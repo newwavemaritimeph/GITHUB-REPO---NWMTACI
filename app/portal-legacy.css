@@ -1,0 +1,557 @@
+/* ==========================================================================
+   Legacy portal class names (portal-shell / portal-page / metric-grid / …)
+   used by components/portal-live-app.tsx.
+
+   The main stylesheet was rewritten around a new set of names, so these are
+   re-implemented here on the same design tokens rather than restored verbatim —
+   the original rules used 7–11px type, which is what made the portal feel
+   unfinished. Sizes here match the rest of the system.
+   ========================================================================== */
+
+.portal-shell {
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.portal-sidebar {
+  position: fixed;
+  z-index: 40;
+  inset: 0 auto 0 0;
+  width: 260px;
+  background: linear-gradient(180deg, #104064, #0c3049);
+  color: #fff;
+  padding: 22px 14px;
+  display: flex;
+  flex-direction: column;
+}
+
+.portal-sidebar nav {
+  overflow: auto;
+  flex: 1;
+}
+
+.portal-sidebar nav button {
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #b9d5e4;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  padding: 0 12px;
+  font-size: 14px;
+  margin: 2px 0;
+}
+
+.portal-sidebar nav button > span {
+  width: 18px;
+  text-align: center;
+  color: #86b6cf;
+  font-size: 15px;
+  flex: 0 0 auto;
+}
+
+.portal-sidebar nav button:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #fff;
+}
+
+.portal-sidebar nav button.active {
+  background: var(--blue);
+  color: #fff;
+  box-shadow: inset 3px 0 var(--orange);
+}
+
+.portal-sidebar nav button.active > span {
+  color: #fff;
+}
+
+.portal-workspace {
+  margin-left: 260px;
+  min-width: 0;
+}
+
+.portal-topbar {
+  height: 68px;
+  background: #fff;
+  border-bottom: 1px solid #e2ecf0;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-page);
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 25;
+}
+
+.top-search {
+  width: min(440px, 40vw);
+  height: 40px;
+  border: 1px solid #dbe7ec;
+  background: #f7fafb;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  color: #7890a0;
+}
+
+.top-search input {
+  border: 0;
+  outline: 0;
+  background: transparent;
+  width: 100%;
+  font-size: 14px;
+}
+
+.user-dot {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #daf4fb;
+  color: var(--blue-dark);
+  font-weight: 700;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+.portal-page {
+  max-width: 1500px;
+  margin: auto;
+  padding: 26px var(--space-page) 56px;
+}
+
+.portal-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+
+.portal-heading h1 {
+  font-size: clamp(24px, 2.6vw, 31px);
+  line-height: 1.16;
+  color: var(--blue-dark);
+  letter-spacing: -0.02em;
+  margin: 4px 0 6px;
+}
+
+.portal-heading p {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 0;
+  max-width: 720px;
+}
+
+.portal-eyebrow {
+  display: block;
+  color: var(--orange-dark);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  margin-bottom: 5px;
+}
+
+.portal-badge {
+  display: inline-flex;
+  width: max-content;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 11px;
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--slate-soft);
+  color: var(--slate);
+  white-space: nowrap;
+}
+
+.portal-badge.green,
+.portal-badge.paid,
+.portal-badge.present,
+.portal-badge.enrolled,
+.portal-badge.verified,
+.portal-badge.released,
+.portal-badge.active {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.portal-badge.orange,
+.portal-badge.pending,
+.portal-badge.partially-paid,
+.portal-badge.open-schedule,
+.portal-badge.pending-attendance,
+.portal-badge.open,
+.portal-badge.full {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
+.portal-badge.blue,
+.portal-badge.ongoing,
+.portal-badge.printed {
+  background: #e8f2ff;
+  color: var(--blue);
+}
+
+.portal-badge.unpaid,
+.portal-badge.cancelled,
+.portal-badge.absent,
+.portal-badge.rejected {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+
+.metric-grid.compact-metrics {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.metric-grid article {
+  background: #fff;
+  border: 1px solid #e3ecf0;
+  border-radius: var(--radius);
+  padding: 16px;
+  min-width: 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.metric-symbol {
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: #e8f2ff;
+  color: var(--blue);
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.metric-symbol.symbol-1 {
+  background: #fff1e7;
+  color: var(--orange-dark);
+}
+.metric-symbol.symbol-2 {
+  background: var(--green-soft);
+  color: var(--green);
+}
+.metric-symbol.symbol-3 {
+  background: var(--cyan-soft);
+  color: #0286ac;
+}
+.metric-symbol.symbol-4 {
+  background: var(--violet-soft);
+  color: var(--violet);
+}
+.metric-symbol.symbol-5 {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.metric-grid article > span,
+.metric-grid article > strong,
+.metric-grid article > small {
+  display: block;
+}
+
+.metric-grid article > span {
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metric-grid article > strong {
+  font-size: 24px;
+  line-height: 1.2;
+  color: var(--blue-dark);
+  margin: 4px 0 3px;
+  letter-spacing: -0.02em;
+}
+
+.metric-grid article > small {
+  font-size: 11.5px;
+  color: #8498a5;
+}
+
+.dashboard-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 20px;
+  align-items: start;
+}
+
+.dashboard-panels > section {
+  padding: 20px 22px;
+}
+
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.panel-heading h2 {
+  font-size: 17px;
+  color: var(--blue-dark);
+  margin: 0;
+}
+
+.panel-heading p {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 3px 0 0;
+}
+
+.panel-heading button {
+  border: 0;
+  background: transparent;
+  color: var(--blue);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.portal-table {
+  overflow: auto;
+}
+
+.portal-table table {
+  width: 100%;
+  min-width: 900px;
+  border-collapse: collapse;
+}
+
+.portal-table th {
+  text-align: left;
+  background: #f7fafb;
+  color: #6d8492;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  padding: 11px 14px;
+  border-bottom: 1px solid #e4edf1;
+  white-space: nowrap;
+}
+
+.portal-table td {
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.portal-table tr:hover td {
+  background: #fafdfe;
+}
+
+.portal-table td strong {
+  display: block;
+  color: var(--blue-dark);
+  font-weight: 600;
+}
+
+.portal-table td small {
+  display: block;
+  font-size: 12px;
+  color: #8da0aa;
+  margin-top: 3px;
+}
+
+.rebate-value {
+  color: var(--green);
+}
+
+.finance-hero {
+  display: grid;
+  grid-template-columns: 1.4fr repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.finance-hero > div {
+  background: linear-gradient(135deg, #0874bc, #123f63);
+  color: #fff;
+  border-radius: var(--radius);
+  padding: 18px;
+}
+
+.finance-hero article {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+
+.finance-hero span,
+.finance-hero strong,
+.finance-hero small {
+  display: block;
+}
+
+.finance-hero span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.finance-hero > div span,
+.finance-hero > div small {
+  color: #b8dae9;
+}
+
+.finance-hero strong {
+  font-size: 18px;
+  color: var(--blue-dark);
+  margin: 5px 0 3px;
+}
+
+.finance-hero > div strong {
+  font-size: 28px;
+  color: #fff;
+  letter-spacing: -0.02em;
+}
+
+.finance-hero small {
+  font-size: 11.5px;
+  color: #8899a5;
+}
+
+.certificate-lock {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--amber-soft);
+  border: 1px solid #f2d5ae;
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  margin-bottom: 18px;
+}
+
+.certificate-lock > span {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  color: var(--orange);
+  flex: 0 0 auto;
+}
+
+.certificate-lock > div {
+  flex: 1;
+}
+
+.certificate-lock strong {
+  display: block;
+  font-size: 15px;
+  color: var(--blue-dark);
+}
+
+.certificate-lock p {
+  font-size: 13px;
+  color: #7d6142;
+  margin: 4px 0 0;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 24px;
+}
+
+.empty-state > span {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: #e4f4fb;
+  color: var(--blue);
+  margin: 0 auto 14px;
+  font-size: 20px;
+}
+
+.empty-state h2 {
+  font-size: 18px;
+  color: var(--blue-dark);
+  margin: 0 0 6px;
+}
+
+.empty-state p {
+  font-size: 14px;
+  color: var(--muted);
+  max-width: 460px;
+  margin: 0 auto 18px;
+}
+
+@media (max-width: 1360px) {
+  .metric-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .finance-hero {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .finance-hero > div {
+    grid-column: span 4;
+  }
+}
+
+@media (max-width: 980px) {
+  .portal-sidebar {
+    transform: translateX(-100%);
+    transition: transform 0.2s ease;
+  }
+  .portal-sidebar.open {
+    transform: none;
+  }
+  .portal-workspace {
+    margin-left: 0;
+  }
+  .dashboard-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .metric-grid,
+  .metric-grid.compact-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+  .finance-hero {
+    grid-template-columns: 1fr 1fr;
+  }
+  .finance-hero > div {
+    grid-column: span 2;
+  }
+  .portal-page {
+    padding: 20px 14px 48px;
+  }
+  .portal-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .top-search {
+    width: auto;
+    flex: 1;
+  }
+}

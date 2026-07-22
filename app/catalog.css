@@ -1,0 +1,8 @@
+.catalog-tabs{display:flex;gap:7px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+.catalog-tabs button{border:0;background:transparent;padding:12px 15px;color:var(--muted);font-size:13px}
+.catalog-tabs button.active{color:var(--blue-dark);font-weight:700;border-bottom:3px solid var(--orange)}
+.catalog-tabs button span{background:#eaf2f6;border-radius:10px;padding:2px 7px;font-size:10px;margin-left:5px}
+.course-code{display:block;color:var(--blue);font-size:10px;margin-top:3px}
+.logo-image-wrap{background:#fff url('/new-wave-logo.png') center 34% / 180% 180% no-repeat}
+.logo-image-wrap img{opacity:0}
+@media(max-width:680px){.catalog-tabs{overflow:auto}.catalog-tabs button{white-space:nowrap;padding:10px}}

@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "./catalog.css";
+import "./portal-legacy.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,19 +22,19 @@ export async function generateMetadata(): Promise<Metadata> {
   const origin = `${protocol}://${host}`;
 
   return {
-    title: "Tara Barko Maritime Operations",
-    description: "Enrollment, payments, and training operations for Tara Barko Maritime Services.",
-    icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
+    title: { default: "New Wave Maritime", template: "%s · New Wave Maritime" },
+    description: "Registration, training, payments, attendance, and learner support from New Wave Maritime Training and Assessment Center, Inc.",
+    icons: { icon: "/new-wave-logo.png", shortcut: "/new-wave-logo.png" },
     openGraph: {
-      title: "Tara Barko Maritime Operations",
-      description: "Enrollments, payments, and training — organized in one maritime operations workspace.",
-      images: [{ url: `${origin}/og.png`, width: 1734, height: 907, alt: "Tara Barko Maritime Operations" }],
+      title: "New Wave Maritime",
+      description: "Ride the New Wave of Maritime Excellence.",
+      images: [{ url: `${origin}/new-wave-social.png`, width: 1200, height: 630, alt: "Ride the New Wave of Maritime Excellence" }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "Tara Barko Maritime Operations",
-      description: "Enrollments, payments, and training in one workspace.",
-      images: [`${origin}/og.png`],
+      title: "New Wave Maritime",
+      description: "Ride the New Wave of Maritime Excellence.",
+      images: [`${origin}/new-wave-social.png`],
     },
   };
 }

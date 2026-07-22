@@ -1,0 +1,9 @@
+import {readFile,writeFile} from "node:fs/promises";
+import {createAcknowledgmentReceiptPdf,createAdmissionPdf,createPaymentInvoicePdf} from "../lib/documents";
+const admission=new Uint8Array(await readFile("public/document-templates/admission-form-reference.png")),terms=new Uint8Array(await readFile("public/document-templates/terms-and-conditions.png")),receipt=new Uint8Array(await readFile("public/document-templates/acknowledgment-receipt-reference.png"));
+const trainee={reference:"REG-2026-000421",traineeNumber:"NWM-2026-000108",firstName:"Juan",middleName:"Santos",lastName:"Dela Cruz",suffix:"Jr.",address:"123 Roxas Boulevard, Ermita, Manila",birthDate:"1995-04-16",placeOfBirth:"Manila",email:"juan.delacruz@example.com",mobile:"0917 123 4567",srn:"SRN-1234567",rank:"Able Seaman",company:"Oceanic Lines",emergencyName:"Maria Dela Cruz",emergencyMobile:"0918 765 4321",course:"Updating Training on Basic Training - PSSR",schedule:"August 3, 2026 - BCH-2026-000012",venue:"New Wave Room 301",termsVersion:"2026-07-03-r01"};
+const payment={invoiceNumber:"INV-2026-000232",receiptNumber:"AR-2026-000232",paymentNumber:"PAY-2026-000232",enrollmentNumber:"ENR-2026-000106",traineeName:"Juan Santos Dela Cruz Jr.",traineeNumber:"NWM-2026-000108",address:trainee.address,course:trainee.course,amountCentavos:250000,totalDueCentavos:500000,totalPaidCentavos:250000,balanceCentavos:250000,method:"GCash",referenceNumber:"1234567890123",receivedAt:"2026-07-23T09:42:00+08:00",cashierName:"Karen Mallari"};
+await writeFile("output/pdf/sample-admission-form.pdf",await createAdmissionPdf(trainee,admission,terms));
+await writeFile("output/pdf/sample-acknowledgment-receipt.pdf",await createAcknowledgmentReceiptPdf(payment,receipt));
+await writeFile("output/pdf/sample-payment-invoice.pdf",await createPaymentInvoicePdf(payment));
+console.log("Rendered official document samples.");
