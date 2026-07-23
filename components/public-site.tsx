@@ -368,6 +368,33 @@ function Contact() {
 
 function StaffLogin() {
   const configured = isSupabaseConfigured() && !isDemoMode();
+  // A deployed site with no Supabase configuration cannot offer the local
+  // workspace, and must not link to /portal, which would bounce straight back.
+  const misconfiguredInProduction = process.env.NODE_ENV === "production" && !isSupabaseConfigured();
+  if (misconfiguredInProduction) {
+    return (
+      <section className="login-page">
+        <div className="login-copy">
+          <span className="eyebrow">Secure staff access</span>
+          <h1>Staff sign-in is unavailable.</h1>
+          <p>
+            This deployment has no database configuration, so staff accounts cannot be verified. Nothing is accessible until
+            it is set.
+          </p>
+        </div>
+        <div className="login-card">
+          <h2>Configuration required</h2>
+          <p>
+            Set <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code> in the hosting
+            environment, then redeploy.
+          </p>
+          <Link className="button button-secondary button-block" href="/">
+            Back to the public website
+          </Link>
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="login-page">
       <div className="login-copy">

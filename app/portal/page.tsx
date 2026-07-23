@@ -8,9 +8,15 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 
 export default async function PortalPage() {
-  // Demo mode, and the case where no Supabase credentials exist at all, both run
-  // the workspace against browser-local records and label themselves on screen.
-  if (isDemoMode() || !isSupabaseConfigured()) return <PortalApp previewMode />;
+  // The unauthenticated browser-local workspace is a development convenience and
+  // must never be reachable from a deployed site. In production a missing
+  // Supabase configuration is a misconfiguration, not an invitation to open the
+  // staff workspace to anyone holding the URL.
+  if (process.env.NODE_ENV === "production") {
+    if (!isSupabaseConfigured()) redirect("/staff-login");
+  } else if (isDemoMode() || !isSupabaseConfigured()) {
+    return <PortalApp previewMode />;
+  }
 
   const supabase = await createSupabaseServerClient();
   const {
