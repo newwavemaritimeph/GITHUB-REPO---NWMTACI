@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/kit";
 import { pesos } from "@/lib/endorsement-catalog";
 import { formatDate, formatDateRange, formatDateTime, fullName, useSystem } from "@/lib/system/store";
-import type { EnrollmentView } from "@/lib/system/types";
+import type { EnrollmentView, RequestType } from "@/lib/system/types";
 import { PageHeader, Panel, StageBadge, StageTrack, type Module } from "./shared";
 
 const filters = ["All", "Unpaid", "Awaiting verification", "Ready for instructions", "In training", "Completed"] as const;
@@ -40,6 +40,7 @@ export function EnrollmentsModule({
     cancelEnrollment,
     createEnrollment,
     addLedgerEntry,
+    createRequest,
   } = useSystem();
   const toast = useToast();
   const [filter, setFilter] = useState<(typeof filters)[number]>("All");
@@ -47,6 +48,10 @@ export function EnrollmentsModule({
   const [openId, setOpenId] = useState<string | null>(focusId ?? null);
   const [payFor, setPayFor] = useState<EnrollmentView | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  // Registration cannot open the Requests module, so changes are raised from here.
+  const [requestFor, setRequestFor] = useState<EnrollmentView | null>(null);
+  const [requestType, setRequestType] = useState<RequestType>("Reschedule");
+  const [requestReason, setRequestReason] = useState("");
 
   const all = views();
   const active = openId ? all.find((item) => item.enrollment.id === openId) : undefined;
@@ -238,8 +243,15 @@ export function EnrollmentsModule({
               >
                 Send instructions
               </button>
-              <button className="secondary-button" onClick={() => go("Attendance")}>
-                Open attendance
+              <button
+                className="secondary-button"
+                onClick={() => {
+                  setRequestFor(active);
+                  setRequestType("Reschedule");
+                  setRequestReason("");
+                }}
+              >
+                Request a change
               </button>
               <button className="secondary-button" onClick={() => go("Certificates")}>
                 Certificate
@@ -322,6 +334,50 @@ export function EnrollmentsModule({
           setPayFor(null);
         }}
       />
+
+      <Modal
+        open={Boolean(requestFor)}
+        title="Request a change"
+        description={requestFor ? `${requestFor.enrollment.reference} · ${requestFor.enrollment.courseName}` : ""}
+        onClose={() => setRequestFor(null)}
+        footer={
+          <>
+            <button className="secondary-button" onClick={() => setRequestFor(null)}>
+              Cancel
+            </button>
+            <button
+              className="primary-button"
+              disabled={requestReason.trim().length < 8}
+              onClick={() => {
+                if (!requestFor) return;
+                const request = createRequest({
+                  type: requestType,
+                  enrollmentId: requestFor.enrollment.id,
+                  traineeName: fullName(requestFor.trainee),
+                  reason: requestReason.trim(),
+                });
+                toast("success", `${request.reference} submitted for approval.`);
+                setRequestFor(null);
+              }}
+            >
+              Submit request
+            </button>
+          </>
+        }
+      >
+        <div className="form-grid">
+          <Field label="What is being requested?" full>
+            <select value={requestType} onChange={(event) => setRequestType(event.target.value as RequestType)}>
+              <option>Reschedule</option>
+              <option>Make-up class</option>
+              <option>Course change</option>
+            </select>
+          </Field>
+          <Field label="Reason" full hint="Approved by Accounting. The reason is kept on the immutable request history.">
+            <textarea rows={4} value={requestReason} onChange={(event) => setRequestReason(event.target.value)} />
+          </Field>
+        </div>
+      </Modal>
 
       <NewEnrollmentModal
         open={newOpen}

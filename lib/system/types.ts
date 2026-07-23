@@ -27,7 +27,15 @@ export type Trainee = {
   emergencyContactName?: string;
   emergencyContactMobile?: string;
   srn?: string;
+  /** Kept in step with the public registration form. */
+  suffix?: string;
+  placeOfBirth?: string;
+  rank?: string;
+  company?: string;
   createdAt: string;
+  /** Set when this record was folded into another on a matching SRN. */
+  mergedIntoTraineeId?: string;
+  mergedAt?: string;
 };
 
 export type BatchStatus = "Draft" | "Open" | "Full" | "Ongoing" | "Completed" | "Cancelled";
@@ -64,6 +72,12 @@ export type Registration = {
   firstName: string;
   middleName?: string;
   lastName: string;
+  /** These mirror the public registration form field for field. */
+  suffix?: string;
+  srn?: string;
+  placeOfBirth?: string;
+  rank?: string;
+  company?: string;
   birthDate: string;
   email: string;
   mobile: string;

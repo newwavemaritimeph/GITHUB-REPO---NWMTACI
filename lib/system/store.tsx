@@ -19,6 +19,7 @@ import {
   type CompletionRequirement,
 } from "@/lib/domain";
 import { IN_HOUSE_COURSES } from "@/lib/in-house-catalog";
+import { chooseSurvivor, findSrnDuplicates, mergeInto } from "@/lib/trainee-identity";
 import { createSeedState, SYSTEM_VERSION } from "./seed";
 import type {
   ActivityEntry,
@@ -580,11 +581,45 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
         const batch = draft.batches.find((item) => item.id === registration.batchId);
         if (!batch) return;
 
-        let trainee = draft.trainees.find(
-          (item) =>
-            item.id === registration.traineeId ||
-            item.email.toLowerCase() === registration.email.toLowerCase(),
-        );
+        // An SRN identifies a seafarer across enrollments, so a matching one is
+        // the same person however their name was typed this time.
+        const srnMatch = registration.srn
+          ? findSrnDuplicates({ id: "incoming", srn: registration.srn }, draft.trainees.map((item) => ({ ...item })))
+          : [];
+        let trainee =
+          (srnMatch.length ? chooseSurvivor(srnMatch) : undefined) ??
+          draft.trainees.find(
+            (item) =>
+              item.id === registration.traineeId ||
+              item.email.toLowerCase() === registration.email.toLowerCase(),
+          );
+
+        // Fold any further SRN matches into the survivor so one seafarer keeps
+        // one record and one trainee number.
+        if (trainee && srnMatch.length > 1) {
+          const survivor = trainee;
+          srnMatch
+            .filter((item) => item.id !== survivor.id)
+            .forEach((duplicate) => {
+              const target = draft.trainees.find((item) => item.id === duplicate.id);
+              if (!target) return;
+              Object.assign(
+                survivor,
+                mergeInto(survivor, target, ["address", "srn", "suffix", "placeOfBirth", "rank", "company", "emergencyContactName", "emergencyContactMobile"]),
+              );
+              draft.enrollments.filter((item) => item.traineeId === target.id).forEach((item) => {
+                item.traineeId = survivor.id;
+              });
+              target.mergedIntoTraineeId = survivor.id;
+              target.mergedAt = new Date().toISOString();
+              log(draft, {
+                action: "Duplicate trainee merged",
+                recordType: "Trainee",
+                recordRef: target.traineeNumber,
+                detail: `Merged into ${survivor.traineeNumber} on matching SRN`,
+              });
+            });
+        }
         if (!trainee) {
           const highest = draft.trainees.reduce((top, item) => {
             const match = /^NWM-(\d{6})$/.exec(item.traineeNumber);
@@ -602,6 +637,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
             address: registration.address,
             emergencyContactName: registration.emergencyContactName,
             emergencyContactMobile: registration.emergencyContactMobile,
+            srn: registration.srn,
             createdAt: new Date().toISOString(),
           };
           draft.trainees.push(trainee);

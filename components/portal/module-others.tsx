@@ -26,6 +26,7 @@ import {
   type ReportRangePreset,
 } from "@/lib/reporting";
 import type { RequestType, Trainee } from "@/lib/system/types";
+import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn } from "@/lib/validation";
 import { PageHeader, Panel, StageBadge, type Module } from "./shared";
 
 /* ---------------------------------------------------------------- trainees */
@@ -36,7 +37,14 @@ export function TraineesModule({ go }: { go: (module: Module) => void }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Trainee | null>(null);
   const [newOpen, setNewOpen] = useState(false);
-  const [draft, setDraft] = useState({ firstName: "", middleName: "", lastName: "", birthDate: "", email: "", mobile: "", address: "" });
+  // Mirrors the public registration form field for field, so a trainee created by
+  // staff carries exactly the same record as one who registered online.
+  const emptyDraft = {
+    firstName: "", middleName: "", lastName: "", suffix: "", srn: "",
+    email: "", address: "", mobile: "", placeOfBirth: "", birthDate: "",
+    rank: "", company: "", emergencyContactName: "", emergencyContactMobile: "",
+  };
+  const [draft, setDraft] = useState(emptyDraft);
 
   const all = views();
   const rows = useMemo(() => {
@@ -175,11 +183,23 @@ export function TraineesModule({ go }: { go: (module: Module) => void }) {
             </button>
             <button
               className="primary-button"
-              disabled={!draft.firstName || !draft.lastName || !draft.email || !draft.mobile || !draft.birthDate}
+              disabled={
+                !draft.firstName || !draft.lastName || !draft.birthDate || !draft.placeOfBirth || !draft.rank ||
+                !draft.address || !draft.emergencyContactName ||
+                !isEmail(draft.email) || !isPhContactNumber(draft.mobile) ||
+                !isPhContactNumber(draft.emergencyContactMobile) ||
+                (draft.srn.trim() !== "" && !isSrn(draft.srn))
+              }
               onClick={() => {
-                const trainee = createTrainee({ ...draft, middleName: draft.middleName || undefined, address: draft.address || undefined });
+                const trainee = createTrainee({
+                  ...draft,
+                  middleName: draft.middleName || undefined,
+                  suffix: draft.suffix || undefined,
+                  srn: draft.srn || undefined,
+                  company: draft.company || undefined,
+                });
                 toast("success", `${trainee.traineeNumber} created.`);
-                setDraft({ firstName: "", middleName: "", lastName: "", birthDate: "", email: "", mobile: "", address: "" });
+                setDraft(emptyDraft);
                 setNewOpen(false);
               }}
             >
@@ -189,26 +209,47 @@ export function TraineesModule({ go }: { go: (module: Module) => void }) {
         }
       >
         <div className="form-grid">
-          <Field label="First name">
+          <Field label="First name*">
             <input value={draft.firstName} onChange={(event) => setDraft({ ...draft, firstName: event.target.value })} />
           </Field>
           <Field label="Middle name">
             <input value={draft.middleName} onChange={(event) => setDraft({ ...draft, middleName: event.target.value })} />
           </Field>
-          <Field label="Last name">
+          <Field label="Last name*">
             <input value={draft.lastName} onChange={(event) => setDraft({ ...draft, lastName: event.target.value })} />
           </Field>
-          <Field label="Birth date">
-            <input type="date" value={draft.birthDate} onChange={(event) => setDraft({ ...draft, birthDate: event.target.value })} />
+          <Field label="Suffix">
+            <input value={draft.suffix} onChange={(event) => setDraft({ ...draft, suffix: event.target.value })} placeholder="Jr., III" />
           </Field>
-          <Field label="Email">
+          <Field label="SRN" hint={draft.srn && !isSrn(draft.srn) ? VALIDATION_MESSAGES.srn : "Exactly 10 digits"}>
+            <input value={draft.srn} onChange={(event) => setDraft({ ...draft, srn: event.target.value })} />
+          </Field>
+          <Field label="Email*" hint={draft.email && !isEmail(draft.email) ? VALIDATION_MESSAGES.email : undefined}>
             <input type="email" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} />
           </Field>
-          <Field label="Mobile">
-            <input value={draft.mobile} onChange={(event) => setDraft({ ...draft, mobile: event.target.value })} />
-          </Field>
-          <Field label="Address" full>
+          <Field label="Present address*" full>
             <input value={draft.address} onChange={(event) => setDraft({ ...draft, address: event.target.value })} />
+          </Field>
+          <Field label="Contact number*" hint={draft.mobile && !isPhContactNumber(draft.mobile) ? VALIDATION_MESSAGES.contact : undefined}>
+            <input value={draft.mobile} onChange={(event) => setDraft({ ...draft, mobile: event.target.value })} placeholder="09XX XXX XXXX" />
+          </Field>
+          <Field label="Place of birth*">
+            <input value={draft.placeOfBirth} onChange={(event) => setDraft({ ...draft, placeOfBirth: event.target.value })} />
+          </Field>
+          <Field label="Date of birth*">
+            <input type="date" value={draft.birthDate} onChange={(event) => setDraft({ ...draft, birthDate: event.target.value })} />
+          </Field>
+          <Field label="Rank*">
+            <input value={draft.rank} onChange={(event) => setDraft({ ...draft, rank: event.target.value })} />
+          </Field>
+          <Field label="Company">
+            <input value={draft.company} onChange={(event) => setDraft({ ...draft, company: event.target.value })} />
+          </Field>
+          <Field label="Emergency contact person*">
+            <input value={draft.emergencyContactName} onChange={(event) => setDraft({ ...draft, emergencyContactName: event.target.value })} />
+          </Field>
+          <Field label="Emergency contact number*" hint={draft.emergencyContactMobile && !isPhContactNumber(draft.emergencyContactMobile) ? VALIDATION_MESSAGES.contact : undefined}>
+            <input value={draft.emergencyContactMobile} onChange={(event) => setDraft({ ...draft, emergencyContactMobile: event.target.value })} />
           </Field>
         </div>
       </Modal>

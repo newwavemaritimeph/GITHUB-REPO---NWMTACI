@@ -123,3 +123,59 @@ certificate eligibility and approved-template upload · accounting, receipts,
 expenses and reconciliation · HR and payroll · reports and exports ·
 Resend configuration for instructor email · launch checklist and final
 acceptance testing.
+
+---
+
+# Role specification — 23 July 2026 (second pass)
+
+## Access control — **Done**
+
+Registration is restricted to Registration, Trainees, Enrollments,
+Courses & centers and Instructions (plus the Dashboard). Schedules, Payments,
+Requests and Reports were removed from that role.
+
+Tension worth confirming: Registration is also meant to raise reschedule,
+make-up and change-of-course requests, but the Requests module is not in its
+allowed list. Resolved by adding a "Request a change" action inside the
+enrollment drawer, so requests can be raised without opening the module.
+
+## Duplicate trainees — **Done**
+
+`lib/trainee-identity.ts` matches on a normalised SRN, exactly and never
+fuzzily. Approving a registration folds SRN matches into the earliest record so
+one seafarer keeps one trainee number; blank fields are filled from the
+duplicate and confirmed values are never overwritten. Shared email or mobile is
+surfaced for review but never merged automatically, since households and
+agencies legitimately share both.
+
+## Trainee fields — **Done**
+
+The staff "New trainee" form now mirrors the public registration form field for
+field: first, middle, last, suffix, SRN, email, present address, contact number,
+place of birth, date of birth, rank, company, emergency contact person and
+number, with the same format validation.
+
+## Open per role
+
+**Registration** — ID and 2x2 photo upload on enrollment (for certificate
+printing) · admission slip in New Wave format, soft and hard copy · training
+instructions sent automatically once enrolled and paid · instruction templates
+per course, and per course *and* training centre for endorsements · feedback
+monitoring for in-house certificate tracking.
+
+**Cashier** — payment invoice issuance · bank and GCash reconciliation ·
+refund, cancellation and discount requests · other charges (make-up classes,
+T-shirt, reprinting, change of course, rescheduling) · automated email
+follow-up for pending balances.
+
+**Training Operations** — MARINA MISMO encoding · automated certificate
+printing from an approved sample format.
+
+**Accounting** — daily sales and expense summary · approval of rescheduling,
+make-up, change of course and cancellation together with their payments ·
+expense category management.
+
+**HR** — payroll · leave, absence, lates and attendance · payslip issuance ·
+certificate of employment · SSS, Pag-IBIG and PhilHealth benefits · employee
+charge reporting, such as reprinting or a reschedule caused by registration
+error.
