@@ -95,6 +95,10 @@ export type Enrollment = {
   instructionsSentAt?: string;
   instructionsAcknowledgedAt?: string;
   cancelledReason?: string;
+  /** New Wave courses gate certificate printing on one of these two. */
+  feedbackFormCompletedAt?: string;
+  completionProofFileName?: string;
+  completionProofUploadedAt?: string;
 };
 
 export type LedgerType = "charge" | "payment" | "discount" | "refund" | "reversal";

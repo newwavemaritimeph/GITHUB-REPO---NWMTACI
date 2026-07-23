@@ -555,3 +555,10 @@
     flex: 1;
   }
 }
+
+/* Upload control styled as a ghost button */
+.upload-button {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}

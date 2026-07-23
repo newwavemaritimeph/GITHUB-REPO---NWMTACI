@@ -17,6 +17,14 @@ import {
 import { ENDORSEMENT_OFFERS, ENDORSEMENT_SUMMARY, PARTNER_CENTERS, pesos } from "@/lib/endorsement-catalog";
 import { IN_HOUSE_COURSES } from "@/lib/in-house-catalog";
 import { formatDate, formatDateRange, formatDateTime, fullName, todayIso, useSystem } from "@/lib/system/store";
+import {
+  REPORT_RANGES,
+  describeRange,
+  resolveRange,
+  withinRange,
+  type DateRange,
+  type ReportRangePreset,
+} from "@/lib/reporting";
 import type { RequestType, Trainee } from "@/lib/system/types";
 import { PageHeader, Panel, StageBadge, type Module } from "./shared";
 
@@ -891,33 +899,42 @@ export function ReportsModule() {
   const toast = useToast();
   const all = views();
 
+  // Every report is bound to a period. An unbounded export is what makes two
+  // people quoting "the collections report" disagree about the number.
+  const [preset, setPreset] = useState<ReportRangePreset>("This month");
+  const [custom, setCustom] = useState<DateRange>({ from: todayIso(), to: todayIso() });
+  const range = resolveRange(preset, todayIso(), custom);
+  const inRange = (value?: string | null) => withinRange(value, range);
+
   const reports = [
     {
       title: "Enrollment register",
-      description: "Every enrollment with trainee, batch, charges, payments, balance, and stage.",
+      description: "Enrollments created in the period, with charges, payments, balance, and stage.",
       rows: () => [
         ["Enrollment", "Trainee", "Trainee number", "Course", "Batch", "Charged", "Paid", "Balance", "Payment status", "Stage"],
-        ...all.map((item) => [
-          item.enrollment.reference,
-          fullName(item.trainee),
-          item.trainee.traineeNumber,
-          item.enrollment.courseName,
-          item.batch?.batchNumber ?? "",
-          (item.dueCentavos / 100).toFixed(2),
-          (item.paidCentavos / 100).toFixed(2),
-          (item.balanceCentavos / 100).toFixed(2),
-          item.paymentStatus,
-          item.stage,
-        ]),
+        ...all
+          .filter((item) => inRange(item.enrollment.createdAt))
+          .map((item) => [
+            item.enrollment.reference,
+            fullName(item.trainee),
+            item.trainee.traineeNumber,
+            item.enrollment.courseName,
+            item.batch?.batchNumber ?? "",
+            (item.dueCentavos / 100).toFixed(2),
+            (item.paidCentavos / 100).toFixed(2),
+            (item.balanceCentavos / 100).toFixed(2),
+            item.paymentStatus,
+            item.stage,
+          ]),
       ],
     },
     {
       title: "Collections report",
-      description: "All payments with method, verification state, receipt, and posting time.",
+      description: "Payments received in the period, with method, verification state, and receipt.",
       rows: () => [
         ["Payment", "Enrollment", "Method", "Reference", "Amount", "Verification", "Receipt", "Recorded at", "Recorded by"],
         ...state.ledger
-          .filter((entry) => entry.type === "payment")
+          .filter((entry) => entry.type === "payment" && inRange(entry.recordedAt))
           .map((entry) => [
             entry.reference,
             state.enrollments.find((item) => item.id === entry.enrollmentId)?.reference ?? "",
@@ -933,34 +950,38 @@ export function ReportsModule() {
     },
     {
       title: "Attendance summary",
-      description: "Per-session attendance status for every enrolled trainee.",
+      description: "Per-session attendance for training days falling in the period.",
       rows: () => [
         ["Batch", "Session", "Date", "Trainee", "Status", "Method", "Checked in", "Checked out"],
-        ...state.attendanceRecords.map((record) => {
-          const session = state.attendanceSessions.find((item) => item.id === record.sessionId);
-          const enrollment = state.enrollments.find((item) => item.id === record.enrollmentId);
-          const trainee = state.trainees.find((item) => item.id === enrollment?.traineeId);
-          const batch = state.batches.find((item) => item.id === session?.batchId);
-          return [
-            batch?.batchNumber ?? "",
-            session?.name ?? "",
-            session?.sessionDate ?? "",
-            trainee ? fullName(trainee) : "",
-            record.status,
-            record.method,
-            record.checkedInAt ?? "",
-            record.checkedOutAt ?? "",
-          ];
-        }),
+        ...state.attendanceRecords
+          .filter((record) => inRange(state.attendanceSessions.find((item) => item.id === record.sessionId)?.sessionDate))
+          .map((record) => {
+            const session = state.attendanceSessions.find((item) => item.id === record.sessionId);
+            const enrollment = state.enrollments.find((item) => item.id === record.enrollmentId);
+            const trainee = state.trainees.find((item) => item.id === enrollment?.traineeId);
+            const batch = state.batches.find((item) => item.id === session?.batchId);
+            return [
+              batch?.batchNumber ?? "",
+              session?.name ?? "",
+              session?.sessionDate ?? "",
+              trainee ? fullName(trainee) : "",
+              record.status,
+              record.method,
+              record.checkedInAt ?? "",
+              record.checkedOutAt ?? "",
+            ];
+          }),
       ],
     },
     {
       title: "Certificate register",
-      description: "Certificate numbers, print and release history for completion records.",
+      description: "Certificates printed or released in the period.",
       rows: () => [
         ["Certificate", "Trainee", "Course", "Status", "Printed", "Released", "Released to"],
+        // Only real issuance events count. `updatedAt` is touched by every
+        // reconciliation pass, so it would pull in untouched certificates.
         ...all
-          .filter((item) => item.certificate)
+          .filter((item) => inRange(item.certificate?.releasedAt ?? item.certificate?.printedAt))
           .map((item) => [
             item.certificate?.certificateNumber ?? "Not assigned",
             fullName(item.trainee),
@@ -974,63 +995,99 @@ export function ReportsModule() {
     },
     {
       title: "Audit trail",
-      description: "Every recorded action with actor, record reference, and timestamp.",
+      description: "Actions recorded in the period, with actor and record reference.",
       rows: () => [
         ["When", "Actor", "Action", "Record type", "Reference", "Detail"],
-        ...state.activity.map((entry) => [entry.createdAt, entry.actor, entry.action, entry.recordType, entry.recordRef, entry.detail ?? ""]),
+        ...state.activity
+          .filter((entry) => inRange(entry.createdAt))
+          .map((entry) => [entry.createdAt, entry.actor, entry.action, entry.recordType, entry.recordRef, entry.detail ?? ""]),
       ],
     },
   ];
+
+  const activity = state.activity.filter((entry) => inRange(entry.createdAt));
 
   return (
     <div className="page">
       <PageHeader
         eyebrow="Audited exports"
         title="Reports"
-        description="Every report is generated from live records and downloads as a spreadsheet-ready CSV."
+        description="Every report is generated from live records for a chosen period and downloads as a spreadsheet-ready CSV."
       />
 
+      <Panel padded={false}>
+        <div className="toolbar toolbar-wrap">
+          <Segmented options={REPORT_RANGES} value={preset} onChange={setPreset} />
+          {preset === "Custom" && (
+            <>
+              <label className="inline-field">
+                <span>From</span>
+                <input type="date" value={custom.from} onChange={(event) => setCustom({ ...custom, from: event.target.value })} />
+              </label>
+              <label className="inline-field">
+                <span>To</span>
+                <input type="date" value={custom.to} onChange={(event) => setCustom({ ...custom, to: event.target.value })} />
+              </label>
+            </>
+          )}
+          <div className="toolbar-end total-block">
+            <span>Reporting period</span>
+            <strong>{describeRange(range)}</strong>
+          </div>
+        </div>
+      </Panel>
+
       <div className="report-grid">
-        {reports.map((report) => (
-          <article key={report.title} className="report-card">
-            <h3>{report.title}</h3>
-            <p>{report.description}</p>
-            <div className="report-foot">
-              <span>{Math.max(0, report.rows().length - 1)} rows</span>
-              <button
-                className="secondary-button"
-                onClick={() => {
-                  downloadCsv(`${report.title.toLowerCase().replaceAll(" ", "-")}-${todayIso()}.csv`, report.rows());
-                  toast("success", `${report.title} exported.`);
-                }}
-              >
-                Download CSV
-              </button>
-            </div>
-          </article>
-        ))}
+        {reports.map((report) => {
+          const count = Math.max(0, report.rows().length - 1);
+          return (
+            <article key={report.title} className="report-card">
+              <h3>{report.title}</h3>
+              <p>{report.description}</p>
+              <div className="report-foot">
+                <span>{count} row{count === 1 ? "" : "s"}</span>
+                <button
+                  className="secondary-button"
+                  disabled={count === 0}
+                  onClick={() => {
+                    downloadCsv(
+                      `${report.title.toLowerCase().replaceAll(" ", "-")}-${range.from}-to-${range.to}.csv`,
+                      report.rows(),
+                    );
+                    toast("success", `${report.title} exported for ${describeRange(range)}.`);
+                  }}
+                >
+                  {count === 0 ? "Nothing in period" : "Download CSV"}
+                </button>
+              </div>
+            </article>
+          );
+        })}
       </div>
 
-      <Panel title="Recent activity" description="The audit trail behind every export" padded={false}>
-        <DataTable columns={["When", "Action", "Record", "Reference", "Actor"]}>
-          {state.activity.slice(0, 25).map((entry) => (
-            <tr key={entry.id}>
-              <td>{formatDateTime(entry.createdAt)}</td>
-              <td>
-                <strong>{entry.action}</strong>
-                {entry.detail && <small>{entry.detail}</small>}
-              </td>
-              <td>{entry.recordType}</td>
-              <td>{entry.recordRef}</td>
-              <td>{entry.actor}</td>
-            </tr>
-          ))}
-        </DataTable>
+      <Panel title="Activity in this period" description={describeRange(range)} padded={false}>
+        {activity.length === 0 ? (
+          <EmptyState title="No activity in this period" text="Choose a wider reporting period to see recorded actions." />
+        ) : (
+          <DataTable columns={["When", "Action", "Record", "Reference", "Actor"]}>
+            {activity.slice(0, 25).map((entry) => (
+              <tr key={entry.id}>
+                <td>{formatDateTime(entry.createdAt)}</td>
+                <td>
+                  <strong>{entry.action}</strong>
+                  {entry.detail && <small>{entry.detail}</small>}
+                </td>
+                <td>{entry.recordType}</td>
+                <td>{entry.recordRef}</td>
+                <td>{entry.actor}</td>
+              </tr>
+            ))}
+          </DataTable>
+        )}
       </Panel>
     </div>
   );
 }
-
 /* ---------------------------------------------------------------- settings */
 
 export function SettingsModule() {

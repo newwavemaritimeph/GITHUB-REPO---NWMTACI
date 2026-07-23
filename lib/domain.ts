@@ -45,6 +45,22 @@ export function suggestAttendanceStatus(input: {
   return input.checkedInAt.getTime() > lateAt ? "Late" : "Present";
 }
 
+/**
+ * Courses New Wave delivers itself carry an extra completion step: the trainee
+ * must either finish the feedback form or upload the required screenshot before
+ * a certificate may be printed. Endorsed partner courses are not gated this way.
+ */
+export type CompletionRequirement = {
+  isNewWaveCourse: boolean;
+  feedbackFormCompleted: boolean;
+  completionProofUploaded: boolean;
+};
+
+export function isCompletionRequirementMet(requirement: CompletionRequirement): boolean {
+  if (!requirement.isNewWaveCourse) return true;
+  return requirement.feedbackFormCompleted || requirement.completionProofUploaded;
+}
+
 export function isCertificateEligible(input: {
   attendance: readonly AttendanceStatus[];
   instructorSubmitted: boolean;
@@ -52,9 +68,12 @@ export function isCertificateEligible(input: {
   templateActive: boolean;
   certificateNumberAvailable: boolean;
   legalNameConfirmed: boolean;
+  /** Omitted for records created before the completion step existed. */
+  completion?: CompletionRequirement;
 }): boolean {
   const complete = input.attendance.length > 0 && input.attendance.every((status) => ["Present", "Late", "Make-Up Completed"].includes(status));
-  return complete && input.instructorSubmitted && input.operationsVerified && input.templateActive && input.certificateNumberAvailable && input.legalNameConfirmed;
+  const completionMet = input.completion ? isCompletionRequirementMet(input.completion) : true;
+  return complete && input.instructorSubmitted && input.operationsVerified && input.templateActive && input.certificateNumberAvailable && input.legalNameConfirmed && completionMet;
 }
 
 export function generateReference(prefix: string, sequence: number, year = new Date().getFullYear()) {

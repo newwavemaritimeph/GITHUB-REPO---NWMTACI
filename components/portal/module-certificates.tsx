@@ -2,14 +2,64 @@
 
 import { useMemo, useState } from "react";
 import { DataTable, EmptyState, Modal, Pill, SearchInput, Segmented, StatCard, useToast } from "@/components/ui/kit";
-import { formatDate, formatDateTime, fullName, useSystem } from "@/lib/system/store";
+import { completionRequirementOf, formatDate, formatDateTime, fullName, useSystem } from "@/lib/system/store";
 import type { EnrollmentView } from "@/lib/system/types";
 import { PageHeader, Panel, type Module } from "./shared";
 
 const filters = ["Ready", "Pending", "Printed", "Released", "All"] as const;
 
+/**
+ * New Wave's own courses only print once the trainee has completed the feedback
+ * form or uploaded the required screenshot. Endorsed partner courses skip this.
+ */
+function CompletionCell({
+  item,
+  onRecord,
+}: {
+  item: EnrollmentView;
+  onRecord: (input: { feedbackForm?: boolean; proofFileName?: string }) => void;
+}) {
+  const requirement = completionRequirementOf(item.enrollment);
+  if (!requirement.isNewWaveCourse) return <span className="muted-text">Not required</span>;
+
+  const done = requirement.feedbackFormCompleted || requirement.completionProofUploaded;
+  if (done) {
+    return (
+      <>
+        <Pill tone="green">Complete</Pill>
+        <small>
+          {requirement.feedbackFormCompleted ? "Feedback form" : item.enrollment.completionProofFileName ?? "Proof uploaded"}
+        </small>
+      </>
+    );
+  }
+  return (
+    <>
+      <Pill tone="amber">Waiting</Pill>
+      <div className="cell-actions">
+        <button className="ghost-button" onClick={() => onRecord({ feedbackForm: true })}>
+          Feedback done
+        </button>
+        <label className="ghost-button upload-button">
+          Upload proof
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            hidden
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) onRecord({ proofFileName: file.name });
+              event.target.value = "";
+            }}
+          />
+        </label>
+      </div>
+    </>
+  );
+}
+
 export function CertificatesModule({ go }: { go: (module: Module) => void }) {
-  const { state, views, printCertificate, releaseCertificate, updateSettings } = useSystem();
+  const { state, views, printCertificate, releaseCertificate, updateSettings, recordCompletionStep } = useSystem();
   const toast = useToast();
   const [filter, setFilter] = useState<(typeof filters)[number]>("Ready");
   const [query, setQuery] = useState("");
@@ -101,7 +151,10 @@ export function CertificatesModule({ go }: { go: (module: Module) => void }) {
             text="A certificate becomes ready once every attendance session of the batch is verified and the template is approved."
           />
         ) : (
-          <DataTable columns={["Trainee", "Course & batch", "Attendance", "Certificate number", "Status", ""]} minWidth={1000}>
+          <DataTable
+            columns={["Trainee", "Course & batch", "Attendance", "Completion step", "Certificate number", "Status", ""]}
+            minWidth={1180}
+          >
             {rows.map((item) => {
               const status = item.certificate?.status ?? "Pending Attendance";
               const recorded = item.attendance.filter((entry) => entry.record).length;
@@ -118,6 +171,15 @@ export function CertificatesModule({ go }: { go: (module: Module) => void }) {
                   <td>
                     {recorded}/{item.attendance.length} recorded
                     <small>{item.attendanceComplete ? "Complete" : (item.certificate?.blockedReason ?? "In progress")}</small>
+                  </td>
+                  <td>
+                    <CompletionCell
+                      item={item}
+                      onRecord={(input) => {
+                        recordCompletionStep({ enrollmentId: item.enrollment.id, ...input });
+                        toast("success", input.feedbackForm ? "Feedback form marked complete." : "Completion proof recorded.");
+                      }}
+                    />
                   </td>
                   <td>
                     <strong>{item.certificate?.certificateNumber ?? "Not assigned"}</strong>

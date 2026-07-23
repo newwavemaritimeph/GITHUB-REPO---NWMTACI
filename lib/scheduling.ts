@@ -29,6 +29,59 @@ export function validBatchStart(code: string, durationLabel: string, start: stri
   return day === 1;
 }
 
+/* ------------------------------------------------- automatic batch opening */
+
+export type PlannedBatch = { startsOn: string; endsOn: string };
+
+function addDays(iso: string, days: number) {
+  const cursor = new Date(`${iso}T00:00:00Z`);
+  cursor.setUTCDate(cursor.getUTCDate() + days);
+  return cursor.toISOString().slice(0, 10);
+}
+
+/**
+ * The next `count` dates on or after `from` that satisfy the course's start
+ * pattern. Used to open New Wave batches ahead of time without anyone picking
+ * dates by hand.
+ */
+export function nextBatchStarts(code: string, durationLabel: string, from: string, count: number): string[] {
+  if (!from || count <= 0) return [];
+  const starts: string[] = [];
+  let cursor = from;
+  // A start pattern repeats weekly, so a valid date always appears within seven
+  // days. The extra headroom simply stops a malformed pattern looping forever.
+  for (let step = 0; step < count * 14 + 14 && starts.length < count; step += 1) {
+    if (validBatchStart(code, durationLabel, cursor)) starts.push(cursor);
+    cursor = addDays(cursor, 1);
+  }
+  return starts;
+}
+
+/**
+ * Opens a schedule for a course.
+ *
+ * New Wave's own courses follow their weekly start pattern and have their end
+ * date derived from the duration, skipping Sundays. Endorsed partner courses
+ * have no New Wave pattern — the chosen date is used exactly as picked.
+ */
+export function planBatches(input: {
+  code: string;
+  durationLabel: string;
+  from: string;
+  count?: number;
+  endorsed?: boolean;
+}): PlannedBatch[] {
+  const { code, durationLabel, from, count = 1, endorsed = false } = input;
+  if (!from) return [];
+  if (endorsed) {
+    return [{ startsOn: from, endsOn: automaticEndDate(from, durationLabel) }];
+  }
+  return nextBatchStarts(code, durationLabel, from, count).map((startsOn) => ({
+    startsOn,
+    endsOn: automaticEndDate(startsOn, durationLabel),
+  }));
+}
+
 export function batchPatternLabel(code: string, durationLabel: string) {
   if (code === "STPPDSPPS") return "Safety begins every Monday.";
   if (code === "PSCMT") return "Crowd runs Tuesday–Wednesday.";

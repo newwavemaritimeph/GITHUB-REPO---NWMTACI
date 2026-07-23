@@ -13,9 +13,12 @@ import {
 import {
   derivePaymentStatus,
   isCertificateEligible,
+  isCompletionRequirementMet,
   suggestAttendanceStatus,
   type AttendanceStatus,
+  type CompletionRequirement,
 } from "@/lib/domain";
+import { IN_HOUSE_COURSES } from "@/lib/in-house-catalog";
 import { createSeedState, SYSTEM_VERSION } from "./seed";
 import type {
   ActivityEntry,
@@ -34,7 +37,7 @@ import type {
   Trainee,
 } from "./types";
 
-const STORAGE_KEY = "new-wave-system-v3";
+const STORAGE_KEY = "new-wave-system-v4";
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -108,6 +111,19 @@ function sessionsOfBatch(state: SystemState, batchId: string) {
     .sort((left, right) => left.dayNumber - right.dayNumber);
 }
 
+/** Courses New Wave delivers itself, as opposed to endorsed partner offers. */
+function isNewWaveCourse(courseCode: string) {
+  return IN_HOUSE_COURSES.some((course) => course.code === courseCode);
+}
+
+export function completionRequirementOf(enrollment: Enrollment): CompletionRequirement {
+  return {
+    isNewWaveCourse: isNewWaveCourse(enrollment.courseCode),
+    feedbackFormCompleted: Boolean(enrollment.feedbackFormCompletedAt),
+    completionProofUploaded: Boolean(enrollment.completionProofUploadedAt),
+  };
+}
+
 function certificateEligibility(state: SystemState, enrollment: Enrollment) {
   const sessions = sessionsOfBatch(state, enrollment.batchId);
   const records = sessions.map((session) =>
@@ -127,6 +143,7 @@ function certificateEligibility(state: SystemState, enrollment: Enrollment) {
       templateActive: state.settings.certificateTemplateApproved && state.settings.certificateIssuanceEnabled,
       certificateNumberAvailable: true,
       legalNameConfirmed: true,
+      completion: completionRequirementOf(enrollment),
     }),
     attendanceComplete:
       everySessionRecorded &&
@@ -139,6 +156,9 @@ function certificateBlockReason(state: SystemState, enrollment: Enrollment) {
   if (sessions.length === 0) return "No attendance sessions scheduled yet.";
   if (!attendanceComplete) return "Attendance is incomplete or has make-up requirements.";
   if (!sessions.every((session) => session.state === "Verified")) return "Training Operations has not verified all sessions.";
+  if (!isCompletionRequirementMet(completionRequirementOf(enrollment))) {
+    return "The trainee must complete the feedback form or upload the required screenshot.";
+  }
   if (!state.settings.certificateTemplateApproved) return "No approved certificate template.";
   if (!state.settings.certificateIssuanceEnabled) return "Certificate issuance is switched off in Settings.";
   return undefined;
@@ -241,6 +261,7 @@ type SystemContextValue = {
   setSessionState: (id: string, state: AttendanceSession["state"]) => void;
   markAttendance: (input: { sessionId: string; enrollmentId: string; status: AttendanceStatus; method?: "QR" | "Manual"; manualReason?: string }) => void;
   scanAttendance: (input: { sessionId: string; enrollmentId: string; scanType: "check-in" | "check-out" }) => { ok: boolean; message: string };
+  recordCompletionStep: (input: { enrollmentId: string; feedbackForm?: boolean; proofFileName?: string }) => void;
   /* certificates */
   printCertificate: (enrollmentId: string) => void;
   releaseCertificate: (enrollmentId: string, recipient: string) => void;
@@ -1000,6 +1021,28 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     [actor, log, state.attendanceRecords, state.attendanceSessions, update],
   );
 
+  const recordCompletionStep = useCallback<SystemContextValue["recordCompletionStep"]>(
+    ({ enrollmentId, feedbackForm, proofFileName }) => {
+      update((draft) => {
+        const enrollment = draft.enrollments.find((item) => item.id === enrollmentId);
+        if (!enrollment) return;
+        const now = new Date().toISOString();
+        if (feedbackForm) enrollment.feedbackFormCompletedAt = now;
+        if (proofFileName) {
+          enrollment.completionProofFileName = proofFileName;
+          enrollment.completionProofUploadedAt = now;
+        }
+        log(draft, {
+          action: feedbackForm ? "Feedback form completed" : "Completion proof uploaded",
+          recordType: "Enrollment",
+          recordRef: enrollment.reference,
+          detail: proofFileName,
+        });
+      });
+    },
+    [log, update],
+  );
+
   const printCertificate = useCallback<SystemContextValue["printCertificate"]>(
     (enrollmentId) => {
       update((draft) => {
@@ -1251,6 +1294,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       setSessionState,
       markAttendance,
       scanAttendance,
+      recordCompletionStep,
       printCertificate,
       releaseCertificate,
       createRequest,
@@ -1290,6 +1334,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       printCertificate,
       publishBatch,
       ready,
+      recordCompletionStep,
       recordPayment,
       releaseCertificate,
       resetSystem,

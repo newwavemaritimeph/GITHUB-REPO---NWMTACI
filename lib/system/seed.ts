@@ -10,7 +10,7 @@ import type {
   Trainee,
 } from "./types";
 
-export const SYSTEM_VERSION = 3;
+export const SYSTEM_VERSION = 4;
 
 function startOfToday() {
   const now = new Date();
@@ -51,6 +51,11 @@ function makeBatch(input: {
   published: boolean;
 }): Batch {
   const course = courseByCode(input.code);
+  // Every seeded code must exist in the catalog, otherwise the course reads as an
+  // endorsed partner offer and skips the New Wave completion gate.
+  if (!course && process.env.NODE_ENV !== "production") {
+    console.warn(`Seed batch ${input.batchNumber} uses course code "${input.code}", which is not in the catalog.`);
+  }
   return {
     id: input.id,
     batchNumber: input.batchNumber,
@@ -109,23 +114,23 @@ export function createSeedState(): SystemState {
   ];
 
   const batches: Batch[] = [
-    makeBatch({ id: "b1", batchNumber: "BT-2026-070", code: "BT", centerName: "New Wave Maritime", startOffset: -24, days: 10, capacity: 24, instructor: "Capt. Ruel Aquino", venue: "Room 301", status: "Completed", published: true }),
-    makeBatch({ id: "b2", batchNumber: "AFF-2026-072", code: "AFF", centerName: "New Wave Maritime", startOffset: -8, days: 5, capacity: 20, instructor: "Engr. Dan Cruz", venue: "Training yard", status: "Completed", published: true }),
-    makeBatch({ id: "b3", batchNumber: "MEFA-2026-074", code: "MEFA", centerName: "New Wave Maritime", startOffset: -2, days: 4, capacity: 18, instructor: "Dr. Vina Lopez", venue: "Room 205", status: "Ongoing", published: true }),
+    makeBatch({ id: "b1", batchNumber: "CCMI-2026-070", code: "CCMI", centerName: "New Wave Maritime", startOffset: -24, days: 6, capacity: 24, instructor: "Capt. Ruel Aquino", venue: "Room 301", status: "Completed", published: true }),
+    makeBatch({ id: "b2", batchNumber: "PSCMHBT-2026-072", code: "PSCMHBT", centerName: "New Wave Maritime", startOffset: -8, days: 3, capacity: 20, instructor: "Engr. Dan Cruz", venue: "Training yard", status: "Completed", published: true }),
+    makeBatch({ id: "b3", batchNumber: "CCMD-2026-074", code: "CCMD", centerName: "New Wave Maritime", startOffset: -2, days: 4, capacity: 18, instructor: "Dr. Vina Lopez", venue: "Room 205", status: "Ongoing", published: true }),
     makeBatch({ id: "b4", batchNumber: "SSO-2026-081", code: "SSO", centerName: "New Wave Maritime", startOffset: 6, days: 3, capacity: 22, instructor: "Capt. Ruel Aquino", venue: "Room 301", status: "Open", published: true }),
-    makeBatch({ id: "b5", batchNumber: "BT-2026-083", code: "BT", centerName: "New Wave Maritime", startOffset: 12, days: 10, capacity: 24, instructor: "Capt. Ruel Aquino", venue: "Room 301", status: "Open", published: true }),
+    makeBatch({ id: "b5", batchNumber: "CCMI-2026-083", code: "CCMI", centerName: "New Wave Maritime", startOffset: 12, days: 6, capacity: 24, instructor: "Capt. Ruel Aquino", venue: "Room 301", status: "Open", published: true }),
     makeBatch({ id: "b6", batchNumber: "SATSDSD-2026-085", code: "SATSDSD", centerName: "New Wave Maritime", startOffset: 9, days: 1, capacity: 30, instructor: "Mr. Alvin Reyes", venue: "Room 102", status: "Open", published: true }),
     makeBatch({ id: "b7", batchNumber: "PSCMT-2026-087", code: "PSCMT", centerName: "New Wave Maritime", startOffset: 18, days: 2, capacity: 25, instructor: "Ms. Karen Diaz", venue: "Room 205", status: "Open", published: true }),
-    makeBatch({ id: "b8", batchNumber: "AFF-2026-090", code: "AFF", centerName: "New Wave Maritime", startOffset: 25, days: 5, capacity: 20, instructor: "Engr. Dan Cruz", venue: "Training yard", status: "Draft", published: false }),
+    makeBatch({ id: "b8", batchNumber: "PSCMHBT-2026-090", code: "PSCMHBT", centerName: "New Wave Maritime", startOffset: 25, days: 3, capacity: 20, instructor: "Engr. Dan Cruz", venue: "Training yard", status: "Draft", published: false }),
     makeBatch({ id: "b9", batchNumber: "CCMI-2026-092", code: "CCMI", centerName: "New Wave Maritime", startOffset: 33, days: 6, capacity: 16, instructor: "Capt. Ruel Aquino", venue: "Room 301", status: "Open", published: true }),
   ];
 
   const enrollments: Enrollment[] = [
-    { id: "e1", reference: "ENR-2026-000101", traineeId: "t1", batchId: "b1", courseCode: "BT", courseName: batches[0].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-40, 10), registrationReference: "REG-2026-000201", instructionsSentAt: stamp(-32, 9), instructionsAcknowledgedAt: stamp(-31, 20) },
-    { id: "e2", reference: "ENR-2026-000102", traineeId: "t2", batchId: "b2", courseCode: "AFF", courseName: batches[1].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-30, 11), registrationReference: "REG-2026-000202", instructionsSentAt: stamp(-14, 9), instructionsAcknowledgedAt: stamp(-13, 21) },
-    { id: "e3", reference: "ENR-2026-000103", traineeId: "t4", batchId: "b3", courseCode: "MEFA", courseName: batches[2].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-18, 15), registrationReference: "REG-2026-000203", instructionsSentAt: stamp(-8, 9), instructionsAcknowledgedAt: stamp(-7, 19) },
+    { id: "e1", reference: "ENR-2026-000101", traineeId: "t1", batchId: "b1", courseCode: "CCMI", courseName: batches[0].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-40, 10), registrationReference: "REG-2026-000201", instructionsSentAt: stamp(-32, 9), instructionsAcknowledgedAt: stamp(-31, 20) },
+    { id: "e2", reference: "ENR-2026-000102", traineeId: "t2", batchId: "b2", courseCode: "PSCMHBT", courseName: batches[1].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-30, 11), registrationReference: "REG-2026-000202", instructionsSentAt: stamp(-14, 9), instructionsAcknowledgedAt: stamp(-13, 21) },
+    { id: "e3", reference: "ENR-2026-000103", traineeId: "t4", batchId: "b3", courseCode: "CCMD", courseName: batches[2].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-18, 15), registrationReference: "REG-2026-000203", instructionsSentAt: stamp(-8, 9), instructionsAcknowledgedAt: stamp(-7, 19) },
     { id: "e4", reference: "ENR-2026-000104", traineeId: "t5", batchId: "b4", courseCode: "SSO", courseName: batches[3].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-10, 9), registrationReference: "REG-2026-000204", instructionsSentAt: stamp(-3, 9) },
-    { id: "e5", reference: "ENR-2026-000105", traineeId: "t6", batchId: "b5", courseCode: "BT", courseName: batches[4].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-6, 14), registrationReference: "REG-2026-000205" },
+    { id: "e5", reference: "ENR-2026-000105", traineeId: "t6", batchId: "b5", courseCode: "CCMI", courseName: batches[4].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-6, 14), registrationReference: "REG-2026-000205" },
     { id: "e6", reference: "ENR-2026-000106", traineeId: "t3", batchId: "b6", courseCode: "SATSDSD", courseName: batches[5].courseName, centerName: "New Wave Maritime", status: "Pending", createdAt: stamp(-2, 11), registrationReference: "REG-2026-000206" },
     { id: "e7", reference: "ENR-2026-000107", traineeId: "t7", batchId: "b7", courseCode: "PSCMT", courseName: batches[6].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-1, 16), registrationReference: "REG-2026-000207" },
   ];
@@ -211,7 +216,7 @@ export function createSeedState(): SystemState {
     });
 
   const certificates: Certificate[] = [
-    { id: "cert1", enrollmentId: "e1", status: "Released", certificateNumber: "NWM-BT-2026-000118", printedAt: stamp(-12, 10), releasedAt: stamp(-10, 14), releasedTo: "Juan Dela Cruz", reprintCount: 0, updatedAt: stamp(-10, 14) },
+    { id: "cert1", enrollmentId: "e1", status: "Released", certificateNumber: "NWM-CCMI-2026-000118", printedAt: stamp(-12, 10), releasedAt: stamp(-10, 14), releasedTo: "Juan Dela Cruz", reprintCount: 0, updatedAt: stamp(-10, 14) },
     { id: "cert2", enrollmentId: "e2", status: "Pending Attendance", reprintCount: 0, updatedAt: stamp(-3, 9) },
     { id: "cert3", enrollmentId: "e3", status: "Pending Attendance", reprintCount: 0, updatedAt: stamp(-2, 9) },
   ];
@@ -288,7 +293,7 @@ export function createSeedState(): SystemState {
       { id: "n3", audience: "staff", title: "Possible duplicate trainee", body: "REG-2026-000210 matches trainee NWM-000031.", createdAt: stamp(0, 7, 15) },
     ],
     activity: [
-      { id: "a1", action: "Certificate released", recordType: "Certificate", recordRef: "NWM-BT-2026-000118", actor: "Training Operations", createdAt: stamp(-10, 14) },
+      { id: "a1", action: "Certificate released", recordType: "Certificate", recordRef: "NWM-CCMI-2026-000118", actor: "Training Operations", createdAt: stamp(-10, 14) },
       { id: "a2", action: "Payment posted", recordType: "Payment", recordRef: "ENR-2026-000103", actor: "Cashier", createdAt: stamp(-16, 14) },
       { id: "a3", action: "Batch published", recordType: "Batch", recordRef: "SSO-2026-081", actor: "Training Operations", createdAt: stamp(-24, 9) },
     ],
