@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { NewWaveLogo } from "./new-wave-logo";
+import { LiveAttendance } from "./portal/live-attendance";
 import { PaymentProofOcr } from "./payment-proof-ocr";
 import { automaticEndDate, batchPatternLabel, validBatchStart } from "@/lib/scheduling";
 import { AdminConfiguration } from "./admin-configuration";
@@ -59,6 +60,7 @@ function PortalContent({active,role,data,query,open,canEnroll,canSchedule,canPay
   if(active==="Schedules")return <Schedules data={data} query={query} open={open} canSchedule={canSchedule}/>;
   if(active==="Payments")return <Payments data={data} query={query} open={open} canPay={canPay}/>;
   if(active==="Courses & centers")return <Catalog data={data} query={query}/>;
+  if(active==="Attendance")return <LiveAttendance batches={data.batches.map(b=>({id:b.id,batch_number:b.batch_number,starts_on:b.starts_on,ends_on:b.ends_on,venue:b.venue}))} />;
   if(active==="Reports")return <div className="portal-page"><PageHead eyebrow="Audited exports" title="Date-sensitive reports" text="Operational and financial exports always require an inclusive reporting period."/><DateReports/></div>;
   if(active==="Settings"&&role==="admin")return <div className="portal-page"><PageHead eyebrow="System administration" title="Configuration and authorized accounts" text="Manage payment modes, users, partners, agencies, courses, prices, and durations."/><AdminConfiguration/></div>;
   return <ConnectedModule module={active} data={data}/>;
