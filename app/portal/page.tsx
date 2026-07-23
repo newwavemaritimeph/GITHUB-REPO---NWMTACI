@@ -23,6 +23,6 @@ export default async function PortalPage() {
     .eq("user_id", user.id)
     .limit(1)
     .maybeSingle();
-  if (!staffRole) redirect("/trainee");
+  if (!staffRole) redirect("/registration-search");
   return <PortalLiveApp />;
 }

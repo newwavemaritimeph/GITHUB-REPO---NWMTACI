@@ -22,7 +22,7 @@ export function AuthForm({ portal }: { portal: "staff" | "trainee" }) {
       const supabase = createSupabaseBrowserClient();
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      window.location.href = portal === "staff" ? "/portal" : "/trainee";
+      window.location.href = portal === "staff" ? "/portal" : "/registration-search";
     } catch (error) {
       setMessage(error instanceof Error && error.message !== "Supabase is not configured." ? error.message : "Invalid email or password.");
     } finally {

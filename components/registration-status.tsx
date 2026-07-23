@@ -152,13 +152,13 @@ function StatusSearch() {
           <p className="status-next">
             <strong>Next step:</strong>{" "}
             {view.balanceCentavos > 0
-              ? "Settle your remaining balance in the trainee portal or at the cashier."
+              ? "Settle your remaining balance at the New Wave cashier, or contact us to arrange payment."
               : view.enrollment.instructionsSentAt && !view.enrollment.instructionsAcknowledgedAt
-                ? "Acknowledge your training instructions in the trainee portal."
+                ? "Confirm your training instructions with New Wave before your reporting date."
                 : "Nothing is required from you right now."}
           </p>
-          <Link className="button button-primary" href="/trainee">
-            Open the trainee portal
+          <Link className="button button-secondary" href="/contact">
+            Contact New Wave
           </Link>
         </div>
       )}

@@ -879,7 +879,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
           action: "Instructions acknowledged",
           recordType: "Enrollment",
           recordRef: enrollment.reference,
-          actor: "Trainee portal",
+          actor: "Enrollment status page",
         });
       });
     },

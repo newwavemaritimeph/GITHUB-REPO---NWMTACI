@@ -42,11 +42,9 @@ export async function POST(request: Request) {
     });
     if (error) throw error;
     const result = data as { registration_reference:string;trainee_id:string;email:string;complete_name:string };
-    try {
-      const invitation = await db.auth.admin.inviteUserByEmail(result.email, { data: { complete_name: result.complete_name, trainee_id: result.trainee_id }, redirectTo: `${process.env.APP_BASE_URL ?? new URL(request.url).origin}/auth/callback?next=/trainee` });
-      if (invitation.data.user) await db.from("trainees").update({ profile_id: invitation.data.user.id }).eq("id", result.trainee_id);
-    } catch { /* Registration remains valid; Admin can resend account activation. */ }
-    return NextResponse.json({ reference: result.registration_reference, accountInvitationQueued: true });
+    // Trainees have no portal account. They follow their enrollment through the
+    // public status lookup using this reference plus their registered email.
+    return NextResponse.json({ reference: result.registration_reference });
   } catch (error) {
     const status = error instanceof Error && error.message === "RATE_LIMITED" ? 429 : 400;
     return NextResponse.json({ error: status === 429 ? "Too many registration attempts. Please try again later." : error instanceof Error ? error.message : "Please review your registration details." }, { status });

@@ -40,8 +40,8 @@ function Header() {
           ))}
         </nav>
         <div className="public-nav-actions">
-          <Link className="text-link" href="/trainee">
-            Trainee portal
+          <Link className="text-link" href="/registration-search">
+            Check enrollment status
           </Link>
           <Link className="button button-primary button-small" href="/register">
             Enroll now
@@ -64,11 +64,10 @@ function Footer() {
         <Link href="/courses">Courses</Link>
         <Link href="/schedules">Available schedules</Link>
         <Link href="/register">Register online</Link>
-        <Link href="/registration-search">Check my status</Link>
+        <Link href="/registration-search">Check enrollment status</Link>
       </div>
       <div>
         <strong>Access</strong>
-        <Link href="/trainee">Trainee portal</Link>
         <Link href="/staff-login">Authorized staff</Link>
         <Link href="/contact">Contact us</Link>
       </div>
@@ -305,9 +304,12 @@ function RegistrationSearch() {
   return (
     <section className="inside-page narrow-page">
       <div className="inside-hero compact">
-        <span className="eyebrow">Registration status</span>
-        <h1>Check where your registration stands.</h1>
-        <p>For your protection, use both the reference sent to you and the email address registered with New Wave.</p>
+        <span className="eyebrow">Enrollment status</span>
+        <h1>Check your enrollment status.</h1>
+        <p>
+          See your schedule, payment balance, training instructions, and certificate progress. For your protection, use both
+          the reference sent to you and the email address registered with New Wave.
+        </p>
       </div>
       <RegistrationStatus />
     </section>

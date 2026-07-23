@@ -231,9 +231,9 @@ export function createSeedState(): SystemState {
     attendanceRecords,
     certificates,
     requests: [
-      { id: "q1", reference: "REQ-2026-000041", type: "Reschedule", enrollmentId: "e5", traineeName: "Leo Ramos", reason: "Vessel joining date moved to next month.", requestedBy: "Trainee portal", status: "Pending", createdAt: stamp(-1, 9) },
+      { id: "q1", reference: "REQ-2026-000041", type: "Reschedule", enrollmentId: "e5", traineeName: "Leo Ramos", reason: "Vessel joining date moved to next month.", requestedBy: "Enrollment status page", status: "Pending", createdAt: stamp(-1, 9) },
       { id: "q2", reference: "REQ-2026-000042", type: "Record correction", enrollmentId: "e4", traineeName: "Liza Flores", reason: "Middle name spelling on record.", requestedBy: "Registration", status: "Pending", createdAt: stamp(0, 8) },
-      { id: "q3", reference: "REQ-2026-000043", type: "Refund", enrollmentId: "e6", traineeName: "Renato Villanueva", reason: "Company cancelled the deployment.", requestedBy: "Trainee portal", status: "For clarification", remarks: "Please attach the company advisory.", createdAt: stamp(-2, 13) },
+      { id: "q3", reference: "REQ-2026-000043", type: "Refund", enrollmentId: "e6", traineeName: "Renato Villanueva", reason: "Company cancelled the deployment.", requestedBy: "Enrollment status page", status: "For clarification", remarks: "Please attach the company advisory.", createdAt: stamp(-2, 13) },
       { id: "q4", reference: "REQ-2026-000044", type: "Make-up class", enrollmentId: "e2", traineeName: "Maria Santos", reason: "Missed practical session due to illness.", requestedBy: "Instructor", status: "Approved", remarks: "Scheduled with the next AFF batch.", createdAt: stamp(-5, 10), decidedAt: stamp(-4, 11), decidedBy: "Training Operations" },
     ],
     employees: [
