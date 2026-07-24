@@ -16,6 +16,8 @@ import {
   type AttendanceStatus,
 } from "@/lib/domain";
 import { chooseSurvivor, findSrnDuplicates, mergeInto } from "@/lib/trainee-identity";
+import { IN_HOUSE_COURSES } from "@/lib/in-house-catalog";
+import { automaticEndDate, courseDays, monthlyBatchStarts } from "@/lib/scheduling";
 import { createSeedState, SYSTEM_VERSION } from "./seed";
 import type {
   ActivityEntry,
@@ -328,6 +330,7 @@ type SystemContextValue = {
   addLedgerEntry: (input: { enrollmentId: string; type: LedgerEntry["type"]; amountCentavos: number; description: string }) => void;
   /* operations */
   createBatch: (input: Omit<Batch, "id" | "status" | "publishedAt">) => Batch;
+  autoOpenMonth: (input: { courseCode: string; year: number; month: number; capacity: number; venue: string; instructor: string }) => number;
   publishBatch: (id: string) => void;
   setBatchStatus: (id: string, status: Batch["status"]) => void;
   sendInstructions: (enrollmentId: string) => void;
@@ -927,6 +930,77 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     [log, update],
   );
 
+  const autoOpenMonth = useCallback<SystemContextValue["autoOpenMonth"]>(
+    ({ courseCode, year, month, capacity, venue, instructor }) => {
+      const course = IN_HOUSE_COURSES.find((item) => item.code === courseCode);
+      if (!course) return 0;
+      let created = 0;
+      update((draft) => {
+        const trainingDays = courseDays(course.duration);
+        // Only future dates matter, and only ones not already scheduled — the
+        // action is idempotent, so re-running a month never duplicates batches.
+        const today = todayIso();
+        const starts = monthlyBatchStarts(courseCode, course.duration, year, month).filter((startsOn) => startsOn > today);
+        starts.forEach((startsOn) => {
+          const exists = draft.batches.some(
+            (batch) => batch.courseCode === courseCode && batch.startsOn === startsOn && batch.status !== "Cancelled",
+          );
+          if (exists) return;
+          const endsOn = automaticEndDate(startsOn, course.duration);
+          const deadline = new Date(`${startsOn}T17:00:00`);
+          deadline.setDate(deadline.getDate() - 1);
+          const batch: Batch = {
+            id: uid("b"),
+            batchNumber: `${course.code}-${year}-${String(Math.floor(100 + Math.random() * 899))}`,
+            courseCode: course.code,
+            courseName: course.course,
+            centerName: "New Wave Maritime",
+            startsOn,
+            endsOn,
+            mode: course.modality,
+            venue,
+            capacity,
+            instructor,
+            status: "Open",
+            publishedAt: new Date().toISOString(),
+            enrollmentDeadline: deadline.toISOString(),
+            feeCentavos: course.priceCentavos,
+            trainingDays,
+          };
+          draft.batches.push(batch);
+          for (let index = 0; index < trainingDays; index += 1) {
+            const date = new Date(`${startsOn}T00:00:00`);
+            date.setDate(date.getDate() + index);
+            const isoDate = date.toISOString().slice(0, 10);
+            draft.attendanceSessions.push({
+              id: `${batch.id}-s${index + 1}`,
+              batchId: batch.id,
+              dayNumber: index + 1,
+              sessionDate: isoDate,
+              name: `Day ${index + 1}`,
+              startsAt: `${isoDate}T08:00:00`,
+              endsAt: `${isoDate}T17:00:00`,
+              lateThresholdMinutes: 15,
+              minimumRequiredMinutes: 360,
+              state: "Planned",
+            });
+          }
+          created += 1;
+        });
+        if (created > 0) {
+          log(draft, {
+            action: "Monthly schedules auto-opened",
+            recordType: "Batch",
+            recordRef: `${course.code} · ${year}-${String(month).padStart(2, "0")}`,
+            detail: `${created} batch${created === 1 ? "" : "es"} published`,
+          });
+        }
+      });
+      return created;
+    },
+    [log, update],
+  );
+
   const publishBatch = useCallback<SystemContextValue["publishBatch"]>(
     (id) => {
       update((draft) => {
@@ -1275,6 +1349,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       setPaymentVerification,
       addLedgerEntry,
       createBatch,
+      autoOpenMonth,
       publishBatch,
       setBatchStatus,
       sendInstructions,
@@ -1308,6 +1383,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       cancelEnrollment,
       createBatch,
       createEnrollment,
+      autoOpenMonth,
       createRequest,
       createTrainee,
       decideExpense,

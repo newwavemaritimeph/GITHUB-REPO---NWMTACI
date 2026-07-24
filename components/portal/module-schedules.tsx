@@ -5,14 +5,13 @@ import { DataTable, EmptyState, Field, Modal, Pill, ProgressBar, SearchInput, Se
 import { pesos } from "@/lib/endorsement-catalog";
 import { IN_HOUSE_COURSES } from "@/lib/in-house-catalog";
 import { formatDate, formatDateRange, todayIso, useSystem } from "@/lib/system/store";
-import { batchPatternLabel, courseDays, planBatches } from "@/lib/scheduling";
-import type { Batch } from "@/lib/system/types";
+import { batchPatternLabel, monthlyBatchStarts } from "@/lib/scheduling";
 import { PageHeader, Panel } from "./shared";
 
 const filters = ["Published", "Draft", "Ongoing", "Completed", "All"] as const;
 
 export function SchedulesModule() {
-  const { state, seats, createBatch, publishBatch, setBatchStatus } = useSystem();
+  const { state, seats, createBatch, autoOpenMonth, publishBatch, setBatchStatus } = useSystem();
   const toast = useToast();
   const [filter, setFilter] = useState<(typeof filters)[number]>("Published");
   const [query, setQuery] = useState("");
@@ -155,12 +154,17 @@ export function SchedulesModule() {
       <AutoOpenModal
         open={autoOpen}
         onClose={() => setAutoOpen(false)}
-        onCreate={(batches) => {
-          batches.forEach((batch) => {
-            const created = createBatch(batch);
-            publishBatch(created.id);
-          });
-          toast("success", `${batches.length} schedule${batches.length === 1 ? "" : "s"} opened and published.`);
+        isScheduled={(courseCode, startsOn) =>
+          state.batches.some((batch) => batch.courseCode === courseCode && batch.startsOn === startsOn && batch.status !== "Cancelled")
+        }
+        onRun={(input) => {
+          const created = autoOpenMonth(input);
+          toast(
+            created > 0 ? "success" : "info",
+            created > 0
+              ? `${created} schedule${created === 1 ? "" : "s"} opened and published.`
+              : "No new schedules — those dates are already open or in the past.",
+          );
           setAutoOpen(false);
           setFilter("Published");
         }}
@@ -313,38 +317,54 @@ function NewBatchModal({
   );
 }
 
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
 /**
- * Opens several batches at once from a course's weekly start pattern, so future
- * schedules exist on the public site without anyone picking dates by hand.
- * Endorsed partner courses have no New Wave pattern, so they take the date as picked.
+ * Opens a whole month of schedules from a course's weekly start pattern, so the
+ * public site always has upcoming dates without anyone picking them by hand. Runs
+ * idempotently — dates already scheduled or in the past are skipped.
  */
 function AutoOpenModal({
   open,
   onClose,
-  onCreate,
+  onRun,
+  isScheduled,
 }: {
   open: boolean;
   onClose: () => void;
-  onCreate: (batches: Omit<Batch, "id" | "status" | "publishedAt">[]) => void;
+  onRun: (input: { courseCode: string; year: number; month: number; capacity: number; venue: string; instructor: string }) => void;
+  isScheduled: (courseCode: string, startsOn: string) => boolean;
 }) {
+  const now = new Date();
   const [courseCode, setCourseCode] = useState("");
-  const [from, setFrom] = useState(todayIso());
-  const [count, setCount] = useState(4);
-  const [endorsed, setEndorsed] = useState(false);
+  const [monthKey, setMonthKey] = useState(`${now.getFullYear()}-${now.getMonth() + 1}`);
   const [capacity, setCapacity] = useState(20);
   const [venue, setVenue] = useState("Room 301");
   const [instructor, setInstructor] = useState("Capt. Ruel Aquino");
 
+  const [year, month] = monthKey.split("-").map(Number);
   const course = IN_HOUSE_COURSES.find((item) => item.code === courseCode);
-  const planned = course
-    ? planBatches({ code: course.code, durationLabel: course.duration, from, count: endorsed ? 1 : count, endorsed })
-    : [];
+  const preview = useMemo(
+    () =>
+      course
+        ? monthlyBatchStarts(course.code, course.duration, year, month).filter(
+            (iso) => iso > todayIso() && !isScheduled(course.code, iso),
+          )
+        : [],
+    [course, year, month, isScheduled],
+  );
+
+  // Offer the current month plus the next five.
+  const monthOptions = Array.from({ length: 6 }, (_, offset) => {
+    const date = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    return { key: `${date.getFullYear()}-${date.getMonth() + 1}`, label: `${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}` };
+  });
 
   return (
     <Modal
       open={open}
-      title="Auto-open schedules"
-      description="Generates future batches from the course's start pattern and publishes them."
+      title="Auto-open schedules for a month"
+      description="Generates and publishes every batch matching the course's start pattern in the chosen month."
       onClose={onClose}
       wide
       footer={
@@ -354,33 +374,10 @@ function AutoOpenModal({
           </button>
           <button
             className="primary-button"
-            disabled={!course || planned.length === 0}
-            onClick={() => {
-              if (!course) return;
-              onCreate(
-                planned.map((slot, index) => {
-                  const deadline = new Date(`${slot.startsOn}T17:00:00`);
-                  deadline.setDate(deadline.getDate() - 1);
-                  return {
-                    batchNumber: `${course.code}-${new Date(`${slot.startsOn}T00:00:00`).getFullYear()}-${String(Math.floor(100 + Math.random() * 899) + index).slice(0, 3)}`,
-                    courseCode: course.code,
-                    courseName: course.course,
-                    centerName: endorsed ? "Endorsed partner center" : "New Wave Maritime",
-                    startsOn: slot.startsOn,
-                    endsOn: slot.endsOn,
-                    mode: course.modality,
-                    venue,
-                    capacity,
-                    instructor,
-                    enrollmentDeadline: deadline.toISOString(),
-                    feeCentavos: course.priceCentavos,
-                    trainingDays: courseDays(course.duration),
-                  };
-                }),
-              );
-            }}
+            disabled={!course || preview.length === 0}
+            onClick={() => course && onRun({ courseCode: course.code, year, month, capacity, venue, instructor })}
           >
-            Open {planned.length} schedule{planned.length === 1 ? "" : "s"}
+            Open {preview.length} schedule{preview.length === 1 ? "" : "s"}
           </button>
         </>
       }
@@ -396,18 +393,14 @@ function AutoOpenModal({
             ))}
           </select>
         </Field>
-        <Field label="Open from" hint={endorsed ? "Used exactly as picked" : "The first matching date on or after this"}>
-          <input type="date" value={from} min={todayIso()} onChange={(event) => setFrom(event.target.value)} />
-        </Field>
-        <Field label="How many" hint={endorsed ? "Endorsed courses open one at a time" : "Consecutive batches to open"}>
-          <input
-            type="number"
-            min={1}
-            max={12}
-            value={count}
-            disabled={endorsed}
-            onChange={(event) => setCount(Number(event.target.value))}
-          />
+        <Field label="Month">
+          <select value={monthKey} onChange={(event) => setMonthKey(event.target.value)}>
+            {monthOptions.map((item) => (
+              <option key={item.key} value={item.key}>
+                {item.label}
+              </option>
+            ))}
+          </select>
         </Field>
         <Field label="Capacity">
           <input type="number" min={1} max={60} value={capacity} onChange={(event) => setCapacity(Number(event.target.value))} />
@@ -430,24 +423,13 @@ function AutoOpenModal({
             <option>Mr. Alvin Reyes</option>
           </select>
         </Field>
-        <label className="consent-row form-full">
-          <input type="checkbox" checked={endorsed} onChange={(event) => setEndorsed(event.target.checked)} />
-          <span>
-            This is an endorsed partner course. New Wave&apos;s weekly start pattern does not apply, so the date above is used
-            exactly as picked.
-          </span>
-        </label>
         {course && (
           <div className="form-full inline-note note-blue">
-            <strong>{endorsed ? "Endorsed schedule" : batchPatternLabel(course.code, course.duration)}</strong>
-            {planned.length === 0 ? (
-              <p>No date matching this pattern was found. Try a different starting point.</p>
+            <strong>{batchPatternLabel(course.code, course.duration)}</strong>
+            {preview.length === 0 ? (
+              <p>No new dates for this month — every pattern date is already open or in the past.</p>
             ) : (
-              <p>
-                {planned
-                  .map((slot) => `${formatDate(slot.startsOn)} – ${formatDate(slot.endsOn)}`)
-                  .join(" · ")}
-              </p>
+              <p>{preview.map((iso) => formatDate(iso)).join(" · ")}</p>
             )}
           </div>
         )}
