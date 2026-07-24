@@ -39,7 +39,7 @@ import type {
   Trainee,
 } from "./types";
 
-const STORAGE_KEY = "new-wave-system-v5";
+const STORAGE_KEY = "new-wave-system-v6";
 
 /* ------------------------------------------------------------------ helpers */
 

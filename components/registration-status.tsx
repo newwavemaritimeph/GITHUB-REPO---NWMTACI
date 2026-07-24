@@ -196,10 +196,10 @@ function Page() {
     <div className="status-page-wrap">
       <div className="status-tabs" role="tablist">
         <button role="tab" aria-selected={tab === "status"} className={tab === "status" ? "active" : ""} onClick={() => setTab("status")}>
-          Enrollment status
+          ENROLLMENT STATUS
         </button>
         <button role="tab" aria-selected={tab === "verify"} className={tab === "verify" ? "active" : ""} onClick={() => setTab("verify")}>
-          Certificate verification
+          CERTIFICATE VERIFICATION
         </button>
       </div>
       {tab === "status" ? <StatusTab /> : <VerifyTab />}

@@ -4920,3 +4920,64 @@ code {
 @media (max-width: 680px) {
   .status-course-detail { grid-template-columns: 1fr; }
 }
+
+/* ==========================================================================
+   Masterplan revision — branding, tagline emphasis, form refinements
+   ========================================================================== */
+
+/* Larger, more prominent logo in the public header */
+.brand-link .logo-image-wrap { width: 62px; height: 62px; }
+.brand-link .logo-image-wrap img { width: 62px; height: 62px; }
+.brand-link .logo-copy strong { font-size: 22px; letter-spacing: 0.01em; }
+.public-header { height: 96px; }
+
+/* Emphasized tagline — wide-tracked, elegant treatment */
+.tagline-hero {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 22px;
+}
+.tagline-lead {
+  font-size: clamp(38px, 5.4vw, 68px);
+  line-height: 1.02;
+  letter-spacing: -0.02em;
+  color: var(--blue-dark);
+  font-weight: 700;
+}
+.tagline-sub {
+  font-size: clamp(15px, 1.8vw, 22px);
+  letter-spacing: 0.42em;
+  text-transform: uppercase;
+  color: var(--orange-dark);
+  font-weight: 500;
+  padding-left: 3px;
+}
+
+.caps-heading { text-transform: uppercase; letter-spacing: 0.01em; }
+
+/* All-caps entry inputs */
+.caps-form input { text-transform: uppercase; }
+.caps-form input[type="email"] { text-transform: none; }
+
+/* Terms and Conditions box — single combined block */
+.terms-box {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #f8fbfc;
+  padding: 18px 20px;
+  max-height: 320px;
+  overflow-y: auto;
+  margin-bottom: 4px;
+}
+.terms-section { margin-bottom: 14px; }
+.terms-section strong { display: block; font-size: 14px; color: var(--blue-dark); margin-bottom: 4px; }
+.terms-section ul { margin: 0; padding-left: 18px; }
+.terms-section li { font-size: 13px; color: var(--ink-soft); line-height: 1.55; margin-bottom: 3px; }
+.terms-footer { font-size: 12.5px; font-style: italic; color: var(--orange-dark); margin: 8px 0 0; }
+
+@media (max-width: 680px) {
+  .public-header { height: 76px; }
+  .brand-link .logo-image-wrap, .brand-link .logo-image-wrap img { width: 48px; height: 48px; }
+  .tagline-sub { letter-spacing: 0.28em; }
+}

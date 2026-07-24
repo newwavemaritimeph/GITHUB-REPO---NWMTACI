@@ -10,7 +10,7 @@ import type {
   Trainee,
 } from "./types";
 
-export const SYSTEM_VERSION = 5;
+export const SYSTEM_VERSION = 6;
 
 function startOfToday() {
   const now = new Date();
@@ -104,8 +104,8 @@ function sessionsFor(batch: Batch, state: AttendanceSession["state"]): Attendanc
 
 export function createSeedState(): SystemState {
   const trainees: Trainee[] = [
-    { id: "t1", traineeNumber: "NWM-000031", firstName: "Juan", middleName: "Perez", lastName: "Dela Cruz", birthDate: "1994-03-12", email: "juan.delacruz@example.com", mobile: "09171234567", address: "Malate, Manila", emergencyContactName: "Rosa Dela Cruz", emergencyContactMobile: "09171234500", srn: "SRN-2014-004221", createdAt: stamp(-240, 10) },
-    { id: "t2", traineeNumber: "NWM-000035", firstName: "Maria", middleName: "Luz", lastName: "Santos", birthDate: "1990-11-02", email: "maria.santos@example.com", mobile: "09281234567", address: "Pasay City", emergencyContactName: "Eduardo Santos", emergencyContactMobile: "09281234500", srn: "SRN-2011-009812", createdAt: stamp(-180, 11) },
+    { id: "t1", traineeNumber: "NWM-000031", firstName: "Juan", middleName: "Perez", lastName: "Dela Cruz", birthDate: "1994-03-12", email: "juan.delacruz@example.com", mobile: "09171234567", address: "Malate, Manila", emergencyContactName: "Rosa Dela Cruz", emergencyContactMobile: "09171234500", srn: "1400004221", createdAt: stamp(-240, 10) },
+    { id: "t2", traineeNumber: "NWM-000035", firstName: "Maria", middleName: "Luz", lastName: "Santos", birthDate: "1990-11-02", email: "maria.santos@example.com", mobile: "09281234567", address: "Pasay City", emergencyContactName: "Eduardo Santos", emergencyContactMobile: "09281234500", srn: "1100009812", createdAt: stamp(-180, 11) },
     { id: "t3", traineeNumber: "NWM-000037", firstName: "Renato", lastName: "Villanueva", birthDate: "1988-06-21", email: "renato.villanueva@example.com", mobile: "09391234567", address: "Cavite City", emergencyContactName: "Lina Villanueva", emergencyContactMobile: "09391234500", createdAt: stamp(-120, 9) },
     { id: "t4", traineeNumber: "NWM-000039", firstName: "Carlo", middleName: "B", lastName: "Reyes", birthDate: "1996-01-30", email: "carlo.reyes@example.com", mobile: "09451234567", address: "Ermita, Manila", emergencyContactName: "Ana Reyes", emergencyContactMobile: "09451234500", createdAt: stamp(-90, 14) },
     { id: "t5", traineeNumber: "NWM-000042", firstName: "Liza", lastName: "Flores", birthDate: "1993-09-14", email: "liza.flores@example.com", mobile: "09561234567", address: "Paranaque City", emergencyContactName: "Mark Flores", emergencyContactMobile: "09561234500", createdAt: stamp(-45, 8) },

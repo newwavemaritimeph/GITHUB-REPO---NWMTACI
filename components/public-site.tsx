@@ -17,17 +17,15 @@ export type PublicPage =
   | "staff-login";
 
 const nav = [
-  ["About", "/about"],
   ["Courses", "/courses"],
-  ["Enrollment Form", "/register"],
-  ["Contact", "/contact"],
+  ["Enrollment Status", "/registration-search"],
 ] as const;
 
 function Header() {
   return (
     <header className="public-header">
       <div className="public-nav">
-        <Link href="/" aria-label="New Wave Maritime home">
+        <Link href="/" aria-label="New Wave Maritime home" className="brand-link">
           <NewWaveLogo />
         </Link>
         <nav aria-label="Public navigation">
@@ -38,11 +36,8 @@ function Header() {
           ))}
         </nav>
         <div className="public-nav-actions">
-          <Link className="text-link" href="/registration-search">
-            Check enrollment status
-          </Link>
-          <Link className="button button-primary button-small" href="/register">
-            Enroll now
+          <Link className="button button-primary" href="/register">
+            Enroll Now
           </Link>
         </div>
       </div>
@@ -92,15 +87,18 @@ function Home() {
     <>
       <section className="hero">
         <div className="hero-copy">
-          <span className="eyebrow">Maritime training, made clear</span>
-          <h1>Ride the New Wave of Maritime Excellence</h1>
+          <span className="eyebrow">New Wave Maritime Training and Assessment Center</span>
+          <h1 className="tagline-hero">
+            <span className="tagline-lead">Ride the New Wave</span>
+            <span className="tagline-sub">of Maritime Excellence</span>
+          </h1>
           <p>
-            From registration to certificate release, New Wave keeps every step of your maritime training organized, visible,
+            From enrollment to certificate release, New Wave keeps every step of your maritime training organized, visible,
             and supported.
           </p>
           <div className="hero-actions">
             <Link className="button button-primary" href="/register">
-              Start your registration <span aria-hidden="true">→</span>
+              Enroll Now <span aria-hidden="true">→</span>
             </Link>
             <Link className="button button-secondary" href="/courses">
               Browse courses
@@ -285,8 +283,8 @@ function RegistrationSearch() {
   return (
     <section className="inside-page narrow-page">
       <div className="inside-hero compact">
-        <span className="eyebrow">Enrollment status &amp; certificate verification</span>
-        <h1>Check your enrollment or verify a certificate.</h1>
+        <span className="eyebrow">New Wave Maritime</span>
+        <h1 className="caps-heading">Enrollment Status &amp; Certificate Verification</h1>
         <p>
           Track every course under one registration reference, or confirm a certificate&apos;s authenticity by its number. No
           trainee account is required.
