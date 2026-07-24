@@ -14,6 +14,9 @@ export type Role =
   | "HR"
   | "Instructor";
 
+export type CivilStatus = "Single" | "Married" | "Widowed" | "Separated" | "Divorced";
+export type SeafarerStatus = "Active seafarer" | "Aspiring seafarer" | "Officer" | "Rating" | "Non-seafarer";
+
 export type Trainee = {
   id: string;
   traineeNumber: string;
@@ -25,17 +28,51 @@ export type Trainee = {
   mobile: string;
   address?: string;
   emergencyContactName?: string;
+  emergencyContactRelation?: string;
   emergencyContactMobile?: string;
   srn?: string;
   /** Kept in step with the public registration form. */
   suffix?: string;
   placeOfBirth?: string;
+  gender?: string;
+  nationality?: string;
+  civilStatus?: string;
+  seafarerStatus?: string;
   rank?: string;
   company?: string;
   createdAt: string;
   /** Set when this record was folded into another on a matching SRN. */
   mergedIntoTraineeId?: string;
   mergedAt?: string;
+};
+
+/**
+ * Everything one public enrollment form collects about the applicant, shared by
+ * the form draft and the stored submission so the two never drift.
+ */
+export type Applicant = {
+  firstName: string;
+  middleName?: string;
+  lastName: string;
+  suffix?: string;
+  birthDate: string;
+  gender?: string;
+  nationality?: string;
+  civilStatus?: string;
+  address?: string;
+  mobile: string;
+  email: string;
+  srn?: string;
+  seafarerStatus?: string;
+  company?: string;
+  rank?: string;
+  emergencyContactName?: string;
+  emergencyContactRelation?: string;
+  emergencyContactMobile?: string;
+  sourceOfInquiry?: string;
+  referralSource?: string;
+  promoCode?: string;
+  additionalNotes?: string;
 };
 
 export type BatchStatus = "Draft" | "Open" | "Full" | "Ongoing" | "Completed" | "Cancelled";
@@ -59,45 +96,71 @@ export type Batch = {
   trainingDays: number;
 };
 
+/** Overall status of a whole registration submission (one form, 1–5 courses). */
 export type RegistrationStatus =
   | "Submitted"
   | "Under Review"
+  | "Partially Approved"
   | "Approved"
   | "Rejected"
   | "Possible Duplicate";
 
-export type Registration = {
+/**
+ * One public enrollment form. Holds the applicant snapshot and fans out to 1–5
+ * course selections and the consent records captured at submission time.
+ */
+export type RegistrationSubmission = {
   id: string;
-  reference: string;
-  firstName: string;
-  middleName?: string;
-  lastName: string;
-  /** These mirror the public registration form field for field. */
-  suffix?: string;
-  srn?: string;
-  placeOfBirth?: string;
-  rank?: string;
-  company?: string;
-  birthDate: string;
-  email: string;
-  mobile: string;
-  address?: string;
-  emergencyContactName?: string;
-  emergencyContactMobile?: string;
-  courseCode: string;
-  courseName: string;
-  batchId: string;
+  reference: string; // NWM-REG-YYYY-NNNNNN
+  applicant: Applicant;
   status: RegistrationStatus;
   traineeId?: string;
-  enrollmentId?: string;
+  publicStatusMessage: string;
   remarks?: string;
   submittedAt: string;
   decidedAt?: string;
 };
 
+/** Per-selection processing status — each course in a submission is decided on its own. */
+export type SelectionStatus = "New" | "For Review" | "Approved" | "Change Requested" | "Rejected" | "Cancelled";
+
+export type CourseSelection = {
+  id: string;
+  submissionId: string;
+  courseCode: string;
+  courseName: string;
+  batchId: string;
+  sequence: number; // 1..5
+  status: SelectionStatus;
+  publicInstruction?: string;
+  internalRemark?: string;
+  createdEnrollmentId?: string;
+  decidedAt?: string;
+  decidedBy?: string;
+};
+
+export type ConsentType =
+  | "Data Privacy Notice"
+  | "Accuracy of Information"
+  | "Training Terms and Conditions"
+  | "Payment Policy"
+  | "Cancellation Policy"
+  | "Rescheduling Policy"
+  | "Certificate Release Policy";
+
+export type RegistrationConsent = {
+  id: string;
+  submissionId: string;
+  consentType: ConsentType;
+  version: string;
+  textSnapshot: string;
+  acceptedAt: string;
+  sessionRef?: string;
+};
+
 export type Enrollment = {
   id: string;
-  reference: string;
+  reference: string; // NWM-ENR-YYYY-NNNNNN
   traineeId: string;
   batchId: string;
   courseCode: string;
@@ -106,13 +169,13 @@ export type Enrollment = {
   status: EnrollmentStatus;
   createdAt: string;
   registrationReference?: string;
+  registrationSubmissionId?: string;
+  courseSelectionId?: string;
   instructionsSentAt?: string;
   instructionsAcknowledgedAt?: string;
   cancelledReason?: string;
-  /** New Wave courses gate certificate printing on one of these two. */
-  feedbackFormCompletedAt?: string;
-  completionProofFileName?: string;
-  completionProofUploadedAt?: string;
+  /** Training completion is marked manually by staff off verified printed attendance. */
+  completedAt?: string;
 };
 
 export type LedgerType = "charge" | "payment" | "discount" | "refund" | "reversal";
@@ -157,7 +220,8 @@ export type AttendanceRecord = {
   sessionId: string;
   enrollmentId: string;
   status: AttendanceStatus;
-  method: "QR" | "Manual";
+  /** Printed-sheet verification only — no QR (masterplan T.3). */
+  method: "Manual";
   manualReason?: string;
   checkedInAt?: string;
   checkedOutAt?: string;
@@ -299,7 +363,9 @@ export type SystemState = {
   version: number;
   trainees: Trainee[];
   batches: Batch[];
-  registrations: Registration[];
+  submissions: RegistrationSubmission[];
+  courseSelections: CourseSelection[];
+  consents: RegistrationConsent[];
   enrollments: Enrollment[];
   ledger: LedgerEntry[];
   attendanceSessions: AttendanceSession[];
@@ -314,7 +380,6 @@ export type SystemState = {
   notifications: NotificationItem[];
   activity: ActivityEntry[];
   settings: Settings;
-  traineeSessionId: string | null;
 };
 
 export type EnrollmentView = {

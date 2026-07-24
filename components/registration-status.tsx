@@ -6,170 +6,214 @@ import { Pill } from "@/components/ui/kit";
 import { SystemProvider, formatDate, formatDateRange, formatDateTime, fullName, useSystem } from "@/lib/system/store";
 import { pesos } from "@/lib/endorsement-catalog";
 
-type Result =
-  | { kind: "none" }
-  | { kind: "not-found" }
-  | { kind: "registration"; reference: string; status: string; remarks?: string; submittedAt: string; course: string }
-  | { kind: "enrollment"; enrollmentId: string };
+/* ----------------------------------------------------- enrollment status --- */
 
-function StatusSearch() {
-  const { state, views, ready } = useSystem();
+function maskName(name: string) {
+  return name
+    .split(" ")
+    .map((part) => (part.length <= 2 ? part : `${part[0]}${"•".repeat(Math.min(part.length - 1, 5))}`))
+    .join(" ");
+}
+
+function StatusTab() {
+  const { state, view, submissionSelections, ready } = useSystem();
   const [reference, setReference] = useState("");
-  const [email, setEmail] = useState("");
-  const [result, setResult] = useState<Result>({ kind: "none" });
+  const [contact, setContact] = useState("");
+  const [result, setResult] = useState<"idle" | "not-found" | string>("idle");
 
   function search() {
-    const ref = reference.trim().toUpperCase();
-    const mail = email.trim().toLowerCase();
-    const registration = state.registrations.find(
-      (item) => item.reference.toUpperCase() === ref && item.email.toLowerCase() === mail,
+    const ref = reference.trim().toLowerCase();
+    const contactValue = contact.trim().toLowerCase();
+    const submission = state.submissions.find(
+      (item) =>
+        item.reference.toLowerCase() === ref &&
+        (item.applicant.email.toLowerCase() === contactValue || item.applicant.mobile.replace(/\D/g, "") === contact.replace(/\D/g, "")),
     );
-    if (registration) {
-      const enrollment = state.enrollments.find((item) => item.id === registration.enrollmentId);
-      if (enrollment) {
-        setResult({ kind: "enrollment", enrollmentId: enrollment.id });
-        return;
-      }
-      setResult({
-        kind: "registration",
-        reference: registration.reference,
-        status: registration.status,
-        remarks: registration.remarks,
-        submittedAt: registration.submittedAt,
-        course: registration.courseName,
-      });
-      return;
-    }
-    const enrollment = state.enrollments.find((item) => item.reference.toUpperCase() === ref);
-    const trainee = enrollment ? state.trainees.find((item) => item.id === enrollment.traineeId) : undefined;
-    if (enrollment && trainee?.email.toLowerCase() === mail) {
-      setResult({ kind: "enrollment", enrollmentId: enrollment.id });
-      return;
-    }
-    setResult({ kind: "not-found" });
+    setResult(submission ? submission.id : "not-found");
   }
 
-  const view = result.kind === "enrollment" ? views().find((item) => item.enrollment.id === result.enrollmentId) : undefined;
+  const submission = typeof result === "string" && result !== "idle" && result !== "not-found"
+    ? state.submissions.find((item) => item.id === result)
+    : undefined;
+  const selections = submission ? submissionSelections(submission.id) : [];
 
   return (
     <>
-      <div className="search-card">
+      <form
+        className="search-card"
+        onSubmit={(event) => {
+          event.preventDefault();
+          search();
+        }}
+      >
         <label>
-          Registration or enrollment reference
-          <input
-            value={reference}
-            onChange={(event) => setReference(event.target.value)}
-            placeholder="REG-2026-000208"
-            autoComplete="off"
-          />
+          Registration reference
+          <input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="NWM-REG-2026-000208" autoComplete="off" />
         </label>
         <label>
-          Registered email
-          <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" />
+          Registered email or mobile number
+          <input value={contact} onChange={(event) => setContact(event.target.value)} placeholder="name@example.com or 09XX XXX XXXX" />
         </label>
-        <button
-          className="button button-primary button-block"
-          disabled={!ready || reference.trim().length < 6 || !email.includes("@")}
-          onClick={search}
-        >
+        <button className="button button-primary button-block" disabled={!ready || reference.trim().length < 6 || contact.trim().length < 4}>
           Check my status
         </button>
-        <p>Both the reference and the registered email are required, so only you can see your record.</p>
-      </div>
+        <p>Both the reference and your registered email or mobile number are required, so only you can see your record.</p>
+      </form>
 
-      {result.kind === "not-found" && (
+      {result === "not-found" && (
         <div className="status-result status-warning">
           <strong>No record matched</strong>
-          <p>Check the reference and the email address you registered with. They must match exactly.</p>
+          <p>Check the reference and the email or mobile number you registered with. They must match exactly.</p>
         </div>
       )}
 
-      {result.kind === "registration" && (
+      {submission && (
         <div className="status-result">
           <div className="status-head">
             <div>
-              <span className="eyebrow">{result.reference}</span>
-              <h2>{result.course}</h2>
+              <span className="eyebrow">{submission.reference}</span>
+              <h2>{fullName(submission.applicant)}</h2>
             </div>
-            <Pill tone={result.status === "Rejected" ? "red" : result.status === "Approved" ? "green" : "amber"}>{result.status}</Pill>
+            <Pill tone={submission.status === "Approved" ? "green" : submission.status === "Rejected" ? "red" : "amber"}>{submission.status}</Pill>
           </div>
-          <p>Submitted {formatDateTime(result.submittedAt)}.</p>
-          <p>
-            {result.status === "Rejected"
-              ? (result.remarks ?? "This registration was not accepted. Please contact New Wave.")
-              : "New Wave is reviewing your submission. Your enrollment and training fee appear here once the review is complete."}
-          </p>
-        </div>
-      )}
-
-      {view && (
-        <div className="status-result">
-          <div className="status-head">
-            <div>
-              <span className="eyebrow">{view.enrollment.reference}</span>
-              <h2>{view.enrollment.courseName}</h2>
-            </div>
-            <Pill tone="green">{view.stage}</Pill>
-          </div>
-          <dl className="review-list">
-            <div>
-              <dt>Trainee</dt>
-              <dd>{fullName(view.trainee)}</dd>
-            </div>
-            <div>
-              <dt>Schedule</dt>
-              <dd>{view.batch ? formatDateRange(view.batch.startsOn, view.batch.endsOn) : "To be scheduled"}</dd>
-            </div>
-            <div>
-              <dt>Venue</dt>
-              <dd>{view.batch?.venue ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>Payment</dt>
-              <dd>
-                {view.paymentStatus} · {pesos(view.paidCentavos)} of {pesos(view.dueCentavos)}
-              </dd>
-            </div>
-            <div>
-              <dt>Balance</dt>
-              <dd>{pesos(view.balanceCentavos)}</dd>
-            </div>
-            <div>
-              <dt>Instructions</dt>
-              <dd>
-                {view.enrollment.instructionsAcknowledgedAt
-                  ? `Acknowledged ${formatDate(view.enrollment.instructionsAcknowledgedAt)}`
-                  : view.enrollment.instructionsSentAt
-                    ? "Sent — acknowledgment required"
-                    : "Not yet sent"}
-              </dd>
-            </div>
-            <div>
-              <dt>Certificate</dt>
-              <dd>{view.certificate?.status ?? "Pending attendance"}</dd>
-            </div>
-          </dl>
           <p className="status-next">
-            <strong>Next step:</strong>{" "}
-            {view.balanceCentavos > 0
-              ? "Settle your remaining balance at the New Wave cashier, or contact us to arrange payment."
-              : view.enrollment.instructionsSentAt && !view.enrollment.instructionsAcknowledgedAt
-                ? "Confirm your training instructions with New Wave before your reporting date."
-                : "Nothing is required from you right now."}
+            <strong>Status:</strong> {submission.publicStatusMessage}
           </p>
-          <Link className="button button-secondary" href="/contact">
-            Contact New Wave
-          </Link>
+          <p className="muted-text">Submitted {formatDateTime(submission.submittedAt)}</p>
+
+          <h3 className="review-subhead">Your courses</h3>
+          <div className="status-courses">
+            {selections.map((selection) => {
+              const batch = state.batches.find((item) => item.id === selection.batchId);
+              const enrollmentView = selection.createdEnrollmentId ? view(selection.createdEnrollmentId) : undefined;
+              return (
+                <div key={selection.id} className="status-course">
+                  <div className="status-course-head">
+                    <div>
+                      <strong>{selection.courseName}</strong>
+                      <small>
+                        {selection.courseCode} · {batch ? formatDateRange(batch.startsOn, batch.endsOn) : "Schedule pending"}
+                        {batch ? ` · ${batch.mode}` : ""}
+                      </small>
+                    </div>
+                    <Pill tone={selection.status === "Approved" ? "green" : selection.status === "Rejected" || selection.status === "Cancelled" ? "red" : "amber"}>
+                      {selection.status}
+                    </Pill>
+                  </div>
+                  {enrollmentView ? (
+                    <dl className="status-course-detail">
+                      <div><dt>Enrollment</dt><dd>{enrollmentView.enrollment.reference}</dd></div>
+                      <div><dt>Payment</dt><dd>{enrollmentView.paymentStatus} · {pesos(enrollmentView.paidCentavos)} of {pesos(enrollmentView.dueCentavos)}</dd></div>
+                      <div><dt>Balance</dt><dd>{pesos(enrollmentView.balanceCentavos)}</dd></div>
+                      <div><dt>Admission slip</dt><dd>{enrollmentView.enrollment.instructionsSentAt ? "Ready" : "Pending payment"}</dd></div>
+                      <div><dt>Training</dt><dd>{enrollmentView.enrollment.completedAt ? "Completed" : enrollmentView.stage}</dd></div>
+                      <div><dt>Certificate</dt><dd>{enrollmentView.certificate?.status ?? "Pending"}</dd></div>
+                    </dl>
+                  ) : (
+                    <p className="muted-text status-course-note">This course is still being reviewed. An enrollment number is issued once it is approved.</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </>
   );
 }
 
+/* ------------------------------------------------ certificate verification --- */
+
+function VerifyTab() {
+  const { state, view, ready } = useSystem();
+  const [number, setNumber] = useState("");
+  const [result, setResult] = useState<"idle" | "not-found" | string>("idle");
+
+  function verify() {
+    const target = number.trim().toLowerCase();
+    const certificate = state.certificates.find((item) => item.certificateNumber?.toLowerCase() === target);
+    setResult(certificate ? certificate.id : "not-found");
+  }
+
+  const certificate = typeof result === "string" && result !== "idle" && result !== "not-found"
+    ? state.certificates.find((item) => item.id === result)
+    : undefined;
+  const enrollmentView = certificate ? view(certificate.enrollmentId) : undefined;
+
+  return (
+    <>
+      <form
+        className="search-card"
+        onSubmit={(event) => {
+          event.preventDefault();
+          verify();
+        }}
+      >
+        <label>
+          Certificate number
+          <input value={number} onChange={(event) => setNumber(event.target.value)} placeholder="NWM-CCMI-2026-000118" autoComplete="off" />
+        </label>
+        <button className="button button-primary button-block" disabled={!ready || number.trim().length < 6}>
+          Verify certificate
+        </button>
+        <p>No email or reference is needed. Verification confirms authenticity from the certificate number alone.</p>
+      </form>
+
+      {result === "not-found" && (
+        <div className="status-result status-warning">
+          <strong>Certificate not found</strong>
+          <p>No certificate matches that number. Check the number printed on the document.</p>
+        </div>
+      )}
+
+      {certificate && enrollmentView && (
+        <div className="status-result">
+          <div className="status-head">
+            <div>
+              <span className="eyebrow">{certificate.certificateNumber}</span>
+              <h2>Verified certificate</h2>
+            </div>
+            <Pill tone={certificate.status === "Released" ? "green" : certificate.status === "Cancelled" ? "red" : "amber"}>{certificate.status}</Pill>
+          </div>
+          <dl className="review-list">
+            <div><dt>Trainee</dt><dd>{maskName(fullName(enrollmentView.trainee))}</dd></div>
+            <div><dt>Course</dt><dd>{enrollmentView.enrollment.courseName}</dd></div>
+            <div><dt>Course code</dt><dd>{enrollmentView.enrollment.courseCode}</dd></div>
+            <div><dt>Completion date</dt><dd>{formatDate(enrollmentView.enrollment.completedAt)}</dd></div>
+            <div><dt>Certificate number</dt><dd>{certificate.certificateNumber}</dd></div>
+            <div><dt>Issuing center</dt><dd>{state.settings.organizationName}</dd></div>
+            <div><dt>Status</dt><dd>{certificate.status}</dd></div>
+          </dl>
+        </div>
+      )}
+    </>
+  );
+}
+
+function Page() {
+  const [tab, setTab] = useState<"status" | "verify">("status");
+  return (
+    <div className="status-page-wrap">
+      <div className="status-tabs" role="tablist">
+        <button role="tab" aria-selected={tab === "status"} className={tab === "status" ? "active" : ""} onClick={() => setTab("status")}>
+          Enrollment status
+        </button>
+        <button role="tab" aria-selected={tab === "verify"} className={tab === "verify" ? "active" : ""} onClick={() => setTab("verify")}>
+          Certificate verification
+        </button>
+      </div>
+      {tab === "status" ? <StatusTab /> : <VerifyTab />}
+      <p className="reg-note status-help">
+        Registering for the first time? <Link href="/register">Start an enrollment form</Link>.
+      </p>
+    </div>
+  );
+}
+
 export function RegistrationStatus() {
   return (
     <SystemProvider>
-      <StatusSearch />
+      <Page />
     </SystemProvider>
   );
 }

@@ -10,7 +10,7 @@ import type {
   Trainee,
 } from "./types";
 
-export const SYSTEM_VERSION = 4;
+export const SYSTEM_VERSION = 5;
 
 function startOfToday() {
   const now = new Date();
@@ -126,7 +126,7 @@ export function createSeedState(): SystemState {
   ];
 
   const enrollments: Enrollment[] = [
-    { id: "e1", reference: "ENR-2026-000101", traineeId: "t1", batchId: "b1", courseCode: "CCMI", courseName: batches[0].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-40, 10), registrationReference: "REG-2026-000201", instructionsSentAt: stamp(-32, 9), instructionsAcknowledgedAt: stamp(-31, 20) },
+    { id: "e1", reference: "ENR-2026-000101", traineeId: "t1", batchId: "b1", courseCode: "CCMI", courseName: batches[0].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-40, 10), registrationReference: "REG-2026-000201", instructionsSentAt: stamp(-32, 9), instructionsAcknowledgedAt: stamp(-31, 20), completedAt: stamp(-12, 9) },
     { id: "e2", reference: "ENR-2026-000102", traineeId: "t2", batchId: "b2", courseCode: "PSCMHBT", courseName: batches[1].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-30, 11), registrationReference: "REG-2026-000202", instructionsSentAt: stamp(-14, 9), instructionsAcknowledgedAt: stamp(-13, 21) },
     { id: "e3", reference: "ENR-2026-000103", traineeId: "t4", batchId: "b3", courseCode: "CCMD", courseName: batches[2].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-18, 15), registrationReference: "REG-2026-000203", instructionsSentAt: stamp(-8, 9), instructionsAcknowledgedAt: stamp(-7, 19) },
     { id: "e4", reference: "ENR-2026-000104", traineeId: "t5", batchId: "b4", courseCode: "SSO", courseName: batches[3].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-10, 9), registrationReference: "REG-2026-000204", instructionsSentAt: stamp(-3, 9) },
@@ -194,7 +194,8 @@ export function createSeedState(): SystemState {
         sessionId: session.id,
         enrollmentId,
         status: session.dayNumber === 3 && session.batchId === "b1" ? "Late" : "Present",
-        method: "QR",
+        method: "Manual",
+        manualReason: "Printed attendance sheet verified.",
         checkedInAt: `${session.sessionDate}T07:52:00`,
         checkedOutAt: `${session.sessionDate}T17:04:00`,
         recordedBy: "Instructor",
@@ -208,7 +209,8 @@ export function createSeedState(): SystemState {
         sessionId: session.id,
         enrollmentId: "e3",
         status: "Present",
-        method: "QR",
+        method: "Manual",
+        manualReason: "Printed attendance sheet verified.",
         checkedInAt: `${session.sessionDate}T07:58:00`,
         checkedOutAt: `${session.sessionDate}T17:02:00`,
         recordedBy: "Instructor",
@@ -225,10 +227,20 @@ export function createSeedState(): SystemState {
     version: SYSTEM_VERSION,
     trainees,
     batches,
-    registrations: [
-      { id: "r1", reference: "REG-2026-000208", firstName: "Miguel", lastName: "Torres", birthDate: "1995-05-05", email: "miguel.torres@example.com", mobile: "09181234567", address: "Las Pinas City", emergencyContactName: "Rita Torres", emergencyContactMobile: "09181234500", courseCode: "SSO", courseName: batches[3].courseName, batchId: "b4", status: "Submitted", submittedAt: stamp(0, 8, 42) },
-      { id: "r2", reference: "REG-2026-000209", firstName: "Grace", middleName: "P", lastName: "Lim", birthDate: "1992-08-17", email: "grace.lim@example.com", mobile: "09191234567", address: "Makati City", courseCode: "BT", courseName: batches[4].courseName, batchId: "b5", status: "Under Review", remarks: "Waiting for valid ID copy.", submittedAt: stamp(-1, 15, 10) },
-      { id: "r3", reference: "REG-2026-000210", firstName: "Juan", middleName: "Perez", lastName: "Dela Cruz", birthDate: "1994-03-12", email: "juan.delacruz@example.com", mobile: "09171234567", courseCode: "PSCMT", courseName: batches[6].courseName, batchId: "b7", status: "Possible Duplicate", remarks: "Matches trainee NWM-000031.", submittedAt: stamp(0, 7, 15) },
+    submissions: [
+      { id: "sub1", reference: "NWM-REG-2026-000208", applicant: { firstName: "Miguel", lastName: "Torres", birthDate: "1995-05-05", gender: "Male", nationality: "Filipino", civilStatus: "Single", email: "miguel.torres@example.com", mobile: "09181234567", address: "Las Pinas City", srn: "1005500881", seafarerStatus: "Active seafarer", rank: "Able Seaman", emergencyContactName: "Rita Torres", emergencyContactRelation: "Spouse", emergencyContactMobile: "09181234500", sourceOfInquiry: "Facebook" }, status: "Submitted", publicStatusMessage: "Your registration form has been received.", submittedAt: stamp(0, 8, 42) },
+      { id: "sub2", reference: "NWM-REG-2026-000209", applicant: { firstName: "Grace", middleName: "P", lastName: "Lim", birthDate: "1992-08-17", gender: "Female", nationality: "Filipino", civilStatus: "Married", email: "grace.lim@example.com", mobile: "09191234567", address: "Makati City", srn: "1102993004", seafarerStatus: "Officer", rank: "Third Mate", emergencyContactName: "Danny Lim", emergencyContactRelation: "Spouse", emergencyContactMobile: "09191234500", sourceOfInquiry: "Referral" }, status: "Under Review", remarks: "Two-course submission under review.", publicStatusMessage: "Your selected courses are being reviewed.", submittedAt: stamp(-1, 15, 10) },
+      { id: "sub3", reference: "NWM-REG-2026-000210", applicant: { firstName: "Juan", middleName: "Perez", lastName: "Dela Cruz", birthDate: "1994-03-12", gender: "Male", nationality: "Filipino", civilStatus: "Married", email: "juan.delacruz@example.com", mobile: "09171234567", address: "Malate, Manila", srn: "1400422100", seafarerStatus: "Active seafarer", rank: "Bosun", emergencyContactName: "Rosa Dela Cruz", emergencyContactRelation: "Spouse", emergencyContactMobile: "09171234500", sourceOfInquiry: "Walk-in" }, status: "Possible Duplicate", traineeId: "t1", remarks: "Matches trainee NWM-000031.", publicStatusMessage: "Your selected courses are being reviewed.", submittedAt: stamp(0, 7, 15) },
+    ],
+    courseSelections: [
+      { id: "sel1", submissionId: "sub1", courseCode: batches[3].courseCode, courseName: batches[3].courseName, batchId: "b4", sequence: 1, status: "New" },
+      { id: "sel2", submissionId: "sub2", courseCode: batches[4].courseCode, courseName: batches[4].courseName, batchId: "b5", sequence: 1, status: "For Review", internalRemark: "Awaiting valid ID copy." },
+      { id: "sel3", submissionId: "sub2", courseCode: batches[6].courseCode, courseName: batches[6].courseName, batchId: "b7", sequence: 2, status: "New" },
+      { id: "sel4", submissionId: "sub3", courseCode: batches[5].courseCode, courseName: batches[5].courseName, batchId: "b6", sequence: 1, status: "New" },
+    ],
+    consents: [
+      { id: "con1", submissionId: "sub1", consentType: "Data Privacy Notice", version: "2026-07-03-r01", textSnapshot: "New Wave collects and processes your information for registration and training purposes only.", acceptedAt: stamp(0, 8, 42) },
+      { id: "con2", submissionId: "sub1", consentType: "Training Terms and Conditions", version: "2026-07-03-r01", textSnapshot: "Training terms, payment, cancellation and rescheduling policies apply as published.", acceptedAt: stamp(0, 8, 42) },
     ],
     enrollments,
     ledger,
@@ -313,6 +325,5 @@ export function createSeedState(): SystemState {
       onlineRegistrationOpen: true,
       reservationFeeCentavos: 100000,
     },
-    traineeSessionId: null,
   };
 }

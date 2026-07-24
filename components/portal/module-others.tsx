@@ -55,7 +55,7 @@ export function TraineesModule({ go }: { go: (module: Module) => void }) {
   }, [query, state.trainees]);
 
   const selectedViews = selected ? all.filter((item) => item.trainee.id === selected.id) : [];
-  const duplicates = state.registrations.filter((item) => item.status === "Possible Duplicate").length;
+  const duplicates = state.submissions.filter((item) => item.status === "Possible Duplicate").length;
 
   return (
     <div className="page">

@@ -4726,3 +4726,197 @@ code {
     letter-spacing: 0.04em;
   }
 }
+
+/* ==========================================================================
+   Multi-course enrollment · combined Courses · status + verification (Phase 1)
+   ========================================================================== */
+
+/* Combined Courses page — card grid */
+.course-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+.course-card-public {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-sm);
+}
+.course-badge {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+.course-badge.stcw { background: #e8f2ff; color: var(--blue); }
+.course-badge.inhouse { background: var(--cyan-soft); color: #0286ac; }
+.course-card-public h3 {
+  font-size: 18px;
+  color: var(--blue-dark);
+  margin: 0 44px 2px 0;
+  line-height: 1.25;
+}
+.course-card-public .course-code {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 14px;
+}
+.course-facts {
+  display: grid;
+  gap: 0;
+  margin: 0 0 16px;
+  flex: 1;
+}
+.course-facts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.course-facts dt { font-size: 13px; color: var(--muted); }
+.course-facts dd { margin: 0; font-size: 13px; font-weight: 600; color: var(--blue-dark); text-align: right; }
+.button-muted { background: #9fb4c0 !important; box-shadow: none !important; }
+
+/* Multi-course selection blocks */
+.selection-list { display: grid; gap: 14px; }
+.selection-block {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 18px;
+  background: #fbfdfe;
+}
+.selection-block-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.selection-block-head strong { font-size: 15px; color: var(--blue-dark); }
+.add-course { margin-top: 16px; width: 100%; }
+.reg-notice-warn { background: var(--amber-soft); border-left-color: var(--orange); }
+
+/* Review + consent */
+.review-subhead {
+  font-size: 15px;
+  color: var(--blue-dark);
+  margin: 24px 0 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-soft);
+}
+.review-courses { display: grid; gap: 2px; }
+.review-course {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 14px;
+  background: #f6fafc;
+  border-radius: var(--radius-sm);
+}
+.review-course strong { display: block; font-size: 14px; color: var(--blue-dark); }
+.review-course small { display: block; font-size: 12.5px; color: var(--muted); }
+.review-course span { font-weight: 700; color: var(--blue-dark); }
+.review-total { background: var(--blue-dark); color: #fff; margin-top: 6px; }
+.review-total strong, .review-total span { color: #fff; }
+.consent-blocks { display: grid; gap: 8px; }
+.policy-block {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  background: #fff;
+}
+.policy-block summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--blue-dark);
+}
+.policy-block p { margin: 10px 0 0; font-size: 13px; color: var(--ink-soft); line-height: 1.6; }
+
+/* Registration review — per-selection cards in the staff drawer */
+.selection-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 14px;
+  background: #fbfdfe;
+}
+.selection-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.selection-head strong { display: block; font-size: 14px; color: var(--blue-dark); }
+.selection-head small { display: block; font-size: 12px; color: var(--muted); }
+
+/* Combined status + certificate-verification page */
+.status-page-wrap { max-width: 720px; margin: 0 auto; }
+.status-tabs {
+  display: flex;
+  gap: 6px;
+  background: #eef3f6;
+  padding: 4px;
+  border-radius: var(--radius);
+  margin-bottom: 20px;
+}
+.status-tabs button {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  padding: 11px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.status-tabs button.active { background: #fff; color: var(--blue-dark); box-shadow: var(--shadow-sm); }
+.status-courses { display: grid; gap: 10px; }
+.status-course {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 16px;
+  background: #fff;
+}
+.status-course-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.status-course-head strong { display: block; font-size: 15px; color: var(--blue-dark); }
+.status-course-head small { display: block; font-size: 12.5px; color: var(--muted); }
+.status-course-detail {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 20px;
+  margin: 0;
+}
+.status-course-detail > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.status-course-detail dt { font-size: 12.5px; color: var(--muted); }
+.status-course-detail dd { margin: 0; font-size: 13px; font-weight: 600; color: var(--blue-dark); text-align: right; }
+.status-course-note { margin: 4px 0 0; font-size: 13px; }
+.status-help { text-align: center; margin-top: 24px; }
+
+@media (max-width: 680px) {
+  .status-course-detail { grid-template-columns: 1fr; }
+}

@@ -2,14 +2,14 @@
 
 import { useState } from "react";
 import { Avatar, EmptyState, Pill, StatCard, useToast } from "@/components/ui/kit";
-import { formatDate, formatTime, fullName, todayIso, useSystem } from "@/lib/system/store";
+import { formatDate, fullName, todayIso, useSystem } from "@/lib/system/store";
 import type { AttendanceStatus } from "@/lib/domain";
 import { PageHeader, Panel } from "./shared";
 
 const statuses: AttendanceStatus[] = ["Present", "Late", "Absent", "Incomplete", "Make-Up Required", "Make-Up Completed"];
 
 export function AttendanceModule() {
-  const { state, views, markAttendance, scanAttendance, setSessionState } = useSystem();
+  const { state, views, markAttendance, setSessionState } = useSystem();
   const toast = useToast();
   // Selection falls back to whatever is running today, so the module always opens
   // on something useful without an effect syncing state after render.
@@ -92,7 +92,7 @@ export function AttendanceModule() {
                   className="primary-button"
                   onClick={() => {
                     setSessionState(session.id, "Open");
-                    toast("success", "Attendance session opened. QR scanning is live.");
+                    toast("success", "Attendance session opened for printed-sheet recording.");
                   }}
                 >
                   Open session
@@ -162,30 +162,7 @@ export function AttendanceModule() {
                       </div>
                     </div>
                     <div className="roster-times">
-                      <span>In {record?.checkedInAt ? formatTime(record.checkedInAt) : "—"}</span>
-                      <span>Out {record?.checkedOutAt ? formatTime(record.checkedOutAt) : "—"}</span>
-                    </div>
-                    <div className="roster-scan">
-                      <button
-                        className="ghost-button"
-                        disabled={session.state !== "Open"}
-                        onClick={() => {
-                          const result = scanAttendance({ sessionId: session.id, enrollmentId: item.enrollment.id, scanType: "check-in" });
-                          toast(result.ok ? "success" : "warning", result.message);
-                        }}
-                      >
-                        Scan in
-                      </button>
-                      <button
-                        className="ghost-button"
-                        disabled={session.state !== "Open"}
-                        onClick={() => {
-                          const result = scanAttendance({ sessionId: session.id, enrollmentId: item.enrollment.id, scanType: "check-out" });
-                          toast(result.ok ? "success" : "warning", result.message);
-                        }}
-                      >
-                        Scan out
-                      </button>
+                      <span>{record ? "On the printed sheet" : "Not yet recorded"}</span>
                     </div>
                     <select
                       className="roster-status"

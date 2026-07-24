@@ -13,32 +13,33 @@ import {
 import {
   derivePaymentStatus,
   isCertificateEligible,
-  isCompletionRequirementMet,
-  suggestAttendanceStatus,
   type AttendanceStatus,
-  type CompletionRequirement,
 } from "@/lib/domain";
-import { IN_HOUSE_COURSES } from "@/lib/in-house-catalog";
 import { chooseSurvivor, findSrnDuplicates, mergeInto } from "@/lib/trainee-identity";
 import { createSeedState, SYSTEM_VERSION } from "./seed";
 import type {
   ActivityEntry,
+  Applicant,
   AttendanceSession,
   Batch,
   Certificate,
   ChangeRequest,
+  ConsentType,
+  CourseSelection,
   Enrollment,
   EnrollmentView,
   LedgerEntry,
-  Registration,
+  RegistrationStatus,
+  RegistrationSubmission,
   RequestType,
+  SelectionStatus,
   Settings,
   Stage,
   SystemState,
   Trainee,
 } from "./types";
 
-const STORAGE_KEY = "new-wave-system-v4";
+const STORAGE_KEY = "new-wave-system-v5";
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -112,19 +113,6 @@ function sessionsOfBatch(state: SystemState, batchId: string) {
     .sort((left, right) => left.dayNumber - right.dayNumber);
 }
 
-/** Courses New Wave delivers itself, as opposed to endorsed partner offers. */
-function isNewWaveCourse(courseCode: string) {
-  return IN_HOUSE_COURSES.some((course) => course.code === courseCode);
-}
-
-export function completionRequirementOf(enrollment: Enrollment): CompletionRequirement {
-  return {
-    isNewWaveCourse: isNewWaveCourse(enrollment.courseCode),
-    feedbackFormCompleted: Boolean(enrollment.feedbackFormCompletedAt),
-    completionProofUploaded: Boolean(enrollment.completionProofUploadedAt),
-  };
-}
-
 function certificateEligibility(state: SystemState, enrollment: Enrollment) {
   const sessions = sessionsOfBatch(state, enrollment.batchId);
   const records = sessions.map((session) =>
@@ -134,17 +122,19 @@ function certificateEligibility(state: SystemState, enrollment: Enrollment) {
   );
   const attendance = records.filter(Boolean).map((record) => record!.status) as AttendanceStatus[];
   const everySessionRecorded = sessions.length > 0 && records.every(Boolean);
+  // Completion is a manual staff decision (markTrainingComplete) taken off
+  // verified printed attendance — no trainee uploads, no QR (masterplan T.2/T.3/T.18).
+  const trainingComplete = Boolean(enrollment.completedAt);
   return {
     sessions,
     attendance,
     eligible: isCertificateEligible({
-      attendance: everySessionRecorded ? attendance : [],
-      instructorSubmitted: sessions.length > 0 && sessions.every((session) => session.state === "Submitted" || session.state === "Verified"),
-      operationsVerified: sessions.length > 0 && sessions.every((session) => session.state === "Verified"),
+      attendance: trainingComplete && everySessionRecorded ? attendance : [],
+      instructorSubmitted: trainingComplete && sessions.length > 0 && sessions.every((session) => session.state === "Submitted" || session.state === "Verified"),
+      operationsVerified: trainingComplete && sessions.length > 0 && sessions.every((session) => session.state === "Verified"),
       templateActive: state.settings.certificateTemplateApproved && state.settings.certificateIssuanceEnabled,
       certificateNumberAvailable: true,
       legalNameConfirmed: true,
-      completion: completionRequirementOf(enrollment),
     }),
     attendanceComplete:
       everySessionRecorded &&
@@ -155,14 +145,102 @@ function certificateEligibility(state: SystemState, enrollment: Enrollment) {
 function certificateBlockReason(state: SystemState, enrollment: Enrollment) {
   const { sessions, attendanceComplete } = certificateEligibility(state, enrollment);
   if (sessions.length === 0) return "No attendance sessions scheduled yet.";
+  if (!sessions.every((session) => session.state === "Verified")) return "Training Operations has not verified the printed attendance.";
   if (!attendanceComplete) return "Attendance is incomplete or has make-up requirements.";
-  if (!sessions.every((session) => session.state === "Verified")) return "Training Operations has not verified all sessions.";
-  if (!isCompletionRequirementMet(completionRequirementOf(enrollment))) {
-    return "The trainee must complete the feedback form or upload the required screenshot.";
-  }
+  if (!enrollment.completedAt) return "Training has not been marked complete by staff.";
   if (!state.settings.certificateTemplateApproved) return "No approved certificate template.";
   if (!state.settings.certificateIssuanceEnabled) return "Certificate issuance is switched off in Settings.";
   return undefined;
+}
+
+/**
+ * Returns the trainee for a submission, creating one from the applicant snapshot
+ * on first approval and folding any SRN duplicates into the earliest record so a
+ * seafarer keeps one trainee number. Reuses the identity helpers.
+ */
+function ensureTraineeForSubmission(draft: SystemState, submission: RegistrationSubmission): Trainee {
+  const applicant = submission.applicant;
+  const srnMatches = applicant.srn
+    ? findSrnDuplicates({ id: "incoming", srn: applicant.srn }, draft.trainees)
+    : [];
+  let trainee =
+    (srnMatches.length ? chooseSurvivor(srnMatches) : undefined) ??
+    (submission.traineeId ? draft.trainees.find((item) => item.id === submission.traineeId) : undefined) ??
+    draft.trainees.find((item) => item.email.toLowerCase() === applicant.email.toLowerCase());
+
+  if (trainee && srnMatches.length > 1) {
+    const survivor = trainee;
+    srnMatches
+      .filter((item) => item.id !== survivor.id)
+      .forEach((duplicate) => {
+        Object.assign(
+          survivor,
+          mergeInto(survivor, duplicate, ["address", "srn", "suffix", "placeOfBirth", "rank", "company", "gender", "nationality", "civilStatus", "seafarerStatus", "emergencyContactName", "emergencyContactRelation", "emergencyContactMobile"]),
+        );
+        draft.enrollments.filter((item) => item.traineeId === duplicate.id).forEach((item) => {
+          item.traineeId = survivor.id;
+        });
+        duplicate.mergedIntoTraineeId = survivor.id;
+        duplicate.mergedAt = new Date().toISOString();
+      });
+  }
+
+  if (!trainee) {
+    const highest = draft.trainees.reduce((top, item) => {
+      const match = /^NWM-(\d{6})$/.exec(item.traineeNumber);
+      return match ? Math.max(top, Number(match[1])) : top;
+    }, 0);
+    trainee = {
+      id: uid("t"),
+      traineeNumber: `NWM-${String(highest + 1).padStart(6, "0")}`,
+      firstName: applicant.firstName,
+      middleName: applicant.middleName,
+      lastName: applicant.lastName,
+      suffix: applicant.suffix,
+      birthDate: applicant.birthDate,
+      placeOfBirth: undefined,
+      gender: applicant.gender,
+      nationality: applicant.nationality,
+      civilStatus: applicant.civilStatus,
+      seafarerStatus: applicant.seafarerStatus,
+      email: applicant.email,
+      mobile: applicant.mobile,
+      address: applicant.address,
+      srn: applicant.srn,
+      rank: applicant.rank,
+      company: applicant.company,
+      emergencyContactName: applicant.emergencyContactName,
+      emergencyContactRelation: applicant.emergencyContactRelation,
+      emergencyContactMobile: applicant.emergencyContactMobile,
+      createdAt: new Date().toISOString(),
+    };
+    draft.trainees.push(trainee);
+  }
+  submission.traineeId = trainee.id;
+  return trainee;
+}
+
+/** Recomputes a submission's overall status and public message from its selections. */
+function recomputeSubmissionStatus(draft: SystemState, submissionId: string) {
+  const submission = draft.submissions.find((item) => item.id === submissionId);
+  if (!submission) return;
+  const selections = draft.courseSelections.filter((item) => item.submissionId === submissionId);
+  const approved = selections.filter((item) => item.status === "Approved").length;
+  const closed = selections.filter((item) => item.status === "Rejected" || item.status === "Cancelled").length;
+  const total = selections.length;
+  if (total > 0 && approved === total) {
+    submission.status = "Approved";
+    submission.publicStatusMessage = "Your enrollment records have been confirmed.";
+  } else if (approved > 0) {
+    submission.status = "Partially Approved";
+    submission.publicStatusMessage = "Some of your selected courses have been confirmed; others are still being reviewed.";
+  } else if (total > 0 && closed === total) {
+    submission.status = "Rejected";
+    submission.publicStatusMessage = "Your registration could not be processed. Please contact New Wave.";
+  } else if (submission.status !== "Possible Duplicate") {
+    submission.status = "Under Review";
+    submission.publicStatusMessage = "Your selected courses are being reviewed.";
+  }
 }
 
 /** Keeps derived records (certificates, batch status, seat counts) consistent. */
@@ -210,19 +288,13 @@ function reconcile(state: SystemState): SystemState {
 
 /* ------------------------------------------------------------------ context */
 
-type RegistrationInput = {
-  firstName: string;
-  middleName?: string;
-  lastName: string;
-  birthDate: string;
-  email: string;
-  mobile: string;
-  address?: string;
-  emergencyContactName?: string;
-  emergencyContactMobile?: string;
-  courseCode: string;
-  courseName: string;
-  batchId: string;
+type SelectionInput = { courseCode: string; courseName: string; batchId: string };
+type ConsentInput = { consentType: ConsentType; version: string; textSnapshot: string };
+type SubmitRegistrationInput = {
+  applicant: Applicant;
+  selections: SelectionInput[]; // 1..5
+  consents: ConsentInput[];
+  sessionRef?: string;
 };
 
 type PaymentInput = {
@@ -243,9 +315,10 @@ type SystemContextValue = {
   actor: string;
   setActor: (actor: string) => void;
   /* registration + enrollment */
-  submitRegistration: (input: RegistrationInput) => Registration;
-  updateRegistrationStatus: (id: string, status: Registration["status"], remarks?: string) => void;
-  approveRegistration: (id: string) => Enrollment | undefined;
+  submitRegistration: (input: SubmitRegistrationInput) => RegistrationSubmission;
+  updateSubmissionStatus: (id: string, status: RegistrationStatus, remarks?: string) => void;
+  reviewSelection: (id: string, status: SelectionStatus, remark?: string) => void;
+  approveSelection: (id: string) => Enrollment | undefined;
   createEnrollment: (input: { traineeId: string; batchId: string }) => Enrollment | undefined;
   cancelEnrollment: (id: string, reason: string) => void;
   createTrainee: (input: Omit<Trainee, "id" | "traineeNumber" | "createdAt">) => Trainee;
@@ -260,9 +333,8 @@ type SystemContextValue = {
   sendInstructions: (enrollmentId: string) => void;
   acknowledgeInstructions: (enrollmentId: string) => void;
   setSessionState: (id: string, state: AttendanceSession["state"]) => void;
-  markAttendance: (input: { sessionId: string; enrollmentId: string; status: AttendanceStatus; method?: "QR" | "Manual"; manualReason?: string }) => void;
-  scanAttendance: (input: { sessionId: string; enrollmentId: string; scanType: "check-in" | "check-out" }) => { ok: boolean; message: string };
-  recordCompletionStep: (input: { enrollmentId: string; feedbackForm?: boolean; proofFileName?: string }) => void;
+  markAttendance: (input: { sessionId: string; enrollmentId: string; status: AttendanceStatus; method?: "Manual"; manualReason?: string }) => void;
+  markTrainingComplete: (enrollmentId: string, complete: boolean) => void;
   /* certificates */
   printCertificate: (enrollmentId: string) => void;
   releaseCertificate: (enrollmentId: string, recipient: string) => void;
@@ -276,13 +348,11 @@ type SystemContextValue = {
   /* system */
   updateSettings: (patch: Partial<Settings>) => void;
   markNotificationsRead: () => void;
-  signInTrainee: (identifier: string) => { ok: boolean; message: string };
-  signOutTrainee: () => void;
   resetSystem: () => void;
   /* selectors */
   view: (enrollmentId: string) => EnrollmentView | undefined;
   views: () => EnrollmentView[];
-  traineeViews: (traineeId: string) => EnrollmentView[];
+  submissionSelections: (submissionId: string) => CourseSelection[];
   seats: (batchId: string) => { capacity: number; taken: number; available: number };
   openBatchesFor: (courseCode: string) => Batch[];
 };
@@ -462,9 +532,12 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     [state.enrollments, view],
   );
 
-  const traineeViews = useCallback(
-    (traineeId: string) => views().filter((item) => item.trainee.id === traineeId),
-    [views],
+  const submissionSelections = useCallback(
+    (submissionId: string) =>
+      state.courseSelections
+        .filter((item) => item.submissionId === submissionId)
+        .sort((left, right) => left.sequence - right.sequence),
+    [state.courseSelections],
   );
 
   const seats = useCallback(
@@ -518,134 +591,115 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
 
   const submitRegistration = useCallback<SystemContextValue["submitRegistration"]>(
     (input) => {
-      const registration: Registration = {
-        ...input,
-        id: uid("reg"),
+      const submission: RegistrationSubmission = {
+        id: uid("sub"),
         reference: "",
+        applicant: input.applicant,
         status: "Submitted",
+        publicStatusMessage: "Your registration form has been received.",
         submittedAt: new Date().toISOString(),
       };
       update((draft) => {
-        registration.reference = nextReference(
-          draft.registrations.map((item) => item.reference),
-          "REG",
-        );
+        submission.reference = nextReference(draft.submissions.map((item) => item.reference), "NWM-REG");
+        // An existing trainee sharing email, mobile or SRN flags the whole
+        // submission for authorized duplicate review before any enrollment.
         const duplicate = draft.trainees.find(
           (trainee) =>
-            trainee.email.toLowerCase() === input.email.toLowerCase() || trainee.mobile === input.mobile,
+            trainee.email.toLowerCase() === input.applicant.email.toLowerCase() ||
+            trainee.mobile === input.applicant.mobile ||
+            (Boolean(input.applicant.srn) && trainee.srn === input.applicant.srn),
         );
         if (duplicate) {
-          registration.status = "Possible Duplicate";
-          registration.traineeId = duplicate.id;
-          registration.remarks = `Matches existing trainee ${duplicate.traineeNumber}.`;
+          submission.status = "Possible Duplicate";
+          submission.traineeId = duplicate.id;
+          submission.remarks = `Matches existing trainee ${duplicate.traineeNumber}.`;
+          submission.publicStatusMessage = "Your selected courses are being reviewed.";
         }
-        draft.registrations.unshift(registration);
+        draft.submissions.unshift(submission);
+        input.selections.slice(0, 5).forEach((selection, index) => {
+          draft.courseSelections.push({
+            id: uid("sel"),
+            submissionId: submission.id,
+            courseCode: selection.courseCode,
+            courseName: selection.courseName,
+            batchId: selection.batchId,
+            sequence: index + 1,
+            status: "New",
+          });
+        });
+        input.consents.forEach((consent) => {
+          draft.consents.push({
+            id: uid("con"),
+            submissionId: submission.id,
+            consentType: consent.consentType,
+            version: consent.version,
+            textSnapshot: consent.textSnapshot,
+            acceptedAt: new Date().toISOString(),
+            sessionRef: input.sessionRef,
+          });
+        });
         notify(draft, {
           audience: "staff",
           title: "New registration received",
-          body: `${fullName(input)} registered for ${input.courseName}.`,
+          body: `${fullName(input.applicant)} selected ${input.selections.length} course${input.selections.length === 1 ? "" : "s"}.`,
         });
         log(draft, {
           action: "Registration submitted",
           recordType: "Registration",
-          recordRef: registration.reference,
+          recordRef: submission.reference,
           actor: "Public website",
-          detail: input.courseName,
+          detail: `${input.selections.length} course selection${input.selections.length === 1 ? "" : "s"}`,
         });
       });
-      return registration;
+      return submission;
     },
     [log, notify, update],
   );
 
-  const updateRegistrationStatus = useCallback<SystemContextValue["updateRegistrationStatus"]>(
+  const updateSubmissionStatus = useCallback<SystemContextValue["updateSubmissionStatus"]>(
     (id, status, remarks) => {
       update((draft) => {
-        const registration = draft.registrations.find((item) => item.id === id);
-        if (!registration) return;
-        registration.status = status;
-        registration.remarks = remarks ?? registration.remarks;
-        registration.decidedAt = new Date().toISOString();
-        log(draft, { action: `Registration ${status.toLowerCase()}`, recordType: "Registration", recordRef: registration.reference });
+        const submission = draft.submissions.find((item) => item.id === id);
+        if (!submission) return;
+        submission.status = status;
+        submission.remarks = remarks ?? submission.remarks;
+        submission.decidedAt = new Date().toISOString();
+        log(draft, { action: `Registration ${status.toLowerCase()}`, recordType: "Registration", recordRef: submission.reference });
       });
     },
     [log, update],
   );
 
-  const approveRegistration = useCallback<SystemContextValue["approveRegistration"]>(
+  const reviewSelection = useCallback<SystemContextValue["reviewSelection"]>(
+    (id, status, remark) => {
+      update((draft) => {
+        const selection = draft.courseSelections.find((item) => item.id === id);
+        if (!selection) return;
+        selection.status = status;
+        if (remark) selection.internalRemark = remark;
+        selection.decidedAt = new Date().toISOString();
+        selection.decidedBy = actor;
+        recomputeSubmissionStatus(draft, selection.submissionId);
+        log(draft, { action: `Course selection ${status.toLowerCase()}`, recordType: "Course selection", recordRef: selection.courseName });
+      });
+    },
+    [actor, log, update],
+  );
+
+  const approveSelection = useCallback<SystemContextValue["approveSelection"]>(
     (id) => {
       let created: Enrollment | undefined;
       update((draft) => {
-        const registration = draft.registrations.find((item) => item.id === id);
-        if (!registration || registration.status === "Approved") return;
-        const batch = draft.batches.find((item) => item.id === registration.batchId);
-        if (!batch) return;
+        const selection = draft.courseSelections.find((item) => item.id === id);
+        if (!selection || selection.createdEnrollmentId) return;
+        const submission = draft.submissions.find((item) => item.id === selection.submissionId);
+        const batch = draft.batches.find((item) => item.id === selection.batchId);
+        if (!submission || !batch) return;
 
-        // An SRN identifies a seafarer across enrollments, so a matching one is
-        // the same person however their name was typed this time.
-        const srnMatch = registration.srn
-          ? findSrnDuplicates({ id: "incoming", srn: registration.srn }, draft.trainees.map((item) => ({ ...item })))
-          : [];
-        let trainee =
-          (srnMatch.length ? chooseSurvivor(srnMatch) : undefined) ??
-          draft.trainees.find(
-            (item) =>
-              item.id === registration.traineeId ||
-              item.email.toLowerCase() === registration.email.toLowerCase(),
-          );
-
-        // Fold any further SRN matches into the survivor so one seafarer keeps
-        // one record and one trainee number.
-        if (trainee && srnMatch.length > 1) {
-          const survivor = trainee;
-          srnMatch
-            .filter((item) => item.id !== survivor.id)
-            .forEach((duplicate) => {
-              const target = draft.trainees.find((item) => item.id === duplicate.id);
-              if (!target) return;
-              Object.assign(
-                survivor,
-                mergeInto(survivor, target, ["address", "srn", "suffix", "placeOfBirth", "rank", "company", "emergencyContactName", "emergencyContactMobile"]),
-              );
-              draft.enrollments.filter((item) => item.traineeId === target.id).forEach((item) => {
-                item.traineeId = survivor.id;
-              });
-              target.mergedIntoTraineeId = survivor.id;
-              target.mergedAt = new Date().toISOString();
-              log(draft, {
-                action: "Duplicate trainee merged",
-                recordType: "Trainee",
-                recordRef: target.traineeNumber,
-                detail: `Merged into ${survivor.traineeNumber} on matching SRN`,
-              });
-            });
-        }
-        if (!trainee) {
-          const highest = draft.trainees.reduce((top, item) => {
-            const match = /^NWM-(\d{6})$/.exec(item.traineeNumber);
-            return match ? Math.max(top, Number(match[1])) : top;
-          }, 0);
-          trainee = {
-            id: uid("t"),
-            traineeNumber: `NWM-${String(highest + 1).padStart(6, "0")}`,
-            firstName: registration.firstName,
-            middleName: registration.middleName,
-            lastName: registration.lastName,
-            birthDate: registration.birthDate,
-            email: registration.email,
-            mobile: registration.mobile,
-            address: registration.address,
-            emergencyContactName: registration.emergencyContactName,
-            emergencyContactMobile: registration.emergencyContactMobile,
-            srn: registration.srn,
-            createdAt: new Date().toISOString(),
-          };
-          draft.trainees.push(trainee);
-        }
-
+        const trainee = ensureTraineeForSubmission(draft, submission);
         const enrollment: Enrollment = {
           id: uid("e"),
-          reference: nextReference(draft.enrollments.map((item) => item.reference), "ENR"),
+          reference: nextReference(draft.enrollments.map((item) => item.reference), "NWM-ENR"),
           traineeId: trainee.id,
           batchId: batch.id,
           courseCode: batch.courseCode,
@@ -653,7 +707,9 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
           centerName: batch.centerName,
           status: "Enrolled",
           createdAt: new Date().toISOString(),
-          registrationReference: registration.reference,
+          registrationReference: submission.reference,
+          registrationSubmissionId: submission.id,
+          courseSelectionId: selection.id,
         };
         draft.enrollments.unshift(enrollment);
         draft.ledger.unshift({
@@ -668,19 +724,14 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
           recordedAt: new Date().toISOString(),
           valid: true,
         });
-        registration.status = "Approved";
-        registration.traineeId = trainee.id;
-        registration.enrollmentId = enrollment.id;
-        registration.decidedAt = new Date().toISOString();
+        selection.status = "Approved";
+        selection.createdEnrollmentId = enrollment.id;
+        selection.decidedAt = new Date().toISOString();
+        selection.decidedBy = actor;
+        recomputeSubmissionStatus(draft, submission.id);
         created = enrollment;
-        notify(draft, {
-          audience: "trainee",
-          traineeId: trainee.id,
-          title: "Enrollment created",
-          body: `${batch.courseName} · ${enrollment.reference}. Settle your training fee to confirm your slot.`,
-        });
         log(draft, {
-          action: "Registration approved",
+          action: "Course selection approved",
           recordType: "Enrollment",
           recordRef: enrollment.reference,
           detail: `${trainee.traineeNumber} · ${batch.batchNumber}`,
@@ -688,7 +739,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       });
       return created;
     },
-    [actor, log, notify, update],
+    [actor, log, update],
   );
 
   const createEnrollment = useCallback<SystemContextValue["createEnrollment"]>(
@@ -999,80 +1050,16 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     [actor, log, update],
   );
 
-  const scanAttendance = useCallback<SystemContextValue["scanAttendance"]>(
-    ({ sessionId, enrollmentId, scanType }) => {
-      const session = state.attendanceSessions.find((item) => item.id === sessionId);
-      if (!session || session.state !== "Open") return { ok: false, message: "The attendance session is not open." };
-      const record = state.attendanceRecords.find(
-        (item) => item.sessionId === sessionId && item.enrollmentId === enrollmentId,
-      );
-      if (scanType === "check-out" && !record?.checkedInAt) {
-        return { ok: false, message: "Check-in is required before check-out." };
-      }
-      if (scanType === "check-in" && record?.checkedInAt) {
-        return { ok: false, message: "This trainee already checked in." };
-      }
-      if (scanType === "check-out" && record?.checkedOutAt) {
-        return { ok: false, message: "This trainee already checked out." };
-      }
-      const now = new Date().toISOString();
-      update((draft) => {
-        const target = draft.attendanceRecords.find(
-          (item) => item.sessionId === sessionId && item.enrollmentId === enrollmentId,
-        );
-        const draftSession = draft.attendanceSessions.find((item) => item.id === sessionId)!;
-        if (!target) {
-          draft.attendanceRecords.push({
-            id: uid("ar"),
-            sessionId,
-            enrollmentId,
-            status: new Date(now).getTime() > new Date(draftSession.startsAt).getTime() + draftSession.lateThresholdMinutes * 60_000 ? "Late" : "Present",
-            method: "QR",
-            checkedInAt: now,
-            recordedBy: actor,
-          });
-        } else if (scanType === "check-in") {
-          target.checkedInAt = now;
-          target.method = "QR";
-        } else {
-          target.checkedOutAt = now;
-          target.status = suggestAttendanceStatus({
-            checkedInAt: new Date(target.checkedInAt!),
-            checkedOutAt: new Date(now),
-            sessionStartsAt: new Date(draftSession.startsAt),
-            lateThresholdMinutes: draftSession.lateThresholdMinutes,
-            minimumRequiredMinutes: draftSession.minimumRequiredMinutes,
-          });
-        }
-        const enrollment = draft.enrollments.find((item) => item.id === enrollmentId);
-        log(draft, {
-          action: `QR ${scanType}`,
-          recordType: "Attendance",
-          recordRef: enrollment?.reference ?? enrollmentId,
-          detail: draftSession.name,
-        });
-      });
-      return { ok: true, message: `${scanType === "check-in" ? "Check-in" : "Check-out"} recorded with server time.` };
-    },
-    [actor, log, state.attendanceRecords, state.attendanceSessions, update],
-  );
-
-  const recordCompletionStep = useCallback<SystemContextValue["recordCompletionStep"]>(
-    ({ enrollmentId, feedbackForm, proofFileName }) => {
+  const markTrainingComplete = useCallback<SystemContextValue["markTrainingComplete"]>(
+    (enrollmentId, complete) => {
       update((draft) => {
         const enrollment = draft.enrollments.find((item) => item.id === enrollmentId);
         if (!enrollment) return;
-        const now = new Date().toISOString();
-        if (feedbackForm) enrollment.feedbackFormCompletedAt = now;
-        if (proofFileName) {
-          enrollment.completionProofFileName = proofFileName;
-          enrollment.completionProofUploadedAt = now;
-        }
+        enrollment.completedAt = complete ? new Date().toISOString() : undefined;
         log(draft, {
-          action: feedbackForm ? "Feedback form completed" : "Completion proof uploaded",
+          action: complete ? "Training marked complete" : "Training completion reversed",
           recordType: "Enrollment",
           recordRef: enrollment.reference,
-          detail: proofFileName,
         });
       });
     },
@@ -1267,42 +1254,6 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     });
   }, [update]);
 
-  const signInTrainee = useCallback<SystemContextValue["signInTrainee"]>(
-    (identifier) => {
-      const term = identifier.trim().toLowerCase();
-      if (!term) return { ok: false, message: "Enter your email or registration reference." };
-      const byEmail = state.trainees.find((trainee) => trainee.email.toLowerCase() === term);
-      const registration = state.registrations.find(
-        (item) => item.reference.toLowerCase() === term || item.email.toLowerCase() === term,
-      );
-      const enrollment = state.enrollments.find((item) => item.reference.toLowerCase() === term);
-      const traineeId =
-        byEmail?.id ??
-        (registration?.traineeId ||
-          state.trainees.find((trainee) => trainee.email.toLowerCase() === registration?.email.toLowerCase())?.id) ??
-        enrollment?.traineeId;
-      if (!traineeId) {
-        return {
-          ok: false,
-          message: registration
-            ? "Your registration is still being reviewed. The portal opens once an enrollment is created."
-            : "No record matched that email or reference.",
-        };
-      }
-      update((draft) => {
-        draft.traineeSessionId = traineeId;
-      });
-      return { ok: true, message: "Signed in." };
-    },
-    [state.enrollments, state.registrations, state.trainees, update],
-  );
-
-  const signOutTrainee = useCallback(() => {
-    update((draft) => {
-      draft.traineeSessionId = null;
-    });
-  }, [update]);
-
   const resetSystem = useCallback(() => {
     setState(reconcile(createSeedState()));
   }, []);
@@ -1314,8 +1265,9 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       actor,
       setActor,
       submitRegistration,
-      updateRegistrationStatus,
-      approveRegistration,
+      updateSubmissionStatus,
+      reviewSelection,
+      approveSelection,
       createEnrollment,
       cancelEnrollment,
       createTrainee,
@@ -1329,8 +1281,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       acknowledgeInstructions,
       setSessionState,
       markAttendance,
-      scanAttendance,
-      recordCompletionStep,
+      markTrainingComplete,
       printCertificate,
       releaseCertificate,
       createRequest,
@@ -1341,12 +1292,10 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       resolveMessage,
       updateSettings,
       markNotificationsRead,
-      signInTrainee,
-      signOutTrainee,
       resetSystem,
       view,
       views,
-      traineeViews,
+      submissionSelections,
       seats,
       openBatchesFor,
     }),
@@ -1355,7 +1304,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       actor,
       addLedgerEntry,
       advancePayroll,
-      approveRegistration,
+      approveSelection,
       cancelEnrollment,
       createBatch,
       createEnrollment,
@@ -1366,28 +1315,26 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       decideRequest,
       markAttendance,
       markNotificationsRead,
+      markTrainingComplete,
       openBatchesFor,
       printCertificate,
       publishBatch,
       ready,
-      recordCompletionStep,
       recordPayment,
       releaseCertificate,
       resetSystem,
       resolveMessage,
-      scanAttendance,
+      reviewSelection,
       seats,
       sendInstructions,
       setBatchStatus,
       setPaymentVerification,
       setSessionState,
-      signInTrainee,
-      signOutTrainee,
       state,
+      submissionSelections,
       submitRegistration,
-      traineeViews,
-      updateRegistrationStatus,
       updateSettings,
+      updateSubmissionStatus,
       view,
       views,
     ],

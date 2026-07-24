@@ -2,64 +2,49 @@
 
 import { useMemo, useState } from "react";
 import { DataTable, EmptyState, Modal, Pill, SearchInput, Segmented, StatCard, useToast } from "@/components/ui/kit";
-import { completionRequirementOf, formatDate, formatDateTime, fullName, useSystem } from "@/lib/system/store";
+import { formatDate, formatDateTime, fullName, useSystem } from "@/lib/system/store";
 import type { EnrollmentView } from "@/lib/system/types";
 import { PageHeader, Panel, type Module } from "./shared";
 
 const filters = ["Ready", "Pending", "Printed", "Released", "All"] as const;
 
 /**
- * New Wave's own courses only print once the trainee has completed the feedback
- * form or uploaded the required screenshot. Endorsed partner courses skip this.
+ * Training completion is a manual staff decision taken off verified printed
+ * attendance — no trainee uploads, no QR (masterplan T.2/T.3/T.18). A course
+ * cannot become certificate-ready until it is marked complete here.
  */
 function CompletionCell({
   item,
-  onRecord,
+  onToggle,
 }: {
   item: EnrollmentView;
-  onRecord: (input: { feedbackForm?: boolean; proofFileName?: string }) => void;
+  onToggle: (complete: boolean) => void;
 }) {
-  const requirement = completionRequirementOf(item.enrollment);
-  if (!requirement.isNewWaveCourse) return <span className="muted-text">Not required</span>;
-
-  const done = requirement.feedbackFormCompleted || requirement.completionProofUploaded;
-  if (done) {
+  if (item.enrollment.completedAt) {
     return (
       <>
-        <Pill tone="green">Complete</Pill>
-        <small>
-          {requirement.feedbackFormCompleted ? "Feedback form" : item.enrollment.completionProofFileName ?? "Proof uploaded"}
-        </small>
+        <Pill tone="green">Completed</Pill>
+        <small>{formatDate(item.enrollment.completedAt)}</small>
+        <button className="ghost-button" onClick={() => onToggle(false)}>
+          Reopen
+        </button>
       </>
     );
   }
+  const attendanceReady =
+    item.attendanceComplete && item.attendance.length > 0 && item.attendance.every((entry) => entry.session.state === "Verified");
   return (
     <>
-      <Pill tone="amber">Waiting</Pill>
-      <div className="cell-actions">
-        <button className="ghost-button" onClick={() => onRecord({ feedbackForm: true })}>
-          Feedback done
-        </button>
-        <label className="ghost-button upload-button">
-          Upload proof
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            hidden
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) onRecord({ proofFileName: file.name });
-              event.target.value = "";
-            }}
-          />
-        </label>
-      </div>
+      <Pill tone="amber">In training</Pill>
+      <button className="ghost-button" disabled={!attendanceReady} onClick={() => onToggle(true)}>
+        {attendanceReady ? "Mark complete" : "Attendance pending"}
+      </button>
     </>
   );
 }
 
 export function CertificatesModule({ go }: { go: (module: Module) => void }) {
-  const { state, views, printCertificate, releaseCertificate, updateSettings, recordCompletionStep } = useSystem();
+  const { state, views, printCertificate, releaseCertificate, updateSettings, markTrainingComplete } = useSystem();
   const toast = useToast();
   const [filter, setFilter] = useState<(typeof filters)[number]>("Ready");
   const [query, setQuery] = useState("");
@@ -152,7 +137,7 @@ export function CertificatesModule({ go }: { go: (module: Module) => void }) {
           />
         ) : (
           <DataTable
-            columns={["Trainee", "Course & batch", "Attendance", "Completion step", "Certificate number", "Status", ""]}
+            columns={["Trainee", "Course & batch", "Attendance", "Training completion", "Certificate number", "Status", ""]}
             minWidth={1180}
           >
             {rows.map((item) => {
@@ -175,9 +160,9 @@ export function CertificatesModule({ go }: { go: (module: Module) => void }) {
                   <td>
                     <CompletionCell
                       item={item}
-                      onRecord={(input) => {
-                        recordCompletionStep({ enrollmentId: item.enrollment.id, ...input });
-                        toast("success", input.feedbackForm ? "Feedback form marked complete." : "Completion proof recorded.");
+                      onToggle={(complete) => {
+                        markTrainingComplete(item.enrollment.id, complete);
+                        toast(complete ? "success" : "info", complete ? "Training marked complete." : "Training completion reopened.");
                       }}
                     />
                   </td>

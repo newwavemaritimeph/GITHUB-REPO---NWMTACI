@@ -2,7 +2,6 @@ import Link from "next/link";
 import { AuthForm } from "./auth-form";
 import { NewWaveLogo } from "./new-wave-logo";
 import { PublicCourseCatalog } from "./public-course-catalog";
-import { PublicSchedules } from "./public-schedules";
 import { RegistrationForm } from "./registration-form";
 import { RegistrationStatus } from "./registration-status";
 import { isDemoMode } from "@/lib/system/mode";
@@ -12,7 +11,6 @@ export type PublicPage =
   | "home"
   | "about"
   | "courses"
-  | "schedules"
   | "register"
   | "registration-search"
   | "contact"
@@ -21,7 +19,7 @@ export type PublicPage =
 const nav = [
   ["About", "/about"],
   ["Courses", "/courses"],
-  ["Schedules", "/schedules"],
+  ["Enrollment Form", "/register"],
   ["Contact", "/contact"],
 ] as const;
 
@@ -62,9 +60,8 @@ function Footer() {
       <div>
         <strong>Explore</strong>
         <Link href="/courses">Courses</Link>
-        <Link href="/schedules">Available schedules</Link>
-        <Link href="/register">Register online</Link>
-        <Link href="/registration-search">Check enrollment status</Link>
+        <Link href="/register">Enrollment form</Link>
+        <Link href="/registration-search">Status &amp; certificate check</Link>
       </div>
       <div>
         <strong>Access</strong>
@@ -105,8 +102,8 @@ function Home() {
             <Link className="button button-primary" href="/register">
               Start your registration <span aria-hidden="true">→</span>
             </Link>
-            <Link className="button button-secondary" href="/schedules">
-              See open schedules
+            <Link className="button button-secondary" href="/courses">
+              Browse courses
             </Link>
           </div>
           <div className="trust-row">
@@ -253,27 +250,11 @@ function Courses() {
         <span className="eyebrow">New Wave course catalog</span>
         <h1>Find the training that fits your next step.</h1>
         <p>
-          Browse STCW Courses, In-House Courses, and Endorsed Trainings in one simple list. Course fees are confirmed
-          privately during enrollment.
+          Browse all STCW and In-House courses in one list, filter by category, and see the schedules and slots open right
+          now. Course fees are confirmed during enrollment.
         </p>
       </div>
       <PublicCourseCatalog />
-    </section>
-  );
-}
-
-function Schedules() {
-  return (
-    <section className="inside-page">
-      <div className="inside-hero compact">
-        <span className="eyebrow">Available schedules</span>
-        <h1>Plan training around your voyage.</h1>
-        <p>
-          Published batches show only future schedules with available slots. Full, cancelled, ongoing, and past sessions are
-          hidden automatically.
-        </p>
-      </div>
-      <PublicSchedules />
     </section>
   );
 }
@@ -304,11 +285,11 @@ function RegistrationSearch() {
   return (
     <section className="inside-page narrow-page">
       <div className="inside-hero compact">
-        <span className="eyebrow">Enrollment status</span>
-        <h1>Check your enrollment status.</h1>
+        <span className="eyebrow">Enrollment status &amp; certificate verification</span>
+        <h1>Check your enrollment or verify a certificate.</h1>
         <p>
-          See your schedule, payment balance, training instructions, and certificate progress. For your protection, use both
-          the reference sent to you and the email address registered with New Wave.
+          Track every course under one registration reference, or confirm a certificate&apos;s authenticity by its number. No
+          trainee account is required.
         </p>
       </div>
       <RegistrationStatus />
@@ -442,8 +423,6 @@ export function PublicSite({ page }: { page: PublicPage }) {
       <About />
     ) : page === "courses" ? (
       <Courses />
-    ) : page === "schedules" ? (
-      <Schedules />
     ) : page === "register" ? (
       <Register />
     ) : page === "registration-search" ? (

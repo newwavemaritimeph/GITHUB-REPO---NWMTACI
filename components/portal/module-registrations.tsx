@@ -3,124 +3,112 @@
 import { useMemo, useState } from "react";
 import { DataTable, Drawer, EmptyState, Pill, SearchInput, Segmented, StatCard, useToast } from "@/components/ui/kit";
 import { formatDateTime, fullName, useSystem } from "@/lib/system/store";
-import type { Registration } from "@/lib/system/types";
+import type { RegistrationSubmission, SelectionStatus } from "@/lib/system/types";
+import { pesos } from "@/lib/endorsement-catalog";
 import { PageHeader, Panel, type Module } from "./shared";
 
 const filters = ["All", "Needs action", "Approved", "Rejected"] as const;
 
+const submissionTone = (status: RegistrationSubmission["status"]) =>
+  status === "Approved"
+    ? "green"
+    : status === "Rejected"
+      ? "red"
+      : status === "Possible Duplicate"
+        ? "violet"
+        : status === "Partially Approved"
+          ? "blue"
+          : "amber";
+
+const selectionTone = (status: SelectionStatus) =>
+  status === "Approved" ? "green" : status === "Rejected" || status === "Cancelled" ? "red" : status === "Change Requested" ? "violet" : "amber";
+
 export function RegistrationsModule({ go }: { go: (module: Module) => void }) {
-  const { state, approveRegistration, updateRegistrationStatus, seats } = useSystem();
+  const { state, submissionSelections, reviewSelection, approveSelection, updateSubmissionStatus, seats } = useSystem();
   const toast = useToast();
   const [filter, setFilter] = useState<(typeof filters)[number]>("All");
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<Registration | null>(null);
-  const [remarks, setRemarks] = useState("");
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  const needsAction = (status: RegistrationSubmission["status"]) =>
+    ["Submitted", "Under Review", "Possible Duplicate", "Partially Approved"].includes(status);
 
   const rows = useMemo(() => {
     const term = query.trim().toLowerCase();
-    return state.registrations.filter((registration) => {
-      const matchesFilter =
-        filter === "All" ||
-        (filter === "Needs action" && ["Submitted", "Under Review", "Possible Duplicate"].includes(registration.status)) ||
-        (filter === "Approved" && registration.status === "Approved") ||
-        (filter === "Rejected" && registration.status === "Rejected");
-      const haystack = `${registration.reference} ${fullName(registration)} ${registration.email} ${registration.courseName}`.toLowerCase();
-      return matchesFilter && (!term || haystack.includes(term));
-    });
-  }, [filter, query, state.registrations]);
+    return state.submissions
+      .filter((submission) => {
+        const matchesFilter =
+          filter === "All" ||
+          (filter === "Needs action" && needsAction(submission.status)) ||
+          (filter === "Approved" && submission.status === "Approved") ||
+          (filter === "Rejected" && submission.status === "Rejected");
+        const haystack = `${submission.reference} ${fullName(submission.applicant)} ${submission.applicant.email}`.toLowerCase();
+        return matchesFilter && (!term || haystack.includes(term));
+      })
+      .sort((left, right) => right.submittedAt.localeCompare(left.submittedAt));
+  }, [filter, query, state.submissions]);
 
-  const pending = state.registrations.filter((item) =>
-    ["Submitted", "Under Review", "Possible Duplicate"].includes(item.status),
-  ).length;
-  const duplicates = state.registrations.filter((item) => item.status === "Possible Duplicate").length;
-  const approvedToday = state.registrations.filter(
-    (item) => item.status === "Approved" && item.decidedAt?.slice(0, 10) === new Date().toISOString().slice(0, 10),
+  const pending = state.submissions.filter((item) => needsAction(item.status)).length;
+  const duplicates = state.submissions.filter((item) => item.status === "Possible Duplicate").length;
+  const today = new Date().toISOString().slice(0, 10);
+  const approvedToday = state.courseSelections.filter(
+    (item) => item.status === "Approved" && item.decidedAt?.slice(0, 10) === today,
   ).length;
 
-  function approve(registration: Registration) {
-    const enrollment = approveRegistration(registration.id);
-    if (enrollment) {
-      toast("success", `${enrollment.reference} created. The training fee is now billed.`);
-      setSelected(null);
-      go("Enrollments");
-    } else {
-      toast("danger", "That registration could not be approved.");
-    }
-  }
+  const active = openId ? state.submissions.find((item) => item.id === openId) : undefined;
+  const activeSelections = active ? submissionSelections(active.id) : [];
 
   return (
     <div className="page">
       <PageHeader
         eyebrow="Registration operations"
         title="Online registrations"
-        description="Every submission from the public website lands here for review, duplicate checking, and enrollment creation."
+        description="Each public submission may hold up to five course selections. Approve, hold, or return each course on its own."
       />
 
       <div className="stat-grid stat-grid-4">
-        <StatCard label="Awaiting review" value={String(pending)} note="Submitted from the website" tone={1} icon="!" />
+        <StatCard label="Awaiting review" value={String(pending)} note="Submissions from the website" tone={1} icon="!" />
         <StatCard label="Possible duplicates" value={String(duplicates)} note="Matched an existing trainee" tone={5} icon="◎" />
-        <StatCard label="Approved today" value={String(approvedToday)} note="Converted to enrollments" tone={2} icon="✓" />
-        <StatCard label="Total registrations" value={String(state.registrations.length)} note="All time" tone={0} icon="▤" />
+        <StatCard label="Courses approved today" value={String(approvedToday)} note="Converted to enrollments" tone={2} icon="✓" />
+        <StatCard label="Total submissions" value={String(state.submissions.length)} note="All time" tone={0} icon="▤" />
       </div>
 
       <Panel padded={false}>
         <div className="toolbar">
-          <SearchInput value={query} onChange={setQuery} placeholder="Search reference, name, email, or course" />
+          <SearchInput value={query} onChange={setQuery} placeholder="Search reference, name, or email" />
           <Segmented options={filters} value={filter} onChange={setFilter} />
         </div>
         {rows.length === 0 ? (
           <EmptyState
-            title="No registrations match"
-            text="Adjust the filter or search term, or submit a registration from the public website to see it appear here instantly."
+            title="No submissions match"
+            text="Adjust the filter or search term, or submit an enrollment form from the public website to see it appear here instantly."
           />
         ) : (
-          <DataTable columns={["Reference", "Applicant", "Course", "Preferred schedule", "Submitted", "Status", ""]}>
-            {rows.map((registration) => {
-              const batch = state.batches.find((item) => item.id === registration.batchId);
-              const seat = seats(registration.batchId);
+          <DataTable columns={["Reference", "Applicant", "Courses", "Submitted", "Status", ""]}>
+            {rows.map((submission) => {
+              const selections = submissionSelections(submission.id);
+              const approved = selections.filter((item) => item.status === "Approved").length;
               return (
-                <tr key={registration.id}>
+                <tr key={submission.id} className="row-clickable" onClick={() => setOpenId(submission.id)}>
                   <td>
-                    <strong>{registration.reference}</strong>
+                    <strong>{submission.reference}</strong>
                   </td>
                   <td>
-                    <strong>{fullName(registration)}</strong>
-                    <small>{registration.email}</small>
+                    <strong>{fullName(submission.applicant)}</strong>
+                    <small>{submission.applicant.email}</small>
                   </td>
                   <td>
-                    <strong>{registration.courseName}</strong>
-                    <small>{registration.courseCode}</small>
+                    <strong>
+                      {approved}/{selections.length} approved
+                    </strong>
+                    <small>{selections.map((item) => item.courseCode).join(", ")}</small>
                   </td>
+                  <td>{formatDateTime(submission.submittedAt)}</td>
                   <td>
-                    {batch?.batchNumber ?? "—"}
-                    <small>{seat.available} of {seat.capacity} slots open</small>
-                  </td>
-                  <td>{formatDateTime(registration.submittedAt)}</td>
-                  <td>
-                    <Pill
-                      tone={
-                        registration.status === "Approved"
-                          ? "green"
-                          : registration.status === "Rejected"
-                            ? "red"
-                            : registration.status === "Possible Duplicate"
-                              ? "violet"
-                              : "amber"
-                      }
-                    >
-                      {registration.status}
-                    </Pill>
+                    <Pill tone={submissionTone(submission.status)}>{submission.status}</Pill>
                   </td>
                   <td className="cell-actions">
-                    <button
-                      className="ghost-button"
-                      onClick={() => {
-                        setSelected(registration);
-                        setRemarks(registration.remarks ?? "");
-                      }}
-                    >
-                      Review
-                    </button>
+                    <button className="ghost-button">Review</button>
                   </td>
                 </tr>
               );
@@ -130,99 +118,138 @@ export function RegistrationsModule({ go }: { go: (module: Module) => void }) {
       </Panel>
 
       <Drawer
-        open={Boolean(selected)}
-        title={selected ? fullName(selected) : ""}
-        subtitle={selected?.reference}
-        onClose={() => setSelected(null)}
+        open={Boolean(active)}
+        title={active ? fullName(active.applicant) : ""}
+        subtitle={active?.reference}
+        onClose={() => setOpenId(null)}
       >
-        {selected && (
+        {active && (
           <>
             <dl className="detail-list">
               <div>
                 <dt>Email</dt>
-                <dd>{selected.email}</dd>
+                <dd>{active.applicant.email}</dd>
               </div>
               <div>
                 <dt>Mobile</dt>
-                <dd>{selected.mobile}</dd>
+                <dd>{active.applicant.mobile}</dd>
               </div>
               <div>
                 <dt>Birth date</dt>
-                <dd>{selected.birthDate}</dd>
+                <dd>{active.applicant.birthDate}</dd>
               </div>
               <div>
-                <dt>Address</dt>
-                <dd>{selected.address ?? "—"}</dd>
+                <dt>SRN</dt>
+                <dd>{active.applicant.srn ?? "Not provided"}</dd>
               </div>
               <div>
-                <dt>Emergency contact</dt>
+                <dt>Rank / Company</dt>
                 <dd>
-                  {selected.emergencyContactName ?? "—"}
-                  {selected.emergencyContactMobile ? ` · ${selected.emergencyContactMobile}` : ""}
+                  {active.applicant.rank ?? "—"}
+                  {active.applicant.company ? ` · ${active.applicant.company}` : ""}
                 </dd>
               </div>
               <div>
-                <dt>Course</dt>
-                <dd>{selected.courseName}</dd>
-              </div>
-              <div>
-                <dt>Requested batch</dt>
-                <dd>{state.batches.find((item) => item.id === selected.batchId)?.batchNumber ?? "—"}</dd>
-              </div>
-              <div>
                 <dt>Submitted</dt>
-                <dd>{formatDateTime(selected.submittedAt)}</dd>
+                <dd>{formatDateTime(active.submittedAt)}</dd>
               </div>
             </dl>
 
-            {selected.status === "Possible Duplicate" && (
+            {active.status === "Possible Duplicate" && (
               <div className="inline-note note-violet">
                 <strong>Possible duplicate</strong>
-                <p>{selected.remarks ?? "This applicant matches an existing trainee record."}</p>
-                <p>Approving links the enrollment to the existing trainee instead of creating a second record.</p>
+                <p>{active.remarks ?? "This applicant matches an existing trainee record."}</p>
+                <p>Approving a course links its enrollment to the existing trainee instead of creating a second record.</p>
               </div>
             )}
 
-            <label className="field field-full">
-              <span className="field-label">Reviewer remarks</span>
-              <textarea rows={3} value={remarks} onChange={(event) => setRemarks(event.target.value)} placeholder="Optional note kept on the registration record" />
-            </label>
+            <h3 className="drawer-section">Course selections</h3>
+            <div className="history-list">
+              {activeSelections.map((selection) => {
+                const batch = state.batches.find((item) => item.id === selection.batchId);
+                const seat = seats(selection.batchId);
+                const decided = selection.status === "Approved" || selection.status === "Rejected" || selection.status === "Cancelled";
+                return (
+                  <div key={selection.id} className="selection-card">
+                    <div className="selection-head">
+                      <div>
+                        <strong>
+                          {selection.sequence}. {selection.courseName}
+                        </strong>
+                        <small>
+                          {selection.courseCode} · {batch?.batchNumber ?? "—"} · {seat.available} of {seat.capacity} slots
+                        </small>
+                      </div>
+                      <Pill tone={selectionTone(selection.status)}>{selection.status}</Pill>
+                    </div>
+                    {selection.createdEnrollmentId && (
+                      <small className="muted-text">
+                        Enrollment {state.enrollments.find((item) => item.id === selection.createdEnrollmentId)?.reference}
+                      </small>
+                    )}
+                    {!decided && (
+                      <div className="cell-actions">
+                        <button
+                          className="ghost-button"
+                          disabled={seat.available === 0}
+                          onClick={() => {
+                            const enrollment = approveSelection(selection.id);
+                            if (enrollment) toast("success", `${enrollment.reference} created.`);
+                            else toast("warning", "That course could not be approved.");
+                          }}
+                        >
+                          Approve
+                        </button>
+                        <button
+                          className="ghost-button"
+                          onClick={() => {
+                            reviewSelection(selection.id, "Change Requested", "A different schedule is required.");
+                            toast("info", "Returned for a schedule change.");
+                          }}
+                        >
+                          Request change
+                        </button>
+                        <button
+                          className="ghost-button ghost-danger"
+                          onClick={() => {
+                            reviewSelection(selection.id, "Rejected", "Did not meet the requirements.");
+                            toast("warning", "Course selection rejected.");
+                          }}
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
 
-            {selected.status === "Approved" ? (
-              <div className="inline-note note-green">
-                <strong>Enrollment created</strong>
-                <p>
-                  {state.enrollments.find((item) => item.id === selected.enrollmentId)?.reference ?? "Enrollment"} is now
-                  tracked under Enrollments and Payments.
-                </p>
-              </div>
-            ) : (
-              <div className="drawer-actions">
-                <button className="primary-button" onClick={() => approve(selected)}>
-                  Approve and create enrollment
-                </button>
-                <button
-                  className="secondary-button"
-                  onClick={() => {
-                    updateRegistrationStatus(selected.id, "Under Review", remarks);
-                    toast("info", "Marked for review.");
-                    setSelected(null);
-                  }}
-                >
-                  Keep under review
-                </button>
-                <button
-                  className="danger-button"
-                  onClick={() => {
-                    updateRegistrationStatus(selected.id, "Rejected", remarks || "Did not meet the requirements.");
-                    toast("warning", "Registration rejected.");
-                    setSelected(null);
-                  }}
-                >
-                  Reject
-                </button>
-              </div>
-            )}
+            <h3 className="drawer-section">Consolidated fee</h3>
+            <p className="muted-text">
+              {pesos(
+                activeSelections
+                  .filter((item) => item.status !== "Rejected" && item.status !== "Cancelled")
+                  .reduce((sum, item) => sum + (state.batches.find((batch) => batch.id === item.batchId)?.feeCentavos ?? 0), 0),
+              )}{" "}
+              across {activeSelections.filter((item) => item.status !== "Rejected" && item.status !== "Cancelled").length} course(s).
+            </p>
+
+            <div className="drawer-actions">
+              <button className="secondary-button" onClick={() => go("Enrollments")}>
+                Open enrollments
+              </button>
+              <button
+                className="danger-button"
+                onClick={() => {
+                  updateSubmissionStatus(active.id, "Rejected", "Submission rejected.");
+                  toast("warning", "Whole submission rejected.");
+                  setOpenId(null);
+                }}
+              >
+                Reject submission
+              </button>
+            </div>
           </>
         )}
       </Drawer>

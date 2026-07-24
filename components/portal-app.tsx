@@ -51,7 +51,7 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
   const { state, views } = useSystem();
   const all = views();
 
-  const pendingRegistrations = state.registrations.filter((item) =>
+  const pendingRegistrations = state.submissions.filter((item) =>
     ["Submitted", "Under Review", "Possible Duplicate"].includes(item.status),
   );
   const pendingPayments = state.ledger.filter((entry) => entry.type === "payment" && entry.verification === "Pending");
@@ -84,7 +84,7 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
     ],
     Registration: [
       { label: "New registrations", value: String(pendingRegistrations.length), note: "From the public site", icon: "✎", module: "Registrations" },
-      { label: "Possible duplicates", value: String(state.registrations.filter((item) => item.status === "Possible Duplicate").length), note: "Need authorized review", icon: "◎", module: "Registrations" },
+      { label: "Possible duplicates", value: String(state.submissions.filter((item) => item.status === "Possible Duplicate").length), note: "Need authorized review", icon: "◎", module: "Registrations" },
       { label: "Active enrollments", value: String(all.filter((item) => item.stage !== "Cancelled").length), note: "All batches", icon: "▤", module: "Enrollments" },
       { label: "Instructions to send", value: String(readyInstructions.length), note: "Fully paid", icon: "✉", module: "Instructions" },
       { label: "Courses offered", value: String(state.batches.length), note: "Batches on record", icon: "□", module: "Courses & centers" },
@@ -295,7 +295,7 @@ function PortalShell({ previewMode }: { previewMode: boolean }) {
   const staffNotifications = state.notifications.filter((item) => item.audience === "staff");
   const unread = staffNotifications.filter((item) => !item.readAt);
   const pendingRequests = state.requests.filter((item) => item.status === "Pending").length;
-  const pendingRegistrations = state.registrations.filter((item) =>
+  const pendingRegistrations = state.submissions.filter((item) =>
     ["Submitted", "Under Review", "Possible Duplicate"].includes(item.status),
   ).length;
 
@@ -313,9 +313,9 @@ function PortalShell({ previewMode }: { previewMode: boolean }) {
         results.push({ key: `e-${enrollment.id}`, label: enrollment.reference, detail: enrollment.courseName, module: "Enrollments" });
       }
     });
-    state.registrations.forEach((registration) => {
-      if (`${registration.reference} ${fullName(registration)}`.toLowerCase().includes(term)) {
-        results.push({ key: `r-${registration.id}`, label: registration.reference, detail: `Registration · ${fullName(registration)}`, module: "Registrations" });
+    state.submissions.forEach((submission) => {
+      if (`${submission.reference} ${fullName(submission.applicant)}`.toLowerCase().includes(term)) {
+        results.push({ key: `r-${submission.id}`, label: submission.reference, detail: `Registration · ${fullName(submission.applicant)}`, module: "Registrations" });
       }
     });
     state.batches.forEach((batch) => {
@@ -324,7 +324,7 @@ function PortalShell({ previewMode }: { previewMode: boolean }) {
       }
     });
     return results.slice(0, 8);
-  }, [search, state.batches, state.enrollments, state.registrations, state.trainees]);
+  }, [search, state.batches, state.enrollments, state.submissions, state.trainees]);
 
   function go(module: Module) {
     setActive(module);
