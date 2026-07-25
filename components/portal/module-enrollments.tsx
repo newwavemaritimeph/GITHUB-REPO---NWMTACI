@@ -57,6 +57,7 @@ export function EnrollmentsModule({
   const [editFor, setEditFor] = useState<EnrollmentView | null>(null);
   const [editBatchId, setEditBatchId] = useState("");
   const [slipFor, setSlipFor] = useState<EnrollmentView | null>(null);
+  const [chargeFor, setChargeFor] = useState<EnrollmentView | null>(null);
   // Registration cannot open the Requests module, so changes are raised from here.
   const [requestFor, setRequestFor] = useState<EnrollmentView | null>(null);
   const [requestType, setRequestType] = useState<RequestType>("Reschedule");
@@ -265,6 +266,11 @@ export function EnrollmentsModule({
                   Record payment
                 </button>
               )}
+              {canRecordPayment && (
+                <button className="secondary-button" onClick={() => setChargeFor(active)}>
+                  Add charge
+                </button>
+              )}
               <button
                 className="secondary-button"
                 disabled={active.paymentStatus !== "Paid" || Boolean(active.enrollment.instructionsSentAt)}
@@ -362,10 +368,11 @@ export function EnrollmentsModule({
       </Drawer>
 
       <PaymentModal
+        key={payFor?.enrollment.id}
         target={payFor}
         onClose={() => setPayFor(null)}
-        onSubmit={(input) => {
-          const entry = recordPayment(input);
+        onSubmit={({ remarks, ...input }) => {
+          const entry = recordPayment({ ...input, description: remarks });
           if (entry) {
             toast(
               "success",
@@ -478,6 +485,19 @@ export function EnrollmentsModule({
         )}
       </Modal>
 
+      {chargeFor && (
+        <AddChargeModal
+          key={chargeFor.enrollment.id}
+          view={chargeFor}
+          charges={state.otherCharges.filter((charge) => charge.active)}
+          onClose={() => setChargeFor(null)}
+          onAdd={(name, amountCentavos) => {
+            addLedgerEntry({ enrollmentId: chargeFor.enrollment.id, type: "charge", amountCentavos, description: name });
+            toast("success", `${name} charge added.`);
+          }}
+        />
+      )}
+
       {slipFor && (
         <AdmissionSlipModal
           key={slipFor.enrollment.id}
@@ -527,14 +547,17 @@ export function PaymentModal({
     receivingAccount?: string;
     referenceNumber?: string;
     needsVerification?: boolean;
+    remarks?: string;
   }) => void;
 }) {
   const { state } = useSystem();
   const channels = state.paymentChannels.filter((channel) => channel.active);
-  const money = useMoneyInput();
+  // Auto-detect the outstanding balance as the default amount to collect.
+  const money = useMoneyInput(target ? (target.balanceCentavos / 100).toFixed(2) : "");
   const [method, setMethod] = useState<string>(channels[0]?.name ?? "Cash");
   const [reference, setReference] = useState("");
   const [account, setAccount] = useState("Main cashier");
+  const [remarks, setRemarks] = useState("");
 
   const selectedChannel = channels.find((channel) => channel.name === method);
   const requiresRef = selectedChannel?.requiresReference ?? method !== "Cash";
@@ -564,9 +587,11 @@ export function PaymentModal({
                 receivingAccount: account,
                 referenceNumber: requiresRef ? reference.trim() : undefined,
                 needsVerification: requiresRef,
+                remarks: remarks.trim() || undefined,
               });
               money.reset();
               setReference("");
+              setRemarks("");
             }}
           >
             {requiresRef ? "Submit for verification" : "Post payment"}
@@ -593,8 +618,11 @@ export function PaymentModal({
             <option>BPI 4491-0022-11</option>
           </select>
         </Field>
-        <Field label="Transaction reference" hint={requiresRef ? "Required for this channel" : "Not required for cash"}>
-          <input value={reference} onChange={(event) => setReference(event.target.value.toUpperCase())} disabled={!requiresRef} placeholder="e.g. 992313" />
+        <Field label="Transaction reference" hint={requiresRef ? "Type or scan the reference — no screenshot needed" : "Not required for cash"}>
+          <input value={reference} onChange={(event) => setReference(event.target.value.toUpperCase())} disabled={!requiresRef} placeholder="Encode or scan reference" />
+        </Field>
+        <Field label="Remarks" full>
+          <input value={remarks} onChange={(event) => setRemarks(event.target.value)} placeholder="Optional note for this payment" />
         </Field>
         <div className="form-full inline-note note-blue">
           <strong>{requiresRef ? `${method} payments require verification` : `${method} is posted immediately`}</strong>
@@ -605,6 +633,74 @@ export function PaymentModal({
           </p>
         </div>
       </div>
+    </Modal>
+  );
+}
+
+function AddChargeModal({
+  view,
+  charges,
+  onClose,
+  onAdd,
+}: {
+  view: EnrollmentView;
+  charges: { id: string; name: string; defaultAmountCentavos: number }[];
+  onClose: () => void;
+  onAdd: (name: string, amountCentavos: number) => void;
+}) {
+  const [chargeId, setChargeId] = useState(charges[0]?.id ?? "");
+  const selected = charges.find((charge) => charge.id === chargeId);
+  const money = useMoneyInput(selected ? (selected.defaultAmountCentavos / 100).toFixed(2) : "");
+  return (
+    <Modal
+      open
+      title="Add other charge"
+      description={`${view.enrollment.reference} · ${fullName(view.trainee)}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="secondary-button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="primary-button"
+            disabled={!selected || money.centavos <= 0}
+            onClick={() => {
+              if (!selected) return;
+              onAdd(selected.name, money.centavos);
+              onClose();
+            }}
+          >
+            Add charge
+          </button>
+        </>
+      }
+    >
+      {charges.length === 0 ? (
+        <EmptyState icon="₱" title="No charge types" text="Ask an Admin to add charge types under Accounting → Other charges." />
+      ) : (
+        <div className="form-grid">
+          <Field label="Charge type" full>
+            <select
+              value={chargeId}
+              onChange={(event) => {
+                setChargeId(event.target.value);
+                const next = charges.find((charge) => charge.id === event.target.value);
+                if (next) money.setRaw((next.defaultAmountCentavos / 100).toFixed(2));
+              }}
+            >
+              {charges.map((charge) => (
+                <option key={charge.id} value={charge.id}>
+                  {charge.name} — {pesos(charge.defaultAmountCentavos)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Amount (PHP)">
+            <input inputMode="decimal" value={money.raw} onChange={(event) => money.setRaw(event.target.value)} />
+          </Field>
+        </div>
+      )}
     </Modal>
   );
 }

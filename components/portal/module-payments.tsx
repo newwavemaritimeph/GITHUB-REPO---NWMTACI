@@ -208,10 +208,11 @@ export function PaymentsModule({ role }: { role: Role }) {
       )}
 
       <PaymentModal
+        key={payFor?.enrollment.id}
         target={payFor}
         onClose={() => setPayFor(null)}
-        onSubmit={(input) => {
-          const entry = recordPayment(input);
+        onSubmit={({ remarks, ...input }) => {
+          const entry = recordPayment({ ...input, description: remarks });
           if (entry) {
             toast(
               "success",

@@ -9,13 +9,14 @@ import type {
   Course,
   Enrollment,
   LedgerEntry,
+  OtherCharge,
   PartnerOfferRecord,
   PaymentChannel,
   SystemState,
   Trainee,
 } from "./types";
 
-export const SYSTEM_VERSION = 10;
+export const SYSTEM_VERSION = 11;
 
 function startOfToday() {
   const now = new Date();
@@ -256,6 +257,13 @@ export function createSeedState(): SystemState {
     { id: "pc-gcash", name: "GCash", requiresReference: true, active: true },
   ];
 
+  const otherCharges: OtherCharge[] = [
+    { id: "oc-uniform", name: "Uniform", defaultAmountCentavos: 150000, active: true },
+    { id: "oc-cancellation", name: "Cancellation Fee", defaultAmountCentavos: 35000, active: true },
+    { id: "oc-reprint", name: "Reprinting", defaultAmountCentavos: 25000, active: true },
+    { id: "oc-makeup", name: "Make-Up Class", defaultAmountCentavos: 50000, active: true },
+  ];
+
   const announcements: Announcement[] = [
     {
       id: "ann1",
@@ -274,6 +282,7 @@ export function createSeedState(): SystemState {
     courses,
     partnerOffers,
     paymentChannels,
+    otherCharges,
     announcements,
     submissions: [
       { id: "sub1", reference: "NWM-REG-2026-000208", applicant: { firstName: "Miguel", lastName: "Torres", birthDate: "1995-05-05", gender: "Male", nationality: "Filipino", civilStatus: "Single", email: "miguel.torres@example.com", mobile: "09181234567", address: "Las Pinas City", srn: "1005500881", seafarerStatus: "Active seafarer", rank: "Able Seaman", emergencyContactName: "Rita Torres", emergencyContactRelation: "Spouse", emergencyContactMobile: "09181234500", sourceOfInquiry: "Facebook" }, status: "Submitted", publicStatusMessage: "Your registration form has been received.", submittedAt: stamp(0, 8, 42) },

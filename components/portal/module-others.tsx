@@ -853,6 +853,7 @@ export function CatalogModule({ role }: { role: Role }) {
 
 type ChannelDraft = { id: string | null; name: string; requiresReference: boolean };
 type AnnouncementDraft = { id: string | null; title: string; body: string; expiresOn: string; pinned: boolean };
+type ChargeDraft = { id: string | null; name: string; amount: string };
 
 export function AccountingModule({ role }: { role: Role }) {
   const {
@@ -862,6 +863,9 @@ export function AccountingModule({ role }: { role: Role }) {
     addPaymentChannel,
     updatePaymentChannel,
     setPaymentChannelActive,
+    addOtherCharge,
+    updateOtherCharge,
+    setOtherChargeActive,
     postAnnouncement,
     updateAnnouncement,
     removeAnnouncement,
@@ -869,7 +873,9 @@ export function AccountingModule({ role }: { role: Role }) {
   const toast = useToast();
   const all = views();
   const canManage = role === "Admin" || role === "Accounting";
+  const canManageCharges = role === "Admin"; // Other charges catalog is Admin-only
   const [channelDraft, setChannelDraft] = useState<ChannelDraft | null>(null);
+  const [chargeDraft, setChargeDraft] = useState<ChargeDraft | null>(null);
   const [annDraft, setAnnDraft] = useState<AnnouncementDraft | null>(null);
 
   const payments = state.ledger.filter((entry) => entry.type === "payment" && entry.verification === "Verified");
@@ -1076,6 +1082,91 @@ export function AccountingModule({ role }: { role: Role }) {
           </Panel>
         </div>
       )}
+
+      {canManageCharges && (
+        <Panel
+          title="Other charges"
+          description="Admin-managed catalog the cashier can post (Uniform, Cancellation Fee, Reprinting, Make-Up Class)"
+          action={
+            <button className="link-button" onClick={() => setChargeDraft({ id: null, name: "", amount: "" })}>
+              ＋ Add charge type
+            </button>
+          }
+        >
+          <div className="history-list">
+            {state.otherCharges.map((charge) => (
+              <div key={charge.id} className={`history-row ${charge.active ? "" : "row-muted"}`}>
+                <div>
+                  <strong>{charge.name}</strong>
+                  <small>Default {pesos(charge.defaultAmountCentavos)}{charge.active ? "" : " · archived"}</small>
+                </div>
+                <div className="cell-actions">
+                  <button
+                    className="ghost-button"
+                    onClick={() => setChargeDraft({ id: charge.id, name: charge.name, amount: (charge.defaultAmountCentavos / 100).toString() })}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="ghost-button"
+                    onClick={() => {
+                      setOtherChargeActive(charge.id, !charge.active);
+                      toast("warning", `${charge.name} ${charge.active ? "archived" : "restored"}.`);
+                    }}
+                  >
+                    {charge.active ? "Archive" : "Restore"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
+
+      <Modal
+        open={Boolean(chargeDraft)}
+        title={chargeDraft?.id ? "Edit charge type" : "Add charge type"}
+        description="Cashiers pick from active charge types when adding to an enrollment."
+        onClose={() => setChargeDraft(null)}
+        footer={
+          <>
+            <button className="secondary-button" onClick={() => setChargeDraft(null)}>Cancel</button>
+            <button
+              className="primary-button"
+              onClick={() => {
+                if (!chargeDraft) return;
+                const name = chargeDraft.name.trim();
+                if (!name || !(Number(chargeDraft.amount) >= 0)) {
+                  toast("warning", "Enter a name and a valid default amount.");
+                  return;
+                }
+                const defaultAmountCentavos = Math.round(Number(chargeDraft.amount) * 100);
+                if (chargeDraft.id) {
+                  updateOtherCharge(chargeDraft.id, { name, defaultAmountCentavos });
+                  toast("success", `${name} updated.`);
+                } else {
+                  addOtherCharge({ name, defaultAmountCentavos });
+                  toast("success", `${name} added.`);
+                }
+                setChargeDraft(null);
+              }}
+            >
+              {chargeDraft?.id ? "Save changes" : "Add charge"}
+            </button>
+          </>
+        }
+      >
+        {chargeDraft && (
+          <div className="form-grid">
+            <Field label="Charge name*" full hint="e.g. Uniform, Cancellation Fee, Reprinting, Make-Up Class">
+              <input value={chargeDraft.name} onChange={(event) => setChargeDraft({ ...chargeDraft, name: event.target.value })} />
+            </Field>
+            <Field label="Default amount (₱)*">
+              <input type="number" min={0} step="1" value={chargeDraft.amount} onChange={(event) => setChargeDraft({ ...chargeDraft, amount: event.target.value })} />
+            </Field>
+          </div>
+        )}
+      </Modal>
 
       <Modal
         open={Boolean(channelDraft)}

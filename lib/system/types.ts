@@ -405,6 +405,15 @@ export type PaymentChannel = {
   active: boolean;
 };
 
+/** Admin-managed catalog of additional charges the cashier can post to an
+ * enrollment — Uniform, Cancellation Fee, Reprinting, Make-Up Class, etc. */
+export type OtherCharge = {
+  id: string;
+  name: string;
+  defaultAmountCentavos: number;
+  active: boolean;
+};
+
 export type Announcement = {
   id: string;
   title: string;
@@ -423,6 +432,7 @@ export type SystemState = {
   courses: Course[];
   partnerOffers: PartnerOfferRecord[];
   paymentChannels: PaymentChannel[];
+  otherCharges: OtherCharge[];
   announcements: Announcement[];
   submissions: RegistrationSubmission[];
   courseSelections: CourseSelection[];

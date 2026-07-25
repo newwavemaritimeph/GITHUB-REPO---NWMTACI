@@ -32,6 +32,7 @@ import type {
   Enrollment,
   EnrollmentView,
   LedgerEntry,
+  OtherCharge,
   PartnerOfferRecord,
   PaymentChannel,
   RegistrationLifecycle,
@@ -45,7 +46,7 @@ import type {
   Trainee,
 } from "./types";
 
-const STORAGE_KEY = "new-wave-system-v10";
+const STORAGE_KEY = "new-wave-system-v11";
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -347,6 +348,9 @@ type SystemContextValue = {
   addPaymentChannel: (input: Omit<PaymentChannel, "id" | "active">) => PaymentChannel;
   updatePaymentChannel: (id: string, patch: Partial<Omit<PaymentChannel, "id">>) => void;
   setPaymentChannelActive: (id: string, active: boolean) => void;
+  addOtherCharge: (input: Omit<OtherCharge, "id" | "active">) => OtherCharge;
+  updateOtherCharge: (id: string, patch: Partial<Omit<OtherCharge, "id">>) => void;
+  setOtherChargeActive: (id: string, active: boolean) => void;
   postAnnouncement: (input: Omit<Announcement, "id" | "postedBy" | "postedAt">) => Announcement;
   updateAnnouncement: (id: string, patch: Partial<Omit<Announcement, "id">>) => void;
   removeAnnouncement: (id: string) => void;
@@ -393,6 +397,7 @@ const REQUIRED_COLLECTIONS: (keyof SystemState)[] = [
   "courses",
   "partnerOffers",
   "paymentChannels",
+  "otherCharges",
   "announcements",
   "submissions",
   "courseSelections",
@@ -1225,6 +1230,46 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     [log, update],
   );
 
+  const addOtherCharge = useCallback<SystemContextValue["addOtherCharge"]>(
+    (input) => {
+      const charge: OtherCharge = { ...input, id: uid("oc"), active: true };
+      update((draft) => {
+        draft.otherCharges.push(charge);
+        log(draft, { action: "Other charge added", recordType: "OtherCharge", recordRef: charge.name });
+      });
+      return charge;
+    },
+    [log, update],
+  );
+
+  const updateOtherCharge = useCallback<SystemContextValue["updateOtherCharge"]>(
+    (id, patch) => {
+      update((draft) => {
+        const charge = draft.otherCharges.find((item) => item.id === id);
+        if (!charge) return;
+        Object.assign(charge, patch);
+        log(draft, { action: "Other charge updated", recordType: "OtherCharge", recordRef: charge.name });
+      });
+    },
+    [log, update],
+  );
+
+  const setOtherChargeActive = useCallback<SystemContextValue["setOtherChargeActive"]>(
+    (id, active) => {
+      update((draft) => {
+        const charge = draft.otherCharges.find((item) => item.id === id);
+        if (!charge) return;
+        charge.active = active;
+        log(draft, {
+          action: active ? "Other charge restored" : "Other charge archived",
+          recordType: "OtherCharge",
+          recordRef: charge.name,
+        });
+      });
+    },
+    [log, update],
+  );
+
   const postAnnouncement = useCallback<SystemContextValue["postAnnouncement"]>(
     (input) => {
       const announcement: Announcement = {
@@ -1728,6 +1773,9 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       addPaymentChannel,
       updatePaymentChannel,
       setPaymentChannelActive,
+      addOtherCharge,
+      updateOtherCharge,
+      setOtherChargeActive,
       postAnnouncement,
       updateAnnouncement,
       removeAnnouncement,
@@ -1764,6 +1812,9 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       addLedgerEntry,
       addPartnerOffer,
       addPaymentChannel,
+      addOtherCharge,
+      updateOtherCharge,
+      setOtherChargeActive,
       advancePayroll,
       postAnnouncement,
       removeAnnouncement,
