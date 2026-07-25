@@ -19,7 +19,7 @@ const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "cur
 const num = (raw: string | null) => (raw == null || raw.trim() === "" ? null : Math.round(Number(raw) * 100));
 
 export function LiveAccounting({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
-  const [tab, setTab] = useState<"Overview" | "Setup">("Overview");
+  const [tab, setTab] = useState<"Overview" | "Vouchers" | "Setup">("Overview");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const canManage = role === "admin" || role === "accounting";
@@ -58,7 +58,7 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         <div><span className="portal-eyebrow">Financial control</span><h1>Accounting</h1><p>Collections, disbursements, receivables, and setup — from the live Supabase ledger.</p></div>
       </div>
       <div className="portal-tabs">
-        {(["Overview", "Setup"] as const).map((item) => (
+        {(["Overview", "Vouchers", "Setup"] as const).map((item) => (
           <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>
         ))}
       </div>
@@ -97,6 +97,38 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
             </tbody></table></div>
           </section>
         </>
+      )}
+
+      {tab === "Vouchers" && (
+        <section className="portal-panel">
+          <div className="panel-heading">
+            <div><h2>Expense vouchers</h2><p>Raise a voucher; Accounting approves, rejects, or marks it paid.</p></div>
+            <button className="portal-primary" disabled={busy} onClick={() => {
+              const payee = window.prompt("Payee?"); if (!payee) return;
+              const category = window.prompt("Category? (e.g. Supplies, Utilities)", "Supplies"); if (!category) return;
+              const amt = num(window.prompt("Amount (PHP)?")); if (!amt) return;
+              const purpose = window.prompt("Purpose / description?"); if (!purpose) return;
+              void post({ action: "expense-create", payee, category, amountCentavos: amt, purpose });
+            }}>+ Raise voucher</button>
+          </div>
+          <div className="portal-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
+            {data.expenses.map((e) => (
+              <tr key={e.id}>
+                <td><strong>{e.expense_number}</strong></td>
+                <td>{e.payee}</td>
+                <td>{e.category}</td>
+                <td>{pesos(e.amount_centavos)}</td>
+                <td>{e.status}</td>
+                <td className="document-actions">
+                  {canManage && e.status === "Pending" && <button disabled={busy} onClick={() => post({ action: "expense-decide", id: e.id, decision: "Approved" })}>Approve</button>}
+                  {canManage && e.status === "Pending" && <button disabled={busy} onClick={() => post({ action: "expense-decide", id: e.id, decision: "Rejected" })}>Reject</button>}
+                  {canManage && e.status === "Approved" && <button disabled={busy} onClick={() => post({ action: "expense-decide", id: e.id, decision: "Paid" })}>Mark paid</button>}
+                </td>
+              </tr>
+            ))}
+            {!data.expenses.length && <tr><td colSpan={6}><span className="portal-empty-copy">No vouchers yet.</span></td></tr>}
+          </tbody></table></div>
+        </section>
       )}
 
       {tab === "Setup" && (

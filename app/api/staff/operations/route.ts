@@ -40,8 +40,10 @@ const channelInput = z.object({ action: z.literal("channel-save"), id: z.string(
 const chargeInput = z.object({ action: z.literal("charge-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), defaultAmountCentavos: z.number().int().nonnegative().default(0), active: z.boolean().optional() });
 const agencyInput = z.object({ action: z.literal("agency-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), contactName: z.string().trim().max(120).optional(), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
 const payableInput = z.object({ action: z.literal("payable-save"), id: z.string().uuid().nullable().optional(), description: z.string().trim().min(1).max(200), amountCentavos: z.number().int().positive().optional(), dueOn: z.string().date().nullable().optional(), remove: z.boolean().optional() });
+const expenseCreateInput = z.object({ action: z.literal("expense-create"), payee: z.string().trim().min(1).max(120), category: z.string().trim().min(1).max(80), amountCentavos: z.number().int().positive(), purpose: z.string().trim().min(1).max(300) });
+const expenseDecideInput = z.object({ action: z.literal("expense-decide"), id: z.string().uuid(), decision: z.enum(["Approved", "Rejected", "Paid"]) });
 
-const actionInput = z.union([batchInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput]);
+const actionInput = z.union([batchInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput]);
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
 
@@ -126,6 +128,25 @@ export async function POST(request: Request) {
       if (!input.amountCentavos) return NextResponse.json({ error: "Amount is required." }, { status: 400 });
       const row = { description: input.description, amount_centavos: input.amountCentavos, due_on: input.dueOn || null };
       const { error } = input.id ? await admin.from("payables").update(row).eq("id", input.id) : await admin.from("payables").insert(row);
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "expense-create") {
+      if (!staff.roleCodes.some((role) => ["admin", "accounting", "cashier"].includes(role))) return NextResponse.json({ error: "Your account cannot raise expense vouchers." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { count } = await admin.from("expenses").select("id", { count: "exact", head: true });
+      const expenseNumber = `CV-${new Date().getFullYear()}-${String((count ?? 0) + 1).padStart(6, "0")}`;
+      const { error } = await admin.from("expenses").insert({ expense_number: expenseNumber, payee: input.payee, category: input.category, amount_centavos: input.amountCentavos, purpose: input.purpose, status: "Pending", requested_by: staff.user.id });
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "expense-decide") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot decide expenses." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const patch = input.decision === "Paid"
+        ? { status: "Paid", paid_at: new Date().toISOString(), approved_by: staff.user.id }
+        : { status: input.decision, approved_by: staff.user.id };
+      const { error } = await admin.from("expenses").update(patch).eq("id", input.id);
       if (error) throw error;
       return NextResponse.json({ ok: true });
     }
