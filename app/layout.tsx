@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Jost } from "next/font/google";
 import "./globals.css";
 import "./catalog.css";
 import "./portal-legacy.css";
@@ -13,6 +13,14 @@ const geistSans = Geist({
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+// Display face for headings and branding — a thin, geometric, wide-tracked
+// uppercase look matching the New Wave typographic reference.
+const jost = Jost({
+  variable: "--font-display",
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600"],
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -46,7 +54,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${jost.variable} antialiased`}>
         {children}
       </body>
     </html>

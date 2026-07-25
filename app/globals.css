@@ -106,6 +106,30 @@ p {
   margin-top: 0;
 }
 
+/* Display face for headings + branding — geometric, thin, wide-tracked. */
+h1,
+h2,
+h3,
+h4,
+.eyebrow,
+.tagline-lead,
+.tagline-sub {
+  font-family: var(--font-display), var(--font-geist-sans), "Segoe UI", system-ui, sans-serif;
+}
+
+/* All data entries render in ALL CAPS (email/password/date/number keep their
+   case; placeholders stay in normal case for legibility). */
+input[type="text"],
+input[type="search"],
+input:not([type]),
+textarea {
+  text-transform: uppercase;
+}
+input::placeholder,
+textarea::placeholder {
+  text-transform: none;
+}
+
 img {
   max-width: 100%;
   height: auto;
@@ -1190,9 +1214,11 @@ img {
 }
 
 .section-heading h2 {
-  font-size: clamp(28px, 3.4vw, 40px);
-  line-height: 1.18;
-  letter-spacing: -0.025em;
+  font-size: clamp(26px, 3.2vw, 38px);
+  line-height: 1.22;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 400;
   color: var(--blue-dark);
   margin-bottom: 14px;
 }
@@ -1329,9 +1355,11 @@ img {
 }
 
 .inside-hero h1 {
-  font-size: clamp(32px, 4.4vw, 52px);
-  line-height: 1.1;
-  letter-spacing: -0.03em;
+  font-size: clamp(30px, 4.2vw, 48px);
+  line-height: 1.14;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  font-weight: 300;
   color: var(--blue-dark);
   margin-bottom: 18px;
 }
@@ -2671,7 +2699,9 @@ code {
   font-size: clamp(24px, 2.6vw, 31px);
   line-height: 1.16;
   color: var(--blue-dark);
-  letter-spacing: -0.02em;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 500;
   margin: 0 0 6px;
 }
 
@@ -5073,18 +5103,19 @@ code {
   margin-bottom: 22px;
 }
 .tagline-lead {
-  font-size: clamp(38px, 5.4vw, 68px);
-  line-height: 1.02;
-  letter-spacing: -0.02em;
+  font-size: clamp(36px, 5.2vw, 66px);
+  line-height: 1.06;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--blue-dark);
-  font-weight: 700;
+  font-weight: 300;
 }
 .tagline-sub {
-  font-size: clamp(15px, 1.8vw, 22px);
+  font-size: clamp(14px, 1.7vw, 21px);
   letter-spacing: 0.42em;
   text-transform: uppercase;
   color: var(--orange-dark);
-  font-weight: 500;
+  font-weight: 400;
   padding-left: 3px;
 }
 
