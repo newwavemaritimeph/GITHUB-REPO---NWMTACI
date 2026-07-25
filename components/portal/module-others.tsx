@@ -24,7 +24,7 @@ import {
   type DateRange,
   type ReportRangePreset,
 } from "@/lib/reporting";
-import type { Role, RequestType, Trainee } from "@/lib/system/types";
+import type { EnrollmentView, Role, RequestType, Trainee } from "@/lib/system/types";
 import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn } from "@/lib/validation";
 import { PageHeader, Panel, StageBadge, type Module } from "./shared";
 
@@ -47,10 +47,62 @@ function FacebookEncoder({ trainee, onSave }: { trainee: Trainee; onSave: (link:
   );
 }
 
-export function TraineesModule({ go }: { go: (module: Module) => void }) {
-  const { state, views, createTrainee, setTraineeFacebook } = useSystem();
+const PAYMENT_STATUSES = ["All statuses", "Paid", "Unpaid", "Partially Paid", "Cancelled", "Refunded"] as const;
+
+/** Payment status of one enrollment, extended with Refunded (not in the base type). */
+function paymentStatusOf(item: EnrollmentView): string {
+  if (item.stage === "Cancelled") return "Cancelled";
+  if (item.entries.some((entry) => entry.type === "refund" || entry.type === "reversal")) return "Refunded";
+  return item.paymentStatus;
+}
+
+function statusTone(status: string): string {
+  if (status === "Paid") return "green";
+  if (status === "Partially Paid") return "amber";
+  if (status === "Cancelled" || status === "Refunded") return "slate";
+  return "red";
+}
+
+const normalizeName = (trainee: Trainee) =>
+  `${trainee.firstName} ${trainee.middleName ?? ""} ${trainee.lastName}`.toLowerCase().replace(/\s+/g, " ").trim();
+
+/** Groups of 2+ trainees sharing an exact SRN or an exact first+middle+last name. */
+function duplicateGroups(trainees: Trainee[]): Trainee[][] {
+  const push = (map: Map<string, Trainee[]>, key: string, trainee: Trainee) => {
+    const list = map.get(key) ?? [];
+    list.push(trainee);
+    map.set(key, list);
+  };
+  const bySrn = new Map<string, Trainee[]>();
+  const byName = new Map<string, Trainee[]>();
+  trainees.forEach((trainee) => {
+    const srn = (trainee.srn ?? "").replace(/\D/g, "");
+    if (srn) push(bySrn, srn, trainee);
+    push(byName, normalizeName(trainee), trainee);
+  });
+  const groups: Trainee[][] = [];
+  const seen = new Set<string>();
+  [bySrn, byName].forEach((map) =>
+    map.forEach((list) => {
+      if (list.length < 2) return;
+      const key = list.map((trainee) => trainee.id).sort().join(",");
+      if (seen.has(key)) return;
+      seen.add(key);
+      groups.push([...list].sort((a, z) => a.createdAt.localeCompare(z.createdAt)));
+    }),
+  );
+  return groups;
+}
+
+export function TraineesModule({ role }: { go: (module: Module) => void; role: Role }) {
+  const { state, views, createTrainee, setTraineeFacebook, mergeTrainees } = useSystem();
   const toast = useToast();
+  const showAmounts = role !== "Registration";
   const [query, setQuery] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState<(typeof PAYMENT_STATUSES)[number]>("All statuses");
+  const [view, setView] = useState<"All trainees" | "Possible duplicates">("All trainees");
   const [selected, setSelected] = useState<Trainee | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   // Mirrors the public registration form field for field, so a trainee created by
@@ -64,15 +116,32 @@ export function TraineesModule({ go }: { go: (module: Module) => void }) {
   const [draft, setDraft] = useState(emptyDraft);
 
   const all = views();
+  const statusesByTrainee = useMemo(() => {
+    const map = new Map<string, string[]>();
+    all.forEach((item) => {
+      const list = map.get(item.trainee.id) ?? [];
+      list.push(paymentStatusOf(item));
+      map.set(item.trainee.id, list);
+    });
+    return map;
+  }, [all]);
+
   const rows = useMemo(() => {
     const term = query.trim().toLowerCase();
-    return state.trainees.filter(
-      (trainee) => !term || `${fullName(trainee)} ${trainee.traineeNumber} ${trainee.email} ${trainee.mobile}`.toLowerCase().includes(term),
-    );
-  }, [query, state.trainees]);
+    return state.trainees.filter((trainee) => {
+      const created = trainee.createdAt.slice(0, 10);
+      const matchesTerm =
+        !term || `${fullName(trainee)} ${trainee.traineeNumber} ${trainee.email} ${trainee.mobile}`.toLowerCase().includes(term);
+      const matchesFrom = !fromDate || created >= fromDate;
+      const matchesTo = !toDate || created <= toDate;
+      const matchesStatus = statusFilter === "All statuses" || (statusesByTrainee.get(trainee.id) ?? []).includes(statusFilter);
+      return matchesTerm && matchesFrom && matchesTo && matchesStatus;
+    });
+  }, [query, fromDate, toDate, statusFilter, statusesByTrainee, state.trainees]);
 
+  const groups = useMemo(() => duplicateGroups(state.trainees), [state.trainees]);
   const selectedViews = selected ? all.filter((item) => item.trainee.id === selected.id) : [];
-  const duplicates = state.submissions.filter((item) => item.status === "Possible Duplicate").length;
+  const duplicateCount = groups.reduce((sum, group) => sum + group.length - 1, 0);
 
   return (
     <div className="page">
@@ -90,18 +159,82 @@ export function TraineesModule({ go }: { go: (module: Module) => void }) {
       <div className="stat-grid stat-grid-4">
         <StatCard label="Trainee records" value={String(state.trainees.length)} note="All programs" tone={0} icon="◎" />
         <StatCard label="With active enrollment" value={String(new Set(all.filter((item) => item.stage !== "Cancelled").map((item) => item.trainee.id)).size)} note="Currently in the pipeline" tone={3} icon="▤" />
-        <StatCard label="Possible duplicates" value={String(duplicates)} note="Awaiting authorized review" tone={1} icon="!" onClick={() => go("Registrations")} />
+        <StatCard label="Possible duplicates" value={String(duplicateCount)} note="Same SRN or full name" tone={1} icon="!" onClick={() => setView("Possible duplicates")} />
         <StatCard label="Certificates released" value={String(all.filter((item) => item.certificate?.status === "Released").length)} note="Completion records" tone={2} icon="✓" />
       </div>
 
       <Panel padded={false}>
-        <div className="toolbar">
-          <SearchInput value={query} onChange={setQuery} placeholder="Search name, trainee number, email, or mobile" />
+        <div className="toolbar toolbar-wrap">
+          <Segmented options={["All trainees", "Possible duplicates"] as const} value={view} onChange={setView} />
+          {view === "All trainees" && (
+            <>
+              <SearchInput value={query} onChange={setQuery} placeholder="Search name, number, email, or mobile" />
+              <label className="inline-field">
+                <span>From</span>
+                <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+              </label>
+              <label className="inline-field">
+                <span>To</span>
+                <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+              </label>
+              <label className="inline-field">
+                <span>Status</span>
+                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as (typeof PAYMENT_STATUSES)[number])}>
+                  {PAYMENT_STATUSES.map((item) => (
+                    <option key={item}>{item}</option>
+                  ))}
+                </select>
+              </label>
+              {(fromDate || toDate || statusFilter !== "All statuses" || query) && (
+                <button className="link-button toolbar-end" onClick={() => { setFromDate(""); setToDate(""); setStatusFilter("All statuses"); setQuery(""); }}>
+                  Clear filters
+                </button>
+              )}
+            </>
+          )}
         </div>
-        {rows.length === 0 ? (
-          <EmptyState title="No trainee matches" text="Try another search term, or create a trainee record manually." />
+
+        {view === "Possible duplicates" ? (
+          groups.length === 0 ? (
+            <EmptyState icon="✓" title="No duplicates detected" text="No trainees share an SRN or an exact first, middle, and last name." />
+          ) : (
+            <div className="dup-list">
+              {groups.map((group, index) => {
+                const survivor = group[0];
+                return (
+                  <div key={index} className="dup-group">
+                    <div className="dup-head">
+                      <strong>{fullName(survivor)}</strong>
+                      <small>{group.length} matching records · {survivor.srn ? `SRN ${survivor.srn}` : "same full name"}</small>
+                    </div>
+                    {group.map((trainee) => (
+                      <div key={trainee.id} className="dup-row">
+                        <div>
+                          <strong>{trainee.traineeNumber}{trainee.id === survivor.id ? " · keep (oldest)" : ""}</strong>
+                          <small>{trainee.email} · {trainee.mobile} · created {formatDate(trainee.createdAt)}</small>
+                        </div>
+                        {trainee.id !== survivor.id && (
+                          <button
+                            className="ghost-button ghost-danger"
+                            onClick={() => {
+                              mergeTrainees(survivor.id, trainee.id);
+                              toast("success", `${trainee.traineeNumber} merged into ${survivor.traineeNumber}.`);
+                            }}
+                          >
+                            Merge &amp; delete
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : rows.length === 0 ? (
+          <EmptyState title="No trainee matches" text="Adjust the search, date range, or status filter." />
         ) : (
-          <DataTable columns={["Trainee", "Contact", "Enrollments", "Balance", "Latest stage", ""]} minWidth={940}>
+          <DataTable columns={["Trainee", "Contact", "Enrollments", showAmounts ? "Balance" : "Payment status", "Latest stage", ""]} minWidth={940}>
             {rows.map((trainee) => {
               const owned = all.filter((item) => item.trainee.id === trainee.id);
               const balance = owned.reduce((sum, item) => sum + item.balanceCentavos, 0);
@@ -122,7 +255,17 @@ export function TraineesModule({ go }: { go: (module: Module) => void }) {
                   </td>
                   <td>{owned.length}</td>
                   <td>
-                    <strong className={balance > 0 ? "value-danger" : "value-good"}>{pesos(balance)}</strong>
+                    {showAmounts ? (
+                      <strong className={balance > 0 ? "value-danger" : "value-good"}>{pesos(balance)}</strong>
+                    ) : owned[0] ? (
+                      <div className="status-stack">
+                        {owned.slice(0, 3).map((item) => (
+                          <Pill key={item.enrollment.id} tone={statusTone(paymentStatusOf(item))}>{paymentStatusOf(item)}</Pill>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="muted-text">—</span>
+                    )}
                   </td>
                   <td>{owned[0] ? <StageBadge stage={owned[0].stage} /> : <span className="muted-text">No enrollment</span>}</td>
                   <td className="cell-actions">
@@ -187,8 +330,14 @@ export function TraineesModule({ go }: { go: (module: Module) => void }) {
                       </small>
                     </div>
                     <div className="history-right">
-                      <StageBadge stage={item.stage} />
-                      <small>{item.balanceCentavos > 0 ? `${pesos(item.balanceCentavos)} balance` : "Settled"}</small>
+                      {showAmounts ? (
+                        <>
+                          <StageBadge stage={item.stage} />
+                          <small>{item.balanceCentavos > 0 ? `${pesos(item.balanceCentavos)} balance` : "Settled"}</small>
+                        </>
+                      ) : (
+                        <Pill tone={statusTone(paymentStatusOf(item))}>{paymentStatusOf(item)}</Pill>
+                      )}
                     </div>
                   </div>
                 ))}

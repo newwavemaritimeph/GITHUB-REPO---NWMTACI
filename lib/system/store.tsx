@@ -329,6 +329,7 @@ type SystemContextValue = {
   cancelEnrollment: (id: string, reason: string) => void;
   createTrainee: (input: Omit<Trainee, "id" | "traineeNumber" | "createdAt">) => Trainee;
   setTraineeFacebook: (id: string, facebookLink: string) => void;
+  mergeTrainees: (survivorId: string, duplicateId: string) => void;
   /* money */
   recordPayment: (input: PaymentInput) => LedgerEntry | undefined;
   setPaymentVerification: (id: string, verification: "Verified" | "Rejected") => void;
@@ -649,6 +650,43 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
         if (!trainee) return;
         trainee.facebookLink = facebookLink.trim() || undefined;
         log(draft, { action: "Facebook link encoded", recordType: "Trainee", recordRef: trainee.traineeNumber });
+      });
+    },
+    [log, update],
+  );
+
+  const mergeTrainees = useCallback<SystemContextValue["mergeTrainees"]>(
+    (survivorId, duplicateId) => {
+      if (survivorId === duplicateId) return;
+      update((draft) => {
+        const survivor = draft.trainees.find((item) => item.id === survivorId);
+        const duplicate = draft.trainees.find((item) => item.id === duplicateId);
+        if (!survivor || !duplicate) return;
+        // Keep the survivor's data, backfilling only blanks from the duplicate.
+        survivor.middleName ??= duplicate.middleName;
+        survivor.suffix ??= duplicate.suffix;
+        survivor.srn ??= duplicate.srn;
+        survivor.address ??= duplicate.address;
+        survivor.company ??= duplicate.company;
+        survivor.rank ??= duplicate.rank;
+        survivor.facebookLink ??= duplicate.facebookLink;
+        survivor.emergencyContactName ??= duplicate.emergencyContactName;
+        survivor.emergencyContactRelation ??= duplicate.emergencyContactRelation;
+        survivor.emergencyContactMobile ??= duplicate.emergencyContactMobile;
+        // Move the duplicate's records onto the survivor, then remove the duplicate.
+        draft.enrollments.forEach((enrollment) => {
+          if (enrollment.traineeId === duplicateId) enrollment.traineeId = survivorId;
+        });
+        draft.submissions.forEach((submission) => {
+          if (submission.traineeId === duplicateId) submission.traineeId = survivorId;
+        });
+        draft.trainees = draft.trainees.filter((item) => item.id !== duplicateId);
+        log(draft, {
+          action: "Duplicate trainee merged",
+          recordType: "Trainee",
+          recordRef: survivor.traineeNumber,
+          detail: `Merged ${duplicate.traineeNumber} into ${survivor.traineeNumber}`,
+        });
       });
     },
     [log, update],
@@ -1607,6 +1645,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       cancelEnrollment,
       createTrainee,
       setTraineeFacebook,
+      mergeTrainees,
       recordPayment,
       setPaymentVerification,
       addLedgerEntry,
@@ -1668,6 +1707,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       createRequest,
       createTrainee,
       setTraineeFacebook,
+      mergeTrainees,
       decideExpense,
       decideLeave,
       decideRequest,

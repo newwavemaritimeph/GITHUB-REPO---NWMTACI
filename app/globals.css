@@ -253,6 +253,17 @@ img {
 .leaderboard-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--blue), var(--cyan)); }
 .leaderboard-count { flex: 0 0 auto; font-size: 16px; color: var(--blue-dark); }
 
+/* trainees: status stack + duplicates */
+.status-stack { display: flex; flex-wrap: wrap; gap: 4px; }
+.dup-list { display: grid; gap: 16px; padding: 18px; }
+.dup-group { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.dup-head { padding: 12px 16px; background: var(--red-soft); }
+.dup-head strong { display: block; color: var(--blue-dark); font-size: 15px; }
+.dup-head small { color: var(--red); font-size: 12px; }
+.dup-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--line-soft); }
+.dup-row strong { display: block; font-size: 14px; color: var(--blue-dark); }
+.dup-row small { font-size: 12px; color: var(--muted); }
+
 /* trainee facebook encoder */
 .fb-encoder { margin-bottom: 8px; }
 .fb-encoder-row { display: flex; gap: 8px; }

@@ -16,7 +16,7 @@ import {
   useToast,
 } from "@/components/ui/kit";
 import { pesos } from "@/lib/endorsement-catalog";
-import { formatDate, formatDateRange, formatDateTime, fullName, useSystem } from "@/lib/system/store";
+import { formatDate, formatDateRange, formatDateTime, fullName, todayIso, useSystem } from "@/lib/system/store";
 import type { EnrollmentView, RequestType } from "@/lib/system/types";
 import { PageHeader, Panel, StageBadge, StageTrack, type Module } from "./shared";
 
@@ -461,7 +461,9 @@ export function EnrollmentsModule({
           setNewOpen(false);
         }}
         trainees={state.trainees}
-        batches={state.batches.filter((batch) => batch.status === "Open" || batch.status === "Draft")}
+        batches={state.batches.filter(
+          (batch) => (batch.status === "Open" || batch.status === "Draft") && batch.startsOn >= todayIso(),
+        )}
         seats={seats}
       />
     </div>
