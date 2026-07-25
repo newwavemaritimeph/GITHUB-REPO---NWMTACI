@@ -17,9 +17,90 @@ export type PublicPage =
   | "staff-login";
 
 const nav = [
+  ["About New Wave", "/about"],
   ["Courses", "/courses"],
   ["Enrollment Status", "/registration-search"],
 ] as const;
+
+/* New Wave's official details and public channels. Update the two social URLs
+ * here if the Facebook page handle differs. */
+const CONTACT = {
+  address: "Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000",
+  mobile: "+63 948 847 6530",
+  telephone: "8553 0310",
+  email: "newwavemaritime@gmail.com",
+  facebook: "https://www.facebook.com/newwavemaritime",
+  messenger: "https://m.me/newwavemaritime",
+};
+
+const ACCREDITATIONS = [
+  ["MARINA", "Maritime Industry Authority — accredited training center"],
+  ["TESDA", "Technical Education and Skills Development Authority"],
+  ["STCW 1978", "As amended — international standards of training & certification"],
+  ["ISO 9001:2015", "Certified quality management system"],
+] as const;
+
+const VISION =
+  "To be a leading Maritime and TESDA Training and Assessment center where individuals gain valuable maritime and technical skills that open doors to rewarding careers through high-quality education and certification, helping our seafarers build competence and confidence, and setting them up for success in the maritime industry.";
+
+const MISSION =
+  "To provide high-quality, practical training that empowers seafarers with essential skills, knowledge, and confidence for a safe and rewarding career at sea — committed to fostering a supportive learning environment, upholding rigorous safety standards, and embracing innovation so our seafarers are well-prepared to meet the evolving demands of the maritime industry.";
+
+const CORE_VALUES = [
+  ["N", "Nurturing Growth", "An environment that encourages personal and professional development."],
+  ["E", "Excellence", "The highest quality in every training program."],
+  ["W", "Wisdom", "The value of knowledge and experience at sea."],
+  ["W", "Workmanship", "A culture of skill and craftsmanship."],
+  ["A", "Adaptability", "Flexibility and resilience in changing maritime environments."],
+  ["V", "Values of Safety", "Safety prioritized in all practices and training."],
+  ["E", "Empowerment", "Trainees equipped with the skills and confidence to succeed."],
+] as const;
+
+const BUSINESS_FOCUS = [
+  ["STCW-compliant courses", "Basic safety and STCW training aligned with international standards."],
+  ["Advanced shipboard courses", "Specialized and upgrading programs for seafarers and officers."],
+  ["In-house maritime programs", "New Wave's own catalog across deck, engine, and catering tracks."],
+  ["Competency assessments", "Assessment and certification for maritime and technical skills."],
+  ["Simulator-based instruction", "Practical, hands-on training on quality-standard equipment."],
+  ["Documentation assistance", "Support for seafarers' certificates and requirements."],
+] as const;
+
+const TESTIMONIALS = [
+  ["John Santos", "The training at New Wave Maritime was excellent. The practical skills and knowledge I gained prepared me well for my career."],
+  ["Daniel Reyes", "A transformative experience — the instructors were supportive and highly experienced."],
+  ["Ellaine Batangas", "I highly recommend New Wave for anyone building a career in the maritime industry."],
+] as const;
+
+function FacebookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor">
+      <path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06c0 5 3.66 9.14 8.44 9.94v-7.03H7.9v-2.9h2.54V9.85c0-2.51 1.49-3.9 3.78-3.9 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56v1.89h2.78l-.44 2.9h-2.34V22c4.78-.8 8.44-4.94 8.44-9.94Z" />
+    </svg>
+  );
+}
+
+function MessengerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="currentColor">
+      <path d="M12 2C6.36 2 2 6.13 2 11.7c0 2.91 1.19 5.42 3.14 7.16.16.14.26.35.27.57l.05 1.78c.02.57.6.94 1.12.71l1.98-.87c.17-.08.36-.09.54-.04 1.83.5 3.79.6 5.72.24C19.8 20.29 22 16.42 22 11.7 22 6.13 17.64 2 12 2Zm6 7.46-2.93 4.65c-.47.74-1.47.93-2.18.4l-2.33-1.75a.6.6 0 0 0-.72 0l-3.15 2.39c-.42.32-.97-.18-.69-.63l2.93-4.65c.47-.74 1.47-.93 2.18-.4l2.33 1.75c.21.16.51.16.72 0l3.15-2.39c.42-.32.97.18.69.63Z" />
+    </svg>
+  );
+}
+
+function SocialLinks({ className = "" }: { className?: string }) {
+  return (
+    <div className={`social-links ${className}`}>
+      <a href={CONTACT.facebook} target="_blank" rel="noopener noreferrer" className="social-btn facebook" aria-label="New Wave Maritime on Facebook">
+        <FacebookIcon />
+        <span>Facebook</span>
+      </a>
+      <a href={CONTACT.messenger} target="_blank" rel="noopener noreferrer" className="social-btn messenger" aria-label="Message New Wave Maritime">
+        <MessengerIcon />
+        <span>Messenger</span>
+      </a>
+    </div>
+  );
+}
 
 function Header() {
   return (
@@ -54,6 +135,7 @@ function Footer() {
       </div>
       <div>
         <strong>Explore</strong>
+        <Link href="/about">About New Wave</Link>
         <Link href="/courses">Courses</Link>
         <Link href="/register">Enrollment form</Link>
         <Link href="/registration-search">Status &amp; certificate check</Link>
@@ -67,19 +149,22 @@ function Footer() {
         <span className="status-dot" />
         Online registration is open
         <p>
-          5F (505) GLC Building, T.M. Kalaw corner A. Mabini, Ermita, Manila 1000
+          {CONTACT.address}
           <br />
-          +63 948 847 6530 · 8553 0310
+          {CONTACT.mobile} · {CONTACT.telephone}
+          <br />
+          {CONTACT.email}
         </p>
+        <SocialLinks className="footer-social" />
       </div>
     </footer>
   );
 }
 
-const journey = [
-  ["01", "Register online", "One guided form creates your trainee record and reserves a published schedule."],
-  ["02", "Pay and confirm", "Pay at the cashier or online. Every payment is verified and receipted."],
-  ["03", "Train and complete", "Instructions, attendance, and certificate release all tracked in your portal."],
+const highlights = [
+  ["⚓", "Professional Maritime Instructors", "Learn from supportive, highly experienced maritime professionals."],
+  ["🛠️", "Quality-Standard Equipment", "Practical, simulator-based training on modern, standard equipment."],
+  ["🎓", "Recognized Certification", "MARINA- and TESDA-aligned training that opens doors to a career at sea."],
 ] as const;
 
 function Home() {
@@ -87,14 +172,15 @@ function Home() {
     <>
       <section className="hero">
         <div className="hero-copy">
-          <span className="eyebrow">New Wave Maritime Training and Assessment Center</span>
+          <span className="eyebrow">MARINA-Accredited · ISO 9001:2015 Certified · TESDA</span>
           <h1 className="tagline-hero">
             <span className="tagline-lead">Ride the New Wave</span>
             <span className="tagline-sub">of Maritime Excellence</span>
           </h1>
           <p>
-            From enrollment to certificate release, New Wave keeps every step of your maritime training organized, visible,
-            and supported.
+            New Wave Maritime Training and Assessment Center empowers Filipino seafarers with high-quality, practical
+            training — over <strong>100 Maritime and Catering Management courses</strong> available both online and
+            face-to-face.
           </p>
           <div className="hero-actions">
             <Link className="button button-primary" href="/register">
@@ -104,51 +190,30 @@ function Home() {
               Browse courses
             </Link>
           </div>
-          <div className="trust-row">
-            <span>✓ Secure registration</span>
-            <span>✓ Verified payments</span>
-            <span>✓ Certificate tracking</span>
-          </div>
+          <SocialLinks className="hero-social" />
         </div>
-        <div className="hero-visual" aria-label="New Wave training journey">
+        <div className="hero-visual" aria-label="New Wave credentials">
           <div className="wave-card main">
-            <span className="card-kicker">Your training journey</span>
-            <h2>One clear path from registration to completion.</h2>
-            <div className="journey-steps">
-              <div className="done">
-                <b>1</b>
-                <span>
-                  <strong>Register</strong>
-                  <small>Your central trainee record</small>
-                </span>
-              </div>
-              <i />
-              <div className="active">
-                <b>2</b>
-                <span>
-                  <strong>Pay & train</strong>
-                  <small>Receipts, instructions, attendance</small>
-                </span>
-              </div>
-              <i />
-              <div>
-                <b>3</b>
-                <span>
-                  <strong>Complete</strong>
-                  <small>Verified attendance and certificate</small>
-                </span>
-              </div>
-            </div>
+            <span className="card-kicker">Trusted &amp; accredited</span>
+            <h2>Training built on recognized maritime standards.</h2>
+            <ul className="cred-badges">
+              {ACCREDITATIONS.map(([name, note]) => (
+                <li key={name}>
+                  <strong>{name}</strong>
+                  <small>{note}</small>
+                </li>
+              ))}
+            </ul>
           </div>
           <div className="float-card float-a">
-            <span>Next schedule</span>
-            <strong>Published by the Scheduler</strong>
+            <span>Modality</span>
+            <strong>Online &amp; Face-to-face</strong>
           </div>
           <div className="float-card float-b">
-            <span className="round-check">✓</span>
+            <span className="round-check">★</span>
             <div>
-              <strong>Registration saved</strong>
-              <small>Search by reference and email</small>
+              <strong>Thousands of trainees</strong>
+              <small>Trained for safer work at sea</small>
             </div>
           </div>
         </div>
@@ -156,33 +221,33 @@ function Home() {
 
       <section className="proof-strip">
         <div>
-          <strong>One trainee record</strong>
-          <span>No repeated information</span>
+          <strong>100+ courses</strong>
+          <span>Maritime &amp; Catering Management</span>
         </div>
         <div>
-          <strong>Live schedules</strong>
-          <span>Only available batches</span>
+          <strong>Online &amp; Face-to-face</strong>
+          <span>Flexible learning modalities</span>
         </div>
         <div>
-          <strong>Verified payments</strong>
-          <span>Receipts and balances</span>
+          <strong>Thousands of trainees</strong>
+          <span>Filipino seafarers trained</span>
         </div>
         <div>
-          <strong>Clear updates</strong>
-          <span>Portal and email notifications</span>
+          <strong>MARINA · TESDA · ISO</strong>
+          <span>Accredited and certified</span>
         </div>
       </section>
 
       <section className="section feature-section">
         <div className="section-heading">
-          <span className="eyebrow">Built around your next step</span>
-          <h2>Everything you need, without the guesswork.</h2>
-          <p>New Wave connects your enrollment, payment, training instructions, attendance, requests, and documents.</p>
+          <span className="eyebrow">Why train with New Wave</span>
+          <h2>Quality training, professional instructors.</h2>
+          <p>Everything we do is focused on preparing competent, confident seafarers for a rewarding career at sea.</p>
         </div>
         <div className="feature-grid">
-          {journey.map(([number, title, text]) => (
-            <article key={number}>
-              <span>{number}</span>
+          {highlights.map(([icon, title, text]) => (
+            <article key={title}>
+              <span aria-hidden="true">{icon}</span>
               <h3>{title}</h3>
               <p>{text}</p>
             </article>
@@ -190,14 +255,62 @@ function Home() {
         </div>
       </section>
 
-      <section className="section callout">
-        <div>
-          <span className="eyebrow light">Ready when you are</span>
-          <h2>Take the next step in your maritime career.</h2>
-          <p>Register online and let the New Wave team guide your enrollment.</p>
+      <section className="section vision-mission">
+        <article>
+          <span className="eyebrow">Our Vision</span>
+          <p>{VISION}</p>
+        </article>
+        <article>
+          <span className="eyebrow">Our Mission</span>
+          <p>{MISSION}</p>
+        </article>
+      </section>
+
+      <section className="section focus-section">
+        <div className="section-heading">
+          <span className="eyebrow">Business focus</span>
+          <h2>What we offer.</h2>
+          <p>A complete range of maritime training and assessment services under MARINA and TESDA approval.</p>
         </div>
-        <Link className="button button-white" href="/register">
-          Begin registration
+        <div className="focus-grid">
+          {BUSINESS_FOCUS.map(([title, text]) => (
+            <article key={title}>
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="section testimonial-section">
+        <div className="section-heading">
+          <span className="eyebrow">Testimonials</span>
+          <h2>What our trainees say.</h2>
+        </div>
+        <div className="testimonial-grid">
+          {TESTIMONIALS.map(([name, quote]) => (
+            <figure key={name}>
+              <blockquote>“{quote}”</blockquote>
+              <figcaption>{name}</figcaption>
+            </figure>
+          ))}
+        </div>
+      </section>
+
+      <section className="section location-section">
+        <div>
+          <span className="eyebrow">Visit us</span>
+          <h2>Find New Wave Maritime.</h2>
+          <p className="location-address">{CONTACT.address}</p>
+          <div className="location-contacts">
+            <span>Mobile <strong>{CONTACT.mobile}</strong></span>
+            <span>Tel <strong>{CONTACT.telephone}</strong></span>
+            <span>Email <strong>{CONTACT.email}</strong></span>
+          </div>
+          <SocialLinks />
+        </div>
+        <Link className="button button-primary" href="/register">
+          Enroll Now <span aria-hidden="true">→</span>
         </Link>
       </section>
     </>
@@ -206,36 +319,137 @@ function Home() {
 
 function About() {
   return (
-    <section className="inside-page">
+    <section className="inside-page about-page">
       <div className="inside-hero">
         <span className="eyebrow">About New Wave</span>
-        <h1>Training people for safer work at sea.</h1>
+        <h1>Empowering Filipino seafarers for safer work at sea.</h1>
         <p>
-          New Wave Maritime Training and Assessment Center, Inc. brings enrollment, training operations, and learner support
-          into one dependable experience.
+          New Wave Maritime Training and Assessment Center, Inc. opened its doors to Filipino seafarers on December 3, 2024.
+          Founded and led by <strong>Dr. Mark Anthony A. Vera</strong> — a dynamic leader from Negros with a solid background
+          in the maritime industry — together with a small, dedicated team, New Wave was built on a shared passion for
+          supporting seafarers through high-quality training and certification.
         </p>
       </div>
-      <div className="split-content">
+
+      <div className="about-vm">
         <article>
-          <h2>Clear systems. Human support.</h2>
-          <p>
-            Our integrated approach gives trainees a single record, accurate schedules, secure documents, and clear status
-            updates. Staff work from the same source of truth so every handoff is accountable.
-          </p>
-          <p>
-            Official accreditations, company history, and leadership details are managed through the Admin launch settings
-            before the public site goes live.
-          </p>
+          <span className="eyebrow">Vision</span>
+          <p>{VISION}</p>
         </article>
-        <div className="principle-card">
-          <span>Our operating principles</span>
-          <ul>
-            <li>Safety before speed</li>
-            <li>Accurate, auditable records</li>
-            <li>Respectful learner support</li>
-            <li>Secure handling of personal data</li>
-          </ul>
+        <article>
+          <span className="eyebrow">Mission</span>
+          <p>{MISSION}</p>
+        </article>
+      </div>
+
+      <div className="about-block">
+        <div className="section-heading left">
+          <span className="eyebrow">Core values</span>
+          <h2>The NEWWAVE that guides us.</h2>
         </div>
+        <div className="values-grid">
+          {CORE_VALUES.map(([letter, title, text], index) => (
+            <article key={`${title}-${index}`}>
+              <span className="value-letter" aria-hidden="true">{letter}</span>
+              <div>
+                <h3>{title}</h3>
+                <p>{text}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <div className="about-block">
+        <div className="section-heading left">
+          <span className="eyebrow">Business focus</span>
+          <h2>Maritime and TESDA training &amp; assessment.</h2>
+        </div>
+        <div className="focus-grid">
+          {BUSINESS_FOCUS.map(([title, text]) => (
+            <article key={title}>
+              <h3>{title}</h3>
+              <p>{text}</p>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <div className="about-block" id="accreditations">
+        <div className="section-heading left">
+          <span className="eyebrow">Accreditations</span>
+          <h2>Recognized and certified.</h2>
+        </div>
+        <div className="accred-grid">
+          {ACCREDITATIONS.map(([name, note]) => (
+            <article key={name}>
+              <strong>{name}</strong>
+              <p>{note}</p>
+            </article>
+          ))}
+        </div>
+        <p className="about-note">
+          Backed by our Certificate of Incorporation and Business Permit for the provision of maritime training and
+          assessment services.
+        </p>
+      </div>
+
+      <div className="about-block" id="team">
+        <div className="section-heading left">
+          <span className="eyebrow">Our people</span>
+          <h2>Led by experienced maritime professionals.</h2>
+        </div>
+        <div className="team-grid">
+          <article className="team-lead">
+            <span className="team-avatar" aria-hidden="true">MV</span>
+            <div>
+              <strong>Dr. Mark Anthony A. Vera</strong>
+              <span className="team-role">Founder &amp; Managing Head</span>
+              <p>A maritime industry leader from Negros, driving New Wave&apos;s mission to train competent, confident seafarers.</p>
+            </div>
+          </article>
+          <article className="team-note">
+            <p>
+              Dr. Vera is supported by a dedicated team of maritime instructors and staff committed to quality training and
+              learner support.
+            </p>
+          </article>
+        </div>
+      </div>
+
+      <div className="about-block" id="facilities">
+        <div className="section-heading left">
+          <span className="eyebrow">Facilities</span>
+          <h2>Built for practical, hands-on learning.</h2>
+        </div>
+        <div className="focus-grid">
+          <article>
+            <h3>Training classrooms</h3>
+            <p>Comfortable rooms for lectures and blended online / face-to-face sessions.</p>
+          </article>
+          <article>
+            <h3>Simulator-based instruction</h3>
+            <p>Practical training on quality-standard maritime equipment.</p>
+          </article>
+          <article>
+            <h3>Assessment area</h3>
+            <p>Dedicated space for competency assessment and certification.</p>
+          </article>
+        </div>
+      </div>
+
+      <div className="about-block about-visit">
+        <div className="section-heading left">
+          <span className="eyebrow">Visit us</span>
+          <h2>Come see New Wave Maritime.</h2>
+        </div>
+        <p className="location-address">{CONTACT.address}</p>
+        <div className="location-contacts">
+          <span>Mobile <strong>{CONTACT.mobile}</strong></span>
+          <span>Tel <strong>{CONTACT.telephone}</strong></span>
+          <span>Email <strong>{CONTACT.email}</strong></span>
+        </div>
+        <SocialLinks />
       </div>
     </section>
   );
@@ -248,8 +462,8 @@ function Courses() {
         <span className="eyebrow">New Wave course catalog</span>
         <h1>Find the training that fits your next step.</h1>
         <p>
-          Browse all STCW and In-House courses in one list, filter by category, and see the schedules and slots open right
-          now. Course fees are confirmed during enrollment.
+          Browse all STCW and In-House courses in one list, filter by category, and see the available dates open for
+          enrollment right now. Course fees are confirmed during enrollment.
         </p>
       </div>
       <PublicCourseCatalog />

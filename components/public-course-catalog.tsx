@@ -12,8 +12,27 @@ function isStcw(category: string) {
   return category === "Upcoming MARINA STCW" || category === "MARINA Domestic";
 }
 
+const monthLabel = (iso: string) =>
+  new Date(`${iso}T00:00:00`).toLocaleDateString("en-PH", { month: "long", year: "numeric" }).toUpperCase();
+const dayRange = (start: string, end: string) => {
+  const fmt = (iso: string) => new Date(`${iso}T00:00:00`).toLocaleDateString("en-PH", { month: "long", day: "numeric" }).toUpperCase();
+  return start === end ? fmt(start) : `${fmt(start)} – ${fmt(end)}`;
+};
+
+/** Group a course's open batches into [MONTH, [date ranges…]] so the public
+ * catalog can list every available date per month without exposing seat counts. */
+function groupByMonth(batches: { startsOn: string; endsOn: string }[]) {
+  const map = new Map<string, string[]>();
+  for (const batch of [...batches].sort((a, z) => a.startsOn.localeCompare(z.startsOn))) {
+    const key = monthLabel(batch.startsOn);
+    if (!map.has(key)) map.set(key, []);
+    map.get(key)!.push(dayRange(batch.startsOn, batch.endsOn));
+  }
+  return [...map.entries()];
+}
+
 function Catalog() {
-  const { state, openBatchesFor, seats, ready } = useSystem();
+  const { state, openBatchesFor, ready } = useSystem();
   const [filter, setFilter] = useState<Filter>("All Courses");
   const [query, setQuery] = useState("");
 
@@ -28,10 +47,9 @@ function Catalog() {
       return matchesFilter && matchesTerm;
     }).map((course) => {
       const schedules = ready ? openBatchesFor(course.code) : [];
-      const availableSlots = schedules.reduce((sum, batch) => sum + seats(batch.id).available, 0);
-      return { course, scheduleCount: schedules.length, availableSlots };
+      return { course, scheduleCount: schedules.length, months: groupByMonth(schedules) };
     });
-  }, [state.courses, filter, query, openBatchesFor, seats, ready]);
+  }, [state.courses, filter, query, openBatchesFor, ready]);
 
   return (
     <div className="catalog-wrap">
@@ -53,7 +71,7 @@ function Catalog() {
       </div>
 
       <div className="course-grid">
-        {rows.map(({ course, scheduleCount, availableSlots }) => (
+        {rows.map(({ course, scheduleCount, months }) => (
           <article key={course.id} className="course-card-public">
             <span className={`course-badge ${isStcw(course.category) ? "stcw" : "inhouse"}`}>{isStcw(course.category) ? "STCW" : "In-House"}</span>
             <h3>{course.course}</h3>
@@ -61,9 +79,26 @@ function Catalog() {
             <dl className="course-facts">
               <div><dt>Duration</dt><dd>{course.duration}</dd></div>
               <div><dt>Modality</dt><dd>{course.modality}</dd></div>
-              <div><dt>Available schedules</dt><dd>{scheduleCount > 0 ? scheduleCount : "None yet"}</dd></div>
-              <div><dt>Available slots</dt><dd>{scheduleCount > 0 ? availableSlots : "—"}</dd></div>
             </dl>
+            {scheduleCount > 0 ? (
+              <div className="course-schedules">
+                <span className="schedule-status open">● Open for enrollment</span>
+                <div className="schedule-months">
+                  {months.map(([month, ranges]) => (
+                    <div key={month} className="schedule-month">
+                      <span className="schedule-month-label">{month}</span>
+                      <ul>
+                        {ranges.map((range) => (
+                          <li key={range}>{range}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <span className="schedule-status soon">Schedule to be announced</span>
+            )}
             <Link className={`button button-primary button-small ${scheduleCount === 0 ? "button-muted" : ""}`} href="/register">
               {scheduleCount > 0 ? "Enroll Now" : "Ask about schedule"}
             </Link>
@@ -72,7 +107,7 @@ function Catalog() {
       </div>
       {rows.length === 0 && <div className="catalog-empty">No course matches your search.</div>}
       <p className="catalog-note">
-        Schedules and slots come directly from batches published by New Wave. Course fees are confirmed during enrollment.
+        Available dates come directly from batches published by New Wave. Course fees are confirmed during enrollment.
       </p>
     </div>
   );

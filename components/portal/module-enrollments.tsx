@@ -38,6 +38,7 @@ export function EnrollmentsModule({
     recordPayment,
     sendInstructions,
     cancelEnrollment,
+    changeEnrollmentBatch,
     createEnrollment,
     addLedgerEntry,
     createRequest,
@@ -48,6 +49,8 @@ export function EnrollmentsModule({
   const [openId, setOpenId] = useState<string | null>(focusId ?? null);
   const [payFor, setPayFor] = useState<EnrollmentView | null>(null);
   const [newOpen, setNewOpen] = useState(false);
+  const [editFor, setEditFor] = useState<EnrollmentView | null>(null);
+  const [editBatchId, setEditBatchId] = useState("");
   // Registration cannot open the Requests module, so changes are raised from here.
   const [requestFor, setRequestFor] = useState<EnrollmentView | null>(null);
   const [requestType, setRequestType] = useState<RequestType>("Reschedule");
@@ -243,6 +246,17 @@ export function EnrollmentsModule({
               >
                 Send instructions
               </button>
+              {active.enrollment.status !== "Cancelled" && (
+                <button
+                  className="secondary-button"
+                  onClick={() => {
+                    setEditFor(active);
+                    setEditBatchId(active.enrollment.batchId);
+                  }}
+                >
+                  Change course / schedule
+                </button>
+              )}
               <button
                 className="secondary-button"
                 onClick={() => {
@@ -377,6 +391,62 @@ export function EnrollmentsModule({
             <textarea rows={4} value={requestReason} onChange={(event) => setRequestReason(event.target.value)} />
           </Field>
         </div>
+      </Modal>
+
+      <Modal
+        open={Boolean(editFor)}
+        title="Change course / schedule"
+        description={editFor ? `${editFor.enrollment.reference} · currently ${editFor.enrollment.courseName}` : ""}
+        onClose={() => setEditFor(null)}
+        wide
+        footer={
+          <>
+            <button className="secondary-button" onClick={() => setEditFor(null)}>
+              Cancel
+            </button>
+            <button
+              className="primary-button"
+              disabled={!editFor || !editBatchId || editBatchId === editFor.enrollment.batchId}
+              onClick={() => {
+                if (!editFor) return;
+                changeEnrollmentBatch(editFor.enrollment.id, editBatchId);
+                toast("success", "Course / schedule updated and fee re-priced.");
+                setEditFor(null);
+              }}
+            >
+              Save change
+            </button>
+          </>
+        }
+      >
+        {editFor && (
+          <div className="form-grid">
+            <Field
+              label="New course &amp; schedule"
+              full
+              hint="Pick any open batch. This changes the course, schedule, and dates, and re-prices the training fee. Verified payments stay on the account."
+            >
+              <select value={editBatchId} onChange={(event) => setEditBatchId(event.target.value)}>
+                {[
+                  ...state.batches.filter(
+                    (batch) => batch.status === "Open" || batch.id === editFor.enrollment.batchId,
+                  ),
+                ]
+                  .sort((a, z) => a.startsOn.localeCompare(z.startsOn))
+                  .map((batch) => {
+                    const seat = seats(batch.id);
+                    const current = batch.id === editFor.enrollment.batchId;
+                    return (
+                      <option key={batch.id} value={batch.id}>
+                        {batch.courseCode} — {batch.courseName} · {formatDateRange(batch.startsOn, batch.endsOn)}
+                        {current ? " (current)" : ` · ${seat.available} open`}
+                      </option>
+                    );
+                  })}
+              </select>
+            </Field>
+          </div>
+        )}
       </Modal>
 
       <NewEnrollmentModal

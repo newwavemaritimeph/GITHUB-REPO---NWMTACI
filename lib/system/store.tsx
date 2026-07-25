@@ -323,6 +323,7 @@ type SystemContextValue = {
   reviewSelection: (id: string, status: SelectionStatus, remark?: string) => void;
   approveSelection: (id: string) => Enrollment | undefined;
   createEnrollment: (input: { traineeId: string; batchId: string }) => Enrollment | undefined;
+  changeEnrollmentBatch: (enrollmentId: string, newBatchId: string) => void;
   cancelEnrollment: (id: string, reason: string) => void;
   createTrainee: (input: Omit<Trainee, "id" | "traineeNumber" | "createdAt">) => Trainee;
   /* money */
@@ -790,6 +791,36 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       return created;
     },
     [actor, log, update],
+  );
+
+  const changeEnrollmentBatch = useCallback<SystemContextValue["changeEnrollmentBatch"]>(
+    (enrollmentId, newBatchId) => {
+      update((draft) => {
+        const enrollment = draft.enrollments.find((item) => item.id === enrollmentId);
+        const batch = draft.batches.find((item) => item.id === newBatchId);
+        if (!enrollment || !batch || enrollment.batchId === newBatchId) return;
+        enrollment.batchId = batch.id;
+        enrollment.courseCode = batch.courseCode;
+        enrollment.courseName = batch.courseName;
+        enrollment.centerName = batch.centerName;
+        // Re-price the training-fee charge to the new batch. Payments already
+        // posted are untouched, so the balance simply reflects the new fee.
+        const charge = draft.ledger.find(
+          (item) => item.enrollmentId === enrollmentId && item.type === "charge" && item.valid,
+        );
+        if (charge) {
+          charge.amountCentavos = batch.feeCentavos;
+          charge.description = `${batch.courseName} training fee`;
+        }
+        log(draft, {
+          action: "Enrollment course/schedule changed",
+          recordType: "Enrollment",
+          recordRef: enrollment.reference,
+          detail: `${batch.courseName} · ${batch.batchNumber} (${batch.startsOn})`,
+        });
+      });
+    },
+    [log, update],
   );
 
   const cancelEnrollment = useCallback<SystemContextValue["cancelEnrollment"]>(
@@ -1435,6 +1466,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       reviewSelection,
       approveSelection,
       createEnrollment,
+      changeEnrollmentBatch,
       cancelEnrollment,
       createTrainee,
       recordPayment,
@@ -1481,6 +1513,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       advancePayroll,
       approveSelection,
       cancelEnrollment,
+      changeEnrollmentBatch,
       createBatch,
       createEnrollment,
       autoOpenMonth,
