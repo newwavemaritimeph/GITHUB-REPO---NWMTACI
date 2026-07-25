@@ -9,8 +9,8 @@ import { SYSTEM_VERSION, createSeedState } from "../lib/system/seed";
 
 describe("editable catalog seed", () => {
   it("bumps the system version so old localStorage reseeds", () => {
-    expect(SYSTEM_VERSION).toBe(7);
-    expect(createSeedState().version).toBe(7);
+    expect(SYSTEM_VERSION).toBe(8);
+    expect(createSeedState().version).toBe(8);
   });
 
   it("seeds every New Wave course as active with pricing intact", () => {
@@ -32,5 +32,17 @@ describe("editable catalog seed", () => {
   it("keeps course codes unique so the CRUD uniqueness check is meaningful", () => {
     const codes = createSeedState().courses.map((course) => course.code);
     expect(new Set(codes).size).toBe(codes.length);
+  });
+
+  it("seeds the four payment channels with Cash needing no reference", () => {
+    const { paymentChannels } = createSeedState();
+    expect(paymentChannels.map((channel) => channel.name)).toEqual(["Cash", "UnionBank", "PSBank", "GCash"]);
+    expect(paymentChannels.find((channel) => channel.name === "Cash")?.requiresReference).toBe(false);
+    expect(paymentChannels.find((channel) => channel.name === "GCash")?.requiresReference).toBe(true);
+  });
+
+  it("attributes seeded enrollments to registration officers for the leaderboard", () => {
+    const officers = createSeedState().enrollments.map((enrollment) => enrollment.processedBy).filter(Boolean);
+    expect(officers.length).toBeGreaterThan(0);
   });
 });

@@ -28,10 +28,12 @@ import type {
   ConsentType,
   Course,
   CourseSelection,
+  Announcement,
   Enrollment,
   EnrollmentView,
   LedgerEntry,
   PartnerOfferRecord,
+  PaymentChannel,
   RegistrationStatus,
   RegistrationSubmission,
   RequestType,
@@ -42,7 +44,7 @@ import type {
   Trainee,
 } from "./types";
 
-const STORAGE_KEY = "new-wave-system-v7";
+const STORAGE_KEY = "new-wave-system-v8";
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -326,6 +328,7 @@ type SystemContextValue = {
   changeEnrollmentBatch: (enrollmentId: string, newBatchId: string) => void;
   cancelEnrollment: (id: string, reason: string) => void;
   createTrainee: (input: Omit<Trainee, "id" | "traineeNumber" | "createdAt">) => Trainee;
+  setTraineeFacebook: (id: string, facebookLink: string) => void;
   /* money */
   recordPayment: (input: PaymentInput) => LedgerEntry | undefined;
   setPaymentVerification: (id: string, verification: "Verified" | "Rejected") => void;
@@ -337,6 +340,12 @@ type SystemContextValue = {
   addPartnerOffer: (input: Omit<PartnerOfferRecord, "id" | "active">) => PartnerOfferRecord;
   updatePartnerOffer: (id: string, patch: Partial<Omit<PartnerOfferRecord, "id">>) => void;
   setPartnerOfferActive: (id: string, active: boolean) => void;
+  addPaymentChannel: (input: Omit<PaymentChannel, "id" | "active">) => PaymentChannel;
+  updatePaymentChannel: (id: string, patch: Partial<Omit<PaymentChannel, "id">>) => void;
+  setPaymentChannelActive: (id: string, active: boolean) => void;
+  postAnnouncement: (input: Omit<Announcement, "id" | "postedBy" | "postedAt">) => Announcement;
+  updateAnnouncement: (id: string, patch: Partial<Omit<Announcement, "id">>) => void;
+  removeAnnouncement: (id: string) => void;
   /* operations */
   createBatch: (input: Omit<Batch, "id" | "status" | "publishedAt">) => Batch;
   autoOpenMonth: (input: { courseCode: string; year: number; month: number; capacity: number; venue: string; instructor: string }) => number;
@@ -601,6 +610,18 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     [log, update],
   );
 
+  const setTraineeFacebook = useCallback<SystemContextValue["setTraineeFacebook"]>(
+    (id, facebookLink) => {
+      update((draft) => {
+        const trainee = draft.trainees.find((item) => item.id === id);
+        if (!trainee) return;
+        trainee.facebookLink = facebookLink.trim() || undefined;
+        log(draft, { action: "Facebook link encoded", recordType: "Trainee", recordRef: trainee.traineeNumber });
+      });
+    },
+    [log, update],
+  );
+
   const submitRegistration = useCallback<SystemContextValue["submitRegistration"]>(
     (input) => {
       const submission: RegistrationSubmission = {
@@ -719,6 +740,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
           centerName: batch.centerName,
           status: "Enrolled",
           createdAt: new Date().toISOString(),
+          processedBy: actor,
           registrationReference: submission.reference,
           registrationSubmissionId: submission.id,
           courseSelectionId: selection.id,
@@ -771,6 +793,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
           centerName: batch.centerName,
           status: "Enrolled",
           createdAt: new Date().toISOString(),
+          processedBy: actor,
         };
         draft.enrollments.unshift(enrollment);
         draft.ledger.unshift({
@@ -1019,6 +1042,88 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
           recordRef: offer.center,
           detail: offer.course,
         });
+      });
+    },
+    [log, update],
+  );
+
+  const addPaymentChannel = useCallback<SystemContextValue["addPaymentChannel"]>(
+    (input) => {
+      const channel: PaymentChannel = { ...input, id: uid("pc"), active: true };
+      update((draft) => {
+        draft.paymentChannels.push(channel);
+        log(draft, { action: "Payment channel added", recordType: "PaymentChannel", recordRef: channel.name });
+      });
+      return channel;
+    },
+    [log, update],
+  );
+
+  const updatePaymentChannel = useCallback<SystemContextValue["updatePaymentChannel"]>(
+    (id, patch) => {
+      update((draft) => {
+        const channel = draft.paymentChannels.find((item) => item.id === id);
+        if (!channel) return;
+        Object.assign(channel, patch);
+        log(draft, { action: "Payment channel updated", recordType: "PaymentChannel", recordRef: channel.name });
+      });
+    },
+    [log, update],
+  );
+
+  const setPaymentChannelActive = useCallback<SystemContextValue["setPaymentChannelActive"]>(
+    (id, active) => {
+      update((draft) => {
+        const channel = draft.paymentChannels.find((item) => item.id === id);
+        if (!channel) return;
+        channel.active = active;
+        log(draft, {
+          action: active ? "Payment channel restored" : "Payment channel archived",
+          recordType: "PaymentChannel",
+          recordRef: channel.name,
+        });
+      });
+    },
+    [log, update],
+  );
+
+  const postAnnouncement = useCallback<SystemContextValue["postAnnouncement"]>(
+    (input) => {
+      const announcement: Announcement = {
+        ...input,
+        id: uid("ann"),
+        postedBy: actor,
+        postedAt: new Date().toISOString(),
+      };
+      update((draft) => {
+        draft.announcements.unshift(announcement);
+        log(draft, { action: "Announcement posted", recordType: "Announcement", recordRef: announcement.title });
+      });
+      return announcement;
+    },
+    [actor, log, update],
+  );
+
+  const updateAnnouncement = useCallback<SystemContextValue["updateAnnouncement"]>(
+    (id, patch) => {
+      update((draft) => {
+        const announcement = draft.announcements.find((item) => item.id === id);
+        if (!announcement) return;
+        Object.assign(announcement, patch);
+        log(draft, { action: "Announcement updated", recordType: "Announcement", recordRef: announcement.title });
+      });
+    },
+    [log, update],
+  );
+
+  const removeAnnouncement = useCallback<SystemContextValue["removeAnnouncement"]>(
+    (id) => {
+      update((draft) => {
+        const announcement = draft.announcements.find((item) => item.id === id);
+        draft.announcements = draft.announcements.filter((item) => item.id !== id);
+        if (announcement) {
+          log(draft, { action: "Announcement removed", recordType: "Announcement", recordRef: announcement.title });
+        }
       });
     },
     [log, update],
@@ -1469,6 +1574,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       changeEnrollmentBatch,
       cancelEnrollment,
       createTrainee,
+      setTraineeFacebook,
       recordPayment,
       setPaymentVerification,
       addLedgerEntry,
@@ -1478,6 +1584,12 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       addPartnerOffer,
       updatePartnerOffer,
       setPartnerOfferActive,
+      addPaymentChannel,
+      updatePaymentChannel,
+      setPaymentChannelActive,
+      postAnnouncement,
+      updateAnnouncement,
+      removeAnnouncement,
       createBatch,
       autoOpenMonth,
       publishBatch,
@@ -1510,7 +1622,11 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       addCourse,
       addLedgerEntry,
       addPartnerOffer,
+      addPaymentChannel,
       advancePayroll,
+      postAnnouncement,
+      removeAnnouncement,
+      updateAnnouncement,
       approveSelection,
       cancelEnrollment,
       changeEnrollmentBatch,
@@ -1519,6 +1635,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       autoOpenMonth,
       createRequest,
       createTrainee,
+      setTraineeFacebook,
       decideExpense,
       decideLeave,
       decideRequest,
@@ -1539,10 +1656,12 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       setBatchStatus,
       setCourseActive,
       setPartnerOfferActive,
+      setPaymentChannelActive,
       setPaymentVerification,
       setSessionState,
       updateCourse,
       updatePartnerOffer,
+      updatePaymentChannel,
       state,
       submissionSelections,
       submitRegistration,

@@ -50,11 +50,13 @@ export function PaymentsModule() {
   const pendingCount = payments.filter((entry) => entry.verification === "Pending").length;
   const outstanding = all.reduce((sum, item) => sum + item.balanceCentavos, 0);
 
-  const byMethod = (["Cash", "GCash", "Bank transfer", "Card"] as const).map((method) => ({
-    method,
-    total: verifiedToday.filter((entry) => entry.method === method).reduce((sum, entry) => sum + entry.amountCentavos, 0),
-    count: verifiedToday.filter((entry) => entry.method === method).length,
-  }));
+  const byMethod = state.paymentChannels
+    .filter((channel) => channel.active)
+    .map((channel) => ({
+      method: channel.name,
+      total: verifiedToday.filter((entry) => entry.method === channel.name).reduce((sum, entry) => sum + entry.amountCentavos, 0),
+      count: verifiedToday.filter((entry) => entry.method === channel.name).length,
+    }));
 
   return (
     <div className="page">

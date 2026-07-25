@@ -212,6 +212,53 @@ img {
   color: var(--green);
 }
 
+/* announcement board */
+.announcement-row {
+  display: flex;
+  gap: 12px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.announcement-row:first-child { border-top: none; }
+.announcement-mark { font-size: 18px; line-height: 1.4; }
+.announcement-body strong { display: block; font-size: 15px; color: var(--blue-dark); }
+.announcement-body p { margin: 4px 0 6px; font-size: 14px; color: var(--ink-soft); line-height: 1.5; }
+.announcement-body small { font-size: 12px; color: var(--muted); }
+
+/* dashboard leaderboards */
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.leaderboard-row:first-child { border-top: none; }
+.leaderboard-row .rank {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--cyan-soft);
+  color: var(--blue);
+  font-weight: 700;
+  font-size: 13px;
+  display: grid;
+  place-items: center;
+}
+.leaderboard-row .rank.gold { background: #fff4d6; color: #b7791f; }
+.leaderboard-copy { flex: 1; min-width: 0; }
+.leaderboard-copy strong { display: block; font-size: 14px; color: var(--blue-dark); margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.leaderboard-bar { height: 6px; border-radius: 999px; background: var(--line-soft); overflow: hidden; }
+.leaderboard-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--blue), var(--cyan)); }
+.leaderboard-count { flex: 0 0 auto; font-size: 16px; color: var(--blue-dark); }
+
+/* trainee facebook encoder */
+.fb-encoder { margin-bottom: 8px; }
+.fb-encoder-row { display: flex; gap: 8px; }
+.fb-encoder-row input { flex: 1; }
+.fb-current { display: inline-block; margin-top: 6px; font-size: 13px; color: var(--blue); }
+
 /* catalog administration */
 .row-muted {
   opacity: 0.5;

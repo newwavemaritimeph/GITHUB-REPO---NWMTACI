@@ -40,6 +40,8 @@ export type Trainee = {
   seafarerStatus?: string;
   rank?: string;
   company?: string;
+  /** Trainee's Facebook profile link, encoded by the Registration Officer. */
+  facebookLink?: string;
   createdAt: string;
   /** Set when this record was folded into another on a matching SRN. */
   mergedIntoTraineeId?: string;
@@ -168,6 +170,8 @@ export type Enrollment = {
   centerName: string;
   status: EnrollmentStatus;
   createdAt: string;
+  /** Registration officer who processed this enrollment (for the leaderboard). */
+  processedBy?: string;
   registrationReference?: string;
   registrationSubmissionId?: string;
   courseSelectionId?: string;
@@ -187,7 +191,7 @@ export type LedgerEntry = {
   type: LedgerType;
   amountCentavos: number;
   description: string;
-  method?: "Cash" | "GCash" | "Bank transfer" | "Card" | "Adjustment";
+  method?: string;
   receivingAccount?: string;
   referenceNumber?: string;
   proofFileName?: string;
@@ -380,12 +384,33 @@ export type PartnerOfferRecord = {
   active: boolean;
 };
 
+export type PaymentChannel = {
+  id: string;
+  name: string;
+  /** Cash needs no reference/proof; bank & e-wallet channels do. */
+  requiresReference: boolean;
+  active: boolean;
+};
+
+export type Announcement = {
+  id: string;
+  title: string;
+  body: string;
+  postedBy: string;
+  postedAt: string;
+  /** Optional expiry — the board hides announcements past this date. */
+  expiresOn?: string;
+  pinned?: boolean;
+};
+
 export type SystemState = {
   version: number;
   trainees: Trainee[];
   batches: Batch[];
   courses: Course[];
   partnerOffers: PartnerOfferRecord[];
+  paymentChannels: PaymentChannel[];
+  announcements: Announcement[];
   submissions: RegistrationSubmission[];
   courseSelections: CourseSelection[];
   consents: RegistrationConsent[];

@@ -36,7 +36,7 @@ const nav: { label: Module; icon: string; roles?: Role[] }[] = [
   { label: "Schedules", icon: "□", roles: ["Admin", "Training Operations", "Instructor"] },
   { label: "Payments", icon: "₱", roles: ["Admin", "Cashier", "Accounting"] },
   { label: "Accounting", icon: "▥", roles: ["Admin", "Accounting"] },
-  { label: "Instructions", icon: "✉", roles: ["Admin", "Registration", "Training Operations"] },
+  { label: "Instructions", icon: "✉", roles: ["Admin", "Training Operations"] },
   { label: "Attendance", icon: "✓", roles: ["Admin", "Training Operations", "Instructor"] },
   { label: "Certificates", icon: "◈", roles: ["Admin", "Training Operations"] },
   { label: "Requests", icon: "↗", roles: ["Admin", "Cashier", "Accounting", "Training Operations", "HR", "Instructor"] },
@@ -73,6 +73,45 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
     );
   const openPayroll = state.payrollPeriods.find((period) => period.status !== "Finalized");
 
+  // ---- date-sensitive registration figures -------------------------------
+  const today = todayIso();
+  const monthKey = today.slice(0, 7);
+  const monthName = new Intl.DateTimeFormat("en-PH", { month: "long", year: "numeric" }).format(new Date());
+  const tomorrow = (() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 1);
+    return date.toISOString().slice(0, 10);
+  })();
+  const newlyRegistered = state.submissions.filter((item) => (item.submittedAt ?? "").slice(0, 10) === today);
+  const registeredThisMonth = state.submissions.filter((item) => (item.submittedAt ?? "").slice(0, 7) === monthKey);
+  const activeEnrollments = all.filter((item) => item.stage !== "Cancelled");
+  const startingTomorrow = activeEnrollments.filter((item) => item.batch?.startsOn === tomorrow);
+
+  const officerBoard = (() => {
+    const counts = new Map<string, number>();
+    activeEnrollments.forEach((item) => {
+      const who = item.enrollment.processedBy;
+      if (who) counts.set(who, (counts.get(who) ?? 0) + 1);
+    });
+    return [...counts.entries()].sort((left, right) => right[1] - left[1]);
+  })();
+  const trainingBoard = (() => {
+    const counts = new Map<string, number>();
+    activeEnrollments.forEach((item) => counts.set(item.enrollment.courseName, (counts.get(item.enrollment.courseName) ?? 0) + 1));
+    return [...counts.entries()].sort((left, right) => right[1] - left[1]).slice(0, 6);
+  })();
+  const maxTraining = trainingBoard[0]?.[1] ?? 1;
+  const maxOfficer = officerBoard[0]?.[1] ?? 1;
+
+  const activeAnnouncements = [...state.announcements]
+    .filter((item) => !item.expiresOn || item.expiresOn >= today)
+    .sort(
+      (left, right) =>
+        Number(Boolean(right.pinned)) - Number(Boolean(left.pinned)) || right.postedAt.localeCompare(left.postedAt),
+    );
+
+  const isRegistration = role === "Registration";
+
   const metrics: Record<Role, { label: string; value: string; note: string; icon: string; module: Module }[]> = {
     Admin: [
       { label: "New registrations", value: String(pendingRegistrations.length), note: "Awaiting review", icon: "✎", module: "Registrations" },
@@ -83,12 +122,10 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
       { label: "Certificates ready", value: String(certificatesReady.length), note: state.settings.certificateIssuanceEnabled ? "Issuance enabled" : "Issuance disabled", icon: "◈", module: "Certificates" },
     ],
     Registration: [
-      { label: "New registrations", value: String(pendingRegistrations.length), note: "From the public site", icon: "✎", module: "Registrations" },
-      { label: "Possible duplicates", value: String(state.submissions.filter((item) => item.status === "Possible Duplicate").length), note: "Need authorized review", icon: "◎", module: "Registrations" },
-      { label: "Active enrollments", value: String(all.filter((item) => item.stage !== "Cancelled").length), note: "All batches", icon: "▤", module: "Enrollments" },
-      { label: "Instructions to send", value: String(readyInstructions.length), note: "Fully paid", icon: "✉", module: "Instructions" },
-      { label: "Courses offered", value: String(state.batches.length), note: "Batches on record", icon: "□", module: "Courses & centers" },
-      { label: "Trainee records", value: String(state.trainees.length), note: "All programs", icon: "◎", module: "Trainees" },
+      { label: "Newly registered today", value: String(newlyRegistered.length), note: "From the public site", icon: "✎", module: "Registrations" },
+      { label: "Registered this month", value: String(registeredThisMonth.length), note: monthName, icon: "◎", module: "Registrations" },
+      { label: "Starting tomorrow", value: String(startingTomorrow.length), note: "Trainees with a schedule in 1 day", icon: "□", module: "Enrollments" },
+      { label: "Active enrollments", value: String(activeEnrollments.length), note: "All batches", icon: "▤", module: "Enrollments" },
     ],
     Cashier: [
       { label: "Collections today", value: pesos(collectionsToday), note: "Verified payments", icon: "₱", module: "Payments" },
@@ -164,7 +201,29 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
         }
       />
 
-      <div className="stat-grid stat-grid-6">
+      {activeAnnouncements.length > 0 && (
+        <Panel
+          title="Announcement board"
+          description="Posted by the Admin / Accounting Manager"
+          action={<Pill tone="blue">{activeAnnouncements.length} active</Pill>}
+        >
+          {activeAnnouncements.map((item) => (
+            <div key={item.id} className="announcement-row">
+              <span className="announcement-mark" aria-hidden="true">{item.pinned ? "📌" : "📣"}</span>
+              <div className="announcement-body">
+                <strong>{item.title}</strong>
+                <p>{item.body}</p>
+                <small>
+                  {item.postedBy} · {formatDate(item.postedAt)}
+                  {item.expiresOn ? ` · shown until ${formatDate(item.expiresOn)}` : ""}
+                </small>
+              </div>
+            </div>
+          ))}
+        </Panel>
+      )}
+
+      <div className={`stat-grid ${isRegistration ? "stat-grid-4" : "stat-grid-6"}`}>
         {metrics[role].map((metric, index) => (
           <StatCard
             key={metric.label}
@@ -178,6 +237,45 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
         ))}
       </div>
 
+      {isRegistration && (
+        <div className="two-column">
+          <Panel title="Trainings with most enrollments" description="Ranked by active enrollments">
+            {trainingBoard.length === 0 ? (
+              <div className="empty-block"><span aria-hidden="true">□</span><h3>No enrollments yet</h3><p>Approved registrations will appear here.</p></div>
+            ) : (
+              trainingBoard.map(([course, count], index) => (
+                <div key={course} className="leaderboard-row">
+                  <span className="rank">{index + 1}</span>
+                  <div className="leaderboard-copy">
+                    <strong>{course}</strong>
+                    <div className="leaderboard-bar"><i style={{ width: `${Math.round((count / maxTraining) * 100)}%` }} /></div>
+                  </div>
+                  <b className="leaderboard-count">{count}</b>
+                </div>
+              ))
+            )}
+          </Panel>
+          <Panel title="Registration performance" description="Officers ranked by enrollments processed">
+            {officerBoard.length === 0 ? (
+              <div className="empty-block"><span aria-hidden="true">◎</span><h3>No attributed enrollments</h3><p>Enrollments you process will be counted here.</p></div>
+            ) : (
+              officerBoard.map(([officer, count], index) => (
+                <div key={officer} className="leaderboard-row">
+                  <span className={`rank ${index === 0 ? "gold" : ""}`}>{index + 1}</span>
+                  <div className="leaderboard-copy">
+                    <strong>{officer}</strong>
+                    <div className="leaderboard-bar"><i style={{ width: `${Math.round((count / maxOfficer) * 100)}%` }} /></div>
+                  </div>
+                  <b className="leaderboard-count">{count}</b>
+                </div>
+              ))
+            )}
+          </Panel>
+        </div>
+      )}
+
+      {!isRegistration && (
+      <>
       <div className="two-column">
         <Panel title="Priority work" description="Built from live records, ordered by operational urgency" action={<Pill tone="amber">{tasks.length} actions</Pill>}>
           {tasks.length === 0 ? (
@@ -277,6 +375,8 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
           </div>
         </div>
       </Panel>
+      </>
+      )}
     </div>
   );
 }
@@ -457,7 +557,7 @@ function PortalShell({ previewMode }: { previewMode: boolean }) {
         {active === "Courses & centers" && <CatalogModule role={role} />}
         {active === "Schedules" && <SchedulesModule />}
         {active === "Payments" && <PaymentsModule />}
-        {active === "Accounting" && <AccountingModule />}
+        {active === "Accounting" && <AccountingModule role={role} />}
         {active === "Instructions" && <InstructionsModule />}
         {active === "Attendance" && <AttendanceModule />}
         {active === "Certificates" && <CertificatesModule go={go} />}

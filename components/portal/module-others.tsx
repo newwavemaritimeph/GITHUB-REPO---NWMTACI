@@ -30,8 +30,25 @@ import { PageHeader, Panel, StageBadge, type Module } from "./shared";
 
 /* ---------------------------------------------------------------- trainees */
 
+function FacebookEncoder({ trainee, onSave }: { trainee: Trainee; onSave: (link: string) => void }) {
+  const [value, setValue] = useState(trainee.facebookLink ?? "");
+  return (
+    <div className="fb-encoder">
+      <div className="fb-encoder-row">
+        <input value={value} onChange={(event) => setValue(event.target.value)} placeholder="https://facebook.com/username" />
+        <button className="secondary-button" onClick={() => onSave(value)}>Save</button>
+      </div>
+      {trainee.facebookLink ? (
+        <a className="fb-current" href={trainee.facebookLink} target="_blank" rel="noopener noreferrer">Open current profile ↗</a>
+      ) : (
+        <small className="muted-text">Not yet encoded. Registration Officer records the trainee&apos;s Facebook profile URL.</small>
+      )}
+    </div>
+  );
+}
+
 export function TraineesModule({ go }: { go: (module: Module) => void }) {
-  const { state, views, createTrainee } = useSystem();
+  const { state, views, createTrainee, setTraineeFacebook } = useSystem();
   const toast = useToast();
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Trainee | null>(null);
@@ -42,6 +59,7 @@ export function TraineesModule({ go }: { go: (module: Module) => void }) {
     firstName: "", middleName: "", lastName: "", suffix: "", srn: "",
     email: "", address: "", mobile: "", placeOfBirth: "", birthDate: "",
     rank: "", company: "", emergencyContactName: "", emergencyContactMobile: "",
+    facebookLink: "",
   };
   const [draft, setDraft] = useState(emptyDraft);
 
@@ -146,6 +164,15 @@ export function TraineesModule({ go }: { go: (module: Module) => void }) {
                 <dd>{selected.emergencyContactName ?? "—"}{selected.emergencyContactMobile ? ` · ${selected.emergencyContactMobile}` : ""}</dd>
               </div>
             </dl>
+            <h3 className="drawer-section">Facebook link</h3>
+            <FacebookEncoder
+              key={selected.id}
+              trainee={selected}
+              onSave={(link) => {
+                setTraineeFacebook(selected.id, link);
+                toast("success", link ? "Facebook link saved." : "Facebook link cleared.");
+              }}
+            />
             <h3 className="drawer-section">Enrollment history</h3>
             {selectedViews.length === 0 ? (
               <p className="muted-text">No enrollment yet for this trainee.</p>
@@ -196,6 +223,7 @@ export function TraineesModule({ go }: { go: (module: Module) => void }) {
                   suffix: draft.suffix || undefined,
                   srn: draft.srn || undefined,
                   company: draft.company || undefined,
+                  facebookLink: draft.facebookLink || undefined,
                 });
                 toast("success", `${trainee.traineeNumber} created.`);
                 setDraft(emptyDraft);
@@ -243,6 +271,9 @@ export function TraineesModule({ go }: { go: (module: Module) => void }) {
           </Field>
           <Field label="Company">
             <input value={draft.company} onChange={(event) => setDraft({ ...draft, company: event.target.value })} />
+          </Field>
+          <Field label="Facebook link" full hint="Encoded by the Registration Officer — the trainee's Facebook profile URL">
+            <input value={draft.facebookLink} onChange={(event) => setDraft({ ...draft, facebookLink: event.target.value })} placeholder="https://facebook.com/…" />
           </Field>
           <Field label="Emergency contact person*">
             <input value={draft.emergencyContactName} onChange={(event) => setDraft({ ...draft, emergencyContactName: event.target.value })} />
@@ -671,10 +702,26 @@ export function CatalogModule({ role }: { role: Role }) {
 
 /* -------------------------------------------------------------- accounting */
 
-export function AccountingModule() {
-  const { state, views, decideExpense } = useSystem();
+type ChannelDraft = { id: string | null; name: string; requiresReference: boolean };
+type AnnouncementDraft = { id: string | null; title: string; body: string; expiresOn: string; pinned: boolean };
+
+export function AccountingModule({ role }: { role: Role }) {
+  const {
+    state,
+    views,
+    decideExpense,
+    addPaymentChannel,
+    updatePaymentChannel,
+    setPaymentChannelActive,
+    postAnnouncement,
+    updateAnnouncement,
+    removeAnnouncement,
+  } = useSystem();
   const toast = useToast();
   const all = views();
+  const canManage = role === "Admin" || role === "Accounting";
+  const [channelDraft, setChannelDraft] = useState<ChannelDraft | null>(null);
+  const [annDraft, setAnnDraft] = useState<AnnouncementDraft | null>(null);
 
   const payments = state.ledger.filter((entry) => entry.type === "payment" && entry.verification === "Verified");
   const gross = payments.reduce((sum, entry) => sum + entry.amountCentavos, 0);
@@ -701,13 +748,14 @@ export function AccountingModule() {
       </div>
 
       <div className="two-column">
-        <Panel title="Collections by method" description="Verified payments only">
+        <Panel title="Collections by channel" description="Verified payments only">
           <div className="bar-list">
-            {(["Cash", "GCash", "Bank transfer", "Card"] as const).map((method) => {
+            {state.paymentChannels.filter((channel) => channel.active).map((channel) => {
+              const method = channel.name;
               const total = payments.filter((entry) => entry.method === method).reduce((sum, entry) => sum + entry.amountCentavos, 0);
               const share = gross > 0 ? Math.round((total / gross) * 100) : 0;
               return (
-                <div key={method} className="bar-row">
+                <div key={channel.id} className="bar-row">
                   <span>{method}</span>
                   <div className="bar-track">
                     <i style={{ width: `${share}%` }} />
@@ -795,6 +843,193 @@ export function AccountingModule() {
           <EmptyState icon="✓" title="No receivables" text="Every active enrollment is fully settled." />
         )}
       </Panel>
+
+      {canManage && (
+        <div className="two-column">
+          <Panel
+            title="Payment channels"
+            description="Modes of payment offered at the cashier"
+            action={
+              <button className="link-button" onClick={() => setChannelDraft({ id: null, name: "", requiresReference: true })}>
+                ＋ Add channel
+              </button>
+            }
+          >
+            <div className="history-list">
+              {state.paymentChannels.map((channel) => (
+                <div key={channel.id} className={`history-row ${channel.active ? "" : "row-muted"}`}>
+                  <div>
+                    <strong>{channel.name}</strong>
+                    <small>{channel.requiresReference ? "Reference required · verified" : "Cash · posted immediately"}{channel.active ? "" : " · archived"}</small>
+                  </div>
+                  <div className="cell-actions">
+                    <button
+                      className="ghost-button"
+                      onClick={() => setChannelDraft({ id: channel.id, name: channel.name, requiresReference: channel.requiresReference })}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="ghost-button"
+                      onClick={() => {
+                        setPaymentChannelActive(channel.id, !channel.active);
+                        toast("warning", `${channel.name} ${channel.active ? "archived" : "restored"}.`);
+                      }}
+                    >
+                      {channel.active ? "Archive" : "Restore"}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Panel>
+
+          <Panel
+            title="Announcement board"
+            description="Posted to every staff dashboard"
+            action={
+              <button className="link-button" onClick={() => setAnnDraft({ id: null, title: "", body: "", expiresOn: "", pinned: false })}>
+                ＋ New announcement
+              </button>
+            }
+          >
+            {state.announcements.length === 0 ? (
+              <EmptyState icon="📣" title="No announcements" text="Post an update for all staff." />
+            ) : (
+              <div className="history-list">
+                {state.announcements.map((item) => (
+                  <div key={item.id} className="history-row">
+                    <div>
+                      <strong>{item.pinned ? "📌 " : ""}{item.title}</strong>
+                      <small>{item.postedBy} · {formatDate(item.postedAt)}{item.expiresOn ? ` · until ${formatDate(item.expiresOn)}` : ""}</small>
+                    </div>
+                    <div className="cell-actions">
+                      <button
+                        className="ghost-button"
+                        onClick={() => setAnnDraft({ id: item.id, title: item.title, body: item.body, expiresOn: item.expiresOn ?? "", pinned: Boolean(item.pinned) })}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="ghost-button ghost-danger"
+                        onClick={() => {
+                          removeAnnouncement(item.id);
+                          toast("warning", "Announcement removed.");
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </div>
+      )}
+
+      <Modal
+        open={Boolean(channelDraft)}
+        title={channelDraft?.id ? "Edit payment channel" : "Add payment channel"}
+        description="Cashiers pick from active channels when posting a payment."
+        onClose={() => setChannelDraft(null)}
+        footer={
+          <>
+            <button className="secondary-button" onClick={() => setChannelDraft(null)}>Cancel</button>
+            <button
+              className="primary-button"
+              onClick={() => {
+                if (!channelDraft) return;
+                const name = channelDraft.name.trim();
+                if (!name) {
+                  toast("warning", "Channel name is required.");
+                  return;
+                }
+                if (channelDraft.id) {
+                  updatePaymentChannel(channelDraft.id, { name, requiresReference: channelDraft.requiresReference });
+                  toast("success", `${name} updated.`);
+                } else {
+                  addPaymentChannel({ name, requiresReference: channelDraft.requiresReference });
+                  toast("success", `${name} added.`);
+                }
+                setChannelDraft(null);
+              }}
+            >
+              {channelDraft?.id ? "Save changes" : "Add channel"}
+            </button>
+          </>
+        }
+      >
+        {channelDraft && (
+          <div className="form-grid">
+            <Field label="Channel name*" full hint="e.g. UnionBank, PSBank, GCash, Cash">
+              <input value={channelDraft.name} onChange={(event) => setChannelDraft({ ...channelDraft, name: event.target.value })} />
+            </Field>
+            <label className="inline-field inline-check field-full">
+              <input
+                type="checkbox"
+                checked={channelDraft.requiresReference}
+                onChange={(event) => setChannelDraft({ ...channelDraft, requiresReference: event.target.checked })}
+              />
+              <span>Requires a transaction reference (bank / e-wallet). Leave unchecked for cash.</span>
+            </label>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={Boolean(annDraft)}
+        title={annDraft?.id ? "Edit announcement" : "New announcement"}
+        description="Shown on every staff dashboard until removed or expired."
+        onClose={() => setAnnDraft(null)}
+        wide
+        footer={
+          <>
+            <button className="secondary-button" onClick={() => setAnnDraft(null)}>Cancel</button>
+            <button
+              className="primary-button"
+              onClick={() => {
+                if (!annDraft) return;
+                const title = annDraft.title.trim();
+                const body = annDraft.body.trim();
+                if (!title || !body) {
+                  toast("warning", "Title and message are required.");
+                  return;
+                }
+                const payload = { title, body, expiresOn: annDraft.expiresOn || undefined, pinned: annDraft.pinned };
+                if (annDraft.id) {
+                  updateAnnouncement(annDraft.id, payload);
+                  toast("success", "Announcement updated.");
+                } else {
+                  postAnnouncement(payload);
+                  toast("success", "Announcement posted.");
+                }
+                setAnnDraft(null);
+              }}
+            >
+              {annDraft?.id ? "Save changes" : "Post announcement"}
+            </button>
+          </>
+        }
+      >
+        {annDraft && (
+          <div className="form-grid">
+            <Field label="Title*" full>
+              <input value={annDraft.title} onChange={(event) => setAnnDraft({ ...annDraft, title: event.target.value })} />
+            </Field>
+            <Field label="Message*" full>
+              <textarea rows={4} value={annDraft.body} onChange={(event) => setAnnDraft({ ...annDraft, body: event.target.value })} />
+            </Field>
+            <Field label="Show until (optional)" hint="Auto-hides after this date">
+              <input type="date" value={annDraft.expiresOn} onChange={(event) => setAnnDraft({ ...annDraft, expiresOn: event.target.value })} />
+            </Field>
+            <label className="inline-field inline-check">
+              <input type="checkbox" checked={annDraft.pinned} onChange={(event) => setAnnDraft({ ...annDraft, pinned: event.target.checked })} />
+              <span>Pin to top</span>
+            </label>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

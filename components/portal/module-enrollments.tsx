@@ -478,19 +478,23 @@ export function PaymentModal({
   onSubmit: (input: {
     enrollmentId: string;
     amountCentavos: number;
-    method: "Cash" | "GCash" | "Bank transfer" | "Card";
+    method: string;
     receivingAccount?: string;
     referenceNumber?: string;
     needsVerification?: boolean;
   }) => void;
 }) {
+  const { state } = useSystem();
+  const channels = state.paymentChannels.filter((channel) => channel.active);
   const money = useMoneyInput();
-  const [method, setMethod] = useState<"Cash" | "GCash" | "Bank transfer" | "Card">("Cash");
+  const [method, setMethod] = useState<string>(channels[0]?.name ?? "Cash");
   const [reference, setReference] = useState("");
   const [account, setAccount] = useState("Main cashier");
 
+  const selectedChannel = channels.find((channel) => channel.name === method);
+  const requiresRef = selectedChannel?.requiresReference ?? method !== "Cash";
   const amount = money.centavos;
-  const invalid = amount <= 0 || (target ? amount > target.balanceCentavos : true) || (method !== "Cash" && reference.trim().length < 4);
+  const invalid = amount <= 0 || (target ? amount > target.balanceCentavos : true) || (requiresRef && reference.trim().length < 4);
 
   return (
     <Modal
@@ -513,14 +517,14 @@ export function PaymentModal({
                 amountCentavos: amount,
                 method,
                 receivingAccount: account,
-                referenceNumber: method === "Cash" ? undefined : reference.trim(),
-                needsVerification: method !== "Cash",
+                referenceNumber: requiresRef ? reference.trim() : undefined,
+                needsVerification: requiresRef,
               });
               money.reset();
               setReference("");
             }}
           >
-            {method === "Cash" ? "Post payment" : "Submit for verification"}
+            {requiresRef ? "Submit for verification" : "Post payment"}
           </button>
         </>
       }
@@ -530,11 +534,10 @@ export function PaymentModal({
           <input inputMode="decimal" value={money.raw} onChange={(event) => money.setRaw(event.target.value)} placeholder="0.00" />
         </Field>
         <Field label="Method">
-          <select value={method} onChange={(event) => setMethod(event.target.value as typeof method)}>
-            <option>Cash</option>
-            <option>GCash</option>
-            <option>Bank transfer</option>
-            <option>Card</option>
+          <select value={method} onChange={(event) => setMethod(event.target.value)}>
+            {channels.map((channel) => (
+              <option key={channel.id}>{channel.name}</option>
+            ))}
           </select>
         </Field>
         <Field label="Receiving account">
@@ -545,15 +548,15 @@ export function PaymentModal({
             <option>BPI 4491-0022-11</option>
           </select>
         </Field>
-        <Field label="Transaction reference" hint={method === "Cash" ? "Not required for cash" : "Required for non-cash payments"}>
-          <input value={reference} onChange={(event) => setReference(event.target.value.toUpperCase())} disabled={method === "Cash"} placeholder="e.g. 992313" />
+        <Field label="Transaction reference" hint={requiresRef ? "Required for this channel" : "Not required for cash"}>
+          <input value={reference} onChange={(event) => setReference(event.target.value.toUpperCase())} disabled={!requiresRef} placeholder="e.g. 992313" />
         </Field>
         <div className="form-full inline-note note-blue">
-          <strong>{method === "Cash" ? "Cash is posted immediately" : "Non-cash payments require verification"}</strong>
+          <strong>{requiresRef ? `${method} payments require verification` : `${method} is posted immediately`}</strong>
           <p>
-            {method === "Cash"
-              ? "An official receipt number is issued as soon as the payment is posted."
-              : "The payment appears under Payments → Verification queue. The receipt is issued only after a cashier confirms the reference against the proof."}
+            {requiresRef
+              ? "The payment appears under Payments → Verification queue. The receipt is issued only after a cashier confirms the reference against the proof."
+              : "An official receipt number is issued as soon as the payment is posted."}
           </p>
         </div>
       </div>
