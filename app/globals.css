@@ -277,6 +277,30 @@ img {
 .leaderboard-bar i { display: block; height: 100%; background: linear-gradient(90deg, var(--blue), var(--cyan)); }
 .leaderboard-count { flex: 0 0 auto; font-size: 16px; color: var(--blue-dark); }
 
+/* registrations hub tabs */
+.hub-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 16px 34px 0;
+  margin: 0 auto;
+  max-width: 1500px;
+}
+.hub-tabs button {
+  border: none;
+  background: transparent;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted);
+  border-radius: 10px 10px 0 0;
+  cursor: pointer;
+}
+.hub-tabs button.active {
+  color: var(--blue-dark);
+  background: #fff;
+  box-shadow: 0 -2px 0 var(--blue) inset;
+}
+
 /* admission slip */
 .status-select { min-width: 170px; }
 .admission-slip {

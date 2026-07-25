@@ -16,20 +16,23 @@ import {
 } from "@/components/ui/kit";
 import { pesos } from "@/lib/endorsement-catalog";
 import { formatDate, formatDateRange, formatDateTime, formatTime, fullName, todayIso, useSystem } from "@/lib/system/store";
-import type { EnrollmentView, RegistrationLifecycle, RequestType } from "@/lib/system/types";
+import type { EnrollmentView, RegistrationLifecycle, Role, RequestType } from "@/lib/system/types";
 import { PageHeader, Panel, StageBadge, StageTrack, type Module } from "./shared";
 
 const filters = ["All", "Unpaid", "Awaiting verification", "Ready for instructions", "In training", "Completed"] as const;
 const REGISTRATION_STATUSES: RegistrationLifecycle[] = ["Waiting for Payment", "Enrolled", "Reschedule", "Generated Voucher", "Cancelled"];
 
 export function EnrollmentsModule({
+  role,
   focusId,
   onFocusHandled,
 }: {
   go: (module: Module) => void;
+  role: Role;
   focusId?: string;
   onFocusHandled?: () => void;
 }) {
+  const canRecordPayment = role === "Cashier";
   const {
     state,
     views,
@@ -257,9 +260,11 @@ export function EnrollmentsModule({
             </dl>
 
             <div className="drawer-actions">
-              <button className="primary-button" onClick={() => setPayFor(active)} disabled={active.balanceCentavos === 0}>
-                Record payment
-              </button>
+              {canRecordPayment && (
+                <button className="primary-button" onClick={() => setPayFor(active)} disabled={active.balanceCentavos === 0}>
+                  Record payment
+                </button>
+              )}
               <button
                 className="secondary-button"
                 disabled={active.paymentStatus !== "Paid" || Boolean(active.enrollment.instructionsSentAt)}

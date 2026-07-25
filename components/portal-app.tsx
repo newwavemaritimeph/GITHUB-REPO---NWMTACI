@@ -18,7 +18,6 @@ import {
   TraineesModule,
 } from "./portal/module-others";
 import { PaymentsModule } from "./portal/module-payments";
-import { RegistrationsModule } from "./portal/module-registrations";
 import { SchedulesModule } from "./portal/module-schedules";
 import { PageHeader, Panel, StageBadge, type Module } from "./portal/shared";
 import { pesos } from "@/lib/endorsement-catalog";
@@ -29,9 +28,7 @@ const roles: Role[] = ["Admin", "Registration", "Cashier", "Accounting", "Traini
 
 const nav: { label: Module; icon: string; roles?: Role[] }[] = [
   { label: "Dashboard", icon: "⌂" },
-  { label: "Registrations", icon: "✎", roles: ["Admin", "Registration"] },
-  { label: "Trainees", icon: "◎", roles: ["Admin", "Registration", "Cashier", "Accounting", "Training Operations"] },
-  { label: "Enrollments", icon: "▤", roles: ["Registration", "Cashier", "Accounting", "Training Operations"] },
+  { label: "Registrations", icon: "✎", roles: ["Admin", "Registration", "Cashier", "Accounting", "Training Operations"] },
   { label: "Courses & centers", icon: "◇", roles: ["Admin", "Registration", "Accounting", "Training Operations"] },
   { label: "Schedules", icon: "□", roles: ["Training Operations", "Instructor"] },
   { label: "Payments", icon: "₱", roles: ["Cashier", "Accounting"] },
@@ -381,6 +378,26 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
   );
 }
 
+/** Consolidated Registrations hub: Trainees + Enrollments in one place. Admin
+ * oversees Trainees only (enrollment operations were removed from Admin). */
+function RegistrationHub({ role, go }: { role: Role; go: (module: Module) => void }) {
+  const tabs: ("Trainees" | "Enrollments")[] = role === "Admin" ? ["Trainees"] : ["Trainees", "Enrollments"];
+  const [tab, setTab] = useState<"Trainees" | "Enrollments">("Trainees");
+  const active = tabs.includes(tab) ? tab : "Trainees";
+  return (
+    <>
+      <div className="hub-tabs">
+        {tabs.map((item) => (
+          <button key={item} className={active === item ? "active" : ""} onClick={() => setTab(item)}>
+            {item}
+          </button>
+        ))}
+      </div>
+      {active === "Enrollments" ? <EnrollmentsModule go={go} role={role} /> : <TraineesModule go={go} role={role} />}
+    </>
+  );
+}
+
 /* ------------------------------------------------------------------- shell */
 
 function PortalShell({ previewMode }: { previewMode: boolean }) {
@@ -551,12 +568,12 @@ function PortalShell({ previewMode }: { previewMode: boolean }) {
         </header>
 
         {active === "Dashboard" && <Dashboard role={role} go={go} />}
-        {active === "Registrations" && <RegistrationsModule go={go} />}
+        {active === "Registrations" && <RegistrationHub role={role} go={go} />}
         {active === "Trainees" && <TraineesModule go={go} role={role} />}
-        {active === "Enrollments" && <EnrollmentsModule go={go} />}
+        {active === "Enrollments" && <EnrollmentsModule go={go} role={role} />}
         {active === "Courses & centers" && <CatalogModule role={role} />}
         {active === "Schedules" && <SchedulesModule />}
-        {active === "Payments" && <PaymentsModule />}
+        {active === "Payments" && <PaymentsModule role={role} />}
         {active === "Accounting" && <AccountingModule role={role} />}
         {active === "Instructions" && <InstructionsModule />}
         {active === "Attendance" && <AttendanceModule />}

@@ -5,14 +5,15 @@ import { DataTable, EmptyState, Pill, SearchInput, Segmented, StatCard, useToast
 import { PaymentProofOcr } from "@/components/payment-proof-ocr";
 import { pesos } from "@/lib/endorsement-catalog";
 import { formatDateTime, fullName, todayIso, useSystem } from "@/lib/system/store";
-import type { EnrollmentView } from "@/lib/system/types";
+import type { EnrollmentView, Role } from "@/lib/system/types";
 import { PageHeader, Panel } from "./shared";
 import { PaymentModal } from "./module-enrollments";
 
 const filters = ["Verification queue", "Today", "All payments"] as const;
 
-export function PaymentsModule() {
+export function PaymentsModule({ role }: { role: Role }) {
   const { state, views, recordPayment, setPaymentVerification } = useSystem();
+  const canRecordPayment = role === "Cashier";
   const toast = useToast();
   const [filter, setFilter] = useState<(typeof filters)[number]>("Verification queue");
   const [query, setQuery] = useState("");
@@ -65,9 +66,11 @@ export function PaymentsModule() {
         title="Payments"
         description="Post collections, verify online proofs, issue receipts, and keep every balance current."
         actions={
-          <button className="primary-button" onClick={() => setPicker(true)}>
-            + Record payment
-          </button>
+          canRecordPayment ? (
+            <button className="primary-button" onClick={() => setPicker(true)}>
+              + Record payment
+            </button>
+          ) : undefined
         }
       />
 
