@@ -562,3 +562,81 @@
   display: inline-flex;
   align-items: center;
 }
+
+/* ── UI/UX polish: tab bars + stacked-panel spacing ─────────────────────── */
+
+/* Tabbed sub-navigation (Accounting Overview/Vouchers/Setup, etc.) */
+.portal-tabs {
+  display: flex;
+  gap: 2px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #e2ecf0;
+  margin: 4px 0 22px;
+}
+.portal-tabs button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 18px;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.portal-tabs button:hover {
+  color: var(--blue-dark);
+}
+.portal-tabs button.active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+
+/* Panels stacked directly on a page (not in the dashboard grid) need their own
+   padding and vertical rhythm so content doesn't sit flush to the border. */
+.portal-page > .portal-panel {
+  padding: 20px 22px;
+  margin-bottom: 18px;
+}
+.portal-page > .portal-panel:last-child {
+  margin-bottom: 0;
+}
+/* Let full-width tables inside a padded panel breathe to the panel edges. */
+.portal-page > .portal-panel > .portal-table {
+  margin: 4px -22px -20px;
+  width: calc(100% + 44px);
+}
+.portal-page > .portal-panel > .portal-table table {
+  min-width: 640px;
+}
+
+/* Compact action buttons inside table cells (Edit / Archive / Approve / …). */
+.document-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.document-actions button,
+.document-actions a {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--blue);
+  border-radius: 7px;
+  padding: 5px 10px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.document-actions button:hover,
+.document-actions a:hover {
+  background: #f2f9ff;
+  border-color: var(--blue);
+}
+.document-actions button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
