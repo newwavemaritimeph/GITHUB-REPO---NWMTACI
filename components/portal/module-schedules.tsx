@@ -288,20 +288,16 @@ function NewBatchModal({
         </Field>
         <Field label="Venue">
           <select value={venue} onChange={(event) => setVenue(event.target.value)}>
-            <option>Room 301</option>
-            <option>Room 205</option>
-            <option>Room 102</option>
-            <option>Training yard</option>
-            <option>Simulator lab</option>
+            {state.classrooms.filter((room) => room.active).map((room) => (
+              <option key={room.id}>{room.name}</option>
+            ))}
           </select>
         </Field>
         <Field label="Instructor" full>
           <select value={instructor} onChange={(event) => setInstructor(event.target.value)}>
-            <option>Capt. Ruel Aquino</option>
-            <option>Engr. Dan Cruz</option>
-            <option>Dr. Vina Lopez</option>
-            <option>Ms. Karen Diaz</option>
-            <option>Mr. Alvin Reyes</option>
+            {state.instructors.filter((item) => item.active).map((item) => (
+              <option key={item.id}>{item.name}</option>
+            ))}
           </select>
         </Field>
         {course && (
@@ -310,6 +306,11 @@ function NewBatchModal({
             <p>
               {course.duration} · {course.modality} · fee {pesos(course.priceCentavos)} charged automatically on every enrollment
               in this batch.
+            </p>
+            <p>
+              Instruction template:{" "}
+              {course.instructionTemplate ? "set for this course" : "not set — generic instruction email will be used"} ·
+              Certificate template: {course.certificateTemplate ? course.certificateTemplate : "none yet"}.
             </p>
           </div>
         )}
@@ -410,20 +411,16 @@ function AutoOpenModal({
         </Field>
         <Field label="Venue">
           <select value={venue} onChange={(event) => setVenue(event.target.value)}>
-            <option>Room 301</option>
-            <option>Room 205</option>
-            <option>Room 102</option>
-            <option>Training yard</option>
-            <option>Simulator lab</option>
+            {state.classrooms.filter((room) => room.active).map((room) => (
+              <option key={room.id}>{room.name}</option>
+            ))}
           </select>
         </Field>
         <Field label="Instructor" full>
           <select value={instructor} onChange={(event) => setInstructor(event.target.value)}>
-            <option>Capt. Ruel Aquino</option>
-            <option>Engr. Dan Cruz</option>
-            <option>Dr. Vina Lopez</option>
-            <option>Ms. Karen Diaz</option>
-            <option>Mr. Alvin Reyes</option>
+            {state.instructors.filter((item) => item.active).map((item) => (
+              <option key={item.id}>{item.name}</option>
+            ))}
           </select>
         </Field>
         {course && (

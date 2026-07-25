@@ -332,8 +332,14 @@ img {
 @media print {
   @page { size: 8.5in 5.5in; margin: 0.25in; }
   body * { visibility: hidden !important; }
-  #admission-slip-print, #admission-slip-print * { visibility: visible !important; }
-  #admission-slip-print {
+  #admission-slip-print, #admission-slip-print *,
+  #admission-invoice-print, #admission-invoice-print *,
+  #invoice-print, #invoice-print *,
+  #voucher-print, #voucher-print * { visibility: visible !important; }
+  #admission-slip-print,
+  #admission-invoice-print,
+  #invoice-print,
+  #voucher-print {
     position: absolute;
     left: 0;
     top: 0;
@@ -415,20 +421,22 @@ img {
 }
 
 .logo-image-wrap {
-  width: 54px;
-  height: 54px;
-  border-radius: 12px;
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
   overflow: hidden;
-  background: #fff;
+  background: radial-gradient(120% 120% at 30% 20%, #ffffff 0%, #f2fbff 100%);
   display: grid;
   place-items: center;
   flex: 0 0 auto;
+  padding: 5px;
+  box-shadow: 0 2px 10px rgba(2, 40, 66, 0.14), inset 0 0 0 1px rgba(53, 204, 250, 0.28);
 }
 
 .logo-image-wrap img {
-  width: 54px;
-  height: 54px;
-  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .logo-copy {
@@ -456,10 +464,11 @@ img {
   letter-spacing: 0.05em;
 }
 
-.logo-compact .logo-image-wrap,
-.logo-compact .logo-image-wrap img {
-  width: 42px;
-  height: 42px;
+.logo-compact .logo-image-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  padding: 4px;
 }
 
 .logo-inverted .logo-copy strong {
@@ -468,6 +477,17 @@ img {
 
 .logo-inverted .logo-copy span {
   color: #d7f6ff;
+}
+
+/*
+ * The badge shows a pre-cropped emblem asset (new-wave-emblem.png — just the
+ * ship's-wheel-and-wave mark, no baked-in wordmark), so it stays crisp at any
+ * size and the name is carried by the copy alongside.
+ */
+.new-wave-logo:not(.logo-compact) .logo-image-wrap {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
 }
 
 /* ---------------------------------------------------------------- pills --- */
@@ -748,6 +768,286 @@ img {
   flex-wrap: wrap;
   gap: 8px;
   margin: 20px 0 4px;
+}
+
+.consolidated-invoice {
+  display: grid;
+  gap: 12px;
+}
+
+.consolidated-invoice-day {
+  display: grid;
+  gap: 4px;
+}
+
+.consolidated-invoice-day-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  color: var(--blue-dark);
+}
+
+.consolidated-invoice-day-head small {
+  color: var(--muted);
+}
+
+.consolidated-invoice-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.consolidated-invoice-line span:last-child {
+  white-space: nowrap;
+}
+
+.consolidated-invoice-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 14px;
+  color: var(--blue-dark);
+}
+
+.agency-rebate-editor .toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.agency-rebate-list {
+  max-height: 340px;
+  overflow-y: auto;
+  display: grid;
+  gap: 6px;
+  padding-right: 4px;
+}
+
+.agency-rebate-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+}
+
+.agency-rebate-row span:first-child {
+  display: grid;
+}
+
+.agency-rebate-row strong {
+  font-size: 12px;
+  color: var(--blue-dark);
+}
+
+.agency-rebate-row small {
+  color: var(--muted);
+}
+
+.agency-rebate-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.agency-rebate-input em {
+  font-style: normal;
+  color: var(--muted);
+}
+
+.agency-rebate-input input {
+  width: 110px;
+  min-height: 36px;
+  border: 1px solid #cbdce4;
+  border-radius: 8px;
+  padding: 6px 9px;
+  font: inherit;
+  text-align: right;
+}
+
+.split-alloc-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.split-alloc-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+}
+
+.split-alloc-pick {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.split-alloc-pick span {
+  display: grid;
+}
+
+.split-alloc-pick strong {
+  font-size: 13px;
+  color: var(--blue-dark);
+}
+
+.split-alloc-pick small {
+  color: var(--muted);
+}
+
+.split-alloc-amount {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.split-alloc-amount em {
+  font-style: normal;
+  color: var(--muted);
+}
+
+.split-alloc-amount input {
+  width: 120px;
+  min-height: 38px;
+  border: 1px solid #cbdce4;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font: inherit;
+  text-align: right;
+}
+
+.split-alloc-amount small {
+  margin-left: 6px;
+}
+
+.split-alloc-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 15px;
+  color: var(--blue-dark);
+}
+
+.cashier-report {
+  padding: 18px 20px 22px;
+  display: grid;
+  gap: 8px;
+}
+
+.cashier-report-figures {
+  display: grid;
+  gap: 14px;
+}
+
+.cashier-report-figures .inline-field {
+  max-width: 240px;
+}
+
+.cashier-drawer {
+  padding: 18px 20px 22px;
+  display: grid;
+  gap: 16px;
+}
+
+.cashier-drawer-inputs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 240px));
+  gap: 16px;
+}
+
+.cashier-drawer-variance {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+}
+
+.cashier-drawer-variance.ok { background: rgba(46, 160, 90, 0.12); color: #1c7a44; }
+.cashier-drawer-variance.short { background: rgba(214, 69, 69, 0.12); color: #b23b3b; }
+.cashier-drawer-variance.over { background: rgba(5, 113, 208, 0.12); color: var(--blue-dark); }
+
+.daily-enrollments {
+  display: grid;
+  gap: 14px;
+  padding: 16px 20px 20px;
+}
+
+.daily-enrollments-day {
+  display: grid;
+  gap: 4px;
+}
+
+.daily-enrollments-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--blue-dark);
+}
+
+.daily-enrollments-head small { color: var(--muted); }
+
+.daily-enrollments-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.6fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.daily-enrollments-course { color: var(--muted); }
+
+.summary-panel,
+.reconciliation {
+  display: grid;
+  gap: 12px;
+  padding: 16px 20px 20px;
+}
+
+.summary-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 14px;
+  color: var(--blue-dark);
+}
+
+@media (max-width: 640px) {
+  .daily-enrollments-row { grid-template-columns: 1fr auto; }
+  .daily-enrollments-course { display: none; }
+}
+
+@media (max-width: 640px) {
+  .cashier-drawer-inputs { grid-template-columns: 1fr; }
 }
 
 /* --------------------------------------------------------------- fields --- */
@@ -2409,6 +2709,17 @@ code {
   min-height: 100vh;
   background: var(--paper);
   color: var(--ink);
+}
+
+/*
+ * House style: the staff portal reads in ALL CAPS. Applied as a display-only
+ * transform (stored data is untouched) and forced with !important so it beats
+ * the many per-element text-transform rules elsewhere in this file.
+ */
+.portal,
+.portal *,
+.portal ::placeholder {
+  text-transform: uppercase !important;
 }
 
 .sidebar {
@@ -5167,8 +5478,7 @@ code {
    ========================================================================== */
 
 /* Larger, more prominent logo in the public header */
-.brand-link .logo-image-wrap { width: 62px; height: 62px; }
-.brand-link .logo-image-wrap img { width: 62px; height: 62px; }
+.brand-link .logo-image-wrap { width: 64px; height: 64px; }
 .brand-link .logo-copy strong { font-size: 22px; letter-spacing: 0.01em; }
 .public-header { height: 96px; }
 
@@ -5220,7 +5530,7 @@ code {
 
 @media (max-width: 680px) {
   .public-header { height: 76px; }
-  .brand-link .logo-image-wrap, .brand-link .logo-image-wrap img { width: 48px; height: 48px; }
+  .brand-link .logo-image-wrap { width: 50px; height: 50px; }
   .tagline-sub { letter-spacing: 0.28em; }
 }
 

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { DataTable, EmptyState, Field, Modal, Pill, SearchInput, Segmented, StatCard, useMoneyInput, useToast } from "@/components/ui/kit";
-import { PaymentProofOcr } from "@/components/payment-proof-ocr";
+import { downloadCsv } from "@/lib/csv";
 import { pesos } from "@/lib/endorsement-catalog";
 import { formatDateTime, fullName, todayIso, useSystem } from "@/lib/system/store";
 import type { EnrollmentView, Role } from "@/lib/system/types";
@@ -11,10 +11,8 @@ import { PaymentModal } from "./module-enrollments";
 
 const filters = ["Verification queue", "Today", "All payments"] as const;
 
-const EXPENSE_CATEGORIES = ["Supplies", "Utilities", "Repairs & Maintenance", "Representation", "Transportation", "Professional Fees", "Others"];
-
 export function PaymentsModule({ role }: { role: Role }) {
-  const { state, views, recordPayment, setPaymentVerification, createExpense } = useSystem();
+  const { state, views, recordPayment, setPaymentVerification, createExpense, createRequest } = useSystem();
   const canRecordPayment = role === "Cashier";
   const toast = useToast();
   const [filter, setFilter] = useState<(typeof filters)[number]>("Verification queue");
@@ -180,7 +178,8 @@ export function PaymentsModule({ role }: { role: Role }) {
         )}
       </Panel>
 
-      <PaymentProofOcr />
+      {canRecordPayment && <CashierDrawerPanel />}
+      {canRecordPayment && <ChannelHistoryPanel payments={payments} channels={state.paymentChannels.filter((c) => c.active && c.requiresReference)} />}
 
       {picker && (
         <Panel title="Choose an enrollment to bill" description="Only enrollments with an open balance are listed.">
@@ -217,11 +216,18 @@ export function PaymentsModule({ role }: { role: Role }) {
 
       {expenseOpen && (
         <ExpenseVoucherModal
-          categories={EXPENSE_CATEGORIES}
+          categories={state.expenseCategories.filter((category) => category.active).map((category) => category.name)}
           onClose={() => setExpenseOpen(false)}
           onCreate={(input) => {
             const expense = createExpense(input);
-            toast("success", `${expense.expenseNumber} created — sent to the Accounting Manager for approval.`);
+            // Expense approvals flow through the Requests module.
+            createRequest({
+              type: "Expenses",
+              traineeName: expense.payee,
+              reason: `${expense.category} · ${expense.purpose}`,
+              payload: { expenseId: expense.id },
+            });
+            toast("success", `${expense.expenseNumber} created — sent to Accounting for approval in Requests.`);
             setExpenseOpen(false);
           }}
         />
@@ -344,5 +350,156 @@ function ExpenseVoucherModal({
         </Field>
       </div>
     </Modal>
+  );
+}
+
+/**
+ * Cashier's daily drawer: she reports her opening float and physical closing
+ * count; received (all channels) and disbursement (refunds + paid vouchers) are
+ * computed for today, and the variance flags a short or over drawer.
+ */
+function CashierDrawerPanel() {
+  const { state } = useSystem();
+  const [openingPesos, setOpeningPesos] = useState("");
+  const [countedPesos, setCountedPesos] = useState("");
+  const today = todayIso();
+
+  const openingCentavos = Math.max(0, Math.round(Number(openingPesos || "0") * 100));
+  const receivedCentavos = state.ledger
+    .filter((entry) => entry.type === "payment" && entry.verification === "Verified" && entry.recordedAt.slice(0, 10) === today)
+    .reduce((sum, entry) => sum + entry.amountCentavos, 0);
+  const disbursementCentavos =
+    state.ledger
+      .filter((entry) => (entry.type === "refund" || entry.type === "reversal") && entry.recordedAt.slice(0, 10) === today)
+      .reduce((sum, entry) => sum + entry.amountCentavos, 0) +
+    state.expenses
+      .filter((expense) => (expense.status === "Paid" || expense.status === "Approved") && (expense.decidedAt ?? expense.createdAt).slice(0, 10) === today)
+      .reduce((sum, expense) => sum + expense.amountCentavos, 0);
+  const expectedCentavos = openingCentavos + receivedCentavos - disbursementCentavos;
+  const counted = countedPesos.trim() === "" ? null : Math.max(0, Math.round(Number(countedPesos) * 100));
+  const variance = counted === null ? null : counted - expectedCentavos;
+
+  return (
+    <Panel title="Opening / Closing" description="Report today's opening float and closing count. Received and disbursement are computed live.">
+      <div className="cashier-drawer">
+        <div className="cashier-drawer-inputs">
+          <Field label="Opening balance (₱)" hint="Cash float at the start of the day">
+            <input type="number" min={0} step="1" value={openingPesos} placeholder="0.00" onChange={(event) => setOpeningPesos(event.target.value)} />
+          </Field>
+          <Field label="Closing count (₱)" hint="Physical cash counted at end of day">
+            <input type="number" min={0} step="1" value={countedPesos} placeholder="0.00" onChange={(event) => setCountedPesos(event.target.value)} />
+          </Field>
+        </div>
+        <div className="stat-grid stat-grid-4">
+          <StatCard label="Opening" value={pesos(openingCentavos)} note="Reported float" tone={0} icon="₱" />
+          <StatCard label="Received today" value={pesos(receivedCentavos)} note="All channels · verified" tone={2} icon="↧" />
+          <StatCard label="Disbursement" value={pesos(disbursementCentavos)} note="Refunds + paid vouchers" tone={5} icon="↥" />
+          <StatCard label="Expected closing" value={pesos(expectedCentavos)} note="Opening + received − disbursed" tone={3} icon="◈" />
+        </div>
+        {counted !== null && (
+          <div className={`cashier-drawer-variance ${variance === 0 ? "ok" : variance! > 0 ? "over" : "short"}`}>
+            <span>Counted {pesos(counted)} vs expected {pesos(expectedCentavos)}</span>
+            <strong>{variance === 0 ? "Balanced" : `${variance! > 0 ? "Over" : "Short"} ${pesos(Math.abs(variance!))}`}</strong>
+          </div>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+const HISTORY_RANGES = ["Daily", "7 Days", "15 Days", "30 Days"] as const;
+
+/** Per-channel received transaction history (GCash / PSBank / UnionBank …) over
+ * a Daily / 7 / 15 / 30-day window, with CSV export. */
+function ChannelHistoryPanel({
+  payments,
+  channels,
+}: {
+  payments: { reference: string; enrollmentId: string; method?: string; referenceNumber?: string; amountCentavos: number; receiptNumber?: string; recordedAt: string; verification: string }[];
+  channels: { id: string; name: string }[];
+}) {
+  const { state } = useSystem();
+  const toast = useToast();
+  const [channel, setChannel] = useState(channels[0]?.name ?? "");
+  const [rangePreset, setRangePreset] = useState<(typeof HISTORY_RANGES)[number]>("Daily");
+
+  const days = rangePreset === "Daily" ? 1 : rangePreset === "7 Days" ? 7 : rangePreset === "15 Days" ? 15 : 30;
+  const fromDate = new Date();
+  fromDate.setDate(fromDate.getDate() - (days - 1));
+  const fromIso = fromDate.toISOString().slice(0, 10);
+
+  const history = payments
+    .filter((entry) => entry.verification === "Verified" && entry.method === channel && entry.recordedAt.slice(0, 10) >= fromIso)
+    .sort((left, right) => right.recordedAt.localeCompare(left.recordedAt));
+  const total = history.reduce((sum, entry) => sum + entry.amountCentavos, 0);
+  const traineeFor = (enrollmentId: string) => {
+    const enrollment = state.enrollments.find((item) => item.id === enrollmentId);
+    const trainee = state.trainees.find((item) => item.id === enrollment?.traineeId);
+    return trainee ? fullName(trainee) : "—";
+  };
+
+  return (
+    <Panel
+      title="Transaction history"
+      description="Verified collections over the selected window."
+      action={
+        <button
+          className="secondary-button"
+          disabled={history.length === 0}
+          onClick={() => {
+            downloadCsv(`transaction-history-${channel}-${rangePreset.replace(" ", "")}-${fromIso}.csv`, [
+              [`${channel} received · ${rangePreset} · from ${fromIso}`],
+              [],
+              ["Payment", "Trainee", "Reference", "Amount", "Receipt", "Received at"],
+              ...history.map((entry) => [
+                entry.reference,
+                traineeFor(entry.enrollmentId),
+                entry.referenceNumber ?? "",
+                (entry.amountCentavos / 100).toFixed(2),
+                entry.receiptNumber ?? "",
+                entry.recordedAt,
+              ]),
+              [],
+              ["Total received", (total / 100).toFixed(2)],
+            ]);
+            toast("success", `${channel} transaction history exported (${rangePreset}).`);
+          }}
+        >
+          Download CSV
+        </button>
+      }
+    >
+      <div className="toolbar toolbar-wrap">
+        <label className="inline-field">
+          <span>Channel</span>
+          <select value={channel} onChange={(event) => setChannel(event.target.value)}>
+            {channels.map((item) => (
+              <option key={item.id}>{item.name}</option>
+            ))}
+          </select>
+        </label>
+        <Segmented options={HISTORY_RANGES} value={rangePreset} onChange={setRangePreset} />
+        <div className="toolbar-end total-block">
+          <span>{channel} received</span>
+          <strong>{pesos(total)}</strong>
+        </div>
+      </div>
+      {history.length === 0 ? (
+        <EmptyState icon="₱" title="No received transactions" text={`No verified ${channel} collections in the selected window.`} />
+      ) : (
+        <DataTable columns={["Payment", "Trainee", "Reference", "Received", "Amount", "Receipt"]} minWidth={860}>
+          {history.map((entry) => (
+            <tr key={entry.reference}>
+              <td><strong>{entry.reference}</strong></td>
+              <td>{traineeFor(entry.enrollmentId)}</td>
+              <td>{entry.referenceNumber || "—"}</td>
+              <td>{formatDateTime(entry.recordedAt)}</td>
+              <td><strong>{pesos(entry.amountCentavos)}</strong></td>
+              <td>{entry.receiptNumber || "—"}</td>
+            </tr>
+          ))}
+        </DataTable>
+      )}
+    </Panel>
   );
 }

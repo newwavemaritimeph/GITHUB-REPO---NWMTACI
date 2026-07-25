@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Avatar,
   DataTable,
@@ -15,6 +15,8 @@ import {
   useToast,
 } from "@/components/ui/kit";
 import { PARTNER_CENTERS, pesos } from "@/lib/endorsement-catalog";
+import { createExpenseVoucherPdf, createPayslipPdf } from "@/lib/documents";
+import { downloadCsv, parseCsv } from "@/lib/csv";
 import { formatDate, formatDateRange, formatDateTime, fullName, todayIso, useSystem } from "@/lib/system/store";
 import {
   REPORT_RANGES,
@@ -24,7 +26,7 @@ import {
   type DateRange,
   type ReportRangePreset,
 } from "@/lib/reporting";
-import type { EnrollmentView, Role, RequestType, Trainee } from "@/lib/system/types";
+import type { CashAdvance, Employee, EnrollmentView, Expense, HrAttendanceRecord, LeaveRequest, Role, RequestType, Trainee } from "@/lib/system/types";
 import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn } from "@/lib/validation";
 import { PageHeader, Panel, StageBadge, simplifiedStage, type Module } from "./shared";
 
@@ -126,10 +128,21 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
     return map;
   }, [all]);
 
+  // Registration works from a clean desk: with no search term or filter it lists
+  // only trainees enrolled (or registered) today. Typing in the search box, or
+  // setting any filter, lifts the restriction so the whole roster is searchable.
+  const today = todayIso();
+  const enrolledTodayIds = useMemo(
+    () => new Set(all.filter((item) => item.enrollment.createdAt.slice(0, 10) === today).map((item) => item.trainee.id)),
+    [all, today],
+  );
+
   const rows = useMemo(() => {
     const term = query.trim().toLowerCase();
+    const registrationToday = role === "Registration" && !term && !fromDate && !toDate && statusFilter === "All stages";
     return state.trainees.filter((trainee) => {
       const created = trainee.createdAt.slice(0, 10);
+      if (registrationToday) return enrolledTodayIds.has(trainee.id) || created === today;
       const matchesTerm =
         !term || `${fullName(trainee)} ${trainee.traineeNumber} ${trainee.email} ${trainee.mobile}`.toLowerCase().includes(term);
       const matchesFrom = !fromDate || created >= fromDate;
@@ -137,7 +150,7 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
       const matchesStage = statusFilter === "All stages" || (stagesByTrainee.get(trainee.id) ?? []).includes(statusFilter);
       return matchesTerm && matchesFrom && matchesTo && matchesStage;
     });
-  }, [query, fromDate, toDate, statusFilter, stagesByTrainee, state.trainees]);
+  }, [query, fromDate, toDate, statusFilter, stagesByTrainee, state.trainees, role, enrolledTodayIds, today]);
 
   const groups = useMemo(() => duplicateGroups(state.trainees), [state.trainees]);
   const selectedViews = selected ? all.filter((item) => item.trainee.id === selected.id) : [];
@@ -148,7 +161,11 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
       <PageHeader
         eyebrow="Central master records"
         title="Trainees"
-        description="Duplicate-aware profiles with registration history, enrollments, balances, and certificates."
+        description={
+          role === "Registration"
+            ? "Trainees enrolled today. Use the search box to find any trainee on record."
+            : "Duplicate-aware profiles with registration history, enrollments, balances, and certificates."
+        }
         actions={
           <button className="primary-button" onClick={() => setNewOpen(true)}>
             + New trainee
@@ -232,7 +249,10 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
             </div>
           )
         ) : rows.length === 0 ? (
-          <EmptyState title="No trainee matches" text="Adjust the search, date range, or status filter." />
+          <EmptyState
+            title={role === "Registration" && !query ? "No trainees enrolled today yet" : "No trainee matches"}
+            text={role === "Registration" && !query ? "Search by name, number, email, or mobile to find any trainee on record." : "Adjust the search, date range, or status filter."}
+          />
         ) : (
           <DataTable columns={["Trainee", "Contact", "Enrollments", showAmounts ? "Balance" : "Payment status", "Latest stage", ""]} minWidth={940}>
             {rows.map((trainee) => {
@@ -446,7 +466,7 @@ const COURSE_CATEGORIES = [
 ];
 const COURSE_MODALITIES = ["Face-to-face", "Blended", "Online", "To be confirmed"];
 
-type CourseDraft = { id: string | null; code: string; course: string; category: string; duration: string; modality: string; price: string };
+type CourseDraft = { id: string | null; code: string; course: string; category: string; duration: string; modality: string; price: string; instructionTemplate: string; certificateTemplate: string };
 type OfferDraft = { id: string | null; center: string; course: string; duration: string; fee: string; rebate: string };
 
 const pesosInput = (centavos: number) => (centavos / 100).toString();
@@ -530,6 +550,8 @@ export function CatalogModule({ role }: { role: Role }) {
       duration: courseDraft.duration.trim(),
       modality: courseDraft.modality,
       priceCentavos: toCentavos(courseDraft.price),
+      instructionTemplate: courseDraft.instructionTemplate.trim() || undefined,
+      certificateTemplate: courseDraft.certificateTemplate.trim() || undefined,
     };
     if (courseDraft.id) {
       updateCourse(courseDraft.id, payload);
@@ -576,7 +598,7 @@ export function CatalogModule({ role }: { role: Role }) {
     setFormError("");
   }
 
-  const newCourse: CourseDraft = { id: null, code: "", course: "", category: COURSE_CATEGORIES[2], duration: "1 day", modality: COURSE_MODALITIES[0], price: "" };
+  const newCourse: CourseDraft = { id: null, code: "", course: "", category: COURSE_CATEGORIES[2], duration: "1 day", modality: COURSE_MODALITIES[0], price: "", instructionTemplate: "", certificateTemplate: "" };
   const newOffer: OfferDraft = { id: null, center: centers[0] ?? "", course: "", duration: "1 day", fee: "", rebate: "" };
 
   const courseColumns = canEdit
@@ -674,6 +696,8 @@ export function CatalogModule({ role }: { role: Role }) {
                           duration: course.duration,
                           modality: course.modality,
                           price: pesosInput(course.priceCentavos),
+                          instructionTemplate: course.instructionTemplate ?? "",
+                          certificateTemplate: course.certificateTemplate ?? "",
                         });
                       }}
                     >
@@ -794,6 +818,21 @@ export function CatalogModule({ role }: { role: Role }) {
             <Field label="Fee (₱)*">
               <input type="number" min={0} step="1" value={courseDraft.price} onChange={(event) => setCourseDraft({ ...courseDraft, price: event.target.value })} />
             </Field>
+            <Field label="Instruction template" full hint="Sent to the trainee once enrolled and paid. Leave blank to use the generic instruction email.">
+              <textarea
+                rows={4}
+                value={courseDraft.instructionTemplate}
+                placeholder="e.g. Report to Room 301 at 8:00 AM. Bring a valid ID, your admission slip, and a black ballpen."
+                onChange={(event) => setCourseDraft({ ...courseDraft, instructionTemplate: event.target.value })}
+              />
+            </Field>
+            <Field label="Certificate template" full hint="Reference for the New Wave certificate layout used when this course issues a certificate. Leave blank if none yet.">
+              <input
+                value={courseDraft.certificateTemplate}
+                placeholder="e.g. NWM-BT-CERT-A4"
+                onChange={(event) => setCourseDraft({ ...courseDraft, certificateTemplate: event.target.value })}
+              />
+            </Field>
             {formError && <p className="form-error field-full">{formError}</p>}
           </div>
         )}
@@ -852,31 +891,398 @@ export function CatalogModule({ role }: { role: Role }) {
 /* -------------------------------------------------------------- accounting */
 
 type ChannelDraft = { id: string | null; name: string; requiresReference: boolean };
-type AnnouncementDraft = { id: string | null; title: string; body: string; expiresOn: string; pinned: boolean };
 type ChargeDraft = { id: string | null; name: string; amount: string };
+type CategoryDraft = { id: string | null; name: string };
+type PayableDraft = { id: string | null; name: string; category: string; amount: string; dueDay: string; notes: string };
+type AgencyDraft = { id: string | null; name: string };
+
+/**
+ * Per-offering rebate table for one marketing agency. Lists every active
+ * in-house course (STCW + in-house) and every endorsed partner training with a
+ * peso input; edits persist immediately so the modal needs no separate save
+ * step. Endorsed trainings are keyed "endorsed:<offerId>" in the rebate map.
+ */
+function AgencyRebateEditor({ agencyId, onSet }: { agencyId: string; onSet: (id: string, key: string, centavos: number) => void }) {
+  const { state } = useSystem();
+  const [query, setQuery] = useState("");
+  const agency = state.marketingAgencies.find((item) => item.id === agencyId);
+  const term = query.trim().toLowerCase();
+
+  // Unify in-house courses and endorsed partner trainings into one rebate list.
+  const inHouse = state.courses
+    .filter((course) => course.active)
+    .map((course) => ({
+      key: course.code,
+      title: course.course,
+      subtitle: `${course.code} · fee ${pesos(course.priceCentavos)}`,
+      endorsed: false,
+    }));
+  const endorsed = state.partnerOffers
+    .filter((offer) => offer.active)
+    .map((offer) => ({
+      key: `endorsed:${offer.id}`,
+      title: offer.course,
+      subtitle: `Endorsed · ${offer.center} · fee ${pesos(offer.trainingFeeCentavos)}`,
+      endorsed: true,
+    }));
+  const items = [...inHouse, ...endorsed]
+    .filter((item) => `${item.title} ${item.subtitle}`.toLowerCase().includes(term))
+    .sort((left, right) => left.title.localeCompare(right.title));
+
+  if (!agency) return null;
+  const priced = Object.keys(agency.rebates).length;
+
+  return (
+    <div className="form-full agency-rebate-editor">
+      <div className="toolbar">
+        <SearchInput value={query} onChange={setQuery} placeholder="Search in-house course or endorsed training" />
+        <span className="muted-text">{priced} of {inHouse.length + endorsed.length} offerings priced</span>
+      </div>
+      <div className="agency-rebate-list">
+        {items.map((item) => {
+          const centavos = agency.rebates[item.key] ?? 0;
+          return (
+            <label key={item.key} className="agency-rebate-row">
+              <span>
+                <strong>{item.title}{item.endorsed ? " " : ""}{item.endorsed && <Pill tone="violet">Endorsed</Pill>}</strong>
+                <small>{item.subtitle}</small>
+              </span>
+              <span className="agency-rebate-input">
+                <em>₱</em>
+                <input
+                  type="number"
+                  min={0}
+                  step="1"
+                  defaultValue={centavos ? (centavos / 100).toString() : ""}
+                  placeholder="0"
+                  onBlur={(event) => {
+                    const value = event.target.value.trim();
+                    const next = value === "" ? 0 : Math.max(0, Math.round(Number(value) * 100));
+                    if (Number.isFinite(next) && next !== centavos) onSet(agencyId, item.key, next);
+                  }}
+                />
+              </span>
+            </label>
+          );
+        })}
+        {items.length === 0 && <p className="muted-text">Nothing matches “{query}”.</p>}
+      </div>
+    </div>
+  );
+}
+
+const ACCOUNTING_TABS = ["Overview", "Invoices & Vouchers", "Reconciliation", "Setup"] as const;
+type AccountingTab = (typeof ACCOUNTING_TABS)[number];
+
+const SUMMARY_RANGES = ["Daily", "Weekly", "Monthly"] as const;
+type SummaryRange = (typeof SUMMARY_RANGES)[number];
+const summaryPreset = (r: SummaryRange): ReportRangePreset => (r === "Daily" ? "Today" : r === "Weekly" ? "Last 7 days" : "This month");
+
+/** Summary of Invoices (collections) per channel over Daily/Weekly/Monthly. */
+function InvoiceSummary() {
+  const { state } = useSystem();
+  const toast = useToast();
+  const [span, setSpan] = useState<SummaryRange>("Daily");
+  const range = resolveRange(summaryPreset(span), todayIso());
+  const invoices = state.ledger.filter((entry) => entry.type === "payment" && entry.verification === "Verified" && withinRange(entry.recordedAt, range));
+  const byChannel = state.paymentChannels
+    .filter((channel) => channel.active)
+    .map((channel) => {
+      const list = invoices.filter((entry) => entry.method === channel.name);
+      return { channel: channel.name, count: list.length, total: list.reduce((sum, entry) => sum + entry.amountCentavos, 0) };
+    })
+    .filter((row) => row.count > 0);
+  const total = invoices.reduce((sum, entry) => sum + entry.amountCentavos, 0);
+
+  return (
+    <Panel
+      title="Summary of invoices"
+      description={`Collections per channel · ${describeRange(range)}`}
+      action={
+        <button
+          className="secondary-button"
+          disabled={invoices.length === 0}
+          onClick={() => {
+            downloadCsv(`invoice-summary-${span}-${range.from}.csv`, [
+              [`Invoice summary · ${span} · ${describeRange(range)}`],
+              [],
+              ["Channel", "Invoices", "Amount"],
+              ...byChannel.map((row) => [row.channel, row.count, (row.total / 100).toFixed(2)]),
+              [],
+              ["Total", invoices.length, (total / 100).toFixed(2)],
+            ]);
+            toast("success", "Invoice summary exported.");
+          }}
+        >
+          Download CSV
+        </button>
+      }
+    >
+      <div className="summary-panel">
+        <Segmented options={SUMMARY_RANGES} value={span} onChange={setSpan} />
+        {invoices.length === 0 ? (
+          <EmptyState icon="₱" title="No invoices in this period" text="No verified collections in the selected window." />
+        ) : (
+          <DataTable columns={["Channel", "Invoices", "Amount"]}>
+            {byChannel.map((row) => (
+              <tr key={row.channel}>
+                <td>{row.channel}</td>
+                <td>{row.count}</td>
+                <td><strong>{pesos(row.total)}</strong></td>
+              </tr>
+            ))}
+          </DataTable>
+        )}
+        <div className="summary-total"><span>Total · {invoices.length} invoice{invoices.length === 1 ? "" : "s"}</span><strong>{pesos(total)}</strong></div>
+      </div>
+    </Panel>
+  );
+}
+
+/** Summary of Expense Vouchers per category over Daily/Weekly/Monthly. */
+function ExpenseVoucherSummary() {
+  const { state } = useSystem();
+  const toast = useToast();
+  const [span, setSpan] = useState<SummaryRange>("Daily");
+  const range = resolveRange(summaryPreset(span), todayIso());
+  const vouchers = state.expenses.filter((expense) => withinRange(expense.createdAt, range));
+  const categories = Array.from(new Set(vouchers.map((expense) => expense.category))).map((category) => {
+    const list = vouchers.filter((expense) => expense.category === category);
+    return { category, count: list.length, total: list.reduce((sum, expense) => sum + expense.amountCentavos, 0) };
+  });
+  const total = vouchers.reduce((sum, expense) => sum + expense.amountCentavos, 0);
+  const approved = vouchers.filter((expense) => expense.status === "Approved" || expense.status === "Paid").reduce((sum, expense) => sum + expense.amountCentavos, 0);
+
+  return (
+    <Panel
+      title="Summary of expense vouchers"
+      description={`Per category · ${describeRange(range)}`}
+      action={
+        <button
+          className="secondary-button"
+          disabled={vouchers.length === 0}
+          onClick={() => {
+            downloadCsv(`expense-voucher-summary-${span}-${range.from}.csv`, [
+              [`Expense voucher summary · ${span} · ${describeRange(range)}`],
+              [],
+              ["Category", "Vouchers", "Amount"],
+              ...categories.map((row) => [row.category, row.count, (row.total / 100).toFixed(2)]),
+              [],
+              ["Total", vouchers.length, (total / 100).toFixed(2)],
+              ["Approved / paid", "", (approved / 100).toFixed(2)],
+            ]);
+            toast("success", "Expense voucher summary exported.");
+          }}
+        >
+          Download CSV
+        </button>
+      }
+    >
+      <div className="summary-panel">
+        <Segmented options={SUMMARY_RANGES} value={span} onChange={setSpan} />
+        {vouchers.length === 0 ? (
+          <EmptyState icon="▥" title="No vouchers in this period" text="No expense vouchers raised in the selected window." />
+        ) : (
+          <DataTable columns={["Category", "Vouchers", "Amount"]}>
+            {categories.map((row) => (
+              <tr key={row.category}>
+                <td>{row.category}</td>
+                <td>{row.count}</td>
+                <td><strong>{pesos(row.total)}</strong></td>
+              </tr>
+            ))}
+          </DataTable>
+        )}
+        <div className="summary-total"><span>Total · {vouchers.length} voucher{vouchers.length === 1 ? "" : "s"}</span><strong>{pesos(total)}</strong></div>
+      </div>
+    </Panel>
+  );
+}
+
+const normalizeRef = (value: string) => value.replace(/[\s-]/g, "").toUpperCase();
+
+/**
+ * Bank & GCash reconciliation. Accounting uploads a channel's external
+ * transaction-history CSV; each row is matched to a recorded verified payment on
+ * that channel by transaction reference (fallback: amount + date). Session-only.
+ */
+function BankReconciliation() {
+  const { state } = useSystem();
+  const toast = useToast();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const channels = state.paymentChannels.filter((c) => c.active && c.requiresReference);
+  const [channel, setChannel] = useState(channels[0]?.name ?? "");
+  const [bankRows, setBankRows] = useState<{ reference: string; amountCentavos: number; date: string; raw: string }[]>([]);
+  const [fileName, setFileName] = useState("");
+
+  const systemPayments = state.ledger.filter(
+    (entry) => entry.type === "payment" && entry.verification === "Verified" && entry.method === channel,
+  );
+
+  // Match each bank row to a system payment: reference first, then amount+date.
+  const usedSystem = new Set<string>();
+  const matched: { bankRef: string; amountCentavos: number; systemRef: string }[] = [];
+  const bankOnly: typeof bankRows = [];
+  for (const row of bankRows) {
+    const byRef = systemPayments.find((entry) => !usedSystem.has(entry.id) && entry.referenceNumber && normalizeRef(entry.referenceNumber) === row.reference);
+    const byAmountDate =
+      byRef ??
+      systemPayments.find(
+        (entry) => !usedSystem.has(entry.id) && entry.amountCentavos === row.amountCentavos && entry.recordedAt.slice(0, 10) === row.date,
+      );
+    if (byAmountDate) {
+      usedSystem.add(byAmountDate.id);
+      matched.push({ bankRef: row.reference, amountCentavos: row.amountCentavos, systemRef: byAmountDate.reference });
+    } else {
+      bankOnly.push(row);
+    }
+  }
+  const systemOnly = systemPayments.filter((entry) => !usedSystem.has(entry.id));
+
+  function handleFile(file: File | undefined) {
+    if (!file) return;
+    setFileName(file.name);
+    void file.text().then((text) => {
+      const grid = parseCsv(text);
+      if (grid.length < 2) {
+        toast("warning", "That file has no data rows.");
+        setBankRows([]);
+        return;
+      }
+      const header = grid[0].map((h) => h.trim().toLowerCase());
+      const refCol = header.findIndex((h) => h.includes("ref"));
+      const amtCol = header.findIndex((h) => h.includes("amount") || h.includes("amt") || h.includes("value"));
+      const dateCol = header.findIndex((h) => h.includes("date"));
+      if (amtCol < 0) {
+        toast("warning", "Could not find an amount column in the CSV header.");
+        setBankRows([]);
+        return;
+      }
+      const parsed = grid.slice(1).map((cells) => {
+        const amountCentavos = Math.round(Number((cells[amtCol] ?? "0").replace(/[^0-9.-]/g, "")) * 100);
+        return {
+          reference: refCol >= 0 ? normalizeRef(cells[refCol] ?? "") : "",
+          amountCentavos,
+          date: dateCol >= 0 ? (cells[dateCol] ?? "").trim().slice(0, 10) : "",
+          raw: cells.join(" · "),
+        };
+      });
+      setBankRows(parsed);
+      toast("success", `${parsed.length} transaction${parsed.length === 1 ? "" : "s"} loaded from ${file.name}.`);
+    });
+  }
+
+  return (
+    <Panel
+      title="Bank & GCash reconciliation"
+      description="Upload a channel's transaction history (PSBank, UnionBank, GCash) and match it against recorded collections."
+      action={
+        bankRows.length > 0 ? (
+          <button
+            className="secondary-button"
+            onClick={() => {
+              downloadCsv(`reconciliation-${channel}-${todayIso()}.csv`, [
+                [`Reconciliation · ${channel} · ${fileName}`],
+                [],
+                ["Result", "Bank reference", "Amount", "System payment"],
+                ...matched.map((m) => ["Matched", m.bankRef, (m.amountCentavos / 100).toFixed(2), m.systemRef]),
+                ...bankOnly.map((b) => ["In bank file only", b.reference, (b.amountCentavos / 100).toFixed(2), ""]),
+                ...systemOnly.map((s) => ["In system only", s.referenceNumber ?? "", (s.amountCentavos / 100).toFixed(2), s.reference]),
+              ]);
+              toast("success", "Reconciliation exported.");
+            }}
+          >
+            Download CSV
+          </button>
+        ) : undefined
+      }
+    >
+      <div className="reconciliation">
+        <div className="toolbar toolbar-wrap">
+          <label className="inline-field">
+            <span>Channel</span>
+            <select value={channel} onChange={(event) => { setChannel(event.target.value); setBankRows([]); setFileName(""); }}>
+              {channels.map((c) => (
+                <option key={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </label>
+          <button className="secondary-button" onClick={() => inputRef.current?.click()}>
+            Upload transaction history (CSV)
+          </button>
+          <input ref={inputRef} type="file" accept=".csv,text/csv" hidden onChange={(event) => handleFile(event.target.files?.[0])} />
+          {fileName && <span className="muted-text">{fileName}</span>}
+        </div>
+
+        {bankRows.length === 0 ? (
+          <EmptyState icon="◎" title="No file uploaded" text="Export a channel's transaction history (Payments → Transaction history) or upload a bank/GCash CSV with Date, Reference, and Amount columns." />
+        ) : (
+          <>
+            <div className="stat-grid stat-grid-3">
+              <StatCard label="Matched" value={String(matched.length)} note={pesos(matched.reduce((s, m) => s + m.amountCentavos, 0))} tone={2} icon="✓" />
+              <StatCard label="In bank file only" value={String(bankOnly.length)} note={pesos(bankOnly.reduce((s, b) => s + b.amountCentavos, 0))} tone={5} icon="!" />
+              <StatCard label="In system only" value={String(systemOnly.length)} note={pesos(systemOnly.reduce((s, e) => s + e.amountCentavos, 0))} tone={1} icon="◎" />
+            </div>
+            {bankOnly.length > 0 && (
+              <>
+                <h3 className="drawer-section">In bank file, not recorded</h3>
+                <DataTable columns={["Reference", "Amount", "Date"]}>
+                  {bankOnly.map((b, index) => (
+                    <tr key={index}><td>{b.reference || "—"}</td><td>{pesos(b.amountCentavos)}</td><td>{b.date || "—"}</td></tr>
+                  ))}
+                </DataTable>
+              </>
+            )}
+            {systemOnly.length > 0 && (
+              <>
+                <h3 className="drawer-section">Recorded, not in bank file</h3>
+                <DataTable columns={["Payment", "Reference", "Amount"]}>
+                  {systemOnly.map((s) => (
+                    <tr key={s.id}><td><strong>{s.reference}</strong></td><td>{s.referenceNumber || "—"}</td><td>{pesos(s.amountCentavos)}</td></tr>
+                  ))}
+                </DataTable>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </Panel>
+  );
+}
 
 export function AccountingModule({ role }: { role: Role }) {
   const {
     state,
     views,
-    decideExpense,
     addPaymentChannel,
     updatePaymentChannel,
     setPaymentChannelActive,
     addOtherCharge,
     updateOtherCharge,
     setOtherChargeActive,
-    postAnnouncement,
-    updateAnnouncement,
-    removeAnnouncement,
+    addExpenseCategory,
+    updateExpenseCategory,
+    setExpenseCategoryActive,
+    addMonthlyPayable,
+    updateMonthlyPayable,
+    setMonthlyPayableActive,
+    removeMonthlyPayable,
+    addMarketingAgency,
+    updateMarketingAgency,
+    setMarketingAgencyActive,
+    setAgencyCourseRebate,
   } = useSystem();
   const toast = useToast();
   const all = views();
   const canManage = role === "Admin" || role === "Accounting";
-  const canManageCharges = role === "Admin"; // Other charges catalog is Admin-only
+  const canManageCharges = role === "Admin" || role === "Accounting"; // Accounting Manager manages all catalogs
   const [channelDraft, setChannelDraft] = useState<ChannelDraft | null>(null);
   const [chargeDraft, setChargeDraft] = useState<ChargeDraft | null>(null);
-  const [annDraft, setAnnDraft] = useState<AnnouncementDraft | null>(null);
+  const [categoryDraft, setCategoryDraft] = useState<CategoryDraft | null>(null);
+  const [payableDraft, setPayableDraft] = useState<PayableDraft | null>(null);
+  const [agencyDraft, setAgencyDraft] = useState<AgencyDraft | null>(null);
+  const [voucherFor, setVoucherFor] = useState<Expense | null>(null);
+  const [tab, setTab] = useState<AccountingTab>("Overview");
 
   const payments = state.ledger.filter((entry) => entry.type === "payment" && entry.verification === "Verified");
   const gross = payments.reduce((sum, entry) => sum + entry.amountCentavos, 0);
@@ -885,7 +1291,6 @@ export function AccountingModule({ role }: { role: Role }) {
     .reduce((sum, entry) => sum + entry.amountCentavos, 0);
   const receivables = all.reduce((sum, item) => sum + item.balanceCentavos, 0);
   const unreconciled = state.ledger.filter((entry) => entry.type === "payment" && entry.verification === "Pending");
-  const expensesPending = state.expenses.filter((expense) => expense.status === "Pending");
 
   return (
     <div className="page">
@@ -895,6 +1300,16 @@ export function AccountingModule({ role }: { role: Role }) {
         description="Collections, receivables, reconciliation, expenses, and partner payables built from the same ledger the cashier posts to."
       />
 
+      <div className="hub-tabs">
+        {ACCOUNTING_TABS.map((item) => (
+          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>
+            {item}
+          </button>
+        ))}
+      </div>
+
+      {tab === "Overview" && (
+      <>
       <div className="stat-grid stat-grid-4">
         <StatCard label="Gross collections" value={pesos(gross)} note={`${payments.length} verified payments`} tone={2} icon="₱" />
         <StatCard label="Net collections" value={pesos(gross - refunds)} note={`${pesos(refunds)} refunded or reversed`} tone={0} icon="▥" />
@@ -902,7 +1317,6 @@ export function AccountingModule({ role }: { role: Role }) {
         <StatCard label="Unreconciled" value={String(unreconciled.length)} note={pesos(unreconciled.reduce((sum, entry) => sum + entry.amountCentavos, 0))} tone={5} icon="◎" />
       </div>
 
-      <div className="two-column">
         <Panel title="Collections by channel" description="Verified payments only">
           <div className="bar-list">
             {state.paymentChannels.filter((channel) => channel.active).map((channel) => {
@@ -921,58 +1335,6 @@ export function AccountingModule({ role }: { role: Role }) {
             })}
           </div>
         </Panel>
-
-        <Panel title="Expense approvals" description="Vouchers waiting for a decision">
-          {expensesPending.length === 0 ? (
-            <EmptyState icon="✓" title="No pending vouchers" text="Every submitted expense has been decided." />
-          ) : (
-            <div className="history-list">
-              {state.expenses.map((expense) => (
-                <div key={expense.id} className="history-row">
-                  <div>
-                    <strong>{expense.expenseNumber} · {expense.purpose}</strong>
-                    <small>
-                      {expense.category}
-                      {expense.itemUnit ? ` · ${expense.itemUnit}` : ""}
-                      {expense.quantity ? ` · qty ${expense.quantity}` : ""}
-                      {expense.payor ? ` · payor ${expense.payor}` : ""}
-                      {expense.modeOfPayment ? ` · ${expense.modeOfPayment}` : ""}
-                      {expense.requestedBy ? ` · by ${expense.requestedBy}` : ""}
-                    </small>
-                  </div>
-                  <div className="history-right">
-                    <strong>{pesos(expense.amountCentavos)}</strong>
-                    {expense.status === "Pending" ? (
-                      <div className="cell-actions">
-                        <button
-                          className="ghost-button"
-                          onClick={() => {
-                            decideExpense(expense.id, "Approved");
-                            toast("success", "Expense approved.");
-                          }}
-                        >
-                          Approve
-                        </button>
-                        <button
-                          className="ghost-button ghost-danger"
-                          onClick={() => {
-                            decideExpense(expense.id, "Rejected");
-                            toast("warning", "Expense rejected.");
-                          }}
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    ) : (
-                      <Pill tone={expense.status === "Rejected" ? "red" : "green"}>{expense.status}</Pill>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </Panel>
-      </div>
 
       <Panel title="Receivables ageing" description="Open balances by enrollment" padded={false}>
         <DataTable columns={["Trainee", "Enrollment", "Charged", "Paid", "Balance", "Stage"]}>
@@ -1003,9 +1365,113 @@ export function AccountingModule({ role }: { role: Role }) {
           <EmptyState icon="✓" title="No receivables" text="Every active enrollment is fully settled." />
         )}
       </Panel>
+      </>
+      )}
 
-      {canManage && (
+      {tab === "Invoices & Vouchers" && (
+      <>
         <div className="two-column">
+          <InvoiceSummary />
+          <ExpenseVoucherSummary />
+        </div>
+
+        <Panel title="Expense vouchers" description="Approve or reject in the Requests module — each voucher raises an Expense request.">
+          {state.expenses.length === 0 ? (
+            <EmptyState icon="✓" title="No vouchers yet" text="Expense vouchers raised from Payments appear here." />
+          ) : (
+            <div className="history-list">
+              {state.expenses.map((expense) => (
+                <div key={expense.id} className="history-row">
+                  <div>
+                    <strong>{expense.expenseNumber} · {expense.purpose}</strong>
+                    <small>
+                      {expense.category}
+                      {expense.itemUnit ? ` · ${expense.itemUnit}` : ""}
+                      {expense.quantity ? ` · qty ${expense.quantity}` : ""}
+                      {expense.payor ? ` · payor ${expense.payor}` : ""}
+                      {expense.modeOfPayment ? ` · ${expense.modeOfPayment}` : ""}
+                      {expense.requestedBy ? ` · by ${expense.requestedBy}` : ""}
+                    </small>
+                  </div>
+                  <div className="history-right">
+                    <strong>{pesos(expense.amountCentavos)}</strong>
+                    <Pill tone={expense.status === "Rejected" ? "red" : expense.status === "Pending" ? "amber" : "green"}>{expense.status}</Pill>
+                    <button className="ghost-button" onClick={() => setVoucherFor(expense)}>
+                      View voucher
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+
+        <Panel
+          title="Monthly payables"
+          description="Recurring bills tracked for the month — reminded on the Accounting and Admin dashboards."
+          action={
+            canManageCharges ? (
+              <button className="link-button" onClick={() => setPayableDraft({ id: null, name: "", category: "Utilities", amount: "", dueDay: "1", notes: "" })}>
+                ＋ Add payable
+              </button>
+            ) : undefined
+          }
+        >
+          {state.monthlyPayables.length === 0 ? (
+            <EmptyState icon="₱" title="No monthly payables" text="Add recurring bills (rent, utilities, remittances) to track them each month." />
+          ) : (
+            <div className="history-list">
+              {[...state.monthlyPayables].sort((a, b) => a.dueDay - b.dueDay).map((payable) => (
+                <div key={payable.id} className={`history-row ${payable.active ? "" : "row-muted"}`}>
+                  <div>
+                    <strong>{payable.name}</strong>
+                    <small>{payable.category} · due day {payable.dueDay}{payable.notes ? ` · ${payable.notes}` : ""}{payable.active ? "" : " · archived"}</small>
+                  </div>
+                  <div className="history-right">
+                    <strong>{pesos(payable.amountCentavos)}</strong>
+                    {canManageCharges && (
+                      <>
+                        <button
+                          className="ghost-button"
+                          onClick={() => setPayableDraft({ id: payable.id, name: payable.name, category: payable.category, amount: (payable.amountCentavos / 100).toString(), dueDay: String(payable.dueDay), notes: payable.notes ?? "" })}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="ghost-button"
+                          onClick={() => {
+                            setMonthlyPayableActive(payable.id, !payable.active);
+                            toast("warning", `${payable.name} ${payable.active ? "archived" : "restored"}.`);
+                          }}
+                        >
+                          {payable.active ? "Archive" : "Restore"}
+                        </button>
+                        <button
+                          className="ghost-button"
+                          onClick={() => {
+                            if (!window.confirm(`Remove "${payable.name}" from monthly payables?`)) return;
+                            removeMonthlyPayable(payable.id);
+                            toast("warning", `${payable.name} removed.`);
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Panel>
+      </>
+      )}
+
+      {tab === "Reconciliation" && <BankReconciliation />}
+
+      {tab === "Setup" && (
+      <>
+      {canManage && (
           <Panel
             title="Payment channels"
             description="Modes of payment offered at the cashier"
@@ -1043,49 +1509,6 @@ export function AccountingModule({ role }: { role: Role }) {
               ))}
             </div>
           </Panel>
-
-          <Panel
-            title="Announcement board"
-            description="Posted to every staff dashboard"
-            action={
-              <button className="link-button" onClick={() => setAnnDraft({ id: null, title: "", body: "", expiresOn: "", pinned: false })}>
-                ＋ New announcement
-              </button>
-            }
-          >
-            {state.announcements.length === 0 ? (
-              <EmptyState icon="📣" title="No announcements" text="Post an update for all staff." />
-            ) : (
-              <div className="history-list">
-                {state.announcements.map((item) => (
-                  <div key={item.id} className="history-row">
-                    <div>
-                      <strong>{item.pinned ? "📌 " : ""}{item.title}</strong>
-                      <small>{item.postedBy} · {formatDate(item.postedAt)}{item.expiresOn ? ` · until ${formatDate(item.expiresOn)}` : ""}</small>
-                    </div>
-                    <div className="cell-actions">
-                      <button
-                        className="ghost-button"
-                        onClick={() => setAnnDraft({ id: item.id, title: item.title, body: item.body, expiresOn: item.expiresOn ?? "", pinned: Boolean(item.pinned) })}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        className="ghost-button ghost-danger"
-                        onClick={() => {
-                          removeAnnouncement(item.id);
-                          toast("warning", "Announcement removed.");
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </Panel>
-        </div>
       )}
 
       {canManageCharges && (
@@ -1126,6 +1549,94 @@ export function AccountingModule({ role }: { role: Role }) {
             ))}
           </div>
         </Panel>
+      )}
+
+      {canManageCharges && (
+        <Panel
+          title="Expense categories"
+          description="Admin-managed categories the cashier picks when raising an expense voucher."
+          action={
+            <button className="link-button" onClick={() => setCategoryDraft({ id: null, name: "" })}>
+              ＋ Add category
+            </button>
+          }
+        >
+          <div className="history-list">
+            {state.expenseCategories.map((category) => (
+              <div key={category.id} className={`history-row ${category.active ? "" : "row-muted"}`}>
+                <div>
+                  <strong>{category.name}</strong>
+                  <small>Voucher category{category.active ? "" : " · archived"}</small>
+                </div>
+                <div className="cell-actions">
+                  <button className="ghost-button" onClick={() => setCategoryDraft({ id: category.id, name: category.name })}>
+                    Edit
+                  </button>
+                  <button
+                    className="ghost-button"
+                    onClick={() => {
+                      setExpenseCategoryActive(category.id, !category.active);
+                      toast("warning", `${category.name} ${category.active ? "archived" : "restored"}.`);
+                    }}
+                  >
+                    {category.active ? "Archive" : "Restore"}
+                  </button>
+                </div>
+              </div>
+            ))}
+            {state.expenseCategories.length === 0 && (
+              <EmptyState icon="▥" title="No expense categories" text="Add a category so vouchers can be classified." />
+            )}
+          </div>
+        </Panel>
+      )}
+
+      {canManageCharges && (
+        <Panel
+          title="Marketing agencies"
+          description="Admin-managed referral agencies with per-course rebates across the STCW and in-house catalog. The cashier picks one and the rebate for that course is applied as a trainee discount."
+          action={
+            <button className="link-button" onClick={() => setAgencyDraft({ id: null, name: "" })}>
+              ＋ Add agency
+            </button>
+          }
+        >
+          <div className="history-list">
+            {state.marketingAgencies.map((agency) => {
+              const priced = Object.keys(agency.rebates).length;
+              return (
+              <div key={agency.id} className={`history-row ${agency.active ? "" : "row-muted"}`}>
+                <div>
+                  <strong>{agency.name}</strong>
+                  <small>{priced} course{priced === 1 ? "" : "s"} with a rebate{agency.active ? "" : " · archived"}</small>
+                </div>
+                <div className="cell-actions">
+                  <button
+                    className="ghost-button"
+                    onClick={() => setAgencyDraft({ id: agency.id, name: agency.name })}
+                  >
+                    Edit rebates
+                  </button>
+                  <button
+                    className="ghost-button"
+                    onClick={() => {
+                      setMarketingAgencyActive(agency.id, !agency.active);
+                      toast("warning", `${agency.name} ${agency.active ? "archived" : "restored"}.`);
+                    }}
+                  >
+                    {agency.active ? "Archive" : "Restore"}
+                  </button>
+                </div>
+              </div>
+              );
+            })}
+            {state.marketingAgencies.length === 0 && (
+              <EmptyState icon="◇" title="No marketing agencies" text="Add an agency so cashiers can apply its rebate." />
+            )}
+          </div>
+        </Panel>
+      )}
+      </>
       )}
 
       <Modal
@@ -1169,6 +1680,153 @@ export function AccountingModule({ role }: { role: Role }) {
             <Field label="Default amount (₱)*">
               <input type="number" min={0} step="1" value={chargeDraft.amount} onChange={(event) => setChargeDraft({ ...chargeDraft, amount: event.target.value })} />
             </Field>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={Boolean(categoryDraft)}
+        title={categoryDraft?.id ? "Edit expense category" : "Add expense category"}
+        description="Cashiers pick from active categories when raising an expense voucher."
+        onClose={() => setCategoryDraft(null)}
+        footer={
+          <>
+            <button className="secondary-button" onClick={() => setCategoryDraft(null)}>Cancel</button>
+            <button
+              className="primary-button"
+              onClick={() => {
+                if (!categoryDraft) return;
+                const name = categoryDraft.name.trim();
+                if (!name) {
+                  toast("warning", "Category name is required.");
+                  return;
+                }
+                if (categoryDraft.id) {
+                  updateExpenseCategory(categoryDraft.id, { name });
+                  toast("success", `${name} updated.`);
+                } else {
+                  addExpenseCategory({ name });
+                  toast("success", `${name} added.`);
+                }
+                setCategoryDraft(null);
+              }}
+            >
+              {categoryDraft?.id ? "Save changes" : "Add category"}
+            </button>
+          </>
+        }
+      >
+        {categoryDraft && (
+          <div className="form-grid">
+            <Field label="Category name*" full hint="e.g. Supplies, Utilities, Professional Fees">
+              <input value={categoryDraft.name} onChange={(event) => setCategoryDraft({ ...categoryDraft, name: event.target.value })} />
+            </Field>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={Boolean(payableDraft)}
+        title={payableDraft?.id ? "Edit monthly payable" : "Add monthly payable"}
+        description="Recurring bills reminded on the Accounting and Admin dashboards."
+        onClose={() => setPayableDraft(null)}
+        footer={
+          <>
+            <button className="secondary-button" onClick={() => setPayableDraft(null)}>Cancel</button>
+            <button
+              className="primary-button"
+              onClick={() => {
+                if (!payableDraft) return;
+                const name = payableDraft.name.trim();
+                const amountCentavos = Math.round(Number(payableDraft.amount) * 100);
+                const dueDay = Math.min(31, Math.max(1, Math.round(Number(payableDraft.dueDay) || 1)));
+                if (!name) { toast("warning", "Payable name is required."); return; }
+                if (!Number.isFinite(amountCentavos) || amountCentavos <= 0) { toast("warning", "Enter a valid amount."); return; }
+                const patch = { name, category: payableDraft.category.trim() || "Others", amountCentavos, dueDay, notes: payableDraft.notes.trim() || undefined };
+                if (payableDraft.id) {
+                  updateMonthlyPayable(payableDraft.id, patch);
+                  toast("success", `${name} updated.`);
+                } else {
+                  addMonthlyPayable(patch);
+                  toast("success", `${name} added.`);
+                }
+                setPayableDraft(null);
+              }}
+            >
+              {payableDraft?.id ? "Save changes" : "Add payable"}
+            </button>
+          </>
+        }
+      >
+        {payableDraft && (
+          <div className="form-grid">
+            <Field label="Payable name*" full hint="e.g. Office rent, Internet (PLDT), SSS remittance">
+              <input value={payableDraft.name} onChange={(event) => setPayableDraft({ ...payableDraft, name: event.target.value })} />
+            </Field>
+            <Field label="Category">
+              <input value={payableDraft.category} onChange={(event) => setPayableDraft({ ...payableDraft, category: event.target.value })} />
+            </Field>
+            <Field label="Amount (PHP)*">
+              <input inputMode="decimal" value={payableDraft.amount} onChange={(event) => setPayableDraft({ ...payableDraft, amount: event.target.value })} />
+            </Field>
+            <Field label="Due day of month (1–31)*">
+              <input inputMode="numeric" value={payableDraft.dueDay} onChange={(event) => setPayableDraft({ ...payableDraft, dueDay: event.target.value })} />
+            </Field>
+            <Field label="Notes" full>
+              <input value={payableDraft.notes} onChange={(event) => setPayableDraft({ ...payableDraft, notes: event.target.value })} />
+            </Field>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={Boolean(agencyDraft)}
+        title={agencyDraft?.id ? "Edit marketing agency" : "Add marketing agency"}
+        description="Set a per-course rebate for every STCW and in-house course. Cashiers pick the agency and the rebate for that course is applied as a trainee discount."
+        onClose={() => setAgencyDraft(null)}
+        wide
+        footer={
+          <>
+            <button className="secondary-button" onClick={() => setAgencyDraft(null)}>
+              {agencyDraft?.id ? "Done" : "Cancel"}
+            </button>
+            {!agencyDraft?.id && (
+              <button
+                className="primary-button"
+                onClick={() => {
+                  if (!agencyDraft) return;
+                  const name = agencyDraft.name.trim();
+                  if (!name) {
+                    toast("warning", "Agency name is required.");
+                    return;
+                  }
+                  const created = addMarketingAgency({ name, rebates: {} });
+                  toast("success", `${name} added. Set its per-course rebates.`);
+                  setAgencyDraft({ id: created.id, name: created.name });
+                }}
+              >
+                Add agency
+              </button>
+            )}
+          </>
+        }
+      >
+        {agencyDraft && (
+          <div className="form-grid">
+            <Field label="Agency name*" full hint="e.g. Seafront Manning Agency">
+              <input
+                value={agencyDraft.name}
+                onChange={(event) => setAgencyDraft({ ...agencyDraft, name: event.target.value })}
+                onBlur={() => {
+                  if (agencyDraft.id && agencyDraft.name.trim()) updateMarketingAgency(agencyDraft.id, { name: agencyDraft.name.trim() });
+                }}
+              />
+            </Field>
+            {agencyDraft.id ? (
+              <AgencyRebateEditor agencyId={agencyDraft.id} onSet={setAgencyCourseRebate} />
+            ) : (
+              <p className="form-full muted-text">Add the agency first, then set its per-course rebates here.</p>
+            )}
           </div>
         )}
       </Modal>
@@ -1222,60 +1880,118 @@ export function AccountingModule({ role }: { role: Role }) {
         )}
       </Modal>
 
-      <Modal
-        open={Boolean(annDraft)}
-        title={annDraft?.id ? "Edit announcement" : "New announcement"}
-        description="Shown on every staff dashboard until removed or expired."
-        onClose={() => setAnnDraft(null)}
-        wide
-        footer={
-          <>
-            <button className="secondary-button" onClick={() => setAnnDraft(null)}>Cancel</button>
-            <button
-              className="primary-button"
-              onClick={() => {
-                if (!annDraft) return;
-                const title = annDraft.title.trim();
-                const body = annDraft.body.trim();
-                if (!title || !body) {
-                  toast("warning", "Title and message are required.");
-                  return;
-                }
-                const payload = { title, body, expiresOn: annDraft.expiresOn || undefined, pinned: annDraft.pinned };
-                if (annDraft.id) {
-                  updateAnnouncement(annDraft.id, payload);
-                  toast("success", "Announcement updated.");
-                } else {
-                  postAnnouncement(payload);
-                  toast("success", "Announcement posted.");
-                }
-                setAnnDraft(null);
-              }}
-            >
-              {annDraft?.id ? "Save changes" : "Post announcement"}
-            </button>
-          </>
-        }
-      >
-        {annDraft && (
-          <div className="form-grid">
-            <Field label="Title*" full>
-              <input value={annDraft.title} onChange={(event) => setAnnDraft({ ...annDraft, title: event.target.value })} />
-            </Field>
-            <Field label="Message*" full>
-              <textarea rows={4} value={annDraft.body} onChange={(event) => setAnnDraft({ ...annDraft, body: event.target.value })} />
-            </Field>
-            <Field label="Show until (optional)" hint="Auto-hides after this date">
-              <input type="date" value={annDraft.expiresOn} onChange={(event) => setAnnDraft({ ...annDraft, expiresOn: event.target.value })} />
-            </Field>
-            <label className="inline-field inline-check">
-              <input type="checkbox" checked={annDraft.pinned} onChange={(event) => setAnnDraft({ ...annDraft, pinned: event.target.checked })} />
-              <span>Pin to top</span>
-            </label>
-          </div>
-        )}
-      </Modal>
+      {voucherFor && <ExpenseVoucherPreviewModal expense={voucherFor} onClose={() => setVoucherFor(null)} />}
     </div>
+  );
+}
+
+/**
+ * Expense voucher preview in the shared New Wave document format. Shown on screen
+ * first (no auto-download); the half-sheet PDF and print are triggered from here.
+ */
+function ExpenseVoucherPreviewModal({ expense, onClose }: { expense: Expense; onClose: () => void }) {
+  const toast = useToast();
+  const [building, setBuilding] = useState(false);
+
+  async function downloadPdf() {
+    setBuilding(true);
+    try {
+      let logoBytes: Uint8Array | undefined;
+      try {
+        logoBytes = new Uint8Array(await (await fetch("/new-wave-logo.png")).arrayBuffer());
+      } catch {
+        /* logo optional */
+      }
+      const bytes = await createExpenseVoucherPdf({
+        number: expense.expenseNumber,
+        issuedAt: formatDate(expense.createdAt),
+        payee: expense.payee,
+        category: expense.category,
+        purpose: expense.purpose,
+        amountCentavos: expense.amountCentavos,
+        quantity: expense.quantity,
+        unit: expense.itemUnit,
+        requestedBy: expense.requestedBy ?? expense.payor ?? "",
+        modeOfPayment: expense.modeOfPayment ?? "",
+        status: expense.status,
+        preparedBy: expense.requestedBy ?? "",
+        approvedBy: expense.decidedBy ?? "",
+        logoBytes,
+      });
+      const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "application/pdf" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `${expense.expenseNumber}-expense-voucher.pdf`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast("warning", "Could not generate the voucher PDF.");
+    } finally {
+      setBuilding(false);
+    }
+  }
+
+  return (
+    <Modal
+      open
+      title="Expense voucher"
+      description={`${expense.expenseNumber} · ${expense.payee}`}
+      onClose={onClose}
+      wide
+      footer={
+        <>
+          <button className="secondary-button" onClick={onClose}>Close</button>
+          <button className="secondary-button" onClick={() => window.print()}>Print</button>
+          <button className="primary-button" onClick={downloadPdf} disabled={building}>
+            {building ? "Generating…" : "Download PDF"}
+          </button>
+        </>
+      }
+    >
+      <div className="admission-slip" id="voucher-print">
+        <div className="slip-head">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/new-wave-logo.png" alt="New Wave Maritime" className="slip-logo" />
+          <div>
+            <h2>NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.</h2>
+            <p>Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000</p>
+            <strong>EXPENSE VOUCHER</strong>
+          </div>
+        </div>
+
+        <div className="slip-meta">
+          <span>Voucher <strong>{expense.expenseNumber}</strong></span>
+          <span>Issued <strong>{formatDate(expense.createdAt)}</strong></span>
+          <span>Status <strong>{expense.status}</strong></span>
+        </div>
+
+        <h3 className="slip-section">Voucher details</h3>
+        <div className="slip-grid">
+          <div><span>Payee</span><strong>{expense.payee}</strong></div>
+          <div><span>Category</span><strong>{expense.category}</strong></div>
+          <div><span>Purpose</span><strong>{expense.purpose}</strong></div>
+          <div><span>Mode of payment</span><strong>{expense.modeOfPayment ?? "—"}</strong></div>
+          <div><span>Quantity / unit</span><strong>{`${expense.quantity ?? "—"} ${expense.itemUnit ?? ""}`.trim()}</strong></div>
+          <div><span>Requested by</span><strong>{expense.requestedBy ?? expense.payor ?? "—"}</strong></div>
+        </div>
+
+        <div className="slip-grid" style={{ marginTop: 16 }}>
+          <div><span>Amount</span><strong>{pesos(expense.amountCentavos)}</strong></div>
+          <div><span>Status</span><strong>{expense.status}</strong></div>
+        </div>
+
+        <div className="slip-signatures">
+          <div>
+            <div className="sign-line">{expense.requestedBy ?? " "}</div>
+            <span>Prepared by · Signature over Printed Name</span>
+          </div>
+          <div>
+            <div className="sign-line">{expense.decidedBy ?? " "}</div>
+            <span>Approved by · Signature over Printed Name</span>
+          </div>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -1378,7 +2094,7 @@ export function InstructionsModule() {
 
 /* ---------------------------------------------------------------- requests */
 
-const requestTypes: RequestType[] = ["Reschedule", "Course change", "Refund", "Record correction", "Make-up class", "Reprinting", "Cancellation"];
+const requestTypes: RequestType[] = ["Rescheduling", "Change Course", "Releasing Rebates", "Expenses", "Batch rescheduling", "Batch cancellation", "Change of instructor", "Change of room", "Refund", "Record correction", "Make-up class", "Reprinting", "Cancellation"];
 
 export function RequestsModule({ role }: { role: Role }) {
   const { state, views, createRequest, decideRequest } = useSystem();
@@ -1391,7 +2107,7 @@ export function RequestsModule({ role }: { role: Role }) {
   const [newOpen, setNewOpen] = useState(false);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [draft, setDraft] = useState({ type: "Reschedule" as RequestType, enrollmentId: "", reason: "" });
+  const [draft, setDraft] = useState({ type: "Rescheduling" as RequestType, enrollmentId: "", reason: "" });
 
   const all = views();
   const rows = state.requests
@@ -1542,7 +2258,7 @@ export function RequestsModule({ role }: { role: Role }) {
                   reason: draft.reason.trim(),
                 });
                 toast("success", `${request.reference} submitted for approval.`);
-                setDraft({ type: "Reschedule", enrollmentId: "", reason: "" });
+                setDraft({ type: "Rescheduling", enrollmentId: "", reason: "" });
                 setNewOpen(false);
               }}
             >
@@ -1580,181 +2296,577 @@ export function RequestsModule({ role }: { role: Role }) {
 
 /* ---------------------------------------------------------------------- HR */
 
-export function HrModule() {
-  const { state, decideLeave, advancePayroll } = useSystem();
-  const toast = useToast();
-  const [tab, setTab] = useState<"Employees" | "Leave" | "Payroll">("Employees");
-
-  const draft = state.payrollPeriods.find((period) => period.status !== "Finalized");
-  const draftGross = draft?.items.reduce((sum, item) => sum + item.grossCentavos, 0) ?? 0;
-  const draftNet = draft?.items.reduce((sum, item) => sum + item.grossCentavos - item.deductionCentavos, 0) ?? 0;
-
+/** HR account setup — its own nav module. */
+export function UserSetupModule() {
   return (
     <div className="page">
-      <PageHeader
-        eyebrow="People operations"
-        title="HR & payroll"
-        description="Employees, leave decisions, and payroll periods with a draft → review → finalize control."
-      />
+      <PageHeader eyebrow="People operations" title="User setup" description="Add, edit, and separate employee accounts with payroll setup." />
+      <HrUserSetup />
+    </div>
+  );
+}
 
-      <div className="stat-grid stat-grid-4">
-        <StatCard label="Active employees" value={String(state.employees.filter((item) => item.status === "Active").length)} note={`${state.employees.filter((item) => item.department === "Training").length} in training`} tone={0} icon="◎" />
-        <StatCard label="Pending leave" value={String(state.leaveRequests.filter((item) => item.status === "Pending").length)} note="Awaiting a decision" tone={1} icon="!" onClick={() => setTab("Leave")} />
-        <StatCard label="Payroll draft" value={pesos(draftNet)} note={draft ? `${draft.periodNumber} · ${draft.status}` : "No open period"} tone={3} icon="₱" onClick={() => setTab("Payroll")} />
-        <StatCard label="Gross this period" value={pesos(draftGross)} note={draft ? formatDateRange(draft.startsOn, draft.endsOn) : "—"} tone={2} icon="▥" />
+const PAYROLL_TABS = ["Attendance", "Payroll & payslips", "13th month"] as const;
+type PayrollTab = (typeof PAYROLL_TABS)[number];
+
+/** Consolidated payroll workspace — attendance, payroll, payslips, and 13th month. */
+export function PayrollModule() {
+  const [tab, setTab] = useState<PayrollTab>("Payroll & payslips");
+  const now = new Date();
+  const midCutoff = new Date(now.getFullYear(), now.getMonth(), 15);
+  const endCutoff = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return (
+    <div className="page">
+      <PageHeader eyebrow="People operations" title="Payroll" description="Attendance, payroll runs, payslips, and 13th-month pay." />
+      <div className="inline-note note-blue">
+        <strong>Semi-monthly cut-off — 15th &amp; 30th (end of month)</strong>
+        <p>This month: 1st–15th paid on {formatDate(midCutoff.toISOString())}; 16th–end paid on {formatDate(endCutoff.toISOString())}.</p>
       </div>
+      <div className="hub-tabs">
+        {PAYROLL_TABS.map((item) => (
+          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>
+        ))}
+      </div>
+      {tab === "Attendance" && <HrAttendanceTab />}
+      {tab === "Payroll & payslips" && <HrPayrollTab />}
+      {tab === "13th month" && <HrThirteenthTab />}
+    </div>
+  );
+}
 
-      <Panel padded={false}>
-        <div className="toolbar">
-          <Segmented options={["Employees", "Leave", "Payroll"] as const} value={tab} onChange={setTab} />
-        </div>
+/** Employee requests (MyHR) — leave, cash advance, and absences. */
+export function HrRequestModule() {
+  return (
+    <div className="page">
+      <PageHeader eyebrow="People operations" title="Request" description="Employee leave, cash-advance requests, and absences (MyHR)." />
+      <HrRequestsTab />
+    </div>
+  );
+}
 
-        {tab === "Employees" && (
-          <DataTable columns={["Employee", "Position", "Department", "Type", "Monthly rate", "Status"]}>
-            {state.employees.map((employee) => (
-              <tr key={employee.id}>
-                <td>
-                  <div className="person-cell">
-                    <Avatar name={employee.name} tone="orange" />
-                    <div>
-                      <strong>{employee.name}</strong>
-                      <small>{employee.employeeNumber}</small>
-                    </div>
-                  </div>
-                </td>
-                <td>{employee.position}</td>
-                <td>{employee.department}</td>
-                <td>{employee.employmentType}</td>
-                <td>{employee.monthlyRateCentavos > 0 ? pesos(employee.monthlyRateCentavos) : `${pesos(employee.dailyRateCentavos)} / day`}</td>
-                <td>
-                  <Pill tone={employee.status === "Active" ? "green" : "amber"}>{employee.status}</Pill>
-                </td>
-              </tr>
-            ))}
-          </DataTable>
-        )}
+type EmployeeDraft = {
+  id: string | null;
+  name: string; position: string; department: string;
+  employmentType: Employee["employmentType"];
+  dateHired: string;
+  payFrequency: NonNullable<Employee["payFrequency"]>;
+  email: string;
+  basic: string; allowance: string; sss: string; pagibig: string; philhealth: string;
+};
 
-        {tab === "Leave" && (
-          <DataTable columns={["Reference", "Employee", "Type", "Dates", "Reason", "Status", ""]} minWidth={980}>
-            {state.leaveRequests.map((leave) => {
-              const employee = state.employees.find((item) => item.id === leave.employeeId);
-              return (
-                <tr key={leave.id}>
-                  <td>
-                    <strong>{leave.reference}</strong>
-                  </td>
-                  <td>{employee?.name ?? "—"}</td>
-                  <td>{leave.leaveType}</td>
-                  <td>{formatDateRange(leave.startsOn, leave.endsOn)}</td>
-                  <td className="cell-wrap">{leave.reason}</td>
-                  <td>
-                    <Pill tone={leave.status === "Approved" ? "green" : leave.status === "Rejected" ? "red" : "amber"}>{leave.status}</Pill>
-                  </td>
-                  <td className="cell-actions">
-                    {leave.status === "Pending" ? (
-                      <>
-                        <button
-                          className="ghost-button"
-                          onClick={() => {
-                            decideLeave(leave.id, "Approved");
-                            toast("success", "Leave approved.");
-                          }}
-                        >
-                          Approve
-                        </button>
-                        <button
-                          className="ghost-button ghost-danger"
-                          onClick={() => {
-                            decideLeave(leave.id, "Rejected");
-                            toast("warning", "Leave rejected.");
-                          }}
-                        >
-                          Reject
-                        </button>
-                      </>
-                    ) : (
-                      <span className="muted-text">{leave.decidedAt ? formatDate(leave.decidedAt) : "—"}</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </DataTable>
-        )}
+const EMPLOYMENT_TYPES: Employee["employmentType"][] = ["Probationary", "Regular", "Contractual", "Trainee", "Part-time", "Contract"];
+const PAY_FREQUENCIES: NonNullable<Employee["payFrequency"]>[] = ["Daily", "Weekly", "Semi-Monthly", "Monthly"];
+const toC = (value: string) => Math.max(0, Math.round(Number(value || "0") * 100));
 
-        {tab === "Payroll" && (
-          <div className="panel-padded">
-            {state.payrollPeriods.map((period) => {
-              const gross = period.items.reduce((sum, item) => sum + item.grossCentavos, 0);
-              const deductions = period.items.reduce((sum, item) => sum + item.deductionCentavos, 0);
-              return (
-                <div key={period.id} className="payroll-card">
-                  <div>
-                    <strong>{period.periodNumber}</strong>
-                    <small>
-                      {formatDateRange(period.startsOn, period.endsOn)} · pay date {formatDate(period.payDate)} · {period.items.length} employees
-                    </small>
-                  </div>
-                  <div className="payroll-figures">
-                    <span>
-                      Gross <strong>{pesos(gross)}</strong>
-                    </span>
-                    <span>
-                      Deductions <strong>{pesos(deductions)}</strong>
-                    </span>
-                    <span>
-                      Net <strong className="value-good">{pesos(gross - deductions)}</strong>
-                    </span>
-                  </div>
-                  <div className="payroll-actions">
-                    <Pill tone={period.status === "Finalized" ? "green" : period.status === "For review" ? "blue" : "amber"}>{period.status}</Pill>
-                    {period.status !== "Finalized" && (
-                      <button
-                        className="ghost-button"
-                        onClick={() => {
-                          advancePayroll(period.id);
-                          toast("success", period.status === "Draft" ? "Payroll sent for review." : "Payroll finalized.");
-                        }}
-                      >
-                        {period.status === "Draft" ? "Send for review" : "Finalize"}
-                      </button>
-                    )}
-                  </div>
+/** User Setup — add / edit / archive employee accounts with payroll setup. */
+function HrUserSetup() {
+  const { state, addEmployee, updateEmployee, setEmployeeStatus } = useSystem();
+  const toast = useToast();
+  const [draft, setDraft] = useState<EmployeeDraft | null>(null);
+  const emptyDraft: EmployeeDraft = { id: null, name: "", position: "", department: "", employmentType: "Probationary", dateHired: todayIso(), payFrequency: "Semi-Monthly", email: "", basic: "", allowance: "", sss: "", pagibig: "", philhealth: "" };
+
+  return (
+    <>
+      <Panel padded={false} action={<button className="link-button" onClick={() => setDraft(emptyDraft)}>＋ Add employee</button>}>
+        <DataTable columns={["Employee", "Position / dept", "Type", "Pay", "Basic salary", "Status", ""]} minWidth={1040}>
+          {state.employees.map((employee) => (
+            <tr key={employee.id} className={employee.status === "Separated" ? "row-muted" : ""}>
+              <td>
+                <div className="person-cell">
+                  <Avatar name={employee.name} tone="orange" />
+                  <div><strong>{employee.name}</strong><small>{employee.employeeNumber} · {employee.email}</small></div>
                 </div>
-              );
-            })}
+              </td>
+              <td>{employee.position}<small>{employee.department}</small></td>
+              <td>{employee.employmentType}</td>
+              <td>{employee.payFrequency ?? "—"}</td>
+              <td>{pesos(employee.basicSalaryCentavos ?? employee.monthlyRateCentavos)}</td>
+              <td><Pill tone={employee.status === "Active" ? "green" : employee.status === "Separated" ? "red" : "amber"}>{employee.status}</Pill></td>
+              <td className="cell-actions">
+                <button
+                  className="ghost-button"
+                  onClick={() => setDraft({ id: employee.id, name: employee.name, position: employee.position, department: employee.department, employmentType: employee.employmentType, dateHired: employee.dateHired ?? "", payFrequency: employee.payFrequency ?? "Semi-Monthly", email: employee.email, basic: String((employee.basicSalaryCentavos ?? employee.monthlyRateCentavos) / 100), allowance: String((employee.allowanceCentavos ?? 0) / 100), sss: String((employee.sssCentavos ?? 0) / 100), pagibig: String((employee.pagibigCentavos ?? 0) / 100), philhealth: String((employee.philhealthCentavos ?? 0) / 100) })}
+                >
+                  Edit
+                </button>
+                <button
+                  className="ghost-button"
+                  onClick={() => {
+                    const next = employee.status === "Active" ? "Separated" : "Active";
+                    setEmployeeStatus(employee.id, next);
+                    toast("warning", `${employee.name} ${next === "Active" ? "reactivated" : "separated"}.`);
+                  }}
+                >
+                  {employee.status === "Active" ? "Separate" : "Reactivate"}
+                </button>
+              </td>
+            </tr>
+          ))}
+        </DataTable>
+      </Panel>
+
+      <Modal
+        open={Boolean(draft)}
+        title={draft?.id ? "Edit employee" : "Add employee account"}
+        description="Creates a portal account with payroll setup."
+        onClose={() => setDraft(null)}
+        wide
+        footer={
+          <>
+            <button className="secondary-button" onClick={() => setDraft(null)}>Cancel</button>
+            <button
+              className="primary-button"
+              onClick={() => {
+                if (!draft) return;
+                const name = draft.name.trim();
+                if (!name || !draft.position.trim()) {
+                  toast("warning", "Name and position are required.");
+                  return;
+                }
+                const basicSalaryCentavos = toC(draft.basic);
+                const payload = {
+                  name, position: draft.position.trim(), department: draft.department.trim(), employmentType: draft.employmentType,
+                  dateHired: draft.dateHired, payFrequency: draft.payFrequency, email: draft.email.trim(),
+                  monthlyRateCentavos: basicSalaryCentavos, dailyRateCentavos: Math.round(basicSalaryCentavos / 22),
+                  basicSalaryCentavos, allowanceCentavos: toC(draft.allowance), sssCentavos: toC(draft.sss), pagibigCentavos: toC(draft.pagibig), philhealthCentavos: toC(draft.philhealth),
+                };
+                if (draft.id) {
+                  updateEmployee(draft.id, payload);
+                  toast("success", `${name} updated.`);
+                } else {
+                  addEmployee(payload);
+                  toast("success", `${name} added.`);
+                }
+                setDraft(null);
+              }}
+            >
+              {draft?.id ? "Save changes" : "Add employee"}
+            </button>
+          </>
+        }
+      >
+        {draft && (
+          <div className="form-grid">
+            <Field label="Full name*" full><input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
+            <Field label="Position*"><input value={draft.position} onChange={(e) => setDraft({ ...draft, position: e.target.value })} /></Field>
+            <Field label="Department"><input value={draft.department} onChange={(e) => setDraft({ ...draft, department: e.target.value })} /></Field>
+            <Field label="Email"><input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></Field>
+            <Field label="Date hired"><input type="date" value={draft.dateHired} onChange={(e) => setDraft({ ...draft, dateHired: e.target.value })} /></Field>
+            <Field label="Status">
+              <select value={draft.employmentType} onChange={(e) => setDraft({ ...draft, employmentType: e.target.value as Employee["employmentType"] })}>
+                {EMPLOYMENT_TYPES.map((type) => <option key={type}>{type}</option>)}
+              </select>
+            </Field>
+            <Field label="Pay frequency">
+              <select value={draft.payFrequency} onChange={(e) => setDraft({ ...draft, payFrequency: e.target.value as NonNullable<Employee["payFrequency"]> })}>
+                {PAY_FREQUENCIES.map((freq) => <option key={freq}>{freq}</option>)}
+              </select>
+            </Field>
+            <Field label="Basic salary (₱ / month)"><input type="number" min={0} value={draft.basic} onChange={(e) => setDraft({ ...draft, basic: e.target.value })} /></Field>
+            <Field label="Allowance (₱)"><input type="number" min={0} value={draft.allowance} onChange={(e) => setDraft({ ...draft, allowance: e.target.value })} /></Field>
+            <Field label="SSS (₱)"><input type="number" min={0} value={draft.sss} onChange={(e) => setDraft({ ...draft, sss: e.target.value })} /></Field>
+            <Field label="Pag-IBIG (₱)"><input type="number" min={0} value={draft.pagibig} onChange={(e) => setDraft({ ...draft, pagibig: e.target.value })} /></Field>
+            <Field label="PhilHealth (₱)"><input type="number" min={0} value={draft.philhealth} onChange={(e) => setDraft({ ...draft, philhealth: e.target.value })} /></Field>
           </div>
         )}
+      </Modal>
+    </>
+  );
+}
+
+/** Attendance — daily time in / out vs schedule, deriving Present/Late/Undertime/Absent. */
+function HrAttendanceTab() {
+  const { state, upsertHrAttendance } = useSystem();
+  const toast = useToast();
+  const [date, setDate] = useState(todayIso());
+  const active = state.employees.filter((item) => item.status === "Active");
+
+  const deriveStatus = (scheduleIn: string, scheduleOut: string, timeIn: string, timeOut: string): HrAttendanceRecord["status"] => {
+    if (!timeIn && !timeOut) return "Absent";
+    if (timeIn > scheduleIn) return "Late";
+    if (timeOut && timeOut < scheduleOut) return "Undertime";
+    return "Present";
+  };
+
+  return (
+    <Panel padded={false}>
+      <div className="toolbar toolbar-wrap">
+        <label className="inline-field"><span>Date</span><input type="date" value={date} onChange={(e) => setDate(e.target.value)} /></label>
+        <span className="toolbar-end catalog-count">{active.length} employees</span>
+      </div>
+      <DataTable columns={["Employee", "Schedule", "Time in", "Time out", "Status", ""]} minWidth={900}>
+        {active.map((employee) => {
+          const record = state.hrAttendance.find((item) => item.employeeId === employee.id && item.date === date);
+          return <HrAttendanceRow key={employee.id} employee={employee} date={date} record={record} onSave={(timeIn, timeOut) => {
+            const scheduleIn = "08:00", scheduleOut = "17:00";
+            upsertHrAttendance({ employeeId: employee.id, date, scheduleIn, scheduleOut, timeIn, timeOut, status: deriveStatus(scheduleIn, scheduleOut, timeIn, timeOut) });
+            toast("success", `${employee.name} attendance saved.`);
+          }} />;
+        })}
+      </DataTable>
+    </Panel>
+  );
+}
+
+function HrAttendanceRow({ employee, record, onSave }: { employee: Employee; date: string; record?: HrAttendanceRecord; onSave: (timeIn: string, timeOut: string) => void }) {
+  const [timeIn, setTimeIn] = useState(record?.timeIn ?? "");
+  const [timeOut, setTimeOut] = useState(record?.timeOut ?? "");
+  return (
+    <tr>
+      <td><strong>{employee.name}</strong><small>{employee.employeeNumber}</small></td>
+      <td>{record?.scheduleIn ?? "08:00"} – {record?.scheduleOut ?? "17:00"}</td>
+      <td><input type="time" value={timeIn} onChange={(e) => setTimeIn(e.target.value)} /></td>
+      <td><input type="time" value={timeOut} onChange={(e) => setTimeOut(e.target.value)} /></td>
+      <td>{record ? <Pill tone={record.status === "Present" ? "green" : record.status === "Absent" ? "red" : "amber"}>{record.status}</Pill> : <span className="muted-text">Not logged</span>}</td>
+      <td className="cell-actions"><button className="ghost-button" onClick={() => onSave(timeIn, timeOut)}>Save</button></td>
+    </tr>
+  );
+}
+
+/** Requests (MyHR) — per-employee leave, absences, and cash advances. */
+function HrRequestsTab() {
+  const { state, createLeave, decideLeave, createCashAdvance, decideCashAdvance } = useSystem();
+  const toast = useToast();
+  const [employeeId, setEmployeeId] = useState(state.employees[0]?.id ?? "");
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [advanceOpen, setAdvanceOpen] = useState(false);
+  const [leaveDraft, setLeaveDraft] = useState({ leaveType: "Vacation" as LeaveRequest["leaveType"], startsOn: todayIso(), endsOn: todayIso(), reason: "" });
+  const [advanceDraft, setAdvanceDraft] = useState({ amount: "", reason: "" });
+
+  const employee = state.employees.find((item) => item.id === employeeId);
+  const leaves = state.leaveRequests.filter((item) => item.employeeId === employeeId);
+  const advances = state.cashAdvances.filter((item) => item.employeeId === employeeId);
+  const absences = state.hrAttendance.filter((item) => item.employeeId === employeeId && item.status === "Absent");
+
+  return (
+    <>
+      <Panel padded={false}>
+        <div className="toolbar toolbar-wrap">
+          <label className="inline-field">
+            <span>MyHR — employee</span>
+            <select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}>
+              {state.employees.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          </label>
+          {employee && (
+            <>
+              <button className="secondary-button toolbar-end" onClick={() => { setLeaveDraft({ leaveType: "Vacation", startsOn: todayIso(), endsOn: todayIso(), reason: "" }); setLeaveOpen(true); }}>File leave</button>
+              <button className="secondary-button" onClick={() => { setAdvanceDraft({ amount: "", reason: "" }); setAdvanceOpen(true); }}>File cash advance</button>
+            </>
+          )}
+        </div>
       </Panel>
-    </div>
+
+      <div className="two-column">
+        <Panel title="Leave requests" description="Filed by / for this employee">
+          {leaves.length === 0 ? <EmptyState icon="✓" title="No leave" text="No leave requests on file." /> : leaves.map((leave) => (
+            <div key={leave.id} className="activity-row">
+              <div><strong>{leave.leaveType} · {formatDateRange(leave.startsOn, leave.endsOn)}</strong><small>{leave.reference} · {leave.reason}</small></div>
+              <div className="cell-actions">
+                {leave.status === "Pending" ? (
+                  <>
+                    <button className="ghost-button" onClick={() => { decideLeave(leave.id, "Approved"); toast("success", "Leave approved."); }}>Approve</button>
+                    <button className="ghost-button ghost-danger" onClick={() => { decideLeave(leave.id, "Rejected"); toast("warning", "Leave rejected."); }}>Reject</button>
+                  </>
+                ) : <Pill tone={leave.status === "Approved" ? "green" : "red"}>{leave.status}</Pill>}
+              </div>
+            </div>
+          ))}
+        </Panel>
+
+        <Panel title="Cash advances" description="Payroll deduction on approval">
+          {advances.length === 0 ? <EmptyState icon="₱" title="No advances" text="No cash-advance requests on file." /> : advances.map((advance) => (
+            <div key={advance.id} className="activity-row">
+              <div><strong>{pesos(advance.amountCentavos)}</strong><small>{advance.reference} · {advance.reason}</small></div>
+              <div className="cell-actions">
+                {advance.status === "Pending" ? (
+                  <>
+                    <button className="ghost-button" onClick={() => { decideCashAdvance(advance.id, "Approved"); toast("success", "Cash advance approved."); }}>Approve</button>
+                    <button className="ghost-button ghost-danger" onClick={() => { decideCashAdvance(advance.id, "Rejected"); toast("warning", "Cash advance rejected."); }}>Reject</button>
+                  </>
+                ) : <Pill tone={advance.status === "Rejected" ? "red" : "green"}>{advance.status}</Pill>}
+              </div>
+            </div>
+          ))}
+        </Panel>
+      </div>
+
+      <Panel title="Absences" description="Days marked absent in attendance" padded={false}>
+        {absences.length === 0 ? <EmptyState icon="✓" title="No absences" text="This employee has no recorded absences." /> : (
+          <DataTable columns={["Date", "Schedule", "Status"]}>
+            {absences.map((item) => <tr key={item.id}><td>{formatDate(item.date)}</td><td>{item.scheduleIn} – {item.scheduleOut}</td><td><Pill tone="red">Absent</Pill></td></tr>)}
+          </DataTable>
+        )}
+      </Panel>
+
+      <Modal open={leaveOpen} title="File leave" description={employee?.name} onClose={() => setLeaveOpen(false)} footer={
+        <>
+          <button className="secondary-button" onClick={() => setLeaveOpen(false)}>Cancel</button>
+          <button className="primary-button" onClick={() => {
+            if (!employee || leaveDraft.reason.trim().length < 4) { toast("warning", "Add a reason."); return; }
+            createLeave({ employeeId: employee.id, leaveType: leaveDraft.leaveType, startsOn: leaveDraft.startsOn, endsOn: leaveDraft.endsOn, reason: leaveDraft.reason.trim() });
+            toast("success", "Leave filed."); setLeaveOpen(false);
+          }}>Submit</button>
+        </>
+      }>
+        <div className="form-grid">
+          <Field label="Leave type"><select value={leaveDraft.leaveType} onChange={(e) => setLeaveDraft({ ...leaveDraft, leaveType: e.target.value as LeaveRequest["leaveType"] })}><option>Vacation</option><option>Sick</option><option>Emergency</option><option>Unpaid</option></select></Field>
+          <Field label="From"><input type="date" value={leaveDraft.startsOn} onChange={(e) => setLeaveDraft({ ...leaveDraft, startsOn: e.target.value })} /></Field>
+          <Field label="To"><input type="date" value={leaveDraft.endsOn} onChange={(e) => setLeaveDraft({ ...leaveDraft, endsOn: e.target.value })} /></Field>
+          <Field label="Reason" full><textarea rows={3} value={leaveDraft.reason} onChange={(e) => setLeaveDraft({ ...leaveDraft, reason: e.target.value })} /></Field>
+        </div>
+      </Modal>
+
+      <Modal open={advanceOpen} title="File cash advance" description={employee?.name} onClose={() => setAdvanceOpen(false)} footer={
+        <>
+          <button className="secondary-button" onClick={() => setAdvanceOpen(false)}>Cancel</button>
+          <button className="primary-button" onClick={() => {
+            if (!employee || !(toC(advanceDraft.amount) > 0) || advanceDraft.reason.trim().length < 4) { toast("warning", "Enter an amount and reason."); return; }
+            createCashAdvance({ employeeId: employee.id, amountCentavos: toC(advanceDraft.amount), reason: advanceDraft.reason.trim() });
+            toast("success", "Cash advance filed."); setAdvanceOpen(false);
+          }}>Submit</button>
+        </>
+      }>
+        <div className="form-grid">
+          <Field label="Amount (₱)*"><input type="number" min={0} value={advanceDraft.amount} onChange={(e) => setAdvanceDraft({ ...advanceDraft, amount: e.target.value })} /></Field>
+          <Field label="Reason*" full><textarea rows={3} value={advanceDraft.reason} onChange={(e) => setAdvanceDraft({ ...advanceDraft, reason: e.target.value })} /></Field>
+        </div>
+      </Modal>
+    </>
+  );
+}
+
+/** Payroll periods + a payslip generator per employee. */
+function HrPayrollTab() {
+  const { state, advancePayroll } = useSystem();
+  const toast = useToast();
+  const [payslipFor, setPayslipFor] = useState<Employee | null>(null);
+
+  return (
+    <>
+      <Panel title="Payroll periods" description="Draft → review → finalize; finalizing posts a Paid payroll expense">
+        <div className="panel-padded">
+          {state.payrollPeriods.map((period) => {
+            const gross = period.items.reduce((sum, item) => sum + item.grossCentavos, 0);
+            const deductions = period.items.reduce((sum, item) => sum + item.deductionCentavos, 0);
+            return (
+              <div key={period.id} className="payroll-card">
+                <div><strong>{period.periodNumber}</strong><small>{formatDateRange(period.startsOn, period.endsOn)} · pay date {formatDate(period.payDate)} · {period.items.length} employees</small></div>
+                <div className="payroll-figures">
+                  <span>Gross <strong>{pesos(gross)}</strong></span>
+                  <span>Deductions <strong>{pesos(deductions)}</strong></span>
+                  <span>Net <strong className="value-good">{pesos(gross - deductions)}</strong></span>
+                </div>
+                <div className="payroll-actions">
+                  <Pill tone={period.status === "Finalized" ? "green" : period.status === "For review" ? "blue" : "amber"}>{period.status}</Pill>
+                  {period.status !== "Finalized" && (
+                    <button className="ghost-button" onClick={() => { advancePayroll(period.id); toast("success", period.status === "Draft" ? "Payroll sent for review." : "Payroll finalized."); }}>
+                      {period.status === "Draft" ? "Send for review" : "Finalize"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Panel>
+
+      <Panel title="Payslips" description="Generate a payslip per employee" padded={false}>
+        <DataTable columns={["Employee", "Basic", "Allowance", "Deductions", "Net", ""]} minWidth={900}>
+          {state.employees.filter((item) => item.status === "Active").map((employee) => {
+            const basic = employee.basicSalaryCentavos ?? employee.monthlyRateCentavos;
+            const allowance = employee.allowanceCentavos ?? 0;
+            const deductions = (employee.sssCentavos ?? 0) + (employee.pagibigCentavos ?? 0) + (employee.philhealthCentavos ?? 0);
+            const net = basic + allowance - deductions;
+            return (
+              <tr key={employee.id}>
+                <td><strong>{employee.name}</strong><small>{employee.employeeNumber}</small></td>
+                <td>{pesos(basic)}</td>
+                <td>{pesos(allowance)}</td>
+                <td>{pesos(deductions)}</td>
+                <td><strong className="value-good">{pesos(net)}</strong></td>
+                <td className="cell-actions"><button className="ghost-button" onClick={() => setPayslipFor(employee)}>Payslip</button></td>
+              </tr>
+            );
+          })}
+        </DataTable>
+      </Panel>
+
+      {payslipFor && <PayslipModal employee={payslipFor} advances={state.cashAdvances.filter((a) => a.employeeId === payslipFor.id && a.status === "Approved")} onClose={() => setPayslipFor(null)} />}
+    </>
+  );
+}
+
+/** 13th-month calculator: monthly basic × months employed this year ÷ 12. */
+function HrThirteenthTab() {
+  const { state } = useSystem();
+  const toast = useToast();
+  const year = new Date().getFullYear();
+  const monthsThisYear = (dateHired?: string) => {
+    if (!dateHired) return 12;
+    const hired = new Date(dateHired);
+    const startMonth = hired.getFullYear() < year ? 0 : hired.getMonth();
+    return Math.max(0, 12 - startMonth);
+  };
+  const rows = state.employees.filter((item) => item.status === "Active").map((employee) => {
+    const basic = employee.basicSalaryCentavos ?? employee.monthlyRateCentavos;
+    const months = monthsThisYear(employee.dateHired);
+    const thirteenth = Math.round((basic * months) / 12);
+    return { employee, basic, months, thirteenth };
+  });
+  const total = rows.reduce((sum, row) => sum + row.thirteenth, 0);
+
+  return (
+    <Panel
+      title={`13th-month pay — ${year}`}
+      description="Monthly basic × months employed this year ÷ 12"
+      padded={false}
+      action={
+        <button className="secondary-button" onClick={() => {
+          downloadCsv(`13th-month-${year}.csv`, [["Employee", "Basic (monthly)", "Months", "13th month"], ...rows.map((r) => [r.employee.name, (r.basic / 100).toFixed(2), r.months, (r.thirteenth / 100).toFixed(2)]), [], ["Total", "", "", (total / 100).toFixed(2)]]);
+          toast("success", "13th-month schedule exported.");
+        }}>Download CSV</button>
+      }
+    >
+      <DataTable columns={["Employee", "Basic (monthly)", "Months this year", "13th-month pay"]} minWidth={820}>
+        {rows.map((row) => (
+          <tr key={row.employee.id}>
+            <td><strong>{row.employee.name}</strong><small>{row.employee.employeeNumber}</small></td>
+            <td>{pesos(row.basic)}</td>
+            <td>{row.months}</td>
+            <td><strong className="value-good">{pesos(row.thirteenth)}</strong></td>
+          </tr>
+        ))}
+      </DataTable>
+      <div className="summary-total" style={{ padding: "12px 20px" }}><span>Total 13th-month liability</span><strong>{pesos(total)}</strong></div>
+    </Panel>
+  );
+}
+
+function PayslipModal({ employee, advances, onClose }: { employee: Employee; advances: CashAdvance[]; onClose: () => void }) {
+  const toast = useToast();
+  const [building, setBuilding] = useState(false);
+  const basic = employee.basicSalaryCentavos ?? employee.monthlyRateCentavos;
+  const allowance = employee.allowanceCentavos ?? 0;
+  const advanceTotal = advances.reduce((sum, a) => sum + a.amountCentavos, 0);
+  const earnings = [{ label: "Basic salary", amountCentavos: basic }, { label: "Allowance", amountCentavos: allowance }];
+  const deductions = [
+    { label: "SSS", amountCentavos: employee.sssCentavos ?? 0 },
+    { label: "Pag-IBIG", amountCentavos: employee.pagibigCentavos ?? 0 },
+    { label: "PhilHealth", amountCentavos: employee.philhealthCentavos ?? 0 },
+    ...(advanceTotal > 0 ? [{ label: "Cash advance", amountCentavos: advanceTotal }] : []),
+  ];
+  const grossCentavos = basic + allowance;
+  const totalDeductionsCentavos = deductions.reduce((sum, d) => sum + d.amountCentavos, 0);
+  const netCentavos = grossCentavos - totalDeductionsCentavos;
+
+  async function downloadPdf() {
+    setBuilding(true);
+    try {
+      let logoBytes: Uint8Array | undefined;
+      try { logoBytes = new Uint8Array(await (await fetch("/new-wave-logo.png")).arrayBuffer()); } catch { /* optional */ }
+      const bytes = await createPayslipPdf({
+        employeeNumber: employee.employeeNumber, employeeName: employee.name, position: employee.position,
+        payFrequency: employee.payFrequency ?? "", dateHired: employee.dateHired ? formatDate(employee.dateHired) : "",
+        period: `Current · ${employee.payFrequency ?? ""}`, payDate: formatDate(todayIso()),
+        earnings, deductions, grossCentavos, totalDeductionsCentavos, netCentavos, preparedBy: "HR", logoBytes,
+      });
+      const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "application/pdf" }));
+      const anchor = document.createElement("a"); anchor.href = url; anchor.download = `${employee.employeeNumber}-payslip.pdf`; anchor.click(); URL.revokeObjectURL(url);
+    } catch { toast("warning", "Could not generate the payslip."); } finally { setBuilding(false); }
+  }
+
+  return (
+    <Modal open title="Payslip" description={`${employee.employeeNumber} · ${employee.name}`} onClose={onClose} wide footer={
+      <>
+        <button className="secondary-button" onClick={onClose}>Close</button>
+        <button className="primary-button" onClick={downloadPdf} disabled={building}>{building ? "Generating…" : "Download PDF"}</button>
+      </>
+    }>
+      <div className="slip-grid">
+        <div><span>Name</span><strong>{employee.name}</strong></div>
+        <div><span>Position</span><strong>{employee.position}</strong></div>
+        <div><span>Pay frequency</span><strong>{employee.payFrequency ?? "—"}</strong></div>
+        <div><span>Date hired</span><strong>{employee.dateHired ? formatDate(employee.dateHired) : "—"}</strong></div>
+      </div>
+      <h3 className="drawer-section">Earnings</h3>
+      <div className="ledger-list">
+        {earnings.map((e) => <div key={e.label} className="ledger-row ledger-charge"><div><strong>{e.label}</strong></div><div className="ledger-amount"><strong>{pesos(e.amountCentavos)}</strong></div></div>)}
+      </div>
+      <h3 className="drawer-section">Deductions</h3>
+      <div className="ledger-list">
+        {deductions.map((d) => <div key={d.label} className="ledger-row ledger-payment"><div><strong>{d.label}</strong></div><div className="ledger-amount"><strong>−{pesos(d.amountCentavos)}</strong></div></div>)}
+      </div>
+      <div className="summary-total"><span>Net pay</span><strong>{pesos(netCentavos)}</strong></div>
+    </Modal>
   );
 }
 
 /* ----------------------------------------------------------------- reports */
 
-function downloadCsv(filename: string, rows: (string | number)[][]) {
-  const body = rows
-    .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(","))
-    .join("\n");
-  const url = URL.createObjectURL(new Blob([body], { type: "text/csv;charset=utf-8;" }));
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = filename;
-  anchor.click();
-  URL.revokeObjectURL(url);
-}
 
-export function ReportsModule() {
+export function ReportsModule({ role }: { role: Role }) {
   const { state, views } = useSystem();
   const toast = useToast();
   const all = views();
+  const [openingPesos, setOpeningPesos] = useState("");
+  const showCashierReport = role === "Cashier" || role === "Accounting" || role === "Admin";
 
   // Every report is bound to a period. An unbounded export is what makes two
-  // people quoting "the collections report" disagree about the number.
-  const [preset, setPreset] = useState<ReportRangePreset>("This month");
+  // people quoting "the collections report" disagree about the number. The
+  // Cashier's reports (incl. the activity report) default to the current date.
+  const [preset, setPreset] = useState<ReportRangePreset>(role === "Cashier" ? "Today" : "This month");
   const [custom, setCustom] = useState<DateRange>({ from: todayIso(), to: todayIso() });
   const range = resolveRange(preset, todayIso(), custom);
   const inRange = (value?: string | null) => withinRange(value, range);
+
+  // Cashier opening/closing figures for the period. Received = verified payments
+  // across every channel; disbursement = cash out (refunds/reversals + paid or
+  // approved expense vouchers). Closing = opening + received − disbursement.
+  const openingCentavos = Math.max(0, Math.round(Number(openingPesos || "0") * 100));
+  const receivedCentavos = state.ledger
+    .filter((entry) => entry.type === "payment" && entry.verification === "Verified" && inRange(entry.recordedAt))
+    .reduce((sum, entry) => sum + entry.amountCentavos, 0);
+  const disbursementCentavos =
+    state.ledger
+      .filter((entry) => (entry.type === "refund" || entry.type === "reversal") && inRange(entry.recordedAt))
+      .reduce((sum, entry) => sum + entry.amountCentavos, 0) +
+    state.expenses
+      .filter((expense) => (expense.status === "Paid" || expense.status === "Approved") && inRange(expense.decidedAt ?? expense.createdAt))
+      .reduce((sum, expense) => sum + expense.amountCentavos, 0);
+  const closingCentavos = openingCentavos + receivedCentavos - disbursementCentavos;
+
+  const enrollmentsInPeriod = all.filter((item) => inRange(item.enrollment.createdAt));
+  const inHouseEnrollments = enrollmentsInPeriod.filter((item) => !item.enrollment.courseCode.startsWith("endorsed:"));
+  const endorsedEnrollments = enrollmentsInPeriod
+    .filter((item) => item.enrollment.courseCode.startsWith("endorsed:"))
+    .map((item) => {
+      const offer = state.partnerOffers.find((entry) => `endorsed:${entry.id}` === item.enrollment.courseCode);
+      return { item, rebateCentavos: offer?.rebateCentavos ?? 0 };
+    });
+  const money = (centavos: number) => (centavos / 100).toFixed(2);
+
+  const cashierReportRows = () => [
+    ["Cashier Opening/Closing Report", describeRange(range)],
+    [],
+    ["Opening balance", money(openingCentavos)],
+    ["Total received (all channels)", money(receivedCentavos)],
+    ["Total disbursement (all channels)", money(disbursementCentavos)],
+    ["Closing balance", money(closingCentavos)],
+    [],
+    ["New Wave trainee enrollments"],
+    ["Name", "Course", "Amount"],
+    ...inHouseEnrollments.map((item) => [fullName(item.trainee), item.enrollment.courseName, money(item.dueCentavos)]),
+    [],
+    ["Endorsed trainee enrollments"],
+    ["Name", "Course", "Amount", "Rebate"],
+    ...endorsedEnrollments.map(({ item, rebateCentavos }) => [
+      fullName(item.trainee),
+      item.enrollment.courseName,
+      money(item.dueCentavos),
+      money(rebateCentavos),
+    ]),
+  ];
 
   const reports = [
     {
@@ -1886,6 +2998,129 @@ export function ReportsModule() {
           </div>
         </div>
       </Panel>
+
+      {showCashierReport && (
+        <Panel
+          title="Cashier opening / closing"
+          description={`Received, disbursed, and enrollment breakdown for ${describeRange(range)}.`}
+          action={
+            <button
+              className="secondary-button"
+              onClick={() => {
+                downloadCsv(`cashier-opening-closing-${range.from}-to-${range.to}.csv`, cashierReportRows());
+                toast("success", `Cashier report exported for ${describeRange(range)}.`);
+              }}
+            >
+              Download CSV
+            </button>
+          }
+        >
+          <div className="cashier-report">
+            <div className="cashier-report-figures">
+              <label className="inline-field">
+                <span>Opening balance (₱)</span>
+                <input
+                  type="number"
+                  min={0}
+                  step="1"
+                  value={openingPesos}
+                  placeholder="0.00"
+                  onChange={(event) => setOpeningPesos(event.target.value)}
+                />
+              </label>
+              <div className="stat-grid stat-grid-4">
+                <StatCard label="Opening balance" value={pesos(openingCentavos)} note="Cashier-reported float" tone={0} icon="₱" />
+                <StatCard label="Total received" value={pesos(receivedCentavos)} note="All channels · verified" tone={2} icon="↧" />
+                <StatCard label="Total disbursement" value={pesos(disbursementCentavos)} note="Refunds + paid vouchers" tone={5} icon="↥" />
+                <StatCard label="Closing balance" value={pesos(closingCentavos)} note="Opening + received − disbursed" tone={3} icon="◈" />
+              </div>
+            </div>
+
+            <h3 className="drawer-section">New Wave trainee enrollments</h3>
+            {inHouseEnrollments.length === 0 ? (
+              <EmptyState title="No New Wave enrollments in this period" text="Widen the reporting period to see enrollments." />
+            ) : (
+              <DataTable columns={["Name", "Course", "Amount"]}>
+                {inHouseEnrollments.map((item) => (
+                  <tr key={item.enrollment.id}>
+                    <td>{fullName(item.trainee)}</td>
+                    <td>{item.enrollment.courseName}</td>
+                    <td><strong>{pesos(item.dueCentavos)}</strong></td>
+                  </tr>
+                ))}
+              </DataTable>
+            )}
+
+            <h3 className="drawer-section">Endorsed trainee enrollments</h3>
+            {endorsedEnrollments.length === 0 ? (
+              <EmptyState title="No endorsed enrollments in this period" text="Endorsed enrollments recorded by the cashier will appear here." />
+            ) : (
+              <DataTable columns={["Name", "Course", "Amount", "Rebate"]}>
+                {endorsedEnrollments.map(({ item, rebateCentavos }) => (
+                  <tr key={item.enrollment.id}>
+                    <td>{fullName(item.trainee)}</td>
+                    <td>{item.enrollment.courseName}</td>
+                    <td><strong>{pesos(item.dueCentavos)}</strong></td>
+                    <td className="value-good">{pesos(rebateCentavos)}</td>
+                  </tr>
+                ))}
+              </DataTable>
+            )}
+          </div>
+        </Panel>
+      )}
+
+      {showCashierReport && (() => {
+        const salesIn = (from: string, to: string) => state.ledger.filter((e) => e.type === "payment" && e.verification === "Verified" && e.recordedAt.slice(0, 10) >= from && e.recordedAt.slice(0, 10) <= to).reduce((s, e) => s + e.amountCentavos, 0);
+        const disbIn = (from: string, to: string) =>
+          state.ledger.filter((e) => (e.type === "refund" || e.type === "reversal") && e.recordedAt.slice(0, 10) >= from && e.recordedAt.slice(0, 10) <= to).reduce((s, e) => s + e.amountCentavos, 0) +
+          state.expenses.filter((x) => (x.status === "Paid" || x.status === "Approved") && (x.decidedAt ?? x.createdAt).slice(0, 10) >= from && (x.decidedAt ?? x.createdAt).slice(0, 10) <= to).reduce((s, x) => s + x.amountCentavos, 0);
+        const rangeSales = salesIn(range.from, range.to);
+        const rangeDisb = disbIn(range.from, range.to);
+        const months = [0, 1, 2, 3].map((offset) => {
+          const d = new Date();
+          d.setDate(1);
+          d.setMonth(d.getMonth() - offset);
+          const y = d.getFullYear();
+          const m = d.getMonth();
+          const from = `${y}-${String(m + 1).padStart(2, "0")}-01`;
+          const to = new Date(y, m + 1, 0).toISOString().slice(0, 10);
+          const s = salesIn(from, to);
+          const dd = disbIn(from, to);
+          return { label: new Intl.DateTimeFormat("en-PH", { month: "long", year: "numeric" }).format(d), sales: s, disb: dd, net: s - dd };
+        });
+        return (
+          <Panel
+            title="Sales, disbursements & earnings"
+            description={`Selected period ${describeRange(range)} · month-over-month trend`}
+            action={
+              <button className="secondary-button" onClick={() => {
+                downloadCsv(`earnings-overview-${range.from}.csv`, [["Month", "Sales", "Disbursements", "Net earnings"], ...months.map((r) => [r.label, (r.sales / 100).toFixed(2), (r.disb / 100).toFixed(2), (r.net / 100).toFixed(2)])]);
+                toast("success", "Earnings overview exported.");
+              }}>Download CSV</button>
+            }
+          >
+            <div className="summary-panel">
+              <div className="stat-grid stat-grid-3">
+                <StatCard label="Total sales" value={pesos(rangeSales)} note="Verified collections" tone={2} icon="₱" />
+                <StatCard label="Total disbursements" value={pesos(rangeDisb)} note="Refunds + expenses" tone={5} icon="↥" />
+                <StatCard label="Net earnings" value={pesos(rangeSales - rangeDisb)} note={rangeSales - rangeDisb >= 0 ? "Earning this period" : "Loss this period"} tone={rangeSales - rangeDisb >= 0 ? 3 : 1} icon="◈" />
+              </div>
+              <h3 className="drawer-section">Month-over-month</h3>
+              <DataTable columns={["Month", "Sales", "Disbursements", "Net earnings"]}>
+                {months.map((r) => (
+                  <tr key={r.label}>
+                    <td>{r.label}</td>
+                    <td>{pesos(r.sales)}</td>
+                    <td>{pesos(r.disb)}</td>
+                    <td><strong className={r.net >= 0 ? "value-good" : "value-danger"}>{pesos(r.net)}</strong></td>
+                  </tr>
+                ))}
+              </DataTable>
+            </div>
+          </Panel>
+        );
+      })()}
 
       <div className="report-grid">
         {reports.map((report) => {

@@ -1,9 +1,12 @@
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { PortalApp } from "@/components/portal-app";
 import { PortalLiveApp } from "@/components/portal-live-app";
 import { isDemoMode } from "@/lib/system/mode";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getUserRoleNames } from "@/lib/supabase/roles";
+import { MFA_COOKIE, isMfaEnforced, mfaEnforcementEnabled, verifyMfaCookie } from "@/lib/mfa";
 
 export const dynamic = "force-dynamic";
 
@@ -30,5 +33,17 @@ export default async function PortalPage() {
     .limit(1)
     .maybeSingle();
   if (!staffRole) redirect("/registration-search");
+
+  // Step-up MFA for privileged roles (Admin / Accounting) — only when enabled.
+  if (mfaEnforcementEnabled()) {
+    const roleNames = await getUserRoleNames(user.id);
+    if (isMfaEnforced(roleNames)) {
+      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      const cookieStore = await cookies();
+      const emailPassed = verifyMfaCookie(cookieStore.get(MFA_COOKIE)?.value, user.id);
+      if (aal?.currentLevel !== "aal2" && !emailPassed) redirect("/portal/mfa");
+    }
+  }
+
   return <PortalLiveApp />;
 }

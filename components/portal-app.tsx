@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Pill, StatCard, ToastProvider } from "@/components/ui/kit";
+import { EmptyState, Field, Modal, Pill, Segmented, StatCard, ToastProvider, useToast } from "@/components/ui/kit";
 import { NewWaveLogo } from "./new-wave-logo";
 import { AttendanceModule } from "./portal/module-attendance";
 import { CertificatesModule } from "./portal/module-certificates";
@@ -10,43 +10,99 @@ import { EnrollmentsModule } from "./portal/module-enrollments";
 import {
   AccountingModule,
   CatalogModule,
-  HrModule,
+  HrRequestModule,
   InstructionsModule,
+  PayrollModule,
   ReportsModule,
   RequestsModule,
   SettingsModule,
   TraineesModule,
+  UserSetupModule,
 } from "./portal/module-others";
 import { PaymentsModule } from "./portal/module-payments";
 import { SchedulesModule } from "./portal/module-schedules";
+import { ClassroomsModule, InstructorsModule, TrainingSetupModule } from "./portal/module-training";
+import { SearchTraineeModule, SetupModule } from "./portal/module-admin";
 import { PageHeader, Panel, StageBadge, type Module } from "./portal/shared";
 import { pesos } from "@/lib/endorsement-catalog";
 import { SystemProvider, formatDate, formatDateTime, fullName, todayIso, useSystem } from "@/lib/system/store";
-import type { Role } from "@/lib/system/types";
+import type { MonthlyPayable, Role } from "@/lib/system/types";
 
 const roles: Role[] = ["Admin", "Registration", "Cashier", "Accounting", "Training Operations", "HR", "Instructor"];
 
+/** Dashboard reminder of the month's recurring bills for Accounting + Admin. */
+function MonthlyPayablesReminder({ payables }: { payables: MonthlyPayable[] }) {
+  const active = payables.filter((item) => item.active).sort((a, b) => a.dueDay - b.dueDay);
+  const total = active.reduce((sum, item) => sum + item.amountCentavos, 0);
+  const todayDay = new Date().getDate();
+  return (
+    <Panel title="Monthly payables — reminder" description="Recurring bills due this month">
+      {active.length === 0 ? (
+        <div className="empty-block"><span aria-hidden="true">✓</span><h3>No payables set</h3><p>Add recurring bills in Accounting → Invoices &amp; Vouchers.</p></div>
+      ) : (
+        <>
+          <div className="finance-strip">
+            <div className="finance-lead">
+              <span>Total this month</span>
+              <strong>{pesos(total)}</strong>
+              <small>{active.length} payable{active.length === 1 ? "" : "s"}</small>
+            </div>
+          </div>
+          <div className="history-list">
+            {active.map((item) => {
+              const dueSoon = item.dueDay >= todayDay && item.dueDay - todayDay <= 7;
+              const overdue = item.dueDay < todayDay;
+              return (
+                <div key={item.id} className="history-row">
+                  <div>
+                    <strong>{item.name}</strong>
+                    <small>{item.category} · due day {item.dueDay}{item.notes ? ` · ${item.notes}` : ""}</small>
+                  </div>
+                  <div className="history-right">
+                    <strong>{pesos(item.amountCentavos)}</strong>
+                    {overdue ? <Pill tone="red">Overdue</Pill> : dueSoon ? <Pill tone="amber">Due soon</Pill> : <Pill tone="slate">Day {item.dueDay}</Pill>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </Panel>
+  );
+}
+
 const nav: { label: Module; icon: string; roles?: Role[] }[] = [
   { label: "Dashboard", icon: "⌂" },
-  { label: "Registrations", icon: "✎", roles: ["Admin", "Registration", "Cashier", "Accounting", "Training Operations"] },
-  { label: "Courses & centers", icon: "◇", roles: ["Admin", "Registration", "Accounting", "Training Operations"] },
+  { label: "Search trainee", icon: "⌕", roles: ["Admin"] },
+  { label: "Registrations", icon: "✎", roles: ["Registration", "Cashier", "Accounting"] },
+  { label: "Courses & centers", icon: "◇", roles: ["Registration", "Training Operations"] },
   { label: "Schedules", icon: "□", roles: ["Training Operations", "Instructor"] },
   { label: "Payments", icon: "₱", roles: ["Cashier", "Accounting"] },
   { label: "Accounting", icon: "▥", roles: ["Admin", "Accounting"] },
-  { label: "Instructions", icon: "✉", roles: ["Admin", "Training Operations"] },
-  { label: "Attendance", icon: "✓", roles: ["Admin", "Training Operations", "Instructor"] },
+  { label: "Instructions", icon: "✉", roles: ["Registration", "Training Operations"] },
+  { label: "Attendance", icon: "✓", roles: ["Training Operations", "Instructor"] },
+  { label: "Classrooms", icon: "▦", roles: ["Training Operations"] },
   { label: "Certificates", icon: "◈", roles: ["Training Operations"] },
-  { label: "Requests", icon: "↗", roles: ["Admin", "Cashier", "Accounting", "Training Operations", "HR", "Instructor"] },
-  { label: "HR & payroll", icon: "♙", roles: ["HR"] },
-  { label: "Reports", icon: "↥", roles: ["Admin", "Cashier", "Accounting", "Training Operations", "HR"] },
+  { label: "Training setup", icon: "⚙", roles: ["Training Operations"] },
+  { label: "Requests", icon: "↗", roles: ["Admin", "Cashier", "Accounting", "Training Operations", "Instructor"] },
+  { label: "User setup", icon: "◎", roles: ["HR"] },
+  { label: "Instructors", icon: "◎", roles: ["HR"] },
+  { label: "Payroll", icon: "♙", roles: ["HR"] },
+  { label: "Request", icon: "↗", roles: ["HR"] },
+  { label: "Setup", icon: "⚙", roles: ["Admin"] },
+  { label: "Reports", icon: "↥", roles: ["Admin", "Cashier", "Accounting"] },
   { label: "Settings", icon: "⚙", roles: ["Admin"] },
 ];
 
 /* --------------------------------------------------------------- dashboard */
 
 function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
-  const { state, views } = useSystem();
+  const { state, views, postAnnouncement, updateAnnouncement, removeAnnouncement } = useSystem();
+  const toast = useToast();
   const all = views();
+  const canManageAnnouncements = role === "Admin" || role === "Accounting";
+  const [annDraft, setAnnDraft] = useState<{ id: string | null; title: string; body: string; expiresOn: string; pinned: boolean } | null>(null);
 
   const pendingRegistrations = state.submissions.filter((item) =>
     ["Submitted", "Under Review", "Possible Duplicate"].includes(item.status),
@@ -99,6 +155,15 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
     );
 
   const isRegistration = role === "Registration";
+  const isAccounting = role === "Accounting";
+  const isTrainingOps = role === "Training Operations";
+  const isCashier = role === "Cashier";
+  const isHR = role === "HR";
+  const isAdmin = role === "Admin";
+  const [adminSpan, setAdminSpan] = useState<"Today" | "This week" | "This month">("Today");
+  const [boardSpan, setBoardSpan] = useState<"Daily" | "Weekly" | "Monthly">("Daily");
+  const [certFilter, setCertFilter] = useState<"Drafted" | "Printed" | "Released">("Drafted");
+  const [dueWindow, setDueWindow] = useState<"Tomorrow" | "Within 3 days" | "This week">("Tomorrow");
 
   // ---- registration officer's daily desk ---------------------------------
   const threeDaysOut = (() => {
@@ -117,11 +182,11 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
 
   const metrics: Record<Role, { label: string; value: string; note: string; icon: string; module: Module }[]> = {
     Admin: [
-      { label: "New registrations", value: String(pendingRegistrations.length), note: "Awaiting review", icon: "✎", module: "Registrations" },
       { label: "Collections today", value: pesos(collectionsToday), note: `${pendingPayments.length} to verify`, icon: "₱", module: "Accounting" },
       { label: "Outstanding", value: pesos(outstanding), note: `${all.filter((item) => item.balanceCentavos > 0).length} enrollments`, icon: "!", module: "Accounting" },
       { label: "Pending approvals", value: String(pendingRequests.length), note: "Requests and changes", icon: "↗", module: "Requests" },
-      { label: "Trainee records", value: String(state.trainees.length), note: "All programs", icon: "◎", module: "Trainees" },
+      { label: "Trainee lookup", value: String(state.trainees.length), note: "Search records", icon: "⌕", module: "Search trainee" },
+      { label: "Setup", value: String(state.employees.length), note: "Accounts & catalog", icon: "⚙", module: "Setup" },
       { label: "Reports", value: String(5), note: "Audited exports", icon: "↥", module: "Reports" },
     ],
     Registration: [
@@ -145,8 +210,7 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
       { label: "Receivables", value: pesos(outstanding), note: "Open balances", icon: "!", module: "Accounting" },
       { label: "Unreconciled", value: String(pendingPayments.length), note: pesos(pendingPayments.reduce((sum, entry) => sum + entry.amountCentavos, 0)), icon: "◎", module: "Payments" },
       { label: "Expenses pending", value: String(state.expenses.filter((expense) => expense.status === "Pending").length), note: pesos(state.expenses.filter((expense) => expense.status === "Pending").reduce((sum, expense) => sum + expense.amountCentavos, 0)), icon: "▥", module: "Accounting" },
-      { label: "Partner offers", value: String(96), note: "Endorsed catalog", icon: "◇", module: "Courses & centers" },
-      { label: "Payroll draft", value: pesos(openPayroll?.items.reduce((sum, item) => sum + item.grossCentavos - item.deductionCentavos, 0) ?? 0), note: openPayroll?.periodNumber ?? "All periods closed", icon: "♙", module: "HR & payroll" },
+      { label: "Partner offers", value: String(96), note: "Endorsed catalog", icon: "◇", module: "Reports" },
     ],
     "Training Operations": [
       { label: "Sessions today", value: String(todaySessions.length), note: `${state.batches.filter((batch) => batch.status === "Ongoing").length} batches running`, icon: "✓", module: "Attendance" },
@@ -157,12 +221,12 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
       { label: "Instructions to send", value: String(readyInstructions.length), note: "Fully paid enrollments", icon: "✉", module: "Instructions" },
     ],
     HR: [
-      { label: "Active employees", value: String(state.employees.filter((employee) => employee.status === "Active").length), note: `${state.employees.filter((employee) => employee.department === "Training").length} in training`, icon: "◎", module: "HR & payroll" },
-      { label: "Pending leave", value: String(state.leaveRequests.filter((leave) => leave.status === "Pending").length), note: "Awaiting a decision", icon: "!", module: "HR & payroll" },
-      { label: "Payroll status", value: openPayroll?.status ?? "Finalized", note: openPayroll?.periodNumber ?? "All periods closed", icon: "₱", module: "HR & payroll" },
-      { label: "Approved leave", value: String(state.leaveRequests.filter((leave) => leave.status === "Approved").length), note: "This period", icon: "✓", module: "HR & payroll" },
-      { label: "Part-time staff", value: String(state.employees.filter((employee) => employee.employmentType === "Part-time").length), note: "Daily-rate instructors", icon: "□", module: "HR & payroll" },
-      { label: "Available exports", value: String(5), note: "Audited reports", icon: "↥", module: "Reports" },
+      { label: "Active employees", value: String(state.employees.filter((employee) => employee.status === "Active").length), note: `${state.employees.filter((employee) => employee.department === "Training").length} in training`, icon: "◎", module: "User setup" },
+      { label: "Pending leave", value: String(state.leaveRequests.filter((leave) => leave.status === "Pending").length), note: "Awaiting a decision", icon: "!", module: "Request" },
+      { label: "Payroll status", value: openPayroll?.status ?? "Finalized", note: openPayroll?.periodNumber ?? "All periods closed", icon: "₱", module: "Payroll" },
+      { label: "Approved leave", value: String(state.leaveRequests.filter((leave) => leave.status === "Approved").length), note: "This period", icon: "✓", module: "Request" },
+      { label: "Cash advances", value: String(state.cashAdvances.filter((advance) => advance.status === "Pending").length), note: "Pending approval", icon: "□", module: "Request" },
+      { label: "Payroll periods", value: String(state.payrollPeriods.length), note: "Draft → review → finalize", icon: "▥", module: "Payroll" },
     ],
     Instructor: [
       { label: "Sessions today", value: String(todaySessions.length), note: todaySessions.length ? "Ready for check-in" : "No class today", icon: "✓", module: "Attendance" },
@@ -199,32 +263,63 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
         actions={
           <button
             className="primary-button"
-            onClick={() => go(role === "Cashier" ? "Payments" : role === "Instructor" ? "Attendance" : role === "HR" ? "HR & payroll" : "Registrations")}
+            onClick={() => go(role === "Cashier" ? "Payments" : role === "Instructor" ? "Attendance" : role === "HR" ? "Payroll" : "Registrations")}
           >
             {role === "Cashier" ? "Record payment" : role === "Instructor" ? "Start attendance" : role === "HR" ? "Open payroll" : "Review registrations"}
           </button>
         }
       />
 
-      {activeAnnouncements.length > 0 && (
+      {(activeAnnouncements.length > 0 || canManageAnnouncements) && (
         <Panel
           title="Announcement board"
           description="Posted by the Admin / Accounting Manager"
-          action={<Pill tone="blue">{activeAnnouncements.length} active</Pill>}
+          action={
+            canManageAnnouncements ? (
+              <button className="link-button" onClick={() => setAnnDraft({ id: null, title: "", body: "", expiresOn: "", pinned: false })}>
+                ＋ New announcement
+              </button>
+            ) : (
+              <Pill tone="blue">{activeAnnouncements.length} active</Pill>
+            )
+          }
         >
-          {activeAnnouncements.map((item) => (
-            <div key={item.id} className="announcement-row">
-              <span className="announcement-mark" aria-hidden="true">{item.pinned ? "📌" : "📣"}</span>
-              <div className="announcement-body">
-                <strong>{item.title}</strong>
-                <p>{item.body}</p>
-                <small>
-                  {item.postedBy} · {formatDate(item.postedAt)}
-                  {item.expiresOn ? ` · shown until ${formatDate(item.expiresOn)}` : ""}
-                </small>
+          {activeAnnouncements.length === 0 ? (
+            <EmptyState icon="📣" title="No announcements" text="Post an update for all staff." />
+          ) : (
+            activeAnnouncements.map((item) => (
+              <div key={item.id} className="announcement-row">
+                <span className="announcement-mark" aria-hidden="true">{item.pinned ? "📌" : "📣"}</span>
+                <div className="announcement-body">
+                  <strong>{item.title}</strong>
+                  <p>{item.body}</p>
+                  <small>
+                    {item.postedBy} · {formatDate(item.postedAt)}
+                    {item.expiresOn ? ` · shown until ${formatDate(item.expiresOn)}` : ""}
+                  </small>
+                </div>
+                {canManageAnnouncements && (
+                  <div className="cell-actions">
+                    <button
+                      className="ghost-button"
+                      onClick={() => setAnnDraft({ id: item.id, title: item.title, body: item.body, expiresOn: item.expiresOn ?? "", pinned: Boolean(item.pinned) })}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="ghost-button ghost-danger"
+                      onClick={() => {
+                        removeAnnouncement(item.id);
+                        toast("warning", "Announcement removed.");
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            ))
+          )}
         </Panel>
       )}
 
@@ -241,6 +336,330 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
           />
         ))}
       </div>
+
+      {isAccounting && (() => {
+        const verifiedToday = state.ledger.filter(
+          (entry) => entry.type === "payment" && entry.verification === "Verified" && entry.recordedAt.slice(0, 10) === today,
+        );
+        const collectionTotal = verifiedToday.reduce((sum, entry) => sum + entry.amountCentavos, 0);
+        const collectionByChannel = state.paymentChannels
+          .filter((channel) => channel.active)
+          .map((channel) => ({
+            name: channel.name,
+            total: verifiedToday.filter((entry) => entry.method === channel.name).reduce((sum, entry) => sum + entry.amountCentavos, 0),
+            count: verifiedToday.filter((entry) => entry.method === channel.name).length,
+          }));
+        const disbursements = [
+          ...state.ledger
+            .filter((entry) => (entry.type === "refund" || entry.type === "reversal") && entry.recordedAt.slice(0, 10) === today)
+            .map((entry) => ({ channel: entry.method ?? "Other", amountCentavos: entry.amountCentavos })),
+          ...state.expenses
+            .filter((expense) => (expense.status === "Paid" || expense.status === "Approved") && (expense.decidedAt ?? expense.createdAt).slice(0, 10) === today)
+            .map((expense) => ({ channel: expense.modeOfPayment || "Cash", amountCentavos: expense.amountCentavos })),
+        ];
+        const disbursementTotal = disbursements.reduce((sum, item) => sum + item.amountCentavos, 0);
+        const disbursementChannels = Array.from(new Set(disbursements.map((item) => item.channel))).map((channel) => ({
+          name: channel,
+          total: disbursements.filter((item) => item.channel === channel).reduce((sum, item) => sum + item.amountCentavos, 0),
+          count: disbursements.filter((item) => item.channel === channel).length,
+        }));
+        return (
+          <>
+            <Panel title="Daily collections" description="Verified collections across all payment channels — today">
+              <div className="finance-strip">
+                <div className="finance-lead">
+                  <span>Total collected today</span>
+                  <strong>{pesos(collectionTotal)}</strong>
+                  <small>{verifiedToday.length} payment{verifiedToday.length === 1 ? "" : "s"}</small>
+                </div>
+                {collectionByChannel.map((channel) => (
+                  <article key={channel.name}>
+                    <span>{channel.name}</span>
+                    <strong>{pesos(channel.total)}</strong>
+                    <small>{channel.count} payment{channel.count === 1 ? "" : "s"}</small>
+                  </article>
+                ))}
+              </div>
+            </Panel>
+
+            <Panel title="Disbursement" description="Refunds, reversals, and paid/approved expense vouchers — today">
+              <div className="finance-strip">
+                <div className="finance-lead">
+                  <span>Total disbursed today</span>
+                  <strong>{pesos(disbursementTotal)}</strong>
+                  <small>{disbursements.length} disbursement{disbursements.length === 1 ? "" : "s"}</small>
+                </div>
+                {disbursementChannels.length === 0 ? (
+                  <article><span>No disbursements</span><strong>{pesos(0)}</strong><small>today</small></article>
+                ) : (
+                  disbursementChannels.map((channel) => (
+                    <article key={channel.name}>
+                      <span>{channel.name}</span>
+                      <strong>{pesos(channel.total)}</strong>
+                      <small>{channel.count} item{channel.count === 1 ? "" : "s"}</small>
+                    </article>
+                  ))
+                )}
+              </div>
+            </Panel>
+
+            <Panel
+              title="Opening / closing — today"
+              description="Net cash movement today"
+              action={<button className="secondary-button" onClick={() => go("Reports")}>Open full report</button>}
+            >
+              <div className="finance-strip">
+                <div className="finance-lead">
+                  <span>Net movement today</span>
+                  <strong>{pesos(collectionTotal - disbursementTotal)}</strong>
+                  <small>Received − disbursed</small>
+                </div>
+                <article><span>Received</span><strong>{pesos(collectionTotal)}</strong><small>all channels</small></article>
+                <article><span>Disbursed</span><strong>{pesos(disbursementTotal)}</strong><small>all channels</small></article>
+              </div>
+            </Panel>
+
+            <MonthlyPayablesReminder payables={state.monthlyPayables} />
+          </>
+        );
+      })()}
+
+      {isTrainingOps && (() => {
+        const weekStart = (() => { const d = new Date(); const day = (d.getDay() + 6) % 7; d.setDate(d.getDate() - day); return d.toISOString().slice(0, 10); })();
+        const weekEnd = (() => { const d = new Date(weekStart); d.setDate(d.getDate() + 6); return d.toISOString().slice(0, 10); })();
+        const horizon = (() => { const d = new Date(); d.setDate(d.getDate() + 14); return d.toISOString().slice(0, 10); })();
+        const upcomingBatches = state.batches
+          .filter((batch) => batch.startsOn >= today && batch.startsOn <= horizon && batch.status !== "Cancelled")
+          .sort((a, b) => a.startsOn.localeCompare(b.startsOn));
+        const weekBatches = state.batches
+          .filter((batch) => batch.startsOn <= weekEnd && batch.endsOn >= weekStart && batch.status !== "Cancelled")
+          .sort((a, b) => a.startsOn.localeCompare(b.startsOn));
+        const certStatus = certFilter === "Drafted" ? "Ready to Print" : certFilter;
+        const certRows = all.filter((item) => item.certificate?.status === certStatus);
+        return (
+          <>
+            <Panel title="Trainees for upcoming schedules" description="Batches starting within the next 14 days">
+              {upcomingBatches.length === 0 ? (
+                <div className="empty-block"><span aria-hidden="true">□</span><h3>No upcoming batches</h3><p>Open or publish a batch to see its trainees here.</p></div>
+              ) : (
+                upcomingBatches.map((batch) => {
+                  const trainees = all.filter((item) => item.enrollment.batchId === batch.id && item.stage !== "Cancelled");
+                  return (
+                    <div key={batch.id} className="activity-row">
+                      <div>
+                        <strong>{batch.courseName} · {formatDate(batch.startsOn)}</strong>
+                        <small>{batch.instructor} · {batch.venue} · {trainees.length} trainee{trainees.length === 1 ? "" : "s"}: {trainees.map((t) => fullName(t.trainee)).join(", ") || "none yet"}</small>
+                      </div>
+                      <Pill tone="blue">{batch.batchNumber}</Pill>
+                    </div>
+                  );
+                })
+              )}
+            </Panel>
+
+            <div className="two-column">
+              <Panel
+                title="Certificates"
+                description="Filter by status"
+                action={
+                  <select value={certFilter} onChange={(event) => setCertFilter(event.target.value as typeof certFilter)}>
+                    <option>Drafted</option>
+                    <option>Printed</option>
+                    <option>Released</option>
+                  </select>
+                }
+              >
+                {certRows.length === 0 ? (
+                  <div className="empty-block"><span aria-hidden="true">◈</span><h3>None {certFilter.toLowerCase()}</h3><p>No certificates in this status.</p></div>
+                ) : (
+                  certRows.map((item) => (
+                    <div key={item.enrollment.id} className="activity-row">
+                      <div>
+                        <strong>{fullName(item.trainee)}</strong>
+                        <small>{item.enrollment.courseName} · {item.certificate?.certificateNumber ?? "No number yet"}</small>
+                      </div>
+                      <Pill tone={certFilter === "Released" ? "green" : certFilter === "Printed" ? "blue" : "amber"}>{certFilter}</Pill>
+                    </div>
+                  ))
+                )}
+              </Panel>
+
+              <Panel title="This week's schedule" description={`${formatDate(weekStart)} – ${formatDate(weekEnd)}`}>
+                {weekBatches.length === 0 ? (
+                  <div className="empty-block"><span aria-hidden="true">□</span><h3>No sessions this week</h3><p>Nothing is scheduled for the current week.</p></div>
+                ) : (
+                  weekBatches.map((batch) => (
+                    <div key={batch.id} className="activity-row">
+                      <div>
+                        <strong>{batch.courseName}</strong>
+                        <small>{formatDate(batch.startsOn)}–{formatDate(batch.endsOn)} · {batch.instructor} · {batch.venue}</small>
+                      </div>
+                      <Pill tone="slate">{batch.batchNumber}</Pill>
+                    </div>
+                  ))
+                )}
+              </Panel>
+            </div>
+          </>
+        );
+      })()}
+
+      {isCashier && (() => {
+        const days = dueWindow === "Tomorrow" ? 1 : dueWindow === "Within 3 days" ? 3 : 7;
+        const limit = (() => { const d = new Date(); d.setDate(d.getDate() + days); return d.toISOString().slice(0, 10); })();
+        const dueSoon = all
+          .filter((item) => item.balanceCentavos > 0 && item.batch && item.batch.startsOn >= today && item.batch.startsOn <= limit && item.stage !== "Cancelled")
+          .sort((a, b) => (a.batch?.startsOn ?? "").localeCompare(b.batch?.startsOn ?? ""));
+        return (
+          <Panel
+            title="Trainees with pending balances before training"
+            description="Follow up on unpaid balances ahead of the training date"
+            action={
+              <select value={dueWindow} onChange={(event) => setDueWindow(event.target.value as typeof dueWindow)}>
+                <option>Tomorrow</option>
+                <option>Within 3 days</option>
+                <option>This week</option>
+              </select>
+            }
+          >
+            {dueSoon.length === 0 ? (
+              <div className="empty-block"><span aria-hidden="true">✓</span><h3>Nothing due {dueWindow.toLowerCase()}</h3><p>No trainee has an outstanding balance for a training starting in this window.</p></div>
+            ) : (
+              dueSoon.map((item) => (
+                <button key={item.enrollment.id} className="activity-row row-clickable" onClick={() => go("Payments")}>
+                  <div>
+                    <strong>{fullName(item.trainee)}</strong>
+                    <small>{item.enrollment.courseName} · starts {formatDate(item.batch!.startsOn)} · {item.enrollment.reference}</small>
+                  </div>
+                  <strong className="value-danger">{pesos(item.balanceCentavos)} due</strong>
+                </button>
+              ))
+            )}
+          </Panel>
+        );
+      })()}
+
+      {isHR && (() => {
+        const active = state.employees.filter((employee) => employee.status === "Active");
+        const board = active
+          .map((employee) => {
+            const records = state.hrAttendance.filter((record) => record.employeeId === employee.id);
+            const present = records.filter((record) => record.status !== "Absent").length;
+            const onTime = records.filter((record) => record.status === "Present").length;
+            const score = present * 2 + onTime; // present days weighted, on-time bonus
+            return { employee, present, onTime, total: records.length, score };
+          })
+          .sort((a, b) => b.score - a.score);
+        const maxScore = Math.max(1, ...board.map((row) => row.score));
+        return (
+          <div className="two-column">
+            <Panel title="Active employees" description={`${active.length} on the roster`}>
+              {active.length === 0 ? (
+                <div className="empty-block"><span aria-hidden="true">◎</span><h3>No active employees</h3><p>Add employees under HR &amp; payroll → User setup.</p></div>
+              ) : (
+                active.map((employee) => (
+                  <div key={employee.id} className="activity-row">
+                    <div>
+                      <strong>{employee.name}</strong>
+                      <small>{employee.position} · {employee.department} · {employee.employmentType}</small>
+                    </div>
+                    <Pill tone="green">Active</Pill>
+                  </div>
+                ))
+              )}
+            </Panel>
+
+            <Panel title="Performance leaderboard" description="Ranked by attendance (present days + on-time)">
+              {board.every((row) => row.total === 0) ? (
+                <div className="empty-block"><span aria-hidden="true">▤</span><h3>No attendance yet</h3><p>Log daily attendance to build the leaderboard.</p></div>
+              ) : (
+                board.map((row, index) => (
+                  <div key={row.employee.id} className="leaderboard-row">
+                    <span className={`rank ${index === 0 ? "gold" : ""}`}>{index + 1}</span>
+                    <div className="leaderboard-copy">
+                      <strong>{row.employee.name}</strong>
+                      <div className="leaderboard-bar"><i style={{ width: `${Math.round((row.score / maxScore) * 100)}%` }} /></div>
+                    </div>
+                    <b className="leaderboard-count">{row.present}/{row.total} · {row.onTime} on-time</b>
+                  </div>
+                ))
+              )}
+            </Panel>
+          </div>
+        );
+      })()}
+
+      {isAdmin && (() => {
+        const fromFor = (label: string) => {
+          const d = new Date();
+          if (label === "Today" || label === "Daily") return today;
+          if (label === "This week" || label === "Weekly") { d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10); }
+          return `${today.slice(0, 8)}01`; // month-to-date
+        };
+        const from = fromFor(adminSpan);
+        const inSpan = (value?: string | null) => Boolean(value) && value!.slice(0, 10) >= from && value!.slice(0, 10) <= today;
+        const enrollCount = all.filter((item) => inSpan(item.enrollment.createdAt)).length;
+        const sales = state.ledger.filter((e) => e.type === "payment" && e.verification === "Verified" && inSpan(e.recordedAt)).reduce((s, e) => s + e.amountCentavos, 0);
+        const disbursement =
+          state.ledger.filter((e) => (e.type === "refund" || e.type === "reversal") && inSpan(e.recordedAt)).reduce((s, e) => s + e.amountCentavos, 0) +
+          state.expenses.filter((x) => (x.status === "Paid" || x.status === "Approved") && inSpan(x.decidedAt ?? x.createdAt)).reduce((s, x) => s + x.amountCentavos, 0);
+
+        const boardFrom = fromFor(boardSpan);
+        const boardEnrolls = all.filter((item) => item.enrollment.createdAt.slice(0, 10) >= boardFrom && item.stage !== "Cancelled");
+        const rank = (keyOf: (item: (typeof boardEnrolls)[number]) => string | undefined, limit: number) => {
+          const map = new Map<string, number>();
+          boardEnrolls.forEach((item) => { const k = keyOf(item); if (k) map.set(k, (map.get(k) ?? 0) + 1); });
+          return Array.from(map.entries()).sort((a, b) => b[1] - a[1]).slice(0, limit);
+        };
+        const courses = rank((item) => item.enrollment.courseName, 3);
+        const officers = rank((item) => item.enrollment.processedBy, 5);
+        const agencies = rank((item) => item.enrollment.agencyName, 5);
+        const board = (title: string, rows: [string, number][], empty: string) => {
+          const max = rows[0]?.[1] ?? 1;
+          return (
+            <Panel title={title} description={`This ${boardSpan.toLowerCase().replace("ly", "")} · by enrollments`}>
+              {rows.length === 0 ? (
+                <div className="empty-block"><span aria-hidden="true">▤</span><h3>{empty}</h3><p>No data in this period.</p></div>
+              ) : rows.map(([name, count], index) => (
+                <div key={name} className="leaderboard-row">
+                  <span className={`rank ${index === 0 ? "gold" : ""}`}>{index + 1}</span>
+                  <div className="leaderboard-copy"><strong>{name}</strong><div className="leaderboard-bar"><i style={{ width: `${Math.round((count / max) * 100)}%` }} /></div></div>
+                  <b className="leaderboard-count">{count}</b>
+                </div>
+              ))}
+            </Panel>
+          );
+        };
+        return (
+          <>
+            <div className="finance-strip">
+              <div className="finance-lead">
+                <span>Net sales · {adminSpan}</span>
+                <strong>{pesos(sales - disbursement)}</strong>
+                <small>Sales − disbursement</small>
+              </div>
+              <article><span>Enrollments</span><strong>{enrollCount}</strong><small>{adminSpan}</small></article>
+              <article><span>Total sales</span><strong>{pesos(sales)}</strong><small>Verified collections</small></article>
+              <article><span>Total disbursement</span><strong>{pesos(disbursement)}</strong><small>Refunds + expenses</small></article>
+            </div>
+            <div className="toolbar toolbar-wrap" style={{ padding: "0 4px" }}>
+              <Segmented options={["Today", "This week", "This month"] as const} value={adminSpan} onChange={setAdminSpan} />
+            </div>
+
+            <div className="toolbar toolbar-wrap" style={{ padding: "8px 4px 0" }}>
+              <strong style={{ color: "var(--blue-dark)" }}>Performance leaderboard</strong>
+              <Segmented options={["Daily", "Weekly", "Monthly"] as const} value={boardSpan} onChange={setBoardSpan} />
+            </div>
+            <div className="two-column">
+              {board("Most enrolled courses", courses, "No enrollments")}
+              {board("Top registration officers", officers, "No attributed enrollments")}
+            </div>
+            {board("Top consultancies / agencies", agencies, "No agency-referred enrollments")}
+
+            <MonthlyPayablesReminder payables={state.monthlyPayables} />
+          </>
+        );
+      })()}
 
       {isRegistration && (
         <Panel title="Requests requiring action" description="Trainee change requests still open">
@@ -297,7 +716,7 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
         </div>
       )}
 
-      {!isRegistration && (
+      {!isRegistration && !isAccounting && !isTrainingOps && !isCashier && !isHR && !isAdmin && (
       <>
       <div className="two-column">
         <Panel title="Priority work" description="Built from live records, ordered by operational urgency" action={<Pill tone="amber">{tasks.length} actions</Pill>}>
@@ -400,6 +819,60 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
       </Panel>
       </>
       )}
+
+      <Modal
+        open={Boolean(annDraft)}
+        title={annDraft?.id ? "Edit announcement" : "New announcement"}
+        description="Shown on every staff dashboard until removed or expired."
+        onClose={() => setAnnDraft(null)}
+        wide
+        footer={
+          <>
+            <button className="secondary-button" onClick={() => setAnnDraft(null)}>Cancel</button>
+            <button
+              className="primary-button"
+              onClick={() => {
+                if (!annDraft) return;
+                const title = annDraft.title.trim();
+                const body = annDraft.body.trim();
+                if (!title || !body) {
+                  toast("warning", "Title and message are required.");
+                  return;
+                }
+                const payload = { title, body, expiresOn: annDraft.expiresOn || undefined, pinned: annDraft.pinned };
+                if (annDraft.id) {
+                  updateAnnouncement(annDraft.id, payload);
+                  toast("success", "Announcement updated.");
+                } else {
+                  postAnnouncement(payload);
+                  toast("success", "Announcement posted.");
+                }
+                setAnnDraft(null);
+              }}
+            >
+              {annDraft?.id ? "Save changes" : "Post announcement"}
+            </button>
+          </>
+        }
+      >
+        {annDraft && (
+          <div className="form-grid">
+            <Field label="Title*" full>
+              <input value={annDraft.title} onChange={(event) => setAnnDraft({ ...annDraft, title: event.target.value })} />
+            </Field>
+            <Field label="Message*" full>
+              <textarea rows={4} value={annDraft.body} onChange={(event) => setAnnDraft({ ...annDraft, body: event.target.value })} />
+            </Field>
+            <Field label="Show until (optional)" hint="Auto-hides after this date">
+              <input type="date" value={annDraft.expiresOn} onChange={(event) => setAnnDraft({ ...annDraft, expiresOn: event.target.value })} />
+            </Field>
+            <label className="inline-field inline-check">
+              <input type="checkbox" checked={annDraft.pinned} onChange={(event) => setAnnDraft({ ...annDraft, pinned: event.target.checked })} />
+              <span>Pin to top</span>
+            </label>
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }
@@ -415,7 +888,7 @@ function RegistrationHub({ role, go }: { role: Role; go: (module: Module) => voi
       <div className="hub-tabs">
         {tabs.map((item) => (
           <button key={item} className={active === item ? "active" : ""} onClick={() => setTab(item)}>
-            {item}
+            {item === "Enrollments" ? "Enrollments Summary" : item}
           </button>
         ))}
       </div>
@@ -603,10 +1076,17 @@ function PortalShell({ previewMode }: { previewMode: boolean }) {
         {active === "Accounting" && <AccountingModule role={role} />}
         {active === "Instructions" && <InstructionsModule />}
         {active === "Attendance" && <AttendanceModule />}
+        {active === "Instructors" && <InstructorsModule />}
+        {active === "Classrooms" && <ClassroomsModule />}
+        {active === "Training setup" && <TrainingSetupModule />}
         {active === "Certificates" && <CertificatesModule go={go} />}
         {active === "Requests" && <RequestsModule role={role} />}
-        {active === "HR & payroll" && <HrModule />}
-        {active === "Reports" && <ReportsModule />}
+        {active === "User setup" && <UserSetupModule />}
+        {active === "Payroll" && <PayrollModule />}
+        {active === "Request" && <HrRequestModule />}
+        {active === "Search trainee" && <SearchTraineeModule />}
+        {active === "Setup" && <SetupModule />}
+        {active === "Reports" && <ReportsModule role={role} />}
         {active === "Settings" && <SettingsModule />}
       </section>
 
@@ -624,3 +1104,4 @@ export function PortalApp({ previewMode = false }: { previewMode?: boolean }) {
     </SystemProvider>
   );
 }
+

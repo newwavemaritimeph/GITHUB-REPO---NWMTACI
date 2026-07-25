@@ -15,7 +15,7 @@ import {
   isCertificateEligible,
   type AttendanceStatus,
 } from "@/lib/domain";
-import { chooseSurvivor, findSrnDuplicates, mergeInto } from "@/lib/trainee-identity";
+import { chooseSurvivor, findContactDuplicates, findSrnDuplicates, mergeInto } from "@/lib/trainee-identity";
 import { automaticEndDate, courseDays, monthlyBatchStarts } from "@/lib/scheduling";
 import { createSeedState, SYSTEM_VERSION } from "./seed";
 import type {
@@ -32,7 +32,16 @@ import type {
   Enrollment,
   EnrollmentView,
   Expense,
+  CashAdvance,
+  Classroom,
+  Employee,
+  ExpenseCategory,
+  MonthlyPayable,
+  HrAttendanceRecord,
+  Instructor,
+  LeaveRequest,
   LedgerEntry,
+  MarketingAgency,
   OtherCharge,
   PartnerOfferRecord,
   PaymentChannel,
@@ -161,6 +170,63 @@ function certificateBlockReason(state: SystemState, enrollment: Enrollment) {
   return undefined;
 }
 
+/** Fields backfilled onto a survivor when a duplicate is folded in. */
+const MERGE_FIELDS = [
+  "middleName", "suffix", "srn", "address", "company", "rank", "facebookLink", "placeOfBirth",
+  "gender", "nationality", "civilStatus", "seafarerStatus",
+  "emergencyContactName", "emergencyContactRelation", "emergencyContactMobile",
+] as const;
+
+/** Folds `duplicate` into `survivor`: backfills blanks, moves the duplicate's
+ * enrollments and submissions onto the survivor, and tombstones the duplicate. */
+function foldTrainee(draft: SystemState, survivor: Trainee, duplicate: Trainee) {
+  if (survivor.id === duplicate.id) return;
+  Object.assign(survivor, mergeInto(survivor as unknown as Record<string, unknown>, duplicate as unknown as Record<string, unknown>, MERGE_FIELDS as unknown as string[]));
+  draft.enrollments.forEach((item) => { if (item.traineeId === duplicate.id) item.traineeId = survivor.id; });
+  draft.submissions.forEach((item) => { if (item.traineeId === duplicate.id) item.traineeId = survivor.id; });
+  draft.trainees = draft.trainees.filter((item) => item.id !== duplicate.id);
+}
+
+/** Normalised exact-name key (first+middle+last) for duplicate grouping. */
+function nameKey(trainee: Trainee): string {
+  return [trainee.firstName, trainee.middleName ?? "", trainee.lastName]
+    .map((part) => part.trim().toLowerCase().replace(/\s+/g, " "))
+    .join("|");
+}
+
+/**
+ * Idempotent sweep that automatically merges duplicate trainees so no manual
+ * review is left: records sharing a normalised SRN are always folded together,
+ * and records with an identical full name are folded only when they also share a
+ * contact (email or mobile), never on name alone. The earliest-created record
+ * survives so the trainee keeps their original number and history.
+ */
+function autoMergeDuplicates(draft: SystemState) {
+  let changed = true;
+  // Loop until stable — folding can expose transitive matches (A≡B, B≡C).
+  while (changed) {
+    changed = false;
+    for (const trainee of draft.trainees) {
+      // SRN matches: authoritative, merge unconditionally.
+      const srnMatches = findSrnDuplicates(trainee, draft.trainees);
+      // Same exact name AND a shared contact.
+      const nameMatches = draft.trainees.filter(
+        (other) =>
+          other.id !== trainee.id &&
+          nameKey(other) === nameKey(trainee) &&
+          findContactDuplicates(trainee, [other]).length > 0,
+      );
+      const group = [trainee, ...srnMatches, ...nameMatches];
+      const unique = Array.from(new Map(group.map((item) => [item.id, item])).values());
+      if (unique.length < 2) continue;
+      const survivor = chooseSurvivor(unique) ?? unique[0];
+      unique.filter((item) => item.id !== survivor.id).forEach((duplicate) => foldTrainee(draft, survivor, duplicate));
+      changed = true;
+      break; // restart the scan after mutating the list
+    }
+  }
+}
+
 /**
  * Returns the trainee for a submission, creating one from the applicant snapshot
  * on first approval and folding any SRN duplicates into the earliest record so a
@@ -253,6 +319,21 @@ function recomputeSubmissionStatus(draft: SystemState, submissionId: string) {
 
 /** Keeps derived records (certificates, batch status, seat counts) consistent. */
 function reconcile(state: SystemState): SystemState {
+  // Collapse any duplicate trainees automatically so no manual review is left.
+  autoMergeDuplicates(state);
+
+  // Auto-send training instructions once an enrollment is paid or partially paid.
+  const paidOf = (enrollmentId: string) => {
+    const entries = state.ledger.filter((entry) => entry.enrollmentId === enrollmentId && entry.valid);
+    const paid = entries.filter((entry) => entry.type === "payment" && entry.verification === "Verified").reduce((sum, entry) => sum + entry.amountCentavos, 0);
+    const out = entries.filter((entry) => entry.type === "refund" || entry.type === "reversal").reduce((sum, entry) => sum + entry.amountCentavos, 0);
+    return paid - out;
+  };
+  state.enrollments.forEach((enrollment) => {
+    if (enrollment.status === "Cancelled" || enrollment.instructionsSentAt) return;
+    if (paidOf(enrollment.id) > 0) enrollment.instructionsSentAt = new Date().toISOString();
+  });
+
   const batches: Batch[] = state.batches.map((batch) => {
     const seats = batchSeatCount(state, batch.id);
     if (batch.status === "Cancelled" || batch.status === "Draft") return batch;
@@ -328,6 +409,7 @@ type SystemContextValue = {
   reviewSelection: (id: string, status: SelectionStatus, remark?: string) => void;
   approveSelection: (id: string) => Enrollment | undefined;
   createEnrollment: (input: { traineeId: string; batchId: string }) => Enrollment | undefined;
+  createEndorsedEnrollment: (input: { traineeId: string; offerId: string }) => Enrollment | undefined;
   changeEnrollmentBatch: (enrollmentId: string, newBatchId: string) => void;
   setRegistrationStatus: (enrollmentId: string, status: RegistrationLifecycle) => void;
   generateAdmissionSlip: (enrollmentId: string, input: { officer: string; cashier: string }) => void;
@@ -352,6 +434,30 @@ type SystemContextValue = {
   addOtherCharge: (input: Omit<OtherCharge, "id" | "active">) => OtherCharge;
   updateOtherCharge: (id: string, patch: Partial<Omit<OtherCharge, "id">>) => void;
   setOtherChargeActive: (id: string, active: boolean) => void;
+  addExpenseCategory: (input: Omit<ExpenseCategory, "id" | "active">) => ExpenseCategory;
+  updateExpenseCategory: (id: string, patch: Partial<Omit<ExpenseCategory, "id">>) => void;
+  setExpenseCategoryActive: (id: string, active: boolean) => void;
+  addMonthlyPayable: (input: Omit<MonthlyPayable, "id" | "active">) => MonthlyPayable;
+  updateMonthlyPayable: (id: string, patch: Partial<Omit<MonthlyPayable, "id">>) => void;
+  setMonthlyPayableActive: (id: string, active: boolean) => void;
+  removeMonthlyPayable: (id: string) => void;
+  addMarketingAgency: (input: Omit<MarketingAgency, "id" | "active">) => MarketingAgency;
+  updateMarketingAgency: (id: string, patch: Partial<Omit<MarketingAgency, "id">>) => void;
+  setMarketingAgencyActive: (id: string, active: boolean) => void;
+  setAgencyCourseRebate: (id: string, courseCode: string, centavos: number) => void;
+  addInstructor: (input: Omit<Instructor, "id" | "active">) => Instructor;
+  updateInstructor: (id: string, patch: Partial<Omit<Instructor, "id">>) => void;
+  setInstructorActive: (id: string, active: boolean) => void;
+  addClassroom: (input: Omit<Classroom, "id" | "active">) => Classroom;
+  updateClassroom: (id: string, patch: Partial<Omit<Classroom, "id">>) => void;
+  setClassroomActive: (id: string, active: boolean) => void;
+  addEmployee: (input: Omit<Employee, "id" | "employeeNumber" | "status">) => Employee | undefined;
+  updateEmployee: (id: string, patch: Partial<Omit<Employee, "id">>) => void;
+  setEmployeeStatus: (id: string, status: Employee["status"]) => void;
+  upsertHrAttendance: (input: Omit<HrAttendanceRecord, "id">) => void;
+  createLeave: (input: Omit<LeaveRequest, "id" | "reference" | "status">) => LeaveRequest | undefined;
+  createCashAdvance: (input: Omit<CashAdvance, "id" | "reference" | "status" | "createdAt">) => CashAdvance | undefined;
+  decideCashAdvance: (id: string, decision: CashAdvance["status"]) => void;
   postAnnouncement: (input: Omit<Announcement, "id" | "postedBy" | "postedAt">) => Announcement;
   updateAnnouncement: (id: string, patch: Partial<Omit<Announcement, "id">>) => void;
   removeAnnouncement: (id: string) => void;
@@ -369,7 +475,7 @@ type SystemContextValue = {
   printCertificate: (enrollmentId: string) => void;
   releaseCertificate: (enrollmentId: string, recipient: string) => void;
   /* requests + people */
-  createRequest: (input: { type: RequestType; enrollmentId?: string; traineeName: string; reason: string; requestedBy?: string }) => ChangeRequest;
+  createRequest: (input: { type: RequestType; enrollmentId?: string; traineeName: string; reason: string; requestedBy?: string; payload?: Record<string, string> }) => ChangeRequest;
   decideRequest: (id: string, decision: "Approved" | "Rejected" | "For clarification", remarks?: string) => void;
   decideLeave: (id: string, decision: "Approved" | "Rejected") => void;
   advancePayroll: (id: string) => void;
@@ -410,6 +516,13 @@ const REQUIRED_COLLECTIONS: (keyof SystemState)[] = [
   "partnerOffers",
   "paymentChannels",
   "otherCharges",
+  "expenseCategories",
+  "monthlyPayables",
+  "marketingAgencies",
+  "instructors",
+  "classrooms",
+  "hrAttendance",
+  "cashAdvances",
   "announcements",
   "submissions",
   "courseSelections",
@@ -934,6 +1047,51 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     [actor, log, update],
   );
 
+  // Endorsed partner trainings have no New Wave batch, so a staff-created
+  // endorsed enrollment carries an empty batchId and takes its course, center,
+  // and fee from the partner offer. The courseCode is keyed "endorsed:<offerId>"
+  // so a marketing-agency rebate set against the same offer lines up.
+  const createEndorsedEnrollment = useCallback<SystemContextValue["createEndorsedEnrollment"]>(
+    ({ traineeId, offerId }) => {
+      let created: Enrollment | undefined;
+      update((draft) => {
+        const offer = draft.partnerOffers.find((item) => item.id === offerId);
+        const trainee = draft.trainees.find((item) => item.id === traineeId);
+        if (!offer || !trainee) return;
+        const enrollment: Enrollment = {
+          id: uid("e"),
+          reference: nextReference(draft.enrollments.map((item) => item.reference), "ENR"),
+          traineeId,
+          batchId: "",
+          courseCode: `endorsed:${offer.id}`,
+          courseName: offer.course,
+          centerName: offer.center,
+          status: "Enrolled",
+          createdAt: new Date().toISOString(),
+          registrationStatus: "Waiting for Payment",
+          processedBy: actor,
+        };
+        draft.enrollments.unshift(enrollment);
+        draft.ledger.unshift({
+          id: uid("chg"),
+          reference: `CHG-${enrollment.reference}`,
+          enrollmentId: enrollment.id,
+          type: "charge",
+          amountCentavos: offer.trainingFeeCentavos,
+          description: `${offer.course} training fee (endorsed · ${offer.center})`,
+          verification: "Not required",
+          recordedBy: actor,
+          recordedAt: new Date().toISOString(),
+          valid: true,
+        });
+        created = enrollment;
+        log(draft, { action: "Endorsed enrollment created", recordType: "Enrollment", recordRef: enrollment.reference, detail: offer.center });
+      });
+      return created;
+    },
+    [actor, log, update],
+  );
+
   const changeEnrollmentBatch = useCallback<SystemContextValue["changeEnrollmentBatch"]>(
     (enrollmentId, newBatchId) => {
       update((draft) => {
@@ -1282,6 +1440,320 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     [log, update],
   );
 
+  const addExpenseCategory = useCallback<SystemContextValue["addExpenseCategory"]>(
+    (input) => {
+      const category: ExpenseCategory = { ...input, id: uid("ec"), active: true };
+      update((draft) => {
+        draft.expenseCategories.push(category);
+        log(draft, { action: "Expense category added", recordType: "ExpenseCategory", recordRef: category.name });
+      });
+      return category;
+    },
+    [log, update],
+  );
+
+  const updateExpenseCategory = useCallback<SystemContextValue["updateExpenseCategory"]>(
+    (id, patch) => {
+      update((draft) => {
+        const category = draft.expenseCategories.find((item) => item.id === id);
+        if (!category) return;
+        Object.assign(category, patch);
+        log(draft, { action: "Expense category updated", recordType: "ExpenseCategory", recordRef: category.name });
+      });
+    },
+    [log, update],
+  );
+
+  const setExpenseCategoryActive = useCallback<SystemContextValue["setExpenseCategoryActive"]>(
+    (id, active) => {
+      update((draft) => {
+        const category = draft.expenseCategories.find((item) => item.id === id);
+        if (!category) return;
+        category.active = active;
+        log(draft, {
+          action: active ? "Expense category restored" : "Expense category archived",
+          recordType: "ExpenseCategory",
+          recordRef: category.name,
+        });
+      });
+    },
+    [log, update],
+  );
+
+  const addMonthlyPayable = useCallback<SystemContextValue["addMonthlyPayable"]>(
+    (input) => {
+      const payable: MonthlyPayable = { ...input, id: uid("mp"), active: true };
+      update((draft) => {
+        draft.monthlyPayables.push(payable);
+        log(draft, { action: "Monthly payable added", recordType: "MonthlyPayable", recordRef: payable.name });
+      });
+      return payable;
+    },
+    [log, update],
+  );
+
+  const updateMonthlyPayable = useCallback<SystemContextValue["updateMonthlyPayable"]>(
+    (id, patch) => {
+      update((draft) => {
+        const payable = draft.monthlyPayables.find((item) => item.id === id);
+        if (!payable) return;
+        Object.assign(payable, patch);
+        log(draft, { action: "Monthly payable updated", recordType: "MonthlyPayable", recordRef: payable.name });
+      });
+    },
+    [log, update],
+  );
+
+  const setMonthlyPayableActive = useCallback<SystemContextValue["setMonthlyPayableActive"]>(
+    (id, active) => {
+      update((draft) => {
+        const payable = draft.monthlyPayables.find((item) => item.id === id);
+        if (!payable) return;
+        payable.active = active;
+        log(draft, {
+          action: active ? "Monthly payable restored" : "Monthly payable archived",
+          recordType: "MonthlyPayable",
+          recordRef: payable.name,
+        });
+      });
+    },
+    [log, update],
+  );
+
+  const removeMonthlyPayable = useCallback<SystemContextValue["removeMonthlyPayable"]>(
+    (id) => {
+      update((draft) => {
+        const payable = draft.monthlyPayables.find((item) => item.id === id);
+        if (!payable) return;
+        draft.monthlyPayables = draft.monthlyPayables.filter((item) => item.id !== id);
+        log(draft, { action: "Monthly payable removed", recordType: "MonthlyPayable", recordRef: payable.name });
+      });
+    },
+    [log, update],
+  );
+
+  const addMarketingAgency = useCallback<SystemContextValue["addMarketingAgency"]>(
+    (input) => {
+      const agency: MarketingAgency = { ...input, id: uid("ma"), active: true };
+      update((draft) => {
+        draft.marketingAgencies.push(agency);
+        log(draft, { action: "Marketing agency added", recordType: "MarketingAgency", recordRef: agency.name });
+      });
+      return agency;
+    },
+    [log, update],
+  );
+
+  const updateMarketingAgency = useCallback<SystemContextValue["updateMarketingAgency"]>(
+    (id, patch) => {
+      update((draft) => {
+        const agency = draft.marketingAgencies.find((item) => item.id === id);
+        if (!agency) return;
+        Object.assign(agency, patch);
+        log(draft, { action: "Marketing agency updated", recordType: "MarketingAgency", recordRef: agency.name });
+      });
+    },
+    [log, update],
+  );
+
+  const setMarketingAgencyActive = useCallback<SystemContextValue["setMarketingAgencyActive"]>(
+    (id, active) => {
+      update((draft) => {
+        const agency = draft.marketingAgencies.find((item) => item.id === id);
+        if (!agency) return;
+        agency.active = active;
+        log(draft, {
+          action: active ? "Marketing agency restored" : "Marketing agency archived",
+          recordType: "MarketingAgency",
+          recordRef: agency.name,
+        });
+      });
+    },
+    [log, update],
+  );
+
+  const setAgencyCourseRebate = useCallback<SystemContextValue["setAgencyCourseRebate"]>(
+    (id, courseCode, centavos) => {
+      update((draft) => {
+        const agency = draft.marketingAgencies.find((item) => item.id === id);
+        if (!agency) return;
+        if (centavos > 0) agency.rebates[courseCode] = centavos;
+        else delete agency.rebates[courseCode];
+        log(draft, { action: "Agency rebate updated", recordType: "MarketingAgency", recordRef: agency.name, detail: courseCode });
+      });
+    },
+    [log, update],
+  );
+
+  const addInstructor = useCallback<SystemContextValue["addInstructor"]>(
+    (input) => {
+      const instructor: Instructor = { ...input, id: uid("ins"), active: true };
+      update((draft) => {
+        draft.instructors.push(instructor);
+        log(draft, { action: "Instructor added", recordType: "Instructor", recordRef: instructor.name });
+      });
+      return instructor;
+    },
+    [log, update],
+  );
+
+  const updateInstructor = useCallback<SystemContextValue["updateInstructor"]>(
+    (id, patch) => {
+      update((draft) => {
+        const instructor = draft.instructors.find((item) => item.id === id);
+        if (!instructor) return;
+        Object.assign(instructor, patch);
+        log(draft, { action: "Instructor updated", recordType: "Instructor", recordRef: instructor.name });
+      });
+    },
+    [log, update],
+  );
+
+  const setInstructorActive = useCallback<SystemContextValue["setInstructorActive"]>(
+    (id, active) => {
+      update((draft) => {
+        const instructor = draft.instructors.find((item) => item.id === id);
+        if (!instructor) return;
+        instructor.active = active;
+        log(draft, { action: active ? "Instructor restored" : "Instructor archived", recordType: "Instructor", recordRef: instructor.name });
+      });
+    },
+    [log, update],
+  );
+
+  const addClassroom = useCallback<SystemContextValue["addClassroom"]>(
+    (input) => {
+      const classroom: Classroom = { ...input, id: uid("room"), active: true };
+      update((draft) => {
+        draft.classrooms.push(classroom);
+        log(draft, { action: "Classroom added", recordType: "Classroom", recordRef: classroom.name });
+      });
+      return classroom;
+    },
+    [log, update],
+  );
+
+  const updateClassroom = useCallback<SystemContextValue["updateClassroom"]>(
+    (id, patch) => {
+      update((draft) => {
+        const classroom = draft.classrooms.find((item) => item.id === id);
+        if (!classroom) return;
+        Object.assign(classroom, patch);
+        log(draft, { action: "Classroom updated", recordType: "Classroom", recordRef: classroom.name });
+      });
+    },
+    [log, update],
+  );
+
+  const setClassroomActive = useCallback<SystemContextValue["setClassroomActive"]>(
+    (id, active) => {
+      update((draft) => {
+        const classroom = draft.classrooms.find((item) => item.id === id);
+        if (!classroom) return;
+        classroom.active = active;
+        log(draft, { action: active ? "Classroom restored" : "Classroom archived", recordType: "Classroom", recordRef: classroom.name });
+      });
+    },
+    [log, update],
+  );
+
+  const addEmployee = useCallback<SystemContextValue["addEmployee"]>(
+    (input) => {
+      let created: Employee | undefined;
+      update((draft) => {
+        const highest = draft.employees.reduce((top, item) => {
+          const match = /^EMP-(\d+)$/.exec(item.employeeNumber);
+          return match ? Math.max(top, Number(match[1])) : top;
+        }, 0);
+        const employee: Employee = { ...input, id: uid("emp"), employeeNumber: `EMP-${String(highest + 1).padStart(3, "0")}`, status: "Active" };
+        draft.employees.push(employee);
+        created = employee;
+        log(draft, { action: "Employee added", recordType: "Employee", recordRef: employee.employeeNumber, detail: employee.name });
+      });
+      return created;
+    },
+    [log, update],
+  );
+
+  const updateEmployee = useCallback<SystemContextValue["updateEmployee"]>(
+    (id, patch) => {
+      update((draft) => {
+        const employee = draft.employees.find((item) => item.id === id);
+        if (!employee) return;
+        Object.assign(employee, patch);
+        log(draft, { action: "Employee updated", recordType: "Employee", recordRef: employee.employeeNumber, detail: employee.name });
+      });
+    },
+    [log, update],
+  );
+
+  const setEmployeeStatus = useCallback<SystemContextValue["setEmployeeStatus"]>(
+    (id, status) => {
+      update((draft) => {
+        const employee = draft.employees.find((item) => item.id === id);
+        if (!employee) return;
+        employee.status = status;
+        log(draft, { action: `Employee ${status.toLowerCase()}`, recordType: "Employee", recordRef: employee.employeeNumber, detail: employee.name });
+      });
+    },
+    [log, update],
+  );
+
+  const upsertHrAttendance = useCallback<SystemContextValue["upsertHrAttendance"]>(
+    (input) => {
+      update((draft) => {
+        const existing = draft.hrAttendance.find((item) => item.employeeId === input.employeeId && item.date === input.date);
+        if (existing) Object.assign(existing, input);
+        else draft.hrAttendance.unshift({ ...input, id: uid("att") });
+        const employee = draft.employees.find((item) => item.id === input.employeeId);
+        log(draft, { action: "Attendance logged", recordType: "HrAttendance", recordRef: employee?.employeeNumber ?? input.employeeId, detail: `${input.date} · ${input.status}` });
+      });
+    },
+    [log, update],
+  );
+
+  const createLeave = useCallback<SystemContextValue["createLeave"]>(
+    (input) => {
+      let created: LeaveRequest | undefined;
+      update((draft) => {
+        const leave: LeaveRequest = { ...input, id: uid("lv"), reference: nextReference(draft.leaveRequests.map((item) => item.reference), "LVE"), status: "Pending" };
+        draft.leaveRequests.unshift(leave);
+        created = leave;
+        log(draft, { action: "Leave filed", recordType: "Leave", recordRef: leave.reference });
+      });
+      return created;
+    },
+    [log, update],
+  );
+
+  const createCashAdvance = useCallback<SystemContextValue["createCashAdvance"]>(
+    (input) => {
+      let created: CashAdvance | undefined;
+      update((draft) => {
+        const advance: CashAdvance = { ...input, id: uid("ca"), reference: nextReference(draft.cashAdvances.map((item) => item.reference), "CA"), status: "Pending", createdAt: new Date().toISOString() };
+        draft.cashAdvances.unshift(advance);
+        created = advance;
+        log(draft, { action: "Cash advance filed", recordType: "CashAdvance", recordRef: advance.reference });
+      });
+      return created;
+    },
+    [log, update],
+  );
+
+  const decideCashAdvance = useCallback<SystemContextValue["decideCashAdvance"]>(
+    (id, decision) => {
+      update((draft) => {
+        const advance = draft.cashAdvances.find((item) => item.id === id);
+        if (!advance) return;
+        advance.status = decision;
+        advance.decidedAt = new Date().toISOString();
+        advance.decidedBy = actor;
+        log(draft, { action: `Cash advance ${decision.toLowerCase()}`, recordType: "CashAdvance", recordRef: advance.reference });
+      });
+    },
+    [actor, log, update],
+  );
+
   const postAnnouncement = useCallback<SystemContextValue["postAnnouncement"]>(
     (input) => {
       const announcement: Announcement = {
@@ -1572,11 +2044,15 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
         if (!draft.settings.certificateTemplateApproved || !draft.settings.certificateIssuanceEnabled) return;
         if (certificate.status !== "Ready to Print" && certificate.status !== "Printed") return;
         if (!certificate.certificateNumber) {
+          // Per-course-code running sequence, e.g. BST-2026-0001.
+          const prefix = `${enrollment.courseCode}-${new Date().getFullYear()}-`;
           const highest = draft.certificates.reduce((top, item) => {
-            const match = /-(\d{6})$/.exec(item.certificateNumber ?? "");
+            const number = item.certificateNumber ?? "";
+            if (!number.startsWith(prefix)) return top;
+            const match = /-(\d+)$/.exec(number);
             return match ? Math.max(top, Number(match[1])) : top;
           }, 0);
-          certificate.certificateNumber = `NWM-${enrollment.courseCode}-${new Date().getFullYear()}-${String(highest + 1).padStart(6, "0")}`;
+          certificate.certificateNumber = `${prefix}${String(highest + 1).padStart(4, "0")}`;
         }
         if (certificate.status === "Printed") certificate.reprintCount += 1;
         certificate.status = "Printed";
@@ -1631,6 +2107,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
         reason: input.reason,
         requestedBy: input.requestedBy ?? actor,
         status: "Pending",
+        payload: input.payload,
         createdAt: new Date().toISOString(),
       };
       update((draft) => {
@@ -1662,6 +2139,49 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
           if (enrollment) {
             enrollment.status = "Cancelled";
             enrollment.cancelledReason = request.reason;
+          }
+        }
+        // Expense approval now flows through Requests: approving the request
+        // approves the linked voucher, rejecting it rejects the voucher.
+        if (request.type === "Expenses" && request.payload?.expenseId) {
+          const expense = draft.expenses.find((item) => item.id === request.payload?.expenseId);
+          if (expense && (decision === "Approved" || decision === "Rejected")) {
+            expense.status = decision;
+            expense.decidedBy = actor;
+            expense.decidedAt = new Date().toISOString();
+          }
+        }
+        // Releasing a rebate posts the agency discount to the enrollment ledger
+        // only once Accounting approves the request.
+        if (decision === "Approved" && request.type === "Releasing Rebates" && request.enrollmentId) {
+          const enrollment = draft.enrollments.find((item) => item.id === request.enrollmentId);
+          const amountCentavos = Number(request.payload?.amountCentavos ?? "0");
+          if (enrollment && amountCentavos > 0) {
+            draft.ledger.unshift({
+              id: uid("discount"),
+              reference: `DIS-${enrollment.reference}-${draft.ledger.length + 1}`,
+              enrollmentId: enrollment.id,
+              type: "discount",
+              amountCentavos,
+              description: `Marketing agency rebate — ${request.payload?.agencyName ?? "agency"}`,
+              verification: "Not required",
+              recordedBy: actor,
+              recordedAt: new Date().toISOString(),
+              valid: true,
+            });
+          }
+        }
+        // Batch-change requests (Training Ops) apply to a batch on approval.
+        if (decision === "Approved" && request.payload?.batchId) {
+          const batch = draft.batches.find((item) => item.id === request.payload?.batchId);
+          if (batch) {
+            if (request.type === "Change of instructor" && request.payload.value) batch.instructor = request.payload.value;
+            if (request.type === "Change of room" && request.payload.value) batch.venue = request.payload.value;
+            if (request.type === "Batch cancellation") batch.status = "Cancelled";
+            if (request.type === "Batch rescheduling") {
+              if (request.payload.startsOn) batch.startsOn = request.payload.startsOn;
+              if (request.payload.endsOn) batch.endsOn = request.payload.endsOn;
+            }
           }
         }
         const enrollment = draft.enrollments.find((item) => item.id === request.enrollmentId);
@@ -1697,12 +2217,37 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       update((draft) => {
         const period = draft.payrollPeriods.find((item) => item.id === id);
         if (!period) return;
+        const finalizing = period.status === "For review";
         period.status = period.status === "Draft" ? "For review" : "Finalized";
         if (period.status === "Finalized") period.finalizedAt = new Date().toISOString();
+        // Once released, payroll is a real disbursement — post it as a Paid
+        // expense so it flows into the expense/disbursement figures.
+        if (finalizing && period.status === "Finalized") {
+          const net = period.items.reduce((sum, item) => sum + item.grossCentavos - item.deductionCentavos, 0);
+          const year = new Date().getFullYear();
+          const highest = draft.expenses.reduce((top, item) => {
+            const match = new RegExp(`^EXP-${year}-(\\d{4})$`).exec(item.expenseNumber);
+            return match ? Math.max(top, Number(match[1])) : top;
+          }, 0);
+          draft.expenses.unshift({
+            id: uid("exp"),
+            expenseNumber: `EXP-${year}-${String(highest + 1).padStart(4, "0")}`,
+            payee: "Payroll",
+            category: "Payroll",
+            amountCentavos: net,
+            purpose: `Payroll disbursement — ${period.periodNumber}`,
+            status: "Paid",
+            createdAt: new Date().toISOString(),
+            decidedBy: actor,
+            decidedAt: new Date().toISOString(),
+            modeOfPayment: "Bank transfer",
+            requestedBy: actor,
+          });
+        }
         log(draft, { action: `Payroll ${period.status.toLowerCase()}`, recordType: "Payroll", recordRef: period.periodNumber });
       });
     },
-    [log, update],
+    [actor, log, update],
   );
 
   const createExpense = useCallback<SystemContextValue["createExpense"]>(
@@ -1806,6 +2351,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       reviewSelection,
       approveSelection,
       createEnrollment,
+      createEndorsedEnrollment,
       changeEnrollmentBatch,
       setRegistrationStatus,
       generateAdmissionSlip,
@@ -1828,6 +2374,30 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       addOtherCharge,
       updateOtherCharge,
       setOtherChargeActive,
+      addExpenseCategory,
+      updateExpenseCategory,
+      setExpenseCategoryActive,
+      addMonthlyPayable,
+      updateMonthlyPayable,
+      setMonthlyPayableActive,
+      removeMonthlyPayable,
+      addMarketingAgency,
+      updateMarketingAgency,
+      setMarketingAgencyActive,
+      setAgencyCourseRebate,
+      addInstructor,
+      updateInstructor,
+      setInstructorActive,
+      addClassroom,
+      updateClassroom,
+      setClassroomActive,
+      addEmployee,
+      updateEmployee,
+      setEmployeeStatus,
+      upsertHrAttendance,
+      createLeave,
+      createCashAdvance,
+      decideCashAdvance,
       postAnnouncement,
       updateAnnouncement,
       removeAnnouncement,
@@ -1868,6 +2438,30 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       addOtherCharge,
       updateOtherCharge,
       setOtherChargeActive,
+      addExpenseCategory,
+      updateExpenseCategory,
+      setExpenseCategoryActive,
+      addMonthlyPayable,
+      updateMonthlyPayable,
+      setMonthlyPayableActive,
+      removeMonthlyPayable,
+      addMarketingAgency,
+      updateMarketingAgency,
+      setMarketingAgencyActive,
+      setAgencyCourseRebate,
+      addInstructor,
+      updateInstructor,
+      setInstructorActive,
+      addClassroom,
+      updateClassroom,
+      setClassroomActive,
+      addEmployee,
+      updateEmployee,
+      setEmployeeStatus,
+      upsertHrAttendance,
+      createLeave,
+      createCashAdvance,
+      decideCashAdvance,
       advancePayroll,
       postAnnouncement,
       removeAnnouncement,
@@ -1879,6 +2473,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       generateAdmissionSlip,
       createBatch,
       createEnrollment,
+      createEndorsedEnrollment,
       autoOpenMonth,
       createRequest,
       createTrainee,

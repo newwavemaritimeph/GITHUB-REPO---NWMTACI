@@ -185,6 +185,8 @@ export type Enrollment = {
   cashierAssigned?: string;
   /** Registration officer who processed this enrollment (for the leaderboard). */
   processedBy?: string;
+  /** Referring consultancy / marketing agency (for the agency leaderboard). */
+  agencyName?: string;
   registrationReference?: string;
   registrationSubmissionId?: string;
   courseSelectionId?: string;
@@ -259,8 +261,14 @@ export type Certificate = {
 };
 
 export type RequestType =
-  | "Reschedule"
-  | "Course change"
+  | "Rescheduling"
+  | "Change Course"
+  | "Releasing Rebates"
+  | "Expenses"
+  | "Batch rescheduling"
+  | "Batch cancellation"
+  | "Change of instructor"
+  | "Change of room"
   | "Refund"
   | "Record correction"
   | "Make-up class"
@@ -289,11 +297,47 @@ export type Employee = {
   name: string;
   position: string;
   department: string;
-  employmentType: "Regular" | "Probationary" | "Part-time" | "Contract";
+  employmentType: "Regular" | "Probationary" | "Contractual" | "Trainee" | "Part-time" | "Contract";
   monthlyRateCentavos: number;
   dailyRateCentavos: number;
   status: "Active" | "On leave" | "Separated";
   email: string;
+  /** HR account & payroll setup (optional so existing seed stays valid). */
+  dateHired?: string;
+  payFrequency?: "Daily" | "Weekly" | "Semi-Monthly" | "Monthly";
+  basicSalaryCentavos?: number;
+  allowanceCentavos?: number;
+  sssCentavos?: number;
+  pagibigCentavos?: number;
+  philhealthCentavos?: number;
+  /** Simulated portal account (no real auth in the demo). */
+  portalRole?: Role;
+  password?: string;
+};
+
+/** Daily HR attendance: scheduled vs actual time in/out. */
+export type HrAttendanceRecord = {
+  id: string;
+  employeeId: string;
+  date: string;
+  scheduleIn: string;
+  scheduleOut: string;
+  timeIn: string;
+  timeOut: string;
+  status: "Present" | "Late" | "Undertime" | "Absent";
+};
+
+/** Employee cash-advance request routed through HR approval. */
+export type CashAdvance = {
+  id: string;
+  reference: string;
+  employeeId: string;
+  amountCentavos: number;
+  reason: string;
+  status: "Pending" | "Approved" | "Rejected" | "Paid";
+  createdAt: string;
+  decidedAt?: string;
+  decidedBy?: string;
 };
 
 export type LeaveRequest = {
@@ -395,6 +439,12 @@ export type Course = {
   modality: string;
   priceCentavos: number;
   active: boolean;
+  /** Instructions emailed to trainees once enrolled and paid (masterplan course
+   * model). Blank falls back to the generic instruction email. */
+  instructionTemplate?: string;
+  /** Certificate template reference used when New Wave issues the certificate.
+   * Blank means this course has no in-house certificate template yet. */
+  certificateTemplate?: string;
 };
 
 export type PartnerOfferRecord = {
@@ -424,6 +474,60 @@ export type OtherCharge = {
   active: boolean;
 };
 
+/** Admin-managed expense/voucher category catalog, picked when raising a voucher. */
+export type ExpenseCategory = {
+  id: string;
+  name: string;
+  active: boolean;
+};
+
+/** Recurring monthly bill the Accounting Manager tracks (rent, internet, remittances).
+ * Surfaced as a reminder on the Accounting and Admin dashboards. */
+export type MonthlyPayable = {
+  id: string;
+  name: string;
+  category: string;
+  amountCentavos: number;
+  /** Day of the month the bill falls due (1–31). */
+  dueDay: number;
+  active: boolean;
+  notes?: string;
+};
+
+/** Training instructor / trainor with personal details. Selected when scheduling
+ * a batch. */
+export type Instructor = {
+  id: string;
+  name: string;
+  mobile: string;
+  email: string;
+  specialization: string;
+  licenseNumber: string;
+  active: boolean;
+};
+
+/** Physical training room. The batch venue is picked from this list. */
+export type Classroom = {
+  id: string;
+  name: string;
+  capacity: number;
+  /** Instructor assigned to this room (name). */
+  instructor?: string;
+  active: boolean;
+};
+
+/** Admin-managed marketing / referral agencies. Rebates differ per course, so
+ * each agency holds a course-code → peso-rebate map covering the STCW and
+ * in-house catalog. The cashier picks an agency and the rebate for that
+ * enrollment's course is auto-applied as a trainee discount. */
+export type MarketingAgency = {
+  id: string;
+  name: string;
+  /** courseCode → rebate in centavos. Missing course = no rebate (0). */
+  rebates: Record<string, number>;
+  active: boolean;
+};
+
 export type Announcement = {
   id: string;
   title: string;
@@ -443,6 +547,13 @@ export type SystemState = {
   partnerOffers: PartnerOfferRecord[];
   paymentChannels: PaymentChannel[];
   otherCharges: OtherCharge[];
+  expenseCategories: ExpenseCategory[];
+  monthlyPayables: MonthlyPayable[];
+  marketingAgencies: MarketingAgency[];
+  instructors: Instructor[];
+  classrooms: Classroom[];
+  hrAttendance: HrAttendanceRecord[];
+  cashAdvances: CashAdvance[];
   announcements: Announcement[];
   submissions: RegistrationSubmission[];
   courseSelections: CourseSelection[];

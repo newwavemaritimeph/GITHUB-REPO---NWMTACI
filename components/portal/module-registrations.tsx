@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { DataTable, Drawer, EmptyState, Pill, SearchInput, Segmented, StatCard, useToast } from "@/components/ui/kit";
-import { formatDateTime, fullName, useSystem } from "@/lib/system/store";
+import { formatDate, formatDateTime, fullName, useSystem } from "@/lib/system/store";
 import type { RegistrationSubmission, SelectionStatus } from "@/lib/system/types";
 import { pesos } from "@/lib/endorsement-catalog";
 import { PageHeader, Panel, type Module } from "./shared";
@@ -225,15 +225,53 @@ export function RegistrationsModule({ go }: { go: (module: Module) => void }) {
               })}
             </div>
 
-            <h3 className="drawer-section">Consolidated fee</h3>
-            <p className="muted-text">
-              {pesos(
-                activeSelections
-                  .filter((item) => item.status !== "Rejected" && item.status !== "Cancelled")
-                  .reduce((sum, item) => sum + (state.batches.find((batch) => batch.id === item.batchId)?.feeCentavos ?? 0), 0),
-              )}{" "}
-              across {activeSelections.filter((item) => item.status !== "Rejected" && item.status !== "Cancelled").length} course(s).
-            </p>
+            <h3 className="drawer-section">Consolidated same-day invoice</h3>
+            {(() => {
+              const billable = activeSelections.filter((item) => item.status !== "Rejected" && item.status !== "Cancelled");
+              if (billable.length === 0) {
+                return <p className="muted-text">No billable courses in this submission yet.</p>;
+              }
+              // Group by the batch start date so courses beginning the same day bill
+              // as one invoice; open/unscheduled selections fall under "Open schedule".
+              const groups = new Map<string, { label: string; lines: { name: string; fee: number }[]; subtotal: number }>();
+              for (const item of billable) {
+                const batch = state.batches.find((entry) => entry.id === item.batchId);
+                const key = batch?.startsOn ?? "open";
+                const label = batch?.startsOn ? formatDate(batch.startsOn) : "Open schedule";
+                const fee = batch?.feeCentavos ?? 0;
+                const group = groups.get(key) ?? { label, lines: [], subtotal: 0 };
+                group.lines.push({ name: item.courseName, fee });
+                group.subtotal += fee;
+                groups.set(key, group);
+              }
+              const days = Array.from(groups.entries()).sort(([a], [b]) => a.localeCompare(b));
+              const grandTotal = days.reduce((sum, [, group]) => sum + group.subtotal, 0);
+              return (
+                <div className="consolidated-invoice">
+                  {days.map(([key, group]) => (
+                    <div key={key} className="consolidated-invoice-day">
+                      <div className="consolidated-invoice-day-head">
+                        <strong>{group.label}</strong>
+                        {days.length > 1 && <small>{pesos(group.subtotal)}</small>}
+                      </div>
+                      {group.lines.map((line, index) => (
+                        <div key={index} className="consolidated-invoice-line">
+                          <span>{line.name}</span>
+                          <span>{pesos(line.fee)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                  <div className="consolidated-invoice-total">
+                    <span>
+                      Total · {billable.length} course{billable.length === 1 ? "" : "s"}
+                      {days.length > 1 ? ` across ${days.length} start dates` : ""}
+                    </span>
+                    <strong>{pesos(grandTotal)}</strong>
+                  </div>
+                </div>
+              );
+            })()}
 
             <div className="drawer-actions">
               <button className="secondary-button" onClick={() => go("Enrollments")}>

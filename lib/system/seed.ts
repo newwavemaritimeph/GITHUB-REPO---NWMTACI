@@ -8,7 +8,12 @@ import type {
   Announcement,
   Course,
   Enrollment,
+  Classroom,
+  ExpenseCategory,
+  MonthlyPayable,
+  Instructor,
   LedgerEntry,
+  MarketingAgency,
   OtherCharge,
   PartnerOfferRecord,
   PaymentChannel,
@@ -16,7 +21,7 @@ import type {
   Trainee,
 } from "./types";
 
-export const SYSTEM_VERSION = 11;
+export const SYSTEM_VERSION = 18;
 
 function startOfToday() {
   const now = new Date();
@@ -132,9 +137,9 @@ export function createSeedState(): SystemState {
   ];
 
   const enrollments: Enrollment[] = [
-    { id: "e1", reference: "ENR-2026-000101", registrationStatus: "Enrolled", traineeId: "t1", batchId: "b1", courseCode: "CCMI", courseName: batches[0].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-40, 10), processedBy: "Karen Mallari", registrationReference: "REG-2026-000201", instructionsSentAt: stamp(-32, 9), instructionsAcknowledgedAt: stamp(-31, 20), completedAt: stamp(-12, 9) },
-    { id: "e2", reference: "ENR-2026-000102", registrationStatus: "Enrolled", traineeId: "t2", batchId: "b2", courseCode: "PSCMHBT", courseName: batches[1].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-30, 11), processedBy: "April Cantoneros", registrationReference: "REG-2026-000202", instructionsSentAt: stamp(-14, 9), instructionsAcknowledgedAt: stamp(-13, 21) },
-    { id: "e3", reference: "ENR-2026-000103", registrationStatus: "Generated Voucher", traineeId: "t4", batchId: "b3", courseCode: "CCMD", courseName: batches[2].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-18, 15), processedBy: "Kathleen Garcia", registrationReference: "REG-2026-000203", instructionsSentAt: stamp(-8, 9), instructionsAcknowledgedAt: stamp(-7, 19) },
+    { id: "e1", reference: "ENR-2026-000101", registrationStatus: "Enrolled", traineeId: "t1", batchId: "b1", courseCode: "CCMI", courseName: batches[0].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-40, 10), processedBy: "Karen Mallari", registrationReference: "REG-2026-000201", agencyName: "Seafront Manning Agency", instructionsSentAt: stamp(-32, 9), instructionsAcknowledgedAt: stamp(-31, 20), completedAt: stamp(-12, 9) },
+    { id: "e2", reference: "ENR-2026-000102", registrationStatus: "Enrolled", traineeId: "t2", batchId: "b2", courseCode: "PSCMHBT", courseName: batches[1].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-30, 11), processedBy: "April Cantoneros", registrationReference: "REG-2026-000202", agencyName: "OceanLink Crewing Services", instructionsSentAt: stamp(-14, 9), instructionsAcknowledgedAt: stamp(-13, 21) },
+    { id: "e3", reference: "ENR-2026-000103", registrationStatus: "Generated Voucher", traineeId: "t4", batchId: "b3", courseCode: "CCMD", courseName: batches[2].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-18, 15), processedBy: "Kathleen Garcia", registrationReference: "REG-2026-000203", agencyName: "Seafront Manning Agency", instructionsSentAt: stamp(-8, 9), instructionsAcknowledgedAt: stamp(-7, 19) },
     { id: "e4", reference: "ENR-2026-000104", registrationStatus: "Waiting for Payment", traineeId: "t5", batchId: "b4", courseCode: "SSO", courseName: batches[3].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-10, 9), processedBy: "April Cantoneros", registrationReference: "REG-2026-000204", instructionsSentAt: stamp(-3, 9) },
     { id: "e5", reference: "ENR-2026-000105", registrationStatus: "Waiting for Payment", traineeId: "t6", batchId: "b5", courseCode: "CCMI", courseName: batches[4].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-6, 14), processedBy: "Karen Mallari", registrationReference: "REG-2026-000205" },
     { id: "e6", reference: "ENR-2026-000106", registrationStatus: "Reschedule", traineeId: "t3", batchId: "b6", courseCode: "SATSDSD", courseName: batches[5].courseName, centerName: "New Wave Maritime", status: "Pending", createdAt: stamp(-2, 11), processedBy: "Kathleen Garcia", registrationReference: "REG-2026-000206" },
@@ -264,6 +269,47 @@ export function createSeedState(): SystemState {
     { id: "oc-makeup", name: "Make-Up Class", defaultAmountCentavos: 50000, active: true },
   ];
 
+  const expenseCategories: ExpenseCategory[] = [
+    { id: "ec-supplies", name: "Supplies", active: true },
+    { id: "ec-utilities", name: "Utilities", active: true },
+    { id: "ec-repairs", name: "Repairs & Maintenance", active: true },
+    { id: "ec-representation", name: "Representation", active: true },
+    { id: "ec-transportation", name: "Transportation", active: true },
+    { id: "ec-professional", name: "Professional Fees", active: true },
+    { id: "ec-others", name: "Others", active: true },
+  ];
+
+  const monthlyPayables: MonthlyPayable[] = [
+    { id: "mp-rent", name: "Office rent — Bel-Air Apartment", category: "Rent", amountCentavos: 4500000, dueDay: 5, active: true, notes: "Room 103 lease" },
+    { id: "mp-internet", name: "Internet & telephone (PLDT)", category: "Utilities", amountCentavos: 350000, dueDay: 10, active: true },
+    { id: "mp-electric", name: "Electricity (Meralco)", category: "Utilities", amountCentavos: 900000, dueDay: 18, active: true },
+    { id: "mp-water", name: "Water (Maynilad)", category: "Utilities", amountCentavos: 180000, dueDay: 18, active: true },
+    { id: "mp-remit", name: "SSS / Pag-IBIG / PhilHealth remittance", category: "Government", amountCentavos: 2500000, dueDay: 30, active: true, notes: "Employer share + employee deductions" },
+  ];
+
+  // Rebates differ per course and per agency. Seed each agency with example
+  // rebates across the first several catalog courses; the Admin fills the rest.
+  const rebatesFor = (perCourse: number, span: number, step: number): Record<string, number> =>
+    Object.fromEntries(courses.slice(0, span).map((course, index) => [course.code, perCourse + index * step]));
+  const instructors: Instructor[] = [
+    { id: "ins-aquino", name: "Capt. Ruel Aquino", mobile: "0917-100-2001", email: "r.aquino@newwave.example", specialization: "Deck / Bridge simulation", licenseNumber: "MST-0011-2019", active: true },
+    { id: "ins-delacruz", name: "C/E Mario Dela Cruz", mobile: "0917-100-2002", email: "m.delacruz@newwave.example", specialization: "Engine / ERM", licenseNumber: "MST-0044-2020", active: true },
+    { id: "ins-reyes", name: "Ms. Andrea Reyes", mobile: "0917-100-2003", email: "a.reyes@newwave.example", specialization: "Safety & survival", licenseNumber: "MST-0102-2021", active: true },
+  ];
+
+  const classrooms: Classroom[] = [
+    { id: "room-301", name: "Room 301", capacity: 24, active: true },
+    { id: "room-302", name: "Room 302", capacity: 24, active: true },
+    { id: "room-sim", name: "Simulation Lab", capacity: 16, active: true },
+    { id: "room-pool", name: "Survival Pool", capacity: 20, active: true },
+  ];
+
+  const marketingAgencies: MarketingAgency[] = [
+    { id: "ma-seafront", name: "Seafront Manning Agency", rebates: rebatesFor(50000, 8, 5000), active: true },
+    { id: "ma-oceanlink", name: "OceanLink Crewing Services", rebates: rebatesFor(30000, 6, 4000), active: true },
+    { id: "ma-harborgate", name: "Harborgate Recruitment", rebates: rebatesFor(20000, 5, 2500), active: true },
+  ];
+
   const announcements: Announcement[] = [
     {
       id: "ann1",
@@ -283,6 +329,11 @@ export function createSeedState(): SystemState {
     partnerOffers,
     paymentChannels,
     otherCharges,
+    expenseCategories,
+    monthlyPayables,
+    marketingAgencies,
+    instructors,
+    classrooms,
     announcements,
     submissions: [
       { id: "sub1", reference: "NWM-REG-2026-000208", applicant: { firstName: "Miguel", lastName: "Torres", birthDate: "1995-05-05", gender: "Male", nationality: "Filipino", civilStatus: "Single", email: "miguel.torres@example.com", mobile: "09181234567", address: "Las Pinas City", srn: "1005500881", seafarerStatus: "Active seafarer", rank: "Able Seaman", emergencyContactName: "Rita Torres", emergencyContactRelation: "Spouse", emergencyContactMobile: "09181234500", sourceOfInquiry: "Facebook" }, status: "Submitted", publicStatusMessage: "Your registration form has been received.", submittedAt: stamp(0, 8, 42) },
@@ -305,18 +356,29 @@ export function createSeedState(): SystemState {
     attendanceRecords,
     certificates,
     requests: [
-      { id: "q1", reference: "REQ-2026-000041", type: "Reschedule", enrollmentId: "e5", traineeName: "Leo Ramos", reason: "Vessel joining date moved to next month.", requestedBy: "Enrollment status page", status: "Pending", createdAt: stamp(-1, 9) },
+      { id: "q1", reference: "REQ-2026-000041", type: "Rescheduling", enrollmentId: "e5", traineeName: "Leo Ramos", reason: "Vessel joining date moved to next month.", requestedBy: "Enrollment status page", status: "Pending", createdAt: stamp(-1, 9) },
       { id: "q2", reference: "REQ-2026-000042", type: "Record correction", enrollmentId: "e4", traineeName: "Liza Flores", reason: "Middle name spelling on record.", requestedBy: "Registration", status: "Pending", createdAt: stamp(0, 8) },
       { id: "q3", reference: "REQ-2026-000043", type: "Refund", enrollmentId: "e6", traineeName: "Renato Villanueva", reason: "Company cancelled the deployment.", requestedBy: "Enrollment status page", status: "For clarification", remarks: "Please attach the company advisory.", createdAt: stamp(-2, 13) },
       { id: "q4", reference: "REQ-2026-000044", type: "Make-up class", enrollmentId: "e2", traineeName: "Maria Santos", reason: "Missed practical session due to illness.", requestedBy: "Instructor", status: "Approved", remarks: "Scheduled with the next AFF batch.", createdAt: stamp(-5, 10), decidedAt: stamp(-4, 11), decidedBy: "Training Operations" },
     ],
     employees: [
-      { id: "emp1", employeeNumber: "EMP-001", name: "Jocelyn Eala", position: "Center Administrator", department: "Administration", employmentType: "Regular", monthlyRateCentavos: 6500000, dailyRateCentavos: 295000, status: "Active", email: "jocelyn@newwave.example" },
-      { id: "emp2", employeeNumber: "EMP-004", name: "Capt. Ruel Aquino", position: "Senior Instructor", department: "Training", employmentType: "Regular", monthlyRateCentavos: 7200000, dailyRateCentavos: 327000, status: "Active", email: "ruel@newwave.example" },
-      { id: "emp3", employeeNumber: "EMP-007", name: "Engr. Dan Cruz", position: "Instructor", department: "Training", employmentType: "Regular", monthlyRateCentavos: 6200000, dailyRateCentavos: 281000, status: "Active", email: "dan@newwave.example" },
-      { id: "emp4", employeeNumber: "EMP-011", name: "Sheila Bautista", position: "Cashier", department: "Finance", employmentType: "Regular", monthlyRateCentavos: 3200000, dailyRateCentavos: 145000, status: "Active", email: "sheila@newwave.example" },
-      { id: "emp5", employeeNumber: "EMP-014", name: "Marvin Ocampo", position: "Registration Officer", department: "Registration", employmentType: "Probationary", monthlyRateCentavos: 2800000, dailyRateCentavos: 127000, status: "Active", email: "marvin@newwave.example" },
-      { id: "emp6", employeeNumber: "EMP-019", name: "Dr. Vina Lopez", position: "Medical Instructor", department: "Training", employmentType: "Part-time", monthlyRateCentavos: 0, dailyRateCentavos: 350000, status: "Active", email: "vina@newwave.example" },
+      { id: "emp1", employeeNumber: "EMP-001", name: "Jocelyn Eala", position: "Center Administrator", department: "Administration", employmentType: "Regular", monthlyRateCentavos: 6500000, dailyRateCentavos: 295000, status: "Active", email: "jocelyn@newwave.example", dateHired: "2021-02-01", payFrequency: "Semi-Monthly", basicSalaryCentavos: 6500000, allowanceCentavos: 300000, sssCentavos: 135000, pagibigCentavos: 20000, philhealthCentavos: 120000 },
+      { id: "emp2", employeeNumber: "EMP-004", name: "Capt. Ruel Aquino", position: "Senior Instructor", department: "Training", employmentType: "Regular", monthlyRateCentavos: 7200000, dailyRateCentavos: 327000, status: "Active", email: "ruel@newwave.example", dateHired: "2020-06-15", payFrequency: "Semi-Monthly", basicSalaryCentavos: 7200000, allowanceCentavos: 400000, sssCentavos: 135000, pagibigCentavos: 20000, philhealthCentavos: 135000 },
+      { id: "emp3", employeeNumber: "EMP-007", name: "Engr. Dan Cruz", position: "Instructor", department: "Training", employmentType: "Regular", monthlyRateCentavos: 6200000, dailyRateCentavos: 281000, status: "Active", email: "dan@newwave.example", dateHired: "2022-03-01", payFrequency: "Semi-Monthly", basicSalaryCentavos: 6200000, allowanceCentavos: 300000, sssCentavos: 135000, pagibigCentavos: 20000, philhealthCentavos: 115000 },
+      { id: "emp4", employeeNumber: "EMP-011", name: "Sheila Bautista", position: "Cashier", department: "Finance", employmentType: "Regular", monthlyRateCentavos: 3200000, dailyRateCentavos: 145000, status: "Active", email: "sheila@newwave.example", dateHired: "2023-08-01", payFrequency: "Semi-Monthly", basicSalaryCentavos: 3200000, allowanceCentavos: 200000, sssCentavos: 128000, pagibigCentavos: 20000, philhealthCentavos: 60000 },
+      { id: "emp5", employeeNumber: "EMP-014", name: "Marvin Ocampo", position: "Registration Officer", department: "Registration", employmentType: "Probationary", monthlyRateCentavos: 2800000, dailyRateCentavos: 127000, status: "Active", email: "marvin@newwave.example", dateHired: "2026-05-01", payFrequency: "Semi-Monthly", basicSalaryCentavos: 2800000, allowanceCentavos: 150000, sssCentavos: 112000, pagibigCentavos: 20000, philhealthCentavos: 52500 },
+      { id: "emp6", employeeNumber: "EMP-019", name: "Dr. Vina Lopez", position: "Medical Instructor", department: "Training", employmentType: "Part-time", monthlyRateCentavos: 0, dailyRateCentavos: 350000, status: "Active", email: "vina@newwave.example", dateHired: "2024-01-10", payFrequency: "Daily", basicSalaryCentavos: 0, allowanceCentavos: 0, sssCentavos: 0, pagibigCentavos: 20000, philhealthCentavos: 0 },
+    ],
+    hrAttendance: [
+      { id: "att1", employeeId: "emp1", date: day(0), scheduleIn: "08:00", scheduleOut: "17:00", timeIn: "07:55", timeOut: "17:05", status: "Present" },
+      { id: "att2", employeeId: "emp2", date: day(0), scheduleIn: "08:00", scheduleOut: "17:00", timeIn: "08:18", timeOut: "17:02", status: "Late" },
+      { id: "att3", employeeId: "emp3", date: day(0), scheduleIn: "08:00", scheduleOut: "17:00", timeIn: "07:58", timeOut: "16:40", status: "Undertime" },
+      { id: "att4", employeeId: "emp4", date: day(-1), scheduleIn: "08:00", scheduleOut: "17:00", timeIn: "07:50", timeOut: "17:10", status: "Present" },
+      { id: "att5", employeeId: "emp5", date: day(-1), scheduleIn: "08:00", scheduleOut: "17:00", timeIn: "", timeOut: "", status: "Absent" },
+    ],
+    cashAdvances: [
+      { id: "ca1", reference: "CA-2026-000003", employeeId: "emp4", amountCentavos: 500000, reason: "Medical expense, payable next cutoff.", status: "Pending", createdAt: stamp(-1, 9) },
+      { id: "ca2", reference: "CA-2026-000004", employeeId: "emp3", amountCentavos: 300000, reason: "Transportation advance.", status: "Approved", createdAt: stamp(-4, 14), decidedAt: stamp(-3, 10), decidedBy: "HR" },
     ],
     leaveRequests: [
       { id: "lv1", reference: "LVE-2026-000018", employeeId: "emp3", leaveType: "Vacation", startsOn: day(9), endsOn: day(12), reason: "Family trip.", status: "Pending" },

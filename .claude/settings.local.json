@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"C:/Users/Kate Esguerra/Desktop/GITHUB-REPO---NWMTACI-main\" status)",
+      "Bash(npm run *)",
+      "Bash(echo \"started pid $!\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/)",
+      "Bash(cd \"C:/Users/Kate Esguerra/Desktop/GITHUB-REPO---NWMTACI-main\" && echo \"=== CertificateStatus ===\"; grep -rn \"CertificateStatus\\\\s*=\" lib/*.ts lib/system/*.ts; echo \"=== printCertificate numbering ===\"; sed -n '/const printCertificate = useCallback/,/^  \\);/p' lib/system/store.tsx | head -30; echo \"=== Batch type fields ===\"; sed -n '/export type Batch = {/,/};/p' lib/system/types.ts)",
+      "Bash(grep -v \"//\")",
+      "Bash(grep -aB3 \"never used\\\\|no-unused-vars\")"
+    ]
+  }
+}

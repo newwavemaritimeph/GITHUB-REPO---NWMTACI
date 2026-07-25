@@ -15,9 +15,17 @@ export type Module =
   | "Accounting"
   | "Instructions"
   | "Attendance"
+  | "Instructors"
+  | "Classrooms"
+  | "Training setup"
   | "Certificates"
   | "Requests"
   | "HR & payroll"
+  | "User setup"
+  | "Payroll"
+  | "Request"
+  | "Search trainee"
+  | "Setup"
   | "Reports"
   | "Settings";
 

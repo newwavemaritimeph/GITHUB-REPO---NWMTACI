@@ -15,12 +15,32 @@ import {
   useToast,
 } from "@/components/ui/kit";
 import { pesos } from "@/lib/endorsement-catalog";
+import { downloadCsv } from "@/lib/csv";
+import { createAdmissionInvoicePdf } from "@/lib/documents";
 import { formatDate, formatDateRange, formatDateTime, formatTime, fullName, todayIso, useSystem } from "@/lib/system/store";
 import type { EnrollmentView, RegistrationLifecycle, Role, RequestType } from "@/lib/system/types";
 import { PageHeader, Panel, StageBadge, StageTrack, type Module } from "./shared";
 
 const filters = ["All", "Unpaid", "Awaiting verification", "Ready for instructions", "In training", "Completed"] as const;
 const REGISTRATION_STATUSES: RegistrationLifecycle[] = ["Waiting for Payment", "Enrolled", "Reschedule", "Generated Voucher", "Cancelled"];
+
+/** Fetch the New Wave logo PNG for embedding in generated PDFs (optional). */
+async function fetchLogoBytes(): Promise<Uint8Array | undefined> {
+  try {
+    return new Uint8Array(await (await fetch("/new-wave-logo.png")).arrayBuffer());
+  } catch {
+    return undefined;
+  }
+}
+
+function triggerPdfDownload(bytes: Uint8Array, filename: string) {
+  const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "application/pdf" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
 
 export function EnrollmentsModule({
   role,
@@ -45,6 +65,7 @@ export function EnrollmentsModule({
     setRegistrationStatus,
     generateAdmissionSlip,
     createEnrollment,
+    createEndorsedEnrollment,
     addLedgerEntry,
     createRequest,
   } = useSystem();
@@ -53,14 +74,16 @@ export function EnrollmentsModule({
   const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<string | null>(focusId ?? null);
   const [payFor, setPayFor] = useState<EnrollmentView | null>(null);
+  const [splitFor, setSplitFor] = useState<EnrollmentView | null>(null);
   const [newOpen, setNewOpen] = useState(false);
   const [editFor, setEditFor] = useState<EnrollmentView | null>(null);
   const [editBatchId, setEditBatchId] = useState("");
   const [slipFor, setSlipFor] = useState<EnrollmentView | null>(null);
   const [chargeFor, setChargeFor] = useState<EnrollmentView | null>(null);
+  const [agencyFor, setAgencyFor] = useState<EnrollmentView | null>(null);
   // Registration cannot open the Requests module, so changes are raised from here.
   const [requestFor, setRequestFor] = useState<EnrollmentView | null>(null);
-  const [requestType, setRequestType] = useState<RequestType>("Reschedule");
+  const [requestType, setRequestType] = useState<RequestType>("Rescheduling");
   const [requestReason, setRequestReason] = useState("");
   const [fromDate, setFromDate] = useState(todayIso());
   const [toDate, setToDate] = useState(todayIso());
@@ -97,6 +120,66 @@ export function EnrollmentsModule({
           </button>
         }
       />
+
+      {(() => {
+        // Daily summary of the currently filtered enrollments: Trainee > Course >
+        // Payment status, grouped by the day each enrollment was created.
+        const groups = new Map<string, EnrollmentView[]>();
+        for (const item of rows) {
+          const day = item.enrollment.createdAt.slice(0, 10);
+          const list = groups.get(day) ?? [];
+          list.push(item);
+          groups.set(day, list);
+        }
+        const days = Array.from(groups.entries()).sort(([a], [b]) => b.localeCompare(a));
+        if (days.length === 0) return null;
+        const tone = (status: string) =>
+          status === "Paid" ? "green" : status === "Partially Paid" ? "amber" : status === "Cancelled" ? "red" : "slate";
+        return (
+          <Panel
+            title="Daily enrollments summary"
+            description="Trainee · Course · Payment status, grouped by enrollment date."
+            action={
+              <button
+                className="secondary-button"
+                onClick={() =>
+                  downloadCsv(`daily-enrollments-${fromDate}-to-${toDate}.csv`, [
+                    ["Date", "Trainee", "Trainee number", "Course", "Payment status", "Balance"],
+                    ...rows.map((item) => [
+                      item.enrollment.createdAt.slice(0, 10),
+                      fullName(item.trainee),
+                      item.trainee.traineeNumber,
+                      item.enrollment.courseName,
+                      item.paymentStatus,
+                      (item.balanceCentavos / 100).toFixed(2),
+                    ]),
+                  ])
+                }
+              >
+                Download CSV
+              </button>
+            }
+          >
+            <div className="daily-enrollments">
+              {days.map(([day, items]) => (
+                <div key={day} className="daily-enrollments-day">
+                  <div className="daily-enrollments-head">
+                    <strong>{formatDate(day)}</strong>
+                    <small>{items.length} enrollment{items.length === 1 ? "" : "s"}</small>
+                  </div>
+                  {items.map((item) => (
+                    <div key={item.enrollment.id} className="daily-enrollments-row">
+                      <span className="daily-enrollments-name">{fullName(item.trainee)}</span>
+                      <span className="daily-enrollments-course">{item.enrollment.courseName}</span>
+                      <Pill tone={tone(item.paymentStatus)}>{item.paymentStatus}</Pill>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          </Panel>
+        );
+      })()}
 
       <Panel padded={false}>
         <div className="toolbar toolbar-wrap">
@@ -267,20 +350,36 @@ export function EnrollmentsModule({
                 </button>
               )}
               {canRecordPayment && (
+                <button className="secondary-button" onClick={() => setSplitFor(active)}>
+                  Split payment
+                </button>
+              )}
+              {canRecordPayment && (
                 <button className="secondary-button" onClick={() => setChargeFor(active)}>
                   Add charge
                 </button>
               )}
-              <button
-                className="secondary-button"
-                disabled={active.paymentStatus !== "Paid" || Boolean(active.enrollment.instructionsSentAt)}
-                onClick={() => {
-                  sendInstructions(active.enrollment.id);
-                  toast("success", "Training instructions sent to the trainee portal.");
-                }}
-              >
-                Send instructions
-              </button>
+              {canRecordPayment && (
+                <button
+                  className="secondary-button"
+                  disabled={active.balanceCentavos === 0}
+                  onClick={() => setAgencyFor(active)}
+                >
+                  Apply agency rebate
+                </button>
+              )}
+              {role !== "Cashier" && (
+                <button
+                  className="secondary-button"
+                  disabled={active.paymentStatus === "Unpaid" || Boolean(active.enrollment.instructionsSentAt)}
+                  onClick={() => {
+                    sendInstructions(active.enrollment.id);
+                    toast("success", "Training instructions sent to the trainee portal.");
+                  }}
+                >
+                  {active.enrollment.instructionsSentAt ? "Instructions sent" : "Send instructions"}
+                </button>
+              )}
               {active.enrollment.status !== "Cancelled" && (
                 <button
                   className="secondary-button"
@@ -297,16 +396,18 @@ export function EnrollmentsModule({
                   className="secondary-button"
                   onClick={() => {
                     setRequestFor(active);
-                    setRequestType("Reschedule");
+                    setRequestType("Rescheduling");
                     setRequestReason("");
                   }}
                 >
                   Request a change
                 </button>
               )}
-              <button className="secondary-button" onClick={() => setSlipFor(active)}>
-                Admission slip
-              </button>
+              {canRecordPayment && (
+                <button className="secondary-button" onClick={() => setSlipFor(active)}>
+                  Admission slip + invoice
+                </button>
+              )}
               {active.enrollment.status !== "Cancelled" && (
                 <button
                   className="danger-button"
@@ -387,6 +488,38 @@ export function EnrollmentsModule({
         }}
       />
 
+      {splitFor && (
+        <SplitPaymentModal
+          key={splitFor.enrollment.id}
+          trainee={splitFor.trainee}
+          enrollments={all.filter(
+            (item) => item.trainee.id === splitFor.trainee.id && item.balanceCentavos > 0 && item.enrollment.status !== "Cancelled",
+          )}
+          channels={state.paymentChannels.filter((channel) => channel.active)}
+          onClose={() => setSplitFor(null)}
+          onSubmit={({ allocations, method, referenceNumber, needsVerification }) => {
+            let posted = 0;
+            for (const allocation of allocations) {
+              const entry = recordPayment({
+                enrollmentId: allocation.enrollmentId,
+                amountCentavos: allocation.amountCentavos,
+                method,
+                receivingAccount: method,
+                referenceNumber,
+                needsVerification,
+                description: `Split payment across ${allocations.length} courses · ref ${referenceNumber || "cash"}`,
+              });
+              if (entry) posted += 1;
+            }
+            toast(
+              "success",
+              `Split payment allocated to ${posted} course${posted === 1 ? "" : "s"}${referenceNumber ? ` under reference ${referenceNumber}` : ""}.`,
+            );
+            setSplitFor(null);
+          }}
+        />
+      )}
+
       <Modal
         open={Boolean(requestFor)}
         title="Request a change"
@@ -420,9 +553,9 @@ export function EnrollmentsModule({
         <div className="form-grid">
           <Field label="What is being requested?" full>
             <select value={requestType} onChange={(event) => setRequestType(event.target.value as RequestType)}>
-              <option>Reschedule</option>
+              <option>Rescheduling</option>
               <option>Make-up class</option>
-              <option>Course change</option>
+              <option>Change Course</option>
             </select>
           </Field>
           <Field label="Reason" full hint="Approved by Accounting. The reason is kept on the immutable request history.">
@@ -500,16 +633,38 @@ export function EnrollmentsModule({
         />
       )}
 
+      {agencyFor && (
+        <AgencyRebateModal
+          key={agencyFor.enrollment.id}
+          view={agencyFor}
+          agencies={state.marketingAgencies.filter((agency) => agency.active)}
+          onClose={() => setAgencyFor(null)}
+          onApply={(name, amountCentavos) => {
+            // Releasing a rebate requires Accounting approval — raise a request;
+            // the discount posts when the request is approved.
+            createRequest({
+              type: "Releasing Rebates",
+              enrollmentId: agencyFor.enrollment.id,
+              traineeName: fullName(agencyFor.trainee),
+              reason: `${pesos(amountCentavos)} rebate from ${name} for ${agencyFor.enrollment.courseName}`,
+              payload: { enrollmentId: agencyFor.enrollment.id, amountCentavos: String(amountCentavos), agencyName: name },
+            });
+            toast("success", `Rebate release requested — awaiting Accounting approval.`);
+          }}
+        />
+      )}
+
       {slipFor && (
-        <AdmissionSlipModal
+        <AdmissionInvoiceModal
           key={slipFor.enrollment.id}
           view={slipFor}
           defaultOfficer={slipFor.enrollment.processedBy || actor}
+          defaultCashier={actor}
           session={state.attendanceSessions.find((item) => item.batchId === slipFor.enrollment.batchId)}
           onClose={() => setSlipFor(null)}
           onGenerate={(officer, cashier) => {
             generateAdmissionSlip(slipFor.enrollment.id, { officer, cashier });
-            toast("success", "Admission slip generated — status set to Generated Voucher.");
+            toast("success", "Admission slip & invoice generated — status set to Generated Voucher.");
           }}
         />
       )}
@@ -517,8 +672,10 @@ export function EnrollmentsModule({
       <NewEnrollmentModal
         open={newOpen}
         onClose={() => setNewOpen(false)}
-        onCreate={(traineeId, batchId) => {
-          const enrollment = createEnrollment({ traineeId, batchId });
+        onCreate={({ traineeId, batchId, offerId }) => {
+          const enrollment = offerId
+            ? createEndorsedEnrollment({ traineeId, offerId })
+            : createEnrollment({ traineeId, batchId: batchId ?? "" });
           if (enrollment) {
             toast("success", `${enrollment.reference} created.`);
             setOpenId(enrollment.id);
@@ -529,6 +686,7 @@ export function EnrollmentsModule({
         batches={state.batches.filter(
           (batch) => (batch.status === "Open" || batch.status === "Draft") && batch.startsOn >= todayIso(),
         )}
+        offers={state.partnerOffers.filter((offer) => offer.active)}
         seats={seats}
       />
     </div>
@@ -558,7 +716,6 @@ export function PaymentModal({
   const money = useMoneyInput(target ? (target.balanceCentavos / 100).toFixed(2) : "");
   const [method, setMethod] = useState<string>(channels[0]?.name ?? "Cash");
   const [reference, setReference] = useState("");
-  const [account, setAccount] = useState("Main cashier");
   const [remarks, setRemarks] = useState("");
 
   const selectedChannel = channels.find((channel) => channel.name === method);
@@ -586,9 +743,10 @@ export function PaymentModal({
                 enrollmentId: target.enrollment.id,
                 amountCentavos: amount,
                 method,
-                receivingAccount: account,
+                receivingAccount: method,
                 referenceNumber: requiresRef ? reference.trim() : undefined,
-                needsVerification: requiresRef,
+                // Cashier-recorded payments post immediately — no approval step.
+                needsVerification: false,
                 remarks: remarks.trim() || undefined,
               });
               money.reset();
@@ -596,7 +754,7 @@ export function PaymentModal({
               setRemarks("");
             }}
           >
-            {requiresRef ? "Submit for verification" : "Post payment"}
+            Post payment
           </button>
         </>
       }
@@ -605,19 +763,11 @@ export function PaymentModal({
         <Field label="Amount (PHP)" hint={target ? `Maximum ${pesos(target.balanceCentavos)}` : undefined}>
           <input inputMode="decimal" value={money.raw} onChange={(event) => money.setRaw(event.target.value)} placeholder="0.00" />
         </Field>
-        <Field label="Method">
+        <Field label="Payment channel" hint="Channels are configured by the Admin under Payment channels.">
           <select value={method} onChange={(event) => setMethod(event.target.value)}>
             {channels.map((channel) => (
               <option key={channel.id}>{channel.name}</option>
             ))}
-          </select>
-        </Field>
-        <Field label="Receiving account">
-          <select value={account} onChange={(event) => setAccount(event.target.value)}>
-            <option>Main cashier</option>
-            <option>GCash 0917-000-0000</option>
-            <option>BDO 0012-3456-7890</option>
-            <option>BPI 4491-0022-11</option>
           </select>
         </Field>
         <Field label="Transaction reference" hint={requiresRef ? "Type or scan the reference — no screenshot needed" : "Not required for cash"}>
@@ -627,11 +777,10 @@ export function PaymentModal({
           <input value={remarks} onChange={(event) => setRemarks(event.target.value)} placeholder="Optional note for this payment" />
         </Field>
         <div className="form-full inline-note note-blue">
-          <strong>{requiresRef ? `${method} payments require verification` : `${method} is posted immediately`}</strong>
+          <strong>{method} is posted immediately</strong>
           <p>
-            {requiresRef
-              ? "The payment appears under Payments → Verification queue. The receipt is issued only after a cashier confirms the reference against the proof."
-              : "An official receipt number is issued as soon as the payment is posted."}
+            An official receipt number is issued as soon as the payment is posted — no separate approval step.
+            {requiresRef ? " Record the transaction reference for the account trail." : ""}
           </p>
         </div>
       </div>
@@ -707,28 +856,300 @@ function AddChargeModal({
   );
 }
 
-function AdmissionSlipModal({
+/**
+ * Cashier applies a marketing agency's rebate as a trainee discount. Selecting
+ * the agency auto-detects the amount (capped at the outstanding balance) and
+ * shows the resulting balance before it is posted to the ledger.
+ */
+function AgencyRebateModal({
+  view,
+  agencies,
+  onClose,
+  onApply,
+}: {
+  view: EnrollmentView;
+  agencies: { id: string; name: string; rebates: Record<string, number> }[];
+  onClose: () => void;
+  onApply: (name: string, amountCentavos: number) => void;
+}) {
+  const courseCode = view.enrollment.courseCode;
+  const [agencyId, setAgencyId] = useState(agencies[0]?.id ?? "");
+  const selected = agencies.find((agency) => agency.id === agencyId);
+  const courseRebate = selected ? selected.rebates[courseCode] ?? 0 : 0;
+  // Never discount more than the trainee still owes.
+  const amount = Math.min(courseRebate, view.balanceCentavos);
+  const resultingBalance = view.balanceCentavos - amount;
+
+  return (
+    <Modal
+      open
+      title="Apply agency rebate"
+      description={`${view.enrollment.reference} · ${fullName(view.trainee)}`}
+      onClose={onClose}
+      footer={
+        <>
+          <button className="secondary-button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="primary-button"
+            disabled={!selected || amount <= 0}
+            onClick={() => {
+              if (!selected) return;
+              onApply(selected.name, amount);
+              onClose();
+            }}
+          >
+            Request rebate release
+          </button>
+        </>
+      }
+    >
+      {agencies.length === 0 ? (
+        <EmptyState icon="◇" title="No marketing agencies" text="Ask an Admin to add agencies under Accounting → Marketing agencies." />
+      ) : (
+        <div className="form-grid">
+          <Field label="Marketing agency" full hint={`Rebate shown is for ${view.enrollment.courseName} (${courseCode}).`}>
+            <select value={agencyId} onChange={(event) => setAgencyId(event.target.value)}>
+              {agencies.map((agency) => (
+                <option key={agency.id} value={agency.id}>
+                  {agency.name} — {pesos(agency.rebates[courseCode] ?? 0)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <div className="form-full inline-note note-blue">
+            {courseRebate <= 0 ? (
+              <>
+                <strong>No rebate set for this course</strong>
+                <p>{selected?.name ?? "This agency"} has no rebate configured for {view.enrollment.courseName}. Ask an Admin to set one under Accounting → Marketing agencies.</p>
+              </>
+            ) : (
+              <>
+                <strong>Rebate {pesos(amount)} applied as a discount</strong>
+                <p>
+                  Current balance {pesos(view.balanceCentavos)} → new balance {pesos(resultingBalance)}.
+                  {amount < courseRebate ? " Capped to the outstanding balance." : ""}
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+/**
+ * Cashier records ONE payment (one reference, one channel) and splits it across
+ * several of the trainee's unpaid courses — e.g. ₱5,000 covering two courses.
+ * Each course gets its own ledger payment posted under the shared reference.
+ */
+function SplitPaymentModal({
+  trainee,
+  enrollments,
+  channels,
+  onClose,
+  onSubmit,
+}: {
+  trainee: EnrollmentView["trainee"];
+  enrollments: EnrollmentView[];
+  channels: { id: string; name: string; requiresReference: boolean }[];
+  onClose: () => void;
+  onSubmit: (input: {
+    allocations: { enrollmentId: string; amountCentavos: number }[];
+    method: string;
+    referenceNumber?: string;
+    needsVerification?: boolean;
+  }) => void;
+}) {
+  const [method, setMethod] = useState<string>(channels[0]?.name ?? "Cash");
+  const [reference, setReference] = useState("");
+  const [included, setIncluded] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(enrollments.map((item) => [item.enrollment.id, true])),
+  );
+  // Peso strings keyed by enrollment; default each to its full outstanding balance.
+  const [amounts, setAmounts] = useState<Record<string, string>>(
+    () => Object.fromEntries(enrollments.map((item) => [item.enrollment.id, (item.balanceCentavos / 100).toFixed(2)])),
+  );
+
+  const requiresRef = channels.find((channel) => channel.name === method)?.requiresReference ?? method !== "Cash";
+  const rows = enrollments.map((item) => {
+    const centavos = included[item.enrollment.id] ? Math.round(Number(amounts[item.enrollment.id] || "0") * 100) : 0;
+    const overBalance = centavos > item.balanceCentavos;
+    return { item, centavos, overBalance };
+  });
+  const totalCentavos = rows.reduce((sum, row) => sum + row.centavos, 0);
+  const anyOver = rows.some((row) => row.overBalance);
+  const selectedCount = rows.filter((row) => row.centavos > 0).length;
+  const invalid = totalCentavos <= 0 || selectedCount < 1 || anyOver || (requiresRef && reference.trim().length < 4);
+
+  return (
+    <Modal
+      open
+      title="Split payment across courses"
+      description={`${fullName(trainee)} · ${trainee.traineeNumber}`}
+      onClose={onClose}
+      wide
+      footer={
+        <>
+          <button className="secondary-button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="primary-button"
+            disabled={invalid}
+            onClick={() =>
+              onSubmit({
+                allocations: rows.filter((row) => row.centavos > 0).map((row) => ({ enrollmentId: row.item.enrollment.id, amountCentavos: row.centavos })),
+                method,
+                referenceNumber: requiresRef ? reference.trim() : undefined,
+                // Cashier-recorded payments post immediately — no approval step.
+                needsVerification: false,
+              })
+            }
+          >
+            Post split payment
+          </button>
+        </>
+      }
+    >
+      {enrollments.length < 2 ? (
+        <EmptyState
+          icon="₱"
+          title="Only one unpaid course"
+          text="Split payment needs at least two of this trainee's courses to have an outstanding balance. Use Record payment instead."
+        />
+      ) : (
+        <>
+          <div className="form-grid">
+            <Field label="Payment channel" hint="Channels are configured by the Admin.">
+              <select value={method} onChange={(event) => setMethod(event.target.value)}>
+                {channels.map((channel) => (
+                  <option key={channel.id}>{channel.name}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="One reference number" hint={requiresRef ? "Shared by every course in this split" : "Not required for cash"}>
+              <input
+                value={reference}
+                disabled={!requiresRef}
+                onChange={(event) => setReference(event.target.value.toUpperCase())}
+                placeholder="Single reference for all courses"
+              />
+            </Field>
+          </div>
+
+          <div className="split-alloc-list">
+            {rows.map(({ item, overBalance }) => (
+              <div key={item.enrollment.id} className="split-alloc-row">
+                <label className="split-alloc-pick">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(included[item.enrollment.id])}
+                    onChange={(event) => setIncluded({ ...included, [item.enrollment.id]: event.target.checked })}
+                  />
+                  <span>
+                    <strong>{item.enrollment.courseName}</strong>
+                    <small>{item.enrollment.reference} · balance {pesos(item.balanceCentavos)}</small>
+                  </span>
+                </label>
+                <span className="split-alloc-amount">
+                  <em>₱</em>
+                  <input
+                    inputMode="decimal"
+                    value={amounts[item.enrollment.id] ?? ""}
+                    disabled={!included[item.enrollment.id]}
+                    onChange={(event) => setAmounts({ ...amounts, [item.enrollment.id]: event.target.value })}
+                  />
+                  {overBalance && <small className="value-danger">Over balance</small>}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <div className="split-alloc-total">
+            <span>Total across {selectedCount} course{selectedCount === 1 ? "" : "s"}</span>
+            <strong>{pesos(totalCentavos)}</strong>
+          </div>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+function AdmissionInvoiceModal({
   view,
   defaultOfficer,
+  defaultCashier,
   session,
   onClose,
   onGenerate,
 }: {
   view: EnrollmentView;
   defaultOfficer: string;
+  defaultCashier: string;
   session?: { startsAt: string; endsAt: string };
   onClose: () => void;
   onGenerate: (officer: string, cashier: string) => void;
 }) {
   const [officer, setOfficer] = useState(defaultOfficer);
-  const [cashier, setCashier] = useState(view.enrollment.cashierAssigned ?? "");
-  const { trainee, batch, enrollment } = view;
+  const [cashier, setCashier] = useState(view.enrollment.cashierAssigned || defaultCashier);
+  const [building, setBuilding] = useState(false);
+  const toast = useToast();
+  const { trainee, batch, enrollment, entries, dueCentavos, paidCentavos, balanceCentavos, paymentStatus } = view;
+  const charges = entries.filter((entry) => entry.type === "charge");
+  const payments = entries.filter((entry) => entry.type === "payment" || entry.type === "discount" || entry.type === "refund");
+  const statusTone = paymentStatus === "Paid" ? "green" : paymentStatus === "Partially Paid" ? "amber" : "red";
+  const statusLabel = paymentStatus === "Paid" ? "FULLY PAID" : paymentStatus === "Partially Paid" ? "PARTIALLY PAID" : "UNPAID";
   const time = session ? `${formatTime(session.startsAt)} – ${formatTime(session.endsAt)}` : "8:00 AM – 5:00 PM";
+
+  async function downloadPdf() {
+    setBuilding(true);
+    try {
+      const logoBytes = await fetchLogoBytes();
+      const detailOf = (entry: (typeof entries)[number]) =>
+        `${entry.reference} · ${formatDateTime(entry.recordedAt)}` +
+        (entry.referenceNumber ? ` · Ref ${entry.referenceNumber}` : "") +
+        (entry.receiptNumber ? ` · ${entry.receiptNumber}` : "");
+      const bytes = await createAdmissionInvoicePdf({
+        reference: enrollment.reference,
+        traineeName: `${fullName(trainee)}${trainee.suffix ? ` ${trainee.suffix}` : ""}`,
+        traineeNumber: trainee.traineeNumber,
+        srn: trainee.srn ?? "",
+        mobile: trainee.mobile,
+        email: trainee.email,
+        course: `${enrollment.courseName} (${enrollment.courseCode})`,
+        schedule: batch ? formatDateRange(batch.startsOn, batch.endsOn) : "Open schedule",
+        time,
+        venue: batch?.venue ?? "",
+        instructor: batch?.instructor ?? "",
+        registrationStatus: enrollment.registrationStatus ?? "Waiting for Payment",
+        issuedAt: formatDate(new Date().toISOString()),
+        officer: officer.trim(),
+        cashier: cashier.trim(),
+        lines: [
+          ...charges.map((entry) => ({ description: entry.description, detail: detailOf(entry), amountCentavos: entry.amountCentavos })),
+          ...payments.map((entry) => ({ description: entry.description, detail: detailOf(entry), amountCentavos: entry.amountCentavos, negative: true })),
+        ],
+        dueCentavos,
+        paidCentavos,
+        balanceCentavos,
+        paymentStatus,
+        logoBytes,
+      });
+      triggerPdfDownload(bytes, `${enrollment.reference}-admission-invoice.pdf`);
+    } catch {
+      toast("warning", "Could not generate the combined PDF.");
+    } finally {
+      setBuilding(false);
+    }
+  }
 
   return (
     <Modal
       open
-      title="Admission slip"
+      title="Admission slip + payment invoice"
       description={`${enrollment.reference} · ${enrollment.courseName}`}
       onClose={onClose}
       wide
@@ -739,6 +1160,9 @@ function AdmissionSlipModal({
           </button>
           <button className="secondary-button" onClick={() => window.print()}>
             Print
+          </button>
+          <button className="secondary-button" onClick={downloadPdf} disabled={building}>
+            {building ? "Generating…" : "Download PDF"}
           </button>
           <button
             className="primary-button"
@@ -761,15 +1185,20 @@ function AdmissionSlipModal({
         </Field>
       </div>
 
-      <div className="admission-slip" id="admission-slip-print">
+      <p className="muted-text" style={{ margin: "0 0 8px" }}>
+        Prints on one 8&quot;×13&quot; long-bond sheet — the block below repeats twice (upper = original copy, lower = duplicate copy).
+      </p>
+
+      <div className="admission-slip" id="admission-invoice-print">
         <div className="slip-head">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/new-wave-logo.png" alt="New Wave Maritime" className="slip-logo" />
           <div>
             <h2>NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.</h2>
             <p>Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000</p>
-            <strong>ADMISSION SLIP</strong>
+            <strong>ADMISSION SLIP &amp; PAYMENT INVOICE</strong>
           </div>
+          <Pill tone={statusTone}>{statusLabel}</Pill>
         </div>
 
         <div className="slip-meta">
@@ -778,14 +1207,12 @@ function AdmissionSlipModal({
           <span>Issued <strong>{formatDate(new Date().toISOString())}</strong></span>
         </div>
 
-        <h3 className="slip-section">Personal details</h3>
+        <h3 className="slip-section">Trainee</h3>
         <div className="slip-grid">
           <div><span>Name</span><strong>{fullName(trainee)}{trainee.suffix ? ` ${trainee.suffix}` : ""}</strong></div>
           <div><span>SRN</span><strong>{trainee.srn ?? "—"}</strong></div>
-          <div><span>Birth date</span><strong>{trainee.birthDate}</strong></div>
           <div><span>Mobile</span><strong>{trainee.mobile}</strong></div>
           <div><span>Email</span><strong>{trainee.email}</strong></div>
-          <div><span>Address</span><strong>{trainee.address ?? "—"}</strong></div>
         </div>
 
         <h3 className="slip-section">Training details</h3>
@@ -796,6 +1223,40 @@ function AdmissionSlipModal({
           <div><span>Classroom</span><strong>{batch?.venue ?? "—"}</strong></div>
           <div><span>Instructor</span><strong>{batch?.instructor ?? "—"}</strong></div>
           <div><span>Registration status</span><strong>{enrollment.registrationStatus ?? "Waiting for Payment"}</strong></div>
+        </div>
+
+        <h3 className="slip-section">Charges &amp; payments</h3>
+        <div className="ledger-list">
+          {charges.map((entry) => (
+            <div key={entry.id} className="ledger-row ledger-charge">
+              <div>
+                <strong>{entry.description}</strong>
+                <small>{entry.reference} · {formatDateTime(entry.recordedAt)}</small>
+              </div>
+              <div className="ledger-amount"><strong>{pesos(entry.amountCentavos)}</strong></div>
+            </div>
+          ))}
+          {payments.map((entry) => (
+            <div key={entry.id} className={`ledger-row ledger-${entry.type}`}>
+              <div>
+                <strong>{entry.description}</strong>
+                <small>
+                  {entry.reference} · {formatDateTime(entry.recordedAt)}
+                  {entry.referenceNumber ? ` · Ref ${entry.referenceNumber}` : ""}
+                  {entry.receiptNumber ? ` · ${entry.receiptNumber}` : ""}
+                </small>
+              </div>
+              <div className="ledger-amount"><strong>&minus;{pesos(entry.amountCentavos)}</strong></div>
+            </div>
+          ))}
+          {charges.length === 0 && payments.length === 0 && <p className="muted-text">No ledger entries yet.</p>}
+        </div>
+
+        <div className="slip-grid" style={{ marginTop: 16 }}>
+          <div><span>Total due</span><strong>{pesos(dueCentavos)}</strong></div>
+          <div><span>Total paid</span><strong>{pesos(paidCentavos)}</strong></div>
+          <div><span>Balance</span><strong>{pesos(balanceCentavos)}</strong></div>
+          <div><span>Payment status</span><strong>{statusLabel}</strong></div>
         </div>
 
         <div className="slip-signatures">
@@ -819,29 +1280,40 @@ function NewEnrollmentModal({
   onCreate,
   trainees,
   batches,
+  offers,
   seats,
 }: {
   open: boolean;
   onClose: () => void;
-  onCreate: (traineeId: string, batchId: string) => void;
+  onCreate: (input: { traineeId: string; batchId?: string; offerId?: string }) => void;
   trainees: { id: string; traineeNumber: string; firstName: string; middleName?: string; lastName: string }[];
   batches: { id: string; batchNumber: string; courseName: string; startsOn: string; endsOn: string }[];
+  offers: { id: string; course: string; center: string; trainingFeeCentavos: number }[];
   seats: (batchId: string) => { capacity: number; taken: number; available: number };
 }) {
   const [traineeId, setTraineeId] = useState("");
+  const [type, setType] = useState<"In-house" | "Endorsed">("In-house");
   const [batchId, setBatchId] = useState("");
+  const [offerId, setOfferId] = useState("");
+
+  const valid = Boolean(traineeId) && (type === "In-house" ? Boolean(batchId) : Boolean(offerId));
+
   return (
     <Modal
       open={open}
       title="New enrollment"
-      description="Enroll an existing trainee into a batch. The training fee is charged automatically."
+      description="Enroll an existing trainee into an in-house batch or an endorsed partner training. The training fee is charged automatically."
       onClose={onClose}
       footer={
         <>
           <button className="secondary-button" onClick={onClose}>
             Cancel
           </button>
-          <button className="primary-button" disabled={!traineeId || !batchId} onClick={() => onCreate(traineeId, batchId)}>
+          <button
+            className="primary-button"
+            disabled={!valid}
+            onClick={() => onCreate({ traineeId, batchId: type === "In-house" ? batchId : undefined, offerId: type === "Endorsed" ? offerId : undefined })}
+          >
             Create enrollment
           </button>
         </>
@@ -858,19 +1330,35 @@ function NewEnrollmentModal({
             ))}
           </select>
         </Field>
-        <Field label="Batch" full>
-          <select value={batchId} onChange={(event) => setBatchId(event.target.value)}>
-            <option value="">Select a batch</option>
-            {batches.map((batch) => {
-              const seat = seats(batch.id);
-              return (
-                <option key={batch.id} value={batch.id} disabled={seat.available === 0}>
-                  {batch.batchNumber} — {batch.courseName} · {formatDateRange(batch.startsOn, batch.endsOn)} · {seat.available} slots
-                </option>
-              );
-            })}
-          </select>
+        <Field label="Training type" full>
+          <Segmented options={["In-house", "Endorsed"] as const} value={type} onChange={setType} />
         </Field>
+        {type === "In-house" ? (
+          <Field label="Batch" full>
+            <select value={batchId} onChange={(event) => setBatchId(event.target.value)}>
+              <option value="">Select a batch</option>
+              {batches.map((batch) => {
+                const seat = seats(batch.id);
+                return (
+                  <option key={batch.id} value={batch.id} disabled={seat.available === 0}>
+                    {batch.batchNumber} — {batch.courseName} · {formatDateRange(batch.startsOn, batch.endsOn)} · {seat.available} slots
+                  </option>
+                );
+              })}
+            </select>
+          </Field>
+        ) : (
+          <Field label="Endorsed training" full hint="Scheduling is coordinated with the partner center — no New Wave batch.">
+            <select value={offerId} onChange={(event) => setOfferId(event.target.value)}>
+              <option value="">Select an endorsed training</option>
+              {offers.map((offer) => (
+                <option key={offer.id} value={offer.id}>
+                  {offer.course} — {offer.center} · {pesos(offer.trainingFeeCentavos)}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
       </div>
     </Modal>
   );
