@@ -380,13 +380,45 @@ type SystemContextValue = {
 
 const SystemContext = createContext<SystemContextValue | null>(null);
 
+// Every top-level collection the app iterates. A stored state missing any of
+// these — e.g. one persisted mid-upgrade before a new array existed — would
+// crash the portal, so we treat it as invalid and reseed instead.
+const REQUIRED_COLLECTIONS: (keyof SystemState)[] = [
+  "trainees",
+  "batches",
+  "courses",
+  "partnerOffers",
+  "paymentChannels",
+  "announcements",
+  "submissions",
+  "courseSelections",
+  "consents",
+  "enrollments",
+  "ledger",
+  "attendanceSessions",
+  "attendanceRecords",
+  "certificates",
+  "requests",
+  "employees",
+  "leaveRequests",
+  "payrollPeriods",
+  "expenses",
+  "contactMessages",
+  "notifications",
+  "activity",
+];
+
+function isCompleteState(value: SystemState): boolean {
+  return REQUIRED_COLLECTIONS.every((key) => Array.isArray(value[key])) && Boolean(value.settings);
+}
+
 function loadInitialState(): SystemState {
   if (typeof window === "undefined") return createSeedState();
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (stored) {
       const parsed = JSON.parse(stored) as SystemState;
-      if (parsed.version === SYSTEM_VERSION) return reconcile(parsed);
+      if (parsed.version === SYSTEM_VERSION && isCompleteState(parsed)) return reconcile(parsed);
     }
   } catch {
     /* corrupted or unavailable storage falls back to the seeded demo data */
@@ -425,7 +457,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       if (event.key !== STORAGE_KEY || !event.newValue || writing.current) return;
       try {
         const parsed = JSON.parse(event.newValue) as SystemState;
-        if (parsed.version === SYSTEM_VERSION) setState(parsed);
+        if (parsed.version === SYSTEM_VERSION && isCompleteState(parsed)) setState(parsed);
       } catch {
         /* ignore malformed cross-tab payloads */
       }
