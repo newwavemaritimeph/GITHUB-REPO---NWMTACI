@@ -72,17 +72,8 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
 
   // ---- date-sensitive registration figures -------------------------------
   const today = todayIso();
-  const monthKey = today.slice(0, 7);
-  const monthName = new Intl.DateTimeFormat("en-PH", { month: "long", year: "numeric" }).format(new Date());
-  const tomorrow = (() => {
-    const date = new Date();
-    date.setDate(date.getDate() + 1);
-    return date.toISOString().slice(0, 10);
-  })();
   const newlyRegistered = state.submissions.filter((item) => (item.submittedAt ?? "").slice(0, 10) === today);
-  const registeredThisMonth = state.submissions.filter((item) => (item.submittedAt ?? "").slice(0, 7) === monthKey);
   const activeEnrollments = all.filter((item) => item.stage !== "Cancelled");
-  const startingTomorrow = activeEnrollments.filter((item) => item.batch?.startsOn === tomorrow);
 
   const officerBoard = (() => {
     const counts = new Map<string, number>();
@@ -109,6 +100,21 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
 
   const isRegistration = role === "Registration";
 
+  // ---- registration officer's daily desk ---------------------------------
+  const threeDaysOut = (() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 3);
+    return date.toISOString().slice(0, 10);
+  })();
+  const needsConfirmation = activeEnrollments.filter((item) => item.enrollment.registrationStatus === "Waiting for Payment");
+  const needsSlip = activeEnrollments.filter(
+    (item) => !item.enrollment.admissionSlipGeneratedAt && item.enrollment.registrationStatus !== "Cancelled",
+  );
+  const startingSoon = activeEnrollments.filter(
+    (item) => item.batch && item.batch.startsOn >= today && item.batch.startsOn <= threeDaysOut,
+  );
+  const registrationRequests = state.requests.filter((item) => item.status === "Pending" || item.status === "For clarification");
+
   const metrics: Record<Role, { label: string; value: string; note: string; icon: string; module: Module }[]> = {
     Admin: [
       { label: "New registrations", value: String(pendingRegistrations.length), note: "Awaiting review", icon: "✎", module: "Registrations" },
@@ -119,10 +125,12 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
       { label: "Reports", value: String(5), note: "Audited exports", icon: "↥", module: "Reports" },
     ],
     Registration: [
-      { label: "Newly registered today", value: String(newlyRegistered.length), note: "From the public site", icon: "✎", module: "Registrations" },
-      { label: "Registered this month", value: String(registeredThisMonth.length), note: monthName, icon: "◎", module: "Registrations" },
-      { label: "Starting tomorrow", value: String(startingTomorrow.length), note: "Trainees with a schedule in 1 day", icon: "□", module: "Enrollments" },
-      { label: "Active enrollments", value: String(activeEnrollments.length), note: "All batches", icon: "▤", module: "Enrollments" },
+      { label: "Registered today", value: String(newlyRegistered.length), note: "Who registered", icon: "✎", module: "Registrations" },
+      { label: "Needs confirmation", value: String(needsConfirmation.length), note: "Waiting for payment", icon: "!", module: "Registrations" },
+      { label: "Needs admission slip", value: String(needsSlip.length), note: "Not yet generated", icon: "◈", module: "Registrations" },
+      { label: "Starting soon", value: String(startingSoon.length), note: "Within 3 days", icon: "□", module: "Registrations" },
+      { label: "Requests to action", value: String(registrationRequests.length), note: "Trainee requests", icon: "↗", module: "Registrations" },
+      { label: "Active enrollments", value: String(activeEnrollments.length), note: "All batches", icon: "▤", module: "Registrations" },
     ],
     Cashier: [
       { label: "Collections today", value: pesos(collectionsToday), note: "Verified payments", icon: "₱", module: "Payments" },
@@ -220,7 +228,7 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
         </Panel>
       )}
 
-      <div className={`stat-grid ${isRegistration ? "stat-grid-4" : "stat-grid-6"}`}>
+      <div className="stat-grid stat-grid-6">
         {metrics[role].map((metric, index) => (
           <StatCard
             key={metric.label}
@@ -233,6 +241,24 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
           />
         ))}
       </div>
+
+      {isRegistration && (
+        <Panel title="Requests requiring action" description="Trainee change requests still open">
+          {registrationRequests.length === 0 ? (
+            <div className="empty-block"><span aria-hidden="true">✓</span><h3>Nothing pending</h3><p>No trainee requests need attention right now.</p></div>
+          ) : (
+            registrationRequests.map((request) => (
+              <div key={request.id} className="activity-row">
+                <div>
+                  <strong>{request.traineeName} · {request.type}</strong>
+                  <small>{request.reference} · {request.reason}</small>
+                </div>
+                <Pill tone={request.status === "For clarification" ? "amber" : "slate"}>{request.status}</Pill>
+              </div>
+            ))
+          )}
+        </Panel>
+      )}
 
       {isRegistration && (
         <div className="two-column">
