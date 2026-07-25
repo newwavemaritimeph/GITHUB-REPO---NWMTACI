@@ -5,12 +5,13 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { NewWaveLogo } from "./new-wave-logo";
 import { LiveAttendance } from "./portal/live-attendance";
 import { LiveAccounting } from "./portal/live-accounting";
+import { LiveCashierClosing } from "./portal/live-cashier-closing";
 import { PaymentProofOcr } from "./payment-proof-ocr";
 import { automaticEndDate, batchPatternLabel, validBatchStart } from "@/lib/scheduling";
 import { AdminConfiguration } from "./admin-configuration";
 import { DateReports } from "./date-reports";
 
-type Module = "Dashboard" | "Trainees" | "Enrollments" | "Courses & centers" | "Schedules" | "Payments" | "Accounting" | "Attendance" | "Certificates" | "HR & payroll" | "Reports" | "Settings";
+type Module = "Dashboard" | "Trainees" | "Enrollments" | "Courses & centers" | "Schedules" | "Payments" | "Cashier closing" | "Accounting" | "Attendance" | "Certificates" | "HR & payroll" | "Reports" | "Settings";
 type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; course_categories?: {name:string}|{name:string}[]|null };
 type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string}|{name:string}[]|null };
 type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; birthdate:string; email:string; mobile:string; account_state:string; registered_at:string };
@@ -19,12 +20,12 @@ type Enrollment = { id:string; enrollment_number:string; trainee_id:string; cour
 type Payment = { id:string; payment_number:string; trainee_id:string; amount_centavos:number; method:string; receiving_account:string; reference_number?:string|null; proof_id?:string|null; received_at:string; verification_state:string; trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null };
 type Notification = { id:string; title:string; body:string; deep_link?:string|null; read_at?:string|null; created_at:string };
 type PortalData = { profile:{complete_name:string;email:string}; roles:string[]; courses:Course[]; offers:Offer[]; trainees:Trainee[]; batches:Batch[]; enrollments:Enrollment[]; payments:Payment[]; notifications:Notification[];
-  paymentMethods:{id:string;code:string;name:string;requires_reference:boolean;allows_proof:boolean;active:boolean}[]; charges:{id:string;name:string;default_amount_centavos:number;active:boolean;used_count:number}[]; agencies:{id:string;name:string;contact_name?:string|null;email?:string|null;mobile?:string|null;active:boolean}[]; expenses:{id:string;expense_number:string;payee:string;category:string;amount_centavos:number;status:string;created_at:string}[]; payables:{id:string;description:string;amount_centavos:number;due_on?:string|null;status:string}[] };
+  paymentMethods:{id:string;code:string;name:string;requires_reference:boolean;allows_proof:boolean;active:boolean}[]; charges:{id:string;name:string;default_amount_centavos:number;active:boolean;used_count:number}[]; agencies:{id:string;name:string;contact_name?:string|null;email?:string|null;mobile?:string|null;active:boolean}[]; expenses:{id:string;expense_number:string;payee:string;category:string;amount_centavos:number;status:string;created_at:string}[]; payables:{id:string;description:string;amount_centavos:number;due_on?:string|null;status:string}[]; cashierClosings:{id:string;closing_date:string;opening_cash_centavos:number;cash_collections_centavos:number;online_collections_centavos:number;expenses_centavos:number;expected_cash_centavos:number;actual_cash_centavos?:number|null;variance_centavos?:number|null;status:string}[] };
 
 const nav: {label:Module;icon:string;roles?:string[]}[] = [
   {label:"Dashboard",icon:"⌂"},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting","training_operations"]},
   {label:"Enrollments",icon:"▤",roles:["admin","registration","cashier","accounting","training_operations"]},{label:"Courses & centers",icon:"◇"},
-  {label:"Schedules",icon:"□",roles:["admin","registration","training_operations","instructor"]},{label:"Payments",icon:"₱",roles:["admin","cashier","accounting","registration"]},
+  {label:"Schedules",icon:"□",roles:["admin","registration","training_operations","instructor"]},{label:"Payments",icon:"₱",roles:["admin","cashier","accounting","registration"]},{label:"Cashier closing",icon:"▦",roles:["admin","cashier","accounting"]},
   {label:"Accounting",icon:"▥",roles:["admin","accounting"]},{label:"Attendance",icon:"✓",roles:["admin","training_operations","instructor"]},
   {label:"Certificates",icon:"◈",roles:["admin","training_operations"]},{label:"HR & payroll",icon:"♙",roles:["admin","hr"]},{label:"Reports",icon:"↥"},{label:"Settings",icon:"⚙",roles:["admin"]},
 ];
@@ -64,6 +65,7 @@ function PortalContent({active,role,data,query,open,canEnroll,canSchedule,canPay
   if(active==="Courses & centers")return <Catalog data={data} query={query}/>;
   if(active==="Attendance")return <LiveAttendance batches={data.batches.map(b=>({id:b.id,batch_number:b.batch_number,starts_on:b.starts_on,ends_on:b.ends_on,venue:b.venue}))} />;
   if(active==="Reports")return <div className="portal-page"><PageHead eyebrow="Audited exports" title="Date-sensitive reports" text="Operational and financial exports always require an inclusive reporting period."/><DateReports/></div>;
+  if(active==="Cashier closing")return <LiveCashierClosing data={data} reload={reload}/>;
   if(active==="Accounting")return <LiveAccounting data={data} role={role} reload={reload}/>;
   if(active==="Settings"&&role==="admin")return <div className="portal-page"><PageHead eyebrow="System administration" title="Configuration and authorized accounts" text="Manage payment modes, users, partners, agencies, courses, prices, and durations."/><AdminConfiguration/></div>;
   return <ConnectedModule module={active} data={data}/>;
