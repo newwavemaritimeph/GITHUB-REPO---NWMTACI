@@ -26,7 +26,7 @@ import {
 } from "@/lib/reporting";
 import type { EnrollmentView, Role, RequestType, Trainee } from "@/lib/system/types";
 import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn } from "@/lib/validation";
-import { PageHeader, Panel, StageBadge, type Module } from "./shared";
+import { PageHeader, Panel, StageBadge, simplifiedStage, type Module } from "./shared";
 
 /* ---------------------------------------------------------------- trainees */
 
@@ -47,7 +47,7 @@ function FacebookEncoder({ trainee, onSave }: { trainee: Trainee; onSave: (link:
   );
 }
 
-const PAYMENT_STATUSES = ["All statuses", "Paid", "Unpaid", "Partially Paid", "Cancelled", "Refunded"] as const;
+const STAGE_FILTERS = ["All stages", "Pending", "In Training", "Training Complete", "Certificate Release"] as const;
 
 /** Payment status of one enrollment, extended with Refunded (not in the base type). */
 function paymentStatusOf(item: EnrollmentView): string {
@@ -101,7 +101,7 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
   const [query, setQuery] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [statusFilter, setStatusFilter] = useState<(typeof PAYMENT_STATUSES)[number]>("All statuses");
+  const [statusFilter, setStatusFilter] = useState<(typeof STAGE_FILTERS)[number]>("All stages");
   const [view, setView] = useState<"All trainees" | "Possible duplicates">("All trainees");
   const [selected, setSelected] = useState<Trainee | null>(null);
   const [newOpen, setNewOpen] = useState(false);
@@ -116,11 +116,11 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
   const [draft, setDraft] = useState(emptyDraft);
 
   const all = views();
-  const statusesByTrainee = useMemo(() => {
+  const stagesByTrainee = useMemo(() => {
     const map = new Map<string, string[]>();
     all.forEach((item) => {
       const list = map.get(item.trainee.id) ?? [];
-      list.push(paymentStatusOf(item));
+      list.push(simplifiedStage(item.stage));
       map.set(item.trainee.id, list);
     });
     return map;
@@ -134,10 +134,10 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
         !term || `${fullName(trainee)} ${trainee.traineeNumber} ${trainee.email} ${trainee.mobile}`.toLowerCase().includes(term);
       const matchesFrom = !fromDate || created >= fromDate;
       const matchesTo = !toDate || created <= toDate;
-      const matchesStatus = statusFilter === "All statuses" || (statusesByTrainee.get(trainee.id) ?? []).includes(statusFilter);
-      return matchesTerm && matchesFrom && matchesTo && matchesStatus;
+      const matchesStage = statusFilter === "All stages" || (stagesByTrainee.get(trainee.id) ?? []).includes(statusFilter);
+      return matchesTerm && matchesFrom && matchesTo && matchesStage;
     });
-  }, [query, fromDate, toDate, statusFilter, statusesByTrainee, state.trainees]);
+  }, [query, fromDate, toDate, statusFilter, stagesByTrainee, state.trainees]);
 
   const groups = useMemo(() => duplicateGroups(state.trainees), [state.trainees]);
   const selectedViews = selected ? all.filter((item) => item.trainee.id === selected.id) : [];
@@ -178,15 +178,15 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
                 <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
               </label>
               <label className="inline-field">
-                <span>Status</span>
-                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as (typeof PAYMENT_STATUSES)[number])}>
-                  {PAYMENT_STATUSES.map((item) => (
+                <span>Stage</span>
+                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as (typeof STAGE_FILTERS)[number])}>
+                  {STAGE_FILTERS.map((item) => (
                     <option key={item}>{item}</option>
                   ))}
                 </select>
               </label>
-              {(fromDate || toDate || statusFilter !== "All statuses" || query) && (
-                <button className="link-button toolbar-end" onClick={() => { setFromDate(""); setToDate(""); setStatusFilter("All statuses"); setQuery(""); }}>
+              {(fromDate || toDate || statusFilter !== "All stages" || query) && (
+                <button className="link-button toolbar-end" onClick={() => { setFromDate(""); setToDate(""); setStatusFilter("All stages"); setQuery(""); }}>
                   Clear filters
                 </button>
               )}
