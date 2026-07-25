@@ -25,7 +25,7 @@ const batchInput = z.object({
 
 const paymentInput = z.object({
   action: z.literal("post-payment"), enrollmentId: z.string().uuid(), amountCentavos: z.number().int().positive(),
-  method: z.enum(["Cash", "GCash", "Bank transfer", "Other"]), receivingAccount: z.string().trim().min(2).max(120),
+  method: z.string().trim().min(1).max(80), receivingAccount: z.string().trim().min(2).max(120),
   referenceNumber: z.string().trim().max(80).optional().default(""), proofId: z.string().uuid().nullable().optional(),
   receivedAt: z.string().datetime({ offset: true }), remarks: z.string().trim().max(500).optional().default(""),
 }).superRefine((value, context) => {
