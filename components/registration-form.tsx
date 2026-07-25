@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { pesos } from "@/lib/endorsement-catalog";
-import { SystemProvider, formatDateRange, useSystem } from "@/lib/system/store";
+import { SystemProvider, formatDateRange, formatTime, useSystem } from "@/lib/system/store";
 import type { Applicant } from "@/lib/system/types";
 
 const CONSENT_VERSION = "2026-07-03-r01";
@@ -352,14 +352,15 @@ function Wizard() {
                   {schedules.length > 0 && (
                     <div className="schedule-picker">
                       {schedules.map((batch) => {
-                        const seat = seats(batch.id);
                         const takenElsewhere = pickedBatches.includes(batch.id) && selection.batchId !== batch.id;
+                        const session = state.attendanceSessions.find((item) => item.batchId === batch.id);
+                        const time = session ? `${formatTime(session.startsAt)} – ${formatTime(session.endsAt)}` : "8:00 AM – 5:00 PM";
                         return (
                           <button key={batch.id} type="button" className={`schedule-option ${selection.batchId === batch.id ? "selected" : ""}`} disabled={takenElsewhere} onClick={() => updateSelection(index, { batchId: batch.id })}>
                             <span className="schedule-body">
                               <strong>{formatDateRange(batch.startsOn, batch.endsOn)}</strong>
-                              <small>{batch.mode} · {batch.venue} · {batch.batchNumber}</small>
-                              <small>{takenElsewhere ? "Already selected above" : `${seat.available} of ${seat.capacity} slots available`}</small>
+                              <small>{time}</small>
+                              {takenElsewhere && <small>Already selected above</small>}
                             </span>
                           </button>
                         );
@@ -397,7 +398,7 @@ function Wizard() {
                 <div key={index} className="review-course">
                   <div>
                     <strong>{course?.course}</strong>
-                    <small>{batch ? `${formatDateRange(batch.startsOn, batch.endsOn)} · ${batch.mode} · ${batch.venue}` : ""}</small>
+                    <small>{batch ? formatDateRange(batch.startsOn, batch.endsOn) : ""}</small>
                   </div>
                   <span>{batch ? pesos(batch.feeCentavos) : ""}</span>
                 </div>
