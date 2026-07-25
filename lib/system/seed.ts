@@ -1,16 +1,19 @@
+import { ENDORSEMENT_OFFERS } from "@/lib/endorsement-catalog";
 import { IN_HOUSE_COURSES } from "@/lib/in-house-catalog";
 import type {
   AttendanceRecord,
   AttendanceSession,
   Batch,
   Certificate,
+  Course,
   Enrollment,
   LedgerEntry,
+  PartnerOfferRecord,
   SystemState,
   Trainee,
 } from "./types";
 
-export const SYSTEM_VERSION = 6;
+export const SYSTEM_VERSION = 7;
 
 function startOfToday() {
   const now = new Date();
@@ -223,10 +226,33 @@ export function createSeedState(): SystemState {
     { id: "cert3", enrollmentId: "e3", status: "Pending Attendance", reprintCount: 0, updatedAt: stamp(-2, 9) },
   ];
 
+  const courses: Course[] = IN_HOUSE_COURSES.map((course) => ({
+    id: course.id,
+    category: course.category,
+    code: course.code,
+    course: course.course,
+    duration: course.duration,
+    modality: course.modality,
+    priceCentavos: course.priceCentavos,
+    active: true,
+  }));
+
+  const partnerOffers: PartnerOfferRecord[] = ENDORSEMENT_OFFERS.map((offer) => ({
+    id: offer.id,
+    center: offer.center,
+    course: offer.course,
+    duration: offer.duration,
+    trainingFeeCentavos: offer.trainingFeeCentavos,
+    rebateCentavos: offer.rebateCentavos,
+    active: offer.active,
+  }));
+
   return {
     version: SYSTEM_VERSION,
     trainees,
     batches,
+    courses,
+    partnerOffers,
     submissions: [
       { id: "sub1", reference: "NWM-REG-2026-000208", applicant: { firstName: "Miguel", lastName: "Torres", birthDate: "1995-05-05", gender: "Male", nationality: "Filipino", civilStatus: "Single", email: "miguel.torres@example.com", mobile: "09181234567", address: "Las Pinas City", srn: "1005500881", seafarerStatus: "Active seafarer", rank: "Able Seaman", emergencyContactName: "Rita Torres", emergencyContactRelation: "Spouse", emergencyContactMobile: "09181234500", sourceOfInquiry: "Facebook" }, status: "Submitted", publicStatusMessage: "Your registration form has been received.", submittedAt: stamp(0, 8, 42) },
       { id: "sub2", reference: "NWM-REG-2026-000209", applicant: { firstName: "Grace", middleName: "P", lastName: "Lim", birthDate: "1992-08-17", gender: "Female", nationality: "Filipino", civilStatus: "Married", email: "grace.lim@example.com", mobile: "09191234567", address: "Makati City", srn: "1102993004", seafarerStatus: "Officer", rank: "Third Mate", emergencyContactName: "Danny Lim", emergencyContactRelation: "Spouse", emergencyContactMobile: "09191234500", sourceOfInquiry: "Referral" }, status: "Under Review", remarks: "Two-course submission under review.", publicStatusMessage: "Your selected courses are being reviewed.", submittedAt: stamp(-1, 15, 10) },

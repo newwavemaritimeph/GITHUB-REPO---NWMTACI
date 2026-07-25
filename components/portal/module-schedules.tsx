@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { DataTable, EmptyState, Field, Modal, Pill, ProgressBar, SearchInput, Segmented, StatCard, useToast } from "@/components/ui/kit";
 import { pesos } from "@/lib/endorsement-catalog";
-import { IN_HOUSE_COURSES } from "@/lib/in-house-catalog";
 import { formatDate, formatDateRange, todayIso, useSystem } from "@/lib/system/store";
 import { batchPatternLabel, monthlyBatchStarts } from "@/lib/scheduling";
 import { PageHeader, Panel } from "./shared";
@@ -207,6 +206,7 @@ function NewBatchModal({
     trainingDays: number;
   }) => void;
 }) {
+  const { state } = useSystem();
   const [courseCode, setCourseCode] = useState("");
   const [startsOn, setStartsOn] = useState("");
   const [days, setDays] = useState(1);
@@ -214,7 +214,8 @@ function NewBatchModal({
   const [venue, setVenue] = useState("Room 301");
   const [instructor, setInstructor] = useState("Capt. Ruel Aquino");
 
-  const course = IN_HOUSE_COURSES.find((item) => item.code === courseCode);
+  const activeCourses = state.courses.filter((item) => item.active);
+  const course = state.courses.find((item) => item.code === courseCode);
   const endsOn = useMemo(() => {
     if (!startsOn) return "";
     const date = new Date(`${startsOn}T00:00:00`);
@@ -269,7 +270,7 @@ function NewBatchModal({
         <Field label="Course" full>
           <select value={courseCode} onChange={(event) => setCourseCode(event.target.value)}>
             <option value="">Select a course</option>
-            {IN_HOUSE_COURSES.map((item) => (
+            {activeCourses.map((item) => (
               <option key={item.id} value={item.code}>
                 {item.code} — {item.course}
               </option>
@@ -335,6 +336,7 @@ function AutoOpenModal({
   onRun: (input: { courseCode: string; year: number; month: number; capacity: number; venue: string; instructor: string }) => void;
   isScheduled: (courseCode: string, startsOn: string) => boolean;
 }) {
+  const { state } = useSystem();
   const now = new Date();
   const [courseCode, setCourseCode] = useState("");
   const [monthKey, setMonthKey] = useState(`${now.getFullYear()}-${now.getMonth() + 1}`);
@@ -343,7 +345,8 @@ function AutoOpenModal({
   const [instructor, setInstructor] = useState("Capt. Ruel Aquino");
 
   const [year, month] = monthKey.split("-").map(Number);
-  const course = IN_HOUSE_COURSES.find((item) => item.code === courseCode);
+  const activeCourses = state.courses.filter((item) => item.active);
+  const course = state.courses.find((item) => item.code === courseCode);
   const preview = useMemo(
     () =>
       course
@@ -386,7 +389,7 @@ function AutoOpenModal({
         <Field label="Course" full>
           <select value={courseCode} onChange={(event) => setCourseCode(event.target.value)}>
             <option value="">Select a course</option>
-            {IN_HOUSE_COURSES.map((item) => (
+            {activeCourses.map((item) => (
               <option key={item.id} value={item.code}>
                 {item.code} — {item.course}
               </option>

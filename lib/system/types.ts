@@ -359,10 +359,33 @@ export type Settings = {
   reservationFeeCentavos: number;
 };
 
+export type Course = {
+  id: string;
+  category: string;
+  code: string;
+  course: string;
+  duration: string;
+  modality: string;
+  priceCentavos: number;
+  active: boolean;
+};
+
+export type PartnerOfferRecord = {
+  id: string;
+  center: string;
+  course: string;
+  duration: string;
+  trainingFeeCentavos: number;
+  rebateCentavos: number;
+  active: boolean;
+};
+
 export type SystemState = {
   version: number;
   trainees: Trainee[];
   batches: Batch[];
+  courses: Course[];
+  partnerOffers: PartnerOfferRecord[];
   submissions: RegistrationSubmission[];
   courseSelections: CourseSelection[];
   consents: RegistrationConsent[];

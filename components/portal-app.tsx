@@ -454,7 +454,7 @@ function PortalShell({ previewMode }: { previewMode: boolean }) {
         {active === "Registrations" && <RegistrationsModule go={go} />}
         {active === "Trainees" && <TraineesModule go={go} />}
         {active === "Enrollments" && <EnrollmentsModule go={go} />}
-        {active === "Courses & centers" && <CatalogModule />}
+        {active === "Courses & centers" && <CatalogModule role={role} />}
         {active === "Schedules" && <SchedulesModule />}
         {active === "Payments" && <PaymentsModule />}
         {active === "Accounting" && <AccountingModule />}

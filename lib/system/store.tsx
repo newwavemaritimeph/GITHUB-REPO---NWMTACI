@@ -16,7 +16,6 @@ import {
   type AttendanceStatus,
 } from "@/lib/domain";
 import { chooseSurvivor, findSrnDuplicates, mergeInto } from "@/lib/trainee-identity";
-import { IN_HOUSE_COURSES } from "@/lib/in-house-catalog";
 import { automaticEndDate, courseDays, monthlyBatchStarts } from "@/lib/scheduling";
 import { createSeedState, SYSTEM_VERSION } from "./seed";
 import type {
@@ -27,10 +26,12 @@ import type {
   Certificate,
   ChangeRequest,
   ConsentType,
+  Course,
   CourseSelection,
   Enrollment,
   EnrollmentView,
   LedgerEntry,
+  PartnerOfferRecord,
   RegistrationStatus,
   RegistrationSubmission,
   RequestType,
@@ -41,7 +42,7 @@ import type {
   Trainee,
 } from "./types";
 
-const STORAGE_KEY = "new-wave-system-v6";
+const STORAGE_KEY = "new-wave-system-v7";
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -328,6 +329,13 @@ type SystemContextValue = {
   recordPayment: (input: PaymentInput) => LedgerEntry | undefined;
   setPaymentVerification: (id: string, verification: "Verified" | "Rejected") => void;
   addLedgerEntry: (input: { enrollmentId: string; type: LedgerEntry["type"]; amountCentavos: number; description: string }) => void;
+  /* catalog administration */
+  addCourse: (input: Omit<Course, "id" | "active">) => Course;
+  updateCourse: (id: string, patch: Partial<Omit<Course, "id">>) => void;
+  setCourseActive: (id: string, active: boolean) => void;
+  addPartnerOffer: (input: Omit<PartnerOfferRecord, "id" | "active">) => PartnerOfferRecord;
+  updatePartnerOffer: (id: string, patch: Partial<Omit<PartnerOfferRecord, "id">>) => void;
+  setPartnerOfferActive: (id: string, active: boolean) => void;
   /* operations */
   createBatch: (input: Omit<Batch, "id" | "status" | "publishedAt">) => Batch;
   autoOpenMonth: (input: { courseCode: string; year: number; month: number; capacity: number; venue: string; instructor: string }) => number;
@@ -901,6 +909,90 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     [actor, log, update],
   );
 
+  /* --------------------------------------------------- catalog administration */
+
+  const addCourse = useCallback<SystemContextValue["addCourse"]>(
+    (input) => {
+      const course: Course = { ...input, id: uid("crs"), active: true };
+      update((draft) => {
+        draft.courses.push(course);
+        log(draft, { action: "Course added", recordType: "Course", recordRef: course.code, detail: course.course });
+      });
+      return course;
+    },
+    [log, update],
+  );
+
+  const updateCourse = useCallback<SystemContextValue["updateCourse"]>(
+    (id, patch) => {
+      update((draft) => {
+        const course = draft.courses.find((item) => item.id === id);
+        if (!course) return;
+        Object.assign(course, patch);
+        log(draft, { action: "Course updated", recordType: "Course", recordRef: course.code, detail: course.course });
+      });
+    },
+    [log, update],
+  );
+
+  const setCourseActive = useCallback<SystemContextValue["setCourseActive"]>(
+    (id, active) => {
+      update((draft) => {
+        const course = draft.courses.find((item) => item.id === id);
+        if (!course) return;
+        course.active = active;
+        log(draft, {
+          action: active ? "Course restored" : "Course archived",
+          recordType: "Course",
+          recordRef: course.code,
+          detail: course.course,
+        });
+      });
+    },
+    [log, update],
+  );
+
+  const addPartnerOffer = useCallback<SystemContextValue["addPartnerOffer"]>(
+    (input) => {
+      const offer: PartnerOfferRecord = { ...input, id: uid("off"), active: true };
+      update((draft) => {
+        draft.partnerOffers.push(offer);
+        log(draft, { action: "Partner offer added", recordType: "PartnerOffer", recordRef: offer.center, detail: offer.course });
+      });
+      return offer;
+    },
+    [log, update],
+  );
+
+  const updatePartnerOffer = useCallback<SystemContextValue["updatePartnerOffer"]>(
+    (id, patch) => {
+      update((draft) => {
+        const offer = draft.partnerOffers.find((item) => item.id === id);
+        if (!offer) return;
+        Object.assign(offer, patch);
+        log(draft, { action: "Partner offer updated", recordType: "PartnerOffer", recordRef: offer.center, detail: offer.course });
+      });
+    },
+    [log, update],
+  );
+
+  const setPartnerOfferActive = useCallback<SystemContextValue["setPartnerOfferActive"]>(
+    (id, active) => {
+      update((draft) => {
+        const offer = draft.partnerOffers.find((item) => item.id === id);
+        if (!offer) return;
+        offer.active = active;
+        log(draft, {
+          action: active ? "Partner offer restored" : "Partner offer archived",
+          recordType: "PartnerOffer",
+          recordRef: offer.center,
+          detail: offer.course,
+        });
+      });
+    },
+    [log, update],
+  );
+
   const createBatch = useCallback<SystemContextValue["createBatch"]>(
     (input) => {
       const batch: Batch = { ...input, id: uid("b"), status: "Draft", publishedAt: null };
@@ -932,10 +1024,10 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
 
   const autoOpenMonth = useCallback<SystemContextValue["autoOpenMonth"]>(
     ({ courseCode, year, month, capacity, venue, instructor }) => {
-      const course = IN_HOUSE_COURSES.find((item) => item.code === courseCode);
-      if (!course) return 0;
       let created = 0;
       update((draft) => {
+        const course = draft.courses.find((item) => item.code === courseCode);
+        if (!course) return;
         const trainingDays = courseDays(course.duration);
         // Only future dates matter, and only ones not already scheduled — the
         // action is idempotent, so re-running a month never duplicates batches.
@@ -1348,6 +1440,12 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       recordPayment,
       setPaymentVerification,
       addLedgerEntry,
+      addCourse,
+      updateCourse,
+      setCourseActive,
+      addPartnerOffer,
+      updatePartnerOffer,
+      setPartnerOfferActive,
       createBatch,
       autoOpenMonth,
       publishBatch,
@@ -1377,7 +1475,9 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     [
       acknowledgeInstructions,
       actor,
+      addCourse,
       addLedgerEntry,
+      addPartnerOffer,
       advancePayroll,
       approveSelection,
       cancelEnrollment,
@@ -1404,8 +1504,12 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       seats,
       sendInstructions,
       setBatchStatus,
+      setCourseActive,
+      setPartnerOfferActive,
       setPaymentVerification,
       setSessionState,
+      updateCourse,
+      updatePartnerOffer,
       state,
       submissionSelections,
       submitRegistration,

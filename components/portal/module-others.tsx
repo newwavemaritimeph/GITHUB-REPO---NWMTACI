@@ -14,8 +14,7 @@ import {
   StatCard,
   useToast,
 } from "@/components/ui/kit";
-import { ENDORSEMENT_OFFERS, ENDORSEMENT_SUMMARY, PARTNER_CENTERS, pesos } from "@/lib/endorsement-catalog";
-import { IN_HOUSE_COURSES } from "@/lib/in-house-catalog";
+import { PARTNER_CENTERS, pesos } from "@/lib/endorsement-catalog";
 import { formatDate, formatDateRange, formatDateTime, fullName, todayIso, useSystem } from "@/lib/system/store";
 import {
   REPORT_RANGES,
@@ -25,7 +24,7 @@ import {
   type DateRange,
   type ReportRangePreset,
 } from "@/lib/reporting";
-import type { RequestType, Trainee } from "@/lib/system/types";
+import type { Role, RequestType, Trainee } from "@/lib/system/types";
 import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn } from "@/lib/validation";
 import { PageHeader, Panel, StageBadge, type Module } from "./shared";
 
@@ -259,36 +258,168 @@ export function TraineesModule({ go }: { go: (module: Module) => void }) {
 
 /* ----------------------------------------------------------------- catalog */
 
-export function CatalogModule() {
+const COURSE_CATEGORIES = [
+  "Upcoming MARINA STCW",
+  "MARINA Domestic",
+  "Maritime In-House",
+  "Catering (ILO / MLC 2006)",
+];
+const COURSE_MODALITIES = ["Face-to-face", "Blended", "Online", "To be confirmed"];
+
+type CourseDraft = { id: string | null; code: string; course: string; category: string; duration: string; modality: string; price: string };
+type OfferDraft = { id: string | null; center: string; course: string; duration: string; fee: string; rebate: string };
+
+const pesosInput = (centavos: number) => (centavos / 100).toString();
+const toCentavos = (value: string) => Math.round(Number(value) * 100);
+
+export function CatalogModule({ role }: { role: Role }) {
+  const {
+    state,
+    addCourse,
+    updateCourse,
+    setCourseActive,
+    addPartnerOffer,
+    updatePartnerOffer,
+    setPartnerOfferActive,
+  } = useSystem();
+  const toast = useToast();
+  const canEdit = role === "Admin";
+
   const [tab, setTab] = useState<"New Wave courses" | "Endorsed partner offers">("New Wave courses");
   const [query, setQuery] = useState("");
   const [center, setCenter] = useState("All centers");
+  const [showArchived, setShowArchived] = useState(false);
+  const [courseDraft, setCourseDraft] = useState<CourseDraft | null>(null);
+  const [offerDraft, setOfferDraft] = useState<OfferDraft | null>(null);
+  const [formError, setFormError] = useState("");
+
+  const centers = useMemo(
+    () => Array.from(new Set([...PARTNER_CENTERS, ...state.partnerOffers.map((offer) => offer.center)])),
+    [state.partnerOffers],
+  );
 
   const offers = useMemo(
     () =>
-      ENDORSEMENT_OFFERS.filter(
+      state.partnerOffers.filter(
         (offer) =>
+          (showArchived || offer.active) &&
           (center === "All centers" || offer.center === center) &&
           `${offer.course} ${offer.center}`.toLowerCase().includes(query.toLowerCase()),
       ),
-    [center, query],
+    [state.partnerOffers, center, query, showArchived],
   );
   const courses = useMemo(
-    () => IN_HOUSE_COURSES.filter((course) => `${course.code} ${course.course} ${course.category}`.toLowerCase().includes(query.toLowerCase())),
-    [query],
+    () =>
+      state.courses.filter(
+        (course) =>
+          (showArchived || course.active) &&
+          `${course.code} ${course.course} ${course.category}`.toLowerCase().includes(query.toLowerCase()),
+      ),
+    [state.courses, query, showArchived],
   );
-  const rebateTotal = offers.reduce((sum, offer) => sum + offer.rebateCentavos, 0);
+  const rebateTotal = offers.filter((offer) => offer.active).reduce((sum, offer) => sum + offer.rebateCentavos, 0);
+  const summary = useMemo(
+    () =>
+      centers
+        .map((name) => ({ center: name, offers: state.partnerOffers.filter((offer) => offer.center === name && offer.active).length }))
+        .filter((item) => item.offers > 0),
+    [centers, state.partnerOffers],
+  );
+
+  function saveCourse() {
+    if (!courseDraft) return;
+    const code = courseDraft.code.trim().toUpperCase();
+    const name = courseDraft.course.trim();
+    if (!code || !name || !courseDraft.duration.trim()) {
+      setFormError("Course code, name, and duration are required.");
+      return;
+    }
+    if (!(Number(courseDraft.price) >= 0)) {
+      setFormError("Enter a valid fee (0 or more).");
+      return;
+    }
+    const clash = state.courses.some((course) => course.code.toUpperCase() === code && course.id !== courseDraft.id);
+    if (clash) {
+      setFormError(`Course code "${code}" is already in use.`);
+      return;
+    }
+    const payload = {
+      code,
+      course: name,
+      category: courseDraft.category,
+      duration: courseDraft.duration.trim(),
+      modality: courseDraft.modality,
+      priceCentavos: toCentavos(courseDraft.price),
+    };
+    if (courseDraft.id) {
+      updateCourse(courseDraft.id, payload);
+      toast("success", `${code} updated.`);
+    } else {
+      addCourse(payload);
+      toast("success", `${code} added to the catalog.`);
+    }
+    setCourseDraft(null);
+    setFormError("");
+  }
+
+  function saveOffer() {
+    if (!offerDraft) return;
+    const centerName = offerDraft.center.trim();
+    const name = offerDraft.course.trim();
+    if (!centerName || !name || !offerDraft.duration.trim()) {
+      setFormError("Training center, course, and duration are required.");
+      return;
+    }
+    if (!(Number(offerDraft.fee) >= 0) || !(Number(offerDraft.rebate) >= 0)) {
+      setFormError("Enter valid fee and rebate amounts.");
+      return;
+    }
+    if (Number(offerDraft.rebate) > Number(offerDraft.fee)) {
+      setFormError("Rebate cannot exceed the training fee.");
+      return;
+    }
+    const payload = {
+      center: centerName,
+      course: name,
+      duration: offerDraft.duration.trim(),
+      trainingFeeCentavos: toCentavos(offerDraft.fee),
+      rebateCentavos: toCentavos(offerDraft.rebate),
+    };
+    if (offerDraft.id) {
+      updatePartnerOffer(offerDraft.id, payload);
+      toast("success", "Partner offer updated.");
+    } else {
+      addPartnerOffer(payload);
+      toast("success", "Partner offer added.");
+    }
+    setOfferDraft(null);
+    setFormError("");
+  }
+
+  const newCourse: CourseDraft = { id: null, code: "", course: "", category: COURSE_CATEGORIES[2], duration: "1 day", modality: COURSE_MODALITIES[0], price: "" };
+  const newOffer: OfferDraft = { id: null, center: centers[0] ?? "", course: "", duration: "1 day", fee: "", rebate: "" };
+
+  const courseColumns = canEdit
+    ? ["Course", "Category", "Duration", "Delivery", "Fee", ""]
+    : ["Course", "Category", "Duration", "Delivery", "Fee"];
+  const offerColumns = canEdit
+    ? ["Course", "Training center", "Duration", "Training fee", "New Wave rebate", "Partner payable", ""]
+    : ["Course", "Training center", "Duration", "Training fee", "New Wave rebate", "Partner payable"];
 
   return (
     <div className="page">
       <PageHeader
         eyebrow="Internal commercial catalog"
         title="Courses & training centers"
-        description="New Wave course pricing plus endorsed partner offers. Fees, rebates, and payables are staff-only."
+        description={
+          canEdit
+            ? "Add, edit, and archive New Wave courses and endorsed partner offers — no developer needed. Fees, rebates, and payables are staff-only."
+            : "New Wave course pricing plus endorsed partner offers. Fees, rebates, and payables are staff-only."
+        }
       />
 
       <div className="partner-summary">
-        {ENDORSEMENT_SUMMARY.map((item) => (
+        {summary.map((item) => (
           <article key={item.center}>
             <span>{item.center}</span>
             <strong>{item.offers}</strong>
@@ -302,30 +433,46 @@ export function CatalogModule() {
           <Segmented options={["New Wave courses", "Endorsed partner offers"] as const} value={tab} onChange={setTab} />
           <SearchInput value={query} onChange={setQuery} placeholder="Search course or center" />
           {tab === "Endorsed partner offers" && (
-            <>
-              <label className="inline-field">
-                <span>Center</span>
-                <select value={center} onChange={(event) => setCenter(event.target.value)}>
-                  <option>All centers</option>
-                  {PARTNER_CENTERS.map((item) => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-              </label>
-              <div className="toolbar-end total-block">
-                <span>Visible rebate total</span>
-                <strong>{pesos(rebateTotal)}</strong>
-              </div>
-            </>
+            <label className="inline-field">
+              <span>Center</span>
+              <select value={center} onChange={(event) => setCenter(event.target.value)}>
+                <option>All centers</option>
+                {centers.map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          <label className="inline-field inline-check">
+            <input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} />
+            <span>Show archived</span>
+          </label>
+          {tab === "Endorsed partner offers" && (
+            <div className="toolbar-end total-block">
+              <span>Visible rebate total</span>
+              <strong>{pesos(rebateTotal)}</strong>
+            </div>
+          )}
+          {canEdit && (
+            <button
+              className="primary-button toolbar-end"
+              onClick={() => {
+                setFormError("");
+                if (tab === "New Wave courses") setCourseDraft(newCourse);
+                else setOfferDraft(newOffer);
+              }}
+            >
+              {tab === "New Wave courses" ? "＋ Add course" : "＋ Add partner offer"}
+            </button>
           )}
         </div>
         {tab === "New Wave courses" ? (
-          <DataTable columns={["Course", "Category", "Duration", "Delivery", "Fee"]}>
+          <DataTable columns={courseColumns}>
             {courses.map((course) => (
-              <tr key={course.id}>
+              <tr key={course.id} className={course.active ? "" : "row-muted"}>
                 <td>
                   <strong>{course.course}</strong>
-                  <small>{course.code}</small>
+                  <small>{course.code}{course.active ? "" : " · archived"}</small>
                 </td>
                 <td>{course.category}</td>
                 <td>{course.duration}</td>
@@ -333,16 +480,46 @@ export function CatalogModule() {
                 <td>
                   <strong>{pesos(course.priceCentavos)}</strong>
                 </td>
+                {canEdit && (
+                  <td className="row-actions">
+                    <button
+                      className="link-button"
+                      onClick={() => {
+                        setFormError("");
+                        setCourseDraft({
+                          id: course.id,
+                          code: course.code,
+                          course: course.course,
+                          category: course.category,
+                          duration: course.duration,
+                          modality: course.modality,
+                          price: pesosInput(course.priceCentavos),
+                        });
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="link-button"
+                      onClick={() => {
+                        setCourseActive(course.id, !course.active);
+                        toast("warning", `${course.code} ${course.active ? "archived" : "restored"}.`);
+                      }}
+                    >
+                      {course.active ? "Archive" : "Restore"}
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </DataTable>
         ) : (
-          <DataTable columns={["Course", "Training center", "Duration", "Training fee", "New Wave rebate", "Partner payable"]} minWidth={980}>
+          <DataTable columns={offerColumns} minWidth={1040}>
             {offers.map((offer) => (
-              <tr key={offer.id}>
+              <tr key={offer.id} className={offer.active ? "" : "row-muted"}>
                 <td>
                   <strong>{offer.course}</strong>
-                  <small>Source row {offer.sourceRow}</small>
+                  {!offer.active && <small>archived</small>}
                 </td>
                 <td>{offer.center}</td>
                 <td>{offer.duration}</td>
@@ -352,7 +529,36 @@ export function CatalogModule() {
                 <td>
                   <strong className="value-good">{pesos(offer.rebateCentavos)}</strong>
                 </td>
-                <td>{pesos(offer.partnerPayableCentavos)}</td>
+                <td>{pesos(offer.trainingFeeCentavos - offer.rebateCentavos)}</td>
+                {canEdit && (
+                  <td className="row-actions">
+                    <button
+                      className="link-button"
+                      onClick={() => {
+                        setFormError("");
+                        setOfferDraft({
+                          id: offer.id,
+                          center: offer.center,
+                          course: offer.course,
+                          duration: offer.duration,
+                          fee: pesosInput(offer.trainingFeeCentavos),
+                          rebate: pesosInput(offer.rebateCentavos),
+                        });
+                      }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="link-button"
+                      onClick={() => {
+                        setPartnerOfferActive(offer.id, !offer.active);
+                        toast("warning", `Offer ${offer.active ? "archived" : "restored"}.`);
+                      }}
+                    >
+                      {offer.active ? "Archive" : "Restore"}
+                    </button>
+                  </td>
+                )}
               </tr>
             ))}
           </DataTable>
@@ -362,6 +568,103 @@ export function CatalogModule() {
         Fees, rebates, and partner payables are snapshotted when an enrollment is created, so later catalog edits never alter
         historical accounting.
       </p>
+
+      <Modal
+        open={Boolean(courseDraft)}
+        title={courseDraft?.id ? "Edit course" : "Add course"}
+        description="New Wave in-house course. Changes apply to new schedules and the public catalog immediately."
+        onClose={() => setCourseDraft(null)}
+        wide
+        footer={
+          <>
+            <button className="secondary-button" onClick={() => setCourseDraft(null)}>
+              Cancel
+            </button>
+            <button className="primary-button" onClick={saveCourse}>
+              {courseDraft?.id ? "Save changes" : "Add course"}
+            </button>
+          </>
+        }
+      >
+        {courseDraft && (
+          <div className="form-grid">
+            <Field label="Course code*" hint="Unique, e.g. SATSDSD">
+              <input value={courseDraft.code} onChange={(event) => setCourseDraft({ ...courseDraft, code: event.target.value.toUpperCase() })} />
+            </Field>
+            <Field label="Course name*" full>
+              <input value={courseDraft.course} onChange={(event) => setCourseDraft({ ...courseDraft, course: event.target.value })} />
+            </Field>
+            <Field label="Category">
+              <select value={courseDraft.category} onChange={(event) => setCourseDraft({ ...courseDraft, category: event.target.value })}>
+                {COURSE_CATEGORIES.map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Duration*" hint="e.g. 1 day, 5.5 days">
+              <input value={courseDraft.duration} onChange={(event) => setCourseDraft({ ...courseDraft, duration: event.target.value })} />
+            </Field>
+            <Field label="Delivery">
+              <select value={courseDraft.modality} onChange={(event) => setCourseDraft({ ...courseDraft, modality: event.target.value })}>
+                {COURSE_MODALITIES.map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Fee (₱)*">
+              <input type="number" min={0} step="1" value={courseDraft.price} onChange={(event) => setCourseDraft({ ...courseDraft, price: event.target.value })} />
+            </Field>
+            {formError && <p className="form-error field-full">{formError}</p>}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={Boolean(offerDraft)}
+        title={offerDraft?.id ? "Edit partner offer" : "Add partner offer"}
+        description="Endorsed partner / manning-agency course with its rebate rule. Partner payable is the fee less the rebate."
+        onClose={() => setOfferDraft(null)}
+        wide
+        footer={
+          <>
+            <button className="secondary-button" onClick={() => setOfferDraft(null)}>
+              Cancel
+            </button>
+            <button className="primary-button" onClick={saveOffer}>
+              {offerDraft?.id ? "Save changes" : "Add offer"}
+            </button>
+          </>
+        }
+      >
+        {offerDraft && (
+          <div className="form-grid">
+            <Field label="Training center*" hint="Pick an existing center or type a new one">
+              <input list="partner-centers" value={offerDraft.center} onChange={(event) => setOfferDraft({ ...offerDraft, center: event.target.value })} />
+              <datalist id="partner-centers">
+                {centers.map((item) => (
+                  <option key={item} value={item} />
+                ))}
+              </datalist>
+            </Field>
+            <Field label="Course*" full>
+              <input value={offerDraft.course} onChange={(event) => setOfferDraft({ ...offerDraft, course: event.target.value })} />
+            </Field>
+            <Field label="Duration*" hint="e.g. 5 days">
+              <input value={offerDraft.duration} onChange={(event) => setOfferDraft({ ...offerDraft, duration: event.target.value })} />
+            </Field>
+            <Field label="Training fee (₱)*">
+              <input type="number" min={0} step="1" value={offerDraft.fee} onChange={(event) => setOfferDraft({ ...offerDraft, fee: event.target.value })} />
+            </Field>
+            <Field label="New Wave rebate (₱)*">
+              <input type="number" min={0} step="1" value={offerDraft.rebate} onChange={(event) => setOfferDraft({ ...offerDraft, rebate: event.target.value })} />
+            </Field>
+            <Field label="Partner payable">
+              <input readOnly value={pesos(Math.max(0, toCentavos(offerDraft.fee || "0") - toCentavos(offerDraft.rebate || "0")))} />
+            </Field>
+            {formError && <p className="form-error field-full">{formError}</p>}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

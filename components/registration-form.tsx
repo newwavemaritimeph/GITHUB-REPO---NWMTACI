@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { IN_HOUSE_COURSES } from "@/lib/in-house-catalog";
 import { pesos } from "@/lib/endorsement-catalog";
 import { SystemProvider, formatDateRange, useSystem } from "@/lib/system/store";
 import type { Applicant } from "@/lib/system/types";
@@ -93,7 +92,7 @@ function Wizard() {
     setApplicant((current) => ({ ...current, [key]: value }));
 
   const batchOf = (batchId: string) => state.batches.find((item) => item.id === batchId);
-  const courseOf = (code: string) => IN_HOUSE_COURSES.find((item) => item.code === code);
+  const courseOf = (code: string) => state.courses.find((item) => item.code === code);
 
   // Entering a full SRN pulls the existing trainee's details so repeat clients
   // never re-type their record. The SRN is the first field for this reason.
@@ -131,8 +130,8 @@ function Wizard() {
   const mobileExists = mobileDigits.length >= 7 && state.trainees.some((trainee) => trainee.mobile.replace(/\D/g, "") === mobileDigits);
 
   const bookableCourses = useMemo(
-    () => IN_HOUSE_COURSES.filter((course) => openBatchesFor(course.code).length > 0),
-    [openBatchesFor],
+    () => state.courses.filter((course) => course.active && openBatchesFor(course.code).length > 0),
+    [state.courses, openBatchesFor],
   );
   const pickedCourses = selections.map((item) => item.courseCode).filter(Boolean);
   const pickedBatches = selections.map((item) => item.batchId).filter(Boolean);

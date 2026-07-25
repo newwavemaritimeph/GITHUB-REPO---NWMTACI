@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { IN_HOUSE_COURSES } from "@/lib/in-house-catalog";
 import { SystemProvider, useSystem } from "@/lib/system/store";
 
 const filters = ["All Courses", "STCW Courses", "In-House Courses"] as const;
@@ -14,13 +13,13 @@ function isStcw(category: string) {
 }
 
 function Catalog() {
-  const { openBatchesFor, seats, ready } = useSystem();
+  const { state, openBatchesFor, seats, ready } = useSystem();
   const [filter, setFilter] = useState<Filter>("All Courses");
   const [query, setQuery] = useState("");
 
   const rows = useMemo(() => {
     const term = query.trim().toLowerCase();
-    return IN_HOUSE_COURSES.filter((course) => {
+    return state.courses.filter((course) => course.active).filter((course) => {
       const matchesFilter =
         filter === "All Courses" ||
         (filter === "STCW Courses" && isStcw(course.category)) ||
@@ -32,7 +31,7 @@ function Catalog() {
       const availableSlots = schedules.reduce((sum, batch) => sum + seats(batch.id).available, 0);
       return { course, scheduleCount: schedules.length, availableSlots };
     });
-  }, [filter, query, openBatchesFor, seats, ready]);
+  }, [state.courses, filter, query, openBatchesFor, seats, ready]);
 
   return (
     <div className="catalog-wrap">

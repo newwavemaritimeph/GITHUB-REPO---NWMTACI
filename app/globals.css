@@ -212,6 +212,32 @@ img {
   color: var(--green);
 }
 
+/* catalog administration */
+.row-muted {
+  opacity: 0.5;
+}
+.row-actions {
+  white-space: nowrap;
+  text-align: right;
+}
+.row-actions .link-button + .link-button {
+  margin-left: 14px;
+}
+.inline-check {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+.inline-check input {
+  width: auto;
+}
+.form-error {
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 500;
+  margin: 0;
+}
+
 .value-danger {
   color: var(--red);
 }
