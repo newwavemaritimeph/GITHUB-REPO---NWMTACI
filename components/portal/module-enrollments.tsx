@@ -11,7 +11,6 @@ import {
   Pill,
   SearchInput,
   Segmented,
-  StatCard,
   useMoneyInput,
   useToast,
 } from "@/components/ui/kit";
@@ -59,12 +58,17 @@ export function EnrollmentsModule({
   const [requestFor, setRequestFor] = useState<EnrollmentView | null>(null);
   const [requestType, setRequestType] = useState<RequestType>("Reschedule");
   const [requestReason, setRequestReason] = useState("");
+  const [fromDate, setFromDate] = useState(todayIso());
+  const [toDate, setToDate] = useState(todayIso());
 
   const all = views();
   const active = openId ? all.find((item) => item.enrollment.id === openId) : undefined;
 
   const term = query.trim().toLowerCase();
   const rows = all.filter((item) => {
+    const created = item.enrollment.createdAt.slice(0, 10);
+    const matchesFrom = !fromDate || created >= fromDate;
+    const matchesTo = !toDate || created <= toDate;
     const matchesFilter =
       filter === "All" ||
       (filter === "Unpaid" && item.balanceCentavos > 0 && item.stage !== "Cancelled") ||
@@ -74,18 +78,15 @@ export function EnrollmentsModule({
       (filter === "Completed" && ["Training complete", "Certificate ready", "Certificate released"].includes(item.stage));
     const haystack =
       `${item.enrollment.reference} ${fullName(item.trainee)} ${item.trainee.traineeNumber} ${item.enrollment.courseName} ${item.batch?.batchNumber ?? ""}`.toLowerCase();
-    return matchesFilter && (!term || haystack.includes(term));
+    return matchesFrom && matchesTo && matchesFilter && (!term || haystack.includes(term));
   });
-
-  const outstanding = all.reduce((sum, item) => sum + item.balanceCentavos, 0);
-  const readyForInstructions = all.filter((item) => item.paymentStatus === "Paid" && !item.enrollment.instructionsSentAt).length;
 
   return (
     <div className="page">
       <PageHeader
         eyebrow="Registration operations"
         title="Enrollments"
-        description="One connected view of trainee, course, schedule, money, attendance, and certificate readiness."
+        description="Daily enrollments — pick a date range to see the schedule, payment status, and latest stage of each."
         actions={
           <button className="primary-button" onClick={() => setNewOpen(true)}>
             + New enrollment
@@ -93,17 +94,19 @@ export function EnrollmentsModule({
         }
       />
 
-      <div className="stat-grid stat-grid-4">
-        <StatCard label="Active enrollments" value={String(all.filter((item) => item.stage !== "Cancelled").length)} note="Across all batches" tone={0} icon="▤" />
-        <StatCard label="Outstanding balance" value={pesos(outstanding)} note={`${all.filter((item) => item.balanceCentavos > 0).length} enrollments`} tone={1} icon="₱" onClick={() => setFilter("Unpaid")} />
-        <StatCard label="Ready for instructions" value={String(readyForInstructions)} note="Fully paid, not yet sent" tone={3} icon="✉" onClick={() => setFilter("Ready for instructions")} />
-        <StatCard label="Completed training" value={String(all.filter((item) => item.attendanceComplete).length)} note="Attendance verified" tone={2} icon="✓" />
-      </div>
-
       <Panel padded={false}>
-        <div className="toolbar">
+        <div className="toolbar toolbar-wrap">
           <SearchInput value={query} onChange={setQuery} placeholder="Search trainee, reference, course, or batch" />
+          <label className="inline-field">
+            <span>From</span>
+            <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+          </label>
+          <label className="inline-field">
+            <span>To</span>
+            <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+          </label>
           <Segmented options={filters} value={filter} onChange={setFilter} />
+          <span className="toolbar-end catalog-count">{rows.length} enrollment{rows.length === 1 ? "" : "s"}</span>
         </div>
         {rows.length === 0 ? (
           <EmptyState title="No enrollments here" text="Change the filter, or approve a registration to create the first enrollment in this view." />
