@@ -290,7 +290,7 @@ export function TraineesModule({ go }: { go: (module: Module) => void }) {
 /* ----------------------------------------------------------------- catalog */
 
 const COURSE_CATEGORIES = [
-  "Upcoming MARINA STCW",
+  "Accredited MARINA STCW",
   "MARINA Domestic",
   "Maritime In-House",
   "Catering (ILO / MLC 2006)",

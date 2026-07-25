@@ -1,6 +1,6 @@
 export type InHouseCourse = {
   id: string;
-  category: "Upcoming MARINA STCW" | "MARINA Domestic" | "Maritime In-House" | "Catering (ILO / MLC 2006)";
+  category: "Accredited MARINA STCW" | "MARINA Domestic" | "Maritime In-House" | "Catering (ILO / MLC 2006)";
   code: string;
   course: string;
   duration: string;
@@ -9,7 +9,7 @@ export type InHouseCourse = {
 };
 
 const raw = `
-#Upcoming MARINA STCW
+#Accredited MARINA STCW
 SATSDSD|Security Awareness Training and Seafarer with Designated Security Duties|1 day|Face-to-face|60000
 SSO|Ship Security Officer|3 days|Face-to-face|200000
 STPPDSPPS|Safety Training for Personnel Providing Direct Service to Passengers in Passenger Spaces|1 day|Face-to-face|120000
@@ -173,4 +173,4 @@ export const IN_HOUSE_COURSES: readonly InHouseCourse[] = raw.trim().split("\n")
   return [{ id: `nwm-${String(index + 1).padStart(3, "0")}`, category, code, course, duration, modality, priceCentavos: Number(price) }];
 });
 
-export const IN_HOUSE_CATEGORIES = ["All New Wave categories", "Upcoming MARINA STCW", "MARINA Domestic", "Maritime In-House", "Catering (ILO / MLC 2006)"] as const;
+export const IN_HOUSE_CATEGORIES = ["All New Wave categories", "Accredited MARINA STCW", "MARINA Domestic", "Maritime In-House", "Catering (ILO / MLC 2006)"] as const;

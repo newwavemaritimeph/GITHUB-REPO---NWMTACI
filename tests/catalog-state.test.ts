@@ -9,8 +9,8 @@ import { SYSTEM_VERSION, createSeedState } from "../lib/system/seed";
 
 describe("editable catalog seed", () => {
   it("bumps the system version so old localStorage reseeds", () => {
-    expect(SYSTEM_VERSION).toBe(8);
-    expect(createSeedState().version).toBe(8);
+    expect(SYSTEM_VERSION).toBe(9);
+    expect(createSeedState().version).toBe(9);
   });
 
   it("seeds every New Wave course as active with pricing intact", () => {

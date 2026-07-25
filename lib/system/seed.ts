@@ -15,7 +15,7 @@ import type {
   Trainee,
 } from "./types";
 
-export const SYSTEM_VERSION = 8;
+export const SYSTEM_VERSION = 9;
 
 function startOfToday() {
   const now = new Date();

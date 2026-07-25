@@ -4807,8 +4807,8 @@ code {
 /* Combined Courses page — card grid */
 .course-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
   margin-top: 20px;
 }
 .course-card-public {
@@ -4881,7 +4881,7 @@ code {
 .schedule-months {
   display: grid;
   gap: 10px;
-  max-height: 190px;
+  max-height: 220px;
   overflow-y: auto;
 }
 .schedule-month-label {
@@ -4890,19 +4890,26 @@ code {
   font-weight: 700;
   color: var(--muted);
   letter-spacing: 0.04em;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
 }
+/* Dates fill the whole card width as wrapping chips instead of a narrow column */
 .schedule-month ul {
   list-style: none;
   margin: 0;
   padding: 0;
-  display: grid;
-  gap: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 .schedule-month li {
-  font-size: 13px;
+  flex: 0 0 auto;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--blue-dark);
+  background: var(--cyan-soft);
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+  padding: 4px 10px;
 }
 
 /* Multi-course selection blocks */

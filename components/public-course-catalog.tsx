@@ -9,7 +9,7 @@ type Filter = (typeof filters)[number];
 
 /** STCW vs In-House derives from the course's catalog category. */
 function isStcw(category: string) {
-  return category === "Upcoming MARINA STCW" || category === "MARINA Domestic";
+  return category === "Accredited MARINA STCW" || category === "MARINA Domestic";
 }
 
 const monthLabel = (iso: string) =>
