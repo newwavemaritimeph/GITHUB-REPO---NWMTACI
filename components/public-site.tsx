@@ -29,8 +29,8 @@ const CONTACT = {
   mobile: "+63 948 847 6530",
   telephone: "8553 0310",
   email: "newwavemaritime@gmail.com",
-  facebook: "https://www.facebook.com/newwavemaritime",
-  messenger: "https://m.me/newwavemaritime",
+  facebook: "https://www.facebook.com/newwavemtc",
+  messenger: "https://m.me/newwavemtc",
 };
 
 const ACCREDITATIONS = [
