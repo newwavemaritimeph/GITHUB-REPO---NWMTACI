@@ -264,6 +264,7 @@ export type RequestType =
   | "Refund"
   | "Record correction"
   | "Make-up class"
+  | "Reprinting"
   | "Cancellation";
 
 export type ChangeRequest = {
@@ -320,13 +321,22 @@ export type PayrollPeriod = {
 
 export type Expense = {
   id: string;
-  expenseNumber: string;
+  expenseNumber: string; // voucher number
   payee: string;
   category: string;
   amountCentavos: number;
-  purpose: string;
+  purpose: string; // description
   status: "Pending" | "Approved" | "Rejected" | "Paid";
   createdAt: string;
+  /** Voucher detail lines. */
+  itemUnit?: string;
+  quantity?: number;
+  payor?: string;
+  modeOfPayment?: string;
+  requestedBy?: string;
+  remarks?: string;
+  decidedBy?: string;
+  decidedAt?: string;
 };
 
 export type ContactMessage = {

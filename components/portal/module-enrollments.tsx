@@ -292,16 +292,18 @@ export function EnrollmentsModule({
                   Change course / schedule
                 </button>
               )}
-              <button
-                className="secondary-button"
-                onClick={() => {
-                  setRequestFor(active);
-                  setRequestType("Reschedule");
-                  setRequestReason("");
-                }}
-              >
-                Request a change
-              </button>
+              {role !== "Cashier" && (
+                <button
+                  className="secondary-button"
+                  onClick={() => {
+                    setRequestFor(active);
+                    setRequestType("Reschedule");
+                    setRequestReason("");
+                  }}
+                >
+                  Request a change
+                </button>
+              )}
               <button className="secondary-button" onClick={() => setSlipFor(active)}>
                 Admission slip
               </button>

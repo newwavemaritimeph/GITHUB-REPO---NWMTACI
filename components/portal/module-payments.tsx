@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { DataTable, EmptyState, Pill, SearchInput, Segmented, StatCard, useToast } from "@/components/ui/kit";
+import { DataTable, EmptyState, Field, Modal, Pill, SearchInput, Segmented, StatCard, useMoneyInput, useToast } from "@/components/ui/kit";
 import { PaymentProofOcr } from "@/components/payment-proof-ocr";
 import { pesos } from "@/lib/endorsement-catalog";
 import { formatDateTime, fullName, todayIso, useSystem } from "@/lib/system/store";
@@ -11,14 +11,17 @@ import { PaymentModal } from "./module-enrollments";
 
 const filters = ["Verification queue", "Today", "All payments"] as const;
 
+const EXPENSE_CATEGORIES = ["Supplies", "Utilities", "Repairs & Maintenance", "Representation", "Transportation", "Professional Fees", "Others"];
+
 export function PaymentsModule({ role }: { role: Role }) {
-  const { state, views, recordPayment, setPaymentVerification } = useSystem();
+  const { state, views, recordPayment, setPaymentVerification, createExpense } = useSystem();
   const canRecordPayment = role === "Cashier";
   const toast = useToast();
   const [filter, setFilter] = useState<(typeof filters)[number]>("Verification queue");
   const [query, setQuery] = useState("");
   const [payFor, setPayFor] = useState<EnrollmentView | null>(null);
   const [picker, setPicker] = useState(false);
+  const [expenseOpen, setExpenseOpen] = useState(false);
 
   const all = views();
   const byEnrollment = useMemo(() => new Map(all.map((item) => [item.enrollment.id, item])), [all]);
@@ -67,9 +70,14 @@ export function PaymentsModule({ role }: { role: Role }) {
         description="Post collections, verify online proofs, issue receipts, and keep every balance current."
         actions={
           canRecordPayment ? (
-            <button className="primary-button" onClick={() => setPicker(true)}>
-              + Record payment
-            </button>
+            <>
+              <button className="secondary-button" onClick={() => setExpenseOpen(true)}>
+                Expense voucher
+              </button>
+              <button className="primary-button" onClick={() => setPicker(true)}>
+                + Record payment
+              </button>
+            </>
           ) : undefined
         }
       />
@@ -207,6 +215,18 @@ export function PaymentsModule({ role }: { role: Role }) {
         </Panel>
       )}
 
+      {expenseOpen && (
+        <ExpenseVoucherModal
+          categories={EXPENSE_CATEGORIES}
+          onClose={() => setExpenseOpen(false)}
+          onCreate={(input) => {
+            const expense = createExpense(input);
+            toast("success", `${expense.expenseNumber} created — sent to the Accounting Manager for approval.`);
+            setExpenseOpen(false);
+          }}
+        />
+      )}
+
       <PaymentModal
         key={payFor?.enrollment.id}
         target={payFor}
@@ -225,5 +245,104 @@ export function PaymentsModule({ role }: { role: Role }) {
         }}
       />
     </div>
+  );
+}
+
+function ExpenseVoucherModal({
+  categories,
+  onClose,
+  onCreate,
+}: {
+  categories: string[];
+  onClose: () => void;
+  onCreate: (input: {
+    category: string;
+    itemUnit: string;
+    quantity: number;
+    purpose: string;
+    payor: string;
+    amountCentavos: number;
+    modeOfPayment: string;
+    remarks: string;
+  }) => void;
+}) {
+  const [category, setCategory] = useState(categories[0]);
+  const [itemUnit, setItemUnit] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [purpose, setPurpose] = useState("");
+  const [payor, setPayor] = useState("");
+  const [modeOfPayment, setModeOfPayment] = useState("Cash");
+  const [remarks, setRemarks] = useState("");
+  const money = useMoneyInput("");
+  const invalid = !purpose.trim() || money.centavos <= 0;
+  return (
+    <Modal
+      open
+      title="Expense voucher"
+      description="Auto-generates a voucher number and sends it to the Accounting Manager for approval."
+      onClose={onClose}
+      wide
+      footer={
+        <>
+          <button className="secondary-button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="primary-button"
+            disabled={invalid}
+            onClick={() =>
+              onCreate({
+                category,
+                itemUnit: itemUnit.trim(),
+                quantity: Math.max(1, Number(quantity) || 1),
+                purpose: purpose.trim(),
+                payor: payor.trim(),
+                amountCentavos: money.centavos,
+                modeOfPayment,
+                remarks: remarks.trim(),
+              })
+            }
+          >
+            Create voucher
+          </button>
+        </>
+      }
+    >
+      <div className="form-grid">
+        <Field label="Category">
+          <select value={category} onChange={(event) => setCategory(event.target.value)}>
+            {categories.map((item) => (
+              <option key={item}>{item}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Item / Unit">
+          <input value={itemUnit} onChange={(event) => setItemUnit(event.target.value)} placeholder="e.g. Bond paper / ream" />
+        </Field>
+        <Field label="Quantity">
+          <input type="number" min={1} value={quantity} onChange={(event) => setQuantity(event.target.value)} />
+        </Field>
+        <Field label="Mode of payment">
+          <select value={modeOfPayment} onChange={(event) => setModeOfPayment(event.target.value)}>
+            <option>Cash</option>
+            <option>Check</option>
+            <option>Bank transfer</option>
+            <option>GCash</option>
+          </select>
+        </Field>
+        <Field label="Description*" full>
+          <input value={purpose} onChange={(event) => setPurpose(event.target.value)} placeholder="What is this expense for?" />
+        </Field>
+        <Field label="Payor / Payee">
+          <input value={payor} onChange={(event) => setPayor(event.target.value)} placeholder="Who is being paid" />
+        </Field>
+        <Field label="Amount (PHP)*">
+          <input inputMode="decimal" value={money.raw} onChange={(event) => money.setRaw(event.target.value)} placeholder="0.00" />
+        </Field>
+        <Field label="Remarks" full>
+          <input value={remarks} onChange={(event) => setRemarks(event.target.value)} placeholder="Optional note" />
+        </Field>
+      </div>
+    </Modal>
   );
 }

@@ -31,6 +31,7 @@ import type {
   Announcement,
   Enrollment,
   EnrollmentView,
+  Expense,
   LedgerEntry,
   OtherCharge,
   PartnerOfferRecord,
@@ -372,6 +373,17 @@ type SystemContextValue = {
   decideRequest: (id: string, decision: "Approved" | "Rejected" | "For clarification", remarks?: string) => void;
   decideLeave: (id: string, decision: "Approved" | "Rejected") => void;
   advancePayroll: (id: string) => void;
+  createExpense: (input: {
+    category: string;
+    itemUnit?: string;
+    quantity?: number;
+    purpose: string;
+    payor?: string;
+    payee?: string;
+    amountCentavos: number;
+    modeOfPayment?: string;
+    remarks?: string;
+  }) => Expense;
   decideExpense: (id: string, decision: "Approved" | "Rejected" | "Paid") => void;
   resolveMessage: (id: string) => void;
   /* system */
@@ -1693,16 +1705,56 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     [log, update],
   );
 
+  const createExpense = useCallback<SystemContextValue["createExpense"]>(
+    (input) => {
+      const year = new Date().getFullYear();
+      const expense: Expense = {
+        id: uid("exp"),
+        expenseNumber: "",
+        payee: input.payee ?? input.payor ?? "—",
+        category: input.category,
+        amountCentavos: input.amountCentavos,
+        purpose: input.purpose,
+        status: "Pending",
+        createdAt: new Date().toISOString(),
+        itemUnit: input.itemUnit,
+        quantity: input.quantity,
+        payor: input.payor,
+        modeOfPayment: input.modeOfPayment,
+        remarks: input.remarks,
+        requestedBy: actor,
+      };
+      update((draft) => {
+        const highest = draft.expenses.reduce((top, item) => {
+          const match = new RegExp(`^EXP-${year}-(\\d{4})$`).exec(item.expenseNumber);
+          return match ? Math.max(top, Number(match[1])) : top;
+        }, 0);
+        expense.expenseNumber = `EXP-${year}-${String(highest + 1).padStart(4, "0")}`;
+        draft.expenses.unshift(expense);
+        notify(draft, {
+          audience: "staff",
+          title: "Expense voucher for approval",
+          body: `${expense.expenseNumber} · ${expense.category} · needs Accounting Manager approval.`,
+        });
+        log(draft, { action: "Expense voucher created", recordType: "Expense", recordRef: expense.expenseNumber });
+      });
+      return expense;
+    },
+    [actor, log, notify, update],
+  );
+
   const decideExpense = useCallback<SystemContextValue["decideExpense"]>(
     (id, decision) => {
       update((draft) => {
         const expense = draft.expenses.find((item) => item.id === id);
         if (!expense) return;
         expense.status = decision;
+        expense.decidedBy = actor;
+        expense.decidedAt = new Date().toISOString();
         log(draft, { action: `Expense ${decision.toLowerCase()}`, recordType: "Expense", recordRef: expense.expenseNumber });
       });
     },
-    [log, update],
+    [actor, log, update],
   );
 
   const resolveMessage = useCallback<SystemContextValue["resolveMessage"]>(
@@ -1794,6 +1846,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       decideRequest,
       decideLeave,
       advancePayroll,
+      createExpense,
       decideExpense,
       resolveMessage,
       updateSettings,
@@ -1831,6 +1884,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       createTrainee,
       setTraineeFacebook,
       mergeTrainees,
+      createExpense,
       decideExpense,
       decideLeave,
       decideRequest,

@@ -930,9 +930,14 @@ export function AccountingModule({ role }: { role: Role }) {
               {state.expenses.map((expense) => (
                 <div key={expense.id} className="history-row">
                   <div>
-                    <strong>{expense.payee}</strong>
+                    <strong>{expense.expenseNumber} · {expense.purpose}</strong>
                     <small>
-                      {expense.expenseNumber} · {expense.category} · {expense.purpose}
+                      {expense.category}
+                      {expense.itemUnit ? ` · ${expense.itemUnit}` : ""}
+                      {expense.quantity ? ` · qty ${expense.quantity}` : ""}
+                      {expense.payor ? ` · payor ${expense.payor}` : ""}
+                      {expense.modeOfPayment ? ` · ${expense.modeOfPayment}` : ""}
+                      {expense.requestedBy ? ` · by ${expense.requestedBy}` : ""}
                     </small>
                   </div>
                   <div className="history-right">
@@ -1373,34 +1378,52 @@ export function InstructionsModule() {
 
 /* ---------------------------------------------------------------- requests */
 
-const requestTypes: RequestType[] = ["Reschedule", "Course change", "Refund", "Record correction", "Make-up class", "Cancellation"];
+const requestTypes: RequestType[] = ["Reschedule", "Course change", "Refund", "Record correction", "Make-up class", "Reprinting", "Cancellation"];
 
-export function RequestsModule() {
+export function RequestsModule({ role }: { role: Role }) {
   const { state, views, createRequest, decideRequest } = useSystem();
   const toast = useToast();
+  // Reschedule/cancellation/reprinting/make-up/course-change are approved by the
+  // Accounting Manager. The cashier's tab is read-only — status of their own
+  // requests, and changes apply only once approved.
+  const canDecide = role === "Admin" || role === "Accounting";
   const [tab, setTab] = useState<"Pending" | "Decided" | "All">("Pending");
   const [newOpen, setNewOpen] = useState(false);
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const [draft, setDraft] = useState({ type: "Reschedule" as RequestType, enrollmentId: "", reason: "" });
 
   const all = views();
-  const rows = state.requests.filter((request) =>
-    tab === "Pending"
-      ? request.status === "Pending" || request.status === "For clarification"
-      : tab === "Decided"
-        ? request.status === "Approved" || request.status === "Rejected"
-        : true,
-  );
+  const rows = state.requests
+    .filter((request) => (role === "Cashier" ? request.requestedBy === "Cashier" : true))
+    .filter((request) => {
+      const created = request.createdAt.slice(0, 10);
+      return (!fromDate || created >= fromDate) && (!toDate || created <= toDate);
+    })
+    .filter((request) =>
+      tab === "Pending"
+        ? request.status === "Pending" || request.status === "For clarification"
+        : tab === "Decided"
+          ? request.status === "Approved" || request.status === "Rejected"
+          : true,
+    );
 
   return (
     <div className="page">
       <PageHeader
         eyebrow="Controlled changes"
         title="Requests & approvals"
-        description="Reschedules, corrections, refunds, and cancellations with an immutable decision history."
+        description={
+          canDecide
+            ? "Reschedules, corrections, reprinting, make-up, and course changes approved by the Accounting Manager."
+            : "Track the status of your requests — changes apply only once the Accounting Manager approves them."
+        }
         actions={
-          <button className="primary-button" onClick={() => setNewOpen(true)}>
-            + New request
-          </button>
+          role !== "Cashier" ? (
+            <button className="primary-button" onClick={() => setNewOpen(true)}>
+              + New request
+            </button>
+          ) : undefined
         }
       />
 
@@ -1412,11 +1435,19 @@ export function RequestsModule() {
       </div>
 
       <Panel padded={false}>
-        <div className="toolbar">
+        <div className="toolbar toolbar-wrap">
           <Segmented options={["Pending", "Decided", "All"] as const} value={tab} onChange={setTab} />
+          <label className="inline-field">
+            <span>From</span>
+            <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+          </label>
+          <label className="inline-field">
+            <span>To</span>
+            <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+          </label>
         </div>
         {rows.length === 0 ? (
-          <EmptyState icon="✓" title="Nothing to decide" text="New requests from the trainee portal and staff appear here." />
+          <EmptyState icon="✓" title={canDecide ? "Nothing to decide" : "No requests"} text={canDecide ? "New requests from staff appear here for approval." : "Requests you raise appear here with their status."} />
         ) : (
           <DataTable columns={["Request", "Type", "Trainee", "Reason", "Status", ""]} minWidth={980}>
             {rows.map((request) => (
@@ -1444,7 +1475,7 @@ export function RequestsModule() {
                   </Pill>
                 </td>
                 <td className="cell-actions">
-                  {request.status === "Pending" || request.status === "For clarification" ? (
+                  {canDecide && (request.status === "Pending" || request.status === "For clarification") ? (
                     <>
                       <button
                         className="ghost-button"

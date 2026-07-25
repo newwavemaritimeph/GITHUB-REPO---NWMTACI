@@ -604,7 +604,7 @@ function PortalShell({ previewMode }: { previewMode: boolean }) {
         {active === "Instructions" && <InstructionsModule />}
         {active === "Attendance" && <AttendanceModule />}
         {active === "Certificates" && <CertificatesModule go={go} />}
-        {active === "Requests" && <RequestsModule />}
+        {active === "Requests" && <RequestsModule role={role} />}
         {active === "HR & payroll" && <HrModule />}
         {active === "Reports" && <ReportsModule />}
         {active === "Settings" && <SettingsModule />}
