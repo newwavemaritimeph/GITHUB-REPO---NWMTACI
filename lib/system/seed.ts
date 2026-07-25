@@ -15,7 +15,7 @@ import type {
   Trainee,
 } from "./types";
 
-export const SYSTEM_VERSION = 9;
+export const SYSTEM_VERSION = 10;
 
 function startOfToday() {
   const now = new Date();
@@ -131,13 +131,13 @@ export function createSeedState(): SystemState {
   ];
 
   const enrollments: Enrollment[] = [
-    { id: "e1", reference: "ENR-2026-000101", traineeId: "t1", batchId: "b1", courseCode: "CCMI", courseName: batches[0].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-40, 10), processedBy: "Karen Mallari", registrationReference: "REG-2026-000201", instructionsSentAt: stamp(-32, 9), instructionsAcknowledgedAt: stamp(-31, 20), completedAt: stamp(-12, 9) },
-    { id: "e2", reference: "ENR-2026-000102", traineeId: "t2", batchId: "b2", courseCode: "PSCMHBT", courseName: batches[1].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-30, 11), processedBy: "April Cantoneros", registrationReference: "REG-2026-000202", instructionsSentAt: stamp(-14, 9), instructionsAcknowledgedAt: stamp(-13, 21) },
-    { id: "e3", reference: "ENR-2026-000103", traineeId: "t4", batchId: "b3", courseCode: "CCMD", courseName: batches[2].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-18, 15), processedBy: "Kathleen Garcia", registrationReference: "REG-2026-000203", instructionsSentAt: stamp(-8, 9), instructionsAcknowledgedAt: stamp(-7, 19) },
-    { id: "e4", reference: "ENR-2026-000104", traineeId: "t5", batchId: "b4", courseCode: "SSO", courseName: batches[3].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-10, 9), processedBy: "April Cantoneros", registrationReference: "REG-2026-000204", instructionsSentAt: stamp(-3, 9) },
-    { id: "e5", reference: "ENR-2026-000105", traineeId: "t6", batchId: "b5", courseCode: "CCMI", courseName: batches[4].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-6, 14), processedBy: "Karen Mallari", registrationReference: "REG-2026-000205" },
-    { id: "e6", reference: "ENR-2026-000106", traineeId: "t3", batchId: "b6", courseCode: "SATSDSD", courseName: batches[5].courseName, centerName: "New Wave Maritime", status: "Pending", createdAt: stamp(-2, 11), processedBy: "Kathleen Garcia", registrationReference: "REG-2026-000206" },
-    { id: "e7", reference: "ENR-2026-000107", traineeId: "t7", batchId: "b7", courseCode: "PSCMT", courseName: batches[6].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-1, 16), processedBy: "April Cantoneros", registrationReference: "REG-2026-000207" },
+    { id: "e1", reference: "ENR-2026-000101", registrationStatus: "Enrolled", traineeId: "t1", batchId: "b1", courseCode: "CCMI", courseName: batches[0].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-40, 10), processedBy: "Karen Mallari", registrationReference: "REG-2026-000201", instructionsSentAt: stamp(-32, 9), instructionsAcknowledgedAt: stamp(-31, 20), completedAt: stamp(-12, 9) },
+    { id: "e2", reference: "ENR-2026-000102", registrationStatus: "Enrolled", traineeId: "t2", batchId: "b2", courseCode: "PSCMHBT", courseName: batches[1].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-30, 11), processedBy: "April Cantoneros", registrationReference: "REG-2026-000202", instructionsSentAt: stamp(-14, 9), instructionsAcknowledgedAt: stamp(-13, 21) },
+    { id: "e3", reference: "ENR-2026-000103", registrationStatus: "Generated Voucher", traineeId: "t4", batchId: "b3", courseCode: "CCMD", courseName: batches[2].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-18, 15), processedBy: "Kathleen Garcia", registrationReference: "REG-2026-000203", instructionsSentAt: stamp(-8, 9), instructionsAcknowledgedAt: stamp(-7, 19) },
+    { id: "e4", reference: "ENR-2026-000104", registrationStatus: "Waiting for Payment", traineeId: "t5", batchId: "b4", courseCode: "SSO", courseName: batches[3].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-10, 9), processedBy: "April Cantoneros", registrationReference: "REG-2026-000204", instructionsSentAt: stamp(-3, 9) },
+    { id: "e5", reference: "ENR-2026-000105", registrationStatus: "Waiting for Payment", traineeId: "t6", batchId: "b5", courseCode: "CCMI", courseName: batches[4].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-6, 14), processedBy: "Karen Mallari", registrationReference: "REG-2026-000205" },
+    { id: "e6", reference: "ENR-2026-000106", registrationStatus: "Reschedule", traineeId: "t3", batchId: "b6", courseCode: "SATSDSD", courseName: batches[5].courseName, centerName: "New Wave Maritime", status: "Pending", createdAt: stamp(-2, 11), processedBy: "Kathleen Garcia", registrationReference: "REG-2026-000206" },
+    { id: "e7", reference: "ENR-2026-000107", registrationStatus: "Enrolled", traineeId: "t7", batchId: "b7", courseCode: "PSCMT", courseName: batches[6].courseName, centerName: "New Wave Maritime", status: "Enrolled", createdAt: stamp(-1, 16), processedBy: "April Cantoneros", registrationReference: "REG-2026-000207" },
   ];
 
   const ledger: LedgerEntry[] = [];

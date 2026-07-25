@@ -34,6 +34,7 @@ import type {
   LedgerEntry,
   PartnerOfferRecord,
   PaymentChannel,
+  RegistrationLifecycle,
   RegistrationStatus,
   RegistrationSubmission,
   RequestType,
@@ -44,7 +45,7 @@ import type {
   Trainee,
 } from "./types";
 
-const STORAGE_KEY = "new-wave-system-v9";
+const STORAGE_KEY = "new-wave-system-v10";
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -326,6 +327,8 @@ type SystemContextValue = {
   approveSelection: (id: string) => Enrollment | undefined;
   createEnrollment: (input: { traineeId: string; batchId: string }) => Enrollment | undefined;
   changeEnrollmentBatch: (enrollmentId: string, newBatchId: string) => void;
+  setRegistrationStatus: (enrollmentId: string, status: RegistrationLifecycle) => void;
+  generateAdmissionSlip: (enrollmentId: string, input: { officer: string; cashier: string }) => void;
   cancelEnrollment: (id: string, reason: string) => void;
   createTrainee: (input: Omit<Trainee, "id" | "traineeNumber" | "createdAt">) => Trainee;
   setTraineeFacebook: (id: string, facebookLink: string) => void;
@@ -704,20 +707,6 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       };
       update((draft) => {
         submission.reference = nextReference(draft.submissions.map((item) => item.reference), "NWM-REG");
-        // An existing trainee sharing email, mobile or SRN flags the whole
-        // submission for authorized duplicate review before any enrollment.
-        const duplicate = draft.trainees.find(
-          (trainee) =>
-            trainee.email.toLowerCase() === input.applicant.email.toLowerCase() ||
-            trainee.mobile === input.applicant.mobile ||
-            (Boolean(input.applicant.srn) && trainee.srn === input.applicant.srn),
-        );
-        if (duplicate) {
-          submission.status = "Possible Duplicate";
-          submission.traineeId = duplicate.id;
-          submission.remarks = `Matches existing trainee ${duplicate.traineeNumber}.`;
-          submission.publicStatusMessage = "Your selected courses are being reviewed.";
-        }
         draft.submissions.unshift(submission);
         input.selections.slice(0, 5).forEach((selection, index) => {
           draft.courseSelections.push({
@@ -727,7 +716,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
             courseName: selection.courseName,
             batchId: selection.batchId,
             sequence: index + 1,
-            status: "New",
+            status: "Approved",
           });
         });
         input.consents.forEach((consent) => {
@@ -741,13 +730,53 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
             sessionRef: input.sessionRef,
           });
         });
+        // No approval step: create/merge the trainee, then open one enrollment
+        // per selection at "Waiting for Payment" straight away.
+        const trainee = ensureTraineeForSubmission(draft, submission);
+        draft.courseSelections
+          .filter((selection) => selection.submissionId === submission.id)
+          .forEach((selection) => {
+            const batch = draft.batches.find((item) => item.id === selection.batchId);
+            if (!batch) return;
+            const enrollment: Enrollment = {
+              id: uid("e"),
+              reference: nextReference(draft.enrollments.map((item) => item.reference), "NWM-ENR"),
+              traineeId: trainee.id,
+              batchId: batch.id,
+              courseCode: batch.courseCode,
+              courseName: batch.courseName,
+              centerName: batch.centerName,
+              status: "Enrolled",
+              createdAt: new Date().toISOString(),
+              registrationStatus: "Waiting for Payment",
+              registrationReference: submission.reference,
+              registrationSubmissionId: submission.id,
+              courseSelectionId: selection.id,
+            };
+            draft.enrollments.unshift(enrollment);
+            draft.ledger.unshift({
+              id: uid("chg"),
+              reference: `CHG-${enrollment.reference}`,
+              enrollmentId: enrollment.id,
+              type: "charge",
+              amountCentavos: batch.feeCentavos,
+              description: `${batch.courseName} training fee`,
+              verification: "Not required",
+              recordedBy: "Registration",
+              recordedAt: new Date().toISOString(),
+              valid: true,
+            });
+            selection.createdEnrollmentId = enrollment.id;
+          });
+        submission.status = "Approved";
+        submission.publicStatusMessage = "Your enrollment is confirmed. Please proceed with payment to secure your slot.";
         notify(draft, {
           audience: "staff",
-          title: "New registration received",
-          body: `${fullName(input.applicant)} selected ${input.selections.length} course${input.selections.length === 1 ? "" : "s"}.`,
+          title: "New registration enrolled",
+          body: `${fullName(input.applicant)} enrolled in ${input.selections.length} course${input.selections.length === 1 ? "" : "s"}.`,
         });
         log(draft, {
-          action: "Registration submitted",
+          action: "Registration enrolled (no approval)",
           recordType: "Registration",
           recordRef: submission.reference,
           actor: "Public website",
@@ -810,6 +839,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
           centerName: batch.centerName,
           status: "Enrolled",
           createdAt: new Date().toISOString(),
+          registrationStatus: "Waiting for Payment",
           processedBy: actor,
           registrationReference: submission.reference,
           registrationSubmissionId: submission.id,
@@ -863,6 +893,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
           centerName: batch.centerName,
           status: "Enrolled",
           createdAt: new Date().toISOString(),
+          registrationStatus: "Waiting for Payment",
           processedBy: actor,
         };
         draft.enrollments.unshift(enrollment);
@@ -910,6 +941,43 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
           recordType: "Enrollment",
           recordRef: enrollment.reference,
           detail: `${batch.courseName} · ${batch.batchNumber} (${batch.startsOn})`,
+        });
+      });
+    },
+    [log, update],
+  );
+
+  const setRegistrationStatus = useCallback<SystemContextValue["setRegistrationStatus"]>(
+    (enrollmentId, status) => {
+      update((draft) => {
+        const enrollment = draft.enrollments.find((item) => item.id === enrollmentId);
+        if (!enrollment) return;
+        enrollment.registrationStatus = status;
+        if (status === "Cancelled") enrollment.status = "Cancelled";
+        log(draft, {
+          action: `Registration status → ${status}`,
+          recordType: "Enrollment",
+          recordRef: enrollment.reference,
+        });
+      });
+    },
+    [log, update],
+  );
+
+  const generateAdmissionSlip = useCallback<SystemContextValue["generateAdmissionSlip"]>(
+    (enrollmentId, { officer, cashier }) => {
+      update((draft) => {
+        const enrollment = draft.enrollments.find((item) => item.id === enrollmentId);
+        if (!enrollment) return;
+        enrollment.admissionSlipGeneratedAt = new Date().toISOString();
+        enrollment.cashierAssigned = cashier || undefined;
+        if (officer) enrollment.processedBy = officer;
+        enrollment.registrationStatus = "Generated Voucher";
+        log(draft, {
+          action: "Admission slip generated",
+          recordType: "Enrollment",
+          recordRef: enrollment.reference,
+          detail: `Officer ${officer || "—"} · Cashier ${cashier || "—"}`,
         });
       });
     },
@@ -1642,6 +1710,8 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       approveSelection,
       createEnrollment,
       changeEnrollmentBatch,
+      setRegistrationStatus,
+      generateAdmissionSlip,
       cancelEnrollment,
       createTrainee,
       setTraineeFacebook,
@@ -1701,6 +1771,8 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       approveSelection,
       cancelEnrollment,
       changeEnrollmentBatch,
+      setRegistrationStatus,
+      generateAdmissionSlip,
       createBatch,
       createEnrollment,
       autoOpenMonth,

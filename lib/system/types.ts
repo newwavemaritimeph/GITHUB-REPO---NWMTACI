@@ -160,6 +160,14 @@ export type RegistrationConsent = {
   sessionRef?: string;
 };
 
+/** The registration-officer–facing status of an enrollment. */
+export type RegistrationLifecycle =
+  | "Waiting for Payment"
+  | "Enrolled"
+  | "Reschedule"
+  | "Generated Voucher"
+  | "Cancelled";
+
 export type Enrollment = {
   id: string;
   reference: string; // NWM-ENR-YYYY-NNNNNN
@@ -170,6 +178,11 @@ export type Enrollment = {
   centerName: string;
   status: EnrollmentStatus;
   createdAt: string;
+  /** Registration-officer status: Waiting for Payment / Enrolled / etc. */
+  registrationStatus?: RegistrationLifecycle;
+  /** Set when a registration officer generates the admission slip / voucher. */
+  admissionSlipGeneratedAt?: string;
+  cashierAssigned?: string;
   /** Registration officer who processed this enrollment (for the leaderboard). */
   processedBy?: string;
   registrationReference?: string;

@@ -73,21 +73,20 @@ export function Panel({
   );
 }
 
-const stageTone: Record<Stage, string> = {
-  Registered: "slate",
-  "Awaiting payment": "amber",
-  "Payment verification": "amber",
-  Paid: "green",
-  "Instructions sent": "blue",
-  "In training": "blue",
-  "Training complete": "green",
-  "Certificate ready": "violet",
-  "Certificate released": "green",
-  Cancelled: "red",
-};
+/** Collapses the detailed internal stage to the four latest-stage labels
+ * New Wave shows: In Training, Training Complete, Certificate Release, Pending. */
+export type LatestStage = "Pending" | "In Training" | "Training Complete" | "Certificate Release";
+export function simplifiedStage(stage: Stage): LatestStage {
+  if (stage === "In training") return "In Training";
+  if (stage === "Training complete") return "Training Complete";
+  if (stage === "Certificate ready" || stage === "Certificate released") return "Certificate Release";
+  return "Pending";
+}
 
 export function StageBadge({ stage }: { stage: Stage }) {
-  return <Pill tone={stageTone[stage]}>{stage}</Pill>;
+  const label = simplifiedStage(stage);
+  const tone = label === "In Training" ? "blue" : label === "Training Complete" ? "green" : label === "Certificate Release" ? "violet" : "slate";
+  return <Pill tone={tone}>{label}</Pill>;
 }
 
 export const STAGE_ORDER: Stage[] = [

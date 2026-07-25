@@ -16,14 +16,14 @@ import {
   useToast,
 } from "@/components/ui/kit";
 import { pesos } from "@/lib/endorsement-catalog";
-import { formatDate, formatDateRange, formatDateTime, fullName, todayIso, useSystem } from "@/lib/system/store";
-import type { EnrollmentView, RequestType } from "@/lib/system/types";
+import { formatDate, formatDateRange, formatDateTime, formatTime, fullName, todayIso, useSystem } from "@/lib/system/store";
+import type { EnrollmentView, RegistrationLifecycle, RequestType } from "@/lib/system/types";
 import { PageHeader, Panel, StageBadge, StageTrack, type Module } from "./shared";
 
 const filters = ["All", "Unpaid", "Awaiting verification", "Ready for instructions", "In training", "Completed"] as const;
+const REGISTRATION_STATUSES: RegistrationLifecycle[] = ["Waiting for Payment", "Enrolled", "Reschedule", "Generated Voucher", "Cancelled"];
 
 export function EnrollmentsModule({
-  go,
   focusId,
   onFocusHandled,
 }: {
@@ -35,10 +35,13 @@ export function EnrollmentsModule({
     state,
     views,
     seats,
+    actor,
     recordPayment,
     sendInstructions,
     cancelEnrollment,
     changeEnrollmentBatch,
+    setRegistrationStatus,
+    generateAdmissionSlip,
     createEnrollment,
     addLedgerEntry,
     createRequest,
@@ -51,6 +54,7 @@ export function EnrollmentsModule({
   const [newOpen, setNewOpen] = useState(false);
   const [editFor, setEditFor] = useState<EnrollmentView | null>(null);
   const [editBatchId, setEditBatchId] = useState("");
+  const [slipFor, setSlipFor] = useState<EnrollmentView | null>(null);
   // Registration cannot open the Requests module, so changes are raised from here.
   const [requestFor, setRequestFor] = useState<EnrollmentView | null>(null);
   const [requestType, setRequestType] = useState<RequestType>("Reschedule");
@@ -195,6 +199,23 @@ export function EnrollmentsModule({
 
             <dl className="detail-list">
               <div>
+                <dt>Registration status</dt>
+                <dd>
+                  <select
+                    className="status-select"
+                    value={active.enrollment.registrationStatus ?? "Waiting for Payment"}
+                    onChange={(event) => {
+                      setRegistrationStatus(active.enrollment.id, event.target.value as RegistrationLifecycle);
+                      toast("success", `Registration status set to ${event.target.value}.`);
+                    }}
+                  >
+                    {REGISTRATION_STATUSES.map((item) => (
+                      <option key={item}>{item}</option>
+                    ))}
+                  </select>
+                </dd>
+              </div>
+              <div>
                 <dt>Batch</dt>
                 <dd>{active.batch?.batchNumber ?? "Open schedule"}</dd>
               </div>
@@ -267,8 +288,8 @@ export function EnrollmentsModule({
               >
                 Request a change
               </button>
-              <button className="secondary-button" onClick={() => go("Certificates")}>
-                Certificate
+              <button className="secondary-button" onClick={() => setSlipFor(active)}>
+                Admission slip
               </button>
               {active.enrollment.status !== "Cancelled" && (
                 <button
@@ -449,6 +470,20 @@ export function EnrollmentsModule({
         )}
       </Modal>
 
+      {slipFor && (
+        <AdmissionSlipModal
+          key={slipFor.enrollment.id}
+          view={slipFor}
+          defaultOfficer={slipFor.enrollment.processedBy || actor}
+          session={state.attendanceSessions.find((item) => item.batchId === slipFor.enrollment.batchId)}
+          onClose={() => setSlipFor(null)}
+          onGenerate={(officer, cashier) => {
+            generateAdmissionSlip(slipFor.enrollment.id, { officer, cashier });
+            toast("success", "Admission slip generated — status set to Generated Voucher.");
+          }}
+        />
+      )}
+
       <NewEnrollmentModal
         open={newOpen}
         onClose={() => setNewOpen(false)}
@@ -560,6 +595,112 @@ export function PaymentModal({
               ? "The payment appears under Payments → Verification queue. The receipt is issued only after a cashier confirms the reference against the proof."
               : "An official receipt number is issued as soon as the payment is posted."}
           </p>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+function AdmissionSlipModal({
+  view,
+  defaultOfficer,
+  session,
+  onClose,
+  onGenerate,
+}: {
+  view: EnrollmentView;
+  defaultOfficer: string;
+  session?: { startsAt: string; endsAt: string };
+  onClose: () => void;
+  onGenerate: (officer: string, cashier: string) => void;
+}) {
+  const [officer, setOfficer] = useState(defaultOfficer);
+  const [cashier, setCashier] = useState(view.enrollment.cashierAssigned ?? "");
+  const { trainee, batch, enrollment } = view;
+  const time = session ? `${formatTime(session.startsAt)} – ${formatTime(session.endsAt)}` : "8:00 AM – 5:00 PM";
+
+  return (
+    <Modal
+      open
+      title="Admission slip"
+      description={`${enrollment.reference} · ${enrollment.courseName}`}
+      onClose={onClose}
+      wide
+      footer={
+        <>
+          <button className="secondary-button" onClick={onClose}>
+            Close
+          </button>
+          <button className="secondary-button" onClick={() => window.print()}>
+            Print
+          </button>
+          <button
+            className="primary-button"
+            onClick={() => {
+              onGenerate(officer.trim(), cashier.trim());
+              onClose();
+            }}
+          >
+            Generate &amp; mark voucher
+          </button>
+        </>
+      }
+    >
+      <div className="form-grid">
+        <Field label="Assigned Registration Officer">
+          <input value={officer} onChange={(event) => setOfficer(event.target.value)} />
+        </Field>
+        <Field label="Cashier Assigned">
+          <input value={cashier} onChange={(event) => setCashier(event.target.value)} />
+        </Field>
+      </div>
+
+      <div className="admission-slip" id="admission-slip-print">
+        <div className="slip-head">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/new-wave-logo.png" alt="New Wave Maritime" className="slip-logo" />
+          <div>
+            <h2>NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.</h2>
+            <p>Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000</p>
+            <strong>ADMISSION SLIP</strong>
+          </div>
+        </div>
+
+        <div className="slip-meta">
+          <span>Reference <strong>{enrollment.reference}</strong></span>
+          <span>Trainee No. <strong>{trainee.traineeNumber}</strong></span>
+          <span>Issued <strong>{formatDate(new Date().toISOString())}</strong></span>
+        </div>
+
+        <h3 className="slip-section">Personal details</h3>
+        <div className="slip-grid">
+          <div><span>Name</span><strong>{fullName(trainee)}{trainee.suffix ? ` ${trainee.suffix}` : ""}</strong></div>
+          <div><span>SRN</span><strong>{trainee.srn ?? "—"}</strong></div>
+          <div><span>Birth date</span><strong>{trainee.birthDate}</strong></div>
+          <div><span>Mobile</span><strong>{trainee.mobile}</strong></div>
+          <div><span>Email</span><strong>{trainee.email}</strong></div>
+          <div><span>Address</span><strong>{trainee.address ?? "—"}</strong></div>
+        </div>
+
+        <h3 className="slip-section">Training details</h3>
+        <div className="slip-grid">
+          <div><span>Course</span><strong>{enrollment.courseName} ({enrollment.courseCode})</strong></div>
+          <div><span>Schedule</span><strong>{batch ? formatDateRange(batch.startsOn, batch.endsOn) : "—"}</strong></div>
+          <div><span>Time</span><strong>{time}</strong></div>
+          <div><span>Classroom</span><strong>{batch?.venue ?? "—"}</strong></div>
+          <div><span>Instructor</span><strong>{batch?.instructor ?? "—"}</strong></div>
+          <div><span>Registration status</span><strong>{enrollment.registrationStatus ?? "Waiting for Payment"}</strong></div>
+        </div>
+
+        <div className="slip-signatures">
+          <div>
+            <div className="sign-line">{officer || " "}</div>
+            <span>Registration Officer · Signature over Printed Name</span>
+          </div>
+          <div>
+            <div className="sign-line">{cashier || " "}</div>
+            <span>Cashier · Signature over Printed Name</span>
+          </div>
         </div>
       </div>
     </Modal>
