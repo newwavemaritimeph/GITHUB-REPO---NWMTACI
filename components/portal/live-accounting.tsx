@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { parseCsv, downloadCsv } from "@/lib/csv";
 
 /** Loose shapes for the accounting slices of the staff-operations payload. */
-type Payment = { method: string; amount_centavos: number; verification_state: string };
+type Payment = { payment_number?: string; method: string; amount_centavos: number; reference_number?: string | null; received_at?: string; verification_state: string };
 type Enrollment = { id: string; enrollment_number: string; selling_price_centavos: number; paid_centavos: number; enrollment_status: string; trainees?: unknown; courses?: unknown };
 type Channel = { id: string; code: string; name: string; requires_reference: boolean; allows_proof: boolean; active: boolean };
 type Charge = { id: string; name: string; default_amount_centavos: number; active: boolean; used_count: number };
@@ -19,7 +20,7 @@ const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "cur
 const num = (raw: string | null) => (raw == null || raw.trim() === "" ? null : Math.round(Number(raw) * 100));
 
 export function LiveAccounting({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
-  const [tab, setTab] = useState<"Overview" | "Vouchers" | "Setup">("Overview");
+  const [tab, setTab] = useState<"Overview" | "Vouchers" | "Reconciliation" | "Setup">("Overview");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const canManage = role === "admin" || role === "accounting";
@@ -58,7 +59,7 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         <div><span className="portal-eyebrow">Financial control</span><h1>Accounting</h1><p>Collections, disbursements, receivables, and setup — from the live Supabase ledger.</p></div>
       </div>
       <div className="portal-tabs">
-        {(["Overview", "Vouchers", "Setup"] as const).map((item) => (
+        {(["Overview", "Vouchers", "Reconciliation", "Setup"] as const).map((item) => (
           <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>
         ))}
       </div>
@@ -131,6 +132,8 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         </section>
       )}
 
+      {tab === "Reconciliation" && <Reconciliation payments={data.payments} channels={data.paymentMethods} />}
+
       {tab === "Setup" && (
         <>
           {!canManage && <div className="portal-message error">Only Admin and Accounting can edit setup.</div>}
@@ -160,6 +163,144 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         </>
       )}
     </div>
+  );
+}
+
+/* ---- Bank & GCash reconciliation (session-only; no store/DB writes) ---- */
+
+type BankRow = { line: number; reference: string; amountCentavos: number | null; date: string; raw: string };
+const normalizeRef = (value: string) => value.replace(/[\s-]/g, "").toUpperCase();
+const parseAmount = (value: string): number | null => {
+  const cleaned = value.replace(/[^0-9.-]/g, "");
+  if (cleaned === "" || cleaned === "-" || cleaned === ".") return null;
+  const n = Number(cleaned);
+  return Number.isFinite(n) ? Math.round(Math.abs(n) * 100) : null;
+};
+const isoDay = (value?: string | null) => {
+  if (!value) return "";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? String(value).slice(0, 10) : new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(d);
+};
+
+function Reconciliation({ payments, channels }: { payments: Payment[]; channels: Channel[] }) {
+  const active = channels.filter((c) => c.active);
+  const [channel, setChannel] = useState(active.find((c) => c.name !== "Cash")?.name ?? active[0]?.name ?? "");
+  const [rows, setRows] = useState<BankRow[]>([]);
+  const [fileName, setFileName] = useState("");
+  const [error, setError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function onFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = ""; // allow re-selecting the same file
+    if (!file) return;
+    setError("");
+    try {
+      const grid = parseCsv(await file.text());
+      if (grid.length < 2) throw new Error("The file has no data rows.");
+      const header = grid[0].map((h) => h.trim().toLowerCase());
+      const findCol = (keys: string[]) => header.findIndex((h) => keys.some((k) => h.includes(k)));
+      const refCol = findCol(["reference", "ref no", "ref", "transaction id", "txn", "confirmation"]);
+      const amtCol = findCol(["amount", "credit", "value", "paid"]);
+      const dateCol = findCol(["date", "time", "posted"]);
+      if (refCol === -1 && amtCol === -1) throw new Error("Could not find a Reference or Amount column in the header.");
+      const parsed: BankRow[] = grid.slice(1).map((cells, i) => ({
+        line: i + 2,
+        reference: refCol === -1 ? "" : (cells[refCol] ?? "").trim(),
+        amountCentavos: amtCol === -1 ? null : parseAmount(cells[amtCol] ?? ""),
+        date: dateCol === -1 ? "" : isoDay((cells[dateCol] ?? "").trim()),
+        raw: cells.join(" · "),
+      }));
+      setRows(parsed);
+      setFileName(file.name);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not read the file.");
+      setRows([]); setFileName("");
+    }
+  }
+
+  const result = useMemo(() => {
+    const ledger = payments.filter((p) => p.method === channel);
+    const usedLedger = new Set<number>();
+    const matched: { bank: BankRow; payment: Payment; via: string }[] = [];
+    const bankOnly: BankRow[] = [];
+    for (const bank of rows) {
+      const bankRef = normalizeRef(bank.reference);
+      let idx = -1; let via = "";
+      if (bankRef) idx = ledger.findIndex((p, li) => !usedLedger.has(li) && p.reference_number && normalizeRef(p.reference_number) === bankRef);
+      if (idx !== -1) via = "reference";
+      else if (bank.amountCentavos != null) {
+        idx = ledger.findIndex((p, li) => !usedLedger.has(li) && Number(p.amount_centavos) === bank.amountCentavos && (!bank.date || isoDay(p.received_at) === bank.date));
+        if (idx !== -1) via = "amount + date";
+      }
+      if (idx !== -1) { usedLedger.add(idx); matched.push({ bank, payment: ledger[idx], via }); }
+      else bankOnly.push(bank);
+    }
+    const systemOnly = ledger.filter((_, li) => !usedLedger.has(li));
+    return { matched, bankOnly, systemOnly, ledgerCount: ledger.length };
+  }, [rows, payments, channel]);
+
+  function exportCsv() {
+    const out: (string | number)[][] = [["Status", "Reference", "Amount (PHP)", "Date", "Matched via", "Payment no."]];
+    for (const m of result.matched) out.push(["Matched", m.bank.reference, ((m.bank.amountCentavos ?? 0) / 100).toFixed(2), m.bank.date, m.via, m.payment.payment_number ?? ""]);
+    for (const b of result.bankOnly) out.push(["In bank file only", b.reference, b.amountCentavos == null ? "" : (b.amountCentavos / 100).toFixed(2), b.date, "", ""]);
+    for (const p of result.systemOnly) out.push(["In system only", p.reference_number ?? "", (Number(p.amount_centavos) / 100).toFixed(2), isoDay(p.received_at), "", p.payment_number ?? ""]);
+    downloadCsv(`reconciliation-${channel}-${isoDay(new Date().toISOString())}.csv`, out);
+  }
+
+  return (
+    <>
+      <section className="portal-panel">
+        <div className="panel-heading"><div><h2>Bank &amp; GCash reconciliation</h2><p>Upload a channel&apos;s transaction history (CSV) and match it against posted payments. Session-only — nothing is saved.</p></div></div>
+        <div className="portal-form" style={{ padding: "4px 0" }}>
+          <label>Channel<select value={channel} onChange={(e) => { setChannel(e.target.value); }}>
+            {active.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+          </select></label>
+          <div className="full" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onFile} style={{ display: "none" }} />
+            <button className="portal-primary" type="button" onClick={() => fileRef.current?.click()}>Upload transaction history</button>
+            {fileName && <span style={{ color: "var(--muted)", fontSize: 13 }}>{fileName} · {rows.length} rows</span>}
+            {rows.length > 0 && <button type="button" onClick={exportCsv}>Download reconciliation CSV</button>}
+          </div>
+        </div>
+        {error && <div className="portal-message error" role="alert">{error}</div>}
+      </section>
+
+      {rows.length > 0 && (
+        <>
+          <div className="finance-hero">
+            <div><span>Matched</span><strong>{result.matched.length}</strong><small>Bank rows found in the ledger</small></div>
+            <article><span>In bank file only</span><strong>{result.bankOnly.length}</strong><small>No posted payment</small></article>
+            <article><span>In system only</span><strong>{result.systemOnly.length}</strong><small>Not on the statement</small></article>
+            <article><span>Ledger rows</span><strong>{result.ledgerCount}</strong><small>{channel} payments</small></article>
+          </div>
+
+          <section className="portal-panel">
+            <div className="panel-heading"><div><h2>In bank file only</h2><p>Statement rows with no matching posted payment — investigate</p></div></div>
+            <div className="portal-table"><table><thead><tr><th>Line</th><th>Reference</th><th>Amount</th><th>Date</th></tr></thead><tbody>
+              {result.bankOnly.map((b) => <tr key={b.line}><td>{b.line}</td><td><strong>{b.reference || "—"}</strong></td><td>{b.amountCentavos == null ? "—" : pesos(b.amountCentavos)}</td><td>{b.date || "—"}</td></tr>)}
+              {!result.bankOnly.length && <tr><td colSpan={4}><span className="portal-empty-copy">Every statement row matched a payment.</span></td></tr>}
+            </tbody></table></div>
+          </section>
+
+          <section className="portal-panel">
+            <div className="panel-heading"><div><h2>In system only</h2><p>Posted {channel} payments not on the uploaded statement</p></div></div>
+            <div className="portal-table"><table><thead><tr><th>Payment</th><th>Reference</th><th>Amount</th><th>Date</th></tr></thead><tbody>
+              {result.systemOnly.map((p, i) => <tr key={p.payment_number ?? i}><td><strong>{p.payment_number ?? "—"}</strong></td><td>{p.reference_number ?? "—"}</td><td>{pesos(p.amount_centavos)}</td><td>{isoDay(p.received_at) || "—"}</td></tr>)}
+              {!result.systemOnly.length && <tr><td colSpan={4}><span className="portal-empty-copy">Every posted payment is on the statement.</span></td></tr>}
+            </tbody></table></div>
+          </section>
+
+          <section className="portal-panel">
+            <div className="panel-heading"><div><h2>Matched</h2><p>Statement rows reconciled to the ledger</p></div></div>
+            <div className="portal-table"><table><thead><tr><th>Reference</th><th>Amount</th><th>Date</th><th>Via</th><th>Payment</th></tr></thead><tbody>
+              {result.matched.map((m) => <tr key={m.bank.line}><td><strong>{m.bank.reference || "—"}</strong></td><td>{m.bank.amountCentavos == null ? "—" : pesos(m.bank.amountCentavos)}</td><td>{m.bank.date || "—"}</td><td>{m.via}</td><td>{m.payment.payment_number ?? "—"}</td></tr>)}
+              {!result.matched.length && <tr><td colSpan={5}><span className="portal-empty-copy">No rows matched — check the channel and file columns.</span></td></tr>}
+            </tbody></table></div>
+          </section>
+        </>
+      )}
+    </>
   );
 }
 
