@@ -5,7 +5,9 @@ import { parseCsv, downloadCsv } from "@/lib/csv";
 
 /** Loose shapes for the accounting slices of the staff-operations payload. */
 type Payment = { payment_number?: string; method: string; amount_centavos: number; reference_number?: string | null; received_at?: string; verification_state: string };
-type Enrollment = { id: string; enrollment_number: string; selling_price_centavos: number; paid_centavos: number; enrollment_status: string; trainees?: unknown; courses?: unknown };
+type Enrollment = { id: string; enrollment_number: string; selling_price_centavos: number; paid_centavos: number; charges_centavos?: number; discounts_centavos?: number; enrollment_status: string; trainees?: unknown; courses?: unknown };
+/** Amount due = base price + other charges − rebates/discounts. */
+const dueOf = (e: Enrollment) => Number(e.selling_price_centavos) + Number(e.charges_centavos ?? 0) - Number(e.discounts_centavos ?? 0);
 type Channel = { id: string; code: string; name: string; requires_reference: boolean; allows_proof: boolean; active: boolean };
 type Charge = { id: string; name: string; default_amount_centavos: number; active: boolean; used_count: number };
 type Agency = { id: string; name: string; contact_name?: string | null; email?: string | null; mobile?: string | null; active: boolean };
@@ -49,8 +51,8 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
   const collectionTotal = collections.reduce((sum, [, v]) => sum + v.total, 0);
   const disbursements = data.expenses.filter((e) => e.status === "Paid" || e.status === "Approved");
   const disbursementTotal = disbursements.reduce((sum, e) => sum + Number(e.amount_centavos), 0);
-  const receivables = data.enrollments.filter((e) => Number(e.selling_price_centavos) - Number(e.paid_centavos) > 0 && e.enrollment_status !== "Cancelled");
-  const receivableTotal = receivables.reduce((sum, e) => sum + (Number(e.selling_price_centavos) - Number(e.paid_centavos)), 0);
+  const receivables = data.enrollments.filter((e) => dueOf(e) - Number(e.paid_centavos) > 0 && e.enrollment_status !== "Cancelled");
+  const receivableTotal = receivables.reduce((sum, e) => sum + (dueOf(e) - Number(e.paid_centavos)), 0);
   const payableTotal = data.payables.reduce((sum, p) => sum + Number(p.amount_centavos), 0);
 
   return (
@@ -85,7 +87,7 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
           <section className="portal-panel">
             <div className="panel-heading"><div><h2>Receivables ageing</h2><p>Open enrollment balances</p></div></div>
             <div className="portal-table"><table><thead><tr><th>Enrollment</th><th>Charged</th><th>Paid</th><th>Balance</th></tr></thead><tbody>
-              {receivables.slice(0, 50).map((e) => <tr key={e.id}><td><strong>{e.enrollment_number}</strong></td><td>{pesos(e.selling_price_centavos)}</td><td>{pesos(e.paid_centavos)}</td><td><strong>{pesos(Number(e.selling_price_centavos) - Number(e.paid_centavos))}</strong></td></tr>)}
+              {receivables.slice(0, 50).map((e) => <tr key={e.id}><td><strong>{e.enrollment_number}</strong>{(Number(e.charges_centavos ?? 0) > 0 || Number(e.discounts_centavos ?? 0) > 0) && <small>{Number(e.charges_centavos ?? 0) > 0 ? `+${pesos(e.charges_centavos ?? 0)} charges` : ""}{Number(e.discounts_centavos ?? 0) > 0 ? ` −${pesos(e.discounts_centavos ?? 0)} rebate` : ""}</small>}</td><td>{pesos(dueOf(e))}</td><td>{pesos(e.paid_centavos)}</td><td><strong>{pesos(dueOf(e) - Number(e.paid_centavos))}</strong></td></tr>)}
               {!receivables.length && <tr><td colSpan={4}><span className="portal-empty-copy">Every enrollment is settled.</span></td></tr>}
             </tbody></table></div>
           </section>

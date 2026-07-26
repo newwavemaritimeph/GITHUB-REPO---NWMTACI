@@ -23,13 +23,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { data: allocations } = await db.from("payment_allocations")
     .select("amount_centavos,payments!inner(payment_number,method,reference_number,received_at,valid)")
     .eq("enrollment_id", id).eq("payments.valid", true);
+  const { data: chargeRows } = await db.from("enrollment_charges")
+    .select("description,amount_centavos,event_type").eq("enrollment_id", id).eq("valid", true).order("created_at");
   const paid = (allocations ?? []).reduce((sum, a) => sum + Number(a.amount_centavos), 0);
-  const due = Number(data.selling_price_centavos);
+  const chargeTotal = (chargeRows ?? []).filter((r) => r.event_type !== "discount").reduce((sum, r) => sum + Number(r.amount_centavos), 0);
+  const discountTotal = (chargeRows ?? []).filter((r) => r.event_type === "discount").reduce((sum, r) => sum + Number(r.amount_centavos), 0);
+  const due = Number(data.selling_price_centavos) + chargeTotal - discountTotal;
   const balance = Math.max(0, due - paid);
   const paymentStatus = balance <= 0 && paid > 0 ? "Paid" : paid > 0 ? "Partially Paid" : "Unpaid";
 
   const lines: AdmissionInvoiceLine[] = [
-    { description: `${course?.name ?? "Training"} fee`, detail: data.enrollment_number, amountCentavos: due },
+    { description: `${course?.name ?? "Training"} fee`, detail: data.enrollment_number, amountCentavos: Number(data.selling_price_centavos) },
+    ...(chargeRows ?? []).map((r) => ({ description: r.event_type === "discount" ? `Rebate — ${r.description}` : r.description, detail: r.event_type === "discount" ? "Discount" : "Other charge", amountCentavos: Number(r.amount_centavos), negative: r.event_type === "discount" })),
     ...(allocations ?? []).map((a) => {
       const payment = one(a.payments as unknown as { payment_number: string; method: string; reference_number?: string | null; received_at: string });
       return { description: `Payment ${payment?.payment_number ?? ""}`, detail: `${payment?.method ?? ""}${payment?.reference_number ? ` · Ref ${payment.reference_number}` : ""}`, amountCentavos: Number(a.amount_centavos), negative: true };
