@@ -6,6 +6,7 @@ import { NewWaveLogo } from "./new-wave-logo";
 import { LiveAttendance } from "./portal/live-attendance";
 import { LiveAccounting } from "./portal/live-accounting";
 import { LiveCashierClosing } from "./portal/live-cashier-closing";
+import { LiveHr, type HrData } from "./portal/live-hr";
 import { PaymentProofOcr } from "./payment-proof-ocr";
 import { automaticEndDate, batchPatternLabel, validBatchStart } from "@/lib/scheduling";
 import { AdminConfiguration } from "./admin-configuration";
@@ -21,7 +22,8 @@ type Payment = { id:string; payment_number:string; trainee_id:string; amount_cen
 type Notification = { id:string; title:string; body:string; deep_link?:string|null; read_at?:string|null; created_at:string };
 type EnrollmentCharge = { id:string; enrollment_id:string; charge_catalog_id?:string|null; description:string; amount_centavos:number; event_type:string; created_at:string };
 type PortalData = { profile:{complete_name:string;email:string}; roles:string[]; courses:Course[]; offers:Offer[]; trainees:Trainee[]; batches:Batch[]; enrollments:Enrollment[]; payments:Payment[]; notifications:Notification[];
-  paymentMethods:{id:string;code:string;name:string;requires_reference:boolean;allows_proof:boolean;active:boolean}[]; charges:{id:string;name:string;default_amount_centavos:number;active:boolean;used_count:number}[]; agencies:{id:string;name:string;contact_name?:string|null;email?:string|null;mobile?:string|null;active:boolean}[]; expenses:{id:string;expense_number:string;payee:string;category:string;amount_centavos:number;status:string;created_at:string}[]; payables:{id:string;description:string;amount_centavos:number;due_on?:string|null;status:string}[]; cashierClosings:{id:string;closing_date:string;opening_cash_centavos:number;cash_collections_centavos:number;online_collections_centavos:number;expenses_centavos:number;expected_cash_centavos:number;actual_cash_centavos?:number|null;variance_centavos?:number|null;status:string}[]; enrollmentCharges:EnrollmentCharge[] };
+  paymentMethods:{id:string;code:string;name:string;requires_reference:boolean;allows_proof:boolean;active:boolean}[]; charges:{id:string;name:string;default_amount_centavos:number;active:boolean;used_count:number}[]; agencies:{id:string;name:string;contact_name?:string|null;email?:string|null;mobile?:string|null;active:boolean}[]; expenses:{id:string;expense_number:string;payee:string;category:string;amount_centavos:number;status:string;created_at:string}[]; payables:{id:string;description:string;amount_centavos:number;due_on?:string|null;status:string}[]; cashierClosings:{id:string;closing_date:string;opening_cash_centavos:number;cash_collections_centavos:number;online_collections_centavos:number;expenses_centavos:number;expected_cash_centavos:number;actual_cash_centavos?:number|null;variance_centavos?:number|null;status:string}[]; enrollmentCharges:EnrollmentCharge[];
+  employees:HrData["employees"]; employeeAttendance:HrData["employeeAttendance"]; leaveRequests:HrData["leaveRequests"]; cashAdvances:HrData["cashAdvances"]; payrollPeriods:HrData["payrollPeriods"] };
 
 const nav: {label:Module;icon:string;roles?:string[]}[] = [
   {label:"Dashboard",icon:"⌂"},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting","training_operations"]},
@@ -69,6 +71,7 @@ function PortalContent({active,role,data,query,open,canEnroll,canSchedule,canPay
   if(active==="Reports")return <div className="portal-page"><PageHead eyebrow="Audited exports" title="Date-sensitive reports" text="Operational and financial exports always require an inclusive reporting period."/><DateReports/></div>;
   if(active==="Cashier closing")return <LiveCashierClosing data={data} reload={reload}/>;
   if(active==="Accounting")return <LiveAccounting data={data} role={role} reload={reload}/>;
+  if(active==="HR & payroll"&&["admin","hr"].includes(role))return <LiveHr data={data} role={role} reload={reload}/>;
   if(active==="Settings"&&role==="admin")return <div className="portal-page"><PageHead eyebrow="System administration" title="Configuration and authorized accounts" text="Manage payment modes, users, partners, agencies, courses, prices, and durations."/><AdminConfiguration/></div>;
   return <ConnectedModule module={active} data={data}/>;
 }
