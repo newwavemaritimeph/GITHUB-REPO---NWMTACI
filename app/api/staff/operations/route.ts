@@ -56,8 +56,10 @@ const leaveFileInput = z.object({ action: z.literal("leave-file"), employeeId: z
 const leaveDecideInput = z.object({ action: z.literal("leave-decide"), id: z.string().uuid(), decision: z.enum(["Approved", "Rejected"]) });
 const advanceFileInput = z.object({ action: z.literal("advance-file"), employeeId: z.string().uuid(), amountCentavos: z.number().int().positive(), requestedOn: z.string().date() });
 const advanceDecideInput = z.object({ action: z.literal("advance-decide"), id: z.string().uuid(), decision: z.enum(["Approved", "Rejected"]) });
+const employeeSaveInput = z.object({ action: z.literal("employee-save"), id: z.string().uuid().nullable().optional(), completeName: z.string().trim().min(2).max(160), position: z.string().trim().min(1).max(120), employmentStatus: z.string().trim().min(1).max(40).default("Active"), dateHired: z.string().date(), payType: z.enum(["Monthly", "Semi-Monthly", "Weekly", "Daily"]).default("Monthly"), baseRateCentavos: z.number().int().nonnegative().default(0), instructorDailyRateCentavos: z.number().int().nonnegative().nullable().optional(), workEmail: z.string().email().optional().or(z.literal("")), active: z.boolean().optional() });
+const employeeSetActiveInput = z.object({ action: z.literal("employee-set-active"), id: z.string().uuid(), active: z.boolean() });
 
-const actionInput = z.union([batchInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput]);
+const actionInput = z.union([batchInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput]);
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
 const canManageHr = (roles: string[]) => roles.some((role) => ["admin", "hr"].includes(role));
@@ -266,6 +268,28 @@ export async function POST(request: Request) {
       if (!canManageHr(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot decide cash advances." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { error } = await admin.from("cash_advances").update({ status: input.decision, approved_by: staff.user.id }).eq("id", input.id);
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "employee-save") {
+      if (!canManageHr(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage employees." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const base = { complete_name: input.completeName, position: input.position, employment_status: input.employmentStatus, date_hired: input.dateHired, pay_type: input.payType, base_rate_centavos: input.baseRateCentavos, instructor_daily_rate_centavos: input.instructorDailyRateCentavos ?? null, work_email: input.workEmail || null };
+      if (input.id) {
+        const { error } = await admin.from("employees").update({ ...base, ...(input.active !== undefined ? { active: input.active } : {}) }).eq("id", input.id);
+        if (error) throw error;
+        return NextResponse.json({ ok: true });
+      }
+      const { data: employeeNumber, error: numberError } = await db.rpc("next_reference", { prefix: "EMP", requested_year: new Date().getFullYear() });
+      if (numberError) throw numberError;
+      const { error } = await admin.from("employees").insert({ ...base, employee_number: employeeNumber, government_ids: {}, payroll_account: {}, emergency_contact: {}, leave_balances: {}, active: true });
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "employee-set-active") {
+      if (!canManageHr(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage employees." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { error } = await admin.from("employees").update({ active: input.active }).eq("id", input.id);
       if (error) throw error;
       return NextResponse.json({ ok: true });
     }

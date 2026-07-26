@@ -33,6 +33,18 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
     } finally { setBusy(false); }
   }
 
+  function saveEmployee(existing?: Employee) {
+    const completeName = window.prompt("Full name?", existing?.complete_name ?? ""); if (!completeName) return;
+    const position = window.prompt("Position?", existing?.position ?? "Instructor"); if (!position) return;
+    const employmentStatus = window.prompt("Employment status? (Active, Probationary, Contractual, Trainee, Inactive)", existing?.employment_status ?? "Active"); if (!employmentStatus) return;
+    const dateHired = window.prompt("Date hired (YYYY-MM-DD)?", existing?.date_hired ?? todayManila()); if (!dateHired) return;
+    const payType = window.prompt("Pay type? (Monthly, Semi-Monthly, Weekly, Daily)", existing?.pay_type ?? "Monthly"); if (!payType) return;
+    const baseRate = num(window.prompt("Base rate (PHP)? For Monthly this is the monthly salary.", existing ? String(existing.base_rate_centavos / 100) : "0")) ?? 0;
+    const dailyRaw = payType === "Daily" ? window.prompt("Instructor daily rate (PHP)?", existing?.instructor_daily_rate_centavos ? String(existing.instructor_daily_rate_centavos / 100) : "0") : null;
+    const workEmail = window.prompt("Work email (optional)?", existing?.work_email ?? "") ?? "";
+    void post({ action: "employee-save", id: existing?.id ?? null, completeName, position, employmentStatus, dateHired, payType, baseRateCentavos: baseRate, instructorDailyRateCentavos: dailyRaw == null ? null : (num(dailyRaw) ?? 0), workEmail });
+  }
+
   const activeEmployees = data.employees.filter((e) => e.active);
   const pendingLeave = data.leaveRequests.filter((l) => l.status === "Pending");
   const pendingAdvances = data.cashAdvances.filter((a) => a.status === "Pending");
@@ -85,8 +97,8 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
 
       {tab === "Directory" && (
         <section className="portal-panel">
-          <div className="panel-heading"><div><h2>Employee directory</h2><p>Active and inactive staff on record</p></div></div>
-          <div className="portal-table"><table><thead><tr><th>Employee</th><th>Position</th><th>Status</th><th>Pay type</th><th>Base rate</th><th>Work email</th></tr></thead><tbody>
+          <div className="panel-heading"><div><h2>Employee directory</h2><p>Active and inactive staff on record</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => saveEmployee()}>+ Add employee</button>}</div>
+          <div className="portal-table"><table><thead><tr><th>Employee</th><th>Position</th><th>Status</th><th>Pay type</th><th>Base rate</th><th>Work email</th><th></th></tr></thead><tbody>
             {data.employees.map((e) => (
               <tr key={e.id} className={e.active ? "" : "row-muted"}>
                 <td><strong>{e.complete_name}</strong><small>{e.employee_number} · hired {e.date_hired}</small></td>
@@ -95,9 +107,13 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
                 <td>{e.pay_type}{e.pay_type === "Daily" && e.instructor_daily_rate_centavos ? ` · ${pesos(e.instructor_daily_rate_centavos)}/day` : ""}</td>
                 <td>{pesos(e.base_rate_centavos)}</td>
                 <td>{e.work_email ?? "—"}</td>
+                <td className="document-actions">
+                  {canManage && <button disabled={busy} onClick={() => saveEmployee(e)}>Edit</button>}
+                  {canManage && <button disabled={busy} onClick={() => post({ action: "employee-set-active", id: e.id, active: !e.active })}>{e.active ? "Archive" : "Restore"}</button>}
+                </td>
               </tr>
             ))}
-            {!data.employees.length && <tr><td colSpan={6}><span className="portal-empty-copy">No employees on record.</span></td></tr>}
+            {!data.employees.length && <tr><td colSpan={7}><span className="portal-empty-copy">No employees on record.</span></td></tr>}
           </tbody></table></div>
         </section>
       )}
