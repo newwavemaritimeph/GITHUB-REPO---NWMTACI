@@ -8,12 +8,13 @@ import { LiveAccounting } from "./portal/live-accounting";
 import { LiveCashierClosing } from "./portal/live-cashier-closing";
 import { LiveHr, type HrData } from "./portal/live-hr";
 import { LiveTraining, type TrainingData } from "./portal/live-training";
+import { LiveSearchTrainee } from "./portal/live-search-trainee";
 import { PaymentProofOcr } from "./payment-proof-ocr";
 import { automaticEndDate, batchPatternLabel, validBatchStart } from "@/lib/scheduling";
 import { AdminConfiguration } from "./admin-configuration";
 import { DateReports } from "./date-reports";
 
-type Module = "Dashboard" | "Trainees" | "Enrollments" | "Courses & centers" | "Schedules" | "Payments" | "Cashier closing" | "Accounting" | "Attendance" | "Classrooms" | "Certificates" | "HR & payroll" | "Reports" | "Settings";
+type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Courses & centers" | "Schedules" | "Payments" | "Cashier closing" | "Accounting" | "Attendance" | "Classrooms" | "Certificates" | "HR & payroll" | "Reports" | "Settings";
 type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; course_categories?: {name:string}|{name:string}[]|null };
 type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string}|{name:string}[]|null };
 type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; birthdate:string; email:string; mobile:string; account_state:string; registered_at:string };
@@ -28,7 +29,7 @@ type PortalData = { profile:{complete_name:string;email:string}; roles:string[];
   classrooms:TrainingData["classrooms"]; certificates:TrainingData["certificates"] };
 
 const nav: {label:Module;icon:string;roles?:string[]}[] = [
-  {label:"Dashboard",icon:"⌂"},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting","training_operations"]},
+  {label:"Dashboard",icon:"⌂"},{label:"Search trainee",icon:"⌕",roles:["admin"]},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting","training_operations"]},
   {label:"Enrollments",icon:"▤",roles:["admin","registration","cashier","accounting","training_operations"]},{label:"Courses & centers",icon:"◇"},
   {label:"Schedules",icon:"□",roles:["admin","registration","training_operations","instructor"]},{label:"Payments",icon:"₱",roles:["admin","cashier","accounting","registration"]},{label:"Cashier closing",icon:"▦",roles:["admin","cashier","accounting"]},
   {label:"Accounting",icon:"▥",roles:["admin","accounting"]},{label:"Attendance",icon:"✓",roles:["admin","training_operations","instructor"]},
@@ -64,6 +65,7 @@ export function PortalLiveApp(){
 
 function PortalContent({active,role,data,query,open,canEnroll,canSchedule,canPay,reload}:{active:Module;role:string;data:PortalData;query:string;open:(value:"enrollment"|"batch"|"payment")=>void;canEnroll:boolean;canSchedule:boolean;canPay:boolean;reload:()=>Promise<void>}){
   if(active==="Dashboard")return <Dashboard data={data} role={role} open={open} canEnroll={canEnroll} canPay={canPay}/>;
+  if(active==="Search trainee"&&role==="admin")return <LiveSearchTrainee data={{trainees:data.trainees,enrollments:data.enrollments,payments:data.payments}}/>;
   if(active==="Trainees")return <Trainees data={data} query={query} open={open} canEnroll={canEnroll}/>;
   if(active==="Enrollments")return <Enrollments data={data} query={query} open={open} canEnroll={canEnroll} role={role} reload={reload}/>;
   if(active==="Schedules")return <Schedules data={data} query={query} open={open} canSchedule={canSchedule}/>;
