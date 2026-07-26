@@ -61,11 +61,15 @@ const employeeSetActiveInput = z.object({ action: z.literal("employee-set-active
 const payrollOpenInput = z.object({ action: z.literal("payroll-open"), startsOn: z.string().date(), endsOn: z.string().date(), payDate: z.string().date() });
 const payrollReviewInput = z.object({ action: z.literal("payroll-review"), id: z.string().uuid() });
 const payrollFinalizeInput = z.object({ action: z.literal("payroll-finalize"), id: z.string().uuid() });
+// Training Operations: managed classrooms (name / venue / capacity).
+const classroomSaveInput = z.object({ action: z.literal("classroom-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), venue: z.string().trim().min(1).max(160), capacity: z.number().int().positive().max(1000), active: z.boolean().optional() });
+const classroomSetActiveInput = z.object({ action: z.literal("classroom-set-active"), id: z.string().uuid(), active: z.boolean() });
 
-const actionInput = z.union([batchInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput]);
+const actionInput = z.union([batchInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput]);
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
 const canManageHr = (roles: string[]) => roles.some((role) => ["admin", "hr"].includes(role));
+const canManageTraining = (roles: string[]) => roles.some((role) => ["admin", "training_operations"].includes(role));
 const minutesOfDay = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 const stampManila = (date: string, hhmm: string) => `${date}T${hhmm}:00+08:00`;
 
@@ -91,11 +95,12 @@ export async function GET() {
     db.from("payables").select("id,description,amount_centavos,due_on,status,partner_center_id,enrollment_id,created_at").order("created_at", { ascending: false }).limit(250),
     db.from("cashier_closings").select("id,closing_date,opening_cash_centavos,cash_collections_centavos,online_collections_centavos,refunds_centavos,expenses_centavos,expected_cash_centavos,actual_cash_centavos,variance_centavos,status,submitted_at").order("closing_date", { ascending: false }).limit(60),
     db.from("enrollment_charges").select("id,enrollment_id,charge_catalog_id,description,amount_centavos,event_type,created_at").eq("valid", true).order("created_at", { ascending: false }).limit(500),
+    db.from("classrooms").select("id,name,venue,capacity,active").order("name"),
   ]);
   const error = results.find((item) => item.error)?.error;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const [profile, courses, offers, trainees, batches, enrollmentsResult, payments, allocations, notifications,
-    paymentMethods, charges, agencies, expenses, payables, cashierClosings, enrollmentCharges] = results;
+    paymentMethods, charges, agencies, expenses, payables, cashierClosings, enrollmentCharges, classrooms] = results;
   const paidByEnrollment = new Map<string, number>();
   for (const allocation of allocations.data ?? []) paidByEnrollment.set(allocation.enrollment_id, (paidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
   const chargesByEnrollment = new Map<string, number>();
@@ -119,12 +124,19 @@ export async function GET() {
     ]);
     hr = { employees: hrResults[0].data ?? [], employeeAttendance: hrResults[1].data ?? [], leaveRequests: hrResults[2].data ?? [], cashAdvances: hrResults[3].data ?? [], payrollPeriods: hrResults[4].data ?? [], payrollItems: hrResults[5].data ?? [] };
   }
+  // Certificates carry trainee identity — only Training Operations and Admin receive them.
+  let certificates: unknown[] = [];
+  if (canManageTraining(staff.roleCodes)) {
+    const { data } = await db.from("certificates").select("id,enrollment_id,status,printed_at,reprint_count,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name,code))").order("created_at", { ascending: false }).limit(300);
+    certificates = data ?? [];
+  }
   return NextResponse.json({ profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
     paymentMethods: paymentMethods.data ?? [], charges: charges.data ?? [], agencies: agencies.data ?? [],
     expenses: expenses.data ?? [], payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
-    employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems }, { headers: { "Cache-Control": "no-store" } });
+    employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems,
+    classrooms: classrooms.data ?? [], certificates }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -356,6 +368,21 @@ export async function POST(request: Request) {
         const periodNumber = (period as { period_number?: string } | null)?.period_number ?? "payroll";
         await admin.from("expenses").insert({ expense_number: expenseNumber, payee: "Payroll", category: "Payroll", amount_centavos: net, purpose: `Net payroll for ${periodNumber}`, status: "Paid", paid_at: new Date().toISOString(), requested_by: staff.user.id, approved_by: staff.user.id });
       }
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "classroom-save") {
+      if (!canManageTraining(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage classrooms." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const row = { name: input.name, venue: input.venue, capacity: input.capacity, ...(input.active !== undefined ? { active: input.active } : {}) };
+      const { error } = input.id ? await admin.from("classrooms").update(row).eq("id", input.id) : await admin.from("classrooms").insert(row);
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "classroom-set-active") {
+      if (!canManageTraining(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage classrooms." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { error } = await admin.from("classrooms").update({ active: input.active }).eq("id", input.id);
+      if (error) throw error;
       return NextResponse.json({ ok: true });
     }
     if (input.action === "create-batch") {
