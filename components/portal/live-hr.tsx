@@ -8,7 +8,19 @@ type Attendance = { id: string; employee_id: string; attendance_date: string; ch
 type Leave = { id: string; employee_id: string; leave_type: string; starts_on: string; ends_on: string; reason: string; status: string; created_at: string };
 type Advance = { id: string; employee_id: string; amount_centavos: number; requested_on: string; balance_centavos: number; status: string };
 type Period = { id: string; period_number: string; starts_on: string; ends_on: string; pay_date: string; status: string; finalized_at?: string | null };
-export type HrData = { employees: Employee[]; employeeAttendance: Attendance[]; leaveRequests: Leave[]; cashAdvances: Advance[]; payrollPeriods: Period[] };
+type PayItem = { id: string; payroll_period_id: string; employee_id: string; gross_centavos: number; deduction_centavos: number; net_centavos: number; breakdown?: Record<string, unknown> };
+export type HrData = { employees: Employee[]; employeeAttendance: Attendance[]; leaveRequests: Leave[]; cashAdvances: Advance[]; payrollPeriods: Period[]; payrollItems: PayItem[] };
+
+/** Current semi-monthly cut-off window (1–15 paid 15th, 16–EOM paid EOM). */
+function currentCutoff() {
+  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const y = Number(parts.find((p) => p.type === "year")!.value), m = Number(parts.find((p) => p.type === "month")!.value), d = Number(parts.find((p) => p.type === "day")!.value);
+  const mm = String(m).padStart(2, "0");
+  const eom = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  return d <= 15
+    ? { startsOn: `${y}-${mm}-01`, endsOn: `${y}-${mm}-15`, payDate: `${y}-${mm}-15` }
+    : { startsOn: `${y}-${mm}-16`, endsOn: `${y}-${mm}-${eom}`, payDate: `${y}-${mm}-${eom}` };
+}
 
 const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0 }).format((Number(centavos) || 0) / 100);
 const todayManila = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
@@ -182,17 +194,7 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
         </>
       )}
 
-      {tab === "Payroll" && (
-        <section className="portal-panel">
-          <div className="panel-heading"><div><h2>Payroll periods</h2><p>Semi-monthly cut-off — 1–15 (paid 15th) and 16–EOM (paid 30th)</p></div></div>
-          <div className="portal-table"><table><thead><tr><th>Period</th><th>Covers</th><th>Pay date</th><th>Status</th></tr></thead><tbody>
-            {data.payrollPeriods.map((p) => (
-              <tr key={p.id}><td><strong>{p.period_number}</strong></td><td>{p.starts_on} → {p.ends_on}</td><td>{p.pay_date}</td><td>{p.status}{p.finalized_at ? " · finalized" : ""}</td></tr>
-            ))}
-            {!data.payrollPeriods.length && <tr><td colSpan={4}><span className="portal-empty-copy">No payroll periods yet. Finalizing periods and payslips is the next HR slice.</span></td></tr>}
-          </tbody></table></div>
-        </section>
-      )}
+      {tab === "Payroll" && <PayrollTab data={data} nameOf={nameOf} canManage={canManage} busy={busy} post={post} />}
     </div>
   );
 }
@@ -204,6 +206,73 @@ function pickEmployee(employees: Employee[]): string | null {
   const pick = window.prompt(`Which employee? Enter a number:\n${menu}`);
   const idx = pick == null ? NaN : Number(pick) - 1;
   return Number.isInteger(idx) && idx >= 0 && idx < active.length ? active[idx].id : null;
+}
+
+function PayrollTab({ data, nameOf, canManage, busy, post }: { data: HrData; nameOf: Map<string, string>; canManage: boolean; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
+  const cutoff = currentCutoff();
+  const [startsOn, setStartsOn] = useState(cutoff.startsOn);
+  const [endsOn, setEndsOn] = useState(cutoff.endsOn);
+  const [payDate, setPayDate] = useState(cutoff.payDate);
+  const itemsByPeriod = useMemo(() => {
+    const map = new Map<string, PayItem[]>();
+    for (const item of data.payrollItems) { const list = map.get(item.payroll_period_id) ?? []; list.push(item); map.set(item.payroll_period_id, list); }
+    return map;
+  }, [data.payrollItems]);
+
+  return (
+    <>
+      {canManage && (
+        <section className="portal-panel">
+          <div className="panel-heading"><div><h2>Open a payroll run</h2><p>Semi-monthly cut-off — 1–15 (paid 15th) and 16–EOM (paid EOM). Gross is computed per pay type; approved cash advances are deducted.</p></div></div>
+          <div className="portal-form" style={{ padding: "4px 0" }}>
+            <label>Covers from<input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} /></label>
+            <label>Covers to<input type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} /></label>
+            <label>Pay date<input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} /></label>
+            <div className="full"><button className="portal-primary" disabled={busy} onClick={() => post({ action: "payroll-open", startsOn, endsOn, payDate })}>{busy ? "Opening…" : "Open period & compute"}</button></div>
+          </div>
+        </section>
+      )}
+
+      <section className="portal-panel">
+        <div className="panel-heading"><div><h2>Payroll periods</h2><p>Draft → Reviewed → Finalized. Finalizing posts a Paid Payroll voucher to Accounting.</p></div></div>
+        <div className="portal-table"><table><thead><tr><th>Period</th><th>Covers</th><th>Pay date</th><th>Employees</th><th>Net total</th><th>Status</th><th></th></tr></thead><tbody>
+          {data.payrollPeriods.map((p) => {
+            const items = itemsByPeriod.get(p.id) ?? [];
+            const net = items.reduce((s, i) => s + Number(i.net_centavos), 0);
+            return <tr key={p.id}>
+              <td><strong>{p.period_number}</strong></td>
+              <td>{p.starts_on} → {p.ends_on}</td>
+              <td>{p.pay_date}</td>
+              <td>{items.length}</td>
+              <td><strong>{pesos(net)}</strong></td>
+              <td>{p.status}{p.finalized_at ? " ·✓" : ""}</td>
+              <td className="document-actions">
+                {canManage && p.status === "Draft" && <button disabled={busy} onClick={() => post({ action: "payroll-review", id: p.id })}>Mark reviewed</button>}
+                {canManage && p.status === "Reviewed" && <button disabled={busy} onClick={() => post({ action: "payroll-finalize", id: p.id })}>Finalize</button>}
+              </td>
+            </tr>;
+          })}
+          {!data.payrollPeriods.length && <tr><td colSpan={7}><span className="portal-empty-copy">No payroll periods yet — open one above.</span></td></tr>}
+        </tbody></table></div>
+      </section>
+
+      <section className="portal-panel">
+        <div className="panel-heading"><div><h2>Payslips</h2><p>Per-employee computed pay — open the PDF</p></div></div>
+        <div className="portal-table"><table><thead><tr><th>Employee</th><th>Gross</th><th>Deductions</th><th>Net</th><th></th></tr></thead><tbody>
+          {data.payrollItems.map((i) => (
+            <tr key={i.id}>
+              <td><strong>{nameOf.get(i.employee_id) ?? "—"}</strong></td>
+              <td>{pesos(i.gross_centavos)}</td>
+              <td>{pesos(i.deduction_centavos)}</td>
+              <td><strong>{pesos(i.net_centavos)}</strong></td>
+              <td className="document-actions"><a href={`/api/documents/payslip/${i.id}`} target="_blank" rel="noreferrer">Payslip</a></td>
+            </tr>
+          ))}
+          {!data.payrollItems.length && <tr><td colSpan={5}><span className="portal-empty-copy">No payslips yet — open a payroll period to compute pay.</span></td></tr>}
+        </tbody></table></div>
+      </section>
+    </>
+  );
 }
 
 function AttendanceTab({ data, nameOf, canManage, busy, post }: { data: HrData; nameOf: Map<string, string>; canManage: boolean; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {

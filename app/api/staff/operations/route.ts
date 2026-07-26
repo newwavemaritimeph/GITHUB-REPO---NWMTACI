@@ -58,8 +58,11 @@ const advanceFileInput = z.object({ action: z.literal("advance-file"), employeeI
 const advanceDecideInput = z.object({ action: z.literal("advance-decide"), id: z.string().uuid(), decision: z.enum(["Approved", "Rejected"]) });
 const employeeSaveInput = z.object({ action: z.literal("employee-save"), id: z.string().uuid().nullable().optional(), completeName: z.string().trim().min(2).max(160), position: z.string().trim().min(1).max(120), employmentStatus: z.string().trim().min(1).max(40).default("Active"), dateHired: z.string().date(), payType: z.enum(["Monthly", "Semi-Monthly", "Weekly", "Daily"]).default("Monthly"), baseRateCentavos: z.number().int().nonnegative().default(0), instructorDailyRateCentavos: z.number().int().nonnegative().nullable().optional(), workEmail: z.string().email().optional().or(z.literal("")), active: z.boolean().optional() });
 const employeeSetActiveInput = z.object({ action: z.literal("employee-set-active"), id: z.string().uuid(), active: z.boolean() });
+const payrollOpenInput = z.object({ action: z.literal("payroll-open"), startsOn: z.string().date(), endsOn: z.string().date(), payDate: z.string().date() });
+const payrollReviewInput = z.object({ action: z.literal("payroll-review"), id: z.string().uuid() });
+const payrollFinalizeInput = z.object({ action: z.literal("payroll-finalize"), id: z.string().uuid() });
 
-const actionInput = z.union([batchInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput]);
+const actionInput = z.union([batchInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput]);
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
 const canManageHr = (roles: string[]) => roles.some((role) => ["admin", "hr"].includes(role));
@@ -104,7 +107,7 @@ export async function GET() {
   const enrollments = (enrollmentsResult.data ?? []).map((row) => ({ ...row, paid_centavos: paidByEnrollment.get(row.id) ?? 0, charges_centavos: chargesByEnrollment.get(row.id) ?? 0, discounts_centavos: discountsByEnrollment.get(row.id) ?? 0 }));
   // HR datasets are sensitive (salaries, government IDs) — only HR and Admin receive them.
   const isHr = canManageHr(staff.roleCodes);
-  let hr: Record<string, unknown[]> = { employees: [], employeeAttendance: [], leaveRequests: [], cashAdvances: [], payrollPeriods: [] };
+  let hr: Record<string, unknown[]> = { employees: [], employeeAttendance: [], leaveRequests: [], cashAdvances: [], payrollPeriods: [], payrollItems: [] };
   if (isHr) {
     const hrResults = await Promise.all([
       db.from("employees").select("id,employee_number,complete_name,position,employment_status,date_hired,pay_type,base_rate_centavos,instructor_daily_rate_centavos,work_email,active").order("complete_name"),
@@ -112,15 +115,16 @@ export async function GET() {
       db.from("leave_requests").select("id,employee_id,leave_type,starts_on,ends_on,reason,status,created_at").order("created_at", { ascending: false }).limit(200),
       db.from("cash_advances").select("id,employee_id,amount_centavos,requested_on,balance_centavos,status").order("requested_on", { ascending: false }).limit(200),
       db.from("payroll_periods").select("id,period_number,starts_on,ends_on,pay_date,status,finalized_at").order("starts_on", { ascending: false }).limit(60),
+      db.from("payroll_items").select("id,payroll_period_id,employee_id,gross_centavos,deduction_centavos,net_centavos,breakdown").limit(600),
     ]);
-    hr = { employees: hrResults[0].data ?? [], employeeAttendance: hrResults[1].data ?? [], leaveRequests: hrResults[2].data ?? [], cashAdvances: hrResults[3].data ?? [], payrollPeriods: hrResults[4].data ?? [] };
+    hr = { employees: hrResults[0].data ?? [], employeeAttendance: hrResults[1].data ?? [], leaveRequests: hrResults[2].data ?? [], cashAdvances: hrResults[3].data ?? [], payrollPeriods: hrResults[4].data ?? [], payrollItems: hrResults[5].data ?? [] };
   }
   return NextResponse.json({ profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
     paymentMethods: paymentMethods.data ?? [], charges: charges.data ?? [], agencies: agencies.data ?? [],
     expenses: expenses.data ?? [], payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
-    employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods }, { headers: { "Cache-Control": "no-store" } });
+    employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -291,6 +295,67 @@ export async function POST(request: Request) {
       const admin = createSupabaseAdminClient();
       const { error } = await admin.from("employees").update({ active: input.active }).eq("id", input.id);
       if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "payroll-open") {
+      if (!canManageHr(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot open payroll." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: dupe } = await admin.from("payroll_periods").select("id").eq("pay_date", input.payDate).maybeSingle();
+      if (dupe) throw new Error("A payroll period for this pay date already exists.");
+      const { data: period, error: periodError } = await admin.from("payroll_periods").insert({ period_number: `PR-${input.payDate}`, starts_on: input.startsOn, ends_on: input.endsOn, pay_date: input.payDate, status: "Draft" }).select("id").single();
+      if (periodError) throw periodError;
+      const { data: emps } = await admin.from("employees").select("id,pay_type,base_rate_centavos,instructor_daily_rate_centavos").eq("active", true);
+      const { data: att } = await admin.from("employee_attendance").select("employee_id,status").gte("attendance_date", input.startsOn).lte("attendance_date", input.endsOn);
+      const presentDays = new Map<string, number>();
+      for (const a of att ?? []) if (a.status !== "Absent") presentDays.set(a.employee_id, (presentDays.get(a.employee_id) ?? 0) + 1);
+      // Approved, still-outstanding cash advances are amortised (FIFO) against this run.
+      const { data: advs } = await admin.from("cash_advances").select("id,employee_id,balance_centavos").eq("status", "Approved").gt("balance_centavos", 0).order("requested_on");
+      const advByEmp = new Map<string, { id: string; balance: number }[]>();
+      for (const a of advs ?? []) { const list = advByEmp.get(a.employee_id) ?? []; list.push({ id: a.id, balance: Number(a.balance_centavos) }); advByEmp.set(a.employee_id, list); }
+      const items = [] as Record<string, unknown>[];
+      const advanceUpdates = [] as { id: string; balance: number; settled: boolean }[];
+      for (const e of emps ?? []) {
+        const days = presentDays.get(e.id) ?? 0;
+        const gross = e.pay_type === "Monthly" ? Math.round(Number(e.base_rate_centavos) / 2)
+          : e.pay_type === "Daily" ? Number(e.instructor_daily_rate_centavos ?? e.base_rate_centavos) * days
+          : Number(e.base_rate_centavos);
+        let remaining = Math.min(gross, (advByEmp.get(e.id) ?? []).reduce((s, a) => s + a.balance, 0));
+        const deduction = remaining;
+        for (const advance of advByEmp.get(e.id) ?? []) {
+          if (remaining <= 0) break;
+          const applied = Math.min(remaining, advance.balance);
+          remaining -= applied;
+          advanceUpdates.push({ id: advance.id, balance: advance.balance - applied, settled: advance.balance - applied <= 0 });
+        }
+        items.push({ payroll_period_id: period.id, employee_id: e.id, gross_centavos: gross, deduction_centavos: deduction, net_centavos: Math.max(0, gross - deduction), breakdown: { basic_centavos: gross, present_days: days, pay_type: e.pay_type, advance_deducted_centavos: deduction } });
+      }
+      if (items.length) { const { error } = await admin.from("payroll_items").insert(items); if (error) throw error; }
+      for (const update of advanceUpdates) await admin.from("cash_advances").update({ balance_centavos: update.balance, ...(update.settled ? { status: "Settled" } : {}) }).eq("id", update.id);
+      return NextResponse.json({ ok: true, period: period.id, employees: items.length });
+    }
+    if (input.action === "payroll-review") {
+      if (!canManageHr(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot review payroll." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: anyItem } = await admin.from("payroll_items").select("id").eq("payroll_period_id", input.id).limit(1);
+      if (!anyItem?.length) throw new Error("This period has no payroll items to review.");
+      const { error } = await admin.from("payroll_periods").update({ status: "Reviewed", reviewed_by: staff.user.id }).eq("id", input.id).eq("status", "Draft");
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "payroll-finalize") {
+      if (!canManageHr(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot finalize payroll." }, { status: 403 });
+      const { data: period, error: finalizeError } = await db.rpc("finalize_payroll", { target_period: input.id });
+      if (finalizeError) throw finalizeError;
+      // Mirror the finalized net total into Accounting as a Paid "Payroll" voucher.
+      const admin = createSupabaseAdminClient();
+      const { data: sums } = await admin.from("payroll_items").select("net_centavos").eq("payroll_period_id", input.id);
+      const net = (sums ?? []).reduce((sum, i) => sum + Number(i.net_centavos), 0);
+      if (net > 0) {
+        const { count } = await admin.from("expenses").select("id", { count: "exact", head: true });
+        const expenseNumber = `CV-${new Date().getFullYear()}-${String((count ?? 0) + 1).padStart(6, "0")}`;
+        const periodNumber = (period as { period_number?: string } | null)?.period_number ?? "payroll";
+        await admin.from("expenses").insert({ expense_number: expenseNumber, payee: "Payroll", category: "Payroll", amount_centavos: net, purpose: `Net payroll for ${periodNumber}`, status: "Paid", paid_at: new Date().toISOString(), requested_by: staff.user.id, approved_by: staff.user.id });
+      }
       return NextResponse.json({ ok: true });
     }
     if (input.action === "create-batch") {
