@@ -2048,7 +2048,7 @@ export function AccountingModule({ role }: { role: Role }) {
  * Expense voucher preview in the shared New Wave document format. Shown on screen
  * first (no auto-download); the half-sheet PDF and print are triggered from here.
  */
-function ExpenseVoucherPreviewModal({ expense, onClose }: { expense: Expense; onClose: () => void }) {
+export function ExpenseVoucherPreviewModal({ expense, onClose }: { expense: Expense; onClose: () => void }) {
   const toast = useToast();
   const [building, setBuilding] = useState(false);
 

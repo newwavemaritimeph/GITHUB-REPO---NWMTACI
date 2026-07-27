@@ -231,6 +231,7 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
                 {canManage && e.status === "Pending" && <button disabled={busy} onClick={() => post({ action: "expense-decide", id: e.id, decision: "Approved" })}>Approve</button>}
                 {canManage && e.status === "Pending" && <button disabled={busy} onClick={() => post({ action: "expense-decide", id: e.id, decision: "Rejected" })}>Reject</button>}
                 {canManage && e.status === "Approved" && <button disabled={busy} onClick={() => post({ action: "expense-decide", id: e.id, decision: "Paid" })}>Mark paid</button>}
+                {(e.status === "Approved" || e.status === "Paid") && <a href={`/api/documents/expense/${e.id}`} target="_blank" rel="noreferrer">Generate</a>}
               </td>
             </tr>
           ))}

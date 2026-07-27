@@ -5,8 +5,9 @@ import { DataTable, EmptyState, Field, Modal, Pill, SearchInput, Segmented, Stat
 import { downloadCsv } from "@/lib/csv";
 import { pesos } from "@/lib/endorsement-catalog";
 import { formatDateTime, fullName, todayIso, useSystem } from "@/lib/system/store";
-import type { EnrollmentView, Role } from "@/lib/system/types";
+import type { EnrollmentView, Expense, Role } from "@/lib/system/types";
 import { PageHeader, Panel } from "./shared";
+import { ExpenseVoucherPreviewModal } from "./module-others";
 import { PaymentModal, SplitPaymentModal, AddChargeModal, AdmissionInvoiceModal } from "./module-enrollments";
 import { resolveRange, withinRange, type ReportRangePreset } from "@/lib/reporting";
 
@@ -343,6 +344,7 @@ export function ExpenseVouchersModule({ role }: { role: Role }) {
   const { state, createExpense, createRequest } = useSystem();
   const toast = useToast();
   const [open, setOpen] = useState(false);
+  const [voucherFor, setVoucherFor] = useState<Expense | null>(null);
   const canRaise = role === "Cashier" || role === "Accounting" || role === "Admin";
   const expenses = [...state.expenses].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   return (
@@ -354,18 +356,24 @@ export function ExpenseVouchersModule({ role }: { role: Role }) {
         actions={canRaise ? <button className="primary-button" onClick={() => setOpen(true)}>+ Raise voucher</button> : undefined}
       />
       <Panel padded={false}>
-        <DataTable columns={["Voucher", "Payee", "Category", "Amount", "Status", "Raised"]} minWidth={880}>
-          {expenses.map((e) => (
-            <tr key={e.id}>
-              <td><strong>{e.expenseNumber}</strong><small>{e.purpose}</small></td>
-              <td>{e.payee}</td>
-              <td>{e.category}</td>
-              <td><strong>{pesos(e.amountCentavos)}</strong></td>
-              <td><Pill tone={e.status === "Paid" || e.status === "Approved" ? "green" : e.status === "Rejected" ? "red" : "amber"}>{e.status}</Pill></td>
-              <td>{formatDateTime(e.createdAt)}</td>
-            </tr>
-          ))}
-          {expenses.length === 0 && <tr><td colSpan={6}><span className="muted-text">No vouchers yet.</span></td></tr>}
+        <DataTable columns={["Voucher", "Payee", "Category", "Amount", "Status", "Raised", ""]} minWidth={940}>
+          {expenses.map((e) => {
+            const approved = e.status === "Approved" || e.status === "Paid";
+            return (
+              <tr key={e.id}>
+                <td><strong>{e.expenseNumber}</strong><small>{e.purpose}</small></td>
+                <td>{e.payee}</td>
+                <td>{e.category}</td>
+                <td><strong>{pesos(e.amountCentavos)}</strong></td>
+                <td><Pill tone={approved ? "green" : e.status === "Rejected" ? "red" : "amber"}>{e.status}</Pill></td>
+                <td>{formatDateTime(e.createdAt)}</td>
+                <td className="cell-actions">
+                  <button className="ghost-button" disabled={!approved} title={approved ? "" : "Available once Accounting approves this voucher"} onClick={() => setVoucherFor(e)}>Generate</button>
+                </td>
+              </tr>
+            );
+          })}
+          {expenses.length === 0 && <tr><td colSpan={7}><span className="muted-text">No vouchers yet.</span></td></tr>}
         </DataTable>
       </Panel>
       {open && (
@@ -380,6 +388,7 @@ export function ExpenseVouchersModule({ role }: { role: Role }) {
           }}
         />
       )}
+      {voucherFor && <ExpenseVoucherPreviewModal expense={voucherFor} onClose={() => setVoucherFor(null)} />}
     </div>
   );
 }
