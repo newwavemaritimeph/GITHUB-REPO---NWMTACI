@@ -38,11 +38,9 @@ function rangeFor(span: "Daily" | "Weekly" | "Monthly"): { from: string; to: str
 const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0 }).format((Number(centavos) || 0) / 100);
 
 export function LiveAccounting({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
-  const [tab, setTab] = useState<"Overview" | "Sales" | "Vouchers" | "Reconciliation" | "Setup">("Overview");
+  const [tab, setTab] = useState<"Overview" | "Sales" | "Reconciliation" | "Setup">("Overview");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const [voucher, setVoucher] = useState<{ payee: string; category: string; amount: string; purpose: string } | null>(null);
-  const [voucherError, setVoucherError] = useState("");
   const canManage = role === "admin" || role === "accounting";
 
   async function post(body: Record<string, unknown>) {
@@ -79,7 +77,7 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         <div><span className="portal-eyebrow">Financial control</span><h1>Accounting</h1><p>Collections, disbursements, receivables, and setup — from the live Supabase ledger.</p></div>
       </div>
       <div className="portal-tabs">
-        {(["Overview", "Sales", "Vouchers", "Reconciliation", "Setup"] as const).map((item) => (
+        {(["Overview", "Sales", "Reconciliation", "Setup"] as const).map((item) => (
           <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>
         ))}
       </div>
@@ -118,49 +116,6 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
             </tbody></table></div>
           </section>
         </>
-      )}
-
-      {tab === "Vouchers" && (
-        <section className="portal-panel">
-          <div className="panel-heading">
-            <div><h2>Expense vouchers</h2><p>Raise a voucher; Accounting approves, rejects, or marks it paid.</p></div>
-            <button className="portal-primary" disabled={busy} onClick={() => { setVoucherError(""); setVoucher({ payee: "", category: "Supplies", amount: "", purpose: "" }); }}>+ Raise voucher</button>
-          </div>
-          <div className="portal-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
-            {data.expenses.map((e) => (
-              <tr key={e.id}>
-                <td><strong>{e.expense_number}</strong></td>
-                <td>{e.payee}</td>
-                <td>{e.category}</td>
-                <td>{pesos(e.amount_centavos)}</td>
-                <td>{e.status}</td>
-                <td className="document-actions">
-                  {canManage && e.status === "Pending" && <button disabled={busy} onClick={() => post({ action: "expense-decide", id: e.id, decision: "Approved" })}>Approve</button>}
-                  {canManage && e.status === "Pending" && <button disabled={busy} onClick={() => post({ action: "expense-decide", id: e.id, decision: "Rejected" })}>Reject</button>}
-                  {canManage && e.status === "Approved" && <button disabled={busy} onClick={() => post({ action: "expense-decide", id: e.id, decision: "Paid" })}>Mark paid</button>}
-                </td>
-              </tr>
-            ))}
-            {!data.expenses.length && <tr><td colSpan={6}><span className="portal-empty-copy">No vouchers yet.</span></td></tr>}
-          </tbody></table></div>
-          {voucher && (
-            <EditModal title="Raise expense voucher" busy={busy} saveLabel="Raise voucher" onClose={() => setVoucher(null)} onSave={async () => {
-              const amt = Math.round(Number(voucher.amount) * 100);
-              if (!voucher.payee.trim()) { setVoucherError("Payee is required."); return; }
-              if (!voucher.category.trim()) { setVoucherError("Category is required."); return; }
-              if (!Number.isFinite(amt) || amt <= 0) { setVoucherError("Enter a valid amount."); return; }
-              if (!voucher.purpose.trim()) { setVoucherError("Purpose is required."); return; }
-              await post({ action: "expense-create", payee: voucher.payee, category: voucher.category, amountCentavos: amt, purpose: voucher.purpose });
-              setVoucher(null);
-            }}>
-              {voucherError && <div className="portal-message error full">{voucherError}</div>}
-              <label className="full">Payee<input autoFocus value={voucher.payee} onChange={(e) => setVoucher({ ...voucher, payee: e.target.value })} /></label>
-              <label>Category<input value={voucher.category} onChange={(e) => setVoucher({ ...voucher, category: e.target.value })} /></label>
-              <label>Amount (PHP)<input type="number" min="0" step="0.01" value={voucher.amount} onChange={(e) => setVoucher({ ...voucher, amount: e.target.value })} /></label>
-              <label className="full">Purpose / description<textarea rows={2} value={voucher.purpose} onChange={(e) => setVoucher({ ...voucher, purpose: e.target.value })} /></label>
-            </EditModal>
-          )}
-        </section>
       )}
 
       {tab === "Sales" && <SalesReport payments={data.payments} payables={data.payables} />}
@@ -241,6 +196,65 @@ function SalesReport({ payments, payables }: { payments: Payment[]; payables: Pa
         </tbody></table></div>
       </section>
     </>
+  );
+}
+
+/* ---- Standalone Expense Vouchers module (own nav item) ---- */
+export function LiveVouchers({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
+  const canManage = role === "admin" || role === "accounting";
+  const canRaise = ["admin", "accounting", "cashier"].includes(role);
+  const [busy, setBusy] = useState(false);
+  const [voucher, setVoucher] = useState<{ payee: string; category: string; amount: string; purpose: string } | null>(null);
+  const [error, setError] = useState("");
+  async function post(body: Record<string, unknown>) {
+    setBusy(true);
+    try {
+      const r = await fetch("/api/staff/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "The action could not be completed.");
+      await reload();
+    } finally { setBusy(false); }
+  }
+  return (
+    <div className="portal-page">
+      <div className="portal-heading"><div><span className="portal-eyebrow">Cashier / Accounting</span><h1>Expense vouchers</h1><p>Raise cash and expense vouchers; Accounting approves, rejects, or marks them paid.</p></div>{canRaise && <button className="portal-primary" disabled={busy} onClick={() => { setError(""); setVoucher({ payee: "", category: "Supplies", amount: "", purpose: "" }); }}>+ Raise voucher</button>}</div>
+      <section className="portal-panel">
+        <div className="portal-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
+          {data.expenses.map((e) => (
+            <tr key={e.id}>
+              <td><strong>{e.expense_number}</strong></td>
+              <td>{e.payee}</td>
+              <td>{e.category}</td>
+              <td>{pesos(e.amount_centavos)}</td>
+              <td>{e.status}</td>
+              <td className="document-actions">
+                {canManage && e.status === "Pending" && <button disabled={busy} onClick={() => post({ action: "expense-decide", id: e.id, decision: "Approved" })}>Approve</button>}
+                {canManage && e.status === "Pending" && <button disabled={busy} onClick={() => post({ action: "expense-decide", id: e.id, decision: "Rejected" })}>Reject</button>}
+                {canManage && e.status === "Approved" && <button disabled={busy} onClick={() => post({ action: "expense-decide", id: e.id, decision: "Paid" })}>Mark paid</button>}
+              </td>
+            </tr>
+          ))}
+          {!data.expenses.length && <tr><td colSpan={6}><span className="portal-empty-copy">No vouchers yet.</span></td></tr>}
+        </tbody></table></div>
+      </section>
+      {voucher && (
+        <EditModal title="Raise expense voucher" busy={busy} saveLabel="Raise voucher" onClose={() => setVoucher(null)} onSave={async () => {
+          const amt = Math.round(Number(voucher.amount) * 100);
+          if (!voucher.payee.trim()) { setError("Payee is required."); return; }
+          if (!voucher.category.trim()) { setError("Category is required."); return; }
+          if (!Number.isFinite(amt) || amt <= 0) { setError("Enter a valid amount."); return; }
+          if (!voucher.purpose.trim()) { setError("Purpose is required."); return; }
+          await post({ action: "expense-create", payee: voucher.payee, category: voucher.category, amountCentavos: amt, purpose: voucher.purpose });
+          setVoucher(null);
+        }}>
+          {error && <div className="portal-message error full">{error}</div>}
+          <label className="full">Payee<input autoFocus value={voucher.payee} onChange={(e) => setVoucher({ ...voucher, payee: e.target.value })} /></label>
+          <label>Category<input value={voucher.category} onChange={(e) => setVoucher({ ...voucher, category: e.target.value })} /></label>
+          <label>Amount (PHP)<input type="number" min="0" step="0.01" value={voucher.amount} onChange={(e) => setVoucher({ ...voucher, amount: e.target.value })} /></label>
+          <label className="full">Purpose / description<textarea rows={2} value={voucher.purpose} onChange={(e) => setVoucher({ ...voucher, purpose: e.target.value })} /></label>
+        </EditModal>
+      )}
+    </div>
   );
 }
 

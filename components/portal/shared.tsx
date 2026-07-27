@@ -12,6 +12,7 @@ export type Module =
   | "Courses & centers"
   | "Schedules"
   | "Payments"
+  | "Expense vouchers"
   | "Accounting"
   | "Supplies"
   | "Instructions"

@@ -14,14 +14,13 @@ const filters = ["Verification queue", "Today", "All payments"] as const;
 const awaitRanges = ["Today", "Last 7 days", "This month", "All"] as const;
 
 export function PaymentsModule({ role }: { role: Role }) {
-  const { state, views, recordPayment, setPaymentVerification, createExpense, createRequest, addLedgerEntry, generateAdmissionSlip, changeEnrollmentBatch } = useSystem();
+  const { state, views, recordPayment, setPaymentVerification, addLedgerEntry, generateAdmissionSlip, changeEnrollmentBatch } = useSystem();
   const canRecordPayment = role === "Cashier";
   const toast = useToast();
   const [filter, setFilter] = useState<(typeof filters)[number]>("Verification queue");
   const [query, setQuery] = useState("");
   const [payFor, setPayFor] = useState<EnrollmentView | null>(null);
   const [picker, setPicker] = useState(false);
-  const [expenseOpen, setExpenseOpen] = useState(false);
   const [splitFor, setSplitFor] = useState<EnrollmentView | null>(null);
   const [chargeFor, setChargeFor] = useState<EnrollmentView | null>(null);
   const [slipFor, setSlipFor] = useState<EnrollmentView | null>(null);
@@ -78,14 +77,9 @@ export function PaymentsModule({ role }: { role: Role }) {
         description="Post collections, verify online proofs, issue receipts, and keep every balance current."
         actions={
           canRecordPayment ? (
-            <>
-              <button className="secondary-button" onClick={() => setExpenseOpen(true)}>
-                Expense voucher
-              </button>
-              <button className="primary-button" onClick={() => setPicker(true)}>
-                + Record payment
-              </button>
-            </>
+            <button className="primary-button" onClick={() => setPicker(true)}>
+              + Record payment
+            </button>
           ) : undefined
         }
       />
@@ -251,25 +245,6 @@ export function PaymentsModule({ role }: { role: Role }) {
         </Panel>
       )}
 
-      {expenseOpen && (
-        <ExpenseVoucherModal
-          categories={state.expenseCategories.filter((category) => category.active).map((category) => category.name)}
-          onClose={() => setExpenseOpen(false)}
-          onCreate={(input) => {
-            const expense = createExpense(input);
-            // Expense approvals flow through the Requests module.
-            createRequest({
-              type: "Expenses",
-              traineeName: expense.payee,
-              reason: `${expense.category} · ${expense.purpose}`,
-              payload: { expenseId: expense.id },
-            });
-            toast("success", `${expense.expenseNumber} created — sent to Accounting for approval in Requests.`);
-            setExpenseOpen(false);
-          }}
-        />
-      )}
-
       <PaymentModal
         key={payFor?.enrollment.id}
         target={payFor}
@@ -357,6 +332,53 @@ export function PaymentsModule({ role }: { role: Role }) {
             </select>
           </Field>
         </Modal>
+      )}
+    </div>
+  );
+}
+
+/** Standalone Expense Vouchers module (own nav item). Cashier/Accounting/Admin
+ * raise vouchers here; approval happens in Requests. */
+export function ExpenseVouchersModule({ role }: { role: Role }) {
+  const { state, createExpense, createRequest } = useSystem();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const canRaise = role === "Cashier" || role === "Accounting" || role === "Admin";
+  const expenses = [...state.expenses].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return (
+    <div className="page">
+      <PageHeader
+        eyebrow="Cashier / Accounting"
+        title="Expense vouchers"
+        description="Raise cash and expense vouchers. Accounting approves them in the Requests module."
+        actions={canRaise ? <button className="primary-button" onClick={() => setOpen(true)}>+ Raise voucher</button> : undefined}
+      />
+      <Panel padded={false}>
+        <DataTable columns={["Voucher", "Payee", "Category", "Amount", "Status", "Raised"]} minWidth={880}>
+          {expenses.map((e) => (
+            <tr key={e.id}>
+              <td><strong>{e.expenseNumber}</strong><small>{e.purpose}</small></td>
+              <td>{e.payee}</td>
+              <td>{e.category}</td>
+              <td><strong>{pesos(e.amountCentavos)}</strong></td>
+              <td><Pill tone={e.status === "Paid" || e.status === "Approved" ? "green" : e.status === "Rejected" ? "red" : "amber"}>{e.status}</Pill></td>
+              <td>{formatDateTime(e.createdAt)}</td>
+            </tr>
+          ))}
+          {expenses.length === 0 && <tr><td colSpan={6}><span className="muted-text">No vouchers yet.</span></td></tr>}
+        </DataTable>
+      </Panel>
+      {open && (
+        <ExpenseVoucherModal
+          categories={state.expenseCategories.filter((category) => category.active).map((category) => category.name)}
+          onClose={() => setOpen(false)}
+          onCreate={(input) => {
+            const expense = createExpense(input);
+            createRequest({ type: "Expenses", traineeName: expense.payee, reason: `${expense.category} · ${expense.purpose}`, payload: { expenseId: expense.id } });
+            toast("success", `${expense.expenseNumber} created — sent to Accounting for approval in Requests.`);
+            setOpen(false);
+          }}
+        />
       )}
     </div>
   );

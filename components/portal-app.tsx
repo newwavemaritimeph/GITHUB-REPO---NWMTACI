@@ -20,7 +20,7 @@ import {
   TraineesModule,
   UserSetupModule,
 } from "./portal/module-others";
-import { PaymentsModule } from "./portal/module-payments";
+import { PaymentsModule, ExpenseVouchersModule } from "./portal/module-payments";
 import { SchedulesModule } from "./portal/module-schedules";
 import { ClassroomsModule, InstructorsModule, TrainingSetupModule } from "./portal/module-training";
 import { SearchTraineeModule, SetupModule } from "./portal/module-admin";
@@ -80,6 +80,7 @@ const nav: { label: Module; icon: string; roles?: Role[] }[] = [
   { label: "Courses & centers", icon: "◇", roles: ["Registration", "Training Operations"] },
   { label: "Schedules", icon: "□", roles: ["Training Operations", "Instructor"] },
   { label: "Payments", icon: "₱", roles: ["Cashier", "Accounting"] },
+  { label: "Expense vouchers", icon: "◰", roles: ["Cashier", "Accounting", "Admin"] },
   { label: "Accounting", icon: "▥", roles: ["Admin", "Accounting"] },
   { label: "Supplies", icon: "▣", roles: ["Admin", "Accounting"] },
   { label: "Instructions", icon: "✉", roles: ["Registration", "Training Operations"] },
@@ -263,12 +264,14 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
         title="Good day, Jocelyn."
         description={`Here is what needs attention in ${role.toLowerCase()} today.`}
         actions={
-          <button
-            className="primary-button"
-            onClick={() => go(role === "Cashier" ? "Payments" : role === "Instructor" ? "Attendance" : role === "HR" ? "Payroll" : "Registrations")}
-          >
-            {role === "Cashier" ? "Record payment" : role === "Instructor" ? "Start attendance" : role === "HR" ? "Open payroll" : "Review registrations"}
-          </button>
+          role === "Cashier" ? undefined : (
+            <button
+              className="primary-button"
+              onClick={() => go(role === "Instructor" ? "Attendance" : role === "HR" ? "Payroll" : "Registrations")}
+            >
+              {role === "Instructor" ? "Start attendance" : role === "HR" ? "Open payroll" : "Review registrations"}
+            </button>
+          )
         }
       />
 
@@ -1075,6 +1078,7 @@ function PortalShell({ previewMode }: { previewMode: boolean }) {
         {active === "Courses & centers" && <CatalogModule role={role} />}
         {active === "Schedules" && <SchedulesModule />}
         {active === "Payments" && <PaymentsModule role={role} />}
+        {active === "Expense vouchers" && <ExpenseVouchersModule role={role} />}
         {active === "Accounting" && <AccountingModule role={role} />}
         {active === "Supplies" && <SuppliesModule role={role} />}
         {active === "Instructions" && <InstructionsModule />}
