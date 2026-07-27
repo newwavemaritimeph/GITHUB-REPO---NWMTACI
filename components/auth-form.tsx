@@ -38,8 +38,15 @@ export function AuthForm({ portal }: { portal: "staff" | "trainee" }) {
       const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth/reset` });
       if (error) throw error;
       setMessage("Check your email for a secure password reset link.");
-    } catch {
-      setMessage("Password reset will be available after the authentication environment is connected.");
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "";
+      setMessage(
+        detail === "Supabase is not configured."
+          ? "Password reset will be available after the authentication environment is connected."
+          : detail
+            ? `Could not send the reset link: ${detail}`
+            : "Could not send the reset link. Please try again shortly.",
+      );
     } finally {
       setBusy(false);
     }
