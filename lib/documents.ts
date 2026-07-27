@@ -371,17 +371,18 @@ export type AdmissionInvoiceSnapshot = {
 };
 
 /**
- * Combined Payment Invoice + Admission Slip on A4 portrait (595.28 × 841.89pt).
- * The same combined block is rendered on two pages — page 1 tagged ORIGINAL COPY
- * (for the trainee), page 2 DUPLICATE COPY (file copy). The payment status is
+ * Combined Payment Invoice + Admission Slip on ONE A4 portrait sheet
+ * (595.28 × 841.89pt) with narrow margins. The block is printed twice — the
+ * upper half tagged ORIGINAL COPY (trainee), the lower half DUPLICATE COPY
+ * (file copy) — so the sheet is cut across the middle. Payment status is
  * stamped prominently for instructor verification.
  */
 export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapshot) {
   const pdf = await PDFDocument.create();
   const width = 595.28; // A4 portrait
   const height = 841.89;
-  const bandH = height; // one full A4 page per copy
-  let page = pdf.addPage([width, height]);
+  const bandH = height / 2; // two copies stacked on one A4 (upper + lower)
+  const page = pdf.addPage([width, height]);
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const ink = rgb(0.07, 0.25, 0.39);
@@ -391,8 +392,8 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
   const line = rgb(0.84, 0.9, 0.93);
   const panel = rgb(0.95, 0.98, 0.99);
   const green = rgb(0.05, 0.5, 0.25);
-  const left = 28;
-  const right = width - 28;
+  const left = 20; // narrow margins to fit two copies
+  const right = width - 20;
   const mid = left + Math.round((right - left) / 2);
 
   let logo: Awaited<ReturnType<typeof pdf.embedPng>> | undefined;
@@ -414,7 +415,7 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
 
   // Draws one combined copy anchored at the band whose bottom edge is `baseY`.
   const drawCopy = (baseY: number, copyLabel: string) => {
-    let y = baseY + bandH - 22;
+    let y = baseY + bandH - 14;
     let headerX = left;
     if (logo) {
       const dims = logo.scale(34 / logo.width);
@@ -440,7 +441,7 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
       page.drawText(statusInfo.label, { x: boxX + 10, y: boxY + 7, size, font: bold, color: rgb(1, 1, 1) });
     }
 
-    y -= 40;
+    y -= 34;
     page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 1.2, color: blue });
     y -= 14;
 
@@ -456,7 +457,7 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
       page.drawText(field.label, { x, y, size: 6, font: regular, color: muted });
       page.drawText(field.value.slice(0, 30), { x, y: y - 9, size: 8, font: bold, color: ink });
     });
-    y -= 24;
+    y -= 18;
 
     // Two-column detail grid (trainee + training details)
     const cols: { label: string; value: string }[] = [
@@ -476,10 +477,10 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
       const b = cols[i + 1];
       page.drawText(a.label, { x: left, y, size: 6, font: regular, color: muted });
       if (b) page.drawText(b.label, { x: mid, y, size: 6, font: regular, color: muted });
-      y -= 9;
+      y -= 8;
       page.drawText(a.value.slice(0, 44), { x: left, y, size: 8, font: bold, color: ink });
       if (b) page.drawText(b.value.slice(0, 44), { x: mid, y, size: 8, font: bold, color: ink });
-      y -= 14;
+      y -= 11;
     }
     y -= 2;
 
@@ -534,9 +535,10 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
     page.drawText("Present the ORIGINAL copy on the first training day with a valid ID. Amounts reflect the enrollment ledger.", { x: left, y: baseY + 12, size: 5.5, font: regular, color: muted });
   };
 
-  drawCopy(0, "ORIGINAL COPY"); // page 1 — trainee copy
-  page = pdf.addPage([width, height]);
-  drawCopy(0, "DUPLICATE COPY"); // page 2 — file copy
+  // Dashed cut line between the two copies.
+  page.drawLine({ start: { x: 0, y: bandH }, end: { x: width, y: bandH }, thickness: 0.6, color: line, dashArray: [4, 4] });
+  drawCopy(bandH, "ORIGINAL COPY"); // upper half — trainee copy
+  drawCopy(0, "DUPLICATE COPY"); // lower half — file copy
 
   return pdf.save();
 }

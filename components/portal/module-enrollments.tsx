@@ -1186,7 +1186,7 @@ function AdmissionInvoiceModal({
       </div>
 
       <p className="muted-text" style={{ margin: "0 0 8px" }}>
-        Download PDF produces an A4 document — page 1 is the original copy, page 2 the duplicate (file) copy.
+        Download PDF produces one A4 sheet — upper half is the original copy, lower half the duplicate (file) copy, cut across the middle.
       </p>
 
       <div className="admission-slip" id="admission-invoice-print">
