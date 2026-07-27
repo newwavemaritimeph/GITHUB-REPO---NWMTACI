@@ -227,8 +227,45 @@ function SalesReport({ payments, payables }: { payments: Payment[]; payables: Pa
   );
 }
 
+/* ---- Small styled modal (replaces native window.prompt) ---- */
+function EditModal({ title, subtitle, children, onClose, onSave, saveLabel = "Save changes", busy }: { title: string; subtitle?: string; children: React.ReactNode; onClose: () => void; onSave: () => void; saveLabel?: string; busy?: boolean }) {
+  return (
+    <div className="portal-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <section className="portal-modal" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
+        <header><div><span className="portal-eyebrow">Accounting · pricing</span><h2 id="edit-modal-title">{title}</h2>{subtitle && <p style={{ margin: "2px 0 0", color: "var(--muted)", fontSize: 13 }}>{subtitle}</p>}</div><button type="button" onClick={onClose} aria-label="Close dialog">×</button></header>
+        <form className="portal-form" onSubmit={(e) => { e.preventDefault(); onSave(); }}>
+          {children}
+          <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="submit" className="portal-primary" disabled={busy}>{busy ? "Saving…" : saveLabel}</button></div>
+        </form>
+      </section>
+    </div>
+  );
+}
+
+type PriceEdit = { kind: "course"; id: string; label: string; price: string } | { kind: "offer"; id: string; label: string; fee: string; rebate: string };
+
 /* ---- Pricelist: course prices + endorsed-offer rates/rebates ---- */
 function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canManage: boolean; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
+  const [edit, setEdit] = useState<PriceEdit | null>(null);
+  const [error, setError] = useState("");
+  const pesoFromInput = (raw: string) => { const n = Number(raw); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null; };
+
+  async function save() {
+    if (!edit) return;
+    setError("");
+    if (edit.kind === "course") {
+      const price = pesoFromInput(edit.price);
+      if (price == null) { setError("Enter a valid price."); return; }
+      await post({ action: "course-price-save", courseId: edit.id, priceCentavos: price });
+    } else {
+      const fee = pesoFromInput(edit.fee); const rebate = pesoFromInput(edit.rebate);
+      if (fee == null || rebate == null) { setError("Enter valid amounts."); return; }
+      if (rebate > fee) { setError("Rebate cannot exceed the training fee."); return; }
+      await post({ action: "offer-rate-save", offerId: edit.id, trainingFeeCentavos: fee, rebateCentavos: rebate });
+    }
+    setEdit(null);
+  }
+
   return (
     <>
       {!canManage && <div className="portal-message error">Only Admin and Accounting can edit pricing.</div>}
@@ -240,7 +277,7 @@ function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canM
               <td><strong>{c.name}</strong><small>{c.code}</small></td>
               <td>{c.delivery_type}</td>
               <td>{pesos(c.standard_price_centavos)}</td>
-              <td className="document-actions">{canManage && <button disabled={busy} onClick={() => { const amt = num(window.prompt(`New price for ${c.name} (PHP)?`, String(c.standard_price_centavos / 100))); if (amt != null) void post({ action: "course-price-save", courseId: c.id, priceCentavos: amt }); }}>Edit price</button>}</td>
+              <td className="document-actions">{canManage && <button disabled={busy} onClick={() => { setError(""); setEdit({ kind: "course", id: c.id, label: c.name, price: String(c.standard_price_centavos / 100) }); }}>Edit price</button>}</td>
             </tr>
           ))}
           {!data.courses.length && <tr><td colSpan={4}><span className="portal-empty-copy">No courses.</span></td></tr>}
@@ -258,16 +295,27 @@ function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canM
               <td>{pesos(o.training_fee_centavos)}</td>
               <td>{pesos(o.rebate_centavos)}</td>
               <td>{pesos(o.partner_payable_centavos)}</td>
-              <td className="document-actions">{canManage && <button disabled={busy} onClick={() => {
-                const fee = num(window.prompt(`Training fee for ${course} (PHP)?`, String(o.training_fee_centavos / 100))); if (fee == null) return;
-                const rebate = num(window.prompt(`New Wave rebate (PHP)? Partner payable = fee − rebate.`, String(o.rebate_centavos / 100))); if (rebate == null) return;
-                void post({ action: "offer-rate-save", offerId: o.id, trainingFeeCentavos: fee, rebateCentavos: rebate });
-              }}>Edit rate</button>}</td>
+              <td className="document-actions">{canManage && <button disabled={busy} onClick={() => { setError(""); setEdit({ kind: "offer", id: o.id, label: `${course} · ${center}`, fee: String(o.training_fee_centavos / 100), rebate: String(o.rebate_centavos / 100) }); }}>Edit rate</button>}</td>
             </tr>;
           })}
           {!data.offers.length && <tr><td colSpan={6}><span className="portal-empty-copy">No endorsed offers.</span></td></tr>}
         </tbody></table></div>
       </section>
+
+      {edit && edit.kind === "course" && (
+        <EditModal title="Edit course price" subtitle={edit.label} busy={busy} onClose={() => setEdit(null)} onSave={save}>
+          {error && <div className="portal-message error full">{error}</div>}
+          <label className="full">Price (PHP)<input type="number" min="0" step="0.01" autoFocus value={edit.price} onChange={(e) => setEdit({ ...edit, price: e.target.value })} /></label>
+        </EditModal>
+      )}
+      {edit && edit.kind === "offer" && (
+        <EditModal title="Edit endorsement rate" subtitle={edit.label} busy={busy} onClose={() => setEdit(null)} onSave={save}>
+          {error && <div className="portal-message error full">{error}</div>}
+          <label>Training fee (PHP)<input type="number" min="0" step="0.01" autoFocus value={edit.fee} onChange={(e) => setEdit({ ...edit, fee: e.target.value })} /></label>
+          <label>New Wave rebate (PHP)<input type="number" min="0" step="0.01" value={edit.rebate} onChange={(e) => setEdit({ ...edit, rebate: e.target.value })} /></label>
+          <p className="portal-form-note full">Partner payable is computed automatically as fee − rebate: {(() => { const f = Number(edit.fee) || 0; const r = Number(edit.rebate) || 0; return pesos(Math.max(0, Math.round((f - r) * 100))); })()}</p>
+        </EditModal>
+      )}
     </>
   );
 }
