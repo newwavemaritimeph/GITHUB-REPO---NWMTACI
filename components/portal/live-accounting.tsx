@@ -13,16 +13,31 @@ type Charge = { id: string; name: string; default_amount_centavos: number; activ
 type Agency = { id: string; name: string; contact_name?: string | null; email?: string | null; mobile?: string | null; active: boolean };
 type Expense = { id: string; expense_number: string; payee: string; category: string; amount_centavos: number; status: string; created_at: string };
 type Payable = { id: string; description: string; amount_centavos: number; due_on?: string | null; status: string };
+type Course = { id: string; code: string; name: string; delivery_type: string; standard_price_centavos: number };
+type CenterRef = { name: string };
+type CourseRef = { name: string; code?: string };
+type Offer = { id: string; course_id?: string; duration_label: string; training_fee_centavos: number; rebate_centavos: number; partner_payable_centavos: number; partner_centers?: CenterRef | CenterRef[] | null; courses?: CourseRef | CourseRef[] | null };
 export type AccountingData = {
   payments: Payment[]; enrollments: Enrollment[]; paymentMethods: Channel[];
   charges: Charge[]; agencies: Agency[]; expenses: Expense[]; payables: Payable[];
+  courses: Course[]; offers: Offer[];
 };
+
+const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
+const manilaDay = (value?: string | null) => (value ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(value)) : "");
+/** Inclusive [from,to] Manila-day range for Daily / Weekly (last 7d) / Monthly (this month). */
+function rangeFor(span: "Daily" | "Weekly" | "Monthly"): { from: string; to: string } {
+  const today = manilaDay(new Date().toISOString());
+  if (span === "Daily") return { from: today, to: today };
+  if (span === "Weekly") { const d = new Date(); d.setDate(d.getDate() - 6); return { from: manilaDay(d.toISOString()), to: today }; }
+  return { from: today.slice(0, 8) + "01", to: today };
+}
 
 const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0 }).format((Number(centavos) || 0) / 100);
 const num = (raw: string | null) => (raw == null || raw.trim() === "" ? null : Math.round(Number(raw) * 100));
 
 export function LiveAccounting({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
-  const [tab, setTab] = useState<"Overview" | "Vouchers" | "Reconciliation" | "Setup">("Overview");
+  const [tab, setTab] = useState<"Overview" | "Sales" | "Pricelist" | "Vouchers" | "Reconciliation" | "Setup">("Overview");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const canManage = role === "admin" || role === "accounting";
@@ -61,7 +76,7 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         <div><span className="portal-eyebrow">Financial control</span><h1>Accounting</h1><p>Collections, disbursements, receivables, and setup — from the live Supabase ledger.</p></div>
       </div>
       <div className="portal-tabs">
-        {(["Overview", "Vouchers", "Reconciliation", "Setup"] as const).map((item) => (
+        {(["Overview", "Sales", "Pricelist", "Vouchers", "Reconciliation", "Setup"] as const).map((item) => (
           <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>
         ))}
       </div>
@@ -134,6 +149,10 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         </section>
       )}
 
+      {tab === "Sales" && <SalesReport payments={data.payments} payables={data.payables} />}
+
+      {tab === "Pricelist" && <Pricelist data={data} canManage={canManage} busy={busy} post={post} />}
+
       {tab === "Reconciliation" && <Reconciliation payments={data.payments} channels={data.paymentMethods} />}
 
       {tab === "Setup" && (
@@ -165,6 +184,91 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         </>
       )}
     </div>
+  );
+}
+
+/* ---- Date-sensitive sales + payables ---- */
+function SalesReport({ payments, payables }: { payments: Payment[]; payables: Payable[] }) {
+  const [span, setSpan] = useState<"Daily" | "Weekly" | "Monthly">("Daily");
+  const view = useMemo(() => {
+    const { from, to } = rangeFor(span);
+    const inRange = payments.filter((p) => { const d = manilaDay(p.received_at); return d >= from && d <= to; });
+    const byChannel = new Map<string, { total: number; count: number }>();
+    for (const p of inRange) { const k = p.method || "Other"; const e = byChannel.get(k) ?? { total: 0, count: 0 }; e.total += Number(p.amount_centavos); e.count += 1; byChannel.set(k, e); }
+    const duePayables = payables.filter((p) => p.due_on && p.due_on >= from && p.due_on <= to);
+    return { from, to, total: inRange.reduce((s, p) => s + Number(p.amount_centavos), 0), count: inRange.length, channels: [...byChannel.entries()].sort((a, b) => b[1].total - a[1].total), duePayables, payableTotal: duePayables.reduce((s, p) => s + Number(p.amount_centavos), 0) };
+  }, [payments, payables, span]);
+
+  return (
+    <>
+      <div className="portal-tabs" style={{ marginTop: -4 }}>
+        {(["Daily", "Weekly", "Monthly"] as const).map((s) => <button key={s} className={span === s ? "active" : ""} onClick={() => setSpan(s)}>{s}</button>)}
+      </div>
+      <div className="finance-hero">
+        <div><span>Sales · {span}</span><strong>{pesos(view.total)}</strong><small>{view.from} → {view.to}</small></div>
+        <article><span>Payments</span><strong>{view.count}</strong><small>posted in range</small></article>
+        <article><span>Payables due</span><strong>{pesos(view.payableTotal)}</strong><small>{view.duePayables.length} in range</small></article>
+      </div>
+      <section className="portal-panel">
+        <div className="panel-heading"><div><h2>Sales by channel</h2><p>Collections {view.from} → {view.to}</p></div><span>{pesos(view.total)}</span></div>
+        <div className="portal-table"><table><thead><tr><th>Channel</th><th>Payments</th><th>Total</th></tr></thead><tbody>
+          {view.channels.map(([name, v]) => <tr key={name}><td><strong>{name}</strong></td><td>{v.count}</td><td>{pesos(v.total)}</td></tr>)}
+          {!view.channels.length && <tr><td colSpan={3}><span className="portal-empty-copy">No sales in this period.</span></td></tr>}
+        </tbody></table></div>
+      </section>
+      <section className="portal-panel">
+        <div className="panel-heading"><div><h2>Payables due in period</h2><p>Recurring bills with a due date in range</p></div><span>{pesos(view.payableTotal)}</span></div>
+        <div className="portal-table"><table><thead><tr><th>Payable</th><th>Due</th><th>Status</th><th>Amount</th></tr></thead><tbody>
+          {view.duePayables.map((p) => <tr key={p.id}><td>{p.description}</td><td>{p.due_on}</td><td>{p.status}</td><td>{pesos(p.amount_centavos)}</td></tr>)}
+          {!view.duePayables.length && <tr><td colSpan={4}><span className="portal-empty-copy">No payables due in this period.</span></td></tr>}
+        </tbody></table></div>
+      </section>
+    </>
+  );
+}
+
+/* ---- Pricelist: course prices + endorsed-offer rates/rebates ---- */
+function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canManage: boolean; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
+  return (
+    <>
+      {!canManage && <div className="portal-message error">Only Admin and Accounting can edit pricing.</div>}
+      <section className="portal-panel">
+        <div className="panel-heading"><div><h2>Training pricelist</h2><p>Standard course prices (applies to new enrollments)</p></div></div>
+        <div className="portal-table"><table><thead><tr><th>Course</th><th>Type</th><th>Price</th><th></th></tr></thead><tbody>
+          {data.courses.map((c) => (
+            <tr key={c.id}>
+              <td><strong>{c.name}</strong><small>{c.code}</small></td>
+              <td>{c.delivery_type}</td>
+              <td>{pesos(c.standard_price_centavos)}</td>
+              <td className="document-actions">{canManage && <button disabled={busy} onClick={() => { const amt = num(window.prompt(`New price for ${c.name} (PHP)?`, String(c.standard_price_centavos / 100))); if (amt != null) void post({ action: "course-price-save", courseId: c.id, priceCentavos: amt }); }}>Edit price</button>}</td>
+            </tr>
+          ))}
+          {!data.courses.length && <tr><td colSpan={4}><span className="portal-empty-copy">No courses.</span></td></tr>}
+        </tbody></table></div>
+      </section>
+
+      <section className="portal-panel">
+        <div className="panel-heading"><div><h2>Endorsement rates &amp; rebates</h2><p>Partner-endorsed offers — training fee, New Wave rebate, partner payable</p></div></div>
+        <div className="portal-table"><table><thead><tr><th>Course · Center</th><th>Duration</th><th>Training fee</th><th>Rebate</th><th>Partner payable</th><th></th></tr></thead><tbody>
+          {data.offers.map((o) => {
+            const center = one(o.partner_centers)?.name ?? "—"; const course = data.courses.find((c) => c.id === o.course_id)?.name ?? one(o.courses)?.name ?? "—";
+            return <tr key={o.id}>
+              <td><strong>{course}</strong><small>{center}</small></td>
+              <td>{o.duration_label}</td>
+              <td>{pesos(o.training_fee_centavos)}</td>
+              <td>{pesos(o.rebate_centavos)}</td>
+              <td>{pesos(o.partner_payable_centavos)}</td>
+              <td className="document-actions">{canManage && <button disabled={busy} onClick={() => {
+                const fee = num(window.prompt(`Training fee for ${course} (PHP)?`, String(o.training_fee_centavos / 100))); if (fee == null) return;
+                const rebate = num(window.prompt(`New Wave rebate (PHP)? Partner payable = fee − rebate.`, String(o.rebate_centavos / 100))); if (rebate == null) return;
+                void post({ action: "offer-rate-save", offerId: o.id, trainingFeeCentavos: fee, rebateCentavos: rebate });
+              }}>Edit rate</button>}</td>
+            </tr>;
+          })}
+          {!data.offers.length && <tr><td colSpan={6}><span className="portal-empty-copy">No endorsed offers.</span></td></tr>}
+        </tbody></table></div>
+      </section>
+    </>
   );
 }
 

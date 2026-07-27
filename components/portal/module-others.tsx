@@ -971,7 +971,7 @@ function AgencyRebateEditor({ agencyId, onSet }: { agencyId: string; onSet: (id:
   );
 }
 
-const ACCOUNTING_TABS = ["Overview", "Invoices & Vouchers", "Reconciliation", "Setup"] as const;
+const ACCOUNTING_TABS = ["Overview", "Invoices & Vouchers", "Pricelist", "Reconciliation", "Setup"] as const;
 type AccountingTab = (typeof ACCOUNTING_TABS)[number];
 
 const SUMMARY_RANGES = ["Daily", "Weekly", "Monthly"] as const;
@@ -1271,6 +1271,8 @@ export function AccountingModule({ role }: { role: Role }) {
     updateMarketingAgency,
     setMarketingAgencyActive,
     setAgencyCourseRebate,
+    updateCourse,
+    updatePartnerOffer,
   } = useSystem();
   const toast = useToast();
   const all = views();
@@ -1465,6 +1467,72 @@ export function AccountingModule({ role }: { role: Role }) {
           )}
         </Panel>
       </>
+      )}
+
+      {tab === "Pricelist" && (
+        <>
+          <Panel title="Training pricelist" description="Standard New Wave course prices — applies to new enrollments">
+            <table className="ledger-table" style={{ width: "100%" }}>
+              <thead><tr><th>Course</th><th>Duration</th><th style={{ textAlign: "right" }}>Price</th><th /></tr></thead>
+              <tbody>
+                {state.courses.map((course) => (
+                  <tr key={course.id}>
+                    <td><strong>{course.course}</strong><small style={{ display: "block", color: "var(--muted)" }}>{course.code}</small></td>
+                    <td>{course.duration}</td>
+                    <td style={{ textAlign: "right" }}>{pesos(course.priceCentavos)}</td>
+                    <td style={{ textAlign: "right" }}>
+                      {canManage && (
+                        <button className="secondary-button" onClick={() => {
+                          const raw = window.prompt(`New price for ${course.course} (PHP)?`, String(course.priceCentavos / 100));
+                          if (raw == null || raw.trim() === "") return;
+                          const centavos = Math.round(Number(raw) * 100);
+                          if (!Number.isFinite(centavos) || centavos < 0) { toast("danger", "Enter a valid price."); return; }
+                          updateCourse(course.id, { priceCentavos: centavos });
+                          toast("success", `${course.course} price updated.`);
+                        }}>Edit price</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {state.courses.length === 0 && <tr><td colSpan={4} style={{ color: "var(--muted)" }}>No courses yet.</td></tr>}
+              </tbody>
+            </table>
+          </Panel>
+
+          <Panel title="Endorsement rates & rebates" description="Partner-endorsed offers — training fee, New Wave rebate, and partner payable (fee − rebate)">
+            <table className="ledger-table" style={{ width: "100%" }}>
+              <thead><tr><th>Course · Center</th><th>Duration</th><th style={{ textAlign: "right" }}>Training fee</th><th style={{ textAlign: "right" }}>Rebate</th><th style={{ textAlign: "right" }}>Partner payable</th><th /></tr></thead>
+              <tbody>
+                {state.partnerOffers.map((offer) => (
+                  <tr key={offer.id}>
+                    <td><strong>{offer.course}</strong><small style={{ display: "block", color: "var(--muted)" }}>{offer.center}</small></td>
+                    <td>{offer.duration}</td>
+                    <td style={{ textAlign: "right" }}>{pesos(offer.trainingFeeCentavos)}</td>
+                    <td style={{ textAlign: "right" }}>{pesos(offer.rebateCentavos)}</td>
+                    <td style={{ textAlign: "right" }}>{pesos(Math.max(0, offer.trainingFeeCentavos - offer.rebateCentavos))}</td>
+                    <td style={{ textAlign: "right" }}>
+                      {canManage && (
+                        <button className="secondary-button" onClick={() => {
+                          const feeRaw = window.prompt(`Training fee for ${offer.course} (PHP)?`, String(offer.trainingFeeCentavos / 100));
+                          if (feeRaw == null || feeRaw.trim() === "") return;
+                          const fee = Math.round(Number(feeRaw) * 100);
+                          const rebateRaw = window.prompt("New Wave rebate (PHP)? Partner payable = fee − rebate.", String(offer.rebateCentavos / 100));
+                          if (rebateRaw == null || rebateRaw.trim() === "") return;
+                          const rebate = Math.round(Number(rebateRaw) * 100);
+                          if (!Number.isFinite(fee) || !Number.isFinite(rebate) || fee < 0 || rebate < 0) { toast("danger", "Enter valid amounts."); return; }
+                          if (rebate > fee) { toast("danger", "Rebate cannot exceed the training fee."); return; }
+                          updatePartnerOffer(offer.id, { trainingFeeCentavos: fee, rebateCentavos: rebate });
+                          toast("success", `${offer.course} rate updated.`);
+                        }}>Edit rate</button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+                {state.partnerOffers.length === 0 && <tr><td colSpan={6} style={{ color: "var(--muted)" }}>No endorsed offers yet.</td></tr>}
+              </tbody>
+            </table>
+          </Panel>
+        </>
       )}
 
       {tab === "Reconciliation" && <BankReconciliation />}
