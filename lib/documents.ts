@@ -424,7 +424,7 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
     }
     page.drawText("NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", { x: headerX, y, size: 9, font: bold, color: ink });
     page.drawText("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000", { x: headerX, y: y - 11, size: 6.5, font: regular, color: muted });
-    page.drawText("PAYMENT INVOICE & ADMISSION SLIP", { x: headerX, y: y - 26, size: 12, font: bold, color: orange });
+    page.drawText("TRAINEE ADMISSION RECORD", { x: headerX, y: y - 26, size: 12, font: bold, color: orange });
 
     // Copy tag (top-right)
     page.drawText(copyLabel, { x: right - bold.widthOfTextAtSize(copyLabel, 8), y: baseY + bandH - 16, size: 8, font: bold, color: muted });

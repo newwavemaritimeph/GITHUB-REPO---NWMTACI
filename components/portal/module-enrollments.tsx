@@ -405,7 +405,7 @@ export function EnrollmentsModule({
               )}
               {canRecordPayment && (
                 <button className="secondary-button" onClick={() => setSlipFor(active)}>
-                  Admission slip + invoice
+                  Trainee admission record
                 </button>
               )}
               {active.enrollment.status !== "Cancelled" && (
@@ -1154,7 +1154,7 @@ export function AdmissionInvoiceModal({
         <div>
           <h2>NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.</h2>
           <p>Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000</p>
-          <strong>PAYMENT INVOICE &amp; ADMISSION SLIP</strong>
+          <strong>TRAINEE ADMISSION RECORD</strong>
         </div>
         <div className="slip-head-right"><span className="slip-copytag">{copyTag}</span><Pill tone={statusTone}>{statusLabel}</Pill></div>
       </div>
@@ -1217,7 +1217,7 @@ export function AdmissionInvoiceModal({
   return (
     <Modal
       open
-      title="Payment invoice & admission slip"
+      title="Trainee admission record"
       description={`${enrollment.reference} · ${enrollment.courseName}`}
       onClose={onClose}
       wide
