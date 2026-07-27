@@ -283,8 +283,12 @@ img {
   gap: 6px;
   padding: 16px 34px 0;
   margin: 0 auto;
-  max-width: 1500px;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.hub-tabs::-webkit-scrollbar { display: none; }
+.hub-tabs button { flex: 0 0 auto; white-space: nowrap; }
 .hub-tabs button {
   border: none;
   background: transparent;
@@ -3458,8 +3462,12 @@ code {
   background: #eef3f6;
   padding: 3px;
   border-radius: 9px;
-  overflow: auto;
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: none;
 }
+.segmented::-webkit-scrollbar { display: none; }
+.segmented button { flex: 0 0 auto; }
 
 .segmented button {
   border: 0;
@@ -5183,6 +5191,10 @@ code {
   }
   .page {
     padding: 20px 14px 48px;
+  }
+  .hub-tabs {
+    padding-left: 14px;
+    padding-right: 14px;
   }
   .page-header .primary-button {
     width: 100%;
