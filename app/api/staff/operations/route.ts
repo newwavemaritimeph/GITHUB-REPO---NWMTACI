@@ -69,8 +69,13 @@ const coursePriceInput = z.object({ action: z.literal("course-price-save"), cour
 const offerRateInput = z.object({ action: z.literal("offer-rate-save"), offerId: z.string().uuid(), trainingFeeCentavos: z.number().int().nonnegative(), rebateCentavos: z.number().int().nonnegative() });
 const courseSaveInput = z.object({ action: z.literal("course-save"), id: z.string().uuid().nullable().optional(), code: z.string().trim().min(2).max(40), name: z.string().trim().min(2).max(240), categoryId: z.string().uuid(), deliveryType: z.enum(["In-House", "Partner or Endorsed"]), durationLabel: z.string().trim().min(1).max(60), durationDays: z.number().positive().max(365), mode: z.string().trim().min(2).max(80), priceCentavos: z.number().int().nonnegative() });
 const centerSaveInput = z.object({ action: z.literal("center-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(2).max(160), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
+// Cashier actions relocated into the Payments module.
+const paymentSplitInput = z.object({ action: z.literal("payment-split"), allocations: z.array(z.object({ enrollmentId: z.string().uuid(), amountCentavos: z.number().int().positive() })).min(1).max(10), method: z.string().trim().min(1).max(80), receivingAccount: z.string().trim().min(2).max(120), referenceNumber: z.string().trim().max(80).optional().default(""), receivedAt: z.string().datetime({ offset: true }), remarks: z.string().trim().max(500).optional().default("") });
+const courseChangeInput = z.object({ action: z.literal("enrollment-course-change"), enrollmentId: z.string().uuid(), courseId: z.string().uuid(), partnerOfferId: z.string().uuid().nullable().optional() });
+const rescheduleInput = z.object({ action: z.literal("enrollment-reschedule"), enrollmentId: z.string().uuid(), batchId: z.string().uuid().nullable() });
 
-const actionInput = z.union([batchInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput]);
+const actionInput = z.union([batchInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput]);
+const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
 const canManageHr = (roles: string[]) => roles.some((role) => ["admin", "hr"].includes(role));
@@ -390,6 +395,76 @@ export async function POST(request: Request) {
       const admin = createSupabaseAdminClient();
       const { error } = await admin.from("partner_course_offers").update({ training_fee_centavos: input.trainingFeeCentavos, rebate_centavos: input.rebateCentavos, partner_payable_centavos: input.trainingFeeCentavos - input.rebateCentavos }).eq("id", input.offerId);
       if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "payment-split") {
+      if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot post payments." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const ids = input.allocations.map((a) => a.enrollmentId);
+      const { data: enrs } = await admin.from("enrollments").select("id,trainee_id,selling_price_centavos").in("id", ids);
+      if (!enrs || enrs.length !== new Set(ids).size) throw new Error("One or more enrollments were not found.");
+      const traineeId = enrs[0].trainee_id;
+      if (enrs.some((e) => e.trainee_id !== traineeId)) throw new Error("A split payment must be for a single trainee.");
+      const { data: allocs } = await admin.from("payment_allocations").select("enrollment_id,amount_centavos,payments!inner(valid)").in("enrollment_id", ids).eq("payments.valid", true);
+      const { data: chgs } = await admin.from("enrollment_charges").select("enrollment_id,amount_centavos,event_type").in("enrollment_id", ids).eq("valid", true);
+      for (const a of input.allocations) {
+        const e = enrs.find((row) => row.id === a.enrollmentId)!;
+        const paid = (allocs ?? []).filter((r) => r.enrollment_id === a.enrollmentId).reduce((s, r) => s + Number(r.amount_centavos), 0);
+        const charge = (chgs ?? []).filter((r) => r.enrollment_id === a.enrollmentId && r.event_type !== "discount").reduce((s, r) => s + Number(r.amount_centavos), 0);
+        const discount = (chgs ?? []).filter((r) => r.enrollment_id === a.enrollmentId && r.event_type === "discount").reduce((s, r) => s + Number(r.amount_centavos), 0);
+        const balance = Number(e.selling_price_centavos) + charge - discount - paid;
+        if (a.amountCentavos > balance) throw new Error(`A split amount exceeds the remaining balance on ${a.enrollmentId}.`);
+      }
+      const total = input.allocations.reduce((s, a) => s + a.amountCentavos, 0);
+      const { error } = await db.rpc("post_payment", { target_trainee: traineeId, target_amount_centavos: total, target_method: input.method, target_receiving_account: input.receivingAccount, target_reference: input.referenceNumber || null, target_received_at: input.receivedAt, target_proof: null, target_allocations: input.allocations.map((a) => ({ enrollment_id: a.enrollmentId, amount_centavos: a.amountCentavos })), target_remarks: input.remarks || null });
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "enrollment-course-change") {
+      if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot change a course." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: enrollment } = await admin.from("enrollments").select("id").eq("id", input.enrollmentId).maybeSingle();
+      if (!enrollment) throw new Error("Enrollment not found.");
+      let price = 0;
+      if (input.partnerOfferId) {
+        const { data: offer } = await admin.from("partner_course_offers").select("training_fee_centavos").eq("id", input.partnerOfferId).maybeSingle();
+        if (!offer) throw new Error("Endorsed offer not found."); price = Number(offer.training_fee_centavos);
+      } else {
+        const { data: course } = await admin.from("courses").select("standard_price_centavos").eq("id", input.courseId).maybeSingle();
+        if (!course) throw new Error("Course not found."); price = Number(course.standard_price_centavos);
+      }
+      const { data: allocs } = await admin.from("payment_allocations").select("amount_centavos,payments!inner(valid)").eq("enrollment_id", input.enrollmentId).eq("payments.valid", true);
+      const paid = (allocs ?? []).reduce((s, r) => s + Number(r.amount_centavos), 0);
+      const { data: chgs } = await admin.from("enrollment_charges").select("amount_centavos,event_type").eq("enrollment_id", input.enrollmentId).eq("valid", true);
+      const charge = (chgs ?? []).filter((r) => r.event_type !== "discount").reduce((s, r) => s + Number(r.amount_centavos), 0);
+      const discount = (chgs ?? []).filter((r) => r.event_type === "discount").reduce((s, r) => s + Number(r.amount_centavos), 0);
+      if (paid > price + charge - discount) throw new Error("The new course price is lower than the amount already paid on this enrollment.");
+      const { error } = await admin.from("enrollments").update({ course_id: input.courseId, partner_offer_id: input.partnerOfferId ?? null, selling_price_centavos: price }).eq("id", input.enrollmentId);
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "enrollment-reschedule") {
+      if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot reschedule." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: enrollment } = await admin.from("enrollments").select("id,batch_id").eq("id", input.enrollmentId).maybeSingle();
+      if (!enrollment) throw new Error("Enrollment not found.");
+      const oldBatch = enrollment.batch_id as string | null;
+      if (input.batchId && input.batchId !== oldBatch) {
+        const { data: nb } = await admin.from("batches").select("capacity,confirmed_count").eq("id", input.batchId).maybeSingle();
+        if (!nb) throw new Error("Schedule not found.");
+        if (Number(nb.confirmed_count) >= Number(nb.capacity)) throw new Error("That schedule is already full.");
+      }
+      const { error } = await admin.from("enrollments").update({ batch_id: input.batchId }).eq("id", input.enrollmentId);
+      if (error) throw error;
+      // confirmed_count is maintained by app code (no trigger); mirror the enrollment RPCs.
+      if (oldBatch && oldBatch !== input.batchId) {
+        const { data: ob } = await admin.from("batches").select("confirmed_count,capacity,status").eq("id", oldBatch).maybeSingle();
+        if (ob) { const next = Math.max(0, Number(ob.confirmed_count) - 1); await admin.from("batches").update({ confirmed_count: next, status: ob.status === "Full" && next < Number(ob.capacity) ? "Open" : ob.status }).eq("id", oldBatch); }
+      }
+      if (input.batchId && input.batchId !== oldBatch) {
+        const { data: nb2 } = await admin.from("batches").select("confirmed_count,capacity,status").eq("id", input.batchId).maybeSingle();
+        if (nb2) { const next = Number(nb2.confirmed_count) + 1; await admin.from("batches").update({ confirmed_count: next, status: next >= Number(nb2.capacity) ? "Full" : nb2.status }).eq("id", input.batchId); }
+      }
       return NextResponse.json({ ok: true });
     }
     if (input.action === "course-save") {
