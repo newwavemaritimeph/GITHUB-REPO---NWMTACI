@@ -971,7 +971,7 @@ function AgencyRebateEditor({ agencyId, onSet }: { agencyId: string; onSet: (id:
   );
 }
 
-const ACCOUNTING_TABS = ["Overview", "Invoices & Vouchers", "Pricelist", "Reconciliation", "Setup"] as const;
+const ACCOUNTING_TABS = ["Overview", "Invoices & Vouchers", "Reconciliation", "Setup"] as const;
 type AccountingTab = (typeof ACCOUNTING_TABS)[number];
 
 const SUMMARY_RANGES = ["Daily", "Weekly", "Monthly"] as const;
@@ -1469,7 +1469,7 @@ export function AccountingModule({ role }: { role: Role }) {
       </>
       )}
 
-      {tab === "Pricelist" && (
+      {tab === "Setup" && (
         <>
           <Panel title="Training pricelist" description="Standard New Wave course prices — applies to new enrollments">
             <table className="ledger-table" style={{ width: "100%" }}>

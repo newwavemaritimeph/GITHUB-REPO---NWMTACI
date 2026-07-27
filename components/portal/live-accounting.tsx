@@ -36,7 +36,7 @@ function rangeFor(span: "Daily" | "Weekly" | "Monthly"): { from: string; to: str
 const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0 }).format((Number(centavos) || 0) / 100);
 
 export function LiveAccounting({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
-  const [tab, setTab] = useState<"Overview" | "Sales" | "Pricelist" | "Vouchers" | "Reconciliation" | "Setup">("Overview");
+  const [tab, setTab] = useState<"Overview" | "Sales" | "Vouchers" | "Reconciliation" | "Setup">("Overview");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [voucher, setVoucher] = useState<{ payee: string; category: string; amount: string; purpose: string } | null>(null);
@@ -77,7 +77,7 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         <div><span className="portal-eyebrow">Financial control</span><h1>Accounting</h1><p>Collections, disbursements, receivables, and setup — from the live Supabase ledger.</p></div>
       </div>
       <div className="portal-tabs">
-        {(["Overview", "Sales", "Pricelist", "Vouchers", "Reconciliation", "Setup"] as const).map((item) => (
+        {(["Overview", "Sales", "Vouchers", "Reconciliation", "Setup"] as const).map((item) => (
           <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>
         ))}
       </div>
@@ -163,13 +163,12 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
 
       {tab === "Sales" && <SalesReport payments={data.payments} payables={data.payables} />}
 
-      {tab === "Pricelist" && <Pricelist data={data} canManage={canManage} busy={busy} post={post} />}
-
       {tab === "Reconciliation" && <Reconciliation payments={data.payments} channels={data.paymentMethods} />}
 
       {tab === "Setup" && (
         <>
           {!canManage && <div className="portal-message error">Only Admin and Accounting can edit setup.</div>}
+          <Pricelist data={data} canManage={canManage} busy={busy} post={post} />
           <SetupList title="Payment channels" description="Modes offered at the cashier" entityLabel="payment channel"
             canManage={canManage} busy={busy}
             fields={[{ key: "name", label: "Channel name" }, { key: "requiresReference", label: "Requires a reference number", type: "checkbox" }]}
