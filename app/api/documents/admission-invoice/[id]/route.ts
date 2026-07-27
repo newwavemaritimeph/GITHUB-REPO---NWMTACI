@@ -12,6 +12,9 @@ const fmtDate = (value?: string | null) => (value ? new Intl.DateTimeFormat("en-
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   if (!(await requireStaff())) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   const { id } = await params;
+  const url = new URL(request.url);
+  const officerName = (url.searchParams.get("officer") ?? "").slice(0, 120);
+  const cashierName = (url.searchParams.get("cashier") ?? "").slice(0, 120);
   const db = createSupabaseAdminClient();
   const { data } = await db.from("enrollments")
     .select("id,enrollment_number,registration_reference,selling_price_centavos,enrollment_status,trainees(trainee_number,legal_first_name,legal_middle_name,legal_last_name,suffix,email,mobile,srn),courses(name,code),batches(batch_number,starts_on,ends_on,daily_start,daily_end,venue)")
@@ -58,8 +61,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     instructor: "",
     registrationStatus: data.enrollment_status,
     issuedAt: new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date()),
-    officer: "",
-    cashier: "",
+    officer: officerName,
+    cashier: cashierName,
     lines,
     dueCentavos: due,
     paidCentavos: paid,
