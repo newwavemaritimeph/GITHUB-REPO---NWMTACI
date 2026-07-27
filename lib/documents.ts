@@ -371,18 +371,17 @@ export type AdmissionInvoiceSnapshot = {
 };
 
 /**
- * Combined Admission Slip + Payment Invoice on a single 8" × 13" long-bond sheet
- * (portrait, 576 × 936pt). The same combined block is printed twice — the upper
- * half tagged ORIGINAL COPY, the lower half DUPLICATE COPY — so the sheet is cut
- * across the middle to yield an original for the trainee and a file copy. The
- * payment status is stamped prominently for instructor verification.
+ * Combined Payment Invoice + Admission Slip on A4 portrait (595.28 × 841.89pt).
+ * The same combined block is rendered on two pages — page 1 tagged ORIGINAL COPY
+ * (for the trainee), page 2 DUPLICATE COPY (file copy). The payment status is
+ * stamped prominently for instructor verification.
  */
 export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapshot) {
   const pdf = await PDFDocument.create();
-  const width = 576;
-  const height = 936;
-  const bandH = height / 2; // 468pt per copy
-  const page = pdf.addPage([width, height]);
+  const width = 595.28; // A4 portrait
+  const height = 841.89;
+  const bandH = height; // one full A4 page per copy
+  let page = pdf.addPage([width, height]);
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const ink = rgb(0.07, 0.25, 0.39);
@@ -424,7 +423,7 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
     }
     page.drawText("NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", { x: headerX, y, size: 9, font: bold, color: ink });
     page.drawText("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000", { x: headerX, y: y - 11, size: 6.5, font: regular, color: muted });
-    page.drawText("ADMISSION SLIP & PAYMENT INVOICE", { x: headerX, y: y - 26, size: 12, font: bold, color: orange });
+    page.drawText("PAYMENT INVOICE & ADMISSION SLIP", { x: headerX, y: y - 26, size: 12, font: bold, color: orange });
 
     // Copy tag (top-right)
     page.drawText(copyLabel, { x: right - bold.widthOfTextAtSize(copyLabel, 8), y: baseY + bandH - 16, size: 8, font: bold, color: muted });
@@ -535,11 +534,9 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
     page.drawText("Present the ORIGINAL copy on the first training day with a valid ID. Amounts reflect the enrollment ledger.", { x: left, y: baseY + 12, size: 5.5, font: regular, color: muted });
   };
 
-  // Divider between the two copies (cut line)
-  page.drawLine({ start: { x: 0, y: bandH }, end: { x: width, y: bandH }, thickness: 0.6, color: line, dashArray: [4, 4] });
-
-  drawCopy(bandH, "ORIGINAL COPY"); // upper half
-  drawCopy(0, "DUPLICATE COPY"); // lower half
+  drawCopy(0, "ORIGINAL COPY"); // page 1 — trainee copy
+  page = pdf.addPage([width, height]);
+  drawCopy(0, "DUPLICATE COPY"); // page 2 — file copy
 
   return pdf.save();
 }

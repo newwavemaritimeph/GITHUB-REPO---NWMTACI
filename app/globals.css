@@ -330,7 +330,7 @@ img {
 
 /* Print on half of a short bond sheet (8.5in x 5.5in). */
 @media print {
-  @page { size: 8.5in 5.5in; margin: 0.25in; }
+  @page { size: A4 portrait; margin: 0.5in; }
   body * { visibility: hidden !important; }
   #admission-slip-print, #admission-slip-print *,
   #admission-invoice-print, #admission-invoice-print *,
@@ -343,21 +343,21 @@ img {
     position: absolute;
     left: 0;
     top: 0;
-    width: 8in;
+    width: 100%;
     border: none;
     margin: 0;
     padding: 0;
-    font-size: 10px;
+    font-size: 11px;
   }
-  #admission-slip-print .slip-head h2 { font-size: 11px; }
-  #admission-slip-print .slip-head p { font-size: 8px; }
-  #admission-slip-print .slip-head strong { font-size: 12px; }
-  #admission-slip-print .slip-logo { width: 48px; height: 48px; }
-  #admission-slip-print .slip-section { font-size: 9px; margin: 10px 0 6px; }
-  #admission-slip-print .slip-grid strong { font-size: 10px; }
-  #admission-slip-print .slip-grid span { font-size: 8px; }
-  #admission-slip-print .slip-meta { margin: 8px 0 2px; }
-  #admission-slip-print .slip-signatures { margin-top: 22px; gap: 30px; }
+  #admission-slip-print .slip-head h2, #admission-invoice-print .slip-head h2 { font-size: 13px; }
+  #admission-slip-print .slip-head p, #admission-invoice-print .slip-head p { font-size: 9px; }
+  #admission-slip-print .slip-head strong, #admission-invoice-print .slip-head strong { font-size: 13px; }
+  #admission-slip-print .slip-logo, #admission-invoice-print .slip-logo { width: 54px; height: 54px; }
+  #admission-slip-print .slip-section, #admission-invoice-print .slip-section { font-size: 10px; margin: 12px 0 7px; }
+  #admission-slip-print .slip-grid strong, #admission-invoice-print .slip-grid strong { font-size: 11px; }
+  #admission-slip-print .slip-grid span, #admission-invoice-print .slip-grid span { font-size: 9px; }
+  #admission-slip-print .slip-meta, #admission-invoice-print .slip-meta { margin: 10px 0 3px; }
+  #admission-slip-print .slip-signatures, #admission-invoice-print .slip-signatures { margin-top: 26px; gap: 30px; }
 }
 
 /* trainees: status stack + duplicates */

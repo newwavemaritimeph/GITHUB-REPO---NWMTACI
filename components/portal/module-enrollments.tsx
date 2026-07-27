@@ -1149,7 +1149,7 @@ function AdmissionInvoiceModal({
   return (
     <Modal
       open
-      title="Admission slip + payment invoice"
+      title="Payment invoice & admission slip"
       description={`${enrollment.reference} · ${enrollment.courseName}`}
       onClose={onClose}
       wide
@@ -1186,7 +1186,7 @@ function AdmissionInvoiceModal({
       </div>
 
       <p className="muted-text" style={{ margin: "0 0 8px" }}>
-        Prints on one 8&quot;×13&quot; long-bond sheet — the block below repeats twice (upper = original copy, lower = duplicate copy).
+        Download PDF produces an A4 document — page 1 is the original copy, page 2 the duplicate (file) copy.
       </p>
 
       <div className="admission-slip" id="admission-invoice-print">
@@ -1196,7 +1196,7 @@ function AdmissionInvoiceModal({
           <div>
             <h2>NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.</h2>
             <p>Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000</p>
-            <strong>ADMISSION SLIP &amp; PAYMENT INVOICE</strong>
+            <strong>PAYMENT INVOICE &amp; ADMISSION SLIP</strong>
           </div>
           <Pill tone={statusTone}>{statusLabel}</Pill>
         </div>
