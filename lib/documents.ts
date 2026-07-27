@@ -345,6 +345,15 @@ export async function createAdmissionSlipPdf(snapshot: AdmissionSlipSnapshot) {
 }
 
 export type AdmissionInvoiceLine = { description: string; detail?: string; amountCentavos: number; negative?: boolean };
+/** One course the trainee enrolled in on the admission day. */
+export type AdmissionCourseLine = {
+  course: string;
+  schedule: string;
+  time: string;
+  venue: string;
+  instructor: string;
+};
+
 export type AdmissionInvoiceSnapshot = {
   reference: string;
   traineeName: string;
@@ -352,11 +361,8 @@ export type AdmissionInvoiceSnapshot = {
   srn: string;
   mobile: string;
   email: string;
-  course: string;
-  schedule: string;
-  time: string;
-  venue: string;
-  instructor: string;
+  /** Every course the trainee enrolled in on the admission day (same-day enrollments). */
+  courses: AdmissionCourseLine[];
   registrationStatus: string;
   issuedAt: string;
   officer: string;
@@ -413,18 +419,36 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
     return { label: "UNPAID", fill: rgb(0.78, 0.12, 0.12) };
   })();
 
+  // Word-wrap a string to a max pixel width for a given font/size.
+  const wrap = (text: string, font: typeof regular, size: number, maxWidth: number) => {
+    const words = text.split(/\s+/);
+    const lines: string[] = [];
+    let current = "";
+    for (const word of words) {
+      const attempt = current ? `${current} ${word}` : word;
+      if (font.widthOfTextAtSize(attempt, size) > maxWidth && current) {
+        lines.push(current);
+        current = word;
+      } else {
+        current = attempt;
+      }
+    }
+    if (current) lines.push(current);
+    return lines;
+  };
+
   // Draws one combined copy anchored at the band whose bottom edge is `baseY`.
   const drawCopy = (baseY: number, copyLabel: string) => {
     let y = baseY + bandH - 14;
     let headerX = left;
     if (logo) {
-      const dims = logo.scale(34 / logo.width);
+      const dims = logo.scale(30 / logo.width);
       page.drawImage(logo, { x: left, y: y - dims.height + 8, width: dims.width, height: dims.height });
       headerX = left + dims.width + 10;
     }
     page.drawText("NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", { x: headerX, y, size: 9, font: bold, color: ink });
     page.drawText("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000", { x: headerX, y: y - 11, size: 6.5, font: regular, color: muted });
-    page.drawText("TRAINEE ADMISSION RECORD", { x: headerX, y: y - 26, size: 12, font: bold, color: orange });
+    page.drawText("TRAINEE ADMISSION RECORD", { x: headerX, y: y - 25, size: 12, font: bold, color: orange });
 
     // Copy tag (top-right)
     page.drawText(copyLabel, { x: right - bold.widthOfTextAtSize(copyLabel, 8), y: baseY + bandH - 16, size: 8, font: bold, color: muted });
@@ -441,9 +465,9 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
       page.drawText(statusInfo.label, { x: boxX + 10, y: boxY + 7, size, font: bold, color: rgb(1, 1, 1) });
     }
 
-    y -= 34;
+    y -= 33;
     page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 1.2, color: blue });
-    y -= 14;
+    y -= 13;
 
     // Meta row
     const meta = [
@@ -457,49 +481,55 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
       page.drawText(field.label, { x, y, size: 6, font: regular, color: muted });
       page.drawText(field.value.slice(0, 30), { x, y: y - 9, size: 8, font: bold, color: ink });
     });
-    y -= 18;
+    y -= 19;
 
-    // Two-column detail grid (trainee + training details)
-    const cols: { label: string; value: string }[] = [
-      { label: "Name", value: snapshot.traineeName },
-      { label: "SRN", value: snapshot.srn || "-" },
-      { label: "Mobile", value: snapshot.mobile || "-" },
-      { label: "Email", value: snapshot.email || "-" },
-      { label: "Course", value: snapshot.course },
-      { label: "Schedule", value: snapshot.schedule },
-      { label: "Time", value: snapshot.time },
-      { label: "Classroom", value: snapshot.venue || "-" },
-      { label: "Instructor", value: snapshot.instructor || "-" },
-      { label: "Registration status", value: snapshot.registrationStatus || "-" },
+    // Trainee identity — two compact rows
+    const idRows: [string, string, string, string][] = [
+      ["Name", snapshot.traineeName, "SRN", snapshot.srn || "-"],
+      ["Mobile", snapshot.mobile || "-", "Email", snapshot.email || "-"],
     ];
-    for (let i = 0; i < cols.length; i += 2) {
-      const a = cols[i];
-      const b = cols[i + 1];
-      page.drawText(a.label, { x: left, y, size: 6, font: regular, color: muted });
-      if (b) page.drawText(b.label, { x: mid, y, size: 6, font: regular, color: muted });
+    idRows.forEach(([la, va, lb, vb]) => {
+      page.drawText(la, { x: left, y, size: 6, font: regular, color: muted });
+      page.drawText(lb, { x: mid, y, size: 6, font: regular, color: muted });
       y -= 8;
-      page.drawText(a.value.slice(0, 44), { x: left, y, size: 8, font: bold, color: ink });
-      if (b) page.drawText(b.value.slice(0, 44), { x: mid, y, size: 8, font: bold, color: ink });
+      page.drawText(va.slice(0, 46), { x: left, y, size: 8, font: bold, color: ink });
+      page.drawText(vb.slice(0, 46), { x: mid, y, size: 8, font: bold, color: ink });
       y -= 11;
-    }
-    y -= 2;
+    });
+    y -= 3;
 
-    // Charges & payments
+    // Courses enrolled (same-day) — schedule / time / classroom / instructor per course
+    page.drawText("COURSES ENROLLED", { x: left, y, size: 7.5, font: bold, color: blue });
+    y -= 4;
+    const courses = snapshot.courses.length ? snapshot.courses : [{ course: "-", schedule: "-", time: "-", venue: "", instructor: "" }];
+    courses.forEach((c) => {
+      const rowH = 22;
+      y -= rowH;
+      page.drawRectangle({ x: left, y, width: right - left, height: rowH, color: panel });
+      page.drawRectangle({ x: left, y, width: 3, height: rowH, color: orange });
+      page.drawText(c.course.slice(0, 64), { x: left + 10, y: y + rowH - 11, size: 8, font: bold, color: ink });
+      const detail = [c.schedule, c.time, c.venue ? `Room: ${c.venue}` : "", c.instructor ? `Instructor: ${c.instructor}` : ""].filter(Boolean).join("   ·   ");
+      page.drawText(detail.slice(0, 104), { x: left + 10, y: y + 5, size: 6, font: regular, color: muted });
+      y -= 3;
+    });
+    y -= 4;
+
+    // Charges & payments (compact single-line rows)
     page.drawText("CHARGES & PAYMENTS", { x: left, y, size: 7.5, font: bold, color: blue });
     y -= 4;
     const rows = snapshot.lines.length ? snapshot.lines : [{ description: "No ledger entries yet.", amountCentavos: 0 }];
     rows.forEach((item) => {
-      const rowH = item.detail ? 22 : 15;
+      const rowH = 14;
       y -= rowH;
       page.drawRectangle({ x: left, y, width: right - left, height: rowH, color: panel });
       page.drawRectangle({ x: left, y, width: 3, height: rowH, color: item.negative ? green : blue });
-      page.drawText(item.description.slice(0, 60), { x: left + 10, y: y + rowH - 11, size: 7.5, font: bold, color: ink });
-      if (item.detail) page.drawText(item.detail.slice(0, 92), { x: left + 10, y: y + 5, size: 6, font: regular, color: muted });
+      const desc = item.detail ? `${item.description} — ${item.detail}` : item.description;
+      page.drawText(desc.slice(0, 84), { x: left + 10, y: y + 4, size: 6.5, font: regular, color: ink });
       if (item.amountCentavos) {
         const amount = `${item.negative ? "-" : ""}${php(item.amountCentavos)}`;
-        page.drawText(amount, { x: right - 8 - bold.widthOfTextAtSize(amount, 8), y: y + rowH / 2 - 3, size: 8, font: bold, color: item.negative ? green : ink });
+        page.drawText(amount, { x: right - 8 - bold.widthOfTextAtSize(amount, 7.5), y: y + 4, size: 7.5, font: bold, color: item.negative ? green : ink });
       }
-      y -= 3;
+      y -= 2;
     });
 
     // Totals
@@ -517,22 +547,31 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
       page.drawText(t.label, { x, y, size: 6, font: regular, color: muted });
       page.drawText(t.value, { x, y: y - 10, size: 9, font: bold, color: t.label === "Balance" && snapshot.balanceCentavos > 0 ? rgb(0.78, 0.12, 0.12) : ink });
     });
-    y -= 26;
+    y -= 24;
 
-    // Signatures
+    // Acknowledgment + terms
+    const terms = `I, ${snapshot.traineeName}, hereby acknowledge and accept the Terms and Conditions of New Wave Maritime Training and Assessment Center, Inc.`;
+    wrap(terms, regular, 6.5, right - left).forEach((ln) => {
+      page.drawText(ln, { x: left, y, size: 6.5, font: regular, color: ink });
+      y -= 9;
+    });
+    y -= 16; // room for the signature stroke
+
+    // Three signature columns — trainee (printed name shown), officer, cashier
     const sigs = [
+      { label: "Trainee — Signature over Printed Name", name: snapshot.traineeName },
       { label: "Registration Officer — Signature over Printed Name", name: snapshot.officer },
       { label: "Cashier — Signature over Printed Name", name: snapshot.cashier },
     ];
     const sStep = (right - left) / sigs.length;
     sigs.forEach((sig, index) => {
       const x = left + sStep * index;
-      page.drawText((sig.name || " ").slice(0, 28), { x, y: y + 4, size: 7.5, font: bold, color: ink });
-      page.drawLine({ start: { x, y }, end: { x: x + sStep - 24, y }, thickness: 0.6, color: line });
-      page.drawText(sig.label, { x, y: y - 9, size: 6, font: regular, color: muted });
+      page.drawText((sig.name || " ").slice(0, 26), { x, y: y + 4, size: 7, font: bold, color: ink });
+      page.drawLine({ start: { x, y }, end: { x: x + sStep - 16, y }, thickness: 0.6, color: line });
+      page.drawText(sig.label, { x, y: y - 8, size: 5.5, font: regular, color: muted });
     });
 
-    page.drawText("Present the ORIGINAL copy on the first training day with a valid ID. Amounts reflect the enrollment ledger.", { x: left, y: baseY + 12, size: 5.5, font: regular, color: muted });
+    page.drawText("Present the ORIGINAL copy on the first training day with a valid ID. Amounts reflect the enrollment ledger.", { x: left, y: baseY + 10, size: 5.5, font: regular, color: muted });
   };
 
   // Dashed cut line between the two copies.

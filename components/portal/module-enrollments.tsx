@@ -1097,33 +1097,58 @@ export function AdmissionInvoiceModal({
   const [cashier, setCashier] = useState(view.enrollment.cashierAssigned || defaultCashier);
   const [building, setBuilding] = useState(false);
   const toast = useToast();
-  const { trainee, batch, enrollment, entries, dueCentavos, paidCentavos, balanceCentavos, paymentStatus } = view;
-  const charges = entries.filter((entry) => entry.type === "charge");
-  const payments = entries.filter((entry) => entry.type === "payment" || entry.type === "discount" || entry.type === "refund");
+  const { views } = useSystem();
+  const { trainee, enrollment } = view;
+
+  // One admission record covers every course this trainee enrolled in on the
+  // same day (same-day enrollments), not just the row that was opened.
+  const admissionDay = enrollment.createdAt.slice(0, 10);
+  const siblings = views()
+    .filter((v) => v.trainee.id === trainee.id && v.enrollment.createdAt.slice(0, 10) === admissionDay)
+    .sort((a, b) => a.enrollment.createdAt.localeCompare(b.enrollment.createdAt));
+  const group = siblings.length ? siblings : [view];
+
+  const timeOf = (v: EnrollmentView) => {
+    if (v.enrollment.id === enrollment.id && session) return `${formatTime(session.startsAt)} – ${formatTime(session.endsAt)}`;
+    const first = v.attendance[0]?.session;
+    return first ? `${formatTime(first.startsAt)} – ${formatTime(first.endsAt)}` : "8:00 AM – 5:00 PM";
+  };
+  const courseLines = group.map((v) => ({
+    course: `${v.enrollment.courseName} (${v.enrollment.courseCode})`,
+    schedule: v.batch ? formatDateRange(v.batch.startsOn, v.batch.endsOn) : "Open schedule",
+    time: timeOf(v),
+    venue: v.batch?.venue ?? "",
+    instructor: v.batch?.instructor ?? "",
+  }));
+
+  // Aggregate the ledger across every same-day enrollment.
+  const groupEntries = group.flatMap((v) => v.entries);
+  const charges = groupEntries.filter((entry) => entry.type === "charge");
+  const payments = groupEntries.filter((entry) => entry.type === "payment" || entry.type === "discount" || entry.type === "refund");
+  const dueCentavos = group.reduce((sum, v) => sum + v.dueCentavos, 0);
+  const paidCentavos = group.reduce((sum, v) => sum + v.paidCentavos, 0);
+  const balanceCentavos = group.reduce((sum, v) => sum + v.balanceCentavos, 0);
+  const paymentStatus: EnrollmentView["paymentStatus"] = balanceCentavos <= 0 && paidCentavos > 0 ? "Paid" : paidCentavos > 0 ? "Partially Paid" : "Unpaid";
   const statusTone = paymentStatus === "Paid" ? "green" : paymentStatus === "Partially Paid" ? "amber" : "red";
   const statusLabel = paymentStatus === "Paid" ? "FULLY PAID" : paymentStatus === "Partially Paid" ? "PARTIALLY PAID" : "UNPAID";
-  const time = session ? `${formatTime(session.startsAt)} – ${formatTime(session.endsAt)}` : "8:00 AM – 5:00 PM";
+  const traineeName = `${fullName(trainee)}${trainee.suffix ? ` ${trainee.suffix}` : ""}`;
 
   async function downloadPdf() {
     setBuilding(true);
     try {
       const logoBytes = await fetchLogoBytes();
-      const detailOf = (entry: (typeof entries)[number]) =>
+      const detailOf = (entry: (typeof groupEntries)[number]) =>
         `${entry.reference} · ${formatDateTime(entry.recordedAt)}` +
         (entry.referenceNumber ? ` · Ref ${entry.referenceNumber}` : "") +
         (entry.receiptNumber ? ` · ${entry.receiptNumber}` : "");
       const bytes = await createAdmissionInvoicePdf({
         reference: enrollment.reference,
-        traineeName: `${fullName(trainee)}${trainee.suffix ? ` ${trainee.suffix}` : ""}`,
+        traineeName,
         traineeNumber: trainee.traineeNumber,
         srn: trainee.srn ?? "",
         mobile: trainee.mobile,
         email: trainee.email,
-        course: `${enrollment.courseName} (${enrollment.courseCode})`,
-        schedule: batch ? formatDateRange(batch.startsOn, batch.endsOn) : "Open schedule",
-        time,
-        venue: batch?.venue ?? "",
-        instructor: batch?.instructor ?? "",
+        courses: courseLines,
         registrationStatus: enrollment.registrationStatus ?? "Waiting for Payment",
         issuedAt: formatDate(new Date().toISOString()),
         officer: officer.trim(),
@@ -1167,20 +1192,20 @@ export function AdmissionInvoiceModal({
 
       <h3 className="slip-section">Trainee</h3>
       <div className="slip-grid">
-        <div><span>Name</span><strong>{fullName(trainee)}{trainee.suffix ? ` ${trainee.suffix}` : ""}</strong></div>
+        <div><span>Name</span><strong>{traineeName}</strong></div>
         <div><span>SRN</span><strong>{trainee.srn ?? "—"}</strong></div>
         <div><span>Mobile</span><strong>{trainee.mobile}</strong></div>
         <div><span>Email</span><strong>{trainee.email}</strong></div>
       </div>
 
-      <h3 className="slip-section">Training details</h3>
-      <div className="slip-grid">
-        <div><span>Course</span><strong>{enrollment.courseName} ({enrollment.courseCode})</strong></div>
-        <div><span>Schedule</span><strong>{batch ? formatDateRange(batch.startsOn, batch.endsOn) : "—"}</strong></div>
-        <div><span>Time</span><strong>{time}</strong></div>
-        <div><span>Classroom</span><strong>{batch?.venue ?? "—"}</strong></div>
-        <div><span>Instructor</span><strong>{batch?.instructor ?? "—"}</strong></div>
-        <div><span>Registration status</span><strong>{enrollment.registrationStatus ?? "Waiting for Payment"}</strong></div>
+      <h3 className="slip-section">Courses enrolled{courseLines.length > 1 ? ` (${courseLines.length})` : ""}</h3>
+      <div className="slip-courses">
+        {courseLines.map((c, index) => (
+          <div key={index} className="slip-course-row">
+            <strong>{c.course}</strong>
+            <small>{[c.schedule, c.time, c.venue ? `Room: ${c.venue}` : "", c.instructor ? `Instructor: ${c.instructor}` : ""].filter(Boolean).join("  ·  ")}</small>
+          </div>
+        ))}
       </div>
 
       <h3 className="slip-section">Charges &amp; payments</h3>
@@ -1207,7 +1232,11 @@ export function AdmissionInvoiceModal({
         <div><span>Payment status</span><strong>{statusLabel}</strong></div>
       </div>
 
-      <div className="slip-signatures">
+      <p className="slip-acknowledge">
+        I, <strong>{traineeName}</strong>, hereby acknowledge and accept the Terms and Conditions of New Wave Maritime Training and Assessment Center, Inc.
+      </p>
+      <div className="slip-signatures slip-signatures-three">
+        <div><div className="sign-line">{traineeName}</div><span>Trainee · Signature over Printed Name</span></div>
         <div><div className="sign-line">{officer || " "}</div><span>Registration Officer · Signature over Printed Name</span></div>
         <div><div className="sign-line">{cashier || " "}</div><span>Cashier · Signature over Printed Name</span></div>
       </div>
@@ -1218,7 +1247,7 @@ export function AdmissionInvoiceModal({
     <Modal
       open
       title="Trainee admission record"
-      description={`${enrollment.reference} · ${enrollment.courseName}`}
+      description={courseLines.length > 1 ? `${trainee.traineeNumber} · ${courseLines.length} courses enrolled ${admissionDay}` : `${enrollment.reference} · ${enrollment.courseName}`}
       onClose={onClose}
       wide
       footer={

@@ -325,8 +325,16 @@ img {
 .slip-grid span { font-size: 11px; color: var(--muted); }
 .slip-grid strong { font-size: 14px; color: var(--blue-dark); }
 .slip-signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 44px; }
+.slip-signatures-three { grid-template-columns: 1fr 1fr 1fr; gap: 24px; }
 .sign-line { border-top: 1px solid var(--ink); padding-top: 6px; text-align: center; font-weight: 600; min-height: 30px; text-transform: uppercase; }
 .slip-signatures span { display: block; text-align: center; font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+/* Courses-enrolled list (one row per same-day enrollment). */
+.slip-courses { display: flex; flex-direction: column; gap: 6px; }
+.slip-course-row { border: 1px solid var(--line, #d9e7ee); border-left: 3px solid var(--orange); border-radius: 6px; padding: 7px 10px; display: flex; flex-direction: column; gap: 2px; }
+.slip-course-row strong { font-size: 13px; color: var(--blue-dark); }
+.slip-course-row small { font-size: 11px; color: var(--muted); }
+.slip-acknowledge { font-size: 11px; color: var(--ink); margin: 16px 0 0; line-height: 1.4; }
 
 /* Combined voucher: ORIGINAL (upper) + DUPLICATE (lower) on one A4 sheet. */
 .admission-slip-duplex { padding: 0; }
@@ -349,7 +357,13 @@ img {
   #admission-invoice-print.admission-slip-duplex .ledger-row { padding: 3px 8px; }
   #admission-invoice-print.admission-slip-duplex .ledger-row strong { font-size: 9px; }
   #admission-invoice-print.admission-slip-duplex .ledger-row small { font-size: 7px; }
-  #admission-invoice-print.admission-slip-duplex .slip-signatures { margin-top: 12px; gap: 24px; }
+  #admission-invoice-print.admission-slip-duplex .slip-signatures { margin-top: 10px; gap: 14px; }
+  #admission-invoice-print.admission-slip-duplex .slip-course-row { padding: 3px 8px; }
+  #admission-invoice-print.admission-slip-duplex .slip-course-row strong { font-size: 9px; }
+  #admission-invoice-print.admission-slip-duplex .slip-course-row small { font-size: 7px; }
+  #admission-invoice-print.admission-slip-duplex .slip-acknowledge { font-size: 7px; margin-top: 6px; }
+  #admission-invoice-print.admission-slip-duplex .sign-line { min-height: 16px; font-size: 8px; }
+  #admission-invoice-print.admission-slip-duplex .slip-signatures span { font-size: 6.5px; }
   #admission-invoice-print.admission-slip-duplex .slip-head h2 { font-size: 10px; }
   #admission-invoice-print.admission-slip-duplex .slip-head strong { font-size: 11px; }
   #admission-invoice-print.admission-slip-duplex .slip-logo { width: 42px; height: 42px; }
