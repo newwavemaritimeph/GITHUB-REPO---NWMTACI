@@ -1026,7 +1026,7 @@ function PortalShell({ previewMode }: { previewMode: boolean }) {
               </div>
             )}
           </div>
-          {previewMode && <Pill tone="blue">Secure preview</Pill>}
+          {previewMode && <Pill tone="blue">Prototype · sample data</Pill>}
           <div className="topbar-actions">
             <button
               className="bell"
