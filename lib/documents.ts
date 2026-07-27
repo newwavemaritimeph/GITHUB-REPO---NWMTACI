@@ -396,11 +396,9 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
   const orange = rgb(0.95, 0.34, 0.08);
   const muted = rgb(0.38, 0.47, 0.54);
   const line = rgb(0.84, 0.9, 0.93);
-  const panel = rgb(0.95, 0.98, 0.99);
   const green = rgb(0.05, 0.5, 0.25);
   const left = 20; // narrow margins to fit two copies
   const right = width - 20;
-  const mid = left + Math.round((right - left) / 2);
 
   let logo: Awaited<ReturnType<typeof pdf.embedPng>> | undefined;
   if (snapshot.logoBytes) {
@@ -418,6 +416,14 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
     if (status === "paid" || status.includes("fully")) return { label: "FULLY PAID", fill: green };
     return { label: "UNPAID", fill: rgb(0.78, 0.12, 0.12) };
   })();
+
+  // Truncate a string to a max pixel width, appending an ellipsis if trimmed.
+  const fit = (text: string, font: typeof regular, size: number, maxWidth: number) => {
+    if (font.widthOfTextAtSize(text, size) <= maxWidth) return text;
+    let t = text;
+    while (t.length > 1 && font.widthOfTextAtSize(`${t}…`, size) > maxWidth) t = t.slice(0, -1);
+    return `${t}…`;
+  };
 
   // Word-wrap a string to a max pixel width for a given font/size.
   const wrap = (text: string, font: typeof regular, size: number, maxWidth: number) => {
@@ -467,87 +473,109 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
 
     y -= 33;
     page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 1.2, color: blue });
-    y -= 13;
+    y -= 12;
 
-    // Meta row
-    const meta = [
-      { label: "Reference", value: snapshot.reference },
-      { label: "Trainee No.", value: snapshot.traineeNumber },
-      { label: "Issued", value: snapshot.issuedAt },
-    ];
-    const step = (right - left) / meta.length;
-    meta.forEach((field, index) => {
-      const x = left + step * index;
-      page.drawText(field.label, { x, y, size: 6, font: regular, color: muted });
-      page.drawText(field.value.slice(0, 30), { x, y: y - 9, size: 8, font: bold, color: ink });
-    });
-    y -= 19;
+    const contentW = right - left;
+    const headFill = rgb(0.90, 0.95, 0.99);
+    // Draw one thead cell label; returns nothing.
+    const th = (text: string, x: number, ty: number, alignRight = false, cellW = 0) =>
+      page.drawText(text, { x: alignRight ? x + cellW - 5 - bold.widthOfTextAtSize(text, 6) : x + 5, y: ty, size: 6, font: bold, color: blue });
 
-    // Trainee identity — two compact rows
-    const idRows: [string, string, string, string][] = [
-      ["Name", snapshot.traineeName, "SRN", snapshot.srn || "-"],
-      ["Mobile", snapshot.mobile || "-", "Email", snapshot.email || "-"],
-    ];
-    idRows.forEach(([la, va, lb, vb]) => {
-      page.drawText(la, { x: left, y, size: 6, font: regular, color: muted });
-      page.drawText(lb, { x: mid, y, size: 6, font: regular, color: muted });
-      y -= 8;
-      page.drawText(va.slice(0, 46), { x: left, y, size: 8, font: bold, color: ink });
-      page.drawText(vb.slice(0, 46), { x: mid, y, size: 8, font: bold, color: ink });
-      y -= 11;
-    });
-    y -= 3;
+    // ---- Trainee information card (one bordered block) ----
+    const infoRowH = 17;
+    const infoBoxH = 8 + infoRowH * 3;
+    const infoTop = y;
+    page.drawRectangle({ x: left, y: infoTop - infoBoxH, width: contentW, height: infoBoxH, borderColor: line, borderWidth: 0.8, color: rgb(1, 1, 1) });
+    const iColW = (contentW - 20) / 3;
+    const iX = (i: number) => left + 10 + iColW * i;
+    const field = (x: number, ly: number, label: string, value: string, maxW: number) => {
+      page.drawText(label, { x, y: ly, size: 5.5, font: regular, color: muted });
+      page.drawText(fit(value || "-", bold, 8, maxW), { x, y: ly - 9, size: 8, font: bold, color: ink });
+    };
+    let iy = infoTop - 13;
+    field(iX(0), iy, "REFERENCE", snapshot.reference, iColW - 6);
+    field(iX(1), iy, "TRAINEE NO.", snapshot.traineeNumber, iColW - 6);
+    field(iX(2), iy, "ISSUED", snapshot.issuedAt, iColW - 6);
+    iy -= infoRowH;
+    field(iX(0), iy, "TRAINEE NAME", snapshot.traineeName, contentW - 20);
+    iy -= infoRowH;
+    field(iX(0), iy, "SRN", snapshot.srn || "-", iColW - 6);
+    field(iX(1), iy, "MOBILE", snapshot.mobile || "-", iColW - 6);
+    field(iX(2), iy, "EMAIL", snapshot.email || "-", iColW - 6);
+    y = infoTop - infoBoxH - 14;
 
-    // Courses enrolled (same-day) — schedule / time / classroom / instructor per course
-    page.drawText("COURSES ENROLLED", { x: left, y, size: 7.5, font: bold, color: blue });
-    y -= 4;
+    // ---- Courses enrolled table ----
+    page.drawText("COURSES ENROLLED", { x: left, y, size: 8, font: bold, color: ink });
+    y -= 11;
     const courses = snapshot.courses.length ? snapshot.courses : [{ course: "-", schedule: "-", time: "-", venue: "", instructor: "" }];
+    // column widths: Course | Schedule | Time | Classroom
+    const cw = [contentW - 150 - 92 - 118, 150, 92, 118];
+    const cx = [left, left + cw[0], left + cw[0] + cw[1], left + cw[0] + cw[1] + cw[2]];
+    const cHeadH = 13;
+    const cTop = y;
+    page.drawRectangle({ x: left, y: y - cHeadH, width: contentW, height: cHeadH, color: headFill });
+    th("COURSE", cx[0], y - 9);
+    th("SCHEDULE", cx[1], y - 9);
+    th("TIME", cx[2], y - 9);
+    th("CLASSROOM", cx[3], y - 9);
+    let cy = y - cHeadH;
     courses.forEach((c) => {
-      const rowH = 22;
-      y -= rowH;
-      page.drawRectangle({ x: left, y, width: right - left, height: rowH, color: panel });
-      page.drawRectangle({ x: left, y, width: 3, height: rowH, color: orange });
-      page.drawText(c.course.slice(0, 64), { x: left + 10, y: y + rowH - 11, size: 8, font: bold, color: ink });
-      const detail = [c.schedule, c.time, c.venue ? `Room: ${c.venue}` : "", c.instructor ? `Instructor: ${c.instructor}` : ""].filter(Boolean).join("   ·   ");
-      page.drawText(detail.slice(0, 104), { x: left + 10, y: y + 5, size: 6, font: regular, color: muted });
-      y -= 3;
+      const rowH = c.instructor ? 21 : 15;
+      cy -= rowH;
+      page.drawText(fit(c.course, bold, 7.5, cw[0] - 10), { x: cx[0] + 5, y: cy + rowH - 10, size: 7.5, font: bold, color: ink });
+      if (c.instructor) page.drawText(fit(`Instructor: ${c.instructor}`, regular, 5.5, cw[0] - 10), { x: cx[0] + 5, y: cy + 4, size: 5.5, font: regular, color: muted });
+      page.drawText(fit(c.schedule, regular, 7, cw[1] - 8), { x: cx[1] + 5, y: cy + rowH - 10, size: 7, font: regular, color: ink });
+      page.drawText(fit(c.time, regular, 7, cw[2] - 8), { x: cx[2] + 5, y: cy + rowH - 10, size: 7, font: regular, color: ink });
+      page.drawText(fit(c.venue || "-", regular, 7, cw[3] - 8), { x: cx[3] + 5, y: cy + rowH - 10, size: 7, font: regular, color: ink });
+      page.drawLine({ start: { x: left, y: cy }, end: { x: right, y: cy }, thickness: 0.4, color: line });
     });
-    y -= 4;
+    page.drawRectangle({ x: left, y: cy, width: contentW, height: cTop - cy, borderColor: line, borderWidth: 0.8 });
+    [cx[1], cx[2], cx[3]].forEach((x) => page.drawLine({ start: { x, y: cy }, end: { x, y: cTop }, thickness: 0.4, color: line }));
+    y = cy - 14;
 
-    // Charges & payments (compact single-line rows)
-    page.drawText("CHARGES & PAYMENTS", { x: left, y, size: 7.5, font: bold, color: blue });
-    y -= 4;
-    const rows = snapshot.lines.length ? snapshot.lines : [{ description: "No ledger entries yet.", amountCentavos: 0 }];
+    // ---- Charges & payments table (with totals footer) ----
+    page.drawText("CHARGES & PAYMENTS", { x: left, y, size: 8, font: bold, color: ink });
+    y -= 11;
+    const rows = snapshot.lines.length ? snapshot.lines : [{ description: "No ledger entries yet.", detail: "", amountCentavos: 0 }];
+    const pw = [contentW - 150 - 100, 150, 100]; // Description | Reference | Amount
+    const px = [left, left + pw[0], left + pw[0] + pw[1]];
+    const amtRight = right - 6;
+    const pHeadH = 13;
+    const pTop = y;
+    page.drawRectangle({ x: left, y: y - pHeadH, width: contentW, height: pHeadH, color: headFill });
+    th("DESCRIPTION", px[0], y - 9);
+    th("REFERENCE", px[1], y - 9);
+    th("AMOUNT", px[2], y - 9, true, pw[2]);
+    let py = y - pHeadH;
     rows.forEach((item) => {
-      const rowH = 14;
-      y -= rowH;
-      page.drawRectangle({ x: left, y, width: right - left, height: rowH, color: panel });
-      page.drawRectangle({ x: left, y, width: 3, height: rowH, color: item.negative ? green : blue });
-      const desc = item.detail ? `${item.description} — ${item.detail}` : item.description;
-      page.drawText(desc.slice(0, 84), { x: left + 10, y: y + 4, size: 6.5, font: regular, color: ink });
+      const rowH = 13;
+      py -= rowH;
+      page.drawText(fit(item.description, regular, 7, pw[0] - 10), { x: px[0] + 5, y: py + 4, size: 7, font: regular, color: ink });
+      if (item.detail) page.drawText(fit(item.detail, regular, 6.5, pw[1] - 8), { x: px[1] + 5, y: py + 4, size: 6.5, font: regular, color: muted });
       if (item.amountCentavos) {
         const amount = `${item.negative ? "-" : ""}${php(item.amountCentavos)}`;
-        page.drawText(amount, { x: right - 8 - bold.widthOfTextAtSize(amount, 7.5), y: y + 4, size: 7.5, font: bold, color: item.negative ? green : ink });
+        page.drawText(amount, { x: amtRight - bold.widthOfTextAtSize(amount, 7.5), y: py + 4, size: 7.5, font: bold, color: item.negative ? green : ink });
       }
-      y -= 2;
+      page.drawLine({ start: { x: left, y: py }, end: { x: right, y: py }, thickness: 0.4, color: line });
     });
-
-    // Totals
-    y -= 2;
-    page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 0.6, color: line });
-    y -= 11;
+    // Totals footer rows (right-aligned label + amount within the same table)
     const totals = [
-      { label: "Total due", value: php(snapshot.dueCentavos) },
-      { label: "Total paid", value: php(snapshot.paidCentavos) },
-      { label: "Balance", value: php(snapshot.balanceCentavos) },
+      { label: "TOTAL DUE", value: snapshot.dueCentavos, strong: false },
+      { label: "TOTAL PAID", value: snapshot.paidCentavos, strong: false },
+      { label: "BALANCE", value: snapshot.balanceCentavos, strong: true },
     ];
-    const tStep = (right - left) / totals.length;
-    totals.forEach((t, index) => {
-      const x = left + tStep * index;
-      page.drawText(t.label, { x, y, size: 6, font: regular, color: muted });
-      page.drawText(t.value, { x, y: y - 10, size: 9, font: bold, color: t.label === "Balance" && snapshot.balanceCentavos > 0 ? rgb(0.78, 0.12, 0.12) : ink });
+    totals.forEach((t) => {
+      const rowH = 14;
+      py -= rowH;
+      if (t.strong) page.drawRectangle({ x: px[1], y: py, width: right - px[1], height: rowH, color: t.value > 0 ? rgb(0.99, 0.93, 0.92) : rgb(0.92, 0.97, 0.93) });
+      page.drawText(t.label, { x: px[2] - 8 - bold.widthOfTextAtSize(t.label, 7), y: py + 4, size: 7, font: bold, color: muted });
+      const amount = php(t.value);
+      const color = t.strong ? (t.value > 0 ? rgb(0.78, 0.12, 0.12) : green) : ink;
+      page.drawText(amount, { x: amtRight - bold.widthOfTextAtSize(amount, t.strong ? 9 : 8), y: py + 4, size: t.strong ? 9 : 8, font: bold, color });
     });
-    y -= 24;
+    page.drawRectangle({ x: left, y: py, width: contentW, height: pTop - py, borderColor: line, borderWidth: 0.8 });
+    [px[1], px[2]].forEach((x) => page.drawLine({ start: { x, y: py }, end: { x, y: pTop }, thickness: 0.4, color: line }));
+    y = py - 16;
 
     // Acknowledgment + terms
     const terms = `I, ${snapshot.traineeName}, hereby acknowledge and accept the Terms and Conditions of New Wave Maritime Training and Assessment Center, Inc.`;

@@ -1184,53 +1184,65 @@ export function AdmissionInvoiceModal({
         <div className="slip-head-right"><span className="slip-copytag">{copyTag}</span><Pill tone={statusTone}>{statusLabel}</Pill></div>
       </div>
 
-      <div className="slip-meta">
-        <span>Reference <strong>{enrollment.reference}</strong></span>
-        <span>Trainee No. <strong>{trainee.traineeNumber}</strong></span>
-        <span>Issued <strong>{formatDate(new Date().toISOString())}</strong></span>
-      </div>
-
-      <h3 className="slip-section">Trainee</h3>
-      <div className="slip-grid">
-        <div><span>Name</span><strong>{traineeName}</strong></div>
-        <div><span>SRN</span><strong>{trainee.srn ?? "—"}</strong></div>
-        <div><span>Mobile</span><strong>{trainee.mobile}</strong></div>
-        <div><span>Email</span><strong>{trainee.email}</strong></div>
-      </div>
+      <table className="slip-info">
+        <tbody>
+          <tr>
+            <th>Reference</th><td>{enrollment.reference}</td>
+            <th>Trainee No.</th><td>{trainee.traineeNumber}</td>
+            <th>Issued</th><td>{formatDate(new Date().toISOString())}</td>
+          </tr>
+          <tr>
+            <th>Name</th><td colSpan={5}>{traineeName}</td>
+          </tr>
+          <tr>
+            <th>SRN</th><td>{trainee.srn ?? "—"}</td>
+            <th>Mobile</th><td>{trainee.mobile}</td>
+            <th>Email</th><td>{trainee.email}</td>
+          </tr>
+        </tbody>
+      </table>
 
       <h3 className="slip-section">Courses enrolled{courseLines.length > 1 ? ` (${courseLines.length})` : ""}</h3>
-      <div className="slip-courses">
-        {courseLines.map((c, index) => (
-          <div key={index} className="slip-course-row">
-            <strong>{c.course}</strong>
-            <small>{[c.schedule, c.time, c.venue ? `Room: ${c.venue}` : "", c.instructor ? `Instructor: ${c.instructor}` : ""].filter(Boolean).join("  ·  ")}</small>
-          </div>
-        ))}
-      </div>
+      <table className="slip-table">
+        <thead><tr><th>Course</th><th>Schedule</th><th>Time</th><th>Classroom</th></tr></thead>
+        <tbody>
+          {courseLines.map((c, index) => (
+            <tr key={index}>
+              <td>{c.course}{c.instructor ? <small className="slip-sub">Instructor: {c.instructor}</small> : null}</td>
+              <td>{c.schedule}</td>
+              <td>{c.time}</td>
+              <td>{c.venue || "—"}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
 
       <h3 className="slip-section">Charges &amp; payments</h3>
-      <div className="ledger-list">
-        {charges.map((entry) => (
-          <div key={entry.id} className="ledger-row ledger-charge">
-            <div><strong>{entry.description}</strong><small>{entry.reference} · {formatDateTime(entry.recordedAt)}</small></div>
-            <div className="ledger-amount"><strong>{pesos(entry.amountCentavos)}</strong></div>
-          </div>
-        ))}
-        {payments.map((entry) => (
-          <div key={entry.id} className={`ledger-row ledger-${entry.type}`}>
-            <div><strong>{entry.description}</strong><small>{entry.reference} · {formatDateTime(entry.recordedAt)}{entry.referenceNumber ? ` · Ref ${entry.referenceNumber}` : ""}{entry.receiptNumber ? ` · ${entry.receiptNumber}` : ""}</small></div>
-            <div className="ledger-amount"><strong>&minus;{pesos(entry.amountCentavos)}</strong></div>
-          </div>
-        ))}
-        {charges.length === 0 && payments.length === 0 && <p className="muted-text">No ledger entries yet.</p>}
-      </div>
-
-      <div className="slip-grid" style={{ marginTop: 10 }}>
-        <div><span>Total due</span><strong>{pesos(dueCentavos)}</strong></div>
-        <div><span>Total paid</span><strong>{pesos(paidCentavos)}</strong></div>
-        <div><span>Balance</span><strong>{pesos(balanceCentavos)}</strong></div>
-        <div><span>Payment status</span><strong>{statusLabel}</strong></div>
-      </div>
+      <table className="slip-table slip-table-money">
+        <thead><tr><th>Description</th><th>Reference</th><th className="num">Amount</th></tr></thead>
+        <tbody>
+          {charges.map((entry) => (
+            <tr key={entry.id}>
+              <td>{entry.description}</td>
+              <td className="slip-ref">{entry.reference} · {formatDateTime(entry.recordedAt)}</td>
+              <td className="num">{pesos(entry.amountCentavos)}</td>
+            </tr>
+          ))}
+          {payments.map((entry) => (
+            <tr key={entry.id} className={`slip-${entry.type}`}>
+              <td>{entry.description}</td>
+              <td className="slip-ref">{entry.reference} · {formatDateTime(entry.recordedAt)}{entry.referenceNumber ? ` · Ref ${entry.referenceNumber}` : ""}{entry.receiptNumber ? ` · ${entry.receiptNumber}` : ""}</td>
+              <td className="num">&minus;{pesos(entry.amountCentavos)}</td>
+            </tr>
+          ))}
+          {charges.length === 0 && payments.length === 0 && <tr><td colSpan={3} className="muted-text">No ledger entries yet.</td></tr>}
+        </tbody>
+        <tfoot>
+          <tr><td /><th className="num">Total due</th><td className="num">{pesos(dueCentavos)}</td></tr>
+          <tr><td /><th className="num">Total paid</th><td className="num">{pesos(paidCentavos)}</td></tr>
+          <tr className="slip-balance"><td /><th className="num">Balance</th><td className="num">{pesos(balanceCentavos)}</td></tr>
+        </tfoot>
+      </table>
 
       <p className="slip-acknowledge">
         I, <strong>{traineeName}</strong>, hereby acknowledge and accept the Terms and Conditions of New Wave Maritime Training and Assessment Center, Inc.

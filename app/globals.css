@@ -329,11 +329,23 @@ img {
 .sign-line { border-top: 1px solid var(--ink); padding-top: 6px; text-align: center; font-weight: 600; min-height: 30px; text-transform: uppercase; }
 .slip-signatures span { display: block; text-align: center; font-size: 11px; color: var(--muted); margin-top: 4px; }
 
-/* Courses-enrolled list (one row per same-day enrollment). */
-.slip-courses { display: flex; flex-direction: column; gap: 6px; }
-.slip-course-row { border: 1px solid var(--line, #d9e7ee); border-left: 3px solid var(--orange); border-radius: 6px; padding: 7px 10px; display: flex; flex-direction: column; gap: 2px; }
-.slip-course-row strong { font-size: 13px; color: var(--blue-dark); }
-.slip-course-row small { font-size: 11px; color: var(--muted); }
+/* Consolidated tables on the admission record. */
+.slip-info { width: 100%; border-collapse: collapse; border: 1px solid var(--line, #d9e7ee); margin-bottom: 4px; }
+.slip-info th, .slip-info td { border: 1px solid var(--line, #d9e7ee); padding: 5px 9px; text-align: left; vertical-align: top; }
+.slip-info th { font-size: 9px; font-weight: 600; letter-spacing: 0.05em; color: var(--muted); text-transform: uppercase; white-space: nowrap; width: 1%; background: #f5fafc; }
+.slip-info td { font-size: 12px; font-weight: 600; color: var(--blue-dark); }
+.slip-table { width: 100%; border-collapse: collapse; border: 1px solid var(--line, #d9e7ee); }
+.slip-table th, .slip-table td { border: 1px solid var(--line, #d9e7ee); padding: 5px 9px; text-align: left; vertical-align: top; }
+.slip-table thead th { font-size: 9px; font-weight: 700; letter-spacing: 0.05em; color: var(--blue); text-transform: uppercase; background: #eef6fc; }
+.slip-table tbody td { font-size: 11px; color: var(--blue-dark); }
+.slip-table .num { text-align: right; white-space: nowrap; }
+.slip-table .slip-ref { font-size: 10px; color: var(--muted); }
+.slip-table .slip-sub { display: block; font-size: 9px; font-weight: 400; color: var(--muted); margin-top: 2px; }
+.slip-table tfoot th { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.slip-table tfoot td { font-size: 12px; font-weight: 700; color: var(--blue-dark); }
+.slip-table tfoot tr td:first-child, .slip-table tfoot tr:first-child td:first-child { border: none; }
+.slip-table tfoot .slip-balance th, .slip-table tfoot .slip-balance td { background: #fdecea; color: var(--orange); }
+.slip-table .slip-payment td, .slip-table .slip-discount td, .slip-table .slip-refund td { color: #0a7a3d; }
 .slip-acknowledge { font-size: 11px; color: var(--ink); margin: 16px 0 0; line-height: 1.4; }
 
 /* Combined voucher: ORIGINAL (upper) + DUPLICATE (lower) on one A4 sheet. */
@@ -354,13 +366,19 @@ img {
   #admission-invoice-print.admission-slip-duplex .slip-grid { gap: 5px 20px; }
   #admission-invoice-print.admission-slip-duplex .slip-grid strong { font-size: 9px; }
   #admission-invoice-print.admission-slip-duplex .slip-grid span { font-size: 7.5px; }
-  #admission-invoice-print.admission-slip-duplex .ledger-row { padding: 3px 8px; }
-  #admission-invoice-print.admission-slip-duplex .ledger-row strong { font-size: 9px; }
-  #admission-invoice-print.admission-slip-duplex .ledger-row small { font-size: 7px; }
+  #admission-invoice-print.admission-slip-duplex .slip-info th,
+  #admission-invoice-print.admission-slip-duplex .slip-info td,
+  #admission-invoice-print.admission-slip-duplex .slip-table th,
+  #admission-invoice-print.admission-slip-duplex .slip-table td { padding: 2px 5px; }
+  #admission-invoice-print.admission-slip-duplex .slip-info th,
+  #admission-invoice-print.admission-slip-duplex .slip-table thead th { font-size: 6.5px; }
+  #admission-invoice-print.admission-slip-duplex .slip-info td { font-size: 8px; }
+  #admission-invoice-print.admission-slip-duplex .slip-table tbody td { font-size: 7.5px; }
+  #admission-invoice-print.admission-slip-duplex .slip-table .slip-ref,
+  #admission-invoice-print.admission-slip-duplex .slip-table .slip-sub { font-size: 6px; }
+  #admission-invoice-print.admission-slip-duplex .slip-table tfoot td { font-size: 8px; }
+  #admission-invoice-print.admission-slip-duplex .slip-table tfoot th { font-size: 6.5px; }
   #admission-invoice-print.admission-slip-duplex .slip-signatures { margin-top: 10px; gap: 14px; }
-  #admission-invoice-print.admission-slip-duplex .slip-course-row { padding: 3px 8px; }
-  #admission-invoice-print.admission-slip-duplex .slip-course-row strong { font-size: 9px; }
-  #admission-invoice-print.admission-slip-duplex .slip-course-row small { font-size: 7px; }
   #admission-invoice-print.admission-slip-duplex .slip-acknowledge { font-size: 7px; margin-top: 6px; }
   #admission-invoice-print.admission-slip-duplex .sign-line { min-height: 16px; font-size: 8px; }
   #admission-invoice-print.admission-slip-duplex .slip-signatures span { font-size: 6.5px; }
