@@ -107,3 +107,38 @@ config flow once signed in, or a one-off SQL insert). Without a role, `/portal` 
 - Certificate issuance stays disabled until an approved active template exists **and**
   `CERTIFICATE_ISSUANCE_ENABLED=true` is deliberately set.
 - Do not promote staging to production until the launch checklist and acceptance suite pass.
+
+## Auth email & SMTP (staff invites, password resets)
+
+Auth emails (invitations, password recovery) are sent by Supabase, not the app.
+
+### Required — URL configuration (fixes "site can't be reached")
+Supabase dashboard → **Authentication → URL Configuration**:
+- **Site URL**: `https://nwmtaci-2026.vercel.app`
+- **Redirect URLs**: add `https://nwmtaci-2026.vercel.app/**`
+
+Without these, recovery/invite links fall back to `localhost:3000`. The app now
+builds `redirectTo` from the live request origin, but Supabase still only honors
+allowlisted redirect URLs and otherwise uses the Site URL.
+
+Optional: set `APP_BASE_URL=https://nwmtaci-2026.vercel.app` in Vercel to make the
+redirect origin explicit (the request-origin fallback already covers it).
+
+### Required for real use — custom SMTP (removes the built-in rate limit)
+The built-in Supabase sender is test-only (~2–4 auth emails/hour across invites +
+resets → "email rate limit exceeded"). Configure a real sender in
+**Authentication → Emails → SMTP Settings** (matches the Resend plan in CLAUDE.md):
+
+- **Host**: `smtp.resend.com`
+- **Port**: `465` (SSL) or `587` (STARTTLS)
+- **Username**: `resend`
+- **Password**: your Resend API key (`re_…`) — entered in the Supabase dashboard only, never committed
+- **Sender email**: an address on a domain verified in Resend (e.g. `no-reply@yourdomain`)
+- **Sender name**: `New Wave Maritime`
+
+After saving, raise **Rate Limits** (Authentication → Rate Limits) to your provider's capacity.
+
+### Passwords
+Never set/stored in the portal by design (browser only gets the anon key). Users set
+their own via the invite or reset email. To force a reset without email, use
+**Authentication → Users → (user) → Reset/Update password** in the Supabase dashboard.
