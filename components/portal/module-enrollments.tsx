@@ -788,7 +788,7 @@ export function PaymentModal({
   );
 }
 
-function AddChargeModal({
+export function AddChargeModal({
   view,
   charges,
   onClose,
@@ -945,7 +945,7 @@ function AgencyRebateModal({
  * several of the trainee's unpaid courses — e.g. ₱5,000 covering two courses.
  * Each course gets its own ledger payment posted under the shared reference.
  */
-function SplitPaymentModal({
+export function SplitPaymentModal({
   trainee,
   enrollments,
   channels,
@@ -1078,7 +1078,7 @@ function SplitPaymentModal({
   );
 }
 
-function AdmissionInvoiceModal({
+export function AdmissionInvoiceModal({
   view,
   defaultOfficer,
   defaultCashier,

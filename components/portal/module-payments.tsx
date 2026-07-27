@@ -7,12 +7,14 @@ import { pesos } from "@/lib/endorsement-catalog";
 import { formatDateTime, fullName, todayIso, useSystem } from "@/lib/system/store";
 import type { EnrollmentView, Role } from "@/lib/system/types";
 import { PageHeader, Panel } from "./shared";
-import { PaymentModal } from "./module-enrollments";
+import { PaymentModal, SplitPaymentModal, AddChargeModal, AdmissionInvoiceModal } from "./module-enrollments";
+import { resolveRange, withinRange, type ReportRangePreset } from "@/lib/reporting";
 
 const filters = ["Verification queue", "Today", "All payments"] as const;
+const awaitRanges = ["Today", "Last 7 days", "This month", "All"] as const;
 
 export function PaymentsModule({ role }: { role: Role }) {
-  const { state, views, recordPayment, setPaymentVerification, createExpense, createRequest } = useSystem();
+  const { state, views, recordPayment, setPaymentVerification, createExpense, createRequest, addLedgerEntry, generateAdmissionSlip, changeEnrollmentBatch } = useSystem();
   const canRecordPayment = role === "Cashier";
   const toast = useToast();
   const [filter, setFilter] = useState<(typeof filters)[number]>("Verification queue");
@@ -20,6 +22,12 @@ export function PaymentsModule({ role }: { role: Role }) {
   const [payFor, setPayFor] = useState<EnrollmentView | null>(null);
   const [picker, setPicker] = useState(false);
   const [expenseOpen, setExpenseOpen] = useState(false);
+  const [splitFor, setSplitFor] = useState<EnrollmentView | null>(null);
+  const [chargeFor, setChargeFor] = useState<EnrollmentView | null>(null);
+  const [slipFor, setSlipFor] = useState<EnrollmentView | null>(null);
+  const [editFor, setEditFor] = useState<EnrollmentView | null>(null);
+  const [editBatchId, setEditBatchId] = useState("");
+  const [awaitRange, setAwaitRange] = useState<(typeof awaitRanges)[number]>("Today");
 
   const all = views();
   const byEnrollment = useMemo(() => new Map(all.map((item) => [item.enrollment.id, item])), [all]);
@@ -51,6 +59,8 @@ export function PaymentsModule({ role }: { role: Role }) {
   const collectionsToday = verifiedToday.reduce((sum, entry) => sum + entry.amountCentavos, 0);
   const pendingCount = payments.filter((entry) => entry.verification === "Pending").length;
   const outstanding = all.reduce((sum, item) => sum + item.balanceCentavos, 0);
+  const awaitingRange = awaitRange === "All" ? null : resolveRange(awaitRange as ReportRangePreset, todayIso());
+  const awaiting = all.filter((item) => item.balanceCentavos > 0 && item.enrollment.status !== "Cancelled" && (!awaitingRange || withinRange(item.enrollment.createdAt, awaitingRange)));
 
   const byMethod = state.paymentChannels
     .filter((channel) => channel.active)
@@ -102,6 +112,33 @@ export function PaymentsModule({ role }: { role: Role }) {
         <StatCard label="Outstanding balances" value={pesos(outstanding)} note={`${all.filter((item) => item.balanceCentavos > 0).length} enrollments`} tone={5} icon="₱" />
         <StatCard label="Receipts issued" value={String(payments.filter((entry) => entry.receiptNumber).length)} note="All time" tone={2} icon="◈" />
       </div>
+
+      {canRecordPayment && (
+        <Panel
+          title="Enrollments awaiting payment"
+          description="Record or split payments, add charges, change the course/schedule, and generate the voucher — date-sensitive by enrollment date."
+          action={<Segmented options={awaitRanges} value={awaitRange} onChange={setAwaitRange} />}
+        >
+          <DataTable columns={["Trainee", "Enrollment", "Course", "Balance", ""]} minWidth={980}>
+            {awaiting.map((item) => (
+              <tr key={item.enrollment.id}>
+                <td><strong>{fullName(item.trainee)}</strong></td>
+                <td><strong>{item.enrollment.reference}</strong><small>{item.paymentStatus}</small></td>
+                <td>{item.enrollment.courseName}</td>
+                <td><strong>{pesos(item.balanceCentavos)}</strong></td>
+                <td className="cell-actions">
+                  <button className="ghost-button" onClick={() => setPayFor(item)}>Record</button>
+                  <button className="ghost-button" onClick={() => setSplitFor(item)}>Split</button>
+                  <button className="ghost-button" onClick={() => setChargeFor(item)}>Add charge</button>
+                  <button className="ghost-button" onClick={() => { setEditFor(item); setEditBatchId(item.enrollment.batchId ?? ""); }}>Change course</button>
+                  <button className="ghost-button" onClick={() => setSlipFor(item)}>Generate voucher</button>
+                </td>
+              </tr>
+            ))}
+            {awaiting.length === 0 && <tr><td colSpan={5}><span className="muted-text">No enrollments awaiting payment in this period.</span></td></tr>}
+          </DataTable>
+        </Panel>
+      )}
 
       <Panel padded={false}>
         <div className="toolbar">
@@ -250,6 +287,77 @@ export function PaymentsModule({ role }: { role: Role }) {
           setPayFor(null);
         }}
       />
+
+      {splitFor && (
+        <SplitPaymentModal
+          key={splitFor.enrollment.id}
+          trainee={splitFor.trainee}
+          enrollments={all.filter((item) => item.trainee.id === splitFor.trainee.id && item.balanceCentavos > 0 && item.enrollment.status !== "Cancelled")}
+          channels={state.paymentChannels.filter((channel) => channel.active)}
+          onClose={() => setSplitFor(null)}
+          onSubmit={({ allocations, method, referenceNumber, needsVerification }) => {
+            let posted = 0;
+            for (const allocation of allocations) {
+              const entry = recordPayment({ enrollmentId: allocation.enrollmentId, amountCentavos: allocation.amountCentavos, method, receivingAccount: method, referenceNumber, needsVerification, description: `Split payment · ref ${referenceNumber || "cash"}` });
+              if (entry) posted += 1;
+            }
+            toast("success", `Split payment allocated to ${posted} course${posted === 1 ? "" : "s"}.`);
+            setSplitFor(null);
+          }}
+        />
+      )}
+
+      {chargeFor && (
+        <AddChargeModal
+          key={chargeFor.enrollment.id}
+          view={chargeFor}
+          charges={state.otherCharges.filter((charge) => charge.active)}
+          onClose={() => setChargeFor(null)}
+          onAdd={(name, amountCentavos) => {
+            addLedgerEntry({ enrollmentId: chargeFor.enrollment.id, type: "charge", amountCentavos, description: name });
+            toast("success", `${name} charge added.`);
+          }}
+        />
+      )}
+
+      {slipFor && (
+        <AdmissionInvoiceModal
+          key={slipFor.enrollment.id}
+          view={slipFor}
+          defaultOfficer={slipFor.enrollment.processedBy || ""}
+          defaultCashier=""
+          session={state.attendanceSessions.find((item) => item.batchId === slipFor.enrollment.batchId)}
+          onClose={() => setSlipFor(null)}
+          onGenerate={(officer, cashier) => {
+            generateAdmissionSlip(slipFor.enrollment.id, { officer, cashier });
+            toast("success", "Admission slip & invoice generated — status set to Generated Voucher.");
+          }}
+        />
+      )}
+
+      {editFor && (
+        <Modal
+          open
+          title="Change course / schedule"
+          description={`${editFor.enrollment.reference} · currently ${editFor.enrollment.courseName}`}
+          onClose={() => setEditFor(null)}
+          wide
+          footer={
+            <>
+              <button className="secondary-button" onClick={() => setEditFor(null)}>Cancel</button>
+              <button className="primary-button" disabled={!editBatchId || editBatchId === editFor.enrollment.batchId} onClick={() => { changeEnrollmentBatch(editFor.enrollment.id, editBatchId); toast("success", "Course / schedule updated and fee re-priced."); setEditFor(null); }}>Save change</button>
+            </>
+          }
+        >
+          <Field label="New course &amp; schedule" full hint="Pick any open batch. This changes the course, schedule, and dates and re-prices the fee. Verified payments stay on the account.">
+            <select value={editBatchId} onChange={(event) => setEditBatchId(event.target.value)}>
+              {state.batches.filter((batch) => batch.status === "Open" || batch.id === editFor.enrollment.batchId).sort((a, z) => a.startsOn.localeCompare(z.startsOn)).map((batch) => (
+                <option key={batch.id} value={batch.id}>{batch.courseName} · {batch.startsOn} → {batch.endsOn}</option>
+              ))}
+            </select>
+          </Field>
+        </Modal>
+      )}
     </div>
   );
 }

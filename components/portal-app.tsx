@@ -76,7 +76,7 @@ function MonthlyPayablesReminder({ payables }: { payables: MonthlyPayable[] }) {
 const nav: { label: Module; icon: string; roles?: Role[] }[] = [
   { label: "Dashboard", icon: "⌂" },
   { label: "Search trainee", icon: "⌕", roles: ["Admin"] },
-  { label: "Registrations", icon: "✎", roles: ["Registration", "Cashier", "Accounting"] },
+  { label: "Registrations", icon: "✎", roles: ["Registration", "Accounting"] },
   { label: "Courses & centers", icon: "◇", roles: ["Registration", "Training Operations"] },
   { label: "Schedules", icon: "□", roles: ["Training Operations", "Instructor"] },
   { label: "Payments", icon: "₱", roles: ["Cashier", "Accounting"] },
