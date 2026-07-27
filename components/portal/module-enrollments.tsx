@@ -1146,6 +1146,74 @@ export function AdmissionInvoiceModal({
     }
   }
 
+  const slipCopy = (copyTag: string) => (
+    <div className="slip-copy">
+      <div className="slip-head">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/new-wave-logo.png" alt="New Wave Maritime" className="slip-logo" />
+        <div>
+          <h2>NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.</h2>
+          <p>Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000</p>
+          <strong>PAYMENT INVOICE &amp; ADMISSION SLIP</strong>
+        </div>
+        <div className="slip-head-right"><span className="slip-copytag">{copyTag}</span><Pill tone={statusTone}>{statusLabel}</Pill></div>
+      </div>
+
+      <div className="slip-meta">
+        <span>Reference <strong>{enrollment.reference}</strong></span>
+        <span>Trainee No. <strong>{trainee.traineeNumber}</strong></span>
+        <span>Issued <strong>{formatDate(new Date().toISOString())}</strong></span>
+      </div>
+
+      <h3 className="slip-section">Trainee</h3>
+      <div className="slip-grid">
+        <div><span>Name</span><strong>{fullName(trainee)}{trainee.suffix ? ` ${trainee.suffix}` : ""}</strong></div>
+        <div><span>SRN</span><strong>{trainee.srn ?? "—"}</strong></div>
+        <div><span>Mobile</span><strong>{trainee.mobile}</strong></div>
+        <div><span>Email</span><strong>{trainee.email}</strong></div>
+      </div>
+
+      <h3 className="slip-section">Training details</h3>
+      <div className="slip-grid">
+        <div><span>Course</span><strong>{enrollment.courseName} ({enrollment.courseCode})</strong></div>
+        <div><span>Schedule</span><strong>{batch ? formatDateRange(batch.startsOn, batch.endsOn) : "—"}</strong></div>
+        <div><span>Time</span><strong>{time}</strong></div>
+        <div><span>Classroom</span><strong>{batch?.venue ?? "—"}</strong></div>
+        <div><span>Instructor</span><strong>{batch?.instructor ?? "—"}</strong></div>
+        <div><span>Registration status</span><strong>{enrollment.registrationStatus ?? "Waiting for Payment"}</strong></div>
+      </div>
+
+      <h3 className="slip-section">Charges &amp; payments</h3>
+      <div className="ledger-list">
+        {charges.map((entry) => (
+          <div key={entry.id} className="ledger-row ledger-charge">
+            <div><strong>{entry.description}</strong><small>{entry.reference} · {formatDateTime(entry.recordedAt)}</small></div>
+            <div className="ledger-amount"><strong>{pesos(entry.amountCentavos)}</strong></div>
+          </div>
+        ))}
+        {payments.map((entry) => (
+          <div key={entry.id} className={`ledger-row ledger-${entry.type}`}>
+            <div><strong>{entry.description}</strong><small>{entry.reference} · {formatDateTime(entry.recordedAt)}{entry.referenceNumber ? ` · Ref ${entry.referenceNumber}` : ""}{entry.receiptNumber ? ` · ${entry.receiptNumber}` : ""}</small></div>
+            <div className="ledger-amount"><strong>&minus;{pesos(entry.amountCentavos)}</strong></div>
+          </div>
+        ))}
+        {charges.length === 0 && payments.length === 0 && <p className="muted-text">No ledger entries yet.</p>}
+      </div>
+
+      <div className="slip-grid" style={{ marginTop: 10 }}>
+        <div><span>Total due</span><strong>{pesos(dueCentavos)}</strong></div>
+        <div><span>Total paid</span><strong>{pesos(paidCentavos)}</strong></div>
+        <div><span>Balance</span><strong>{pesos(balanceCentavos)}</strong></div>
+        <div><span>Payment status</span><strong>{statusLabel}</strong></div>
+      </div>
+
+      <div className="slip-signatures">
+        <div><div className="sign-line">{officer || " "}</div><span>Registration Officer · Signature over Printed Name</span></div>
+        <div><div className="sign-line">{cashier || " "}</div><span>Cashier · Signature over Printed Name</span></div>
+      </div>
+    </div>
+  );
+
   return (
     <Modal
       open
@@ -1189,86 +1257,10 @@ export function AdmissionInvoiceModal({
         Download PDF produces one A4 sheet — upper half is the original copy, lower half the duplicate (file) copy, cut across the middle.
       </p>
 
-      <div className="admission-slip" id="admission-invoice-print">
-        <div className="slip-head">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/new-wave-logo.png" alt="New Wave Maritime" className="slip-logo" />
-          <div>
-            <h2>NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.</h2>
-            <p>Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000</p>
-            <strong>PAYMENT INVOICE &amp; ADMISSION SLIP</strong>
-          </div>
-          <Pill tone={statusTone}>{statusLabel}</Pill>
-        </div>
-
-        <div className="slip-meta">
-          <span>Reference <strong>{enrollment.reference}</strong></span>
-          <span>Trainee No. <strong>{trainee.traineeNumber}</strong></span>
-          <span>Issued <strong>{formatDate(new Date().toISOString())}</strong></span>
-        </div>
-
-        <h3 className="slip-section">Trainee</h3>
-        <div className="slip-grid">
-          <div><span>Name</span><strong>{fullName(trainee)}{trainee.suffix ? ` ${trainee.suffix}` : ""}</strong></div>
-          <div><span>SRN</span><strong>{trainee.srn ?? "—"}</strong></div>
-          <div><span>Mobile</span><strong>{trainee.mobile}</strong></div>
-          <div><span>Email</span><strong>{trainee.email}</strong></div>
-        </div>
-
-        <h3 className="slip-section">Training details</h3>
-        <div className="slip-grid">
-          <div><span>Course</span><strong>{enrollment.courseName} ({enrollment.courseCode})</strong></div>
-          <div><span>Schedule</span><strong>{batch ? formatDateRange(batch.startsOn, batch.endsOn) : "—"}</strong></div>
-          <div><span>Time</span><strong>{time}</strong></div>
-          <div><span>Classroom</span><strong>{batch?.venue ?? "—"}</strong></div>
-          <div><span>Instructor</span><strong>{batch?.instructor ?? "—"}</strong></div>
-          <div><span>Registration status</span><strong>{enrollment.registrationStatus ?? "Waiting for Payment"}</strong></div>
-        </div>
-
-        <h3 className="slip-section">Charges &amp; payments</h3>
-        <div className="ledger-list">
-          {charges.map((entry) => (
-            <div key={entry.id} className="ledger-row ledger-charge">
-              <div>
-                <strong>{entry.description}</strong>
-                <small>{entry.reference} · {formatDateTime(entry.recordedAt)}</small>
-              </div>
-              <div className="ledger-amount"><strong>{pesos(entry.amountCentavos)}</strong></div>
-            </div>
-          ))}
-          {payments.map((entry) => (
-            <div key={entry.id} className={`ledger-row ledger-${entry.type}`}>
-              <div>
-                <strong>{entry.description}</strong>
-                <small>
-                  {entry.reference} · {formatDateTime(entry.recordedAt)}
-                  {entry.referenceNumber ? ` · Ref ${entry.referenceNumber}` : ""}
-                  {entry.receiptNumber ? ` · ${entry.receiptNumber}` : ""}
-                </small>
-              </div>
-              <div className="ledger-amount"><strong>&minus;{pesos(entry.amountCentavos)}</strong></div>
-            </div>
-          ))}
-          {charges.length === 0 && payments.length === 0 && <p className="muted-text">No ledger entries yet.</p>}
-        </div>
-
-        <div className="slip-grid" style={{ marginTop: 16 }}>
-          <div><span>Total due</span><strong>{pesos(dueCentavos)}</strong></div>
-          <div><span>Total paid</span><strong>{pesos(paidCentavos)}</strong></div>
-          <div><span>Balance</span><strong>{pesos(balanceCentavos)}</strong></div>
-          <div><span>Payment status</span><strong>{statusLabel}</strong></div>
-        </div>
-
-        <div className="slip-signatures">
-          <div>
-            <div className="sign-line">{officer || " "}</div>
-            <span>Registration Officer · Signature over Printed Name</span>
-          </div>
-          <div>
-            <div className="sign-line">{cashier || " "}</div>
-            <span>Cashier · Signature over Printed Name</span>
-          </div>
-        </div>
+      <div className="admission-slip admission-slip-duplex" id="admission-invoice-print">
+        {slipCopy("ORIGINAL COPY")}
+        <div className="slip-cut" aria-hidden />
+        {slipCopy("DUPLICATE COPY")}
       </div>
     </Modal>
   );
