@@ -52,6 +52,7 @@ export function AuthForm({ portal }: { portal: "staff" | "trainee" }) {
       {message && <p className="form-message" role="status">{message}</p>}
       <button className="button button-primary button-block" disabled={busy}>{busy ? "Signing in..." : `Sign in to ${portal} portal`}</button>
       <button className="text-button" type="button" onClick={resetPassword} disabled={busy}>Forgot your password?</button>
+      {portal === "staff" && <a className="text-button" href="/prototype" style={{ display: "block", textAlign: "center", marginTop: 6 }}>Explore the prototype — no login required</a>}
     </form>
   );
 }
