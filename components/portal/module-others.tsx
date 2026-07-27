@@ -1250,6 +1250,97 @@ function BankReconciliation() {
   );
 }
 
+/* ------------------------------------------------------ supplies / inventory */
+type SupplyDraft = { id?: string; name: string; category: string; unit: string; quantityOnHand: string; reorderLevel: string };
+const EMPTY_SUPPLY: SupplyDraft = { name: "", category: "Office", unit: "piece", quantityOnHand: "0", reorderLevel: "0" };
+
+/** Simple supplies stock list (tissues, bond paper, markers, …). Admin/Accounting
+ * add items and adjust quantities up/down; a "Low" flag shows at/below reorder level. */
+export function SuppliesModule({ role }: { role: Role }) {
+  const { state, addSupply, updateSupply, adjustSupply, setSupplyActive } = useSystem();
+  const toast = useToast();
+  const canManage = role === "Admin" || role === "Accounting";
+  const [draft, setDraft] = useState<SupplyDraft | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+
+  const items = state.supplies.filter((s) => showArchived || s.active);
+  const lowStock = state.supplies.filter((s) => s.active && s.quantityOnHand <= s.reorderLevel);
+
+  function save() {
+    if (!draft) return;
+    if (!draft.name.trim() || !draft.unit.trim()) { toast("danger", "Item name and unit are required."); return; }
+    const quantityOnHand = Math.max(0, Math.round(Number(draft.quantityOnHand) || 0));
+    const reorderLevel = Math.max(0, Math.round(Number(draft.reorderLevel) || 0));
+    if (draft.id) { updateSupply(draft.id, { name: draft.name.trim(), category: draft.category.trim() || "General", unit: draft.unit.trim(), quantityOnHand, reorderLevel }); toast("success", "Supply item updated."); }
+    else { addSupply({ name: draft.name.trim(), category: draft.category.trim() || "General", unit: draft.unit.trim(), quantityOnHand, reorderLevel }); toast("success", "Supply item added."); }
+    setDraft(null);
+  }
+
+  return (
+    <div className="page">
+      <PageHeader eyebrow="Operations" title="Supplies & inventory" description="Simple stock list for office and training supplies. Adjust quantities as stock comes in or is issued." />
+
+      <Panel
+        title="Stock on hand"
+        description={lowStock.length > 0 ? `${lowStock.length} item(s) at or below reorder level` : "All items above reorder level"}
+        action={canManage ? <button className="primary-button" onClick={() => setDraft({ ...EMPTY_SUPPLY })}>+ Add item</button> : undefined}
+      >
+        <label style={{ display: "inline-flex", gap: 6, alignItems: "center", marginBottom: 10, fontSize: 13, color: "var(--muted)" }}>
+          <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Show archived
+        </label>
+        <table className="ledger-table" style={{ width: "100%" }}>
+          <thead><tr><th>Item</th><th>Category</th><th>Unit</th><th style={{ textAlign: "right" }}>On hand</th><th>Status</th><th /></tr></thead>
+          <tbody>
+            {items.map((s) => {
+              const low = s.active && s.quantityOnHand <= s.reorderLevel;
+              return (
+                <tr key={s.id} style={{ opacity: s.active ? 1 : 0.5 }}>
+                  <td>
+                    <strong>{s.name}</strong>
+                    {low && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: "#fff", background: "var(--red, #c0392b)", borderRadius: 6, padding: "2px 6px" }}>LOW</span>}
+                    <small style={{ display: "block", color: "var(--muted)" }}>reorder at {s.reorderLevel}</small>
+                  </td>
+                  <td>{s.category}</td>
+                  <td>{s.unit}</td>
+                  <td style={{ textAlign: "right" }}><strong>{s.quantityOnHand}</strong></td>
+                  <td>{s.active ? "Active" : "Archived"}</td>
+                  <td style={{ textAlign: "right", whiteSpace: "nowrap" }}>
+                    {canManage && s.active && (
+                      <span style={{ display: "inline-flex", gap: 6 }}>
+                        <button className="secondary-button" onClick={() => adjustSupply(s.id, -1)} disabled={s.quantityOnHand <= 0} aria-label={`Issue one ${s.name}`}>−</button>
+                        <button className="secondary-button" onClick={() => adjustSupply(s.id, 1)} aria-label={`Receive one ${s.name}`}>+</button>
+                        <button className="secondary-button" onClick={() => setDraft({ id: s.id, name: s.name, category: s.category, unit: s.unit, quantityOnHand: String(s.quantityOnHand), reorderLevel: String(s.reorderLevel) })}>Edit</button>
+                        <button className="secondary-button" onClick={() => setSupplyActive(s.id, false)}>Archive</button>
+                      </span>
+                    )}
+                    {canManage && !s.active && <button className="secondary-button" onClick={() => setSupplyActive(s.id, true)}>Restore</button>}
+                  </td>
+                </tr>
+              );
+            })}
+            {items.length === 0 && <tr><td colSpan={6} style={{ color: "var(--muted)" }}>No supplies yet.</td></tr>}
+          </tbody>
+        </table>
+      </Panel>
+
+      {draft && (
+        <Modal
+          open
+          title={draft.id ? "Edit supply item" : "Add supply item"}
+          onClose={() => setDraft(null)}
+          footer={<><button className="secondary-button" onClick={() => setDraft(null)}>Cancel</button><button className="primary-button" disabled={!draft.name.trim() || !draft.unit.trim()} onClick={save}>{draft.id ? "Save changes" : "Add item"}</button></>}
+        >
+          <Field label="Item name*"><input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
+          <Field label="Category"><input value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} /></Field>
+          <Field label="Unit*" hint="box, pack, piece, bottle, ream…"><input value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} /></Field>
+          <Field label="Quantity on hand"><input type="number" min="0" value={draft.quantityOnHand} onChange={(e) => setDraft({ ...draft, quantityOnHand: e.target.value })} /></Field>
+          <Field label="Reorder level" hint="Flags 'LOW' at or below this quantity"><input type="number" min="0" value={draft.reorderLevel} onChange={(e) => setDraft({ ...draft, reorderLevel: e.target.value })} /></Field>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 export function AccountingModule({ role }: { role: Role }) {
   const {
     state,

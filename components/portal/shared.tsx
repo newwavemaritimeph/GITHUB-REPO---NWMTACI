@@ -13,6 +13,7 @@ export type Module =
   | "Schedules"
   | "Payments"
   | "Accounting"
+  | "Supplies"
   | "Instructions"
   | "Attendance"
   | "Instructors"

@@ -9,6 +9,7 @@ import { CertificatesModule } from "./portal/module-certificates";
 import { EnrollmentsModule } from "./portal/module-enrollments";
 import {
   AccountingModule,
+  SuppliesModule,
   CatalogModule,
   HrRequestModule,
   InstructionsModule,
@@ -80,6 +81,7 @@ const nav: { label: Module; icon: string; roles?: Role[] }[] = [
   { label: "Schedules", icon: "□", roles: ["Training Operations", "Instructor"] },
   { label: "Payments", icon: "₱", roles: ["Cashier", "Accounting"] },
   { label: "Accounting", icon: "▥", roles: ["Admin", "Accounting"] },
+  { label: "Supplies", icon: "▣", roles: ["Admin", "Accounting"] },
   { label: "Instructions", icon: "✉", roles: ["Registration", "Training Operations"] },
   { label: "Attendance", icon: "✓", roles: ["Training Operations", "Instructor"] },
   { label: "Classrooms", icon: "▦", roles: ["Training Operations"] },
@@ -1074,6 +1076,7 @@ function PortalShell({ previewMode }: { previewMode: boolean }) {
         {active === "Schedules" && <SchedulesModule />}
         {active === "Payments" && <PaymentsModule role={role} />}
         {active === "Accounting" && <AccountingModule role={role} />}
+        {active === "Supplies" && <SuppliesModule role={role} />}
         {active === "Instructions" && <InstructionsModule />}
         {active === "Attendance" && <AttendanceModule />}
         {active === "Instructors" && <InstructorsModule />}

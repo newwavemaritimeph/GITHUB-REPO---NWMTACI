@@ -11,6 +11,7 @@ import type {
   Classroom,
   ExpenseCategory,
   MonthlyPayable,
+  SupplyItem,
   Instructor,
   LedgerEntry,
   MarketingAgency,
@@ -21,7 +22,7 @@ import type {
   Trainee,
 } from "./types";
 
-export const SYSTEM_VERSION = 18;
+export const SYSTEM_VERSION = 19;
 
 function startOfToday() {
   const now = new Date();
@@ -304,6 +305,15 @@ export function createSeedState(): SystemState {
     { id: "room-pool", name: "Survival Pool", capacity: 20, active: true },
   ];
 
+  const supplies: SupplyItem[] = [
+    { id: "sup-tissue", name: "Tissue (interfolded)", category: "Sanitary", unit: "box", quantityOnHand: 24, reorderLevel: 10, active: true },
+    { id: "sup-bond", name: "Bond paper A4 (sub 20)", category: "Office", unit: "ream", quantityOnHand: 18, reorderLevel: 8, active: true },
+    { id: "sup-alcohol", name: "Ethyl alcohol 70% (500ml)", category: "Sanitary", unit: "bottle", quantityOnHand: 6, reorderLevel: 8, active: true },
+    { id: "sup-marker", name: "Whiteboard marker (black)", category: "Training", unit: "piece", quantityOnHand: 30, reorderLevel: 12, active: true },
+    { id: "sup-ballpen", name: "Ballpen (blue)", category: "Office", unit: "box", quantityOnHand: 9, reorderLevel: 5, active: true },
+    { id: "sup-ink", name: "Printer ink (black)", category: "Office", unit: "bottle", quantityOnHand: 4, reorderLevel: 4, active: true },
+  ];
+
   const marketingAgencies: MarketingAgency[] = [
     { id: "ma-seafront", name: "Seafront Manning Agency", rebates: rebatesFor(50000, 8, 5000), active: true },
     { id: "ma-oceanlink", name: "OceanLink Crewing Services", rebates: rebatesFor(30000, 6, 4000), active: true },
@@ -331,6 +341,7 @@ export function createSeedState(): SystemState {
     otherCharges,
     expenseCategories,
     monthlyPayables,
+    supplies,
     marketingAgencies,
     instructors,
     classrooms,

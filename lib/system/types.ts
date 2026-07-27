@@ -494,6 +494,20 @@ export type MonthlyPayable = {
   notes?: string;
 };
 
+/** Office / training supply item tracked as a simple stock list (tissues, bond
+ * paper, markers, etc.). Quantity is adjusted up/down; a low-stock flag shows
+ * when it drops to or below the reorder level. */
+export type SupplyItem = {
+  id: string;
+  name: string;
+  category: string;
+  /** Counting unit: box, pack, piece, bottle, ream, etc. */
+  unit: string;
+  quantityOnHand: number;
+  reorderLevel: number;
+  active: boolean;
+};
+
 /** Training instructor / trainor with personal details. Selected when scheduling
  * a batch. */
 export type Instructor = {
@@ -549,6 +563,7 @@ export type SystemState = {
   otherCharges: OtherCharge[];
   expenseCategories: ExpenseCategory[];
   monthlyPayables: MonthlyPayable[];
+  supplies: SupplyItem[];
   marketingAgencies: MarketingAgency[];
   instructors: Instructor[];
   classrooms: Classroom[];

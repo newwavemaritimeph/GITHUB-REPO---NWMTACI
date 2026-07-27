@@ -37,6 +37,7 @@ import type {
   Employee,
   ExpenseCategory,
   MonthlyPayable,
+  SupplyItem,
   HrAttendanceRecord,
   Instructor,
   LeaveRequest,
@@ -441,6 +442,10 @@ type SystemContextValue = {
   updateMonthlyPayable: (id: string, patch: Partial<Omit<MonthlyPayable, "id">>) => void;
   setMonthlyPayableActive: (id: string, active: boolean) => void;
   removeMonthlyPayable: (id: string) => void;
+  addSupply: (input: Omit<SupplyItem, "id" | "active">) => SupplyItem;
+  updateSupply: (id: string, patch: Partial<Omit<SupplyItem, "id">>) => void;
+  adjustSupply: (id: string, delta: number) => void;
+  setSupplyActive: (id: string, active: boolean) => void;
   addMarketingAgency: (input: Omit<MarketingAgency, "id" | "active">) => MarketingAgency;
   updateMarketingAgency: (id: string, patch: Partial<Omit<MarketingAgency, "id">>) => void;
   setMarketingAgencyActive: (id: string, active: boolean) => void;
@@ -518,6 +523,7 @@ const REQUIRED_COLLECTIONS: (keyof SystemState)[] = [
   "otherCharges",
   "expenseCategories",
   "monthlyPayables",
+  "supplies",
   "marketingAgencies",
   "instructors",
   "classrooms",
@@ -1532,6 +1538,54 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
     [log, update],
   );
 
+  const addSupply = useCallback<SystemContextValue["addSupply"]>(
+    (input) => {
+      const item: SupplyItem = { ...input, id: uid("sup"), active: true };
+      update((draft) => {
+        draft.supplies.push(item);
+        log(draft, { action: "Supply item added", recordType: "Supply", recordRef: item.name });
+      });
+      return item;
+    },
+    [log, update],
+  );
+
+  const updateSupply = useCallback<SystemContextValue["updateSupply"]>(
+    (id, patch) => {
+      update((draft) => {
+        const item = draft.supplies.find((row) => row.id === id);
+        if (!item) return;
+        Object.assign(item, patch);
+        log(draft, { action: "Supply item updated", recordType: "Supply", recordRef: item.name });
+      });
+    },
+    [log, update],
+  );
+
+  const adjustSupply = useCallback<SystemContextValue["adjustSupply"]>(
+    (id, delta) => {
+      update((draft) => {
+        const item = draft.supplies.find((row) => row.id === id);
+        if (!item) return;
+        item.quantityOnHand = Math.max(0, item.quantityOnHand + delta);
+        log(draft, { action: `Supply ${delta >= 0 ? "received" : "issued"} (${Math.abs(delta)})`, recordType: "Supply", recordRef: item.name });
+      });
+    },
+    [log, update],
+  );
+
+  const setSupplyActive = useCallback<SystemContextValue["setSupplyActive"]>(
+    (id, active) => {
+      update((draft) => {
+        const item = draft.supplies.find((row) => row.id === id);
+        if (!item) return;
+        item.active = active;
+        log(draft, { action: active ? "Supply item restored" : "Supply item archived", recordType: "Supply", recordRef: item.name });
+      });
+    },
+    [log, update],
+  );
+
   const addMarketingAgency = useCallback<SystemContextValue["addMarketingAgency"]>(
     (input) => {
       const agency: MarketingAgency = { ...input, id: uid("ma"), active: true };
@@ -2381,6 +2435,10 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       updateMonthlyPayable,
       setMonthlyPayableActive,
       removeMonthlyPayable,
+      addSupply,
+      updateSupply,
+      adjustSupply,
+      setSupplyActive,
       addMarketingAgency,
       updateMarketingAgency,
       setMarketingAgencyActive,
@@ -2445,6 +2503,10 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
       updateMonthlyPayable,
       setMonthlyPayableActive,
       removeMonthlyPayable,
+      addSupply,
+      updateSupply,
+      adjustSupply,
+      setSupplyActive,
       addMarketingAgency,
       updateMarketingAgency,
       setMarketingAgencyActive,
