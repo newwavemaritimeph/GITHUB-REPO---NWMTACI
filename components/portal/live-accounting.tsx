@@ -13,14 +13,16 @@ type Charge = { id: string; name: string; default_amount_centavos: number; activ
 type Agency = { id: string; name: string; contact_name?: string | null; email?: string | null; mobile?: string | null; active: boolean };
 type Expense = { id: string; expense_number: string; payee: string; category: string; amount_centavos: number; status: string; created_at: string };
 type Payable = { id: string; description: string; amount_centavos: number; due_on?: string | null; status: string };
-type Course = { id: string; code: string; name: string; delivery_type: string; standard_price_centavos: number };
+type Course = { id: string; code: string; name: string; delivery_type: string; duration_label?: string; duration_days?: number; training_mode?: string; category_id?: string; standard_price_centavos: number };
 type CenterRef = { name: string };
 type CourseRef = { name: string; code?: string };
 type Offer = { id: string; course_id?: string; duration_label: string; training_fee_centavos: number; rebate_centavos: number; partner_payable_centavos: number; partner_centers?: CenterRef | CenterRef[] | null; courses?: CourseRef | CourseRef[] | null };
+type Category = { id: string; name: string };
+type Center = { id: string; name: string; active: boolean };
 export type AccountingData = {
   payments: Payment[]; enrollments: Enrollment[]; paymentMethods: Channel[];
   charges: Charge[]; agencies: Agency[]; expenses: Expense[]; payables: Payable[];
-  courses: Course[]; offers: Offer[];
+  courses: Course[]; offers: Offer[]; courseCategories: Category[]; partnerCenters: Center[];
 };
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -257,45 +259,71 @@ function EditModal({ title, subtitle, children, onClose, onSave, saveLabel = "Sa
   );
 }
 
-type PriceEdit = { kind: "course"; id: string; label: string; price: string } | { kind: "offer"; id: string; label: string; fee: string; rebate: string };
+type PriceEdit =
+  | { kind: "course"; id?: string; code: string; name: string; categoryId: string; deliveryType: "In-House" | "Partner or Endorsed"; durationLabel: string; durationDays: string; mode: string; price: string }
+  | { kind: "offer"; id: string; label: string; fee: string; rebate: string }
+  | { kind: "center"; id?: string; name: string; email: string; mobile: string };
 
-/* ---- Pricelist: course prices + endorsed-offer rates/rebates ---- */
+/* ---- Courses & centers + endorsed-offer rates/rebates ---- */
 function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canManage: boolean; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
   const [edit, setEdit] = useState<PriceEdit | null>(null);
   const [error, setError] = useState("");
   const pesoFromInput = (raw: string) => { const n = Number(raw); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null; };
+  const defaultCategory = data.courseCategories[0]?.id ?? "";
 
   async function save() {
     if (!edit) return;
     setError("");
     if (edit.kind === "course") {
       const price = pesoFromInput(edit.price);
+      const days = Number(edit.durationDays);
+      if (edit.code.trim().length < 2 || edit.name.trim().length < 2) { setError("Code and name are required."); return; }
+      if (!edit.categoryId) { setError("Pick a category."); return; }
+      if (!Number.isFinite(days) || days <= 0) { setError("Enter valid duration days."); return; }
       if (price == null) { setError("Enter a valid price."); return; }
-      await post({ action: "course-price-save", courseId: edit.id, priceCentavos: price });
-    } else {
+      await post({ action: "course-save", id: edit.id ?? null, code: edit.code, name: edit.name, categoryId: edit.categoryId, deliveryType: edit.deliveryType, durationLabel: edit.durationLabel, durationDays: days, mode: edit.mode, priceCentavos: price });
+    } else if (edit.kind === "offer") {
       const fee = pesoFromInput(edit.fee); const rebate = pesoFromInput(edit.rebate);
       if (fee == null || rebate == null) { setError("Enter valid amounts."); return; }
       if (rebate > fee) { setError("Rebate cannot exceed the training fee."); return; }
       await post({ action: "offer-rate-save", offerId: edit.id, trainingFeeCentavos: fee, rebateCentavos: rebate });
+    } else {
+      if (edit.name.trim().length < 2) { setError("Center name is required."); return; }
+      await post({ action: "center-save", id: edit.id ?? null, name: edit.name, email: edit.email, mobile: edit.mobile });
     }
     setEdit(null);
   }
 
   return (
     <>
-      {!canManage && <div className="portal-message error">Only Admin and Accounting can edit pricing.</div>}
+      {!canManage && <div className="portal-message error">Only Admin and Accounting can edit courses, centers, and pricing.</div>}
       <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Training pricelist</h2><p>Standard course prices (applies to new enrollments)</p></div></div>
-        <div className="portal-table"><table><thead><tr><th>Course</th><th>Type</th><th>Price</th><th></th></tr></thead><tbody>
+        <div className="panel-heading"><div><h2>Courses</h2><p>Training courses and standard prices</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => { setError(""); setEdit({ kind: "course", code: "", name: "", categoryId: defaultCategory, deliveryType: "In-House", durationLabel: "1 day", durationDays: "1", mode: "In-person", price: "0" }); }}>+ Add course</button>}</div>
+        <div className="portal-table"><table><thead><tr><th>Course</th><th>Type</th><th>Duration</th><th>Price</th><th></th></tr></thead><tbody>
           {data.courses.map((c) => (
             <tr key={c.id}>
               <td><strong>{c.name}</strong><small>{c.code}</small></td>
               <td>{c.delivery_type}</td>
+              <td>{c.duration_label ?? "—"}</td>
               <td>{pesos(c.standard_price_centavos)}</td>
-              <td className="document-actions">{canManage && <button disabled={busy} onClick={() => { setError(""); setEdit({ kind: "course", id: c.id, label: c.name, price: String(c.standard_price_centavos / 100) }); }}>Edit price</button>}</td>
+              <td className="document-actions">{canManage && <button disabled={busy} onClick={() => { setError(""); setEdit({ kind: "course", id: c.id, code: c.code, name: c.name, categoryId: c.category_id ?? defaultCategory, deliveryType: c.delivery_type === "Partner or Endorsed" ? "Partner or Endorsed" : "In-House", durationLabel: c.duration_label ?? "", durationDays: String(c.duration_days ?? 1), mode: c.training_mode ?? "In-person", price: String(c.standard_price_centavos / 100) }); }}>Edit</button>}</td>
             </tr>
           ))}
-          {!data.courses.length && <tr><td colSpan={4}><span className="portal-empty-copy">No courses.</span></td></tr>}
+          {!data.courses.length && <tr><td colSpan={5}><span className="portal-empty-copy">No courses.</span></td></tr>}
+        </tbody></table></div>
+      </section>
+
+      <section className="portal-panel">
+        <div className="panel-heading"><div><h2>Training centers</h2><p>Partner / endorsing centers</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => { setError(""); setEdit({ kind: "center", name: "", email: "", mobile: "" }); }}>+ Add center</button>}</div>
+        <div className="portal-table"><table><thead><tr><th>Center</th><th>Status</th><th></th></tr></thead><tbody>
+          {data.partnerCenters.map((c) => (
+            <tr key={c.id} className={c.active ? "" : "row-muted"}>
+              <td><strong>{c.name}</strong></td>
+              <td>{c.active ? "Active" : "Archived"}</td>
+              <td className="document-actions">{canManage && <button disabled={busy} onClick={() => { setError(""); setEdit({ kind: "center", id: c.id, name: c.name, email: "", mobile: "" }); }}>Edit</button>}</td>
+            </tr>
+          ))}
+          {!data.partnerCenters.length && <tr><td colSpan={3}><span className="portal-empty-copy">No training centers.</span></td></tr>}
         </tbody></table></div>
       </section>
 
@@ -318,9 +346,24 @@ function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canM
       </section>
 
       {edit && edit.kind === "course" && (
-        <EditModal title="Edit course price" subtitle={edit.label} busy={busy} onClose={() => setEdit(null)} onSave={save}>
+        <EditModal title={edit.id ? "Edit course" : "Add course"} busy={busy} onClose={() => setEdit(null)} onSave={save} saveLabel={edit.id ? "Save changes" : "Add course"}>
           {error && <div className="portal-message error full">{error}</div>}
-          <label className="full">Price (PHP)<input type="number" min="0" step="0.01" autoFocus value={edit.price} onChange={(e) => setEdit({ ...edit, price: e.target.value })} /></label>
+          <label>Code<input autoFocus value={edit.code} onChange={(e) => setEdit({ ...edit, code: e.target.value })} /></label>
+          <label>Category<select value={edit.categoryId} onChange={(e) => setEdit({ ...edit, categoryId: e.target.value })}><option value="">Select…</option>{data.courseCategories.map((cat) => <option key={cat.id} value={cat.id}>{cat.name}</option>)}</select></label>
+          <label className="full">Name<input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
+          <label>Delivery type<select value={edit.deliveryType} onChange={(e) => setEdit({ ...edit, deliveryType: e.target.value as "In-House" | "Partner or Endorsed" })}><option value="In-House">In-House</option><option value="Partner or Endorsed">Partner or Endorsed</option></select></label>
+          <label>Mode<input value={edit.mode} onChange={(e) => setEdit({ ...edit, mode: e.target.value })} /></label>
+          <label>Duration label<input value={edit.durationLabel} onChange={(e) => setEdit({ ...edit, durationLabel: e.target.value })} placeholder="e.g. 3 days" /></label>
+          <label>Duration days<input type="number" min="0.5" step="0.5" value={edit.durationDays} onChange={(e) => setEdit({ ...edit, durationDays: e.target.value })} /></label>
+          <label>Price (PHP)<input type="number" min="0" step="0.01" value={edit.price} onChange={(e) => setEdit({ ...edit, price: e.target.value })} /></label>
+        </EditModal>
+      )}
+      {edit && edit.kind === "center" && (
+        <EditModal title={edit.id ? "Edit training center" : "Add training center"} busy={busy} onClose={() => setEdit(null)} onSave={save} saveLabel={edit.id ? "Save changes" : "Add center"}>
+          {error && <div className="portal-message error full">{error}</div>}
+          <label className="full">Center name<input autoFocus value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
+          <label>Email<input type="email" value={edit.email} onChange={(e) => setEdit({ ...edit, email: e.target.value })} /></label>
+          <label>Mobile<input value={edit.mobile} onChange={(e) => setEdit({ ...edit, mobile: e.target.value })} /></label>
         </EditModal>
       )}
       {edit && edit.kind === "offer" && (

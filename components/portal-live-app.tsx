@@ -26,7 +26,8 @@ type EnrollmentCharge = { id:string; enrollment_id:string; charge_catalog_id?:st
 type PortalData = { profile:{complete_name:string;email:string}; roles:string[]; courses:Course[]; offers:Offer[]; trainees:Trainee[]; batches:Batch[]; enrollments:Enrollment[]; payments:Payment[]; notifications:Notification[];
   paymentMethods:{id:string;code:string;name:string;requires_reference:boolean;allows_proof:boolean;active:boolean}[]; charges:{id:string;name:string;default_amount_centavos:number;active:boolean;used_count:number}[]; agencies:{id:string;name:string;contact_name?:string|null;email?:string|null;mobile?:string|null;active:boolean}[]; expenses:{id:string;expense_number:string;payee:string;category:string;amount_centavos:number;status:string;created_at:string}[]; payables:{id:string;description:string;amount_centavos:number;due_on?:string|null;status:string}[]; cashierClosings:{id:string;closing_date:string;opening_cash_centavos:number;cash_collections_centavos:number;online_collections_centavos:number;expenses_centavos:number;expected_cash_centavos:number;actual_cash_centavos?:number|null;variance_centavos?:number|null;status:string}[]; enrollmentCharges:EnrollmentCharge[];
   employees:HrData["employees"]; employeeAttendance:HrData["employeeAttendance"]; leaveRequests:HrData["leaveRequests"]; cashAdvances:HrData["cashAdvances"]; payrollPeriods:HrData["payrollPeriods"]; payrollItems:HrData["payrollItems"];
-  classrooms:TrainingData["classrooms"]; certificates:TrainingData["certificates"] };
+  classrooms:TrainingData["classrooms"]; certificates:TrainingData["certificates"];
+  courseCategories:{id:string;name:string}[]; partnerCenters:{id:string;name:string;active:boolean}[] };
 
 const nav: {label:Module;icon:string;roles?:string[]}[] = [
   {label:"Dashboard",icon:"⌂"},{label:"Search trainee",icon:"⌕",roles:["admin"]},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting","training_operations"]},

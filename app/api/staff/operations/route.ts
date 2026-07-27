@@ -67,8 +67,10 @@ const classroomSetActiveInput = z.object({ action: z.literal("classroom-set-acti
 // Accounting-managed pricing: course pricelist + endorsed-offer rates/rebates.
 const coursePriceInput = z.object({ action: z.literal("course-price-save"), courseId: z.string().uuid(), priceCentavos: z.number().int().nonnegative() });
 const offerRateInput = z.object({ action: z.literal("offer-rate-save"), offerId: z.string().uuid(), trainingFeeCentavos: z.number().int().nonnegative(), rebateCentavos: z.number().int().nonnegative() });
+const courseSaveInput = z.object({ action: z.literal("course-save"), id: z.string().uuid().nullable().optional(), code: z.string().trim().min(2).max(40), name: z.string().trim().min(2).max(240), categoryId: z.string().uuid(), deliveryType: z.enum(["In-House", "Partner or Endorsed"]), durationLabel: z.string().trim().min(1).max(60), durationDays: z.number().positive().max(365), mode: z.string().trim().min(2).max(80), priceCentavos: z.number().int().nonnegative() });
+const centerSaveInput = z.object({ action: z.literal("center-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(2).max(160), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
 
-const actionInput = z.union([batchInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput]);
+const actionInput = z.union([batchInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput]);
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
 const canManageHr = (roles: string[]) => roles.some((role) => ["admin", "hr"].includes(role));
@@ -82,7 +84,7 @@ export async function GET() {
   const db = createSupabaseAdminClient();
   const results = await Promise.all([
     db.from("profiles").select("complete_name,email").eq("id", staff.user.id).maybeSingle(),
-    db.from("courses").select("id,code,name,delivery_type,duration_label,standard_price_centavos,active,course_categories(name)").eq("active", true).order("name"),
+    db.from("courses").select("id,code,name,delivery_type,duration_label,duration_days,training_mode,category_id,standard_price_centavos,active,course_categories(name)").eq("active", true).order("name"),
     db.from("partner_course_offers").select("id,course_id,duration_label,training_fee_centavos,rebate_centavos,partner_payable_centavos,partner_centers(name)").eq("active", true).order("training_fee_centavos"),
     db.from("trainees").select("id,trainee_number,legal_first_name,legal_middle_name,legal_last_name,birthdate,email,mobile,account_state,registered_at").neq("account_state", "Deactivated").order("created_at", { ascending: false }).limit(250),
     db.from("batches").select("id,batch_number,course_id,partner_offer_id,starts_on,ends_on,daily_start,daily_end,mode,venue,capacity,confirmed_count,enrollment_deadline,status,published_at,courses(name,code),partner_course_offers(partner_centers(name))").eq("active", true).order("starts_on", { ascending: true }).limit(250),
@@ -99,11 +101,13 @@ export async function GET() {
     db.from("cashier_closings").select("id,closing_date,opening_cash_centavos,cash_collections_centavos,online_collections_centavos,refunds_centavos,expenses_centavos,expected_cash_centavos,actual_cash_centavos,variance_centavos,status,submitted_at").order("closing_date", { ascending: false }).limit(60),
     db.from("enrollment_charges").select("id,enrollment_id,charge_catalog_id,description,amount_centavos,event_type,created_at").eq("valid", true).order("created_at", { ascending: false }).limit(500),
     db.from("classrooms").select("id,name,venue,capacity,active").order("name"),
+    db.from("course_categories").select("id,name").eq("active", true).order("sort_order"),
+    db.from("partner_centers").select("id,name,active").order("name"),
   ]);
   const error = results.find((item) => item.error)?.error;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const [profile, courses, offers, trainees, batches, enrollmentsResult, payments, allocations, notifications,
-    paymentMethods, charges, agencies, expenses, payables, cashierClosings, enrollmentCharges, classrooms] = results;
+    paymentMethods, charges, agencies, expenses, payables, cashierClosings, enrollmentCharges, classrooms, courseCategories, partnerCenters] = results;
   const paidByEnrollment = new Map<string, number>();
   for (const allocation of allocations.data ?? []) paidByEnrollment.set(allocation.enrollment_id, (paidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
   const chargesByEnrollment = new Map<string, number>();
@@ -139,7 +143,7 @@ export async function GET() {
     paymentMethods: paymentMethods.data ?? [], charges: charges.data ?? [], agencies: agencies.data ?? [],
     expenses: expenses.data ?? [], payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems,
-    classrooms: classrooms.data ?? [], certificates }, { headers: { "Cache-Control": "no-store" } });
+    classrooms: classrooms.data ?? [], certificates, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [] }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -385,6 +389,22 @@ export async function POST(request: Request) {
       if (input.rebateCentavos > input.trainingFeeCentavos) throw new Error("Rebate cannot exceed the training fee.");
       const admin = createSupabaseAdminClient();
       const { error } = await admin.from("partner_course_offers").update({ training_fee_centavos: input.trainingFeeCentavos, rebate_centavos: input.rebateCentavos, partner_payable_centavos: input.trainingFeeCentavos - input.rebateCentavos }).eq("id", input.offerId);
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "course-save") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage courses." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const payload = { code: input.code.toUpperCase(), name: input.name, category_id: input.categoryId, delivery_type: input.deliveryType, duration_label: input.durationLabel, duration_days: input.durationDays, training_mode: input.mode, standard_price_centavos: input.priceCentavos, public_visible: input.deliveryType === "In-House", active: true };
+      const { error } = input.id ? await admin.from("courses").update(payload).eq("id", input.id) : await admin.from("courses").insert(payload);
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "center-save") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage training centers." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const row = { name: input.name, contact_details: { email: input.email || null, mobile: input.mobile || null }, ...(input.active !== undefined ? { active: input.active } : {}) };
+      const { error } = input.id ? await admin.from("partner_centers").update(row).eq("id", input.id) : await admin.from("partner_centers").insert({ ...row, active: true });
       if (error) throw error;
       return NextResponse.json({ ok: true });
     }
