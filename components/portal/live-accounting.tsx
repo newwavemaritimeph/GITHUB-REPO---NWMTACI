@@ -34,12 +34,13 @@ function rangeFor(span: "Daily" | "Weekly" | "Monthly"): { from: string; to: str
 }
 
 const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0 }).format((Number(centavos) || 0) / 100);
-const num = (raw: string | null) => (raw == null || raw.trim() === "" ? null : Math.round(Number(raw) * 100));
 
 export function LiveAccounting({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
   const [tab, setTab] = useState<"Overview" | "Sales" | "Pricelist" | "Vouchers" | "Reconciliation" | "Setup">("Overview");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [voucher, setVoucher] = useState<{ payee: string; category: string; amount: string; purpose: string } | null>(null);
+  const [voucherError, setVoucherError] = useState("");
   const canManage = role === "admin" || role === "accounting";
 
   async function post(body: Record<string, unknown>) {
@@ -121,13 +122,7 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         <section className="portal-panel">
           <div className="panel-heading">
             <div><h2>Expense vouchers</h2><p>Raise a voucher; Accounting approves, rejects, or marks it paid.</p></div>
-            <button className="portal-primary" disabled={busy} onClick={() => {
-              const payee = window.prompt("Payee?"); if (!payee) return;
-              const category = window.prompt("Category? (e.g. Supplies, Utilities)", "Supplies"); if (!category) return;
-              const amt = num(window.prompt("Amount (PHP)?")); if (!amt) return;
-              const purpose = window.prompt("Purpose / description?"); if (!purpose) return;
-              void post({ action: "expense-create", payee, category, amountCentavos: amt, purpose });
-            }}>+ Raise voucher</button>
+            <button className="portal-primary" disabled={busy} onClick={() => { setVoucherError(""); setVoucher({ payee: "", category: "Supplies", amount: "", purpose: "" }); }}>+ Raise voucher</button>
           </div>
           <div className="portal-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
             {data.expenses.map((e) => (
@@ -146,6 +141,23 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
             ))}
             {!data.expenses.length && <tr><td colSpan={6}><span className="portal-empty-copy">No vouchers yet.</span></td></tr>}
           </tbody></table></div>
+          {voucher && (
+            <EditModal title="Raise expense voucher" busy={busy} saveLabel="Raise voucher" onClose={() => setVoucher(null)} onSave={async () => {
+              const amt = Math.round(Number(voucher.amount) * 100);
+              if (!voucher.payee.trim()) { setVoucherError("Payee is required."); return; }
+              if (!voucher.category.trim()) { setVoucherError("Category is required."); return; }
+              if (!Number.isFinite(amt) || amt <= 0) { setVoucherError("Enter a valid amount."); return; }
+              if (!voucher.purpose.trim()) { setVoucherError("Purpose is required."); return; }
+              await post({ action: "expense-create", payee: voucher.payee, category: voucher.category, amountCentavos: amt, purpose: voucher.purpose });
+              setVoucher(null);
+            }}>
+              {voucherError && <div className="portal-message error full">{voucherError}</div>}
+              <label className="full">Payee<input autoFocus value={voucher.payee} onChange={(e) => setVoucher({ ...voucher, payee: e.target.value })} /></label>
+              <label>Category<input value={voucher.category} onChange={(e) => setVoucher({ ...voucher, category: e.target.value })} /></label>
+              <label>Amount (PHP)<input type="number" min="0" step="0.01" value={voucher.amount} onChange={(e) => setVoucher({ ...voucher, amount: e.target.value })} /></label>
+              <label className="full">Purpose / description<textarea rows={2} value={voucher.purpose} onChange={(e) => setVoucher({ ...voucher, purpose: e.target.value })} /></label>
+            </EditModal>
+          )}
         </section>
       )}
 
@@ -158,29 +170,33 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
       {tab === "Setup" && (
         <>
           {!canManage && <div className="portal-message error">Only Admin and Accounting can edit setup.</div>}
-          <SetupList title="Payment channels" description="Modes offered at the cashier" rows={data.paymentMethods.map((c) => ({ id: c.id, primary: c.name, secondary: `${c.requires_reference ? "Reference required" : "No reference"} · ${c.code}`, active: c.active }))}
+          <SetupList title="Payment channels" description="Modes offered at the cashier" entityLabel="payment channel"
             canManage={canManage} busy={busy}
-            onAdd={() => { const name = window.prompt("Channel name?"); if (name) void post({ action: "channel-save", name, requiresReference: window.confirm("Requires a reference number? OK = yes"), allowsProof: true }); }}
-            onEdit={(id, cur) => { const name = window.prompt("Channel name?", cur); if (name) void post({ action: "channel-save", id, name, requiresReference: window.confirm("Requires a reference number? OK = yes"), allowsProof: true }); }}
+            fields={[{ key: "name", label: "Channel name" }, { key: "requiresReference", label: "Requires a reference number", type: "checkbox" }]}
+            rows={data.paymentMethods.map((c) => ({ id: c.id, primary: c.name, secondary: `${c.requires_reference ? "Reference required" : "No reference"} · ${c.code}`, active: c.active, values: { name: c.name, requiresReference: c.requires_reference } }))}
+            onSubmit={(v, id) => post({ action: "channel-save", id, name: String(v.name), requiresReference: Boolean(v.requiresReference), allowsProof: true })}
             onArchive={(id, active, name) => post({ action: "channel-save", id, name, active: !active })} />
 
-          <SetupList title="Other charges" description="Uniform, reprinting, make-up, etc." rows={data.charges.map((c) => ({ id: c.id, primary: c.name, secondary: `Default ${pesos(c.default_amount_centavos)}`, active: c.active }))}
+          <SetupList title="Other charges" description="Uniform, reprinting, make-up, etc." entityLabel="charge"
             canManage={canManage} busy={busy}
-            onAdd={() => { const name = window.prompt("Charge name?"); if (!name) return; const amt = num(window.prompt("Default amount (PHP)?", "0")); void post({ action: "charge-save", name, defaultAmountCentavos: amt ?? 0 }); }}
-            onEdit={(id, cur) => { const name = window.prompt("Charge name?", cur); if (!name) return; const amt = num(window.prompt("Default amount (PHP)?", "0")); void post({ action: "charge-save", id, name, defaultAmountCentavos: amt ?? 0 }); }}
+            fields={[{ key: "name", label: "Charge name" }, { key: "defaultAmount", label: "Default amount (PHP)", type: "number", optional: true }]}
+            rows={data.charges.map((c) => ({ id: c.id, primary: c.name, secondary: `Default ${pesos(c.default_amount_centavos)}`, active: c.active, values: { name: c.name, defaultAmount: String(c.default_amount_centavos / 100) } }))}
+            onSubmit={(v, id) => post({ action: "charge-save", id, name: String(v.name), defaultAmountCentavos: Math.round((Number(v.defaultAmount) || 0) * 100) })}
             onArchive={(id, active, name) => post({ action: "charge-save", id, name, active: !active })} />
 
-          <SetupList title="Marketing agencies" description="Referring consultancies" rows={data.agencies.map((a) => ({ id: a.id, primary: a.name, secondary: [a.contact_name, a.email, a.mobile].filter(Boolean).join(" · ") || "—", active: a.active }))}
+          <SetupList title="Marketing agencies" description="Referring consultancies" entityLabel="agency"
             canManage={canManage} busy={busy}
-            onAdd={() => { const name = window.prompt("Agency name?"); if (name) void post({ action: "agency-save", name }); }}
-            onEdit={(id, cur) => { const name = window.prompt("Agency name?", cur); if (name) void post({ action: "agency-save", id, name }); }}
+            fields={[{ key: "name", label: "Agency name" }, { key: "contactName", label: "Contact person", optional: true }, { key: "email", label: "Email", optional: true }, { key: "mobile", label: "Mobile", optional: true }]}
+            rows={data.agencies.map((a) => ({ id: a.id, primary: a.name, secondary: [a.contact_name, a.email, a.mobile].filter(Boolean).join(" · ") || "—", active: a.active, values: { name: a.name, contactName: a.contact_name || "", email: a.email || "", mobile: a.mobile || "" } }))}
+            onSubmit={(v, id) => post({ action: "agency-save", id, name: String(v.name), contactName: String(v.contactName || ""), email: String(v.email || ""), mobile: String(v.mobile || "") })}
             onArchive={(id, active, name) => post({ action: "agency-save", id, name, active: !active })} />
 
-          <SetupList title="Monthly payables" description="Recurring bills (rent, utilities, remittances)" rows={data.payables.map((p) => ({ id: p.id, primary: p.description, secondary: `${pesos(p.amount_centavos)}${p.due_on ? ` · due ${p.due_on}` : ""}`, active: true }))}
+          <SetupList title="Monthly payables" description="Recurring bills (rent, utilities, remittances)" entityLabel="payable"
             canManage={canManage} busy={busy} removable
-            onAdd={() => { const description = window.prompt("Payable description?"); if (!description) return; const amt = num(window.prompt("Amount (PHP)?")); if (!amt) return; const dueOn = window.prompt("Due date (YYYY-MM-DD, optional)?") || null; void post({ action: "payable-save", description, amountCentavos: amt, dueOn }); }}
-            onEdit={(id, cur) => { const description = window.prompt("Payable description?", cur); if (!description) return; const amt = num(window.prompt("Amount (PHP)?")); if (!amt) return; void post({ action: "payable-save", id, description, amountCentavos: amt }); }}
-            onRemove={(id) => { if (window.confirm("Remove this payable?")) void post({ action: "payable-save", id, description: "x", remove: true }); }} />
+            fields={[{ key: "description", label: "Description" }, { key: "amount", label: "Amount (PHP)", type: "number" }, { key: "dueOn", label: "Due date (YYYY-MM-DD)", type: "date", optional: true }]}
+            rows={data.payables.map((p) => ({ id: p.id, primary: p.description, secondary: `${pesos(p.amount_centavos)}${p.due_on ? ` · due ${p.due_on}` : ""}`, active: true, values: { description: p.description, amount: String(p.amount_centavos / 100), dueOn: p.due_on || "" } }))}
+            onSubmit={(v, id) => post({ action: "payable-save", id, description: String(v.description), amountCentavos: Math.round((Number(v.amount) || 0) * 100), dueOn: String(v.dueOn || "") || null })}
+            onRemove={(id) => post({ action: "payable-save", id, description: "x", remove: true })} />
         </>
       )}
     </div>
@@ -458,15 +474,27 @@ function Reconciliation({ payments, channels }: { payments: Payment[]; channels:
   );
 }
 
-type SetupRow = { id: string; primary: string; secondary: string; active: boolean };
-function SetupList({ title, description, rows, canManage, busy, onAdd, onEdit, onArchive, onRemove, removable }: {
-  title: string; description: string; rows: SetupRow[]; canManage: boolean; busy: boolean;
-  onAdd: () => void; onEdit: (id: string, current: string) => void;
+type SetupField = { key: string; label: string; type?: "text" | "number" | "date" | "checkbox"; placeholder?: string; optional?: boolean };
+type SetupRow = { id: string; primary: string; secondary: string; active: boolean; values: Record<string, string | boolean> };
+type SetupDraft = { id?: string; values: Record<string, string | boolean> };
+function SetupList({ title, description, entityLabel, rows, canManage, busy, fields, onSubmit, onArchive, onRemove, removable }: {
+  title: string; description: string; entityLabel: string; rows: SetupRow[]; canManage: boolean; busy: boolean;
+  fields: SetupField[]; onSubmit: (values: Record<string, string | boolean>, id?: string) => Promise<void> | void;
   onArchive?: (id: string, active: boolean, name: string) => void; onRemove?: (id: string) => void; removable?: boolean;
 }) {
+  const [draft, setDraft] = useState<SetupDraft | null>(null);
+  const [error, setError] = useState("");
+  function openAdd() { const v: Record<string, string | boolean> = {}; for (const f of fields) v[f.key] = f.type === "checkbox" ? false : ""; setError(""); setDraft({ values: v }); }
+  function openEdit(row: SetupRow) { setError(""); setDraft({ id: row.id, values: { ...row.values } }); }
+  async function save() {
+    if (!draft) return;
+    for (const f of fields) { if (!f.optional && f.type !== "checkbox" && String(draft.values[f.key] ?? "").trim() === "") { setError(`${f.label} is required.`); return; } }
+    await onSubmit(draft.values, draft.id);
+    setDraft(null);
+  }
   return (
     <section className="portal-panel">
-      <div className="panel-heading"><div><h2>{title}</h2><p>{description}</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={onAdd}>+ Add</button>}</div>
+      <div className="panel-heading"><div><h2>{title}</h2><p>{description}</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={openAdd}>+ Add</button>}</div>
       <div className="portal-table"><table><thead><tr><th>Name</th><th>Details</th><th>Status</th><th></th></tr></thead><tbody>
         {rows.map((row) => (
           <tr key={row.id} className={row.active ? "" : "row-muted"}>
@@ -474,14 +502,26 @@ function SetupList({ title, description, rows, canManage, busy, onAdd, onEdit, o
             <td>{row.secondary}</td>
             <td>{row.active ? "Active" : "Archived"}</td>
             <td className="document-actions">
-              {canManage && <button onClick={() => onEdit(row.id, row.primary)} disabled={busy}>Edit</button>}
-              {canManage && removable && onRemove && <button onClick={() => onRemove(row.id)} disabled={busy}>Remove</button>}
+              {canManage && <button onClick={() => openEdit(row)} disabled={busy}>Edit</button>}
+              {canManage && removable && onRemove && <button onClick={() => { if (window.confirm(`Remove this ${entityLabel}?`)) onRemove(row.id); }} disabled={busy}>Remove</button>}
               {canManage && !removable && onArchive && <button onClick={() => onArchive(row.id, row.active, row.primary)} disabled={busy}>{row.active ? "Archive" : "Restore"}</button>}
             </td>
           </tr>
         ))}
         {!rows.length && <tr><td colSpan={4}><span className="portal-empty-copy">Nothing yet.</span></td></tr>}
       </tbody></table></div>
+      {draft && (
+        <EditModal title={`${draft.id ? "Edit" : "Add"} ${entityLabel}`} busy={busy} onClose={() => setDraft(null)} onSave={save}>
+          {error && <div className="portal-message error full">{error}</div>}
+          {fields.map((f) => f.type === "checkbox" ? (
+            <label key={f.key} className="portal-check full"><input type="checkbox" checked={Boolean(draft.values[f.key])} onChange={(e) => setDraft({ ...draft, values: { ...draft.values, [f.key]: e.target.checked } })} /><span>{f.label}</span></label>
+          ) : (
+            <label key={f.key} className={f.type === "number" ? "" : "full"}>{f.label}
+              <input type={f.type === "number" ? "number" : f.type === "date" ? "date" : "text"} {...(f.type === "number" ? { min: "0", step: "0.01" } : {})} placeholder={f.placeholder} value={String(draft.values[f.key] ?? "")} onChange={(e) => setDraft({ ...draft, values: { ...draft.values, [f.key]: e.target.value } })} />
+            </label>
+          ))}
+        </EditModal>
+      )}
     </section>
   );
 }
