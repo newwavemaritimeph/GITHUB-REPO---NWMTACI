@@ -15,6 +15,7 @@ const input=z.discriminatedUnion("action",[
   z.object({action:z.literal("set-user-role"),userId:z.string().uuid(),roleCode:z.enum(["admin","registration","cashier","accounting","training_operations","hr","instructor"])}),
   z.object({action:z.literal("grant-role-by-email"),email:z.string().email(),completeName:z.string().trim().max(160).optional(),roleCode:z.enum(["admin","registration","cashier","accounting","training_operations","hr","instructor"])}),
   z.object({action:z.literal("remove-user"),userId:z.string().uuid()}),
+  z.object({action:z.literal("create-user"),email:z.string().email(),password:z.string().min(6).max(200),completeName:z.string().trim().min(2).max(160),roleCode:z.enum(["admin","registration","cashier","accounting","training_operations","hr","instructor"]),position:z.string().trim().max(120).optional()}),
 ]);
 const slug=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,50);
 
@@ -62,6 +63,25 @@ export async function POST(request:Request){const staff=await requireStaff(["adm
     const del=await db.from("user_roles").delete().eq("user_id",authUser.id);if(del.error)throw del.error;
     const ins=await db.from("user_roles").insert({user_id:authUser.id,role_id:role.id,assigned_by:staff.user.id});if(ins.error)throw ins.error;
     record={userId:authUser.id,email:value.email,role:value.roleCode}}
+  else if(value.action==="create-user"){
+    // Create the Supabase Auth login AND the portal profile/role in one step,
+    // server-side via the service role. The plaintext password is used only to
+    // create the account (Supabase stores a hash) and is never persisted or
+    // logged by this app.
+    const created=await db.auth.admin.createUser({email:value.email,password:value.password,email_confirm:true,user_metadata:{complete_name:value.completeName}});
+    if(created.error||!created.data.user)throw new Error(created.error?.message?.includes("registered")?"That email already has a login. Use “Add or change a user by email” to assign its role instead.":created.error?.message??"Could not create the account.");
+    const uid=created.data.user.id;
+    const up=await db.from("profiles").upsert({id:uid,email:value.email,complete_name:value.completeName,account_state:"Active"});if(up.error)throw up.error;
+    const {data:role}=await db.from("roles").select("id").eq("code",value.roleCode).single();if(!role)throw new Error("Role not found.");
+    const ins=await db.from("user_roles").upsert({user_id:uid,role_id:role.id,assigned_by:staff.user.id});if(ins.error)throw ins.error;
+    if(value.position){
+      const {data:employeeNumber,error:numErr}=await db.rpc("next_reference",{prefix:"EMP",requested_year:new Date().getFullYear()});
+      if(numErr)throw numErr;
+      const emp=await db.from("employees").insert({profile_id:uid,employee_number:employeeNumber,complete_name:value.completeName,position:value.position,date_hired:new Date().toISOString().slice(0,10),pay_type:"Monthly",work_email:value.email});
+      if(emp.error)throw emp.error;
+    }
+    record={userId:uid,email:value.email,role:value.roleCode};
+  }
   else if(value.action==="remove-user"){
     // Revoke portal access (soft): strip roles and deactivate the profile. The
     // Supabase login is left intact — delete it in the dashboard if truly needed.
