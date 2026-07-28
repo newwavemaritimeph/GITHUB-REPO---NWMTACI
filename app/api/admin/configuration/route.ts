@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const input=z.discriminatedUnion("action",[
   z.object({action:z.literal("payment-method"),name:z.string().trim().min(2).max(80),requiresReference:z.boolean(),allowsProof:z.boolean()}),
@@ -17,7 +18,24 @@ const input=z.discriminatedUnion("action",[
 ]);
 const slug=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,50);
 
-export async function GET(){const staff=await requireStaff(["admin"]);if(!staff)return NextResponse.json({error:"Admin access required."},{status:403});const db=createSupabaseAdminClient(),results=await Promise.all([db.from("payment_methods").select("*").order("sort_order"),db.from("marketing_agencies").select("*").order("name"),db.from("partner_centers").select("*").order("name"),db.from("courses").select("id,code,name,category_id,delivery_type,duration_label,duration_days,training_mode,standard_price_centavos,active").order("name"),db.from("partner_course_offers").select("id,course_id,partner_center_id,duration_label,training_fee_centavos,rebate_centavos,partner_payable_centavos,partner_centers(name),courses(name)").eq("active",true),db.from("course_categories").select("id,name").eq("active",true).order("sort_order"),db.from("employees").select("id,complete_name,position,work_email,profile_id,active").eq("active",true).order("complete_name"),db.from("profiles").select("id,email,complete_name,account_state").order("complete_name"),db.from("user_roles").select("user_id,roles(code)")]);const error=results.find(r=>r.error)?.error;if(error)return NextResponse.json({error:error.message},{status:500});
+export async function GET(){const staff=await requireStaff(["admin"]);
+  if(!staff){
+    // Self-diagnostic: report who is signed in and what roles the DB actually
+    // holds for them (read via service role so RLS can't hide the truth).
+    let debug:{userId:string|null;email:string|null;roles:string[]}|undefined;
+    try{
+      const server=await createSupabaseServerClient();
+      const {data:{user}}=await server.auth.getUser();
+      if(user){
+        const admin=createSupabaseAdminClient();
+        const {data}=await admin.from("user_roles").select("roles(code)").eq("user_id",user.id);
+        const roles=((data??[]) as {roles?:{code?:string}|{code?:string}[]|null}[]).flatMap(r=>{const rr=r.roles;return Array.isArray(rr)?rr.map(x=>x.code??""):rr?[rr.code??""]:[]}).filter(Boolean);
+        debug={userId:user.id,email:user.email??null,roles};
+      } else debug={userId:null,email:null,roles:[]};
+    }catch{/* diagnostics are best-effort */}
+    return NextResponse.json({error:"Admin access required.",debug},{status:403});
+  }
+  const db=createSupabaseAdminClient(),results=await Promise.all([db.from("payment_methods").select("*").order("sort_order"),db.from("marketing_agencies").select("*").order("name"),db.from("partner_centers").select("*").order("name"),db.from("courses").select("id,code,name,category_id,delivery_type,duration_label,duration_days,training_mode,standard_price_centavos,active").order("name"),db.from("partner_course_offers").select("id,course_id,partner_center_id,duration_label,training_fee_centavos,rebate_centavos,partner_payable_centavos,partner_centers(name),courses(name)").eq("active",true),db.from("course_categories").select("id,name").eq("active",true).order("sort_order"),db.from("employees").select("id,complete_name,position,work_email,profile_id,active").eq("active",true).order("complete_name"),db.from("profiles").select("id,email,complete_name,account_state").order("complete_name"),db.from("user_roles").select("user_id,roles(code)")]);const error=results.find(r=>r.error)?.error;if(error)return NextResponse.json({error:error.message},{status:500});
   const roleBy=new Map<string,string[]>();for(const ur of (results[8].data??[]) as {user_id:string;roles?:{code:string}|{code:string}[]|null}[]){const codes=Array.isArray(ur.roles)?ur.roles.map(r=>r.code):ur.roles?[ur.roles.code]:[];roleBy.set(ur.user_id,[...(roleBy.get(ur.user_id)??[]),...codes])}
   const empBy=new Map<string,string>();for(const e of (results[6].data??[]) as {profile_id?:string|null;position:string}[])if(e.profile_id)empBy.set(e.profile_id,e.position);
   const users=((results[7].data??[]) as {id:string;email:string;complete_name:string;account_state:string}[]).map(p=>({id:p.id,email:p.email,completeName:p.complete_name,accountState:p.account_state,roles:roleBy.get(p.id)??[],position:empBy.get(p.id)??null}));
