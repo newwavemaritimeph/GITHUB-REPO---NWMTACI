@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -21,18 +22,24 @@ const slug=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g,"_").replac
 
 export async function GET(){const staff=await requireStaff(["admin"]);
   if(!staff){
-    // Self-diagnostic: report who is signed in and what roles the DB actually
-    // holds for them (read via service role so RLS can't hide the truth).
-    let debug:{userId:string|null;email:string|null;roles:string[]}|undefined;
+    // Self-diagnostic: report which cookies the route received, who is signed
+    // in, and what roles the DB actually holds (read via service role so RLS
+    // can't hide the truth). Surfaces whether the failure is session vs role.
+    let debug:{userId:string|null;email:string|null;roles:string[];totalCookies:number;authCookies:string[]}|undefined;
     try{
+      const jar=await cookies();
+      const names=jar.getAll().map(c=>c.name);
+      const authCookies=names.filter(n=>n.startsWith("sb-")||n.includes("auth-token"));
       const server=await createSupabaseServerClient();
       const {data:{user}}=await server.auth.getUser();
+      let userId:string|null=null,email:string|null=null,roles:string[]=[];
       if(user){
+        userId=user.id;email=user.email??null;
         const admin=createSupabaseAdminClient();
         const {data}=await admin.from("user_roles").select("roles(code)").eq("user_id",user.id);
-        const roles=((data??[]) as {roles?:{code?:string}|{code?:string}[]|null}[]).flatMap(r=>{const rr=r.roles;return Array.isArray(rr)?rr.map(x=>x.code??""):rr?[rr.code??""]:[]}).filter(Boolean);
-        debug={userId:user.id,email:user.email??null,roles};
-      } else debug={userId:null,email:null,roles:[]};
+        roles=((data??[]) as {roles?:{code?:string}|{code?:string}[]|null}[]).flatMap(r=>{const rr=r.roles;return Array.isArray(rr)?rr.map(x=>x.code??""):rr?[rr.code??""]:[]}).filter(Boolean);
+      }
+      debug={userId,email,roles,totalCookies:names.length,authCookies};
     }catch{/* diagnostics are best-effort */}
     return NextResponse.json({error:"Admin access required.",debug},{status:403});
   }
