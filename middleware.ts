@@ -33,7 +33,10 @@ export async function middleware(request: NextRequest) {
 
   // IMPORTANT: refresh the auth token. Do not add logic between creating the
   // client and calling getUser(), per @supabase/ssr guidance.
-  await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
+
+  // Verification stamp: proves the middleware executed and whether it saw a user.
+  response.headers.set("x-nwm-mw", user ? "user" : "anon");
 
   return response;
 }
