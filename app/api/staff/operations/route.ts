@@ -56,6 +56,8 @@ const notificationInput = z.object({ action: z.literal("mark-notifications-read"
 const channelInput = z.object({ action: z.literal("channel-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), code: z.string().trim().max(40).optional(), requiresReference: z.boolean().default(false), allowsProof: z.boolean().default(true), active: z.boolean().optional() });
 const chargeInput = z.object({ action: z.literal("charge-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), defaultAmountCentavos: z.number().int().nonnegative().default(0), active: z.boolean().optional() });
 const expenseCategoryInput = z.object({ action: z.literal("expense-category-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), active: z.boolean().optional(), remove: z.boolean().optional() });
+const inventoryItemInput = z.object({ action: z.literal("inventory-item-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), category: z.string().trim().max(80).optional(), unit: z.string().trim().min(1).max(24).default("pc"), unitValueCentavos: z.number().int().nonnegative().default(0), active: z.boolean().optional(), remove: z.boolean().optional() });
+const inventoryMoveInput = z.object({ action: z.literal("inventory-move"), itemId: z.string().uuid(), movementType: z.enum(["in", "out"]), quantity: z.number().int().positive(), remarks: z.string().trim().max(240).optional() });
 const agencyInput = z.object({ action: z.literal("agency-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), contactName: z.string().trim().max(120).optional(), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
 const payableInput = z.object({ action: z.literal("payable-save"), id: z.string().uuid().nullable().optional(), description: z.string().trim().min(1).max(200), amountCentavos: z.number().int().positive().optional(), dueOn: z.string().date().nullable().optional(), remove: z.boolean().optional() });
 const expenseCreateInput = z.object({ action: z.literal("expense-create"), payee: z.string().trim().min(1).max(120), category: z.string().trim().min(1).max(80), amountCentavos: z.number().int().positive(), purpose: z.string().trim().min(1).max(300) });
@@ -92,7 +94,7 @@ const paymentSplitInput = z.object({ action: z.literal("payment-split"), allocat
 const courseChangeInput = z.object({ action: z.literal("enrollment-course-change"), enrollmentId: z.string().uuid(), courseId: z.string().uuid(), partnerOfferId: z.string().uuid().nullable().optional() });
 const rescheduleInput = z.object({ action: z.literal("enrollment-reschedule"), enrollmentId: z.string().uuid(), batchId: z.string().uuid().nullable() });
 
-const actionInput = z.union([batchInput, autoOpenBatchInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput]);
+const actionInput = z.union([batchInput, autoOpenBatchInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
@@ -129,11 +131,13 @@ export async function GET() {
     db.from("agency_course_rebates").select("id,agency_id,course_id,rebate_centavos"),
     db.from("agency_rebates").select("id,agency_id,enrollment_id,course_id,rebate_centavos,status,created_at,marketing_agencies(name),courses(name),trainees(legal_first_name,legal_last_name)").order("created_at", { ascending: false }).limit(300),
     db.from("expense_categories").select("id,name,active").order("name"),
+    db.from("inventory_items").select("id,name,category,unit,quantity_on_hand,unit_value_centavos,active").order("name"),
+    db.from("inventory_movements").select("id,item_id,movement_type,quantity,remarks,created_at,inventory_items(name)").order("created_at", { ascending: false }).limit(200),
   ]);
   const error = results.find((item) => item.error)?.error;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const [profile, courses, offers, trainees, batches, enrollmentsResult, payments, allocations, notifications,
-    paymentMethods, charges, agencies, expenses, payables, cashierClosings, enrollmentCharges, classrooms, courseCategories, partnerCenters, agencyCourseRebates, agencyRebates, expenseCategories] = results;
+    paymentMethods, charges, agencies, expenses, payables, cashierClosings, enrollmentCharges, classrooms, courseCategories, partnerCenters, agencyCourseRebates, agencyRebates, expenseCategories, inventoryItems, inventoryMovements] = results;
   const paidByEnrollment = new Map<string, number>();
   for (const allocation of allocations.data ?? []) paidByEnrollment.set(allocation.enrollment_id, (paidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
   const chargesByEnrollment = new Map<string, number>();
@@ -170,7 +174,7 @@ export async function GET() {
     expenses: expenses.data ?? [], payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems,
     classrooms: classrooms.data ?? [], certificates, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [] }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [] }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -208,6 +212,21 @@ export async function POST(request: Request) {
       const { error } = input.id ? await admin.from("expense_categories").update(row).eq("id", input.id) : await admin.from("expense_categories").insert(row);
       if (error) throw error;
       return NextResponse.json({ ok: true });
+    }
+    if (input.action === "inventory-item-save") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage inventory." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      if (input.remove && input.id) { const { error } = await admin.from("inventory_items").delete().eq("id", input.id); if (error) throw error; return NextResponse.json({ ok: true }); }
+      const row = { name: input.name, category: input.category ?? null, unit: input.unit, unit_value_centavos: input.unitValueCentavos, ...(input.active !== undefined ? { active: input.active } : {}) };
+      const { error } = input.id ? await admin.from("inventory_items").update(row).eq("id", input.id) : await admin.from("inventory_items").insert(row);
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "inventory-move") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage inventory." }, { status: 403 });
+      const { data, error } = await db.rpc("record_inventory_movement", { target_item: input.itemId, target_type: input.movementType, target_quantity: input.quantity, target_remarks: input.remarks ?? null });
+      if (error) throw error;
+      return NextResponse.json({ ok: true, item: data });
     }
     if (input.action === "agency-save") {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage agencies." }, { status: 403 });

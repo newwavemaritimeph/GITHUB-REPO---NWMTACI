@@ -21,12 +21,15 @@ type Category = { id: string; name: string };
 type Center = { id: string; name: string; active: boolean };
 type AgencyRebate = { id: string; agency_id: string; course_id: string; rebate_centavos: number };
 type AgencyRebateEntry = { id: string; agency_id: string; enrollment_id: string; course_id: string; rebate_centavos: number; status: string; created_at: string; marketing_agencies?: { name: string } | { name: string }[] | null; courses?: { name: string } | { name: string }[] | null; trainees?: { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null };
+type InventoryItem = { id: string; name: string; category?: string | null; unit: string; quantity_on_hand: number; unit_value_centavos: number; active: boolean };
+type InventoryMovement = { id: string; item_id: string; movement_type: string; quantity: number; remarks?: string | null; created_at: string; inventory_items?: { name: string } | { name: string }[] | null };
 export type AccountingData = {
   payments: Payment[]; enrollments: Enrollment[]; paymentMethods: Channel[];
   charges: Charge[]; agencies: Agency[]; expenses: Expense[]; payables: Payable[];
   courses: Course[]; offers: Offer[]; courseCategories: Category[]; partnerCenters: Center[];
   agencyCourseRebates: AgencyRebate[]; agencyRebates: AgencyRebateEntry[];
   expenseCategories: { id: string; name: string; active: boolean }[];
+  inventoryItems: InventoryItem[]; inventoryMovements: InventoryMovement[];
 };
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -42,7 +45,7 @@ function rangeFor(span: "Daily" | "Weekly" | "Monthly"): { from: string; to: str
 const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0 }).format((Number(centavos) || 0) / 100);
 
 export function LiveAccounting({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
-  const [tab, setTab] = useState<"Overview" | "Sales" | "Reconciliation" | "Setup">("Overview");
+  const [tab, setTab] = useState<"Overview" | "Sales" | "Reconciliation" | "Inventory" | "Setup">("Overview");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const canManage = role === "admin" || role === "accounting";
@@ -81,7 +84,7 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         <div><span className="portal-eyebrow">Financial control</span><h1>Accounting</h1><p>Collections, disbursements, receivables, and setup — from the live Supabase ledger.</p></div>
       </div>
       <div className="portal-tabs">
-        {(["Overview", "Sales", "Reconciliation", "Setup"] as const).map((item) => (
+        {(["Overview", "Sales", "Reconciliation", "Inventory", "Setup"] as const).map((item) => (
           <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>
         ))}
       </div>
@@ -127,6 +130,8 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
       {tab === "Sales" && <SalesReport payments={data.payments} payables={data.payables} />}
 
       {tab === "Reconciliation" && <Reconciliation payments={data.payments} channels={data.paymentMethods} />}
+
+      {tab === "Inventory" && <Inventory data={data} canManage={canManage} busy={busy} post={post} />}
 
       {tab === "Setup" && (
         <>
@@ -541,6 +546,70 @@ function Reconciliation({ payments, channels }: { payments: Payment[]; channels:
             </tbody></table></div>
           </section>
         </>
+      )}
+    </>
+  );
+}
+
+/* ---- Inventory — items + stock in/out movements ---- */
+function Inventory({ data, canManage, busy, post }: { data: AccountingData; canManage: boolean; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
+  const [edit, setEdit] = useState<{ id?: string; name: string; category: string; unit: string; unitValue: string } | null>(null);
+  const [move, setMove] = useState<{ item: InventoryItem; type: "in" | "out"; quantity: string; remarks: string } | null>(null);
+  const [error, setError] = useState("");
+  const totalValue = data.inventoryItems.reduce((s, i) => s + Number(i.quantity_on_hand) * Number(i.unit_value_centavos), 0);
+  async function saveItem() {
+    if (!edit) return;
+    if (edit.name.trim().length < 1) { setError("Item name is required."); return; }
+    const cents = Math.round(Number(edit.unitValue || "0") * 100);
+    if (!Number.isFinite(cents) || cents < 0) { setError("Enter a valid unit value."); return; }
+    await post({ action: "inventory-item-save", id: edit.id ?? null, name: edit.name, category: edit.category, unit: edit.unit || "pc", unitValueCentavos: cents });
+    setEdit(null);
+  }
+  async function saveMove() {
+    if (!move) return;
+    const qty = Math.round(Number(move.quantity));
+    if (!Number.isInteger(qty) || qty <= 0) { setError("Enter a whole quantity greater than zero."); return; }
+    await post({ action: "inventory-move", itemId: move.item.id, movementType: move.type, quantity: qty, remarks: move.remarks });
+    setMove(null);
+  }
+  return (
+    <>
+      {!canManage && <div className="portal-message error">Only Admin and Accounting can manage inventory.</div>}
+      <div className="finance-hero">
+        <div><span>Inventory value</span><strong>{pesos(totalValue)}</strong><small>{data.inventoryItems.length} items</small></div>
+        <article><span>Low stock</span><strong>{data.inventoryItems.filter((i) => i.active && i.quantity_on_hand <= 5).length}</strong><small>≤ 5 on hand</small></article>
+        <article><span>Movements</span><strong>{data.inventoryMovements.length}</strong><small>recent in/out</small></article>
+      </div>
+      <section className="portal-panel">
+        <div className="panel-heading"><div><h2>Items</h2><p>Stock on hand and value</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => { setError(""); setEdit({ name: "", category: "", unit: "pc", unitValue: "0" }); }}>+ Add item</button>}</div>
+        <div className="portal-table"><table><thead><tr><th>Item</th><th>Unit</th><th>On hand</th><th>Unit value</th><th>Total</th>{canManage && <th></th>}</tr></thead><tbody>
+          {data.inventoryItems.map((i) => <tr key={i.id} className={i.active ? "" : "row-muted"}><td><strong>{i.name}</strong><small>{i.category || "—"}</small></td><td>{i.unit}</td><td><strong>{i.quantity_on_hand}</strong></td><td>{pesos(i.unit_value_centavos)}</td><td>{pesos(Number(i.quantity_on_hand) * Number(i.unit_value_centavos))}</td>{canManage && <td className="document-actions"><button disabled={busy} onClick={() => { setError(""); setMove({ item: i, type: "in", quantity: "", remarks: "" }); }}>Stock in</button><button disabled={busy} onClick={() => { setError(""); setMove({ item: i, type: "out", quantity: "", remarks: "" }); }}>Stock out</button><button disabled={busy} onClick={() => { setError(""); setEdit({ id: i.id, name: i.name, category: i.category || "", unit: i.unit, unitValue: String(i.unit_value_centavos / 100) }); }}>Edit</button><button disabled={busy} onClick={() => { if (window.confirm("Remove this item and its movement history?")) post({ action: "inventory-item-save", id: i.id, name: i.name, remove: true }); }}>Remove</button></td>}</tr>)}
+          {!data.inventoryItems.length && <tr><td colSpan={canManage ? 6 : 5}><span className="portal-empty-copy">No items yet.</span></td></tr>}
+        </tbody></table></div>
+      </section>
+      <section className="portal-panel">
+        <div className="panel-heading"><div><h2>Recent movements</h2><p>Stock in / out history</p></div></div>
+        <div className="portal-table"><table><thead><tr><th>Item</th><th>Type</th><th>Qty</th><th>Remarks</th><th>When</th></tr></thead><tbody>
+          {data.inventoryMovements.slice(0, 60).map((m) => <tr key={m.id}><td><strong>{one(m.inventory_items)?.name ?? "—"}</strong></td><td>{m.movement_type === "in" ? "Stock in" : "Stock out"}</td><td>{m.movement_type === "in" ? "+" : "−"}{m.quantity}</td><td>{m.remarks || "—"}</td><td>{manilaDay(m.created_at)}</td></tr>)}
+          {!data.inventoryMovements.length && <tr><td colSpan={5}><span className="portal-empty-copy">No movements yet.</span></td></tr>}
+        </tbody></table></div>
+      </section>
+      {edit && (
+        <EditModal title={edit.id ? "Edit item" : "Add item"} busy={busy} onClose={() => setEdit(null)} onSave={saveItem} saveLabel={edit.id ? "Save changes" : "Add item"}>
+          {error && <div className="portal-message error full">{error}</div>}
+          <label className="full">Item name<input autoFocus value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} /></label>
+          <label>Category<input value={edit.category} onChange={(e) => setEdit({ ...edit, category: e.target.value })} placeholder="e.g. Supplies" /></label>
+          <label>Unit<input value={edit.unit} onChange={(e) => setEdit({ ...edit, unit: e.target.value })} placeholder="pc / ream / box" /></label>
+          <label>Unit value (PHP)<input type="number" min="0" step="0.01" value={edit.unitValue} onChange={(e) => setEdit({ ...edit, unitValue: e.target.value })} /></label>
+          <p className="portal-form-note full">Quantity on hand changes only through stock-in / stock-out movements.</p>
+        </EditModal>
+      )}
+      {move && (
+        <EditModal title={move.type === "in" ? "Stock in" : "Stock out"} subtitle={`${move.item.name} · ${move.item.quantity_on_hand} on hand`} busy={busy} onClose={() => setMove(null)} onSave={saveMove} saveLabel={move.type === "in" ? "Add stock" : "Issue stock"}>
+          {error && <div className="portal-message error full">{error}</div>}
+          <label>Quantity<input autoFocus type="number" min="1" step="1" value={move.quantity} onChange={(e) => setMove({ ...move, quantity: e.target.value })} /></label>
+          <label className="full">Remarks<input value={move.remarks} onChange={(e) => setMove({ ...move, remarks: e.target.value })} placeholder="Optional" /></label>
+        </EditModal>
       )}
     </>
   );

@@ -29,6 +29,7 @@ type PortalData = { profile:{complete_name:string;email:string}; roles:string[];
   classrooms:TrainingData["classrooms"]; certificates:TrainingData["certificates"];
   agencyCourseRebates:{id:string;agency_id:string;course_id:string;rebate_centavos:number}[]; agencyRebates:{id:string;agency_id:string;enrollment_id:string;course_id:string;rebate_centavos:number;status:string;created_at:string;marketing_agencies?:{name:string}|{name:string}[]|null;courses?:{name:string}|{name:string}[]|null;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null}[];
   expenseCategories:{id:string;name:string;active:boolean}[];
+  inventoryItems:{id:string;name:string;category?:string|null;unit:string;quantity_on_hand:number;unit_value_centavos:number;active:boolean}[]; inventoryMovements:{id:string;item_id:string;movement_type:string;quantity:number;remarks?:string|null;created_at:string;inventory_items?:{name:string}|{name:string}[]|null}[];
   courseCategories:{id:string;name:string}[]; partnerCenters:{id:string;name:string;active:boolean}[] };
 
 const nav: {label:Module;icon:string;roles?:string[]}[] = [
