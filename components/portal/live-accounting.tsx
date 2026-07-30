@@ -47,7 +47,7 @@ function rangeFor(span: "Daily" | "Weekly" | "Monthly"): { from: string; to: str
 const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0 }).format((Number(centavos) || 0) / 100);
 
 export function LiveAccounting({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
-  const [tab, setTab] = useState<"Overview" | "Sales" | "Reconciliation" | "Inventory" | "Vouchers" | "Cashier closing" | "Setup">(role === "admin" || role === "accounting" ? "Overview" : "Vouchers");
+  const [tab, setTab] = useState<"Overview" | "Sales" | "Reconciliation" | "Inventory" | "Expenses" | "Cashier closing" | "Setup">(role === "admin" || role === "accounting" ? "Overview" : "Expenses");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const canManage = role === "admin" || role === "accounting";
@@ -86,7 +86,7 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         <div><span className="portal-eyebrow">Financial control</span><h1>Accounting</h1><p>Collections, disbursements, receivables, and setup — from the live Supabase ledger.</p></div>
       </div>
       <div className="portal-tabs">
-        {(canManage ? ["Overview", "Sales", "Reconciliation", "Inventory", "Vouchers", "Cashier closing", "Setup"] : ["Vouchers", "Cashier closing"]).map((item) => (
+        {(canManage ? ["Overview", "Sales", "Reconciliation", "Inventory", "Expenses", "Cashier closing", "Setup"] : ["Expenses", "Cashier closing"]).map((item) => (
           <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item as typeof tab)}>{item}</button>
         ))}
       </div>
@@ -135,7 +135,27 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
 
       {tab === "Inventory" && <Inventory data={data} canManage={canManage} busy={busy} post={post} />}
 
-      {tab === "Vouchers" && <LiveVouchers data={data} role={role} reload={reload} />}
+      {tab === "Expenses" && (
+        <>
+          <LiveVouchers data={data} role={role} reload={reload} />
+          {canManage && (
+            <>
+              <SetupList title="Expense categories" description="Categories for expense vouchers (Utilities, Salary, Government…)" entityLabel="category"
+                canManage={canManage} busy={busy} removable
+                fields={[{ key: "name", label: "Category name" }]}
+                rows={data.expenseCategories.map((c) => ({ id: c.id, primary: c.name, secondary: c.active ? "Active" : "Archived", active: c.active, values: { name: c.name } }))}
+                onSubmit={(v, id) => post({ action: "expense-category-save", id, name: String(v.name) })}
+                onRemove={(id) => post({ action: "expense-category-save", id, name: "x", remove: true })} />
+              <SetupList title="Monthly payables" description="Recurring bills (rent, utilities, remittances)" entityLabel="payable"
+                canManage={canManage} busy={busy} removable
+                fields={[{ key: "description", label: "Description" }, { key: "amount", label: "Amount (PHP)", type: "number" }, { key: "dueOn", label: "Due date (YYYY-MM-DD)", type: "date", optional: true }]}
+                rows={data.payables.map((p) => ({ id: p.id, primary: p.description, secondary: `${pesos(p.amount_centavos)}${p.due_on ? ` · due ${p.due_on}` : ""}`, active: true, values: { description: p.description, amount: String(p.amount_centavos / 100), dueOn: p.due_on || "" } }))}
+                onSubmit={(v, id) => post({ action: "payable-save", id, description: String(v.description), amountCentavos: Math.round((Number(v.amount) || 0) * 100), dueOn: String(v.dueOn || "") || null })}
+                onRemove={(id) => post({ action: "payable-save", id, description: "x", remove: true })} />
+            </>
+          )}
+        </>
+      )}
 
       {tab === "Cashier closing" && <LiveCashierClosing data={data as unknown as ClosingData} reload={reload} />}
 
@@ -166,19 +186,6 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
 
           <AgencyRebatesEditor data={data} canManage={canManage} busy={busy} post={post} />
 
-          <SetupList title="Expense categories" description="Categories for expense vouchers (Utilities, Salary, Government…)" entityLabel="category"
-            canManage={canManage} busy={busy} removable
-            fields={[{ key: "name", label: "Category name" }]}
-            rows={data.expenseCategories.map((c) => ({ id: c.id, primary: c.name, secondary: c.active ? "Active" : "Archived", active: c.active, values: { name: c.name } }))}
-            onSubmit={(v, id) => post({ action: "expense-category-save", id, name: String(v.name) })}
-            onRemove={(id) => post({ action: "expense-category-save", id, name: "x", remove: true })} />
-
-          <SetupList title="Monthly payables" description="Recurring bills (rent, utilities, remittances)" entityLabel="payable"
-            canManage={canManage} busy={busy} removable
-            fields={[{ key: "description", label: "Description" }, { key: "amount", label: "Amount (PHP)", type: "number" }, { key: "dueOn", label: "Due date (YYYY-MM-DD)", type: "date", optional: true }]}
-            rows={data.payables.map((p) => ({ id: p.id, primary: p.description, secondary: `${pesos(p.amount_centavos)}${p.due_on ? ` · due ${p.due_on}` : ""}`, active: true, values: { description: p.description, amount: String(p.amount_centavos / 100), dueOn: p.due_on || "" } }))}
-            onSubmit={(v, id) => post({ action: "payable-save", id, description: String(v.description), amountCentavos: Math.round((Number(v.amount) || 0) * 100), dueOn: String(v.dueOn || "") || null })}
-            onRemove={(id) => post({ action: "payable-save", id, description: "x", remove: true })} />
         </>
       )}
     </div>
