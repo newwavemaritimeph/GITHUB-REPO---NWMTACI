@@ -5,8 +5,9 @@ import { parseCsv, downloadCsv } from "@/lib/csv";
 import { LiveCashierClosing, type ClosingData } from "./live-cashier-closing";
 
 /** Loose shapes for the accounting slices of the staff-operations payload. */
-type Payment = { payment_number?: string; method: string; amount_centavos: number; reference_number?: string | null; received_at?: string; verification_state: string };
-type Enrollment = { id: string; enrollment_number: string; selling_price_centavos: number; paid_centavos: number; charges_centavos?: number; discounts_centavos?: number; enrollment_status: string; trainees?: unknown; courses?: unknown };
+type Payment = { payment_number?: string; method: string; amount_centavos: number; reference_number?: string | null; received_at?: string; verification_state: string; trainee_id?: string };
+type Enrollment = { id: string; enrollment_number: string; trainee_id?: string; selling_price_centavos: number; paid_centavos: number; charges_centavos?: number; discounts_centavos?: number; enrollment_status: string; trainees?: unknown; courses?: unknown };
+type TraineeRow = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; srn?: string | null; email?: string | null; mobile?: string | null };
 /** Amount due = base price + other charges − rebates/discounts. */
 const dueOf = (e: Enrollment) => Number(e.selling_price_centavos) + Number(e.charges_centavos ?? 0) - Number(e.discounts_centavos ?? 0);
 type Channel = { id: string; code: string; name: string; requires_reference: boolean; allows_proof: boolean; active: boolean };
@@ -32,6 +33,7 @@ export type AccountingData = {
   expenseCategories: { id: string; name: string; active: boolean }[];
   inventoryItems: InventoryItem[]; inventoryMovements: InventoryMovement[];
   cashierClosings: { id: string; closing_date: string; opening_cash_centavos: number; cash_collections_centavos: number; online_collections_centavos: number; expenses_centavos: number; expected_cash_centavos: number; actual_cash_centavos?: number | null; variance_centavos?: number | null; status: string }[];
+  trainees: TraineeRow[];
 };
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -47,7 +49,7 @@ function rangeFor(span: "Daily" | "Weekly" | "Monthly"): { from: string; to: str
 const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0 }).format((Number(centavos) || 0) / 100);
 
 export function LiveAccounting({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
-  const [tab, setTab] = useState<"Overview" | "Sales" | "Reconciliation" | "Inventory" | "Expenses" | "Cashier closing" | "Setup">(role === "admin" || role === "accounting" ? "Overview" : "Expenses");
+  const [tab, setTab] = useState<"Overview" | "Sales" | "Reconciliation" | "Trainees" | "Inventory" | "Expenses" | "Cashier closing" | "Setup">(role === "admin" || role === "accounting" ? "Overview" : "Expenses");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const canManage = role === "admin" || role === "accounting";
@@ -86,7 +88,7 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         <div><span className="portal-eyebrow">Financial control</span><h1>Accounting</h1><p>Collections, disbursements, receivables, and setup — from the live Supabase ledger.</p></div>
       </div>
       <div className="portal-tabs">
-        {(canManage ? ["Overview", "Sales", "Reconciliation", "Inventory", "Expenses", "Cashier closing", "Setup"] : ["Expenses", "Cashier closing"]).map((item) => (
+        {(canManage ? ["Overview", "Sales", "Reconciliation", "Trainees", "Inventory", "Expenses", "Cashier closing", "Setup"] : ["Expenses", "Cashier closing"]).map((item) => (
           <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item as typeof tab)}>{item}</button>
         ))}
       </div>
@@ -132,6 +134,8 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
       {tab === "Sales" && <SalesReport payments={data.payments} payables={data.payables} />}
 
       {tab === "Reconciliation" && <Reconciliation payments={data.payments} channels={data.paymentMethods} />}
+
+      {tab === "Trainees" && <TraineeLookup data={data} />}
 
       {tab === "Inventory" && <Inventory data={data} canManage={canManage} busy={busy} post={post} />}
 
@@ -556,6 +560,54 @@ function Reconciliation({ payments, channels }: { payments: Payment[]; channels:
             <div className="portal-table"><table><thead><tr><th>Reference</th><th>Amount</th><th>Date</th><th>Via</th><th>Payment</th></tr></thead><tbody>
               {result.matched.map((m) => <tr key={m.bank.line}><td><strong>{m.bank.reference || "—"}</strong></td><td>{m.bank.amountCentavos == null ? "—" : pesos(m.bank.amountCentavos)}</td><td>{m.bank.date || "—"}</td><td>{m.via}</td><td>{m.payment.payment_number ?? "—"}</td></tr>)}
               {!result.matched.length && <tr><td colSpan={5}><span className="portal-empty-copy">No rows matched — check the channel and file columns.</span></td></tr>}
+            </tbody></table></div>
+          </section>
+        </>
+      )}
+    </>
+  );
+}
+
+/* ---- Trainee lookup — Accounting Manager searches by name/SRN ---- */
+function TraineeLookup({ data }: { data: AccountingData }) {
+  const [q, setQ] = useState("");
+  const [selectedId, setSelectedId] = useState("");
+  const term = q.trim().toLowerCase();
+  const nameOf = (t: TraineeRow) => `${t.legal_first_name} ${t.legal_middle_name ?? ""} ${t.legal_last_name}`.replace(/\s+/g, " ").trim();
+  const matches = term.length < 2 ? [] : data.trainees.filter((t) => `${nameOf(t)} ${t.trainee_number} ${t.srn ?? ""}`.toLowerCase().includes(term)).slice(0, 25);
+  const selected = data.trainees.find((t) => t.id === selectedId) ?? null;
+  const enrollments = selected ? data.enrollments.filter((e) => e.trainee_id === selected.id) : [];
+  const payments = selected ? data.payments.filter((p) => p.trainee_id === selected.id) : [];
+  return (
+    <>
+      {!selected && (
+        <section className="portal-panel">
+          <div className="panel-heading"><div><h2>Trainee lookup</h2><p>Search a trainee by name or SRN to review their enrollments and payments</p></div></div>
+          <div className="portal-form" style={{ padding: "4px 0" }}>
+            <label className="full">Search name or SRN<input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Dela Cruz or SRN-99887" /></label>
+          </div>
+          {term.length < 2 ? <p className="portal-empty-copy">Type at least 2 characters to search.</p> : (
+            <div className="portal-table"><table><thead><tr><th>Trainee</th><th>SRN</th><th>Contact</th><th></th></tr></thead><tbody>
+              {matches.map((t) => <tr key={t.id}><td><strong>{nameOf(t)}</strong><small>{t.trainee_number}</small></td><td>{t.srn || "—"}</td><td>{t.email || t.mobile || "—"}</td><td className="document-actions"><button onClick={() => setSelectedId(t.id)}>Open</button></td></tr>)}
+              {!matches.length && <tr><td colSpan={4}><span className="portal-empty-copy">No trainee matches “{q}”.</span></td></tr>}
+            </tbody></table></div>
+          )}
+        </section>
+      )}
+      {selected && (
+        <>
+          <section className="portal-panel">
+            <div className="panel-heading"><div><h2>{nameOf(selected)}</h2><p>{selected.trainee_number}{selected.srn ? ` · SRN ${selected.srn}` : ""}{selected.mobile ? ` · ${selected.mobile}` : ""}</p></div><button className="portal-secondary" onClick={() => setSelectedId("")}>← Back to search</button></div>
+            <div className="portal-table"><table><thead><tr><th>Enrollment</th><th>Course</th><th>Due</th><th>Paid</th><th>Balance</th><th>Status</th></tr></thead><tbody>
+              {enrollments.map((e) => { const due = dueOf(e); const bal = Math.max(0, due - Number(e.paid_centavos)); return <tr key={e.id}><td><strong>{e.enrollment_number}</strong></td><td>{one(e.courses as CourseRef | CourseRef[] | null)?.name ?? "—"}</td><td>{pesos(due)}</td><td>{pesos(e.paid_centavos)}</td><td><strong>{pesos(bal)}</strong></td><td>{e.enrollment_status}</td></tr>; })}
+              {!enrollments.length && <tr><td colSpan={6}><span className="portal-empty-copy">No enrollments.</span></td></tr>}
+            </tbody></table></div>
+          </section>
+          <section className="portal-panel">
+            <div className="panel-heading"><div><h2>Payments</h2><p>Posted payments for this trainee</p></div></div>
+            <div className="portal-table"><table><thead><tr><th>Payment</th><th>Method</th><th>Reference</th><th>Amount</th><th>Verification</th></tr></thead><tbody>
+              {payments.map((p, i) => <tr key={p.payment_number ?? i}><td><strong>{p.payment_number ?? "—"}</strong></td><td>{p.method}</td><td>{p.reference_number ?? "—"}</td><td>{pesos(p.amount_centavos)}</td><td>{p.verification_state}</td></tr>)}
+              {!payments.length && <tr><td colSpan={5}><span className="portal-empty-copy">No payments.</span></td></tr>}
             </tbody></table></div>
           </section>
         </>
