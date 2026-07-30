@@ -49,7 +49,7 @@ function rangeFor(span: "Daily" | "Weekly" | "Monthly"): { from: string; to: str
 const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0 }).format((Number(centavos) || 0) / 100);
 
 export function LiveAccounting({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
-  const [tab, setTab] = useState<"Overview" | "Sales" | "Reconciliation" | "Trainees" | "Inventory" | "Expenses" | "Cashier closing" | "Setup">(role === "admin" || role === "accounting" ? "Overview" : "Expenses");
+  const [tab, setTab] = useState<"Dashboard" | "Sales" | "Reconciliation" | "Cashier closing" | "Setup">(role === "admin" || role === "accounting" ? "Dashboard" : "Cashier closing");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const canManage = role === "admin" || role === "accounting";
@@ -103,13 +103,13 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         <div><span className="portal-eyebrow">Financial control</span><h1>Accounting</h1><p>Collections, disbursements, receivables, and setup — from the live Supabase ledger.</p></div>
       </div>
       <div className="portal-tabs">
-        {(canManage ? ["Overview", "Sales", "Reconciliation", "Trainees", "Inventory", "Expenses", "Cashier closing", "Setup"] : ["Expenses", "Cashier closing"]).map((item) => (
+        {(canManage ? ["Dashboard", "Sales", "Reconciliation", "Cashier closing", "Setup"] : ["Cashier closing"]).map((item) => (
           <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item as typeof tab)}>{item}</button>
         ))}
       </div>
       {message && <div className="portal-message error" role="alert">{message}</div>}
 
-      {tab === "Overview" && (
+      {tab === "Dashboard" && (
         <>
           <section className="portal-panel" style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
             <label style={{ display: "flex", flexDirection: "column", fontSize: 13, color: "var(--muted)" }}>From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
@@ -165,32 +165,6 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
       {tab === "Sales" && <SalesReport payments={data.payments} payables={data.payables} />}
 
       {tab === "Reconciliation" && <Reconciliation payments={data.payments} channels={data.paymentMethods} />}
-
-      {tab === "Trainees" && <TraineeLookup data={data} />}
-
-      {tab === "Inventory" && <Inventory data={data} canManage={canManage} busy={busy} post={post} />}
-
-      {tab === "Expenses" && (
-        <>
-          <LiveVouchers data={data} role={role} reload={reload} />
-          {canManage && (
-            <>
-              <SetupList title="Expense categories" description="Categories for expense vouchers (Utilities, Salary, Government…)" entityLabel="category"
-                canManage={canManage} busy={busy} removable
-                fields={[{ key: "name", label: "Category name" }]}
-                rows={data.expenseCategories.map((c) => ({ id: c.id, primary: c.name, secondary: c.active ? "Active" : "Archived", active: c.active, values: { name: c.name } }))}
-                onSubmit={(v, id) => post({ action: "expense-category-save", id, name: String(v.name) })}
-                onRemove={(id) => post({ action: "expense-category-save", id, name: "x", remove: true })} />
-              <SetupList title="Monthly payables" description="Recurring bills (rent, utilities, remittances)" entityLabel="payable"
-                canManage={canManage} busy={busy} removable
-                fields={[{ key: "description", label: "Description" }, { key: "amount", label: "Amount (PHP)", type: "number" }, { key: "dueOn", label: "Due date (YYYY-MM-DD)", type: "date", optional: true }]}
-                rows={data.payables.map((p) => ({ id: p.id, primary: p.description, secondary: `${pesos(p.amount_centavos)}${p.due_on ? ` · due ${p.due_on}` : ""}`, active: true, values: { description: p.description, amount: String(p.amount_centavos / 100), dueOn: p.due_on || "" } }))}
-                onSubmit={(v, id) => post({ action: "payable-save", id, description: String(v.description), amountCentavos: Math.round((Number(v.amount) || 0) * 100), dueOn: String(v.dueOn || "") || null })}
-                onRemove={(id) => post({ action: "payable-save", id, description: "x", remove: true })} />
-            </>
-          )}
-        </>
-      )}
 
       {tab === "Cashier closing" && <LiveCashierClosing data={data as unknown as ClosingData} reload={reload} />}
 
@@ -324,6 +298,52 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
         </EditModal>
       )}
     </div>
+  );
+}
+
+/* ---- Standalone Inventory module (own left-nav item) ---- */
+export function LiveInventory({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
+  const canManage = role === "admin" || role === "accounting";
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  async function post(body: Record<string, unknown>) {
+    setBusy(true); setMessage("");
+    try { const r = await fetch("/api/staff/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); const j = await r.json(); if (!r.ok) throw new Error(j.error ?? "The action could not be completed."); await reload(); }
+    catch (e) { setMessage(e instanceof Error ? e.message : "The action could not be completed."); }
+    finally { setBusy(false); }
+  }
+  return <div className="portal-page"><div className="portal-heading"><div><span className="portal-eyebrow">Accounting</span><h1>Inventory</h1><p>Items with stock-in / stock-out movements</p></div></div>{message && <div className="portal-message error" role="alert">{message}</div>}<Inventory data={data} canManage={canManage} busy={busy} post={post} /></div>;
+}
+
+/* ---- Standalone Expenses module (own left-nav item) ---- */
+export function LiveExpenses({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
+  const canManage = role === "admin" || role === "accounting";
+  const [busy, setBusy] = useState(false);
+  async function post(body: Record<string, unknown>) {
+    setBusy(true);
+    try { const r = await fetch("/api/staff/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); const j = await r.json(); if (!r.ok) throw new Error(j.error ?? "The action could not be completed."); await reload(); }
+    finally { setBusy(false); }
+  }
+  return (
+    <>
+      <LiveVouchers data={data} role={role} reload={reload} />
+      {canManage && (
+        <div className="portal-page" style={{ paddingTop: 0 }}>
+          <SetupList title="Expense categories" description="Categories for expense vouchers (Utilities, Salary, Government…)" entityLabel="category"
+            canManage={canManage} busy={busy} removable
+            fields={[{ key: "name", label: "Category name" }]}
+            rows={data.expenseCategories.map((c) => ({ id: c.id, primary: c.name, secondary: c.active ? "Active" : "Archived", active: c.active, values: { name: c.name } }))}
+            onSubmit={(v, id) => post({ action: "expense-category-save", id, name: String(v.name) })}
+            onRemove={(id) => post({ action: "expense-category-save", id, name: "x", remove: true })} />
+          <SetupList title="Monthly payables" description="Recurring bills (rent, utilities, remittances)" entityLabel="payable"
+            canManage={canManage} busy={busy} removable
+            fields={[{ key: "description", label: "Description" }, { key: "amount", label: "Amount (PHP)", type: "number" }, { key: "dueOn", label: "Due date (YYYY-MM-DD)", type: "date", optional: true }]}
+            rows={data.payables.map((p) => ({ id: p.id, primary: p.description, secondary: `${pesos(p.amount_centavos)}${p.due_on ? ` · due ${p.due_on}` : ""}`, active: true, values: { description: p.description, amount: String(p.amount_centavos / 100), dueOn: p.due_on || "" } }))}
+            onSubmit={(v, id) => post({ action: "payable-save", id, description: String(v.description), amountCentavos: Math.round((Number(v.amount) || 0) * 100), dueOn: String(v.dueOn || "") || null })}
+            onRemove={(id) => post({ action: "payable-save", id, description: "x", remove: true })} />
+        </div>
+      )}
+    </>
   );
 }
 
@@ -602,7 +622,7 @@ function Reconciliation({ payments, channels }: { payments: Payment[]; channels:
 }
 
 /* ---- Trainee lookup — Accounting Manager searches by name/SRN ---- */
-function TraineeLookup({ data }: { data: AccountingData }) {
+export function TraineeLookup({ data }: { data: AccountingData }) {
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState("");
   const term = q.trim().toLowerCase();
