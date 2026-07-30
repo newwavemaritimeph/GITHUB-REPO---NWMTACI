@@ -19,7 +19,7 @@
   z-index: 40;
   inset: 0 auto 0 0;
   width: 260px;
-  background: linear-gradient(180deg, #104064, #0c3049);
+  background: linear-gradient(180deg, #ff8330, #f25615 58%, #d8480c);
   color: #fff;
   padding: 22px 14px;
   display: flex;
@@ -37,7 +37,7 @@
   border: 0;
   border-radius: 9px;
   background: transparent;
-  color: #b9d5e4;
+  color: rgba(255, 255, 255, 0.92);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -50,24 +50,59 @@
 .portal-sidebar nav button > span {
   width: 18px;
   text-align: center;
-  color: #86b6cf;
+  color: rgba(255, 255, 255, 0.8);
   font-size: 15px;
   flex: 0 0 auto;
 }
 
 .portal-sidebar nav button:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.16);
   color: #fff;
 }
 
 .portal-sidebar nav button.active {
-  background: var(--blue);
-  color: #fff;
-  box-shadow: inset 3px 0 var(--orange);
+  background: #fff;
+  color: var(--orange-dark);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.14);
 }
 
 .portal-sidebar nav button.active > span {
+  color: var(--orange-dark);
+}
+
+/* Orange-rail theme (design B) — scoped overrides so the shared sidebar
+   children read correctly on the orange gradient. */
+.portal-sidebar .sidebar-brand {
+  border-bottom-color: rgba(255, 255, 255, 0.28);
+}
+.portal-sidebar .role-picker span {
+  color: #ffe4d2;
+}
+.portal-sidebar .role-picker select {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.34);
   color: #fff;
+}
+.portal-sidebar .sidebar-footer {
+  border-top-color: rgba(255, 255, 255, 0.26);
+}
+.portal-sidebar .sidebar-footer > div span {
+  color: #ffe4d2;
+}
+.portal-sidebar .sidebar-footer a,
+.portal-sidebar .sidebar-account-button {
+  color: #fff;
+}
+.portal-sidebar .sidebar-account-button:hover {
+  color: #ffe4d2;
+}
+.portal-sidebar .user-dot {
+  background: #fff;
+  color: var(--orange-dark);
+}
+.portal-sidebar nav button small {
+  background: #fff;
+  color: var(--orange-dark);
 }
 
 .portal-workspace {
