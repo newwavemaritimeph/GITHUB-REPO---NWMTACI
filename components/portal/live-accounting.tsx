@@ -26,6 +26,7 @@ export type AccountingData = {
   charges: Charge[]; agencies: Agency[]; expenses: Expense[]; payables: Payable[];
   courses: Course[]; offers: Offer[]; courseCategories: Category[]; partnerCenters: Center[];
   agencyCourseRebates: AgencyRebate[]; agencyRebates: AgencyRebateEntry[];
+  expenseCategories: { id: string; name: string; active: boolean }[];
 };
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -154,6 +155,13 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
 
           <AgencyRebatesEditor data={data} canManage={canManage} busy={busy} post={post} />
 
+          <SetupList title="Expense categories" description="Categories for expense vouchers (Utilities, Salary, Government…)" entityLabel="category"
+            canManage={canManage} busy={busy} removable
+            fields={[{ key: "name", label: "Category name" }]}
+            rows={data.expenseCategories.map((c) => ({ id: c.id, primary: c.name, secondary: c.active ? "Active" : "Archived", active: c.active, values: { name: c.name } }))}
+            onSubmit={(v, id) => post({ action: "expense-category-save", id, name: String(v.name) })}
+            onRemove={(id) => post({ action: "expense-category-save", id, name: "x", remove: true })} />
+
           <SetupList title="Monthly payables" description="Recurring bills (rent, utilities, remittances)" entityLabel="payable"
             canManage={canManage} busy={busy} removable
             fields={[{ key: "description", label: "Description" }, { key: "amount", label: "Amount (PHP)", type: "number" }, { key: "dueOn", label: "Due date (YYYY-MM-DD)", type: "date", optional: true }]}
@@ -224,7 +232,7 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
   }
   return (
     <div className="portal-page">
-      <div className="portal-heading"><div><span className="portal-eyebrow">Cashier / Accounting</span><h1>Expense vouchers</h1><p>Raise cash and expense vouchers; Accounting approves, rejects, or marks them paid.</p></div>{canRaise && <button className="portal-primary" disabled={busy} onClick={() => { setError(""); setVoucher({ payee: "", category: "Supplies", amount: "", purpose: "" }); }}>+ Raise voucher</button>}</div>
+      <div className="portal-heading"><div><span className="portal-eyebrow">Cashier / Accounting</span><h1>Expense vouchers</h1><p>Raise cash and expense vouchers; Accounting approves, rejects, or marks them paid.</p></div>{canRaise && <button className="portal-primary" disabled={busy} onClick={() => { setError(""); setVoucher({ payee: "", category: data.expenseCategories.find((c) => c.active)?.name ?? "Others", amount: "", purpose: "" }); }}>+ Raise voucher</button>}</div>
       <section className="portal-panel">
         <div className="portal-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
           {data.expenses.map((e) => (
@@ -257,7 +265,7 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
         }}>
           {error && <div className="portal-message error full">{error}</div>}
           <label className="full">Payee<input autoFocus value={voucher.payee} onChange={(e) => setVoucher({ ...voucher, payee: e.target.value })} /></label>
-          <label>Category<input value={voucher.category} onChange={(e) => setVoucher({ ...voucher, category: e.target.value })} /></label>
+          <label>Category<select value={voucher.category} onChange={(e) => setVoucher({ ...voucher, category: e.target.value })}>{data.expenseCategories.filter((c) => c.active).map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}{voucher.category && !data.expenseCategories.some((c) => c.active && c.name === voucher.category) && <option value={voucher.category}>{voucher.category}</option>}</select></label>
           <label>Amount (PHP)<input type="number" min="0" step="0.01" value={voucher.amount} onChange={(e) => setVoucher({ ...voucher, amount: e.target.value })} /></label>
           <label className="full">Purpose / description<textarea rows={2} value={voucher.purpose} onChange={(e) => setVoucher({ ...voucher, purpose: e.target.value })} /></label>
         </EditModal>

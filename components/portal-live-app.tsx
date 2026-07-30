@@ -28,6 +28,7 @@ type PortalData = { profile:{complete_name:string;email:string}; roles:string[];
   employees:HrData["employees"]; employeeAttendance:HrData["employeeAttendance"]; leaveRequests:HrData["leaveRequests"]; cashAdvances:HrData["cashAdvances"]; payrollPeriods:HrData["payrollPeriods"]; payrollItems:HrData["payrollItems"];
   classrooms:TrainingData["classrooms"]; certificates:TrainingData["certificates"];
   agencyCourseRebates:{id:string;agency_id:string;course_id:string;rebate_centavos:number}[]; agencyRebates:{id:string;agency_id:string;enrollment_id:string;course_id:string;rebate_centavos:number;status:string;created_at:string;marketing_agencies?:{name:string}|{name:string}[]|null;courses?:{name:string}|{name:string}[]|null;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null}[];
+  expenseCategories:{id:string;name:string;active:boolean}[];
   courseCategories:{id:string;name:string}[]; partnerCenters:{id:string;name:string;active:boolean}[] };
 
 const nav: {label:Module;icon:string;roles?:string[]}[] = [
