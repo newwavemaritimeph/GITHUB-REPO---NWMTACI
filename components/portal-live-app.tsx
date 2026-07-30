@@ -35,8 +35,8 @@ type PortalData = { profile:{complete_name:string;email:string}; roles:string[];
 const nav: {label:Module;icon:string;roles?:string[]}[] = [
   {label:"Dashboard",icon:"⌂"},{label:"Search trainee",icon:"⌕",roles:["admin"]},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting","training_operations"]},
   {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting","training_operations"]},{label:"Courses & centers",icon:"◇"},
-  {label:"Schedules",icon:"□",roles:["admin","registration","training_operations","instructor"]},{label:"Payments",icon:"₱",roles:["admin","cashier","accounting","registration"]},{label:"Expense vouchers",icon:"◰",roles:["admin","cashier","accounting"]},{label:"Cashier closing",icon:"▦",roles:["admin","cashier","accounting"]},
-  {label:"Accounting",icon:"▥",roles:["admin","accounting"]},{label:"Attendance",icon:"✓",roles:["admin","training_operations","instructor"]},
+  {label:"Schedules",icon:"□",roles:["admin","registration","training_operations","instructor"]},{label:"Payments",icon:"₱",roles:["admin","cashier","accounting","registration"]},
+  {label:"Accounting",icon:"▥",roles:["admin","accounting","cashier"]},{label:"Attendance",icon:"✓",roles:["admin","training_operations","instructor"]},
   {label:"Classrooms",icon:"▢",roles:["admin","training_operations"]},{label:"Certificates",icon:"◈",roles:["admin","training_operations"]},{label:"HR & payroll",icon:"♙",roles:["admin","hr"]},{label:"Reports",icon:"↥"},{label:"Setup",icon:"⚙",roles:["admin"]},
 ];
 const roleNames:Record<string,string>={admin:"Admin",registration:"Registration",cashier:"Cashier",accounting:"Accounting",training_operations:"Training Operations",hr:"HR",instructor:"Instructor"};

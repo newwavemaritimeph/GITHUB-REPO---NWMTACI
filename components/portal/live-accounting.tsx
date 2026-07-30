@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { parseCsv, downloadCsv } from "@/lib/csv";
+import { LiveCashierClosing, type ClosingData } from "./live-cashier-closing";
 
 /** Loose shapes for the accounting slices of the staff-operations payload. */
 type Payment = { payment_number?: string; method: string; amount_centavos: number; reference_number?: string | null; received_at?: string; verification_state: string };
@@ -30,6 +31,7 @@ export type AccountingData = {
   agencyCourseRebates: AgencyRebate[]; agencyRebates: AgencyRebateEntry[];
   expenseCategories: { id: string; name: string; active: boolean }[];
   inventoryItems: InventoryItem[]; inventoryMovements: InventoryMovement[];
+  cashierClosings: { id: string; closing_date: string; opening_cash_centavos: number; cash_collections_centavos: number; online_collections_centavos: number; expenses_centavos: number; expected_cash_centavos: number; actual_cash_centavos?: number | null; variance_centavos?: number | null; status: string }[];
 };
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -45,7 +47,7 @@ function rangeFor(span: "Daily" | "Weekly" | "Monthly"): { from: string; to: str
 const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0 }).format((Number(centavos) || 0) / 100);
 
 export function LiveAccounting({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
-  const [tab, setTab] = useState<"Overview" | "Sales" | "Reconciliation" | "Inventory" | "Setup">("Overview");
+  const [tab, setTab] = useState<"Overview" | "Sales" | "Reconciliation" | "Inventory" | "Vouchers" | "Cashier closing" | "Setup">(role === "admin" || role === "accounting" ? "Overview" : "Vouchers");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const canManage = role === "admin" || role === "accounting";
@@ -84,8 +86,8 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         <div><span className="portal-eyebrow">Financial control</span><h1>Accounting</h1><p>Collections, disbursements, receivables, and setup — from the live Supabase ledger.</p></div>
       </div>
       <div className="portal-tabs">
-        {(["Overview", "Sales", "Reconciliation", "Inventory", "Setup"] as const).map((item) => (
-          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>
+        {(canManage ? ["Overview", "Sales", "Reconciliation", "Inventory", "Vouchers", "Cashier closing", "Setup"] : ["Vouchers", "Cashier closing"]).map((item) => (
+          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item as typeof tab)}>{item}</button>
         ))}
       </div>
       {message && <div className="portal-message error" role="alert">{message}</div>}
@@ -132,6 +134,10 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
       {tab === "Reconciliation" && <Reconciliation payments={data.payments} channels={data.paymentMethods} />}
 
       {tab === "Inventory" && <Inventory data={data} canManage={canManage} busy={busy} post={post} />}
+
+      {tab === "Vouchers" && <LiveVouchers data={data} role={role} reload={reload} />}
+
+      {tab === "Cashier closing" && <LiveCashierClosing data={data as unknown as ClosingData} reload={reload} />}
 
       {tab === "Setup" && (
         <>
