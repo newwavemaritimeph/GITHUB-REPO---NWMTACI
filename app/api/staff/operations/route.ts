@@ -68,6 +68,8 @@ const closingInput = z.object({ action: z.literal("cashier-close"), closingDate:
 // corrections mark the row invalid rather than deleting it.
 const enrollmentChargeInput = z.object({ action: z.literal("enrollment-charge"), enrollmentId: z.string().uuid(), chargeCatalogId: z.string().uuid().nullable().optional(), description: z.string().trim().min(1).max(200), amountCentavos: z.number().int().positive(), kind: z.enum(["charge", "discount"]).default("charge") });
 const enrollmentChargeVoidInput = z.object({ action: z.literal("enrollment-charge-void"), id: z.string().uuid() });
+const discountRequestInput = z.object({ action: z.literal("discount-request"), enrollmentId: z.string().uuid(), amountCentavos: z.number().int().positive(), description: z.string().trim().max(200).optional(), agencyId: z.string().uuid().nullable().optional() });
+const discountDecideInput = z.object({ action: z.literal("discount-decide"), id: z.string().uuid(), approve: z.boolean() });
 
 // HR / payroll (Slice 1): attendance logging and leave / cash-advance filing + decisions.
 const hm = /^\d{2}:\d{2}$/;
@@ -94,7 +96,7 @@ const paymentSplitInput = z.object({ action: z.literal("payment-split"), allocat
 const courseChangeInput = z.object({ action: z.literal("enrollment-course-change"), enrollmentId: z.string().uuid(), courseId: z.string().uuid(), partnerOfferId: z.string().uuid().nullable().optional() });
 const rescheduleInput = z.object({ action: z.literal("enrollment-reschedule"), enrollmentId: z.string().uuid(), batchId: z.string().uuid().nullable() });
 
-const actionInput = z.union([batchInput, autoOpenBatchInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput]);
+const actionInput = z.union([batchInput, autoOpenBatchInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, discountRequestInput, discountDecideInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
@@ -133,11 +135,12 @@ export async function GET() {
     db.from("expense_categories").select("id,name,active").order("name"),
     db.from("inventory_items").select("id,name,category,unit,quantity_on_hand,unit_value_centavos,active").order("name"),
     db.from("inventory_movements").select("id,item_id,movement_type,quantity,remarks,created_at,inventory_items(name)").order("created_at", { ascending: false }).limit(200),
+    db.from("enrollment_charges").select("id,enrollment_id,description,amount_centavos,agency_id,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name)),marketing_agencies(name)").eq("event_type", "discount").eq("approval_status", "Pending").order("created_at", { ascending: false }).limit(200),
   ]);
   const error = results.find((item) => item.error)?.error;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const [profile, courses, offers, trainees, batches, enrollmentsResult, payments, allocations, notifications,
-    paymentMethods, charges, agencies, expenses, payables, cashierClosings, enrollmentCharges, classrooms, courseCategories, partnerCenters, agencyCourseRebates, agencyRebates, expenseCategories, inventoryItems, inventoryMovements] = results;
+    paymentMethods, charges, agencies, expenses, payables, cashierClosings, enrollmentCharges, classrooms, courseCategories, partnerCenters, agencyCourseRebates, agencyRebates, expenseCategories, inventoryItems, inventoryMovements, pendingDiscounts] = results;
   const paidByEnrollment = new Map<string, number>();
   for (const allocation of allocations.data ?? []) paidByEnrollment.set(allocation.enrollment_id, (paidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
   const chargesByEnrollment = new Map<string, number>();
@@ -174,7 +177,7 @@ export async function GET() {
     expenses: expenses.data ?? [], payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems,
     classrooms: classrooms.data ?? [], certificates, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [] }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [] }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -303,6 +306,18 @@ export async function POST(request: Request) {
       const { error } = await admin.from("enrollment_charges").update({ valid: false }).eq("id", input.id);
       if (error) throw error;
       return NextResponse.json({ ok: true });
+    }
+    if (input.action === "discount-request") {
+      if (!staff.roleCodes.some((r) => ["admin", "accounting", "cashier"].includes(r))) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+      const { data, error } = await db.rpc("request_enrollment_discount", { target_enrollment: input.enrollmentId, target_amount: input.amountCentavos, target_description: input.description ?? "Discount", target_agency: input.agencyId ?? null });
+      if (error) throw error;
+      return NextResponse.json({ ok: true, charge: data });
+    }
+    if (input.action === "discount-decide") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or Admin can decide discounts." }, { status: 403 });
+      const { data, error } = await db.rpc("decide_enrollment_discount", { target_charge: input.id, target_approve: input.approve });
+      if (error) throw error;
+      return NextResponse.json({ ok: true, charge: data });
     }
     if (input.action === "hr-attendance-log") {
       if (!canManageHr(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot record HR attendance." }, { status: 403 });
