@@ -19,10 +19,13 @@ type CourseRef = { name: string; code?: string };
 type Offer = { id: string; course_id?: string; duration_label: string; training_fee_centavos: number; rebate_centavos: number; partner_payable_centavos: number; partner_centers?: CenterRef | CenterRef[] | null; courses?: CourseRef | CourseRef[] | null };
 type Category = { id: string; name: string };
 type Center = { id: string; name: string; active: boolean };
+type AgencyRebate = { id: string; agency_id: string; course_id: string; rebate_centavos: number };
+type AgencyRebateEntry = { id: string; agency_id: string; enrollment_id: string; course_id: string; rebate_centavos: number; status: string; created_at: string; marketing_agencies?: { name: string } | { name: string }[] | null; courses?: { name: string } | { name: string }[] | null; trainees?: { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null };
 export type AccountingData = {
   payments: Payment[]; enrollments: Enrollment[]; paymentMethods: Channel[];
   charges: Charge[]; agencies: Agency[]; expenses: Expense[]; payables: Payable[];
   courses: Course[]; offers: Offer[]; courseCategories: Category[]; partnerCenters: Center[];
+  agencyCourseRebates: AgencyRebate[]; agencyRebates: AgencyRebateEntry[];
 };
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -115,6 +118,8 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
               {!data.payables.length && <tr><td colSpan={4}><span className="portal-empty-copy">No payables recorded.</span></td></tr>}
             </tbody></table></div>
           </section>
+
+          <AgencyRebatesOwed data={data} canManage={canManage} busy={busy} post={post} />
         </>
       )}
 
@@ -146,6 +151,8 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
             rows={data.agencies.map((a) => ({ id: a.id, primary: a.name, secondary: [a.contact_name, a.email, a.mobile].filter(Boolean).join(" · ") || "—", active: a.active, values: { name: a.name, contactName: a.contact_name || "", email: a.email || "", mobile: a.mobile || "" } }))}
             onSubmit={(v, id) => post({ action: "agency-save", id, name: String(v.name), contactName: String(v.contactName || ""), email: String(v.email || ""), mobile: String(v.mobile || "") })}
             onArchive={(id, active, name) => post({ action: "agency-save", id, name, active: !active })} />
+
+          <AgencyRebatesEditor data={data} canManage={canManage} busy={busy} post={post} />
 
           <SetupList title="Monthly payables" description="Recurring bills (rent, utilities, remittances)" entityLabel="payable"
             canManage={canManage} busy={busy} removable
@@ -528,6 +535,56 @@ function Reconciliation({ payments, channels }: { payments: Payment[]; channels:
         </>
       )}
     </>
+  );
+}
+
+/* ---- Agency (consultancy) rebate matrix — agency × course → amount ---- */
+function AgencyRebatesEditor({ data, canManage, busy, post }: { data: AccountingData; canManage: boolean; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
+  const agencies = data.agencies.filter((a) => a.active);
+  const [agencyId, setAgencyId] = useState(agencies[0]?.id ?? "");
+  const courses = data.courses.filter((c) => c.delivery_type === "In-House");
+  const rebateFor = (courseId: string) => data.agencyCourseRebates.find((r) => r.agency_id === agencyId && r.course_id === courseId)?.rebate_centavos ?? 0;
+  const [edit, setEdit] = useState<{ courseId: string; name: string; amount: string } | null>(null);
+  const [error, setError] = useState("");
+  async function save() {
+    if (!edit) return;
+    const cents = Math.round(Number(edit.amount) * 100);
+    if (!Number.isFinite(cents) || cents < 0) { setError("Enter a valid amount."); return; }
+    await post({ action: "agency-rebate-set", agencyId, courseId: edit.courseId, cents });
+    setEdit(null);
+  }
+  return (
+    <section className="portal-panel">
+      <div className="panel-heading"><div><h2>Agency rebates</h2><p>Rebate paid to a consultancy per course. Auto-fills when a cashier tags the endorsing agency on a payment.</p></div></div>
+      {!canManage && <div className="portal-message error">Only Admin and Accounting can set rebates.</div>}
+      <div className="portal-form" style={{ padding: "4px 0 10px" }}>
+        <label>Consultancy / agency<select value={agencyId} onChange={(e) => setAgencyId(e.target.value)}>{agencies.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}{!agencies.length && <option value="">No agencies yet</option>}</select></label>
+      </div>
+      <div className="portal-table"><table><thead><tr><th>Course</th><th>Rebate</th><th></th></tr></thead><tbody>
+        {agencyId && courses.map((c) => <tr key={c.id}><td><strong>{c.name}</strong><small>{c.code}</small></td><td>{pesos(rebateFor(c.id))}</td><td className="document-actions">{canManage && <button disabled={busy} onClick={() => { setError(""); setEdit({ courseId: c.id, name: c.name, amount: String(rebateFor(c.id) / 100) }); }}>Set</button>}</td></tr>)}
+        {(!agencyId || !courses.length) && <tr><td colSpan={3}><span className="portal-empty-copy">{agencies.length ? "No New Wave courses to price." : "Add a marketing agency first (below)."}</span></td></tr>}
+      </tbody></table></div>
+      {edit && (
+        <EditModal title="Set agency rebate" subtitle={`${data.agencies.find((a) => a.id === agencyId)?.name ?? ""} · ${edit.name}`} busy={busy} onClose={() => setEdit(null)} onSave={save}>
+          {error && <div className="portal-message error full">{error}</div>}
+          <label className="full">Rebate amount (PHP)<input autoFocus type="number" min="0" step="0.01" value={edit.amount} onChange={(e) => setEdit({ ...edit, amount: e.target.value })} /></label>
+        </EditModal>
+      )}
+    </section>
+  );
+}
+
+/* ---- Agency rebates payable — what New Wave owes referring consultancies ---- */
+function AgencyRebatesOwed({ data, canManage, busy, post }: { data: AccountingData; canManage: boolean; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
+  const total = data.agencyRebates.filter((r) => r.status === "Pending").reduce((s, r) => s + Number(r.rebate_centavos), 0);
+  return (
+    <section className="portal-panel">
+      <div className="panel-heading"><div><h2>Agency rebates payable</h2><p>Owed to referring consultancies (recorded at payment)</p></div><span>{pesos(total)}</span></div>
+      <div className="portal-table"><table><thead><tr><th>Agency</th><th>Course · Trainee</th><th>Rebate</th><th>Status</th>{canManage && <th></th>}</tr></thead><tbody>
+        {data.agencyRebates.slice(0, 100).map((r) => { const t = one(r.trainees); return <tr key={r.id}><td><strong>{one(r.marketing_agencies)?.name ?? "—"}</strong></td><td>{one(r.courses)?.name ?? "—"}<small>{t ? `${t.legal_first_name} ${t.legal_last_name}` : ""}</small></td><td>{pesos(r.rebate_centavos)}</td><td>{r.status}</td>{canManage && <td className="document-actions">{r.status === "Pending" && <button disabled={busy} onClick={() => post({ action: "agency-rebate-settle", id: r.id, status: "Paid" })}>Mark paid</button>}</td>}</tr>; })}
+        {!data.agencyRebates.length && <tr><td colSpan={canManage ? 5 : 4}><span className="portal-empty-copy">No agency rebates recorded yet.</span></td></tr>}
+      </tbody></table></div>
+    </section>
   );
 }
 

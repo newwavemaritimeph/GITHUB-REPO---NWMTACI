@@ -36,6 +36,10 @@ const batchUpdateInput = z.object({
   mode: z.string().trim().min(2).max(80), enrollmentDeadline: z.string().datetime({ offset: true }), publish: z.boolean(),
 });
 
+const agencyRebateSetInput = z.object({ action: z.literal("agency-rebate-set"), agencyId: z.string().uuid(), courseId: z.string().uuid(), cents: z.number().int().min(0) });
+const recordAgencyRebateInput = z.object({ action: z.literal("record-agency-rebate"), enrollmentId: z.string().uuid(), agencyId: z.string().uuid() });
+const agencyRebateSettleInput = z.object({ action: z.literal("agency-rebate-settle"), id: z.string().uuid(), status: z.enum(["Pending", "Paid", "Cancelled"]) });
+
 const paymentInput = z.object({
   action: z.literal("post-payment"), enrollmentId: z.string().uuid(), amountCentavos: z.number().int().positive(),
   method: z.string().trim().min(1).max(80), receivingAccount: z.string().trim().min(2).max(120),
@@ -87,7 +91,7 @@ const paymentSplitInput = z.object({ action: z.literal("payment-split"), allocat
 const courseChangeInput = z.object({ action: z.literal("enrollment-course-change"), enrollmentId: z.string().uuid(), courseId: z.string().uuid(), partnerOfferId: z.string().uuid().nullable().optional() });
 const rescheduleInput = z.object({ action: z.literal("enrollment-reschedule"), enrollmentId: z.string().uuid(), batchId: z.string().uuid().nullable() });
 
-const actionInput = z.union([batchInput, autoOpenBatchInput, batchUpdateInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput]);
+const actionInput = z.union([batchInput, autoOpenBatchInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
@@ -121,11 +125,13 @@ export async function GET() {
     db.from("classrooms").select("id,name,venue,capacity,active").order("name"),
     db.from("course_categories").select("id,name").eq("active", true).order("sort_order"),
     db.from("partner_centers").select("id,name,active").order("name"),
+    db.from("agency_course_rebates").select("id,agency_id,course_id,rebate_centavos"),
+    db.from("agency_rebates").select("id,agency_id,enrollment_id,course_id,rebate_centavos,status,created_at,marketing_agencies(name),courses(name),trainees(legal_first_name,legal_last_name)").order("created_at", { ascending: false }).limit(300),
   ]);
   const error = results.find((item) => item.error)?.error;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const [profile, courses, offers, trainees, batches, enrollmentsResult, payments, allocations, notifications,
-    paymentMethods, charges, agencies, expenses, payables, cashierClosings, enrollmentCharges, classrooms, courseCategories, partnerCenters] = results;
+    paymentMethods, charges, agencies, expenses, payables, cashierClosings, enrollmentCharges, classrooms, courseCategories, partnerCenters, agencyCourseRebates, agencyRebates] = results;
   const paidByEnrollment = new Map<string, number>();
   for (const allocation of allocations.data ?? []) paidByEnrollment.set(allocation.enrollment_id, (paidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
   const chargesByEnrollment = new Map<string, number>();
@@ -161,7 +167,8 @@ export async function GET() {
     paymentMethods: paymentMethods.data ?? [], charges: charges.data ?? [], agencies: agencies.data ?? [],
     expenses: expenses.data ?? [], payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems,
-    classrooms: classrooms.data ?? [], certificates, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [] }, { headers: { "Cache-Control": "no-store" } });
+    classrooms: classrooms.data ?? [], certificates, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [] }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -533,6 +540,24 @@ export async function POST(request: Request) {
         target_daily_start: input.dailyStart, target_daily_end: input.dailyEnd, target_mode: input.mode, target_enrollment_deadline: input.enrollmentDeadline, target_publish: input.publish });
       if (error) throw error;
       return NextResponse.json({ ok: true, batch: data });
+    }
+    if (input.action === "agency-rebate-set") {
+      if (!staff.roleCodes.some((role) => ["admin", "accounting"].includes(role))) return NextResponse.json({ error: "Only Accounting can set rebates." }, { status: 403 });
+      const { data, error } = await db.rpc("set_agency_course_rebate", { target_agency: input.agencyId, target_course: input.courseId, target_cents: input.cents });
+      if (error) throw error;
+      return NextResponse.json({ ok: true, rebate: data });
+    }
+    if (input.action === "record-agency-rebate") {
+      if (!staff.roleCodes.some((role) => ["admin", "accounting", "cashier"].includes(role))) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+      const { data, error } = await db.rpc("record_agency_rebate", { target_enrollment: input.enrollmentId, target_agency: input.agencyId });
+      if (error) throw error;
+      return NextResponse.json({ ok: true, rebate: data });
+    }
+    if (input.action === "agency-rebate-settle") {
+      if (!staff.roleCodes.some((role) => ["admin", "accounting"].includes(role))) return NextResponse.json({ error: "Only Accounting can settle rebates." }, { status: 403 });
+      const { data, error } = await db.rpc("settle_agency_rebate", { target_entry: input.id, target_status: input.status });
+      if (error) throw error;
+      return NextResponse.json({ ok: true, rebate: data });
     }
     if (input.action === "create-enrollment") {
       if (!staff.roleCodes.some((role) => ["admin", "registration", "training_operations"].includes(role))) return NextResponse.json({ error: "Your account cannot create enrollments." }, { status: 403 });
