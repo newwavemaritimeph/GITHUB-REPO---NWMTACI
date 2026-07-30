@@ -74,6 +74,15 @@ body {
   font-size: 16px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
+  /* House style: all on-screen text renders uppercase (display only; stored
+     values such as emails and names are unchanged). */
+  text-transform: uppercase;
+}
+
+/* Keep email addresses in their natural case — uppercasing an address the
+   user must recognise or type is misleading. */
+input[type="email"] {
+  text-transform: none;
 }
 
 button,
