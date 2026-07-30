@@ -228,7 +228,7 @@ function SalesReport({ payments, payables }: { payments: Payment[]; payables: Pa
 /* ---- Standalone Expense Vouchers module (own nav item) ---- */
 export function LiveVouchers({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
   const canManage = role === "admin" || role === "accounting";
-  const canRaise = ["admin", "accounting", "cashier"].includes(role);
+  const canRaise = ["admin", "cashier"].includes(role);
   const [busy, setBusy] = useState(false);
   const [voucher, setVoucher] = useState<{ payee: string; category: string; amount: string; purpose: string } | null>(null);
   const [error, setError] = useState("");

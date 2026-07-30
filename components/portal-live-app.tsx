@@ -34,10 +34,10 @@ type PortalData = { profile:{complete_name:string;email:string}; roles:string[];
 
 const nav: {label:Module;icon:string;roles?:string[]}[] = [
   {label:"Dashboard",icon:"⌂"},{label:"Search trainee",icon:"⌕",roles:["admin"]},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting","training_operations"]},
-  {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting","training_operations"]},{label:"Courses & centers",icon:"◇"},
-  {label:"Schedules",icon:"□",roles:["admin","registration","training_operations","instructor"]},{label:"Payments",icon:"₱",roles:["admin","cashier","accounting","registration"]},
+  {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting"]},
+  {label:"Schedules",icon:"□",roles:["admin","registration","training_operations","instructor"]},{label:"Courses & centers",icon:"◇"},{label:"Payments",icon:"₱",roles:["cashier"]},
   {label:"Accounting",icon:"▥",roles:["admin","accounting","cashier"]},{label:"Attendance",icon:"✓",roles:["admin","training_operations","instructor"]},
-  {label:"Classrooms",icon:"▢",roles:["admin","training_operations"]},{label:"Certificates",icon:"◈",roles:["admin","training_operations"]},{label:"HR & payroll",icon:"♙",roles:["admin","hr"]},{label:"Reports",icon:"↥"},{label:"Setup",icon:"⚙",roles:["admin"]},
+  {label:"Classrooms",icon:"▢",roles:["admin","training_operations"]},{label:"Certificates",icon:"◈",roles:["admin","training_operations"]},{label:"HR & payroll",icon:"♙",roles:["admin","hr"]},{label:"Reports",icon:"↥",roles:["admin","registration","accounting"]},{label:"Setup",icon:"⚙",roles:["admin"]},
 ];
 const roleNames:Record<string,string>={admin:"Admin",registration:"Registration",cashier:"Cashier",accounting:"Accounting",training_operations:"Training Operations",hr:"HR",instructor:"Instructor"};
 const pesos=(centavos:number)=>new Intl.NumberFormat("en-PH",{style:"currency",currency:"PHP",minimumFractionDigits:0}).format((Number(centavos)||0)/100);
