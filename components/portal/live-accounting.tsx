@@ -6,7 +6,7 @@ import { LiveCashierClosing, type ClosingData } from "./live-cashier-closing";
 
 /** Loose shapes for the accounting slices of the staff-operations payload. */
 type Payment = { payment_number?: string; method: string; amount_centavos: number; reference_number?: string | null; received_at?: string; verification_state: string; trainee_id?: string };
-type Enrollment = { id: string; enrollment_number: string; trainee_id?: string; selling_price_centavos: number; paid_centavos: number; charges_centavos?: number; discounts_centavos?: number; enrollment_status: string; trainees?: unknown; courses?: unknown };
+type Enrollment = { id: string; enrollment_number: string; trainee_id?: string; created_at?: string; selling_price_centavos: number; paid_centavos: number; charges_centavos?: number; discounts_centavos?: number; enrollment_status: string; trainees?: unknown; courses?: unknown };
 type TraineeRow = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; srn?: string | null; email?: string | null; mobile?: string | null };
 /** Amount due = base price + other charges − rebates/discounts. */
 const dueOf = (e: Enrollment) => Number(e.selling_price_centavos) + Number(e.charges_centavos ?? 0) - Number(e.discounts_centavos ?? 0);
@@ -53,6 +53,21 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const canManage = role === "admin" || role === "accounting";
+  const today = manilaDay(new Date().toISOString());
+  const [from, setFrom] = useState(today);
+  const [to, setTo] = useState(today);
+  const inRange = (v?: string | null) => { const d = manilaDay(v); return !!d && d >= from && d <= to; };
+  const enrollInRange = data.enrollments.filter((e) => inRange(e.created_at));
+  const salesInRange = data.payments.filter((p) => inRange(p.received_at)).reduce((s, p) => s + Number(p.amount_centavos), 0);
+  const expensesInRange = data.expenses.filter((e) => (e.status === "Paid" || e.status === "Approved") && inRange(e.created_at)).reduce((s, e) => s + Number(e.amount_centavos), 0);
+  const netSales = salesInRange - expensesInRange;
+  const courseCounts = new Map<string, number>();
+  for (const e of enrollInRange) { const n = one(e.courses as CourseRef | CourseRef[] | null)?.name ?? "Unknown"; courseCounts.set(n, (courseCounts.get(n) ?? 0) + 1); }
+  const topCourses = [...courseCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const agencyCounts = new Map<string, number>();
+  for (const r of data.agencyRebates.filter((r) => inRange(r.created_at))) { const n = one(r.marketing_agencies)?.name ?? "Unknown"; agencyCounts.set(n, (agencyCounts.get(n) ?? 0) + 1); }
+  const topAgencies = [...agencyCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  const pendingBalances = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && dueOf(e) - Number(e.paid_centavos) > 0);
 
   async function post(body: Record<string, unknown>) {
     setBusy(true); setMessage("");
@@ -96,6 +111,22 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
 
       {tab === "Overview" && (
         <>
+          <section className="portal-panel" style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
+            <label style={{ display: "flex", flexDirection: "column", fontSize: 13, color: "var(--muted)" }}>From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+            <label style={{ display: "flex", flexDirection: "column", fontSize: 13, color: "var(--muted)" }}>To<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+            <span className="portal-empty-copy" style={{ margin: 0 }}>{from} → {to}</span>
+          </section>
+          <div className="finance-hero">
+            <div><span>Net sales</span><strong>{pesos(netSales)}</strong><small>Sales − expenses</small></div>
+            <article><span>Sales</span><strong>{pesos(salesInRange)}</strong><small>Payments in range</small></article>
+            <article><span>Expenses</span><strong>{pesos(expensesInRange)}</strong><small>Approved / paid</small></article>
+            <article><span>Enrollments</span><strong>{enrollInRange.length}</strong><small>New in range</small></article>
+          </div>
+          <div className="dashboard-panels">
+            <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Most enrolled courses</h2><p>Top courses in range</p></div></div>{topCourses.map(([name, n]) => <div className="live-row-item" key={name}><div><strong>{name}</strong></div><span className="slot-count">{n}</span></div>)}{!topCourses.length && <p className="portal-empty-copy">No enrollments in range.</p>}</section>
+            <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Top agencies</h2><p>Most rebated enrollments in range</p></div></div>{topAgencies.map(([name, n]) => <div className="live-row-item" key={name}><div><strong>{name}</strong></div><span className="slot-count">{n}</span></div>)}{!topAgencies.length && <p className="portal-empty-copy">No agency-tagged enrollments in range.</p>}</section>
+          </div>
+          <section className="portal-panel"><div className="panel-heading"><div><h2>Trainees with pending balances</h2><p>Outstanding enrollment balances</p></div><span>{pesos(pendingBalances.reduce((s, e) => s + (dueOf(e) - Number(e.paid_centavos)), 0))}</span></div><div className="portal-table"><table><thead><tr><th>Trainee</th><th>Course</th><th>Balance</th></tr></thead><tbody>{pendingBalances.slice(0, 50).map((e) => { const t = one(e.trainees as TraineeRow | TraineeRow[] | null); return <tr key={e.id}><td><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</strong></td><td>{one(e.courses as CourseRef | CourseRef[] | null)?.name ?? "—"}</td><td><strong>{pesos(dueOf(e) - Number(e.paid_centavos))}</strong></td></tr>; })}{!pendingBalances.length && <tr><td colSpan={3}><span className="portal-empty-copy">No pending balances.</span></td></tr>}</tbody></table></div></section>
           <div className="finance-hero">
             <div><span>Collections</span><strong>{pesos(collectionTotal)}</strong><small>{data.payments.length} posted payments</small></div>
             <article><span>Disbursements</span><strong>{pesos(disbursementTotal)}</strong><small>{disbursements.length} paid/approved</small></article>
