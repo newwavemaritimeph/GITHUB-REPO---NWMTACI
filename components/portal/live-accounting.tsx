@@ -320,6 +320,8 @@ type PriceEdit =
 function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canManage: boolean; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
   const [edit, setEdit] = useState<PriceEdit | null>(null);
   const [error, setError] = useState("");
+  const offerCenters = [...new Set(data.offers.map((o) => one(o.partner_centers)?.name).filter(Boolean))] as string[];
+  const [offerCenter, setOfferCenter] = useState(offerCenters[0] ?? "");
   const pesoFromInput = (raw: string) => { const n = Number(raw); return Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null; };
   const defaultCategory = data.courseCategories[0]?.id ?? "";
 
@@ -380,12 +382,12 @@ function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canM
       </section>
 
       <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Endorsement rates &amp; rebates</h2><p>Partner-endorsed offers — training fee, New Wave rebate, partner payable</p></div></div>
-        <div className="portal-table"><table><thead><tr><th>Course · Center</th><th>Duration</th><th>Training fee</th><th>Rebate</th><th>Partner payable</th><th></th></tr></thead><tbody>
-          {data.offers.map((o) => {
+        <div className="panel-heading"><div><h2>Endorsement rates &amp; rebates</h2><p>Pick a partner center to see the courses it offers</p></div>{offerCenters.length > 0 && <select value={offerCenter} onChange={(e) => setOfferCenter(e.target.value)} style={{ maxWidth: 240 }}>{offerCenters.map((c) => <option key={c} value={c}>{c}</option>)}</select>}</div>
+        <div className="portal-table"><table><thead><tr><th>Course</th><th>Duration</th><th>Training fee</th><th>Rebate</th><th>Partner payable</th><th></th></tr></thead><tbody>
+          {data.offers.filter((o) => one(o.partner_centers)?.name === offerCenter).map((o) => {
             const center = one(o.partner_centers)?.name ?? "—"; const course = data.courses.find((c) => c.id === o.course_id)?.name ?? one(o.courses)?.name ?? "—";
             return <tr key={o.id}>
-              <td><strong>{course}</strong><small>{center}</small></td>
+              <td><strong>{course}</strong></td>
               <td>{o.duration_label}</td>
               <td>{pesos(o.training_fee_centavos)}</td>
               <td>{pesos(o.rebate_centavos)}</td>
@@ -393,7 +395,7 @@ function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canM
               <td className="document-actions">{canManage && <button disabled={busy} onClick={() => { setError(""); setEdit({ kind: "offer", id: o.id, label: `${course} · ${center}`, fee: String(o.training_fee_centavos / 100), rebate: String(o.rebate_centavos / 100) }); }}>Edit rate</button>}</td>
             </tr>;
           })}
-          {!data.offers.length && <tr><td colSpan={6}><span className="portal-empty-copy">No endorsed offers.</span></td></tr>}
+          {!data.offers.filter((o) => one(o.partner_centers)?.name === offerCenter).length && <tr><td colSpan={6}><span className="portal-empty-copy">No courses for this center.</span></td></tr>}
         </tbody></table></div>
       </section>
 
