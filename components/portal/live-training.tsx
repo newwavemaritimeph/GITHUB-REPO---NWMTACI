@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { CertificatePdfModal, type CertPdfTarget } from "./certificate-pdf-modal";
 
 type Classroom = { id: string; name: string; venue: string; capacity: number; active: boolean };
 type CertEnrollment = { enrollment_number?: string; trainees?: unknown; courses?: unknown };
 type Certificate = { id: string; enrollment_id: string; status: string; printed_at?: string | null; reprint_count: number; created_at: string; enrollments?: CertEnrollment | CertEnrollment[] | null };
 type Batch = { id: string; batch_number: string; starts_on: string; ends_on: string; venue?: string | null; mode: string; capacity: number; confirmed_count: number; status: string; courses?: { name: string; code: string } | { name: string; code: string }[] | null };
-type TEnrollment = { id: string; enrollment_number: string; enrollment_status: string; trainees?: unknown; courses?: unknown };
+type TEnrollment = { id: string; enrollment_number: string; enrollment_status: string; course_id?: string; trainees?: unknown; courses?: unknown };
 type TCourse = { id: string; code: string; name: string; delivery_type: string };
 type CertTemplate = { id: string; course_id: string; version: number; active: boolean; fields: { key: string; label: string }[]; approved_at?: string | null; courses?: { name: string; code: string } | { name: string; code: string }[] | null };
 export type TrainingData = { classrooms: Classroom[]; certificates: Certificate[]; batches: Batch[]; enrollments: TEnrollment[]; courses: TCourse[]; certificateTemplates: CertTemplate[] };
@@ -27,6 +28,8 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
   const [tplFile, setTplFile] = useState<File | null>(null);
   const [tplBusy, setTplBusy] = useState(false);
   const [tplMsg, setTplMsg] = useState("");
+  const [pdfTarget, setPdfTarget] = useState<CertPdfTarget | null>(null);
+  const activeTemplateFor = (courseId?: string) => (courseId ? data.certificateTemplates.find((t) => t.course_id === courseId && t.active)?.id ?? null : null);
   async function uploadTemplate() {
     if (!tplCourse || !tplFile) { setTplMsg("Pick a course and a file."); return; }
     setTplBusy(true); setTplMsg("");
@@ -125,16 +128,16 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
             : <div className="certificate-lock"><span>◈</span><div><strong>Read-only</strong><p>Only Admin and Training Operations can issue or update certificates.</p></div><span className="portal-badge orange">Read-only</span></div>}
           <section className="portal-panel">
             <div className="panel-heading"><div><h2>Certificate register</h2><p>Move a certificate through Draft → For Printing → Released</p></div></div>
-            <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Course</th><th>Enrollment</th><th>Certificate status</th><th>Printed</th></tr></thead><tbody>
+            <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Course</th><th>Enrollment</th><th>Certificate status</th><th>Printed</th>{canManage && <th></th>}</tr></thead><tbody>
               {data.enrollments.filter((e) => e.enrollment_status !== "Cancelled").map((e) => {
                 const t = one(e.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null | undefined);
                 const c = one(e.courses as { name: string; code: string } | { name: string; code: string }[] | null | undefined);
                 const cert = data.certificates.find((x) => x.enrollment_id === e.id) ?? null;
                 return <tr key={e.id}><td><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</strong></td><td>{c?.name ?? "—"}</td><td>{e.enrollment_number}</td><td>{canManage
                   ? <select value={cert?.status ?? ""} disabled={busy} onChange={(ev) => { void post({ action: "certificate-status", enrollmentId: e.id, status: ev.target.value }); }}><option value="" disabled>Not issued</option>{CERT_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-                  : (cert ? (CERT_STATUSES.find(([v]) => v === cert.status)?.[1] ?? cert.status) : "Not issued")}</td><td>{cert?.printed_at ? day(cert.printed_at) : "—"}</td></tr>;
+                  : (cert ? (CERT_STATUSES.find(([v]) => v === cert.status)?.[1] ?? cert.status) : "Not issued")}</td><td>{cert?.printed_at ? day(cert.printed_at) : "—"}</td>{canManage && <td className="document-actions">{(() => { const tid = activeTemplateFor(e.course_id); return <button disabled={busy || !tid} title={tid ? "Generate/view the certificate PDF (optional 2x2 photo)" : "Upload an active template for this course first"} onClick={() => setPdfTarget({ templateId: tid, traineeName: t ? `${t.legal_first_name} ${t.legal_last_name}` : "", courseName: c?.name ?? "", enrollmentNumber: e.enrollment_number, certificateNumber: null, completionDate: cert?.printed_at ?? null })}>View PDF</button>; })()}</td>}</tr>;
               })}
-              {!data.enrollments.filter((e) => e.enrollment_status !== "Cancelled").length && <tr><td colSpan={5}><span className="portal-empty-copy">No enrollments to certify yet.</span></td></tr>}
+              {!data.enrollments.filter((e) => e.enrollment_status !== "Cancelled").length && <tr><td colSpan={canManage ? 6 : 5}><span className="portal-empty-copy">No enrollments to certify yet.</span></td></tr>}
             </tbody></table></div>
           </section>
           {canManage && <section className="portal-panel">
@@ -153,6 +156,7 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
           </section>}
         </>
       )}
+      {pdfTarget && <CertificatePdfModal target={pdfTarget} onClose={() => setPdfTarget(null)} />}
     </div>
   );
 }
