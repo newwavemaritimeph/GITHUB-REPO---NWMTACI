@@ -37,7 +37,7 @@ export type AccountingData = {
   cashierClosings: { id: string; closing_date: string; opening_cash_centavos: number; cash_collections_centavos: number; online_collections_centavos: number; expenses_centavos: number; expected_cash_centavos: number; actual_cash_centavos?: number | null; variance_centavos?: number | null; status: string }[];
   trainees: TraineeRow[];
   pendingDiscounts: PendingDiscount[];
-  announcements: { id: string; title: string; body: string; audience_roles: string[]; expires_at?: string | null; created_at: string }[];
+  announcements: { id: string; title: string; body: string; audience_roles: string[]; expires_at?: string | null }[];
 };
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);

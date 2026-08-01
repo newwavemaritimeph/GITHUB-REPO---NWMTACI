@@ -31,7 +31,7 @@ type PortalData = { profile:{complete_name:string;email:string}; roles:string[];
   expenseCategories:{id:string;name:string;active:boolean}[];
   inventoryItems:{id:string;name:string;category?:string|null;unit:string;quantity_on_hand:number;unit_value_centavos:number;active:boolean}[]; inventoryMovements:{id:string;item_id:string;movement_type:string;quantity:number;remarks?:string|null;created_at:string;inventory_items?:{name:string}|{name:string}[]|null}[];
   pendingDiscounts:{id:string;enrollment_id:string;description:string;amount_centavos:number;agency_id?:string|null;created_at:string}[];
-  announcements:{id:string;title:string;body:string;audience_roles:string[];published_at?:string|null;expires_at?:string|null;created_at:string}[];
+  announcements:{id:string;title:string;body:string;audience_roles:string[];published_at?:string|null;expires_at?:string|null}[];
   courseCategories:{id:string;name:string}[]; partnerCenters:{id:string;name:string;active:boolean}[] };
 
 const nav: {label:Module;icon:string;roles?:string[]}[] = [

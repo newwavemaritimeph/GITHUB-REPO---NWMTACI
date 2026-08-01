@@ -139,7 +139,7 @@ export async function GET() {
     db.from("inventory_items").select("id,name,category,unit,quantity_on_hand,unit_value_centavos,active").order("name"),
     db.from("inventory_movements").select("id,item_id,movement_type,quantity,remarks,created_at,inventory_items(name)").order("created_at", { ascending: false }).limit(200),
     db.from("enrollment_charges").select("id,enrollment_id,description,amount_centavos,agency_id,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name)),marketing_agencies(name)").eq("event_type", "discount").eq("approval_status", "Pending").order("created_at", { ascending: false }).limit(200),
-    db.from("announcements").select("id,title,body,audience_roles,published_at,expires_at,created_at").order("created_at", { ascending: false }).limit(30),
+    db.from("announcements").select("id,title,body,audience_roles,published_at,expires_at").order("published_at", { ascending: false, nullsFirst: false }).limit(30),
   ]);
   const error = results.find((item) => item.error)?.error;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
