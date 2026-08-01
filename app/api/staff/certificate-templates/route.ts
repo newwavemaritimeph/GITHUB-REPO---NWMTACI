@@ -22,6 +22,12 @@ export async function POST(request: Request) {
     try { const raw = form.get("fields"); if (raw) fields = JSON.parse(String(raw)); } catch { fields = []; }
 
     const db = createSupabaseAdminClient();
+    // Certificate templates are only for New Wave in-house courses (incl. STCW).
+    // Endorsed / partner trainings are excluded — New Wave does not issue their certificates.
+    const { data: course, error: courseError } = await db.from("courses").select("delivery_type").eq("id", courseId).maybeSingle();
+    if (courseError) throw courseError;
+    if (!course) return NextResponse.json({ error: "Course not found." }, { status: 404 });
+    if (course.delivery_type !== "In-House") return NextResponse.json({ error: "Certificate templates are only for New Wave in-house courses, not endorsed/partner trainings." }, { status: 400 });
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "-").slice(-100) || "template";
     const path = `${courseId}/${crypto.randomUUID()}-${safeName}`;
     const { error: uploadError } = await db.storage.from("certificate-templates").upload(path, file, { contentType: file.type, upsert: false });

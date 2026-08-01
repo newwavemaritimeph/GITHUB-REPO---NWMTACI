@@ -141,7 +141,7 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
             <div className="panel-heading"><div><h2>Certificate templates</h2><p>Upload a sample template per course and set the fields to fill in (number, name, date…)</p></div></div>
             <div className="portal-form" style={{ padding: "4px 0 10px" }}>
               {tplMsg && <div className="portal-message full" role="status">{tplMsg}</div>}
-              <label>Course<select value={tplCourse} onChange={(e) => setTplCourse(e.target.value)}><option value="">Select a course…</option>{data.courses.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label>
+              <label>Course<select value={tplCourse} onChange={(e) => setTplCourse(e.target.value)}><option value="">Select an in-house course…</option>{data.courses.filter((c) => c.delivery_type === "In-House").map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select><small className="portal-form-note">Only New Wave in-house courses (incl. STCW). Endorsed / partner trainings are excluded.</small></label>
               <label>Template file (PDF/PNG/JPEG)<input type="file" accept="application/pdf,image/png,image/jpeg" onChange={(e) => setTplFile(e.target.files?.[0] ?? null)} /></label>
               <label className="full">Editable fields (comma-separated)<input value={tplFields} onChange={(e) => setTplFields(e.target.value)} /></label>
               <div className="full"><button type="button" className="portal-primary" disabled={tplBusy || !tplCourse || !tplFile} onClick={uploadTemplate}>{tplBusy ? "Uploading…" : "Upload template"}</button></div>
