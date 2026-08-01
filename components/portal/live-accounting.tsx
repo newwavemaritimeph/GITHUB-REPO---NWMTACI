@@ -440,7 +440,7 @@ function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canM
       </section>
 
       <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Endorsement rates &amp; rebates</h2><p>Pick a partner center to see the courses it offers</p></div>{offerCenters.length > 0 && <select value={offerCenter} onChange={(e) => setOfferCenter(e.target.value)} style={{ maxWidth: 240 }}>{offerCenters.map((c) => <option key={c} value={c}>{c}</option>)}</select>}</div>
+        <div className="panel-heading"><div><h2>Endorsed Programs (rates &amp; rebates)</h2><p>Pick a partner center to see the courses it offers</p></div>{offerCenters.length > 0 && <select value={offerCenter} onChange={(e) => setOfferCenter(e.target.value)} style={{ maxWidth: 240 }}>{offerCenters.map((c) => <option key={c} value={c}>{c}</option>)}</select>}</div>
         <div className="portal-table"><table><thead><tr><th>Course</th><th>Duration</th><th>Training fee</th><th>Rebate</th><th>Partner payable</th><th>Edited</th><th></th></tr></thead><tbody>
           {data.offers.filter((o) => one(o.partner_centers)?.name === offerCenter).map((o) => {
             const center = one(o.partner_centers)?.name ?? "—"; const course = data.courses.find((c) => c.id === o.course_id)?.name ?? one(o.courses)?.name ?? "—";
@@ -480,7 +480,7 @@ function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canM
         </EditModal>
       )}
       {edit && edit.kind === "offer" && (
-        <EditModal title="Edit endorsement rate" subtitle={edit.label} busy={busy} onClose={() => setEdit(null)} onSave={save}>
+        <EditModal title="Edit Endorsed Program rate" subtitle={edit.label} busy={busy} onClose={() => setEdit(null)} onSave={save}>
           {error && <div className="portal-message error full">{error}</div>}
           <label>Training fee (PHP)<input type="number" min="0" step="0.01" autoFocus value={edit.fee} onChange={(e) => setEdit({ ...edit, fee: e.target.value })} /></label>
           <label>New Wave rebate (PHP)<input type="number" min="0" step="0.01" value={edit.rebate} onChange={(e) => setEdit({ ...edit, rebate: e.target.value })} /></label>
