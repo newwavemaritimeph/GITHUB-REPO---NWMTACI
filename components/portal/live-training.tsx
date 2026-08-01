@@ -150,7 +150,7 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
               {data.certificateTemplates.map((tp) => <tr key={tp.id}><td><strong>{one(tp.courses as { name: string } | { name: string }[] | null | undefined)?.name ?? "—"}</strong></td><td>v{tp.version}</td><td>{(tp.fields ?? []).map((f) => f.label).join(", ") || "—"}</td><td>{tp.active ? "Active" : "—"}</td></tr>)}
               {!data.certificateTemplates.length && <tr><td colSpan={4}><span className="portal-empty-copy">No templates uploaded yet.</span></td></tr>}
             </tbody></table></div>
-          </section>
+          </section>}
         </>
       )}
     </div>
