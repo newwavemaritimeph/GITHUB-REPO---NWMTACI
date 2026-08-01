@@ -15,13 +15,13 @@ type Charge = { id: string; name: string; default_amount_centavos: number; activ
 type Agency = { id: string; name: string; contact_name?: string | null; email?: string | null; mobile?: string | null; active: boolean };
 type Expense = { id: string; expense_number: string; payee: string; category: string; amount_centavos: number; status: string; created_at: string };
 type Payable = { id: string; description: string; amount_centavos: number; due_on?: string | null; status: string };
-type Course = { id: string; code: string; name: string; delivery_type: string; duration_label?: string; duration_days?: number; training_mode?: string; category_id?: string; standard_price_centavos: number };
+type Course = { id: string; code: string; name: string; delivery_type: string; duration_label?: string; duration_days?: number; training_mode?: string; category_id?: string; standard_price_centavos: number; updated_at?: string };
 type CenterRef = { name: string };
 type CourseRef = { name: string; code?: string };
-type Offer = { id: string; course_id?: string; duration_label: string; training_fee_centavos: number; rebate_centavos: number; partner_payable_centavos: number; partner_centers?: CenterRef | CenterRef[] | null; courses?: CourseRef | CourseRef[] | null };
+type Offer = { id: string; course_id?: string; duration_label: string; training_fee_centavos: number; rebate_centavos: number; partner_payable_centavos: number; updated_at?: string; partner_centers?: CenterRef | CenterRef[] | null; courses?: CourseRef | CourseRef[] | null };
 type Category = { id: string; name: string };
 type Center = { id: string; name: string; active: boolean };
-type AgencyRebate = { id: string; agency_id: string; course_id: string; rebate_centavos: number };
+type AgencyRebate = { id: string; agency_id: string; course_id: string; rebate_centavos: number; updated_at?: string };
 type AgencyRebateEntry = { id: string; agency_id: string; enrollment_id: string; course_id: string; rebate_centavos: number; status: string; created_at: string; marketing_agencies?: { name: string } | { name: string }[] | null; courses?: { name: string } | { name: string }[] | null; trainees?: { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null };
 type InventoryItem = { id: string; name: string; category?: string | null; unit: string; quantity_on_hand: number; unit_value_centavos: number; active: boolean };
 type InventoryMovement = { id: string; item_id: string; movement_type: string; quantity: number; remarks?: string | null; created_at: string; inventory_items?: { name: string } | { name: string }[] | null };
@@ -408,17 +408,18 @@ function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canM
       {!canManage && <div className="portal-message error">Only Admin and Accounting can edit courses, centers, and pricing.</div>}
       <section className="portal-panel">
         <div className="panel-heading"><div><h2>Courses</h2><p>Pick a course from the list to edit, or add a new one</p></div>{canManage && <div style={{ display: "flex", gap: "8px", alignItems: "center" }}><select value="" onChange={(e) => { const c = data.courses.find((x) => x.id === e.target.value); if (c) { setError(""); setEdit({ kind: "course", id: c.id, code: c.code, name: c.name, categoryId: c.category_id ?? defaultCategory, deliveryType: c.delivery_type === "Partner or Endorsed" ? "Partner or Endorsed" : "In-House", durationLabel: c.duration_label ?? "", durationDays: String(c.duration_days ?? 1), mode: c.training_mode ?? "In-person", price: String(c.standard_price_centavos / 100) }); } }} style={{ maxWidth: 240 }}><option value="">Select a course…</option>{data.courses.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select><button className="portal-primary" disabled={busy} onClick={() => { setError(""); setEdit({ kind: "course", code: "", name: "", categoryId: defaultCategory, deliveryType: "In-House", durationLabel: "1 day", durationDays: "1", mode: "In-person", price: "0" }); }}>+ Add course</button></div>}</div>
-        <div className="portal-table"><table><thead><tr><th>Course</th><th>Type</th><th>Duration</th><th>Price</th><th></th></tr></thead><tbody>
+        <div className="portal-table"><table><thead><tr><th>Course</th><th>Type</th><th>Duration</th><th>Price</th><th>Edited</th><th></th></tr></thead><tbody>
           {data.courses.map((c) => (
             <tr key={c.id}>
               <td><strong>{c.name}</strong><small>{c.code}</small></td>
               <td>{c.delivery_type}</td>
               <td>{c.duration_label ?? "—"}</td>
               <td>{pesos(c.standard_price_centavos)}</td>
+              <td>{c.updated_at ? manilaDay(c.updated_at) : "—"}</td>
               <td className="document-actions">{canManage && <button disabled={busy} onClick={() => { setError(""); setEdit({ kind: "course", id: c.id, code: c.code, name: c.name, categoryId: c.category_id ?? defaultCategory, deliveryType: c.delivery_type === "Partner or Endorsed" ? "Partner or Endorsed" : "In-House", durationLabel: c.duration_label ?? "", durationDays: String(c.duration_days ?? 1), mode: c.training_mode ?? "In-person", price: String(c.standard_price_centavos / 100) }); }}>Edit</button>}</td>
             </tr>
           ))}
-          {!data.courses.length && <tr><td colSpan={5}><span className="portal-empty-copy">No courses.</span></td></tr>}
+          {!data.courses.length && <tr><td colSpan={6}><span className="portal-empty-copy">No courses.</span></td></tr>}
         </tbody></table></div>
       </section>
 
@@ -438,7 +439,7 @@ function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canM
 
       <section className="portal-panel">
         <div className="panel-heading"><div><h2>Endorsement rates &amp; rebates</h2><p>Pick a partner center to see the courses it offers</p></div>{offerCenters.length > 0 && <select value={offerCenter} onChange={(e) => setOfferCenter(e.target.value)} style={{ maxWidth: 240 }}>{offerCenters.map((c) => <option key={c} value={c}>{c}</option>)}</select>}</div>
-        <div className="portal-table"><table><thead><tr><th>Course</th><th>Duration</th><th>Training fee</th><th>Rebate</th><th>Partner payable</th><th></th></tr></thead><tbody>
+        <div className="portal-table"><table><thead><tr><th>Course</th><th>Duration</th><th>Training fee</th><th>Rebate</th><th>Partner payable</th><th>Edited</th><th></th></tr></thead><tbody>
           {data.offers.filter((o) => one(o.partner_centers)?.name === offerCenter).map((o) => {
             const center = one(o.partner_centers)?.name ?? "—"; const course = data.courses.find((c) => c.id === o.course_id)?.name ?? one(o.courses)?.name ?? "—";
             return <tr key={o.id}>
@@ -447,10 +448,11 @@ function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canM
               <td>{pesos(o.training_fee_centavos)}</td>
               <td>{pesos(o.rebate_centavos)}</td>
               <td>{pesos(o.partner_payable_centavos)}</td>
+              <td>{o.updated_at ? manilaDay(o.updated_at) : "—"}</td>
               <td className="document-actions">{canManage && <button disabled={busy} onClick={() => { setError(""); setEdit({ kind: "offer", id: o.id, label: `${course} · ${center}`, fee: String(o.training_fee_centavos / 100), rebate: String(o.rebate_centavos / 100) }); }}>Edit rate</button>}</td>
             </tr>;
           })}
-          {!data.offers.filter((o) => one(o.partner_centers)?.name === offerCenter).length && <tr><td colSpan={6}><span className="portal-empty-copy">No courses for this center.</span></td></tr>}
+          {!data.offers.filter((o) => one(o.partner_centers)?.name === offerCenter).length && <tr><td colSpan={7}><span className="portal-empty-copy">No courses for this center.</span></td></tr>}
         </tbody></table></div>
       </section>
 
