@@ -87,7 +87,7 @@ function PortalContent({active,role,data,query,open,onPay,canEnroll,canSchedule,
   if(active==="Expenses")return <LiveExpenses data={data} role={role} reload={reload}/>;
   if(active==="Inventory")return <LiveInventory data={data} role={role} reload={reload}/>;
   if(active==="HR & payroll"&&["admin","hr"].includes(role))return <LiveHr data={data} role={role} reload={reload}/>;
-  if((active==="Classrooms"||active==="Certificates")&&["admin","training_operations"].includes(role))return <LiveTraining data={{classrooms:data.classrooms,certificates:data.certificates,batches:data.batches}} role={role} reload={reload} initialTab={active==="Certificates"?"Certificates":"Classrooms"}/>;
+  if((active==="Classrooms"||active==="Certificates")&&["admin","training_operations"].includes(role))return <LiveTraining data={{classrooms:data.classrooms,certificates:data.certificates,batches:data.batches,enrollments:data.enrollments}} role={role} reload={reload} initialTab={active==="Certificates"?"Certificates":"Classrooms"}/>;
   if(active==="Setup"&&role==="admin")return <div className="portal-page"><PageHead eyebrow="System administration" title="Configuration and authorized accounts" text="Manage payment modes, users, partners, agencies, courses, prices, and durations."/><AdminConfiguration/></div>;
   return <ConnectedModule module={active} data={data}/>;
 }

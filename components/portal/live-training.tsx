@@ -6,7 +6,10 @@ type Classroom = { id: string; name: string; venue: string; capacity: number; ac
 type CertEnrollment = { enrollment_number?: string; trainees?: unknown; courses?: unknown };
 type Certificate = { id: string; enrollment_id: string; status: string; printed_at?: string | null; reprint_count: number; created_at: string; enrollments?: CertEnrollment | CertEnrollment[] | null };
 type Batch = { id: string; batch_number: string; starts_on: string; ends_on: string; venue?: string | null; mode: string; capacity: number; confirmed_count: number; status: string; courses?: { name: string; code: string } | { name: string; code: string }[] | null };
-export type TrainingData = { classrooms: Classroom[]; certificates: Certificate[]; batches: Batch[] };
+type TEnrollment = { id: string; enrollment_number: string; enrollment_status: string; trainees?: unknown; courses?: unknown };
+export type TrainingData = { classrooms: Classroom[]; certificates: Certificate[]; batches: Batch[]; enrollments: TEnrollment[] };
+/** DB status value → friendly label shown in the Certificate register. */
+const CERT_STATUSES: [string, string][] = [["Pending Attendance", "Draft"], ["Ready to Print", "For Printing"], ["Printed", "Printed"], ["Released", "Released"], ["Cancelled", "Cancelled"]];
 
 const one = <T,>(value: T | T[] | null | undefined): T | null => (Array.isArray(value) ? value[0] ?? null : value ?? null);
 const day = (value?: string | null) => (value ? new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${value}T00:00:00+08:00`)) : "—");
@@ -97,19 +100,21 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
 
       {tab === "Certificates" && (
         <>
-          <div className="certificate-lock">
-            <span>◈</span>
-            <div><strong>Certificate issuance is disabled</strong><p>Printing and release stay blocked until an approved New Wave template is uploaded and the issuance feature flag is enabled. This view is read-only.</p></div>
-            <span className="portal-badge orange">Safety lock active</span>
-          </div>
+          {canManage
+            ? <div className="portal-message" role="status">Issue and update certificate status below. In-house certificates require the trainee&apos;s completed feedback before release.</div>
+            : <div className="certificate-lock"><span>◈</span><div><strong>Read-only</strong><p>Only Admin and Training Operations can issue or update certificates.</p></div><span className="portal-badge orange">Read-only</span></div>}
           <section className="portal-panel">
-            <div className="panel-heading"><div><h2>Certificate register</h2><p>Eligibility and status by enrollment</p></div></div>
-            <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Course</th><th>Enrollment</th><th>Status</th><th>Printed</th></tr></thead><tbody>
-              {data.certificates.map((cert) => {
-                const e = one(cert.enrollments); const t = one(e?.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null | undefined); const c = one(e?.courses as { name: string; code: string } | { name: string; code: string }[] | null | undefined);
-                return <tr key={cert.id}><td><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</strong></td><td>{c?.name ?? "—"}</td><td>{e?.enrollment_number ?? "—"}</td><td>{cert.status}</td><td>{cert.printed_at ? day(cert.printed_at) : "—"}</td></tr>;
+            <div className="panel-heading"><div><h2>Certificate register</h2><p>Move a certificate through Draft → For Printing → Released</p></div></div>
+            <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Course</th><th>Enrollment</th><th>Certificate status</th><th>Printed</th></tr></thead><tbody>
+              {data.enrollments.filter((e) => e.enrollment_status !== "Cancelled").map((e) => {
+                const t = one(e.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null | undefined);
+                const c = one(e.courses as { name: string; code: string } | { name: string; code: string }[] | null | undefined);
+                const cert = data.certificates.find((x) => x.enrollment_id === e.id) ?? null;
+                return <tr key={e.id}><td><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</strong></td><td>{c?.name ?? "—"}</td><td>{e.enrollment_number}</td><td>{canManage
+                  ? <select value={cert?.status ?? ""} disabled={busy} onChange={(ev) => { void post({ action: "certificate-status", enrollmentId: e.id, status: ev.target.value }); }}><option value="" disabled>Not issued</option>{CERT_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+                  : (cert ? (CERT_STATUSES.find(([v]) => v === cert.status)?.[1] ?? cert.status) : "Not issued")}</td><td>{cert?.printed_at ? day(cert.printed_at) : "—"}</td></tr>;
               })}
-              {!data.certificates.length && <tr><td colSpan={5}><span className="portal-empty-copy">No certificate records yet. They appear once attendance completion generates eligibility.</span></td></tr>}
+              {!data.enrollments.filter((e) => e.enrollment_status !== "Cancelled").length && <tr><td colSpan={5}><span className="portal-empty-copy">No enrollments to certify yet.</span></td></tr>}
             </tbody></table></div>
           </section>
         </>
