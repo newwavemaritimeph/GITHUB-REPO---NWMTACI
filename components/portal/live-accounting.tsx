@@ -37,6 +37,7 @@ export type AccountingData = {
   cashierClosings: { id: string; closing_date: string; opening_cash_centavos: number; cash_collections_centavos: number; online_collections_centavos: number; expenses_centavos: number; expected_cash_centavos: number; actual_cash_centavos?: number | null; variance_centavos?: number | null; status: string }[];
   trainees: TraineeRow[];
   pendingDiscounts: PendingDiscount[];
+  announcements: { id: string; title: string; body: string; audience_roles: string[]; expires_at?: string | null; created_at: string }[];
 };
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -114,6 +115,7 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
 
       {tab === "Dashboard" && (
         <>
+          {data.announcements.length > 0 && <section className="portal-panel live-list" style={{ marginBottom: 16 }}><div className="panel-heading"><div><h2>📣 Announcements</h2></div></div>{data.announcements.slice(0, 5).map((a) => <div className="live-row-item" key={a.id}><div><strong>{a.title}</strong><small>{a.body}</small></div></div>)}</section>}
           <section className="portal-panel" style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
             <label style={{ display: "flex", flexDirection: "column", fontSize: 13, color: "var(--muted)" }}>From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
             <label style={{ display: "flex", flexDirection: "column", fontSize: 13, color: "var(--muted)" }}>To<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
