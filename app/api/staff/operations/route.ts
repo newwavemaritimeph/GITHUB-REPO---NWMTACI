@@ -170,9 +170,12 @@ export async function GET() {
   }
   // Certificates carry trainee identity — only Training Operations and Admin receive them.
   let certificates: unknown[] = [];
+  let certificateTemplates: unknown[] = [];
   if (canManageTraining(staff.roleCodes)) {
     const { data } = await db.from("certificates").select("id,enrollment_id,status,printed_at,reprint_count,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name,code))").order("created_at", { ascending: false }).limit(300);
     certificates = data ?? [];
+    const { data: tpls } = await db.from("certificate_templates").select("id,course_id,version,storage_path,active,fields,approved_at,courses(name,code)").order("created_at", { ascending: false }).limit(200);
+    certificateTemplates = tpls ?? [];
   }
   return NextResponse.json({ profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
@@ -180,7 +183,7 @@ export async function GET() {
     paymentMethods: paymentMethods.data ?? [], charges: charges.data ?? [], agencies: agencies.data ?? [],
     expenses: expenses.data ?? [], payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems,
-    classrooms: classrooms.data ?? [], certificates, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
+    classrooms: classrooms.data ?? [], certificates, certificateTemplates, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
     agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [] }, { headers: { "Cache-Control": "no-store" } });
 }
 

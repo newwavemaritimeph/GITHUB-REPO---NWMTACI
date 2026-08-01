@@ -7,7 +7,9 @@ type CertEnrollment = { enrollment_number?: string; trainees?: unknown; courses?
 type Certificate = { id: string; enrollment_id: string; status: string; printed_at?: string | null; reprint_count: number; created_at: string; enrollments?: CertEnrollment | CertEnrollment[] | null };
 type Batch = { id: string; batch_number: string; starts_on: string; ends_on: string; venue?: string | null; mode: string; capacity: number; confirmed_count: number; status: string; courses?: { name: string; code: string } | { name: string; code: string }[] | null };
 type TEnrollment = { id: string; enrollment_number: string; enrollment_status: string; trainees?: unknown; courses?: unknown };
-export type TrainingData = { classrooms: Classroom[]; certificates: Certificate[]; batches: Batch[]; enrollments: TEnrollment[] };
+type TCourse = { id: string; code: string; name: string; delivery_type: string };
+type CertTemplate = { id: string; course_id: string; version: number; active: boolean; fields: { key: string; label: string }[]; approved_at?: string | null; courses?: { name: string; code: string } | { name: string; code: string }[] | null };
+export type TrainingData = { classrooms: Classroom[]; certificates: Certificate[]; batches: Batch[]; enrollments: TEnrollment[]; courses: TCourse[]; certificateTemplates: CertTemplate[] };
 /** DB status value → friendly label shown in the Certificate register. */
 const CERT_STATUSES: [string, string][] = [["Pending Attendance", "Draft"], ["Ready to Print", "For Printing"], ["Printed", "Printed"], ["Released", "Released"], ["Cancelled", "Cancelled"]];
 
@@ -20,6 +22,24 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const canManage = role === "admin" || role === "training_operations";
+  const [tplCourse, setTplCourse] = useState("");
+  const [tplFields, setTplFields] = useState("Certificate Number, Trainee Name, Completion Date, Course Name");
+  const [tplFile, setTplFile] = useState<File | null>(null);
+  const [tplBusy, setTplBusy] = useState(false);
+  const [tplMsg, setTplMsg] = useState("");
+  async function uploadTemplate() {
+    if (!tplCourse || !tplFile) { setTplMsg("Pick a course and a file."); return; }
+    setTplBusy(true); setTplMsg("");
+    try {
+      const fd = new FormData();
+      fd.set("template", tplFile); fd.set("courseId", tplCourse);
+      fd.set("fields", JSON.stringify(tplFields.split(",").map((s) => s.trim()).filter(Boolean).map((label) => ({ key: label.toLowerCase().replace(/[^a-z0-9]+/g, "_"), label }))));
+      const r = await fetch("/api/staff/certificate-templates", { method: "POST", body: fd });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error ?? "Upload failed.");
+      setTplFile(null); setTplMsg("Template uploaded."); await reload();
+    } catch (e) { setTplMsg(e instanceof Error ? e.message : "Upload failed."); } finally { setTplBusy(false); }
+  }
   const today = todayIso();
 
   async function post(body: Record<string, unknown>) {
@@ -115,6 +135,20 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
                   : (cert ? (CERT_STATUSES.find(([v]) => v === cert.status)?.[1] ?? cert.status) : "Not issued")}</td><td>{cert?.printed_at ? day(cert.printed_at) : "—"}</td></tr>;
               })}
               {!data.enrollments.filter((e) => e.enrollment_status !== "Cancelled").length && <tr><td colSpan={5}><span className="portal-empty-copy">No enrollments to certify yet.</span></td></tr>}
+            </tbody></table></div>
+          </section>
+          {canManage && <section className="portal-panel">
+            <div className="panel-heading"><div><h2>Certificate templates</h2><p>Upload a sample template per course and set the fields to fill in (number, name, date…)</p></div></div>
+            <div className="portal-form" style={{ padding: "4px 0 10px" }}>
+              {tplMsg && <div className="portal-message full" role="status">{tplMsg}</div>}
+              <label>Course<select value={tplCourse} onChange={(e) => setTplCourse(e.target.value)}><option value="">Select a course…</option>{data.courses.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label>
+              <label>Template file (PDF/PNG/JPEG)<input type="file" accept="application/pdf,image/png,image/jpeg" onChange={(e) => setTplFile(e.target.files?.[0] ?? null)} /></label>
+              <label className="full">Editable fields (comma-separated)<input value={tplFields} onChange={(e) => setTplFields(e.target.value)} /></label>
+              <div className="full"><button type="button" className="portal-primary" disabled={tplBusy || !tplCourse || !tplFile} onClick={uploadTemplate}>{tplBusy ? "Uploading…" : "Upload template"}</button></div>
+            </div>
+            <div className="portal-table"><table><thead><tr><th>Course</th><th>Version</th><th>Fields</th><th>Active</th></tr></thead><tbody>
+              {data.certificateTemplates.map((tp) => <tr key={tp.id}><td><strong>{one(tp.courses as { name: string } | { name: string }[] | null | undefined)?.name ?? "—"}</strong></td><td>v{tp.version}</td><td>{(tp.fields ?? []).map((f) => f.label).join(", ") || "—"}</td><td>{tp.active ? "Active" : "—"}</td></tr>)}
+              {!data.certificateTemplates.length && <tr><td colSpan={4}><span className="portal-empty-copy">No templates uploaded yet.</span></td></tr>}
             </tbody></table></div>
           </section>
         </>
