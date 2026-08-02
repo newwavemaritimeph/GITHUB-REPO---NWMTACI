@@ -782,6 +782,13 @@ export async function POST(request: Request) {
     if (error) throw error;
     return NextResponse.json({ ok: true, payment: data });
   } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "The operation could not be completed." }, { status: 400 });
+    // Supabase/Postgres errors are plain objects (not Error instances); surface their
+    // message so staff see the real reason (e.g. duplicate trainee) instead of a generic one.
+    const message = error instanceof Error
+      ? error.message
+      : (error && typeof error === "object" && "message" in error && (error as { message?: unknown }).message)
+        ? String((error as { message: unknown }).message)
+        : "The operation could not be completed.";
+    return NextResponse.json({ error: message }, { status: 400 });
   }
 }
