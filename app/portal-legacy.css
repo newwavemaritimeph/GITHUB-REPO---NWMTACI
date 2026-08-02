@@ -12,9 +12,9 @@
   min-height: 100vh;
   background: var(--paper);
   color: var(--ink);
-  /* House style: all portal text renders uppercase (display only; stored
-     values such as emails and names are unchanged). */
-  text-transform: uppercase;
+  /* House style: portal text renders in Capitalized (Title) Case (display only;
+     stored values such as emails and names are unchanged). */
+  text-transform: capitalize;
 }
 
 /* Keep email fields readable/lowercase as typed — uppercase display would be

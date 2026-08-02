@@ -74,15 +74,17 @@ body {
   font-size: 16px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
-  /* House style: all on-screen text renders uppercase (display only; stored
-     values such as emails and names are unchanged). */
-  text-transform: uppercase;
+  /* House style: on-screen text renders in Capitalized (Title) Case, display
+     only — stored values such as emails and names are unchanged. */
+  text-transform: capitalize;
 }
 
-/* Keep email addresses in their natural case — uppercasing an address the
-   user must recognise or type is misleading. */
-input[type="email"] {
-  text-transform: none;
+/* Keep emails and passwords in their natural case — transforming a value the
+   user must recognise or type is misleading. !important so it survives the
+   blanket transforms below. */
+input[type="email"],
+input[type="password"] {
+  text-transform: none !important;
 }
 
 button,
@@ -2780,14 +2782,14 @@ code {
 }
 
 /*
- * House style: the staff portal reads in ALL CAPS. Applied as a display-only
- * transform (stored data is untouched) and forced with !important so it beats
- * the many per-element text-transform rules elsewhere in this file.
+ * House style: the staff portal reads in Capitalized (Title) Case. Applied as a
+ * display-only transform (stored data is untouched) and forced with !important
+ * so it beats the many per-element text-transform rules elsewhere in this file.
  */
 .portal,
 .portal *,
 .portal ::placeholder {
-  text-transform: uppercase !important;
+  text-transform: capitalize !important;
 }
 
 .sidebar {
