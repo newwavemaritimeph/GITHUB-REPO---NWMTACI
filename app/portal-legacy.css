@@ -92,6 +92,12 @@
   border-color: rgba(255, 255, 255, 0.34);
   color: #fff;
 }
+/* The native dropdown list renders on a white popup, so force readable dark
+   options — otherwise the white select text is invisible when opened. */
+.portal-sidebar .role-picker select option {
+  color: #123f63;
+  background: #ffffff;
+}
 .portal-sidebar .sidebar-footer {
   border-top-color: rgba(255, 255, 255, 0.26);
 }
