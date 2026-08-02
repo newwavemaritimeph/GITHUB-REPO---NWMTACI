@@ -99,8 +99,9 @@ const centerSaveInput = z.object({ action: z.literal("center-save"), id: z.strin
 const paymentSplitInput = z.object({ action: z.literal("payment-split"), allocations: z.array(z.object({ enrollmentId: z.string().uuid(), amountCentavos: z.number().int().positive() })).min(1).max(10), method: z.string().trim().min(1).max(80), receivingAccount: z.string().trim().min(2).max(120), referenceNumber: z.string().trim().max(80).optional().default(""), receivedAt: z.string().datetime({ offset: true }), remarks: z.string().trim().max(500).optional().default("") });
 const courseChangeInput = z.object({ action: z.literal("enrollment-course-change"), enrollmentId: z.string().uuid(), courseId: z.string().uuid(), partnerOfferId: z.string().uuid().nullable().optional() });
 const rescheduleInput = z.object({ action: z.literal("enrollment-reschedule"), enrollmentId: z.string().uuid(), batchId: z.string().uuid().nullable() });
+const sendInstructionsInput = z.object({ action: z.literal("send-instructions"), enrollmentId: z.string().uuid() });
 
-const actionInput = z.union([batchInput, autoOpenBatchInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, discountRequestInput, discountDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput]);
+const actionInput = z.union([batchInput, autoOpenBatchInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, discountRequestInput, discountDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
@@ -158,9 +159,12 @@ export async function GET() {
   // migrated yet, the query errors in isolation and we simply omit the date rather
   // than failing the whole workspace load.
   const scheduledByEnrollment = new Map<string, string | null>();
+  const sentByEnrollment = new Map<string, string | null>();
   const scheduledResult = await db.from("enrollments").select("id,scheduled_on").limit(250);
   if (!scheduledResult.error) for (const row of scheduledResult.data ?? []) scheduledByEnrollment.set(row.id, (row as { scheduled_on?: string | null }).scheduled_on ?? null);
-  const enrollments = (enrollmentsResult.data ?? []).map((row) => ({ ...row, scheduled_on: scheduledByEnrollment.get(row.id) ?? null, paid_centavos: paidByEnrollment.get(row.id) ?? 0, charges_centavos: chargesByEnrollment.get(row.id) ?? 0, discounts_centavos: discountsByEnrollment.get(row.id) ?? 0 }));
+  const sentResult = await db.from("enrollments").select("id,instructions_sent_at").limit(250);
+  if (!sentResult.error) for (const row of sentResult.data ?? []) sentByEnrollment.set(row.id, (row as { instructions_sent_at?: string | null }).instructions_sent_at ?? null);
+  const enrollments = (enrollmentsResult.data ?? []).map((row) => ({ ...row, scheduled_on: scheduledByEnrollment.get(row.id) ?? null, instructions_sent_at: sentByEnrollment.get(row.id) ?? null, paid_centavos: paidByEnrollment.get(row.id) ?? 0, charges_centavos: chargesByEnrollment.get(row.id) ?? 0, discounts_centavos: discountsByEnrollment.get(row.id) ?? 0 }));
   // HR datasets are sensitive (salaries, government IDs) — only HR and Admin receive them.
   const isHr = canManageHr(staff.roleCodes);
   let hr: Record<string, unknown[]> = { employees: [], employeeAttendance: [], leaveRequests: [], cashAdvances: [], payrollPeriods: [], payrollItems: [] };
@@ -332,6 +336,27 @@ export async function POST(request: Request) {
       const { data, error } = await db.rpc("decide_enrollment_discount", { target_charge: input.id, target_approve: input.approve });
       if (error) throw error;
       return NextResponse.json({ ok: true, charge: data });
+    }
+    if (input.action === "send-instructions") {
+      if (!staff.roleCodes.some((r) => ["admin", "registration", "training_operations"].includes(r))) return NextResponse.json({ error: "Your account cannot send training instructions." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: enrollment, error: findError } = await admin.from("enrollments")
+        .select("id,enrollment_number,trainee_id,trainees(profile_id,legal_first_name),courses(name)")
+        .eq("id", input.enrollmentId).maybeSingle();
+      if (findError || !enrollment) throw findError ?? new Error("Enrollment not found.");
+      // Mark instructions as sent. Tolerate a not-yet-migrated column so the action
+      // never hard-fails; the column exists once 202608020002 is applied.
+      const { error: sentError } = await admin.from("enrollments").update({ instructions_sent_at: new Date().toISOString() }).eq("id", input.enrollmentId);
+      if (sentError) console.error("Could not set instructions_sent_at:", sentError.message);
+      // Best-effort in-app notification to the trainee (only if they have a portal account).
+      const trainee = Array.isArray(enrollment.trainees) ? enrollment.trainees[0] : enrollment.trainees;
+      const course = Array.isArray(enrollment.courses) ? enrollment.courses[0] : enrollment.courses;
+      if (trainee?.profile_id) {
+        await admin.from("notifications").insert({ recipient_id: trainee.profile_id, notification_type: "training_instructions",
+          title: "Your training instructions are ready", body: `Reporting instructions for ${course?.name ?? "your training"} (${enrollment.enrollment_number}) have been sent. Please review your portal for reporting details.`,
+          related_record_type: "enrollment", related_record_id: input.enrollmentId }).then(({ error }) => { if (error) console.error("Instruction notification failed:", error.message); });
+      }
+      return NextResponse.json({ ok: true });
     }
     if (input.action === "announcement-post") {
       if (!staff.roleCodes.some((r) => ["admin", "accounting"].includes(r))) return NextResponse.json({ error: "Only Admin or Accounting can post announcements." }, { status: 403 });
