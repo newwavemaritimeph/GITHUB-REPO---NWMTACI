@@ -10,10 +10,6 @@ const enrollmentInput = z.object({
   birthDate: z.string().date().optional(), email: z.string().email().optional(), mobile: z.string().trim().min(7).max(30).optional(),
   courseId: z.string().uuid(), partnerOfferId: z.string().uuid().nullable().optional(), batchId: z.string().uuid().nullable().optional(),
   scheduledOn: z.string().date().nullable().optional(),
-}).superRefine((value, context) => {
-  if (!value.existingTraineeId && (!value.birthDate || !value.email || !value.mobile || value.firstName.length < 2 || value.lastName.length < 2)) {
-    context.addIssue({ code: "custom", message: "Complete the trainee's name, birth date, email, and mobile number." });
-  }
 });
 
 const batchInput = z.object({
@@ -46,8 +42,6 @@ const paymentInput = z.object({
   method: z.string().trim().min(1).max(80), receivingAccount: z.string().trim().min(2).max(120),
   referenceNumber: z.string().trim().max(80).optional().default(""), proofId: z.string().uuid().nullable().optional(),
   receivedAt: z.string().datetime({ offset: true }), remarks: z.string().trim().max(500).optional().default(""),
-}).superRefine((value, context) => {
-  if (["GCash", "Bank transfer"].includes(value.method) && !value.referenceNumber) context.addIssue({ code: "custom", message: "A transaction reference is required for GCash and bank transfers." });
 });
 
 const notificationInput = z.object({ action: z.literal("mark-notifications-read") });
@@ -103,7 +97,7 @@ const sendInstructionsInput = z.object({ action: z.literal("send-instructions"),
 const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional() });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.union([batchInput, autoOpenBatchInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput]);
+const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
@@ -745,6 +739,9 @@ export async function POST(request: Request) {
     }
     if (input.action === "create-enrollment") {
       if (!staff.roleCodes.some((role) => ["admin", "registration", "training_operations"].includes(role))) return NextResponse.json({ error: "Your account cannot create enrollments." }, { status: 403 });
+      if (!input.existingTraineeId && (!input.birthDate || !input.email || !input.mobile || input.firstName.length < 2 || input.lastName.length < 2)) {
+        return NextResponse.json({ error: "Complete the trainee's name, birth date, email, and mobile number." }, { status: 400 });
+      }
       const { data, error } = await db.rpc("create_staff_enrollment", { target_existing_trainee: input.existingTraineeId ?? null,
         target_first_name: input.firstName, target_middle_name: input.middleName, target_last_name: input.lastName, target_birthdate: input.birthDate ?? "1900-01-01",
         target_email: input.email ?? "", target_mobile: input.mobile ?? "", target_course: input.courseId, target_partner_offer: input.partnerOfferId ?? null,
@@ -761,6 +758,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, enrollment: data });
     }
     if (!staff.roleCodes.some((role) => ["admin", "cashier", "accounting"].includes(role))) return NextResponse.json({ error: "Your account cannot post payments." }, { status: 403 });
+    if (["GCash", "Bank transfer"].includes(input.method) && !input.referenceNumber) return NextResponse.json({ error: "A transaction reference is required for GCash and bank transfers." }, { status: 400 });
     const admin = createSupabaseAdminClient();
     const { data: enrollment, error: enrollmentError } = await admin.from("enrollments").select("id,trainee_id,selling_price_centavos").eq("id", input.enrollmentId).maybeSingle();
     if (enrollmentError || !enrollment) throw enrollmentError ?? new Error("Enrollment not found.");
@@ -782,6 +780,11 @@ export async function POST(request: Request) {
     if (error) throw error;
     return NextResponse.json({ ok: true, payment: data });
   } catch (error) {
+    // Zod validation errors: report the specific field problems, not the raw JSON dump.
+    if (error instanceof z.ZodError) {
+      const message = error.issues.map((issue) => { const field = issue.path.filter((p) => p !== "action").join("."); return field ? `${field}: ${issue.message}` : issue.message; }).join("; ");
+      return NextResponse.json({ error: message || "Please check the submitted values." }, { status: 400 });
+    }
     // Supabase/Postgres errors are plain objects (not Error instances); surface their
     // message so staff see the real reason (e.g. duplicate trainee) instead of a generic one.
     const message = error instanceof Error
