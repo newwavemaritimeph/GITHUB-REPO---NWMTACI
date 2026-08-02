@@ -5,12 +5,15 @@ import { DataTable, EmptyState, Field, Modal, Pill, ProgressBar, SearchInput, Se
 import { pesos } from "@/lib/endorsement-catalog";
 import { formatDate, formatDateRange, todayIso, useSystem } from "@/lib/system/store";
 import { batchPatternLabel, monthlyBatchStarts } from "@/lib/scheduling";
+import type { Role } from "@/lib/system/types";
 import { PageHeader, Panel } from "./shared";
 
 const filters = ["Published", "Draft", "Ongoing", "Completed", "All"] as const;
 
-export function SchedulesModule() {
+export function SchedulesModule({ role }: { role: Role }) {
   const { state, seats, createBatch, autoOpenMonth, publishBatch, setBatchStatus } = useSystem();
+  // Registration can browse schedules but may not open, publish, or cancel batches.
+  const readOnly = role === "Registration";
   const toast = useToast();
   const [filter, setFilter] = useState<(typeof filters)[number]>("Published");
   const [query, setQuery] = useState("");
@@ -43,16 +46,22 @@ export function SchedulesModule() {
       <PageHeader
         eyebrow="Training operations"
         title="Schedules & resources"
-        description="Capacity-safe batches, instructors, venues, and publication control for the public website."
+        description={
+          readOnly
+            ? "View published batches, dates, venues, and capacity. Opening or changing batches is handled by Training Operations."
+            : "Capacity-safe batches, instructors, venues, and publication control for the public website."
+        }
         actions={
-          <>
-            <button className="secondary-button" onClick={() => setAutoOpen(true)}>
-              Auto-open schedules
-            </button>
-            <button className="primary-button" onClick={() => setNewOpen(true)}>
-              + New batch
-            </button>
-          </>
+          readOnly ? undefined : (
+            <>
+              <button className="secondary-button" onClick={() => setAutoOpen(true)}>
+                Auto-open schedules
+              </button>
+              <button className="primary-button" onClick={() => setNewOpen(true)}>
+                + New batch
+              </button>
+            </>
+          )
         }
       />
 
@@ -119,7 +128,9 @@ export function SchedulesModule() {
                     </Pill>
                   </td>
                   <td className="cell-actions">
-                    {batch.publishedAt === null && batch.status !== "Cancelled" ? (
+                    {readOnly ? (
+                      <span className="muted-text">—</span>
+                    ) : batch.publishedAt === null && batch.status !== "Cancelled" ? (
                       <button
                         className="ghost-button"
                         onClick={() => {

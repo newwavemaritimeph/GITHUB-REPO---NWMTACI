@@ -9,7 +9,7 @@ export type Module =
   | "Registrations"
   | "Trainees"
   | "Enrollments"
-  | "Courses & centers"
+  | "Endorsed courses"
   | "Schedules"
   | "Payments"
   | "Expense vouchers"

@@ -24,6 +24,20 @@ import { PageHeader, Panel, StageBadge, StageTrack, type Module } from "./shared
 const filters = ["All", "Unpaid", "Awaiting verification", "Ready for instructions", "In training", "Completed"] as const;
 const REGISTRATION_STATUSES: RegistrationLifecycle[] = ["Waiting for Payment", "Enrolled", "Reschedule", "Generated Voucher", "Cancelled"];
 
+/** Short schedule label: batch number for in-house, or the free date for endorsed. */
+function scheduleLabel(view: EnrollmentView): string {
+  if (view.batch) return view.batch.batchNumber;
+  if (view.enrollment.scheduledOn) return `Endorsed · ${formatDate(view.enrollment.scheduledOn)}`;
+  return "Open schedule";
+}
+
+/** Schedule date(s): batch range for in-house, single free date for endorsed. */
+function scheduleDates(view: EnrollmentView): string {
+  if (view.batch) return formatDateRange(view.batch.startsOn, view.batch.endsOn);
+  if (view.enrollment.scheduledOn) return formatDate(view.enrollment.scheduledOn);
+  return "—";
+}
+
 /** Fetch the New Wave logo PNG for embedding in generated PDFs (optional). */
 async function fetchLogoBytes(): Promise<Uint8Array | undefined> {
   try {
@@ -222,9 +236,9 @@ export function EnrollmentsModule({
                 </td>
                 <td>
                   <strong>{item.enrollment.courseName}</strong>
-                  <small>{item.batch?.batchNumber ?? "Open schedule"}</small>
+                  <small>{scheduleLabel(item)}</small>
                 </td>
-                <td>{item.batch ? formatDateRange(item.batch.startsOn, item.batch.endsOn) : "—"}</td>
+                <td>{scheduleDates(item)}</td>
                 <td>
                   <Pill
                     tone={
@@ -307,11 +321,11 @@ export function EnrollmentsModule({
               </div>
               <div>
                 <dt>Batch</dt>
-                <dd>{active.batch?.batchNumber ?? "Open schedule"}</dd>
+                <dd>{scheduleLabel(active)}</dd>
               </div>
               <div>
                 <dt>Training dates</dt>
-                <dd>{active.batch ? formatDateRange(active.batch.startsOn, active.batch.endsOn) : "—"}</dd>
+                <dd>{scheduleDates(active)}</dd>
               </div>
               <div>
                 <dt>Venue</dt>
@@ -672,9 +686,9 @@ export function EnrollmentsModule({
       <NewEnrollmentModal
         open={newOpen}
         onClose={() => setNewOpen(false)}
-        onCreate={({ traineeId, batchId, offerId }) => {
+        onCreate={({ traineeId, batchId, offerId, scheduledOn }) => {
           const enrollment = offerId
-            ? createEndorsedEnrollment({ traineeId, offerId })
+            ? createEndorsedEnrollment({ traineeId, offerId, scheduledOn })
             : createEnrollment({ traineeId, batchId: batchId ?? "" });
           if (enrollment) {
             toast("success", `${enrollment.reference} created.`);
@@ -1115,7 +1129,7 @@ export function AdmissionInvoiceModal({
   };
   const courseLines = group.map((v) => ({
     course: `${v.enrollment.courseName} (${v.enrollment.courseCode})`,
-    schedule: v.batch ? formatDateRange(v.batch.startsOn, v.batch.endsOn) : "Open schedule",
+    schedule: v.batch ? formatDateRange(v.batch.startsOn, v.batch.endsOn) : v.enrollment.scheduledOn ? formatDate(v.enrollment.scheduledOn) : "Open schedule",
     time: timeOf(v),
     venue: v.batch?.venue ?? "",
     instructor: v.batch?.instructor ?? "",
@@ -1318,7 +1332,7 @@ function NewEnrollmentModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onCreate: (input: { traineeId: string; batchId?: string; offerId?: string }) => void;
+  onCreate: (input: { traineeId: string; batchId?: string; offerId?: string; scheduledOn?: string }) => void;
   trainees: { id: string; traineeNumber: string; firstName: string; middleName?: string; lastName: string }[];
   batches: { id: string; batchNumber: string; courseName: string; startsOn: string; endsOn: string }[];
   offers: { id: string; course: string; center: string; trainingFeeCentavos: number }[];
@@ -1328,8 +1342,10 @@ function NewEnrollmentModal({
   const [type, setType] = useState<"In-house" | "Endorsed">("In-house");
   const [batchId, setBatchId] = useState("");
   const [offerId, setOfferId] = useState("");
+  const [scheduledOn, setScheduledOn] = useState("");
 
-  const valid = Boolean(traineeId) && (type === "In-house" ? Boolean(batchId) : Boolean(offerId));
+  const valid =
+    Boolean(traineeId) && (type === "In-house" ? Boolean(batchId) : Boolean(offerId) && Boolean(scheduledOn));
 
   return (
     <Modal
@@ -1345,7 +1361,14 @@ function NewEnrollmentModal({
           <button
             className="primary-button"
             disabled={!valid}
-            onClick={() => onCreate({ traineeId, batchId: type === "In-house" ? batchId : undefined, offerId: type === "Endorsed" ? offerId : undefined })}
+            onClick={() =>
+              onCreate({
+                traineeId,
+                batchId: type === "In-house" ? batchId : undefined,
+                offerId: type === "Endorsed" ? offerId : undefined,
+                scheduledOn: type === "Endorsed" ? scheduledOn : undefined,
+              })
+            }
           >
             Create enrollment
           </button>
@@ -1381,16 +1404,21 @@ function NewEnrollmentModal({
             </select>
           </Field>
         ) : (
-          <Field label="Endorsed training" full hint="Scheduling is coordinated with the partner center — no New Wave batch.">
-            <select value={offerId} onChange={(event) => setOfferId(event.target.value)}>
-              <option value="">Select an endorsed training</option>
-              {offers.map((offer) => (
-                <option key={offer.id} value={offer.id}>
-                  {offer.course} — {offer.center} · {pesos(offer.trainingFeeCentavos)}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <>
+            <Field label="Endorsed training" full hint="Scheduling is coordinated with the partner center — no New Wave batch.">
+              <select value={offerId} onChange={(event) => setOfferId(event.target.value)}>
+                <option value="">Select an endorsed training</option>
+                {offers.map((offer) => (
+                  <option key={offer.id} value={offer.id}>
+                    {offer.course} — {offer.center} · {pesos(offer.trainingFeeCentavos)}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Training date" full hint="Pick the agreed training date with the partner center.">
+              <input type="date" value={scheduledOn} onChange={(event) => setScheduledOn(event.target.value)} />
+            </Field>
+          </>
         )}
       </div>
     </Modal>

@@ -410,7 +410,7 @@ type SystemContextValue = {
   reviewSelection: (id: string, status: SelectionStatus, remark?: string) => void;
   approveSelection: (id: string) => Enrollment | undefined;
   createEnrollment: (input: { traineeId: string; batchId: string }) => Enrollment | undefined;
-  createEndorsedEnrollment: (input: { traineeId: string; offerId: string }) => Enrollment | undefined;
+  createEndorsedEnrollment: (input: { traineeId: string; offerId: string; scheduledOn?: string }) => Enrollment | undefined;
   changeEnrollmentBatch: (enrollmentId: string, newBatchId: string) => void;
   setRegistrationStatus: (enrollmentId: string, status: RegistrationLifecycle) => void;
   generateAdmissionSlip: (enrollmentId: string, input: { officer: string; cashier: string }) => void;
@@ -1058,7 +1058,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
   // and fee from the partner offer. The courseCode is keyed "endorsed:<offerId>"
   // so a marketing-agency rebate set against the same offer lines up.
   const createEndorsedEnrollment = useCallback<SystemContextValue["createEndorsedEnrollment"]>(
-    ({ traineeId, offerId }) => {
+    ({ traineeId, offerId, scheduledOn }) => {
       let created: Enrollment | undefined;
       update((draft) => {
         const offer = draft.partnerOffers.find((item) => item.id === offerId);
@@ -1074,6 +1074,7 @@ export function SystemProvider({ children }: { children: React.ReactNode }) {
           centerName: offer.center,
           status: "Enrolled",
           createdAt: new Date().toISOString(),
+          scheduledOn: scheduledOn || undefined,
           registrationStatus: "Waiting for Payment",
           processedBy: actor,
         };

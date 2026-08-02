@@ -65,6 +65,20 @@ function statusTone(status: string): string {
   return "red";
 }
 
+/** Front-desk enrollment status: ENROLLED (paid/confirmed), PENDING (awaiting payment), or CANCELLED. */
+function traineeStatus(item: EnrollmentView | undefined): "Enrolled" | "Pending" | "Cancelled" | null {
+  if (!item) return null;
+  if (item.stage === "Cancelled" || item.enrollment.status === "Cancelled" || item.enrollment.registrationStatus === "Cancelled") return "Cancelled";
+  if (item.paymentStatus === "Paid" || item.enrollment.registrationStatus === "Enrolled") return "Enrolled";
+  return "Pending";
+}
+
+function traineeStatusTone(status: "Enrolled" | "Pending" | "Cancelled"): "green" | "amber" | "slate" {
+  if (status === "Enrolled") return "green";
+  if (status === "Cancelled") return "slate";
+  return "amber";
+}
+
 const normalizeName = (trainee: Trainee) =>
   `${trainee.firstName} ${trainee.middleName ?? ""} ${trainee.lastName}`.toLowerCase().replace(/\s+/g, " ").trim();
 
@@ -156,6 +170,14 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
   const selectedViews = selected ? all.filter((item) => item.trainee.id === selected.id) : [];
   const duplicateCount = groups.reduce((sum, group) => sum + group.length - 1, 0);
 
+  // Label for the date-sensitive summary header.
+  const summaryRange =
+    fromDate || toDate
+      ? describeRange(resolveRange("Custom", today, { from: fromDate || toDate, to: toDate || fromDate }))
+      : role === "Registration" && !query && statusFilter === "All stages"
+        ? "Enrolled today"
+        : "All dates";
+
   return (
     <div className="page">
       <PageHeader
@@ -180,39 +202,16 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
         <StatCard label="Certificates released" value={String(all.filter((item) => item.certificate?.status === "Released").length)} note="Completion records" tone={2} icon="✓" />
       </div>
 
-      <Panel padded={false}>
+      <Panel title="Trainee lookup" description="Find any trainee on record by name, trainee number, email, or mobile.">
         <div className="toolbar toolbar-wrap">
           <Segmented options={["All trainees", "Possible duplicates"] as const} value={view} onChange={setView} />
-          {view === "All trainees" && (
-            <>
-              <SearchInput value={query} onChange={setQuery} placeholder="Search name, number, email, or mobile" />
-              <label className="inline-field">
-                <span>From</span>
-                <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-              </label>
-              <label className="inline-field">
-                <span>To</span>
-                <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
-              </label>
-              <label className="inline-field">
-                <span>Stage</span>
-                <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as (typeof STAGE_FILTERS)[number])}>
-                  {STAGE_FILTERS.map((item) => (
-                    <option key={item}>{item}</option>
-                  ))}
-                </select>
-              </label>
-              {(fromDate || toDate || statusFilter !== "All stages" || query) && (
-                <button className="link-button toolbar-end" onClick={() => { setFromDate(""); setToDate(""); setStatusFilter("All stages"); setQuery(""); }}>
-                  Clear filters
-                </button>
-              )}
-            </>
-          )}
+          <SearchInput value={query} onChange={setQuery} placeholder="Search name, number, email, or mobile" />
         </div>
+      </Panel>
 
-        {view === "Possible duplicates" ? (
-          groups.length === 0 ? (
+      {view === "Possible duplicates" ? (
+        <Panel padded={false} title="Possible duplicates" description="Same SRN or an exact first, middle, and last name.">
+          {groups.length === 0 ? (
             <EmptyState icon="✓" title="No duplicates detected" text="No trainees share an SRN or an exact first, middle, and last name." />
           ) : (
             <div className="dup-list">
@@ -247,56 +246,88 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
                 );
               })}
             </div>
-          )
-        ) : rows.length === 0 ? (
-          <EmptyState
-            title={role === "Registration" && !query ? "No trainees enrolled today yet" : "No trainee matches"}
-            text={role === "Registration" && !query ? "Search by name, number, email, or mobile to find any trainee on record." : "Adjust the search, date range, or status filter."}
-          />
-        ) : (
-          <DataTable columns={["Trainee", "Contact", "Enrollments", showAmounts ? "Balance" : "Payment status", "Latest stage", ""]} minWidth={940}>
-            {rows.map((trainee) => {
-              const owned = all.filter((item) => item.trainee.id === trainee.id);
-              const balance = owned.reduce((sum, item) => sum + item.balanceCentavos, 0);
-              return (
-                <tr key={trainee.id} className="row-clickable" onClick={() => setSelected(trainee)}>
-                  <td>
-                    <div className="person-cell">
-                      <Avatar name={fullName(trainee)} />
-                      <div>
-                        <strong>{fullName(trainee)}</strong>
-                        <small>{trainee.traineeNumber}</small>
+          )}
+        </Panel>
+      ) : (
+        <Panel padded={false} title="Trainee summary" description={`Date-sensitive · ${summaryRange}`}>
+          <div className="toolbar toolbar-wrap">
+            <label className="inline-field">
+              <span>Start date</span>
+              <input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
+            </label>
+            <label className="inline-field">
+              <span>End date</span>
+              <input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+            </label>
+            <label className="inline-field">
+              <span>Stage</span>
+              <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as (typeof STAGE_FILTERS)[number])}>
+                {STAGE_FILTERS.map((item) => (
+                  <option key={item}>{item}</option>
+                ))}
+              </select>
+            </label>
+            {(fromDate || toDate || statusFilter !== "All stages" || query) && (
+              <button className="link-button toolbar-end" onClick={() => { setFromDate(""); setToDate(""); setStatusFilter("All stages"); setQuery(""); }}>
+                Clear filters
+              </button>
+            )}
+          </div>
+
+          {rows.length === 0 ? (
+            <EmptyState
+              title={role === "Registration" && !query ? "No trainees enrolled today yet" : "No trainee matches"}
+              text={role === "Registration" && !query ? "Search by name, number, email, or mobile, or pick a start and end date to see more." : "Adjust the search, date range, or status filter."}
+            />
+          ) : (
+            <DataTable columns={["Trainee", "Contact", "Enrollments", "Status", showAmounts ? "Balance" : "Payment status", "Latest stage", ""]} minWidth={1020}>
+              {rows.map((trainee) => {
+                const owned = all.filter((item) => item.trainee.id === trainee.id);
+                const balance = owned.reduce((sum, item) => sum + item.balanceCentavos, 0);
+                const status = traineeStatus(owned[0]);
+                return (
+                  <tr key={trainee.id} className="row-clickable" onClick={() => setSelected(trainee)}>
+                    <td>
+                      <div className="person-cell">
+                        <Avatar name={fullName(trainee)} />
+                        <div>
+                          <strong>{fullName(trainee)}</strong>
+                          <small>{trainee.traineeNumber}</small>
+                        </div>
                       </div>
-                    </div>
-                  </td>
-                  <td>
-                    {trainee.email}
-                    <small>{trainee.mobile}</small>
-                  </td>
-                  <td>{owned.length}</td>
-                  <td>
-                    {showAmounts ? (
-                      <strong className={balance > 0 ? "value-danger" : "value-good"}>{pesos(balance)}</strong>
-                    ) : owned[0] ? (
-                      <div className="status-stack">
-                        {owned.slice(0, 3).map((item) => (
-                          <Pill key={item.enrollment.id} tone={statusTone(paymentStatusOf(item))}>{paymentStatusOf(item)}</Pill>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="muted-text">—</span>
-                    )}
-                  </td>
-                  <td>{owned[0] ? <StageBadge stage={owned[0].stage} /> : <span className="muted-text">No enrollment</span>}</td>
-                  <td className="cell-actions">
-                    <button className="ghost-button">View</button>
-                  </td>
-                </tr>
-              );
-            })}
-          </DataTable>
-        )}
-      </Panel>
+                    </td>
+                    <td>
+                      {trainee.email}
+                      <small>{trainee.mobile}</small>
+                    </td>
+                    <td>{owned.length}</td>
+                    <td>
+                      {status ? <Pill tone={traineeStatusTone(status)}>{status}</Pill> : <span className="muted-text">—</span>}
+                    </td>
+                    <td>
+                      {showAmounts ? (
+                        <strong className={balance > 0 ? "value-danger" : "value-good"}>{pesos(balance)}</strong>
+                      ) : owned[0] ? (
+                        <div className="status-stack">
+                          {owned.slice(0, 3).map((item) => (
+                            <Pill key={item.enrollment.id} tone={statusTone(paymentStatusOf(item))}>{paymentStatusOf(item)}</Pill>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="muted-text">—</span>
+                      )}
+                    </td>
+                    <td>{owned[0] ? <StageBadge stage={owned[0].stage} /> : <span className="muted-text">No enrollment</span>}</td>
+                    <td className="cell-actions">
+                      <button className="ghost-button">View</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </DataTable>
+          )}
+        </Panel>
+      )}
 
       <Drawer open={Boolean(selected)} title={selected ? fullName(selected) : ""} subtitle={selected?.traineeNumber} onClose={() => setSelected(null)}>
         {selected && (
@@ -612,7 +643,7 @@ export function CatalogModule({ role }: { role: Role }) {
     <div className="page">
       <PageHeader
         eyebrow="Internal commercial catalog"
-        title="Courses & training centers"
+        title="Endorsed courses"
         description={
           canEdit
             ? "Add, edit, and archive New Wave courses and endorsed partner offers — no developer needed. Fees, rebates, and payables are staff-only."

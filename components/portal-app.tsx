@@ -77,8 +77,8 @@ const nav: { label: Module; icon: string; roles?: Role[] }[] = [
   { label: "Dashboard", icon: "⌂" },
   { label: "Search trainee", icon: "⌕", roles: ["Admin"] },
   { label: "Registrations", icon: "✎", roles: ["Registration", "Accounting"] },
-  { label: "Courses & centers", icon: "◇", roles: ["Registration", "Training Operations"] },
-  { label: "Schedules", icon: "□", roles: ["Training Operations", "Instructor"] },
+  { label: "Endorsed courses", icon: "◇", roles: ["Registration", "Training Operations"] },
+  { label: "Schedules", icon: "□", roles: ["Registration", "Training Operations", "Instructor"] },
   { label: "Payments", icon: "₱", roles: ["Cashier", "Accounting"] },
   { label: "Expense vouchers", icon: "◰", roles: ["Cashier", "Accounting", "Admin"] },
   { label: "Accounting", icon: "▥", roles: ["Admin", "Accounting"] },
@@ -88,7 +88,7 @@ const nav: { label: Module; icon: string; roles?: Role[] }[] = [
   { label: "Classrooms", icon: "▦", roles: ["Training Operations"] },
   { label: "Certificates", icon: "◈", roles: ["Training Operations"] },
   { label: "Training setup", icon: "⚙", roles: ["Training Operations"] },
-  { label: "Requests", icon: "↗", roles: ["Admin", "Cashier", "Accounting", "Training Operations", "Instructor"] },
+  { label: "Requests", icon: "↗", roles: ["Registration", "Admin", "Cashier", "Accounting", "Training Operations", "Instructor"] },
   { label: "User setup", icon: "◎", roles: ["HR"] },
   { label: "Instructors", icon: "◎", roles: ["HR"] },
   { label: "Payroll", icon: "♙", roles: ["HR"] },
@@ -131,24 +131,10 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
 
   // ---- date-sensitive registration figures -------------------------------
   const today = todayIso();
-  const newlyRegistered = state.submissions.filter((item) => (item.submittedAt ?? "").slice(0, 10) === today);
+  // "Registered today" reflects enrollments created today (consistent with the
+  // enrollment-based cards below), not raw public submissions.
+  const newlyRegistered = all.filter((item) => (item.enrollment.createdAt ?? "").slice(0, 10) === today);
   const activeEnrollments = all.filter((item) => item.stage !== "Cancelled");
-
-  const officerBoard = (() => {
-    const counts = new Map<string, number>();
-    activeEnrollments.forEach((item) => {
-      const who = item.enrollment.processedBy;
-      if (who) counts.set(who, (counts.get(who) ?? 0) + 1);
-    });
-    return [...counts.entries()].sort((left, right) => right[1] - left[1]);
-  })();
-  const trainingBoard = (() => {
-    const counts = new Map<string, number>();
-    activeEnrollments.forEach((item) => counts.set(item.enrollment.courseName, (counts.get(item.enrollment.courseName) ?? 0) + 1));
-    return [...counts.entries()].sort((left, right) => right[1] - left[1]).slice(0, 6);
-  })();
-  const maxTraining = trainingBoard[0]?.[1] ?? 1;
-  const maxOfficer = officerBoard[0]?.[1] ?? 1;
 
   const activeAnnouncements = [...state.announcements]
     .filter((item) => !item.expiresOn || item.expiresOn >= today)
@@ -684,43 +670,6 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
         </Panel>
       )}
 
-      {isRegistration && (
-        <div className="two-column">
-          <Panel title="Trainings with most enrollments" description="Ranked by active enrollments">
-            {trainingBoard.length === 0 ? (
-              <div className="empty-block"><span aria-hidden="true">□</span><h3>No enrollments yet</h3><p>Approved registrations will appear here.</p></div>
-            ) : (
-              trainingBoard.map(([course, count], index) => (
-                <div key={course} className="leaderboard-row">
-                  <span className="rank">{index + 1}</span>
-                  <div className="leaderboard-copy">
-                    <strong>{course}</strong>
-                    <div className="leaderboard-bar"><i style={{ width: `${Math.round((count / maxTraining) * 100)}%` }} /></div>
-                  </div>
-                  <b className="leaderboard-count">{count}</b>
-                </div>
-              ))
-            )}
-          </Panel>
-          <Panel title="Registration performance" description="Officers ranked by enrollments processed">
-            {officerBoard.length === 0 ? (
-              <div className="empty-block"><span aria-hidden="true">◎</span><h3>No attributed enrollments</h3><p>Enrollments you process will be counted here.</p></div>
-            ) : (
-              officerBoard.map(([officer, count], index) => (
-                <div key={officer} className="leaderboard-row">
-                  <span className={`rank ${index === 0 ? "gold" : ""}`}>{index + 1}</span>
-                  <div className="leaderboard-copy">
-                    <strong>{officer}</strong>
-                    <div className="leaderboard-bar"><i style={{ width: `${Math.round((count / maxOfficer) * 100)}%` }} /></div>
-                  </div>
-                  <b className="leaderboard-count">{count}</b>
-                </div>
-              ))
-            )}
-          </Panel>
-        </div>
-      )}
-
       {!isRegistration && !isAccounting && !isTrainingOps && !isCashier && !isHR && !isAdmin && (
       <>
       <div className="two-column">
@@ -1075,8 +1024,8 @@ function PortalShell({ previewMode }: { previewMode: boolean }) {
         {active === "Registrations" && <RegistrationHub role={role} go={go} />}
         {active === "Trainees" && <TraineesModule go={go} role={role} />}
         {active === "Enrollments" && <EnrollmentsModule go={go} role={role} />}
-        {active === "Courses & centers" && <CatalogModule role={role} />}
-        {active === "Schedules" && <SchedulesModule />}
+        {active === "Endorsed courses" && <CatalogModule role={role} />}
+        {active === "Schedules" && <SchedulesModule role={role} />}
         {active === "Payments" && <PaymentsModule role={role} />}
         {active === "Expense vouchers" && <ExpenseVouchersModule role={role} />}
         {active === "Accounting" && <AccountingModule role={role} />}

@@ -178,6 +178,8 @@ export type Enrollment = {
   centerName: string;
   status: EnrollmentStatus;
   createdAt: string;
+  /** Free training date for endorsed/partner enrollments that have no New Wave batch. */
+  scheduledOn?: string;
   /** Registration-officer status: Waiting for Payment / Enrolled / etc. */
   registrationStatus?: RegistrationLifecycle;
   /** Set when a registration officer generates the admission slip / voucher. */
