@@ -382,7 +382,7 @@ export async function POST(request: Request) {
       if (input.batchId) requested.batchId = input.batchId;
       if (input.amountCentavos) requested.amountCentavos = input.amountCentavos;
       if (input.paymentId) requested.paymentId = input.paymentId;
-      const { data: reference, error: refError } = await admin.rpc("next_reference", { prefix: "REQ" });
+      const { data: reference, error: refError } = await db.rpc("next_reference", { prefix: "REQ" });
       if (refError) throw refError;
       const { data: created, error: insertError } = await admin.from("enrollment_requests").insert({ request_number: reference, trainee_id: enrollment.trainee_id, enrollment_id: input.enrollmentId, request_type: input.requestType, requested_values: requested, reason: input.reason, requester_id: staff.user.id, status: "Pending" }).select("id").single();
       if (insertError) throw insertError;
