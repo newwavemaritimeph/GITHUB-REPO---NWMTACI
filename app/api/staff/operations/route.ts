@@ -9,6 +9,7 @@ const enrollmentInput = z.object({
   firstName: z.string().trim().max(80).optional().default(""), middleName: z.string().trim().max(80).optional().default(""), lastName: z.string().trim().max(80).optional().default(""),
   birthDate: z.string().date().optional(), email: z.string().email().optional(), mobile: z.string().trim().min(7).max(30).optional(),
   courseId: z.string().uuid(), partnerOfferId: z.string().uuid().nullable().optional(), batchId: z.string().uuid().nullable().optional(),
+  scheduledOn: z.string().date().nullable().optional(),
 }).superRefine((value, context) => {
   if (!value.existingTraineeId && (!value.birthDate || !value.email || !value.mobile || value.firstName.length < 2 || value.lastName.length < 2)) {
     context.addIssue({ code: "custom", message: "Complete the trainee's name, birth date, email, and mobile number." });
@@ -153,7 +154,13 @@ export async function GET() {
     const target = row.event_type === "discount" ? discountsByEnrollment : chargesByEnrollment;
     target.set(row.enrollment_id, (target.get(row.enrollment_id) ?? 0) + Number(row.amount_centavos));
   }
-  const enrollments = (enrollmentsResult.data ?? []).map((row) => ({ ...row, paid_centavos: paidByEnrollment.get(row.id) ?? 0, charges_centavos: chargesByEnrollment.get(row.id) ?? 0, discounts_centavos: discountsByEnrollment.get(row.id) ?? 0 }));
+  // scheduled_on is fetched separately and tolerantly: if the column has not been
+  // migrated yet, the query errors in isolation and we simply omit the date rather
+  // than failing the whole workspace load.
+  const scheduledByEnrollment = new Map<string, string | null>();
+  const scheduledResult = await db.from("enrollments").select("id,scheduled_on").limit(250);
+  if (!scheduledResult.error) for (const row of scheduledResult.data ?? []) scheduledByEnrollment.set(row.id, (row as { scheduled_on?: string | null }).scheduled_on ?? null);
+  const enrollments = (enrollmentsResult.data ?? []).map((row) => ({ ...row, scheduled_on: scheduledByEnrollment.get(row.id) ?? null, paid_centavos: paidByEnrollment.get(row.id) ?? 0, charges_centavos: chargesByEnrollment.get(row.id) ?? 0, discounts_centavos: discountsByEnrollment.get(row.id) ?? 0 }));
   // HR datasets are sensitive (salaries, government IDs) — only HR and Admin receive them.
   const isHr = canManageHr(staff.roleCodes);
   let hr: Record<string, unknown[]> = { employees: [], employeeAttendance: [], leaveRequests: [], cashAdvances: [], payrollPeriods: [], payrollItems: [] };
@@ -638,6 +645,14 @@ export async function POST(request: Request) {
         target_email: input.email ?? "", target_mobile: input.mobile ?? "", target_course: input.courseId, target_partner_offer: input.partnerOfferId ?? null,
         target_batch: input.batchId ?? null, target_source: "Staff-assisted registration" });
       if (error) throw error;
+      // Endorsed/partner enrollments carry a free training date (no New Wave batch).
+      // Persist it separately so the create RPC stays unchanged. Tolerate a missing
+      // column (pre-migration) so enrollment creation never fails on this step.
+      if (input.scheduledOn && data?.id) {
+        const admin = createSupabaseAdminClient();
+        const { error: dateError } = await admin.from("enrollments").update({ scheduled_on: input.scheduledOn }).eq("id", data.id);
+        if (dateError) console.error("Could not save enrollment scheduled_on:", dateError.message);
+      }
       return NextResponse.json({ ok: true, enrollment: data });
     }
     if (!staff.roleCodes.some((role) => ["admin", "cashier", "accounting"].includes(role))) return NextResponse.json({ error: "Your account cannot post payments." }, { status: 403 });
