@@ -100,14 +100,40 @@ const paymentSplitInput = z.object({ action: z.literal("payment-split"), allocat
 const courseChangeInput = z.object({ action: z.literal("enrollment-course-change"), enrollmentId: z.string().uuid(), courseId: z.string().uuid(), partnerOfferId: z.string().uuid().nullable().optional() });
 const rescheduleInput = z.object({ action: z.literal("enrollment-reschedule"), enrollmentId: z.string().uuid(), batchId: z.string().uuid().nullable() });
 const sendInstructionsInput = z.object({ action: z.literal("send-instructions"), enrollmentId: z.string().uuid() });
+const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional() });
+const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.union([batchInput, autoOpenBatchInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, discountRequestInput, discountDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput]);
+const actionInput = z.union([batchInput, autoOpenBatchInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
 const canManageHr = (roles: string[]) => roles.some((role) => ["admin", "hr"].includes(role));
 const canManageTraining = (roles: string[]) => roles.some((role) => ["admin", "training_operations"].includes(role));
 const minutesOfDay = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+// Move an enrollment to a new batch (or to "no batch"), keeping confirmed_count and
+// Open/Full status correct on both batches. Shared by the direct reschedule action and
+// the approval side-effect of a Rescheduling request.
+async function applyReschedule(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentId: string, newBatchId: string | null) {
+  const { data: enrollment } = await admin.from("enrollments").select("id,batch_id").eq("id", enrollmentId).maybeSingle();
+  if (!enrollment) throw new Error("Enrollment not found.");
+  const oldBatch = enrollment.batch_id as string | null;
+  if (newBatchId && newBatchId !== oldBatch) {
+    const { data: nb } = await admin.from("batches").select("capacity,confirmed_count").eq("id", newBatchId).maybeSingle();
+    if (!nb) throw new Error("Schedule not found.");
+    if (Number(nb.confirmed_count) >= Number(nb.capacity)) throw new Error("That schedule is already full.");
+  }
+  const { error } = await admin.from("enrollments").update({ batch_id: newBatchId }).eq("id", enrollmentId);
+  if (error) throw error;
+  if (oldBatch && oldBatch !== newBatchId) {
+    const { data: ob } = await admin.from("batches").select("confirmed_count,capacity,status").eq("id", oldBatch).maybeSingle();
+    if (ob) { const next = Math.max(0, Number(ob.confirmed_count) - 1); await admin.from("batches").update({ confirmed_count: next, status: ob.status === "Full" && next < Number(ob.capacity) ? "Open" : ob.status }).eq("id", oldBatch); }
+  }
+  if (newBatchId && newBatchId !== oldBatch) {
+    const { data: nb2 } = await admin.from("batches").select("confirmed_count,capacity,status").eq("id", newBatchId).maybeSingle();
+    if (nb2) { const next = Number(nb2.confirmed_count) + 1; await admin.from("batches").update({ confirmed_count: next, status: next >= Number(nb2.capacity) ? "Full" : nb2.status }).eq("id", newBatchId); }
+  }
+}
 const stampManila = (date: string, hhmm: string) => `${date}T${hhmm}:00+08:00`;
 
 export async function GET() {
@@ -188,6 +214,14 @@ export async function GET() {
     const { data: tpls } = await db.from("certificate_templates").select("id,course_id,version,storage_path,active,fields,approved_at,courses(name,code)").order("created_at", { ascending: false }).limit(200);
     certificateTemplates = tpls ?? [];
   }
+  // Cashier→Accounting requests (Cancellation/Refund/Make-up/Rescheduling). enrollment_requests is
+  // RLS-protected, so read via service role; expose only to cashier/accounting/admin.
+  let requests: unknown[] = [];
+  if (canCashier(staff.roleCodes)) {
+    const admin = createSupabaseAdminClient();
+    const { data } = await admin.from("enrollment_requests").select("id,request_number,request_type,requested_values,reason,status,decision_remarks,created_at,decided_at,trainees(legal_first_name,legal_last_name),enrollments(enrollment_number,courses(name))").in("request_type", ["Cancellation", "Refund", "Make-up Class", "Rescheduling"]).order("created_at", { ascending: false }).limit(200);
+    requests = data ?? [];
+  }
   return NextResponse.json({ profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
@@ -195,7 +229,7 @@ export async function GET() {
     expenses: expenses.data ?? [], payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems,
     classrooms: classrooms.data ?? [], certificates, certificateTemplates, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [] }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -336,6 +370,52 @@ export async function POST(request: Request) {
       const { data, error } = await db.rpc("decide_enrollment_discount", { target_charge: input.id, target_approve: input.approve });
       if (error) throw error;
       return NextResponse.json({ ok: true, charge: data });
+    }
+    if (input.action === "request-raise") {
+      if (!staff.roleCodes.some((r) => ["admin", "cashier", "accounting"].includes(r))) return NextResponse.json({ error: "Your account cannot raise requests." }, { status: 403 });
+      if (input.requestType === "Rescheduling" && !input.batchId) return NextResponse.json({ error: "Choose the new schedule for the reschedule request." }, { status: 400 });
+      if (input.requestType === "Refund" && !input.amountCentavos) return NextResponse.json({ error: "Enter the refund amount." }, { status: 400 });
+      const admin = createSupabaseAdminClient();
+      const { data: enrollment, error: findError } = await admin.from("enrollments").select("id,trainee_id").eq("id", input.enrollmentId).maybeSingle();
+      if (findError || !enrollment) throw findError ?? new Error("Enrollment not found.");
+      const requested: Record<string, unknown> = {};
+      if (input.batchId) requested.batchId = input.batchId;
+      if (input.amountCentavos) requested.amountCentavos = input.amountCentavos;
+      if (input.paymentId) requested.paymentId = input.paymentId;
+      const { data: reference, error: refError } = await admin.rpc("next_reference", { prefix: "REQ" });
+      if (refError) throw refError;
+      const { data: created, error: insertError } = await admin.from("enrollment_requests").insert({ request_number: reference, trainee_id: enrollment.trainee_id, enrollment_id: input.enrollmentId, request_type: input.requestType, requested_values: requested, reason: input.reason, requester_id: staff.user.id, status: "Pending" }).select("id").single();
+      if (insertError) throw insertError;
+      await admin.from("request_events").insert({ request_id: created.id, actor_id: staff.user.id, event_type: "raised", new_values: requested, remarks: input.reason });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "request-decide") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or Admin can decide requests." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: req, error: findError } = await admin.from("enrollment_requests").select("id,enrollment_id,request_type,requested_values,status").eq("id", input.id).maybeSingle();
+      if (findError || !req) throw findError ?? new Error("Request not found.");
+      if (req.status !== "Pending") return NextResponse.json({ error: "This request has already been decided." }, { status: 400 });
+      if (input.approve) {
+        const rv = (req.requested_values ?? {}) as { batchId?: string; amountCentavos?: number; paymentId?: string };
+        if (req.request_type === "Rescheduling") {
+          await applyReschedule(admin, req.enrollment_id, rv.batchId ?? null);
+        } else if (req.request_type === "Cancellation") {
+          const { error } = await admin.from("enrollments").update({ enrollment_status: "Cancelled", cancelled_at: new Date().toISOString() }).eq("id", req.enrollment_id);
+          if (error) throw error;
+        } else if (req.request_type === "Refund") {
+          const { error } = await admin.from("refunds_and_reversals").insert({ enrollment_id: req.enrollment_id, payment_id: rv.paymentId ?? null, event_type: "refund", amount_centavos: rv.amountCentavos ?? 0, reason: input.remarks ?? "Approved refund request", approved_request_id: req.id, created_by: staff.user.id });
+          if (error) throw error;
+        } else if (req.request_type === "Make-up Class") {
+          // Requires migration 202608020003 (nullable original_attendance_record_id). Best-effort so
+          // approval still records before the column is nullable; Training Ops completes the assignment.
+          const { error } = await admin.from("make_up_assignments").insert({ enrollment_id: req.enrollment_id, status: "Pending", assigned_by: staff.user.id });
+          if (error) console.error("Make-up assignment insert failed (apply migration 202608020003):", error.message);
+        }
+      }
+      const { error: updateError } = await admin.from("enrollment_requests").update({ status: input.approve ? "Approved" : "Rejected", decided_at: new Date().toISOString(), decision_remarks: input.remarks ?? null, assigned_approver_id: staff.user.id }).eq("id", req.id);
+      if (updateError) throw updateError;
+      await admin.from("request_events").insert({ request_id: req.id, actor_id: staff.user.id, event_type: input.approve ? "approved" : "rejected", remarks: input.remarks ?? null });
+      return NextResponse.json({ ok: true });
     }
     if (input.action === "send-instructions") {
       if (!staff.roleCodes.some((r) => ["admin", "registration", "training_operations"].includes(r))) return NextResponse.json({ error: "Your account cannot send training instructions." }, { status: 403 });
