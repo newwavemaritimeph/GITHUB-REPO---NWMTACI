@@ -290,6 +290,11 @@ function FinanceCatalogSetup({data,reload}:{data:PortalData;reload:()=>Promise<v
       rows={data.charges.map(c=>({id:c.id,primary:c.name,secondary:`Default ${pesos(c.default_amount_centavos)}`,active:c.active,values:{name:c.name,defaultAmount:String(c.default_amount_centavos/100)}}))}
       onSubmit={(v,id)=>post({action:"charge-save",id,name:String(v.name),defaultAmountCentavos:Math.round((Number(v.defaultAmount)||0)*100)})}
       onArchive={(id,active,name)=>post({action:"charge-save",id,name,active:!active})}/>
+    <SetupList title="Marketing agencies" description="Referring consultancies / agencies" entityLabel="agency" canManage busy={false}
+      fields={[{key:"name",label:"Agency name"},{key:"contactName",label:"Contact person",optional:true},{key:"email",label:"Email",optional:true},{key:"mobile",label:"Mobile",optional:true}]}
+      rows={data.agencies.map(a=>({id:a.id,primary:a.name,secondary:[a.contact_name,a.email,a.mobile].filter(Boolean).join(" · ")||"—",active:a.active,values:{name:a.name,contactName:a.contact_name||"",email:a.email||"",mobile:a.mobile||""}}))}
+      onSubmit={(v,id)=>post({action:"agency-save",id,name:String(v.name),contactName:String(v.contactName||""),email:String(v.email||""),mobile:String(v.mobile||"")})}
+      onArchive={(id,active,name)=>post({action:"agency-save",id,name,active:!active})}/>
   </div>;
 }
 
