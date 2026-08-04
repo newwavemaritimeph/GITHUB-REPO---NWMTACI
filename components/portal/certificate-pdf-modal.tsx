@@ -15,7 +15,9 @@ export type CertPdfTarget = {
   courseName: string;
   enrollmentNumber: string;
   certificateNumber?: string | null;
-  completionDate?: string | null;
+  conductedDate?: string | null;
+  issuedDate?: string | null;
+  registrationNumber?: string | null;
 };
 
 type PhotoBox = { x: number; yTop: number; w: number; h: number; pageW: number; pageH: number } | null;
@@ -79,7 +81,7 @@ export function CertificatePdfModal({ target, onClose }: { target: CertPdfTarget
         const x = center ? (W - font.widthOfTextAtSize(name, nameSize)) / 2 : 150;
         page.drawText(name, { x, y: H - ny, size: nameSize, font, color: rgb(0.07, 0.25, 0.39) });
       }
-      const sub = [target.courseName, target.certificateNumber, target.completionDate].filter(Boolean).join("   ·   ");
+      const sub = [target.courseName, target.certificateNumber && `Cert No. ${target.certificateNumber}`, target.registrationNumber && `Reg No. ${target.registrationNumber}`, target.conductedDate && `Conducted ${target.conductedDate}`, target.issuedDate && `Issued ${target.issuedDate}`].filter(Boolean).join("   ·   ");
       if (sub) {
         const subFont = await pdf.embedFont(StandardFonts.Helvetica);
         const x = center ? (W - subFont.widthOfTextAtSize(sub, 11)) / 2 : 150;

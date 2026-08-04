@@ -84,11 +84,12 @@ export function LiveReleasing({ data, role, reload }: { data: ReleasingData; rol
   }
   function activeTemplateFor(courseId: string) { return data.certificateTemplates.find((t) => t.course_id === courseId && t.active && t.approved_at) ?? null; }
   function copyLink(token: string) { const url = `${window.location.origin}/feedback/${token}`; if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => setMessage("Feedback link copied to clipboard.")).catch(() => window.prompt("Share this feedback link with the trainee:", url)); else window.prompt("Share this feedback link with the trainee:", url); }
+  async function sendFeedback(e: Enrollment) { setBusy(true); setMessage(""); try { await submit({ action: "feedback-send-email", enrollmentId: e.id }); setMessage(`Feedback form emailed to ${traineeName(e)} (queued for delivery).`); } catch (err) { setMessage(err instanceof Error ? err.message : "Could not send the feedback form."); } finally { setBusy(false); } }
   function openPdf(e: Enrollment) {
     const c = certOf(data, e.id);
     const snap = (c?.snapshot ?? {}) as { certificate_number?: string; overrides?: Record<string, string> };
     const ov = snap.overrides ?? {};
-    setPdf({ templateId: (c?.template_id ?? activeTemplateFor(e.course_id)?.id) ?? null, traineeName: ov.name || traineeName(e), courseName: ov.course_title || (one(e.courses)?.name ?? ""), enrollmentNumber: e.enrollment_number, certificateNumber: snap.certificate_number ?? null, completionDate: ov.completion_date || (one(e.batches)?.ends_on ?? null) });
+    setPdf({ templateId: (c?.template_id ?? activeTemplateFor(e.course_id)?.id) ?? null, traineeName: ov.name || traineeName(e), courseName: ov.course_title || (one(e.courses)?.name ?? ""), enrollmentNumber: e.enrollment_number, certificateNumber: snap.certificate_number ?? null, conductedDate: ov.conducted_date || ov.completion_date || (one(e.batches)?.ends_on ?? null), issuedDate: ov.issued_date || null, registrationNumber: ov.registration_number || e.enrollment_number });
   }
 
   const rows = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && inHouse(data, e)).sort((a, z) => Number(isPaid(z)) - Number(isPaid(a)));
@@ -119,11 +120,11 @@ export function LiveReleasing({ data, role, reload }: { data: ReleasingData; rol
           <td><strong>{traineeName(e)}</strong><small>{e.enrollment_number}</small></td>
           <td>{one(e.courses)?.name}<small>{one(e.courses)?.code}</small></td>
           <td><span className={`portal-badge ${paid ? "green" : "red"}`}>{paid ? "Paid" : "Balance"}</span></td>
-          <td><span className={`portal-badge ${e.feedback_submitted ? "green" : "orange"}`}>{e.feedback_submitted ? "Submitted" : "Pending"}</span>{e.feedback_token && <button type="button" className="ghost-button" style={{ marginLeft: 6 }} onClick={() => copyLink(e.feedback_token!)}>Copy link</button>}</td>
+          <td><span className={`portal-badge ${e.feedback_submitted ? "green" : "orange"}`}>{e.feedback_submitted ? "Submitted" : "Pending"}</span>{e.feedback_token && <span className="document-actions" style={{ marginTop: 4 }}><button type="button" className="ghost-button" onClick={() => copyLink(e.feedback_token!)}>Copy link</button><button type="button" className="ghost-button" disabled={busy} onClick={() => void sendFeedback(e)}>Email form</button></span>}</td>
           <td><strong>{c?.status ?? "Not issued"}</strong><small>{snap.certificate_number ? `No. ${snap.certificate_number}` : "—"}{c?.reprint_count ? ` · ${c.reprint_count} reprint(s)` : ""}</small></td>
           <td className="document-actions">
             <button type="button" disabled={busy || !paid} onClick={() => issue(e)}>{c ? "Re-issue #" : "Issue #"}</button>
-            <button type="button" disabled={busy || !c} onClick={() => void act({ action: "certificate-print", enrollmentId: e.id })}>Print</button>
+            <button type="button" disabled={busy || !c || !e.feedback_submitted} title={!e.feedback_submitted ? "The trainee must submit the feedback form before printing." : undefined} onClick={() => void act({ action: "certificate-print", enrollmentId: e.id })}>Print</button>
             {printed && <button type="button" disabled={busy} onClick={() => void act({ action: "certificate-print", enrollmentId: e.id, reprint: true })}>Reprint</button>}
             <button type="button" disabled={busy || !c || !printed || c?.status === "Released"} onClick={() => setRelease(e)}>Release</button>
             <button type="button" disabled={busy || !c} onClick={() => openPdf(e)}>PDF</button>
@@ -155,20 +156,24 @@ function OverrideModal({ enrollment, cert, onClose, onDone, busy }: { enrollment
   const snap = (cert?.snapshot ?? {}) as { certificate_number?: string; overrides?: Record<string, string> };
   const ov = snap.overrides ?? {};
   const [name, setName] = useState(ov.name || traineeName(enrollment));
-  const [courseTitle, setCourseTitle] = useState(ov.course_title || (one(enrollment.courses)?.name ?? ""));
+  const [courseName, setCourseName] = useState(ov.course_title || (one(enrollment.courses)?.name ?? ""));
   const [courseContent, setCourseContent] = useState(ov.course_content || "");
-  const [completionDate, setCompletionDate] = useState(ov.completion_date || (one(enrollment.batches)?.ends_on ?? ""));
+  const [conductedDate, setConductedDate] = useState(ov.conducted_date || ov.completion_date || (one(enrollment.batches)?.ends_on ?? ""));
+  const [issuedDate, setIssuedDate] = useState(ov.issued_date || "");
   const [certNo, setCertNo] = useState(snap.certificate_number || "");
-  function go() { void onDone({ action: "certificate-override", enrollmentId: enrollment.id, certificateNumber: certNo.trim() || undefined, overrides: { name: name.trim(), course_title: courseTitle.trim(), course_content: courseContent.trim(), completion_date: completionDate.trim() } }); }
+  const [regNo, setRegNo] = useState(ov.registration_number || enrollment.enrollment_number || "");
+  function go() { void onDone({ action: "certificate-override", enrollmentId: enrollment.id, certificateNumber: certNo.trim() || undefined, overrides: { name: name.trim(), course_title: courseName.trim(), course_content: courseContent.trim(), conducted_date: conductedDate.trim(), issued_date: issuedDate.trim(), registration_number: regNo.trim() } }); }
   return <div className="portal-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
     <section className="portal-modal" role="dialog" aria-modal="true"><header><div><span className="portal-eyebrow">Admin override</span><h2>Edit certificate details</h2></div><button type="button" onClick={onClose} aria-label="Close">×</button></header>
       <div className="portal-form">
-        <p className="portal-form-note full">Admin-only. These values print on the certificate (they override the trainee/course defaults). Leave the number blank to keep the issued one.</p>
+        <p className="portal-form-note full">Admin-only. These values print on the certificate (they override the trainee/course defaults). Leave a field blank to keep the default.</p>
         <label className="full">Name on certificate<input value={name} onChange={(e) => setName(e.target.value)} /></label>
-        <label className="full">Course title<input value={courseTitle} onChange={(e) => setCourseTitle(e.target.value)} /></label>
-        <label className="full">Course content<textarea rows={2} value={courseContent} onChange={(e) => setCourseContent(e.target.value)} placeholder="Optional — e.g. modules covered" /></label>
-        <label>Completion date<input value={completionDate} onChange={(e) => setCompletionDate(e.target.value)} placeholder="YYYY-MM-DD" /></label>
+        <label className="full">Course name<input value={courseName} onChange={(e) => setCourseName(e.target.value)} /></label>
+        <label className="full">Course content<textarea rows={2} value={courseContent} onChange={(e) => setCourseContent(e.target.value)} placeholder="e.g. modules covered" /></label>
+        <label>Conducted date<input value={conductedDate} onChange={(e) => setConductedDate(e.target.value)} placeholder="YYYY-MM-DD" /></label>
+        <label>Issued date<input value={issuedDate} onChange={(e) => setIssuedDate(e.target.value)} placeholder="YYYY-MM-DD" /></label>
         <label>Certificate no.<input value={certNo} onChange={(e) => setCertNo(e.target.value)} placeholder="Keep issued" /></label>
+        <label>Registration no.<input value={regNo} onChange={(e) => setRegNo(e.target.value)} /></label>
         <div className="portal-form-actions full"><button type="button" className="ghost-button" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={go}>{busy ? "Saving…" : "Save overrides"}</button></div>
       </div></section>
   </div>;

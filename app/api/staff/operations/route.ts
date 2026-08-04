@@ -77,6 +77,7 @@ const certificateVoidInput = z.object({ action: z.literal("certificate-void"), e
 const certificateReleaseInput = z.object({ action: z.literal("certificate-release"), enrollmentId: z.string().uuid(), recipientName: z.string().trim().min(1).max(160), recipientIdType: z.string().trim().max(80).optional(), reason: z.string().trim().max(300).optional() });
 const certificateOverrideInput = z.object({ action: z.literal("certificate-override"), enrollmentId: z.string().uuid(), certificateNumber: z.string().trim().max(80).optional(), overrides: z.record(z.string(), z.string()).optional() });
 const certificateIssuanceToggleInput = z.object({ action: z.literal("certificate-issuance-toggle"), enabled: z.boolean() });
+const feedbackSendEmailInput = z.object({ action: z.literal("feedback-send-email"), enrollmentId: z.string().uuid() });
 
 // HR / payroll (Slice 1): attendance logging and leave / cash-advance filing + decisions.
 const hm = /^\d{2}:\d{2}$/;
@@ -110,7 +111,7 @@ const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-li
 const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional(), courseId: z.string().uuid().nullable().optional(), partnerOfferId: z.string().uuid().nullable().optional() });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateOverrideInput, certificateIssuanceToggleInput]);
+const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
@@ -620,6 +621,14 @@ export async function POST(request: Request) {
     if (input.action === "certificate-print") {
       if (!canRelease(staff.roleCodes)) return NextResponse.json({ error: "Only Admin or the Releasing Officer can print certificates." }, { status: 403 });
       const admin = createSupabaseAdminClient();
+      // In-House certificates are only printable once the trainee has submitted the feedback
+      // form (their online-training attendance).
+      const { data: enr } = await admin.from("enrollments").select("id,courses(delivery_type)").eq("id", input.enrollmentId).maybeSingle();
+      if ((first(enr?.courses) as { delivery_type?: string } | null)?.delivery_type === "In-House") {
+        // Tolerant of the pre-migration state: only enforce when the training_feedback table exists.
+        const { data: fb, error: fbErr } = await admin.from("training_feedback").select("id").eq("enrollment_id", input.enrollmentId).maybeSingle();
+        if (!fbErr && !fb) return NextResponse.json({ error: "The trainee must submit the feedback form (online-training attendance) before this certificate can be printed." }, { status: 400 });
+      }
       const { data: cert } = await admin.from("certificates").select("id,status,reprint_count").eq("enrollment_id", input.enrollmentId).maybeSingle();
       if (!cert) return NextResponse.json({ error: "Issue the certificate (assign a number) before printing." }, { status: 400 });
       if (cert.status === "Printed" || cert.status === "Released") {
@@ -673,6 +682,21 @@ export async function POST(request: Request) {
       const { data: s } = await admin.from("organization_settings").select("id").maybeSingle();
       if (!s) return NextResponse.json({ error: "Organization settings not found." }, { status: 400 });
       const { error } = await admin.from("organization_settings").update({ certificate_issuance_enabled: input.enabled }).eq("id", s.id);
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "feedback-send-email") {
+      if (!(canRelease(staff.roleCodes) || staff.roleCodes.includes("registration"))) return NextResponse.json({ error: "Your account cannot send the feedback form." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: enr } = await admin.from("enrollments").select("id,feedback_token,trainees(legal_first_name,legal_last_name,email),courses(name)").eq("id", input.enrollmentId).maybeSingle();
+      if (!enr) throw new Error("Enrollment not found.");
+      const t = first(enr.trainees) as { legal_first_name?: string; legal_last_name?: string; email?: string } | null;
+      if (!t?.email) return NextResponse.json({ error: "This trainee has no email address on file." }, { status: 400 });
+      if (!(enr as { feedback_token?: string }).feedback_token) return NextResponse.json({ error: "No feedback link yet — apply the training-feedback migration first." }, { status: 400 });
+      const base = process.env.APP_BASE_URL ?? new URL(request.url).origin;
+      const url = `${base}/feedback/${(enr as { feedback_token: string }).feedback_token}`;
+      const name = `${t.legal_first_name ?? ""} ${t.legal_last_name ?? ""}`.trim() || "Trainee";
+      const { error } = await admin.from("email_jobs").insert({ idempotency_key: `feedback:${input.enrollmentId}:${Date.now()}`, template_code: "training.feedback", recipient: t.email, variables: { trainee_name: name, course_name: (first(enr.courses) as { name?: string } | null)?.name ?? "your training", feedback_url: url } });
       if (error) throw error;
       return NextResponse.json({ ok: true });
     }
