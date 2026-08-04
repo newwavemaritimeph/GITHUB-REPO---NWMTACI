@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 // browser can fetch the template file to render a certificate PDF client-side.
 // Training Operations / Admin only.
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const staff = await requireStaff(["admin", "training_operations"]);
+  const staff = await requireStaff(["admin", "training_operations", "releasing_officer"]);
   if (!staff) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   const { id } = await params;
   const db = createSupabaseAdminClient();

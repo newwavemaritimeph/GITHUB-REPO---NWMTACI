@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 const allowedTypes = new Set(["application/pdf", "image/png", "image/jpeg"]);
 
 export async function POST(request: Request) {
-  const staff = await requireStaff(["admin", "training_operations"]);
+  const staff = await requireStaff(["admin", "training_operations", "releasing_officer"]);
   if (!staff) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   try {
     const form = await request.formData();
