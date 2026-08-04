@@ -6,7 +6,7 @@ import { LiveCashierClosing, type ClosingData } from "./live-cashier-closing";
 
 /** Loose shapes for the accounting slices of the staff-operations payload. */
 type Payment = { payment_number?: string; method: string; amount_centavos: number; reference_number?: string | null; received_at?: string; verification_state: string; trainee_id?: string };
-type Enrollment = { id: string; enrollment_number: string; trainee_id?: string; created_at?: string; selling_price_centavos: number; paid_centavos: number; charges_centavos?: number; discounts_centavos?: number; enrollment_status: string; trainees?: unknown; courses?: unknown };
+type Enrollment = { id: string; enrollment_number: string; trainee_id?: string; created_at?: string; selling_price_centavos: number; paid_centavos: number; charges_centavos?: number; discounts_centavos?: number; enrollment_status: string; partner_offer_id?: string | null; trainees?: unknown; courses?: unknown };
 type TraineeRow = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; srn?: string | null; email?: string | null; mobile?: string | null };
 /** Amount due = base price + other charges − rebates/discounts. */
 const dueOf = (e: Enrollment) => Number(e.selling_price_centavos) + Number(e.charges_centavos ?? 0) - Number(e.discounts_centavos ?? 0);
@@ -53,11 +53,10 @@ function rangeFor(span: "Daily" | "Weekly" | "Monthly"): { from: string; to: str
 
 const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0 }).format((Number(centavos) || 0) / 100);
 
-export function LiveAccounting({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
-  const [tab, setTab] = useState<"Dashboard" | "Sales" | "Reconciliation" | "Cashier closing" | "Setup">(role === "admin" || role === "accounting" ? "Dashboard" : "Cashier closing");
+export function AccountingDashboard({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
+  const canManage = role === "admin" || role === "accounting";
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const canManage = role === "admin" || role === "accounting";
   const today = manilaDay(new Date().toISOString());
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
@@ -73,6 +72,17 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
   for (const r of data.agencyRebates.filter((r) => inRange(r.created_at))) { const n = one(r.marketing_agencies)?.name ?? "Unknown"; agencyCounts.set(n, (agencyCounts.get(n) ?? 0) + 1); }
   const topAgencies = [...agencyCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
   const pendingBalances = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && dueOf(e) - Number(e.paid_centavos) > 0);
+  // Owner overview: daily collectibles / payables, voucher requests, enrollment counts.
+  const dailyCollectibles = data.payments.filter((p) => manilaDay(p.received_at) === today);
+  const dailyCollectibleTotal = dailyCollectibles.reduce((s, p) => s + Number(p.amount_centavos), 0);
+  const dailyPayables = data.payables.filter((p) => p.status !== "Paid" && (!p.due_on || p.due_on <= today));
+  const dailyPayableTotal = dailyPayables.reduce((s, p) => s + Number(p.amount_centavos), 0);
+  const pendingRebates = data.agencyRebates.filter((r) => r.status === "Pending");
+  const pendingRebateTotal = pendingRebates.reduce((s, r) => s + Number(r.rebate_centavos), 0);
+  const pendingExpenses = data.expenses.filter((e) => e.status === "Pending");
+  const statusCounts = data.enrollments.reduce((a, e) => { if (e.enrollment_status === "Cancelled") a.cancelled++; else if (dueOf(e) - Number(e.paid_centavos) <= 0) a.paid++; else a.pending++; return a; }, { paid: 0, pending: 0, cancelled: 0 });
+  const endorsedCount = data.enrollments.filter((e) => !!e.partner_offer_id).length;
+  const walkinCount = data.enrollments.length - endorsedCount;
 
   async function post(body: Record<string, unknown>) {
     setBusy(true); setMessage("");
@@ -103,32 +113,37 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
   const payableTotal = data.payables.reduce((sum, p) => sum + Number(p.amount_centavos), 0);
 
   return (
-    <div className="portal-page">
-      <div className="portal-heading">
-        <div><span className="portal-eyebrow">Financial control</span><h1>Accounting</h1><p>Collections, disbursements, receivables, and setup — from the live Supabase ledger.</p></div>
-      </div>
-      <div className="portal-tabs">
-        {(canManage ? ["Dashboard", "Sales", "Reconciliation", "Cashier closing", "Setup"] : ["Cashier closing"]).map((item) => (
-          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item as typeof tab)}>{item}</button>
-        ))}
-      </div>
+    <>
       {message && <div className="portal-message error" role="alert">{message}</div>}
-
-      {tab === "Dashboard" && (
-        <>
-          {data.announcements.length > 0 && <section className="portal-panel live-list" style={{ marginBottom: 16 }}><div className="panel-heading"><div><h2>📣 Announcements</h2></div></div>{data.announcements.slice(0, 5).map((a) => <div className="live-row-item" key={a.id}><div><strong>{a.title}</strong><small>{a.body}</small></div></div>)}</section>}
-          <section className="portal-panel" style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
-            <label style={{ display: "flex", flexDirection: "column", fontSize: 13, color: "var(--muted)" }}>From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-            <label style={{ display: "flex", flexDirection: "column", fontSize: 13, color: "var(--muted)" }}>To<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
-            <span className="portal-empty-copy" style={{ margin: 0 }}>{from} → {to}</span>
-          </section>
-          <div className="finance-hero">
-            <div><span>Net sales</span><strong>{pesos(netSales)}</strong><small>Sales − expenses</small></div>
-            <article><span>Sales</span><strong>{pesos(salesInRange)}</strong><small>Payments in range</small></article>
-            <article><span>Expenses</span><strong>{pesos(expensesInRange)}</strong><small>Approved / paid</small></article>
-            <article><span>Enrollments</span><strong>{enrollInRange.length}</strong><small>New in range</small></article>
-          </div>
-          <div className="dashboard-panels">
+      {data.announcements.length > 0 && <section className="portal-panel live-list" style={{ marginBottom: 16 }}><div className="panel-heading"><div><h2>📣 Announcements</h2></div></div>{data.announcements.slice(0, 5).map((a) => <div className="live-row-item" key={a.id}><div><strong>{a.title}</strong><small>{a.body}</small></div></div>)}</section>}
+      <div className="finance-hero">
+        <div><span>Daily collectibles</span><strong>{pesos(dailyCollectibleTotal)}</strong><small>{dailyCollectibles.length} payment{dailyCollectibles.length === 1 ? "" : "s"} today</small></div>
+        <article><span>Daily payables</span><strong>{pesos(dailyPayableTotal + pendingRebateTotal)}</strong><small>{dailyPayables.length} bill{dailyPayables.length === 1 ? "" : "s"} · {pendingRebates.length} rebate{pendingRebates.length === 1 ? "" : "s"} due</small></article>
+        <article><span>Voucher requests</span><strong>{pendingExpenses.length}</strong><small>Awaiting approval</small></article>
+        <article><span>Enrollments</span><strong>{data.enrollments.length}</strong><small>{walkinCount} walk-in · {endorsedCount} endorsed</small></article>
+      </div>
+      <div className="finance-hero">
+        <div><span>Paid</span><strong>{statusCounts.paid}</strong><small>Fully settled</small></div>
+        <article><span>Pending</span><strong>{statusCounts.pending}</strong><small>With balance</small></article>
+        <article><span>Cancelled</span><strong>{statusCounts.cancelled}</strong><small>Cancelled enrollments</small></article>
+        <article><span>Endorsed</span><strong>{endorsedCount}</strong><small>vs {walkinCount} walk-in</small></article>
+      </div>
+      <div className="dashboard-panels">
+        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Daily payables due</h2><p>Bills due today/overdue + pending agency rebates</p></div><span className="slot-count">{pesos(dailyPayableTotal + pendingRebateTotal)}</span></div>{dailyPayables.map((p) => <div className="live-row-item" key={p.id}><div><strong>{p.description}</strong><small>{p.due_on ? `Due ${p.due_on}` : "No due date"} · {p.status}</small></div><span className="slot-count">{pesos(p.amount_centavos)}</span></div>)}{pendingRebates.slice(0, 20).map((r) => { const t = one(r.trainees); return <div className="live-row-item" key={r.id}><div><strong>Agency rebate{t ? ` · ${t.legal_first_name} ${t.legal_last_name}` : ""}</strong><small>{one(r.marketing_agencies)?.name ?? "Agency"} · {one(r.courses)?.name ?? ""}</small></div><span className="slot-count">{pesos(r.rebate_centavos)}</span></div>; })}{!dailyPayables.length && !pendingRebates.length && <p className="portal-empty-copy">No payables due.</p>}</section>
+        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>New expense voucher requests</h2><p>Awaiting your approval</p></div><span className="slot-count">{pendingExpenses.length}</span></div>{pendingExpenses.slice(0, 20).map((e) => <div className="live-row-item" key={e.id}><div><strong>{e.payee}</strong><small>{e.category} · {e.expense_number}</small></div><span className="slot-count">{pesos(e.amount_centavos)}</span></div>)}{!pendingExpenses.length && <p className="portal-empty-copy">No voucher requests awaiting approval.</p>}</section>
+      </div>
+      <section className="portal-panel" style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
+        <label style={{ display: "flex", flexDirection: "column", fontSize: 13, color: "var(--muted)" }}>From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label style={{ display: "flex", flexDirection: "column", fontSize: 13, color: "var(--muted)" }}>To<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+        <span className="portal-empty-copy" style={{ margin: 0 }}>{from} → {to}</span>
+      </section>
+      <div className="finance-hero">
+        <div><span>Net sales</span><strong>{pesos(netSales)}</strong><small>Sales − expenses</small></div>
+        <article><span>Sales</span><strong>{pesos(salesInRange)}</strong><small>Payments in range</small></article>
+        <article><span>Expenses</span><strong>{pesos(expensesInRange)}</strong><small>Approved / paid</small></article>
+        <article><span>Enrollments</span><strong>{enrollInRange.length}</strong><small>New in range</small></article>
+      </div>
+      <div className="dashboard-panels">
             <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Most enrolled courses</h2><p>Top courses in range</p></div></div>{topCourses.map(([name, n]) => <div className="live-row-item" key={name}><div><strong>{name}</strong></div><span className="slot-count">{n}</span></div>)}{!topCourses.length && <p className="portal-empty-copy">No enrollments in range.</p>}</section>
             <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Top agencies</h2><p>Most rebated enrollments in range</p></div></div>{topAgencies.map(([name, n]) => <div className="live-row-item" key={name}><div><strong>{name}</strong></div><span className="slot-count">{n}</span></div>)}{!topAgencies.length && <p className="portal-empty-copy">No agency-tagged enrollments in range.</p>}</section>
           </div>
@@ -166,9 +181,43 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
             </tbody></table></div>
           </section>
 
-          <AgencyRebatesOwed data={data} canManage={canManage} busy={busy} post={post} />
-        </>
-      )}
+      <AgencyRebatesOwed data={data} canManage={canManage} busy={busy} post={post} />
+    </>
+  );
+}
+
+export function LiveAccounting({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
+  const [tab, setTab] = useState<"Dashboard" | "Sales" | "Reconciliation" | "Cashier closing" | "Setup">(role === "accounting" ? "Sales" : role === "admin" ? "Dashboard" : "Cashier closing");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const canManage = role === "admin" || role === "accounting";
+  const tabs: (typeof tab)[] = !canManage ? ["Cashier closing"] : role === "accounting" ? ["Sales", "Reconciliation", "Cashier closing", "Setup"] : ["Dashboard", "Sales", "Reconciliation", "Cashier closing", "Setup"];
+
+  async function post(body: Record<string, unknown>) {
+    setBusy(true); setMessage("");
+    try {
+      const response = await fetch("/api/staff/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "The action could not be completed.");
+      await reload();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The action could not be completed.");
+    } finally { setBusy(false); }
+  }
+
+  return (
+    <div className="portal-page">
+      <div className="portal-heading">
+        <div><span className="portal-eyebrow">Financial control</span><h1>Accounting</h1><p>Collections, disbursements, receivables, and setup — from the live Supabase ledger.</p></div>
+      </div>
+      <div className="portal-tabs">
+        {tabs.map((item) => (
+          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>
+        ))}
+      </div>
+      {message && <div className="portal-message error" role="alert">{message}</div>}
+
+      {tab === "Dashboard" && <AccountingDashboard data={data} role={role} reload={reload} />}
 
       {tab === "Sales" && <SalesReport payments={data.payments} payables={data.payables} />}
 
