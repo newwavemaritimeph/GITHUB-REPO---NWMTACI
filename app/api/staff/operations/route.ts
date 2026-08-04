@@ -101,7 +101,7 @@ const rescheduleInput = z.object({ action: z.literal("enrollment-reschedule"), e
 const sendInstructionsInput = z.object({ action: z.literal("send-instructions"), enrollmentId: z.string().uuid() });
 const instructionTemplateSaveInput = z.object({ action: z.literal("instruction-template-save"), courseId: z.string().uuid(), subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(8000) });
 const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-link-save"), courseId: z.string().uuid(), link: z.string().trim().max(500) });
-const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional() });
+const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional(), courseId: z.string().uuid().nullable().optional(), partnerOfferId: z.string().uuid().nullable().optional() });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
 const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput]);
@@ -153,6 +153,26 @@ async function applyReschedule(admin: ReturnType<typeof createSupabaseAdminClien
     const { data: nb2 } = await admin.from("batches").select("confirmed_count,capacity,status").eq("id", newBatchId).maybeSingle();
     if (nb2) { const next = Number(nb2.confirmed_count) + 1; await admin.from("batches").update({ confirmed_count: next, status: next >= Number(nb2.capacity) ? "Full" : nb2.status }).eq("id", newBatchId); }
   }
+}
+async function applyCourseChange(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentId: string, courseId: string, partnerOfferId: string | null) {
+  const { data: enrollment } = await admin.from("enrollments").select("id").eq("id", enrollmentId).maybeSingle();
+  if (!enrollment) throw new Error("Enrollment not found.");
+  let price = 0;
+  if (partnerOfferId) {
+    const { data: offer } = await admin.from("partner_course_offers").select("training_fee_centavos").eq("id", partnerOfferId).maybeSingle();
+    if (!offer) throw new Error("Endorsed offer not found."); price = Number(offer.training_fee_centavos);
+  } else {
+    const { data: course } = await admin.from("courses").select("standard_price_centavos").eq("id", courseId).maybeSingle();
+    if (!course) throw new Error("Course not found."); price = Number(course.standard_price_centavos);
+  }
+  const { data: allocs } = await admin.from("payment_allocations").select("amount_centavos,payments!inner(valid)").eq("enrollment_id", enrollmentId).eq("payments.valid", true);
+  const paid = (allocs ?? []).reduce((s, r) => s + Number(r.amount_centavos), 0);
+  const { data: chgs } = await admin.from("enrollment_charges").select("amount_centavos,event_type").eq("enrollment_id", enrollmentId).eq("valid", true);
+  const charge = (chgs ?? []).filter((r) => r.event_type !== "discount").reduce((s, r) => s + Number(r.amount_centavos), 0);
+  const discount = (chgs ?? []).filter((r) => r.event_type === "discount").reduce((s, r) => s + Number(r.amount_centavos), 0);
+  if (paid > price + charge - discount) throw new Error("The new course price is lower than the amount already paid on this enrollment.");
+  const { error } = await admin.from("enrollments").update({ course_id: courseId, partner_offer_id: partnerOfferId ?? null, selling_price_centavos: price }).eq("id", enrollmentId);
+  if (error) throw error;
 }
 const stampManila = (date: string, hhmm: string) => `${date}T${hhmm}:00+08:00`;
 
@@ -245,7 +265,7 @@ export async function GET() {
   }
   if (canCashier(staff.roleCodes) || staff.roleCodes.includes("registration")) {
     const admin = createSupabaseAdminClient();
-    const { data } = await admin.from("enrollment_requests").select("id,request_number,request_type,requested_values,reason,status,decision_remarks,created_at,decided_at,trainees(legal_first_name,legal_last_name),enrollments(enrollment_number,courses(name))").in("request_type", ["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting"]).order("created_at", { ascending: false }).limit(200);
+    const { data } = await admin.from("enrollment_requests").select("id,request_number,request_type,requested_values,reason,status,decision_remarks,created_at,decided_at,trainees(legal_first_name,legal_last_name),enrollments(enrollment_number,courses(name))").in("request_type", ["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course"]).order("created_at", { ascending: false }).limit(200);
     requests = data ?? [];
   }
   // Per-course training instruction templates (subject/body) for the Instructions editor + PDF.
@@ -437,6 +457,7 @@ export async function POST(request: Request) {
       if (!staff.roleCodes.some((r) => ["admin", "cashier", "accounting", "registration"].includes(r))) return NextResponse.json({ error: "Your account cannot raise requests." }, { status: 403 });
       if (input.requestType === "Rescheduling" && !input.batchId) return NextResponse.json({ error: "Choose the new schedule for the reschedule request." }, { status: 400 });
       if (input.requestType === "Refund" && !input.amountCentavos) return NextResponse.json({ error: "Enter the refund amount." }, { status: 400 });
+      if (input.requestType === "Change Course" && !input.courseId) return NextResponse.json({ error: "Choose the course to change to." }, { status: 400 });
       const admin = createSupabaseAdminClient();
       const { data: enrollment, error: findError } = await admin.from("enrollments").select("id,trainee_id").eq("id", input.enrollmentId).maybeSingle();
       if (findError || !enrollment) throw findError ?? new Error("Enrollment not found.");
@@ -444,6 +465,8 @@ export async function POST(request: Request) {
       if (input.batchId) requested.batchId = input.batchId;
       if (input.amountCentavos) requested.amountCentavos = input.amountCentavos;
       if (input.paymentId) requested.paymentId = input.paymentId;
+      if (input.courseId) requested.courseId = input.courseId;
+      if (input.partnerOfferId) requested.partnerOfferId = input.partnerOfferId;
       const { data: reference, error: refError } = await db.rpc("next_reference", { prefix: "REQ" });
       if (refError) throw refError;
       const { data: created, error: insertError } = await admin.from("enrollment_requests").insert({ request_number: reference, trainee_id: enrollment.trainee_id, enrollment_id: input.enrollmentId, request_type: input.requestType, requested_values: requested, reason: input.reason, requester_id: staff.user.id, status: "Pending" }).select("id").single();
@@ -458,9 +481,11 @@ export async function POST(request: Request) {
       if (findError || !req) throw findError ?? new Error("Request not found.");
       if (req.status !== "Pending") return NextResponse.json({ error: "This request has already been decided." }, { status: 400 });
       if (input.approve) {
-        const rv = (req.requested_values ?? {}) as { batchId?: string; amountCentavos?: number; paymentId?: string };
+        const rv = (req.requested_values ?? {}) as { batchId?: string; amountCentavos?: number; paymentId?: string; courseId?: string; partnerOfferId?: string };
         if (req.request_type === "Rescheduling") {
           await applyReschedule(admin, req.enrollment_id, rv.batchId ?? null);
+        } else if (req.request_type === "Change Course") {
+          await applyCourseChange(admin, req.enrollment_id, rv.courseId ?? "", rv.partnerOfferId ?? null);
         } else if (req.request_type === "Cancellation") {
           const { error } = await admin.from("enrollments").update({ enrollment_status: "Cancelled", cancelled_at: new Date().toISOString() }).eq("id", req.enrollment_id);
           if (error) throw error;
@@ -745,24 +770,7 @@ export async function POST(request: Request) {
     if (input.action === "enrollment-course-change") {
       if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot change a course." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      const { data: enrollment } = await admin.from("enrollments").select("id").eq("id", input.enrollmentId).maybeSingle();
-      if (!enrollment) throw new Error("Enrollment not found.");
-      let price = 0;
-      if (input.partnerOfferId) {
-        const { data: offer } = await admin.from("partner_course_offers").select("training_fee_centavos").eq("id", input.partnerOfferId).maybeSingle();
-        if (!offer) throw new Error("Endorsed offer not found."); price = Number(offer.training_fee_centavos);
-      } else {
-        const { data: course } = await admin.from("courses").select("standard_price_centavos").eq("id", input.courseId).maybeSingle();
-        if (!course) throw new Error("Course not found."); price = Number(course.standard_price_centavos);
-      }
-      const { data: allocs } = await admin.from("payment_allocations").select("amount_centavos,payments!inner(valid)").eq("enrollment_id", input.enrollmentId).eq("payments.valid", true);
-      const paid = (allocs ?? []).reduce((s, r) => s + Number(r.amount_centavos), 0);
-      const { data: chgs } = await admin.from("enrollment_charges").select("amount_centavos,event_type").eq("enrollment_id", input.enrollmentId).eq("valid", true);
-      const charge = (chgs ?? []).filter((r) => r.event_type !== "discount").reduce((s, r) => s + Number(r.amount_centavos), 0);
-      const discount = (chgs ?? []).filter((r) => r.event_type === "discount").reduce((s, r) => s + Number(r.amount_centavos), 0);
-      if (paid > price + charge - discount) throw new Error("The new course price is lower than the amount already paid on this enrollment.");
-      const { error } = await admin.from("enrollments").update({ course_id: input.courseId, partner_offer_id: input.partnerOfferId ?? null, selling_price_centavos: price }).eq("id", input.enrollmentId);
-      if (error) throw error;
+      await applyCourseChange(admin, input.enrollmentId, input.courseId, input.partnerOfferId ?? null);
       return NextResponse.json({ ok: true });
     }
     if (input.action === "enrollment-reschedule") {
