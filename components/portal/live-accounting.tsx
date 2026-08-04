@@ -10,7 +10,7 @@ type Enrollment = { id: string; enrollment_number: string; trainee_id?: string; 
 type TraineeRow = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; srn?: string | null; email?: string | null; mobile?: string | null };
 /** Amount due = base price + other charges − rebates/discounts. */
 const dueOf = (e: Enrollment) => Number(e.selling_price_centavos) + Number(e.charges_centavos ?? 0) - Number(e.discounts_centavos ?? 0);
-type Channel = { id: string; code: string; name: string; requires_reference: boolean; allows_proof: boolean; active: boolean };
+type Channel = { id: string; code: string; name: string; requires_reference: boolean; allows_proof: boolean; active: boolean; kind?: string };
 type Charge = { id: string; name: string; default_amount_centavos: number; active: boolean; used_count: number };
 type Agency = { id: string; name: string; contact_name?: string | null; email?: string | null; mobile?: string | null; active: boolean };
 type Expense = { id: string; expense_number: string; payee: string; category: string; amount_centavos: number; status: string; created_at: string };
@@ -180,12 +180,19 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
         <>
           {!canManage && <div className="portal-message error">Only Admin and Accounting can edit setup.</div>}
           <Pricelist data={data} canManage={canManage} busy={busy} post={post} />
-          <SetupList title="Payment channels" description="Modes offered at the cashier" entityLabel="payment channel"
+          <SetupList title="Receivable channels" description="Collection modes offered at the cashier" entityLabel="receivable channel"
             canManage={canManage} busy={busy}
             fields={[{ key: "name", label: "Channel name" }, { key: "requiresReference", label: "Requires a reference number", type: "checkbox" }]}
-            rows={data.paymentMethods.map((c) => ({ id: c.id, primary: c.name, secondary: `${c.requires_reference ? "Reference required" : "No reference"} · ${c.code}`, active: c.active, values: { name: c.name, requiresReference: c.requires_reference } }))}
-            onSubmit={(v, id) => post({ action: "channel-save", id, name: String(v.name), requiresReference: Boolean(v.requiresReference), allowsProof: true })}
+            rows={data.paymentMethods.filter((c) => c.kind !== "payable").map((c) => ({ id: c.id, primary: c.name, secondary: `${c.requires_reference ? "Reference required" : "No reference"} · ${c.code}`, active: c.active, values: { name: c.name, requiresReference: c.requires_reference } }))}
+            onSubmit={(v, id) => post({ action: "channel-save", id, name: String(v.name), requiresReference: Boolean(v.requiresReference), allowsProof: true, kind: "receivable" })}
             onArchive={(id, active, name) => post({ action: "channel-save", id, name, active: !active })} />
+
+          <SetupList title="Payables channels" description="Disbursement channels for payables (bank, GCash, cash)" entityLabel="payables channel"
+            canManage={canManage} busy={busy}
+            fields={[{ key: "name", label: "Channel name" }]}
+            rows={data.paymentMethods.filter((c) => c.kind === "payable").map((c) => ({ id: c.id, primary: c.name, secondary: c.code, active: c.active, values: { name: c.name } }))}
+            onSubmit={(v, id) => post({ action: "channel-save", id, name: String(v.name), kind: "payable" })}
+            onArchive={(id, active, name) => post({ action: "channel-save", id, name, kind: "payable", active: !active })} />
 
           <SetupList title="Other charges" description="Uniform, reprinting, make-up, etc." entityLabel="charge"
             canManage={canManage} busy={busy}
@@ -796,7 +803,7 @@ function AgencyRebatesOwed({ data, canManage, busy, post }: { data: AccountingDa
 type SetupField = { key: string; label: string; type?: "text" | "number" | "date" | "checkbox"; placeholder?: string; optional?: boolean };
 type SetupRow = { id: string; primary: string; secondary: string; active: boolean; values: Record<string, string | boolean> };
 type SetupDraft = { id?: string; values: Record<string, string | boolean> };
-function SetupList({ title, description, entityLabel, rows, canManage, busy, fields, onSubmit, onArchive, onRemove, removable }: {
+export function SetupList({ title, description, entityLabel, rows, canManage, busy, fields, onSubmit, onArchive, onRemove, removable }: {
   title: string; description: string; entityLabel: string; rows: SetupRow[]; canManage: boolean; busy: boolean;
   fields: SetupField[]; onSubmit: (values: Record<string, string | boolean>, id?: string) => Promise<void> | void;
   onArchive?: (id: string, active: boolean, name: string) => void; onRemove?: (id: string) => void; removable?: boolean;

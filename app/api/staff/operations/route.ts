@@ -50,7 +50,7 @@ const notificationInput = z.object({ action: z.literal("mark-notifications-read"
 
 // Accounting Setup CRUD (Slice 1). Admin / Accounting only; applied with the
 // service-role admin client after an explicit role check.
-const channelInput = z.object({ action: z.literal("channel-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), code: z.string().trim().max(40).optional(), requiresReference: z.boolean().default(false), allowsProof: z.boolean().default(true), active: z.boolean().optional() });
+const channelInput = z.object({ action: z.literal("channel-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), code: z.string().trim().max(40).optional(), requiresReference: z.boolean().default(false), allowsProof: z.boolean().default(true), kind: z.enum(["receivable", "payable"]).optional(), active: z.boolean().optional() });
 const chargeInput = z.object({ action: z.literal("charge-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), defaultAmountCentavos: z.number().int().nonnegative().default(0), active: z.boolean().optional() });
 const expenseCategoryInput = z.object({ action: z.literal("expense-category-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), active: z.boolean().optional(), remove: z.boolean().optional() });
 const inventoryItemInput = z.object({ action: z.literal("inventory-item-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), category: z.string().trim().max(80).optional(), unit: z.string().trim().min(1).max(24).default("pc"), unitValueCentavos: z.number().int().nonnegative().default(0), active: z.boolean().optional(), remove: z.boolean().optional() });
@@ -254,6 +254,14 @@ export async function GET() {
     const { data } = await db.from("training_instruction_templates").select("course_id,subject,body,active").eq("active", true).order("version", { ascending: false }).limit(500);
     instructionTemplates = data ?? [];
   }
+  // Merge the payment-channel kind (receivable/payable) tolerantly — the column may not
+  // be migrated yet, in which case every channel is treated as receivable.
+  const kindByMethod = new Map<string, string>();
+  {
+    const { error, data } = await db.from("payment_methods").select("id,kind");
+    if (!error) for (const r of data ?? []) kindByMethod.set(r.id as string, (r as { kind?: string }).kind ?? "receivable");
+  }
+  const paymentMethodsWithKind = (paymentMethods.data ?? []).map((m) => ({ ...m, kind: kindByMethod.get((m as { id: string }).id) ?? "receivable" }));
   // MyHr self-service: the signed-in staff's OWN employee record + leave / cash-advance history,
   // matched by login email → employees.work_email. Read via service role, self only.
   let myHr: { employee: unknown; leave: unknown[]; advances: unknown[] } | null = null;
@@ -269,7 +277,7 @@ export async function GET() {
   return NextResponse.json({ profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
-    paymentMethods: paymentMethods.data ?? [], charges: charges.data ?? [], agencies: agencies.data ?? [],
+    paymentMethods: paymentMethodsWithKind, charges: charges.data ?? [], agencies: agencies.data ?? [],
     expenses: expenses.data ?? [], payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems,
     classrooms: classrooms.data ?? [], certificates, certificateTemplates, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
@@ -290,7 +298,7 @@ export async function POST(request: Request) {
     if (input.action === "channel-save") {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage payment channels." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      const row = { name: input.name, code: (input.code || input.name).toUpperCase().replace(/[^A-Z0-9]+/g, "_").slice(0, 40), requires_reference: input.requiresReference, allows_proof: input.allowsProof, ...(input.active !== undefined ? { active: input.active } : {}) };
+      const row = { name: input.name, code: (input.code || input.name).toUpperCase().replace(/[^A-Z0-9]+/g, "_").slice(0, 40), requires_reference: input.requiresReference, allows_proof: input.allowsProof, ...(input.kind ? { kind: input.kind } : {}), ...(input.active !== undefined ? { active: input.active } : {}) };
       const { error } = input.id ? await admin.from("payment_methods").update(row).eq("id", input.id) : await admin.from("payment_methods").insert(row);
       if (error) throw error;
       return NextResponse.json({ ok: true });
