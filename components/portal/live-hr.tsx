@@ -27,7 +27,7 @@ const todayManila = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Man
 const num = (raw: string | null) => (raw == null || raw.trim() === "" ? null : Math.round(Number(raw) * 100));
 
 export function LiveHr({ data, role, reload }: { data: HrData; role: string; reload: () => Promise<void> }) {
-  const [tab, setTab] = useState<"Overview" | "Directory" | "Attendance" | "Requests" | "Payroll">("Overview");
+  const [tab, setTab] = useState<"Overview" | "Directory" | "Attendance" | "Requests" | "Payroll" | "13th month">("Overview");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const canManage = role === "admin" || role === "hr";
@@ -82,7 +82,7 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
         <div><span className="portal-eyebrow">People operations</span><h1>HR &amp; payroll</h1><p>Employee directory, daily attendance, leave and cash-advance requests, and payroll periods.</p></div>
       </div>
       <div className="portal-tabs">
-        {(["Overview", "Directory", "Attendance", "Requests", "Payroll"] as const).map((item) => (
+        {(["Overview", "Directory", "Attendance", "Requests", "Payroll", "13th month"] as const).map((item) => (
           <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>
         ))}
       </div>
@@ -195,6 +195,7 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
       )}
 
       {tab === "Payroll" && <PayrollTab data={data} nameOf={nameOf} canManage={canManage} busy={busy} post={post} />}
+      {tab === "13th month" && <ThirteenthMonthTab data={data} />}
     </div>
   );
 }
@@ -325,6 +326,33 @@ function AttendanceTab({ data, nameOf, canManage, busy, post }: { data: HrData; 
           {!data.employeeAttendance.length && <tr><td colSpan={7}><span className="portal-empty-copy">No attendance logged yet.</span></td></tr>}
         </tbody></table></div>
       </section>
+    </>
+  );
+}
+
+function ThirteenthMonthTab({ data }: { data: HrData }) {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const monthlyBasic = (e: Employee) => { const b = Number(e.base_rate_centavos); return e.pay_type === "Weekly" ? Math.round(b * 4.33) : e.pay_type === "Daily" ? b * 26 : b; };
+  const monthsIn = (e: Employee) => { const h = new Date(e.date_hired); const hy = h.getFullYear(), hm = h.getMonth() + 1; const start = hy < year ? 1 : hy === year ? hm : 13; if (start > 12) return 0; const end = year < now.getFullYear() ? 12 : year === now.getFullYear() ? now.getMonth() + 1 : 0; return Math.max(0, end - start + 1); };
+  const rows = data.employees.filter((e) => e.active).map((e) => { const mb = monthlyBasic(e), m = monthsIn(e); return { e, mb, m, amt: Math.round((mb * m) / 12) }; });
+  const total = rows.reduce((s, r) => s + r.amt, 0);
+  const csv = () => {
+    const lines = [["Employee", "Position", "Pay type", "Monthly basic", "Months", "13th month"].join(","), ...rows.map((r) => [r.e.complete_name, r.e.position, r.e.pay_type, (r.mb / 100).toFixed(2), String(r.m), (r.amt / 100).toFixed(2)].map((x) => `"${String(x).replace(/"/g, '""')}"`).join(","))].join("\n");
+    const url = URL.createObjectURL(new Blob([lines], { type: "text/csv" })); const a = document.createElement("a"); a.href = url; a.download = `13th-month-${year}.csv`; a.click(); URL.revokeObjectURL(url);
+  };
+  const years = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2];
+  return (
+    <>
+      <div className="portal-form" style={{ padding: "0 0 8px" }}>
+        <label>Year<select value={year} onChange={(e) => setYear(Number(e.target.value))}>{years.map((y) => <option key={y} value={y}>{y}</option>)}</select></label>
+        <label style={{ alignSelf: "end" }}><button type="button" className="portal-secondary" onClick={csv}>Export CSV</button></label>
+      </div>
+      <p className="portal-empty-copy" style={{ margin: "0 0 8px" }}>Pro-rated from date hired: monthly basic x months employed in {year} / 12.</p>
+      <div className="portal-table portal-panel"><table><thead><tr><th>Employee</th><th>Pay type</th><th>Date hired</th><th>Monthly basic</th><th>Months</th><th>13th month</th></tr></thead><tbody>
+        {rows.map((r) => <tr key={r.e.id}><td><strong>{r.e.complete_name}</strong><small>{r.e.position}</small></td><td>{r.e.pay_type}</td><td>{r.e.date_hired}</td><td>{pesos(r.mb)}</td><td>{r.m}</td><td><strong>{pesos(r.amt)}</strong></td></tr>)}
+        {!rows.length && <tr><td colSpan={6}><span className="portal-empty-copy">No active employees.</span></td></tr>}
+      </tbody><tfoot><tr><td colSpan={5}><strong>Total</strong></td><td><strong>{pesos(total)}</strong></td></tr></tfoot></table></div>
     </>
   );
 }

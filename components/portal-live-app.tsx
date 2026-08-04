@@ -14,10 +14,10 @@ import { automaticEndDate, batchPatternLabel, validBatchStart } from "@/lib/sche
 import { AdminConfiguration } from "./admin-configuration";
 import { DateReports } from "./date-reports";
 
-type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Classrooms" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Daily TAR" | "Enrollment summary" | "Reports" | "Setup";
+type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Classrooms" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Daily TAR" | "Enrollment summary" | "Charges report" | "Reports" | "Setup";
 type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
-type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string}|{name:string}[]|null };
-type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; birthdate:string; email:string; mobile:string; account_state:string; registered_at:string };
+type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
+type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
 type Batch = { id:string; batch_number:string; course_id:string; partner_offer_id?:string|null; starts_on:string; ends_on:string; daily_start?:string|null; daily_end?:string|null; mode:string; venue?:string|null; capacity:number; confirmed_count:number; enrollment_deadline:string; status:string; published_at?:string|null; courses?: {name:string;code:string}|{name:string;code:string}[]|null; partner_course_offers?: {partner_centers?:{name:string}|{name:string}[]|null}|{partner_centers?:{name:string}|{name:string}[]|null}[]|null };
 type Enrollment = { id:string; enrollment_number:string; trainee_id:string; course_id:string; partner_offer_id?:string|null; batch_id?:string|null; scheduled_on?:string|null; enrollment_status:string; instructions_status?:string; instructions_sent_at?:string|null; selling_price_centavos:number; rebate_centavos:number; partner_payable_centavos:number; paid_centavos:number; charges_centavos?:number; discounts_centavos?:number; created_at:string; trainees?: {trainee_number:string;legal_first_name:string;legal_middle_name?:string|null;legal_last_name:string;email:string;mobile:string}|{trainee_number:string;legal_first_name:string;legal_middle_name?:string|null;legal_last_name:string;email:string;mobile:string}[]|null; courses?:{name:string;code:string}|{name:string;code:string}[]|null; batches?:{batch_number:string;starts_on:string;ends_on:string;mode:string;venue?:string|null}|{batch_number:string;starts_on:string;ends_on:string;mode:string;venue?:string|null}[]|null; partner_course_offers?:{partner_centers?:{name:string}|{name:string}[]|null}|{partner_centers?:{name:string}|{name:string}[]|null}[]|null };
 type Payment = { id:string; payment_number:string; trainee_id:string; amount_centavos:number; method:string; receiving_account:string; reference_number?:string|null; proof_id?:string|null; received_at:string; verification_state:string; trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null };
@@ -43,7 +43,7 @@ const nav: {label:Module;icon:string;roles?:string[]}[] = [
   {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting"]},
   {label:"Schedules",icon:"□",roles:["admin","registration","training_operations","instructor"]},{label:"Instructions",icon:"✉",roles:["admin","registration","training_operations"]},{label:"Endorsed courses",icon:"◇"},{label:"Payments",icon:"₱",roles:["cashier"]},
   {label:"Accounting",icon:"▥",roles:["admin","accounting","cashier"]},{label:"Expenses",icon:"◰",roles:["admin","accounting","cashier"]},{label:"Inventory",icon:"▦",roles:["admin","accounting"]},{label:"Attendance",icon:"✓",roles:["admin","training_operations","instructor"]},
-  {label:"Classrooms",icon:"▢",roles:["admin","training_operations"]},{label:"Certificates",icon:"◈",roles:["admin","training_operations"]},{label:"HR & payroll",icon:"♙",roles:["admin","hr"]},{label:"MyHr",icon:"☺"},{label:"Daily TAR",icon:"▤",roles:["admin","accounting","cashier"]},{label:"Enrollment summary",icon:"▤",roles:["admin","training_operations","accounting"]},{label:"Requests",icon:"↺",roles:["admin","accounting","cashier"]},{label:"Reports",icon:"↥",roles:["admin","accounting"]},{label:"Setup",icon:"⚙",roles:["admin"]},
+  {label:"Classrooms",icon:"▢",roles:["admin","training_operations"]},{label:"Certificates",icon:"◈",roles:["admin","training_operations"]},{label:"HR & payroll",icon:"♙",roles:["admin","hr"]},{label:"MyHr",icon:"☺"},{label:"Daily TAR",icon:"▤",roles:["admin","accounting","cashier"]},{label:"Enrollment summary",icon:"▤",roles:["admin","training_operations","accounting"]},{label:"Charges report",icon:"₱",roles:["admin","accounting"]},{label:"Requests",icon:"↺",roles:["admin","accounting","cashier"]},{label:"Reports",icon:"↥",roles:["admin","accounting"]},{label:"Setup",icon:"⚙",roles:["admin"]},
 ];
 const roleNames:Record<string,string>={admin:"Admin",registration:"Registration",cashier:"Cashier",accounting:"Accounting",training_operations:"Training Operations",hr:"HR",instructor:"Instructor"};
 const pesos=(centavos:number)=>new Intl.NumberFormat("en-PH",{style:"currency",currency:"PHP",minimumFractionDigits:0}).format((Number(centavos)||0)/100);
@@ -85,9 +85,10 @@ function PortalContent({active,role,data,query,open,onPay,canEnroll,canSchedule,
   if(active==="Schedules")return <Schedules data={data} query={query} open={open} canSchedule={canSchedule} reload={reload}/>;
   if(active==="Instructions")return <LiveInstructions data={data} query={query} reload={reload}/>;
   if(active==="Requests")return <LiveRequests data={data} role={role} reload={reload}/>;
-  if(active==="MyHr")return <LiveMyHr data={data}/>;
+  if(active==="MyHr")return <LiveMyHr data={data} reload={reload}/>;
   if(active==="Daily TAR")return <DailyTar data={data}/>;
   if(active==="Enrollment summary")return <EnrollmentSummary data={data}/>;
+  if(active==="Charges report")return <ChargesReport data={data}/>;
   if(active==="Payments")return <Payments data={data} query={query} onPay={onPay} canPay={canPay} reload={reload} role={role}/>;
   if(active==="Endorsed courses")return <Catalog data={data} query={query}/>;
   if(active==="Attendance")return <LiveAttendance batches={data.batches.map(b=>({id:b.id,batch_number:b.batch_number,starts_on:b.starts_on,ends_on:b.ends_on,venue:b.venue}))} />;
@@ -131,7 +132,7 @@ function traineeEnrollmentStatus(data:PortalData,traineeId:string):"Enrolled"|"P
   return "Pending";
 }
 function Trainees({data,query}:{data:PortalData;query:string}){
-  const [lookup,setLookup]=useState(""),[from,setFrom]=useState(""),[to,setTo]=useState("");
+  const [lookup,setLookup]=useState(""),[from,setFrom]=useState(""),[to,setTo]=useState(""),[sel,setSel]=useState<Trainee|null>(null);
   const term=(lookup||query).toLowerCase();
   const rows=data.trainees.filter(t=>{
     const reg=(t.registered_at||"").slice(0,10);
@@ -144,9 +145,32 @@ function Trainees({data,query}:{data:PortalData;query:string}){
     <section className="portal-panel" style={{marginBottom:16}}><div className="panel-heading"><div><h2>Trainee lookup</h2><p>Find any trainee by name, number, email, or mobile</p></div></div><div className="portal-form" style={{padding:"0 0 4px"}}><label className="full">Search<input value={lookup} onChange={e=>setLookup(e.target.value)} placeholder="Search name, number, email, or mobile"/></label></div></section>
     <section className="portal-panel"><div className="panel-heading"><div><h2>Trainee summary</h2><p>Date-sensitive · {rangeLabel}</p></div></div>
       <div className="portal-form" style={{padding:"0 0 8px"}}><label>Start date<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>End date<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label>{(from||to)&&<label style={{alignSelf:"end"}}><button type="button" className="ghost-button" onClick={()=>{setFrom("");setTo("")}}>Clear dates</button></label>}</div>
-      <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Contact</th><th>Status</th><th>Registered</th></tr></thead><tbody>{rows.map(t=>{const s=traineeEnrollmentStatus(data,t.id);return <tr key={t.id}><td><strong>{fullName(t)}</strong><small>{t.trainee_number}</small></td><td>{t.email}<small>{t.mobile}</small></td><td>{s?<Badge>{s}</Badge>:<span className="portal-empty-copy">—</span>}</td><td>{new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",year:"numeric",timeZone:"Asia/Manila"}).format(new Date(t.registered_at))}</td></tr>})}</tbody></table>{!rows.length&&<p className="portal-empty-copy">No matching trainees.</p>}</div>
+      <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Contact</th><th>Status</th><th>Registered</th><th></th></tr></thead><tbody>{rows.map(t=>{const s=traineeEnrollmentStatus(data,t.id);return <tr key={t.id} className="row-clickable" onClick={()=>setSel(t)}><td><strong>{fullName(t)}</strong><small>{t.trainee_number}</small></td><td>{t.email}<small>{t.mobile}</small></td><td>{s?<Badge>{s}</Badge>:<span className="portal-empty-copy">—</span>}</td><td>{new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",year:"numeric",timeZone:"Asia/Manila"}).format(new Date(t.registered_at))}</td><td className="document-actions"><button type="button">View</button></td></tr>})}</tbody></table>{!rows.length&&<p className="portal-empty-copy">No matching trainees.</p>}</div>
     </section>
+    {sel&&<TraineeDetailModal data={data} trainee={sel} onClose={()=>setSel(null)}/>}
   </div>;
+}
+
+function TraineeDetailModal({data,trainee,onClose}:{data:PortalData;trainee:Trainee;onClose:()=>void}){
+  const enrolls=data.enrollments.filter(e=>e.trainee_id===trainee.id);
+  const centerOf=(offerId?:string|null)=>{if(!offerId)return null;const o=data.offers.find(x=>x.id===offerId);return o?first(o.partner_centers):null};
+  return <Modal title="Trainee details" onClose={onClose}>
+    <div id="trainee-packet" className="portal-form">
+      <div className="full"><strong>{fullName(trainee)}</strong> · {trainee.trainee_number}</div>
+      <label>SRN<input readOnly value={trainee.srn??"—"}/></label>
+      <label>Birth date<input readOnly value={trainee.birthdate?date(trainee.birthdate):"—"}/></label>
+      <label>Sex<input readOnly value={trainee.sex??"—"}/></label>
+      <label>Nationality<input readOnly value={trainee.nationality??"—"}/></label>
+      <label>Email<input readOnly value={trainee.email}/></label>
+      <label>Mobile<input readOnly value={trainee.mobile}/></label>
+      <label className="full">Address<input readOnly value={trainee.address??"—"}/></label>
+      <div className="full"><strong>Enrollments</strong></div>
+      {enrolls.map(e=>{const c=first(e.courses),b=first(e.batches),center=centerOf(e.partner_offer_id);const cd=center?.contact_details;return <div className="live-row-item full" key={e.id}><div><strong>{c?.name} · {e.enrollment_number}</strong><small>{b?`${date(b.starts_on)} - ${date(b.ends_on)}`:e.scheduled_on?date(e.scheduled_on):"Open schedule"}{center?` · Endorsed: ${center.name}${cd?.email?` (${cd.email})`:""}`:""}</small></div><Badge>{e.enrollment_status}</Badge></div>})}
+      {!enrolls.length&&<p className="portal-empty-copy full">No enrollments yet.</p>}
+      <p className="portal-form-note full">For endorsed courses, the partner center contact is shown above so you can forward the trainee&apos;s details for enrollment.</p>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Close</button><button type="button" className="portal-primary" onClick={()=>window.print()}>Print info packet</button></div>
+    </div>
+  </Modal>;
 }
 
 function Enrollments({data,query,open,canEnroll,role,reload}:{data:PortalData;query:string;open:(v:"enrollment")=>void;canEnroll:boolean;role:string;reload:()=>Promise<void>}){
@@ -197,18 +221,45 @@ function PageHead({eyebrow,title,text,action,onAction}:{eyebrow:string;title:str
 
 async function submit(body:unknown){const response=await fetch("/api/staff/operations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const result=await response.json();if(!response.ok)throw new Error(result.error??"Unable to save the record.");return result}
 
-function LiveMyHr({data}:{data:PortalData}){
+function LiveMyHr({data,reload}:{data:PortalData;reload:()=>Promise<void>}){
   const hr=data.myHr;
+  const [busy,setBusy]=useState(""),[msg,setMsg]=useState("");
+  const [lt,setLt]=useState("Vacation"),[ls,setLs]=useState(""),[le,setLe]=useState(""),[lr,setLr]=useState("");
+  const [amt,setAmt]=useState(""),[ar,setAr]=useState("");
+  async function fileLeave(){if(!ls||!le||!lr.trim()){setMsg("Complete the leave dates and reason.");return}setBusy("leave");setMsg("");try{await submit({action:"leave-file-self",leaveType:lt,startsOn:ls,endsOn:le,reason:lr.trim()});setLs("");setLe("");setLr("");await reload()}catch(e){setMsg(e instanceof Error?e.message:"Could not file leave.")}finally{setBusy("")}}
+  async function fileAdvance(){const cents=Math.round(Number(amt)*100);if(!Number.isFinite(cents)||cents<=0){setMsg("Enter a valid amount.");return}setBusy("adv");setMsg("");try{await submit({action:"advance-file-self",amountCentavos:cents,reason:ar.trim()});setAmt("");setAr("");await reload()}catch(e){setMsg(e instanceof Error?e.message:"Could not request the advance.")}finally{setBusy("")}}
   if(!hr)return <div className="portal-page"><PageHead eyebrow="Self-service" title="MyHr" text="Your own employee record, leave, and cash advances."/><section className="portal-panel live-list"><p className="portal-empty-copy">No employee record is linked to your account yet. Ask HR to add you (matched by your work email).</p></section></div>;
   const e=hr.employee;
   return <div className="portal-page">
-    <PageHead eyebrow="Self-service" title="MyHr" text="Your own employee record, leave, and cash advances."/>
+    <PageHead eyebrow="Self-service" title="MyHr" text="Your own employee record, leave, and cash advances."/>{msg&&<Message kind="error" text={msg}/>}
+    <div className="dashboard-panels">
+      <section className="portal-panel"><div className="panel-heading"><div><h2>File a leave request</h2><p>Sent to HR for approval</p></div></div><div className="portal-form"><label>Type<select value={lt} onChange={ev=>setLt(ev.target.value)}><option>Vacation</option><option>Sick</option><option>Emergency</option><option>Unpaid</option></select></label><label>From<input type="date" value={ls} onChange={ev=>setLs(ev.target.value)}/></label><label>To<input type="date" value={le} onChange={ev=>setLe(ev.target.value)}/></label><label className="full">Reason<input value={lr} onChange={ev=>setLr(ev.target.value)}/></label><div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy==="leave"} onClick={fileLeave}>{busy==="leave"?"Filing…":"File leave"}</button></div></div></section>
+      <section className="portal-panel"><div className="panel-heading"><div><h2>Request a cash advance</h2><p>Sent to HR for approval</p></div></div><div className="portal-form"><label>Amount (PHP)<input type="number" min="0" step="0.01" value={amt} onChange={ev=>setAmt(ev.target.value)}/></label><label className="full">Reason (optional)<input value={ar} onChange={ev=>setAr(ev.target.value)}/></label><div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy==="adv"} onClick={fileAdvance}>{busy==="adv"?"Requesting…":"Request advance"}</button></div></div></section>
+    </div>
     <section className="portal-panel live-list"><div className="panel-heading"><div><h2>{e.complete_name}</h2><p>{e.position} · {e.employee_number}</p></div><Badge tone={e.active?"green":"slate"}>{e.employment_status}</Badge></div>
       <div className="live-row-item"><div><strong>Date hired</strong><small>{e.date_hired?date(e.date_hired):"—"}</small></div><span className="slot-count">{e.pay_type??""}</span></div>
       {typeof e.base_rate_centavos==="number"&&<div className="live-row-item"><div><strong>Base rate</strong><small>Per your pay type</small></div><span className="slot-count">{pesos(e.base_rate_centavos)}</span></div>}
     </section>
     <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Leave history</h2><p>Your filed leave</p></div><Badge>{hr.leave.length}</Badge></div>{hr.leave.map(l=><div className="live-row-item" key={l.id}><div><strong>{l.leave_type} · {date(l.starts_on)}–{date(l.ends_on)}</strong><small>{l.reason}</small></div><Badge tone={l.status==="Approved"?"green":l.status==="Rejected"?"red":"orange"}>{l.status}</Badge></div>)}{!hr.leave.length&&<p className="portal-empty-copy">No leave on record.</p>}</section>
     <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Cash advances</h2><p>Your advances and balances</p></div><Badge>{hr.advances.length}</Badge></div>{hr.advances.map(a=><div className="live-row-item" key={a.id}><div><strong>{pesos(a.amount_centavos)}</strong><small>Requested {date(a.requested_on)} · balance {pesos(a.balance_centavos)}</small></div><Badge tone={a.status==="Approved"?"green":a.status==="Rejected"?"red":"orange"}>{a.status}</Badge></div>)}{!hr.advances.length&&<p className="portal-empty-copy">No cash advances on record.</p>}</section>
+  </div>;
+}
+
+function ChargesReport({data}:{data:PortalData}){
+  const todayISO=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date());
+  const [from,setFrom]=useState(todayISO.slice(0,8)+"01"),[to,setTo]=useState(todayISO),[type,setType]=useState<"All"|"Enrollment"|"Rescheduling"|"Reprinting">("All");
+  const mday=(v:string)=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date(v));
+  const inRange=(d:string)=>{const x=mday(d);return x>=from&&x<=to};
+  const catName=(id?:string|null)=>id?(data.charges.find(c=>c.id===id)?.name??""):"";
+  const classify=(chargeCatalogId:string|null|undefined,desc:string)=>{const s=`${catName(chargeCatalogId)} ${desc}`.toLowerCase();if(/reschedul/.test(s))return "Rescheduling";if(/reprint/.test(s))return "Reprinting";return "Other charge"};
+  const rows:{date:string;trainee:string;course:string;type:string;desc:string;amt:number}[]=[];
+  if(type==="All"||type==="Enrollment"){for(const e of data.enrollments){if(e.enrollment_status==="Cancelled"||!inRange(e.created_at))continue;const t=first(e.trainees),c=first(e.courses);rows.push({date:e.created_at,trainee:t?fullName(t):"—",course:c?.name??"",type:"Enrollment",desc:"Enrollment fee",amt:Number(e.selling_price_centavos)})}}
+  if(type!=="Enrollment"){for(const ch of data.enrollmentCharges){if(ch.event_type!=="charge"||!inRange(ch.created_at))continue;const cls=classify(ch.charge_catalog_id,ch.description);if(type!=="All"&&cls!==type)continue;const e=data.enrollments.find(x=>x.id===ch.enrollment_id);const t=e?first(e.trainees):null,c=e?first(e.courses):null;rows.push({date:ch.created_at,trainee:t?fullName(t):"—",course:c?.name??"",type:cls,desc:ch.description,amt:Number(ch.amount_centavos)})}}
+  rows.sort((a,b)=>b.date.localeCompare(a.date));
+  const total=rows.reduce((s,r)=>s+r.amt,0);
+  return <div className="portal-page"><PageHead eyebrow="Accounting" title="Report of charges" text="Charges by type over a date range (Enrollment, Rescheduling, Reprinting)."/>
+    <div className="portal-form" style={{padding:"0 0 8px"}}><label>Type<select value={type} onChange={e=>setType(e.target.value as "All"|"Enrollment"|"Rescheduling"|"Reprinting")}><option>All</option><option>Enrollment</option><option>Rescheduling</option><option>Reprinting</option></select></label><label>Start date<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>End date<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label></div>
+    <div className="portal-table portal-panel"><table><thead><tr><th>Date</th><th>Trainee</th><th>Course</th><th>Type</th><th>Description</th><th>Amount</th></tr></thead><tbody>{rows.map((r,i)=><tr key={i}><td>{date(r.date)}</td><td>{r.trainee}</td><td>{r.course}</td><td><Badge tone={r.type==="Enrollment"?"blue":r.type==="Rescheduling"?"orange":r.type==="Reprinting"?"green":"slate"}>{r.type}</Badge></td><td>{r.desc}</td><td><strong>{pesos(r.amt)}</strong></td></tr>)}{!rows.length&&<tr><td colSpan={6}><span className="portal-empty-copy">No charges in this range.</span></td></tr>}</tbody><tfoot><tr><td colSpan={5}><strong>Total</strong></td><td><strong>{pesos(total)}</strong></td></tr></tfoot></table></div>
   </div>;
 }
 
