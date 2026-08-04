@@ -11,16 +11,16 @@ const input=z.discriminatedUnion("action",[
   z.object({action:z.literal("partner"),name:z.string().trim().min(2).max(160),email:z.string().email().optional().or(z.literal("")),mobile:z.string().trim().max(40).optional()}),
   z.object({action:z.literal("course"),id:z.string().uuid().optional(),code:z.string().trim().min(2).max(40),name:z.string().trim().min(2).max(240),categoryId:z.string().uuid(),deliveryType:z.enum(["In-House","Partner or Endorsed"]),durationLabel:z.string().trim().min(2).max(60),durationDays:z.number().positive().max(365),mode:z.string().trim().min(2).max(80),priceCentavos:z.number().int().nonnegative()}),
   z.object({action:z.literal("offer-rate"),id:z.string().uuid(),durationLabel:z.string().trim().min(2).max(60),trainingFeeCentavos:z.number().int().nonnegative(),rebateCentavos:z.number().int().nonnegative()}),
-  z.object({action:z.literal("invite-user"),employeeId:z.string().uuid().optional(),completeName:z.string().trim().min(2).max(160),email:z.string().email(),roleCode:z.enum(["admin","registration","cashier","accounting","training_operations","hr","instructor"])}),
+  z.object({action:z.literal("invite-user"),employeeId:z.string().uuid().optional(),completeName:z.string().trim().min(2).max(160),email:z.string().email(),roleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","training_operations","hr","instructor"])}),
   z.object({action:z.literal("reset-password"),email:z.string().email()}),
-  z.object({action:z.literal("set-user-role"),userId:z.string().uuid(),roleCode:z.enum(["admin","registration","cashier","accounting","training_operations","hr","instructor"])}),
-  z.object({action:z.literal("grant-role-by-email"),email:z.string().email(),completeName:z.string().trim().max(160).optional(),roleCode:z.enum(["admin","registration","cashier","accounting","training_operations","hr","instructor"])}),
+  z.object({action:z.literal("set-user-role"),userId:z.string().uuid(),roleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","training_operations","hr","instructor"])}),
+  z.object({action:z.literal("grant-role-by-email"),email:z.string().email(),completeName:z.string().trim().max(160).optional(),roleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","training_operations","hr","instructor"])}),
   z.object({action:z.literal("remove-user"),userId:z.string().uuid()}),
-  z.object({action:z.literal("create-user"),email:z.string().email(),password:z.string().min(6).max(200),completeName:z.string().trim().min(2).max(160),roleCode:z.enum(["admin","registration","cashier","accounting","training_operations","hr","instructor"]),position:z.string().trim().max(120).optional()}),
+  z.object({action:z.literal("create-user"),email:z.string().email(),password:z.string().min(6).max(200),completeName:z.string().trim().min(2).max(160),roleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","training_operations","hr","instructor"]),position:z.string().trim().max(120).optional()}),
 ]);
 const slug=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,50);
 
-export async function GET(){const staff=await requireStaff(["admin"]);
+export async function GET(){const staff=await requireStaff(["super_admin"]);
   if(!staff){
     // Self-diagnostic: report which cookies the route received, who is signed
     // in, and what roles the DB actually holds (read via service role so RLS
@@ -49,7 +49,7 @@ export async function GET(){const staff=await requireStaff(["admin"]);
   const users=((results[7].data??[]) as {id:string;email:string;complete_name:string;account_state:string}[]).map(p=>({id:p.id,email:p.email,completeName:p.complete_name,accountState:p.account_state,roles:roleBy.get(p.id)??[],position:empBy.get(p.id)??null}));
   return NextResponse.json({paymentMethods:results[0].data,agencies:results[1].data,partners:results[2].data,courses:results[3].data,offers:results[4].data,categories:results[5].data,employees:results[6].data,users},{headers:{"cache-control":"no-store"}})}
 
-export async function POST(request:Request){const staff=await requireStaff(["admin"]);if(!staff)return NextResponse.json({error:"Admin access required."},{status:403});try{const value=input.parse(await request.json()),db=createSupabaseAdminClient();let record:unknown,recordType=value.action;
+export async function POST(request:Request){const staff=await requireStaff(["super_admin"]);if(!staff)return NextResponse.json({error:"Super Admin access required."},{status:403});try{const value=input.parse(await request.json()),db=createSupabaseAdminClient();let record:unknown,recordType=value.action;
   // Build auth-email redirects from the live request origin so links never fall back to localhost.
   const authRedirect=`${process.env.APP_BASE_URL??new URL(request.url).origin}/auth/callback?next=/portal`;
   if(value.action==="payment-method"){const {data,error}=await db.from("payment_methods").upsert({code:slug(value.name),name:value.name,requires_reference:value.requiresReference,allows_proof:value.allowsProof,active:true},{onConflict:"code"}).select().single();if(error)throw error;record=data}

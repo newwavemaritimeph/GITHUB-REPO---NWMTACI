@@ -33,6 +33,10 @@ export async function requireStaff(allowedRoles?: string[]) {
     const role = entry.roles as unknown as { code?: string } | { code?: string }[];
     return Array.isArray(role) ? role.map((item) => item.code ?? "") : [role?.code ?? ""];
   });
+  // Super Admin is admin-equivalent everywhere: inject 'admin' so every downstream
+  // role check that allows admin also allows super_admin. Super-admin-only gates
+  // (e.g. user management) still require the literal "super_admin" code.
+  if (roleCodes.includes("super_admin") && !roleCodes.includes("admin")) roleCodes.push("admin");
   if (roleCodes.length === 0 || (allowedRoles && !roleCodes.some((role) => allowedRoles.includes(role)))) return null;
   return { user, roleCodes };
 }

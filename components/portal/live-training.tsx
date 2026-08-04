@@ -22,7 +22,7 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
   const [tab, setTab] = useState<"Overview" | "Classrooms" | "Certificates">(initialTab);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const canManage = role === "admin" || role === "training_operations";
+  const canManage = role === "admin" || role === "training_operations" || role === "releasing_officer";
   const [tplCourse, setTplCourse] = useState("");
   const [tplFields, setTplFields] = useState("Certificate Number, Trainee Name, Completion Date, Course Name");
   const [tplFile, setTplFile] = useState<File | null>(null);
