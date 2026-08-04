@@ -40,10 +40,11 @@ export function FeedbackForm({ token }: { token: string }) {
 
   async function submit() {
     if (!overall) { setError("Please give an overall rating."); return; }
+    if (!comments.trim()) { setError("Please add a comment before submitting."); return; }
     setBusy(true); setError("");
     try {
       const r = await fetch("/api/public/feedback", { method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token, overallRating: overall, instructorRating: instructor || undefined, comments: comments.trim() || undefined }) });
+        body: JSON.stringify({ token, overallRating: overall, instructorRating: instructor || undefined, comments: comments.trim() }) });
       const body = await r.json();
       if (!r.ok) throw new Error(body.error ?? "Could not submit your feedback.");
       setDone(true);
@@ -74,7 +75,7 @@ export function FeedbackForm({ token }: { token: string }) {
             <Stars label="Overall training experience" value={overall} onChange={setOverall} />
             <Stars label="Instructor" value={instructor} onChange={setInstructor} />
             <label style={{ display: "block", margin: "14px 0" }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: "#123F63" }}>Comments (optional)</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#123F63" }}>Comments <span style={{ color: "#F25615" }}>*</span></span>
               <textarea value={comments} onChange={(e) => setComments(e.target.value)} rows={4}
                 style={{ width: "100%", marginTop: 6, borderRadius: 8, border: "1px solid #9EE3F1", padding: 10, fontFamily: "inherit", fontSize: 14 }} />
             </label>

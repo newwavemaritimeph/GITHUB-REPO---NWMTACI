@@ -31,7 +31,7 @@ const submitInput = z.object({
   token: z.string().min(1),
   overallRating: z.number().int().min(1).max(5).optional(),
   instructorRating: z.number().int().min(1).max(5).optional(),
-  comments: z.string().trim().max(2000).optional(),
+  comments: z.string().trim().min(1, "Please add a comment.").max(2000),
 });
 
 // POST → record feedback (= online-training attendance). For In-House courses, mark the
