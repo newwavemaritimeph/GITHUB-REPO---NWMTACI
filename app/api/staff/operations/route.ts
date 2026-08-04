@@ -236,7 +236,14 @@ export async function GET() {
   if (!scheduledResult.error) for (const row of scheduledResult.data ?? []) scheduledByEnrollment.set(row.id, (row as { scheduled_on?: string | null }).scheduled_on ?? null);
   const sentResult = await db.from("enrollments").select("id,instructions_sent_at").limit(250);
   if (!sentResult.error) for (const row of sentResult.data ?? []) sentByEnrollment.set(row.id, (row as { instructions_sent_at?: string | null }).instructions_sent_at ?? null);
-  const enrollments = (enrollmentsResult.data ?? []).map((row) => ({ ...row, scheduled_on: scheduledByEnrollment.get(row.id) ?? null, instructions_sent_at: sentByEnrollment.get(row.id) ?? null, paid_centavos: paidByEnrollment.get(row.id) ?? 0, charges_centavos: chargesByEnrollment.get(row.id) ?? 0, discounts_centavos: discountsByEnrollment.get(row.id) ?? 0 }));
+  // Feedback token (share link) + submitted set — both tolerant of the pre-migration state.
+  const tokenByEnrollment = new Map<string, string | null>();
+  const feedbackByEnrollment = new Set<string>();
+  const tokenResult = await db.from("enrollments").select("id,feedback_token").limit(250);
+  if (!tokenResult.error) for (const row of tokenResult.data ?? []) tokenByEnrollment.set(row.id, (row as { feedback_token?: string | null }).feedback_token ?? null);
+  const feedbackResult = await db.from("training_feedback").select("enrollment_id").limit(500);
+  if (!feedbackResult.error) for (const row of feedbackResult.data ?? []) feedbackByEnrollment.add((row as { enrollment_id: string }).enrollment_id);
+  const enrollments = (enrollmentsResult.data ?? []).map((row) => ({ ...row, scheduled_on: scheduledByEnrollment.get(row.id) ?? null, instructions_sent_at: sentByEnrollment.get(row.id) ?? null, paid_centavos: paidByEnrollment.get(row.id) ?? 0, charges_centavos: chargesByEnrollment.get(row.id) ?? 0, discounts_centavos: discountsByEnrollment.get(row.id) ?? 0, feedback_token: tokenByEnrollment.get(row.id) ?? null, feedback_submitted: feedbackByEnrollment.has(row.id) }));
   // HR datasets are sensitive (salaries, government IDs) — only HR and Admin receive them.
   const isHr = canManageHr(staff.roleCodes);
   let hr: Record<string, unknown[]> = { employees: [], employeeAttendance: [], leaveRequests: [], cashAdvances: [], payrollPeriods: [], payrollItems: [] };

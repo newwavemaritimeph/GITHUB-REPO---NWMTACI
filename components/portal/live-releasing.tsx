@@ -8,7 +8,7 @@ import { downloadCsv } from "@/lib/csv";
 type NameRef = { legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string };
 type CourseRef = { name?: string; code?: string };
 type EnrollRef = { enrollment_number?: string; trainees?: NameRef | NameRef[] | null; courses?: CourseRef | CourseRef[] | null };
-type Enrollment = { id: string; enrollment_number: string; course_id: string; partner_offer_id?: string | null; selling_price_centavos: number; paid_centavos: number; charges_centavos?: number; discounts_centavos?: number; enrollment_status: string; trainees?: NameRef | NameRef[] | null; courses?: CourseRef | CourseRef[] | null; batches?: { ends_on: string } | { ends_on: string }[] | null };
+type Enrollment = { id: string; enrollment_number: string; course_id: string; partner_offer_id?: string | null; selling_price_centavos: number; paid_centavos: number; charges_centavos?: number; discounts_centavos?: number; enrollment_status: string; feedback_token?: string | null; feedback_submitted?: boolean; trainees?: NameRef | NameRef[] | null; courses?: CourseRef | CourseRef[] | null; batches?: { ends_on: string } | { ends_on: string }[] | null };
 type Certificate = { id: string; enrollment_id: string; status: string; printed_at?: string | null; reprint_count?: number; snapshot?: Record<string, unknown> | null; number_pool_id?: string | null; template_id?: string | null };
 type CertTemplate = { id: string; course_id: string; version: number; active: boolean; approved_at?: string | null; courses?: CourseRef | CourseRef[] | null };
 type ReleaseEvent = { id: string; certificate_id: string; event_type: string; recipient_name?: string | null; recipient_id_type?: string | null; reason?: string | null; created_at: string; certificates?: { enrollment_id?: string; snapshot?: Record<string, unknown> | null; enrollments?: EnrollRef | EnrollRef[] | null } | { enrollment_id?: string; snapshot?: Record<string, unknown> | null; enrollments?: EnrollRef | EnrollRef[] | null }[] | null };
@@ -44,18 +44,18 @@ export function ReleasingDashboard({ data }: { data: ReleasingData }) {
   const releasedWeek = released.filter((r) => relDay(r) >= weekAgo).length;
   const releasedMonth = released.filter((r) => relDay(r) >= monthStart).length;
   const unreleasedPaid = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && inHouse(data, e) && isPaid(e) && certOf(data, e.id)?.status !== "Released");
-  const ending = data.batches.filter((b) => b.ends_on >= today && b.ends_on <= in7).sort((a, z) => a.ends_on.localeCompare(z.ends_on));
+  const ending = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && inHouse(data, e)).map((e) => ({ e, end: one(e.batches)?.ends_on ?? "" })).filter((x) => x.end && x.end >= today && x.end <= in7).sort((a, z) => a.end.localeCompare(z.end));
   return (
     <>
       <div className="finance-hero">
         <div><span>Unreleased · paid</span><strong>{unreleasedPaid.length}</strong><small>In-house, fully paid, not yet released</small></div>
-        <article><span>Ending trainings</span><strong>{ending.length}</strong><small>Batches ending within 7 days</small></article>
+        <article><span>Ending trainings</span><strong>{ending.length}</strong><small>Trainees ending within 7 days</small></article>
         <article><span>Released today</span><strong>{releasedToday}</strong><small>{releasedWeek} this week</small></article>
         <article><span>Released this month</span><strong>{releasedMonth}</strong><small>Certificates handed over</small></article>
       </div>
       <div className="dashboard-panels">
         <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Unreleased certificates — paid</h2><p>Ready to process</p></div><span className="slot-count">{unreleasedPaid.length}</span></div>{unreleasedPaid.slice(0, 20).map((e) => { const c = certOf(data, e.id); return <div className="live-row-item" key={e.id}><div><strong>{traineeName(e)}</strong><small>{one(e.courses)?.name ?? ""} · {e.enrollment_number}</small></div><span className="slot-count">{c?.status ?? "Not issued"}</span></div>; })}{!unreleasedPaid.length && <p className="portal-empty-copy">Nothing awaiting release.</p>}</section>
-        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Trainees with ending trainings</h2><p>Batches ending within 7 days</p></div><span className="slot-count">{ending.length}</span></div>{ending.slice(0, 20).map((b) => <div className="live-row-item" key={b.id}><div><strong>{one(b.courses)?.name ?? b.batch_number}</strong><small>{b.batch_number} · {b.confirmed_count} enrolled</small></div><span className="slot-count">{fmtDate(b.ends_on)}</span></div>)}{!ending.length && <p className="portal-empty-copy">No trainings ending soon.</p>}</section>
+        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Trainees with ending trainings</h2><p>Ending within 7 days</p></div><span className="slot-count">{ending.length}</span></div>{ending.slice(0, 20).map(({ e, end }) => <div className="live-row-item" key={e.id}><div><strong>{traineeName(e)}</strong><small>{one(e.courses)?.name ?? ""}</small></div><span className="slot-count">{fmtDate(end)}</span></div>)}{!ending.length && <p className="portal-empty-copy">No trainings ending soon.</p>}</section>
       </div>
     </>
   );
@@ -81,6 +81,7 @@ export function LiveReleasing({ data, reload }: { data: ReleasingData; role: str
     void act({ action: "certificate-issue", enrollmentId: e.id, certificateNumber: override.trim() || undefined });
   }
   function activeTemplateFor(courseId: string) { return data.certificateTemplates.find((t) => t.course_id === courseId && t.active && t.approved_at) ?? null; }
+  function copyLink(token: string) { const url = `${window.location.origin}/feedback/${token}`; if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => setMessage("Feedback link copied to clipboard.")).catch(() => window.prompt("Share this feedback link with the trainee:", url)); else window.prompt("Share this feedback link with the trainee:", url); }
   function openPdf(e: Enrollment) {
     const c = certOf(data, e.id);
     const snap = (c?.snapshot ?? {}) as { certificate_number?: string; overrides?: Record<string, string> };
@@ -107,11 +108,12 @@ export function LiveReleasing({ data, reload }: { data: ReleasingData; role: str
       <div className="portal-tabs">{(["Register", "Templates", "Released report"] as const).map((t) => <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{t}</button>)}</div>
       {message && <div className="portal-message error" role="alert">{message}</div>}
 
-      {tab === "Register" && <div className="portal-table portal-panel"><table><thead><tr><th>Trainee</th><th>Course</th><th>Payment</th><th>Certificate</th><th>Actions</th></tr></thead><tbody>
+      {tab === "Register" && <div className="portal-table portal-panel"><table><thead><tr><th>Trainee</th><th>Course</th><th>Payment</th><th>Feedback (online attendance)</th><th>Certificate</th><th>Actions</th></tr></thead><tbody>
         {rows.map((e) => { const c = certOf(data, e.id); const snap = (c?.snapshot ?? {}) as { certificate_number?: string }; const paid = isPaid(e); const printed = c?.status === "Printed" || c?.status === "Released"; return <tr key={e.id}>
           <td><strong>{traineeName(e)}</strong><small>{e.enrollment_number}</small></td>
           <td>{one(e.courses)?.name}<small>{one(e.courses)?.code}</small></td>
           <td><span className={`portal-badge ${paid ? "green" : "red"}`}>{paid ? "Paid" : "Balance"}</span></td>
+          <td><span className={`portal-badge ${e.feedback_submitted ? "green" : "orange"}`}>{e.feedback_submitted ? "Submitted" : "Pending"}</span>{e.feedback_token && <button type="button" className="ghost-button" style={{ marginLeft: 6 }} onClick={() => copyLink(e.feedback_token!)}>Copy link</button>}</td>
           <td><strong>{c?.status ?? "Not issued"}</strong><small>{snap.certificate_number ? `No. ${snap.certificate_number}` : "—"}{c?.reprint_count ? ` · ${c.reprint_count} reprint(s)` : ""}</small></td>
           <td className="document-actions">
             <button type="button" disabled={busy || !paid} onClick={() => issue(e)}>{c ? "Re-issue #" : "Issue #"}</button>
@@ -121,7 +123,7 @@ export function LiveReleasing({ data, reload }: { data: ReleasingData; role: str
             <button type="button" disabled={busy || !c} onClick={() => openPdf(e)}>PDF</button>
             {c && c.status !== "Released" && <button type="button" className="ghost-danger" disabled={busy} onClick={() => { const reason = window.prompt("Void this certificate? Reason:") ?? undefined; if (reason !== undefined) void act({ action: "certificate-void", enrollmentId: e.id, reason }); }}>Void</button>}
           </td></tr>; })}
-        {!rows.length && <tr><td colSpan={5}><span className="portal-empty-copy">No in-house enrollments yet.</span></td></tr>}
+        {!rows.length && <tr><td colSpan={6}><span className="portal-empty-copy">No in-house enrollments yet.</span></td></tr>}
       </tbody></table></div>}
 
       {tab === "Templates" && <TemplateUpload data={data} ownCourses={ownCourses} onSaved={reload} />}

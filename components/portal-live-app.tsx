@@ -64,7 +64,8 @@ export function PortalLiveApp(){
   useEffect(()=>{void load()},[load]);
   const adminHidden=new Set<Module>(["Trainees","Instructions","Attendance","Inventory","Classrooms","Certificates","HR & payroll","Daily TAR"]);
   const accountingHidden=new Set<Module>(["MyHr","Enrollment summary","Trainees","Enrollments","Summary","Reports"]);
-  const allowedNav=nav.filter(item=>(!item.roles||item.roles.includes(role)||(role==="super_admin"&&item.roles.includes("admin")))&&!(role==="admin"&&adminHidden.has(item.label))&&!(role==="accounting"&&accountingHidden.has(item.label)));
+  const releasingHidden=new Set<Module>(["Endorsed courses"]);
+  const allowedNav=nav.filter(item=>(!item.roles||item.roles.includes(role)||(role==="super_admin"&&item.roles.includes("admin")))&&!(role==="admin"&&adminHidden.has(item.label))&&!(role==="accounting"&&accountingHidden.has(item.label))&&!(role==="releasing_officer"&&releasingHidden.has(item.label)));
   const go=(module:Module)=>{setActive(module);setSidebar(false)};
   const unread=data?.notifications.filter(item=>!item.read_at).length??0;
   async function markRead(){await fetch("/api/staff/operations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"mark-notifications-read"})});setData(current=>current?{...current,notifications:current.notifications.map(item=>({...item,read_at:item.read_at??new Date().toISOString()}))}:current)}
