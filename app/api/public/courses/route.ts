@@ -10,7 +10,8 @@ export async function GET(request: Request) {
   if (!isSupabaseConfigured()) return NextResponse.json({ courses: [] });
   const db = await createSupabaseServerClient();
   const now = new Date();
-  const today = now.toISOString().slice(0, 10);
+  // Manila calendar day — align with the submit RPC's current_date check.
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(now);
   const { data, error } = await db.from("batches")
     .select("capacity,confirmed_count,courses!inner(code,name,delivery_type)")
     .eq("status", "Open")
@@ -26,5 +27,5 @@ export async function GET(request: Request) {
     if (!seen.has(c.code)) seen.set(c.code, { code: c.code, name: c.name });
   }
   const courses = [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
-  return NextResponse.json({ courses }, { headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=300" } });
+  return NextResponse.json({ courses }, { headers: { "Cache-Control": "no-store" } });
 }

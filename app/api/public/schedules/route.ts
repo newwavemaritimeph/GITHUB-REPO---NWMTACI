@@ -11,7 +11,9 @@ export async function GET(request: Request) {
   if (!isSupabaseConfigured()) return NextResponse.json({ schedules: [] });
   const db = await createSupabaseServerClient();
   const now = new Date();
-  const today = now.toISOString().slice(0, 10);
+  // Manila calendar day — must match how the submit RPC evaluates starts_on/current_date,
+  // otherwise a batch starting "today" in Manila shows here but is rejected on submit.
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(now);
   const { data, error } = await db.from("batches")
     .select("id,batch_number,starts_on,ends_on,mode,venue,capacity,confirmed_count,courses!inner(code)")
     .eq("courses.code", parsed.data)
@@ -26,5 +28,5 @@ export async function GET(request: Request) {
     label: `${new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${batch.starts_on}T00:00:00+08:00`))}${batch.ends_on !== batch.starts_on ? ` – ${new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${batch.ends_on}T00:00:00+08:00`))}` : ""} · ${batch.mode}${batch.venue ? ` · ${batch.venue}` : ""}`,
     availableSlots: batch.capacity - batch.confirmed_count,
   }));
-  return NextResponse.json({ schedules }, { headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=300" } });
+  return NextResponse.json({ schedules }, { headers: { "Cache-Control": "no-store" } });
 }
