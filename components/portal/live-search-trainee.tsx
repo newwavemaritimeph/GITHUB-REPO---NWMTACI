@@ -48,7 +48,7 @@ export function LiveSearchTrainee({ data }: { data: SearchData }) {
               <tr key={t.id}>
                 <td><strong>{fullName(t)}</strong></td>
                 <td>{t.trainee_number}</td>
-                <td>{t.email}<small>{t.mobile}</small></td>
+                <td className="lc">{t.email}<small>{t.mobile}</small></td>
                 <td className="document-actions"><button onClick={() => setSelectedId(t.id)}>Open</button></td>
               </tr>
             ))}
@@ -65,7 +65,7 @@ export function LiveSearchTrainee({ data }: { data: SearchData }) {
               <button className="portal-secondary" onClick={() => { setSelectedId(null); }}>← Back to results</button>
             </div>
             <div className="finance-hero">
-              <div><span>Email</span><strong style={{ fontSize: 16 }}>{selected.email}</strong><small>{selected.mobile}</small></div>
+              <div><span>Email</span><strong className="lc" style={{ fontSize: 16 }}>{selected.email}</strong><small>{selected.mobile}</small></div>
               <article><span>Enrollments</span><strong>{enrollments.length}</strong><small>All statuses</small></article>
               <article><span>Total due</span><strong>{pesos(dueTotal)}</strong><small>Price + charges − rebates</small></article>
               <article><span>Total paid</span><strong>{pesos(paidTotal)}</strong><small>{payments.length} payments</small></article>

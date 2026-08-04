@@ -22,6 +22,12 @@
 .portal-shell input[type="email"] {
   text-transform: none;
 }
+/* Emails, links, and other verbatim values must never be title-cased by the
+   house style. Apply .lc to any element that shows an address or URL. */
+.portal-shell .lc,
+.portal-shell .lc * {
+  text-transform: none !important;
+}
 
 .portal-sidebar {
   position: fixed;

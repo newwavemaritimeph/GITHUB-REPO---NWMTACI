@@ -2288,7 +2288,7 @@ img {
 
 .schedule-option {
   display: grid;
-  grid-template-columns: 62px 1fr auto;
+  grid-template-columns: 1fr;
   gap: 16px;
   align-items: center;
   text-align: left;

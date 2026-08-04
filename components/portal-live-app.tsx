@@ -145,7 +145,7 @@ function Trainees({data,query}:{data:PortalData;query:string}){
     <section className="portal-panel" style={{marginBottom:16}}><div className="panel-heading"><div><h2>Trainee lookup</h2><p>Find any trainee by name, number, email, or mobile</p></div></div><div className="portal-form" style={{padding:"0 0 4px"}}><label className="full">Search<input value={lookup} onChange={e=>setLookup(e.target.value)} placeholder="Search name, number, email, or mobile"/></label></div></section>
     <section className="portal-panel"><div className="panel-heading"><div><h2>Trainee summary</h2><p>Date-sensitive · {rangeLabel}</p></div></div>
       <div className="portal-form" style={{padding:"0 0 8px"}}><label>Start date<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>End date<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label>{(from||to)&&<label style={{alignSelf:"end"}}><button type="button" className="ghost-button" onClick={()=>{setFrom("");setTo("")}}>Clear dates</button></label>}</div>
-      <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Contact</th><th>Status</th><th>Registered</th><th></th></tr></thead><tbody>{rows.map(t=>{const s=traineeEnrollmentStatus(data,t.id);return <tr key={t.id} className="row-clickable" onClick={()=>setSel(t)}><td><strong>{fullName(t)}</strong><small>{t.trainee_number}</small></td><td>{t.email}<small>{t.mobile}</small></td><td>{s?<Badge>{s}</Badge>:<span className="portal-empty-copy">—</span>}</td><td>{new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",year:"numeric",timeZone:"Asia/Manila"}).format(new Date(t.registered_at))}</td><td className="document-actions"><button type="button">View</button></td></tr>})}</tbody></table>{!rows.length&&<p className="portal-empty-copy">No matching trainees.</p>}</div>
+      <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Contact</th><th>Status</th><th>Registered</th><th></th></tr></thead><tbody>{rows.map(t=>{const s=traineeEnrollmentStatus(data,t.id);return <tr key={t.id} className="row-clickable" onClick={()=>setSel(t)}><td><strong>{fullName(t)}</strong><small>{t.trainee_number}</small></td><td className="lc">{t.email}<small>{t.mobile}</small></td><td>{s?<Badge>{s}</Badge>:<span className="portal-empty-copy">—</span>}</td><td>{new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",year:"numeric",timeZone:"Asia/Manila"}).format(new Date(t.registered_at))}</td><td className="document-actions"><button type="button">View</button></td></tr>})}</tbody></table>{!rows.length&&<p className="portal-empty-copy">No matching trainees.</p>}</div>
     </section>
     {sel&&<TraineeDetailModal data={data} trainee={sel} onClose={()=>setSel(null)}/>}
   </div>;
@@ -161,7 +161,7 @@ function TraineeDetailModal({data,trainee,onClose}:{data:PortalData;trainee:Trai
       <label>Birth date<input readOnly value={trainee.birthdate?date(trainee.birthdate):"—"}/></label>
       <label>Sex<input readOnly value={trainee.sex??"—"}/></label>
       <label>Nationality<input readOnly value={trainee.nationality??"—"}/></label>
-      <label>Email<input readOnly value={trainee.email}/></label>
+      <label>Email<input className="lc" readOnly value={trainee.email}/></label>
       <label>Mobile<input readOnly value={trainee.mobile}/></label>
       <label className="full">Address<input readOnly value={trainee.address??"—"}/></label>
       <div className="full"><strong>Enrollments</strong></div>
