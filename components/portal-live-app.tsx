@@ -61,7 +61,8 @@ export function PortalLiveApp(){
   const [data,setData]=useState<PortalData|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[active,setActive]=useState<Module>("Dashboard"),[role,setRole]=useState("admin"),[sidebar,setSidebar]=useState(false),[notices,setNotices]=useState(false),[modal,setModal]=useState<"enrollment"|"batch"|"payment"|null>(null),[payTarget,setPayTarget]=useState(""),[query,setQuery]=useState(""),[account,setAccount]=useState(false);
   const load=useCallback(async()=>{setLoading(true);setError("");try{const response=await fetch("/api/staff/operations",{cache:"no-store"});const body=await response.json();if(!response.ok)throw new Error(body.error??"Unable to load staff records.");setData(body);setRole((current:string)=>body.roles.includes(current)?current:body.roles[0]??"admin")}catch(e){setError(e instanceof Error?e.message:"Unable to load staff records.")}finally{setLoading(false)}},[]);
   useEffect(()=>{void load()},[load]);
-  const allowedNav=nav.filter(item=>!item.roles||item.roles.includes(role));
+  const adminHidden=new Set<Module>(["Trainees","Instructions","Attendance","Inventory","Classrooms","Certificates","HR & payroll","Daily TAR"]);
+  const allowedNav=nav.filter(item=>(!item.roles||item.roles.includes(role))&&!(role==="admin"&&adminHidden.has(item.label)));
   const go=(module:Module)=>{setActive(module);setSidebar(false)};
   const unread=data?.notifications.filter(item=>!item.read_at).length??0;
   async function markRead(){await fetch("/api/staff/operations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"mark-notifications-read"})});setData(current=>current?{...current,notifications:current.notifications.map(item=>({...item,read_at:item.read_at??new Date().toISOString()}))}:current)}
