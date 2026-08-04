@@ -26,6 +26,15 @@ const registrationSchema = z.object({
   courseCode: z.string().trim().min(2).max(40), courseName: z.string().trim().min(2).max(240), scheduleId: z.string().uuid(), termsAccepted: z.literal("on"),
 });
 
+export const runtime = "nodejs";
+export const maxDuration = 25;
+
+// Fail loudly instead of hanging: if a DB call blocks (e.g. a locked id_sequences
+// row from a stuck transaction), return a clear message rather than an endless spinner.
+function withTimeout<T>(promise: PromiseLike<T>, ms: number, message: string): Promise<T> {
+  return Promise.race([promise, new Promise<T>((_, reject) => setTimeout(() => reject(new Error(message)), ms))]);
+}
+
 export async function POST(request: Request) {
   if (!isSupabaseConfigured()) return NextResponse.json({ error: "Registration will open after the secure production environment is connected." }, { status: 503 });
   try {
@@ -34,12 +43,12 @@ export async function POST(request: Request) {
     const db = createSupabaseAdminClient();
     const { data: terms } = await db.from("terms_documents").select("version").eq("active", true).lte("effective_from", new Date().toISOString().slice(0,10)).order("effective_from", { ascending: false }).limit(1).maybeSingle();
     if (!terms) throw new Error("No approved terms are active.");
-    const { data, error } = await db.rpc("submit_public_registration", {
+    const { data, error } = await withTimeout(db.rpc("submit_public_registration", {
       target_first_name: body.firstName,target_middle_name: body.middleName,target_last_name: body.lastName,target_suffix: body.suffix,target_srn: normalizeSrn(body.srn) ?? "",
       target_email: normalizeEmail(body.email),target_address: body.presentAddress,target_mobile: normalizePhContactNumber(body.mobile)!,target_place_of_birth: body.placeOfBirth,target_birthdate: body.birthDate,
       target_rank: body.rank,target_company: body.company,target_emergency_name: body.emergencyContactName,target_emergency_mobile: normalizePhContactNumber(body.emergencyContactMobile)!,
       target_batch: body.scheduleId,target_terms_version: terms.version,target_ip_hash: ipHash,target_marketing_agency: null,
-    });
+    }), 15000, "The registration service is busy (a previous submission may still be finalizing). Please try again in a minute.");
     if (error) throw error;
     const result = data as { registration_reference:string;trainee_id:string;email:string;complete_name:string };
     // Trainees have no portal account. They follow their enrollment through the

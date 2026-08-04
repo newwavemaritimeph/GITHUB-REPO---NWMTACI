@@ -81,12 +81,17 @@ function Wizard() {
       fd.set("placeOfBirth", applicant.placeOfBirth); fd.set("birthDate", applicant.birthDate); fd.set("rank", rank); fd.set("company", applicant.company);
       fd.set("emergencyContactName", applicant.emergencyContactName); fd.set("emergencyContactMobile", applicant.emergencyContactMobile);
       fd.set("courseCode", courseCode); fd.set("courseName", courseName); fd.set("scheduleId", scheduleId); fd.set("termsAccepted", "on");
-      const response = await fetch("/api/public/registrations", { method: "POST", body: fd });
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 25000);
+      let response: Response;
+      try {
+        response = await fetch("/api/public/registrations", { method: "POST", body: fd, signal: controller.signal });
+      } finally { clearTimeout(timer); }
       const body = await response.json();
       if (!response.ok) { setError(body.error ?? "We could not submit your enrollment. Please review your details and try again."); return; }
       setReference(body.reference);
-    } catch {
-      setError("We could not reach the server. Please check your connection and try again.");
+    } catch (e) {
+      setError(e instanceof DOMException && e.name === "AbortError" ? "The server took too long to respond. Please try again in a moment." : "We could not reach the server. Please check your connection and try again.");
     } finally { setSubmitting(false); }
   }
 
