@@ -24,6 +24,8 @@ const autoOpenBatchInput = z.object({
   action: z.literal("auto-open-batches"), courseId: z.string().uuid(),
   year: z.number().int().min(2024).max(2100), month: z.number().int().min(1).max(12),
 });
+const autoOpenAllInput = z.object({ action: z.literal("auto-open-all-batches"), year: z.number().int().min(2024).max(2100), month: z.number().int().min(1).max(12) });
+const enrollmentDeleteInput = z.object({ action: z.literal("enrollment-delete"), enrollmentId: z.string().uuid() });
 
 const batchUpdateInput = z.object({
   action: z.literal("batch-update"), batchId: z.string().uuid(),
@@ -102,7 +104,7 @@ const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-li
 const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional() });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput]);
+const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
@@ -716,6 +718,22 @@ export async function POST(request: Request) {
       await autoSendInstructions(admin, ids);
       return NextResponse.json({ ok: true });
     }
+    if (input.action === "enrollment-delete") {
+      if (!staff.roleCodes.includes("admin")) return NextResponse.json({ error: "Only Admin can delete enrollments." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: allocs } = await admin.from("payment_allocations").select("payment_id").eq("enrollment_id", input.enrollmentId).limit(1);
+      if (allocs && allocs.length) return NextResponse.json({ error: "This enrollment has posted payments and cannot be deleted. Cancel it instead." }, { status: 400 });
+      const { data: enr } = await admin.from("enrollments").select("id,batch_id").eq("id", input.enrollmentId).maybeSingle();
+      if (!enr) return NextResponse.json({ error: "Enrollment not found." }, { status: 404 });
+      // Remove dependent rows (none are append-only for an unpaid enrollment), then the enrollment.
+      for (const table of ["enrollment_charges", "agency_rebates", "enrollment_requests", "training_instructions", "make_up_assignments", "certificates", "invoices", "receipts", "payables"]) {
+        await admin.from(table).delete().eq("enrollment_id", input.enrollmentId);
+      }
+      const { error } = await admin.from("enrollments").delete().eq("id", input.enrollmentId);
+      if (error) throw error;
+      if (enr.batch_id) { const { data: b } = await admin.from("batches").select("confirmed_count,capacity,status").eq("id", enr.batch_id).maybeSingle(); if (b) { const next = Math.max(0, Number(b.confirmed_count) - 1); await admin.from("batches").update({ confirmed_count: next, status: b.status === "Full" && next < Number(b.capacity) ? "Open" : b.status }).eq("id", enr.batch_id); } }
+      return NextResponse.json({ ok: true });
+    }
     if (input.action === "enrollment-course-change") {
       if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot change a course." }, { status: 403 });
       const admin = createSupabaseAdminClient();
@@ -808,6 +826,26 @@ export async function POST(request: Request) {
       const { data, error } = await db.rpc("auto_open_training_batches", { target_course: input.courseId, target_year: input.year, target_month: input.month });
       if (error) throw error;
       return NextResponse.json({ ok: true, created: data });
+    }
+    if (input.action === "auto-open-all-batches") {
+      if (!staff.roleCodes.some((role) => ["admin", "training_operations"].includes(role))) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: courses } = await admin.from("courses").select("id,name").eq("active", true).eq("delivery_type", "In-House");
+      const ids = (courses ?? []).map((c) => c.id as string);
+      let created = 0; const failed: string[] = [];
+      for (const c of courses ?? []) {
+        const { data, error } = await db.rpc("auto_open_training_batches", { target_course: c.id, target_year: input.year, target_month: input.month });
+        if (error) failed.push(c.name as string); else created += Number(data ?? 0);
+      }
+      // Publish the freshly-opened batches for the month so the public registration form can see them.
+      let published = 0;
+      if (ids.length) {
+        const mm = String(input.month).padStart(2, "0");
+        const eom = new Date(Date.UTC(input.year, input.month, 0)).getUTCDate();
+        const { data: pub } = await admin.from("batches").update({ published_at: new Date().toISOString() }).in("course_id", ids).is("published_at", null).eq("status", "Open").gte("starts_on", `${input.year}-${mm}-01`).lte("starts_on", `${input.year}-${mm}-${eom}`).select("id");
+        published = (pub ?? []).length;
+      }
+      return NextResponse.json({ ok: true, created, published, courses: (courses ?? []).length, failed });
     }
     if (input.action === "batch-update") {
       if (!staff.roleCodes.some((role) => ["admin", "training_operations"].includes(role))) return NextResponse.json({ error: "Your account cannot edit schedules." }, { status: 403 });
