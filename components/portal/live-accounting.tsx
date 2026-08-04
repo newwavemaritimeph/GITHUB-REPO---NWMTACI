@@ -58,20 +58,6 @@ export function AccountingDashboard({ data, role, reload }: { data: AccountingDa
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const today = manilaDay(new Date().toISOString());
-  const [from, setFrom] = useState(today);
-  const [to, setTo] = useState(today);
-  const inRange = (v?: string | null) => { const d = manilaDay(v); return !!d && d >= from && d <= to; };
-  const enrollInRange = data.enrollments.filter((e) => inRange(e.created_at));
-  const salesInRange = data.payments.filter((p) => inRange(p.received_at)).reduce((s, p) => s + Number(p.amount_centavos), 0);
-  const expensesInRange = data.expenses.filter((e) => (e.status === "Paid" || e.status === "Approved") && inRange(e.created_at)).reduce((s, e) => s + Number(e.amount_centavos), 0);
-  const netSales = salesInRange - expensesInRange;
-  const courseCounts = new Map<string, number>();
-  for (const e of enrollInRange) { const n = one(e.courses as CourseRef | CourseRef[] | null)?.name ?? "Unknown"; courseCounts.set(n, (courseCounts.get(n) ?? 0) + 1); }
-  const topCourses = [...courseCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const agencyCounts = new Map<string, number>();
-  for (const r of data.agencyRebates.filter((r) => inRange(r.created_at))) { const n = one(r.marketing_agencies)?.name ?? "Unknown"; agencyCounts.set(n, (agencyCounts.get(n) ?? 0) + 1); }
-  const topAgencies = [...agencyCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-  const pendingBalances = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && dueOf(e) - Number(e.paid_centavos) > 0);
   // Owner overview: daily collectibles / payables, voucher requests, enrollment counts.
   const dailyCollectibles = data.payments.filter((p) => manilaDay(p.received_at) === today);
   const dailyCollectibleTotal = dailyCollectibles.reduce((s, p) => s + Number(p.amount_centavos), 0);
@@ -110,76 +96,37 @@ export function AccountingDashboard({ data, role, reload }: { data: AccountingDa
   const disbursementTotal = disbursements.reduce((sum, e) => sum + Number(e.amount_centavos), 0);
   const receivables = data.enrollments.filter((e) => dueOf(e) - Number(e.paid_centavos) > 0 && e.enrollment_status !== "Cancelled");
   const receivableTotal = receivables.reduce((sum, e) => sum + (dueOf(e) - Number(e.paid_centavos)), 0);
-  const payableTotal = data.payables.reduce((sum, p) => sum + Number(p.amount_centavos), 0);
 
   return (
     <>
       {message && <div className="portal-message error" role="alert">{message}</div>}
-      {data.announcements.length > 0 && <section className="portal-panel live-list" style={{ marginBottom: 16 }}><div className="panel-heading"><div><h2>📣 Announcements</h2></div></div>{data.announcements.slice(0, 5).map((a) => <div className="live-row-item" key={a.id}><div><strong>{a.title}</strong><small>{a.body}</small></div></div>)}</section>}
       <div className="finance-hero">
         <div><span>Daily collectibles</span><strong>{pesos(dailyCollectibleTotal)}</strong><small>{dailyCollectibles.length} payment{dailyCollectibles.length === 1 ? "" : "s"} today</small></div>
-        <article><span>Daily payables</span><strong>{pesos(dailyPayableTotal + pendingRebateTotal)}</strong><small>{dailyPayables.length} bill{dailyPayables.length === 1 ? "" : "s"} · {pendingRebates.length} rebate{pendingRebates.length === 1 ? "" : "s"} due</small></article>
-        <article><span>Voucher requests</span><strong>{pendingExpenses.length}</strong><small>Awaiting approval</small></article>
-        <article><span>Enrollments</span><strong>{data.enrollments.length}</strong><small>{walkinCount} walk-in · {endorsedCount} endorsed</small></article>
+        <article><span>Daily payables</span><strong>{pesos(dailyPayableTotal + pendingRebateTotal)}</strong><small>{dailyPayables.length} bill{dailyPayables.length === 1 ? "" : "s"} · {pendingRebates.length} rebate{pendingRebates.length === 1 ? "" : "s"}</small></article>
+        <article><span>Receivables</span><strong>{pesos(receivableTotal)}</strong><small>{receivables.length} open balance{receivables.length === 1 ? "" : "s"}</small></article>
+        <article><span>Net collections</span><strong>{pesos(collectionTotal - disbursementTotal)}</strong><small>Collections − disbursements</small></article>
       </div>
       <div className="finance-hero">
-        <div><span>Paid</span><strong>{statusCounts.paid}</strong><small>Fully settled</small></div>
+        <div><span>Enrollments</span><strong>{data.enrollments.length}</strong><small>{walkinCount} walk-in · {endorsedCount} endorsed</small></div>
+        <article><span>Paid</span><strong>{statusCounts.paid}</strong><small>Fully settled</small></article>
         <article><span>Pending</span><strong>{statusCounts.pending}</strong><small>With balance</small></article>
-        <article><span>Cancelled</span><strong>{statusCounts.cancelled}</strong><small>Cancelled enrollments</small></article>
-        <article><span>Endorsed</span><strong>{endorsedCount}</strong><small>vs {walkinCount} walk-in</small></article>
+        <article><span>Cancelled</span><strong>{statusCounts.cancelled}</strong><small>Cancelled</small></article>
       </div>
+
+      {canManage && <div className="dashboard-panels">
+        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Discount approvals</h2><p>Awaiting your approval</p></div><span className="slot-count">{data.pendingDiscounts.length}</span></div>{data.pendingDiscounts.map((d) => { const enr = d.enrollments ?? null; const t = one(enr?.trainees ?? null); return <div className="live-row-item" key={d.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : enr?.enrollment_number ?? "—"}</strong><small>{d.description} · {pesos(d.amount_centavos)}{one(d.marketing_agencies)?.name ? ` · ${one(d.marketing_agencies)?.name}` : ""}</small></div><div className="document-actions"><button disabled={busy} onClick={() => post({ action: "discount-decide", id: d.id, approve: true })}>Approve</button><button disabled={busy} onClick={() => post({ action: "discount-decide", id: d.id, approve: false })}>Reject</button></div></div>; })}{!data.pendingDiscounts.length && <p className="portal-empty-copy">None pending.</p>}</section>
+        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Charge approvals</h2><p>Awaiting your approval</p></div><span className="slot-count">{data.pendingCharges.length}</span></div>{data.pendingCharges.map((ch) => { const enr = one(ch.enrollments); const t = one(enr?.trainees ?? null); return <div className="live-row-item" key={ch.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : enr?.enrollment_number ?? "—"}</strong><small>{ch.description} · {pesos(ch.amount_centavos)}</small></div><div className="document-actions"><button disabled={busy} onClick={() => post({ action: "charge-decide", id: ch.id, approve: true })}>Approve</button><button disabled={busy} onClick={() => post({ action: "charge-decide", id: ch.id, approve: false })}>Reject</button></div></div>; })}{!data.pendingCharges.length && <p className="portal-empty-copy">None pending.</p>}</section>
+      </div>}
+
       <div className="dashboard-panels">
-        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Daily payables due</h2><p>Bills due today/overdue + pending agency rebates</p></div><span className="slot-count">{pesos(dailyPayableTotal + pendingRebateTotal)}</span></div>{dailyPayables.map((p) => <div className="live-row-item" key={p.id}><div><strong>{p.description}</strong><small>{p.due_on ? `Due ${p.due_on}` : "No due date"} · {p.status}</small></div><span className="slot-count">{pesos(p.amount_centavos)}</span></div>)}{pendingRebates.slice(0, 20).map((r) => { const t = one(r.trainees); return <div className="live-row-item" key={r.id}><div><strong>Agency rebate{t ? ` · ${t.legal_first_name} ${t.legal_last_name}` : ""}</strong><small>{one(r.marketing_agencies)?.name ?? "Agency"} · {one(r.courses)?.name ?? ""}</small></div><span className="slot-count">{pesos(r.rebate_centavos)}</span></div>; })}{!dailyPayables.length && !pendingRebates.length && <p className="portal-empty-copy">No payables due.</p>}</section>
+        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Daily payables due</h2><p>Bills due today / overdue</p></div><span className="slot-count">{pesos(dailyPayableTotal)}</span></div>{dailyPayables.map((p) => <div className="live-row-item" key={p.id}><div><strong>{p.description}</strong><small>{p.due_on ? `Due ${p.due_on}` : "No due date"} · {p.status}</small></div><span className="slot-count">{pesos(p.amount_centavos)}</span></div>)}{!dailyPayables.length && <p className="portal-empty-copy">No payables due.</p>}</section>
         <section className="portal-panel live-list"><div className="panel-heading"><div><h2>New expense voucher requests</h2><p>Awaiting your approval</p></div><span className="slot-count">{pendingExpenses.length}</span></div>{pendingExpenses.slice(0, 20).map((e) => <div className="live-row-item" key={e.id}><div><strong>{e.payee}</strong><small>{e.category} · {e.expense_number}</small></div><span className="slot-count">{pesos(e.amount_centavos)}</span></div>)}{!pendingExpenses.length && <p className="portal-empty-copy">No voucher requests awaiting approval.</p>}</section>
       </div>
-      <section className="portal-panel" style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
-        <label style={{ display: "flex", flexDirection: "column", fontSize: 13, color: "var(--muted)" }}>From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
-        <label style={{ display: "flex", flexDirection: "column", fontSize: 13, color: "var(--muted)" }}>To<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
-        <span className="portal-empty-copy" style={{ margin: 0 }}>{from} → {to}</span>
-      </section>
-      <div className="finance-hero">
-        <div><span>Net sales</span><strong>{pesos(netSales)}</strong><small>Sales − expenses</small></div>
-        <article><span>Sales</span><strong>{pesos(salesInRange)}</strong><small>Payments in range</small></article>
-        <article><span>Expenses</span><strong>{pesos(expensesInRange)}</strong><small>Approved / paid</small></article>
-        <article><span>Enrollments</span><strong>{enrollInRange.length}</strong><small>New in range</small></article>
-      </div>
+
       <div className="dashboard-panels">
-            <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Most enrolled courses</h2><p>Top courses in range</p></div></div>{topCourses.map(([name, n]) => <div className="live-row-item" key={name}><div><strong>{name}</strong></div><span className="slot-count">{n}</span></div>)}{!topCourses.length && <p className="portal-empty-copy">No enrollments in range.</p>}</section>
-            <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Top agencies</h2><p>Most rebated enrollments in range</p></div></div>{topAgencies.map(([name, n]) => <div className="live-row-item" key={name}><div><strong>{name}</strong></div><span className="slot-count">{n}</span></div>)}{!topAgencies.length && <p className="portal-empty-copy">No agency-tagged enrollments in range.</p>}</section>
-          </div>
-          <section className="portal-panel"><div className="panel-heading"><div><h2>Trainees with pending balances</h2><p>Outstanding enrollment balances</p></div><span>{pesos(pendingBalances.reduce((s, e) => s + (dueOf(e) - Number(e.paid_centavos)), 0))}</span></div><div className="portal-table"><table><thead><tr><th>Trainee</th><th>Course</th><th>Balance</th></tr></thead><tbody>{pendingBalances.slice(0, 50).map((e) => { const t = one(e.trainees as TraineeRow | TraineeRow[] | null); return <tr key={e.id}><td><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</strong></td><td>{one(e.courses as CourseRef | CourseRef[] | null)?.name ?? "—"}</td><td><strong>{pesos(dueOf(e) - Number(e.paid_centavos))}</strong></td></tr>; })}{!pendingBalances.length && <tr><td colSpan={3}><span className="portal-empty-copy">No pending balances.</span></td></tr>}</tbody></table></div></section>
-          {canManage && <section className="portal-panel"><div className="panel-heading"><div><h2>Discount approvals</h2><p>Cashier-requested discounts / agency rebates awaiting approval — approving deducts from the trainee&apos;s balance</p></div><span>{data.pendingDiscounts.length}</span></div><div className="portal-table"><table><thead><tr><th>Trainee · Course</th><th>Reason</th><th>Agency</th><th>Amount</th><th></th></tr></thead><tbody>{data.pendingDiscounts.map((d) => { const enr = d.enrollments ?? null; const t = one(enr?.trainees ?? null); return <tr key={d.id}><td><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : enr?.enrollment_number ?? "—"}</strong><small>{one(enr?.courses ?? null)?.name ?? ""}</small></td><td>{d.description}</td><td>{one(d.marketing_agencies)?.name ?? "—"}</td><td><strong>{pesos(d.amount_centavos)}</strong></td><td className="document-actions"><button disabled={busy} onClick={() => post({ action: "discount-decide", id: d.id, approve: true })}>Approve</button><button disabled={busy} onClick={() => post({ action: "discount-decide", id: d.id, approve: false })}>Reject</button></td></tr>; })}{!data.pendingDiscounts.length && <tr><td colSpan={5}><span className="portal-empty-copy">No pending discount requests.</span></td></tr>}</tbody></table></div></section>}
-          {canManage && <section className="portal-panel"><div className="panel-heading"><div><h2>Charge approvals</h2><p>Cashier/Registration-raised charges (T-shirt, reprint, reschedule, make-up, etc.) awaiting approval — approving adds them to the trainee&apos;s balance</p></div><span>{data.pendingCharges.length}</span></div><div className="portal-table"><table><thead><tr><th>Trainee · Course</th><th>Charge</th><th>Amount</th><th></th></tr></thead><tbody>{data.pendingCharges.map((ch) => { const enr = one(ch.enrollments); const t = one(enr?.trainees ?? null); return <tr key={ch.id}><td><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : enr?.enrollment_number ?? "—"}</strong><small>{one(enr?.courses ?? null)?.name ?? ""}</small></td><td>{ch.description}</td><td><strong>{pesos(ch.amount_centavos)}</strong></td><td className="document-actions"><button disabled={busy} onClick={() => post({ action: "charge-decide", id: ch.id, approve: true })}>Approve</button><button disabled={busy} onClick={() => post({ action: "charge-decide", id: ch.id, approve: false })}>Reject</button></td></tr>; })}{!data.pendingCharges.length && <tr><td colSpan={4}><span className="portal-empty-copy">No charges awaiting approval.</span></td></tr>}</tbody></table></div></section>}
-          <div className="finance-hero">
-            <div><span>Collections</span><strong>{pesos(collectionTotal)}</strong><small>{data.payments.length} posted payments</small></div>
-            <article><span>Disbursements</span><strong>{pesos(disbursementTotal)}</strong><small>{disbursements.length} paid/approved</small></article>
-            <article><span>Net</span><strong>{pesos(collectionTotal - disbursementTotal)}</strong><small>Collections − disbursements</small></article>
-            <article><span>Receivables</span><strong>{pesos(receivableTotal)}</strong><small>{receivables.length} open balances</small></article>
-          </div>
-
-          <section className="portal-panel">
-            <div className="panel-heading"><div><h2>Collections by channel</h2><p>Posted payments grouped by method</p></div></div>
-            <div className="portal-table"><table><thead><tr><th>Channel</th><th>Payments</th><th>Total</th></tr></thead><tbody>
-              {collections.map(([name, v]) => <tr key={name}><td><strong>{name}</strong></td><td>{v.count}</td><td>{pesos(v.total)}</td></tr>)}
-              {!collections.length && <tr><td colSpan={3}><span className="portal-empty-copy">No payments yet.</span></td></tr>}
-            </tbody></table></div>
-          </section>
-
-          <section className="portal-panel">
-            <div className="panel-heading"><div><h2>Receivables ageing</h2><p>Open enrollment balances</p></div></div>
-            <div className="portal-table"><table><thead><tr><th>Enrollment</th><th>Charged</th><th>Paid</th><th>Balance</th></tr></thead><tbody>
-              {receivables.slice(0, 50).map((e) => <tr key={e.id}><td><strong>{e.enrollment_number}</strong>{(Number(e.charges_centavos ?? 0) > 0 || Number(e.discounts_centavos ?? 0) > 0) && <small>{Number(e.charges_centavos ?? 0) > 0 ? `+${pesos(e.charges_centavos ?? 0)} charges` : ""}{Number(e.discounts_centavos ?? 0) > 0 ? ` −${pesos(e.discounts_centavos ?? 0)} rebate` : ""}</small>}</td><td>{pesos(dueOf(e))}</td><td>{pesos(e.paid_centavos)}</td><td><strong>{pesos(dueOf(e) - Number(e.paid_centavos))}</strong></td></tr>)}
-              {!receivables.length && <tr><td colSpan={4}><span className="portal-empty-copy">Every enrollment is settled.</span></td></tr>}
-            </tbody></table></div>
-          </section>
-
-          <section className="portal-panel">
-            <div className="panel-heading"><div><h2>Monthly payables — reminder</h2><p>Recurring bills due</p></div><span>{pesos(payableTotal)}</span></div>
-            <div className="portal-table"><table><thead><tr><th>Payable</th><th>Due</th><th>Status</th><th>Amount</th></tr></thead><tbody>
-              {data.payables.map((p) => <tr key={p.id}><td>{p.description}</td><td>{p.due_on ?? "—"}</td><td>{p.status}</td><td>{pesos(p.amount_centavos)}</td></tr>)}
-              {!data.payables.length && <tr><td colSpan={4}><span className="portal-empty-copy">No payables recorded.</span></td></tr>}
-            </tbody></table></div>
-          </section>
+        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Receivables</h2><p>Open enrollment balances</p></div><span className="slot-count">{pesos(receivableTotal)}</span></div>{receivables.slice(0, 20).map((e) => { const t = one(e.trainees as TraineeRow | TraineeRow[] | null); return <div className="live-row-item" key={e.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : e.enrollment_number}</strong><small>{one(e.courses as CourseRef | CourseRef[] | null)?.name ?? e.enrollment_number}</small></div><span className="slot-count">{pesos(dueOf(e) - Number(e.paid_centavos))}</span></div>; })}{!receivables.length && <p className="portal-empty-copy">Every enrollment is settled.</p>}</section>
+        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Collections by channel</h2><p>Posted payments by method</p></div><span className="slot-count">{pesos(collectionTotal)}</span></div>{collections.map(([name, v]) => <div className="live-row-item" key={name}><div><strong>{name}</strong><small>{v.count} payment{v.count === 1 ? "" : "s"}</small></div><span className="slot-count">{pesos(v.total)}</span></div>)}{!collections.length && <p className="portal-empty-copy">No payments yet.</p>}</section>
+      </div>
 
       <AgencyRebatesOwed data={data} canManage={canManage} busy={busy} post={post} />
     </>

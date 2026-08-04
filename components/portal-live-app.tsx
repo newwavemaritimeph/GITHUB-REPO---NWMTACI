@@ -62,7 +62,7 @@ export function PortalLiveApp(){
   const load=useCallback(async()=>{setLoading(true);setError("");try{const response=await fetch("/api/staff/operations",{cache:"no-store"});const body=await response.json();if(!response.ok)throw new Error(body.error??"Unable to load staff records.");setData(body);setRole((current:string)=>body.roles.includes(current)?current:body.roles[0]??"admin")}catch(e){setError(e instanceof Error?e.message:"Unable to load staff records.")}finally{setLoading(false)}},[]);
   useEffect(()=>{void load()},[load]);
   const adminHidden=new Set<Module>(["Trainees","Instructions","Attendance","Inventory","Classrooms","Certificates","HR & payroll","Daily TAR"]);
-  const accountingHidden=new Set<Module>(["MyHr","Enrollment summary","Trainees","Enrollments"]);
+  const accountingHidden=new Set<Module>(["MyHr","Enrollment summary","Trainees","Enrollments","Summary","Reports"]);
   const allowedNav=nav.filter(item=>(!item.roles||item.roles.includes(role)||(role==="super_admin"&&item.roles.includes("admin")))&&!(role==="admin"&&adminHidden.has(item.label))&&!(role==="accounting"&&accountingHidden.has(item.label)));
   const go=(module:Module)=>{setActive(module);setSidebar(false)};
   const unread=data?.notifications.filter(item=>!item.read_at).length??0;
