@@ -95,16 +95,37 @@ const paymentSplitInput = z.object({ action: z.literal("payment-split"), allocat
 const courseChangeInput = z.object({ action: z.literal("enrollment-course-change"), enrollmentId: z.string().uuid(), courseId: z.string().uuid(), partnerOfferId: z.string().uuid().nullable().optional() });
 const rescheduleInput = z.object({ action: z.literal("enrollment-reschedule"), enrollmentId: z.string().uuid(), batchId: z.string().uuid().nullable() });
 const sendInstructionsInput = z.object({ action: z.literal("send-instructions"), enrollmentId: z.string().uuid() });
+const instructionTemplateSaveInput = z.object({ action: z.literal("instruction-template-save"), courseId: z.string().uuid(), subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(8000) });
+const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-link-save"), courseId: z.string().uuid(), link: z.string().trim().max(500) });
 const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional() });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput]);
+const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
 const canManageHr = (roles: string[]) => roles.some((role) => ["admin", "hr"].includes(role));
 const canManageTraining = (roles: string[]) => roles.some((role) => ["admin", "training_operations"].includes(role));
 const minutesOfDay = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+// After a payment posts, auto-send training instructions for in-house, scheduled, enrolled
+// enrollments that have not yet been sent. Best-effort — never blocks the payment.
+async function autoSendInstructions(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentIds: string[]) {
+  for (const eid of enrollmentIds) {
+    try {
+      const { data: e } = await admin.from("enrollments").select("id,enrollment_number,batch_id,enrollment_status,instructions_sent_at,trainees(profile_id),courses(name,delivery_type,google_classroom_link)").eq("id", eid).maybeSingle();
+      if (!e) continue;
+      const course = Array.isArray(e.courses) ? e.courses[0] : e.courses;
+      if (course?.delivery_type !== "In-House" || !e.batch_id || e.enrollment_status !== "Enrolled" || e.instructions_sent_at) continue;
+      await admin.from("enrollments").update({ instructions_sent_at: new Date().toISOString() }).eq("id", eid);
+      const trainee = Array.isArray(e.trainees) ? e.trainees[0] : e.trainees;
+      if (trainee?.profile_id) {
+        const link = course?.google_classroom_link ? ` Google Classroom: ${course.google_classroom_link}` : "";
+        await admin.from("notifications").insert({ recipient_id: trainee.profile_id, notification_type: "training_instructions", title: "Your training instructions are ready", body: `Reporting instructions for ${course?.name ?? "your training"} (${e.enrollment_number}) have been sent. Please review your portal for reporting details.${link}`, related_record_type: "enrollment", related_record_id: eid });
+      }
+    } catch (err) { console.error("auto-send instructions failed:", err instanceof Error ? err.message : err); }
+  }
+}
 
 // Move an enrollment to a new batch (or to "no batch"), keeping confirmed_count and
 // Open/Full status correct on both batches. Shared by the direct reschedule action and
@@ -137,7 +158,7 @@ export async function GET() {
   const db = createSupabaseAdminClient();
   const results = await Promise.all([
     db.from("profiles").select("complete_name,email").eq("id", staff.user.id).maybeSingle(),
-    db.from("courses").select("id,code,name,delivery_type,duration_label,duration_days,training_mode,category_id,standard_price_centavos,active,updated_at,course_categories(name)").eq("active", true).order("name"),
+    db.from("courses").select("id,code,name,delivery_type,duration_label,duration_days,training_mode,category_id,standard_price_centavos,google_classroom_link,active,updated_at,course_categories(name)").eq("active", true).order("name"),
     db.from("partner_course_offers").select("id,course_id,duration_label,training_fee_centavos,rebate_centavos,partner_payable_centavos,updated_at,partner_centers(name)").eq("active", true).order("training_fee_centavos"),
     db.from("trainees").select("id,trainee_number,legal_first_name,legal_middle_name,legal_last_name,birthdate,email,mobile,srn,account_state,registered_at").neq("account_state", "Deactivated").order("created_at", { ascending: false }).limit(250),
     db.from("batches").select("id,batch_number,course_id,partner_offer_id,starts_on,ends_on,daily_start,daily_end,mode,venue,capacity,confirmed_count,enrollment_deadline,status,published_at,courses(name,code),partner_course_offers(partner_centers(name))").eq("active", true).order("starts_on", { ascending: true }).limit(250),
@@ -223,6 +244,12 @@ export async function GET() {
     const { data } = await admin.from("enrollment_requests").select("id,request_number,request_type,requested_values,reason,status,decision_remarks,created_at,decided_at,trainees(legal_first_name,legal_last_name),enrollments(enrollment_number,courses(name))").in("request_type", ["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting"]).order("created_at", { ascending: false }).limit(200);
     requests = data ?? [];
   }
+  // Per-course training instruction templates (subject/body) for the Instructions editor + PDF.
+  let instructionTemplates: unknown[] = [];
+  {
+    const { data } = await db.from("training_instruction_templates").select("course_id,subject,body,active").eq("active", true).order("version", { ascending: false }).limit(500);
+    instructionTemplates = data ?? [];
+  }
   // MyHr self-service: the signed-in staff's OWN employee record + leave / cash-advance history,
   // matched by login email → employees.work_email. Read via service role, self only.
   let myHr: { employee: unknown; leave: unknown[]; advances: unknown[] } | null = null;
@@ -242,7 +269,7 @@ export async function GET() {
     expenses: expenses.data ?? [], payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems,
     classrooms: classrooms.data ?? [], certificates, certificateTemplates, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, instructionTemplates }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -442,6 +469,26 @@ export async function POST(request: Request) {
       const { error: updateError } = await admin.from("enrollment_requests").update({ status: input.approve ? "Approved" : "Rejected", decided_at: new Date().toISOString(), decision_remarks: input.remarks ?? null, assigned_approver_id: staff.user.id }).eq("id", req.id);
       if (updateError) throw updateError;
       await admin.from("request_events").insert({ request_id: req.id, actor_id: staff.user.id, event_type: input.approve ? "approved" : "rejected", remarks: input.remarks ?? null });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "instruction-template-save") {
+      if (!staff.roleCodes.some((r) => ["admin", "registration", "training_operations"].includes(r))) return NextResponse.json({ error: "Your account cannot edit instruction templates." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: course } = await admin.from("courses").select("id,delivery_type").eq("id", input.courseId).maybeSingle();
+      if (!course) throw new Error("Course not found.");
+      if (course.delivery_type !== "In-House") return NextResponse.json({ error: "Instruction templates are for New Wave in-house courses only." }, { status: 400 });
+      const { data: maxRow } = await admin.from("training_instruction_templates").select("version").eq("course_id", input.courseId).order("version", { ascending: false }).limit(1).maybeSingle();
+      const nextVersion = Number(maxRow?.version ?? 0) + 1;
+      await admin.from("training_instruction_templates").update({ active: false }).eq("course_id", input.courseId);
+      const { error } = await admin.from("training_instruction_templates").insert({ course_id: input.courseId, version: nextVersion, subject: input.subject, body: { text: input.body }, active: true, approved_by: staff.user.id, approved_at: new Date().toISOString() });
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "course-classroom-link-save") {
+      if (!staff.roleCodes.some((r) => ["admin", "registration", "training_operations"].includes(r))) return NextResponse.json({ error: "Your account cannot set the Google Classroom link." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { error } = await admin.from("courses").update({ google_classroom_link: input.link || null }).eq("id", input.courseId);
+      if (error) throw error;
       return NextResponse.json({ ok: true });
     }
     if (input.action === "send-instructions") {
@@ -649,6 +696,7 @@ export async function POST(request: Request) {
       const total = input.allocations.reduce((s, a) => s + a.amountCentavos, 0);
       const { error } = await db.rpc("post_payment", { target_trainee: traineeId, target_amount_centavos: total, target_method: input.method, target_receiving_account: input.receivingAccount, target_reference: input.referenceNumber || null, target_received_at: input.receivedAt, target_proof: null, target_allocations: input.allocations.map((a) => ({ enrollment_id: a.enrollmentId, amount_centavos: a.amountCentavos })), target_remarks: input.remarks || null });
       if (error) throw error;
+      await autoSendInstructions(admin, ids);
       return NextResponse.json({ ok: true });
     }
     if (input.action === "enrollment-course-change") {
@@ -811,6 +859,7 @@ export async function POST(request: Request) {
       target_method: input.method, target_receiving_account: input.receivingAccount, target_reference: input.referenceNumber || null,
       target_received_at: input.receivedAt, target_proof: input.proofId ?? null, target_allocations: [{ enrollment_id: input.enrollmentId, amount_centavos: input.amountCentavos }], target_remarks: input.remarks || null });
     if (error) throw error;
+    await autoSendInstructions(admin, [input.enrollmentId]);
     return NextResponse.json({ ok: true, payment: data });
   } catch (error) {
     // Zod validation errors: report the specific field problems, not the raw JSON dump.

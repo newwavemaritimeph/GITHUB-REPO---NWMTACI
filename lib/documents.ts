@@ -45,6 +45,123 @@ export async function createBrandedPdf(snapshot: DocumentSnapshot) {
   return pdf.save();
 }
 
+export type TrainingInstructionsSnapshot = {
+  traineeName: string;
+  courseName: string;
+  dateOfTraining: string;
+  time: string;
+  classroom: string;
+  googleClassroomLink?: string | null;
+  subject?: string;
+  body?: string;
+  reference?: string;
+  issuedAt: string;
+  logoBytes?: Uint8Array;
+};
+
+// Strip characters Helvetica's WinAnsi encoding can't render (en/em dash, smart quotes,
+// bullets, ellipsis) so live DB text can never crash PDF generation.
+const ascii = (s: string) => (s ?? "").replace(/[–—]/g, "-").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[•]/g, "-").replace(/…/g, "...").replace(/[^\x00-\xFF]/g, "");
+
+// The owner's default reporting letter. Registration can override the body per course;
+// dynamic details (name/date/time/classroom + Google Classroom) are merged separately.
+export const DEFAULT_INSTRUCTIONS_BODY = [
+  "Welcome aboard! Your enrollment has been confirmed. Please review your reporting details below and observe the reminders.",
+  "",
+  "IMPORTANT REMINDERS:",
+  "- Check the printed name in your admission record and report any corrections immediately.",
+  "- Arrive on time, observe proper conduct, and complete all requirements before training starts.",
+  "- Bring your own tumbler - drinking water is available in the Training Room.",
+  "- Wear the official training uniform during the training period (Php 150.00 uniform fee applies).",
+  "",
+  "New Wave MTACI sincerely appreciates your trust in choosing us as your training provider.",
+  "",
+  "Thank you!",
+].join("\n");
+
+const INSTRUCTION_TERMS: [string, string[]][] = [
+  ["Payment Terms", ["50% down payment required upon enrollment; full payment before completion.", "Full payment is required for 1-day courses."]],
+  ["Cancellation", ["Communicate cancellations before the scheduled date.", "Charges per the Refund Policy."]],
+  ["Rescheduling", ["1-2 day courses may be rescheduled, subject to slots and approval.", "Reschedule charges per the Refund Policy."]],
+  ["Refund", ["5+ days before: Php 350.00 processing fee.", "Under 5 days before: 50% of course fee + Php 250.00 fee."]],
+  ["Make-up Class", ["Available for 3-day+ courses, subject to approval.", "Php 350.00 per training day."]],
+  ["Certificate", ["Issued only after completing all requirements and settling all balances."]],
+];
+
+// Option 1 design: centered logo, minimal editorial letter, single page, Terms & Conditions
+// combined at the bottom (two compact columns).
+export async function createTrainingInstructionsPdf(snapshot: TrainingInstructionsSnapshot) {
+  const pdf = await PDFDocument.create();
+  const page = pdf.addPage([595.28, 841.89]);
+  const reg = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const c = { orange: rgb(.949,.337,.082), blue: rgb(.02,.443,.816), cyan: rgb(.208,.8,.98), lightcyan: rgb(.62,.89,.945), darkblue: rgb(.071,.247,.388), muted: rgb(.42,.5,.56), line: rgb(.85,.92,.96), soft: rgb(.93,.985,1) };
+  const H = 841.89, mid = 595.28 / 2, left = 48, right = 547, width = right - left;
+  const text = (t: string, x: number, yy: number, size: number, font = reg, color = c.darkblue) => page.drawText(ascii(t), { x, y: yy, size, font, color });
+  const wrap = (t: string, x: number, yy: number, size: number, maxW: number, font = reg, color = c.darkblue, lead = 12) => {
+    let line = "";
+    for (const w of ascii(t).split(" ")) {
+      const test = line ? `${line} ${w}` : w;
+      if (font.widthOfTextAtSize(test, size) > maxW) { page.drawText(line, { x, y: yy, size, font, color }); yy -= lead; line = w; }
+      else line = test;
+    }
+    if (line) { page.drawText(line, { x, y: yy, size, font, color }); yy -= lead; }
+    return yy;
+  };
+  let y = H - 26;
+  // Centered logo + orange rule + title.
+  if (snapshot.logoBytes) {
+    try { const logo = await pdf.embedPng(snapshot.logoBytes); const d = logo.scale(58 / logo.width); page.drawImage(logo, { x: mid - d.width / 2, y: y - d.height, width: d.width, height: d.height }); y -= d.height + 8; } catch { y -= 20; }
+  }
+  page.drawRectangle({ x: mid - 34, y, width: 68, height: 2.5, color: c.orange });
+  y -= 22;
+  const title = "TRAINING INSTRUCTIONS";
+  text(title, mid - bold.widthOfTextAtSize(title, 15) / 2, y, 15, bold);
+  y -= 15;
+  const sub = `${snapshot.reference ?? ""}${snapshot.reference ? "  -  " : ""}Issued ${snapshot.issuedAt}`;
+  text(sub, mid - reg.widthOfTextAtSize(ascii(sub), 8) / 2, y, 8, reg, c.muted);
+  y -= 22;
+  text(`Dear ${snapshot.traineeName || "Trainee"},`, left, y, 10.5, bold);
+  y -= 15;
+  // Body (per-course template or default).
+  for (const rawLine of ((snapshot.body && snapshot.body.trim()) ? snapshot.body : DEFAULT_INSTRUCTIONS_BODY).split("\n")) {
+    if (rawLine === "") { y -= 6; continue; }
+    const isReminders = /^IMPORTANT REMINDERS/i.test(rawLine);
+    y = wrap(rawLine, left, y, 9, width, isReminders ? bold : reg, isReminders ? c.orange : c.darkblue, 12);
+  }
+  y -= 6;
+  // Training details box.
+  const rows: [string, string][] = [["Course", snapshot.courseName], ["Date of Training", snapshot.dateOfTraining], ["Time", snapshot.time], ["Classroom", snapshot.classroom]];
+  const boxH = 20 + rows.length * 17;
+  page.drawRectangle({ x: left, y: y - boxH + 12, width, height: boxH, color: c.soft, borderColor: c.lightcyan, borderWidth: 1 });
+  text("TRAINING DETAILS", left + 12, y - 1, 8.5, bold, c.blue);
+  let ry = y - 20;
+  for (const [k, v] of rows) { text(k, left + 12, ry, 8.5, reg, c.muted); text(v || "-", left + 140, ry, 9, bold); ry -= 17; }
+  y = y - boxH - 4;
+  if (snapshot.googleClassroomLink) {
+    text("Google Classroom (in-house):", left, y, 8.5, bold);
+    text(snapshot.googleClassroomLink, left + 150, y, 8.5, reg, c.blue);
+    y -= 16;
+  } else { y -= 4; }
+  // Terms & Conditions (two columns).
+  page.drawRectangle({ x: left, y: y - 15, width, height: 19, color: c.blue });
+  text("TERMS AND CONDITIONS", left + 10, y - 10, 10, bold, rgb(1, 1, 1));
+  text("Please read carefully.", right - reg.widthOfTextAtSize("Please read carefully.", 7.5) - 8, y - 9, 7.5, reg, rgb(1, 1, 1));
+  y -= 26;
+  const colW = (width - 20) / 2, colX = [left, left + colW + 20], colY = [y, y];
+  INSTRUCTION_TERMS.forEach(([h, items], i) => {
+    const ci = i < 3 ? 0 : 1, x = colX[ci]; let cy = colY[ci];
+    text(`${i + 1}. ${h}`, x, cy, 8.5, bold); cy -= 11;
+    for (const it of items) { text("-", x + 4, cy, 7.5, bold, c.cyan); cy = wrap(it, x + 12, cy, 7.5, colW - 12, reg, c.darkblue, 9.5); cy -= 1; }
+    cy -= 4; colY[ci] = cy;
+  });
+  const footY = Math.min(colY[0], colY[1]) - 4;
+  wrap("New Wave Maritime Training and Assessment Center reserves the right to amend, revise, or update the details stated above without prior notice.", left, footY, 7.5, width, bold, c.orange, 10);
+  page.drawLine({ start: { x: left, y: 50 }, end: { x: right, y: 50 }, thickness: 0.5, color: c.line });
+  text("Unit 103, Bel-Air Apartments, Roxas Boulevard, Ermita Manila   -   newwavemaritime@gmail.com   -   0948-847-6530", left, 38, 7, reg, c.muted);
+  return pdf.save();
+}
+
 type AdmissionSnapshot={reference:string;traineeNumber:string;firstName:string;middleName:string;lastName:string;suffix:string;address:string;birthDate:string;placeOfBirth:string;email:string;mobile:string;srn:string;rank:string;company:string;emergencyName:string;emergencyMobile:string;course:string;schedule:string;venue:string;termsVersion:string};
 type PaymentSnapshot={invoiceNumber:string;receiptNumber:string;paymentNumber:string;enrollmentNumber:string;traineeName:string;traineeNumber:string;address:string;course:string;amountCentavos:number;totalDueCentavos:number;totalPaidCentavos:number;balanceCentavos:number;method:string;referenceNumber:string;receivedAt:string;cashierName:string};
 const php=(value:number)=>`PHP ${(value/100).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2})}`;

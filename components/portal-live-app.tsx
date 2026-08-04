@@ -15,7 +15,7 @@ import { AdminConfiguration } from "./admin-configuration";
 import { DateReports } from "./date-reports";
 
 type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Classrooms" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Daily TAR" | "Enrollment summary" | "Reports" | "Setup";
-type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; course_categories?: {name:string}|{name:string}[]|null };
+type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string}|{name:string}[]|null };
 type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; birthdate:string; email:string; mobile:string; account_state:string; registered_at:string };
 type Batch = { id:string; batch_number:string; course_id:string; partner_offer_id?:string|null; starts_on:string; ends_on:string; daily_start?:string|null; daily_end?:string|null; mode:string; venue?:string|null; capacity:number; confirmed_count:number; enrollment_deadline:string; status:string; published_at?:string|null; courses?: {name:string;code:string}|{name:string;code:string}[]|null; partner_course_offers?: {partner_centers?:{name:string}|{name:string}[]|null}|{partner_centers?:{name:string}|{name:string}[]|null}[]|null };
@@ -35,7 +35,8 @@ type PortalData = { profile:{complete_name:string;email:string}; roles:string[];
   courseCategories:{id:string;name:string}[]; partnerCenters:{id:string;name:string;active:boolean}[];
   requests:{id:string;request_number:string;request_type:string;requested_values:{batchId?:string;amountCentavos?:number;paymentId?:string}|null;reason:string;status:string;decision_remarks?:string|null;created_at:string;decided_at?:string|null;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;enrollments?:{enrollment_number:string;courses?:{name:string}|{name:string}[]|null}|{enrollment_number:string;courses?:{name:string}|{name:string}[]|null}[]|null}[];
   pendingCharges:{id:string;enrollment_id:string;description:string;amount_centavos:number;created_at:string;enrollments?:{enrollment_number:string;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;courses?:{name:string}|{name:string}[]|null}|{enrollment_number:string;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;courses?:{name:string}|{name:string}[]|null}[]|null}[];
-  myHr:{employee:{employee_number:string;complete_name:string;position:string;employment_status:string;date_hired?:string|null;pay_type?:string|null;base_rate_centavos?:number|null;work_email?:string|null;active:boolean};leave:{id:string;leave_type:string;starts_on:string;ends_on:string;reason:string;status:string;created_at:string}[];advances:{id:string;amount_centavos:number;requested_on:string;balance_centavos:number;status:string}[]}|null };
+  myHr:{employee:{employee_number:string;complete_name:string;position:string;employment_status:string;date_hired?:string|null;pay_type?:string|null;base_rate_centavos?:number|null;work_email?:string|null;active:boolean};leave:{id:string;leave_type:string;starts_on:string;ends_on:string;reason:string;status:string;created_at:string}[];advances:{id:string;amount_centavos:number;requested_on:string;balance_centavos:number;status:string}[]}|null;
+  instructionTemplates:{course_id:string;subject:string;body:{text?:string}|string|null;active:boolean}[] };
 
 const nav: {label:Module;icon:string;roles?:string[]}[] = [
   {label:"Dashboard",icon:"⌂"},{label:"Search trainee",icon:"⌕",roles:["admin"]},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting","training_operations"]},
@@ -253,8 +254,10 @@ function LiveRequests({data,role,reload}:{data:PortalData;role:string;reload:()=
   </div>;
 }
 
+const DEFAULT_INSTRUCTION_BODY = "Welcome aboard! Your enrollment has been confirmed. Please review your reporting details below and observe the reminders.\n\nIMPORTANT REMINDERS:\n- Check the printed name in your admission record and report any corrections immediately.\n- Arrive on time, observe proper conduct, and complete all requirements before training starts.\n- Bring your own tumbler - drinking water is available in the Training Room.\n- Wear the official training uniform during the training period (Php 150.00 uniform fee applies).\n\nNew Wave MTACI sincerely appreciates your trust in choosing us as your training provider.\n\nThank you!";
+
 function LiveInstructions({data,query,reload}:{data:PortalData;query:string;reload:()=>Promise<void>}){
-  const [busy,setBusy]=useState(""),[message,setMessage]=useState("");
+  const [busy,setBusy]=useState(""),[message,setMessage]=useState(""),[tab,setTab]=useState<"Send"|"Templates">("Send");
   const term=query.toLowerCase();
   const match=(e:Enrollment)=>{const t=first(e.trainees),c=first(e.courses);return `${t?fullName(t):""} ${e.enrollment_number} ${c?.name??""}`.toLowerCase().includes(term)};
   const activeRows=data.enrollments.filter(e=>e.enrollment_status!=="Cancelled").filter(match);
@@ -264,11 +267,35 @@ function LiveInstructions({data,query,reload}:{data:PortalData;query:string;relo
   async function send(id:string){setBusy(id);setMessage("");try{await submit({action:"send-instructions",enrollmentId:id});await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not send instructions.")}finally{setBusy("")}}
   async function sendAll(){setBusy("all");setMessage("");try{for(const e of ready)await submit({action:"send-instructions",enrollmentId:e.id});await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not send instructions.")}finally{setBusy("")}}
   const scheduleOf=(e:Enrollment)=>{const b=first(e.batches);return b?`${date(b.starts_on)} - ${date(b.ends_on)}`:e.scheduled_on?date(e.scheduled_on):"Open schedule"};
-  const row=(e:Enrollment,sendable:boolean)=>{const t=first(e.trainees),c=first(e.courses);return <div className="live-row-item" key={e.id}><div><strong>{t?fullName(t):"Unknown trainee"}</strong><small>{c?.name} · {e.enrollment_number} · {scheduleOf(e)}</small></div>{sendable?<button className="portal-primary" disabled={!!busy} onClick={()=>send(e.id)}>{busy===e.id?"Sending…":"Send"}</button>:<Badge tone={e.instructions_status==="Acknowledged"?"green":"orange"}>{e.instructions_status==="Acknowledged"?"Acknowledged":"Sent"}</Badge>}</div>};
-  return <div className="portal-page"><PageHead eyebrow="Registration operations" title="Training instructions" text="Send reporting instructions to enrolled trainees and track acknowledgment."/>{message&&<Message kind="error" text={message}/>}
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Ready to send</h2><p>Instructions not yet sent</p></div>{ready.length>0&&<button className="portal-primary" disabled={!!busy} onClick={sendAll}>{busy==="all"?"Sending…":`Send all (${ready.length})`}</button>}</div>{ready.map(e=>row(e,true))}{!ready.length&&<p className="portal-empty-copy">Nothing waiting to be sent.</p>}</section>
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Awaiting acknowledgment</h2><p>Sent — trainee has not confirmed</p></div><Badge tone="orange">{sent.length}</Badge></div>{sent.map(e=>row(e,false))}{!sent.length&&<p className="portal-empty-copy">No pending acknowledgments.</p>}</section>
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Acknowledged</h2><p>Confirmed by the trainee</p></div><Badge tone="green">{acknowledged.length}</Badge></div>{acknowledged.map(e=>row(e,false))}{!acknowledged.length&&<p className="portal-empty-copy">None yet.</p>}</section>
+  const row=(e:Enrollment,sendable:boolean)=>{const t=first(e.trainees),c=first(e.courses);return <div className="live-row-item" key={e.id}><div><strong>{t?fullName(t):"Unknown trainee"}</strong><small>{c?.name} · {e.enrollment_number} · {scheduleOf(e)}</small></div><div className="document-actions"><a href={`/api/documents/training-instructions/${e.id}`} target="_blank" rel="noreferrer">Preview PDF</a>{sendable?<button className="portal-primary" disabled={!!busy} onClick={()=>send(e.id)}>{busy===e.id?"Sending…":"Send"}</button>:<Badge tone={e.instructions_status==="Acknowledged"?"green":"orange"}>{e.instructions_status==="Acknowledged"?"Acknowledged":"Sent"}</Badge>}</div></div>};
+
+  // Template editor state (in-house courses only).
+  const inhouse=data.courses.filter(c=>c.delivery_type==="In-House");
+  const [courseId,setCourseId]=useState("");
+  const [subject,setSubject]=useState(""),[body,setBody]=useState(""),[link,setLink]=useState("");
+  const bodyOf=(cid:string)=>{const t=data.instructionTemplates.find(x=>x.course_id===cid&&x.active);if(!t)return DEFAULT_INSTRUCTION_BODY;return typeof t.body==="string"?t.body:(t.body?.text??DEFAULT_INSTRUCTION_BODY)};
+  function loadCourse(cid:string){setCourseId(cid);const t=data.instructionTemplates.find(x=>x.course_id===cid&&x.active);const c=data.courses.find(x=>x.id===cid);setSubject(t?.subject??"Training Instructions");setBody(bodyOf(cid));setLink(c?.google_classroom_link??"")}
+  async function saveTpl(){if(!courseId){setMessage("Pick a course first.");return}setBusy("tpl");setMessage("");try{await submit({action:"instruction-template-save",courseId,subject:subject.trim()||"Training Instructions",body:body.trim()||DEFAULT_INSTRUCTION_BODY});await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not save template.")}finally{setBusy("")}}
+  async function saveLink(){if(!courseId){setMessage("Pick a course first.");return}setBusy("link");setMessage("");try{await submit({action:"course-classroom-link-save",courseId,link:link.trim()});await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not save the link.")}finally{setBusy("")}}
+
+  return <div className="portal-page"><PageHead eyebrow="Registration operations" title="Training instructions" text="Create per-course instruction templates and Google Classroom links, then send reporting instructions to enrolled trainees."/>{message&&<Message kind="error" text={message}/>}
+    <div className="portal-tabs">{(["Send","Templates"] as const).map(t=><button key={t} className={tab===t?"active":""} onClick={()=>setTab(t)}>{t}</button>)}</div>
+    {tab==="Send"?<>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Ready to send</h2><p>Instructions not yet sent (auto-sends once paid & enrolled)</p></div>{ready.length>0&&<button className="portal-primary" disabled={!!busy} onClick={sendAll}>{busy==="all"?"Sending…":`Send all (${ready.length})`}</button>}</div>{ready.map(e=>row(e,true))}{!ready.length&&<p className="portal-empty-copy">Nothing waiting to be sent.</p>}</section>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Awaiting acknowledgment</h2><p>Sent — trainee has not confirmed</p></div><Badge tone="orange">{sent.length}</Badge></div>{sent.map(e=>row(e,false))}{!sent.length&&<p className="portal-empty-copy">No pending acknowledgments.</p>}</section>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Acknowledged</h2><p>Confirmed by the trainee</p></div><Badge tone="green">{acknowledged.length}</Badge></div>{acknowledged.map(e=>row(e,false))}{!acknowledged.length&&<p className="portal-empty-copy">None yet.</p>}</section>
+    </>:<section className="portal-panel"><div className="panel-heading"><div><h2>Per-course template</h2><p>In-house courses only. Trainee name, date, time, and classroom are merged automatically at send.</p></div></div>
+      <div className="portal-form">
+        <label className="full">Course<select value={courseId} onChange={e=>loadCourse(e.target.value)}><option value="">Select an in-house course</option>{inhouse.map(c=><option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label>
+        {courseId&&<>
+          <label className="full">Subject<input value={subject} onChange={e=>setSubject(e.target.value)} placeholder="Training Instructions"/></label>
+          <label className="full">Letter body<textarea rows={10} value={body} onChange={e=>setBody(e.target.value)} placeholder={DEFAULT_INSTRUCTION_BODY}/></label>
+          <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy==="tpl"} onClick={saveTpl}>{busy==="tpl"?"Saving…":"Save template"}</button></div>
+          <label className="full">Google Classroom link (in-house)<input value={link} onChange={e=>setLink(e.target.value)} placeholder="https://classroom.google.com/c/..."/></label>
+          <div className="portal-form-actions full"><button type="button" className="portal-secondary" disabled={busy==="link"} onClick={saveLink}>{busy==="link"?"Saving…":"Save Google Classroom link"}</button></div>
+        </>}
+      </div>
+    </section>}
   </div>;
 }
 
