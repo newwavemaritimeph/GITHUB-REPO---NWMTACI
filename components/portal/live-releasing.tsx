@@ -89,7 +89,7 @@ export function LiveReleasing({ data, role, reload }: { data: ReleasingData; rol
     const c = certOf(data, e.id);
     const snap = (c?.snapshot ?? {}) as { certificate_number?: string; overrides?: Record<string, string> };
     const ov = snap.overrides ?? {};
-    setPdf({ templateId: (c?.template_id ?? activeTemplateFor(e.course_id)?.id) ?? null, traineeName: ov.name || traineeName(e), courseName: ov.course_title || (one(e.courses)?.name ?? ""), enrollmentNumber: e.enrollment_number, certificateNumber: snap.certificate_number ?? null, conductedDate: ov.conducted_date || ov.completion_date || (one(e.batches)?.ends_on ?? null), issuedDate: ov.issued_date || null, registrationNumber: ov.registration_number || e.enrollment_number });
+    setPdf({ templateId: (c?.template_id ?? activeTemplateFor(e.course_id)?.id) ?? null, traineeName: ov.name || traineeName(e), courseName: ov.course_title || (one(e.courses)?.name ?? ""), enrollmentNumber: e.enrollment_number, certificateNumber: snap.certificate_number ?? null, conductedDate: ov.conducted_date || ov.completion_date || (one(e.batches)?.ends_on ?? null), issuedDate: ov.issued_date || null, registrationNumber: ov.registration_number || e.enrollment_number, courseContent: ov.course_content || null });
   }
 
   const rows = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && inHouse(data, e)).sort((a, z) => Number(isPaid(z)) - Number(isPaid(a)));
@@ -127,8 +127,8 @@ export function LiveReleasing({ data, role, reload }: { data: ReleasingData; rol
             <button type="button" disabled={busy || !c || !e.feedback_submitted} title={!e.feedback_submitted ? "The trainee must submit the feedback form before printing." : undefined} onClick={() => void act({ action: "certificate-print", enrollmentId: e.id })}>Print</button>
             {printed && <button type="button" disabled={busy} onClick={() => void act({ action: "certificate-print", enrollmentId: e.id, reprint: true })}>Reprint</button>}
             <button type="button" disabled={busy || !c || !printed || c?.status === "Released"} onClick={() => setRelease(e)}>Release</button>
-            <button type="button" disabled={busy || !c} onClick={() => openPdf(e)}>PDF</button>
-            {isAdmin && <button type="button" disabled={busy} onClick={() => setEdit(e)}>Edit</button>}
+            <button type="button" disabled={busy || !c || !e.feedback_submitted} title={!e.feedback_submitted ? "The trainee must submit the feedback form before the certificate can be printed." : undefined} onClick={() => openPdf(e)}>PDF</button>
+            {isAdmin && <button type="button" disabled={busy || !c} onClick={() => setEdit(e)}>Edit</button>}
             {c && c.status !== "Released" && <button type="button" className="ghost-danger" disabled={busy} onClick={() => { const reason = window.prompt("Void this certificate? Reason:") ?? undefined; if (reason !== undefined) void act({ action: "certificate-void", enrollmentId: e.id, reason }); }}>Void</button>}
           </td></tr>; })}
         {!rows.length && <tr><td colSpan={6}><span className="portal-empty-copy">No in-house enrollments yet.</span></td></tr>}

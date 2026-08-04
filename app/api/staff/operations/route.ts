@@ -592,6 +592,9 @@ export async function POST(request: Request) {
     }
     if (input.action === "certificate-status") {
       if (!staff.roleCodes.some((r) => ["admin", "training_operations", "releasing_officer"].includes(r))) return NextResponse.json({ error: "Only Admin, Training Operations, or the Releasing Officer can manage certificates." }, { status: 403 });
+      // Printing and release must go through the gated certificate-print / certificate-release
+      // actions (feedback + issuance checks); this action cannot flip a cert to Printed/Released.
+      if (input.status === "Printed" || input.status === "Released") return NextResponse.json({ error: "Use the Print or Release action in the certificates module." }, { status: 400 });
       const { data, error } = await db.rpc("set_certificate_status", { target_enrollment: input.enrollmentId, target_status: input.status });
       if (error) throw error;
       return NextResponse.json({ ok: true, certificate: data });
@@ -621,22 +624,24 @@ export async function POST(request: Request) {
     if (input.action === "certificate-print") {
       if (!canRelease(staff.roleCodes)) return NextResponse.json({ error: "Only Admin or the Releasing Officer can print certificates." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      // In-House certificates are only printable once the trainee has submitted the feedback
-      // form (their online-training attendance).
-      const { data: enr } = await admin.from("enrollments").select("id,courses(delivery_type)").eq("id", input.enrollmentId).maybeSingle();
-      if ((first(enr?.courses) as { delivery_type?: string } | null)?.delivery_type === "In-House") {
-        // Tolerant of the pre-migration state: only enforce when the training_feedback table exists.
-        const { data: fb, error: fbErr } = await admin.from("training_feedback").select("id").eq("enrollment_id", input.enrollmentId).maybeSingle();
-        if (!fbErr && !fb) return NextResponse.json({ error: "The trainee must submit the feedback form (online-training attendance) before this certificate can be printed." }, { status: 400 });
-      }
       const { data: cert } = await admin.from("certificates").select("id,status,reprint_count").eq("enrollment_id", input.enrollmentId).maybeSingle();
       if (!cert) return NextResponse.json({ error: "Issue the certificate (assign a number) before printing." }, { status: 400 });
+      // Reprint path: already printed once — logged, no feedback re-check (feedback was required at first print).
       if (cert.status === "Printed" || cert.status === "Released") {
         if (!input.reprint) return NextResponse.json({ error: "This certificate was already printed. Choose Reprint (logged) or Void to re-issue." }, { status: 400 });
         const { error } = await admin.from("certificates").update({ reprint_count: Number(cert.reprint_count ?? 0) + 1 }).eq("id", cert.id);
         if (error) throw error;
         await admin.from("certificate_release_events").insert({ certificate_id: cert.id, event_type: "reprint", released_by: staff.user.id, reason: "Reprint" });
         return NextResponse.json({ ok: true, reprint: true });
+      }
+      // First print: issuance must be enabled, and In-House requires the trainee's submitted feedback.
+      const { data: settings } = await admin.from("organization_settings").select("certificate_issuance_enabled").maybeSingle();
+      if (!settings?.certificate_issuance_enabled) return NextResponse.json({ error: "Certificate issuance is disabled. An admin must enable it before certificates can be printed." }, { status: 400 });
+      const { data: enr } = await admin.from("enrollments").select("id,courses(delivery_type)").eq("id", input.enrollmentId).maybeSingle();
+      if ((first(enr?.courses) as { delivery_type?: string } | null)?.delivery_type === "In-House") {
+        // Tolerant of the pre-migration state: only enforce when the training_feedback table exists.
+        const { data: fb, error: fbErr } = await admin.from("training_feedback").select("id").eq("enrollment_id", input.enrollmentId).maybeSingle();
+        if (!fbErr && !fb) return NextResponse.json({ error: "The trainee must submit the feedback form (online-training attendance) before this certificate can be printed." }, { status: 400 });
       }
       const { error } = await db.rpc("set_certificate_status", { target_enrollment: input.enrollmentId, target_status: "Printed" });
       if (error) throw error;
@@ -668,12 +673,15 @@ export async function POST(request: Request) {
     if (input.action === "certificate-override") {
       if (!staff.roleCodes.includes("admin")) return NextResponse.json({ error: "Only Admin can override certificate details." }, { status: 403 });
       const admin = createSupabaseAdminClient();
+      // Override edits an already-issued certificate — it never creates one (that would bypass the
+      // issuance-enabled + approved-template guards on certificate-issue).
       const { data: cert } = await admin.from("certificates").select("id,snapshot").eq("enrollment_id", input.enrollmentId).maybeSingle();
-      const prevSnap = (cert?.snapshot ?? {}) as Record<string, unknown>;
+      if (!cert) return NextResponse.json({ error: "Issue the certificate (assign a number) before editing its details." }, { status: 400 });
+      const prevSnap = (cert.snapshot ?? {}) as Record<string, unknown>;
       const overrides = { ...((prevSnap.overrides as Record<string, string>) ?? {}), ...(input.overrides ?? {}) };
       const snapshot = { ...prevSnap, overrides, ...(input.certificateNumber ? { certificate_number: input.certificateNumber } : {}) };
-      if (cert) { const { error } = await admin.from("certificates").update({ snapshot }).eq("id", cert.id); if (error) throw error; }
-      else { const { error } = await admin.from("certificates").insert({ enrollment_id: input.enrollmentId, status: "Pending Attendance", snapshot }); if (error) throw error; }
+      const { error } = await admin.from("certificates").update({ snapshot }).eq("id", cert.id);
+      if (error) throw error;
       return NextResponse.json({ ok: true });
     }
     if (input.action === "certificate-issuance-toggle") {
@@ -696,8 +704,11 @@ export async function POST(request: Request) {
       const base = process.env.APP_BASE_URL ?? new URL(request.url).origin;
       const url = `${base}/feedback/${(enr as { feedback_token: string }).feedback_token}`;
       const name = `${t.legal_first_name ?? ""} ${t.legal_last_name ?? ""}`.trim() || "Trainee";
-      const { error } = await admin.from("email_jobs").insert({ idempotency_key: `feedback:${input.enrollmentId}:${Date.now()}`, template_code: "training.feedback", recipient: t.email, variables: { trainee_name: name, course_name: (first(enr.courses) as { name?: string } | null)?.name ?? "your training", feedback_url: url } });
-      if (error) throw error;
+      // Hour-bucketed key: a duplicate within the hour is deduped (unique constraint), so repeated
+      // clicks don't spam the trainee, while a genuine resend later still goes out.
+      const bucket = Math.floor(Date.now() / 3_600_000);
+      const { error } = await admin.from("email_jobs").insert({ idempotency_key: `feedback:${input.enrollmentId}:${bucket}`, template_code: "training.feedback", recipient: t.email, variables: { trainee_name: name, course_name: (first(enr.courses) as { name?: string } | null)?.name ?? "your training", feedback_url: url } });
+      if (error && error.code !== "23505") throw error;
       return NextResponse.json({ ok: true });
     }
     if (input.action === "hr-attendance-log") {
