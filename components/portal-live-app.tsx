@@ -100,7 +100,7 @@ function PortalContent({active,role,data,query,open,onPay,canEnroll,canSchedule,
   if(active==="Inventory")return <LiveInventory data={data} role={role} reload={reload}/>;
   if(active==="HR & payroll"&&["admin","hr"].includes(role))return <LiveHr data={data} role={role} reload={reload}/>;
   if((active==="Classrooms"||active==="Certificates")&&["admin","training_operations"].includes(role))return <LiveTraining data={{classrooms:data.classrooms,certificates:data.certificates,batches:data.batches,enrollments:data.enrollments,courses:data.courses,certificateTemplates:data.certificateTemplates}} role={role} reload={reload} initialTab={active==="Certificates"?"Certificates":"Classrooms"}/>;
-  if(active==="Setup"&&role==="admin")return <div className="portal-page"><PageHead eyebrow="System administration" title="Configuration and authorized accounts" text="Manage users, partners, agencies, courses, prices, expense categories, payment channels, and charges."/><AdminConfiguration/><FinanceCatalogSetup data={data} reload={reload}/></div>;
+  if(active==="Setup"&&role==="admin")return <div className="portal-page"><PageHead eyebrow="System administration" title="Configuration and authorized accounts" text="Manage users, partners, agencies, courses, prices, expense categories, payment channels, and charges."/><AdminConfiguration catalog={financeCatalogSections(data,reload)}/></div>;
   return <ConnectedModule module={active} data={data}/>;
 }
 
@@ -267,35 +267,35 @@ function LiveMyHr({data,reload}:{data:PortalData;reload:()=>Promise<void>}){
   </div>;
 }
 
-function FinanceCatalogSetup({data,reload}:{data:PortalData;reload:()=>Promise<void>}){
+function financeCatalogSections(data:PortalData,reload:()=>Promise<void>):{key:string;label:string;node:React.ReactNode}[]{
   const post=async(body:Record<string,unknown>)=>{await submit(body);await reload()};
-  return <div style={{marginTop:16}}>
-    <SetupList title="Expense categories" description="Categories for expense vouchers" entityLabel="category" canManage busy={false}
-      fields={[{key:"name",label:"Category name"}]}
-      rows={data.expenseCategories.map(c=>({id:c.id,primary:c.name,secondary:c.active?"Active":"Archived",active:c.active,values:{name:c.name}}))}
-      onSubmit={(v,id)=>post({action:"expense-category-save",id,name:String(v.name)})}
-      onRemove={(id)=>post({action:"expense-category-save",id,name:"x",remove:true})} removable/>
-    <SetupList title="Receivable channels" description="Collection modes offered at the cashier" entityLabel="receivable channel" canManage busy={false}
-      fields={[{key:"name",label:"Channel name"},{key:"requiresReference",label:"Requires a reference number",type:"checkbox"}]}
-      rows={data.paymentMethods.filter(c=>c.kind!=="payable").map(c=>({id:c.id,primary:c.name,secondary:`${c.requires_reference?"Reference required":"No reference"} · ${c.code}`,active:c.active,values:{name:c.name,requiresReference:c.requires_reference}}))}
-      onSubmit={(v,id)=>post({action:"channel-save",id,name:String(v.name),requiresReference:Boolean(v.requiresReference),allowsProof:true,kind:"receivable"})}
-      onArchive={(id,active,name)=>post({action:"channel-save",id,name,active:!active})}/>
-    <SetupList title="Payables channels" description="Disbursement channels for payables" entityLabel="payables channel" canManage busy={false}
-      fields={[{key:"name",label:"Channel name"}]}
-      rows={data.paymentMethods.filter(c=>c.kind==="payable").map(c=>({id:c.id,primary:c.name,secondary:c.code,active:c.active,values:{name:c.name}}))}
-      onSubmit={(v,id)=>post({action:"channel-save",id,name:String(v.name),kind:"payable"})}
-      onArchive={(id,active,name)=>post({action:"channel-save",id,name,kind:"payable",active:!active})}/>
-    <SetupList title="Charges" description="Rescheduling, Make-up, Reprinting, Uniform, Change Course, etc." entityLabel="charge" canManage busy={false}
-      fields={[{key:"name",label:"Charge name"},{key:"defaultAmount",label:"Default amount (PHP)",type:"number",optional:true}]}
-      rows={data.charges.map(c=>({id:c.id,primary:c.name,secondary:`Default ${pesos(c.default_amount_centavos)}`,active:c.active,values:{name:c.name,defaultAmount:String(c.default_amount_centavos/100)}}))}
-      onSubmit={(v,id)=>post({action:"charge-save",id,name:String(v.name),defaultAmountCentavos:Math.round((Number(v.defaultAmount)||0)*100)})}
-      onArchive={(id,active,name)=>post({action:"charge-save",id,name,active:!active})}/>
-    <SetupList title="Marketing agencies" description="Referring consultancies / agencies" entityLabel="agency" canManage busy={false}
+  return [
+    {key:"marketing agencies",label:"marketing agencies",node:<SetupList title="Marketing agencies" description="Referring consultancies / agencies" entityLabel="agency" canManage busy={false}
       fields={[{key:"name",label:"Agency name"},{key:"contactName",label:"Contact person",optional:true},{key:"email",label:"Email",optional:true},{key:"mobile",label:"Mobile",optional:true}]}
       rows={data.agencies.map(a=>({id:a.id,primary:a.name,secondary:[a.contact_name,a.email,a.mobile].filter(Boolean).join(" · ")||"—",active:a.active,values:{name:a.name,contactName:a.contact_name||"",email:a.email||"",mobile:a.mobile||""}}))}
       onSubmit={(v,id)=>post({action:"agency-save",id,name:String(v.name),contactName:String(v.contactName||""),email:String(v.email||""),mobile:String(v.mobile||"")})}
-      onArchive={(id,active,name)=>post({action:"agency-save",id,name,active:!active})}/>
-  </div>;
+      onArchive={(id,active,name)=>post({action:"agency-save",id,name,active:!active})}/>},
+    {key:"receivable channels",label:"receivable channels",node:<SetupList title="Receivable channels" description="Collection modes offered at the cashier" entityLabel="receivable channel" canManage busy={false}
+      fields={[{key:"name",label:"Channel name"},{key:"requiresReference",label:"Requires a reference number",type:"checkbox"}]}
+      rows={data.paymentMethods.filter(c=>c.kind!=="payable").map(c=>({id:c.id,primary:c.name,secondary:`${c.requires_reference?"Reference required":"No reference"} · ${c.code}`,active:c.active,values:{name:c.name,requiresReference:c.requires_reference}}))}
+      onSubmit={(v,id)=>post({action:"channel-save",id,name:String(v.name),requiresReference:Boolean(v.requiresReference),allowsProof:true,kind:"receivable"})}
+      onArchive={(id,active,name)=>post({action:"channel-save",id,name,active:!active})}/>},
+    {key:"payables channels",label:"payables channels",node:<SetupList title="Payables channels" description="Disbursement channels for payables" entityLabel="payables channel" canManage busy={false}
+      fields={[{key:"name",label:"Channel name"}]}
+      rows={data.paymentMethods.filter(c=>c.kind==="payable").map(c=>({id:c.id,primary:c.name,secondary:c.code,active:c.active,values:{name:c.name}}))}
+      onSubmit={(v,id)=>post({action:"channel-save",id,name:String(v.name),kind:"payable"})}
+      onArchive={(id,active,name)=>post({action:"channel-save",id,name,kind:"payable",active:!active})}/>},
+    {key:"charges",label:"charges",node:<SetupList title="Charges" description="Rescheduling, Make-up, Reprinting, Uniform, Change Course, etc." entityLabel="charge" canManage busy={false}
+      fields={[{key:"name",label:"Charge name"},{key:"defaultAmount",label:"Default amount (PHP)",type:"number",optional:true}]}
+      rows={data.charges.map(c=>({id:c.id,primary:c.name,secondary:`Default ${pesos(c.default_amount_centavos)}`,active:c.active,values:{name:c.name,defaultAmount:String(c.default_amount_centavos/100)}}))}
+      onSubmit={(v,id)=>post({action:"charge-save",id,name:String(v.name),defaultAmountCentavos:Math.round((Number(v.defaultAmount)||0)*100)})}
+      onArchive={(id,active,name)=>post({action:"charge-save",id,name,active:!active})}/>},
+    {key:"expense categories",label:"expense categories",node:<SetupList title="Expense categories" description="Categories for expense vouchers" entityLabel="category" canManage busy={false}
+      fields={[{key:"name",label:"Category name"}]}
+      rows={data.expenseCategories.map(c=>({id:c.id,primary:c.name,secondary:c.active?"Active":"Archived",active:c.active,values:{name:c.name}}))}
+      onSubmit={(v,id)=>post({action:"expense-category-save",id,name:String(v.name)})}
+      onRemove={(id)=>post({action:"expense-category-save",id,name:"x",remove:true})} removable/>},
+  ];
 }
 
 function ChargesReport({data}:{data:PortalData}){
