@@ -75,6 +75,8 @@ const certificateIssueInput = z.object({ action: z.literal("certificate-issue"),
 const certificatePrintInput = z.object({ action: z.literal("certificate-print"), enrollmentId: z.string().uuid(), reprint: z.boolean().optional() });
 const certificateVoidInput = z.object({ action: z.literal("certificate-void"), enrollmentId: z.string().uuid(), reason: z.string().trim().max(300).optional() });
 const certificateReleaseInput = z.object({ action: z.literal("certificate-release"), enrollmentId: z.string().uuid(), recipientName: z.string().trim().min(1).max(160), recipientIdType: z.string().trim().max(80).optional(), reason: z.string().trim().max(300).optional() });
+const certificateOverrideInput = z.object({ action: z.literal("certificate-override"), enrollmentId: z.string().uuid(), certificateNumber: z.string().trim().max(80).optional(), overrides: z.record(z.string(), z.string()).optional() });
+const certificateIssuanceToggleInput = z.object({ action: z.literal("certificate-issuance-toggle"), enabled: z.boolean() });
 
 // HR / payroll (Slice 1): attendance logging and leave / cash-advance filing + decisions.
 const hm = /^\d{2}:\d{2}$/;
@@ -108,7 +110,7 @@ const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-li
 const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional(), courseId: z.string().uuid().nullable().optional(), partnerOfferId: z.string().uuid().nullable().optional() });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput]);
+const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateOverrideInput, certificateIssuanceToggleInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
@@ -271,6 +273,13 @@ export async function GET() {
     const { data: rel } = await db.from("certificate_release_events").select("id,certificate_id,event_type,recipient_name,recipient_id_type,reason,created_at,certificates(enrollment_id,snapshot,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name,code)))").order("created_at", { ascending: false }).limit(400);
     certificateReleases = rel ?? [];
   }
+  // Certificate issuance safety flag (admin-toggleable; read via service role).
+  let certificateIssuanceEnabled = false;
+  if (canManageTraining(staff.roleCodes) || canRelease(staff.roleCodes)) {
+    const admin = createSupabaseAdminClient();
+    const { data: s } = await admin.from("organization_settings").select("certificate_issuance_enabled").maybeSingle();
+    certificateIssuanceEnabled = Boolean(s?.certificate_issuance_enabled);
+  }
   // Cashier→Accounting requests (Cancellation/Refund/Make-up/Rescheduling). enrollment_requests is
   // RLS-protected, so read via service role; expose only to cashier/accounting/admin.
   let requests: unknown[] = [];
@@ -317,7 +326,7 @@ export async function GET() {
     paymentMethods: paymentMethodsWithKind, charges: charges.data ?? [], agencies: agencies.data ?? [],
     expenses: expenses.data ?? [], payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems,
-    classrooms: classrooms.data ?? [], certificates, certificateTemplates, certificateReleases, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
+    classrooms: classrooms.data ?? [], certificates, certificateTemplates, certificateReleases, certificateIssuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
     agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, instructionTemplates }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -645,6 +654,26 @@ export async function POST(request: Request) {
       if (error) throw error;
       const { error: relErr } = await admin.from("certificate_release_events").insert({ certificate_id: cert.id, event_type: "release", recipient_name: input.recipientName, recipient_id_type: input.recipientIdType ?? null, released_by: staff.user.id, reason: input.reason ?? null });
       if (relErr) throw relErr;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "certificate-override") {
+      if (!staff.roleCodes.includes("admin")) return NextResponse.json({ error: "Only Admin can override certificate details." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: cert } = await admin.from("certificates").select("id,snapshot").eq("enrollment_id", input.enrollmentId).maybeSingle();
+      const prevSnap = (cert?.snapshot ?? {}) as Record<string, unknown>;
+      const overrides = { ...((prevSnap.overrides as Record<string, string>) ?? {}), ...(input.overrides ?? {}) };
+      const snapshot = { ...prevSnap, overrides, ...(input.certificateNumber ? { certificate_number: input.certificateNumber } : {}) };
+      if (cert) { const { error } = await admin.from("certificates").update({ snapshot }).eq("id", cert.id); if (error) throw error; }
+      else { const { error } = await admin.from("certificates").insert({ enrollment_id: input.enrollmentId, status: "Pending Attendance", snapshot }); if (error) throw error; }
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "certificate-issuance-toggle") {
+      if (!staff.roleCodes.includes("admin")) return NextResponse.json({ error: "Only Admin can change the certificate issuance setting." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: s } = await admin.from("organization_settings").select("id").maybeSingle();
+      if (!s) return NextResponse.json({ error: "Organization settings not found." }, { status: 400 });
+      const { error } = await admin.from("organization_settings").update({ certificate_issuance_enabled: input.enabled }).eq("id", s.id);
+      if (error) throw error;
       return NextResponse.json({ ok: true });
     }
     if (input.action === "hr-attendance-log") {

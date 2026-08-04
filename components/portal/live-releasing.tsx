@@ -14,7 +14,7 @@ type CertTemplate = { id: string; course_id: string; version: number; active: bo
 type ReleaseEvent = { id: string; certificate_id: string; event_type: string; recipient_name?: string | null; recipient_id_type?: string | null; reason?: string | null; created_at: string; certificates?: { enrollment_id?: string; snapshot?: Record<string, unknown> | null; enrollments?: EnrollRef | EnrollRef[] | null } | { enrollment_id?: string; snapshot?: Record<string, unknown> | null; enrollments?: EnrollRef | EnrollRef[] | null }[] | null };
 type Course = { id: string; code: string; name: string; delivery_type: string };
 type Batch = { id: string; batch_number: string; course_id: string; starts_on: string; ends_on: string; confirmed_count: number; capacity: number; courses?: CourseRef | CourseRef[] | null };
-export type ReleasingData = { profile: { complete_name: string }; enrollments: Enrollment[]; certificates: Certificate[]; certificateTemplates: CertTemplate[]; certificateReleases: ReleaseEvent[]; courses: Course[]; batches: Batch[] };
+export type ReleasingData = { profile: { complete_name: string }; enrollments: Enrollment[]; certificates: Certificate[]; certificateTemplates: CertTemplate[]; certificateReleases: ReleaseEvent[]; courses: Course[]; batches: Batch[]; certificateIssuanceEnabled: boolean };
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
 const manilaDay = (value?: string | null) => (value ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(value)) : "");
@@ -61,11 +61,13 @@ export function ReleasingDashboard({ data }: { data: ReleasingData }) {
   );
 }
 
-export function LiveReleasing({ data, reload }: { data: ReleasingData; role: string; reload: () => Promise<void> }) {
+export function LiveReleasing({ data, role, reload }: { data: ReleasingData; role: string; reload: () => Promise<void> }) {
+  const isAdmin = role === "admin";
   const [tab, setTab] = useState<"Register" | "Templates" | "Released report">("Register");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [release, setRelease] = useState<Enrollment | null>(null);
+  const [edit, setEdit] = useState<Enrollment | null>(null);
   const [pdf, setPdf] = useState<CertPdfTarget | null>(null);
   const [span, setSpan] = useState<"Daily" | "Weekly" | "Monthly" | "All">("Weekly");
 
@@ -107,6 +109,10 @@ export function LiveReleasing({ data, reload }: { data: ReleasingData; role: str
       <div className="portal-heading"><div><span className="portal-eyebrow">Releasing officer</span><h1>Training certificates</h1><p>Issue, print, release, and monitor in-house training certificates.</p></div></div>
       <div className="portal-tabs">{(["Register", "Templates", "Released report"] as const).map((t) => <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{t}</button>)}</div>
       {message && <div className="portal-message error" role="alert">{message}</div>}
+      <div className="portal-panel" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", padding: "12px 14px", marginBottom: 12 }}>
+        <div><strong>Certificate issuance: <span className={`portal-badge ${data.certificateIssuanceEnabled ? "green" : "orange"}`}>{data.certificateIssuanceEnabled ? "Enabled" : "Disabled"}</span></strong><small style={{ display: "block", color: "var(--muted)" }}>{data.certificateIssuanceEnabled ? "Numbers can be issued and certificates printed and released." : "Issue, print, and release are blocked until this is enabled."}</small></div>
+        {isAdmin ? <button type="button" className="portal-secondary" disabled={busy} onClick={() => void act({ action: "certificate-issuance-toggle", enabled: !data.certificateIssuanceEnabled })}>{data.certificateIssuanceEnabled ? "Disable issuance" : "Enable issuance"}</button> : <small style={{ color: "var(--muted)" }}>Only an admin can change this.</small>}
+      </div>
 
       {tab === "Register" && <div className="portal-table portal-panel"><table><thead><tr><th>Trainee</th><th>Course</th><th>Payment</th><th>Feedback (online attendance)</th><th>Certificate</th><th>Actions</th></tr></thead><tbody>
         {rows.map((e) => { const c = certOf(data, e.id); const snap = (c?.snapshot ?? {}) as { certificate_number?: string }; const paid = isPaid(e); const printed = c?.status === "Printed" || c?.status === "Released"; return <tr key={e.id}>
@@ -121,6 +127,7 @@ export function LiveReleasing({ data, reload }: { data: ReleasingData; role: str
             {printed && <button type="button" disabled={busy} onClick={() => void act({ action: "certificate-print", enrollmentId: e.id, reprint: true })}>Reprint</button>}
             <button type="button" disabled={busy || !c || !printed || c?.status === "Released"} onClick={() => setRelease(e)}>Release</button>
             <button type="button" disabled={busy || !c} onClick={() => openPdf(e)}>PDF</button>
+            {isAdmin && <button type="button" disabled={busy} onClick={() => setEdit(e)}>Edit</button>}
             {c && c.status !== "Released" && <button type="button" className="ghost-danger" disabled={busy} onClick={() => { const reason = window.prompt("Void this certificate? Reason:") ?? undefined; if (reason !== undefined) void act({ action: "certificate-void", enrollmentId: e.id, reason }); }}>Void</button>}
           </td></tr>; })}
         {!rows.length && <tr><td colSpan={6}><span className="portal-empty-copy">No in-house enrollments yet.</span></td></tr>}
@@ -138,9 +145,33 @@ export function LiveReleasing({ data, reload }: { data: ReleasingData; role: str
       </div>}
 
       {release && <ReleaseModal enrollment={release} onClose={() => setRelease(null)} onDone={async (body) => { await act(body); setRelease(null); }} busy={busy} />}
+      {edit && <OverrideModal enrollment={edit} cert={certOf(data, edit.id)} onClose={() => setEdit(null)} onDone={async (body) => { await act(body); setEdit(null); }} busy={busy} />}
       {pdf && <CertificatePdfModal target={pdf} onClose={() => setPdf(null)} />}
     </div>
   );
+}
+
+function OverrideModal({ enrollment, cert, onClose, onDone, busy }: { enrollment: Enrollment; cert: Certificate | null; onClose: () => void; onDone: (body: Record<string, unknown>) => Promise<void>; busy: boolean }) {
+  const snap = (cert?.snapshot ?? {}) as { certificate_number?: string; overrides?: Record<string, string> };
+  const ov = snap.overrides ?? {};
+  const [name, setName] = useState(ov.name || traineeName(enrollment));
+  const [courseTitle, setCourseTitle] = useState(ov.course_title || (one(enrollment.courses)?.name ?? ""));
+  const [courseContent, setCourseContent] = useState(ov.course_content || "");
+  const [completionDate, setCompletionDate] = useState(ov.completion_date || (one(enrollment.batches)?.ends_on ?? ""));
+  const [certNo, setCertNo] = useState(snap.certificate_number || "");
+  function go() { void onDone({ action: "certificate-override", enrollmentId: enrollment.id, certificateNumber: certNo.trim() || undefined, overrides: { name: name.trim(), course_title: courseTitle.trim(), course_content: courseContent.trim(), completion_date: completionDate.trim() } }); }
+  return <div className="portal-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <section className="portal-modal" role="dialog" aria-modal="true"><header><div><span className="portal-eyebrow">Admin override</span><h2>Edit certificate details</h2></div><button type="button" onClick={onClose} aria-label="Close">×</button></header>
+      <div className="portal-form">
+        <p className="portal-form-note full">Admin-only. These values print on the certificate (they override the trainee/course defaults). Leave the number blank to keep the issued one.</p>
+        <label className="full">Name on certificate<input value={name} onChange={(e) => setName(e.target.value)} /></label>
+        <label className="full">Course title<input value={courseTitle} onChange={(e) => setCourseTitle(e.target.value)} /></label>
+        <label className="full">Course content<textarea rows={2} value={courseContent} onChange={(e) => setCourseContent(e.target.value)} placeholder="Optional — e.g. modules covered" /></label>
+        <label>Completion date<input value={completionDate} onChange={(e) => setCompletionDate(e.target.value)} placeholder="YYYY-MM-DD" /></label>
+        <label>Certificate no.<input value={certNo} onChange={(e) => setCertNo(e.target.value)} placeholder="Keep issued" /></label>
+        <div className="portal-form-actions full"><button type="button" className="ghost-button" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={go}>{busy ? "Saving…" : "Save overrides"}</button></div>
+      </div></section>
+  </div>;
 }
 
 function ReleaseModal({ enrollment, onClose, onDone, busy }: { enrollment: Enrollment; onClose: () => void; onDone: (body: Record<string, unknown>) => Promise<void>; busy: boolean }) {
