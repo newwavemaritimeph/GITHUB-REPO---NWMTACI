@@ -164,7 +164,7 @@ function Wizard() {
             <div className="schedule-picker">
               {schedules.map((batch) => (
                 <button key={batch.id} type="button" className={`schedule-option ${scheduleId === batch.id ? "selected" : ""}`} onClick={() => setScheduleId(batch.id)}>
-                  <span className="schedule-body"><strong>{batch.label}</strong><small>{batch.availableSlots} slot{batch.availableSlots === 1 ? "" : "s"} available</small></span>
+                  <span className="schedule-body"><strong>{batch.label}</strong></span>
                 </button>
               ))}
             </div>
