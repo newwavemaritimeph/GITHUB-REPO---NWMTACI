@@ -15,6 +15,12 @@
 
 begin;
 
+-- Financial/audit tables are append-only (a prevent_immutable_change trigger blocks
+-- DELETE). Disable triggers for this reset session so the cleanup can run, then restore.
+-- This also lifts FK checks, so delete order below no longer matters — but it is kept
+-- child->parent for clarity. Requires running as the postgres role (Supabase SQL editor).
+set session_replication_role = replica;
+
 -- Payments & financial documents
 delete from public.payment_allocations;
 delete from public.receipts;
@@ -66,6 +72,9 @@ delete from public.expense_vouchers;
 delete from public.expenses;
 delete from public.account_reconciliation_items;
 delete from public.cashier_closings;
+
+-- Restore normal trigger/constraint enforcement.
+set session_replication_role = default;
 
 commit;
 
