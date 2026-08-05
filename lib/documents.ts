@@ -771,6 +771,75 @@ export async function createExpenseVoucherPdf(snapshot: ExpenseVoucherSnapshot) 
   });
 }
 
+export type DailyExpensesSnapshot = {
+  dateLabel: string;
+  rows: { number: string; payee: string; category: string; channel: string; reference: string; status: string; amountCentavos: number }[];
+  totalCentavos: number;
+  paidCentavos: number;
+  preparedBy: string;
+  logoBytes?: Uint8Array;
+};
+
+/** Daily expenses summary — one A4 portrait page (paginated) listing the day's
+ * expense vouchers with payment channel, reference, status, and totals. */
+export async function createDailyExpensesPdf(snapshot: DailyExpensesSnapshot) {
+  const doc = await PDFDocument.create();
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const orange = rgb(0.949, 0.337, 0.086), dark = rgb(0.071, 0.247, 0.388), gray = rgb(0.42, 0.45, 0.5), line = rgb(0.85, 0.88, 0.9);
+  const W = 595.28, H = 841.89, margin = 40;
+  const cols = [
+    { label: "Voucher", x: margin, w: 74 },
+    { label: "Payee", x: margin + 74, w: 104 },
+    { label: "Category", x: margin + 178, w: 80 },
+    { label: "Channel", x: margin + 258, w: 58 },
+    { label: "Reference", x: margin + 316, w: 74 },
+    { label: "Status", x: margin + 390, w: 46 },
+    { label: "Amount", x: margin + 436, w: W - margin - (margin + 436), align: "right" as const },
+  ];
+  const fit = (text: string, f: typeof font, size: number, w: number) => {
+    let t = text ?? "";
+    while (t.length > 1 && f.widthOfTextAtSize(t, size) > w - 4) t = t.slice(0, -1);
+    return t.length < (text ?? "").length ? `${t.slice(0, -1)}…` : t;
+  };
+  let page = doc.addPage([W, H]);
+  let y = H - margin;
+  const header = async () => {
+    if (snapshot.logoBytes) { try { const img = await doc.embedPng(snapshot.logoBytes); const d = img.scaleToFit(46, 46); page.drawImage(img, { x: margin, y: y - d.height + 6, width: d.width, height: d.height }); } catch { /* skip logo */ } }
+    page.drawText("New Wave Maritime Training and Assessment Center, Inc.", { x: margin + 54, y: y - 8, size: 11, font: bold, color: dark });
+    page.drawText("Daily Expenses Summary", { x: margin + 54, y: y - 24, size: 15, font: bold, color: orange });
+    page.drawText(snapshot.dateLabel, { x: margin + 54, y: y - 40, size: 10, font, color: gray });
+    y -= 66;
+    drawHead();
+  };
+  const drawHead = () => {
+    page.drawRectangle({ x: margin, y: y - 4, width: W - margin * 2, height: 18, color: rgb(0.96, 0.98, 0.99) });
+    for (const c of cols) page.drawText(c.label, { x: c.align === "right" ? c.x + c.w - (bold.widthOfTextAtSize(c.label, 8) + 2) : c.x + 2, y, size: 8, font: bold, color: dark });
+    y -= 18;
+  };
+  await header();
+  for (const r of snapshot.rows) {
+    if (y < margin + 60) { page = doc.addPage([W, H]); y = H - margin; drawHead(); }
+    const cells = [r.number, r.payee, r.category, r.channel || "—", r.reference || "—", r.status, php(r.amountCentavos)];
+    cells.forEach((val, i) => {
+      const c = cols[i];
+      const t = fit(String(val), font, 8.5, c.w);
+      page.drawText(t, { x: c.align === "right" ? c.x + c.w - (font.widthOfTextAtSize(t, 8.5) + 2) : c.x + 2, y, size: 8.5, font, color: rgb(0.15, 0.18, 0.22) });
+    });
+    y -= 15;
+    page.drawLine({ start: { x: margin, y: y + 3 }, end: { x: W - margin, y: y + 3 }, thickness: 0.4, color: line });
+  }
+  if (!snapshot.rows.length) { page.drawText("No expenses recorded for this day.", { x: margin, y, size: 9, font, color: gray }); y -= 15; }
+  y -= 8;
+  page.drawText(`Total expenses: ${php(snapshot.totalCentavos)}`, { x: margin, y, size: 10, font: bold, color: dark });
+  page.drawText(`Paid: ${php(snapshot.paidCentavos)}`, { x: margin + 220, y, size: 10, font: bold, color: dark });
+  page.drawText(`${snapshot.rows.length} voucher(s)`, { x: W - margin - font.widthOfTextAtSize(`${snapshot.rows.length} voucher(s)`, 9), y, size: 9, font, color: gray });
+  y -= 40;
+  page.drawText(`Prepared by: ${snapshot.preparedBy || "—"}`, { x: margin, y, size: 9, font, color: rgb(0.15, 0.18, 0.22) });
+  page.drawText("Amounts are in Philippine peso. Retain for accounting and audit.", { x: margin, y: margin - 12, size: 7.5, font, color: gray });
+  return doc.save();
+}
+
 export type PayslipSnapshot = {
   employeeNumber: string;
   employeeName: string;

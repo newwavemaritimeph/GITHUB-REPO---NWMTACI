@@ -13,7 +13,8 @@ const dueOf = (e: Enrollment) => Number(e.selling_price_centavos) + Number(e.cha
 type Channel = { id: string; code: string; name: string; requires_reference: boolean; allows_proof: boolean; active: boolean; kind?: string };
 type Charge = { id: string; name: string; default_amount_centavos: number; active: boolean; used_count: number };
 type Agency = { id: string; name: string; contact_name?: string | null; email?: string | null; mobile?: string | null; active: boolean };
-type Expense = { id: string; expense_number: string; payee: string; category: string; amount_centavos: number; status: string; created_at: string };
+type Expense = { id: string; expense_number: string; payee: string; category: string; amount_centavos: number; status: string; created_at: string; payment_channel?: string | null; reference_number?: string | null };
+const EXPENSE_CHANNELS = ["Cash", "GCash", "Unionbank", "Cheque", "PSBank", "Other"];
 type Payable = { id: string; description: string; amount_centavos: number; due_on?: string | null; status: string };
 type Course = { id: string; code: string; name: string; delivery_type: string; duration_label?: string; duration_days?: number; training_mode?: string; category_id?: string; standard_price_centavos: number; updated_at?: string };
 type CenterRef = { name: string };
@@ -257,8 +258,9 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
   const canManage = role === "admin" || role === "accounting";
   const canRaise = ["admin", "cashier"].includes(role);
   const [busy, setBusy] = useState(false);
-  const [voucher, setVoucher] = useState<{ payee: string; category: string; amount: string; purpose: string } | null>(null);
+  const [voucher, setVoucher] = useState<{ payee: string; category: string; amount: string; purpose: string; paymentChannel: string; referenceNumber: string } | null>(null);
   const [error, setError] = useState("");
+  const [summaryDate, setSummaryDate] = useState(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date()));
   async function post(body: Record<string, unknown>) {
     setBusy(true);
     try {
@@ -270,14 +272,17 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
   }
   return (
     <div className="portal-page">
-      <div className="portal-heading"><div><span className="portal-eyebrow">Cashier / Accounting</span><h1>Expense vouchers</h1><p>Raise cash and expense vouchers; Accounting approves, rejects, or marks them paid.</p></div>{canRaise && <button className="portal-primary" disabled={busy} onClick={() => { setError(""); setVoucher({ payee: "", category: data.expenseCategories.find((c) => c.active)?.name ?? "Others", amount: "", purpose: "" }); }}>+ Raise voucher</button>}</div>
+      <div className="portal-heading"><div><span className="portal-eyebrow">Cashier / Accounting</span><h1>Expense vouchers</h1><p>Raise cash and expense vouchers; Accounting approves, rejects, or marks them paid.</p></div>{canRaise && <button className="portal-primary" disabled={busy} onClick={() => { setError(""); setVoucher({ payee: "", category: data.expenseCategories.find((c) => c.active)?.name ?? "Others", amount: "", purpose: "", paymentChannel: "Cash", referenceNumber: "" }); }}>+ Raise voucher</button>}</div>
+      <div className="portal-form" style={{ padding: "0 0 10px" }}><label>Daily summary date<input type="date" value={summaryDate} onChange={(e) => setSummaryDate(e.target.value)} /></label><label style={{ alignSelf: "end" }}><button type="button" className="portal-secondary" onClick={() => window.open(`/api/documents/expenses-daily?date=${summaryDate}`, "_blank", "noopener")}>Daily expenses summary (PDF)</button></label></div>
       <section className="portal-panel">
-        <div className="portal-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Category</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
+        <div className="portal-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Category</th><th>Channel</th><th>Reference</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
           {data.expenses.map((e) => (
             <tr key={e.id}>
               <td><strong>{e.expense_number}</strong></td>
               <td>{e.payee}</td>
               <td>{e.category}</td>
+              <td>{e.payment_channel ?? "—"}</td>
+              <td>{e.reference_number ?? "—"}</td>
               <td>{pesos(e.amount_centavos)}</td>
               <td>{e.status}</td>
               <td className="document-actions">
@@ -288,7 +293,7 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
               </td>
             </tr>
           ))}
-          {!data.expenses.length && <tr><td colSpan={6}><span className="portal-empty-copy">No vouchers yet.</span></td></tr>}
+          {!data.expenses.length && <tr><td colSpan={8}><span className="portal-empty-copy">No vouchers yet.</span></td></tr>}
         </tbody></table></div>
       </section>
       {voucher && (
@@ -298,13 +303,15 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
           if (!voucher.category.trim()) { setError("Category is required."); return; }
           if (!Number.isFinite(amt) || amt <= 0) { setError("Enter a valid amount."); return; }
           if (!voucher.purpose.trim()) { setError("Purpose is required."); return; }
-          await post({ action: "expense-create", payee: voucher.payee, category: voucher.category, amountCentavos: amt, purpose: voucher.purpose });
+          await post({ action: "expense-create", payee: voucher.payee, category: voucher.category, amountCentavos: amt, purpose: voucher.purpose, paymentChannel: voucher.paymentChannel, referenceNumber: voucher.referenceNumber.trim() });
           setVoucher(null);
         }}>
           {error && <div className="portal-message error full">{error}</div>}
           <label className="full">Payee<input autoFocus value={voucher.payee} onChange={(e) => setVoucher({ ...voucher, payee: e.target.value })} /></label>
           <label>Category<select value={voucher.category} onChange={(e) => setVoucher({ ...voucher, category: e.target.value })}>{data.expenseCategories.filter((c) => c.active).map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}{voucher.category && !data.expenseCategories.some((c) => c.active && c.name === voucher.category) && <option value={voucher.category}>{voucher.category}</option>}</select></label>
           <label>Amount (PHP)<input type="number" min="0" step="0.01" value={voucher.amount} onChange={(e) => setVoucher({ ...voucher, amount: e.target.value })} /></label>
+          <label>Payment channel<select value={voucher.paymentChannel} onChange={(e) => setVoucher({ ...voucher, paymentChannel: e.target.value })}>{EXPENSE_CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
+          <label>Reference number<input value={voucher.referenceNumber} onChange={(e) => setVoucher({ ...voucher, referenceNumber: e.target.value })} placeholder="Cheque / txn no. (optional)" /></label>
           <label className="full">Purpose / description<textarea rows={2} value={voucher.purpose} onChange={(e) => setVoucher({ ...voucher, purpose: e.target.value })} /></label>
         </EditModal>
       )}

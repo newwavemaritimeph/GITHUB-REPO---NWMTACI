@@ -62,7 +62,7 @@ const inventoryItemInput = z.object({ action: z.literal("inventory-item-save"), 
 const inventoryMoveInput = z.object({ action: z.literal("inventory-move"), itemId: z.string().uuid(), movementType: z.enum(["in", "out"]), quantity: z.number().int().positive(), remarks: z.string().trim().max(240).optional() });
 const agencyInput = z.object({ action: z.literal("agency-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), contactName: z.string().trim().max(120).optional(), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
 const payableInput = z.object({ action: z.literal("payable-save"), id: z.string().uuid().nullable().optional(), description: z.string().trim().min(1).max(200), amountCentavos: z.number().int().positive().optional(), dueOn: z.string().date().nullable().optional(), remove: z.boolean().optional() });
-const expenseCreateInput = z.object({ action: z.literal("expense-create"), payee: z.string().trim().min(1).max(120), category: z.string().trim().min(1).max(80), amountCentavos: z.number().int().positive(), purpose: z.string().trim().min(1).max(300) });
+const expenseCreateInput = z.object({ action: z.literal("expense-create"), payee: z.string().trim().min(1).max(120), category: z.string().trim().min(1).max(80), amountCentavos: z.number().int().positive(), purpose: z.string().trim().min(1).max(300), paymentChannel: z.string().trim().max(40).optional().default(""), referenceNumber: z.string().trim().max(80).optional().default("") });
 const expenseDecideInput = z.object({ action: z.literal("expense-decide"), id: z.string().uuid(), decision: z.enum(["Approved", "Rejected", "Paid"]) });
 const closingInput = z.object({ action: z.literal("cashier-close"), closingDate: z.string().date(), openingCashCentavos: z.number().int().nonnegative(), actualCashCentavos: z.number().int().nonnegative(), remarks: z.string().trim().max(500).optional().default("") });
 // Other charges + agency rebates posted to an enrollment ledger (enrollment_charges).
@@ -348,6 +348,13 @@ export async function GET() {
       myHr = { employee: emp, leave: leave ?? [], advances: adv ?? [], charges: chg ?? [], attendance: att ?? [] };
     }
   }
+  // Tolerant merge of expense payment channel + reference (migration 202608100001).
+  // Kept out of the main select so a pre-migration schema doesn't empty the expenses list.
+  let expensesMerged = (expenses.data ?? []) as Record<string, unknown>[];
+  {
+    const { data: ex } = await db.from("expenses").select("id,payment_channel,reference_number").order("created_at", { ascending: false }).limit(250);
+    if (ex) { const m = new Map(ex.map((r) => [(r as { id: string }).id, r])); expensesMerged = expensesMerged.map((e) => ({ ...e, ...(m.get((e as { id: string }).id) ?? {}) })); }
+  }
   // Employee-charge management for the Accounting Manager (admin / accounting / hr): the charge list
   // plus a minimal employee roster to file against (accounting does not receive the full HR dataset).
   // Separate tolerant queries so a pre-migration schema yields [] instead of 500-ing the GET.
@@ -364,7 +371,7 @@ export async function GET() {
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
     paymentMethods: paymentMethodsWithKind, charges: charges.data ?? [], agencies: agencies.data ?? [],
-    expenses: expenses.data ?? [], payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
+    expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates, certificateTemplates, certificateReleases, certificateIssuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
     agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges, chargeEmployees, instructionTemplates }, { headers: { "Cache-Control": "no-store" } });
@@ -448,8 +455,13 @@ export async function POST(request: Request) {
       const admin = createSupabaseAdminClient();
       const { count } = await admin.from("expenses").select("id", { count: "exact", head: true });
       const expenseNumber = `CV-${new Date().getFullYear()}-${String((count ?? 0) + 1).padStart(6, "0")}`;
-      const { error } = await admin.from("expenses").insert({ expense_number: expenseNumber, payee: input.payee, category: input.category, amount_centavos: input.amountCentavos, purpose: input.purpose, status: "Pending", requested_by: staff.user.id });
+      const { data: created, error } = await admin.from("expenses").insert({ expense_number: expenseNumber, payee: input.payee, category: input.category, amount_centavos: input.amountCentavos, purpose: input.purpose, status: "Pending", requested_by: staff.user.id }).select("id").single();
       if (error) throw error;
+      // Deploy-safe: payment_channel/reference_number arrive with migration 202608100001.
+      // Set them separately and ignore a pre-migration "column does not exist" error.
+      if (input.paymentChannel || input.referenceNumber) {
+        await admin.from("expenses").update({ payment_channel: input.paymentChannel || null, reference_number: input.referenceNumber || null }).eq("id", created.id);
+      }
       return NextResponse.json({ ok: true });
     }
     if (input.action === "expense-decide") {
