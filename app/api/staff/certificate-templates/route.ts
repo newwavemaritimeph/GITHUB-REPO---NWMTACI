@@ -18,8 +18,15 @@ export async function POST(request: Request) {
     if (!(file instanceof File)) return NextResponse.json({ error: "Choose a template file (PDF, PNG, or JPEG)." }, { status: 400 });
     if (!allowedTypes.has(file.type)) return NextResponse.json({ error: "Use a PDF, PNG, or JPEG file." }, { status: 400 });
     if (file.size <= 0 || file.size > 50 * 1024 * 1024) return NextResponse.json({ error: "The file must be smaller than 50 MB." }, { status: 400 });
+    // Accept a JSON array of {key,label} or a comma-separated list of labels.
     let fields: { key: string; label: string }[] = [];
-    try { const raw = form.get("fields"); if (raw) fields = JSON.parse(String(raw)); } catch { fields = []; }
+    const rawFields = form.get("fields");
+    if (rawFields) {
+      const s = String(rawFields).trim();
+      const slug = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+      if (s.startsWith("[")) { try { const arr = JSON.parse(s) as { key?: unknown; label?: unknown }[]; fields = arr.filter((f) => typeof f?.label === "string").map((f) => ({ key: String(f.key ?? slug(String(f.label))), label: String(f.label) })); } catch { fields = []; } }
+      else fields = s.split(",").map((x) => x.trim()).filter(Boolean).map((label) => ({ key: slug(label), label }));
+    }
 
     const db = createSupabaseAdminClient();
     // Certificate templates are only for New Wave in-house courses (incl. STCW).

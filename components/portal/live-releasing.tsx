@@ -10,7 +10,7 @@ type CourseRef = { name?: string; code?: string };
 type EnrollRef = { enrollment_number?: string; trainees?: NameRef | NameRef[] | null; courses?: CourseRef | CourseRef[] | null };
 type Enrollment = { id: string; enrollment_number: string; course_id: string; partner_offer_id?: string | null; selling_price_centavos: number; paid_centavos: number; charges_centavos?: number; discounts_centavos?: number; enrollment_status: string; feedback_token?: string | null; feedback_submitted?: boolean; trainees?: NameRef | NameRef[] | null; courses?: CourseRef | CourseRef[] | null; batches?: { ends_on: string } | { ends_on: string }[] | null };
 type Certificate = { id: string; enrollment_id: string; status: string; printed_at?: string | null; reprint_count?: number; snapshot?: Record<string, unknown> | null; number_pool_id?: string | null; template_id?: string | null };
-type CertTemplate = { id: string; course_id: string; version: number; active: boolean; approved_at?: string | null; courses?: CourseRef | CourseRef[] | null };
+type CertTemplate = { id: string; course_id: string; version: number; active: boolean; approved_at?: string | null; fields?: { key: string; label: string }[] | null; courses?: CourseRef | CourseRef[] | null };
 type ReleaseEvent = { id: string; certificate_id: string; event_type: string; recipient_name?: string | null; recipient_id_type?: string | null; reason?: string | null; created_at: string; certificates?: { enrollment_id?: string; snapshot?: Record<string, unknown> | null; enrollments?: EnrollRef | EnrollRef[] | null } | { enrollment_id?: string; snapshot?: Record<string, unknown> | null; enrollments?: EnrollRef | EnrollRef[] | null }[] | null };
 type Course = { id: string; code: string; name: string; delivery_type: string };
 type Batch = { id: string; batch_number: string; course_id: string; starts_on: string; ends_on: string; confirmed_count: number; capacity: number; courses?: CourseRef | CourseRef[] | null };
@@ -211,6 +211,37 @@ function TemplateUpload({ data, ownCourses, onSaved }: { data: ReleasingData; ow
     } catch (e) { setMessage({ kind: "error", text: e instanceof Error ? e.message : "Upload failed." }); }
     finally { setBusy(false); }
   }
+  // Add/remove/edit + preview go through the /certificate-templates/[id] endpoint.
+  async function tplRequest(id: string, method: string, body?: unknown) {
+    const response = await fetch(`/api/staff/certificate-templates/${id}`, { method, headers: body ? { "content-type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error ?? "The action could not be completed.");
+    return result;
+  }
+  async function preview(id: string) {
+    setMessage(null);
+    try { const j = await tplRequest(id, "GET"); if (j.url) window.open(j.url, "_blank", "noopener,noreferrer"); else throw new Error("No preview link was returned."); }
+    catch (e) { setMessage({ kind: "error", text: e instanceof Error ? e.message : "Could not open the template." }); }
+  }
+  async function editFields(t: CertTemplate) {
+    const current = (t.fields ?? []).map((f) => f.label).join(", ");
+    const next = window.prompt("Overlay fields to fill on the certificate (comma-separated labels):", current);
+    if (next == null) return;
+    setMessage(null);
+    try { await tplRequest(t.id, "PATCH", { fields: next }); setMessage({ kind: "success", text: "Template fields updated." }); await onSaved(); }
+    catch (e) { setMessage({ kind: "error", text: e instanceof Error ? e.message : "Update failed." }); }
+  }
+  async function setActive(id: string) {
+    setMessage(null);
+    try { await tplRequest(id, "PATCH", { active: true }); setMessage({ kind: "success", text: "Template set active." }); await onSaved(); }
+    catch (e) { setMessage({ kind: "error", text: e instanceof Error ? e.message : "Update failed." }); }
+  }
+  async function removeTemplate(t: CertTemplate) {
+    if (!window.confirm(`Remove the ${one(t.courses)?.name ?? "selected"} certificate template (v${t.version})? This cannot be undone.`)) return;
+    setMessage(null);
+    try { await tplRequest(t.id, "DELETE"); setMessage({ kind: "success", text: "Template removed." }); await onSaved(); }
+    catch (e) { setMessage({ kind: "error", text: e instanceof Error ? e.message : "Remove failed." }); }
+  }
   return <div className="portal-panel" style={{ padding: 16 }}>
     <form className="portal-form" onSubmit={upload}>
       <div className="full"><h2 style={{ margin: 0, fontSize: 16 }}>Upload certificate template</h2><p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: 13 }}>In-house courses only (Safety, Crowd, Crisis, SATSDSD, BT-PSSR, Ship&apos;s Security Officer, etc.). PDF or PNG/JPEG, ≤ 50 MB. The newest upload becomes the active template.</p></div>
@@ -220,9 +251,18 @@ function TemplateUpload({ data, ownCourses, onSaved }: { data: ReleasingData; ow
       <label className="full">Overlay fields (comma-separated)<input name="fields" defaultValue="Certificate Number, Trainee Name, Completion Date, Course Name" /></label>
       <div className="portal-form-actions full"><button className="portal-primary" disabled={busy}>{busy ? "Uploading…" : "Upload template"}</button></div>
     </form>
-    <div className="portal-table" style={{ marginTop: 12 }}><table><thead><tr><th>Course</th><th>Version</th><th>Active</th><th>Approved</th></tr></thead><tbody>
-      {data.certificateTemplates.map((t) => <tr key={t.id}><td>{one(t.courses)?.name ?? t.course_id}</td><td>v{t.version}</td><td>{t.active ? "Active" : "—"}</td><td>{t.approved_at ? fmtDate(t.approved_at) : "—"}</td></tr>)}
-      {!data.certificateTemplates.length && <tr><td colSpan={4}><span className="portal-empty-copy">No templates uploaded yet.</span></td></tr>}
+    <div className="portal-table" style={{ marginTop: 12 }}><table><thead><tr><th>Course</th><th>Version</th><th>Active</th><th>Approved</th><th>Fields</th><th>Actions</th></tr></thead><tbody>
+      {data.certificateTemplates.map((t) => <tr key={t.id}>
+        <td>{one(t.courses)?.name ?? t.course_id}</td><td>v{t.version}</td><td>{t.active ? "Active" : "—"}</td><td>{t.approved_at ? fmtDate(t.approved_at) : "—"}</td>
+        <td>{(t.fields ?? []).map((f) => f.label).join(", ") || "—"}</td>
+        <td><div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          <button type="button" className="portal-secondary" onClick={() => preview(t.id)}>Preview</button>
+          <button type="button" className="ghost-button" onClick={() => editFields(t)}>Edit</button>
+          {!t.active && <button type="button" className="ghost-button" onClick={() => setActive(t.id)}>Set active</button>}
+          <button type="button" className="ghost-button" onClick={() => removeTemplate(t)}>Remove</button>
+        </div></td>
+      </tr>)}
+      {!data.certificateTemplates.length && <tr><td colSpan={6}><span className="portal-empty-copy">No templates uploaded yet.</span></td></tr>}
     </tbody></table></div>
   </div>;
 }
