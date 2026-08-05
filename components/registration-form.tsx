@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 const SUFFIXES = ["", "JR.", "SR.", "II", "III", "IV", "V"] as const;
 const RANKS = [
@@ -23,6 +23,7 @@ const TERMS_SECTIONS: { heading: string; items: string[] }[] = [
 
 type Course = { code: string; name: string };
 type Schedule = { id: string; label: string; availableSlots: number };
+type Selection = { courseCode: string; scheduleId: string };
 
 const emptyApplicant = {
   srn: "", firstName: "", middleName: "", lastName: "", suffix: "", birthDate: "", placeOfBirth: "",
@@ -32,15 +33,15 @@ const emptyApplicant = {
 
 const steps = ["Applicant details", "Course selection", "Review and consent"] as const;
 const upper = (value: string) => value.toUpperCase();
+const MAX_COURSES = 5;
 
 function Wizard() {
   const [step, setStep] = useState(0);
   const [applicant, setApplicant] = useState(emptyApplicant);
-  const [courseCode, setCourseCode] = useState("");
-  const [scheduleId, setScheduleId] = useState("");
   const [courses, setCourses] = useState<Course[]>([]);
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
-  const [loadingSchedules, setLoadingSchedules] = useState(false);
+  const [selections, setSelections] = useState<Selection[]>([{ courseCode: "", scheduleId: "" }]);
+  const [schedulesByCourse, setSchedulesByCourse] = useState<Record<string, Schedule[]>>({});
+  const [loadingCourse, setLoadingCourse] = useState<Record<string, boolean>>({});
   const [accepted, setAccepted] = useState(false);
   const [reference, setReference] = useState("");
   const [error, setError] = useState("");
@@ -48,17 +49,30 @@ function Wizard() {
 
   const set = <K extends keyof typeof emptyApplicant>(key: K, value: string) => setApplicant((current) => ({ ...current, [key]: value }));
 
-  // Live bookable courses (with a published, open, future schedule).
+  // Live bookable courses (with a published, open schedule this week).
   useEffect(() => { let live = true; fetch("/api/public/courses").then((r) => r.json()).then((b) => { if (live) setCourses(b.courses ?? []); }).catch(() => {}); return () => { live = false; }; }, []);
-  // Live schedules for the chosen course.
-  useEffect(() => {
-    if (!courseCode) { setSchedules([]); return; }
-    let live = true; setLoadingSchedules(true); setScheduleId("");
-    fetch(`/api/public/schedules?courseCode=${encodeURIComponent(courseCode)}`).then((r) => r.json()).then((b) => { if (live) setSchedules(b.schedules ?? []); }).catch(() => { if (live) setSchedules([]); }).finally(() => { if (live) setLoadingSchedules(false); });
-    return () => { live = false; };
-  }, [courseCode]);
 
-  const courseName = useMemo(() => courses.find((c) => c.code === courseCode)?.name ?? "", [courses, courseCode]);
+  async function ensureSchedules(code: string) {
+    if (!code || schedulesByCourse[code] || loadingCourse[code]) return;
+    setLoadingCourse((l) => ({ ...l, [code]: true }));
+    try { const r = await fetch(`/api/public/schedules?courseCode=${encodeURIComponent(code)}`); const b = await r.json(); setSchedulesByCourse((m) => ({ ...m, [code]: b.schedules ?? [] })); }
+    catch { setSchedulesByCourse((m) => ({ ...m, [code]: [] })); }
+    finally { setLoadingCourse((l) => ({ ...l, [code]: false })); }
+  }
+
+  function chooseCourse(index: number, code: string) {
+    setSelections((cur) => cur.map((s, i) => (i === index ? { courseCode: code, scheduleId: "" } : s)));
+    if (code) void ensureSchedules(code);
+  }
+  function chooseSchedule(index: number, id: string) {
+    setSelections((cur) => cur.map((s, i) => (i === index ? { ...s, scheduleId: id } : s)));
+  }
+  function addSelection() { setSelections((cur) => (cur.length < MAX_COURSES ? [...cur, { courseCode: "", scheduleId: "" }] : cur)); }
+  function removeSelection(index: number) { setSelections((cur) => (cur.length > 1 ? cur.filter((_, i) => i !== index) : cur)); }
+
+  const nameOf = (code: string) => courses.find((c) => c.code === code)?.name ?? "";
+  const labelOf = (code: string, id: string) => (schedulesByCourse[code] ?? []).find((s) => s.id === id)?.label ?? "";
+
   const mobileDigits = applicant.mobile.replace(/\D/g, "");
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(applicant.email);
   const mobileValid = mobileDigits.length >= 7;
@@ -68,7 +82,9 @@ function Wizard() {
     applicant.firstName.trim().length >= 2 && applicant.lastName.trim().length >= 2 && Boolean(applicant.birthDate) &&
     applicant.placeOfBirth.trim().length >= 2 && applicant.address.trim().length >= 8 && mobileValid && emailValid && rankValid &&
     applicant.emergencyContactName.trim().length >= 2 && emergencyMobileValid && (applicant.srn === "" || applicant.srn.length === 10);
-  const selectionsValid = Boolean(courseCode && scheduleId);
+  const completeSelections = selections.filter((s) => s.courseCode && s.scheduleId);
+  // Every row must be either fully complete or completely empty; at least one complete.
+  const selectionsValid = completeSelections.length >= 1 && selections.every((s) => (!s.courseCode && !s.scheduleId) || (Boolean(s.courseCode) && Boolean(s.scheduleId)));
 
   async function submit() {
     setError("");
@@ -80,7 +96,8 @@ function Wizard() {
       fd.set("srn", applicant.srn); fd.set("email", applicant.email.toLowerCase()); fd.set("presentAddress", applicant.address); fd.set("mobile", applicant.mobile);
       fd.set("placeOfBirth", applicant.placeOfBirth); fd.set("birthDate", applicant.birthDate); fd.set("rank", rank); fd.set("company", applicant.company);
       fd.set("emergencyContactName", applicant.emergencyContactName); fd.set("emergencyContactMobile", applicant.emergencyContactMobile);
-      fd.set("courseCode", courseCode); fd.set("courseName", courseName); fd.set("scheduleId", scheduleId); fd.set("termsAccepted", "on");
+      for (const s of completeSelections) fd.append("scheduleIds", s.scheduleId);
+      fd.set("termsAccepted", "on");
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 25000);
       let response: Response;
@@ -179,27 +196,39 @@ function Wizard() {
 
       {step === 1 && (
         <section className="wizard-panel">
-          <h2>Select your course</h2>
-          <p className="wizard-hint">Pick a course, then an available schedule.</p>
-          <div className="reg-grid">
-            <Field label="Preferred course*" wide>
-              <select value={courseCode} onChange={(e) => setCourseCode(e.target.value)}>
-                <option value="">Select a course</option>
-                {courses.map((item) => <option key={item.code} value={item.code}>{item.code} — {item.name}</option>)}
-              </select>
-            </Field>
-          </div>
-          {!courses.length && <div className="reg-notice"><strong>No published schedules are open right now</strong><p>Please check back soon or contact New Wave.</p></div>}
-          {courseCode && (
-            loadingSchedules ? <p className="wizard-hint">Loading schedules…</p> :
-            schedules.length === 0 ? <div className="reg-notice"><strong>No published schedule for this course yet</strong><p>Please choose another course or contact New Wave.</p></div> :
-            <div className="schedule-picker">
-              {schedules.map((batch) => (
-                <button key={batch.id} type="button" className={`schedule-option ${scheduleId === batch.id ? "selected" : ""}`} onClick={() => setScheduleId(batch.id)}>
-                  <span className="schedule-body"><strong>{batch.label}</strong></span>
-                </button>
-              ))}
-            </div>
+          <h2>Select your courses</h2>
+          <p className="wizard-hint">Pick a course and an available schedule. You can add up to {MAX_COURSES} courses in one submission.</p>
+          {!courses.length && <div className="reg-notice"><strong>No published schedules are open this week</strong><p>Please check back soon or contact New Wave.</p></div>}
+          {selections.map((sel, index) => {
+            const list = schedulesByCourse[sel.courseCode] ?? [];
+            const available = courses.filter((c) => c.code === sel.courseCode || !selections.some((s) => s.courseCode === c.code));
+            return (
+              <div key={index} className="reg-selection" style={{ border: "1px solid #cfe6ef", borderRadius: 12, padding: 14, margin: "0 0 14px" }}>
+                <div className="reg-grid">
+                  <Field label={`Course ${index + 1}*`} wide>
+                    <select value={sel.courseCode} onChange={(e) => chooseCourse(index, e.target.value)}>
+                      <option value="">Select a course</option>
+                      {available.map((item) => <option key={item.code} value={item.code}>{item.code} — {item.name}</option>)}
+                    </select>
+                  </Field>
+                </div>
+                {sel.courseCode && (
+                  loadingCourse[sel.courseCode] ? <p className="wizard-hint">Loading schedules…</p> :
+                  list.length === 0 ? <div className="reg-notice"><strong>No schedule this week for this course</strong><p>Please choose another course.</p></div> :
+                  <div className="schedule-picker">
+                    {list.map((batch) => (
+                      <button key={batch.id} type="button" className={`schedule-option ${sel.scheduleId === batch.id ? "selected" : ""}`} onClick={() => chooseSchedule(index, batch.id)}>
+                        <span className="schedule-body"><strong>{batch.label}</strong></span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {selections.length > 1 && <button type="button" className="button button-secondary" style={{ marginTop: 10 }} onClick={() => removeSelection(index)}>Remove course {index + 1}</button>}
+              </div>
+            );
+          })}
+          {selections.length < MAX_COURSES && courses.length > 0 && (
+            <button type="button" className="button button-secondary" onClick={addSelection}>+ Add another course ({selections.length}/{MAX_COURSES})</button>
           )}
         </section>
       )}
@@ -208,7 +237,9 @@ function Wizard() {
         <section className="wizard-panel">
           <h2>Review and accept</h2>
           <div className="review-courses">
-            <div className="review-course"><div><strong>{courseName}</strong><small>{schedules.find((s) => s.id === scheduleId)?.label ?? ""}</small></div></div>
+            {completeSelections.map((s, i) => (
+              <div key={i} className="review-course"><div><strong>{nameOf(s.courseCode)}</strong><small>{labelOf(s.courseCode, s.scheduleId)}</small></div></div>
+            ))}
           </div>
           <h3 className="review-subhead">Terms and Conditions</h3>
           <div className="terms-box">

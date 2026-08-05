@@ -12,11 +12,14 @@ export async function GET(request: Request) {
   const now = new Date();
   // Manila calendar day — align with the submit RPC's current_date check.
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(now);
+  // Only surface courses that have a published, bookable batch in the coming week.
+  const weekEnd = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(now.getTime() + 7 * 86400000));
   const { data, error } = await db.from("batches")
     .select("capacity,confirmed_count,courses!inner(code,name,delivery_type)")
     .eq("status", "Open")
     .not("published_at", "is", null)
     .gt("starts_on", today)
+    .lte("starts_on", weekEnd)
     .gt("enrollment_deadline", now.toISOString());
   if (error) return NextResponse.json({ courses: [] }, { status: 500 });
   const seen = new Map<string, { code: string; name: string }>();
