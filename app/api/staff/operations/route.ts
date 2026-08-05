@@ -96,6 +96,13 @@ const employeeSetActiveInput = z.object({ action: z.literal("employee-set-active
 const payrollOpenInput = z.object({ action: z.literal("payroll-open"), startsOn: z.string().date(), endsOn: z.string().date(), payDate: z.string().date() });
 const payrollReviewInput = z.object({ action: z.literal("payroll-review"), id: z.string().uuid() });
 const payrollFinalizeInput = z.object({ action: z.literal("payroll-finalize"), id: z.string().uuid() });
+// Employee salary charges: employee self-files (category + note, no amount); the Accounting
+// Manager sets the amount (which activates it) or inputs a charge directly; auto-deducted from payroll.
+const employeeChargeCategory = z.enum(["Rescheduling", "Cancellation", "Wrong Enrollment", "Reprinting", "Others"]);
+const employeeChargeFileSelfInput = z.object({ action: z.literal("employee-charge-file-self"), category: employeeChargeCategory, note: z.string().trim().max(300).optional().default("") });
+const employeeChargeSetAmountInput = z.object({ action: z.literal("employee-charge-set-amount"), id: z.string().uuid(), amountCentavos: z.number().int().positive() });
+const employeeChargeInput = z.object({ action: z.literal("employee-charge-input"), employeeId: z.string().uuid(), category: employeeChargeCategory, amountCentavos: z.number().int().positive(), note: z.string().trim().max(300).optional().default("") });
+const employeeChargeCancelInput = z.object({ action: z.literal("employee-charge-cancel"), id: z.string().uuid() });
 // Training Operations: managed classrooms (name / venue / capacity).
 const classroomSaveInput = z.object({ action: z.literal("classroom-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), venue: z.string().trim().min(1).max(160), capacity: z.number().int().positive().max(1000), active: z.boolean().optional() });
 const classroomSetActiveInput = z.object({ action: z.literal("classroom-set-active"), id: z.string().uuid(), active: z.boolean() });
@@ -114,11 +121,13 @@ const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-li
 const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional(), courseId: z.string().uuid().nullable().optional(), partnerOfferId: z.string().uuid().nullable().optional() });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput]);
+const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
 const canManageHr = (roles: string[]) => roles.some((role) => ["admin", "hr"].includes(role));
+// Employee-charge management: the Accounting Manager owns it; admin + HR (who run payroll) included.
+const canManageEmployeeCharges = (roles: string[]) => roles.some((role) => ["admin", "accounting", "hr"].includes(role));
 const canManageTraining = (roles: string[]) => roles.some((role) => ["admin", "training_operations"].includes(role));
 const canRelease = (roles: string[]) => roles.some((role) => ["admin", "releasing_officer"].includes(role));
 const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
@@ -314,15 +323,29 @@ export async function GET() {
   const paymentMethodsWithKind = (paymentMethods.data ?? []).map((m) => ({ ...m, kind: kindByMethod.get((m as { id: string }).id) ?? "receivable" }));
   // MyHr self-service: the signed-in staff's OWN employee record + leave / cash-advance history,
   // matched by login email → employees.work_email. Read via service role, self only.
-  let myHr: { employee: unknown; leave: unknown[]; advances: unknown[] } | null = null;
+  let myHr: { employee: unknown; leave: unknown[]; advances: unknown[]; charges: unknown[] } | null = null;
   if (staff.user.email) {
     const admin = createSupabaseAdminClient();
     const { data: emp } = await admin.from("employees").select("id,employee_number,complete_name,position,employment_status,date_hired,pay_type,base_rate_centavos,work_email,active").ilike("work_email", staff.user.email).maybeSingle();
     if (emp) {
       const { data: leave } = await admin.from("leave_requests").select("id,leave_type,starts_on,ends_on,reason,status,created_at").eq("employee_id", emp.id).order("created_at", { ascending: false }).limit(50);
       const { data: adv } = await admin.from("cash_advances").select("id,amount_centavos,requested_on,balance_centavos,status").eq("employee_id", emp.id).order("requested_on", { ascending: false }).limit(50);
-      myHr = { employee: emp, leave: leave ?? [], advances: adv ?? [] };
+      // Tolerant: the employee_charges category/note/balance columns may not be migrated yet.
+      const { data: chg } = await admin.from("employee_charges").select("id,category,note,amount_centavos,balance_centavos,status,effective_on,activated_at").eq("employee_id", emp.id).order("effective_on", { ascending: false }).limit(50);
+      myHr = { employee: emp, leave: leave ?? [], advances: adv ?? [], charges: chg ?? [] };
     }
+  }
+  // Employee-charge management for the Accounting Manager (admin / accounting / hr): the charge list
+  // plus a minimal employee roster to file against (accounting does not receive the full HR dataset).
+  // Separate tolerant queries so a pre-migration schema yields [] instead of 500-ing the GET.
+  let employeeCharges: unknown[] = [];
+  let chargeEmployees: unknown[] = [];
+  if (canManageEmployeeCharges(staff.roleCodes)) {
+    const admin = createSupabaseAdminClient();
+    const { data } = await admin.from("employee_charges").select("id,employee_id,category,note,amount_centavos,balance_centavos,status,effective_on,activated_at,employees(complete_name,employee_number)").order("effective_on", { ascending: false }).limit(400);
+    employeeCharges = data ?? [];
+    const { data: roster } = await admin.from("employees").select("id,complete_name,employee_number,active").eq("active", true).order("complete_name");
+    chargeEmployees = roster ?? [];
   }
   return NextResponse.json({ profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
@@ -331,7 +354,7 @@ export async function GET() {
     expenses: expenses.data ?? [], payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems,
     classrooms: classrooms.data ?? [], certificates, certificateTemplates, certificateReleases, certificateIssuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, instructionTemplates }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges, chargeEmployees, instructionTemplates }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -774,6 +797,44 @@ export async function POST(request: Request) {
       }
       return NextResponse.json({ ok: true });
     }
+    if (input.action === "employee-charge-file-self") {
+      // Any signed-in employee files a charge against themselves (category + note, no amount).
+      // It stays Pending until the Accounting Manager sets the amount. Resolve employee by login email.
+      const admin = createSupabaseAdminClient();
+      const { data: emp } = await admin.from("employees").select("id").ilike("work_email", staff.user.email ?? "___none___").maybeSingle();
+      if (!emp) return NextResponse.json({ error: "No employee record is linked to your account. Ask HR to add you." }, { status: 400 });
+      const effectiveOn = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+      const { error } = await admin.from("employee_charges").insert({ employee_id: emp.id, category: input.category, description: input.category, note: input.note || null, amount_centavos: 0, balance_centavos: 0, effective_on: effectiveOn, status: "Pending", filed_by: staff.user.id });
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "employee-charge-set-amount") {
+      // The Accounting Manager entering the amount IS the approval — it activates the charge.
+      if (!canManageEmployeeCharges(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage employee charges." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: updated, error } = await admin.from("employee_charges").update({ amount_centavos: input.amountCentavos, balance_centavos: input.amountCentavos, status: "Active", activated_at: new Date().toISOString(), amount_set_by: staff.user.id }).eq("id", input.id).eq("status", "Pending").select("id");
+      if (error) throw error;
+      if (!updated?.length) return NextResponse.json({ error: "That charge is no longer awaiting an amount." }, { status: 409 });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "employee-charge-input") {
+      // The Accounting Manager inputs a charge directly for an employee — created already Active.
+      if (!canManageEmployeeCharges(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage employee charges." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const effectiveOn = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+      const { error } = await admin.from("employee_charges").insert({ employee_id: input.employeeId, category: input.category, description: input.category, note: input.note || null, amount_centavos: input.amountCentavos, balance_centavos: input.amountCentavos, effective_on: effectiveOn, status: "Active", activated_at: new Date().toISOString(), filed_by: staff.user.id, amount_set_by: staff.user.id });
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "employee-charge-cancel") {
+      // Void a wrong charge. A charge that has already been (partly) deducted cannot be cancelled.
+      if (!canManageEmployeeCharges(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage employee charges." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: updated, error } = await admin.from("employee_charges").update({ status: "Cancelled", balance_centavos: 0 }).eq("id", input.id).in("status", ["Pending", "Active"]).select("id");
+      if (error) throw error;
+      if (!updated?.length) return NextResponse.json({ error: "Only a Pending or Active charge can be cancelled." }, { status: 409 });
+      return NextResponse.json({ ok: true });
+    }
     if (input.action === "employee-save") {
       if (!canManageHr(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage employees." }, { status: 403 });
       const admin = createSupabaseAdminClient();
@@ -811,25 +872,34 @@ export async function POST(request: Request) {
       const { data: advs } = await admin.from("cash_advances").select("id,employee_id,balance_centavos").eq("status", "Approved").gt("balance_centavos", 0).order("requested_on");
       const advByEmp = new Map<string, { id: string; balance: number }[]>();
       for (const a of advs ?? []) { const list = advByEmp.get(a.employee_id) ?? []; list.push({ id: a.id, balance: Number(a.balance_centavos) }); advByEmp.set(a.employee_id, list); }
+      // Active employee charges are deducted as the "Others" line (FIFO), after advances. Tolerant:
+      // if the table is pre-migration, this yields no rows and payroll behaves as before.
+      const { data: chgs } = await admin.from("employee_charges").select("id,employee_id,balance_centavos").eq("status", "Active").gt("balance_centavos", 0).order("effective_on");
+      const chgByEmp = new Map<string, { id: string; balance: number }[]>();
+      for (const c of chgs ?? []) { const list = chgByEmp.get(c.employee_id) ?? []; list.push({ id: c.id, balance: Number(c.balance_centavos) }); chgByEmp.set(c.employee_id, list); }
       const items = [] as Record<string, unknown>[];
       const advanceUpdates = [] as { id: string; balance: number; settled: boolean }[];
+      const chargeUpdates = [] as { id: string; balance: number; settled: boolean }[];
+      // Draw a FIFO amount from a list of {id,balance}, capped at `cap`; records updates, returns total drawn.
+      const drawDown = (list: { id: string; balance: number }[], cap: number, updates: { id: string; balance: number; settled: boolean }[]) => {
+        let remaining = Math.min(cap, list.reduce((s, x) => s + x.balance, 0));
+        const drawn = remaining;
+        for (const row of list) { if (remaining <= 0) break; const applied = Math.min(remaining, row.balance); remaining -= applied; updates.push({ id: row.id, balance: row.balance - applied, settled: row.balance - applied <= 0 }); }
+        return drawn;
+      };
       for (const e of emps ?? []) {
         const days = presentDays.get(e.id) ?? 0;
         const gross = e.pay_type === "Monthly" ? Math.round(Number(e.base_rate_centavos) / 2)
           : e.pay_type === "Daily" ? Number(e.instructor_daily_rate_centavos ?? e.base_rate_centavos) * days
           : Number(e.base_rate_centavos);
-        let remaining = Math.min(gross, (advByEmp.get(e.id) ?? []).reduce((s, a) => s + a.balance, 0));
-        const deduction = remaining;
-        for (const advance of advByEmp.get(e.id) ?? []) {
-          if (remaining <= 0) break;
-          const applied = Math.min(remaining, advance.balance);
-          remaining -= applied;
-          advanceUpdates.push({ id: advance.id, balance: advance.balance - applied, settled: advance.balance - applied <= 0 });
-        }
-        items.push({ payroll_period_id: period.id, employee_id: e.id, gross_centavos: gross, deduction_centavos: deduction, net_centavos: Math.max(0, gross - deduction), breakdown: { basic_centavos: gross, present_days: days, pay_type: e.pay_type, advance_deducted_centavos: deduction } });
+        const advanceDeducted = drawDown(advByEmp.get(e.id) ?? [], gross, advanceUpdates);
+        const otherDeducted = drawDown(chgByEmp.get(e.id) ?? [], gross - advanceDeducted, chargeUpdates);
+        const deduction = advanceDeducted + otherDeducted;
+        items.push({ payroll_period_id: period.id, employee_id: e.id, gross_centavos: gross, deduction_centavos: deduction, net_centavos: Math.max(0, gross - deduction), breakdown: { basic_centavos: gross, present_days: days, pay_type: e.pay_type, advance_deducted_centavos: advanceDeducted, other_deducted_centavos: otherDeducted } });
       }
       if (items.length) { const { error } = await admin.from("payroll_items").insert(items); if (error) throw error; }
       for (const update of advanceUpdates) await admin.from("cash_advances").update({ balance_centavos: update.balance, ...(update.settled ? { status: "Settled" } : {}) }).eq("id", update.id);
+      for (const update of chargeUpdates) await admin.from("employee_charges").update({ balance_centavos: update.balance, ...(update.settled ? { status: "Settled" } : {}) }).eq("id", update.id);
       return NextResponse.json({ ok: true, period: period.id, employees: items.length });
     }
     if (input.action === "payroll-review") {
