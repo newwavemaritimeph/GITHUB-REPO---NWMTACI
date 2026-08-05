@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { hardDeleteEnrollment } from "@/lib/enrollments";
 
 const enrollmentInput = z.object({
   action: z.literal("create-enrollment"), existingTraineeId: z.string().uuid().nullable().optional(),
@@ -899,15 +900,9 @@ export async function POST(request: Request) {
       const admin = createSupabaseAdminClient();
       const { data: allocs } = await admin.from("payment_allocations").select("payment_id").eq("enrollment_id", input.enrollmentId).limit(1);
       if (allocs && allocs.length) return NextResponse.json({ error: "This enrollment has posted payments and cannot be deleted. Cancel it instead." }, { status: 400 });
-      const { data: enr } = await admin.from("enrollments").select("id,batch_id").eq("id", input.enrollmentId).maybeSingle();
+      const { data: enr } = await admin.from("enrollments").select("id").eq("id", input.enrollmentId).maybeSingle();
       if (!enr) return NextResponse.json({ error: "Enrollment not found." }, { status: 404 });
-      // Remove dependent rows (none are append-only for an unpaid enrollment), then the enrollment.
-      for (const table of ["enrollment_charges", "agency_rebates", "enrollment_requests", "training_instructions", "make_up_assignments", "certificates", "invoices", "receipts", "payables"]) {
-        await admin.from(table).delete().eq("enrollment_id", input.enrollmentId);
-      }
-      const { error } = await admin.from("enrollments").delete().eq("id", input.enrollmentId);
-      if (error) throw error;
-      if (enr.batch_id) { const { data: b } = await admin.from("batches").select("confirmed_count,capacity,status").eq("id", enr.batch_id).maybeSingle(); if (b) { const next = Math.max(0, Number(b.confirmed_count) - 1); await admin.from("batches").update({ confirmed_count: next, status: b.status === "Full" && next < Number(b.capacity) ? "Open" : b.status }).eq("id", enr.batch_id); } }
+      await hardDeleteEnrollment(admin, input.enrollmentId);
       return NextResponse.json({ ok: true });
     }
     if (input.action === "enrollment-course-change") {
