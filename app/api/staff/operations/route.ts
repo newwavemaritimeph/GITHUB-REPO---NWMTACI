@@ -14,9 +14,10 @@ const enrollmentInput = z.object({
 
 const batchInput = z.object({
   action: z.literal("create-batch"), courseId: z.string().uuid(), partnerOfferId: z.string().uuid().nullable().optional(),
-  instructorName: z.string().trim().min(2).max(160), instructorEmail: z.string().email(), roomName: z.string().trim().min(1).max(120),
+  // Instructor / room / venue are optional for In-House batches (assigned later, or never).
+  instructorName: z.string().trim().max(160).optional().default(""), instructorEmail: z.string().trim().max(160).optional().default(""), roomName: z.string().trim().max(120).optional().default(""),
   startsOn: z.string().date(), endsOn: z.string().date(), dailyStart: z.string().regex(/^\d{2}:\d{2}$/), dailyEnd: z.string().regex(/^\d{2}:\d{2}$/),
-  mode: z.string().trim().min(2).max(80), venue: z.string().trim().min(1).max(160), capacity: z.literal(24),
+  mode: z.string().trim().min(2).max(80), venue: z.string().trim().max(160).optional().default(""), capacity: z.literal(24),
   enrollmentDeadline: z.string().datetime({ offset: true }), publish: z.boolean().default(true),
 });
 
@@ -29,8 +30,8 @@ const enrollmentDeleteInput = z.object({ action: z.literal("enrollment-delete"),
 
 const batchUpdateInput = z.object({
   action: z.literal("batch-update"), batchId: z.string().uuid(),
-  instructorName: z.string().trim().min(2).max(160), instructorEmail: z.string().email(),
-  roomName: z.string().trim().min(1).max(120), venue: z.string().trim().min(1).max(160),
+  instructorName: z.string().trim().max(160).optional().default(""), instructorEmail: z.string().trim().max(160).optional().default(""),
+  roomName: z.string().trim().max(120).optional().default(""), venue: z.string().trim().max(160).optional().default(""),
   dailyStart: z.string().regex(/^\d{2}:\d{2}$/), dailyEnd: z.string().regex(/^\d{2}:\d{2}$/),
   mode: z.string().trim().min(2).max(80), enrollmentDeadline: z.string().datetime({ offset: true }), publish: z.boolean(),
 });
