@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { pruneUnpaidEnrollments } from "@/lib/enrollments";
+import { pruneUnpaidEnrollments, deletePastEmptyBatches } from "@/lib/enrollments";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -11,8 +11,10 @@ async function run(request: Request) {
   const expected = process.env.SCHEDULED_JOB_SECRET;
   if (!expected || request.headers.get("authorization") !== `Bearer ${expected}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const removed = await pruneUnpaidEnrollments(createSupabaseAdminClient());
-    return NextResponse.json({ removed });
+    const admin = createSupabaseAdminClient();
+    const removed = await pruneUnpaidEnrollments(admin);
+    const batchesRemoved = await deletePastEmptyBatches(admin);
+    return NextResponse.json({ removed, batchesRemoved });
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Prune failed." }, { status: 500 });
   }

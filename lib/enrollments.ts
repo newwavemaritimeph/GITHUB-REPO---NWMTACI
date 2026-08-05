@@ -33,6 +33,25 @@ export async function pruneUnpaidEnrollments(admin: AdminClient): Promise<number
   return toDelete.length;
 }
 
+// Delete schedules (batches) whose training has already ended (ends_on before today, Manila)
+// and that have NO enrollments of any status — leftover empty batches. Batches with enrollments
+// are attendance/financial history and are kept (the DB would also block their deletion).
+// batch_training_dates / resource_assignments / attendance cascade from the batches row.
+export async function deletePastEmptyBatches(admin: AdminClient): Promise<number> {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+  const { data: batches, error } = await admin.from("batches").select("id").lt("ends_on", today).limit(5000);
+  if (error) throw new Error(error.message);
+  let removed = 0;
+  for (const b of batches ?? []) {
+    const { count } = await admin.from("enrollments").select("id", { count: "exact", head: true }).eq("batch_id", b.id);
+    if ((count ?? 0) > 0) continue;
+    await admin.from("incidents").delete().eq("batch_id", b.id);
+    const { error: delErr } = await admin.from("batches").delete().eq("id", b.id);
+    if (!delErr) removed++;
+  }
+  return removed;
+}
+
 // Hard-delete an UNPAID enrollment and its dependent rows, decrement the batch
 // seat count, and remove a fresh public-signup trainee that has no other
 // enrollments. Callers MUST verify the enrollment has no posted payments first.

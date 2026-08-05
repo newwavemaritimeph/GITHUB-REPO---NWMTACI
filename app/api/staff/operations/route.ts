@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { hardDeleteEnrollment, pruneUnpaidEnrollments } from "@/lib/enrollments";
+import { hardDeleteEnrollment, pruneUnpaidEnrollments, deletePastEmptyBatches } from "@/lib/enrollments";
 
 const enrollmentInput = z.object({
   action: z.literal("create-enrollment"), existingTraineeId: z.string().uuid().nullable().optional(),
@@ -32,6 +32,7 @@ const pruneNowInput = z.object({ action: z.literal("prune-enrollments-now") });
 
 const batchUpdateInput = z.object({
   action: z.literal("batch-update"), batchId: z.string().uuid(),
+  batchNumber: z.string().trim().min(1).max(60).optional(),
   instructorName: z.string().trim().max(160).optional().default(""), instructorEmail: z.string().trim().max(160).optional().default(""),
   roomName: z.string().trim().max(120).optional().default(""), venue: z.string().trim().max(160).optional().default(""),
   dailyStart: z.string().regex(/^\d{2}:\d{2}$/), dailyEnd: z.string().regex(/^\d{2}:\d{2}$/),
@@ -979,8 +980,10 @@ export async function POST(request: Request) {
     }
     if (input.action === "prune-enrollments-now") {
       if (!staff.roleCodes.includes("admin")) return NextResponse.json({ error: "Only Admin can run the pending-enrollment cleanup." }, { status: 403 });
-      const removed = await pruneUnpaidEnrollments(createSupabaseAdminClient());
-      return NextResponse.json({ ok: true, removed });
+      const admin = createSupabaseAdminClient();
+      const removed = await pruneUnpaidEnrollments(admin);
+      const batchesRemoved = await deletePastEmptyBatches(admin);
+      return NextResponse.json({ ok: true, removed, batchesRemoved });
     }
     if (input.action === "enrollment-course-change") {
       if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot change a course." }, { status: 403 });
@@ -1084,6 +1087,12 @@ export async function POST(request: Request) {
         target_instructor_name: input.instructorName, target_instructor_email: input.instructorEmail, target_room_name: input.roomName, target_venue: input.venue,
         target_daily_start: input.dailyStart, target_daily_end: input.dailyEnd, target_mode: input.mode, target_enrollment_deadline: input.enrollmentDeadline, target_publish: input.publish });
       if (error) throw error;
+      // Renaming the batch number is Admin-only (it's a unique identifier). Applied separately from the RPC.
+      if (input.batchNumber && staff.roleCodes.includes("admin")) {
+        const admin = createSupabaseAdminClient();
+        const { error: renameError } = await admin.from("batches").update({ batch_number: input.batchNumber }).eq("id", input.batchId);
+        if (renameError) return NextResponse.json({ error: renameError.code === "23505" ? "That batch number is already used by another schedule." : renameError.message }, { status: 409 });
+      }
       return NextResponse.json({ ok: true, batch: data });
     }
     if (input.action === "batch-delete") {
