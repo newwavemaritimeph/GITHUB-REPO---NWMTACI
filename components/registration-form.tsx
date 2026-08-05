@@ -102,7 +102,34 @@ function Wizard() {
         <h2>Enrollment received</h2>
         <p>Keep this reference. Use it with your registered email or mobile number to track your enrollment.</p>
         <div className="reference-block"><span>Registration reference</span><strong>{reference}</strong></div>
-        <div className="reg-success-actions">
+
+        <div className="reg-next-steps" style={{ textAlign: "left", marginTop: 20 }}>
+          <h3 style={{ margin: "0 0 8px", color: "#123F63" }}>Next steps</h3>
+          <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 1.6 }}>
+            <li><strong>Screenshot this confirmation</strong> (with your registration reference).</li>
+            <li>Send the screenshot together with a <strong>valid ID</strong> to our official Facebook page{" "}
+              <a href="https://web.facebook.com/newwavemtc" target="_blank" rel="noopener noreferrer">facebook.com/newwavemtc</a>{" "}
+              or email <a href="mailto:newwavemaritime@gmail.com">newwavemaritime@gmail.com</a>.</li>
+            <li>Settle your training fee through an official payment channel below, then send the payment screenshot for verification.</li>
+          </ol>
+        </div>
+
+        <div className="reg-payment-channels" style={{ textAlign: "left", marginTop: 18, padding: 14, border: "1px solid #9EE3F1", borderRadius: 10, background: "#F5FCFE" }}>
+          <h3 style={{ margin: "0 0 10px", color: "#F25615", letterSpacing: ".02em" }}>New Wave — Official payment channels</h3>
+          <div style={{ marginBottom: 10 }}>
+            <strong style={{ color: "#123F63" }}>UnionBank of the Philippines</strong>
+            <div>New Wave Maritime</div>
+            <div style={{ fontFamily: "monospace", fontSize: "1.05em", letterSpacing: ".04em" }}>002280021128</div>
+          </div>
+          <div>
+            <strong style={{ color: "#123F63" }}>GCash</strong>
+            <div>Ap**l C.</div>
+            <div style={{ fontFamily: "monospace", fontSize: "1.05em", letterSpacing: ".04em" }}>0993 380 2997</div>
+          </div>
+          <p style={{ margin: "10px 0 0", fontSize: ".85em", color: "#456" }}>Always confirm the account name before sending. Keep your payment receipt for verification.</p>
+        </div>
+
+        <div className="reg-success-actions" style={{ marginTop: 18 }}>
           <Link className="button button-primary" href="/registration-search">Check enrollment status</Link>
           <Link className="button button-secondary" href="/courses">Browse courses</Link>
         </div>
