@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { hardDeleteEnrollment } from "@/lib/enrollments";
+import { hardDeleteEnrollment, pruneUnpaidEnrollments } from "@/lib/enrollments";
 
 const enrollmentInput = z.object({
   action: z.literal("create-enrollment"), existingTraineeId: z.string().uuid().nullable().optional(),
@@ -28,6 +28,7 @@ const autoOpenBatchInput = z.object({
 });
 const autoOpenAllInput = z.object({ action: z.literal("auto-open-all-batches"), year: z.number().int().min(2024).max(2100), month: z.number().int().min(1).max(12) });
 const enrollmentDeleteInput = z.object({ action: z.literal("enrollment-delete"), enrollmentId: z.string().uuid() });
+const pruneNowInput = z.object({ action: z.literal("prune-enrollments-now") });
 
 const batchUpdateInput = z.object({
   action: z.literal("batch-update"), batchId: z.string().uuid(),
@@ -113,7 +114,7 @@ const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-li
 const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional(), courseId: z.string().uuid().nullable().optional(), partnerOfferId: z.string().uuid().nullable().optional() });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput]);
+const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
@@ -904,6 +905,11 @@ export async function POST(request: Request) {
       if (!enr) return NextResponse.json({ error: "Enrollment not found." }, { status: 404 });
       await hardDeleteEnrollment(admin, input.enrollmentId);
       return NextResponse.json({ ok: true });
+    }
+    if (input.action === "prune-enrollments-now") {
+      if (!staff.roleCodes.includes("admin")) return NextResponse.json({ error: "Only Admin can run the pending-enrollment cleanup." }, { status: 403 });
+      const removed = await pruneUnpaidEnrollments(createSupabaseAdminClient());
+      return NextResponse.json({ ok: true, removed });
     }
     if (input.action === "enrollment-course-change") {
       if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot change a course." }, { status: 403 });
