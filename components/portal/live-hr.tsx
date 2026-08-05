@@ -9,7 +9,9 @@ type Leave = { id: string; employee_id: string; leave_type: string; starts_on: s
 type Advance = { id: string; employee_id: string; amount_centavos: number; requested_on: string; balance_centavos: number; status: string };
 type Period = { id: string; period_number: string; starts_on: string; ends_on: string; pay_date: string; status: string; finalized_at?: string | null };
 type PayItem = { id: string; payroll_period_id: string; employee_id: string; gross_centavos: number; deduction_centavos: number; net_centavos: number; breakdown?: Record<string, unknown> };
-export type HrData = { employees: Employee[]; employeeAttendance: Attendance[]; leaveRequests: Leave[]; cashAdvances: Advance[]; payrollPeriods: Period[]; payrollItems: PayItem[] };
+type Benefit = { id: string; employee_id: string; benefit_type: string; reference?: string | null; amount_centavos: number; effective_from?: string | null; effective_to?: string | null };
+type Contract = { id: string; employee_id: string; contract_type: string; position?: string | null; rate_centavos?: number | null; starts_on: string; ends_on?: string | null; status: string; notes?: string | null };
+export type HrData = { employees: Employee[]; employeeAttendance: Attendance[]; leaveRequests: Leave[]; cashAdvances: Advance[]; payrollPeriods: Period[]; payrollItems: PayItem[]; benefitRecords: Benefit[]; employmentContracts: Contract[] };
 
 /** Current semi-monthly cut-off window (1–15 paid 15th, 16–EOM paid EOM). */
 function currentCutoff() {
@@ -27,7 +29,7 @@ const todayManila = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Man
 const num = (raw: string | null) => (raw == null || raw.trim() === "" ? null : Math.round(Number(raw) * 100));
 
 export function LiveHr({ data, role, reload }: { data: HrData; role: string; reload: () => Promise<void> }) {
-  const [tab, setTab] = useState<"Overview" | "Directory" | "Attendance" | "Requests" | "Payroll" | "13th month">("Overview");
+  const [tab, setTab] = useState<"Overview" | "Directory" | "Attendance" | "Requests" | "Benefits" | "Contracts" | "Payroll" | "13th month">("Overview");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const canManage = role === "admin" || role === "hr";
@@ -82,7 +84,7 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
         <div><span className="portal-eyebrow">People operations</span><h1>HR &amp; payroll</h1><p>Employee directory, daily attendance, leave and cash-advance requests, and payroll periods.</p></div>
       </div>
       <div className="portal-tabs">
-        {(["Overview", "Directory", "Attendance", "Requests", "Payroll", "13th month"] as const).map((item) => (
+        {(["Overview", "Directory", "Attendance", "Requests", "Benefits", "Contracts", "Payroll", "13th month"] as const).map((item) => (
           <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>
         ))}
       </div>
@@ -194,6 +196,8 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
         </>
       )}
 
+      {tab === "Benefits" && <BenefitsTab data={data} nameOf={nameOf} canManage={canManage} busy={busy} post={post} />}
+      {tab === "Contracts" && <ContractsTab data={data} nameOf={nameOf} canManage={canManage} busy={busy} post={post} />}
       {tab === "Payroll" && <PayrollTab data={data} nameOf={nameOf} canManage={canManage} busy={busy} post={post} />}
       {tab === "13th month" && <ThirteenthMonthTab data={data} />}
     </div>
@@ -327,6 +331,74 @@ function AttendanceTab({ data, nameOf, canManage, busy, post }: { data: HrData; 
         </tbody></table></div>
       </section>
     </>
+  );
+}
+
+function BenefitsTab({ data, nameOf, canManage, busy, post }: { data: HrData; nameOf: Map<string, string>; canManage: boolean; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
+  function saveBenefit(existing?: Benefit) {
+    const employeeId = existing?.employee_id ?? pickEmployee(data.employees); if (!employeeId) return;
+    const benefitType = window.prompt("Benefit type? (SSS, PhilHealth, Pag-IBIG, TIN/BIR, Other)", existing?.benefit_type ?? "SSS"); if (!benefitType) return;
+    const reference = window.prompt("Reference / ID number? (optional)", existing?.reference ?? "") ?? "";
+    const amount = num(window.prompt("Monthly contribution (PHP)? (optional, 0 for none)", existing ? String((existing.amount_centavos || 0) / 100) : "0")) ?? 0;
+    const effectiveFrom = window.prompt("Effective from (YYYY-MM-DD)? (optional)", existing?.effective_from ?? "") || null;
+    void post({ action: "benefit-save", id: existing?.id ?? null, employeeId, benefitType, reference, amountCentavos: amount, effectiveFrom });
+  }
+  return (
+    <section className="portal-panel">
+      <div className="panel-heading"><div><h2>Government benefits</h2><p>SSS, PhilHealth, Pag-IBIG, and TIN records per employee</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => saveBenefit()}>+ Add benefit</button>}</div>
+      <div className="portal-table"><table><thead><tr><th>Employee</th><th>Benefit</th><th>Reference</th><th>Monthly amount</th><th>Effective</th><th></th></tr></thead><tbody>
+        {data.benefitRecords.map((b) => (
+          <tr key={b.id}>
+            <td><strong>{nameOf.get(b.employee_id) ?? "—"}</strong></td>
+            <td>{b.benefit_type}</td>
+            <td>{b.reference ?? "—"}</td>
+            <td>{b.amount_centavos ? pesos(b.amount_centavos) : "—"}</td>
+            <td>{b.effective_from ?? "—"}{b.effective_to ? ` → ${b.effective_to}` : ""}</td>
+            <td className="document-actions">
+              {canManage && <button disabled={busy} onClick={() => saveBenefit(b)}>Edit</button>}
+              {canManage && <button disabled={busy} onClick={() => { if (window.confirm("Remove this benefit record?")) void post({ action: "benefit-remove", id: b.id }); }}>Remove</button>}
+            </td>
+          </tr>
+        ))}
+        {!data.benefitRecords.length && <tr><td colSpan={6}><span className="portal-empty-copy">No benefit records yet.</span></td></tr>}
+      </tbody></table></div>
+    </section>
+  );
+}
+
+function ContractsTab({ data, nameOf, canManage, busy, post }: { data: HrData; nameOf: Map<string, string>; canManage: boolean; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
+  function saveContract(existing?: Contract) {
+    const employeeId = existing?.employee_id ?? pickEmployee(data.employees); if (!employeeId) return;
+    const contractType = window.prompt("Contract type? (Probationary, Regular, Project, Consultancy)", existing?.contract_type ?? "Probationary"); if (!contractType) return;
+    const position = window.prompt("Position? (optional)", existing?.position ?? "") ?? "";
+    const rate = num(window.prompt("Rate (PHP)? (optional)", existing?.rate_centavos ? String(existing.rate_centavos / 100) : "0")) ?? 0;
+    const startsOn = window.prompt("Start date (YYYY-MM-DD)?", existing?.starts_on ?? todayManila()); if (!startsOn) return;
+    const endsOn = window.prompt("End date (YYYY-MM-DD)? (blank for open-ended)", existing?.ends_on ?? "") || null;
+    const status = window.prompt("Status? (Active, Ended, Terminated)", existing?.status ?? "Active") ?? "Active";
+    const notes = window.prompt("Notes? (optional)", existing?.notes ?? "") ?? "";
+    void post({ action: "contract-save", id: existing?.id ?? null, employeeId, contractType, position, rateCentavos: rate, startsOn, endsOn, status, notes });
+  }
+  return (
+    <section className="portal-panel">
+      <div className="panel-heading"><div><h2>Employment contracts</h2><p>Contract type, position, rate, and coverage dates per employee</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => saveContract()}>+ Add contract</button>}</div>
+      <div className="portal-table"><table><thead><tr><th>Employee</th><th>Type</th><th>Position</th><th>Rate</th><th>Coverage</th><th>Status</th><th></th></tr></thead><tbody>
+        {data.employmentContracts.map((c) => (
+          <tr key={c.id}>
+            <td><strong>{nameOf.get(c.employee_id) ?? "—"}</strong></td>
+            <td>{c.contract_type}</td>
+            <td>{c.position ?? "—"}</td>
+            <td>{c.rate_centavos ? pesos(c.rate_centavos) : "—"}</td>
+            <td>{c.starts_on}{c.ends_on ? ` → ${c.ends_on}` : " → open"}</td>
+            <td>{c.status}</td>
+            <td className="document-actions">
+              {canManage && <button disabled={busy} onClick={() => saveContract(c)}>Edit</button>}
+              {canManage && <button disabled={busy} onClick={() => { if (window.confirm("Remove this contract record?")) void post({ action: "contract-remove", id: c.id }); }}>Remove</button>}
+            </td>
+          </tr>
+        ))}
+        {!data.employmentContracts.length && <tr><td colSpan={7}><span className="portal-empty-copy">No contracts yet.</span></td></tr>}
+      </tbody></table></div>
+    </section>
   );
 }
 

@@ -105,6 +105,13 @@ const employeeChargeFileSelfInput = z.object({ action: z.literal("employee-charg
 const employeeChargeSetAmountInput = z.object({ action: z.literal("employee-charge-set-amount"), id: z.string().uuid(), amountCentavos: z.number().int().positive() });
 const employeeChargeInput = z.object({ action: z.literal("employee-charge-input"), employeeId: z.string().uuid(), category: employeeChargeCategory, amountCentavos: z.number().int().positive(), note: z.string().trim().max(300).optional().default("") });
 const employeeChargeCancelInput = z.object({ action: z.literal("employee-charge-cancel"), id: z.string().uuid() });
+// HR: government-benefit records + employment contracts (details only) + self clock-in/out.
+const benefitSaveInput = z.object({ action: z.literal("benefit-save"), id: z.string().uuid().nullable().optional(), employeeId: z.string().uuid(), benefitType: z.string().trim().min(1).max(60), reference: z.string().trim().max(120).optional().default(""), amountCentavos: z.number().int().nonnegative().optional().default(0), effectiveFrom: z.string().date().nullable().optional(), effectiveTo: z.string().date().nullable().optional() });
+const benefitRemoveInput = z.object({ action: z.literal("benefit-remove"), id: z.string().uuid() });
+const contractSaveInput = z.object({ action: z.literal("contract-save"), id: z.string().uuid().nullable().optional(), employeeId: z.string().uuid(), contractType: z.string().trim().min(1).max(60), position: z.string().trim().max(120).optional().default(""), rateCentavos: z.number().int().nonnegative().optional().default(0), startsOn: z.string().date(), endsOn: z.string().date().nullable().optional(), status: z.string().trim().min(1).max(40).optional().default("Active"), notes: z.string().trim().max(500).optional().default("") });
+const contractRemoveInput = z.object({ action: z.literal("contract-remove"), id: z.string().uuid() });
+const attendanceCheckInSelfInput = z.object({ action: z.literal("attendance-check-in-self") });
+const attendanceCheckOutSelfInput = z.object({ action: z.literal("attendance-check-out-self") });
 // Training Operations: managed classrooms (name / venue / capacity).
 const classroomSaveInput = z.object({ action: z.literal("classroom-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), venue: z.string().trim().min(1).max(160), capacity: z.number().int().positive().max(1000), active: z.boolean().optional() });
 const classroomSetActiveInput = z.object({ action: z.literal("classroom-set-active"), id: z.string().uuid(), active: z.boolean() });
@@ -123,7 +130,7 @@ const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-li
 const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional(), courseId: z.string().uuid().nullable().optional(), partnerOfferId: z.string().uuid().nullable().optional() });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput]);
+const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
@@ -263,7 +270,7 @@ export async function GET() {
   const enrollments = (enrollmentsResult.data ?? []).map((row) => ({ ...row, scheduled_on: scheduledByEnrollment.get(row.id) ?? null, instructions_sent_at: sentByEnrollment.get(row.id) ?? null, paid_centavos: paidByEnrollment.get(row.id) ?? 0, charges_centavos: chargesByEnrollment.get(row.id) ?? 0, discounts_centavos: discountsByEnrollment.get(row.id) ?? 0, feedback_token: tokenByEnrollment.get(row.id) ?? null, feedback_submitted: feedbackByEnrollment.has(row.id) }));
   // HR datasets are sensitive (salaries, government IDs) — only HR and Admin receive them.
   const isHr = canManageHr(staff.roleCodes);
-  let hr: Record<string, unknown[]> = { employees: [], employeeAttendance: [], leaveRequests: [], cashAdvances: [], payrollPeriods: [], payrollItems: [] };
+  let hr: Record<string, unknown[]> = { employees: [], employeeAttendance: [], leaveRequests: [], cashAdvances: [], payrollPeriods: [], payrollItems: [], benefitRecords: [], employmentContracts: [] };
   if (isHr) {
     const hrResults = await Promise.all([
       db.from("employees").select("id,employee_number,complete_name,position,employment_status,date_hired,pay_type,base_rate_centavos,instructor_daily_rate_centavos,work_email,active").order("complete_name"),
@@ -272,8 +279,11 @@ export async function GET() {
       db.from("cash_advances").select("id,employee_id,amount_centavos,requested_on,balance_centavos,status").order("requested_on", { ascending: false }).limit(200),
       db.from("payroll_periods").select("id,period_number,starts_on,ends_on,pay_date,status,finalized_at").order("starts_on", { ascending: false }).limit(60),
       db.from("payroll_items").select("id,payroll_period_id,employee_id,gross_centavos,deduction_centavos,net_centavos,breakdown").limit(600),
+      // Tolerant: benefit_records.created_at + employment_contracts arrive with migration 202608090001.
+      db.from("benefit_records").select("id,employee_id,benefit_type,reference,amount_centavos,effective_from,effective_to").order("created_at", { ascending: false }).limit(400),
+      db.from("employment_contracts").select("id,employee_id,contract_type,position,rate_centavos,starts_on,ends_on,status,notes").order("created_at", { ascending: false }).limit(400),
     ]);
-    hr = { employees: hrResults[0].data ?? [], employeeAttendance: hrResults[1].data ?? [], leaveRequests: hrResults[2].data ?? [], cashAdvances: hrResults[3].data ?? [], payrollPeriods: hrResults[4].data ?? [], payrollItems: hrResults[5].data ?? [] };
+    hr = { employees: hrResults[0].data ?? [], employeeAttendance: hrResults[1].data ?? [], leaveRequests: hrResults[2].data ?? [], cashAdvances: hrResults[3].data ?? [], payrollPeriods: hrResults[4].data ?? [], payrollItems: hrResults[5].data ?? [], benefitRecords: hrResults[6].data ?? [], employmentContracts: hrResults[7].data ?? [] };
   }
   // Certificates carry trainee identity — only Training Operations, Releasing Officer, and Admin receive them.
   let certificates: unknown[] = [];
@@ -325,7 +335,7 @@ export async function GET() {
   const paymentMethodsWithKind = (paymentMethods.data ?? []).map((m) => ({ ...m, kind: kindByMethod.get((m as { id: string }).id) ?? "receivable" }));
   // MyHr self-service: the signed-in staff's OWN employee record + leave / cash-advance history,
   // matched by login email → employees.work_email. Read via service role, self only.
-  let myHr: { employee: unknown; leave: unknown[]; advances: unknown[]; charges: unknown[] } | null = null;
+  let myHr: { employee: unknown; leave: unknown[]; advances: unknown[]; charges: unknown[]; attendance: unknown[] } | null = null;
   if (staff.user.email) {
     const admin = createSupabaseAdminClient();
     const { data: emp } = await admin.from("employees").select("id,employee_number,complete_name,position,employment_status,date_hired,pay_type,base_rate_centavos,work_email,active").ilike("work_email", staff.user.email).maybeSingle();
@@ -334,7 +344,8 @@ export async function GET() {
       const { data: adv } = await admin.from("cash_advances").select("id,amount_centavos,requested_on,balance_centavos,status").eq("employee_id", emp.id).order("requested_on", { ascending: false }).limit(50);
       // Tolerant: the employee_charges category/note/balance columns may not be migrated yet.
       const { data: chg } = await admin.from("employee_charges").select("id,category,note,amount_centavos,balance_centavos,status,effective_on,activated_at").eq("employee_id", emp.id).order("effective_on", { ascending: false }).limit(50);
-      myHr = { employee: emp, leave: leave ?? [], advances: adv ?? [], charges: chg ?? [] };
+      const { data: att } = await admin.from("employee_attendance").select("id,attendance_date,checked_in_at,checked_out_at,minutes_late,minutes_undertime,status").eq("employee_id", emp.id).order("attendance_date", { ascending: false }).limit(30);
+      myHr = { employee: emp, leave: leave ?? [], advances: adv ?? [], charges: chg ?? [], attendance: att ?? [] };
     }
   }
   // Employee-charge management for the Accounting Manager (admin / accounting / hr): the charge list
@@ -354,7 +365,7 @@ export async function GET() {
     payments: payments.data ?? [], notifications: notifications.data ?? [],
     paymentMethods: paymentMethodsWithKind, charges: charges.data ?? [], agencies: agencies.data ?? [],
     expenses: expenses.data ?? [], payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
-    employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems,
+    employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates, certificateTemplates, certificateReleases, certificateIssuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
     agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges, chargeEmployees, instructionTemplates }, { headers: { "Cache-Control": "no-store" } });
 }
@@ -856,6 +867,63 @@ export async function POST(request: Request) {
       if (!canManageHr(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage employees." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { error } = await admin.from("employees").update({ active: input.active }).eq("id", input.id);
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "benefit-save") {
+      if (!canManageHr(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage benefits." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const base = { employee_id: input.employeeId, benefit_type: input.benefitType, reference: input.reference || null, amount_centavos: input.amountCentavos ?? 0, effective_from: input.effectiveFrom ?? null, effective_to: input.effectiveTo ?? null };
+      const { error } = input.id ? await admin.from("benefit_records").update(base).eq("id", input.id) : await admin.from("benefit_records").insert(base);
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "benefit-remove") {
+      if (!canManageHr(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage benefits." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { error } = await admin.from("benefit_records").delete().eq("id", input.id);
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "contract-save") {
+      if (!canManageHr(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage contracts." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const base = { employee_id: input.employeeId, contract_type: input.contractType, position: input.position || null, rate_centavos: input.rateCentavos ?? 0, starts_on: input.startsOn, ends_on: input.endsOn ?? null, status: input.status ?? "Active", notes: input.notes || null };
+      const { error } = input.id ? await admin.from("employment_contracts").update(base).eq("id", input.id) : await admin.from("employment_contracts").insert(base);
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "contract-remove") {
+      if (!canManageHr(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage contracts." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { error } = await admin.from("employment_contracts").delete().eq("id", input.id);
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "attendance-check-in-self" || input.action === "attendance-check-out-self") {
+      // Any signed-in employee clocks themselves in/out for today. Resolve by login email.
+      const admin = createSupabaseAdminClient();
+      const { data: emp } = await admin.from("employees").select("id").ilike("work_email", staff.user.email ?? "___none___").maybeSingle();
+      if (!emp) return NextResponse.json({ error: "No employee record is linked to your account. Ask HR to add you." }, { status: 400 });
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+      const nowHm = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Manila", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
+      const mins = minutesOfDay(nowHm);
+      const nowIso = new Date().toISOString();
+      const { data: existing } = await admin.from("employee_attendance").select("id,checked_in_at,checked_out_at").eq("employee_id", emp.id).eq("attendance_date", today).maybeSingle();
+      if (input.action === "attendance-check-in-self") {
+        if (existing?.checked_in_at) return NextResponse.json({ error: "You already clocked in today." }, { status: 409 });
+        const late = Math.max(0, mins - minutesOfDay("08:00"));
+        const status = late > 0 ? "Late" : "Present";
+        const { error } = existing
+          ? await admin.from("employee_attendance").update({ checked_in_at: nowIso, minutes_late: late, status }).eq("id", existing.id)
+          : await admin.from("employee_attendance").insert({ employee_id: emp.id, attendance_date: today, checked_in_at: nowIso, minutes_late: late, minutes_undertime: 0, status });
+        if (error) throw error;
+        return NextResponse.json({ ok: true });
+      }
+      if (!existing?.checked_in_at) return NextResponse.json({ error: "Clock in first before clocking out." }, { status: 409 });
+      if (existing.checked_out_at) return NextResponse.json({ error: "You already clocked out today." }, { status: 409 });
+      const under = Math.max(0, minutesOfDay("17:00") - mins);
+      const { error } = await admin.from("employee_attendance").update({ checked_out_at: nowIso, minutes_undertime: under }).eq("id", existing.id);
       if (error) throw error;
       return NextResponse.json({ ok: true });
     }
