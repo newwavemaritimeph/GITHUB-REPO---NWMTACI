@@ -7,7 +7,7 @@ import { LiveCashierClosing, type ClosingData } from "./live-cashier-closing";
 
 /** Loose shapes for the accounting slices of the staff-operations payload. */
 type Payment = { payment_number?: string; method: string; amount_centavos: number; reference_number?: string | null; received_at?: string; verification_state: string; trainee_id?: string };
-type Enrollment = { id: string; enrollment_number: string; trainee_id?: string; created_at?: string; selling_price_centavos: number; paid_centavos: number; charges_centavos?: number; discounts_centavos?: number; enrollment_status: string; partner_offer_id?: string | null; trainees?: unknown; courses?: unknown };
+type Enrollment = { id: string; enrollment_number: string; trainee_id?: string; created_at?: string; selling_price_centavos: number; paid_centavos: number; charges_centavos?: number; discounts_centavos?: number; enrollment_status: string; partner_offer_id?: string | null; trainees?: unknown; courses?: unknown; scheduled_on?: string | null; batches?: { starts_on: string; ends_on: string } | { starts_on: string; ends_on: string }[] | null };
 type TraineeRow = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; srn?: string | null; email?: string | null; mobile?: string | null };
 /** Amount due = base price + other charges − rebates/discounts. */
 type Channel = { id: string; code: string; name: string; requires_reference: boolean; allows_proof: boolean; active: boolean; kind?: string };
@@ -15,7 +15,7 @@ type Charge = { id: string; name: string; default_amount_centavos: number; activ
 type Agency = { id: string; name: string; contact_name?: string | null; email?: string | null; mobile?: string | null; active: boolean };
 type Expense = { id: string; expense_number: string; payee: string; category: string; amount_centavos: number; status: string; created_at: string; payment_channel?: string | null; reference_number?: string | null };
 const EXPENSE_CHANNELS = ["Cash", "GCash", "Unionbank", "Cheque", "PSBank", "Other"];
-type Payable = { id: string; description: string; amount_centavos: number; due_on?: string | null; status: string };
+type Payable = { id: string; description: string; amount_centavos: number; due_on?: string | null; status: string; partner_center_id?: string | null; created_at?: string };
 type Course = { id: string; code: string; name: string; delivery_type: string; duration_label?: string; duration_days?: number; training_mode?: string; category_id?: string; standard_price_centavos: number; updated_at?: string };
 type CenterRef = { name: string };
 type CourseRef = { name: string; code?: string };
@@ -53,107 +53,106 @@ function rangeFor(span: "Daily" | "Weekly" | "Monthly"): { from: string; to: str
 }
 
 
-export function AccountingDashboard({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
-  const canManage = role === "admin" || role === "accounting";
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("");
-  const [span, setSpan] = useState<"Daily" | "Weekly" | "Monthly" | "All">("Monthly");
+/**
+ * Accounting Summary Report — the Accounting Manager's entire dashboard.
+ * A date-sensitive period roll-up of collections, releases, receivables,
+ * payables, reconciliation and cash position; the earlier panel collection
+ * (approvals, channel lists, rebate table) was removed at the owner's request.
+ * Live balances (receivables / payables / cash) ignore the range by design.
+ */
+export function AccountingDashboard({ data }: { data: AccountingData; role?: string; reload?: () => Promise<void> }) {
   const today = manilaDay(new Date().toISOString());
-  // Owner overview: daily collectibles / payables, voucher requests, enrollment counts.
-  const dailyCollectibles = data.payments.filter((p) => manilaDay(p.received_at) === today);
-  const dailyCollectibleTotal = dailyCollectibles.reduce((s, p) => s + Number(p.amount_centavos), 0);
-  const dailyPayables = data.payables.filter((p) => p.status !== "Paid" && (!p.due_on || p.due_on <= today));
-  const dailyPayableTotal = dailyPayables.reduce((s, p) => s + Number(p.amount_centavos), 0);
-  const pendingRebates = data.agencyRebates.filter((r) => r.status === "Pending");
-  const pendingRebateTotal = pendingRebates.reduce((s, r) => s + Number(r.rebate_centavos), 0);
-  const pendingExpenses = data.expenses.filter((e) => e.status === "Pending");
-  const statusCounts = data.enrollments.reduce((a, e) => { if (e.enrollment_status === "Cancelled") a.cancelled++; else if (dueOf(e) - Number(e.paid_centavos) <= 0) a.paid++; else a.pending++; return a; }, { paid: 0, pending: 0, cancelled: 0 });
-  const endorsedCount = data.enrollments.filter((e) => !!e.partner_offer_id).length;
-  const walkinCount = data.enrollments.length - endorsedCount;
+  const [from, setFrom] = useState(today.slice(0, 8) + "01");
+  const [to, setTo] = useState(today);
+  const pesos2 = (c: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format((Number(c) || 0) / 100);
+  const inRange = (v?: string | null) => { if (!v) return false; const d = manilaDay(v); return d >= from && d <= to; };
+  const chip = (f: string, t: string) => { setFrom(f); setTo(t); };
+  const weekAgo = manilaDay(new Date(Date.now() - 6 * 86400000).toISOString());
 
-  async function post(body: Record<string, unknown>) {
-    setBusy(true); setMessage("");
-    try {
-      const response = await fetch("/api/staff/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "The action could not be completed.");
-      await reload();
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "The action could not be completed.");
-    } finally { setBusy(false); }
+  // Collections by channel family (display-only bucketing of payment methods).
+  const bucket = (method: string) => { const m = (method || "").toLowerCase(); if (m.includes("gcash")) return "GCash"; if (m.includes("cash")) return "Cash"; if (m.includes("bank") || m.includes("union") || m.includes("psb") || m.includes("transfer")) return "Bank"; return "Other"; };
+  const paid = data.payments.filter((p) => inRange(p.received_at));
+  const by = { Cash: 0, GCash: 0, Bank: 0, Other: 0 } as Record<string, number>;
+  for (const p of paid) by[bucket(p.method)] += Number(p.amount_centavos);
+  const gross = paid.reduce((s, p) => s + Number(p.amount_centavos), 0);
+
+  // Expenses and releases in the period.
+  const opex = data.expenses.filter((e) => (e.status === "Paid" || e.status === "Approved") && inRange(e.created_at)).reduce((s, e) => s + Number(e.amount_centavos), 0);
+  const refunds = data.requests.filter((r) => r.request_type === "Refund" && r.status === "Approved" && inRange((r as { decided_at?: string | null }).decided_at ?? r.created_at)).reduce((s, r) => s + Number(r.requested_values?.amountCentavos ?? 0), 0);
+  const rebatesReleased = data.agencyRebates.filter((r) => r.status === "Settled" && inRange(r.created_at)).reduce((s, r) => s + Number(r.rebate_centavos), 0);
+  const centerReleased = data.payables.filter((p) => p.partner_center_id && p.status === "Paid" && inRange(p.due_on ?? p.created_at)).reduce((s, p) => s + Number(p.amount_centavos), 0);
+  const netMovement = gross - (opex + refunds + rebatesReleased + centerReleased);
+
+  // Live balances (not ranged): what is owed to us and what we owe.
+  const live = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled");
+  const bal = (e: (typeof live)[number]) => Math.max(0, dueOf(e) - Number(e.paid_centavos));
+  const outstanding = live.reduce((s, e) => s + bal(e), 0);
+  const trainingDate = (e: (typeof live)[number]) => { const b = Array.isArray(e.batches) ? e.batches[0] : e.batches; return b?.ends_on ?? e.scheduled_on ?? null; };
+  const overdue = live.filter((e) => bal(e) > 0 && (trainingDate(e) ?? "9999") < today).reduce((s, e) => s + bal(e), 0);
+  const centerPending = data.payables.filter((p) => p.partner_center_id && p.status !== "Paid").reduce((s, p) => s + Number(p.amount_centavos), 0);
+  const rebatesPayable = data.agencyRebates.filter((r) => r.status === "Pending").reduce((s, r) => s + Number(r.rebate_centavos), 0);
+  const monthStart = today.slice(0, 8) + "01";
+  const monthlyUnpaid = data.payables.filter((p) => !p.partner_center_id && p.status !== "Paid" && (!p.due_on || (p.due_on >= monthStart && p.due_on <= today.slice(0, 8) + "31"))).reduce((s, p) => s + Number(p.amount_centavos), 0);
+
+  // Reconciliation from cashier closings in the period.
+  const closings = data.cashierClosings.filter((c) => c.closing_date >= from && c.closing_date <= to);
+  const locked = closings.filter((c) => (c.status || "").toLowerCase().includes("lock") || (c.status || "").toLowerCase().includes("closed")).length;
+  const exceptions = closings.filter((c) => Number(c.variance_centavos ?? 0) !== 0).length;
+  const variance = closings.reduce((s, c) => s + Number(c.variance_centavos ?? 0), 0);
+
+  // Cash on hand to date: cash-channel collections less paid expenses, up to the To date.
+  const upTo = (v?: string | null) => !!v && manilaDay(v) <= to;
+  const cashIn = data.payments.filter((p) => bucket(p.method) === "Cash" && upTo(p.received_at)).reduce((s, p) => s + Number(p.amount_centavos), 0);
+  const cashOut = data.expenses.filter((e) => (e.status === "Paid" || e.status === "Approved") && upTo(e.created_at)).reduce((s, e) => s + Number(e.amount_centavos), 0);
+  const cashOnHand = cashIn - cashOut;
+
+  function exportCsv() {
+    downloadCsv(`accounting-summary-${from}_to_${to}.csv`, [["Metric", "Amount (PHP)"],
+      ["Cash collected", by.Cash / 100], ["GCash collected", by.GCash / 100], ["Bank collected", by.Bank / 100], ["Other channels", by.Other / 100], ["Gross collections", gross / 100],
+      ["Operating expenses", opex / 100], ["Refunds released", refunds / 100], ["Rebates released", rebatesReleased / 100], ["Center payments released", centerReleased / 100], ["Net cash movement", netMovement / 100],
+      ["Outstanding collectibles", outstanding / 100], ["Overdue collectibles", overdue / 100], ["Center payables pending", centerPending / 100], ["Marketing rebates payable", rebatesPayable / 100], ["Monthly payables unpaid (this month)", monthlyUnpaid / 100],
+      ["Reconciliations locked", locked], ["Open exceptions", exceptions], ["Total variance", variance / 100],
+      ["Cash on hand (to date)", cashOnHand / 100]]);
   }
 
-  // Collections and disbursements used to be all-time with no way to scope them.
-  const range = span === "All" ? null : rangeFor(span);
-  const inRange = (value?: string | null) => { if (!range || !value) return true; const d = manilaDay(value); return d >= range.from && d <= range.to; };
-  const rangeLabel = range ? `${range.from} → ${range.to}` : "All time";
-
-  const scopedPayments = data.payments.filter((p) => inRange(p.received_at));
-  const collections = useMemo(() => {
-    const byChannel = new Map<string, { total: number; count: number }>();
-    for (const payment of scopedPayments) {
-      const key = payment.method || "Other";
-      const entry = byChannel.get(key) ?? { total: 0, count: 0 };
-      entry.total += Number(payment.amount_centavos); entry.count += 1; byChannel.set(key, entry);
-    }
-    return [...byChannel.entries()].sort((a, b) => b[1].total - a[1].total);
-  }, [scopedPayments]);
-  const collectionTotal = collections.reduce((sum, [, v]) => sum + v.total, 0);
-
-  // Pending refund / cancellation / make-up / reschedule decisions land on her desk.
-  const DECISION_TYPES = ["Refund", "Cancellation", "Make-up Class", "Rescheduling"];
-  const pendingRequests = data.requests.filter((r) => r.status === "Pending" && DECISION_TYPES.includes(r.request_type));
-  // Cash-count variances: loaded on the payload but never shown until now.
-  const closings = [...data.cashierClosings].filter((c) => inRange(c.closing_date)).sort((a, z) => z.closing_date.localeCompare(a.closing_date)).slice(0, 8);
-  const varianceTotal = closings.reduce((s, c) => s + Number(c.variance_centavos ?? 0), 0);
-
-  const disbursements = data.expenses.filter((e) => (e.status === "Paid" || e.status === "Approved") && inRange(e.created_at));
-  const disbursementTotal = disbursements.reduce((sum, e) => sum + Number(e.amount_centavos), 0);
-  const receivables = data.enrollments.filter((e) => dueOf(e) - Number(e.paid_centavos) > 0 && e.enrollment_status !== "Cancelled");
-  const receivableTotal = receivables.reduce((sum, e) => sum + (dueOf(e) - Number(e.paid_centavos)), 0);
+  const Row = ({ label, value, tone }: { label: string; value: string | number; tone?: "red" | "green" }) => (
+    <div className="live-row-item"><div><strong>{label}</strong></div><span className="slot-count" style={tone ? { color: tone === "red" ? "#a52020" : "#0a7d3b" } : undefined}>{value}</span></div>
+  );
+  const Card = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>{title}</h2></div></div>{children}</section>
+  );
 
   return (
     <>
-      {message && <div className="portal-message error" role="alert">{message}</div>}
-      <div className="config-picker">
-        <label className="portal-field-inline">Period
-          <select value={span} onChange={(e) => setSpan(e.target.value as "Daily" | "Weekly" | "Monthly" | "All")}>
-            <option value="Daily">Today</option><option value="Weekly">Last 7 days</option><option value="Monthly">This month</option><option value="All">All time</option>
-          </select>
-        </label>
-        <span className="portal-empty-copy" style={{ margin: 0 }}>Collections, disbursements and cash variance for {rangeLabel}. Receivables and payables are live balances.</span>
+      <div className="portal-panel" style={{ padding: 16, marginBottom: 16, display: "flex", gap: 14, flexWrap: "wrap", alignItems: "flex-end" }}>
+        <label className="portal-field-inline">From<input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label className="portal-field-inline">To<input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></label>
+        <span style={{ display: "inline-flex", gap: 8 }}>
+          <button type="button" className="portal-secondary" onClick={() => chip(today, today)}>Today</button>
+          <button type="button" className="portal-secondary" onClick={() => chip(weekAgo, today)}>This week</button>
+          <button type="button" className="portal-secondary" onClick={() => chip(today.slice(0, 8) + "01", today)}>This month</button>
+        </span>
+        <span style={{ flex: 1 }} />
+        <span><span className="portal-eyebrow">Gross collections</span><strong style={{ display: "block", fontSize: 24 }}>{pesos2(gross)}</strong></span>
+        <button type="button" className="portal-primary" onClick={exportCsv}>Export CSV</button>
       </div>
-      <div className="finance-hero">
-        <div><span>Daily collectibles</span><strong>{pesos(dailyCollectibleTotal)}</strong><small>{dailyCollectibles.length} payment{dailyCollectibles.length === 1 ? "" : "s"} today</small></div>
-        <article><span>Daily payables</span><strong>{pesos(dailyPayableTotal + pendingRebateTotal)}</strong><small>{dailyPayables.length} bill{dailyPayables.length === 1 ? "" : "s"} · {pendingRebates.length} rebate{pendingRebates.length === 1 ? "" : "s"}</small></article>
-        <article><span>Receivables</span><strong>{pesos(receivableTotal)}</strong><small>{receivables.length} open balance{receivables.length === 1 ? "" : "s"}</small></article>
-        <article><span>Net collections</span><strong>{pesos(collectionTotal - disbursementTotal)}</strong><small>Collections − disbursements</small></article>
-      </div>
-      <div className="finance-hero">
-        <div><span>Enrollments</span><strong>{data.enrollments.length}</strong><small>{walkinCount} walk-in · {endorsedCount} endorsed</small></div>
-        <article><span>Paid</span><strong>{statusCounts.paid}</strong><small>Fully settled</small></article>
-        <article><span>Pending</span><strong>{statusCounts.pending}</strong><small>With balance</small></article>
-        <article><span>Cancelled</span><strong>{statusCounts.cancelled}</strong><small>Cancelled</small></article>
-      </div>
-
-      {canManage && <div className="dashboard-panels">
-        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Discount approvals</h2><p>Awaiting your approval</p></div><span className="slot-count">{data.pendingDiscounts.length}</span></div>{data.pendingDiscounts.map((d) => { const enr = d.enrollments ?? null; const t = one(enr?.trainees ?? null); return <div className="live-row-item" key={d.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : enr?.enrollment_number ?? "—"}</strong><small>{d.description} · {pesos(d.amount_centavos)}{one(d.marketing_agencies)?.name ? ` · ${one(d.marketing_agencies)?.name}` : ""}</small></div><div className="document-actions"><button disabled={busy} onClick={() => post({ action: "discount-decide", id: d.id, approve: true })}>Approve</button><button disabled={busy} onClick={() => post({ action: "discount-decide", id: d.id, approve: false })}>Reject</button></div></div>; })}{!data.pendingDiscounts.length && <p className="portal-empty-copy">None pending.</p>}</section>
-        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Charge approvals</h2><p>Awaiting your approval</p></div><span className="slot-count">{data.pendingCharges.length}</span></div>{data.pendingCharges.map((ch) => { const enr = one(ch.enrollments); const t = one(enr?.trainees ?? null); return <div className="live-row-item" key={ch.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : enr?.enrollment_number ?? "—"}</strong><small>{ch.description} · {pesos(ch.amount_centavos)}</small></div><div className="document-actions"><button disabled={busy} onClick={() => post({ action: "charge-decide", id: ch.id, approve: true })}>Approve</button><button disabled={busy} onClick={() => post({ action: "charge-decide", id: ch.id, approve: false })}>Reject</button></div></div>; })}{!data.pendingCharges.length && <p className="portal-empty-copy">None pending.</p>}</section>
-      </div>}
-
       <div className="dashboard-panels">
-        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Daily payables due</h2><p>Bills due today / overdue</p></div><span className="slot-count">{pesos(dailyPayableTotal)}</span></div>{dailyPayables.map((p) => <div className="live-row-item" key={p.id}><div><strong>{p.description}</strong><small>{p.due_on ? `Due ${p.due_on}` : "No due date"} · {p.status}</small></div><span className="slot-count">{pesos(p.amount_centavos)}</span></div>)}{!dailyPayables.length && <p className="portal-empty-copy">No payables due.</p>}</section>
-        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>New expense voucher requests</h2><p>Awaiting your approval</p></div><span className="slot-count">{pendingExpenses.length}</span></div>{pendingExpenses.slice(0, 20).map((e) => <div className="live-row-item" key={e.id}><div><strong>{e.payee}</strong><small>{e.category} · {e.expense_number}</small></div><span className="slot-count">{pesos(e.amount_centavos)}</span></div>)}{!pendingExpenses.length && <p className="portal-empty-copy">No voucher requests awaiting approval.</p>}</section>
+        <Card title="Collections">
+          <Row label="Cash collected" value={pesos2(by.Cash)} /><Row label="GCash collected" value={pesos2(by.GCash)} /><Row label="Bank collected" value={pesos2(by.Bank)} /><Row label="Other channels" value={pesos2(by.Other)} /><Row label="Gross collections" value={pesos2(gross)} />
+        </Card>
+        <Card title="Expenses & releases">
+          <Row label="Operating expenses" value={pesos2(opex)} /><Row label="Refunds released" value={pesos2(refunds)} /><Row label="Rebates released" value={pesos2(rebatesReleased)} /><Row label="Center payments released" value={pesos2(centerReleased)} /><Row label="Net cash movement" value={pesos2(netMovement)} tone={netMovement < 0 ? "red" : "green"} />
+        </Card>
+        <Card title="Receivables & payables">
+          <Row label="Outstanding collectibles" value={pesos2(outstanding)} /><Row label="Overdue collectibles" value={pesos2(overdue)} tone={overdue > 0 ? "red" : undefined} /><Row label="Center payables pending" value={pesos2(centerPending)} /><Row label="Marketing rebates payable" value={pesos2(rebatesPayable)} /><Row label="Monthly payables unpaid (this month)" value={pesos2(monthlyUnpaid)} />
+        </Card>
+        <Card title="Reconciliation">
+          <Row label="Reconciliations locked" value={locked} /><Row label="Open exceptions" value={exceptions} tone={exceptions > 0 ? "red" : undefined} /><Row label="Total variance" value={pesos2(variance)} tone={variance !== 0 ? "red" : undefined} />
+        </Card>
+        <Card title="Cash position">
+          <Row label="Cash on hand (to date)" value={pesos2(cashOnHand)} />
+        </Card>
       </div>
-
-      <div className="dashboard-panels">
-        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Receivables</h2><p>Open enrollment balances</p></div><span className="slot-count">{pesos(receivableTotal)}</span></div>{receivables.slice(0, 20).map((e) => { const t = one(e.trainees as TraineeRow | TraineeRow[] | null); return <div className="live-row-item" key={e.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : e.enrollment_number}</strong><small>{one(e.courses as CourseRef | CourseRef[] | null)?.name ?? e.enrollment_number}</small></div><span className="slot-count">{pesos(dueOf(e) - Number(e.paid_centavos))}</span></div>; })}{!receivables.length && <p className="portal-empty-copy">Every enrollment is settled.</p>}</section>
-        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Refund &amp; cancellation requests</h2><p>Awaiting your decision</p></div><span className="slot-count">{pendingRequests.length}</span></div>{pendingRequests.slice(0, 10).map((r) => { const t = one(r.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null | undefined); const amt = r.requested_values?.amountCentavos; return <div className="live-row-item" key={r.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : r.request_number}</strong><small>{r.request_type}{amt ? ` · ${pesos(amt)}` : ""} · {r.reason}</small></div>{canManage ? <div className="document-actions"><button disabled={busy} onClick={() => post({ action: "request-decide", id: r.id, approve: true })}>Approve</button><button disabled={busy} onClick={() => post({ action: "request-decide", id: r.id, approve: false })}>Reject</button></div> : <span className="portal-badge orange">Pending</span>}</div>; })}{!pendingRequests.length && <p className="portal-empty-copy">No requests awaiting a decision.</p>}</section>
-        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Cashier closing variance</h2><p>Counted cash vs expected · {rangeLabel}</p></div><span className="slot-count" style={{ color: varianceTotal !== 0 ? "#a52020" : undefined }}>{pesos(varianceTotal)}</span></div>{closings.map((c) => { const v = Number(c.variance_centavos ?? 0); return <div className="live-row-item" key={c.id}><div><strong>{c.closing_date}</strong><small>Expected {pesos(c.expected_cash_centavos)} · counted {c.actual_cash_centavos == null ? "—" : pesos(c.actual_cash_centavos)} · {c.status}</small></div><span className="slot-count" style={{ color: v !== 0 ? "#a52020" : "#0a7d3b" }}>{v === 0 ? "Balanced" : pesos(v)}</span></div>; })}{!closings.length && <p className="portal-empty-copy">No cashier closings in this period.</p>}</section>
-        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Collections by channel</h2><p>Posted payments by method · {rangeLabel}</p></div><span className="slot-count">{pesos(collectionTotal)}</span></div>{collections.map(([name, v]) => <div className="live-row-item" key={name}><div><strong>{name}</strong><small>{v.count} payment{v.count === 1 ? "" : "s"}</small></div><span className="slot-count">{pesos(v.total)}</span></div>)}{!collections.length && <p className="portal-empty-copy">No payments yet.</p>}</section>
-      </div>
-
-      <AgencyRebatesOwed data={data} canManage={canManage} busy={busy} post={post} />
     </>
   );
 }

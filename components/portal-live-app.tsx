@@ -16,7 +16,7 @@ import { DateReports } from "./date-reports";
 import { downloadCsv } from "@/lib/csv";
 import { pesos, first, dueCentavos, balanceOf, isUnpaid, manilaToday } from "@/lib/portal-format";
 
-type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Classrooms" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Setup" | "Trainees & Enrollments";
+type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Classrooms" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Setup" | "Trainee enrollments";
 type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -47,7 +47,7 @@ type PortalData = { profile:{complete_name:string;email:string}; roles:string[];
 const NAV_GROUPS = ["Work","Records","Finance","People","Configuration"] as const;
 type NavGroup = (typeof NAV_GROUPS)[number];
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
-  {label:"Dashboard",icon:"⌂",group:"Work"},{label:"Search trainee",icon:"⌕",roles:["admin"],group:"Work"},{label:"Trainees & Enrollments",icon:"◎",roles:["accounting"],group:"Work"},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting","training_operations"],group:"Work"},
+  {label:"Dashboard",icon:"⌂",group:"Work"},{label:"Search trainee",icon:"⌕",roles:["admin"],group:"Work"},{label:"Trainee enrollments",icon:"◎",roles:["accounting"],group:"Work"},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting","training_operations"],group:"Work"},
   {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting"],group:"Work"},
   {label:"Schedules",icon:"□",roles:["admin","registration","training_operations","instructor"],group:"Work"},{label:"Instructions",icon:"✉",roles:["admin","registration","training_operations"],group:"Work"},{label:"Attendance",icon:"✓",roles:["admin","training_operations","instructor"],group:"Work"},
   {label:"Classrooms",icon:"▢",roles:["admin","training_operations"],group:"Work"},{label:"Certificates",icon:"◈",roles:["admin","releasing_officer"],group:"Work"},{label:"Requests",icon:"↺",roles:["admin","accounting","cashier"],group:"Work"},
@@ -111,7 +111,7 @@ function PortalContent({active,role,data,query,open,onPay,canEnroll,canSchedule,
   if(active==="Search trainee"&&gateRole==="admin")return <LiveSearchTrainee data={{trainees:data.trainees,enrollments:data.enrollments,payments:data.payments}}/>;
   if(active==="Trainees")return <Trainees data={data} query={query}/>;
   if(active==="Enrollments")return <Enrollments data={data} query={query} open={open} canEnroll={canEnroll} role={gateRole} reload={reload}/>;
-  if(active==="Trainees & Enrollments")return <TraineesEnrollments data={data} query={query} open={open} canEnroll={canEnroll} role={gateRole} reload={reload}/>;
+  if(active==="Trainee enrollments")return <TraineesEnrollments data={data} query={query} open={open} canEnroll={canEnroll} role={gateRole} reload={reload}/>;
   if(active==="Schedules")return <Schedules data={data} query={query} open={open} canSchedule={canSchedule} role={gateRole} reload={reload}/>;
   if(active==="Instructions")return <LiveInstructions data={data} query={query} reload={reload}/>;
   if(active==="Requests")return <LiveRequests data={data} role={gateRole} reload={reload}/>;
