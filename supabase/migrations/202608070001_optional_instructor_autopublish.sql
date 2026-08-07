@@ -160,7 +160,9 @@ begin
   values(auth.uid(),'training_operations','batch.created','batch',result.id::text,to_jsonb(result));
   return result;
 end $$;
-grant execute on function public.create_training_batch(uuid, text, text, text, text, date, date, time, time, text, text, integer, timestamptz, boolean) to authenticated;
+-- Second parameter is target_partner_offer uuid — the signature must match the
+-- function exactly or the GRANT fails with 42883 and rolls back this migration.
+grant execute on function public.create_training_batch(uuid, uuid, text, text, text, date, date, time, time, text, text, integer, timestamptz, boolean) to authenticated;
 
 -- 3) Edit a batch — instructor / room / venue are OPTIONAL.
 create or replace function public.update_training_batch(
