@@ -13,7 +13,7 @@ const raw = `
 SATSDSD|Security Awareness Training and Seafarer with Designated Security Duties|1 day|Face-to-face|60000
 SSO|Ship Security Officer|3 days|Face-to-face|200000
 STPPDSPPS|Safety Training for Personnel Providing Direct Service to Passengers in Passenger Spaces|1 day|Face-to-face|120000
-PSCMT|Passenger Ship Crowd Management Training|2 days|Face-to-face|160000
+PSCMT|Crowd Management Training|2 days|Face-to-face|160000
 PSCMHBT|Passenger Ship Crisis Management and Human Behavior Training|3 days|Face-to-face|160000
 UBT-PSSR|Updating Training on Basic Training - PSSR|1 day|Face-to-face|130000
 CCMI|Safety, Crowd and Crisis Package|5.5 days|Face-to-face|420000
