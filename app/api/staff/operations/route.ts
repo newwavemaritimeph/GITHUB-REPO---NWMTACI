@@ -327,6 +327,28 @@ export async function GET() {
     const { data } = await db.from("training_instruction_templates").select("course_id,subject,body,active").eq("active", true).order("version", { ascending: false }).limit(500);
     instructionTemplates = data ?? [];
   }
+  // Instructor + room per batch, for the Schedule Officer workspace. Assignments are
+  // per training date; the first assignment found represents the batch. Tolerant:
+  // any failure yields an empty list rather than a 500.
+  let batchStaffing: { batch_id: string; instructor_name: string | null; room_name: string | null }[] = [];
+  {
+    const [dates, assigns, emps, rooms] = await Promise.all([
+      db.from("batch_training_dates").select("id,batch_id").limit(5000),
+      db.from("resource_assignments").select("batch_training_date_id,instructor_id,classroom_id").limit(5000),
+      db.from("employees").select("id,complete_name").limit(1000),
+      db.from("classrooms").select("id,name").limit(500),
+    ]);
+    const dateToBatch = new Map((dates.data ?? []).map((d) => [d.id, d.batch_id]));
+    const empName = new Map((emps.data ?? []).map((e) => [e.id, e.complete_name]));
+    const roomName = new Map((rooms.data ?? []).map((r) => [r.id, r.name]));
+    const seen = new Map<string, { batch_id: string; instructor_name: string | null; room_name: string | null }>();
+    for (const a of assigns.data ?? []) {
+      const batchId = dateToBatch.get(a.batch_training_date_id);
+      if (!batchId || seen.has(batchId)) continue;
+      seen.set(batchId, { batch_id: batchId, instructor_name: empName.get(a.instructor_id) ?? null, room_name: roomName.get(a.classroom_id) ?? null });
+    }
+    batchStaffing = [...seen.values()];
+  }
   // Merge the payment-channel kind (receivable/payable) tolerantly — the column may not
   // be migrated yet, in which case every channel is treated as receivable.
   const kindByMethod = new Map<string, string>();
@@ -376,7 +398,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates, certificateTemplates, certificateReleases, certificateIssuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges, chargeEmployees, instructionTemplates }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges, chargeEmployees, instructionTemplates, batchStaffing }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {

@@ -811,3 +811,13 @@
 .reports-hub-body > .portal-page,
 .reports-hub-body > * > .portal-page { padding-top: 0; }
 .reports-hub .config-picker { margin-bottom: 4px; }
+
+/* Training calendar (Schedule Officer). */
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cal-dow { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--muted); text-align: center; padding: 4px 0; text-transform: uppercase; }
+.cal-cell { min-height: 84px; border: 1px solid var(--line, #dbe7ee); border-radius: 8px; padding: 5px 6px; background: #fff; display: flex; flex-direction: column; gap: 3px; }
+.cal-cell.empty { background: transparent; border-color: transparent; }
+.cal-cell.today { border-color: #f25615; box-shadow: 0 0 0 2px rgba(242, 86, 21, .15); }
+.cal-daynum { font-size: 11px; font-weight: 700; color: #405d70; }
+.cal-chip { font-size: 9.5px; font-weight: 700; color: #fff; border-radius: 5px; padding: 2px 5px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal-more { font-size: 10px; color: var(--muted); }
