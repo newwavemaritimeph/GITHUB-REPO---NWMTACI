@@ -387,8 +387,15 @@ export async function GET() {
   // Kept out of the main select so a pre-migration schema doesn't empty the expenses list.
   let expensesMerged = (expenses.data ?? []) as Record<string, unknown>[];
   {
-    const { data: ex } = await db.from("expenses").select("id,payment_channel,reference_number").order("created_at", { ascending: false }).limit(250);
+    const { data: ex } = await db.from("expenses").select("id,payment_channel,reference_number,purpose,requested_by").order("created_at", { ascending: false }).limit(250);
     if (ex) { const m = new Map(ex.map((r) => [(r as { id: string }).id, r])); expensesMerged = expensesMerged.map((e) => ({ ...e, ...(m.get((e as { id: string }).id) ?? {}) })); }
+    // Resolve the requester's display name so the voucher list can show who raised it.
+    const ids = [...new Set(expensesMerged.map((e) => (e as { requested_by?: string }).requested_by).filter(Boolean))] as string[];
+    if (ids.length) {
+      const { data: people } = await db.from("profiles").select("id,complete_name").in("id", ids);
+      const byId = new Map((people ?? []).map((p) => [p.id, p.complete_name]));
+      expensesMerged = expensesMerged.map((e) => ({ ...e, requested_by_name: byId.get((e as { requested_by?: string }).requested_by ?? "") ?? null }));
+    }
   }
   // Employee-charge management for the Accounting Manager (admin / accounting / hr): the charge list
   // plus a minimal employee roster to file against (accounting does not receive the full HR dataset).

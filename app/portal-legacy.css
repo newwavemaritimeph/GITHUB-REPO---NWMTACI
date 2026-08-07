@@ -907,3 +907,8 @@
 .kv-grid > div { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid #f0f5f8; padding: 5px 0; }
 .kv-grid span { font-size: 12px; color: var(--muted); font-weight: 600; }
 .kv-grid b { font-size: 12.5px; }
+
+/* Voucher table pager. */
+.pager { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; font-size: 12.5px; color: var(--muted); border-top: 1px solid #eef3f6; }
+.pager strong { color: var(--ink); }
+.pager select { min-height: 34px; border: 1px solid #cbdce4; border-radius: 7px; padding: 4px 8px; font: inherit; font-size: 12.5px; }

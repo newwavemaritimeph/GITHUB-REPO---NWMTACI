@@ -13,7 +13,7 @@ type TraineeRow = { id: string; trainee_number: string; legal_first_name: string
 type Channel = { id: string; code: string; name: string; requires_reference: boolean; allows_proof: boolean; active: boolean; kind?: string };
 type Charge = { id: string; name: string; default_amount_centavos: number; active: boolean; used_count: number };
 type Agency = { id: string; name: string; contact_name?: string | null; email?: string | null; mobile?: string | null; active: boolean };
-type Expense = { id: string; expense_number: string; payee: string; category: string; amount_centavos: number; status: string; created_at: string; payment_channel?: string | null; reference_number?: string | null };
+type Expense = { id: string; expense_number: string; payee: string; category: string; amount_centavos: number; status: string; created_at: string; payment_channel?: string | null; reference_number?: string | null; purpose?: string | null; requested_by_name?: string | null };
 const EXPENSE_CHANNELS = ["Cash", "GCash", "Unionbank", "Cheque", "PSBank", "Other"];
 type Payable = { id: string; description: string; amount_centavos: number; due_on?: string | null; status: string; partner_center_id?: string | null; created_at?: string };
 type Course = { id: string; code: string; name: string; delivery_type: string; duration_label?: string; duration_days?: number; training_mode?: string; category_id?: string; standard_price_centavos: number; updated_at?: string };
@@ -613,72 +613,171 @@ function SalesReport({ payments, payables }: { payments: Payment[]; payables: Pa
 }
 
 /* ---- Standalone Expense Vouchers module (own nav item) ---- */
+/**
+ * Expense vouchers (owner layout, Aug 2026). Cashiers raise vouchers;
+ * Accounting approves, rejects or marks them paid. Filter bar, four status
+ * cards with 7-day sparklines, a paginated voucher table, and the expense
+ * category / recurring payable catalogues.
+ */
 export function LiveVouchers({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
-  const canManage = role === "admin" || role === "accounting";
-  const canRaise = ["admin", "cashier"].includes(role);
-  const [busy, setBusy] = useState(false);
-  const [voucher, setVoucher] = useState<{ payee: string; category: string; amount: string; purpose: string; paymentChannel: string; referenceNumber: string } | null>(null);
-  const [error, setError] = useState("");
-  const [summaryDate, setSummaryDate] = useState(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date()));
+  const canDecide = role === "admin" || role === "accounting";
+  const today = manilaDay(new Date().toISOString());
+  const monthStart = today.slice(0, 8) + "01";
+  const [from, setFrom] = useState(monthStart), [to, setTo] = useState(today);
+  const [status, setStatus] = useState("All statuses"), [q, setQ] = useState("");
+  const [page, setPage] = useState(1), [perPage, setPerPage] = useState(10);
+  const [busy, setBusy] = useState(false), [msg, setMsg] = useState("");
+  const [openNew, setOpenNew] = useState(false);
+  const money = (c: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format((Number(c) || 0) / 100);
+
   async function post(body: Record<string, unknown>) {
-    setBusy(true);
+    setBusy(true); setMsg("");
     try {
       const r = await fetch("/api/staff/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
-      const j = await r.json();
-      if (!r.ok) throw new Error(j.error ?? "The action could not be completed.");
+      const j = await r.json(); if (!r.ok) throw new Error(j.error ?? "The action could not be completed.");
       await reload();
-    } finally { setBusy(false); }
+    } catch (e) { setMsg(e instanceof Error ? e.message : "The action could not be completed."); }
+    finally { setBusy(false); }
   }
-  return (
-    <div className="portal-page">
-      <div className="portal-heading"><div><span className="portal-eyebrow">Cashier / Accounting</span><h1>Expense vouchers</h1><p>Raise cash and expense vouchers; Accounting approves, rejects, or marks them paid.</p></div>{canRaise && <button className="portal-primary" disabled={busy} onClick={() => { setError(""); setVoucher({ payee: "", category: data.expenseCategories.find((c) => c.active)?.name ?? "Others", amount: "", purpose: "", paymentChannel: "Cash", referenceNumber: "" }); }}>+ Raise voucher</button>}</div>
-      <div className="portal-form" style={{ padding: "0 0 10px" }}><label>Daily summary date<input type="date" value={summaryDate} onChange={(e) => setSummaryDate(e.target.value)} /></label><label style={{ alignSelf: "end" }}><button type="button" className="portal-secondary" onClick={() => window.open(`/api/documents/expenses-daily?date=${summaryDate}`, "_blank", "noopener")}>Daily expenses summary (PDF)</button></label></div>
-      <section className="portal-panel">
-        <div className="portal-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Category</th><th>Channel</th><th>Reference</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
-          {data.expenses.map((e) => (
-            <tr key={e.id}>
-              <td><strong>{e.expense_number}</strong></td>
-              <td>{e.payee}</td>
-              <td>{e.category}</td>
-              <td>{e.payment_channel ?? "—"}</td>
-              <td>{e.reference_number ?? "—"}</td>
-              <td>{pesos(e.amount_centavos)}</td>
-              <td>{e.status}</td>
-              <td className="document-actions">
-                {canManage && e.status === "Pending" && <button disabled={busy} onClick={() => post({ action: "expense-decide", id: e.id, decision: "Approved" })}>Approve</button>}
-                {canManage && e.status === "Pending" && <button disabled={busy} onClick={() => post({ action: "expense-decide", id: e.id, decision: "Rejected" })}>Reject</button>}
-                {canManage && e.status === "Approved" && <button disabled={busy} onClick={() => post({ action: "expense-decide", id: e.id, decision: "Paid" })}>Mark paid</button>}
-                {(e.status === "Approved" || e.status === "Paid") && <a href={`/api/documents/expense/${e.id}`} target="_blank" rel="noreferrer">Generate</a>}
-              </td>
-            </tr>
-          ))}
-          {!data.expenses.length && <tr><td colSpan={8}><span className="portal-empty-copy">No vouchers yet.</span></td></tr>}
-        </tbody></table></div>
-      </section>
-      {voucher && (
-        <EditModal title="Raise expense voucher" busy={busy} saveLabel="Raise voucher" onClose={() => setVoucher(null)} onSave={async () => {
-          const amt = Math.round(Number(voucher.amount) * 100);
-          if (!voucher.payee.trim()) { setError("Payee is required."); return; }
-          if (!voucher.category.trim()) { setError("Category is required."); return; }
-          if (!Number.isFinite(amt) || amt <= 0) { setError("Enter a valid amount."); return; }
-          if (!voucher.purpose.trim()) { setError("Purpose is required."); return; }
-          await post({ action: "expense-create", payee: voucher.payee, category: voucher.category, amountCentavos: amt, purpose: voucher.purpose, paymentChannel: voucher.paymentChannel, referenceNumber: voucher.referenceNumber.trim() });
-          setVoucher(null);
-        }}>
-          {error && <div className="portal-message error full">{error}</div>}
-          <label className="full">Payee<input autoFocus value={voucher.payee} onChange={(e) => setVoucher({ ...voucher, payee: e.target.value })} /></label>
-          <label>Category<select value={voucher.category} onChange={(e) => setVoucher({ ...voucher, category: e.target.value })}>{data.expenseCategories.filter((c) => c.active).map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}{voucher.category && !data.expenseCategories.some((c) => c.active && c.name === voucher.category) && <option value={voucher.category}>{voucher.category}</option>}</select></label>
-          <label>Amount (PHP)<input type="number" min="0" step="0.01" value={voucher.amount} onChange={(e) => setVoucher({ ...voucher, amount: e.target.value })} /></label>
-          <label>Payment channel<select value={voucher.paymentChannel} onChange={(e) => setVoucher({ ...voucher, paymentChannel: e.target.value })}>{EXPENSE_CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
-          <label>Reference number<input value={voucher.referenceNumber} onChange={(e) => setVoucher({ ...voucher, referenceNumber: e.target.value })} placeholder="Cheque / txn no. (optional)" /></label>
-          <label className="full">Purpose / description<textarea rows={2} value={voucher.purpose} onChange={(e) => setVoucher({ ...voucher, purpose: e.target.value })} /></label>
-        </EditModal>
-      )}
+
+  type Vx = (typeof data.expenses)[number] & { purpose?: string | null; requested_by_name?: string | null };
+  const all = data.expenses as Vx[];
+  const inRange = (v: Vx) => manilaDay(v.created_at) >= from && manilaDay(v.created_at) <= to;
+  const ranged = all.filter(inRange);
+  const rows = ranged
+    .filter((v) => status === "All statuses" || v.status === status)
+    .filter((v) => !q.trim() || `${v.expense_number} ${v.payee} ${v.purpose ?? ""} ${v.reference_number ?? ""} ${v.category}`.toLowerCase().includes(q.trim().toLowerCase()))
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const pages = Math.max(1, Math.ceil(rows.length / perPage));
+  const shown = rows.slice((Math.min(page, pages) - 1) * perPage, Math.min(page, pages) * perPage);
+  const sum = (list: Vx[]) => list.reduce((s, v) => s + Number(v.amount_centavos), 0);
+  const pending = ranged.filter((v) => v.status === "Pending"), approved = ranged.filter((v) => v.status === "Approved"), paidV = ranged.filter((v) => v.status === "Paid");
+
+  // 7-day sparkline of voucher counts per status.
+  const days = Array.from({ length: 7 }, (_, i) => manilaDay(new Date(Date.now() - (6 - i) * 86400000).toISOString()));
+  const spark = (list: Vx[]) => { const counts = days.map((d) => list.filter((v) => manilaDay(v.created_at) === d).length); const max = Math.max(1, ...counts); return counts.map((c, i) => `${(i / 6) * 100},${28 - (c / max) * 24}`).join(" "); };
+
+  const cards: { label: string; n: number; total: number; icon: string; accent: string; list: Vx[] }[] = [
+    { label: "Total vouchers", n: ranged.length, total: sum(ranged), icon: "▤", accent: "#0571d0", list: ranged },
+    { label: "Pending approval", n: pending.length, total: sum(pending), icon: "◷", accent: "#f2a615", list: pending },
+    { label: "Approved / for release", n: approved.length, total: sum(approved), icon: "✓", accent: "#0a7d3b", list: approved },
+    { label: "Marked paid", n: paidV.length, total: sum(paidV), icon: "◈", accent: "#7c3aed", list: paidV },
+  ];
+  const tone = (s: string) => (s === "Pending" ? "pending" : s === "Rejected" ? "cancelled" : "active");
+
+  function exportCsv() {
+    downloadCsv(`expense-vouchers-${from}_to_${to}.csv`, [["Voucher", "Payee", "Purpose", "Category", "Channel", "Reference", "Amount (PHP)", "Status", "Requested by", "Date"],
+      ...rows.map((v) => [v.expense_number, v.payee, v.purpose ?? "", v.category, v.payment_channel ?? "", v.reference_number ?? "", Number(v.amount_centavos) / 100, v.status, v.requested_by_name ?? "", manilaDay(v.created_at)])]);
+  }
+
+  return <div className="portal-page">
+    <div className="portal-heading"><div><span className="portal-eyebrow">Cashier / accounting</span><h1>Expense vouchers</h1><p>Raise cash and expense vouchers; accounting approves, rejects, or marks them paid.</p></div></div>
+    {msg && <div className="portal-message error" role="alert">{msg}</div>}
+
+    <section className="portal-panel" style={{ padding: 14, marginBottom: 14, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
+      <label className="portal-field-inline">Start date<input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} /></label>
+      <label className="portal-field-inline">End date<input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} /></label>
+      <label className="portal-field-inline">Status<select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option>All statuses</option><option>Pending</option><option>Approved</option><option>Paid</option><option>Rejected</option></select></label>
+      <label className="portal-field-inline" style={{ minWidth: 240, flex: 1 }}>Search<input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Voucher #, payee, purpose or reference" /></label>
+      <button type="button" className="portal-secondary" onClick={exportCsv} disabled={!rows.length}>Export CSV</button>
+      <a className="portal-secondary" href={`/api/documents/expenses-daily?date=${to}`} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center" }}>Daily summary PDF</a>
+      <button type="button" className="portal-primary" onClick={() => setOpenNew((v) => !v)}>{openNew ? "Close" : "+ New voucher"}</button>
+    </section>
+
+    {openNew && <NewVoucherForm data={data} busy={busy} onSave={async (body) => { await post(body); setOpenNew(false); }} />}
+
+    <div className="fin-cards" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>{cards.map((c) => <article key={c.label} style={{ borderLeftColor: c.accent }}><i style={{ background: `${c.accent}1a`, color: c.accent }}>{c.icon}</i><div style={{ flex: 1 }}><span>{c.label}</span><strong>{c.n}</strong><small>{money(c.total)}</small></div><svg viewBox="0 0 100 28" width="72" height="28" preserveAspectRatio="none" aria-hidden><polyline points={spark(c.list)} fill="none" stroke={c.accent} strokeWidth="2" vectorEffect="non-scaling-stroke" /></svg></article>)}</div>
+
+    <section className="portal-panel" style={{ marginTop: 16 }}>
+      <div className="panel-heading"><div><h2>Voucher records</h2><p>{rows.length} voucher{rows.length === 1 ? "" : "s"} in range</p></div></div>
+      <div className="portal-table"><table><thead><tr><th>Voucher #</th><th>Payee / purpose</th><th>Category</th><th>Channel / reference</th><th>Amount</th><th>Status</th><th>Requested by</th>{canDecide && <th>Action</th>}</tr></thead><tbody>
+        {shown.map((v) => <tr key={v.id}>
+          <td><strong>{v.expense_number}</strong></td>
+          <td><strong>{v.payee}</strong><small>{v.purpose ?? ""}</small></td>
+          <td>{v.category}</td>
+          <td>{v.payment_channel ?? "—"}<small>{v.reference_number ? `Ref: ${v.reference_number}` : ""}</small></td>
+          <td>{money(v.amount_centavos)}</td>
+          <td><span className={`portal-badge ${tone(v.status)}`}>{v.status}</span></td>
+          <td>{v.requested_by_name ?? "—"}<small>{manilaDay(v.created_at)}</small></td>
+          {canDecide && <td className="document-actions">
+            {v.status === "Pending" && <><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: v.id, approve: true })}>Approve</button><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: v.id, approve: false })}>Reject</button></>}
+            {v.status === "Approved" && <button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: v.id, approve: true, markPaid: true })}>Mark paid</button>}
+            {(v.status === "Paid" || v.status === "Rejected") && <span className="portal-empty-copy" style={{ margin: 0 }}>—</span>}
+          </td>}
+        </tr>)}
+      </tbody></table>{!shown.length && <p className="portal-empty-copy">No vouchers match these filters.</p>}</div>
+      <div className="pager">
+        <span>Showing {shown.length ? (Math.min(page, pages) - 1) * perPage + 1 : 0} to {(Math.min(page, pages) - 1) * perPage + shown.length} of {rows.length}</span>
+        <span style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+          <button type="button" className="ghost-button" disabled={page <= 1} onClick={() => setPage(1)}>«</button>
+          <button type="button" className="ghost-button" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>‹</button>
+          <strong>{Math.min(page, pages)} / {pages}</strong>
+          <button type="button" className="ghost-button" disabled={page >= pages} onClick={() => setPage((p) => Math.min(pages, p + 1))}>›</button>
+          <select value={perPage} onChange={(e) => { setPerPage(Number(e.target.value)); setPage(1); }}>{[10, 25, 50].map((n) => <option key={n} value={n}>{n} / page</option>)}</select>
+        </span>
+      </div>
+    </section>
+
+    <div className="dashboard-panels">
+      <CatalogPanel title="Expense categories" empty="No categories yet." items={data.expenseCategories.map((c) => ({ id: c.id, primary: c.name, secondary: c.active ? "Active" : "Inactive", active: c.active }))}
+        canManage={canDecide} busy={busy}
+        onAdd={(name) => post({ action: "expense-category-save", name })}
+        onRemove={(id, name) => post({ action: "expense-category-save", id, name, remove: true })} addLabel="+ Add category" placeholder="Category name" />
+      <RecurringPayables data={data} canManage={canDecide} busy={busy} post={post} />
     </div>
-  );
+  </div>;
 }
 
-/* ---- Standalone Inventory module (own left-nav item) ---- */
+function NewVoucherForm({ data, busy, onSave }: { data: AccountingData; busy: boolean; onSave: (body: Record<string, unknown>) => Promise<void> }) {
+  const [payee, setPayee] = useState(""), [category, setCategory] = useState(data.expenseCategories[0]?.name ?? ""), [amount, setAmount] = useState("");
+  const [purpose, setPurpose] = useState(""), [chan, setChan] = useState(EXPENSE_CHANNELS[0]), [ref, setRef] = useState("");
+  const cents = Math.round(Number(amount) * 100);
+  const ready = payee.trim() && category && purpose.trim() && Number.isFinite(cents) && cents > 0;
+  return <section className="portal-panel" style={{ marginBottom: 14 }}>
+    <div className="panel-heading"><div><h2>New voucher</h2><p>Raised for accounting approval</p></div></div>
+    <div className="portal-form">
+      <label>Payee<input value={payee} onChange={(e) => setPayee(e.target.value)} /></label>
+      <label>Category<select value={category} onChange={(e) => setCategory(e.target.value)}>{data.expenseCategories.map((c) => <option key={c.id}>{c.name}</option>)}</select></label>
+      <label>Amount (PHP)<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+      <label>Payment channel<select value={chan} onChange={(e) => setChan(e.target.value)}>{EXPENSE_CHANNELS.map((c) => <option key={c}>{c}</option>)}</select></label>
+      <label>Reference number<input value={ref} onChange={(e) => setRef(e.target.value)} placeholder="Optional" /></label>
+      <label className="full">Purpose<input value={purpose} onChange={(e) => setPurpose(e.target.value)} /></label>
+      <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || !ready} onClick={() => void onSave({ action: "expense-create", payee: payee.trim(), category, amountCentavos: cents, purpose: purpose.trim(), paymentChannel: chan, referenceNumber: ref.trim() })}>{busy ? "Saving…" : "Submit voucher"}</button></div>
+    </div>
+  </section>;
+}
+
+function CatalogPanel({ title, items, empty, canManage, busy, onAdd, onRemove, addLabel, placeholder }: { title: string; items: { id: string; primary: string; secondary: string; active: boolean }[]; empty: string; canManage: boolean; busy: boolean; onAdd: (name: string) => Promise<void>; onRemove: (id: string, name: string) => Promise<void>; addLabel: string; placeholder: string }) {
+  const [name, setName] = useState("");
+  return <section className="portal-panel live-list">
+    <div className="panel-heading"><div><h2>{title}</h2></div><span className="slot-count">{items.length}</span></div>
+    {canManage && <div style={{ display: "flex", gap: 8, padding: "0 0 10px" }}>
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder={placeholder} style={{ flex: 1, minHeight: 42, border: "1px solid #cbdce4", borderRadius: 8, padding: "8px 11px", font: "inherit" }} />
+      <button type="button" className="portal-primary" disabled={busy || !name.trim()} onClick={async () => { await onAdd(name.trim()); setName(""); }}>{addLabel}</button>
+    </div>}
+    {items.map((it) => <div className="live-row-item" key={it.id}><div><strong>{it.primary}</strong><small>{it.secondary}</small></div>{canManage && <button type="button" className="ghost-button" disabled={busy} onClick={() => onRemove(it.id, it.primary)}>Remove</button>}</div>)}
+    {!items.length && <p className="portal-empty-copy">{empty}</p>}
+  </section>;
+}
+
+function RecurringPayables({ data, canManage, busy, post }: { data: AccountingData; canManage: boolean; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
+  const [desc, setDesc] = useState(""), [amt, setAmt] = useState(""), [due, setDue] = useState("");
+  const money = (c: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format((Number(c) || 0) / 100);
+  const cents = Math.round(Number(amt) * 100);
+  return <section className="portal-panel live-list">
+    <div className="panel-heading"><div><h2>Recurring monthly payables</h2><p>Rent, utilities, remittances</p></div><span className="slot-count">{data.payables.length}</span></div>
+    {canManage && <div className="portal-form" style={{ padding: "0 0 10px" }}>
+      <label className="full">Payable name<input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Electricity" /></label>
+      <label>Default amount (PHP)<input type="number" min="0" step="0.01" value={amt} onChange={(e) => setAmt(e.target.value)} /></label>
+      <label>Due date<input type="date" value={due} onChange={(e) => setDue(e.target.value)} /></label>
+      <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || !desc.trim() || !(cents > 0)} onClick={async () => { await post({ action: "payable-save", description: desc.trim(), amountCentavos: cents, dueOn: due || null }); setDesc(""); setAmt(""); setDue(""); }}>+ Add payable</button></div>
+    </div>}
+    <div className="portal-table"><table><thead><tr><th>Payable</th><th>Due</th><th>Amount</th><th>Status</th>{canManage && <th /> }</tr></thead><tbody>
+      {data.payables.slice(0, 12).map((p) => <tr key={p.id}><td><strong>{p.description}</strong></td><td>{p.due_on ?? "—"}</td><td>{money(p.amount_centavos)}</td><td><span className={`portal-badge ${p.status === "Paid" ? "active" : "pending"}`}>{p.status}</span></td>{canManage && <td className="document-actions"><button type="button" disabled={busy} onClick={() => post({ action: "payable-save", id: p.id, description: p.description, remove: true })}>Remove</button></td>}</tr>)}
+    </tbody></table>{!data.payables.length && <p className="portal-empty-copy">No recurring payables yet.</p>}</div>
+  </section>;
+}
+
 export function LiveInventory({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
   const canManage = role === "admin" || role === "accounting";
   const [busy, setBusy] = useState(false);
