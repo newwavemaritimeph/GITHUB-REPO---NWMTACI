@@ -141,7 +141,7 @@ function PortalContent({active,role,data,query,go,open,onPay,canEnroll,canSchedu
   if(active==="Approvals")return <ApprovalsModule data={data as unknown as Parameters<typeof ApprovalsModule>[0]["data"]} role={gateRole} reload={reload}/>;
   if(active==="Payables")return <PayablesModule data={data as unknown as Parameters<typeof PayablesModule>[0]["data"]}/>;
   if(active==="Cash position")return <CashPositionModule data={data as unknown as Parameters<typeof CashPositionModule>[0]["data"]}/>;
-  if(active==="Accounting")return <LiveAccounting data={data} role={gateRole} reload={reload}/>;
+  if(active==="Accounting")return <LiveAccounting data={data} role={gateRole} reload={reload} go={m=>go(m as Module)}/>;
   if(active==="Expenses")return <LiveExpenses data={data} role={gateRole} reload={reload}/>;
   if(active==="Inventory")return <LiveInventory data={data} role={gateRole} reload={reload}/>;
   if(active==="HR & payroll"&&["admin","hr"].includes(gateRole))return <LiveHr data={data} role={gateRole} reload={reload}/>;

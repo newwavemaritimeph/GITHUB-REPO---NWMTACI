@@ -329,7 +329,7 @@ function AccountingSummaryReport({ data }: { data: AccountingData }) {
   );
 }
 
-export function LiveAccounting({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
+export function LiveAccounting({ data, role, reload, go }: { data: AccountingData; role: string; reload: () => Promise<void>; go?: (module: string) => void }) {
   const [tab, setTab] = useState<"Dashboard" | "Sales" | "Reconciliation" | "Cashier closing" | "Setup">(role === "accounting" ? "Sales" : role === "admin" ? "Dashboard" : "Cashier closing");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -362,7 +362,7 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
 
       {tab === "Dashboard" && <AccountingDashboard data={data} role={role} reload={reload} />}
 
-      {tab === "Sales" && <SalesReport payments={data.payments} payables={data.payables} />}
+      {tab === "Sales" && <AccountingOverview data={data} go={go} />}
 
       {tab === "Reconciliation" && <Reconciliation payments={data.payments} channels={data.paymentMethods} />}
 
@@ -409,6 +409,170 @@ export function LiveAccounting({ data, role, reload }: { data: AccountingData; r
 }
 
 /* ---- Date-sensitive sales + payables ---- */
+
+/**
+ * Accounting module — Sales overview (owner layout, Aug 2026). A live-ledger
+ * control panel: period stat cards, an alerts strip, sales-by-channel donut,
+ * cashier monitoring, receivables / payables / voucher summaries, recent
+ * activity and quick actions. Every figure comes from the existing payload.
+ */
+function AccountingOverview({ data, go }: { data: AccountingData; go?: (module: string) => void }) {
+  const today = manilaDay(new Date().toISOString());
+  const monthStart = today.slice(0, 8) + "01";
+  const weekEnd = manilaDay(new Date(Date.now() + 7 * 86400000).toISOString());
+  const [span, setSpan] = useState<"Daily" | "Weekly" | "Monthly">("Daily");
+  const money = (c: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format((Number(c) || 0) / 100);
+  const clock = (v?: string | null) => (v ? new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(v)) : "—");
+  const from = span === "Daily" ? today : span === "Weekly" ? manilaDay(new Date(Date.now() - 6 * 86400000).toISOString()) : monthStart;
+  const inRange = (v?: string | null) => !!v && manilaDay(v) >= from && manilaDay(v) <= today;
+
+  const channel = (m: string) => { const t = (m || "").toLowerCase(); if (t.includes("gcash")) return "GCash"; if (t.includes("cash")) return "Cash"; if (t.includes("bank") || t.includes("union") || t.includes("psb") || t.includes("transfer")) return "Bank"; return "Others"; };
+  const paid = data.payments.filter((p) => inRange(p.received_at));
+  const sales = paid.reduce((s, p) => s + Number(p.amount_centavos), 0);
+  const CH = ["Cash", "GCash", "Bank", "Others"] as const;
+  const COLORS: Record<string, string> = { Cash: "#0571d0", GCash: "#0a7d3b", Bank: "#f2a615", Others: "#7c3aed" };
+  const byChannel = { Cash: 0, GCash: 0, Bank: 0, Others: 0 } as Record<string, number>;
+  for (const p of paid) byChannel[channel(p.method)] += Number(p.amount_centavos);
+  const verified = paid.filter((p) => p.verification_state === "Verified").length;
+
+  const live = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled");
+  const bal = (e: (typeof live)[number]) => Math.max(0, dueOf(e) - Number(e.paid_centavos));
+  const owing = live.filter((e) => bal(e) > 0).sort((a, b) => bal(b) - bal(a));
+  const outstanding = owing.reduce((s, e) => s + bal(e), 0);
+  const startOf = (e: (typeof live)[number]) => { const b = Array.isArray(e.batches) ? e.batches[0] : e.batches; return b?.starts_on ?? e.scheduled_on ?? null; };
+  const endOf = (e: (typeof live)[number]) => { const b = Array.isArray(e.batches) ? e.batches[0] : e.batches; return b?.ends_on ?? e.scheduled_on ?? null; };
+  const beforeTraining = owing.filter((e) => (startOf(e) ?? "9999") > today).reduce((s, e) => s + bal(e), 0);
+  const inTraining = owing.filter((e) => (startOf(e) ?? "9999") <= today && (endOf(e) ?? "0000") >= today).reduce((s, e) => s + bal(e), 0);
+  const pastDue = owing.filter((e) => (endOf(e) ?? "9999") < today).reduce((s, e) => s + bal(e), 0);
+  const nameOf = (e: (typeof live)[number]) => { const t = one(e.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null); return t ? `${t.legal_first_name} ${t.legal_last_name}` : e.enrollment_number; };
+
+  const disbursed = data.expenses.filter((e) => inRange(e.created_at) && (e.status === "Paid" || e.status === "Approved"));
+  const disbursedTotal = disbursed.reduce((s, e) => s + Number(e.amount_centavos), 0);
+  const pendingVouchers = data.expenses.filter((e) => e.status === "Pending");
+  const approvedVouchers = data.expenses.filter((e) => e.status === "Approved" || e.status === "Paid").length;
+  const rejectedVouchers = data.expenses.filter((e) => e.status === "Rejected").length;
+  const recentVouchers = [...data.expenses].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5);
+
+  const openPayables = data.payables.filter((p) => p.status !== "Paid");
+  const payablesTotal = openPayables.reduce((s, p) => s + Number(p.amount_centavos), 0);
+  const dueToday = openPayables.filter((p) => p.due_on === today).reduce((s, p) => s + Number(p.amount_centavos), 0);
+  const dueWeek = openPayables.filter((p) => p.due_on && p.due_on > today && p.due_on <= weekEnd).reduce((s, p) => s + Number(p.amount_centavos), 0);
+  const overdue = openPayables.filter((p) => p.due_on && p.due_on < today).reduce((s, p) => s + Number(p.amount_centavos), 0);
+  const topPayees = [...openPayables].sort((a, b) => Number(b.amount_centavos) - Number(a.amount_centavos)).slice(0, 3);
+
+  const closingToday = data.cashierClosings.find((c) => c.closing_date === today) ?? null;
+  const variance = Number(closingToday?.variance_centavos ?? 0);
+  const variancePct = closingToday && Number(closingToday.expected_cash_centavos) > 0 ? (Math.abs(variance) / Number(closingToday.expected_cash_centavos)) * 100 : 0;
+  const closingsPending = data.cashierClosings.filter((c) => (c.status || "").toLowerCase() === "open" || (c.status || "").toLowerCase().includes("pending")).length;
+  const lastPayment = [...data.payments].filter((p) => p.received_at).sort((a, b) => (b.received_at ?? "").localeCompare(a.received_at ?? ""))[0];
+
+  const accounts = [...data.payments.reduce((m, p) => { const k = p.receiving_account || channel(p.method); return m.set(k, (m.get(k) ?? 0) + Number(p.amount_centavos)); }, new Map<string, number>()).entries()].sort((a, b) => b[1] - a[1]);
+  const paidExpenses = data.expenses.filter((e) => e.status === "Paid").reduce((s, e) => s + Number(e.amount_centavos), 0);
+  const available = accounts.reduce((s, [, v]) => s + v, 0) - paidExpenses;
+  const [showCash, setShowCash] = useState(false);
+
+  const refundRequests = data.requests.filter((r) => r.status === "Pending" && ["Refund", "Cancellation"].includes(r.request_type));
+  const alerts: { label: string; n: number; tone: "High" | "Medium" | "Low"; color: string }[] = [
+    { label: "Expense vouchers", n: pendingVouchers.length, tone: "High", color: "#f25615" },
+    { label: "Payment adjustments", n: data.pendingCharges.length, tone: "Medium", color: "#f2a615" },
+    { label: "Refund / cancellation", n: refundRequests.length, tone: "Medium", color: "#f2a615" },
+    { label: "Fee waivers", n: data.pendingDiscounts.length, tone: "Low", color: "#0a7d3b" },
+    { label: "Cashier closing", n: closingsPending, tone: "High", color: "#a52020" },
+  ];
+
+  const activity = [
+    ...data.payments.filter((p) => p.received_at).map((p) => ({ at: p.received_at as string, text: `Collection · ${p.method}`, amount: Number(p.amount_centavos) })),
+    ...data.expenses.map((e) => ({ at: e.created_at, text: `Voucher ${e.expense_number} · ${e.status}`, amount: -Number(e.amount_centavos) })),
+  ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 5);
+
+  const cards: { label: string; value: string; note: string; icon: string; accent: string; onClick?: () => void }[] = [
+    { label: `Sales ${span.toLowerCase()}`, value: money(sales), note: `${paid.length} transactions`, icon: "₱", accent: "#0571d0" },
+    { label: "Payments posted", value: String(paid.length), note: "In selected range", icon: "▤", accent: "#0a7d3b" },
+    { label: "Outstanding receivables", value: money(outstanding), note: `${owing.length} unpaid`, icon: "◷", accent: "#7c3aed" },
+    { label: "Payables due", value: money(payablesTotal), note: `${openPayables.length} open`, icon: "▦", accent: "#f2a615" },
+    { label: "Cashier variance", value: money(variance), note: closingToday ? `${variancePct.toFixed(2)}% of cash` : "No closing today", icon: "⚖", accent: "#b45309" },
+    { label: "Available cash / bank", value: money(available), note: "Click for breakdown", icon: "◈", accent: "#0e7490", onClick: () => setShowCash((s) => !s) },
+    { label: "Pending vouchers", value: String(pendingVouchers.length), note: "Awaiting approval", icon: "✉", accent: "#be185d" },
+    { label: "Disbursements this period", value: money(disbursedTotal), note: `${disbursed.length} posted`, icon: "↺", accent: "#f25615" },
+  ];
+
+  // donut geometry
+  const R = 54, C = 2 * Math.PI * R;
+  let acc = 0;
+  const arcs = CH.map((k) => { const frac = sales ? byChannel[k] / sales : 0; const seg = { k, frac, offset: acc }; acc += frac; return seg; });
+
+  return <>
+    <div className="portal-tabs">{(["Daily", "Weekly", "Monthly"] as const).map((s) => <button key={s} type="button" className={span === s ? "active" : ""} onClick={() => setSpan(s)}>{s}</button>)}</div>
+    <div className="fin-cards">{cards.map((c) => <article key={c.label} style={{ borderLeftColor: c.accent, cursor: c.onClick ? "pointer" : undefined }} onClick={c.onClick}><i style={{ background: `${c.accent}1a`, color: c.accent }}>{c.icon}</i><div><span>{c.label}</span><strong>{c.value}</strong><small>{c.note}</small></div></article>)}</div>
+    {showCash && <section className="portal-panel live-list" style={{ marginTop: 12 }}><div className="panel-heading"><div><h2>Cash &amp; bank breakdown</h2><p>Per receiving account, less paid expenses</p></div><span className="slot-count">{money(available)}</span></div>{accounts.map(([n, v]) => <div className="live-row-item" key={n}><div><strong>{n}</strong></div><span className="slot-count">{money(v)}</span></div>)}<div className="live-row-item"><div><strong>Less: paid expenses</strong></div><span className="slot-count" style={{ color: "#a52020" }}>−{money(paidExpenses)}</span></div></section>}
+
+    <section className="portal-panel alerts-bar" style={{ marginTop: 16 }}>
+      <strong>🔔 Accounting alerts</strong>
+      {alerts.map((a) => <span key={a.label}><i style={{ background: a.color }} />{a.label} <b>{a.n}</b> <em className={`prio ${a.tone.toLowerCase()}`}>{a.tone}</em></span>)}
+    </section>
+
+    <div className="fin-3col">
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Sales by channel</h2></div></div>
+        <div className="donut-wrap">
+          <svg viewBox="0 0 140 140" width="132" height="132" role="img" aria-label="Sales by channel">
+            <circle cx="70" cy="70" r={R} fill="none" stroke="#eef3f6" strokeWidth="18" />
+            {arcs.filter((a) => a.frac > 0).map((a) => <circle key={a.k} cx="70" cy="70" r={R} fill="none" stroke={COLORS[a.k]} strokeWidth="18" strokeDasharray={`${a.frac * C} ${C}`} strokeDashoffset={-a.offset * C} transform="rotate(-90 70 70)" />)}
+            <text x="70" y="66" textAnchor="middle" fontSize="12" fontWeight="700" fill="#12303f">{money(sales).replace("₱", "₱")}</text>
+            <text x="70" y="82" textAnchor="middle" fontSize="9" fill="#5f7d8e">Total sales</text>
+          </svg>
+          <div className="donut-legend">{CH.map((k) => <div key={k}><i style={{ background: COLORS[k] }} />{k}<b>{money(byChannel[k])}</b><em>{sales ? ((byChannel[k] / sales) * 100).toFixed(1) : "0.0"}%</em></div>)}<div className="total"><span>Total</span><b>{money(sales)}</b></div></div>
+        </div>
+        <p className="portal-empty-copy" style={{ margin: "6px 0 0" }}>{paid.length} transactions · {verified} verified · {paid.length - verified} for verification</p>
+      </section>
+
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Cashier monitoring</h2></div><span className={`portal-badge ${closingToday ? (variance === 0 ? "active" : "cancelled") : "pending"}`}>{closingToday?.status ?? "No closing"}</span></div>
+        {closingToday ? <div className="kv-grid">
+          <div><span>Transactions</span><b>{paid.length}</b></div>
+          <div><span>System cash</span><b>{money(closingToday.expected_cash_centavos)}</b></div>
+          <div><span>Actual cash</span><b>{closingToday.actual_cash_centavos == null ? "—" : money(closingToday.actual_cash_centavos)}</b></div>
+          <div><span>Variance</span><b style={{ color: variance === 0 ? "#0a7d3b" : "#a52020" }}>{money(variance)}</b></div>
+          <div><span>Variance %</span><b>{variancePct.toFixed(2)}%</b></div>
+          <div><span>Last transaction</span><b>{clock(lastPayment?.received_at)}</b></div>
+        </div> : <p className="portal-empty-copy">No closing opened for today.</p>}
+      </section>
+
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Receivables overview</h2></div></div>
+        <div className="pill-row">
+          <div><span>Total outstanding</span><b>{money(outstanding)}</b></div>
+          <div className="warn"><span>Due before training</span><b>{money(beforeTraining)}</b></div>
+          <div className="ok"><span>In training</span><b>{money(inTraining)}</b></div>
+          <div className="bad"><span>Past due</span><b>{money(pastDue)}</b></div>
+        </div>
+        {owing.slice(0, 3).map((e, i) => <div className="live-row-item" key={e.id}><div><strong>{i + 1}. {nameOf(e)}</strong></div><span className="slot-count">{money(bal(e))}</span></div>)}
+        {!owing.length && <p className="portal-empty-copy">Every enrollment is settled.</p>}
+      </section>
+    </div>
+
+    <div className="fin-3col">
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Payables overview</h2></div></div>
+        <div className="pill-row"><div><span>Due today</span><b>{money(dueToday)}</b></div><div className="warn"><span>Due this week</span><b>{money(dueWeek)}</b></div><div className="bad"><span>Overdue</span><b>{money(overdue)}</b></div></div>
+        {topPayees.map((p, i) => <div className="live-row-item" key={p.id}><div><strong>{i + 1}. {p.description}</strong></div><span className="slot-count">{money(p.amount_centavos)}</span></div>)}
+        {!topPayees.length && <p className="portal-empty-copy">No open payables.</p>}
+      </section>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Expense voucher summary</h2></div></div>
+        <div className="pill-row"><div><span>Pending</span><b>{pendingVouchers.length}</b></div><div className="ok"><span>Approved</span><b>{approvedVouchers}</b></div><div className="bad"><span>Rejected</span><b>{rejectedVouchers}</b></div></div>
+        <div className="portal-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Amount</th><th>Status</th></tr></thead><tbody>
+          {recentVouchers.map((e) => <tr key={e.id}><td>{e.expense_number}</td><td>{e.payee}</td><td>{money(e.amount_centavos)}</td><td><span className={`portal-badge ${e.status === "Pending" ? "pending" : e.status === "Rejected" ? "cancelled" : "active"}`}>{e.status}</span></td></tr>)}
+        </tbody></table>{!recentVouchers.length && <p className="portal-empty-copy">No vouchers yet.</p>}</div>
+      </section>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Recent financial activity</h2></div></div>
+        {activity.map((a, i) => <div className="live-row-item" key={i}><div><strong><span style={{ color: a.amount < 0 ? "#a52020" : "#0a7d3b", marginRight: 6 }}>{a.amount < 0 ? "↓" : "↑"}</span>{a.text}</strong></div><span className="slot-count" style={{ color: a.amount < 0 ? "#a52020" : "#0a7d3b" }}>{a.amount < 0 ? "− " : "+ "}{money(Math.abs(a.amount))}<small style={{ color: "var(--muted)", marginLeft: 8 }}>{clock(a.at)}</small></span></div>)}
+        {!activity.length && <p className="portal-empty-copy">No activity yet.</p>}
+      </section>
+    </div>
+
+    <section className="portal-panel quick-bar" style={{ marginTop: 16 }}>
+      <strong>Quick actions</strong>
+      {[["▤", "Review vouchers", `${pendingVouchers.length} pending`, "Approvals"], ["₱", "Verify payments", `${paid.length - verified} unverified`, "Payments"], ["◷", "View receivables", `${owing.length} unpaid`, "Receivables"], ["⚖", "Review cashier", closingToday ? "Session open" : "No session", "Cashier closing"], ["▦", "Financial reports", "Statements & exports", "Reports"]].map(([icon, label, note, mod]) => <button type="button" key={label} onClick={() => go?.(mod)}><i>{icon}</i><span><b>{label}</b>{note}</span></button>)}
+    </section>
+  </>;
+}
+
 function SalesReport({ payments, payables }: { payments: Payment[]; payables: Payable[] }) {
   const [span, setSpan] = useState<"Daily" | "Weekly" | "Monthly">("Daily");
   const view = useMemo(() => {
