@@ -36,6 +36,7 @@ export type AccountingData = {
   expenseCategories: { id: string; name: string; active: boolean }[];
   inventoryItems: InventoryItem[]; inventoryMovements: InventoryMovement[];
   cashierClosings: { id: string; closing_date: string; opening_cash_centavos: number; cash_collections_centavos: number; online_collections_centavos: number; expenses_centavos: number; expected_cash_centavos: number; actual_cash_centavos?: number | null; variance_centavos?: number | null; status: string }[];
+  profile?: { complete_name: string };
   requests: { id: string; request_number: string; request_type: string; requested_values: { amountCentavos?: number } | null; reason: string; status: string; created_at: string; trainees?: { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null }[];
   trainees: TraineeRow[];
   pendingDiscounts: PendingDiscount[];
@@ -63,19 +64,23 @@ export function AccountingDashboard({ data, role, reload }: { data: AccountingDa
   const [view, setView] = useState<"Operations" | "Summary report">("Operations");
   return <>
     <div className="portal-tabs" style={{ marginBottom: 14 }}>{(["Operations", "Summary report"] as const).map((v) => <button key={v} type="button" className={view === v ? "active" : ""} onClick={() => setView(v)}>{v}</button>)}</div>
-    {view === "Operations" ? <AccountingOperations data={data} role={role} reload={reload} /> : <AccountingSummaryReport data={data} />}
+    {view === "Operations" ? <AccountingOperations data={data} role={role} reload={reload} profileName={data.profile?.complete_name} /> : <AccountingSummaryReport data={data} />}
   </>;
 }
 
-function AccountingOperations({ data, role, reload }: { data: AccountingData; role?: string; reload?: () => Promise<void> }) {
+function AccountingOperations({ data, role, reload, profileName }: { data: AccountingData; role?: string; reload?: () => Promise<void>; profileName?: string }) {
   const canManage = role === "admin" || role === "accounting";
   const today = manilaDay(new Date().toISOString());
   const monthStart = today.slice(0, 8) + "01";
   const weekEnd = manilaDay(new Date(Date.now() + 7 * 86400000).toISOString());
   const [busy, setBusy] = useState(false), [msg, setMsg] = useState("");
   const [showCash, setShowCash] = useState(false);
+  const [span, setSpan] = useState<"Today" | "This week" | "This month">("Today");
   const money = (c: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format((Number(c) || 0) / 100);
+  const clock = (v?: string | null) => (v ? new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(v)) : "—");
   const inMonth = (v?: string | null) => !!v && manilaDay(v) >= monthStart && manilaDay(v) <= today;
+  const spanFrom = span === "Today" ? today : span === "This week" ? manilaDay(new Date(Date.now() - 6 * 86400000).toISOString()) : monthStart;
+  const inSpan = (v?: string | null) => !!v && manilaDay(v) >= spanFrom && manilaDay(v) <= today;
 
   async function post(body: Record<string, unknown>) {
     setBusy(true); setMsg("");
@@ -87,158 +92,146 @@ function AccountingOperations({ data, role, reload }: { data: AccountingData; ro
     finally { setBusy(false); }
   }
 
-  // --- collections -------------------------------------------------------
-  const paidToday = data.payments.filter((p) => manilaDay(p.received_at) === today);
-  const collectedToday = paidToday.reduce((s, p) => s + Number(p.amount_centavos), 0);
+  // collections -----------------------------------------------------------
+  const spanPayments = data.payments.filter((p) => inSpan(p.received_at));
+  const collectedSpan = spanPayments.reduce((s, p) => s + Number(p.amount_centavos), 0);
   const collectedMonth = data.payments.filter((p) => inMonth(p.received_at)).reduce((s, p) => s + Number(p.amount_centavos), 0);
   const channel = (m: string) => { const t = (m || "").toLowerCase(); if (t.includes("gcash")) return "GCash"; if (t.includes("cash")) return "Cash"; if (t.includes("bank") || t.includes("union") || t.includes("psb") || t.includes("transfer")) return "Bank"; return "Others"; };
   const byChannel = { Cash: 0, GCash: 0, Bank: 0, Others: 0 } as Record<string, number>;
-  for (const p of paidToday) byChannel[channel(p.method)] += Number(p.amount_centavos);
+  for (const p of spanPayments) byChannel[channel(p.method)] += Number(p.amount_centavos);
+  const verified = spanPayments.filter((p) => p.verification_state === "Verified").length;
 
-  // --- receivables, aged by training date --------------------------------
+  // receivables -----------------------------------------------------------
   const live = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled");
   const bal = (e: (typeof live)[number]) => Math.max(0, dueOf(e) - Number(e.paid_centavos));
-  const owing = live.filter((e) => bal(e) > 0);
+  const owing = live.filter((e) => bal(e) > 0).sort((a, b) => bal(b) - bal(a));
   const outstanding = owing.reduce((s, e) => s + bal(e), 0);
-  const endOf = (e: (typeof live)[number]) => { const b = Array.isArray(e.batches) ? e.batches[0] : e.batches; return b?.ends_on ?? e.scheduled_on ?? null; };
   const startOf = (e: (typeof live)[number]) => { const b = Array.isArray(e.batches) ? e.batches[0] : e.batches; return b?.starts_on ?? e.scheduled_on ?? null; };
+  const endOf = (e: (typeof live)[number]) => { const b = Array.isArray(e.batches) ? e.batches[0] : e.batches; return b?.ends_on ?? e.scheduled_on ?? null; };
   const beforeTraining = owing.filter((e) => (startOf(e) ?? "9999") > today).reduce((s, e) => s + bal(e), 0);
   const inTraining = owing.filter((e) => (startOf(e) ?? "9999") <= today && (endOf(e) ?? "0000") >= today).reduce((s, e) => s + bal(e), 0);
   const pastDue = owing.filter((e) => (endOf(e) ?? "9999") < today).reduce((s, e) => s + bal(e), 0);
+  const nameOf = (e: (typeof live)[number]) => { const t = one(e.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null); return t ? `${t.legal_first_name} ${t.legal_last_name}` : e.enrollment_number; };
+  const courseOf = (e: (typeof live)[number]) => (Array.isArray(e.courses) ? e.courses[0] : e.courses)?.name ?? "—";
 
-  // --- expenses & payables ----------------------------------------------
+  // expenses & payables ---------------------------------------------------
   const expMonth = data.expenses.filter((e) => inMonth(e.created_at) && (e.status === "Paid" || e.status === "Approved"));
   const expTotal = expMonth.reduce((s, e) => s + Number(e.amount_centavos), 0);
-  const expByCategory = [...expMonth.reduce((m, e) => m.set(e.category || "Others", (m.get(e.category || "Others") ?? 0) + Number(e.amount_centavos)), new Map<string, number>()).entries()].sort((a, b) => b[1] - a[1]);
   const pendingVouchers = data.expenses.filter((e) => e.status === "Pending");
+  const approvedVouchers = data.expenses.filter((e) => e.status === "Approved" || e.status === "Paid").length;
+  const rejectedVouchers = data.expenses.filter((e) => e.status === "Rejected").length;
+  const recentVouchers = [...data.expenses].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5);
   const openPayables = data.payables.filter((p) => p.status !== "Paid");
   const payablesTotal = openPayables.reduce((s, p) => s + Number(p.amount_centavos), 0);
   const dueToday = openPayables.filter((p) => p.due_on === today).reduce((s, p) => s + Number(p.amount_centavos), 0);
   const dueWeek = openPayables.filter((p) => p.due_on && p.due_on > today && p.due_on <= weekEnd).reduce((s, p) => s + Number(p.amount_centavos), 0);
   const overdue = openPayables.filter((p) => p.due_on && p.due_on < today).reduce((s, p) => s + Number(p.amount_centavos), 0);
+  const topPayees = [...openPayables].sort((a, b) => Number(b.amount_centavos) - Number(a.amount_centavos)).slice(0, 5);
 
-  // --- cashier control ---------------------------------------------------
+  // cashier ---------------------------------------------------------------
   const closingToday = data.cashierClosings.find((c) => c.closing_date === today) ?? null;
   const variance = Number(closingToday?.variance_centavos ?? 0);
+  const variancePct = closingToday && Number(closingToday.expected_cash_centavos) > 0 ? (Math.abs(variance) / Number(closingToday.expected_cash_centavos)) * 100 : 0;
   const closingsPending = data.cashierClosings.filter((c) => (c.status || "").toLowerCase() === "open" || (c.status || "").toLowerCase().includes("pending")).length;
+  const lastPayment = [...data.payments].filter((p) => p.received_at).sort((a, b) => (b.received_at ?? "").localeCompare(a.received_at ?? ""))[0];
 
-  // --- cash & bank position (derived from receiving accounts) ------------
+  // cash & bank -----------------------------------------------------------
   const accounts = [...data.payments.reduce((m, p) => { const k = p.receiving_account || channel(p.method); return m.set(k, (m.get(k) ?? 0) + Number(p.amount_centavos)); }, new Map<string, number>()).entries()].sort((a, b) => b[1] - a[1]);
   const paidExpenses = data.expenses.filter((e) => e.status === "Paid").reduce((s, e) => s + Number(e.amount_centavos), 0);
   const available = accounts.reduce((s, [, v]) => s + v, 0) - paidExpenses;
 
-  // --- approval queue ----------------------------------------------------
+  // approvals -------------------------------------------------------------
   const refundRequests = data.requests.filter((r) => r.status === "Pending" && ["Refund", "Cancellation"].includes(r.request_type));
-  const approvals: [string, number, string][] = [
-    ["Expense vouchers", pendingVouchers.length, "Review below"],
-    ["Payment adjustments (charges)", data.pendingCharges.length, "Approve or reject"],
-    ["Cancellation / refund requests", refundRequests.length, "Requests module"],
-    ["Fee waivers / discounts", data.pendingDiscounts.length, "Approve or reject"],
-    ["Cashier closing pending", closingsPending, "Reconciliation"],
-  ].filter(([, n]) => (n as number) > 0) as [string, number, string][];
+  const approvals: { icon: string; label: string; n: number; tone: "High" | "Medium" | "Low" }[] = [
+    { icon: "✉", label: "Expense vouchers", n: pendingVouchers.length, tone: "High" },
+    { icon: "◷", label: "Payment adjustments", n: data.pendingCharges.length, tone: "Medium" },
+    { icon: "↺", label: "Refund / cancellation requests", n: refundRequests.length, tone: "Medium" },
+    { icon: "⚖", label: "Fee waivers", n: data.pendingDiscounts.length, tone: "Low" },
+    { icon: "◈", label: "Cashier closing", n: closingsPending, tone: "High" },
+  ];
+  const approvalsTotal = approvals.reduce((s, a) => s + a.n, 0);
 
-  // --- course collections this month -------------------------------------
-  const courseRows = [...live.reduce((m, e) => {
-    if (!inMonth(e.created_at)) return m;
-    const name = (Array.isArray(e.courses) ? e.courses[0] : e.courses)?.name ?? "Unknown course";
-    const row = m.get(name) ?? { enrollees: 0, billed: 0, collected: 0 };
-    row.enrollees++; row.billed += dueOf(e); row.collected += Number(e.paid_centavos);
-    return m.set(name, row);
-  }, new Map<string, { enrollees: number; billed: number; collected: number }>()).entries()].sort((a, b) => b[1].billed - a[1].billed).slice(0, 8);
+  // recent activity -------------------------------------------------------
+  const activity = [
+    ...data.payments.filter((p) => p.received_at).map((p) => ({ at: p.received_at as string, icon: "₱", text: `Payment received · ${p.method}`, amount: Number(p.amount_centavos) })),
+    ...data.expenses.map((e) => ({ at: e.created_at, icon: "▤", text: `Voucher ${e.expense_number} · ${e.status}`, amount: -Number(e.amount_centavos) })),
+  ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 5);
 
-  // --- recent activity ---------------------------------------------------
-  type Act = { at: string; text: string; amount: number };
-  const activity: Act[] = [
-    ...data.payments.filter((p) => p.received_at).map((p) => ({ at: p.received_at as string, text: `Payment received · ${p.method}`, amount: Number(p.amount_centavos) })),
-    ...data.expenses.map((e) => ({ at: e.created_at, text: `Expense ${e.expense_number} · ${e.status}`, amount: -Number(e.amount_centavos) })),
-  ].sort((a, b) => b.at.localeCompare(a.at)).slice(0, 10);
-
-  const cards: [string, string, string][] = [
-    ["Collections today", money(collectedToday), `${paidToday.length} transaction${paidToday.length === 1 ? "" : "s"}`],
-    ["Collections this month", money(collectedMonth), "Month to date"],
-    ["Outstanding receivables", money(outstanding), `${owing.length} unpaid`],
-    ["Expenses this month", money(expTotal), `${expMonth.length} posted`],
-    ["Payables due", money(payablesTotal), `${openPayables.length} open`],
-    ["Pending expense vouchers", String(pendingVouchers.length), "Awaiting approval"],
-    ["Cashier variance", money(variance), closingToday ? closingToday.status : "No closing today"],
-    ["Available cash / bank", money(available), "Click for breakdown"],
+  const cards: { label: string; value: string; note: string; icon: string; accent: string; onClick?: () => void }[] = [
+    { label: "Collections " + span.toLowerCase(), value: money(collectedSpan), note: `${spanPayments.length} transactions`, icon: "₱", accent: "#f25615" },
+    { label: "Collections this month", value: money(collectedMonth), note: "Month to date", icon: "▦", accent: "#f2a615" },
+    { label: "Outstanding receivables", value: money(outstanding), note: `${owing.length} unpaid`, icon: "◷", accent: "#0a7d3b" },
+    { label: "Expenses this month", value: money(expTotal), note: `${expMonth.length} posted`, icon: "◰", accent: "#0571d0" },
+    { label: "Payables due", value: money(payablesTotal), note: `${openPayables.length} open`, icon: "▤", accent: "#7c3aed" },
+    { label: "Pending expense vouchers", value: String(pendingVouchers.length), note: "Awaiting approval", icon: "✉", accent: "#be185d" },
+    { label: "Cashier variance", value: money(variance), note: closingToday ? `${variancePct.toFixed(2)}% of system cash` : "No closing today", icon: "⚖", accent: "#0e7490" },
+    { label: "Available cash / bank", value: money(available), note: "Click for breakdown", icon: "◈", accent: "#b45309", onClick: () => setShowCash((s) => !s) },
   ];
 
   return <>
+    <div className="portal-heading"><div><span className="portal-eyebrow">Financial control</span><h1>Good day, {(profileName ?? "").split(" ")[0] || "Accounting"}.</h1><p>Collections, receivables, expenses, payables, approvals and cashier monitoring overview.</p></div>
+      <label className="portal-field-inline">Period<select value={span} onChange={(e) => setSpan(e.target.value as typeof span)}><option>Today</option><option>This week</option><option>This month</option></select></label>
+    </div>
     {msg && <div className="portal-message error" role="alert">{msg}</div>}
-    <div className="metric-grid">{cards.map(([label, value, note], i) => <article key={label} onClick={i === 7 ? () => setShowCash((s) => !s) : undefined} style={i === 7 ? { cursor: "pointer" } : undefined}><div className={`metric-symbol symbol-${i % 6}`}>{["₱", "▤", "◷", "◰", "▦", "✉", "⚖", "◈"][i]}</div><span>{label}</span><strong>{value}</strong><small style={i === 6 && variance !== 0 ? { color: "#a52020" } : undefined}>{note}</small></article>)}</div>
-    {showCash && <section className="portal-panel live-list" style={{ marginTop: 12 }}><div className="panel-heading"><div><h2>Cash &amp; bank breakdown</h2><p>Collections per receiving account, less paid expenses</p></div><span className="slot-count">{money(available)}</span></div>{accounts.map(([name, total]) => <div className="live-row-item" key={name}><div><strong>{name}</strong></div><span className="slot-count">{money(total)}</span></div>)}<div className="live-row-item"><div><strong>Less: paid expenses</strong></div><span className="slot-count" style={{ color: "#a52020" }}>−{money(paidExpenses)}</span></div></section>}
 
-    <section className="portal-panel live-list" style={{ marginTop: 16 }}>
-      <div className="panel-heading"><div><h2>Needs your approval</h2><p>Financial control queue</p></div><span className="slot-count">{approvals.reduce((s, [, n]) => s + n, 0)}</span></div>
-      {approvals.map(([label, n, hint]) => <div className="live-row-item" key={label}><div><strong>{n} — {label}</strong><small>{hint}</small></div><span className="portal-badge pending">Review</span></div>)}
-      {!approvals.length && <p className="portal-empty-copy">Nothing awaiting your approval.</p>}
+    <div className="fin-cards">{cards.map((c) => <article key={c.label} style={{ borderLeftColor: c.accent, cursor: c.onClick ? "pointer" : undefined }} onClick={c.onClick}><i style={{ background: `${c.accent}1a`, color: c.accent }}>{c.icon}</i><div><span>{c.label}</span><strong>{c.value}</strong><small>{c.note}</small></div></article>)}</div>
+    {showCash && <section className="portal-panel live-list" style={{ marginTop: 12 }}><div className="panel-heading"><div><h2>Cash &amp; bank breakdown</h2><p>Collections per receiving account, less paid expenses</p></div><span className="slot-count">{money(available)}</span></div>{accounts.map(([n, v]) => <div className="live-row-item" key={n}><div><strong>{n}</strong></div><span className="slot-count">{money(v)}</span></div>)}<div className="live-row-item"><div><strong>Less: paid expenses</strong></div><span className="slot-count" style={{ color: "#a52020" }}>−{money(paidExpenses)}</span></div></section>}
+
+    <section className="portal-panel" style={{ marginTop: 16, padding: "14px 16px" }}>
+      <div className="panel-heading" style={{ padding: 0, marginBottom: 10 }}><div><h2>Needs your approval <span className="portal-badge pending" style={{ marginLeft: 8 }}>{approvalsTotal} total</span></h2></div></div>
+      <div className="approval-strip">{approvals.map((a) => <div key={a.label}><i>{a.icon}</i><div><span>{a.label}</span><b>{a.n}</b></div><em className={`prio ${a.tone.toLowerCase()}`}>{a.tone}</em></div>)}</div>
     </section>
 
-    <div className="dashboard-panels">
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Collections today</h2><p>By channel</p></div><span className="slot-count">{money(collectedToday)}</span></div>
-        {(["Cash", "GCash", "Bank", "Others"] as const).map((k) => <div className="live-row-item" key={k}><div><strong>{k}</strong></div><span className="slot-count">{money(byChannel[k])}</span></div>)}
-        <div className="live-row-item"><div><strong>{paidToday.length} transactions</strong><small>{paidToday.filter((p) => p.verification_state === "Verified").length} verified · {paidToday.filter((p) => p.verification_state !== "Verified").length} to verify</small></div></div>
+    <div className="fin-3col">
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Collections {span.toLowerCase()}</h2><p>By channel</p></div></div>
+        {(["Cash", "GCash", "Bank", "Others"] as const).map((k) => <div className="live-row-item" key={k}><div><strong>{k}</strong></div><span className="slot-count">{money(byChannel[k])} <small style={{ color: "var(--muted)" }}>{collectedSpan ? ((byChannel[k] / collectedSpan) * 100).toFixed(1) : "0.0"}%</small></span></div>)}
+        <div className="live-row-item"><div><strong>Total</strong></div><span className="slot-count" style={{ color: "#0571d0" }}>{money(collectedSpan)}</span></div>
+        <p className="portal-empty-copy" style={{ margin: "6px 0 0" }}>{spanPayments.length} transactions · {verified} verified · {spanPayments.length - verified} for verification</p>
       </section>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Cashier monitoring</h2><p>Today&apos;s session</p></div><span className={`portal-badge ${variance === 0 ? "active" : "cancelled"}`}>{closingToday ? closingToday.status : "No closing"}</span></div>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Cashier monitoring</h2><p>Today&apos;s session</p></div><span className={`portal-badge ${closingToday ? (variance === 0 ? "active" : "cancelled") : "pending"}`}>{closingToday?.status ?? "No closing"}</span></div>
         {closingToday ? <>
+          <div className="live-row-item"><div><strong>Transactions</strong></div><span className="slot-count">{spanPayments.length}</span></div>
           <div className="live-row-item"><div><strong>System cash</strong></div><span className="slot-count">{money(closingToday.expected_cash_centavos)}</span></div>
-          <div className="live-row-item"><div><strong>Actual cash counted</strong></div><span className="slot-count">{closingToday.actual_cash_centavos == null ? "—" : money(closingToday.actual_cash_centavos)}</span></div>
-          <div className="live-row-item"><div><strong>Variance</strong></div><span className="slot-count" style={{ color: variance === 0 ? "#0a7d3b" : "#a52020" }}>{money(variance)}</span></div>
-          <div className="live-row-item"><div><strong>Online collections</strong></div><span className="slot-count">{money(closingToday.online_collections_centavos)}</span></div>
+          <div className="live-row-item"><div><strong>Actual cash</strong></div><span className="slot-count">{closingToday.actual_cash_centavos == null ? "—" : money(closingToday.actual_cash_centavos)}</span></div>
+          <div className="live-row-item"><div><strong>Variance</strong><small>{variancePct.toFixed(2)}% of system cash</small></div><span className="slot-count" style={{ color: variance === 0 ? "#0a7d3b" : "#a52020" }}>{money(variance)}</span></div>
+          <p className="portal-empty-copy" style={{ margin: "6px 0 0" }}>Last transaction: {clock(lastPayment?.received_at)}</p>
         </> : <p className="portal-empty-copy">The cashier has not opened a closing for today.</p>}
       </section>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Receivables</h2><p>Overview</p></div><span className="slot-count">{money(outstanding)}</span></div>
+        <div className="live-row-item"><div><strong>Due before training</strong></div><span className="slot-count">{money(beforeTraining)}</span></div>
+        <div className="live-row-item"><div><strong>In training</strong></div><span className="slot-count">{money(inTraining)}</span></div>
+        <div className="live-row-item"><div><strong>Past due</strong></div><span className="slot-count" style={{ color: pastDue > 0 ? "#a52020" : undefined }}>{money(pastDue)}</span></div>
+        {owing.slice(0, 5).map((e) => <div className="live-row-item" key={e.id}><div><strong>{nameOf(e)}</strong><small>{courseOf(e)}</small></div><span className="slot-count">{money(bal(e))}</span></div>)}
+      </section>
     </div>
 
-    <div className="dashboard-panels">
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Receivables</h2><p>Aged against the training date</p></div><span className="slot-count">{money(outstanding)}</span></div>
-        <div className="live-row-item"><div><strong>Due before training</strong></div><span className="slot-count">{money(beforeTraining)}</span></div>
-        <div className="live-row-item"><div><strong>Currently in training</strong></div><span className="slot-count">{money(inTraining)}</span></div>
-        <div className="live-row-item"><div><strong>Past due</strong></div><span className="slot-count" style={{ color: pastDue > 0 ? "#a52020" : undefined }}>{money(pastDue)}</span></div>
-        {owing.slice(0, 6).map((e) => { const t = one(e.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null); return <div className="live-row-item" key={e.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : e.enrollment_number}</strong><small>{(Array.isArray(e.courses) ? e.courses[0] : e.courses)?.name ?? ""} · paid {money(Number(e.paid_centavos))} of {money(dueOf(e))}</small></div><span className="slot-count">{money(bal(e))}</span></div>; })}
-      </section>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Payables</h2><p>What we owe</p></div><span className="slot-count">{money(payablesTotal)}</span></div>
-        <div className="live-row-item"><div><strong>Due today</strong></div><span className="slot-count">{money(dueToday)}</span></div>
+    <div className="fin-3col">
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Payables</h2><p>Overview</p></div><span className="slot-count">{money(payablesTotal)}</span></div>
+        <div className="live-row-item"><div><strong>Due today</strong></div><span className="slot-count" style={{ color: dueToday > 0 ? "#a52020" : undefined }}>{money(dueToday)}</span></div>
         <div className="live-row-item"><div><strong>Due this week</strong></div><span className="slot-count">{money(dueWeek)}</span></div>
         <div className="live-row-item"><div><strong>Overdue</strong></div><span className="slot-count" style={{ color: overdue > 0 ? "#a52020" : undefined }}>{money(overdue)}</span></div>
-        {openPayables.slice(0, 6).map((p) => <div className="live-row-item" key={p.id}><div><strong>{p.description}</strong><small>{p.due_on ? `Due ${p.due_on}` : "No due date"} · {p.status}</small></div><span className="slot-count">{money(p.amount_centavos)}</span></div>)}
+        {topPayees.map((p) => <div className="live-row-item" key={p.id}><div><strong>{p.description}</strong><small>{p.due_on ? `Due ${p.due_on}` : "No due date"}</small></div><span className="slot-count">{money(p.amount_centavos)}</span></div>)}
       </section>
-    </div>
-
-    <section className="portal-panel" style={{ marginTop: 16 }}>
-      <div className="panel-heading"><div><h2>Expense vouchers awaiting approval</h2><p>Approve, return for correction, or reject</p></div><span className="slot-count">{pendingVouchers.length}</span></div>
-      <div className="portal-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Category</th><th>Amount</th><th>Requested</th>{canManage && <th>Action</th>}</tr></thead><tbody>
-        {pendingVouchers.slice(0, 12).map((e) => <tr key={e.id}><td><strong>{e.expense_number}</strong></td><td>{e.payee}</td><td>{e.category}</td><td>{money(e.amount_centavos)}</td><td>{manilaDay(e.created_at)}</td>{canManage && <td className="document-actions"><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: e.id, approve: true })}>Approve</button><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: e.id, approve: false })}>Reject</button></td>}</tr>)}
-      </tbody></table>{!pendingVouchers.length && <p className="portal-empty-copy">No vouchers awaiting approval.</p>}</div>
-    </section>
-
-    <div className="dashboard-panels">
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Expenses this month</h2><p>By category</p></div><span className="slot-count">{money(expTotal)}</span></div>
-        {expByCategory.map(([cat, total]) => <div className="live-row-item" key={cat}><div><strong>{cat}</strong></div><span className="slot-count">{money(total)}</span></div>)}
-        {!expByCategory.length && <p className="portal-empty-copy">No posted expenses this month.</p>}
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Expense vouchers</h2><p>Summary</p></div></div>
+        <div className="voucher-stats"><span><b>{pendingVouchers.length}</b>Pending</span><span><b style={{ color: "#0a7d3b" }}>{approvedVouchers}</b>Approved</span><span><b style={{ color: "#a52020" }}>{rejectedVouchers}</b>Rejected</span></div>
+        {recentVouchers.map((e) => <div className="live-row-item" key={e.id}><div><strong>{e.expense_number}</strong><small>{e.payee} · {money(e.amount_centavos)}</small></div><span className={`portal-badge ${e.status === "Pending" ? "pending" : e.status === "Rejected" ? "cancelled" : "active"}`}>{e.status}</span></div>)}
+        {!recentVouchers.length && <p className="portal-empty-copy">No vouchers yet.</p>}
       </section>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Recent financial activity</h2><p>Latest payments and vouchers</p></div></div>
-        {activity.map((a, i) => <div className="live-row-item" key={i}><div><strong>{a.text}</strong><small>{manilaDay(a.at)}</small></div><span className="slot-count" style={{ color: a.amount < 0 ? "#a52020" : "#0a7d3b" }}>{a.amount < 0 ? "−" : ""}{money(Math.abs(a.amount))}</span></div>)}
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Recent financial activity</h2><p>Latest movements</p></div></div>
+        {activity.map((a, i) => <div className="live-row-item" key={i}><div><strong>{a.text}</strong><small>{clock(a.at)}</small></div><span className="slot-count" style={{ color: a.amount < 0 ? "#a52020" : "#0a7d3b" }}>{a.amount < 0 ? "−" : ""}{money(Math.abs(a.amount))}</span></div>)}
         {!activity.length && <p className="portal-empty-copy">No financial activity yet.</p>}
       </section>
     </div>
 
-    <section className="portal-panel" style={{ marginTop: 16 }}>
-      <div className="panel-heading"><div><h2>Course collections — this month</h2><p>Billed against collected, per course</p></div></div>
-      <div className="portal-table"><table><thead><tr><th>Course</th><th>Enrollees</th><th>Billed</th><th>Collected</th><th>Balance</th></tr></thead><tbody>
-        {courseRows.map(([name, r]) => <tr key={name}><td><strong>{name}</strong></td><td>{r.enrollees}</td><td>{money(r.billed)}</td><td>{money(r.collected)}</td><td style={{ color: r.billed - r.collected > 0 ? "#a52020" : undefined }}>{money(r.billed - r.collected)}</td></tr>)}
-      </tbody></table>{!courseRows.length && <p className="portal-empty-copy">No enrollments this month.</p>}</div>
-    </section>
+    {canManage && pendingVouchers.length > 0 && <section className="portal-panel" style={{ marginTop: 16 }}>
+      <div className="panel-heading"><div><h2>Vouchers awaiting your approval</h2><p>Approve or reject without leaving the dashboard</p></div><span className="slot-count">{pendingVouchers.length}</span></div>
+      <div className="portal-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Category</th><th>Amount</th><th>Action</th></tr></thead><tbody>
+        {pendingVouchers.slice(0, 8).map((e) => <tr key={e.id}><td><strong>{e.expense_number}</strong></td><td>{e.payee}</td><td>{e.category}</td><td>{money(e.amount_centavos)}</td><td className="document-actions"><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: e.id, approve: true })}>Approve</button><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: e.id, approve: false })}>Reject</button></td></tr>)}
+      </tbody></table></div>
+    </section>}
   </>;
 }
 
-/**
- * Accounting Summary Report — the Accounting Manager's entire dashboard.
- * A date-sensitive period roll-up of collections, releases, receivables,
- * payables, reconciliation and cash position; the earlier panel collection
- * (approvals, channel lists, rebate table) was removed at the owner's request.
- * Live balances (receivables / payables / cash) ignore the range by design.
- */
 function AccountingSummaryReport({ data }: { data: AccountingData }) {
   const today = manilaDay(new Date().toISOString());
   const [from, setFrom] = useState(today.slice(0, 8) + "01");
