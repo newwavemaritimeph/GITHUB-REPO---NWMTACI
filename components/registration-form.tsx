@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const SUFFIXES = ["", "JR.", "SR.", "II", "III", "IV", "V"] as const;
 const RANKS = [
@@ -46,11 +46,35 @@ function Wizard() {
   const [reference, setReference] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [foundNote, setFoundNote] = useState("");
+  const lookedUpSrn = useRef("");
 
   const set = <K extends keyof typeof emptyApplicant>(key: K, value: string) => setApplicant((current) => ({ ...current, [key]: value }));
 
   // Live bookable courses (with a published, open schedule this week).
   useEffect(() => { let live = true; fetch("/api/public/courses").then((r) => r.json()).then((b) => { if (live) setCourses(b.courses ?? []); }).catch(() => {}); return () => { live = false; }; }, []);
+
+  // Returning-applicant autofill: once a full 10-digit SRN is entered, look up the
+  // saved trainee details and prefill the form (once per distinct SRN).
+  useEffect(() => {
+    const srn = applicant.srn;
+    if (srn.length !== 10 || lookedUpSrn.current === srn) return;
+    lookedUpSrn.current = srn;
+    let live = true;
+    const fd = new FormData(); fd.set("srn", srn);
+    fetch("/api/public/trainee-lookup", { method: "POST", body: fd })
+      .then((r) => r.json())
+      .then((b) => {
+        if (!live || !b.found || !b.applicant) return;
+        const a = { ...b.applicant } as Partial<typeof emptyApplicant>;
+        // Map a saved rank that is not in our dropdown to the "OTHER" option.
+        if (a.rank && !(RANKS as readonly string[]).includes(a.rank)) { a.rankOther = a.rank; a.rank = "OTHER"; }
+        setApplicant((cur) => ({ ...cur, ...a, srn }));
+        setFoundNote("We found your record and filled in your details — please review before submitting.");
+      })
+      .catch(() => {});
+    return () => { live = false; };
+  }, [applicant.srn]);
 
   async function ensureSchedules(code: string) {
     if (!code || schedulesByCourse[code] || loadingCourse[code]) return;
@@ -81,7 +105,7 @@ function Wizard() {
   const detailsValid =
     applicant.firstName.trim().length >= 2 && applicant.lastName.trim().length >= 2 && Boolean(applicant.birthDate) &&
     applicant.placeOfBirth.trim().length >= 2 && applicant.address.trim().length >= 8 && mobileValid && emailValid && rankValid &&
-    applicant.emergencyContactName.trim().length >= 2 && emergencyMobileValid && (applicant.srn === "" || applicant.srn.length === 10);
+    applicant.emergencyContactName.trim().length >= 2 && emergencyMobileValid && applicant.srn.length === 10;
   const completeSelections = selections.filter((s) => s.courseCode && s.scheduleId);
   // Every row must be either fully complete or completely empty; at least one complete.
   const selectionsValid = completeSelections.length >= 1 && selections.every((s) => (!s.courseCode && !s.scheduleId) || (Boolean(s.courseCode) && Boolean(s.scheduleId)));
@@ -167,9 +191,10 @@ function Wizard() {
         <>
           <section className="wizard-panel">
             <h2>Applicant details</h2>
-            <p className="wizard-hint">All fields are required except the middle name, suffix, SRN, and company.</p>
+            <p className="wizard-hint">All fields are required except the middle name, suffix, and company. Enter your 10-digit SRN — if you have enrolled before, we&apos;ll fill in your details automatically.</p>
+            {foundNote && <p className="wizard-hint" style={{ color: "#0a7d3b", fontWeight: 600 }}>{foundNote}</p>}
             <div className="reg-grid caps-form">
-              <Field label="SRN / MISMO number (optional)" wide><input value={applicant.srn} onChange={(e) => set("srn", e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" placeholder="10 DIGITS" /></Field>
+              <Field label="SRN / MISMO number*" wide><input value={applicant.srn} onChange={(e) => set("srn", e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" placeholder="10 DIGITS" /></Field>
               <Field label="First name*"><input value={applicant.firstName} onChange={(e) => set("firstName", upper(e.target.value))} /></Field>
               <Field label="Middle name"><input value={applicant.middleName} onChange={(e) => set("middleName", upper(e.target.value))} /></Field>
               <Field label="Last name*"><input value={applicant.lastName} onChange={(e) => set("lastName", upper(e.target.value))} /></Field>

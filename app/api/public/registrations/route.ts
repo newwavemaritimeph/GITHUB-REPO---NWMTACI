@@ -15,8 +15,8 @@ import {
 
 const registrationSchema = z.object({
   firstName: z.string().trim().min(2).max(80), middleName: z.string().trim().max(80).optional().default(""), lastName: z.string().trim().min(2).max(80), suffix: z.string().trim().max(20).optional().default(""),
-  // An SRN is optional, but when supplied it must be exactly 10 digits.
-  srn: z.string().trim().optional().default("").refine((value) => value === "" || isSrn(value), VALIDATION_MESSAGES.srn),
+  // An SRN is required and must be exactly 10 digits.
+  srn: z.string().trim().refine(isSrn, VALIDATION_MESSAGES.srn),
   email: z.string().trim().refine(isEmail, VALIDATION_MESSAGES.email),
   presentAddress: z.string().trim().min(8).max(500),
   mobile: z.string().trim().refine(isPhContactNumber, VALIDATION_MESSAGES.contact),

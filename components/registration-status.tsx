@@ -3,8 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Pill } from "@/components/ui/kit";
-import { SystemProvider, formatDate, formatDateRange, formatDateTime, fullName, useSystem } from "@/lib/system/store";
-import { pesos } from "@/lib/endorsement-catalog";
+import { SystemProvider, formatDate, fullName, useSystem } from "@/lib/system/store";
 
 /* ----------------------------------------------------- enrollment status --- */
 
@@ -16,106 +15,73 @@ function maskName(name: string) {
 }
 
 function StatusTab() {
-  const { state, view, submissionSelections, ready } = useSystem();
+  const [srn, setSrn] = useState("");
   const [reference, setReference] = useState("");
   const [contact, setContact] = useState("");
-  const [result, setResult] = useState<"idle" | "not-found" | string>("idle");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<{ reference: string; status: string; nextStep: string } | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [error, setError] = useState("");
 
-  function search() {
-    const ref = reference.trim().toLowerCase();
-    const contactValue = contact.trim().toLowerCase();
-    const submission = state.submissions.find(
-      (item) =>
-        item.reference.toLowerCase() === ref &&
-        (item.applicant.email.toLowerCase() === contactValue || item.applicant.mobile.replace(/\D/g, "") === contact.replace(/\D/g, "")),
-    );
-    setResult(submission ? submission.id : "not-found");
+  const srnReady = srn.length === 10;
+  const refReady = reference.trim().length >= 6 && contact.trim().length >= 4;
+  const canSearch = srnReady || refReady;
+
+  async function search() {
+    setBusy(true); setResult(null); setNotFound(false); setError("");
+    try {
+      const fd = new FormData();
+      if (srnReady) fd.set("srn", srn);
+      else { fd.set("reference", reference.trim()); fd.set("email", contact.trim()); }
+      const response = await fetch("/api/public/registration-search", { method: "POST", body: fd });
+      const body = await response.json();
+      if (response.status === 404 || body.status === "Not found") { setNotFound(true); return; }
+      if (!response.ok) { setError(body.error ?? "We could not check your status. Please try again."); return; }
+      setResult({ reference: body.reference, status: body.status, nextStep: body.nextStep });
+    } catch { setError("We could not reach the server. Please try again in a moment."); }
+    finally { setBusy(false); }
   }
 
-  const submission = typeof result === "string" && result !== "idle" && result !== "not-found"
-    ? state.submissions.find((item) => item.id === result)
-    : undefined;
-  const selections = submission ? submissionSelections(submission.id) : [];
+  const tone = (status: string) => (/enrolled|approved|released|active/i.test(status) ? "green" : /cancel|reject|not found/i.test(status) ? "red" : "amber");
 
   return (
     <>
-      <form
-        className="search-card"
-        onSubmit={(event) => {
-          event.preventDefault();
-          search();
-        }}
-      >
+      <form className="search-card" onSubmit={(event) => { event.preventDefault(); if (canSearch && !busy) void search(); }}>
+        <label>
+          SRN / MISMO number
+          <input value={srn} onChange={(event) => setSrn(event.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" placeholder="10 DIGITS" autoComplete="off" />
+        </label>
+        <p className="muted-text" style={{ margin: "2px 0 8px" }}>Enter your SRN to check your status — or use your reference and registered email below.</p>
         <label>
           Registration reference
-          <input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="NWM-REG-2026-000208" autoComplete="off" />
+          <input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="REG-2026-000208" autoComplete="off" />
         </label>
         <label>
-          Registered email or mobile number
-          <input value={contact} onChange={(event) => setContact(event.target.value)} placeholder="name@example.com or 09XX XXX XXXX" />
+          Registered email
+          <input value={contact} onChange={(event) => setContact(event.target.value)} placeholder="name@example.com" />
         </label>
-        <button className="button button-primary button-block" disabled={!ready || reference.trim().length < 6 || contact.trim().length < 4}>
-          Check my status
-        </button>
-        <p>Both the reference and your registered email or mobile number are required, so only you can see your record.</p>
+        <button className="button button-primary button-block" disabled={!canSearch || busy}>{busy ? "Checking…" : "Check my status"}</button>
       </form>
 
-      {result === "not-found" && (
+      {notFound && (
         <div className="status-result status-warning">
           <strong>No record matched</strong>
-          <p>Check the reference and the email or mobile number you registered with. They must match exactly.</p>
+          <p>Check your SRN, or the reference and registered email. They must match exactly.</p>
         </div>
       )}
-
-      {submission && (
+      {error && (
+        <div className="status-result status-warning">
+          <strong>Something went wrong</strong>
+          <p>{error}</p>
+        </div>
+      )}
+      {result && (
         <div className="status-result">
           <div className="status-head">
-            <div>
-              <span className="eyebrow">{submission.reference}</span>
-              <h2>{fullName(submission.applicant)}</h2>
-            </div>
-            <Pill tone={submission.status === "Approved" ? "green" : submission.status === "Rejected" ? "red" : "amber"}>{submission.status}</Pill>
+            <div><span className="eyebrow">{result.reference}</span><h2>Enrollment status</h2></div>
+            <Pill tone={tone(result.status)}>{result.status}</Pill>
           </div>
-          <p className="status-next">
-            <strong>Status:</strong> {submission.publicStatusMessage}
-          </p>
-          <p className="muted-text">Submitted {formatDateTime(submission.submittedAt)}</p>
-
-          <h3 className="review-subhead">Your courses</h3>
-          <div className="status-courses">
-            {selections.map((selection) => {
-              const batch = state.batches.find((item) => item.id === selection.batchId);
-              const enrollmentView = selection.createdEnrollmentId ? view(selection.createdEnrollmentId) : undefined;
-              return (
-                <div key={selection.id} className="status-course">
-                  <div className="status-course-head">
-                    <div>
-                      <strong>{selection.courseName}</strong>
-                      <small>
-                        {selection.courseCode} · {batch ? formatDateRange(batch.startsOn, batch.endsOn) : "Schedule pending"}
-                        {batch ? ` · ${batch.mode}` : ""}
-                      </small>
-                    </div>
-                    <Pill tone={selection.status === "Approved" ? "green" : selection.status === "Rejected" || selection.status === "Cancelled" ? "red" : "amber"}>
-                      {selection.status}
-                    </Pill>
-                  </div>
-                  {enrollmentView ? (
-                    <dl className="status-course-detail">
-                      <div><dt>Enrollment</dt><dd>{enrollmentView.enrollment.reference}</dd></div>
-                      <div><dt>Payment</dt><dd>{enrollmentView.paymentStatus} · {pesos(enrollmentView.paidCentavos)} of {pesos(enrollmentView.dueCentavos)}</dd></div>
-                      <div><dt>Balance</dt><dd>{pesos(enrollmentView.balanceCentavos)}</dd></div>
-                      <div><dt>Admission slip</dt><dd>{enrollmentView.enrollment.instructionsSentAt ? "Ready" : "Pending payment"}</dd></div>
-                      <div><dt>Training</dt><dd>{enrollmentView.enrollment.completedAt ? "Completed" : enrollmentView.stage}</dd></div>
-                      <div><dt>Certificate</dt><dd>{enrollmentView.certificate?.status ?? "Pending"}</dd></div>
-                    </dl>
-                  ) : (
-                    <p className="muted-text status-course-note">This course is still being reviewed. An enrollment number is issued once it is approved.</p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          <p className="status-next"><strong>Next step:</strong> {result.nextStep}</p>
         </div>
       )}
     </>
