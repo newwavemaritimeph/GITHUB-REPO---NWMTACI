@@ -93,7 +93,7 @@ export function PortalLiveApp(){
   const accountingHidden=new Set<Module>(["Trainees","Enrollments"]);
   // The Schedule Officer works from a scheduling-only workspace (owner directive).
   const trainingOpsHidden=new Set<Module>(["Trainees","Instructions","Attendance","Endorsed courses"]);
-  const releasingHidden=new Set<Module>(["Endorsed courses"]);
+  const releasingHidden=new Set<Module>(["Endorsed courses","Schedules"]);
   const allowedNav=nav.filter(item=>(!item.roles||item.roles.includes(role)||(role==="super_admin"&&item.roles.includes("admin")))&&!(role==="admin"&&adminHidden.has(item.label))&&!(role==="accounting"&&accountingHidden.has(item.label))&&!(role==="training_operations"&&trainingOpsHidden.has(item.label))&&!(role==="releasing_officer"&&releasingHidden.has(item.label)));
   const go=(module:Module)=>{setActive(module);setSidebar(false)};
   const unread=data?.notifications.filter(item=>!item.read_at).length??0;
@@ -153,7 +153,7 @@ function AnnouncementBoard({data,role,reload}:{data:PortalData;role:string;reloa
 
 function Dashboard({data,role,open,canEnroll,canPay,reload}:{data:PortalData;role:string;open:(v:"enrollment"|"payment")=>void;canEnroll:boolean;canPay:boolean;reload:()=>Promise<void>}){
   if(role==="accounting")return <div className="portal-page"><div className="portal-heading"><div><span className="portal-eyebrow">Financial control</span><h1>Good day, {data.profile.complete_name.split(" ")[0]}.</h1><p>Daily collectibles, payables, voucher requests, approvals, and the enrollment overview.</p></div></div><AccountingDashboard data={data} role={role} reload={reload}/></div>;
-  if(role==="releasing_officer")return <div className="portal-page"><div className="portal-heading"><div><span className="portal-eyebrow">Releasing officer</span><h1>Good day, {data.profile.complete_name.split(" ")[0]}.</h1><p>Certificates awaiting release, trainings ending soon, and release activity.</p></div></div><ReleasingDashboard data={data as unknown as Parameters<typeof ReleasingDashboard>[0]["data"]}/></div>;
+  if(role==="releasing_officer")return <ReleasingDashboard data={data as unknown as Parameters<typeof ReleasingDashboard>[0]["data"]} reload={reload}/>;
   // Outstanding counts live enrollments only — cancelled ones are not money owed.
   const collections=data.payments.reduce((s,p)=>s+Number(p.amount_centavos),0),outstanding=data.enrollments.filter(e=>e.enrollment_status!=="Cancelled").reduce((s,e)=>s+balanceOf(e),0),openSlots=data.batches.filter(b=>b.status==="Open").reduce((s,b)=>s+b.capacity-b.confirmed_count,0);
   const todayISO=manilaToday();

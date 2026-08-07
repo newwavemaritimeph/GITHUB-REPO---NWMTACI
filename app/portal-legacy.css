@@ -835,3 +835,9 @@
 .date-block { display: inline-flex; flex-direction: column; align-items: center; min-width: 44px; border: 1px solid #dbe7ec; border-radius: 9px; padding: 4px 6px; }
 .date-block b { font-size: 16px; line-height: 1.1; }
 .date-block i { font-style: normal; font-size: 10px; color: var(--muted); text-transform: uppercase; }
+
+/* Releasing officer: certificate pipeline strip. */
+.pipeline { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; padding: 6px 0 2px; }
+.pipeline > span { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: #405d70; border: 1px solid #dbe7ec; border-radius: 999px; padding: 7px 14px; background: #fff; }
+.pipeline > span b { font-size: 16px; color: #0571d0; }
+.pipeline > span i { font-style: normal; color: var(--muted); margin-left: 4px; }

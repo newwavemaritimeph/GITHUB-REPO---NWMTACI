@@ -81,7 +81,11 @@ const certificateStatusInput = z.object({ action: z.literal("certificate-status"
 const certificateIssueInput = z.object({ action: z.literal("certificate-issue"), enrollmentId: z.string().uuid(), certificateNumber: z.string().trim().max(80).optional(), overrides: z.record(z.string(), z.string()).optional() });
 const certificatePrintInput = z.object({ action: z.literal("certificate-print"), enrollmentId: z.string().uuid(), reprint: z.boolean().optional() });
 const certificateVoidInput = z.object({ action: z.literal("certificate-void"), enrollmentId: z.string().uuid(), reason: z.string().trim().max(300).optional() });
-const certificateReleaseInput = z.object({ action: z.literal("certificate-release"), enrollmentId: z.string().uuid(), recipientName: z.string().trim().min(1).max(160), recipientIdType: z.string().trim().max(80).optional(), reason: z.string().trim().max(300).optional() });
+const certificateReleaseInput = z.object({ action: z.literal("certificate-release"), enrollmentId: z.string().uuid(), recipientName: z.string().trim().min(1).max(160), recipientIdType: z.string().trim().max(80).optional(), reason: z.string().trim().max(300).optional(), releaseMethod: z.enum(["Pickup", "Representative", "Courier"]).optional(), claimantRelationship: z.string().trim().max(80).optional(), idChecked: z.boolean().optional(), authorizationChecked: z.boolean().optional() });
+// Release plan for a certificate: how it leaves the office, and courier details.
+const certificateReleasePlanInput = z.object({ action: z.literal("certificate-release-plan"), enrollmentId: z.string().uuid(), releaseMethod: z.enum(["Pickup", "Representative", "Courier"]).optional(), expectedPickupOn: z.string().date().nullable().optional(), claimantName: z.string().trim().max(160).optional(), claimantRelationship: z.string().trim().max(80).optional(), courierName: z.string().trim().max(80).optional(), trackingNumber: z.string().trim().max(80).optional(), shippingFeeStatus: z.string().trim().max(40).optional(), shippingAddress: z.string().trim().max(300).optional(), courierStatus: z.enum(["For Booking", "Booked", "Shipped", "Delivered"]).optional() });
+// Certificate correction workflow (wrong spelling, wrong date, reprint needed).
+const certificateIssueInput2 = z.object({ action: z.literal("certificate-issue-report"), enrollmentId: z.string().uuid(), issueStatus: z.enum(["For Correction", "Resolved"]), note: z.string().trim().max(300).optional() });
 const certificateOverrideInput = z.object({ action: z.literal("certificate-override"), enrollmentId: z.string().uuid(), certificateNumber: z.string().trim().max(80).optional(), overrides: z.record(z.string(), z.string()).optional() });
 const certificateIssuanceToggleInput = z.object({ action: z.literal("certificate-issuance-toggle"), enabled: z.boolean() });
 const feedbackSendEmailInput = z.object({ action: z.literal("feedback-send-email"), enrollmentId: z.string().uuid() });
@@ -132,7 +136,7 @@ const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-li
 const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional(), courseId: z.string().uuid().nullable().optional(), partnerOfferId: z.string().uuid().nullable().optional() });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
@@ -294,6 +298,13 @@ export async function GET() {
   if (canManageTraining(staff.roleCodes) || canRelease(staff.roleCodes)) {
     const { data } = await db.from("certificates").select("id,enrollment_id,status,printed_at,printed_by,reprint_count,snapshot,number_pool_id,template_id,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name,code))").order("created_at", { ascending: false }).limit(300);
     certificates = data ?? [];
+    // Release/courier/correction fields ship in a later migration — merge tolerantly
+    // so a pre-migration database returns the base certificate rows instead of 500ing.
+    const { data: extra } = await db.from("certificates").select("id,release_method,expected_pickup_on,claimant_name,claimant_relationship,id_checked,authorization_checked,courier_name,tracking_number,shipping_fee_status,shipping_address,courier_status,issue_status,issue_note,issue_reported_on");
+    if (extra?.length) {
+      const byId = new Map(extra.map((r) => [r.id, r]));
+      certificates = (certificates as { id: string }[]).map((c) => ({ ...c, ...(byId.get(c.id) ?? {}) }));
+    }
     const { data: tpls } = await db.from("certificate_templates").select("id,course_id,version,storage_path,active,fields,approved_at,courses(name,code)").order("created_at", { ascending: false }).limit(200);
     certificateTemplates = tpls ?? [];
     // Released-list report source (tolerant: table exists but may be empty).
@@ -733,12 +744,37 @@ export async function POST(request: Request) {
       await admin.from("certificate_release_events").insert({ certificate_id: cert.id, event_type: "void", released_by: staff.user.id, reason: input.reason ?? "Voided" });
       return NextResponse.json({ ok: true });
     }
+    if (input.action === "certificate-release-plan") {
+      if (!canRelease(staff.roleCodes)) return NextResponse.json({ error: "Only Admin or the Releasing Officer can plan a release." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: cert } = await admin.from("certificates").select("id").eq("enrollment_id", input.enrollmentId).maybeSingle();
+      if (!cert) return NextResponse.json({ error: "No certificate for this enrollment yet." }, { status: 400 });
+      const patch: Record<string, unknown> = {};
+      for (const [key, column] of [["releaseMethod", "release_method"], ["expectedPickupOn", "expected_pickup_on"], ["claimantName", "claimant_name"], ["claimantRelationship", "claimant_relationship"], ["courierName", "courier_name"], ["trackingNumber", "tracking_number"], ["shippingFeeStatus", "shipping_fee_status"], ["shippingAddress", "shipping_address"], ["courierStatus", "courier_status"]] as const) {
+        const value = (input as Record<string, unknown>)[key];
+        if (value !== undefined) patch[column] = value === "" ? null : value;
+      }
+      if (!Object.keys(patch).length) return NextResponse.json({ error: "Nothing to update." }, { status: 400 });
+      const { error } = await admin.from("certificates").update(patch).eq("id", cert.id);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "certificate-issue-report") {
+      if (!canRelease(staff.roleCodes)) return NextResponse.json({ error: "Only Admin or the Releasing Officer can flag a certificate issue." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: cert } = await admin.from("certificates").select("id").eq("enrollment_id", input.enrollmentId).maybeSingle();
+      if (!cert) return NextResponse.json({ error: "No certificate for this enrollment yet." }, { status: 400 });
+      const { error } = await admin.from("certificates").update({ issue_status: input.issueStatus, issue_note: input.note ?? null, issue_reported_on: input.issueStatus === "For Correction" ? new Date().toISOString().slice(0, 10) : null }).eq("id", cert.id);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ ok: true });
+    }
     if (input.action === "certificate-release") {
       if (!canRelease(staff.roleCodes)) return NextResponse.json({ error: "Only Admin or the Releasing Officer can release certificates." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { data: cert } = await admin.from("certificates").select("id,status").eq("enrollment_id", input.enrollmentId).maybeSingle();
       if (!cert) return NextResponse.json({ error: "No certificate to release." }, { status: 400 });
       if (cert.status !== "Printed") return NextResponse.json({ error: "Print the certificate before releasing it." }, { status: 400 });
+      await admin.from("certificates").update({ release_method: input.releaseMethod ?? null, claimant_name: input.recipientName, claimant_relationship: input.claimantRelationship ?? null, id_checked: Boolean(input.idChecked), authorization_checked: Boolean(input.authorizationChecked) }).eq("id", cert.id);
       const { error } = await db.rpc("set_certificate_status", { target_enrollment: input.enrollmentId, target_status: "Released" });
       if (error) throw error;
       const { error: relErr } = await admin.from("certificate_release_events").insert({ certificate_id: cert.id, event_type: "release", recipient_name: input.recipientName, recipient_id_type: input.recipientIdType ?? null, released_by: staff.user.id, reason: input.reason ?? null });

@@ -33,32 +33,162 @@ async function submit(body: Record<string, unknown>) {
 function inHouse(data: ReleasingData, e: Enrollment) { return data.courses.find((c) => c.id === e.course_id)?.delivery_type === "In-House"; }
 function certOf(data: ReleasingData, enrollmentId: string) { return data.certificates.find((c) => c.enrollment_id === enrollmentId) ?? null; }
 
-export function ReleasingDashboard({ data }: { data: ReleasingData }) {
+/**
+ * Releasing Officer dashboard (owner spec, Aug 2026): pipeline counts, the
+ * ready-for-release queue, today's pickup queue, courier monitoring,
+ * corrections, needs-attention and search — with a release confirmation modal
+ * that records claimant, ID/SPA checks and courier details for the audit trail.
+ */
+type CertX = Certificate & { release_method?: string | null; expected_pickup_on?: string | null; claimant_name?: string | null; claimant_relationship?: string | null; id_checked?: boolean; authorization_checked?: boolean; courier_name?: string | null; tracking_number?: string | null; shipping_fee_status?: string | null; shipping_address?: string | null; courier_status?: string | null; issue_status?: string | null; issue_note?: string | null; issue_reported_on?: string | null };
+
+export function ReleasingDashboard({ data, reload }: { data: ReleasingData; reload?: () => Promise<void> }) {
   const today = manilaDay(new Date().toISOString());
-  const weekAgo = manilaDay(new Date(Date.now() - 6 * 86400000).toISOString());
-  const monthStart = today.slice(0, 8) + "01";
-  const in7 = manilaDay(new Date(Date.now() + 7 * 86400000).toISOString());
-  const released = data.certificateReleases.filter((r) => r.event_type === "release");
-  const relDay = (r: ReleaseEvent) => manilaDay(r.created_at);
-  const releasedToday = released.filter((r) => relDay(r) === today).length;
-  const releasedWeek = released.filter((r) => relDay(r) >= weekAgo).length;
-  const releasedMonth = released.filter((r) => relDay(r) >= monthStart).length;
-  const unreleasedPaid = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && inHouse(data, e) && isPaid(e) && certOf(data, e.id)?.status !== "Released");
-  const ending = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && inHouse(data, e)).map((e) => ({ e, end: one(e.batches)?.ends_on ?? "" })).filter((x) => x.end && x.end >= today && x.end <= in7).sort((a, z) => a.end.localeCompare(z.end));
-  return (
-    <>
-      <div className="finance-hero">
-        <div><span>Unreleased · paid</span><strong>{unreleasedPaid.length}</strong><small>In-house, fully paid, not yet released</small></div>
-        <article><span>Ending trainings</span><strong>{ending.length}</strong><small>Trainees ending within 7 days</small></article>
-        <article><span>Released today</span><strong>{releasedToday}</strong><small>{releasedWeek} this week</small></article>
-        <article><span>Released this month</span><strong>{releasedMonth}</strong><small>Certificates handed over</small></article>
+  const [query, setQuery] = useState("");
+  const [release, setRelease] = useState<{ enrollmentId: string; name: string; course: string; certNo: string } | null>(null);
+  const [msg, setMsg] = useState("");
+  const certs = data.certificates as CertX[];
+  const enrolById = new Map(data.enrollments.map((e) => [e.id, e]));
+  const nameOf = (c: CertX) => { const e = enrolById.get(c.enrollment_id); return e ? traineeName(e) : "Unknown trainee"; };
+  const courseOf = (c: CertX) => one(enrolById.get(c.enrollment_id)?.courses)?.name ?? "—";
+  const certNo = (c: CertX) => String((c.snapshot as { certificate_number?: string } | null)?.certificate_number ?? "—");
+  const trainingEnd = (c: CertX) => one(enrolById.get(c.enrollment_id)?.batches)?.ends_on ?? null;
+  const method = (c: CertX) => c.release_method ?? "Pickup";
+
+  const byStatus = (s: string) => certs.filter((c) => c.status === s);
+  const forProcessing = byStatus("Pending Attendance"), forPrinting = byStatus("Ready to Print"), ready = byStatus("Printed");
+  const releasedToday = certs.filter((c) => c.status === "Released" && manilaDay(c.printed_at ?? "") === today);
+  const pickupToday = ready.filter((c) => method(c) !== "Courier" && (c.expected_pickup_on ?? today) === today);
+  const forCourier = ready.filter((c) => method(c) === "Courier");
+  const corrections = certs.filter((c) => c.issue_status === "For Correction");
+
+  const needs: { label: string; items: CertX[] }[] = [
+    { label: "Missing authorization / SPA", items: ready.filter((c) => method(c) === "Representative" && !c.authorization_checked) },
+    { label: "Missing shipping details", items: forCourier.filter((c) => !c.shipping_address) },
+    { label: "Missing courier payment", items: forCourier.filter((c) => (c.shipping_fee_status ?? "Pending") !== "Paid") },
+    { label: "Returned for correction", items: corrections },
+    { label: "No certificate number", items: ready.filter((c) => certNo(c) === "—") },
+  ].filter((n) => n.items.length > 0);
+  const needsTotal = needs.reduce((s, n) => s + n.items.length, 0);
+
+  const stats: [string, number, string][] = [
+    ["For processing", forProcessing.length, "Training done, not yet ready"],
+    ["For printing", forPrinting.length, "Ready to print"],
+    ["Ready for release", ready.length, "Can be claimed"],
+    ["For pickup today", pickupToday.length, "Expected at the office"],
+    ["For courier / LBC", forCourier.length, "To be shipped"],
+    ["Released today", releasedToday.length, "Completed today"],
+  ];
+  const pipeline: [string, number][] = [["Training completed", forProcessing.length], ["For printing", forPrinting.length], ["Ready for release", ready.length], ["Released", certs.filter((c) => c.status === "Released").length]];
+
+  const hit = query.trim().toLowerCase();
+  const found = hit.length >= 2 ? certs.filter((c) => `${nameOf(c)} ${courseOf(c)} ${certNo(c)} ${enrolById.get(c.enrollment_id)?.enrollment_number ?? ""}`.toLowerCase().includes(hit)).slice(0, 8) : [];
+
+  async function post(body: Record<string, unknown>) {
+    setMsg("");
+    try { await submit(body); if (reload) await reload(); }
+    catch (e) { setMsg(e instanceof Error ? e.message : "The action could not be completed."); }
+  }
+  const statusChip = (c: CertX) => {
+    if (c.issue_status === "For Correction") return { text: "For correction", cls: "cancelled" };
+    if (method(c) === "Representative" && !c.authorization_checked) return { text: "Check authorization", cls: "pending" };
+    if (method(c) === "Courier") return { text: c.courier_status ?? "For booking", cls: "pending" };
+    return { text: "Ready", cls: "active" };
+  };
+
+  return <div className="portal-page">
+    <div className="portal-heading"><div><span className="portal-eyebrow">Releasing officer</span><h1>Certificate releasing</h1><p>{fmtDate(today)} · pipeline, pickup queue, courier and corrections</p></div></div>
+    {msg && <div className="portal-message error" role="alert">{msg}</div>}
+    <div className="portal-panel" style={{ padding: 14, marginBottom: 16 }}>
+      <label className="portal-field-inline" style={{ width: "100%" }}>Search trainee, SRN, certificate number, course or reference
+        <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Type at least 2 characters" />
+      </label>
+      {found.map((c) => <div className="live-row-item" key={c.id}><div><strong>{nameOf(c)}</strong><small>{courseOf(c)} · Cert {certNo(c)} · {c.status} · {method(c)}</small></div>{c.status === "Printed" && <button type="button" className="portal-primary" onClick={() => setRelease({ enrollmentId: c.enrollment_id, name: nameOf(c), course: courseOf(c), certNo: certNo(c) })}>Release</button>}</div>)}
+      {hit.length >= 2 && !found.length && <p className="portal-empty-copy">No certificate matches that search.</p>}
+    </div>
+    <div className="metric-grid">{stats.map(([label, value, note], i) => <article key={label}><div className={`metric-symbol symbol-${i}`}>{["◷", "▤", "◈", "◎", "▦", "✓"][i]}</div><span>{label}</span><strong>{value}</strong><small>{note}</small></article>)}</div>
+    {needsTotal > 0 && <div className="portal-message" role="status" style={{ marginTop: 12 }}>⚠ {needsTotal} record{needsTotal === 1 ? "" : "s"} need attention</div>}
+    <section className="portal-panel" style={{ marginTop: 16, padding: 14 }}>
+      <div className="panel-heading"><div><h2>Certificate pipeline</h2><p>Where every certificate currently sits</p></div></div>
+      <div className="pipeline">{pipeline.map(([label, n], i) => <span key={label}><b>{n}</b>{label}{i < pipeline.length - 1 && <i aria-hidden>→</i>}</span>)}</div>
+    </section>
+    <section className="portal-panel" style={{ marginTop: 16 }}>
+      <div className="panel-heading"><div><h2>Ready for release</h2><p>Printed certificates that can be claimed</p></div><span className="slot-count">{ready.length}</span></div>
+      <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Course</th><th>Training date</th><th>Certificate</th><th>Release method</th><th>Status</th><th>Action</th></tr></thead><tbody>
+        {ready.slice(0, 25).map((c) => { const ch = statusChip(c); return <tr key={c.id}><td><strong>{nameOf(c)}</strong></td><td>{courseOf(c)}</td><td>{trainingEnd(c) ? fmtDate(trainingEnd(c) as string) : "—"}</td><td>{certNo(c)}</td><td>{method(c)}</td><td><span className={`portal-badge ${ch.cls}`}>{ch.text}</span></td><td className="document-actions"><button type="button" onClick={() => setRelease({ enrollmentId: c.enrollment_id, name: nameOf(c), course: courseOf(c), certNo: certNo(c) })}>View / release</button></td></tr>; })}
+      </tbody></table>{!ready.length && <p className="portal-empty-copy">Nothing ready for release.</p>}</div>
+    </section>
+    <div className="dashboard-panels">
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Needs attention</h2><p>Blocked or incomplete releases</p></div><span className="slot-count">{needsTotal}</span></div>
+        {needs.map((n) => <div className="live-row-item" key={n.label}><div><strong>{n.items.length} — {n.label}</strong><small>{n.items.slice(0, 3).map((c) => nameOf(c)).join(", ")}{n.items.length > 3 ? "…" : ""}</small></div><span className="portal-badge pending">Review</span></div>)}
+        {!needs.length && <p className="portal-empty-copy">Nothing blocked.</p>}
+      </section>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Today&apos;s pickup queue</h2><p>Expected at the office today</p></div><span className="slot-count">{pickupToday.length}</span></div>
+        {pickupToday.slice(0, 12).map((c) => <div className="live-row-item" key={c.id}><div><strong>{nameOf(c)}</strong><small>{courseOf(c)} · claimant: {c.claimant_name ?? (method(c) === "Representative" ? "representative" : "self")}</small></div><span className={`portal-badge ${method(c) === "Representative" && !c.authorization_checked ? "pending" : "active"}`}>{method(c) === "Representative" && !c.authorization_checked ? "Verify SPA" : "Waiting"}</span></div>)}
+        {!pickupToday.length && <p className="portal-empty-copy">No pickups expected today.</p>}
+      </section>
+    </div>
+    <section className="portal-panel" style={{ marginTop: 16 }}>
+      <div className="panel-heading"><div><h2>Courier / LBC</h2><p>Certificates to be shipped</p></div><span className="slot-count">{forCourier.length}</span></div>
+      <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Destination</th><th>Courier</th><th>Payment</th><th>Tracking</th><th>Status</th></tr></thead><tbody>
+        {forCourier.slice(0, 20).map((c) => <tr key={c.id}><td><strong>{nameOf(c)}</strong></td><td>{c.shipping_address ?? <span className="portal-badge cancelled">Missing</span>}</td><td>{c.courier_name ?? "LBC"}</td><td>{(c.shipping_fee_status ?? "Pending") === "Paid" ? <span className="portal-badge active">Paid</span> : <span className="portal-badge pending">Pending</span>}</td><td>{c.tracking_number ?? "—"}</td><td>{c.courier_status ?? "For Booking"}</td></tr>)}
+      </tbody></table>{!forCourier.length && <p className="portal-empty-copy">No courier releases queued.</p>}</div>
+    </section>
+    <div className="dashboard-panels">
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Released today</h2><p>Most recent completed releases</p></div><span className="slot-count">{releasedToday.length}</span></div>
+        {releasedToday.slice(0, 15).map((c) => <div className="live-row-item" key={c.id}><div><strong>{nameOf(c)}</strong><small>{courseOf(c)} · to {c.claimant_name ?? "self"}{c.release_method ? ` · ${c.release_method}` : ""}</small></div><span className="portal-badge active">Released</span></div>)}
+        {!releasedToday.length && <p className="portal-empty-copy">No certificates released today.</p>}
+      </section>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Certificate corrections</h2><p>Returned for correction</p></div><span className="slot-count">{corrections.length}</span></div>
+        {corrections.slice(0, 12).map((c) => <div className="live-row-item" key={c.id}><div><strong>{nameOf(c)}</strong><small>{courseOf(c)} · {c.issue_note ?? "Correction requested"}{c.issue_reported_on ? ` · ${fmtDate(c.issue_reported_on)}` : ""}</small></div><button type="button" className="ghost-button" onClick={() => void post({ action: "certificate-issue-report", enrollmentId: c.enrollment_id, issueStatus: "Resolved" })}>Mark resolved</button></div>)}
+        {!corrections.length && <p className="portal-empty-copy">No certificates flagged for correction.</p>}
+      </section>
+    </div>
+    {release && <ReleaseConfirm target={release} onClose={() => setRelease(null)} onDone={async () => { setRelease(null); if (reload) await reload(); }} />}
+  </div>;
+}
+
+/** Release confirmation: records who claimed it, the checks performed, and courier details. */
+function ReleaseConfirm({ target, onClose, onDone }: { target: { enrollmentId: string; name: string; course: string; certNo: string }; onClose: () => void; onDone: () => Promise<void> }) {
+  const [method, setMethod] = useState<"Pickup" | "Representative" | "Courier">("Pickup");
+  const [name, setName] = useState(target.name), [rel, setRel] = useState(""), [idType, setIdType] = useState("");
+  const [idOk, setIdOk] = useState(false), [spaOk, setSpaOk] = useState(false);
+  const [courier, setCourier] = useState("LBC"), [tracking, setTracking] = useState(""), [fee, setFee] = useState("Paid"), [address, setAddress] = useState("");
+  const [busy, setBusy] = useState(false), [err, setErr] = useState("");
+  const ready = method === "Pickup" ? name.trim().length > 1 && idOk : method === "Representative" ? name.trim().length > 1 && rel.trim().length > 1 && idOk && spaOk : address.trim().length > 4;
+  async function confirm() {
+    setBusy(true); setErr("");
+    try {
+      if (method === "Courier") await submit({ action: "certificate-release-plan", enrollmentId: target.enrollmentId, releaseMethod: "Courier", courierName: courier, trackingNumber: tracking, shippingFeeStatus: fee, shippingAddress: address, courierStatus: tracking ? "Shipped" : "Booked" });
+      await submit({ action: "certificate-release", enrollmentId: target.enrollmentId, recipientName: method === "Courier" ? `${courier}${tracking ? ` · ${tracking}` : ""}` : name.trim(), recipientIdType: idType || undefined, releaseMethod: method, claimantRelationship: rel || undefined, idChecked: idOk, authorizationChecked: spaOk });
+      await onDone();
+    } catch (e) { setErr(e instanceof Error ? e.message : "Could not release the certificate."); }
+    finally { setBusy(false); }
+  }
+  return <div className="portal-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <section className="portal-modal" role="dialog" aria-modal="true" aria-labelledby="rel-title">
+      <header><div><span className="portal-eyebrow">Secure staff action</span><h2 id="rel-title">Release certificate</h2></div><button type="button" onClick={onClose} aria-label="Close dialog">×</button></header>
+      <div className="portal-form">
+        {err && <div className="portal-message error full" role="alert">{err}</div>}
+        <p className="full" style={{ margin: 0 }}><strong>{target.name}</strong><br />{target.course} · Certificate {target.certNo}</p>
+        <label className="full">Released to<select value={method} onChange={(e) => setMethod(e.target.value as typeof method)}><option value="Pickup">Trainee / self</option><option value="Representative">Authorized representative</option><option value="Courier">Courier / LBC</option></select></label>
+        {method !== "Courier" && <>
+          <label className="full">{method === "Pickup" ? "Trainee name" : "Representative name"}<input value={name} onChange={(e) => setName(e.target.value)} /></label>
+          {method === "Representative" && <label className="full">Relationship to trainee<input value={rel} onChange={(e) => setRel(e.target.value)} placeholder="e.g. spouse, parent" /></label>}
+          <label className="full">ID presented<input value={idType} onChange={(e) => setIdType(e.target.value)} placeholder="e.g. driver's license" /></label>
+          <label className="portal-check full"><input type="checkbox" checked={idOk} onChange={(e) => setIdOk(e.target.checked)} /><span>Valid ID checked</span></label>
+          {method === "Representative" && <label className="portal-check full"><input type="checkbox" checked={spaOk} onChange={(e) => setSpaOk(e.target.checked)} /><span>Authorization letter / SPA checked</span></label>}
+        </>}
+        {method === "Courier" && <>
+          <label>Courier<input value={courier} onChange={(e) => setCourier(e.target.value)} /></label>
+          <label>Tracking number<input value={tracking} onChange={(e) => setTracking(e.target.value)} placeholder="Optional until booked" /></label>
+          <label>Shipping fee<select value={fee} onChange={(e) => setFee(e.target.value)}><option>Paid</option><option>Pending</option></select></label>
+          <label className="full">Shipping address<input value={address} onChange={(e) => setAddress(e.target.value)} /></label>
+        </>}
+        <p className="portal-form-note full">Released by, date and time are recorded automatically for the audit trail.</p>
+        <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !ready} onClick={confirm}>{busy ? "Releasing…" : "Confirm release"}</button></div>
       </div>
-      <div className="dashboard-panels">
-        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Unreleased certificates — paid</h2><p>Ready to process</p></div><span className="slot-count">{unreleasedPaid.length}</span></div>{unreleasedPaid.slice(0, 20).map((e) => { const c = certOf(data, e.id); return <div className="live-row-item" key={e.id}><div><strong>{traineeName(e)}</strong><small>{one(e.courses)?.name ?? ""} · {e.enrollment_number}</small></div><span className="slot-count">{c?.status ?? "Not issued"}</span></div>; })}{!unreleasedPaid.length && <p className="portal-empty-copy">Nothing awaiting release.</p>}</section>
-        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Trainees with ending trainings</h2><p>Ending within 7 days</p></div><span className="slot-count">{ending.length}</span></div>{ending.slice(0, 20).map(({ e, end }) => <div className="live-row-item" key={e.id}><div><strong>{traineeName(e)}</strong><small>{one(e.courses)?.name ?? ""}</small></div><span className="slot-count">{fmtDate(end)}</span></div>)}{!ending.length && <p className="portal-empty-copy">No trainings ending soon.</p>}</section>
-      </div>
-    </>
-  );
+    </section>
+  </div>;
 }
 
 export function LiveReleasing({ data, role, reload }: { data: ReleasingData; role: string; reload: () => Promise<void> }) {
