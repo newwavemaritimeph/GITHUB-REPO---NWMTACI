@@ -5780,3 +5780,82 @@ code {
   .focus-grid, .testimonial-grid { grid-template-columns: 1fr; }
   .accred-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* =====================================================================
+   Readability pass
+   The portal's form type was 10-11px and several list captions were 8-9px,
+   which is hard to read and (under 16px) makes iOS zoom on focus. This block
+   raises the small UI type and defines .portal-field-inline, the inline filter
+   control used by the Schedules and dashboard course/status dropdowns.
+   Print styles (#admission-slip-print / #admission-invoice-print) are
+   intentionally untouched: they are calibrated to the supplied artwork.
+   ===================================================================== */
+
+/* Inline filter control (course / status dropdowns). */
+.portal-field-inline {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 220px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #405d70;
+}
+.portal-field-inline select,
+.portal-field-inline input {
+  min-height: 44px;
+  border: 1px solid #cbdce4;
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+}
+.portal-field-inline select:focus,
+.portal-field-inline input:focus {
+  outline: 0;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(5, 113, 208, 0.1);
+}
+
+/* Portal forms: legible labels and controls. */
+.portal-form label { font-size: 12px; }
+.portal-form input,
+.portal-form select,
+.portal-form textarea { font-size: 15px; min-height: 46px; }
+
+/* Portal lists, tables and captions. */
+.live-row-item small,
+.slot-count,
+.document-actions a,
+.document-link,
+.amount-shortcuts button,
+.rate-preview span,
+.rate-preview small,
+.field-error { font-size: 11px; }
+.portal-empty-copy,
+.config-list span,
+.config-form p,
+.action-card p { font-size: 12px; }
+.date-report-card label { font-size: 12px; }
+.date-report-card input,
+.date-report-card select { font-size: 14px; min-height: 42px; }
+
+/* Public site: registration wizard and status forms. */
+.reg-grid label { font-size: 13px; }
+.reg-grid input,
+.reg-grid select,
+.search-card input,
+.contact-form input,
+.contact-form textarea { font-size: 16px; }
+.schedule-option .schedule-date { font-size: 13px; }
+
+/* Fields locked to a returning applicant's existing record (SRN autofill). */
+.reg-grid input[readonly],
+.reg-grid select:disabled {
+  background: #f1f5f8;
+  color: #56707f;
+  cursor: not-allowed;
+}

@@ -46,8 +46,11 @@ function Wizard() {
   const [reference, setReference] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [foundNote, setFoundNote] = useState("");
+  // Result of the SRN lookup: "found" locks the identity fields to the trainee's
+  // existing record; "none" just tells the applicant to fill the form in.
+  const [lookup, setLookup] = useState<{ kind: "found" | "none"; text: string } | null>(null);
   const lookedUpSrn = useRef("");
+  const locked = lookup?.kind === "found";
 
   const set = <K extends keyof typeof emptyApplicant>(key: K, value: string) => setApplicant((current) => ({ ...current, [key]: value }));
 
@@ -65,14 +68,18 @@ function Wizard() {
     fetch("/api/public/trainee-lookup", { method: "POST", body: fd })
       .then((r) => r.json())
       .then((b) => {
-        if (!live || !b.found || !b.applicant) return;
+        if (!live) return;
+        if (!b.found || !b.applicant) {
+          setLookup({ kind: "none", text: "No previous registration found for this SRN. Please fill in your details below." });
+          return;
+        }
         const a = { ...b.applicant } as Partial<typeof emptyApplicant>;
         // Map a saved rank that is not in our dropdown to the "OTHER" option.
         if (a.rank && !(RANKS as readonly string[]).includes(a.rank)) { a.rankOther = a.rank; a.rank = "OTHER"; }
         setApplicant((cur) => ({ ...cur, ...a, srn }));
-        setFoundNote("We found your record and filled in your details — please review before submitting.");
+        setLookup({ kind: "found", text: "Welcome back — we filled in your details. Your name and birth details are locked to your record; you can still update your address, contact, rank, manning agency, and emergency contact." });
       })
-      .catch(() => {});
+      .catch(() => { if (live) setLookup(null); });
     return () => { live = false; };
   }, [applicant.srn]);
 
@@ -192,15 +199,15 @@ function Wizard() {
           <section className="wizard-panel">
             <h2>Applicant details</h2>
             <p className="wizard-hint">All fields are required except the middle name, suffix, and company. Enter your 10-digit SRN — if you have enrolled before, we&apos;ll fill in your details automatically.</p>
-            {foundNote && <p className="wizard-hint" style={{ color: "#0a7d3b", fontWeight: 600 }}>{foundNote}</p>}
+            {lookup && <p className="wizard-hint" style={{ color: lookup.kind === "found" ? "#0a7d3b" : "#9a5b00", fontWeight: 600 }}>{lookup.text}</p>}
             <div className="reg-grid caps-form">
               <Field label="SRN / MISMO number*" wide><input value={applicant.srn} onChange={(e) => set("srn", e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" placeholder="10 DIGITS" /></Field>
-              <Field label="First name*"><input value={applicant.firstName} onChange={(e) => set("firstName", upper(e.target.value))} /></Field>
-              <Field label="Middle name"><input value={applicant.middleName} onChange={(e) => set("middleName", upper(e.target.value))} /></Field>
-              <Field label="Last name*"><input value={applicant.lastName} onChange={(e) => set("lastName", upper(e.target.value))} /></Field>
-              <Field label="Suffix"><select value={applicant.suffix} onChange={(e) => set("suffix", e.target.value)}>{SUFFIXES.map((item) => <option key={item || "none"} value={item}>{item || "None"}</option>)}</select></Field>
-              <Field label="Date of birth*"><input type="date" value={applicant.birthDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => set("birthDate", e.target.value)} /></Field>
-              <Field label="Place of birth*"><input value={applicant.placeOfBirth} onChange={(e) => set("placeOfBirth", upper(e.target.value))} /></Field>
+              <Field label={locked ? "First name (from your record)" : "First name*"}><input value={applicant.firstName} readOnly={locked} onChange={(e) => set("firstName", upper(e.target.value))} /></Field>
+              <Field label={locked ? "Middle name (from your record)" : "Middle name"}><input value={applicant.middleName} readOnly={locked} onChange={(e) => set("middleName", upper(e.target.value))} /></Field>
+              <Field label={locked ? "Last name (from your record)" : "Last name*"}><input value={applicant.lastName} readOnly={locked} onChange={(e) => set("lastName", upper(e.target.value))} /></Field>
+              <Field label="Suffix"><select value={applicant.suffix} disabled={locked} onChange={(e) => set("suffix", e.target.value)}>{SUFFIXES.map((item) => <option key={item || "none"} value={item}>{item || "None"}</option>)}</select></Field>
+              <Field label={locked ? "Date of birth (from your record)" : "Date of birth*"}><input type="date" value={applicant.birthDate} readOnly={locked} max={new Date().toISOString().slice(0, 10)} onChange={(e) => set("birthDate", e.target.value)} /></Field>
+              <Field label={locked ? "Place of birth (from your record)" : "Place of birth*"}><input value={applicant.placeOfBirth} readOnly={locked} onChange={(e) => set("placeOfBirth", upper(e.target.value))} /></Field>
               <Field label="Complete address*" wide><input value={applicant.address} onChange={(e) => set("address", upper(e.target.value))} /></Field>
               <Field label="Mobile number*"><input value={applicant.mobile} onChange={(e) => set("mobile", e.target.value)} inputMode="tel" placeholder="09XX XXX XXXX" /></Field>
               <Field label="Email address*"><input type="email" value={applicant.email} onChange={(e) => set("email", e.target.value)} /></Field>
