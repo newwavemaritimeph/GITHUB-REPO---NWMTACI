@@ -14,7 +14,7 @@ import { automaticEndDate, batchPatternLabel, validBatchStart } from "@/lib/sche
 import { AdminConfiguration } from "./admin-configuration";
 import { DateReports } from "./date-reports";
 import { downloadCsv } from "@/lib/csv";
-import { ScheduleOfficerDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
+import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, first, dueCentavos, balanceOf, isUnpaid, manilaToday } from "@/lib/portal-format";
 
 type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Setup" | "Trainee enrollments";
@@ -111,6 +111,7 @@ export function PortalLiveApp(){
 
 function PortalContent({active,role,data,query,go,open,onPay,canEnroll,canSchedule,canPay,reload}:{active:Module;role:string;data:PortalData;query:string;go:(module:Module)=>void;open:(value:"enrollment"|"batch"|"payment")=>void;onPay:(enrollmentId:string)=>void;canEnroll:boolean;canSchedule:boolean;canPay:boolean;reload:()=>Promise<void>}){
   const gateRole=role==="super_admin"?"admin":role;
+  if(active==="Dashboard"&&gateRole==="admin")return <AdminDashboard data={data} go={m=>go(m as Module)} openEnrollment={()=>open("enrollment")}/>;
   if(active==="Dashboard"&&gateRole==="training_operations")return <ScheduleOfficerDashboard data={data} go={m=>go(m as Module)} openBatch={()=>open("batch")}/>;
   if(active==="Training calendar")return <TrainingCalendar data={data}/>;
   if(active==="Trainee scheduling")return <TraineeScheduling data={data} reload={reload}/>;

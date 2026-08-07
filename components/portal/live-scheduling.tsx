@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { first, manilaToday } from "@/lib/portal-format";
+import { first, manilaToday, manilaDay, isUnpaid, balanceOf } from "@/lib/portal-format";
 
 /**
  * Schedule Officer workspace: dashboard, training calendar, trainee scheduling,
@@ -12,7 +12,7 @@ import { first, manilaToday } from "@/lib/portal-format";
 type CourseRef = { name: string; code: string };
 type Batch = { id: string; batch_number: string; course_id: string; starts_on: string; ends_on: string; daily_start?: string | null; daily_end?: string | null; mode: string; venue?: string | null; capacity: number; confirmed_count: number; enrollment_deadline: string; status: string; published_at?: string | null; courses?: CourseRef | CourseRef[] | null };
 type TraineeRef = { trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; email: string; mobile: string };
-type Enrollment = { id: string; enrollment_number: string; course_id: string; partner_offer_id?: string | null; batch_id?: string | null; scheduled_on?: string | null; enrollment_status: string; created_at: string; trainees?: TraineeRef | TraineeRef[] | null; courses?: CourseRef | CourseRef[] | null };
+type Enrollment = { id: string; enrollment_number: string; trainee_id?: string; course_id: string; partner_offer_id?: string | null; batch_id?: string | null; scheduled_on?: string | null; enrollment_status: string; created_at: string; selling_price_centavos: number; paid_centavos: number; charges_centavos?: number | null; discounts_centavos?: number | null; trainees?: TraineeRef | TraineeRef[] | null; courses?: CourseRef | CourseRef[] | null };
 type RequestRow = { id: string; request_number: string; request_type: string; reason: string; status: string; created_at: string; decided_at?: string | null; trainees?: { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null };
 type Staffing = { batch_id: string; instructor_name: string | null; room_name: string | null };
 export type SchedulingData = { batches: Batch[]; enrollments: Enrollment[]; requests: RequestRow[]; batchStaffing: Staffing[]; courses: { id: string; code: string; name: string; delivery_type: string }[] };
@@ -181,4 +181,87 @@ export function ScheduleChanges({ data }: { data: SchedulingData }) {
     </div>
     <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Change requests</h2><p>Rescheduling, course changes, cancellations and make-up classes</p></div><span className="slot-count">{requests.length}</span></div>{requests.slice(0, 15).map((r) => { const t = first(r.trainees); return <div className="live-row-item" key={r.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : r.request_number}</strong><small>{r.request_type} · {r.reason}</small></div><span className={`portal-badge ${r.status === "Approved" ? "active" : r.status === "Rejected" ? "cancelled" : "pending"}`}>{r.status}</span></div>; })}{!requests.length && <p className="portal-empty-copy">No change requests on record.</p>}</section>
   </div>;
+}
+
+/** Admin daily-operations dashboard (owner mock, Aug 2026). The mock's
+ * requirements items are substituted with real data — nothing tracks
+ * per-trainee requirement submission yet. */
+export function AdminDashboard({ data, go, openEnrollment }: { data: SchedulingData & { payments: { id: string; trainee_id: string; verification_state: string }[]; certificates: { status: string }[] }; go: (module: string) => void; openEnrollment: () => void }) {
+  const d = derive(data);
+  const [classFilter, setClassFilter] = useState("");
+  const traineesToday = d.todays.reduce((s, b) => s + b.confirmed_count, 0);
+  const newToday = data.enrollments.filter((e) => manilaDay(e.created_at) === d.today).length;
+  const unpaid = data.enrollments.filter((e) => isUnpaid(e));
+  const printed = data.certificates.filter((c) => c.status === "Printed").length;
+  const readyToPrint = data.certificates.filter((c) => c.status === "Ready to Print").length;
+  const pendingCerts = data.certificates.filter((c) => c.status === "Pending Attendance" || c.status === "Ready to Print").length;
+  const toVerify = data.payments.filter((p) => p.verification_state !== "Verified");
+  const unverifiedTrainees = new Set(toVerify.map((p) => p.trainee_id));
+  const changeRequests = data.requests.filter((r) => r.status === "Pending" && ["Rescheduling", "Change Course"].includes(r.request_type)).length;
+  const dayN = (b: { starts_on: string; ends_on: string }) => { if (b.starts_on === b.ends_on || b.starts_on > d.today) return ""; const n = Math.round((new Date(`${d.today}T00:00:00+08:00`).getTime() - new Date(`${b.starts_on}T00:00:00+08:00`).getTime()) / 86400000) + 1; return n > 1 ? ` — Day ${n}` : ""; };
+  const todaysShown = classFilter ? d.todays.filter((b) => b.course_id === classFilter) : d.todays;
+  const recent = [...data.enrollments].sort((a, z) => (z.created_at || "").localeCompare(a.created_at || "")).slice(0, 6);
+  const chip = (e: SchedulingData["enrollments"][number] & { trainee_id?: string }) => {
+    if (balanceOf(e as Parameters<typeof balanceOf>[0]) === 0) return { text: "Paid", cls: "active" };
+    if (e.trainee_id && unverifiedTrainees.has(e.trainee_id)) return { text: "Verify payment", cls: "pending" };
+    if (!e.batch_id && !e.partner_offer_id) return { text: "No schedule", cls: "" };
+    return { text: "Unpaid", cls: "cancelled" };
+  };
+  const needs: [number, string, string][] = [
+    [toVerify.length, "Payments for verification", "Payments"],
+    [d.unscheduled.length, "Trainees without schedule", "Trainee scheduling"],
+    [changeRequests, "Schedule change requests", "Requests"],
+    [pendingCerts, "Certificates pending", "Certificates"],
+    [unpaid.length, "Unpaid enrollments", "Reports"],
+  ];
+  const visibleNeeds = needs.filter(([n]) => n > 0);
+  const actions: [string, string, () => void][] = [
+    ["+", "Enroll trainee", openEnrollment], ["⌕", "Search trainee", () => go("Search trainee")],
+    ["▤", "Assign schedule", () => go("Trainee scheduling")], ["₱", "Verify payment", () => go("Payments")],
+    ["↺", "Change schedule", () => go("Schedules")], ["◈", "Release certificate", () => go("Certificates")],
+    ["↥", "Reports & TAR", () => go("Reports")], ["✉", "Requests", () => go("Requests")],
+  ];
+  const meterTone = (b: { confirmed_count: number; capacity: number }) => (b.confirmed_count >= b.capacity ? "#a52020" : b.confirmed_count >= b.capacity * 0.9 ? "#b45309" : "#0571d0");
+  return <div className="portal-page">
+    <div className="portal-heading"><div><span className="portal-eyebrow">Live operations</span><h1>Admin dashboard</h1><p>{fmtDate(d.today)} · Daily operations overview</p></div><span style={{ display: "inline-flex", gap: 10 }}><button type="button" className="portal-secondary" onClick={() => go("Search trainee")}>Search trainee</button><button type="button" className="portal-primary" onClick={openEnrollment}>+ New enrollment</button></span></div>
+    <div className="metric-grid compact-metrics">
+      <article><span>Trainees today</span><strong>{traineesToday}</strong><small>Across {d.todays.length} class{d.todays.length === 1 ? "" : "es"}</small></article>
+      <article><span>New enrollments</span><strong>{newToday}</strong><small>Today</small></article>
+      <article><span>Unpaid enrollments</span><strong>{unpaid.length}</strong><small>{unpaid.length ? "Needs action" : "All settled"}</small></article>
+      <article><span>Certificates for release</span><strong>{printed}</strong><small>{readyToPrint} ready to print</small></article>
+    </div>
+    <section className="portal-panel" style={{ marginTop: 16 }}>
+      <div className="panel-heading"><div><h2>Today&apos;s training</h2><p>Live class and capacity monitoring</p></div><label className="portal-field-inline" style={{ minWidth: 180 }}>Class<select value={classFilter} onChange={(e) => setClassFilter(e.target.value)}><option value="">All classes</option>{[...new Map(d.todays.map((b) => [b.course_id, courseOf(b)])).entries()].map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label></div>
+      <div className="portal-table"><table><thead><tr><th>Course</th><th>Trainees</th><th>Room</th><th>Status</th></tr></thead><tbody>
+        {todaysShown.map((b) => { const s = d.staffing.get(b.id); const full = b.confirmed_count >= b.capacity; return <tr key={b.id}><td><strong>{courseOf(b)}{dayN(b)}</strong><small>{fmtTime(b.daily_start)}–{fmtTime(b.daily_end)}</small></td><td><strong>{b.confirmed_count} / {b.capacity}</strong><span className="meter"><i style={{ width: `${Math.min(100, Math.round((b.confirmed_count / Math.max(1, b.capacity)) * 100))}%`, background: meterTone(b) }} /></span></td><td>{s?.room_name ?? b.venue ?? b.mode}</td><td><Chip cls={full ? "cancelled" : "ongoing"}>{full ? "FULL" : "Ongoing"}</Chip></td></tr>; })}
+      </tbody></table>{!todaysShown.length && <p className="portal-empty-copy">No classes running today.</p>}</div>
+    </section>
+    <div className="dashboard-panels">
+      <section className="portal-panel live-list">
+        <div className="panel-heading"><div><h2>Needs attention</h2><p>Items requiring admin action</p></div><span className="slot-count">{visibleNeeds.length}</span></div>
+        {visibleNeeds.map(([n, label, module]) => <button type="button" className="needs-row" key={label} onClick={() => go(module)}><span><b>{n}</b> {label}</span><span aria-hidden>›</span></button>)}
+        {!visibleNeeds.length && <p className="portal-empty-copy">All clear — nothing needs action.</p>}
+      </section>
+      <section className="portal-panel live-list">
+        <div className="panel-heading"><div><h2>Recent enrollments</h2><p>Latest trainee registrations</p></div><button type="button" className="ghost-button" onClick={() => go("Enrollments")}>View all</button></div>
+        {recent.map((e) => { const t = first(e.trainees); const c = first(e.courses); const ch = chip(e as SchedulingData["enrollments"][number] & { trainee_id?: string }); return <div className="live-row-item" key={e.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : e.enrollment_number}</strong><small>{c?.code ?? ""} · {manilaDay(e.created_at)}</small></div><Chip cls={ch.cls}>{ch.text}</Chip></div>; })}
+        {!recent.length && <p className="portal-empty-copy">No enrollments yet.</p>}
+      </section>
+    </div>
+    <div className="dashboard-panels">
+      <section className="portal-panel live-list">
+        <div className="panel-heading"><div><h2>Upcoming training</h2><p>Next available classes</p></div><span className="slot-count">{d.upcoming.length}</span></div>
+        {d.upcoming.slice(0, 8).map((b) => { const left = b.capacity - b.confirmed_count; return <div className="live-row-item" key={b.id}><div style={{ display: "flex", gap: 12, alignItems: "center" }}><span className="date-block"><b>{b.starts_on.slice(8, 10)}</b><i>{new Intl.DateTimeFormat("en-PH", { month: "short", timeZone: "Asia/Manila" }).format(new Date(`${b.starts_on}T00:00:00+08:00`))}</i></span><div><strong>{courseOf(b)}</strong><small>{b.confirmed_count} / {b.capacity} trainees</small></div></div><Chip cls={left <= 0 ? "cancelled" : "ongoing"}>{left <= 0 ? "FULL" : `${left} slot${left === 1 ? "" : "s"}`}</Chip></div>; })}
+        {!d.upcoming.length && <p className="portal-empty-copy">Nothing scheduled in the next two weeks.</p>}
+      </section>
+      <section className="portal-panel">
+        <div className="panel-heading"><div><h2>Quick actions</h2><p>Most common daily admin tasks</p></div></div>
+        <div className="qa-grid">{actions.map(([icon, label, fn]) => <button type="button" key={label} onClick={fn}><em aria-hidden>{icon}</em>{label}</button>)}</div>
+      </section>
+    </div>
+  </div>;
+}
+
+function Chip({ cls, children }: { cls: string; children: React.ReactNode }) {
+  return <span className={`portal-badge ${cls}`}>{children}</span>;
 }

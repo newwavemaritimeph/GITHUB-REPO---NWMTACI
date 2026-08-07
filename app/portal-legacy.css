@@ -821,3 +821,17 @@
 .cal-daynum { font-size: 11px; font-weight: 700; color: #405d70; }
 .cal-chip { font-size: 9.5px; font-weight: 700; color: #fff; border-radius: 5px; padding: 2px 5px; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .cal-more { font-size: 10px; color: var(--muted); }
+
+/* Admin dashboard (owner mock): capacity meters, needs-attention rows, quick actions. */
+.meter { display: block; height: 6px; border-radius: 4px; background: #e3ecf0; margin-top: 5px; max-width: 140px; overflow: hidden; }
+.meter i { display: block; height: 100%; border-radius: 4px; }
+.needs-row { display: flex; justify-content: space-between; align-items: center; width: 100%; min-height: 46px; padding: 8px 4px; background: none; border: 0; border-bottom: 1px solid #e9f1f5; font: inherit; font-size: 14px; color: var(--ink); cursor: pointer; text-align: left; }
+.needs-row:hover { background: #f4f9fc; }
+.needs-row b { color: #0571d0; margin-right: 4px; }
+.qa-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 4px 0 8px; }
+.qa-grid button { min-height: 62px; border: 1px solid #dbe7ec; border-radius: 10px; background: #fff; font: inherit; font-size: 13px; font-weight: 700; color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.qa-grid button:hover { border-color: #f25615; color: #d8480c; }
+.qa-grid button em { font-style: normal; font-size: 17px; }
+.date-block { display: inline-flex; flex-direction: column; align-items: center; min-width: 44px; border: 1px solid #dbe7ec; border-radius: 9px; padding: 4px 6px; }
+.date-block b { font-size: 16px; line-height: 1.1; }
+.date-block i { font-style: normal; font-size: 10px; color: var(--muted); text-transform: uppercase; }
