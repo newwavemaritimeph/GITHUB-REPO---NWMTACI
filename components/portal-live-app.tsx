@@ -14,10 +14,11 @@ import { automaticEndDate, batchPatternLabel, validBatchStart } from "@/lib/sche
 import { AdminConfiguration } from "./admin-configuration";
 import { DateReports } from "./date-reports";
 import { downloadCsv } from "@/lib/csv";
+import { RegistrationDashboard, RegistrationChanges } from "./portal/live-registration";
 import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, first, dueCentavos, balanceOf, isUnpaid, manilaToday } from "@/lib/portal-format";
 
-type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Setup" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments";
+type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Setup" | "Registration changes" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments";
 type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -53,7 +54,7 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting"],group:"Work"},
   {label:"Schedules",icon:"□",roles:["admin","registration","training_operations","instructor"],group:"Work"},{label:"Instructions",icon:"✉",roles:["admin","registration","training_operations"],group:"Work"},{label:"Attendance",icon:"✓",roles:["admin","training_operations","instructor"],group:"Work"},
   {label:"Rooms & facilities",icon:"▢",roles:["admin","training_operations"],group:"Work"},{label:"Training calendar",icon:"▦",roles:["admin","training_operations"],group:"Work"},{label:"Trainee scheduling",icon:"◎",roles:["admin","training_operations"],group:"Work"},{label:"Instructor assignment",icon:"♙",roles:["admin","training_operations"],group:"Work"},{label:"Schedule changes",icon:"↺",roles:["admin","training_operations"],group:"Records"},{label:"Certificates",icon:"◈",roles:["admin","releasing_officer"],group:"Work"},{label:"Requests",icon:"↺",roles:["admin","accounting","cashier"],group:"Work"},
-  {label:"Reports",icon:"↥",roles:["admin","accounting","releasing_officer","registration","training_operations","cashier"],group:"Records"},
+  {label:"Registration changes",icon:"↺",roles:["registration"],group:"Records"},{label:"Reports",icon:"↥",roles:["admin","accounting","releasing_officer","registration","training_operations","cashier"],group:"Records"},
   {label:"Payments",icon:"₱",roles:["cashier"],group:"Finance"},{label:"Accounting",icon:"▥",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Expenses",icon:"◰",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Inventory",icon:"▦",roles:["admin","accounting"],group:"Finance"},{label:"Employee charges",icon:"₱",roles:["admin","accounting","hr"],group:"Finance"},
   {label:"Receivables",icon:"◷",roles:["accounting"],group:"Collections"},{label:"Payments",icon:"₱",roles:["accounting"],group:"Collections"},
   {label:"Approvals",icon:"✓",roles:["accounting"],group:"Approvals"},
@@ -97,8 +98,9 @@ export function PortalLiveApp(){
   const accountingHidden=new Set<Module>(["Trainees","Enrollments"]);
   // The Schedule Officer works from a scheduling-only workspace (owner directive).
   const trainingOpsHidden=new Set<Module>(["Trainees","Instructions","Attendance","Endorsed courses"]);
+  const registrationHidden=new Set<Module>(["Instructions","Endorsed courses"]);
   const releasingHidden=new Set<Module>(["Endorsed courses","Schedules"]);
-  const allowedNav=nav.filter(item=>(!item.roles||item.roles.includes(role)||(role==="super_admin"&&item.roles.includes("admin")))&&!(role==="admin"&&adminHidden.has(item.label))&&!(role==="accounting"&&accountingHidden.has(item.label))&&!(role==="training_operations"&&trainingOpsHidden.has(item.label))&&!(role==="releasing_officer"&&releasingHidden.has(item.label)));
+  const allowedNav=nav.filter(item=>(!item.roles||item.roles.includes(role)||(role==="super_admin"&&item.roles.includes("admin")))&&!(role==="admin"&&adminHidden.has(item.label))&&!(role==="accounting"&&accountingHidden.has(item.label))&&!(role==="training_operations"&&trainingOpsHidden.has(item.label))&&!(role==="registration"&&registrationHidden.has(item.label))&&!(role==="releasing_officer"&&releasingHidden.has(item.label)));
   const go=(module:Module)=>{setActive(module);setSidebar(false)};
   const unread=data?.notifications.filter(item=>!item.read_at).length??0;
   async function markRead(){await fetch("/api/staff/operations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"mark-notifications-read"})});setData(current=>current?{...current,notifications:current.notifications.map(item=>({...item,read_at:item.read_at??new Date().toISOString()}))}:current)}
@@ -115,6 +117,8 @@ export function PortalLiveApp(){
 
 function PortalContent({active,role,data,query,go,open,onPay,canEnroll,canSchedule,canPay,reload}:{active:Module;role:string;data:PortalData;query:string;go:(module:Module)=>void;open:(value:"enrollment"|"batch"|"payment")=>void;onPay:(enrollmentId:string)=>void;canEnroll:boolean;canSchedule:boolean;canPay:boolean;reload:()=>Promise<void>}){
   const gateRole=role==="super_admin"?"admin":role;
+  if(active==="Dashboard"&&gateRole==="registration")return <RegistrationDashboard data={data as unknown as Parameters<typeof RegistrationDashboard>[0]["data"]} go={m=>go(m as Module)} openEnrollment={()=>open("enrollment")}/>;
+  if(active==="Registration changes")return <RegistrationChanges data={data as unknown as Parameters<typeof RegistrationChanges>[0]["data"]} go={m=>go(m as Module)}/>;
   if(active==="Dashboard"&&gateRole==="admin")return <AdminDashboard data={data} go={m=>go(m as Module)} openEnrollment={()=>open("enrollment")}/>;
   if(active==="Dashboard"&&gateRole==="training_operations")return <ScheduleOfficerDashboard data={data} go={m=>go(m as Module)} openBatch={()=>open("batch")}/>;
   if(active==="Training calendar")return <TrainingCalendar data={data}/>;

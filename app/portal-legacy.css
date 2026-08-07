@@ -924,3 +924,20 @@
 .recon-tips li { font-size: 12px; color: var(--muted); padding: 4px 0 4px 20px; position: relative; }
 .recon-tips li::before { content: "✓"; position: absolute; left: 0; color: #0a7d3b; font-weight: 700; }
 @media (max-width: 1100px) { .recon-layout { grid-template-columns: 1fr; } }
+
+/* Registration Officer dashboard: clickable KPIs, two-column work layout. */
+.reg-kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 16px; }
+.reg-kpis button { background: #fff; border: 1px solid #e3ecf0; border-radius: 12px; padding: 14px; text-align: left; font: inherit; cursor: pointer; box-shadow: var(--shadow-sm); }
+.reg-kpis button:hover { border-color: #f25615; }
+.reg-kpis button i { font-style: normal; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: #eef5f9; color: #0571d0; font-size: 15px; margin-bottom: 8px; }
+.reg-kpis button span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; }
+.reg-kpis button strong { display: block; font-size: 26px; line-height: 1.15; }
+.reg-kpis button small { color: #0571d0; font-size: 11.5px; font-weight: 700; }
+
+.reg-main { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 14px; margin-top: 16px; align-items: start; }
+.avatar { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #e8f2ff; color: #0571d0; font-size: 10.5px; font-weight: 700; vertical-align: middle; }
+.quick-menu { position: absolute; top: 46px; right: 190px; z-index: 30; background: #fff; border: 1px solid #dbe7ec; border-radius: 10px; box-shadow: 0 10px 26px rgba(18,63,99,.14); padding: 6px; min-width: 190px; }
+.quick-menu button { display: block; width: 100%; text-align: left; background: none; border: 0; font: inherit; font-size: 13px; padding: 9px 12px; border-radius: 7px; cursor: pointer; color: var(--ink); }
+.quick-menu button:hover { background: #f4f9fc; }
+@media (max-width: 1200px) { .reg-kpis { grid-template-columns: repeat(3, 1fr); } .reg-main { grid-template-columns: 1fr; } }
+@media (max-width: 640px) { .reg-kpis { grid-template-columns: repeat(2, 1fr); } }
