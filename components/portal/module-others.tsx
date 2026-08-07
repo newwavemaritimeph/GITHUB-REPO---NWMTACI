@@ -656,7 +656,7 @@ export function CatalogModule({ role }: { role: Role }) {
           <article key={item.center}>
             <span>{item.center}</span>
             <strong>{item.offers}</strong>
-            <small>active offerings</small>
+            <small>Active offerings</small>
           </article>
         ))}
       </div>
@@ -754,7 +754,7 @@ export function CatalogModule({ role }: { role: Role }) {
               <tr key={offer.id} className={offer.active ? "" : "row-muted"}>
                 <td>
                   <strong>{offer.course}</strong>
-                  {!offer.active && <small>archived</small>}
+                  {!offer.active && <small>Archived</small>}
                 </td>
                 <td>{offer.center}</td>
                 <td>{offer.duration}</td>

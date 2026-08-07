@@ -74,9 +74,8 @@ body {
   font-size: 16px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
-  /* House style: on-screen text renders in Capitalized (Title) Case, display
-     only — stored values such as emails and names are unchanged. */
-  text-transform: capitalize;
+  /* Sentence case is the house style — no blanket transform. Individual
+     components opt in to uppercase (eyebrows, table headings) where wanted. */
 }
 
 /* Keep emails and passwords in their natural case — transforming a value the
@@ -2782,15 +2781,13 @@ code {
 }
 
 /*
- * House style: the staff portal reads in Capitalized (Title) Case. Applied as a
- * display-only transform (stored data is untouched) and forced with !important
- * so it beats the many per-element text-transform rules elsewhere in this file.
+ * House style is SENTENCE case (see CLAUDE.md). A previous blanket
+ * `text-transform: capitalize !important` here forced Title Case onto every
+ * string in the portal — "Please Review Your Registration Details.", "Starting
+ * Today Or Later" — which reads as broken copy and fights the per-element
+ * uppercase styles used for eyebrows and headings. Removed deliberately;
+ * capitalisation now comes from the copy itself.
  */
-.portal,
-.portal *,
-.portal ::placeholder {
-  text-transform: capitalize !important;
-}
 
 .sidebar {
   position: fixed;

@@ -232,7 +232,7 @@ function SalesReport({ payments, payables }: { payments: Payment[]; payables: Pa
       </div>
       <div className="finance-hero">
         <div><span>Sales · {span}</span><strong>{pesos(view.total)}</strong><small>{view.from} → {view.to}</small></div>
-        <article><span>Payments</span><strong>{view.count}</strong><small>posted in range</small></article>
+        <article><span>Payments</span><strong>{view.count}</strong><small>Posted in range</small></article>
         <article><span>Payables due</span><strong>{pesos(view.payableTotal)}</strong><small>{view.duePayables.length} in range</small></article>
       </div>
       <section className="portal-panel">
@@ -716,7 +716,7 @@ function Inventory({ data, canManage, busy, post }: { data: AccountingData; canM
       <div className="finance-hero">
         <div><span>Inventory value</span><strong>{pesos(totalValue)}</strong><small>{data.inventoryItems.length} items</small></div>
         <article><span>Low stock</span><strong>{data.inventoryItems.filter((i) => i.active && i.quantity_on_hand <= 5).length}</strong><small>≤ 5 on hand</small></article>
-        <article><span>Movements</span><strong>{data.inventoryMovements.length}</strong><small>recent in/out</small></article>
+        <article><span>Movements</span><strong>{data.inventoryMovements.length}</strong><small>Recent in/out</small></article>
       </div>
       <section className="portal-panel">
         <div className="panel-heading"><div><h2>Items</h2><p>Stock on hand and value</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => { setError(""); setEdit({ name: "", category: "", unit: "pc", unitValue: "0" }); }}>+ Add item</button>}</div>
