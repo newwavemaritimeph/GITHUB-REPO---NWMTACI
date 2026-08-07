@@ -912,3 +912,15 @@
 .pager { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 14px; font-size: 12.5px; color: var(--muted); border-top: 1px solid #eef3f6; }
 .pager strong { color: var(--ink); }
 .pager select { min-height: 34px; border: 1px solid #cbdce4; border-radius: 7px; padding: 4px 8px; font: inherit; font-size: 12.5px; }
+
+/* Reconciliation: two-lane layout with a process rail. */
+.recon-layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+.recon-rail .recon-steps { list-style: none; margin: 0; padding: 0; }
+.recon-steps li { display: flex; gap: 10px; padding: 8px 0; border-left: 2px solid #e3ecf0; margin-left: 13px; padding-left: 14px; position: relative; }
+.recon-steps li b { position: absolute; left: -13px; top: 8px; width: 24px; height: 24px; border-radius: 50%; background: #0571d0; color: #fff; display: grid; place-items: center; font-size: 11px; }
+.recon-steps li strong { display: block; font-size: 12.5px; text-transform: uppercase; letter-spacing: .03em; }
+.recon-steps li small { color: var(--muted); font-size: 11.5px; }
+.recon-tips { list-style: none; margin: 0; padding: 0; }
+.recon-tips li { font-size: 12px; color: var(--muted); padding: 4px 0 4px 20px; position: relative; }
+.recon-tips li::before { content: "✓"; position: absolute; left: 0; color: #0a7d3b; font-weight: 700; }
+@media (max-width: 1100px) { .recon-layout { grid-template-columns: 1fr; } }

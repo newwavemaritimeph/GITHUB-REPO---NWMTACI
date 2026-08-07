@@ -977,129 +977,157 @@ const isoDay = (value?: string | null) => {
   return Number.isNaN(d.getTime()) ? String(value).slice(0, 10) : new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(d);
 };
 
-function Reconciliation({ payments, channels }: { payments: Payment[]; channels: Channel[] }) {
-  const active = channels.filter((c) => c.active);
-  const [channel, setChannel] = useState(active.find((c) => c.name !== "Cash")?.name ?? active[0]?.name ?? "");
-  const [rows, setRows] = useState<BankRow[]>([]);
-  const [fileName, setFileName] = useState("");
-  const [error, setError] = useState("");
-  const fileRef = useRef<HTMLInputElement>(null);
+/**
+ * Bank / GCash reconciliation (owner layout, Aug 2026). Two independent lanes —
+ * bank and GCash — each importing a statement CSV and matching it against the
+ * posted ledger by reference then amount. Session-only: nothing is persisted.
+ */
+type ReconRow = { line: number; reference: string; amountCentavos: number | null; date: string; raw: string };
+type ReconResult = { matched: { bank: ReconRow; payment: Payment; via: string }[]; bankOnly: ReconRow[]; systemOnly: Payment[]; ledgerCount: number };
 
-  async function onFile(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    event.target.value = ""; // allow re-selecting the same file
-    if (!file) return;
-    setError("");
-    try {
-      const grid = parseCsv(await file.text());
-      if (grid.length < 2) throw new Error("The file has no data rows.");
-      const header = grid[0].map((h) => h.trim().toLowerCase());
-      const findCol = (keys: string[]) => header.findIndex((h) => keys.some((k) => h.includes(k)));
-      const refCol = findCol(["reference", "ref no", "ref", "transaction id", "txn", "confirmation"]);
-      const amtCol = findCol(["amount", "credit", "value", "paid"]);
-      const dateCol = findCol(["date", "time", "posted"]);
-      if (refCol === -1 && amtCol === -1) throw new Error("Could not find a Reference or Amount column in the header.");
-      const parsed: BankRow[] = grid.slice(1).map((cells, i) => ({
-        line: i + 2,
-        reference: refCol === -1 ? "" : (cells[refCol] ?? "").trim(),
-        amountCentavos: amtCol === -1 ? null : parseAmount(cells[amtCol] ?? ""),
-        date: dateCol === -1 ? "" : isoDay((cells[dateCol] ?? "").trim()),
-        raw: cells.join(" · "),
-      }));
-      setRows(parsed);
-      setFileName(file.name);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not read the file.");
-      setRows([]); setFileName("");
-    }
-  }
-
-  const result = useMemo(() => {
-    const ledger = payments.filter((p) => p.method === channel);
-    const usedLedger = new Set<number>();
-    const matched: { bank: BankRow; payment: Payment; via: string }[] = [];
-    const bankOnly: BankRow[] = [];
-    for (const bank of rows) {
-      const bankRef = normalizeRef(bank.reference);
-      let idx = -1; let via = "";
-      if (bankRef) idx = ledger.findIndex((p, li) => !usedLedger.has(li) && p.reference_number && normalizeRef(p.reference_number) === bankRef);
-      if (idx !== -1) via = "reference";
-      else if (bank.amountCentavos != null) {
-        idx = ledger.findIndex((p, li) => !usedLedger.has(li) && Number(p.amount_centavos) === bank.amountCentavos && (!bank.date || isoDay(p.received_at) === bank.date));
-        if (idx !== -1) via = "amount + date";
-      }
-      if (idx !== -1) { usedLedger.add(idx); matched.push({ bank, payment: ledger[idx], via }); }
-      else bankOnly.push(bank);
-    }
-    const systemOnly = ledger.filter((_, li) => !usedLedger.has(li));
-    return { matched, bankOnly, systemOnly, ledgerCount: ledger.length };
-  }, [rows, payments, channel]);
-
-  function exportCsv() {
-    const out: (string | number)[][] = [["Status", "Reference", "Amount (PHP)", "Date", "Matched via", "Payment no."]];
-    for (const m of result.matched) out.push(["Matched", m.bank.reference, ((m.bank.amountCentavos ?? 0) / 100).toFixed(2), m.bank.date, m.via, m.payment.payment_number ?? ""]);
-    for (const b of result.bankOnly) out.push(["In bank file only", b.reference, b.amountCentavos == null ? "" : (b.amountCentavos / 100).toFixed(2), b.date, "", ""]);
-    for (const p of result.systemOnly) out.push(["In system only", p.reference_number ?? "", (Number(p.amount_centavos) / 100).toFixed(2), isoDay(p.received_at), "", p.payment_number ?? ""]);
-    downloadCsv(`reconciliation-${channel}-${isoDay(new Date().toISOString())}.csv`, out);
-  }
-
-  return (
-    <>
-      <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Bank &amp; GCash reconciliation</h2><p>Upload a channel&apos;s transaction history (CSV) and match it against posted payments. Session-only — nothing is saved.</p></div></div>
-        <div className="portal-form" style={{ padding: "4px 0" }}>
-          <label>Channel<select value={channel} onChange={(e) => { setChannel(e.target.value); }}>
-            {active.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-          </select></label>
-          <div className="full" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-            <input ref={fileRef} type="file" accept=".csv,text/csv" onChange={onFile} style={{ display: "none" }} />
-            <button className="portal-primary" type="button" onClick={() => fileRef.current?.click()}>Upload transaction history</button>
-            {fileName && <span style={{ color: "var(--muted)", fontSize: 13 }}>{fileName} · {rows.length} rows</span>}
-            {rows.length > 0 && <button type="button" onClick={exportCsv}>Download reconciliation CSV</button>}
-          </div>
-        </div>
-        {error && <div className="portal-message error" role="alert">{error}</div>}
-      </section>
-
-      {rows.length > 0 && (
-        <>
-          <div className="finance-hero">
-            <div><span>Matched</span><strong>{result.matched.length}</strong><small>Bank rows found in the ledger</small></div>
-            <article><span>In bank file only</span><strong>{result.bankOnly.length}</strong><small>No posted payment</small></article>
-            <article><span>In system only</span><strong>{result.systemOnly.length}</strong><small>Not on the statement</small></article>
-            <article><span>Ledger rows</span><strong>{result.ledgerCount}</strong><small>{channel} payments</small></article>
-          </div>
-
-          <section className="portal-panel">
-            <div className="panel-heading"><div><h2>In bank file only</h2><p>Statement rows with no matching posted payment — investigate</p></div></div>
-            <div className="portal-table"><table><thead><tr><th>Line</th><th>Reference</th><th>Amount</th><th>Date</th></tr></thead><tbody>
-              {result.bankOnly.map((b) => <tr key={b.line}><td>{b.line}</td><td><strong>{b.reference || "—"}</strong></td><td>{b.amountCentavos == null ? "—" : pesos(b.amountCentavos)}</td><td>{b.date || "—"}</td></tr>)}
-              {!result.bankOnly.length && <tr><td colSpan={4}><span className="portal-empty-copy">Every statement row matched a payment.</span></td></tr>}
-            </tbody></table></div>
-          </section>
-
-          <section className="portal-panel">
-            <div className="panel-heading"><div><h2>In system only</h2><p>Posted {channel} payments not on the uploaded statement</p></div></div>
-            <div className="portal-table"><table><thead><tr><th>Payment</th><th>Reference</th><th>Amount</th><th>Date</th></tr></thead><tbody>
-              {result.systemOnly.map((p, i) => <tr key={p.payment_number ?? i}><td><strong>{p.payment_number ?? "—"}</strong></td><td>{p.reference_number ?? "—"}</td><td>{pesos(p.amount_centavos)}</td><td>{isoDay(p.received_at) || "—"}</td></tr>)}
-              {!result.systemOnly.length && <tr><td colSpan={4}><span className="portal-empty-copy">Every posted payment is on the statement.</span></td></tr>}
-            </tbody></table></div>
-          </section>
-
-          <section className="portal-panel">
-            <div className="panel-heading"><div><h2>Matched</h2><p>Statement rows reconciled to the ledger</p></div></div>
-            <div className="portal-table"><table><thead><tr><th>Reference</th><th>Amount</th><th>Date</th><th>Via</th><th>Payment</th></tr></thead><tbody>
-              {result.matched.map((m) => <tr key={m.bank.line}><td><strong>{m.bank.reference || "—"}</strong></td><td>{m.bank.amountCentavos == null ? "—" : pesos(m.bank.amountCentavos)}</td><td>{m.bank.date || "—"}</td><td>{m.via}</td><td>{m.payment.payment_number ?? "—"}</td></tr>)}
-              {!result.matched.length && <tr><td colSpan={5}><span className="portal-empty-copy">No rows matched — check the channel and file columns.</span></td></tr>}
-            </tbody></table></div>
-          </section>
-        </>
-      )}
-    </>
-  );
+function parseStatement(text: string): ReconRow[] {
+  const grid = parseCsv(text);
+  if (grid.length < 2) throw new Error("The file has no data rows.");
+  const header = grid[0].map((h) => h.trim().toLowerCase());
+  const findCol = (keys: string[]) => header.findIndex((h) => keys.some((k) => h.includes(k)));
+  const refCol = findCol(["reference", "ref no", "ref", "transaction id", "txn", "confirmation"]);
+  const amtCol = findCol(["amount", "credit", "value", "paid"]);
+  const dateCol = findCol(["date", "time", "posted"]);
+  const descCol = findCol(["description", "particular", "details", "narration"]);
+  if (amtCol === -1) throw new Error("No amount column found. Include a column named Amount, Credit or Value.");
+  return grid.slice(1).filter((r) => r.some((c) => c.trim())).map((r, i) => {
+    const raw = (descCol !== -1 ? r[descCol] : "") || (refCol !== -1 ? r[refCol] : "") || r.join(" ");
+    const digits = (amtCol !== -1 ? r[amtCol] : "").replace(/[^\d.-]/g, "");
+    const value = Number(digits);
+    return { line: i + 2, reference: (refCol !== -1 ? r[refCol] : "").trim(), amountCentavos: Number.isFinite(value) ? Math.round(value * 100) : null, date: (dateCol !== -1 ? r[dateCol] : "").trim(), raw: String(raw).trim() };
+  });
 }
 
-/* ---- Trainee lookup — Accounting Manager searches by name/SRN ---- */
+function reconcile(rows: ReconRow[], ledger: Payment[]): ReconResult {
+  const matched: { bank: ReconRow; payment: Payment; via: string }[] = [];
+  const usedLedger = new Set<number>();
+  const bankOnly: ReconRow[] = [];
+  for (const bank of rows) {
+    const norm = (v: string) => v.replace(/\s|-/g, "").toLowerCase();
+    let idx = bank.reference ? ledger.findIndex((p, i) => !usedLedger.has(i) && p.reference_number && norm(p.reference_number) === norm(bank.reference)) : -1;
+    let via = "Reference";
+    if (idx === -1 && bank.amountCentavos != null) { idx = ledger.findIndex((p, i) => !usedLedger.has(i) && Number(p.amount_centavos) === bank.amountCentavos); via = "Amount"; }
+    if (idx !== -1) { usedLedger.add(idx); matched.push({ bank, payment: ledger[idx], via }); } else bankOnly.push(bank);
+  }
+  const systemOnly = ledger.filter((_, i) => !usedLedger.has(i));
+  return { matched, bankOnly, systemOnly, ledgerCount: ledger.length };
+}
+
+const RECON_STEPS: [string, string][] = [
+  ["Import statement", "Import the latest bank or GCash statement (CSV)."],
+  ["Review transactions", "Review imported transactions and system records."],
+  ["Match transactions", "Match transactions between statement and system."],
+  ["Review unmatched", "Investigate and resolve unmatched transactions."],
+  ["Reconcile", "Finalise reconciliation and lock the period."],
+  ["Generate report", "Download and file the reconciliation report."],
+];
+const BEST_PRACTICES = ["Reconcile regularly (daily / weekly).", "Investigate differences promptly.", "Keep supporting documents.", "Ensure proper approvals.", "Maintain an audit trail."];
+
+function Reconciliation({ payments, channels }: { payments: Payment[]; channels: Channel[] }) {
+  const active = channels.filter((c) => c.active);
+  const isG = (n: string) => n.toLowerCase().includes("gcash");
+  const bankChannels = active.filter((c) => !isG(c.name) && c.name.toLowerCase() !== "cash");
+  const gcashChannels = active.filter((c) => isG(c.name));
+  const [bankName, setBankName] = useState(bankChannels[0]?.name ?? "");
+  const [gcashName, setGcashName] = useState(gcashChannels[0]?.name ?? "GCash");
+  const [bank, setBank] = useState<{ rows: ReconRow[]; file: string; error: string }>({ rows: [], file: "", error: "" });
+  const [gcash, setGcash] = useState<{ rows: ReconRow[]; file: string; error: string }>({ rows: [], file: "", error: "" });
+  const money = (c: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format((Number(c) || 0) / 100);
+
+  const ledgerFor = (name: string) => payments.filter((p) => (p.receiving_account || p.method || "").toLowerCase().includes(name.toLowerCase()) || (p.method || "").toLowerCase() === name.toLowerCase());
+  const bankLedger = ledgerFor(bankName), gcashLedger = ledgerFor(gcashName);
+  const bankRes = reconcile(bank.rows, bankLedger), gcashRes = reconcile(gcash.rows, gcashLedger);
+
+  const stmtTotal = (rows: ReconRow[]) => rows.reduce((s, r) => s + (r.amountCentavos ?? 0), 0);
+  const sysTotal = (l: Payment[]) => l.reduce((s, p) => s + Number(p.amount_centavos), 0);
+  const bankDiff = stmtTotal(bank.rows) - sysTotal(bankLedger), gcashDiff = stmtTotal(gcash.rows) - sysTotal(gcashLedger);
+  const matchedAmt = [...bankRes.matched, ...gcashRes.matched].reduce((s, m) => s + Number(m.payment.amount_centavos), 0);
+  const unmatchedAmt = [...bankRes.bankOnly, ...gcashRes.bankOnly].reduce((s, r) => s + (r.amountCentavos ?? 0), 0);
+  const totalRows = bank.rows.length + gcash.rows.length;
+  const matchedCount = bankRes.matched.length + gcashRes.matched.length;
+  const pct = totalRows ? Math.round((matchedCount / totalRows) * 100) : 0;
+  const imported = totalRows > 0;
+  const status = !imported ? "Not started" : bankDiff === 0 && gcashDiff === 0 ? "Reconciled" : "Partially reconciled";
+
+  async function load(kind: "bank" | "gcash", file: File | undefined) {
+    if (!file) return;
+    const set = kind === "bank" ? setBank : setGcash;
+    try { set({ rows: parseStatement(await file.text()), file: file.name, error: "" }); }
+    catch (e) { set({ rows: [], file: "", error: e instanceof Error ? e.message : "Could not read the file." }); }
+  }
+  function exportCsv(kind: "bank" | "gcash") {
+    const res = kind === "bank" ? bankRes : gcashRes;
+    const out: (string | number)[][] = [["Status", "Reference", "Amount", "Date", "Matched via", "Payment"]];
+    for (const m of res.matched) out.push(["Matched", m.bank.reference, ((m.bank.amountCentavos ?? 0) / 100).toFixed(2), m.bank.date, m.via, m.payment.payment_number ?? ""]);
+    for (const b of res.bankOnly) out.push(["In statement only", b.reference, ((b.amountCentavos ?? 0) / 100).toFixed(2), b.date, "", ""]);
+    for (const p of res.systemOnly) out.push(["In system only", p.reference_number ?? "", (Number(p.amount_centavos) / 100).toFixed(2), manilaDay(p.received_at), "", p.payment_number ?? ""]);
+    downloadCsv(`reconciliation-${kind}-${manilaDay(new Date().toISOString())}.csv`, out);
+  }
+
+  const R = 52, C = 2 * Math.PI * R;
+  const segs = totalRows ? [{ v: matchedCount / totalRows, c: "#0a7d3b" }, { v: (bankRes.bankOnly.length + gcashRes.bankOnly.length) / totalRows, c: "#f2a615" }] : [];
+  let off = 0;
+
+  const Lane = ({ kind, name, setName, options, state, res, ledger, diff }: { kind: "bank" | "gcash"; name: string; setName: (v: string) => void; options: Channel[]; state: { rows: ReconRow[]; file: string; error: string }; res: ReconResult; ledger: Payment[]; diff: number }) => (
+    <section className="portal-panel" style={{ marginTop: 16 }}>
+      <div className="panel-heading"><div><h2>{kind === "bank" ? "Bank reconciliation" : "GCash reconciliation"}</h2><p>{state.file ? `${state.file} · ${state.rows.length} rows` : "Import a statement to begin"}</p></div>
+        <span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}>
+          {options.length > 1 && <select value={name} onChange={(e) => setName(e.target.value)}>{options.map((c) => <option key={c.id ?? c.name}>{c.name}</option>)}</select>}
+          <label className="portal-secondary" style={{ cursor: "pointer" }}>⭱ Import statement<input type="file" accept=".csv,text/csv" style={{ display: "none" }} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; void load(kind, f); }} /></label>
+          <button type="button" className="portal-secondary" disabled={!state.rows.length} onClick={() => exportCsv(kind)}>Export</button>
+        </span>
+      </div>
+      {state.error && <div className="portal-message error" role="alert">{state.error}</div>}
+      <div className="pill-row">
+        <div><span>All</span><b>{state.rows.length}</b></div>
+        <div className="ok"><span>Matched</span><b>{res.matched.length}</b></div>
+        <div className="bad"><span>Unmatched</span><b>{res.bankOnly.length}</b></div>
+        <div className="warn"><span>In system only</span><b>{res.systemOnly.length}</b></div>
+      </div>
+      <div className="portal-table"><table><thead><tr><th>Date</th><th>Description</th><th>Statement</th><th>System record</th><th>Match status</th></tr></thead><tbody>
+        {res.matched.slice(0, 8).map((m, i) => <tr key={`m${i}`}><td>{m.bank.date || "—"}</td><td>{m.bank.raw || m.bank.reference}<small>Matched via {m.via.toLowerCase()}</small></td><td>{money(m.bank.amountCentavos ?? 0)}</td><td>{money(Number(m.payment.amount_centavos))}</td><td><span className="portal-badge active">Matched</span></td></tr>)}
+        {res.bankOnly.slice(0, 6).map((b, i) => <tr key={`b${i}`}><td>{b.date || "—"}</td><td>{b.raw || b.reference}</td><td>{money(b.amountCentavos ?? 0)}</td><td>—</td><td><span className="portal-badge pending">Unmatched</span></td></tr>)}
+        {res.systemOnly.slice(0, 6).map((p, i) => <tr key={`s${i}`}><td>{manilaDay(p.received_at)}</td><td>{p.payment_number ?? "Posted payment"}<small>{p.reference_number ?? ""}</small></td><td>—</td><td>{money(Number(p.amount_centavos))}</td><td><span className="portal-badge cancelled">In system only</span></td></tr>)}
+      </tbody></table>{!state.rows.length && <p className="portal-empty-copy">No statement imported. The ledger holds {ledger.length} {name} payment{ledger.length === 1 ? "" : "s"} totalling {money(sysTotal(ledger))}.</p>}</div>
+      {state.rows.length > 0 && <p className="portal-empty-copy" style={{ padding: "8px 12px" }}>Statement {money(stmtTotal(state.rows))} · system {money(sysTotal(ledger))} · difference <strong style={{ color: diff === 0 ? "#0a7d3b" : "#a52020" }}>{money(diff)}</strong></p>}
+    </section>
+  );
+
+  return <div className="recon-layout">
+    <div>
+      <div className="portal-heading" style={{ marginBottom: 14 }}><div><h2 style={{ margin: 0 }}>Bank / GCash reconciliation</h2><p>Ensure accuracy. Prevent discrepancies. Strengthen financial integrity.</p></div></div>
+      <div className="fin-cards" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
+        <article style={{ borderLeftColor: "#0571d0" }}><i style={{ background: "#0571d01a", color: "#0571d0" }}>▦</i><div><span>Bank account</span><strong>{money(stmtTotal(bank.rows))}</strong><small>Statement · system {money(sysTotal(bankLedger))}</small><small style={{ color: bankDiff === 0 ? "#0a7d3b" : "#a52020" }}>Difference {money(bankDiff)}</small></div></article>
+        <article style={{ borderLeftColor: "#0a7d3b" }}><i style={{ background: "#0a7d3b1a", color: "#0a7d3b" }}>◎</i><div><span>GCash account</span><strong>{money(stmtTotal(gcash.rows))}</strong><small>Statement · system {money(sysTotal(gcashLedger))}</small><small style={{ color: gcashDiff === 0 ? "#0a7d3b" : "#a52020" }}>Difference {money(gcashDiff)}</small></div></article>
+        <article style={{ borderLeftColor: "#f2a615" }}><i style={{ background: "#f2a6151a", color: "#f2a615" }}>▤</i><div><span>Overall summary</span><strong>{money(matchedAmt)}</strong><small>Total cleared · difference {money(bankDiff + gcashDiff)}</small><small><span className={`portal-badge ${status === "Reconciled" ? "active" : status === "Not started" ? "" : "pending"}`}>{status}</span></small></div></article>
+        <article style={{ borderLeftColor: "#7c3aed", alignItems: "center" }}><svg viewBox="0 0 130 130" width="86" height="86" role="img" aria-label="Reconciliation status">
+          <circle cx="65" cy="65" r={R} fill="none" stroke="#eef3f6" strokeWidth="16" />
+          {segs.map((s, i) => { const el = <circle key={i} cx="65" cy="65" r={R} fill="none" stroke={s.c} strokeWidth="16" strokeDasharray={`${s.v * C} ${C}`} strokeDashoffset={-off * C} transform="rotate(-90 65 65)" />; off += s.v; return el; })}
+          <text x="65" y="70" textAnchor="middle" fontSize="18" fontWeight="700" fill="#12303f">{pct}%</text>
+        </svg><div><span>Reconciliation status</span><small style={{ color: "#0a7d3b" }}>Matched {money(matchedAmt)}</small><small style={{ color: "#b45309" }}>Unmatched {money(unmatchedAmt)}</small></div></article>
+      </div>
+      <Lane kind="bank" name={bankName} setName={setBankName} options={bankChannels} state={bank} res={bankRes} ledger={bankLedger} diff={bankDiff} />
+      <Lane kind="gcash" name={gcashName} setName={setGcashName} options={gcashChannels} state={gcash} res={gcashRes} ledger={gcashLedger} diff={gcashDiff} />
+      <div className="portal-message" role="status" style={{ marginTop: 14 }}>ℹ Reconciliation confirms every peso received by New Wave Maritime is recorded in the ledger. Imports are session-only — nothing is saved.</div>
+    </div>
+    <aside className="recon-rail">
+      <section className="portal-panel" style={{ padding: 14 }}>
+        <h2 style={{ fontSize: 15, margin: "0 0 10px" }}>Reconciliation process</h2>
+        <ol className="recon-steps">{RECON_STEPS.map(([t, d], i) => <li key={t}><b>{i + 1}</b><div><strong>{t}</strong><small>{d}</small></div></li>)}</ol>
+      </section>
+      <section className="portal-panel" style={{ padding: 14, marginTop: 12 }}>
+        <h2 style={{ fontSize: 15, margin: "0 0 8px" }}>Best practices</h2>
+        <ul className="recon-tips">{BEST_PRACTICES.map((b) => <li key={b}>{b}</li>)}</ul>
+      </section>
+    </aside>
+  </div>;
+}
+
 export function TraineeLookup({ data }: { data: AccountingData }) {
   const [q, setQ] = useState("");
   const [selectedId, setSelectedId] = useState("");
