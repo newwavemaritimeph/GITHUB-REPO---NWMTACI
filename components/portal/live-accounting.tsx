@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useState } from "react";
 import { parseCsv, downloadCsv } from "@/lib/csv";
 import { pesos, first as one, dueCentavos as dueOf } from "@/lib/portal-format";
 import { LiveCashierClosing, type ClosingData } from "./live-cashier-closing";
@@ -46,12 +46,6 @@ export type AccountingData = {
 
 const manilaDay = (value?: string | null) => (value ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(value)) : "");
 /** Inclusive [from,to] Manila-day range for Daily / Weekly (last 7d) / Monthly (this month). */
-function rangeFor(span: "Daily" | "Weekly" | "Monthly"): { from: string; to: string } {
-  const today = manilaDay(new Date().toISOString());
-  if (span === "Daily") return { from: today, to: today };
-  if (span === "Weekly") { const d = new Date(); d.setDate(d.getDate() - 6); return { from: manilaDay(d.toISOString()), to: today }; }
-  return { from: today.slice(0, 8) + "01", to: today };
-}
 
 
 /**
@@ -573,44 +567,6 @@ function AccountingOverview({ data, go }: { data: AccountingData; go?: (module: 
   </>;
 }
 
-function SalesReport({ payments, payables }: { payments: Payment[]; payables: Payable[] }) {
-  const [span, setSpan] = useState<"Daily" | "Weekly" | "Monthly">("Daily");
-  const view = useMemo(() => {
-    const { from, to } = rangeFor(span);
-    const inRange = payments.filter((p) => { const d = manilaDay(p.received_at); return d >= from && d <= to; });
-    const byChannel = new Map<string, { total: number; count: number }>();
-    for (const p of inRange) { const k = p.method || "Other"; const e = byChannel.get(k) ?? { total: 0, count: 0 }; e.total += Number(p.amount_centavos); e.count += 1; byChannel.set(k, e); }
-    const duePayables = payables.filter((p) => p.due_on && p.due_on >= from && p.due_on <= to);
-    return { from, to, total: inRange.reduce((s, p) => s + Number(p.amount_centavos), 0), count: inRange.length, channels: [...byChannel.entries()].sort((a, b) => b[1].total - a[1].total), duePayables, payableTotal: duePayables.reduce((s, p) => s + Number(p.amount_centavos), 0) };
-  }, [payments, payables, span]);
-
-  return (
-    <>
-      <div className="portal-tabs" style={{ marginTop: -4 }}>
-        {(["Daily", "Weekly", "Monthly"] as const).map((s) => <button key={s} className={span === s ? "active" : ""} onClick={() => setSpan(s)}>{s}</button>)}
-      </div>
-      <div className="finance-hero">
-        <div><span>Sales · {span}</span><strong>{pesos(view.total)}</strong><small>{view.from} → {view.to}</small></div>
-        <article><span>Payments</span><strong>{view.count}</strong><small>Posted in range</small></article>
-        <article><span>Payables due</span><strong>{pesos(view.payableTotal)}</strong><small>{view.duePayables.length} in range</small></article>
-      </div>
-      <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Sales by channel</h2><p>Collections {view.from} → {view.to}</p></div><span>{pesos(view.total)}</span></div>
-        <div className="portal-table"><table><thead><tr><th>Channel</th><th>Payments</th><th>Total</th></tr></thead><tbody>
-          {view.channels.map(([name, v]) => <tr key={name}><td><strong>{name}</strong></td><td>{v.count}</td><td>{pesos(v.total)}</td></tr>)}
-          {!view.channels.length && <tr><td colSpan={3}><span className="portal-empty-copy">No sales in this period.</span></td></tr>}
-        </tbody></table></div>
-      </section>
-      <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Payables due in period</h2><p>Recurring bills with a due date in range</p></div><span>{pesos(view.payableTotal)}</span></div>
-        <div className="portal-table"><table><thead><tr><th>Payable</th><th>Due</th><th>Status</th><th>Amount</th></tr></thead><tbody>
-          {view.duePayables.map((p) => <tr key={p.id}><td>{p.description}</td><td>{p.due_on}</td><td>{p.status}</td><td>{pesos(p.amount_centavos)}</td></tr>)}
-          {!view.duePayables.length && <tr><td colSpan={4}><span className="portal-empty-copy">No payables due in this period.</span></td></tr>}
-        </tbody></table></div>
-      </section>
-    </>
-  );
-}
 
 /* ---- Standalone Expense Vouchers module (own nav item) ---- */
 /**
@@ -793,32 +749,9 @@ export function LiveInventory({ data, role, reload }: { data: AccountingData; ro
 
 /* ---- Standalone Expenses module (own left-nav item) ---- */
 export function LiveExpenses({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
-  const canManage = role === "admin" || role === "accounting";
-  const [busy, setBusy] = useState(false);
-  async function post(body: Record<string, unknown>) {
-    setBusy(true);
-    try { const r = await fetch("/api/staff/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); const j = await r.json(); if (!r.ok) throw new Error(j.error ?? "The action could not be completed."); await reload(); }
-    finally { setBusy(false); }
-  }
   return (
     <>
       <LiveVouchers data={data} role={role} reload={reload} />
-      {canManage && (
-        <div className="portal-page" style={{ paddingTop: 0 }}>
-          <SetupList title="Expense categories" description="Categories for expense vouchers (Utilities, Salary, Government…)" entityLabel="category"
-            canManage={canManage} busy={busy} removable
-            fields={[{ key: "name", label: "Category name" }]}
-            rows={data.expenseCategories.map((c) => ({ id: c.id, primary: c.name, secondary: c.active ? "Active" : "Archived", active: c.active, values: { name: c.name } }))}
-            onSubmit={(v, id) => post({ action: "expense-category-save", id, name: String(v.name) })}
-            onRemove={(id) => post({ action: "expense-category-save", id, name: "x", remove: true })} />
-          <SetupList title="Monthly payables" description="Recurring bills (rent, utilities, remittances)" entityLabel="payable"
-            canManage={canManage} busy={busy} removable
-            fields={[{ key: "description", label: "Description" }, { key: "amount", label: "Amount (PHP)", type: "number" }, { key: "dueOn", label: "Due date (YYYY-MM-DD)", type: "date", optional: true }]}
-            rows={data.payables.map((p) => ({ id: p.id, primary: p.description, secondary: `${pesos(p.amount_centavos)}${p.due_on ? ` · due ${p.due_on}` : ""}`, active: true, values: { description: p.description, amount: String(p.amount_centavos / 100), dueOn: p.due_on || "" } }))}
-            onSubmit={(v, id) => post({ action: "payable-save", id, description: String(v.description), amountCentavos: Math.round((Number(v.amount) || 0) * 100), dueOn: String(v.dueOn || "") || null })}
-            onRemove={(id) => post({ action: "payable-save", id, description: "x", remove: true })} />
-        </div>
-      )}
     </>
   );
 }
@@ -963,19 +896,6 @@ function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canM
 
 /* ---- Bank & GCash reconciliation (session-only; no store/DB writes) ---- */
 
-type BankRow = { line: number; reference: string; amountCentavos: number | null; date: string; raw: string };
-const normalizeRef = (value: string) => value.replace(/[\s-]/g, "").toUpperCase();
-const parseAmount = (value: string): number | null => {
-  const cleaned = value.replace(/[^0-9.-]/g, "");
-  if (cleaned === "" || cleaned === "-" || cleaned === ".") return null;
-  const n = Number(cleaned);
-  return Number.isFinite(n) ? Math.round(Math.abs(n) * 100) : null;
-};
-const isoDay = (value?: string | null) => {
-  if (!value) return "";
-  const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? String(value).slice(0, 10) : new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(d);
-};
 
 /**
  * Bank / GCash reconciliation (owner layout, Aug 2026). Two independent lanes —
@@ -1276,18 +1196,6 @@ function AgencyRebatesEditor({ data, canManage, busy, post }: { data: Accounting
 }
 
 /* ---- Agency rebates payable — what New Wave owes referring consultancies ---- */
-function AgencyRebatesOwed({ data, canManage, busy, post }: { data: AccountingData; canManage: boolean; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
-  const total = data.agencyRebates.filter((r) => r.status === "Pending").reduce((s, r) => s + Number(r.rebate_centavos), 0);
-  return (
-    <section className="portal-panel">
-      <div className="panel-heading"><div><h2>Agency rebates payable</h2><p>Owed to referring consultancies (recorded at payment)</p></div><span>{pesos(total)}</span></div>
-      <div className="portal-table"><table><thead><tr><th>Agency</th><th>Course · Trainee</th><th>Rebate</th><th>Status</th>{canManage && <th></th>}</tr></thead><tbody>
-        {data.agencyRebates.slice(0, 100).map((r) => { const t = one(r.trainees); return <tr key={r.id}><td><strong>{one(r.marketing_agencies)?.name ?? "—"}</strong></td><td>{one(r.courses)?.name ?? "—"}<small>{t ? `${t.legal_first_name} ${t.legal_last_name}` : ""}</small></td><td>{pesos(r.rebate_centavos)}</td><td>{r.status}</td>{canManage && <td className="document-actions">{r.status === "Pending" && <button disabled={busy} onClick={() => post({ action: "agency-rebate-settle", id: r.id, status: "Paid" })}>Mark paid</button>}</td>}</tr>; })}
-        {!data.agencyRebates.length && <tr><td colSpan={canManage ? 5 : 4}><span className="portal-empty-copy">No agency rebates recorded yet.</span></td></tr>}
-      </tbody></table></div>
-    </section>
-  );
-}
 
 type SetupField = { key: string; label: string; type?: "text" | "number" | "date" | "checkbox"; placeholder?: string; optional?: boolean };
 type SetupRow = { id: string; primary: string; secondary: string; active: boolean; values: Record<string, string | boolean> };
