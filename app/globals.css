@@ -5866,3 +5866,25 @@ code {
   margin: 0 0 16px;
 }
 .config-picker .portal-field-inline { min-width: 260px; }
+
+/* =====================================================================
+   House typography: ALL-CAPS everywhere (owner directive, Aug 2026).
+   Display-only — stored values are untouched. The ONLY exemptions are
+   emails (typing or reading an address in caps is misleading) and
+   passwords. Wrap any element that shows an email address in .lc.
+   ===================================================================== */
+body,
+input,
+select,
+textarea,
+button,
+::placeholder {
+  text-transform: uppercase;
+}
+input[type="email"],
+input[type="password"],
+a[href^="mailto:"],
+.lc,
+.lc * {
+  text-transform: none !important;
+}
