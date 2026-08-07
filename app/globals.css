@@ -5859,3 +5859,13 @@ code {
   color: #56707f;
   cursor: not-allowed;
 }
+
+/* Setup: section picker replaces the overflowing nine-tab strip. */
+.config-picker {
+  display: flex;
+  gap: 14px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  margin: 0 0 16px;
+}
+.config-picker .portal-field-inline { min-width: 260px; }
