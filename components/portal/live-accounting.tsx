@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { parseCsv, downloadCsv } from "@/lib/csv";
+import { pesos, first as one, dueCentavos as dueOf } from "@/lib/portal-format";
 import { LiveCashierClosing, type ClosingData } from "./live-cashier-closing";
 
 /** Loose shapes for the accounting slices of the staff-operations payload. */
@@ -9,7 +10,6 @@ type Payment = { payment_number?: string; method: string; amount_centavos: numbe
 type Enrollment = { id: string; enrollment_number: string; trainee_id?: string; created_at?: string; selling_price_centavos: number; paid_centavos: number; charges_centavos?: number; discounts_centavos?: number; enrollment_status: string; partner_offer_id?: string | null; trainees?: unknown; courses?: unknown };
 type TraineeRow = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; srn?: string | null; email?: string | null; mobile?: string | null };
 /** Amount due = base price + other charges − rebates/discounts. */
-const dueOf = (e: Enrollment) => Number(e.selling_price_centavos) + Number(e.charges_centavos ?? 0) - Number(e.discounts_centavos ?? 0);
 type Channel = { id: string; code: string; name: string; requires_reference: boolean; allows_proof: boolean; active: boolean; kind?: string };
 type Charge = { id: string; name: string; default_amount_centavos: number; active: boolean; used_count: number };
 type Agency = { id: string; name: string; contact_name?: string | null; email?: string | null; mobile?: string | null; active: boolean };
@@ -36,13 +36,13 @@ export type AccountingData = {
   expenseCategories: { id: string; name: string; active: boolean }[];
   inventoryItems: InventoryItem[]; inventoryMovements: InventoryMovement[];
   cashierClosings: { id: string; closing_date: string; opening_cash_centavos: number; cash_collections_centavos: number; online_collections_centavos: number; expenses_centavos: number; expected_cash_centavos: number; actual_cash_centavos?: number | null; variance_centavos?: number | null; status: string }[];
+  requests: { id: string; request_number: string; request_type: string; requested_values: { amountCentavos?: number } | null; reason: string; status: string; created_at: string; trainees?: { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null }[];
   trainees: TraineeRow[];
   pendingDiscounts: PendingDiscount[];
   pendingCharges: { id: string; enrollment_id: string; description: string; amount_centavos: number; created_at: string; enrollments?: { enrollment_number: string; trainees?: { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null; courses?: CourseRef | CourseRef[] | null } | { enrollment_number: string; trainees?: { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null; courses?: CourseRef | CourseRef[] | null }[] | null }[];
   announcements: { id: string; title: string; body: string; audience_roles: string[]; expires_at?: string | null }[];
 };
 
-const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
 const manilaDay = (value?: string | null) => (value ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(value)) : "");
 /** Inclusive [from,to] Manila-day range for Daily / Weekly (last 7d) / Monthly (this month). */
 function rangeFor(span: "Daily" | "Weekly" | "Monthly"): { from: string; to: string } {
@@ -52,12 +52,12 @@ function rangeFor(span: "Daily" | "Weekly" | "Monthly"): { from: string; to: str
   return { from: today.slice(0, 8) + "01", to: today };
 }
 
-const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0 }).format((Number(centavos) || 0) / 100);
 
 export function AccountingDashboard({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
   const canManage = role === "admin" || role === "accounting";
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [span, setSpan] = useState<"Daily" | "Weekly" | "Monthly" | "All">("Monthly");
   const today = manilaDay(new Date().toISOString());
   // Owner overview: daily collectibles / payables, voucher requests, enrollment counts.
   const dailyCollectibles = data.payments.filter((p) => manilaDay(p.received_at) === today);
@@ -83,17 +83,31 @@ export function AccountingDashboard({ data, role, reload }: { data: AccountingDa
     } finally { setBusy(false); }
   }
 
+  // Collections and disbursements used to be all-time with no way to scope them.
+  const range = span === "All" ? null : rangeFor(span);
+  const inRange = (value?: string | null) => { if (!range || !value) return true; const d = manilaDay(value); return d >= range.from && d <= range.to; };
+  const rangeLabel = range ? `${range.from} → ${range.to}` : "All time";
+
+  const scopedPayments = data.payments.filter((p) => inRange(p.received_at));
   const collections = useMemo(() => {
     const byChannel = new Map<string, { total: number; count: number }>();
-    for (const payment of data.payments) {
+    for (const payment of scopedPayments) {
       const key = payment.method || "Other";
       const entry = byChannel.get(key) ?? { total: 0, count: 0 };
       entry.total += Number(payment.amount_centavos); entry.count += 1; byChannel.set(key, entry);
     }
     return [...byChannel.entries()].sort((a, b) => b[1].total - a[1].total);
-  }, [data.payments]);
+  }, [scopedPayments]);
   const collectionTotal = collections.reduce((sum, [, v]) => sum + v.total, 0);
-  const disbursements = data.expenses.filter((e) => e.status === "Paid" || e.status === "Approved");
+
+  // Pending refund / cancellation / make-up / reschedule decisions land on her desk.
+  const DECISION_TYPES = ["Refund", "Cancellation", "Make-up Class", "Rescheduling"];
+  const pendingRequests = data.requests.filter((r) => r.status === "Pending" && DECISION_TYPES.includes(r.request_type));
+  // Cash-count variances: loaded on the payload but never shown until now.
+  const closings = [...data.cashierClosings].filter((c) => inRange(c.closing_date)).sort((a, z) => z.closing_date.localeCompare(a.closing_date)).slice(0, 8);
+  const varianceTotal = closings.reduce((s, c) => s + Number(c.variance_centavos ?? 0), 0);
+
+  const disbursements = data.expenses.filter((e) => (e.status === "Paid" || e.status === "Approved") && inRange(e.created_at));
   const disbursementTotal = disbursements.reduce((sum, e) => sum + Number(e.amount_centavos), 0);
   const receivables = data.enrollments.filter((e) => dueOf(e) - Number(e.paid_centavos) > 0 && e.enrollment_status !== "Cancelled");
   const receivableTotal = receivables.reduce((sum, e) => sum + (dueOf(e) - Number(e.paid_centavos)), 0);
@@ -101,6 +115,14 @@ export function AccountingDashboard({ data, role, reload }: { data: AccountingDa
   return (
     <>
       {message && <div className="portal-message error" role="alert">{message}</div>}
+      <div className="config-picker">
+        <label className="portal-field-inline">Period
+          <select value={span} onChange={(e) => setSpan(e.target.value as "Daily" | "Weekly" | "Monthly" | "All")}>
+            <option value="Daily">Today</option><option value="Weekly">Last 7 days</option><option value="Monthly">This month</option><option value="All">All time</option>
+          </select>
+        </label>
+        <span className="portal-empty-copy" style={{ margin: 0 }}>Collections, disbursements and cash variance for {rangeLabel}. Receivables and payables are live balances.</span>
+      </div>
       <div className="finance-hero">
         <div><span>Daily collectibles</span><strong>{pesos(dailyCollectibleTotal)}</strong><small>{dailyCollectibles.length} payment{dailyCollectibles.length === 1 ? "" : "s"} today</small></div>
         <article><span>Daily payables</span><strong>{pesos(dailyPayableTotal + pendingRebateTotal)}</strong><small>{dailyPayables.length} bill{dailyPayables.length === 1 ? "" : "s"} · {pendingRebates.length} rebate{pendingRebates.length === 1 ? "" : "s"}</small></article>
@@ -126,7 +148,9 @@ export function AccountingDashboard({ data, role, reload }: { data: AccountingDa
 
       <div className="dashboard-panels">
         <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Receivables</h2><p>Open enrollment balances</p></div><span className="slot-count">{pesos(receivableTotal)}</span></div>{receivables.slice(0, 20).map((e) => { const t = one(e.trainees as TraineeRow | TraineeRow[] | null); return <div className="live-row-item" key={e.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : e.enrollment_number}</strong><small>{one(e.courses as CourseRef | CourseRef[] | null)?.name ?? e.enrollment_number}</small></div><span className="slot-count">{pesos(dueOf(e) - Number(e.paid_centavos))}</span></div>; })}{!receivables.length && <p className="portal-empty-copy">Every enrollment is settled.</p>}</section>
-        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Collections by channel</h2><p>Posted payments by method</p></div><span className="slot-count">{pesos(collectionTotal)}</span></div>{collections.map(([name, v]) => <div className="live-row-item" key={name}><div><strong>{name}</strong><small>{v.count} payment{v.count === 1 ? "" : "s"}</small></div><span className="slot-count">{pesos(v.total)}</span></div>)}{!collections.length && <p className="portal-empty-copy">No payments yet.</p>}</section>
+        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Refund &amp; cancellation requests</h2><p>Awaiting your decision</p></div><span className="slot-count">{pendingRequests.length}</span></div>{pendingRequests.slice(0, 10).map((r) => { const t = one(r.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null | undefined); const amt = r.requested_values?.amountCentavos; return <div className="live-row-item" key={r.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : r.request_number}</strong><small>{r.request_type}{amt ? ` · ${pesos(amt)}` : ""} · {r.reason}</small></div>{canManage ? <div className="document-actions"><button disabled={busy} onClick={() => post({ action: "request-decide", id: r.id, approve: true })}>Approve</button><button disabled={busy} onClick={() => post({ action: "request-decide", id: r.id, approve: false })}>Reject</button></div> : <span className="portal-badge orange">Pending</span>}</div>; })}{!pendingRequests.length && <p className="portal-empty-copy">No requests awaiting a decision.</p>}</section>
+        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Cashier closing variance</h2><p>Counted cash vs expected · {rangeLabel}</p></div><span className="slot-count" style={{ color: varianceTotal !== 0 ? "#a52020" : undefined }}>{pesos(varianceTotal)}</span></div>{closings.map((c) => { const v = Number(c.variance_centavos ?? 0); return <div className="live-row-item" key={c.id}><div><strong>{c.closing_date}</strong><small>Expected {pesos(c.expected_cash_centavos)} · counted {c.actual_cash_centavos == null ? "—" : pesos(c.actual_cash_centavos)} · {c.status}</small></div><span className="slot-count" style={{ color: v !== 0 ? "#a52020" : "#0a7d3b" }}>{v === 0 ? "Balanced" : pesos(v)}</span></div>; })}{!closings.length && <p className="portal-empty-copy">No cashier closings in this period.</p>}</section>
+        <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Collections by channel</h2><p>Posted payments by method · {rangeLabel}</p></div><span className="slot-count">{pesos(collectionTotal)}</span></div>{collections.map(([name, v]) => <div className="live-row-item" key={name}><div><strong>{name}</strong><small>{v.count} payment{v.count === 1 ? "" : "s"}</small></div><span className="slot-count">{pesos(v.total)}</span></div>)}{!collections.length && <p className="portal-empty-copy">No payments yet.</p>}</section>
       </div>
 
       <AgencyRebatesOwed data={data} canManage={canManage} busy={busy} post={post} />

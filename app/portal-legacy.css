@@ -805,3 +805,9 @@
 .portal-sidebar nav button { font-size: 15px; }
 .portal-sidebar .nav-group > b { font-size: 11px; }
 .top-search input { font-size: 15px; }
+
+/* Reports hub: each report keeps its own heading, so the nested .portal-page
+   must not add a second page's worth of padding under the report picker. */
+.reports-hub-body > .portal-page,
+.reports-hub-body > * > .portal-page { padding-top: 0; }
+.reports-hub .config-picker { margin-bottom: 4px; }
