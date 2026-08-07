@@ -760,3 +760,48 @@
   box-shadow: none;
   border-bottom-color: #f25615;
 }
+
+/* =====================================================================
+   Type scale — second pass. The first pass lifted the worst offenders
+   (8-11px); this sets a comfortable working size across the portal so a
+   full day of reading is easy. Nothing here drops below 12px.
+   ===================================================================== */
+
+.portal-page { font-size: 15px; }
+
+/* Panel and section headings. */
+.panel-heading h2 { font-size: 18px; }
+.panel-heading p { font-size: 14px; }
+.portal-heading p { font-size: 15px; }
+.portal-eyebrow { font-size: 12px; }
+
+/* List rows — the densest, most-read part of the portal. */
+.live-row-item strong { font-size: 14.5px; }
+.live-row-item small { font-size: 13px; }
+.slot-count { font-size: 13.5px; font-weight: 700; }
+.portal-badge { font-size: 13px; padding: 5px 12px; }
+.portal-empty-copy { font-size: 14px; }
+
+/* Metric cards. */
+.metric-grid article span { font-size: 12px; }
+.metric-grid article strong { font-size: 24px; }
+.metric-grid article small { font-size: 12.5px; }
+
+/* Tables. */
+.portal-table td { font-size: 14px; }
+.portal-table td small { font-size: 12.5px; }
+.portal-table th { font-size: 12px; }
+
+/* Forms and filters. */
+.portal-form label { font-size: 13px; }
+.portal-form input,
+.portal-form select,
+.portal-form textarea { font-size: 15.5px; min-height: 48px; }
+.portal-field-inline { font-size: 13px; }
+.portal-field-inline select,
+.portal-field-inline input { font-size: 15.5px; min-height: 46px; }
+
+/* Shell. */
+.portal-sidebar nav button { font-size: 15px; }
+.portal-sidebar .nav-group > b { font-size: 11px; }
+.top-search input { font-size: 15px; }
