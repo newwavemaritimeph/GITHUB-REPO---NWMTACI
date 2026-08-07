@@ -1056,3 +1056,117 @@ export function SetupList({ title, description, entityLabel, rows, canManage, bu
     </section>
   );
 }
+
+/* ---------------------------------------------------------------------------
+ * Accounting Manager modules. These back the Collections / Approvals /
+ * Payables & cash sidebar groups; each reads the existing payload, and every
+ * action reuses a handler that already exists in /api/staff/operations.
+ * ------------------------------------------------------------------------- */
+
+const peso2 = (c: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format((Number(c) || 0) / 100);
+
+export function ReceivablesModule({ data }: { data: AccountingData }) {
+  const today = manilaDay(new Date().toISOString());
+  const [bucket, setBucket] = useState<"All" | "Before training" | "In training" | "Past due">("All");
+  const [q, setQ] = useState("");
+  const live = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled");
+  const bal = (e: (typeof live)[number]) => Math.max(0, dueOf(e) - Number(e.paid_centavos));
+  const dates = (e: (typeof live)[number]) => { const b = Array.isArray(e.batches) ? e.batches[0] : e.batches; return { start: b?.starts_on ?? e.scheduled_on ?? null, end: b?.ends_on ?? e.scheduled_on ?? null }; };
+  const bucketOf = (e: (typeof live)[number]) => { const { start, end } = dates(e); if ((end ?? "9999") < today) return "Past due"; if ((start ?? "9999") <= today) return "In training"; return "Before training"; };
+  const name = (e: (typeof live)[number]) => { const t = one(e.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null); return t ? `${t.legal_first_name} ${t.legal_last_name}` : e.enrollment_number; };
+  const course = (e: (typeof live)[number]) => (Array.isArray(e.courses) ? e.courses[0] : e.courses)?.name ?? "—";
+  const rows = live.filter((e) => bal(e) > 0).filter((e) => bucket === "All" || bucketOf(e) === bucket)
+    .filter((e) => !q.trim() || `${name(e)} ${course(e)} ${e.enrollment_number}`.toLowerCase().includes(q.trim().toLowerCase()))
+    .sort((a, b) => bal(b) - bal(a));
+  const total = rows.reduce((s, e) => s + bal(e), 0);
+  return <div className="portal-page">
+    <div className="portal-heading"><div><span className="portal-eyebrow">Collections</span><h1>Outstanding receivables</h1><p>Unpaid balances aged against the training date.</p></div></div>
+    <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", margin: "0 0 14px" }}>
+      <label className="portal-field-inline">Aging<select value={bucket} onChange={(e) => setBucket(e.target.value as typeof bucket)}><option>All</option><option>Before training</option><option>In training</option><option>Past due</option></select></label>
+      <label className="portal-field-inline" style={{ minWidth: 260 }}>Search<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Trainee, course or enrollment" /></label>
+      <span className="portal-empty-copy" style={{ margin: 0 }}>{rows.length} unpaid · {peso2(total)}</span>
+    </div>
+    <div className="portal-table portal-panel"><table><thead><tr><th>Trainee</th><th>Course</th><th>Training</th><th>Billed</th><th>Paid</th><th>Balance</th><th>Aging</th></tr></thead><tbody>
+      {rows.slice(0, 200).map((e) => { const { start, end } = dates(e); const b = bucketOf(e); return <tr key={e.id}><td><strong>{name(e)}</strong><small>{e.enrollment_number}</small></td><td>{course(e)}</td><td>{start ? `${start}${end && end !== start ? ` – ${end}` : ""}` : "Open schedule"}</td><td>{peso2(dueOf(e))}</td><td>{peso2(Number(e.paid_centavos))}</td><td><strong>{peso2(bal(e))}</strong></td><td><span className={`portal-badge ${b === "Past due" ? "cancelled" : b === "In training" ? "pending" : ""}`}>{b}</span></td></tr>; })}
+    </tbody></table>{!rows.length && <p className="portal-empty-copy">No outstanding balances in this view.</p>}</div>
+  </div>;
+}
+
+export function ApprovalsModule({ data, role, reload }: { data: AccountingData; role: string; reload: () => Promise<void> }) {
+  const canManage = role === "admin" || role === "accounting";
+  const [busy, setBusy] = useState(false), [msg, setMsg] = useState("");
+  async function post(body: Record<string, unknown>) {
+    setBusy(true); setMsg("");
+    try {
+      const r = await fetch("/api/staff/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const j = await r.json(); if (!r.ok) throw new Error(j.error ?? "The action could not be completed.");
+      await reload();
+    } catch (e) { setMsg(e instanceof Error ? e.message : "The action could not be completed."); }
+    finally { setBusy(false); }
+  }
+  const vouchers = data.expenses.filter((e) => e.status === "Pending");
+  const refunds = data.requests.filter((r) => r.status === "Pending" && ["Refund", "Cancellation"].includes(r.request_type));
+  const total = vouchers.length + data.pendingCharges.length + data.pendingDiscounts.length + refunds.length;
+  const Actions = ({ onYes, onNo }: { onYes: () => void; onNo: () => void }) => canManage
+    ? <div className="document-actions"><button type="button" disabled={busy} onClick={onYes}>Approve</button><button type="button" disabled={busy} onClick={onNo}>Reject</button></div>
+    : <span className="portal-badge pending">Pending</span>;
+  return <div className="portal-page">
+    <div className="portal-heading"><div><span className="portal-eyebrow">Financial control</span><h1>Approvals</h1><p>Everything waiting on an Accounting Manager decision.</p></div><span className="portal-badge pending">{total} pending</span></div>
+    {msg && <div className="portal-message error" role="alert">{msg}</div>}
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Expense vouchers</h2><p>Approve before the cashier can print</p></div><span className="slot-count">{vouchers.length}</span></div>
+      {vouchers.map((e) => <div className="live-row-item" key={e.id}><div><strong>{e.payee}</strong><small>{e.expense_number} · {e.category} · {peso2(e.amount_centavos)}</small></div><Actions onYes={() => void post({ action: "expense-decide", id: e.id, approve: true })} onNo={() => void post({ action: "expense-decide", id: e.id, approve: false })} /></div>)}
+      {!vouchers.length && <p className="portal-empty-copy">No vouchers pending.</p>}
+    </section>
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Payment adjustments (charges)</h2><p>Added to a trainee&apos;s balance</p></div><span className="slot-count">{data.pendingCharges.length}</span></div>
+      {data.pendingCharges.map((ch) => { const enr = one(ch.enrollments); const t = one(enr?.trainees ?? null); return <div className="live-row-item" key={ch.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : enr?.enrollment_number ?? "—"}</strong><small>{ch.description} · {peso2(ch.amount_centavos)}</small></div><Actions onYes={() => void post({ action: "charge-decide", id: ch.id, approve: true })} onNo={() => void post({ action: "charge-decide", id: ch.id, approve: false })} /></div>; })}
+      {!data.pendingCharges.length && <p className="portal-empty-copy">No adjustments pending.</p>}
+    </section>
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Fee waivers &amp; discounts</h2><p>Deducted from a trainee&apos;s balance</p></div><span className="slot-count">{data.pendingDiscounts.length}</span></div>
+      {data.pendingDiscounts.map((d) => { const enr = d.enrollments ?? null; const t = one(enr?.trainees ?? null); return <div className="live-row-item" key={d.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : enr?.enrollment_number ?? "—"}</strong><small>{d.description} · {peso2(d.amount_centavos)}</small></div><Actions onYes={() => void post({ action: "discount-decide", id: d.id, approve: true })} onNo={() => void post({ action: "discount-decide", id: d.id, approve: false })} /></div>; })}
+      {!data.pendingDiscounts.length && <p className="portal-empty-copy">No waivers pending.</p>}
+    </section>
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Cancellation &amp; refund requests</h2><p>Money leaving the business</p></div><span className="slot-count">{refunds.length}</span></div>
+      {refunds.map((r) => { const t = one(r.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null | undefined); const amt = r.requested_values?.amountCentavos; return <div className="live-row-item" key={r.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : r.request_number}</strong><small>{r.request_type}{amt ? ` · ${peso2(amt)}` : ""} · {r.reason}</small></div><Actions onYes={() => void post({ action: "request-decide", id: r.id, approve: true })} onNo={() => void post({ action: "request-decide", id: r.id, approve: false })} /></div>; })}
+      {!refunds.length && <p className="portal-empty-copy">No requests pending.</p>}
+    </section>
+  </div>;
+}
+
+export function PayablesModule({ data }: { data: AccountingData }) {
+  const today = manilaDay(new Date().toISOString());
+  const weekEnd = manilaDay(new Date(Date.now() + 7 * 86400000).toISOString());
+  const [tab, setTab] = useState<"All open" | "Due today" | "This week" | "Overdue" | "Paid">("All open");
+  const open = data.payables.filter((p) => p.status !== "Paid");
+  const match = (p: (typeof data.payables)[number]) => {
+    if (tab === "Paid") return p.status === "Paid";
+    if (tab === "All open") return p.status !== "Paid";
+    if (tab === "Due today") return p.status !== "Paid" && p.due_on === today;
+    if (tab === "This week") return p.status !== "Paid" && !!p.due_on && p.due_on > today && p.due_on <= weekEnd;
+    return p.status !== "Paid" && !!p.due_on && p.due_on < today;
+  };
+  const rows = data.payables.filter(match).sort((a, b) => (a.due_on ?? "9999").localeCompare(b.due_on ?? "9999"));
+  const total = rows.reduce((s, p) => s + Number(p.amount_centavos), 0);
+  return <div className="portal-page">
+    <div className="portal-heading"><div><span className="portal-eyebrow">Payables</span><h1>Accounts payable</h1><p>Bills, partner-center payments and professional fees.</p></div><span className="portal-badge pending">{peso2(open.reduce((s, p) => s + Number(p.amount_centavos), 0))} open</span></div>
+    <div className="portal-tabs">{(["All open", "Due today", "This week", "Overdue", "Paid"] as const).map((t) => <button key={t} type="button" className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{t}</button>)}</div>
+    <div className="portal-table portal-panel"><table><thead><tr><th>Payee / particular</th><th>Due date</th><th>Amount</th><th>Status</th></tr></thead><tbody>
+      {rows.map((p) => { const late = p.status !== "Paid" && !!p.due_on && p.due_on < today; return <tr key={p.id}><td><strong>{p.description}</strong></td><td style={late ? { color: "#a52020" } : undefined}>{p.due_on ?? "—"}</td><td>{peso2(p.amount_centavos)}</td><td><span className={`portal-badge ${p.status === "Paid" ? "active" : late ? "cancelled" : "pending"}`}>{late ? "Overdue" : p.status}</span></td></tr>; })}
+    </tbody></table>{!rows.length && <p className="portal-empty-copy">Nothing in this view.</p>}<p className="portal-empty-copy" style={{ padding: "8px 12px" }}>{rows.length} item{rows.length === 1 ? "" : "s"} · {peso2(total)}</p></div>
+  </div>;
+}
+
+export function CashPositionModule({ data }: { data: AccountingData }) {
+  const channel = (m: string) => { const t = (m || "").toLowerCase(); if (t.includes("gcash")) return "GCash"; if (t.includes("cash")) return "Cash"; if (t.includes("bank") || t.includes("union") || t.includes("psb") || t.includes("transfer")) return "Bank"; return "Others"; };
+  const accounts = [...data.payments.reduce((m, p) => { const k = p.receiving_account || channel(p.method); return m.set(k, { total: (m.get(k)?.total ?? 0) + Number(p.amount_centavos), count: (m.get(k)?.count ?? 0) + 1 }); }, new Map<string, { total: number; count: number }>()).entries()].sort((a, b) => b[1].total - a[1].total);
+  const collected = accounts.reduce((s, [, v]) => s + v.total, 0);
+  const paidExpenses = data.expenses.filter((e) => e.status === "Paid").reduce((s, e) => s + Number(e.amount_centavos), 0);
+  return <div className="portal-page">
+    <div className="portal-heading"><div><span className="portal-eyebrow">Cash &amp; bank</span><h1>Cash position</h1><p>Collections per receiving account, less paid expenses.</p></div><span className="portal-badge active">{peso2(collected - paidExpenses)} available</span></div>
+    <div className="portal-message" role="status">Derived from posted payments and paid expenses. The schema has no bank-account ledger, so this is a running position, not a reconciled balance.</div>
+    <div className="portal-table portal-panel" style={{ marginTop: 12 }}><table><thead><tr><th>Account / channel</th><th>Payments</th><th>Collected</th></tr></thead><tbody>
+      {accounts.map(([name, v]) => <tr key={name}><td><strong>{name}</strong></td><td>{v.count}</td><td>{peso2(v.total)}</td></tr>)}
+      <tr><td><strong>Less: paid expenses</strong></td><td>—</td><td style={{ color: "#a52020" }}>−{peso2(paidExpenses)}</td></tr>
+      <tr><td><strong>Total available</strong></td><td>—</td><td><strong>{peso2(collected - paidExpenses)}</strong></td></tr>
+    </tbody></table>{!accounts.length && <p className="portal-empty-copy">No payments posted yet.</p>}</div>
+  </div>;
+}

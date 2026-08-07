@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { NewWaveLogo } from "./new-wave-logo";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { LiveAttendance } from "./portal/live-attendance";
-import { LiveAccounting, AccountingDashboard, LiveVouchers, LiveInventory, LiveExpenses, SetupList } from "./portal/live-accounting";
+import { LiveAccounting, AccountingDashboard, ReceivablesModule, ApprovalsModule, PayablesModule, CashPositionModule, LiveVouchers, LiveInventory, LiveExpenses, SetupList } from "./portal/live-accounting";
 import { LiveCashierClosing } from "./portal/live-cashier-closing";
 import { LiveHr, type HrData } from "./portal/live-hr";
 import { LiveTraining, type TrainingData } from "./portal/live-training";
@@ -17,7 +17,7 @@ import { downloadCsv } from "@/lib/csv";
 import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, first, dueCentavos, balanceOf, isUnpaid, manilaToday } from "@/lib/portal-format";
 
-type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Setup" | "Trainee enrollments";
+type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Setup" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments";
 type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -46,7 +46,7 @@ type PortalData = { profile:{complete_name:string;email:string}; roles:string[];
 
 // Sidebar is grouped so a long role list stays scannable. Group order here is the
 // render order; a group disappears entirely when the role can see none of its items.
-const NAV_GROUPS = ["Work","Records","Finance","People","Configuration"] as const;
+const NAV_GROUPS = ["Work","Collections","Approvals","Payables & cash","Cashier control","Records","Finance","People","Configuration"] as const;
 type NavGroup = (typeof NAV_GROUPS)[number];
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Dashboard",icon:"⌂",group:"Work"},{label:"Search trainee",icon:"⌕",roles:["admin"],group:"Work"},{label:"Trainee enrollments",icon:"◎",roles:["accounting"],group:"Work"},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting","training_operations"],group:"Work"},
@@ -55,6 +55,10 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Rooms & facilities",icon:"▢",roles:["admin","training_operations"],group:"Work"},{label:"Training calendar",icon:"▦",roles:["admin","training_operations"],group:"Work"},{label:"Trainee scheduling",icon:"◎",roles:["admin","training_operations"],group:"Work"},{label:"Instructor assignment",icon:"♙",roles:["admin","training_operations"],group:"Work"},{label:"Schedule changes",icon:"↺",roles:["admin","training_operations"],group:"Records"},{label:"Certificates",icon:"◈",roles:["admin","releasing_officer"],group:"Work"},{label:"Requests",icon:"↺",roles:["admin","accounting","cashier"],group:"Work"},
   {label:"Reports",icon:"↥",roles:["admin","accounting","releasing_officer","registration","training_operations","cashier"],group:"Records"},
   {label:"Payments",icon:"₱",roles:["cashier"],group:"Finance"},{label:"Accounting",icon:"▥",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Expenses",icon:"◰",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Inventory",icon:"▦",roles:["admin","accounting"],group:"Finance"},{label:"Employee charges",icon:"₱",roles:["admin","accounting","hr"],group:"Finance"},
+  {label:"Receivables",icon:"◷",roles:["accounting"],group:"Collections"},{label:"Payments",icon:"₱",roles:["accounting"],group:"Collections"},
+  {label:"Approvals",icon:"✓",roles:["accounting"],group:"Approvals"},
+  {label:"Payables",icon:"▦",roles:["accounting"],group:"Payables & cash"},{label:"Cash position",icon:"◈",roles:["accounting"],group:"Payables & cash"},
+  {label:"Cashier closing",icon:"⚖",roles:["accounting"],group:"Cashier control"},
   {label:"HR & payroll",icon:"♙",roles:["admin","hr"],group:"People"},{label:"MyHr",icon:"☺",group:"People"},
   {label:"Endorsed courses",icon:"◇",group:"Configuration"},{label:"Setup",icon:"⚙",roles:["super_admin","admin"],group:"Configuration"},
 ];
@@ -133,6 +137,10 @@ function PortalContent({active,role,data,query,go,open,onPay,canEnroll,canSchedu
   if(active==="Reports")return <ReportsHub data={data}/>;
   if(active==="Cashier closing")return <LiveCashierClosing data={data} reload={reload}/>;
   if(active==="Expense vouchers")return <LiveVouchers data={data} role={gateRole} reload={reload}/>;
+  if(active==="Receivables")return <ReceivablesModule data={data as unknown as Parameters<typeof ReceivablesModule>[0]["data"]}/>;
+  if(active==="Approvals")return <ApprovalsModule data={data as unknown as Parameters<typeof ApprovalsModule>[0]["data"]} role={gateRole} reload={reload}/>;
+  if(active==="Payables")return <PayablesModule data={data as unknown as Parameters<typeof PayablesModule>[0]["data"]}/>;
+  if(active==="Cash position")return <CashPositionModule data={data as unknown as Parameters<typeof CashPositionModule>[0]["data"]}/>;
   if(active==="Accounting")return <LiveAccounting data={data} role={gateRole} reload={reload}/>;
   if(active==="Expenses")return <LiveExpenses data={data} role={gateRole} reload={reload}/>;
   if(active==="Inventory")return <LiveInventory data={data} role={gateRole} reload={reload}/>;
