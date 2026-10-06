@@ -1,5 +1,6 @@
 import { createSupabaseAdminClient } from "./supabase/admin";
 import { createSupabaseServerClient } from "./supabase/server";
+import { withAuthTimeout } from "./supabase/config";
 
 export async function hashValue(value: string) {
   const bytes = new TextEncoder().encode(value);
@@ -26,7 +27,10 @@ export async function enforceRateLimit(request: Request, action: string, limit: 
 
 export async function requireStaff(allowedRoles?: string[]) {
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  // Bounded: an unreachable Supabase project would otherwise hold every staff
+  // request open long enough to become a 504. A timeout reads as "signed out".
+  const session = await withAuthTimeout(supabase.auth.getUser());
+  const user = session?.data.user;
   if (!user) return null;
   const { data } = await supabase.from("user_roles").select("roles!inner(code)").eq("user_id", user.id);
   const roleCodes = (data ?? []).flatMap((entry) => {

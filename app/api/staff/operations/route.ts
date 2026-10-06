@@ -212,73 +212,65 @@ async function applyCourseChange(admin: ReturnType<typeof createSupabaseAdminCli
 }
 const stampManila = (date: string, hhmm: string) => `${date}T${hhmm}:00+08:00`;
 
+/**
+ * The workspace payload is large, so the ceiling is generous — but the real
+ * guard is that every independent dataset below is gathered concurrently.
+ * This handler used to run ~25 sequential round trips and would exhaust the
+ * platform timeout (returning a 504) as the data grew.
+ */
+export const maxDuration = 60;
+
+/** Enrollment columns that arrive with later migrations; absent before they run. */
+type EnrollmentExtra = { id: string; scheduled_on?: string | null; instructions_sent_at?: string | null; feedback_token?: string | null };
+
+const EMPTY_HR: Record<string, unknown[]> = { employees: [], employeeAttendance: [], leaveRequests: [], cashAdvances: [], payrollPeriods: [], payrollItems: [], benefitRecords: [], employmentContracts: [] };
+
 export async function GET() {
   const staff = await requireStaff();
   if (!staff) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+  // One service-role client for the whole handler.
   const db = createSupabaseAdminClient();
-  const results = await Promise.all([
-    db.from("profiles").select("complete_name,email").eq("id", staff.user.id).maybeSingle(),
-    db.from("courses").select("id,code,name,delivery_type,duration_label,duration_days,training_mode,category_id,standard_price_centavos,google_classroom_link,active,updated_at,course_categories(name)").eq("active", true).order("name"),
-    db.from("partner_course_offers").select("id,course_id,duration_label,training_fee_centavos,rebate_centavos,partner_payable_centavos,updated_at,partner_centers(name,contact_details)").eq("active", true).order("training_fee_centavos"),
-    db.from("trainees").select("id,trainee_number,legal_first_name,legal_middle_name,legal_last_name,birthdate,sex,nationality,address,email,mobile,srn,account_state,registered_at").neq("account_state", "Deactivated").order("created_at", { ascending: false }).limit(250),
-    db.from("batches").select("id,batch_number,course_id,partner_offer_id,starts_on,ends_on,daily_start,daily_end,mode,venue,capacity,confirmed_count,enrollment_deadline,status,published_at,courses(name,code),partner_course_offers(partner_centers(name))").eq("active", true).order("starts_on", { ascending: true }).limit(250),
-    db.from("enrollments").select("id,enrollment_number,trainee_id,course_id,partner_offer_id,batch_id,enrollment_status,instructions_status,selling_price_centavos,rebate_centavos,partner_payable_centavos,created_at,trainees(trainee_number,legal_first_name,legal_middle_name,legal_last_name,email,mobile),courses(name,code),batches(batch_number,starts_on,ends_on,mode,venue),partner_course_offers(partner_centers(name))").order("created_at", { ascending: false }).limit(250),
-    db.from("payments").select("id,payment_number,trainee_id,amount_centavos,method,receiving_account,reference_number,proof_id,received_at,verification_state,remarks,valid,trainees(legal_first_name,legal_last_name)").eq("valid", true).order("received_at", { ascending: false }).limit(250),
-    db.from("payment_allocations").select("payment_id,enrollment_id,amount_centavos"),
-    db.from("notifications").select("id,title,body,deep_link,read_at,created_at").eq("recipient_id", staff.user.id).order("created_at", { ascending: false }).limit(20),
-    // Accounting datasets (Slice 1): channels, charges, agencies, expenses, payables.
-    db.from("payment_methods").select("id,code,name,requires_reference,allows_proof,active,sort_order").order("sort_order"),
-    db.from("charge_catalog").select("id,name,default_amount_centavos,active,used_count").order("name"),
-    db.from("marketing_agencies").select("id,name,contact_name,email,mobile,active").order("name"),
-    db.from("expenses").select("id,expense_number,payee,category,amount_centavos,purpose,status,created_at").order("created_at", { ascending: false }).limit(250),
-    db.from("payables").select("id,description,amount_centavos,due_on,status,partner_center_id,enrollment_id,created_at").order("created_at", { ascending: false }).limit(250),
-    db.from("cashier_closings").select("id,closing_date,opening_cash_centavos,cash_collections_centavos,online_collections_centavos,refunds_centavos,expenses_centavos,expected_cash_centavos,actual_cash_centavos,variance_centavos,status,submitted_at").order("closing_date", { ascending: false }).limit(60),
-    db.from("enrollment_charges").select("id,enrollment_id,charge_catalog_id,description,amount_centavos,event_type,created_at").eq("valid", true).order("created_at", { ascending: false }).limit(500),
-    db.from("classrooms").select("id,name,venue,capacity,active").order("name"),
-    db.from("course_categories").select("id,name").eq("active", true).order("sort_order"),
-    db.from("partner_centers").select("id,name,active").order("name"),
-    db.from("agency_course_rebates").select("id,agency_id,course_id,rebate_centavos,updated_at"),
-    db.from("agency_rebates").select("id,agency_id,enrollment_id,course_id,rebate_centavos,status,created_at,marketing_agencies(name),courses(name),trainees(legal_first_name,legal_last_name)").order("created_at", { ascending: false }).limit(300),
-    db.from("expense_categories").select("id,name,active").order("name"),
-    db.from("inventory_items").select("id,name,category,unit,quantity_on_hand,unit_value_centavos,active").order("name"),
-    db.from("inventory_movements").select("id,item_id,movement_type,quantity,remarks,created_at,inventory_items(name)").order("created_at", { ascending: false }).limit(200),
-    db.from("enrollment_charges").select("id,enrollment_id,description,amount_centavos,agency_id,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name)),marketing_agencies(name)").eq("event_type", "discount").eq("approval_status", "Pending").order("created_at", { ascending: false }).limit(200),
-    db.from("announcements").select("id,title,body,audience_roles,published_at,expires_at").order("published_at", { ascending: false, nullsFirst: false }).limit(30),
-  ]);
-  const error = results.find((item) => item.error)?.error;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  const [profile, courses, offers, trainees, batches, enrollmentsResult, payments, allocations, notifications,
-    paymentMethods, charges, agencies, expenses, payables, cashierClosings, enrollmentCharges, classrooms, courseCategories, partnerCenters, agencyCourseRebates, agencyRebates, expenseCategories, inventoryItems, inventoryMovements, pendingDiscounts, announcements] = results;
-  const paidByEnrollment = new Map<string, number>();
-  for (const allocation of allocations.data ?? []) paidByEnrollment.set(allocation.enrollment_id, (paidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
-  const chargesByEnrollment = new Map<string, number>();
-  const discountsByEnrollment = new Map<string, number>();
-  for (const row of enrollmentCharges.data ?? []) {
-    const target = row.event_type === "discount" ? discountsByEnrollment : chargesByEnrollment;
-    target.set(row.enrollment_id, (target.get(row.enrollment_id) ?? 0) + Number(row.amount_centavos));
-  }
-  // scheduled_on is fetched separately and tolerantly: if the column has not been
-  // migrated yet, the query errors in isolation and we simply omit the date rather
-  // than failing the whole workspace load.
-  const scheduledByEnrollment = new Map<string, string | null>();
-  const sentByEnrollment = new Map<string, string | null>();
-  const scheduledResult = await db.from("enrollments").select("id,scheduled_on").limit(250);
-  if (!scheduledResult.error) for (const row of scheduledResult.data ?? []) scheduledByEnrollment.set(row.id, (row as { scheduled_on?: string | null }).scheduled_on ?? null);
-  const sentResult = await db.from("enrollments").select("id,instructions_sent_at").limit(250);
-  if (!sentResult.error) for (const row of sentResult.data ?? []) sentByEnrollment.set(row.id, (row as { instructions_sent_at?: string | null }).instructions_sent_at ?? null);
-  // Feedback token (share link) + submitted set — both tolerant of the pre-migration state.
-  const tokenByEnrollment = new Map<string, string | null>();
-  const feedbackByEnrollment = new Set<string>();
-  const tokenResult = await db.from("enrollments").select("id,feedback_token").limit(250);
-  if (!tokenResult.error) for (const row of tokenResult.data ?? []) tokenByEnrollment.set(row.id, (row as { feedback_token?: string | null }).feedback_token ?? null);
-  const feedbackResult = await db.from("training_feedback").select("enrollment_id").limit(500);
-  if (!feedbackResult.error) for (const row of feedbackResult.data ?? []) feedbackByEnrollment.add((row as { enrollment_id: string }).enrollment_id);
-  const enrollments = (enrollmentsResult.data ?? []).map((row) => ({ ...row, scheduled_on: scheduledByEnrollment.get(row.id) ?? null, instructions_sent_at: sentByEnrollment.get(row.id) ?? null, paid_centavos: paidByEnrollment.get(row.id) ?? 0, charges_centavos: chargesByEnrollment.get(row.id) ?? 0, discounts_centavos: discountsByEnrollment.get(row.id) ?? 0, feedback_token: tokenByEnrollment.get(row.id) ?? null, feedback_submitted: feedbackByEnrollment.has(row.id) }));
+
   // HR datasets are sensitive (salaries, government IDs) — only HR and Admin receive them.
   const isHr = canManageHr(staff.roleCodes);
-  let hr: Record<string, unknown[]> = { employees: [], employeeAttendance: [], leaveRequests: [], cashAdvances: [], payrollPeriods: [], payrollItems: [], benefitRecords: [], employmentContracts: [] };
-  if (isHr) {
-    const hrResults = await Promise.all([
+  // Certificates carry trainee identity — Training Operations, Releasing Officer, Admin.
+  const seesCertificates = canManageTraining(staff.roleCodes) || canRelease(staff.roleCodes);
+  const seesPendingCharges = canManageAccounting(staff.roleCodes) || canCashier(staff.roleCodes);
+  const seesRequests = canCashier(staff.roleCodes) || staff.roleCodes.includes("registration");
+  const seesEmployeeCharges = canManageEmployeeCharges(staff.roleCodes);
+  const staffEmail = staff.user.email;
+
+  // Every unit below is started now and awaited later, so they overlap with the
+  // core batch instead of queueing behind it. Each is independently tolerant of
+  // a pre-migration schema: a failure yields empty data, never a 500.
+
+  // enrollments gained scheduled_on / instructions_sent_at / feedback_token over
+  // three migrations. Read them in one query; if any column is missing the whole
+  // select errors, so fall back to reading each on its own and omit what is absent.
+  const enrollmentExtrasUnit = (async (): Promise<EnrollmentExtra[]> => {
+    const merged = await db.from("enrollments").select("id,scheduled_on,instructions_sent_at,feedback_token").limit(250);
+    if (!merged.error) return (merged.data ?? []) as EnrollmentExtra[];
+    const parts = await Promise.all([
+      db.from("enrollments").select("id,scheduled_on").limit(250),
+      db.from("enrollments").select("id,instructions_sent_at").limit(250),
+      db.from("enrollments").select("id,feedback_token").limit(250),
+    ]);
+    const byId = new Map<string, EnrollmentExtra>();
+    for (const part of parts) {
+      if (part.error) continue;
+      for (const row of (part.data ?? []) as EnrollmentExtra[]) byId.set(row.id, { ...(byId.get(row.id) ?? { id: row.id }), ...row });
+    }
+    return [...byId.values()];
+  })();
+
+  const feedbackUnit = (async () => {
+    const { data } = await db.from("training_feedback").select("enrollment_id").limit(500);
+    return new Set((data ?? []).map((row) => (row as { enrollment_id: string }).enrollment_id));
+  })();
+
+  const hrUnit = (async (): Promise<Record<string, unknown[]>> => {
+    if (!isHr) return { ...EMPTY_HR };
+    const r = await Promise.all([
       db.from("employees").select("id,employee_number,complete_name,position,employment_status,date_hired,pay_type,base_rate_centavos,instructor_daily_rate_centavos,work_email,active").order("complete_name"),
       db.from("employee_attendance").select("id,employee_id,attendance_date,checked_in_at,checked_out_at,minutes_late,minutes_undertime,status,remarks").order("attendance_date", { ascending: false }).limit(300),
       db.from("leave_requests").select("id,employee_id,leave_type,starts_on,ends_on,reason,status,created_at").order("created_at", { ascending: false }).limit(200),
@@ -289,60 +281,57 @@ export async function GET() {
       db.from("benefit_records").select("id,employee_id,benefit_type,reference,amount_centavos,effective_from,effective_to").order("created_at", { ascending: false }).limit(400),
       db.from("employment_contracts").select("id,employee_id,contract_type,position,rate_centavos,starts_on,ends_on,status,notes").order("created_at", { ascending: false }).limit(400),
     ]);
-    hr = { employees: hrResults[0].data ?? [], employeeAttendance: hrResults[1].data ?? [], leaveRequests: hrResults[2].data ?? [], cashAdvances: hrResults[3].data ?? [], payrollPeriods: hrResults[4].data ?? [], payrollItems: hrResults[5].data ?? [], benefitRecords: hrResults[6].data ?? [], employmentContracts: hrResults[7].data ?? [] };
-  }
-  // Certificates carry trainee identity — only Training Operations, Releasing Officer, and Admin receive them.
-  let certificates: unknown[] = [];
-  let certificateTemplates: unknown[] = [];
-  let certificateReleases: unknown[] = [];
-  if (canManageTraining(staff.roleCodes) || canRelease(staff.roleCodes)) {
-    const { data } = await db.from("certificates").select("id,enrollment_id,status,printed_at,printed_by,reprint_count,snapshot,number_pool_id,template_id,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name,code))").order("created_at", { ascending: false }).limit(300);
-    certificates = data ?? [];
-    // Release/courier/correction fields ship in a later migration — merge tolerantly
-    // so a pre-migration database returns the base certificate rows instead of 500ing.
-    const { data: extra } = await db.from("certificates").select("id,release_method,expected_pickup_on,claimant_name,claimant_relationship,id_checked,authorization_checked,courier_name,tracking_number,shipping_fee_status,shipping_address,courier_status,issue_status,issue_note,issue_reported_on");
-    if (extra?.length) {
-      const byId = new Map(extra.map((r) => [r.id, r]));
-      certificates = (certificates as { id: string }[]).map((c) => ({ ...c, ...(byId.get(c.id) ?? {}) }));
+    return { employees: r[0].data ?? [], employeeAttendance: r[1].data ?? [], leaveRequests: r[2].data ?? [], cashAdvances: r[3].data ?? [], payrollPeriods: r[4].data ?? [], payrollItems: r[5].data ?? [], benefitRecords: r[6].data ?? [], employmentContracts: r[7].data ?? [] };
+  })();
+
+  const certificateUnit = (async () => {
+    if (!seesCertificates) return { certificates: [] as unknown[], templates: [] as unknown[], releases: [] as unknown[], issuanceEnabled: false };
+    const [base, extra, tpls, rel, settings] = await Promise.all([
+      db.from("certificates").select("id,enrollment_id,status,printed_at,printed_by,reprint_count,snapshot,number_pool_id,template_id,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name,code))").order("created_at", { ascending: false }).limit(300),
+      // Release/courier/correction fields ship in a later migration — merge tolerantly
+      // so a pre-migration database returns the base certificate rows instead of 500ing.
+      // The limit matches the base query so the merge cannot miss a loaded row.
+      db.from("certificates").select("id,release_method,expected_pickup_on,claimant_name,claimant_relationship,id_checked,authorization_checked,courier_name,tracking_number,shipping_fee_status,shipping_address,courier_status,issue_status,issue_note,issue_reported_on").order("created_at", { ascending: false }).limit(300),
+      db.from("certificate_templates").select("id,course_id,version,storage_path,active,fields,approved_at,courses(name,code)").order("created_at", { ascending: false }).limit(200),
+      // Released-list report source (tolerant: table exists but may be empty).
+      db.from("certificate_release_events").select("id,certificate_id,event_type,recipient_name,recipient_id_type,reason,created_at,certificates(enrollment_id,snapshot,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name,code)))").order("created_at", { ascending: false }).limit(400),
+      // Certificate issuance safety flag (admin-toggleable; read via service role).
+      db.from("organization_settings").select("certificate_issuance_enabled").maybeSingle(),
+    ]);
+    let certificates = (base.data ?? []) as { id: string }[];
+    if (extra.data?.length) {
+      const byId = new Map((extra.data as { id: string }[]).map((r) => [r.id, r]));
+      certificates = certificates.map((c) => ({ ...c, ...(byId.get(c.id) ?? {}) }));
     }
-    const { data: tpls } = await db.from("certificate_templates").select("id,course_id,version,storage_path,active,fields,approved_at,courses(name,code)").order("created_at", { ascending: false }).limit(200);
-    certificateTemplates = tpls ?? [];
-    // Released-list report source (tolerant: table exists but may be empty).
-    const { data: rel } = await db.from("certificate_release_events").select("id,certificate_id,event_type,recipient_name,recipient_id_type,reason,created_at,certificates(enrollment_id,snapshot,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name,code)))").order("created_at", { ascending: false }).limit(400);
-    certificateReleases = rel ?? [];
-  }
-  // Certificate issuance safety flag (admin-toggleable; read via service role).
-  let certificateIssuanceEnabled = false;
-  if (canManageTraining(staff.roleCodes) || canRelease(staff.roleCodes)) {
-    const admin = createSupabaseAdminClient();
-    const { data: s } = await admin.from("organization_settings").select("certificate_issuance_enabled").maybeSingle();
-    certificateIssuanceEnabled = Boolean(s?.certificate_issuance_enabled);
-  }
-  // Cashier→Accounting requests (Cancellation/Refund/Make-up/Rescheduling). enrollment_requests is
-  // RLS-protected, so read via service role; expose only to cashier/accounting/admin.
-  let requests: unknown[] = [];
-  // Non-discount charges awaiting the Accounting Manager's approval.
-  let pendingCharges: unknown[] = [];
-  if (canManageAccounting(staff.roleCodes) || canCashier(staff.roleCodes)) {
+    return { certificates: certificates as unknown[], templates: tpls.data ?? [], releases: rel.data ?? [], issuanceEnabled: Boolean(settings.data?.certificate_issuance_enabled) };
+  })();
+
+  // Non-discount charges awaiting the Accounting Manager approval queue.
+  const pendingChargesUnit = (async (): Promise<unknown[]> => {
+    if (!seesPendingCharges) return [];
     const { data } = await db.from("enrollment_charges").select("id,enrollment_id,description,amount_centavos,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name))").eq("event_type", "charge").eq("approval_status", "Pending").order("created_at", { ascending: false }).limit(200);
-    pendingCharges = data ?? [];
-  }
-  if (canCashier(staff.roleCodes) || staff.roleCodes.includes("registration")) {
-    const admin = createSupabaseAdminClient();
-    const { data } = await admin.from("enrollment_requests").select("id,request_number,request_type,requested_values,reason,status,decision_remarks,created_at,decided_at,trainees(legal_first_name,legal_last_name),enrollments(enrollment_number,courses(name))").in("request_type", ["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course"]).order("created_at", { ascending: false }).limit(200);
-    requests = data ?? [];
-  }
+    return data ?? [];
+  })();
+
+  // Cashier to Accounting requests (Cancellation/Refund/Make-up/Rescheduling).
+  // enrollment_requests is RLS-protected, so read via service role; expose only
+  // to cashier/accounting/admin.
+  const requestsUnit = (async (): Promise<unknown[]> => {
+    if (!seesRequests) return [];
+    const { data } = await db.from("enrollment_requests").select("id,request_number,request_type,requested_values,reason,status,decision_remarks,created_at,decided_at,trainees(legal_first_name,legal_last_name),enrollments(enrollment_number,courses(name))").in("request_type", ["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course"]).order("created_at", { ascending: false }).limit(200);
+    return data ?? [];
+  })();
+
   // Per-course training instruction templates (subject/body) for the Instructions editor + PDF.
-  let instructionTemplates: unknown[] = [];
-  {
+  const instructionTemplatesUnit = (async (): Promise<unknown[]> => {
     const { data } = await db.from("training_instruction_templates").select("course_id,subject,body,active").eq("active", true).order("version", { ascending: false }).limit(500);
-    instructionTemplates = data ?? [];
-  }
+    return data ?? [];
+  })();
+
   // Instructor + room per batch, for the Schedule Officer workspace. Assignments are
   // per training date; the first assignment found represents the batch. Tolerant:
   // any failure yields an empty list rather than a 500.
-  let batchStaffing: { batch_id: string; instructor_name: string | null; room_name: string | null }[] = [];
-  {
+  const batchStaffingUnit = (async (): Promise<{ batch_id: string; instructor_name: string | null; room_name: string | null }[]> => {
     const [dates, assigns, emps, rooms] = await Promise.all([
       db.from("batch_training_dates").select("id,batch_id").limit(5000),
       db.from("resource_assignments").select("batch_training_date_id,instructor_id,classroom_id").limit(5000),
@@ -358,65 +347,150 @@ export async function GET() {
       if (!batchId || seen.has(batchId)) continue;
       seen.set(batchId, { batch_id: batchId, instructor_name: empName.get(a.instructor_id) ?? null, room_name: roomName.get(a.classroom_id) ?? null });
     }
-    batchStaffing = [...seen.values()];
-  }
+    return [...seen.values()];
+  })();
+
   // Merge the payment-channel kind (receivable/payable) tolerantly — the column may not
   // be migrated yet, in which case every channel is treated as receivable.
-  const kindByMethod = new Map<string, string>();
-  {
+  const methodKindUnit = (async () => {
+    const kindByMethod = new Map<string, string>();
     const { error, data } = await db.from("payment_methods").select("id,kind");
     if (!error) for (const r of data ?? []) kindByMethod.set(r.id as string, (r as { kind?: string }).kind ?? "receivable");
-  }
-  const paymentMethodsWithKind = (paymentMethods.data ?? []).map((m) => ({ ...m, kind: kindByMethod.get((m as { id: string }).id) ?? "receivable" }));
-  // MyHr self-service: the signed-in staff's OWN employee record + leave / cash-advance history,
-  // matched by login email → employees.work_email. Read via service role, self only.
-  let myHr: { employee: unknown; leave: unknown[]; advances: unknown[]; charges: unknown[]; attendance: unknown[] } | null = null;
-  if (staff.user.email) {
-    const admin = createSupabaseAdminClient();
-    const { data: emp } = await admin.from("employees").select("id,employee_number,complete_name,position,employment_status,date_hired,pay_type,base_rate_centavos,work_email,active").ilike("work_email", staff.user.email).maybeSingle();
-    if (emp) {
-      const { data: leave } = await admin.from("leave_requests").select("id,leave_type,starts_on,ends_on,reason,status,created_at").eq("employee_id", emp.id).order("created_at", { ascending: false }).limit(50);
-      const { data: adv } = await admin.from("cash_advances").select("id,amount_centavos,requested_on,balance_centavos,status").eq("employee_id", emp.id).order("requested_on", { ascending: false }).limit(50);
+    return kindByMethod;
+  })();
+
+  // MyHr self-service: the signed-in staff member's OWN employee record plus leave and
+  // cash-advance history, matched by login email to employees.work_email. Read via
+  // service role, self only.
+  const myHrUnit = (async (): Promise<{ employee: unknown; leave: unknown[]; advances: unknown[]; charges: unknown[]; attendance: unknown[] } | null> => {
+    if (!staffEmail) return null;
+    const { data: emp } = await db.from("employees").select("id,employee_number,complete_name,position,employment_status,date_hired,pay_type,base_rate_centavos,work_email,active").ilike("work_email", staffEmail).maybeSingle();
+    if (!emp) return null;
+    const [leave, adv, chg, att] = await Promise.all([
+      db.from("leave_requests").select("id,leave_type,starts_on,ends_on,reason,status,created_at").eq("employee_id", emp.id).order("created_at", { ascending: false }).limit(50),
+      db.from("cash_advances").select("id,amount_centavos,requested_on,balance_centavos,status").eq("employee_id", emp.id).order("requested_on", { ascending: false }).limit(50),
       // Tolerant: the employee_charges category/note/balance columns may not be migrated yet.
-      const { data: chg } = await admin.from("employee_charges").select("id,category,note,amount_centavos,balance_centavos,status,effective_on,activated_at").eq("employee_id", emp.id).order("effective_on", { ascending: false }).limit(50);
-      const { data: att } = await admin.from("employee_attendance").select("id,attendance_date,checked_in_at,checked_out_at,minutes_late,minutes_undertime,status").eq("employee_id", emp.id).order("attendance_date", { ascending: false }).limit(30);
-      myHr = { employee: emp, leave: leave ?? [], advances: adv ?? [], charges: chg ?? [], attendance: att ?? [] };
-    }
-  }
+      db.from("employee_charges").select("id,category,note,amount_centavos,balance_centavos,status,effective_on,activated_at").eq("employee_id", emp.id).order("effective_on", { ascending: false }).limit(50),
+      db.from("employee_attendance").select("id,attendance_date,checked_in_at,checked_out_at,minutes_late,minutes_undertime,status").eq("employee_id", emp.id).order("attendance_date", { ascending: false }).limit(30),
+    ]);
+    return { employee: emp, leave: leave.data ?? [], advances: adv.data ?? [], charges: chg.data ?? [], attendance: att.data ?? [] };
+  })();
+
   // Tolerant merge of expense payment channel + reference (migration 202608100001).
-  // Kept out of the main select so a pre-migration schema doesn't empty the expenses list.
-  let expensesMerged = (expenses.data ?? []) as Record<string, unknown>[];
-  {
+  // Kept out of the main select so a pre-migration schema does not empty the expenses list.
+  const expenseExtrasUnit = (async () => {
     const { data: ex } = await db.from("expenses").select("id,payment_channel,reference_number,purpose,requested_by").order("created_at", { ascending: false }).limit(250);
-    if (ex) { const m = new Map(ex.map((r) => [(r as { id: string }).id, r])); expensesMerged = expensesMerged.map((e) => ({ ...e, ...(m.get((e as { id: string }).id) ?? {}) })); }
+    if (!ex) return { rows: [] as { id: string }[], names: new Map<string, string>() };
+    const rows = ex as { id: string }[];
     // Resolve the requester's display name so the voucher list can show who raised it.
-    const ids = [...new Set(expensesMerged.map((e) => (e as { requested_by?: string }).requested_by).filter(Boolean))] as string[];
-    if (ids.length) {
-      const { data: people } = await db.from("profiles").select("id,complete_name").in("id", ids);
-      const byId = new Map((people ?? []).map((p) => [p.id, p.complete_name]));
-      expensesMerged = expensesMerged.map((e) => ({ ...e, requested_by_name: byId.get((e as { requested_by?: string }).requested_by ?? "") ?? null }));
-    }
-  }
+    const ids = [...new Set(ex.map((r) => (r as { requested_by?: string }).requested_by).filter(Boolean))] as string[];
+    if (!ids.length) return { rows, names: new Map<string, string>() };
+    const { data: people } = await db.from("profiles").select("id,complete_name").in("id", ids);
+    return { rows, names: new Map((people ?? []).map((p) => [p.id as string, p.complete_name as string])) };
+  })();
+
   // Employee-charge management for the Accounting Manager (admin / accounting / hr): the charge list
   // plus a minimal employee roster to file against (accounting does not receive the full HR dataset).
-  // Separate tolerant queries so a pre-migration schema yields [] instead of 500-ing the GET.
-  let employeeCharges: unknown[] = [];
-  let chargeEmployees: unknown[] = [];
-  if (canManageEmployeeCharges(staff.roleCodes)) {
-    const admin = createSupabaseAdminClient();
-    const { data } = await admin.from("employee_charges").select("id,employee_id,category,note,amount_centavos,balance_centavos,status,effective_on,activated_at,employees(complete_name,employee_number)").order("effective_on", { ascending: false }).limit(400);
-    employeeCharges = data ?? [];
-    const { data: roster } = await admin.from("employees").select("id,complete_name,employee_number,active").eq("active", true).order("complete_name");
-    chargeEmployees = roster ?? [];
+  const employeeChargeUnit = (async () => {
+    if (!seesEmployeeCharges) return { charges: [] as unknown[], employees: [] as unknown[] };
+    const [list, roster] = await Promise.all([
+      db.from("employee_charges").select("id,employee_id,category,note,amount_centavos,balance_centavos,status,effective_on,activated_at,employees(complete_name,employee_number)").order("effective_on", { ascending: false }).limit(400),
+      db.from("employees").select("id,complete_name,employee_number,active").eq("active", true).order("complete_name"),
+    ]);
+    return { charges: list.data ?? [], employees: roster.data ?? [] };
+  })();
+
+  const results = await Promise.all([
+    db.from("profiles").select("complete_name,email").eq("id", staff.user.id).maybeSingle(),
+    db.from("courses").select("id,code,name,delivery_type,duration_label,duration_days,training_mode,category_id,standard_price_centavos,google_classroom_link,active,updated_at,course_categories(name)").eq("active", true).order("name"),
+    db.from("partner_course_offers").select("id,course_id,duration_label,training_fee_centavos,rebate_centavos,partner_payable_centavos,updated_at,partner_centers(name,contact_details)").eq("active", true).order("training_fee_centavos"),
+    db.from("trainees").select("id,trainee_number,legal_first_name,legal_middle_name,legal_last_name,birthdate,sex,nationality,address,email,mobile,srn,account_state,registered_at").neq("account_state", "Deactivated").order("created_at", { ascending: false }).limit(250),
+    db.from("batches").select("id,batch_number,course_id,partner_offer_id,starts_on,ends_on,daily_start,daily_end,mode,venue,capacity,confirmed_count,enrollment_deadline,status,published_at,courses(name,code),partner_course_offers(partner_centers(name))").eq("active", true).order("starts_on", { ascending: true }).limit(250),
+    db.from("enrollments").select("id,enrollment_number,trainee_id,course_id,partner_offer_id,batch_id,enrollment_status,instructions_status,selling_price_centavos,rebate_centavos,partner_payable_centavos,created_at,trainees(trainee_number,legal_first_name,legal_middle_name,legal_last_name,email,mobile),courses(name,code),batches(batch_number,starts_on,ends_on,mode,venue),partner_course_offers(partner_centers(name))").order("created_at", { ascending: false }).limit(250),
+    db.from("payments").select("id,payment_number,trainee_id,amount_centavos,method,receiving_account,reference_number,proof_id,received_at,verification_state,remarks,valid,trainees(legal_first_name,legal_last_name)").eq("valid", true).order("received_at", { ascending: false }).limit(250),
+    db.from("notifications").select("id,title,body,deep_link,read_at,created_at").eq("recipient_id", staff.user.id).order("created_at", { ascending: false }).limit(20),
+    // Accounting datasets (Slice 1): channels, charges, agencies, expenses, payables.
+    db.from("payment_methods").select("id,code,name,requires_reference,allows_proof,active,sort_order").order("sort_order"),
+    db.from("charge_catalog").select("id,name,default_amount_centavos,active,used_count").order("name"),
+    db.from("marketing_agencies").select("id,name,contact_name,email,mobile,active").order("name"),
+    db.from("expenses").select("id,expense_number,payee,category,amount_centavos,purpose,status,created_at").order("created_at", { ascending: false }).limit(250),
+    db.from("payables").select("id,description,amount_centavos,due_on,status,partner_center_id,enrollment_id,created_at").order("created_at", { ascending: false }).limit(250),
+    db.from("cashier_closings").select("id,closing_date,opening_cash_centavos,cash_collections_centavos,online_collections_centavos,refunds_centavos,expenses_centavos,expected_cash_centavos,actual_cash_centavos,variance_centavos,status,submitted_at").order("closing_date", { ascending: false }).limit(60),
+    db.from("enrollment_charges").select("id,enrollment_id,charge_catalog_id,description,amount_centavos,event_type,created_at").eq("valid", true).order("created_at", { ascending: false }).limit(500),
+    db.from("classrooms").select("id,name,venue,capacity,active").order("name"),
+    db.from("course_categories").select("id,name").eq("active", true).order("sort_order"),
+    db.from("partner_centers").select("id,name,active").order("name"),
+    db.from("agency_course_rebates").select("id,agency_id,course_id,rebate_centavos,updated_at").limit(2000),
+    db.from("agency_rebates").select("id,agency_id,enrollment_id,course_id,rebate_centavos,status,created_at,marketing_agencies(name),courses(name),trainees(legal_first_name,legal_last_name)").order("created_at", { ascending: false }).limit(300),
+    db.from("expense_categories").select("id,name,active").order("name"),
+    db.from("inventory_items").select("id,name,category,unit,quantity_on_hand,unit_value_centavos,active").order("name"),
+    db.from("inventory_movements").select("id,item_id,movement_type,quantity,remarks,created_at,inventory_items(name)").order("created_at", { ascending: false }).limit(200),
+    db.from("enrollment_charges").select("id,enrollment_id,description,amount_centavos,agency_id,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name)),marketing_agencies(name)").eq("event_type", "discount").eq("approval_status", "Pending").order("created_at", { ascending: false }).limit(200),
+    db.from("announcements").select("id,title,body,audience_roles,published_at,expires_at").order("published_at", { ascending: false, nullsFirst: false }).limit(30),
+  ]);
+  const error = results.find((item) => item.error)?.error;
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const [profile, courses, offers, trainees, batches, enrollmentsResult, payments, notifications,
+    paymentMethods, charges, agencies, expenses, payables, cashierClosings, enrollmentCharges, classrooms, courseCategories, partnerCenters, agencyCourseRebates, agencyRebates, expenseCategories, inventoryItems, inventoryMovements, pendingDiscounts, announcements] = results;
+
+  // Collect the concurrent units started before the core batch.
+  const [enrollmentExtras, feedbackByEnrollment, hr, certs, pendingCharges, requests, instructionTemplates, batchStaffing, kindByMethod, myHr, expenseExtras, employeeChargeData] = await Promise.all([
+    enrollmentExtrasUnit, feedbackUnit, hrUnit, certificateUnit, pendingChargesUnit, requestsUnit,
+    instructionTemplatesUnit, batchStaffingUnit, methodKindUnit, myHrUnit, expenseExtrasUnit, employeeChargeUnit,
+  ]);
+
+  const enrollmentRows = (enrollmentsResult.data ?? []) as { id: string }[];
+
+  // Allocations drive paid_centavos, so they must cover every loaded enrollment
+  // exactly. Scope them by id instead of capping with a limit: a cap would
+  // silently understate what a trainee has paid. Chunked to keep each request
+  // URL short.
+  const paidByEnrollment = new Map<string, number>();
+  const ALLOCATION_CHUNK = 100;
+  const idChunks: string[][] = [];
+  for (let i = 0; i < enrollmentRows.length; i += ALLOCATION_CHUNK) idChunks.push(enrollmentRows.slice(i, i + ALLOCATION_CHUNK).map((row) => row.id));
+  const allocationChunks = await Promise.all(idChunks.map((ids) => db.from("payment_allocations").select("enrollment_id,amount_centavos").in("enrollment_id", ids)));
+  for (const chunk of allocationChunks) {
+    for (const allocation of chunk.data ?? []) paidByEnrollment.set(allocation.enrollment_id, (paidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
   }
+
+  const chargesByEnrollment = new Map<string, number>();
+  const discountsByEnrollment = new Map<string, number>();
+  for (const row of enrollmentCharges.data ?? []) {
+    const target = row.event_type === "discount" ? discountsByEnrollment : chargesByEnrollment;
+    target.set(row.enrollment_id, (target.get(row.enrollment_id) ?? 0) + Number(row.amount_centavos));
+  }
+
+  const extrasByEnrollment = new Map(enrollmentExtras.map((row) => [row.id, row]));
+  const enrollments = (enrollmentsResult.data ?? []).map((row) => {
+    const extra = extrasByEnrollment.get(row.id);
+    return { ...row,
+      scheduled_on: extra?.scheduled_on ?? null,
+      instructions_sent_at: extra?.instructions_sent_at ?? null,
+      paid_centavos: paidByEnrollment.get(row.id) ?? 0,
+      charges_centavos: chargesByEnrollment.get(row.id) ?? 0,
+      discounts_centavos: discountsByEnrollment.get(row.id) ?? 0,
+      feedback_token: extra?.feedback_token ?? null,
+      feedback_submitted: feedbackByEnrollment.has(row.id) };
+  });
+
+  const paymentMethodsWithKind = (paymentMethods.data ?? []).map((m) => ({ ...m, kind: kindByMethod.get((m as { id: string }).id) ?? "receivable" }));
+
+  const expenseExtraById = new Map(expenseExtras.rows.map((row) => [row.id, row]));
+  const expensesMerged = ((expenses.data ?? []) as Record<string, unknown>[]).map((e) => {
+    const id = (e as { id: string }).id;
+    const merged = { ...e, ...(expenseExtraById.get(id) ?? {}) } as Record<string, unknown> & { requested_by?: string };
+    return { ...merged, requested_by_name: expenseExtras.names.get(merged.requested_by ?? "") ?? null };
+  });
+
   return NextResponse.json({ profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
     paymentMethods: paymentMethodsWithKind, charges: charges.data ?? [], agencies: agencies.data ?? [],
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
-    classrooms: classrooms.data ?? [], certificates, certificateTemplates, certificateReleases, certificateIssuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges, chargeEmployees, instructionTemplates, batchStaffing }, { headers: { "Cache-Control": "no-store" } });
+    classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {

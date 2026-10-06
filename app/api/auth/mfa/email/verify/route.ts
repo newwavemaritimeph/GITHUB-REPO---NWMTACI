@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { withAuthTimeout } from "@/lib/supabase/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getUserRoleNames } from "@/lib/supabase/roles";
 import { EMAIL_COOKIE_TTL_MS, EMAIL_MAX_ATTEMPTS, MFA_COOKIE, isMfaEnforced, signMfaCookie, verifyEmailCode } from "@/lib/mfa";
@@ -11,7 +12,7 @@ export const runtime = "nodejs";
  * that lets the portal guard admit this privileged user. */
 export async function POST(request: Request) {
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = (await withAuthTimeout(supabase.auth.getUser()))?.data.user;
   if (!user) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
 
   const roles = await getUserRoleNames(user.id);

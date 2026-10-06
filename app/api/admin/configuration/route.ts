@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { withAuthTimeout } from "@/lib/supabase/config";
 
 const input=z.discriminatedUnion("action",[
   z.object({action:z.literal("payment-method"),name:z.string().trim().min(2).max(80),requiresReference:z.boolean(),allowsProof:z.boolean()}),
@@ -31,7 +32,7 @@ export async function GET(){const staff=await requireStaff(["super_admin"]);
       const names=jar.getAll().map(c=>c.name);
       const authCookies=names.filter(n=>n.startsWith("sb-")||n.includes("auth-token"));
       const server=await createSupabaseServerClient();
-      const {data:{user}}=await server.auth.getUser();
+      const user=(await withAuthTimeout(server.auth.getUser()))?.data.user;
       let userId:string|null=null,email:string|null=null,roles:string[]=[];
       if(user){
         userId=user.id;email=user.email??null;

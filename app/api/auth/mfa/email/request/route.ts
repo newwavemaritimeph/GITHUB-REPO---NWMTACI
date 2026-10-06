@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Resend } from "resend";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { withAuthTimeout } from "@/lib/supabase/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getUserRoleNames } from "@/lib/supabase/roles";
 import { EMAIL_CODE_TTL_MS, EMAIL_MAX_REQUESTS_PER_HOUR, generateEmailCode, hashEmailCode, isMfaEnforced } from "@/lib/mfa";
@@ -11,7 +12,7 @@ export const runtime = "nodejs";
  * sends it via Resend. The code is stored hashed; the plaintext never persists. */
 export async function POST() {
   const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const user = (await withAuthTimeout(supabase.auth.getUser()))?.data.user;
   if (!user?.email) return NextResponse.json({ error: "Not signed in." }, { status: 401 });
 
   const roles = await getUserRoleNames(user.id);

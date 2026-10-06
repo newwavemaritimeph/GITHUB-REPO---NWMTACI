@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { PortalApp } from "@/components/portal-app";
 import { PortalLiveApp } from "@/components/portal-live-app";
 import { isDemoMode } from "@/lib/system/mode";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { isSupabaseConfigured, withAuthTimeout } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getUserRoleNames } from "@/lib/supabase/roles";
 import { MFA_COOKIE, isMfaEnforced, mfaEnforcementEnabled, verifyMfaCookie } from "@/lib/mfa";
@@ -22,9 +22,10 @@ export default async function PortalPage() {
   }
 
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Bounded: an unreachable Supabase project must send the visitor to sign-in
+  // rather than hold the request open until it becomes a 504.
+  const session = await withAuthTimeout(supabase.auth.getUser());
+  const user = session?.data.user;
   if (!user) redirect("/staff-login");
   const { data: staffRole } = await supabase
     .from("user_roles")
@@ -38,7 +39,9 @@ export default async function PortalPage() {
   if (mfaEnforcementEnabled()) {
     const roleNames = await getUserRoleNames(user.id);
     if (isMfaEnforced(roleNames)) {
-      const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      // A timeout leaves aal undefined, which sends the user to the MFA step —
+      // the safe direction when the assurance level cannot be confirmed.
+      const aal = (await withAuthTimeout(supabase.auth.mfa.getAuthenticatorAssuranceLevel()))?.data;
       const cookieStore = await cookies();
       const emailPassed = verifyMfaCookie(cookieStore.get(MFA_COOKIE)?.value, user.id);
       if (aal?.currentLevel !== "aal2" && !emailPassed) redirect("/portal/mfa");

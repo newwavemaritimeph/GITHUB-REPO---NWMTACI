@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { supabaseConfig } from "@/lib/supabase/config";
+import { AUTH_TIMEOUT_MS, supabaseConfig, withAuthTimeout } from "@/lib/supabase/config";
 
 /**
  * Keeps the Supabase auth session fresh on every request.
@@ -29,18 +29,36 @@ export async function middleware(request: NextRequest) {
         cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
       },
     },
+    global: {
+      // Bound every auth round trip. An unreachable or slow Supabase host must
+      // not hold the request open until the platform timeout turns it into a
+      // 504 — a project that stops resolving in DNS once took the whole site
+      // down this way, public pages included.
+      fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(AUTH_TIMEOUT_MS) }),
+    },
   });
 
   // IMPORTANT: refresh the auth token. Do not add logic between creating the
   // client and calling getUser(), per @supabase/ssr guidance.
-  await supabase.auth.getUser();
+  //
+  // Fail open. withAuthTimeout bounds the whole call, not just the fetch:
+  // measured against an unreachable host, this request took ~51s even with an
+  // AbortSignal on fetch, because gotrue retries the refresh internally. A
+  // request that times out is served signed-out; protected pages already
+  // redirect to /staff-login on a missing session, so the worst case is
+  // re-signing in rather than an outage.
+  await withAuthTimeout(supabase.auth.getUser());
 
   return response;
 }
 
 export const config = {
   matcher: [
-    // Run on all paths except Next internals and static image assets.
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    // Only where a session actually matters. The public marketing and
+    // registration pages never read a session, so they must keep rendering
+    // even when Supabase is down.
+    "/portal/:path*",
+    "/auth/:path*",
+    "/api/:path*",
   ],
 };

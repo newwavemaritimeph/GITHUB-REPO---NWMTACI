@@ -44,9 +44,17 @@ required by `CLAUDE.md` — do not publish a partial production release.
 
 ## Steps
 
-> **Supabase is already provisioned.** An existing project on the `newwavemaritimeph`
-> free account is the New Wave backend:
-> - ref `bgcrfyuhrqynohbargcl`, region `ap-southeast-1`, status ACTIVE_HEALTHY
+> **Check the Supabase project is still live before trusting the rest of this
+> section.** On 2026-10-06 `bgcrfyuhrqynohbargcl.supabase.co` returned NXDOMAIN
+> from three independent resolvers, meaning the project had been deleted or the
+> configured ref no longer existed. Verify with
+> `nslookup <ref>.supabase.co` before deploying; a *paused* project still
+> resolves, so NXDOMAIN means gone, not idle.
+>
+> The New Wave backend was an existing project on the `newwavemaritimeph`
+> free account:
+> - ref `bgcrfyuhrqynohbargcl`, region `ap-southeast-1` (status last recorded as
+>   ACTIVE_HEALTHY, but see the warning above)
 > - full schema present (RLS on every table), catalog seeded (`partner_course_offers` = 96),
 >   roles seeded, and **one staff account already linked** (`user_roles`).
 > - Public config values are captured in `.env.staging.example`.
@@ -114,14 +122,15 @@ Auth emails (invitations, password recovery) are sent by Supabase, not the app.
 
 ### Required — URL configuration (fixes "site can't be reached")
 Supabase dashboard → **Authentication → URL Configuration**:
-- **Site URL**: `https://nwmtaci-2026.vercel.app`
-- **Redirect URLs**: add `https://nwmtaci-2026.vercel.app/**`
+- **Site URL**: `https://newwavemaritimemtaci.com` (the live custom domain)
+- **Redirect URLs**: add `https://newwavemaritimemtaci.com/**` (keep
+  `https://nwmtaci-2026.vercel.app/**` too if that host is still in use)
 
 Without these, recovery/invite links fall back to `localhost:3000`. The app now
 builds `redirectTo` from the live request origin, but Supabase still only honors
 allowlisted redirect URLs and otherwise uses the Site URL.
 
-Optional: set `APP_BASE_URL=https://nwmtaci-2026.vercel.app` in Vercel to make the
+Optional: set `APP_BASE_URL=https://newwavemaritimemtaci.com` in Vercel to make the
 redirect origin explicit (the request-origin fallback already covers it).
 
 ### Required for real use — custom SMTP (removes the built-in rate limit)
