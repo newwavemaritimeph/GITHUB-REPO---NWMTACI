@@ -4,9 +4,9 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { NewWaveLogo } from "./new-wave-logo";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { LiveAttendance } from "./portal/live-attendance";
-import { LiveAccounting, AccountingDashboard, ReceivablesModule, ApprovalsModule, PayablesModule, CashPositionModule, LiveVouchers, LiveInventory, LiveExpenses, SetupList, AccountingConfiguration } from "./portal/live-accounting";
+import { LiveAccounting, AccountingDashboard, ReceivablesModule, ApprovalsModule, PayablesModule, CashPositionModule, LiveVouchers, LiveInventory, LiveExpenses, SetupList, AccountingConfiguration, ACCOUNTING_CONFIG_SECTIONS, type AccountingConfigSection } from "./portal/live-accounting";
 import { LiveCashierClosing } from "./portal/live-cashier-closing";
-import { CashierPaymentQueue, RequestChargeModal, TarButton, RecordPaymentModal, CashierDashboard, CashierPayments, DiscountRequests, CashierEnrollments, CashierOpening, CashierSummaryReport, ScheduleOfFees, TarReprints } from "./portal/live-cashier";
+import { CashierPaymentQueue, RequestChargeModal, TarButton, RecordPaymentModal, CashierDashboard, CashierPayments, DiscountRequests, CashierEnrollments, CashierOpening, CashierSummaryReport } from "./portal/live-cashier";
 import { LiveHr, type HrData } from "./portal/live-hr";
 import { LiveTraining, type TrainingData } from "./portal/live-training";
 import { ReleasingDashboard, LiveReleasing } from "./portal/live-releasing";
@@ -23,7 +23,7 @@ import { emailStatusText } from "@/lib/instruction-email-status";
 import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, first, dueCentavos, balanceOf, isUnpaid, manilaToday } from "@/lib/portal-format";
 
-type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Payment records" | "Opening and closing" | "Summary report" | "Schedule of fees" | "Vouchers" | "Change requests" | "Discount requests" | "TAR reprints";
+type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -109,8 +109,9 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   releasing_officer: [],
   hr: [],
   // Cashier (Accounting Officer), owner's menu of 7 Oct 2026, shown as top tabs:
-  // Dashboard · Trainees ▾ · Accounting ▾ · Expenses ▾ · Requests ▾ (CASHIER_TABS).
-  cashier: ["Dashboard","Enrollments","Payment records","Opening and closing","Summary report","Schedule of fees","Expenses","Vouchers","Change requests","Discount requests","TAR reprints"],
+  // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses,
+  // Report (with opening and closing), Requests (CASHIER_TABS).
+  cashier: ["Dashboard","Search trainee","Payments","Expenses","Report","Requests"],
   // accounting is deliberately absent: an absent key keeps the legacy nav.
 };
 
@@ -126,10 +127,11 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Payables",icon:"▦",roles:["accounting"],group:"Payables & cash"},{label:"Cash position",icon:"◈",roles:["accounting"],group:"Payables & cash"},
   {label:"Cashier closing",icon:"⚖",roles:["cashier","accounting"],group:"Cashier control"},
   // Cashier workspace (7 Oct 2026); the top tabs come from CASHIER_TABS.
-  {label:"Payment records",icon:"₱",roles:["cashier"],group:"Accounting"},{label:"Opening and closing",icon:"⚖",roles:["cashier"],group:"Accounting"},{label:"Summary report",icon:"∑",roles:["cashier"],group:"Accounting"},{label:"Schedule of fees",icon:"▤",roles:["cashier"],group:"Accounting"},
-  {label:"Vouchers",icon:"▤",roles:["cashier"],group:"Finance"},{label:"Change requests",icon:"↺",roles:["cashier"],group:"Work"},{label:"Discount requests",icon:"％",roles:["cashier"],group:"Work"},{label:"TAR reprints",icon:"⎙",roles:["cashier"],group:"Work"},
+  {label:"Report",icon:"∑",roles:["cashier"],group:"Accounting"},
   {label:"HR & payroll",icon:"♙",roles:["admin","hr"],group:"People"},{label:"MyHr",icon:"☺",group:"People"},
-  {label:"Endorsed courses",icon:"◇",group:"Configuration"},{label:"Configuration",icon:"⚙",roles:["super_admin","admin","accounting"],group:"Configuration"},
+  {label:"Endorsed courses",icon:"◇",group:"Configuration"},{label:"Configuration",icon:"⚙",roles:["super_admin","admin"],group:"Configuration"},
+  // Accounting › Configuration ▾: one dropdown item per section (owner, 7 Oct 2026).
+  ...ACCOUNTING_CONFIG_SECTIONS.map(label=>({label,icon:"⚙",roles:["accounting"],group:"Configuration" as NavGroup})),
 ];
 /**
  * Top tabs (prototype design, 7 Oct 2026). A tab with one module of the same name
@@ -140,10 +142,8 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
 type TopTab={label:string;items:Module[]};
 const CASHIER_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
-  {label:"Trainees",items:["Enrollments"]},
-  {label:"Accounting",items:["Payment records","Opening and closing","Summary report","Schedule of fees"]},
-  {label:"Expenses",items:["Expenses","Vouchers"]},
-  {label:"Requests",items:["Change requests","Discount requests","TAR reprints"]},
+  {label:"Enrollments",items:["Search trainee"]},
+  {label:"Accounting",items:["Payments","Expenses","Report","Requests"]},
 ];
 const GROUP_LABELS:Partial<Record<NavGroup,string>>={"Payables & cash":"Payables and cash"};
 function topTabsFor(role:string,allowed:Module[]):TopTab[]{
@@ -189,7 +189,7 @@ export function PortalLiveApp(){
   // Accounting, Enrollment summary, Reports, MyHr and Setup. Everything else is the
   // day-to-day work of the specialised roles and is hidden here.
   const adminHidden=new Set<Module>(["Trainees","Instructions","Attendance","Inventory","Rooms & facilities","Certificates","HR & payroll","Schedules","Expenses","Endorsed courses","Employee charges","Requests","Training calendar","Trainee scheduling","Instructor assignment","Schedule changes"]);
-  const accountingHidden=new Set<Module>(["Trainees","Enrollments"]);
+  const accountingHidden=new Set<Module>(["Trainees","Enrollments","Endorsed courses"]);
   // A rebuilding role takes its modules from ROLE_MODULES; everyone else keeps
   // the established role tags and hidden sets. (The registration, training
   // operations and releasing hidden sets are gone: those roles are allow-listed.)
@@ -230,7 +230,7 @@ export function PortalLiveApp(){
           <form action="/auth/signout" method="post"><button type="submit" className="nw-signout">Sign out</button></form>
         </div>
       </div>
-      <nav className="nw-tabs" aria-label="Staff workspace">{tabs.map(tab=>{const single=tab.items.length===1&&tab.items[0]===tab.label;const on=tab.items.includes(active);const isOpen=openTab===tab.label;const count=tab.label==="Requests"?openRequests:0;return <div key={tab.label} className={`nw-tab${on?" on":""}${isOpen?" open":""}`}>
+      <nav className="nw-tabs" aria-label="Staff workspace">{tabs.map(tab=>{const single=tab.items.length===1&&tab.items[0]===tab.label;const on=tab.items.includes(active);const isOpen=openTab===tab.label;const count=tab.items.includes("Requests")?openRequests:0;return <div key={tab.label} className={`nw-tab${on?" on":""}${isOpen?" open":""}`}>
         <button type="button" aria-haspopup={single?undefined:"menu"} aria-expanded={single?undefined:isOpen} aria-current={on?"page":undefined} onClick={e=>{if(single){go(tab.items[0]);return}const r=e.currentTarget.getBoundingClientRect();setMenuAt({left:Math.max(16,Math.min(r.left,window.innerWidth-276)),top:r.bottom+6});setOpenTab(isOpen?"":tab.label)}}>{tab.label}{count>0&&<b className="nw-count">{count}</b>}{!single&&<span className="nw-caret" aria-hidden="true"/>}</button>
         {!single&&isOpen&&<div className="nw-menu" role="menu" style={{left:menuAt.left,top:menuAt.top}}>{tab.items.map(item=><button key={item} type="button" role="menuitem" className={active===item?"on":""} onClick={()=>go(item)}>{item}</button>)}</div>}
       </div>})}</nav>
@@ -249,6 +249,26 @@ function RebuildingWorkspace(){
 }
 
 
+/** A cashier screen with sub-tabs under one title (owner's menu, 7 Oct 2026). */
+function SubTabs({eyebrow,title,tabs,render,action}:{eyebrow:string;title:string;tabs:string[];render:(tab:string)=>React.ReactNode;action?:React.ReactNode}){
+  const [tab,setTab]=useState(tabs[0]);
+  return <div className="portal-page cx"><div className="cx-head"><div><span className="portal-eyebrow">{eyebrow}</span><h1>{title}</h1></div>{action}</div>
+    <div className="cx-status" role="tablist">{tabs.map(t=><button key={t} type="button" role="tab" aria-selected={tab===t} className={tab===t?"on":""} onClick={()=>setTab(t)}>{t}</button>)}</div>
+    {render(tab)}</div>;
+}
+/** Requests by category. A request whose fee is paid is implemented automatically. */
+const REQUEST_CATEGORIES:[string,string|null][]=[["All",null],["Rescheduling","Rescheduling"],["Change course","Change Course"],["Make-up class","Make-up Class"],["Cancellation","Cancellation"],["Reprinting","Reprinting"],["TAR reprint","TAR reprint"],["Discount",null]];
+function CashierRequests({data,reload}:{data:PortalData;reload:()=>Promise<void>}){
+  const [cat,setCat]=useState("All");
+  const type=REQUEST_CATEGORIES.find(([l])=>l===cat)?.[1]??null;
+  const open=(t:string|null)=>data.requests.filter(r=>r.status==="Pending"&&(!t||r.request_type===t)).length;
+  const scoped={...data,requests:type?data.requests.filter(r=>r.request_type===type):data.requests};
+  return <div className="portal-page cx"><div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Requests</h1></div></div>
+    <div className="cx-status" role="tablist">{REQUEST_CATEGORIES.map(([label,t])=>{const n=label==="Discount"?data.pendingDiscounts.length:open(t);return <button key={label} type="button" role="tab" aria-selected={cat===label} className={cat===label?"on":""} onClick={()=>setCat(label)}>{label}{n>0&&<span>{n}</span>}</button>})}</div>
+    {cat==="Discount"?<DiscountRequests data={data} reload={reload}/>:<LiveRequests data={scoped} role="cashier" reload={reload} embedded/>}
+  </div>;
+}
+
 function PortalContent({modules,recordsView,setRecordsView,active,role,data,query,go,open,onPay,canEnroll,canSchedule,canPay,reload}:{modules?:Module[];recordsView:RecordsView;setRecordsView:(v:RecordsView)=>void;active:Module;role:string;data:PortalData;query:string;go:(module:Module)=>void;open:(value:"enrollment"|"batch"|"payment")=>void;onPay:(enrollmentId:string)=>void;canEnroll:boolean;canSchedule:boolean;canPay:boolean;reload:()=>Promise<void>}){
   const gateRole=role==="super_admin"?"admin":role;
   // A role mid-rebuild only renders modules on its allow-list. Without this the
@@ -266,16 +286,11 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Schedule changes")return <ScheduleChanges data={data}/>;
   if(gateRole==="cashier"){
     if(active==="Dashboard")return <CashierDashboard data={data} onPay={onPay} reload={reload}/>;
-    if(active==="Enrollments")return <CashierEnrollments data={data} onPay={onPay} reload={reload}/>;
-    if(active==="Payment records")return <CashierPayments data={data} onPay={onPay}/>;
-    if(active==="Summary report")return <CashierSummaryReport data={data}/>;
-    if(active==="Schedule of fees")return <ScheduleOfFees data={data}/>;
-    if(active==="Vouchers")return <LiveVouchers data={data} role="cashier" reload={reload}/>;
-    if(active==="Change requests")return <LiveRequests data={data} role="cashier" reload={reload}/>;
-    if(active==="Discount requests")return <div className="portal-page cx"><div className="cx-head"><div><span className="portal-eyebrow">Requests</span><h1>Discount requests</h1></div></div><DiscountRequests data={data} reload={reload}/></div>;
-    if(active==="TAR reprints")return <TarReprints data={data}/>;
-    if(active==="Opening and closing")return <div className="portal-page cx"><div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Opening and closing</h1></div></div><CashierOpening data={data} reload={reload}/><LiveCashierClosing data={data} reload={reload} initialOpening={(data.cashierOpenings??[]).find(o=>o.opening_date===manilaToday())?.opening_cash_centavos}/></div>;
-    if(active==="Expenses")return <LiveExpenses data={data} role="cashier" reload={reload}/>;
+    if(active==="Search trainee")return <CashierEnrollments data={data} onPay={onPay} reload={reload}/>;
+    if(active==="Payments")return <CashierPayments data={data} onPay={onPay}/>;
+    if(active==="Report")return <SubTabs eyebrow="Accounting" title="Report" tabs={["Summary report","Opening and closing"]} render={t=>t==="Summary report"?<CashierSummaryReport data={data} embedded/>:<><CashierOpening data={data} reload={reload}/><LiveCashierClosing data={data} reload={reload} initialOpening={(data.cashierOpenings??[]).find(o=>o.opening_date===manilaToday())?.opening_cash_centavos}/></>}/>;
+    if(active==="Requests")return <CashierRequests data={data} reload={reload}/>;
+    if(active==="Expenses")return <SubTabs eyebrow="Accounting" title="Expenses" tabs={["Expenses","Vouchers"]} render={t=>t==="Expenses"?<LiveExpenses data={data} role="cashier" reload={reload}/>:<LiveVouchers data={data} role="cashier" reload={reload}/>}/>;
   }
   if(active==="Dashboard")return <Dashboard data={data} role={gateRole} open={open} canEnroll={canEnroll} canPay={canPay} reload={reload}/>;
   if(active==="Search trainee"&&gateRole==="admin")return <LiveSearchTrainee data={{trainees:data.trainees,enrollments:data.enrollments,payments:data.payments}}/>;
@@ -303,7 +318,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="HR & payroll"&&["admin","hr"].includes(gateRole))return <LiveHr data={data} role={gateRole} reload={reload}/>;
   if(active==="Rooms & facilities"&&["admin","training_operations"].includes(gateRole))return <LiveTraining data={{classrooms:data.classrooms,certificates:data.certificates,batches:data.batches,enrollments:data.enrollments,courses:data.courses,certificateTemplates:data.certificateTemplates}} role={gateRole} reload={reload} initialTab="Classrooms"/>;
   if(active==="Certificates"&&["admin","releasing_officer"].includes(gateRole))return <LiveReleasing data={data as unknown as Parameters<typeof LiveReleasing>[0]["data"]} role={gateRole} reload={reload}/>;
-  if(active==="Configuration"&&gateRole==="accounting")return <AccountingConfiguration data={data as unknown as Parameters<typeof AccountingConfiguration>[0]["data"]} trainees={data.trainees} applicationNumbers={data.applicationNumbers} reload={reload}/>;
+  if((ACCOUNTING_CONFIG_SECTIONS as readonly string[]).includes(active))return <AccountingConfiguration section={active as AccountingConfigSection} data={data as unknown as Parameters<typeof AccountingConfiguration>[0]["data"]} trainees={data.trainees} applicationNumbers={data.applicationNumbers} reload={reload}/>;
   if(active==="Configuration"&&["super_admin","admin"].includes(role))return <div className="portal-page"><PageHead eyebrow="Admin" title="Configuration"/><AdminConfiguration catalog={financeCatalogSections(data,reload)}/></div>;
   return <ConnectedModule module={active} data={data}/>;
 }
@@ -732,7 +747,7 @@ function EnrollmentSummary({data}:{data:PortalData}){
  * Manager approves or rejects ("For approval"). Approval applies the change and
  * posts the charge.
  */
-function LiveRequests({data,role,reload}:{data:PortalData;role:string;reload:()=>Promise<void>}){
+function LiveRequests({data,role,reload,embedded}:{data:PortalData;role:string;reload:()=>Promise<void>;embedded?:boolean}){
   const canDecide=["admin","accounting"].includes(role);
   const canCharge=["admin","cashier","accounting"].includes(role);
   const [busy,setBusy]=useState(""),[message,setMessage]=useState(""),[charging,setCharging]=useState<PortalData["requests"][number]|null>(null);
@@ -744,7 +759,7 @@ function LiveRequests({data,role,reload}:{data:PortalData;role:string;reload:()=
   const typeOf=(r:PortalData["requests"][number])=>r.request_type==="Rescheduling"?"Change batch / reschedule":r.request_type;
   const detailOf=(r:PortalData["requests"][number])=>{const rv=r.requested_values||{};const bits:string[]=[];if(rv.amountCentavos)bits.push(pesos(rv.amountCentavos));if(rv.batchId)bits.push("new batch selected");const ch=first(r.enrollment_charges);if(ch)bits.push(`charge ${pesos(ch.amount_centavos)}`);const cc=data.chargeCollected?.[r.id];if(cc)bits.push(cc.paid?"fee paid ✓":`collect the fee first (${pesos(cc.collected)} of ${pesos(cc.amount)} paid) — approval waits for payment`);if(!ch&&r.stage==="For approval"&&r.status==="Pending"&&r.charge_id===null)bits.push("no charge");return bits.join(" · ")};
   const row=(r:PortalData["requests"][number],action:"charge"|"decide"|"none")=>{const t=first(r.trainees),e=first(r.enrollments),c=e?first(e.courses):null;const extra=detailOf(r);const no=e?.trainee_id?data.applicationNumbers?.[e.trainee_id]:undefined;return <div className="live-row-item" key={r.id}><div><strong>{t?fullName(t):"Unknown trainee"} · {typeOf(r)}</strong><small>{no?<span className="app-no">{no}</span>:null}{c?.name} · {e?.enrollment_number} · {r.reason}{extra?` · ${extra}`:""}</small></div>{action==="charge"?<button type="button" className="portal-primary" onClick={()=>setCharging(r)}>Add charge</button>:action==="decide"?<div className="document-actions"><button type="button" className="portal-primary" disabled={!!busy} onClick={()=>decide(r.id,true)}>{busy===r.id?"…":"Approve"}</button><button type="button" disabled={!!busy} onClick={()=>decide(r.id,false)}>Reject</button></div>:<Badge tone={r.status==="Approved"?"green":r.status==="Rejected"?"red":"orange"}>{r.status==="Pending"?(r.stage==="With cashier"?"With Cashier":"Awaiting Approval"):r.status}</Badge>}</div>};
-  return <div className="portal-page"><PageHead eyebrow="Change requests" title="Requests" text="Change of batch, change of course, make-up classes and cancellations. The Cashier adds the charge; the Accounting Manager approves."/>{message&&<Message kind="error" text={message}/>}
+  return <div className={embedded?"":"portal-page"}>{!embedded&&<PageHead eyebrow="Change requests" title="Requests"/>}{message&&<Message kind="error" text={message}/>}
     <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Needs charges</h2><p>{canCharge?"Add the applicable fee, or mark no charge, to send it for approval":"With the cashier"}</p></div><Badge tone="orange">{withCashier.length}</Badge></div>{withCashier.map(r=>row(r,canCharge?"charge":"none"))}{!withCashier.length&&<p className="portal-empty-copy">Nothing waiting for charges.</p>}</section>
     <section className="portal-panel live-list"><div className="panel-heading"><div><h2>For approval</h2><p>{canDecide?"Approve or reject — approval applies the change and posts the charge":"Waiting for the accounting manager"}</p></div><Badge tone="orange">{forApproval.length}</Badge></div>{forApproval.map(r=>row(r,canDecide?"decide":"none"))}{!forApproval.length&&<p className="portal-empty-copy">No requests waiting for approval.</p>}</section>
     <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Decided</h2><p>Recent history</p></div><Badge>{decided.length}</Badge></div>{decided.slice(0,20).map(r=>row(r,"none"))}{!decided.length&&<p className="portal-empty-copy">Nothing decided yet.</p>}</section>

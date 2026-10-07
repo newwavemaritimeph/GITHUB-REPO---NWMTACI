@@ -1371,14 +1371,14 @@ export function CashPositionModule({ data }: { data: AccountingData }) {
 }
 
 type ConfigTrainee = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; email?: string | null; mobile?: string | null; srn?: string | null; company?: string | null; registered_at?: string | null };
-const CONFIG_SECTIONS = ["Agencies and consultancies", "Rebates per course", "Trainees"] as const;
+export const ACCOUNTING_CONFIG_SECTIONS = ["Schedule of fees", "Payment channels", "Rebates per course", "Agencies and consultancies", "Trainee list"] as const;
+export type AccountingConfigSection = (typeof ACCOUNTING_CONFIG_SECTIONS)[number];
 /**
  * Accounting › Configuration (owner, 7 Oct 2026): the referring agencies and
  * consultancies, the rebate each one earns per course, and the trainee list.
  * Payment channels, course fees, charges and user accounts live in Admin.
  */
-export function AccountingConfiguration({ data, trainees, applicationNumbers, reload }: { data: AccountingData; trainees: ConfigTrainee[]; applicationNumbers?: Record<string, string>; reload: () => Promise<void> }) {
-  const [section, setSection] = useState<(typeof CONFIG_SECTIONS)[number]>("Agencies and consultancies");
+export function AccountingConfiguration({ section, data, trainees, applicationNumbers, reload }: { section: AccountingConfigSection; data: AccountingData; trainees: ConfigTrainee[]; applicationNumbers?: Record<string, string>; reload: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [q, setQ] = useState("");
@@ -1395,16 +1395,32 @@ export function AccountingConfiguration({ data, trainees, applicationNumbers, re
   const people = trainees.filter((t) => !term || `${t.legal_first_name} ${t.legal_last_name} ${t.trainee_number} ${applicationNumbers?.[t.id] ?? ""} ${t.srn ?? ""} ${t.email ?? ""} ${t.company ?? ""}`.toLowerCase().includes(term))
     .sort((a, b) => a.legal_last_name.localeCompare(b.legal_last_name)).slice(0, 400);
   return <div className="portal-page cx">
-    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Configuration</h1></div></div>
-    <div className="cx-seg config-seg" role="tablist">{CONFIG_SECTIONS.map((s) => <button key={s} type="button" role="tab" aria-selected={section === s} className={section === s ? "on" : ""} onClick={() => setSection(s)}>{s}</button>)}</div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Configuration</span><h1>{section}</h1></div></div>
     {error && <div className="portal-message error">{error}</div>}
+    {section === "Schedule of fees" && <SetupList title="Schedule of fees" description="" entityLabel="fee or item" canManage busy={busy}
+      fields={[{ key: "name", label: "Name" }, { key: "defaultAmount", label: "Price (PHP)", type: "number", optional: true }, { key: "isItem", label: "Miscellaneous item (paid at the counter)", type: "checkbox", optional: true }]}
+      rows={data.charges.map((c) => ({ id: c.id, primary: c.name, secondary: `${(c as { kind?: string }).kind === "item" ? "Miscellaneous item" : "Service fee"} · ${pesos(c.default_amount_centavos)}`, active: c.active, values: { name: c.name, defaultAmount: String(c.default_amount_centavos / 100), isItem: (c as { kind?: string }).kind === "item" } }))}
+      onSubmit={(v, id) => post({ action: "charge-save", id, name: String(v.name), defaultAmountCentavos: Math.round((Number(v.defaultAmount) || 0) * 100), kind: v.isItem ? "item" : "fee" })}
+      onArchive={(id, active, name) => void post({ action: "charge-save", id, name, active: !active }).catch(() => undefined)} />}
+    {section === "Payment channels" && <>
+      <SetupList title="For training fees" description="" entityLabel="payment channel" canManage busy={busy}
+        fields={[{ key: "name", label: "Channel name" }, { key: "requiresReference", label: "Requires a reference number", type: "checkbox" }]}
+        rows={data.paymentMethods.filter((c) => c.kind !== "payable").map((c) => ({ id: c.id, primary: c.name, secondary: c.requires_reference ? "Reference required" : "No reference", active: c.active, values: { name: c.name, requiresReference: c.requires_reference } }))}
+        onSubmit={(v, id) => post({ action: "channel-save", id, name: String(v.name), requiresReference: Boolean(v.requiresReference), allowsProof: true, kind: "receivable" })}
+        onArchive={(id, active, name) => void post({ action: "channel-save", id, name, active: !active }).catch(() => undefined)} />
+      <SetupList title="For expenses" description="" entityLabel="payment channel" canManage busy={busy}
+        fields={[{ key: "name", label: "Channel name" }]}
+        rows={data.paymentMethods.filter((c) => c.kind === "payable").map((c) => ({ id: c.id, primary: c.name, secondary: c.code, active: c.active, values: { name: c.name } }))}
+        onSubmit={(v, id) => post({ action: "channel-save", id, name: String(v.name), kind: "payable" })}
+        onArchive={(id, active, name) => void post({ action: "channel-save", id, name, kind: "payable", active: !active }).catch(() => undefined)} />
+    </>}
     {section === "Agencies and consultancies" && <SetupList title="Agencies and consultancies" description="" entityLabel="agency or consultancy" canManage busy={busy}
       fields={[{ key: "name", label: "Name" }, { key: "contactName", label: "Contact person", optional: true }, { key: "email", label: "Email", optional: true }, { key: "mobile", label: "Mobile", optional: true }]}
       rows={data.agencies.map((a) => ({ id: a.id, primary: a.name, secondary: [a.contact_name, a.email, a.mobile].filter(Boolean).join(" · ") || "—", active: a.active, values: { name: a.name, contactName: a.contact_name || "", email: a.email || "", mobile: a.mobile || "" } }))}
       onSubmit={(v, id) => post({ action: "agency-save", id, name: String(v.name), contactName: String(v.contactName || ""), email: String(v.email || ""), mobile: String(v.mobile || "") })}
       onArchive={(id, active, name) => void post({ action: "agency-save", id, name, active: !active }).catch(() => undefined)} />}
     {section === "Rebates per course" && <AgencyRebatesEditor data={data} canManage busy={busy} post={post} />}
-    {section === "Trainees" && <section className="portal-panel cx-panel">
+    {section === "Trainee list" && <section className="portal-panel cx-panel">
       <div className="panel-heading"><div><h2>Trainees</h2></div><span className="slot-count">{trainees.length}</span></div>
       <div className="cx-formpad"><input className="cx-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, NWMTACI number, SRN or company" aria-label="Search trainees" /></div>
       {people.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>SRN</th><th>Company</th><th>Contact</th><th>Registered</th></tr></thead><tbody>

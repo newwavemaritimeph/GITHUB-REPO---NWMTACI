@@ -373,7 +373,7 @@ export function CashierPayments({ data, onPay }: { data: PortalData; onPay: (enr
   for (const p of rows) byMode.set(p.method, (byMode.get(p.method) ?? 0) + Number(p.amount_centavos));
   const total = rows.reduce((s, p) => s + Number(p.amount_centavos), 0);
   return <div className="portal-page cx">
-    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Payment records</h1></div><button type="button" className="portal-primary" onClick={() => onPay("")}>Record payment</button></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Payments</h1></div><button type="button" className="portal-primary" onClick={() => onPay("")}>Record payment</button></div>
     <div className="cx-bar"><div className="cx-seg">{RANGES.map((r) => <button key={r} type="button" className={range === r ? "on" : ""} onClick={() => setRange(r)}>{r}</button>)}</div>
       {range === "Custom" && <><label className="cx-dt">From<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label><label className="cx-dt">To<input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} /></label></>}
       <label className="cx-dt">Mode<select value={mode} onChange={(e) => setMode(e.target.value)}><option value="">All modes</option>{[...new Set([...modeNames(data), ...data.payments.map((p) => p.method)])].map((m) => <option key={m} value={m}>{m}</option>)}</select></label>
@@ -433,7 +433,7 @@ export function CashierEnrollments({ data, onPay, reload }: { data: PortalData; 
     .sort((a, b) => STATUS_ORDER.indexOf(payState(a) as (typeof STATUS_ORDER)[number]) - STATUS_ORDER.indexOf(payState(b) as (typeof STATUS_ORDER)[number]) || dateOf(b).localeCompare(dateOf(a))).slice(0, 300);
   const count = (f: string) => base.filter((e) => f === "All" || payState(e) === f).length;
   return <div className="portal-page cx">
-    <div className="cx-head"><div><span className="portal-eyebrow">Trainees</span><h1>Enrollments</h1></div></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Enrollments</span><h1>Search trainee</h1></div></div>
     <div className="cx-status" role="tablist">{(["All", ...STATUS_ORDER] as const).map((f) => <button key={f} type="button" role="tab" aria-selected={filter === f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{f}<span>{count(f)}</span></button>)}</div>
     <div className="cx-bar"><input className="cx-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, NWMTACI number or course" aria-label="Search enrollments" />
       <label className="cx-dt">From<input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} /></label>
@@ -490,7 +490,7 @@ export function CashierOpening({ data, reload }: { data: PortalData; reload: () 
 }
 
 /** Summary report: collections by mode, expenses, net cash, the cash drawer and balances due after training. */
-export function CashierSummaryReport({ data }: { data: PortalData }) {
+export function CashierSummaryReport({ data, embedded }: { data: PortalData; embedded?: boolean }) {
   const today = manilaToday();
   const [range, setRange] = useState<(typeof RANGES)[number]>("Today");
   const [from, setFrom] = useState(today), [to, setTo] = useState(today);
@@ -510,8 +510,8 @@ export function CashierSummaryReport({ data }: { data: PortalData }) {
   const durations = new Map(data.courses.map((c) => [c.id, c.duration_label]));
   const unpaid = unpaidAfterTraining(data.enrollments as unknown as BalanceEnrollment[], (id) => durations.get(id), today);
   const unpaidTotal = unpaid.reduce((s, r) => s + r.balanceCentavos, 0);
-  return <div className="portal-page cx">
-    <div className="cx-head"><div><span className="portal-eyebrow">{singleDay ? fmtDate(start) : `${fmtDate(start)} – ${fmtDate(end)}`}</span><h1>Summary report</h1></div></div>
+  return <div className={embedded ? "" : "portal-page cx"}>
+    {!embedded && <div className="cx-head"><div><span className="portal-eyebrow">{singleDay ? fmtDate(start) : `${fmtDate(start)} – ${fmtDate(end)}`}</span><h1>Summary report</h1></div></div>}
     <div className="cx-bar"><div className="cx-seg">{RANGES.map((r) => <button key={r} type="button" className={range === r ? "on" : ""} onClick={() => setRange(r)}>{r}</button>)}</div>
       {range === "Custom" && <><label className="cx-dt">From<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label><label className="cx-dt">To<input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} /></label></>}</div>
     <div className="cx-tiles">

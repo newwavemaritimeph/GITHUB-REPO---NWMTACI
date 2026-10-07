@@ -239,6 +239,69 @@ async function chargeCollection(admin: ReturnType<typeof createSupabaseAdminClie
   return { amount, collected, paid: collected >= amount };
 }
 
+
+class RequestNotApplicable extends Error {}
+type ApprovableRequest = { id: string; enrollment_id: string; request_type: string; requested_values: unknown };
+/** Apply an approved change request to the enrollment (shared by Accounting approval and automatic approval once paid). */
+async function applyApprovedRequest(admin: ReturnType<typeof createSupabaseAdminClient>, req: ApprovableRequest, actor: string, remarks: string | null) {
+    const rv = (req.requested_values ?? {}) as { batchId?: string; amountCentavos?: number; paymentId?: string; courseId?: string; partnerOfferId?: string };
+    if (req.request_type === "Rescheduling") {
+      await applyReschedule(admin, req.enrollment_id, rv.batchId ?? null);
+    } else if (req.request_type === "Change Course") {
+      await applyCourseChange(admin, req.enrollment_id, rv.courseId ?? "", rv.partnerOfferId ?? null);
+    } else if (req.request_type === "Cancellation") {
+      const { error } = await admin.from("enrollments").update({ enrollment_status: "Cancelled", cancelled_at: new Date().toISOString() }).eq("id", req.enrollment_id);
+      if (error) throw error;
+    } else if (req.request_type === "Refund") {
+      const { error } = await admin.from("refunds_and_reversals").insert({ enrollment_id: req.enrollment_id, payment_id: rv.paymentId ?? null, event_type: "refund", amount_centavos: rv.amountCentavos ?? 0, reason: remarks ?? "Approved refund request", approved_request_id: req.id, created_by: actor });
+      if (error) throw error;
+    } else if (req.request_type === "Make-up Class") {
+      // Requires migration 202608020003 (nullable original_attendance_record_id). Best-effort so
+      // approval still records before the column is nullable; Training Ops completes the assignment.
+      const { error } = await admin.from("make_up_assignments").insert({ enrollment_id: req.enrollment_id, status: "Pending", assigned_by: actor });
+      if (error) console.error("Make-up assignment insert failed (apply migration 202608020003):", error.message);
+    } else if (req.request_type === "Reprinting") {
+      // Bump the certificate's reprint count so the reprint is tracked; best-effort (no cert yet is fine).
+      const { data: cert } = await admin.from("certificates").select("id,reprint_count").eq("enrollment_id", req.enrollment_id).maybeSingle();
+      if (cert) await admin.from("certificates").update({ reprint_count: Number(cert.reprint_count ?? 0) + 1, status: "Printed" }).eq("id", cert.id);
+    } else if (req.request_type === "TAR reprint") {
+      // One more print of the newest admission record that covers this enrollment.
+      const { data: record, error: recordError } = await admin.from("admission_records").select("id,reprints_approved").contains("enrollment_ids", [req.enrollment_id]).order("issued_at", { ascending: false }).limit(1).maybeSingle();
+      if (recordError) throw recordError;
+      if (!record) throw new RequestNotApplicable("No admission record has been printed for this enrollment yet.");
+      const { error } = await admin.from("admission_records").update({ reprints_approved: Number(record.reprints_approved ?? 0) + 1 }).eq("id", record.id);
+      if (error) throw error;
+    }
+}
+
+/**
+ * Once paid, implement automatically (owner, 7 Oct 2026): a pay-first request
+ * whose fee is fully collected is applied and marked approved straight away,
+ * without waiting for the Accounting Manager. Requests with no fee still go to
+ * Accounting. Failures (for example a full batch) leave the request pending.
+ */
+async function autoImplementPaidRequests(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentIds: string[], actor: string) {
+  if (!enrollmentIds.length) return [] as string[];
+  const { data, error } = await admin.from("enrollment_requests").select("id,enrollment_id,request_type,requested_values,status,stage,charge_id").in("enrollment_id", enrollmentIds).eq("status", "Pending").not("charge_id", "is", null);
+  if (error) return [];
+  const implemented: string[] = [];
+  for (const req of (data ?? []) as (ApprovableRequest & { stage?: string; charge_id: string })[]) {
+    if (req.stage === "With cashier" || !PAY_FIRST_REQUESTS.includes(req.request_type)) continue;
+    const due = await chargeCollection(admin, req.enrollment_id, req.charge_id);
+    if (!due.paid) continue;
+    try {
+      await applyApprovedRequest(admin, req, actor, "Implemented automatically once paid");
+      await admin.from("enrollment_charges").update({ valid: true, approval_status: "Approved", decided_by: actor, decided_at: new Date().toISOString() }).eq("id", req.charge_id).eq("approval_status", "Pending");
+      await admin.from("enrollment_requests").update({ status: "Approved", decided_at: new Date().toISOString(), decision_remarks: "Implemented automatically once paid", assigned_approver_id: actor }).eq("id", req.id);
+      await admin.from("request_events").insert({ request_id: req.id, actor_id: actor, event_type: "approved", remarks: "Implemented automatically once paid" });
+      implemented.push(req.id);
+    } catch (e) {
+      console.error("Automatic request implementation failed:", req.id, e instanceof Error ? e.message : e);
+    }
+  }
+  return implemented;
+}
+
 /**
  * Invite the trainee's email to the course's Google Classroom class, when New
  * Wave has connected Classroom and linked the course to a class. Best-effort:
@@ -948,34 +1011,8 @@ export async function POST(request: Request) {
         if (!due.paid) return NextResponse.json({ error: `The ${req.request_type === "Rescheduling" ? "reschedule" : "change of course"} fee is not paid yet (₱${(due.collected / 100).toFixed(2)} of ₱${(due.amount / 100).toFixed(2)} collected). Approve it once the trainee pays the Cashier.` }, { status: 400 });
       }
       if (input.approve) {
-        const rv = (req.requested_values ?? {}) as { batchId?: string; amountCentavos?: number; paymentId?: string; courseId?: string; partnerOfferId?: string };
-        if (req.request_type === "Rescheduling") {
-          await applyReschedule(admin, req.enrollment_id, rv.batchId ?? null);
-        } else if (req.request_type === "Change Course") {
-          await applyCourseChange(admin, req.enrollment_id, rv.courseId ?? "", rv.partnerOfferId ?? null);
-        } else if (req.request_type === "Cancellation") {
-          const { error } = await admin.from("enrollments").update({ enrollment_status: "Cancelled", cancelled_at: new Date().toISOString() }).eq("id", req.enrollment_id);
-          if (error) throw error;
-        } else if (req.request_type === "Refund") {
-          const { error } = await admin.from("refunds_and_reversals").insert({ enrollment_id: req.enrollment_id, payment_id: rv.paymentId ?? null, event_type: "refund", amount_centavos: rv.amountCentavos ?? 0, reason: input.remarks ?? "Approved refund request", approved_request_id: req.id, created_by: staff.user.id });
-          if (error) throw error;
-        } else if (req.request_type === "Make-up Class") {
-          // Requires migration 202608020003 (nullable original_attendance_record_id). Best-effort so
-          // approval still records before the column is nullable; Training Ops completes the assignment.
-          const { error } = await admin.from("make_up_assignments").insert({ enrollment_id: req.enrollment_id, status: "Pending", assigned_by: staff.user.id });
-          if (error) console.error("Make-up assignment insert failed (apply migration 202608020003):", error.message);
-        } else if (req.request_type === "Reprinting") {
-          // Bump the certificate's reprint count so the reprint is tracked; best-effort (no cert yet is fine).
-          const { data: cert } = await admin.from("certificates").select("id,reprint_count").eq("enrollment_id", req.enrollment_id).maybeSingle();
-          if (cert) await admin.from("certificates").update({ reprint_count: Number(cert.reprint_count ?? 0) + 1, status: "Printed" }).eq("id", cert.id);
-        } else if (req.request_type === "TAR reprint") {
-          // One more print of the newest admission record that covers this enrollment.
-          const { data: record, error: recordError } = await admin.from("admission_records").select("id,reprints_approved").contains("enrollment_ids", [req.enrollment_id]).order("issued_at", { ascending: false }).limit(1).maybeSingle();
-          if (recordError) throw recordError;
-          if (!record) return NextResponse.json({ error: "No admission record has been printed for this enrollment yet." }, { status: 400 });
-          const { error } = await admin.from("admission_records").update({ reprints_approved: Number(record.reprints_approved ?? 0) + 1 }).eq("id", record.id);
-          if (error) throw error;
-        }
+        try { await applyApprovedRequest(admin, req, staff.user.id, input.remarks ?? null); }
+        catch (e) { if (e instanceof RequestNotApplicable) return NextResponse.json({ error: e.message }, { status: 400 }); throw e; }
       }
       if (req.charge_id) {
         const { error: chargeError } = await admin.from("enrollment_charges").update({ valid: input.approve, approval_status: input.approve ? "Approved" : "Rejected", decided_by: staff.user.id, decided_at: new Date().toISOString() }).eq("id", req.charge_id).eq("approval_status", "Pending");
@@ -1655,7 +1692,8 @@ export async function POST(request: Request) {
       }
       await autoSendInstructions(admin, ids);
       const enrolled = await tryAutoEnroll(admin, ids, staff.user.id);
-      return NextResponse.json({ ok: true, enrolled, payment: posted });
+      const implemented = await autoImplementPaidRequests(admin, ids, staff.user.id);
+      return NextResponse.json({ ok: true, enrolled, implemented, payment: posted });
     }
     if (input.action === "enrollment-delete") {
       if (!staff.roleCodes.includes("admin")) return NextResponse.json({ error: "Only Admin can delete enrollments." }, { status: 403 });
@@ -1896,7 +1934,8 @@ export async function POST(request: Request) {
     if (error) throw error;
     await autoSendInstructions(admin, [input.enrollmentId]);
     const enrolled = await tryAutoEnroll(admin, [input.enrollmentId], staff.user.id);
-    return NextResponse.json({ ok: true, payment: data, enrolled });
+    const implemented = await autoImplementPaidRequests(admin, [input.enrollmentId], staff.user.id);
+    return NextResponse.json({ ok: true, payment: data, enrolled, implemented });
   } catch (error) {
     // Zod validation errors: report the specific field problems, not the raw JSON dump.
     if (error instanceof z.ZodError) {
