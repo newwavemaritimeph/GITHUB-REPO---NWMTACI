@@ -147,15 +147,15 @@ function Wizard() {
     return (
       <div className="reg-card reg-success">
         <span className="success-mark">✓</span>
-        <h2>Enrollment received</h2>
-        <p>Keep this reference. Use it with your registered email or mobile number to track your enrollment.</p>
+        <h2>Application received</h2>
+        <p>Your seat is reserved while we screen your application. You are enrolled once your requirements and payment are verified. Keep this reference to track your application with your registered email or mobile number.</p>
         <div className="reference-block"><span>Registration reference</span><strong>{reference}</strong></div>
 
         <div className="reg-next-steps" style={{ textAlign: "left", marginTop: 20 }}>
           <h3 style={{ margin: "0 0 8px", color: "#123F63" }}>Next steps</h3>
           <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 1.6 }}>
             <li><strong>Screenshot this confirmation</strong> (with your registration reference).</li>
-            <li>Send the screenshot together with a <strong>valid ID</strong> to our official Facebook page{" "}
+            <li>Send the screenshot with your requirements — a <strong>valid ID or passport</strong>, your <strong>seaman&apos;s book (SIRB) or SRN</strong>, and your <strong>medical certificate</strong> — to our official Facebook page{" "}
               <a href="https://web.facebook.com/newwavemtc" target="_blank" rel="noopener noreferrer">facebook.com/newwavemtc</a>{" "}
               or email <a href="mailto:newwavemaritime@gmail.com">newwavemaritime@gmail.com</a>.</li>
             <li>Settle your training fee through an official payment channel below, then send the payment screenshot for verification.</li>

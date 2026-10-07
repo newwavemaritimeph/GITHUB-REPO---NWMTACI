@@ -930,17 +930,51 @@
 .reg-kpis button { background: #fff; border: 1px solid #e3ecf0; border-radius: 12px; padding: 14px; text-align: left; font: inherit; cursor: pointer; box-shadow: var(--shadow-sm); }
 .reg-kpis button:hover { border-color: #f25615; }
 .reg-kpis button i { font-style: normal; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; background: #eef5f9; color: #0571d0; font-size: 15px; margin-bottom: 8px; }
-.reg-kpis button span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); font-weight: 700; }
+.reg-kpis button span { display: block; font-size: 13px; color: var(--muted); font-weight: 600; }
 .reg-kpis button strong { display: block; font-size: 26px; line-height: 1.15; }
-.reg-kpis button small { color: #0571d0; font-size: 11.5px; font-weight: 700; }
+.reg-kpis button small { color: var(--muted); font-size: 12.5px; font-weight: 500; }
 
 .reg-main { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 14px; margin-top: 16px; align-items: start; }
 .avatar { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #e8f2ff; color: #0571d0; font-size: 10.5px; font-weight: 700; vertical-align: middle; }
-.quick-menu { position: absolute; top: 46px; right: 190px; z-index: 30; background: #fff; border: 1px solid #dbe7ec; border-radius: 10px; box-shadow: 0 10px 26px rgba(18,63,99,.14); padding: 6px; min-width: 190px; }
-.quick-menu button { display: block; width: 100%; text-align: left; background: none; border: 0; font: inherit; font-size: 13px; padding: 9px 12px; border-radius: 7px; cursor: pointer; color: var(--ink); }
-.quick-menu button:hover { background: #f4f9fc; }
 @media (max-width: 1200px) { .reg-kpis { grid-template-columns: repeat(3, 1fr); } .reg-main { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .reg-kpis { grid-template-columns: repeat(2, 1fr); } }
+
+/* Registration dashboard (simplified Oct 2026): four tiles, four panels. */
+.reg-kpis.rd-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.reg-kpis.rd-4 button { padding: 16px 18px; transition: border-color .15s, transform .15s; }
+.reg-kpis.rd-4 button:hover { transform: translateY(-1px); }
+.reg-kpis.rd-4 button strong { font-size: 30px; color: var(--blue-dark); margin: 2px 0; }
+.rd-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.rd-panel { padding: 18px 20px; scroll-margin-top: 84px; }
+.rd-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 6px; border: 0; border-top: 1px solid #edf2f4; background: none; font: inherit; text-align: left; color: var(--ink); }
+button.rd-row { cursor: pointer; border-radius: 0; }
+button.rd-row:hover { background: #f6fafc; }
+.rd-main { flex: 1; min-width: 0; }
+.rd-main strong { display: block; font-size: 14.5px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rd-main small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rd-time { color: var(--muted); font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rd-tag { font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: #eef3f6; color: var(--ink-soft); white-space: nowrap; }
+.rd-tag.web { background: #e8f2ff; color: var(--blue-text); }
+.rd-group { display: flex; align-items: baseline; gap: 8px; padding: 14px 6px 6px; font-size: 13px; color: var(--muted); min-width: 0; }
+.rd-group span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rd-group b { color: var(--blue-dark); font-size: 13.5px; white-space: nowrap; }
+.rd-group em { margin-left: auto; font-style: normal; font-weight: 600; color: var(--ink-soft); white-space: nowrap; }
+.rd-dot { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); white-space: nowrap; }
+.rd-dot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: #0a7d3b; }
+.rd-dot.warn { color: var(--orange-text); }
+.rd-dot.warn::before { background: var(--orange-fill); }
+.rd-slot { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px; align-items: center; padding: 12px 6px; border-top: 1px solid #edf2f4; }
+.rd-seat { display: block; min-width: 0; }
+.rd-seat > span:first-child { display: block; font-size: 13px; color: var(--ink-soft); }
+.rd-meter { display: block; height: 6px; border-radius: 99px; background: #e3ecf0; margin: 6px 0 4px; overflow: hidden; }
+.rd-meter i { display: block; height: 100%; background: var(--blue); border-radius: inherit; }
+.rd-meter i.low { background: var(--orange-fill); }
+.rd-seat small { display: block; font-size: 12px; color: var(--muted); }
+.rd-more { margin-top: 8px; }
+.rd-empty { color: var(--muted); font-size: 14px; padding: 18px 6px; margin: 0; border-top: 1px solid #edf2f4; }
+@media (max-width: 980px) { .rd-grid { grid-template-columns: 1fr; } }
+@media (max-width: 900px) { .reg-kpis.rd-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .rd-slot { grid-template-columns: 1fr; gap: 8px; } .reg-kpis.rd-4 button strong { font-size: 24px; } }
 
 /* Placeholder shown by RebuildingWorkspace for a role whose modules are being
    rebuilt. .portal-empty-copy is forced to 10px/24px padding in globals.css,
@@ -948,3 +982,33 @@
 .portal-empty { text-align: center; padding: 64px 24px; }
 .portal-empty h2 { margin: 0 0 8px; font-size: 20px; color: var(--blue-dark); }
 .portal-empty .portal-empty-copy { font-size: 14px; max-width: 520px; margin: 0 auto; padding: 0 !important; }
+
+/* Registration: Trainees & enrollments switch and application screening. */
+.rr-switch { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin: 0 0 14px; background: #fff; border: 1px solid #dbe7ec; border-radius: 12px; }
+.rr-switch button { display: inline-flex; align-items: center; gap: 8px; border: 0; background: none; font: inherit; font-size: 14px; font-weight: 600; color: var(--ink-soft); padding: 8px 14px; border-radius: 9px; cursor: pointer; }
+.rr-switch button:hover { background: #f2f7fa; }
+.rr-switch button.active { background: var(--blue-dark); color: #fff; }
+.rr-switch small { font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: #eef3f6; color: var(--ink-soft); }
+.rr-switch button.active small { background: rgba(255, 255, 255, .18); color: #fff; }
+.req-count { display: inline-block; font-weight: 600; color: var(--orange-text); }
+.req-count.ok { color: #0a7d3b; }
+.muted-text { color: var(--muted); }
+.screen-box { border: 1px solid #dbe7ec; border-radius: 12px; padding: 14px 16px; background: #fbfdfe; }
+.screen-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.screen-head strong { display: block; font-size: 15px; color: var(--blue-dark); }
+.screen-head small { display: block; color: var(--muted); font-size: 13px; margin-top: 2px; }
+.req-list { list-style: none; margin: 10px 0 0; padding: 0; }
+.req-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 10px 0; border-top: 1px solid #edf2f4; }
+.req-dot { flex: none; width: 10px; height: 10px; border-radius: 50%; background: #c9d6dd; }
+.req-dot.ok { background: #0a7d3b; }
+.req-dot.bad { background: var(--orange-fill); }
+.req-main { flex: 1; min-width: 180px; }
+.req-main strong { display: block; font-size: 14px; font-weight: 600; color: var(--ink); }
+.req-main small { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.req-actions { display: inline-flex; gap: 6px; }
+.req-actions button { padding: 6px 12px; font-size: 13px; }
+.req-reject { display: flex; gap: 8px; flex-basis: 100%; padding-left: 22px; }
+.req-reject input { flex: 1; min-width: 0; }
+.screen-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 12px; border-top: 1px solid #edf2f4; }
+.screen-foot small { color: var(--ink-soft); font-size: 13px; }
+@media (max-width: 560px) { .req-reject { padding-left: 0; } .screen-foot .portal-primary { width: 100%; } }

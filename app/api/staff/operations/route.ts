@@ -136,15 +136,21 @@ const centerSaveInput = z.object({ action: z.literal("center-save"), id: z.strin
 const paymentSplitInput = z.object({ action: z.literal("payment-split"), allocations: z.array(z.object({ enrollmentId: z.string().uuid(), amountCentavos: z.number().int().positive() })).min(1).max(10), method: z.string().trim().min(1).max(80), receivingAccount: z.string().trim().min(2).max(120), referenceNumber: z.string().trim().max(80).optional().default(""), receivedAt: z.string().datetime({ offset: true }), remarks: z.string().trim().max(500).optional().default("") });
 const courseChangeInput = z.object({ action: z.literal("enrollment-course-change"), enrollmentId: z.string().uuid(), courseId: z.string().uuid(), partnerOfferId: z.string().uuid().nullable().optional() });
 const rescheduleInput = z.object({ action: z.literal("enrollment-reschedule"), enrollmentId: z.string().uuid(), batchId: z.string().uuid().nullable() });
+// Screening a website application (owner instruction, 7 Oct 2026): a staff
+// checklist of three requirements, then enrollment once a verified payment exists.
+const REQUIREMENT_CODES = ["valid_id", "seamans_book", "medical_certificate"] as const;
+const requirementCheckInput = z.object({ action: z.literal("requirement-check"), enrollmentId: z.string().uuid(), requirement: z.enum(REQUIREMENT_CODES), status: z.enum(["Verified", "Rejected"]), remarks: z.string().trim().max(500).optional() });
+const applicationEnrollInput = z.object({ action: z.literal("application-enroll"), enrollmentId: z.string().uuid() });
 const sendInstructionsInput = z.object({ action: z.literal("send-instructions"), enrollmentId: z.string().uuid() });
 const instructionTemplateSaveInput = z.object({ action: z.literal("instruction-template-save"), courseId: z.string().uuid(), subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(8000) });
 const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-link-save"), courseId: z.string().uuid(), link: z.string().trim().max(500) });
 const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional(), courseId: z.string().uuid().nullable().optional(), partnerOfferId: z.string().uuid().nullable().optional() });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [requirementCheckInput, applicationEnrollInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
+const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
 const canManageHr = (roles: string[]) => roles.some((role) => ["admin", "hr"].includes(role));
 // Employee-charge management: the Accounting Manager owns it; admin + HR (who run payroll) included.
@@ -457,9 +463,31 @@ export async function GET() {
   const ALLOCATION_CHUNK = 100;
   const idChunks: string[][] = [];
   for (let i = 0; i < enrollmentRows.length; i += ALLOCATION_CHUNK) idChunks.push(enrollmentRows.slice(i, i + ALLOCATION_CHUNK).map((row) => row.id));
-  const allocationChunks = await Promise.all(idChunks.map((ids) => db.from("payment_allocations").select("enrollment_id,amount_centavos").in("enrollment_id", ids)));
+  // verified_paid_centavos counts only Verified, valid payments: the screening
+  // rule for enrolling a website application.
+  const verifiedPaidByEnrollment = new Map<string, number>();
+  type AllocationPayment = { verification_state: string; valid: boolean };
+  const allocationChunks = await Promise.all(idChunks.map((ids) => db.from("payment_allocations").select("enrollment_id,amount_centavos,payments(verification_state,valid)").in("enrollment_id", ids)));
   for (const chunk of allocationChunks) {
-    for (const allocation of chunk.data ?? []) paidByEnrollment.set(allocation.enrollment_id, (paidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
+    for (const allocation of chunk.data ?? []) {
+      paidByEnrollment.set(allocation.enrollment_id, (paidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
+      const payment = first(allocation.payments as AllocationPayment | AllocationPayment[] | null);
+      if (payment?.verification_state === "Verified" && payment.valid) verifiedPaidByEnrollment.set(allocation.enrollment_id, (verifiedPaidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
+    }
+  }
+
+  // Latest requirement check per (enrollment, requirement). A missing table
+  // (migration 202610070001 not yet applied) just yields no checks.
+  const requirementChecks: { enrollment_id: string; requirement: string; status: string; remarks: string | null; checked_at: string; checked_by_name: string | null }[] = [];
+  const checkChunks = await Promise.all(idChunks.map((ids) => db.from("enrollment_requirement_checks").select("enrollment_id,requirement,status,remarks,checked_at,profiles(complete_name)").in("enrollment_id", ids).order("checked_at", { ascending: false })));
+  const seenChecks = new Set<string>();
+  for (const chunk of checkChunks) {
+    for (const check of chunk.data ?? []) {
+      const key = `${check.enrollment_id}|${check.requirement}`;
+      if (seenChecks.has(key)) continue;
+      seenChecks.add(key);
+      requirementChecks.push({ enrollment_id: check.enrollment_id, requirement: check.requirement, status: check.status, remarks: check.remarks, checked_at: check.checked_at, checked_by_name: first(check.profiles as { complete_name: string } | { complete_name: string }[] | null)?.complete_name ?? null });
+    }
   }
 
   const chargesByEnrollment = new Map<string, number>();
@@ -476,6 +504,7 @@ export async function GET() {
       scheduled_on: extra?.scheduled_on ?? null,
       instructions_sent_at: extra?.instructions_sent_at ?? null,
       paid_centavos: paidByEnrollment.get(row.id) ?? 0,
+      verified_paid_centavos: verifiedPaidByEnrollment.get(row.id) ?? 0,
       charges_centavos: chargesByEnrollment.get(row.id) ?? 0,
       discounts_centavos: discountsByEnrollment.get(row.id) ?? 0,
       feedback_token: extra?.feedback_token ?? null,
@@ -498,7 +527,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -729,6 +758,28 @@ export async function POST(request: Request) {
       const { error } = await admin.from("courses").update({ google_classroom_link: input.link || null }).eq("id", input.courseId);
       if (error) throw error;
       return NextResponse.json({ ok: true });
+    }
+    if (input.action === "requirement-check") {
+      if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot screen applications." }, { status: 403 });
+      if (input.status === "Rejected" && !input.remarks) return NextResponse.json({ error: "Enter the reason for rejecting this requirement." }, { status: 400 });
+      const admin = createSupabaseAdminClient();
+      const { data: enrollment, error: findError } = await admin.from("enrollments").select("id,enrollment_status").eq("id", input.enrollmentId).maybeSingle();
+      if (findError) throw findError;
+      if (!enrollment) return NextResponse.json({ error: "Application not found." }, { status: 404 });
+      if (enrollment.enrollment_status !== "Pending") return NextResponse.json({ error: "Only a Pending application can be screened." }, { status: 400 });
+      const row = { enrollment_id: input.enrollmentId, requirement: input.requirement, status: input.status, remarks: input.remarks || null, checked_by: staff.user.id };
+      const { data: check, error } = await admin.from("enrollment_requirement_checks").insert(row).select("id,checked_at").single();
+      if (error) throw error;
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "registration", action: "application.requirement_checked", record_type: "enrollment", record_id: input.enrollmentId, new_values: { ...row, id: check.id, checked_at: check.checked_at } });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "application-enroll") {
+      if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot enroll applications." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      // The database re-checks every rule (requirements verified, a verified payment).
+      const { data, error } = await admin.rpc("enroll_screened_application", { target_enrollment: input.enrollmentId, actor: staff.user.id });
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      return NextResponse.json({ ok: true, enrollment: data });
     }
     if (input.action === "send-instructions") {
       if (!staff.roleCodes.some((r) => ["admin", "registration", "training_operations"].includes(r))) return NextResponse.json({ error: "Your account cannot send training instructions." }, { status: 403 });

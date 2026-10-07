@@ -22,6 +22,8 @@ export async function POST(request: Request) {
     }
     const enrollment = Array.isArray(data?.enrollments) ? data.enrollments[0] : data?.enrollments;
     const reference = data?.registration_reference ?? (typeof form.reference === "string" ? form.reference : "—");
-    return NextResponse.json(data ? { reference, status: enrollment?.enrollment_status ?? data.account_state, nextStep: data.profile_id ? "Sign in to your trainee account for full details." : "Check your email for the account activation link." } : { reference, status: "Not found", nextStep: "Check the details you entered." }, { status: data ? 200 : 404 });
+    // A Pending enrollment is a website application still being screened.
+    const screening = enrollment?.enrollment_status === "Pending";
+    return NextResponse.json(data ? { reference, status: screening ? "Application under screening" : enrollment?.enrollment_status ?? data.account_state, nextStep: screening ? "Send your valid ID or passport, seaman's book or SRN, medical certificate and payment screenshot. You are enrolled once these are verified." : data.profile_id ? "Sign in to your trainee account for full details." : "Check your email for the account activation link." } : { reference, status: "Not found", nextStep: "Check the details you entered." }, { status: data ? 200 : 404 });
   } catch (error) { return NextResponse.json({ error: error instanceof Error && error.message === "RATE_LIMITED" ? "Too many attempts." : "Invalid search details." }, { status: 400 }); }
 }

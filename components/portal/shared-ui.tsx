@@ -26,6 +26,11 @@ export function Modal({ title, children, onClose, wide }: { title: string; child
   </div>;
 }
 
+/** A screen's page frame. Embedded inside another screen it drops its own frame and heading. */
+export function Page({ embedded, head, children }: { embedded?: boolean; head: ReactNode; children: ReactNode }) {
+  return embedded ? <>{children}</> : <div className="portal-page">{head}{children}</div>;
+}
+
 export function PageHead({ eyebrow, title, text, action, onAction }: { eyebrow: string; title: string; text: string; action?: string; onAction?: () => void }) {
   return <div className="portal-heading"><div><span className="portal-eyebrow">{eyebrow}</span><h1>{title}</h1><p>{text}</p></div>{action && <button className="portal-primary" onClick={onAction}>{action}</button>}</div>;
 }
