@@ -212,6 +212,38 @@ const inFilter = (f: (typeof APP_FILTERS)[number], r: ReturnType<typeof applicat
 
 const NO_BATCH = "none";
 
+const tileMonth = (iso: string) => new Intl.DateTimeFormat("en-PH", { month: "short", timeZone: "Asia/Manila" }).format(new Date(`${iso}T00:00:00+08:00`)).toUpperCase();
+const weekdayOf = (iso: string) => new Intl.DateTimeFormat("en-PH", { weekday: "short", timeZone: "Asia/Manila" }).format(new Date(`${iso}T00:00:00+08:00`));
+const closesAt = (iso: string) => new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso));
+
+/**
+ * Batch cards ("Schedule picker" design 01): a date tile, the day pattern and
+ * dates, batch number with room and instructor, and a seat meter that turns
+ * orange when nearly full. The "No batch yet" card is optional.
+ */
+export function BatchCards({ data, batches, selected, onSelect, allowNone }: { data: PortalData; batches: Batch[]; selected: string; onSelect: (id: string) => void; allowNone?: boolean }) {
+  const staffing = new Map((data.batchStaffing ?? []).map((x) => [x.batch_id, x]));
+  return <div className="bc-list" role="radiogroup" aria-label="Batch">
+    <div className="bc-head"><b>Choose a batch</b><span>{batches.length ? `${batches.length} open · 24 seats each` : "No open batch for this course yet"}</span></div>
+    {batches.map((x) => {
+      const left = seatsLeft(x), on = selected === x.id, low = left <= 3, st = staffing.get(x.id);
+      const days = x.starts_on === x.ends_on ? weekdayOf(x.starts_on) : `${weekdayOf(x.starts_on)}–${weekdayOf(x.ends_on)}`;
+      return <button type="button" role="radio" aria-checked={on} key={x.id} className={`bc-card${on ? " on" : ""}`} onClick={() => onSelect(x.id)}>
+        <span className="bc-radio" aria-hidden="true" />
+        <span className="bc-tile"><small>{tileMonth(x.starts_on)}</small><b>{Number(x.starts_on.slice(8, 10))}</b></span>
+        <span className="bc-main"><b>{days} · {dateRange(x.starts_on, x.ends_on)}</b><small>{x.batch_number} · {st?.room_name ?? x.venue ?? "Room not set"} · {st?.instructor_name ?? "Instructor not assigned"}</small></span>
+        <span className="bc-seats"><span><b className={low ? "low" : ""}>{left} of {x.capacity} left</b><small>{closesAt(x.enrollment_deadline)}</small></span><span className="bc-meter"><i className={low ? "low" : ""} style={{ width: `${Math.round(((x.capacity - left) / Math.max(1, x.capacity)) * 100)}%` }} /></span></span>
+      </button>;
+    })}
+    {allowNone && <button type="button" role="radio" aria-checked={selected === NO_BATCH} className={`bc-card bc-none${selected === NO_BATCH ? " on" : ""}`} onClick={() => onSelect(NO_BATCH)}>
+      <span className="bc-radio" aria-hidden="true" />
+      <span className="bc-main"><b>No batch yet — place later</b><small>{batches.length ? "Screen and take payment now; choose the batch from the application later." : "Screen and take payment now; place on a batch once one opens."}</small></span>
+    </button>}
+  </div>;
+}
+/** One-line summary of the chosen batch, shown beside the confirm button. */
+const batchSummary = (data: PortalData, b: Batch | undefined) => b ? `${dateRange(b.starts_on, b.ends_on)} · ${b.batch_number} · ${seatsLeft(b)} seats left` : "";
+
 /**
  * Assign a New Wave course to an applicant (course now, batch later). Any active
  * in-house course can be chosen; open batches for it are offered, and "No batch
@@ -235,12 +267,8 @@ export function AssignCourseModal({ data, trainee, reload, onClose }: { data: Po
         <optgroup label="STCW courses">{courses.filter(isStcwCourse).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name} · {pesos(c.standard_price_centavos)}</option>)}</optgroup>
         <optgroup label="Other courses">{courses.filter((c) => !isStcwCourse(c)).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name} · {pesos(c.standard_price_centavos)}</option>)}</optgroup>
       </select></label>
-      {course && <div className="full">
-        <small style={{ color: "var(--muted)", fontWeight: 700 }}>Batch · fee {pesos(course.standard_price_centavos)}</small>
-        {batches.map((x) => <label key={x.id} className="assign-batch"><input type="radio" name="batch" checked={batchId === x.id} onChange={() => setBatchId(x.id)} /><span><strong>{dateRange(x.starts_on, x.ends_on)} · {x.batch_number}</strong><small>{seatsLeft(x)} of {x.capacity} seats left · closes {fmtShort(day(x.enrollment_deadline))}{x.venue ? ` · ${x.venue}` : ""}</small></span></label>)}
-        <label className="assign-batch"><input type="radio" name="batch" checked={!withBatch} onChange={() => setBatchId(NO_BATCH)} /><span><strong>No batch yet — place later</strong><small>{batches.length ? "Screen and take payment now; choose the batch from the application later." : "No batch is open for this course yet. Screen and take payment now; place on a batch once one opens."}</small></span></label>
-      </div>}
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!courseId || busy} onClick={assign}>{busy ? "Assigning…" : withBatch ? "Assign course & batch" : "Assign course"}</button></div>
+      {course && <div className="full"><BatchCards data={data} batches={batches} selected={batchId} onSelect={setBatchId} allowNone /></div>}
+      <div className="bc-foot full"><span>{course ? (withBatch ? batchSummary(data, batches.find((x) => x.id === batchId)) : `${course.code} · fee ${pesos(course.standard_price_centavos)} · no batch yet`) : "Choose a course first."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!courseId || busy} onClick={assign}>{busy ? "Assigning…" : withBatch ? "Assign course & batch" : "Assign course"}</button></span></div>
     </div>
   </Modal>;
 }
@@ -255,9 +283,9 @@ function ChooseBatchModal({ data, enrollment, reload, onClose }: { data: PortalD
   return <Modal title={`Choose batch · ${first(enrollment.courses)?.name ?? "Course"}`} onClose={onClose}>
     <div className="portal-form">
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
-      <div className="full">{batches.map((x) => <label key={x.id} className="assign-batch"><input type="radio" name="batch" checked={batchId === x.id} onChange={() => setBatchId(x.id)} /><span><strong>{dateRange(x.starts_on, x.ends_on)} · {x.batch_number}</strong><small>{seatsLeft(x)} of {x.capacity} seats left · closes {fmtShort(day(x.enrollment_deadline))}{x.venue ? ` · ${x.venue}` : ""}</small></span></label>)}</div>
-      {!batches.length && <p className="portal-form-note full">No open batch for this course yet. The application stays ready; place it once a batch opens.</p>}
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!batchId || busy} onClick={place}>{busy ? "Placing…" : "Place on batch"}</button></div>
+      <div className="full"><BatchCards data={data} batches={batches} selected={batchId} onSelect={setBatchId} /></div>
+      {!batches.length && <p className="portal-form-note full">The application stays ready; place it once a batch opens.</p>}
+      <div className="bc-foot full"><span>{batchSummary(data, batches.find((x) => x.id === batchId)) || "Choose a batch."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!batchId || busy} onClick={place}>{busy ? "Placing…" : "Place on batch"}</button></span></div>
     </div>
   </Modal>;
 }
