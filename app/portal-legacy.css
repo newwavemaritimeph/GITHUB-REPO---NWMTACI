@@ -1269,3 +1269,15 @@ button.rd-row:hover { background: #f6fafc; }
 .bc-foot > span:first-child { font-size: 13px; color: var(--ink-soft); font-weight: 600; }
 .bc-foot-actions { display: inline-flex; gap: 8px; }
 @media (max-width: 640px) { .bc-card { grid-template-columns: auto 52px minmax(0, 1fr); } .bc-seats { grid-column: 2 / -1; } .bc-foot-actions { width: 100%; } .bc-foot-actions button { flex: 1; } }
+/* Trainee details: inner padding, portal heading font, courses list. */
+.td-wrap { padding: 18px 24px 22px; }
+.td-wrap .td-card h4 { font-family: var(--font-portal), var(--font-ui), sans-serif; font-weight: 700; }
+.td-wrap .portal-form-actions { padding: 0; }
+.td-stack { display: grid; gap: 14px; }
+.td-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.td-card-head h4 { margin: 0; }
+.td-course { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 9px 10px; margin-top: 6px; border: 1px solid #e3eaf3; border-radius: 12px; background: #fff; font: inherit; text-align: left; color: var(--ink); cursor: pointer; }
+.td-course:hover:not(:disabled) { border-color: #0571d0; background: #f6faff; }
+.td-course:disabled { cursor: default; }
+.td-course b { display: block; font-size: 14px; }
+.td-course small { display: block; margin-top: 2px; font-size: 12.5px; color: var(--muted); }
