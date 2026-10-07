@@ -161,7 +161,7 @@ export function InstructorAssignment({ data, onEdit }: { data: SchedulingData; o
   return <div className="portal-page">
     <div className="portal-heading"><div><span className="portal-eyebrow">Training operations</span><h1>Instructor assignment</h1><p>Who teaches each upcoming batch, and where. Edit a batch to assign or change.</p></div></div>
     <div className="portal-table portal-panel"><table><thead><tr><th>Schedule</th><th>Course</th><th>Instructor</th><th>Room / venue</th><th>Seats</th><th>Actions</th></tr></thead><tbody>
-      {rows.map((b) => { const s = staffing.get(b.id); return <tr key={b.id}><td><strong>{fmtDate(b.starts_on)}</strong><small>{b.batch_number}</small></td><td>{courseOf(b)}</td><td>{s?.instructor_name ?? <span className="portal-badge cancelled">Not assigned</span>}</td><td>{s?.room_name ?? b.venue ?? b.mode}</td><td>{b.confirmed_count}/{b.capacity}</td><td className="document-actions"><button type="button" onClick={() => onEdit(b.id)}>Assign / edit</button></td></tr>; })}
+      {rows.map((b) => { const s = staffing.get(b.id); return <tr key={b.id}><td><strong>{fmtDate(b.starts_on)}</strong><small>{b.batch_number}</small></td><td>{courseOf(b)}</td><td>{s?.instructor_name ?? <span className="portal-badge cancelled">Not assigned</span>}</td><td>{s?.room_name ?? b.venue ?? b.mode}</td><td>{b.confirmed_count}/{b.capacity}</td><td className="document-actions"><button type="button" onClick={() => onEdit(b.id)}>Assign / Edit</button></td></tr>; })}
     </tbody></table>{!rows.length && <p className="portal-empty-copy">No upcoming batches.</p>}</div>
   </div>;
 }
@@ -223,7 +223,7 @@ export function AdminDashboard({ data, go, openEnrollment }: { data: SchedulingD
   ];
   const meterTone = (b: { confirmed_count: number; capacity: number }) => (b.confirmed_count >= b.capacity ? "#a52020" : b.confirmed_count >= b.capacity * 0.9 ? "#b45309" : "#0571d0");
   return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Live operations</span><h1>Admin dashboard</h1><p>{fmtDate(d.today)} · Daily operations overview</p></div><span style={{ display: "inline-flex", gap: 10 }}><button type="button" className="portal-secondary" onClick={() => go("Search trainee")}>Search trainee</button><button type="button" className="portal-primary" onClick={openEnrollment}>+ New enrollment</button></span></div>
+    <div className="portal-heading"><div><span className="portal-eyebrow">Live operations</span><h1>Admin dashboard</h1><p>{fmtDate(d.today)} · Daily operations overview</p></div><span style={{ display: "inline-flex", gap: 10 }}><button type="button" className="portal-secondary" onClick={() => go("Search trainee")}>Search Trainee</button><button type="button" className="portal-primary" onClick={openEnrollment}>+ New enrollment</button></span></div>
     <div className="metric-grid compact-metrics">
       <article><span>Trainees today</span><strong>{traineesToday}</strong><small>Across {d.todays.length} class{d.todays.length === 1 ? "" : "es"}</small></article>
       <article><span>New enrollments</span><strong>{newToday}</strong><small>Today</small></article>
@@ -243,7 +243,7 @@ export function AdminDashboard({ data, go, openEnrollment }: { data: SchedulingD
         {!visibleNeeds.length && <p className="portal-empty-copy">All clear — nothing needs action.</p>}
       </section>
       <section className="portal-panel live-list">
-        <div className="panel-heading"><div><h2>Recent enrollments</h2><p>Latest trainee registrations</p></div><button type="button" className="ghost-button" onClick={() => go("Enrollments")}>View all</button></div>
+        <div className="panel-heading"><div><h2>Recent enrollments</h2><p>Latest trainee registrations</p></div><button type="button" className="ghost-button" onClick={() => go("Enrollments")}>View All</button></div>
         {recent.map((e) => { const t = first(e.trainees); const c = first(e.courses); const ch = chip(e as SchedulingData["enrollments"][number] & { trainee_id?: string }); return <div className="live-row-item" key={e.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : e.enrollment_number}</strong><small>{c?.code ?? ""} · {manilaDay(e.created_at)}</small></div><Chip cls={ch.cls}>{ch.text}</Chip></div>; })}
         {!recent.length && <p className="portal-empty-copy">No enrollments yet.</p>}
       </section>

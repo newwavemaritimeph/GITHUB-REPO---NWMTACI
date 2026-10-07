@@ -214,7 +214,7 @@ function Wizard() {
     const copy = () => { void navigator.clipboard?.writeText(message).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => undefined); };
     return (
       <div className="op-page">
-        <div className="op-heading"><span className="op-check" aria-hidden="true">✓</span><h2>Application received</h2><p>Screenshot the card below and send it with your valid ID to our Facebook page.</p></div>
+        <div className="op-heading"><span className="op-check" aria-hidden="true">✓</span><h2>Application Received</h2><p>Screenshot the card below and send it with your valid ID to our Facebook page.</p></div>
         <div className="op-layout">
           <div>
             <article className="op-pass" aria-label="Application acknowledgment">
@@ -247,22 +247,22 @@ function Wizard() {
             </article>
             <div className="op-actions">
               <a className="op-fb" href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer">Send on Facebook</a>
-              <button type="button" className="button button-secondary" onClick={() => window.print()}>Print or save</button>
+              <button type="button" className="button button-secondary" onClick={() => window.print()}>Print or Save</button>
             </div>
           </div>
           <div className="op-side">
             <section className="op-panel">
-              <h3>Send to our Facebook page</h3>
+              <h3>Send to Our Facebook Page</h3>
               <p>Message <strong>facebook.com/newwavemtc</strong> with your screenshot and a photo of your valid ID. Copy this message:</p>
               <div className="op-message"><span>{message}</span><button type="button" onClick={copy}>{copied ? "Copied" : "Copy"}</button></div>
-              <a className="op-fb small" href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer">Open Facebook page</a>
+              <a className="op-fb small" href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer">Open Facebook Page</a>
             </section>
             <section className="op-panel">
-              <h3>Contact details</h3>
+              <h3>Contact Details</h3>
               <p>{OFFICE.address}<br />Mobile: {OFFICE.mobile} · Telephone: {OFFICE.telephone}<br />Email: <span className="lc">{OFFICE.email}</span><br />Facebook: facebook.com/newwavemtc</p>
             </section>
             <section className="op-panel">
-              <h3>Terms and conditions you accepted</h3>
+              <h3>Terms and Conditions You Accepted</h3>
               <div className="op-terms">{TERMS_SECTIONS.map((section) => <div key={section.heading}><strong>{section.heading}</strong><ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul></div>)}</div>
               <p className="op-fine">New Wave Maritime Training and Assessment Center reserves the right to amend, revise, or update these details without prior notice.</p>
             </section>
@@ -294,7 +294,7 @@ function Wizard() {
   const body: Record<Exclude<SectionKey, "review">, React.ReactNode> = {
     identification: <>
       <div className="ql-grid caps-form">
-        <Field label="SRN / MISMO number*" wide><input value={applicant.srn} onChange={(e) => set("srn", e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" placeholder="10 digits" autoFocus />{hint(applicant.srn, idValid, VALIDATION_MESSAGES.srn)}</Field>
+        <Field label="SRN / MISMO Number*" wide><input value={applicant.srn} onChange={(e) => set("srn", e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" placeholder="10 digits" autoFocus />{hint(applicant.srn, idValid, VALIDATION_MESSAGES.srn)}</Field>
       </div>
       {lookup && <p className={`ql-lookup ${lookup.kind}`}>{lookup.text}</p>}
     </>,
@@ -306,21 +306,21 @@ function Wizard() {
       <Field label={locked ? "Date of birth (from your record)" : "Date of birth*"}><input type="date" value={applicant.birthDate} readOnly={locked} max={new Date().toISOString().slice(0, 10)} onChange={(e) => set("birthDate", e.target.value)} /></Field>
       <Field label={locked ? "Place of birth (from your record)" : "Place of birth*"}><input value={applicant.placeOfBirth} readOnly={locked} onChange={(e) => set("placeOfBirth", upper(e.target.value))} /></Field>
       <Field label="Rank*"><select value={applicant.rank} onChange={(e) => set("rank", e.target.value)}><option value="">Select</option>{RANKS.map((item) => <option key={item} value={item}>{item}</option>)}</select></Field>
-      {applicant.rank === "OTHER" && <Field label="Specify rank*"><input value={applicant.rankOther} onChange={(e) => set("rankOther", upper(e.target.value))} /></Field>}
-      <Field label="Company / manning agency" wide><input value={applicant.company} onChange={(e) => set("company", upper(e.target.value))} placeholder="Optional" /></Field>
+      {applicant.rank === "OTHER" && <Field label="Specify Rank*"><input value={applicant.rankOther} onChange={(e) => set("rankOther", upper(e.target.value))} /></Field>}
+      <Field label="Company / Manning Agency" wide><input value={applicant.company} onChange={(e) => set("company", upper(e.target.value))} placeholder="Optional" /></Field>
     </div>,
     contact: <div className="ql-grid caps-form">
-      <Field label="Complete address*" wide><input value={applicant.address} onChange={(e) => set("address", upper(e.target.value))} /></Field>
-      <Field label="Mobile number*"><input value={applicant.mobile} onChange={(e) => set("mobile", e.target.value)} inputMode="tel" placeholder="09XX XXX XXXX" />{hint(applicant.mobile, mobileValid, VALIDATION_MESSAGES.contact)}</Field>
-      <Field label="Email address*"><input type="email" value={applicant.email} onChange={(e) => set("email", e.target.value)} />{hint(applicant.email, emailValid, VALIDATION_MESSAGES.email)}</Field>
+      <Field label="Complete Address*" wide><input value={applicant.address} onChange={(e) => set("address", upper(e.target.value))} /></Field>
+      <Field label="Mobile Number*"><input value={applicant.mobile} onChange={(e) => set("mobile", e.target.value)} inputMode="tel" placeholder="09XX XXX XXXX" />{hint(applicant.mobile, mobileValid, VALIDATION_MESSAGES.contact)}</Field>
+      <Field label="Email Address*"><input type="email" value={applicant.email} onChange={(e) => set("email", e.target.value)} />{hint(applicant.email, emailValid, VALIDATION_MESSAGES.email)}</Field>
     </div>,
     emergency: <div className="ql-grid caps-form">
-      <Field label="Contact person*"><input value={applicant.emergencyContactName} onChange={(e) => set("emergencyContactName", upper(e.target.value))} /></Field>
-      <Field label="Contact number*"><input value={applicant.emergencyContactMobile} onChange={(e) => set("emergencyContactMobile", e.target.value)} inputMode="tel" placeholder="09XX XXX XXXX" />{hint(applicant.emergencyContactMobile, emergencyMobileValid, VALIDATION_MESSAGES.contact)}</Field>
+      <Field label="Contact Person*"><input value={applicant.emergencyContactName} onChange={(e) => set("emergencyContactName", upper(e.target.value))} /></Field>
+      <Field label="Contact Number*"><input value={applicant.emergencyContactMobile} onChange={(e) => set("emergencyContactMobile", e.target.value)} inputMode="tel" placeholder="09XX XXX XXXX" />{hint(applicant.emergencyContactMobile, emergencyMobileValid, VALIDATION_MESSAGES.contact)}</Field>
     </div>,
     courses: <>
       {!catalog ? <p className="wizard-hint">Loading courses…</p> : <>
-        <p className="ql-rule"><b>Order rule:</b> {ORDER_RULE_TEXT} Dates that break it are greyed out.</p>
+        <p className="ql-rule"><b>Order Rule:</b> {ORDER_RULE_TEXT} Dates that break it are greyed out.</p>
         {rows.map((row, index) => {
           const taken = new Set(rows.filter((_, i) => i !== index).map((r) => r.code).filter(Boolean));
           const st = stcwOf(row.code), ih = inHouseOf(row.code);
@@ -330,8 +330,8 @@ function Wizard() {
           return <div key={index} className="ql-course">
             <div className="ql-course-head"><b>Course {index + 1}</b>{(rows.length > 1 || row.code) && <button type="button" className="ql-link" onClick={() => removeRow(index)}>Remove</button>}</div>
             <select className="ql-course-select" value={row.code} aria-label={`Course ${index + 1}`} onChange={(e) => setRow(index, { code: e.target.value, batchId: "", start: "" })}>
-              <option value="">Select a course</option>
-              <optgroup label="STCW (scheduled batches)">{catalog.stcw.filter((c) => !taken.has(c.code)).map((c) => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}</optgroup>
+              <option value="">Select a Course</option>
+              <optgroup label="STCW (Scheduled Batches)">{catalog.stcw.filter((c) => !taken.has(c.code)).map((c) => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}</optgroup>
               {categories.map((cat) => <optgroup key={cat} label={`${cat} · online`}>{catalog.inHouse.filter((c) => c.category === cat && !taken.has(c.code)).map((c) => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}</optgroup>)}
             </select>
             {st && (st.batches.length ? <div className="ql-chips" role="radiogroup" aria-label="Schedule">{st.batches.map((b) => {
@@ -347,7 +347,7 @@ function Wizard() {
           </div>;
         })}
         {rows.length < MAX_COURSES && <button type="button" className="ql-link" onClick={addRow}>+ Add another course ({rows.length}/{MAX_COURSES})</button>}
-        {trainings.length > 0 && <div className="ql-schedule"><h4>Your training schedule</h4><table><thead><tr><th>#</th><th>Course</th><th>Dates</th></tr></thead><tbody>{trainings.map((t, i) => <tr key={t.code}><td>{i + 1}</td><td><b>{t.name}</b><small>{t.code} · {t.modality}</small></td><td>{pickedRange(t.start, t.end)}</td></tr>)}</tbody></table></div>}
+        {trainings.length > 0 && <div className="ql-schedule"><h4>Your Training Schedule</h4><table><thead><tr><th>#</th><th>Course</th><th>Dates</th></tr></thead><tbody>{trainings.map((t, i) => <tr key={t.code}><td>{i + 1}</td><td><b>{t.name}</b><small>{t.code} · {t.modality}</small></td><td>{pickedRange(t.start, t.end)}</td></tr>)}</tbody></table></div>}
       </>}
     </>,
   };
@@ -361,7 +361,7 @@ function Wizard() {
         <ol>
           {sections.map((x) => <li key={x.key}><button type="button" className={`${x.done ? "done" : ""} ${open === x.key ? "current" : ""}`} onClick={() => setOpen(x.key)}><i aria-hidden="true" />{x.title}</button></li>)}
         </ol>
-        <button type="button" className="ql-rail-submit" disabled={!allDone} onClick={() => setOpen("review")}>Review and submit</button>
+        <button type="button" className="ql-rail-submit" disabled={!allDone} onClick={() => setOpen("review")}>Review and Submit</button>
       </aside>
 
       <div className="ql-sections">
@@ -376,7 +376,7 @@ function Wizard() {
               </button>
               {isOpen && <div className="ql-body">
                 {body[x.key as Exclude<SectionKey, "review">]}
-                <div className="ql-actions"><button type="button" className="button button-primary" disabled={!x.done} onClick={() => next(x.key)}>Save and continue</button></div>
+                <div className="ql-actions"><button type="button" className="button button-primary" disabled={!x.done} onClick={() => next(x.key)}>Save and Continue</button></div>
               </div>}
             </section>
           );
@@ -388,9 +388,9 @@ function Wizard() {
             <span className="ql-title"><h2>{sections.length + 1}. Review and submit</h2><span>{allDone ? "Accept the terms and send your application." : "Complete the sections above first."}</span></span>
           </button>
           {open === "review" && allDone && <div className="ql-body">
-            <div className="ql-schedule"><h4>Your training schedule</h4><table><thead><tr><th>#</th><th>Course</th><th>Dates</th></tr></thead><tbody>{trainings.map((t, i) => <tr key={t.code}><td>{i + 1}</td><td><b>{t.name}</b><small>{t.code} · {t.modality}</small></td><td>{pickedRange(t.start, t.end)}</td></tr>)}</tbody></table></div>
+            <div className="ql-schedule"><h4>Your Training Schedule</h4><table><thead><tr><th>#</th><th>Course</th><th>Dates</th></tr></thead><tbody>{trainings.map((t, i) => <tr key={t.code}><td>{i + 1}</td><td><b>{t.name}</b><small>{t.code} · {t.modality}</small></td><td>{pickedRange(t.start, t.end)}</td></tr>)}</tbody></table></div>
             <p className="ql-note">Your seats are held while our Registration team screens your application, confirms the fees, and collects your requirements and payment.</p>
-            <h3 className="review-subhead">Terms and conditions</h3>
+            <h3 className="review-subhead">Terms and Conditions</h3>
             <div className="terms-box">
               {TERMS_SECTIONS.map((section) => <div key={section.heading} className="terms-section"><strong>{section.heading}</strong><ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul></div>)}
               <p className="terms-footer">New Wave Maritime Training and Assessment Center reserves the right to amend, revise, or update these details without prior notice.</p>
@@ -400,7 +400,7 @@ function Wizard() {
               <span>I have read and accepted the New Wave Maritime Terms and Conditions, including the payment, cancellation, rescheduling, refund, make-up class, and certificate policies, and I confirm that the information I provided is complete and accurate.</span>
             </label>
             {error && <p className="form-message" role="alert">{error}</p>}
-            <div className="ql-actions"><button className="button button-primary" type="button" disabled={!accepted || !selectionsValid || submitting} onClick={submit}>{submitting ? "Submitting…" : "Submit application"}</button></div>
+            <div className="ql-actions"><button className="button button-primary" type="button" disabled={!accepted || !selectionsValid || submitting} onClick={submit}>{submitting ? "Submitting…" : "Submit Application"}</button></div>
           </div>}
         </section>
       </div>

@@ -142,8 +142,11 @@ const courseChangeInput = z.object({ action: z.literal("enrollment-course-change
 const rescheduleInput = z.object({ action: z.literal("enrollment-reschedule"), enrollmentId: z.string().uuid(), batchId: z.string().uuid().nullable() });
 // Screening a website application (owner instruction, 7 Oct 2026): a staff
 // checklist of three requirements, then enrollment once a verified payment exists.
-const REQUIREMENT_CODES = ["valid_id", "seamans_book", "medical_certificate"] as const;
-const requirementCheckInput = z.object({ action: z.literal("requirement-check"), enrollmentId: z.string().uuid(), requirement: z.enum(REQUIREMENT_CODES), status: z.enum(["Verified", "Rejected"]), remarks: z.string().trim().max(500).optional() });
+// Required before hand-over (owner, 7 Oct 2026): valid ID, PEME medical, 2x2 photo,
+// seaman's book / SRN. "other" is an optional noted extra; a legacy
+// "medical_certificate" tick counts as the PEME medical (migration 202610070014).
+const REQUIREMENT_CODES = ["valid_id", "medical_peme", "photo_2x2", "seamans_book"] as const;
+const requirementCheckInput = z.object({ action: z.literal("requirement-check"), enrollmentId: z.string().uuid(), requirement: z.enum([...REQUIREMENT_CODES, "other"]), status: z.enum(["Verified", "Rejected"]), remarks: z.string().trim().max(500).optional() });
 const applicationEnrollInput = z.object({ action: z.literal("application-enroll"), enrollmentId: z.string().uuid() });
 // Registration edits a trainee's contact and work details from the profile.
 // Name, SRN and birth date identify the person and are not edited here.
@@ -659,12 +662,17 @@ export async function GET() {
     target.set(row.enrollment_id, (target.get(row.enrollment_id) ?? 0) + Number(row.amount_centavos));
   }
 
+  // When each enrollment became Enrolled (migration 202610070014; empty without it).
+  const { data: enrolledRows } = await db.from("enrollments").select("id,enrolled_at").not("enrolled_at", "is", null).order("enrolled_at", { ascending: false }).limit(5000);
+  const enrolledAt = new Map(((enrolledRows ?? []) as { id: string; enrolled_at: string }[]).map((r) => [r.id, r.enrolled_at]));
+
   const extrasByEnrollment = new Map(enrollmentExtras.map((row) => [row.id, row]));
   const enrollments = (enrollmentsResult.data ?? []).map((row) => {
     const extra = extrasByEnrollment.get(row.id);
     return { ...row,
       scheduled_on: extra?.scheduled_on ?? null,
       instructions_sent_at: extra?.instructions_sent_at ?? null,
+      enrolled_at: enrolledAt.get(row.id) ?? null,
       paid_centavos: paidByEnrollment.get(row.id) ?? 0,
       verified_paid_centavos: verifiedPaidByEnrollment.get(row.id) ?? 0,
       charges_centavos: chargesByEnrollment.get(row.id) ?? 0,
@@ -980,6 +988,7 @@ export async function POST(request: Request) {
     if (input.action === "requirement-check") {
       if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot screen applications." }, { status: 403 });
       if (input.status === "Rejected" && !input.remarks) return NextResponse.json({ error: "Enter the reason for rejecting this requirement." }, { status: 400 });
+      if (input.requirement === "other" && input.status === "Verified" && !input.remarks) return NextResponse.json({ error: "Describe the other requirement (for example: COP for BT-PSSR)." }, { status: 400 });
       const admin = createSupabaseAdminClient();
       const { data: enrollment, error: findError } = await admin.from("enrollments").select("id,enrollment_status").eq("id", input.enrollmentId).maybeSingle();
       if (findError) throw findError;
@@ -1036,8 +1045,8 @@ export async function POST(request: Request) {
       const { data: checks, error: checkError } = await admin.from("enrollment_requirement_checks").select("requirement,status,checked_at").eq("enrollment_id", input.enrollmentId).order("checked_at", { ascending: false });
       if (checkError) throw checkError;
       const latest = new Map<string, string>();
-      for (const c of checks ?? []) if (!latest.has(c.requirement)) latest.set(c.requirement, c.status);
-      if (!REQUIREMENT_CODES.every((code) => latest.get(code) === "Verified")) return NextResponse.json({ error: "Tick all three requirements before handing to the Cashier." }, { status: 400 });
+      for (const c of checks ?? []) { const code = c.requirement === "medical_certificate" ? "medical_peme" : c.requirement; if (!latest.has(code)) latest.set(code, c.status); }
+      if (!REQUIREMENT_CODES.every((code) => latest.get(code) === "Verified")) return NextResponse.json({ error: "Tick all four requirements (valid ID, PEME medical, 2x2 photo, seaman's book / SRN) before handing to the Cashier." }, { status: 400 });
       const at = new Date().toISOString();
       const { error } = await admin.from("enrollments").update({ handed_to_cashier_at: at, handed_to_cashier_by: staff.user.id }).eq("id", input.enrollmentId).is("handed_to_cashier_at", null);
       if (error) throw error;

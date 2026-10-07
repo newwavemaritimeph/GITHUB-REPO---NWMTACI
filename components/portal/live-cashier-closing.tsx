@@ -45,7 +45,7 @@ export function LiveCashierClosing({ data, reload }: { data: ClosingData; reload
 
   return (
     <div className="portal-page">
-      <div className="portal-heading"><div><span className="portal-eyebrow">Cashier operations</span><h1>Opening / closing</h1><p>Record the opening float and count out the drawer at end of day. Collections are computed from posted payments.</p></div></div>
+      <div className="portal-heading"><div><span className="portal-eyebrow">Cashier operations</span><h1>Opening / Closing</h1><p>Record the opening float and count out the drawer at end of day. Collections are computed from posted payments.</p></div></div>
 
       <div className="finance-hero">
         <div><span>Expected cash · {today}</span><strong>{pesos(expected)}</strong><small>Opening + cash collections</small></div>
@@ -58,20 +58,20 @@ export function LiveCashierClosing({ data, reload }: { data: ClosingData; reload
       {message && <div className="portal-message error" role="alert">{message}</div>}
 
       <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Submit today&apos;s closing</h2><p>Paid expenses are deducted from expected cash on submit.</p></div></div>
+        <div className="panel-heading"><div><h2>Submit Today&apos;s Closing</h2><p>Paid expenses are deducted from expected cash on submit.</p></div></div>
         <div className="portal-form" style={{ padding: "4px 0" }}>
-          <label>Opening cash (PHP)<input type="number" min="0" step="0.01" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0.00" /></label>
-          <label>Actual counted cash (PHP)<input type="number" min="0" step="0.01" value={actual} onChange={(e) => setActual(e.target.value)} placeholder="0.00" /></label>
+          <label>Opening Cash (PHP)<input type="number" min="0" step="0.01" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0.00" /></label>
+          <label>Actual Counted Cash (PHP)<input type="number" min="0" step="0.01" value={actual} onChange={(e) => setActual(e.target.value)} placeholder="0.00" /></label>
           <label className="full">Remarks<textarea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} /></label>
           <div className="full">
-            <button className="portal-primary" disabled={busy || !opening || !actual} onClick={submit}>{busy ? "Submitting…" : alreadyClosed ? "Submit another closing" : "Submit closing"}</button>
+            <button className="portal-primary" disabled={busy || !opening || !actual} onClick={submit}>{busy ? "Submitting…" : alreadyClosed ? "Submit Another Closing" : "Submit Closing"}</button>
             {alreadyClosed && <span style={{ marginLeft: 10, color: "var(--muted)", fontSize: 13 }}>A closing for today already exists.</span>}
           </div>
         </div>
       </section>
 
       <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Recent closings</h2><p>Submitted drawer counts</p></div></div>
+        <div className="panel-heading"><div><h2>Recent Closings</h2><p>Submitted drawer counts</p></div></div>
         <div className="portal-table"><table><thead><tr><th>Date</th><th>Opening</th><th>Cash</th><th>Online</th><th>Expenses</th><th>Expected</th><th>Actual</th><th>Variance</th><th>Status</th></tr></thead><tbody>
           {data.cashierClosings.map((c) => (
             <tr key={c.id}>

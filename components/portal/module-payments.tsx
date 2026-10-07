@@ -124,9 +124,9 @@ export function PaymentsModule({ role }: { role: Role }) {
                 <td className="cell-actions">
                   <button className="ghost-button" onClick={() => setPayFor(item)}>Record</button>
                   <button className="ghost-button" onClick={() => setSplitFor(item)}>Split</button>
-                  <button className="ghost-button" onClick={() => setChargeFor(item)}>Add charge</button>
-                  <button className="ghost-button" onClick={() => { setEditFor(item); setEditBatchId(item.enrollment.batchId ?? ""); }}>Change course</button>
-                  <button className="ghost-button" onClick={() => setSlipFor(item)}>Generate voucher</button>
+                  <button className="ghost-button" onClick={() => setChargeFor(item)}>Add Charge</button>
+                  <button className="ghost-button" onClick={() => { setEditFor(item); setEditBatchId(item.enrollment.batchId ?? ""); }}>Change Course</button>
+                  <button className="ghost-button" onClick={() => setSlipFor(item)}>Generate Voucher</button>
                 </td>
               </tr>
             ))}
@@ -321,7 +321,7 @@ export function PaymentsModule({ role }: { role: Role }) {
           footer={
             <>
               <button className="secondary-button" onClick={() => setEditFor(null)}>Cancel</button>
-              <button className="primary-button" disabled={!editBatchId || editBatchId === editFor.enrollment.batchId} onClick={() => { changeEnrollmentBatch(editFor.enrollment.id, editBatchId); toast("success", "Course / schedule updated and fee re-priced."); setEditFor(null); }}>Save change</button>
+              <button className="primary-button" disabled={!editBatchId || editBatchId === editFor.enrollment.batchId} onClick={() => { changeEnrollmentBatch(editFor.enrollment.id, editBatchId); toast("success", "Course / schedule updated and fee re-priced."); setEditFor(null); }}>Save Change</button>
             </>
           }
         >

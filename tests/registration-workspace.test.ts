@@ -39,11 +39,11 @@ const fixture = {
     { id: "b2", batch_number: "SSO-FULL", course_id: "c1", partner_offer_id: null, starts_on: plus(9), ends_on: plus(11), mode: "Face-to-face", venue: null, capacity: 24, confirmed_count: 24, enrollment_deadline: `${plus(8)}T23:59:59+08:00`, status: "Full", published_at: nowIso, courses: { name: "Ship Security Officers", code: "SSO" } },
   ],
   enrollments: [
-    { id: "e1", enrollment_number: "ENR-0001", trainee_id: "t1", course_id: "c1", partner_offer_id: null, batch_id: "b1", enrollment_status: "Enrolled", selling_price_centavos: 450000, rebate_centavos: 0, partner_payable_centavos: 0, paid_centavos: 200000, charges_centavos: 0, discounts_centavos: 0, created_at: nowIso, source: "Public registration", trainees: { trainee_number: "NW-0001", legal_first_name: "Maria", legal_last_name: "Reyes", email: "maria@example.test", mobile: "+639171234567" }, courses: { name: "Ship Security Officers", code: "SSO" }, batches: { batch_number: "SSO-2610", starts_on: plus(5), ends_on: plus(7), mode: "Face-to-face", venue: "Room 1" } },
+    { id: "e1", enrollment_number: "ENR-0001", trainee_id: "t1", course_id: "c1", partner_offer_id: null, batch_id: "b1", enrollment_status: "Enrolled", enrolled_at: nowIso, selling_price_centavos: 450000, rebate_centavos: 0, partner_payable_centavos: 0, paid_centavos: 200000, charges_centavos: 0, discounts_centavos: 0, created_at: nowIso, source: "Public registration", trainees: { trainee_number: "NW-0001", legal_first_name: "Maria", legal_last_name: "Reyes", email: "maria@example.test", mobile: "+639171234567" }, courses: { name: "Ship Security Officers", code: "SSO" }, batches: { batch_number: "SSO-2610", starts_on: plus(5), ends_on: plus(7), mode: "Face-to-face", venue: "Room 1" } },
     { id: "e2", enrollment_number: "ENR-0002", trainee_id: "t2", course_id: "c2", partner_offer_id: null, batch_id: null, enrollment_status: "Open Schedule", selling_price_centavos: 150000, rebate_centavos: 0, partner_payable_centavos: 0, paid_centavos: 0, created_at: nowIso, source: "Staff-assisted registration", trainees: { trainee_number: "NW-0002", legal_first_name: "Juan", legal_last_name: "Santos", email: "juan@example.test", mobile: "+639181234567" }, courses: { name: "Awareness on Basic Computer", code: "ABC" }, batches: null },
     { id: "e4", enrollment_number: "ENR-0004", trainee_id: "t1", course_id: "c1", partner_offer_id: null, batch_id: "b1", enrollment_status: "Pending", selling_price_centavos: 450000, rebate_centavos: 0, partner_payable_centavos: 0, paid_centavos: 100000, verified_paid_centavos: 100000, created_at: nowIso, source: "Public registration", trainees: { trainee_number: "NW-0001", legal_first_name: "Maria", legal_last_name: "Reyes", email: "maria@example.test", mobile: "+639171234567" }, courses: { name: "Ship Security Officers", code: "SSO" }, batches: { batch_number: "SSO-2610", starts_on: plus(5), ends_on: plus(7), mode: "Face-to-face", venue: "Room 1" } },
     { id: "e5", enrollment_number: "ENR-0005", trainee_id: "t2", course_id: "c1", partner_offer_id: null, batch_id: "b1", enrollment_status: "Pending", selling_price_centavos: 450000, rebate_centavos: 0, partner_payable_centavos: 0, paid_centavos: 0, verified_paid_centavos: 0, created_at: nowIso, source: "Public registration", trainees: { trainee_number: "NW-0002", legal_first_name: "Juan", legal_last_name: "Santos", email: "juan@example.test", mobile: "+639181234567" }, courses: { name: "Ship Security Officers", code: "SSO" }, batches: { batch_number: "SSO-2610", starts_on: plus(5), ends_on: plus(7), mode: "Face-to-face", venue: "Room 1" } },
-    { id: "e6", enrollment_number: "ENR-0006", trainee_id: "t3", course_id: "c1", partner_offer_id: null, batch_id: "b9", enrollment_status: "Enrolled", selling_price_centavos: 450000, rebate_centavos: 0, partner_payable_centavos: 0, paid_centavos: 450000, created_at: "2026-01-01T00:00:00Z", source: "Public registration", trainees: { trainee_number: "NW-0003", legal_first_name: "Pedro", legal_last_name: "Cruz", email: "pedro@example.test", mobile: "+639191234567" }, courses: { name: "Ship Security Officers", code: "SSO" }, batches: { batch_number: "SSO-TMRW", starts_on: plus(1), ends_on: plus(1), mode: "Face-to-face", venue: "Room 2" } },
+    { id: "e6", enrollment_number: "ENR-0006", trainee_id: "t3", course_id: "c1", partner_offer_id: null, batch_id: "b9", enrollment_status: "Enrolled", enrolled_at: "2026-01-01T02:00:00Z", selling_price_centavos: 450000, rebate_centavos: 0, partner_payable_centavos: 0, paid_centavos: 450000, created_at: "2026-01-01T00:00:00Z", source: "Public registration", trainees: { trainee_number: "NW-0003", legal_first_name: "Pedro", legal_last_name: "Cruz", email: "pedro@example.test", mobile: "+639191234567" }, courses: { name: "Ship Security Officers", code: "SSO" }, batches: { batch_number: "SSO-TMRW", starts_on: plus(1), ends_on: plus(1), mode: "Face-to-face", venue: "Room 2" } },
     { id: "e3", enrollment_number: "ENR-0003", trainee_id: "t2", course_id: "c1", partner_offer_id: null, batch_id: null, enrollment_status: "Cancelled", selling_price_centavos: 450000, rebate_centavos: 0, partner_payable_centavos: 0, paid_centavos: 0, created_at: nowIso, trainees: { trainee_number: "NW-0002", legal_first_name: "Juan", legal_last_name: "Santos", email: "juan@example.test", mobile: "+639181234567" }, courses: { name: "Ship Security Officers", code: "SSO" }, batches: null },
   ],
   payments: [{ id: "p1", payment_number: "PAY-0001", trainee_id: "t1", amount_centavos: 200000, method: "GCash", receiving_account: "Main", reference_number: "GC123", received_at: nowIso, verification_state: "Pending" }],
@@ -54,7 +54,8 @@ const fixture = {
   announcements: [{ id: "a1", title: "Welcome", body: "Office-wide note", audience_roles: [], published_at: nowIso, expires_at: null }],
   courseCategories: [], partnerCenters: [{ id: "pc1", name: "Partner Center A", active: true }],
   requests: [{ id: "r1", request_number: "REQ-0001", request_type: "Rescheduling", requested_values: null, reason: "Vessel schedule moved", status: "Pending", created_at: nowIso, trainees: { legal_first_name: "Maria", legal_last_name: "Reyes" }, enrollments: { enrollment_number: "ENR-0001", courses: { name: "Ship Security Officers" } } }],
-  requirementChecks: ["valid_id", "seamans_book", "medical_certificate"].map((requirement) => ({ enrollment_id: "e4", requirement, status: "Verified", remarks: null, checked_at: nowIso, checked_by_name: "Reg Officer" })),
+  // "medical_certificate" is a legacy tick that counts as the PEME medical.
+  requirementChecks: ["valid_id", "seamans_book", "medical_certificate", "photo_2x2"].map((requirement) => ({ enrollment_id: "e4", requirement, status: "Verified", remarks: null, checked_at: nowIso, checked_by_name: "Reg Officer" })),
   awaitingCourseIds: ["t3"],
   applicationNumbers: { t3: "NWMTACI-0000003", t1: "NWMTACI-0000001" },
   instructionsCount: { e1: 2 },
@@ -65,29 +66,20 @@ const noop = () => undefined;
 const reload = async () => undefined;
 
 describe("Registration Officer workspace", () => {
-  it("renders the four-part dashboard with no payment figures", () => {
+  it("renders the two-box dashboard: new registrations and enrollments by day", () => {
     const html = renderToString(createElement(RegistrationDashboard, { data: fixture, go: noop }));
-    for (const title of ["New registrations", "Upcoming trainings", "STCW slots open", "Today&#x27;s trainees", "STCW available slots"]) {
-      expect(html).toContain(title);
-    }
-    // STCW panel: SSO-2610 is bookable (21 seats); SSO-FULL is not; ABC is In-House, not STCW.
-    expect(html).toContain("SSO-2610");
-    expect(html).not.toContain("SSO-FULL");
-    expect(html).not.toContain("Awareness on Basic Computer</small></span><span class=\"rd-seat\"");
-    expect(html).toMatch(/<strong>21<\/strong>/);
-    // New registrations list only applicants not yet enrolled; nothing offers a staff intake.
-    expect(html).toContain("Paid · enrolling");
+    for (const title of ["New Registrations", "Enrollments", "Search Trainee", "Screen Applications"]) expect(html).toContain(title);
+    // New Registrations: applicants not yet enrolled (and the one without a course).
+    const box = html.slice(html.indexOf('id="rd-new"'), html.indexOf('id="rd-enrolled"'));
+    expect(box).toContain("Juan Santos");
+    expect(box).toContain("No Course Yet");
+    expect(box).not.toContain("ENR-0001");
+    // Enrollments: today by default, so ENR-0001 (enrolled today) and not ENR-0006 (January).
+    const enrolled = html.slice(html.indexOf('id="rd-enrolled"'));
+    expect(enrolled).toContain("Maria Reyes");
+    expect(enrolled).not.toContain("Pedro Cruz");
+    expect(enrolled).toContain('type="date"');
     expect(html).not.toContain("Register a trainee");
-    const newPanel = html.slice(html.indexOf('id="rd-new"'), html.indexOf('id="rd-upcoming"'));
-    expect(newPanel).toContain("Juan Santos");
-    expect(newPanel).not.toContain(">Enrolled<");
-    // Upcoming trainings: only tomorrow's class (SSO-TMRW), not the one in 5 days.
-    const upcoming = html.slice(html.indexOf('id="rd-upcoming"'), html.indexOf('id="rd-stcw"'));
-    expect(upcoming).toContain("SSO-TMRW");
-    expect(upcoming).toContain("Pedro Cruz");
-    expect(upcoming).not.toContain("SSO-2610");
-    // MASTERPLAN §10: payment states belong to the Cashier.
-    expect(html).not.toMatch(/Unpaid|Partially paid/);
   });
 
   it("lets an application be paid before it has a batch, enrolling once the batch is chosen", () => {
@@ -111,26 +103,30 @@ describe("Registration Officer workspace", () => {
     expect(ready.ready).toBe(true);
     const blocked = applicationReadiness(e5, fixture.requirementChecks ?? []);
     expect(blocked.ready).toBe(false);
-    expect(blocked.missing).toHaveLength(3);
+    expect(blocked.missing).toHaveLength(4);
+    // An optional "other" line never blocks.
+    expect(applicationReadiness(e4, [...(fixture.requirementChecks ?? []), { enrollment_id: "e4", requirement: "other", status: "Rejected", remarks: "x", checked_at: nowIso, checked_by_name: null }]).ready).toBe(true);
+    // Without the 2x2 photo the application is not complete.
+    expect(applicationReadiness(e4, (fixture.requirementChecks ?? []).filter((c) => c.requirement !== "photo_2x2")).missing).toEqual(["2x2 Photo"]);
     expect(blocked.reason).toMatch(/^Not verified yet/);
     const unpaid = applicationReadiness({ ...e4, verified_paid_centavos: 0 }, fixture.requirementChecks ?? []);
     expect(unpaid.reason).toBe("No verified payment yet");
   });
 
-  it("lists every enrollment under three tabs: All enrollments, Screening, For payment", () => {
+  it("lists every enrollment under three tabs: All Enrollments, Screening, For Payment", () => {
     const props = { data: fixture, query: "", reload, setView: noop, trainees: createElement("p", null, "TRAINEE-LIST") };
     const apps = renderToString(createElement(RegistrationRecords, { ...props, view: "applications" }));
     expect(apps).toContain("ENR-0004");
     expect(apps).toContain("ENR-0005");
     expect(apps).not.toContain("ENR-0001"); // Screening tab: enrolled trainees are not listed
-    expect(apps).toContain("Paid · enrolling");
-    for (const tab of ["All enrollments", "Screening", "For payment"]) expect(apps).toContain(tab);
+    expect(apps).toContain("Paid · Enrolling");
+    for (const tab of ["All Enrollments", "Screening", "For Payment"]) expect(apps).toContain(tab);
     for (const gone of ["Ready to enroll", "With Cashier", "No course yet<small"]) expect(apps).not.toContain(gone);
     expect(apps).not.toContain("Register a trainee");
     // A website applicant without a course waits for Registration to assign one.
-    expect(apps).toContain("No course yet");
+    expect(apps).toContain("No Course Yet");
     expect(apps).toContain("Pedro Cruz");
-    expect(apps).toContain("Assign course");
+    expect(apps).toContain("Assign Course");
     // Staff find applications by the NWMTACI number applicants quote on Facebook.
     expect(apps).toContain("NWMTACI-0000003");
     expect(apps).toContain("NWMTACI-0000001");
@@ -138,7 +134,7 @@ describe("Registration Officer workspace", () => {
     expect(enrolls).toContain("ENR-0001");
     expect(enrolls).toContain("Open Schedule");
     expect(enrolls).toContain("ENR-0004"); // All enrollments includes applications
-    expect(enrolls).toContain("Partially paid");
+    expect(enrolls).toContain("Partially Paid");
     expect(enrolls).not.toContain("Record payment");
     expect(renderToString(createElement(RegistrationRecords, { ...props, view: "trainees" }))).toContain("TRAINEE-LIST");
   });

@@ -69,7 +69,7 @@ function InHouseList({ courses }: { courses: InHouseCourse[] }) {
   const rows = courses.filter((c) => (!category || c.category === category) && (!term || `${c.code} ${c.name}`.toLowerCase().includes(term)));
   return <section className="inhouse-picker">
     <div className="inhouse-fields two">
-      <label>Category<select value={category} onChange={(e) => setCategory(e.target.value)}><option value="">All categories</option>{categories.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
+      <label>Category<select value={category} onChange={(e) => setCategory(e.target.value)}><option value="">All Categories</option>{categories.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
       <label>Search<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Course name or code" /></label>
     </div>
     <p className="inhouse-note">All In-House courses are online. Choose the course and your start date in the registration form; training runs on consecutive days, Monday to Saturday, with no Sundays.</p>

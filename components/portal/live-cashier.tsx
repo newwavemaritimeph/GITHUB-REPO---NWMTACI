@@ -48,10 +48,10 @@ export function TarButton({ data, traineeId, reload, className = "portal-seconda
   const { post } = usePost(reload ?? (async () => undefined));
   const print = () => { setError(""); void openAdmissionRecord(traineeId).then(() => reload?.()).catch((e) => setError(e instanceof Error ? e.message : "Could not open the admission record.")); };
   let button;
-  if (!s.paid.length) button = <button type="button" className={className} disabled title="The TAR prints once a course is paid">Print TAR</button>;
+  if (!s.paid.length) button = <button type="button" className={className} disabled title="The TAR Prints Once a Course Is Paid">Print TAR</button>;
   else if (s.left > 0) button = <button type="button" className={className} onClick={print}>{s.printed ? `Reprint TAR (${s.printed} of ${s.allowed} printed)` : "Print TAR"}</button>;
-  else if (s.pendingReprint) button = <button type="button" className={className} disabled>Reprint awaiting approval</button>;
-  else button = <button type="button" className={className} onClick={() => setRequesting(s.paid[0])}>Request TAR reprint</button>;
+  else if (s.pendingReprint) button = <button type="button" className={className} disabled>Reprint Awaiting Approval</button>;
+  else button = <button type="button" className={className} onClick={() => setRequesting(s.paid[0])}>Request TAR Reprint</button>;
   return <>
     {button}
     {error && <Message kind="error" text={error} />}
@@ -70,8 +70,8 @@ export function CashierPaymentQueue({ data, onPay, reload }: { data: PortalData;
   const toPrint = [...new Set(data.enrollments.filter((e) => PAID_STATUSES.includes(e.enrollment_status) && paidRecently.has(e.trainee_id)).map((e) => e.trainee_id))]
     .map((id) => data.trainees.find((t) => t.id === id)).filter((t): t is PortalData["trainees"][number] => !!t);
   return <div className="portal-page">
-    <PageHead eyebrow="Collections" title="For payment" text="Applicants Registration has screened and handed over. Record their payment: once paid and on a batch they are enrolled automatically. Then print their Training Admission Record." />
-    <div className="portal-table portal-panel"><table><thead><tr><th>Applicant</th><th>Course &amp; batch</th><th>Handed over</th><th>Total due</th><th>Paid</th><th>Balance</th><th></th></tr></thead><tbody>
+    <PageHead eyebrow="Collections" title="For Payment" text="Applicants Registration has screened and handed over. Record their payment: once paid and on a batch they are enrolled automatically. Then print their Training Admission Record." />
+    <div className="portal-table portal-panel"><table><thead><tr><th>Applicant</th><th>Course &Amp; Batch</th><th>Handed Over</th><th>Total Due</th><th>Paid</th><th>Balance</th><th></th></tr></thead><tbody>
       {rows.map((e) => {
         const t = first(e.trainees), b = first(e.batches), balance = balanceOf(e), paid = Number(e.verified_paid_centavos ?? e.paid_centavos);
         const number = data.applicationNumbers?.[e.trainee_id];
@@ -82,7 +82,7 @@ export function CashierPaymentQueue({ data, onPay, reload }: { data: PortalData;
           <td>{pesos(dueCentavos(e))}</td>
           <td>{pesos(paid)}</td>
           <td><strong>{pesos(balance)}</strong></td>
-          <td>{paid > 0 ? <Badge tone="active">{e.batch_id ? "Paid · enrolling" : "Paid · awaiting batch"}</Badge> : <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record payment</button>}</td>
+          <td>{paid > 0 ? <Badge tone="active">{e.batch_id ? "Paid · Enrolling" : "Paid · Awaiting Batch"}</Badge> : <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record Payment</button>}</td>
         </tr>;
       })}
     </tbody></table>{!rows.length && <p className="portal-empty-copy">No applicants waiting for payment. Registration hands them over once their requirements are complete.</p>}</div>
@@ -125,13 +125,13 @@ export function RequestChargeModal({ data, request, reload, onClose }: { data: P
       {request.request_type === "Cancellation" && <p className="portal-form-note full">Policy: 5+ days before training, Php 350.00 processing fee; within 5 days, 50% of the course fee plus Php 250.00.</p>}
       <label className="portal-check full"><input type="checkbox" checked={noCharge} onChange={(ev) => setNoCharge(ev.target.checked)} /><span>No charge for this request</span></label>
       {!noCharge && <>
-        <label className="full">Charge<select value={catalogId} onChange={(ev) => choose(ev.target.value)}><option value="">Custom amount</option>{catalog.map((c) => <option key={c.id} value={c.id}>{c.name} · {pesos(c.default_amount_centavos)}</option>)}</select></label>
+        <label className="full">Charge<select value={catalogId} onChange={(ev) => choose(ev.target.value)}><option value="">Custom Amount</option>{catalog.map((c) => <option key={c.id} value={c.id}>{c.name} · {pesos(c.default_amount_centavos)}</option>)}</select></label>
         <label>Description<input value={description} onChange={(ev) => setDescription(ev.target.value)} placeholder={`${typeLabel} fee`} /></label>
         <label>Amount (PHP)<input type="number" min="0" step="0.01" value={amount} onChange={(ev) => setAmount(ev.target.value)} /></label>
       </>}
-      <label className="full">Remarks (optional)<input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="For the Accounting Manager" /></label>
+      <label className="full">Remarks (Optional)<input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="For the Accounting Manager" /></label>
       <p className="portal-form-note full">The charge is added to the trainee&apos;s balance only when the Accounting Manager approves the request.</p>
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !valid} onClick={send}>{busy ? "Sending…" : "Send for approval"}</button></div>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !valid} onClick={send}>{busy ? "Sending…" : "Send for Approval"}</button></div>
     </div>
   </Modal>;
 }

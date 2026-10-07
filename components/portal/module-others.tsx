@@ -1320,7 +1320,7 @@ export function SuppliesModule({ role }: { role: Role }) {
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Show archived
         </label>
         <table className="ledger-table" style={{ width: "100%" }}>
-          <thead><tr><th>Item</th><th>Category</th><th>Unit</th><th style={{ textAlign: "right" }}>On hand</th><th>Status</th><th /></tr></thead>
+          <thead><tr><th>Item</th><th>Category</th><th>Unit</th><th style={{ textAlign: "right" }}>On Hand</th><th>Status</th><th /></tr></thead>
           <tbody>
             {items.map((s) => {
               const low = s.active && s.quantityOnHand <= s.reorderLevel;
@@ -1611,7 +1611,7 @@ export function AccountingModule({ role }: { role: Role }) {
                           if (!Number.isFinite(centavos) || centavos < 0) { toast("danger", "Enter a valid price."); return; }
                           updateCourse(course.id, { priceCentavos: centavos });
                           toast("success", `${course.course} price updated.`);
-                        }}>Edit price</button>
+                        }}>Edit Price</button>
                       )}
                     </td>
                   </tr>
@@ -1623,7 +1623,7 @@ export function AccountingModule({ role }: { role: Role }) {
 
           <Panel title="Endorsement rates & rebates" description="Partner-endorsed offers — training fee, New Wave rebate, and partner payable (fee − rebate)">
             <table className="ledger-table" style={{ width: "100%" }}>
-              <thead><tr><th>Course · Center</th><th>Duration</th><th style={{ textAlign: "right" }}>Training fee</th><th style={{ textAlign: "right" }}>Rebate</th><th style={{ textAlign: "right" }}>Partner payable</th><th /></tr></thead>
+              <thead><tr><th>Course · Center</th><th>Duration</th><th style={{ textAlign: "right" }}>Training Fee</th><th style={{ textAlign: "right" }}>Rebate</th><th style={{ textAlign: "right" }}>Partner Payable</th><th /></tr></thead>
               <tbody>
                 {state.partnerOffers.map((offer) => (
                   <tr key={offer.id}>
@@ -1645,7 +1645,7 @@ export function AccountingModule({ role }: { role: Role }) {
                           if (rebate > fee) { toast("danger", "Rebate cannot exceed the training fee."); return; }
                           updatePartnerOffer(offer.id, { trainingFeeCentavos: fee, rebateCentavos: rebate });
                           toast("success", `${offer.course} rate updated.`);
-                        }}>Edit rate</button>
+                        }}>Edit Rate</button>
                       )}
                     </td>
                   </tr>
@@ -2740,8 +2740,8 @@ function HrRequestsTab() {
           </label>
           {employee && (
             <>
-              <button className="secondary-button toolbar-end" onClick={() => { setLeaveDraft({ leaveType: "Vacation", startsOn: todayIso(), endsOn: todayIso(), reason: "" }); setLeaveOpen(true); }}>File leave</button>
-              <button className="secondary-button" onClick={() => { setAdvanceDraft({ amount: "", reason: "" }); setAdvanceOpen(true); }}>File cash advance</button>
+              <button className="secondary-button toolbar-end" onClick={() => { setLeaveDraft({ leaveType: "Vacation", startsOn: todayIso(), endsOn: todayIso(), reason: "" }); setLeaveOpen(true); }}>File Leave</button>
+              <button className="secondary-button" onClick={() => { setAdvanceDraft({ amount: "", reason: "" }); setAdvanceOpen(true); }}>File Cash Advance</button>
             </>
           )}
         </div>

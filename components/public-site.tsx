@@ -467,7 +467,7 @@ function About() {
           assessment services.
         </p>
         <div className="cert-gallery-head">
-          <h3>MARINA course approval certificates</h3>
+          <h3>MARINA Course Approval Certificates</h3>
           <p>
             Five Certificates of Course Approval issued by the Maritime Industry Authority on {CERTIFICATE_VALIDITY.issued},
             valid to {CERTIFICATE_VALIDITY.expires}. Each opens the full document.
@@ -532,15 +532,15 @@ function About() {
         </div>
         <div className="focus-grid">
           <article>
-            <h3>Training classrooms</h3>
+            <h3>Training Classrooms</h3>
             <p>Comfortable rooms for lectures and blended online / face-to-face sessions.</p>
           </article>
           <article>
-            <h3>Simulator-based instruction</h3>
+            <h3>Simulator-Based Instruction</h3>
             <p>Practical training on quality-standard maritime equipment.</p>
           </article>
           <article>
-            <h3>Assessment area</h3>
+            <h3>Assessment Area</h3>
             <p>Dedicated space for competency assessment and certification.</p>
           </article>
         </div>
@@ -606,7 +606,7 @@ function RegistrationSearch() {
     <section className="inside-page narrow-page">
       <div className="inside-hero compact">
         <span className="eyebrow">New Wave Maritime</span>
-        <h1 className="caps-heading">Enrollment Status &amp; Certificate Verification</h1>
+        <h1 className="caps-heading">Enrollment Status &Amp; Certificate Verification</h1>
         <p>
           Track every course under one registration reference, or confirm a certificate&apos;s authenticity by its number. No
           trainee account is required.
@@ -643,11 +643,11 @@ function Contact() {
             How can we help?
             <textarea name="message" rows={6} required />
           </label>
-          <button className="button button-primary">Send message</button>
+          <button className="button button-primary">Send Message</button>
         </form>
         <aside>
           <span className="eyebrow">Official details</span>
-          <h2>Visit or contact us</h2>
+          <h2>Visit or Contact Us</h2>
           <p>103 Bel Air Apartments, 1020 Roxas Boulevard, Ermita, Manila 1000</p>
           <div className="contact-point">
             <span>Mobile</span>
@@ -684,7 +684,7 @@ function StaffLogin() {
           </p>
         </div>
         <div className="login-card">
-          <h2>Configuration required</h2>
+          <h2>Configuration Required</h2>
           <p>
             Set <code>NEXT_PUBLIC_SUPABASE_URL</code> and <code>NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY</code> in the hosting
             environment, then redeploy.
@@ -709,7 +709,7 @@ function StaffLogin() {
         </ul>
       </div>
       <div className="login-card">
-        <h2>Authorized staff login</h2>
+        <h2>Authorized Staff Login</h2>
         {configured ? (
           <>
             <p>Enter the email associated with your account.</p>
