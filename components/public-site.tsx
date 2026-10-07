@@ -43,9 +43,11 @@ const PAGE_PATH: Record<PublicPage, string> = {
  * issued documents. All five were issued 12 May 2026 under MARINA Circular
  * No. SC-2021-09 and run to 12 May 2036. Order matches the approved layout.
  *
- * The thumbnails under public/certificates/ are unmodified web derivatives;
- * the originals under public/certificates/originals/ are the files the user
- * supplied, byte for byte, and are what every link opens. */
+ * Published copies (public/certificates/full/*.png and the .webp thumbnails)
+ * have the lower-left payment block blurred at the owner's request: the amount
+ * paid to MARINA is commercial information. Certificate numbers, course titles,
+ * dates, the QR code and the seal are untouched. The unmodified originals are
+ * kept in the design skill's assets folder and are not served. */
 const HERO_CERTIFICATES = [
   { no: "ACC 2026-036", title: "Safety Training for Personnel Providing Direct Service to Passengers in Passengers Spaces", file: "acc-2026-036" },
   { no: "ACC 2026-034", title: "Security Awareness Training and Seafarers with Designated Security Duties", file: "acc-2026-034" },
@@ -270,7 +272,7 @@ function Home() {
           {HERO_CERTIFICATES.map((cert) => (
             <li key={cert.no} className="nw-cert">
               <a
-                href={`/certificates/originals/${cert.file}.png`}
+                href={`/certificates/full/${cert.file}.png`}
                 target="_blank"
                 rel="noopener"
                 aria-label={`View approval certificate ${cert.no}: ${cert.title} (opens the full image in a new tab)`}
@@ -469,7 +471,7 @@ function About() {
             <li key={cert.no}>
               <figure>
                 <a
-                  href={`/certificates/originals/${cert.file}.png`}
+                  href={`/certificates/full/${cert.file}.png`}
                   target="_blank"
                   rel="noopener"
                   aria-label={`View approval certificate ${cert.no}: ${cert.title} (opens the full image in a new tab)`}

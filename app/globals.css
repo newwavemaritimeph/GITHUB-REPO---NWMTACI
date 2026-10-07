@@ -5970,19 +5970,23 @@ a[href^="mailto:"],
   color: var(--orange-text);
 }
 
+/* Editorial direction (owner, 7 Oct 2026): the serif carries the headline in
+   sentence case, replacing the mockup's heavy all-caps sans. Orange emphasis
+   stays; at this size brand orange clears the large-text contrast floor. */
 .nw-headline {
-  font-family: var(--font-ui), "Segoe UI", system-ui, sans-serif;
-  font-size: clamp(38px, 5.6vw, 82px);
-  line-height: 0.98;
-  font-weight: 800;
-  letter-spacing: -0.015em;
-  text-transform: uppercase;
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  font-size: clamp(40px, 5.4vw, 80px);
+  line-height: 1.02;
+  font-weight: 400;
+  letter-spacing: -0.018em;
+  text-transform: none;
   color: var(--blue-dark);
   margin: clamp(10px, 1.4vw, 18px) 0 0;
   text-wrap: balance;
 }
 .nw-headline em {
   font-style: normal;
+  font-weight: 600;
   color: var(--orange);
 }
 
