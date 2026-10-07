@@ -11,6 +11,16 @@
 
 begin;
 
+-- Self-contained: also sets up CCM Domestic late enrollment (same as
+-- 202610070010), so this file works whether or not 010 was run first.
+alter table public.courses add column if not exists late_enrollment boolean not null default false;
+update public.courses set late_enrollment = true where code = 'CCMD' and delivery_type = 'In-House';
+create or replace function public.allows_late_enrollment(target_course uuid)
+returns boolean language sql stable security definer set search_path = public as $
+  select coalesce((select late_enrollment from public.courses where id = target_course), false)
+$;
+grant execute on function public.allows_late_enrollment(uuid) to anon, authenticated, service_role;
+
 -- 24 seats per STCW batch.
 update public.batches b set capacity = 24, updated_at = now()
 from public.courses c
