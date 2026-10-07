@@ -4,7 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn } from "@/lib/validation";
-import { automaticEndDate } from "@/lib/scheduling";
+import { automaticEndDate, fitsInWeek } from "@/lib/scheduling";
+import { MAX_COURSES, ORDER_RULE_TEXT, orderConflict, type PickRange } from "@/lib/course-selection";
 
 // Official New Wave channels shown on the application summary.
 const FACEBOOK_URL = "https://www.facebook.com/newwavemtc";
@@ -33,9 +34,15 @@ const TERMS_SECTIONS: { heading: string; items: string[] }[] = [
   { heading: "6. Issuance of Certificate of Completion", items: ["Certificates of Completion shall be issued only to trainees who have successfully completed all course requirements and settled all outstanding balances."] },
 ];
 
-type Course = { code: string; name: string };
-type Schedule = { id: string; label: string; availableSlots: number };
-type Selection = { courseCode: string; scheduleId: string };
+/** Live catalog (/api/public/catalog): STCW courses with batches, In-House courses for a start date. */
+type CatalogBatch = { id: string; number: string; startsOn: string; endsOn: string; capacity: number; seatsLeft: number };
+type StcwCourse = { code: string; name: string; duration: string; modality: string; category: string; batches: CatalogBatch[] };
+type InHouseCourse = { code: string; name: string; duration: string; modality: string; category: string };
+type Catalog = { stcw: StcwCourse[]; inHouse: InHouseCourse[] };
+/** One course row on the form: an STCW batch, or an In-House start date. */
+type Row = { code: string; batchId: string; start: string };
+type Training = { code: string; name: string; duration: string; modality: string; start: string; end: string };
+const EMPTY_ROW: Row = { code: "", batchId: "", start: "" };
 
 const emptyApplicant = {
   srn: "", firstName: "", middleName: "", lastName: "", suffix: "", birthDate: "", placeOfBirth: "",
@@ -43,29 +50,26 @@ const emptyApplicant = {
   emergencyContactName: "", emergencyContactMobile: "",
 };
 
-// The course step is off for the dry run (owner instruction, 7 Oct 2026): the
-// applicant sends personal details only and Registration assigns the course
-// and schedule while screening. Set NEXT_PUBLIC_REGISTRATION_COURSE_STEP=on to
-// bring it back.
-const COURSE_STEP = process.env.NEXT_PUBLIC_REGISTRATION_COURSE_STEP === "on";
+// Courses (owner, 7 Oct 2026): the trainee chooses up to five courses here, each
+// on an open STCW batch or (In-House, online) a start date. Safety → Crowd →
+// Crisis order is enforced (lib/course-selection), here and on the server.
 // Layout ("Quiet Checklist", Oct 2026): one page of numbered sections that
 // collapse to a one-line summary once complete, a progress rail, and quiet
 // underline fields. Applicants can reopen any finished section to edit it.
 type SectionKey = "identification" | "personal" | "contact" | "emergency" | "courses" | "review";
 const upper = (value: string) => value.toUpperCase();
-const MAX_COURSES = 5;
-/** A course picked on the public Courses page: an STCW batch, or an In-House course and start date. */
-type Picked = { kind: "batch"; id: string } | { kind: "course"; code: string; start: string };
 const pickedDate = (iso: string) => new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
 const pickedRange = (start: string, end: string) => (start === end ? pickedDate(start) : `${pickedDate(start)} – ${pickedDate(end)}`);
+const weekday = (iso: string) => new Intl.DateTimeFormat("en-PH", { weekday: "long", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
+const chipRange = (start: string, end: string) => { const f = (iso: string, o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-PH", { ...o, timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`)); const a = f(start, { weekday: "short", month: "short", day: "numeric" }); return start === end ? a : `${a} – ${(start.slice(0, 7) === end.slice(0, 7) ? `${f(end, { weekday: "short" })} ${Number(end.slice(8, 10))}` : f(end, { weekday: "short", month: "short", day: "numeric" }))}`; };
+const manilaTomorrow = () => new Date(Date.now() + 8 * 3600000 + 86400000).toISOString().slice(0, 10);
 
 function Wizard() {
   const [open, setOpen] = useState<SectionKey>("identification");
   const [applicant, setApplicant] = useState(emptyApplicant);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [selections, setSelections] = useState<Selection[]>([{ courseCode: "", scheduleId: "" }]);
-  const [schedulesByCourse, setSchedulesByCourse] = useState<Record<string, Schedule[]>>({});
-  const [loadingCourse, setLoadingCourse] = useState<Record<string, boolean>>({});
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [rows, setRows] = useState<Row[]>([EMPTY_ROW]);
+  const [submittedTrainings, setSubmittedTrainings] = useState<Training[]>([]);
   const [accepted, setAccepted] = useState(false);
   const [reference, setReference] = useState("");
   const [applicationNumber, setApplicationNumber] = useState("");
@@ -73,8 +77,6 @@ function Wizard() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [picked, setPicked] = useState<Picked | null>(null);
-  const [pickedLabel, setPickedLabel] = useState<{ course: string; dates: string } | null>(null);
   // Result of the SRN lookup: "found" locks the identity fields to the trainee's
   // existing record; "none" just tells the applicant to fill the form in.
   const [lookup, setLookup] = useState<{ kind: "found" | "none"; text: string } | null>(null);
@@ -83,27 +85,20 @@ function Wizard() {
 
   const set = <K extends keyof typeof emptyApplicant>(key: K, value: string) => setApplicant((current) => ({ ...current, [key]: value }));
 
-  // Live bookable courses (with a published, open schedule this week).
-  useEffect(() => { if (!COURSE_STEP) return; let live = true; fetch("/api/public/courses").then((r) => r.json()).then((b) => { if (live) setCourses(b.courses ?? []); }).catch(() => {}); return () => { live = false; }; }, []);
-
-  // The course chosen on the Courses page arrives in the URL (?batch= or ?course=&start=).
+  // Live catalog; a course chosen earlier arrives in the URL (?batch= or ?course=&start=)
+  // and fills the first row.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const batch = params.get("batch"), code = params.get("course"), start = params.get("start");
-    const pick: Picked | null = batch ? { kind: "batch", id: batch } : code && start && /^\d{4}-\d{2}-\d{2}$/.test(start) ? { kind: "course", code, start } : null;
-    if (!pick) return;
     let live = true;
-    fetch("/api/public/catalog").then((r) => r.json()).then((b: { stcw?: { code: string; name: string; batches: { id: string; startsOn: string; endsOn: string }[] }[]; inHouse?: { code: string; name: string; duration: string }[] }) => {
+    fetch("/api/public/catalog").then((r) => r.json()).then((b: Catalog) => {
       if (!live) return;
-      if (pick.kind === "batch") {
-        const course = (b.stcw ?? []).find((c) => c.batches.some((x) => x.id === pick.id));
-        const found = course?.batches.find((x) => x.id === pick.id);
-        if (course && found) { setPicked(pick); setPickedLabel({ course: `${course.name} (${course.code})`, dates: pickedRange(found.startsOn, found.endsOn) }); }
-      } else {
-        const course = (b.inHouse ?? []).find((c) => c.code === pick.code);
-        if (course) { setPicked(pick); setPickedLabel({ course: `${course.name} (${course.code})`, dates: pickedRange(pick.start, automaticEndDate(pick.start, course.duration)) }); }
-      }
-    }).catch(() => undefined);
+      const next = { stcw: b.stcw ?? [], inHouse: b.inHouse ?? [] };
+      setCatalog(next);
+      const params = new URLSearchParams(window.location.search);
+      const batch = params.get("batch"), code = params.get("course"), start = params.get("start");
+      const course = batch ? next.stcw.find((c) => c.batches.some((x) => x.id === batch && x.seatsLeft > 0)) : null;
+      if (course && batch) setRows([{ code: course.code, batchId: batch, start: "" }]);
+      else if (code && start && /^\d{4}-\d{2}-\d{2}$/.test(start) && next.inHouse.some((c) => c.code === code)) setRows([{ code, batchId: "", start }]);
+    }).catch(() => { if (live) setCatalog({ stcw: [], inHouse: [] }); });
     return () => { live = false; };
   }, []);
 
@@ -133,26 +128,32 @@ function Wizard() {
     return () => { live = false; };
   }, [applicant.srn]);
 
-  async function ensureSchedules(code: string) {
-    if (!code || schedulesByCourse[code] || loadingCourse[code]) return;
-    setLoadingCourse((l) => ({ ...l, [code]: true }));
-    try { const r = await fetch(`/api/public/schedules?courseCode=${encodeURIComponent(code)}`); const b = await r.json(); setSchedulesByCourse((m) => ({ ...m, [code]: b.schedules ?? [] })); }
-    catch { setSchedulesByCourse((m) => ({ ...m, [code]: [] })); }
-    finally { setLoadingCourse((l) => ({ ...l, [code]: false })); }
+  const stcwOf = (code: string) => catalog?.stcw.find((c) => c.code === code) ?? null;
+  const inHouseOf = (code: string) => catalog?.inHouse.find((c) => c.code === code) ?? null;
+  const tomorrow = manilaTomorrow();
+  /** The dates a row covers, once it has a batch or a valid start date. */
+  function rangeOf(row: Row): PickRange | null {
+    const st = stcwOf(row.code);
+    if (st) { const b = st.batches.find((x) => x.id === row.batchId); return b ? { code: row.code, start: b.startsOn, end: b.endsOn } : null; }
+    const ih = inHouseOf(row.code);
+    if (ih && row.start && row.start >= tomorrow && fitsInWeek(row.start, ih.duration)) return { code: row.code, start: row.start, end: automaticEndDate(row.start, ih.duration) };
+    return null;
   }
-
-  function chooseCourse(index: number, code: string) {
-    setSelections((cur) => cur.map((s, i) => (i === index ? { courseCode: code, scheduleId: "" } : s)));
-    if (code) void ensureSchedules(code);
+  const othersOf = (index: number) => rows.map((r, i) => (i === index ? null : rangeOf(r))).filter((r): r is PickRange => !!r);
+  /** Why a row is not complete yet ("" when it is). */
+  function rowProblem(row: Row, index: number) {
+    if (!row.code) return "";
+    const range = rangeOf(row);
+    const ih = inHouseOf(row.code);
+    if (!range) return stcwOf(row.code) ? "Choose a schedule." : !row.start ? "Choose a start date." : row.start < tomorrow ? "Choose a date from tomorrow onwards." : `A ${ih ? ih.duration : ""} course runs on consecutive days within one week (no Sundays).`;
+    return orderConflict(range, othersOf(index)) ?? "";
   }
-  function chooseSchedule(index: number, id: string) {
-    setSelections((cur) => cur.map((s, i) => (i === index ? { ...s, scheduleId: id } : s)));
-  }
-  function addSelection() { setSelections((cur) => (cur.length < MAX_COURSES ? [...cur, { courseCode: "", scheduleId: "" }] : cur)); }
-  function removeSelection(index: number) { setSelections((cur) => (cur.length > 1 ? cur.filter((_, i) => i !== index) : cur)); }
-
-  const nameOf = (code: string) => courses.find((c) => c.code === code)?.name ?? "";
-  const labelOf = (code: string, id: string) => (schedulesByCourse[code] ?? []).find((s) => s.id === id)?.label ?? "";
+  const setRow = (index: number, patch: Partial<Row>) => setRows((cur) => cur.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  function addRow() { setRows((cur) => (cur.length < MAX_COURSES ? [...cur, EMPTY_ROW] : cur)); }
+  function removeRow(index: number) { setRows((cur) => (cur.length > 1 ? cur.filter((_, i) => i !== index) : [EMPTY_ROW])); }
+  /** The chosen trainings in date order, for the schedule table and the summary. */
+  const trainings: Training[] = rows.map((r) => { const range = rangeOf(r); const c = stcwOf(r.code) ?? inHouseOf(r.code); return range && c ? { code: c.code, name: c.name, duration: c.duration, modality: c.modality, start: range.start, end: range.end } : null; })
+    .filter((t): t is Training => !!t).sort((a, b) => a.start.localeCompare(b.start));
 
   // The same checks the server runs (lib/validation), so the form never sends
   // something the server will reject with a vague error.
@@ -166,9 +167,8 @@ function Wizard() {
   const personalValid = applicant.firstName.trim().length >= 2 && applicant.lastName.trim().length >= 2 && Boolean(applicant.birthDate) && applicant.placeOfBirth.trim().length >= 2 && rankValid;
   const contactValid = applicant.address.trim().length >= 8 && mobileValid && emailValid;
   const emergencyValid = applicant.emergencyContactName.trim().length >= 2 && emergencyMobileValid;
-  const completeSelections = selections.filter((s) => s.courseCode && s.scheduleId);
-  // Every row must be either fully complete or completely empty; at least one complete.
-  const selectionsValid = !COURSE_STEP || completeSelections.length >= 1 && selections.every((s) => (!s.courseCode && !s.scheduleId) || (Boolean(s.courseCode) && Boolean(s.scheduleId)));
+  // At least one course; every chosen course needs a valid schedule that respects the order.
+  const selectionsValid = trainings.length >= 1 && rows.every((r, i) => !r.code || (!!rangeOf(r) && !rowProblem(r, i)));
 
   async function submit() {
     setError("");
@@ -180,9 +180,11 @@ function Wizard() {
       fd.set("srn", applicant.srn); fd.set("email", applicant.email.toLowerCase()); fd.set("presentAddress", applicant.address); fd.set("mobile", applicant.mobile);
       fd.set("placeOfBirth", applicant.placeOfBirth); fd.set("birthDate", applicant.birthDate); fd.set("rank", rank); fd.set("company", applicant.company);
       fd.set("emergencyContactName", applicant.emergencyContactName); fd.set("emergencyContactMobile", applicant.emergencyContactMobile);
-      if (COURSE_STEP) for (const s of completeSelections) fd.append("scheduleIds", s.scheduleId);
-      if (picked?.kind === "batch" && !COURSE_STEP) fd.append("scheduleIds", picked.id);
-      if (picked?.kind === "course") { fd.set("courseCode", picked.code); fd.set("startDate", picked.start); }
+      for (const r of rows) {
+        if (!r.code || !rangeOf(r)) continue;
+        if (stcwOf(r.code)) fd.append("scheduleIds", r.batchId);
+        else { fd.append("courseCodes", r.code); fd.append("startDates", r.start); }
+      }
       fd.set("termsAccepted", "on");
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 25000);
@@ -194,6 +196,7 @@ function Wizard() {
       if (!response.ok) { setError(body.error ?? "We could not submit your application. Please review your details and try again."); return; }
       setReference(body.reference);
       setApplicationNumber(body.applicationNumber ?? "");
+      setSubmittedTrainings(trainings);
       setSubmittedAt(new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" }).format(new Date()));
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
@@ -226,9 +229,12 @@ function Wizard() {
                 <tr><th>Rank</th><td>{rank}</td></tr>
                 <tr><th>Mobile</th><td>{applicant.mobile}</td></tr>
                 <tr><th>Email</th><td className="lc">{applicant.email.toLowerCase()}</td></tr>
-                {pickedLabel && <tr><th>Training</th><td>{pickedLabel.course}<br />{pickedLabel.dates}</td></tr>}
                 <tr><th>Submitted</th><td>{submittedAt}</td></tr>
               </tbody></table>
+              {submittedTrainings.length > 0 && <div className="op-trainings">
+                <div className="op-trainings-head"><span>TRAININGS APPLIED FOR</span><span>{submittedTrainings.length} COURSE{submittedTrainings.length === 1 ? "" : "S"}</span></div>
+                {submittedTrainings.map((t, i) => <div className="op-training" key={t.code}><i>{i + 1}</i><div><b>{t.name}</b><small>{t.code} · {t.duration} · {t.modality}</small></div><div className="op-training-date">{chipRange(t.start, t.end).replace(/^\w+, /, "")}<small>{t.start === t.end ? weekday(t.start) : `${weekday(t.start).slice(0, 3)} – ${weekday(t.end).slice(0, 3)}`}</small></div></div>)}
+              </div>}
               <div className="op-instructions">
                 <b>INSTRUCTIONS</b>
                 <ol>
@@ -274,7 +280,7 @@ function Wizard() {
     { key: "personal", title: "Personal details", hint: "As written on your seaman's book or passport.", done: personalValid, summary: [nameText, applicant.birthDate, applicant.placeOfBirth, rankText].filter(Boolean).join(" · ") },
     { key: "contact", title: "Contact", hint: "How New Wave will reach you about your application.", done: contactValid, summary: [applicant.mobile, applicant.email].filter(Boolean).join(" · ") },
     { key: "emergency", title: "Emergency contact", hint: "Someone we can call if we cannot reach you.", done: emergencyValid, summary: [applicant.emergencyContactName, applicant.emergencyContactMobile].filter(Boolean).join(" · ") },
-    ...(COURSE_STEP ? [{ key: "courses" as const, title: "Courses", hint: `Pick a course and an available schedule. Up to ${MAX_COURSES} per application.`, done: selectionsValid, summary: completeSelections.map((x) => x.courseCode).join(", ") }] : []),
+    { key: "courses", title: "Courses", hint: `Choose up to ${MAX_COURSES} courses and a schedule for each. ${ORDER_RULE_TEXT}`, done: selectionsValid, summary: trainings.map((t) => `${t.code} ${pickedRange(t.start, t.end)}`).join(" · ") },
   ];
   const doneCount = sections.filter((x) => x.done).length;
   const allDone = doneCount === sections.length;
@@ -313,20 +319,36 @@ function Wizard() {
       <Field label="Contact number*"><input value={applicant.emergencyContactMobile} onChange={(e) => set("emergencyContactMobile", e.target.value)} inputMode="tel" placeholder="09XX XXX XXXX" />{hint(applicant.emergencyContactMobile, emergencyMobileValid, VALIDATION_MESSAGES.contact)}</Field>
     </div>,
     courses: <>
-      {!courses.length && <div className="reg-notice"><strong>No published schedules are open this week</strong><p>Please check back soon or contact New Wave.</p></div>}
-      {selections.map((sel, index) => {
-        const list = schedulesByCourse[sel.courseCode] ?? [];
-        const available = courses.filter((c) => c.code === sel.courseCode || !selections.some((x) => x.courseCode === c.code));
-        return (
-          <div key={index} className="ql-course">
-            <div className="ql-grid"><Field label={`Course ${index + 1}*`} wide><select value={sel.courseCode} onChange={(e) => chooseCourse(index, e.target.value)}><option value="">Select a course</option>{available.map((item) => <option key={item.code} value={item.code}>{item.code} — {item.name}</option>)}</select></Field></div>
-            {sel.courseCode && (loadingCourse[sel.courseCode] ? <p className="wizard-hint">Loading schedules…</p> : list.length === 0 ? <div className="reg-notice"><strong>No schedule this week for this course</strong><p>Please choose another course.</p></div> :
-              <div className="schedule-picker">{list.map((batch) => <button key={batch.id} type="button" className={`schedule-option ${sel.scheduleId === batch.id ? "selected" : ""}`} onClick={() => chooseSchedule(index, batch.id)}><span className="schedule-body"><strong>{batch.label}</strong></span></button>)}</div>)}
-            {selections.length > 1 && <button type="button" className="ql-link" onClick={() => removeSelection(index)}>Remove course {index + 1}</button>}
-          </div>
-        );
-      })}
-      {selections.length < MAX_COURSES && courses.length > 0 && <button type="button" className="ql-link" onClick={addSelection}>+ Add another course ({selections.length}/{MAX_COURSES})</button>}
+      {!catalog ? <p className="wizard-hint">Loading courses…</p> : <>
+        <p className="ql-rule"><b>Order rule:</b> {ORDER_RULE_TEXT} Dates that break it are greyed out.</p>
+        {rows.map((row, index) => {
+          const taken = new Set(rows.filter((_, i) => i !== index).map((r) => r.code).filter(Boolean));
+          const st = stcwOf(row.code), ih = inHouseOf(row.code);
+          const categories = [...new Set(catalog.inHouse.map((c) => c.category))];
+          const others = othersOf(index);
+          const problem = rowProblem(row, index);
+          return <div key={index} className="ql-course">
+            <div className="ql-course-head"><b>Course {index + 1}</b>{(rows.length > 1 || row.code) && <button type="button" className="ql-link" onClick={() => removeRow(index)}>Remove</button>}</div>
+            <select className="ql-course-select" value={row.code} aria-label={`Course ${index + 1}`} onChange={(e) => setRow(index, { code: e.target.value, batchId: "", start: "" })}>
+              <option value="">Select a course</option>
+              <optgroup label="STCW (scheduled batches)">{catalog.stcw.filter((c) => !taken.has(c.code)).map((c) => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}</optgroup>
+              {categories.map((cat) => <optgroup key={cat} label={`${cat} · online`}>{catalog.inHouse.filter((c) => c.category === cat && !taken.has(c.code)).map((c) => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}</optgroup>)}
+            </select>
+            {st && (st.batches.length ? <div className="ql-chips" role="radiogroup" aria-label="Schedule">{st.batches.map((b) => {
+              const conflict = orderConflict({ code: st.code, start: b.startsOn, end: b.endsOn }, others);
+              const disabled = !b.seatsLeft || !!conflict, on = row.batchId === b.id;
+              return <button type="button" role="radio" aria-checked={on} key={b.id} disabled={disabled && !on} className={`ql-chip${on ? " on" : ""}${disabled ? " off" : ""}`} onClick={() => setRow(index, { batchId: b.id })}><b>{on ? "✓ " : ""}{chipRange(b.startsOn, b.endsOn)}</b><small>{!b.seatsLeft ? "Full" : conflict ?? `${b.seatsLeft} seat${b.seatsLeft === 1 ? "" : "s"} left`}</small></button>;
+            })}</div> : <p className="ql-error">No open schedule for this course yet. Please choose another course.</p>)}
+            {ih && <div className="ql-dates">
+              <label><span>Start date</span><input type="date" value={row.start} min={tomorrow} onChange={(e) => setRow(index, { start: e.target.value })} /></label>
+              <div className="ql-ends"><span>Ends</span><b>{rangeOf(row) ? pickedDate(rangeOf(row)!.end) : "—"}</b><small>{ih.duration} · online · Monday to Saturday</small></div>
+            </div>}
+            {row.code && problem && <p className="ql-rule-note">{problem}</p>}
+          </div>;
+        })}
+        {rows.length < MAX_COURSES && <button type="button" className="ql-link" onClick={addRow}>+ Add another course ({rows.length}/{MAX_COURSES})</button>}
+        {trainings.length > 0 && <div className="ql-schedule"><h4>Your training schedule</h4><table><thead><tr><th>#</th><th>Course</th><th>Dates</th></tr></thead><tbody>{trainings.map((t, i) => <tr key={t.code}><td>{i + 1}</td><td><b>{t.name}</b><small>{t.code} · {t.modality}</small></td><td>{pickedRange(t.start, t.end)}</td></tr>)}</tbody></table></div>}
+      </>}
     </>,
   };
 
@@ -343,7 +365,6 @@ function Wizard() {
       </aside>
 
       <div className="ql-sections">
-        {pickedLabel && <div className="ql-picked"><div><span>Selected training</span><strong>{pickedLabel.course}</strong><small>{pickedLabel.dates}</small></div><span className="ql-picked-actions"><Link href="/courses">Change</Link><button type="button" onClick={() => { setPicked(null); setPickedLabel(null); }}>Remove</button></span></div>}
         {sections.map((x, index) => {
           const isOpen = open === x.key;
           return (
@@ -367,8 +388,8 @@ function Wizard() {
             <span className="ql-title"><h2>{sections.length + 1}. Review and submit</h2><span>{allDone ? "Accept the terms and send your application." : "Complete the sections above first."}</span></span>
           </button>
           {open === "review" && allDone && <div className="ql-body">
-            {COURSE_STEP ? <div className="review-courses">{completeSelections.map((x, i) => <div key={i} className="review-course"><div><strong>{nameOf(x.courseCode)}</strong><small>{labelOf(x.courseCode, x.scheduleId)}</small></div></div>)}</div>
-              : <p className="ql-note">{pickedLabel ? `Requested training: ${pickedLabel.course}, ${pickedLabel.dates}. Our Registration team will confirm it, and collect your requirements and payment.` : "After you submit, our Registration team will contact you to confirm your course and schedule, and to collect your requirements and payment."}</p>}
+            <div className="ql-schedule"><h4>Your training schedule</h4><table><thead><tr><th>#</th><th>Course</th><th>Dates</th></tr></thead><tbody>{trainings.map((t, i) => <tr key={t.code}><td>{i + 1}</td><td><b>{t.name}</b><small>{t.code} · {t.modality}</small></td><td>{pickedRange(t.start, t.end)}</td></tr>)}</tbody></table></div>
+            <p className="ql-note">Your seats are held while our Registration team screens your application, confirms the fees, and collects your requirements and payment.</p>
             <h3 className="review-subhead">Terms and conditions</h3>
             <div className="terms-box">
               {TERMS_SECTIONS.map((section) => <div key={section.heading} className="terms-section"><strong>{section.heading}</strong><ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul></div>)}

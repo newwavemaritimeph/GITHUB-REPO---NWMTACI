@@ -12,7 +12,8 @@ import {
   normalizePhContactNumber,
   normalizeSrn,
 } from "@/lib/validation";
-import { PUBLIC_STCW_CODES, fitsInWeek } from "@/lib/scheduling";
+import { PUBLIC_STCW_CODES, automaticEndDate, fitsInWeek } from "@/lib/scheduling";
+import { MAX_COURSES, firstOrderConflict, type PickRange } from "@/lib/course-selection";
 
 const registrationSchema = z.object({
   firstName: z.string().trim().min(2).max(80), middleName: z.string().trim().max(80).optional().default(""), lastName: z.string().trim().min(2).max(80), suffix: z.string().trim().max(20).optional().default(""),
@@ -75,8 +76,13 @@ export async function POST(request: Request) {
     const form = await request.formData();
     const body = registrationSchema.parse(Object.fromEntries(form));
     const batches = batchesSchema.parse(form.getAll("scheduleIds").map((v) => String(v)).filter(Boolean));
-    const dated = form.get("courseCode") && form.get("startDate") ? datedCourseSchema.parse({ courseCode: form.get("courseCode"), startDate: form.get("startDate") }) : null;
+    // In-House courses picked with a start date (courseCodes[i] + startDates[i]).
+    const codes = form.getAll("courseCodes").map(String), starts = form.getAll("startDates").map(String);
+    if (form.get("courseCode") && form.get("startDate")) { codes.push(String(form.get("courseCode"))); starts.push(String(form.get("startDate"))); }
+    const dated = codes.map((code, i) => datedCourseSchema.parse({ courseCode: code, startDate: starts[i] }));
+    if (batches.length + dated.length > MAX_COURSES) throw new Error(`You can choose up to ${MAX_COURSES} courses per application.`);
     const db = createSupabaseAdminClient();
+    await checkCourseOrder(db, batches, dated);
     const { data: terms } = await db.from("terms_documents").select("version").eq("active", true).lte("effective_from", new Date().toISOString().slice(0,10)).order("effective_from", { ascending: false }).limit(1).maybeSingle();
     if (!terms) throw new Error("No approved terms are active.");
     const { data, error } = await withTimeout(db.rpc("submit_public_registration", {
@@ -87,7 +93,7 @@ export async function POST(request: Request) {
     }), 15000, "The registration service is busy (a previous submission may still be finalizing). Please try again in a minute.");
     if (error) throw error;
     const result = data as { application_number?:string;registration_reference:string;trainee_id:string;email:string;complete_name:string };
-    if (dated && !batches.length) await attachDatedCourse(db, result.trainee_id, dated);
+    for (const pick of dated) await attachDatedCourse(db, result.trainee_id, pick);
     // Trainees have no portal account. They follow their enrollment through the
     // public status lookup using this reference plus their registered email.
     // application_number (NWMTACI-0000001) exists once migration 202610070003 is
@@ -117,4 +123,25 @@ async function attachDatedCourse(db: ReturnType<typeof createSupabaseAdminClient
     const { error: dateError } = await db.from("enrollments").update({ scheduled_on: pick.startDate }).eq("id", (enrollment as { id: string }).id);
     if (dateError) console.error("Could not set the picked start date:", dateError.message);
   } catch (err) { console.error("Could not attach the picked course:", err instanceof Error ? err.message : err); }
+}
+
+/**
+ * Safety → Crowd → Crisis: Crowd must start after Safety, and Crisis after
+ * Safety and Crowd, within one application (lib/course-selection). The form
+ * greys out such dates; this refuses an application that slips past it.
+ */
+async function checkCourseOrder(db: ReturnType<typeof createSupabaseAdminClient>, batchIds: string[], dated: { courseCode: string; startDate: string }[]) {
+  const picks: PickRange[] = [];
+  if (batchIds.length) {
+    const { data } = await db.from("batches").select("id,starts_on,ends_on,courses(code)").in("id", batchIds);
+    for (const b of data ?? []) {
+      const course = Array.isArray(b.courses) ? b.courses[0] : b.courses;
+      if (course?.code) picks.push({ code: course.code, start: b.starts_on, end: b.ends_on });
+    }
+  }
+  for (const d of dated) picks.push({ code: d.courseCode, start: d.startDate, end: automaticEndDate(d.startDate, "1") });
+  const seen = new Set<string>();
+  for (const pick of picks) { if (seen.has(pick.code)) throw new Error("Each course can be chosen only once per application."); seen.add(pick.code); }
+  const conflict = firstOrderConflict(picks);
+  if (conflict) throw new Error(`Schedule order: ${conflict}. Crowd must start after Safety, and Crisis after Safety and Crowd.`);
 }

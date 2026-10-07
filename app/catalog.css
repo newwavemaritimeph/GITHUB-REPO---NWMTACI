@@ -29,3 +29,21 @@
 .inhouse-note{margin:0;font-size:13px;color:var(--muted)}
 .inhouse-dates .button{text-align:center}
 @media(max-width:820px){.inhouse-fields,.inhouse-summary{grid-template-columns:1fr}}
+/* Courses page: open dates with seats left (no enroll buttons) */
+.slot-months{display:grid;gap:10px}
+.slot-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.slot-list li{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:13px;padding:7px 10px;border:1px solid var(--line-soft,#e3edf2);border-radius:8px;background:var(--cyan-soft,#eef9fc)}
+.slot-list li b{color:var(--blue-dark);font-weight:600}
+.slot-list li i{font-style:normal;font-weight:700;font-size:12px;color:var(--green,#0a7d3b);white-space:nowrap}
+.slot-list li i.low{color:#b45309}.slot-list li i.full{color:#b42318}
+.slot-list li.full{opacity:.6;background:#f3f5f7}
+.slot-more{margin-top:8px;border:0;background:none;color:var(--blue);font:inherit;font-size:13px;font-weight:600;cursor:pointer;padding:4px 0}
+.slot-foot{margin:auto 0 0;padding-top:10px;border-top:1px dashed var(--line);font-size:13px;color:var(--muted);text-align:center}
+.inhouse-fields.two{grid-template-columns:1fr 1fr}
+.inhouse-table{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:auto;max-height:620px}
+.inhouse-table table{width:100%;border-collapse:collapse;min-width:560px}
+.inhouse-table th{text-align:left;background:#f3f8fa;color:#5b7587;font-size:12px;letter-spacing:.04em;padding:11px 14px;position:sticky;top:0}
+.inhouse-table td{border-top:1px solid #e7eff3;padding:11px 14px;font-size:14px;color:var(--blue-dark)}
+.register-banner{margin-top:22px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;background:var(--blue-dark);color:#fff;border-radius:14px;padding:16px 20px}
+.register-banner b{display:block;font-size:17px}.register-banner span{font-size:14px;color:#bcd6e6}
+@media(max-width:680px){.inhouse-fields.two{grid-template-columns:1fr}.register-banner .button{width:100%;text-align:center}}

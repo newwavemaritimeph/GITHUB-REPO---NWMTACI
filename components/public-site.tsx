@@ -575,8 +575,8 @@ function Register() {
         <span className="eyebrow">Online registration</span>
         <h1>Apply for training in a few short sections.</h1>
         <p>
-          Enter your details once. Our Registration team confirms your course and schedule, checks your requirements and
-          payment, then enrolls you. You will receive a reference to track your application.
+          Enter your details once and choose up to 5 courses with their schedules. Our Registration team checks your requirements
+          and payment, then enrolls you. You will receive a summary of your trainings and a reference to track your application.
         </p>
         <div className="privacy-note">
           <strong>Your privacy matters</strong>

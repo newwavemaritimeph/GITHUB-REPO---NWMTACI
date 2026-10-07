@@ -18,8 +18,8 @@ const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v)
  * - stcw: the five STCW courses New Wave schedules, each with its bookable
  *   batches (published, open, not started, before the deadline, seats left).
  * - inHouse: every other active New Wave in-house course, for the date picker.
- * Read-only and anonymous; only names, codes, durations, modality, category and
- * batch dates leave the server (no prices, rebates or partner data).
+ * Read-only and anonymous; only names, codes, durations, modality, category,
+ * batch dates and seats left leave the server (no prices, rebates or partner data).
  */
 export async function GET() {
   if (!isSupabaseConfigured()) return NextResponse.json({ stcw: [], inHouse: [] });
@@ -29,7 +29,7 @@ export async function GET() {
   const [courses, batches] = await Promise.all([
     db.from("courses").select("id,code,name,duration_label,duration_days,training_mode,course_categories(name)").eq("active", true).eq("delivery_type", "In-House").order("name"),
     db.from("batches").select("id,batch_number,course_id,starts_on,ends_on,capacity,confirmed_count,status,courses!inner(code,delivery_type)")
-      .eq("status", "Open").not("published_at", "is", null).gte("ends_on", today).gt("enrollment_deadline", now.toISOString())
+      .in("status", ["Open", "Full"]).not("published_at", "is", null).gte("ends_on", today).gt("enrollment_deadline", now.toISOString())
       .in("courses.code", [...PUBLIC_STCW_CODES]).order("starts_on"),
   ]);
   if (courses.error || batches.error) {
@@ -44,8 +44,9 @@ export async function GET() {
   for (const c of courses.data) idsByCode.set(c.code, (idsByCode.get(c.code) ?? new Set()).add(c.id));
   const stcw = PUBLIC_STCW_CODES.map((code) => courses.data.find((c) => c.code === code)).filter((c): c is NonNullable<typeof c> => !!c).map((c) => ({
     ...shape(c),
-    batches: (batches.data ?? []).filter((b) => idsByCode.get(c.code)?.has(b.course_id) && b.confirmed_count < b.capacity && (b.starts_on > today || LATE_ENROLLMENT_CODES.includes(c.code)))
-      .map((b) => ({ id: b.id, number: b.batch_number, startsOn: b.starts_on, endsOn: b.ends_on })),
+    batches: (batches.data ?? []).filter((b) => idsByCode.get(c.code)?.has(b.course_id) && (b.starts_on > today || LATE_ENROLLMENT_CODES.includes(c.code)))
+      // Seats left are shown on the Courses page and the form; a full batch stays listed as "Full".
+      .map((b) => ({ id: b.id, number: b.batch_number, startsOn: b.starts_on, endsOn: b.ends_on, capacity: b.capacity, seatsLeft: b.status === "Full" ? 0 : Math.max(0, b.capacity - b.confirmed_count) })),
   }));
   // The In-House picker leaves out every STCW / MARINA Domestic course: only the five above are offered.
   const seen = new Set<string>();
