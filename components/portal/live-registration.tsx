@@ -217,7 +217,7 @@ const NO_BATCH = "none";
  * in-house course can be chosen; open batches for it are offered, and "No batch
  * yet" lets screening and payment go ahead before a batch opens.
  */
-function AssignCourseModal({ data, trainee, reload, onClose }: { data: PortalData; trainee: Trainee; reload: () => Promise<void>; onClose: () => void }) {
+export function AssignCourseModal({ data, trainee, reload, onClose }: { data: PortalData; trainee: Trainee; reload: () => Promise<void>; onClose: () => void }) {
   const { busy, msg, post } = usePost(reload);
   const [courseId, setCourseId] = useState("");
   const [batchId, setBatchId] = useState(NO_BATCH);
@@ -415,7 +415,7 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
 }
 
 /** Everything about one enrollment, read-only on money. Requests go to Accounting. */
-function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void }) {
+export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void }) {
   const { busy, msg, post } = usePost(reload);
   const [req, setReq] = useState<RequestType | null>(null);
   const [addingCourse, setAddingCourse] = useState(false);

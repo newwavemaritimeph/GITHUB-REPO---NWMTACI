@@ -1188,3 +1188,28 @@ button.rd-row:hover { background: #f6fafc; }
 .td-card td small { display: block; color: var(--muted); font-size: 12px; }
 .td-empty { margin: 4px 0; color: var(--muted); font-size: 13.5px; }
 @media (max-width: 760px) { .td-head { flex-wrap: wrap; } .td-totals { width: 100%; justify-content: space-between; } .td-grid { grid-template-columns: 1fr; } .td-kv { grid-template-columns: 1fr; } }
+
+/* Choice controls inside modals: the shared modal input rule (full width,
+   46px tall) was stretching radios and checkboxes into large circles. Reset
+   them to native size, and make each batch option a clear selectable row. */
+.modal-body .assign-batch input[type="radio"],
+.modal-body .req-tick input[type="checkbox"],
+.assign-batch input[type="radio"],
+.req-tick input[type="checkbox"] { width: 18px !important; height: 18px !important; min-height: 0 !important; padding: 0 !important; margin: 2px 0 0 !important; border-radius: 50%; flex: none; accent-color: #0571d0; box-shadow: none !important; }
+.req-tick input[type="checkbox"] { border-radius: 4px; accent-color: #0a7d3b; }
+.assign-batch { align-items: center; gap: 12px; padding: 11px 12px; margin-top: 6px; border: 1px solid #e3eaf3; border-radius: 12px; transition: border-color .15s ease, background .15s ease; }
+.assign-batch:hover { border-color: #b9d3e6; background: #f8fbfd; }
+.assign-batch:has(input:checked) { border-color: #0571d0; background: #f1f7fd; box-shadow: 0 0 0 1px #0571d0 inset; }
+.assign-batch > span { flex: 1; min-width: 0; }
+.td-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: -4px; }
+.td-edit .portal-form { padding: 0; }
+.td-note { margin: -4px 0 10px; font-size: 12.5px; color: var(--muted); }
+/* Trainees list (Oct 2026): one toolbar, clearer columns. */
+.tl-panel { padding: 16px 18px; }
+.tl-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px 14px; margin-bottom: 12px; }
+.tl-search { flex: 1 1 280px; display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border: 1px solid #d3e1e8; border-radius: 12px; background: #fff; color: var(--muted); }
+.tl-search input { border: 0 !important; outline: 0; min-height: 0 !important; padding: 0 !important; background: transparent; width: 100%; font-size: 15px; box-shadow: none !important; }
+.tl-date { display: grid; gap: 3px; font-size: 12px; color: var(--muted); font-weight: 600; }
+.tl-date input { min-height: 40px !important; padding: 6px 10px !important; font-size: 14px; }
+.tl-count { margin-left: auto; font-size: 13px; color: var(--muted); align-self: center; }
+.tl-panel .num { text-align: right; }

@@ -15,7 +15,7 @@ import { automaticEndDate, batchPatternLabel, validBatchStart } from "@/lib/sche
 import { AdminConfiguration } from "./admin-configuration";
 import { DateReports } from "./date-reports";
 import { downloadCsv } from "@/lib/csv";
-import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters } from "./portal/live-registration";
+import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer } from "./portal/live-registration";
 import { Badge, Message, Modal, Page, PageHead, submit, fullName } from "./portal/shared-ui";
 import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, first, dueCentavos, balanceOf, isUnpaid, manilaToday } from "@/lib/portal-format";
@@ -175,7 +175,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Dashboard"&&gateRole==="registration")return <RegistrationDashboard data={data} go={m=>go(m as Module)}/>;
   if(active==="Courses")return <CoursesAndCenters data={data} query={query}/>;
   if(active==="For payment")return <CashierPaymentQueue data={data} onPay={onPay}/>;
-  if(active==="Registration")return <RegistrationRecords data={data} query={query} reload={reload} view={recordsView} setView={setRecordsView} trainees={<Trainees data={data} query={query} embedded/>}/>;
+  if(active==="Registration")return <RegistrationRecords data={data} query={query} reload={reload} view={recordsView} setView={setRecordsView} trainees={<Trainees data={data} query={query} embedded reload={reload} role={gateRole}/>}/>;
   if(active==="Dashboard"&&gateRole==="admin")return <AdminDashboard data={data} go={m=>go(m as Module)} openEnrollment={()=>open("enrollment")}/>;
   if(active==="Dashboard"&&gateRole==="training_operations")return <ScheduleOfficerDashboard data={data} go={m=>go(m as Module)} openBatch={()=>open("batch")}/>;
   if(active==="Training calendar")return <TrainingCalendar data={data}/>;
@@ -184,7 +184,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Schedule changes")return <ScheduleChanges data={data}/>;
   if(active==="Dashboard")return <Dashboard data={data} role={gateRole} open={open} canEnroll={canEnroll} canPay={canPay} reload={reload}/>;
   if(active==="Search trainee"&&gateRole==="admin")return <LiveSearchTrainee data={{trainees:data.trainees,enrollments:data.enrollments,payments:data.payments}}/>;
-  if(active==="Trainees")return <Trainees data={data} query={query}/>;
+  if(active==="Trainees")return <Trainees data={data} query={query} reload={reload} role={gateRole}/>;
   if(active==="Enrollments")return <Enrollments data={data} query={query} open={open} canEnroll={canEnroll} role={gateRole} reload={reload}/>;
   if(active==="Trainee enrollments")return <TraineesEnrollments data={data} query={query} open={open} canEnroll={canEnroll} role={gateRole} reload={reload}/>;
   if(active==="Schedules")return <Schedules data={data} query={query} open={open} canSchedule={canSchedule} role={gateRole} reload={reload}/>;
@@ -261,30 +261,50 @@ function TraineesEnrollments({data,query,open,canEnroll,role,reload}:{data:Porta
   return <><Trainees data={data} query={query}/><Enrollments data={data} query={query} open={open} canEnroll={canEnroll} role={role} reload={reload}/></>;
 }
 
-function Trainees({data,query,embedded}:{data:PortalData;query:string;embedded?:boolean}){
-  const [lookup,setLookup]=useState(""),[from,setFrom]=useState(""),[to,setTo]=useState(""),[sel,setSel]=useState<Trainee|null>(null);
-  const term=(lookup||query).toLowerCase();
+function Trainees({data,query,embedded,reload,role}:{data:PortalData;query:string;embedded?:boolean;reload?:()=>Promise<void>;role?:string}){
+  const [lookup,setLookup]=useState(""),[from,setFrom]=useState(""),[to,setTo]=useState(""),[selId,setSelId]=useState<string|null>(null);
+  const term=(lookup||query).trim().toLowerCase();
   const rows=data.trainees.filter(t=>{
     const reg=(t.registered_at||"").slice(0,10);
-    const matchesTerm=!term||`${fullName(t)} ${t.trainee_number} ${data.applicationNumbers?.[t.id]??""} ${t.email} ${t.mobile}`.toLowerCase().includes(term);
+    const matchesTerm=!term||`${fullName(t)} ${t.trainee_number} ${data.applicationNumbers?.[t.id]??""} ${t.srn??""} ${t.email} ${t.mobile}`.toLowerCase().includes(term);
     return matchesTerm&&(!from||reg>=from)&&(!to||reg<=to);
   });
-  const rangeLabel=from||to?`${from?date(from):"…"} – ${to?date(to):"…"}`:"All dates";
-  return <Page embedded={embedded} head={<PageHead eyebrow="Central master records" title="Trainees" text="Persisted profiles used across enrollment and payments. Enroll trainees from the Enrollments tab."/>}>
-    <section className="portal-panel" style={{marginBottom:16}}><div className="panel-heading"><div><h2>Trainee lookup</h2><p>Find any trainee by name, number, email, or mobile</p></div></div><div className="portal-form" style={{padding:"0 0 4px"}}><label className="full">Search<input value={lookup} onChange={e=>setLookup(e.target.value)} placeholder="Search name, NWMTACI number, email, or mobile"/></label></div></section>
-    <section className="portal-panel"><div className="panel-heading"><div><h2>Trainee summary</h2><p>Date-sensitive · {rangeLabel}</p></div></div>
-      <div className="portal-form" style={{padding:"0 0 8px"}}><label>Start date<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>End date<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label>{(from||to)&&<label style={{alignSelf:"end"}}><button type="button" className="ghost-button" onClick={()=>{setFrom("");setTo("")}}>Clear dates</button></label>}</div>
-      <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Contact</th><th>Status</th><th>Registered</th><th></th></tr></thead><tbody>{rows.map(t=>{const s=traineeEnrollmentStatus(data,t.id);return <tr key={t.id} className="row-clickable" onClick={()=>setSel(t)}><td><strong>{fullName(t)}</strong><small>{t.trainee_number}</small></td><td className="lc">{t.email}<small>{t.mobile}</small></td><td>{s?<Badge>{s}</Badge>:<span className="portal-empty-copy">—</span>}</td><td>{new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",year:"numeric",timeZone:"Asia/Manila"}).format(new Date(t.registered_at))}</td><td className="document-actions"><button type="button">View</button></td></tr>})}</tbody></table>{!rows.length&&<p className="portal-empty-copy">No matching trainees.</p>}</div>
+  // Re-read the trainee from the latest data so the profile reflects edits.
+  const sel=selId?data.trainees.find(t=>t.id===selId)??null:null;
+  const coursesOf=(id:string)=>data.enrollments.filter(e=>e.trainee_id===id&&e.enrollment_status!=="Cancelled");
+  return <Page embedded={embedded} head={<PageHead eyebrow="Central master records" title="Trainees" text="Every trainee record. Open one to see their enrollments, payments and requests."/>}>
+    <section className="portal-panel tl-panel">
+      <div className="tl-toolbar">
+        <label className="tl-search"><span aria-hidden="true">⌕</span><input value={lookup} onChange={e=>setLookup(e.target.value)} placeholder="Search name, NWMTACI number, SRN, email or mobile" aria-label="Search trainees"/></label>
+        <label className="tl-date">Registered from<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label>
+        <label className="tl-date">to<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label>
+        {(from||to)&&<button type="button" className="ghost-button" onClick={()=>{setFrom("");setTo("")}}>Clear</button>}
+        <span className="tl-count">{rows.length} of {data.trainees.length}</span>
+      </div>
+      <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Contact</th><th>Courses</th><th>Status</th><th className="num">Balance</th><th>Registered</th></tr></thead><tbody>
+        {rows.map(t=>{const s=traineeEnrollmentStatus(data,t.id);const list=coursesOf(t.id);const bal=list.reduce((sum,e)=>sum+balanceOf(e),0);const no=data.applicationNumbers?.[t.id];return <tr key={t.id} className="row-clickable" onClick={()=>setSelId(t.id)}>
+          <td><strong>{fullName(t)}</strong><small>{no&&<span className="app-no">{no}</span>}{t.trainee_number}</small></td>
+          <td><span className="lc">{t.email}</span><small>{t.mobile}</small></td>
+          <td>{list.length?<>{first(list[0].courses)?.code??first(list[0].courses)?.name}{list.length>1&&<small>+{list.length-1} more</small>}</>:<span className="muted-text">None yet</span>}</td>
+          <td><Badge tone={s==="Enrolled"?"green":s==="Cancelled"?"red":"orange"}>{s}</Badge></td>
+          <td className="num"><strong>{pesos(bal)}</strong></td>
+          <td>{t.registered_at?date(t.registered_at.slice(0,10)):"—"}</td>
+        </tr>})}
+      </tbody></table>{!rows.length&&<p className="portal-empty-copy">No trainees match.</p>}</div>
     </section>
-    {sel&&<TraineeDetailModal data={data} trainee={sel} onClose={()=>setSel(null)}/>}
+    {sel&&<TraineeDetailModal data={data} trainee={sel} reload={reload} role={role} onClose={()=>setSelId(null)}/>}
   </Page>;
 }
 
 // Trainee details ("Profile & tabs", Oct 2026): header with totals, then
 // Overview / Enrollments / Payments / Requests. No copy/paste packet.
 type TraineeTab="Overview"|"Enrollments"|"Payments"|"Requests";
-export function TraineeDetailModal({data,trainee,onClose}:{data:PortalData;trainee:Trainee;onClose:()=>void}){
+export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:PortalData;trainee:Trainee;onClose:()=>void;reload?:()=>Promise<void>;role?:string}){
   const [tab,setTab]=useState<TraineeTab>("Overview");
+  // Registration (and Admin) can edit contact details, add a course, and open an
+  // enrollment to screen it or request a change.
+  const canEdit=!!reload&&["registration","admin","super_admin"].includes(role??"");
+  const [editing,setEditing]=useState(false),[addingCourse,setAddingCourse]=useState(false),[openEnrollment,setOpenEnrollment]=useState<string|null>(null);
   const enrolls=data.enrollments.filter(e=>e.trainee_id===trainee.id).sort((a,b)=>b.created_at.localeCompare(a.created_at));
   const payments=data.payments.filter(p=>p.trainee_id===trainee.id).sort((a,b)=>b.received_at.localeCompare(a.received_at));
   const requests=data.requests.filter(r=>first(r.enrollments)?.trainee_id===trainee.id).sort((a,b)=>b.created_at.localeCompare(a.created_at));
@@ -308,16 +328,17 @@ export function TraineeDetailModal({data,trainee,onClose}:{data:PortalData;train
         <div className="td-id"><strong>{fullName(trainee)}</strong><small>{appNo&&<span className="app-no">{appNo}</span>}{trainee.trainee_number}{trainee.rank?` · ${trainee.rank}`:""}{trainee.registered_at?` · Registered ${date(trainee.registered_at.slice(0,10))}`:""}</small></div>
         <div className="td-totals"><div><span>Enrollments</span><b>{enrolls.length}</b></div><div><span>Total paid</span><b>{pesos(totalPaid)}</b></div><div><span>Balance</span><b className={balance>0?"due":""}>{pesos(balance)}</b></div></div>
       </div>
+      {canEdit&&<div className="td-actions"><button type="button" className="portal-primary" onClick={()=>setAddingCourse(true)}>+ Add course</button><button type="button" className="portal-secondary" onClick={()=>{setTab("Overview");setEditing(true)}}>Edit details</button></div>}
       <div className="td-tabs" role="tablist">{tabs.map(([k,label])=><button key={k} type="button" role="tab" aria-selected={tab===k} className={tab===k?"active":""} onClick={()=>setTab(k)}>{label}</button>)}</div>
 
       {tab==="Overview"&&<div className="td-grid">
-        <section className="td-card"><h4>Personal &amp; contact</h4><div className="td-kv">{kv("SRN",trainee.srn)}{kv("Rank",trainee.rank)}{kv("Born",[trainee.birthdate?date(trainee.birthdate):"",trainee.place_of_birth].filter(Boolean).join(" · "))}{kv("Company",trainee.company)}{kv("Mobile",trainee.mobile)}<div><span>Email</span><b className="lc">{trainee.email||"—"}</b></div><div className="wide"><span>Address</span><b>{trainee.address||"—"}</b></div><div className="wide"><span>Emergency contact</span><b>{em?.name?`${em.name}${em.mobile?` · ${em.mobile}`:""}`:"—"}</b></div></div></section>
+        {editing&&reload?<TraineeEditForm trainee={trainee} reload={reload} onDone={()=>setEditing(false)}/>:<section className="td-card"><h4>Personal &amp; contact</h4><div className="td-kv">{kv("SRN",trainee.srn)}{kv("Rank",trainee.rank)}{kv("Born",[trainee.birthdate?date(trainee.birthdate):"",trainee.place_of_birth].filter(Boolean).join(" · "))}{kv("Company",trainee.company)}{kv("Mobile",trainee.mobile)}<div><span>Email</span><b className="lc">{trainee.email||"—"}</b></div><div className="wide"><span>Address</span><b>{trainee.address||"—"}</b></div><div className="wide"><span>Emergency contact</span><b>{em?.name?`${em.name}${em.mobile?` · ${em.mobile}`:""}`:"—"}</b></div></div></section>}
         <section className="td-card"><h4>Latest payments</h4>{payments.slice(0,4).map(p=><div className="td-line" key={p.id}><span><b className="td-mono">{p.payment_number}</b><small>{date(p.received_at.slice(0,10))} · {p.method}</small></span><span className="td-money">{pesos(p.amount_centavos)}</span></div>)}{!payments.length&&<p className="td-empty">No payments yet.</p>}
           <h4 className="td-sub">Open requests</h4>{openRequests.map(r=>{const st=reqStage(r);return <div className="td-line" key={r.id}><span><b>{reqType(r)}</b><small>{first(r.enrollments)?.enrollment_number} · {r.reason}</small></span><Badge tone={st.c}>{st.t}</Badge></div>})}{!openRequests.length&&<p className="td-empty">No open requests.</p>}</section>
       </div>}
 
       {tab==="Enrollments"&&<section className="td-card"><div className="portal-table"><table><thead><tr><th>Course</th><th>Schedule</th><th>Status</th><th className="num">Due</th><th className="num">Paid</th><th className="num">Balance</th><th></th></tr></thead><tbody>
-        {enrolls.map(e=>{const st=statusOf(e),charges=Number(e.charges_centavos??0);return <tr key={e.id}><td><strong>{first(e.courses)?.name??"—"}</strong><small>{e.enrollment_number}</small></td><td>{scheduleOfE(e)}</td><td><Badge tone={st.c}>{st.t}</Badge></td><td className="num td-money">{pesos(dueCentavos(e))}{charges>0&&<small>incl. {pesos(charges)} charges</small>}</td><td className="num td-money">{pesos(e.paid_centavos)}</td><td className="num td-money">{pesos(e.enrollment_status==="Cancelled"?0:balanceOf(e))}</td><td>{e.enrollment_status==="Enrolled"&&<a href={`/api/documents/admission-invoice/${e.id}`} target="_blank" rel="noreferrer">Admission slip</a>}</td></tr>})}
+        {enrolls.map(e=>{const st=statusOf(e),charges=Number(e.charges_centavos??0);return <tr key={e.id} className={canEdit?"row-clickable":undefined} onClick={canEdit?()=>setOpenEnrollment(e.id):undefined} title={canEdit?"Open to screen, choose a batch or request a change":undefined}><td><strong>{first(e.courses)?.name??"—"}</strong><small>{e.enrollment_number}</small></td><td>{scheduleOfE(e)}</td><td><Badge tone={st.c}>{st.t}</Badge></td><td className="num td-money">{pesos(dueCentavos(e))}{charges>0&&<small>incl. {pesos(charges)} charges</small>}</td><td className="num td-money">{pesos(e.paid_centavos)}</td><td className="num td-money">{pesos(e.enrollment_status==="Cancelled"?0:balanceOf(e))}</td><td>{e.enrollment_status==="Enrolled"&&<a href={`/api/documents/admission-invoice/${e.id}`} target="_blank" rel="noreferrer" onClick={ev=>ev.stopPropagation()}>Admission slip</a>}</td></tr>})}
       </tbody></table>{!enrolls.length&&<p className="td-empty">No enrollments yet.</p>}</div></section>}
 
       {tab==="Payments"&&<section className="td-card"><div className="portal-table"><table><thead><tr><th>Payment</th><th>Date</th><th>Method · reference</th><th>State</th><th className="num">Amount</th></tr></thead><tbody>
@@ -328,7 +349,34 @@ export function TraineeDetailModal({data,trainee,onClose}:{data:PortalData;train
 
       <div className="portal-form-actions"><button type="button" className="portal-secondary" onClick={onClose}>Close</button></div>
     </div>
+    {addingCourse&&reload&&<AssignCourseModal data={data} trainee={trainee} reload={reload} onClose={()=>{setAddingCourse(false);setTab("Enrollments")}}/>}
+    {openEnrollment&&reload&&(()=>{const e=data.enrollments.find(x=>x.id===openEnrollment);return e?<EnrollmentDrawer data={data} enrollment={e} reload={reload} onClose={()=>setOpenEnrollment(null)}/>:null})()}
   </Modal>;
+}
+
+/** Edit a trainee's contact and work details. Name, SRN and birth date stay as recorded. */
+function TraineeEditForm({trainee,reload,onDone}:{trainee:Trainee;reload:()=>Promise<void>;onDone:()=>void}){
+  const em=trainee.emergency_contact;
+  const [f,setF]=useState({mobile:trainee.mobile??"",email:trainee.email??"",address:trainee.address??"",placeOfBirth:trainee.place_of_birth??"",rank:trainee.rank??"",company:trainee.company??"",suffix:trainee.suffix??"",emergencyContactName:em?.name??"",emergencyContactMobile:em?.mobile??""});
+  const [busy,setBusy]=useState(false),[err,setErr]=useState("");
+  const set=(k:keyof typeof f)=>(ev:{target:{value:string}})=>setF(c=>({...c,[k]:ev.target.value}));
+  async function save(){setBusy(true);setErr("");try{await submit({action:"trainee-update",traineeId:trainee.id,...f});await reload();onDone()}catch(e){setErr(e instanceof Error?e.message:"Could not save the changes.")}finally{setBusy(false)}}
+  return <section className="td-card td-edit"><h4>Edit details</h4>
+    {err&&<Message kind="error" text={err}/>}
+    <p className="td-note">Name, SRN and birth date are kept as recorded.</p>
+    <div className="portal-form">
+      <label>Mobile number<input value={f.mobile} onChange={set("mobile")} inputMode="tel"/></label>
+      <label>Email<input className="lc" type="email" value={f.email} onChange={set("email")}/></label>
+      <label className="full">Complete address<input value={f.address} onChange={set("address")}/></label>
+      <label>Place of birth<input value={f.placeOfBirth} onChange={set("placeOfBirth")}/></label>
+      <label>Suffix<input value={f.suffix} onChange={set("suffix")} placeholder="Jr., III"/></label>
+      <label>Rank<input value={f.rank} onChange={set("rank")}/></label>
+      <label>Company / manning agency<input value={f.company} onChange={set("company")}/></label>
+      <label>Emergency contact person<input value={f.emergencyContactName} onChange={set("emergencyContactName")}/></label>
+      <label>Emergency contact number<input value={f.emergencyContactMobile} onChange={set("emergencyContactMobile")} inputMode="tel"/></label>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onDone}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={()=>void save()}>{busy?"Saving…":"Save changes"}</button></div>
+    </div>
+  </section>;
 }
 
 function Enrollments({data,query,open,canEnroll,role,reload}:{data:PortalData;query:string;open:(v:"enrollment")=>void;canEnroll:boolean;role:string;reload:()=>Promise<void>}){

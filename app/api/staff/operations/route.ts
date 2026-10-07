@@ -4,7 +4,7 @@ import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hardDeleteEnrollment, pruneUnpaidEnrollments, deletePastEmptyBatches } from "@/lib/enrollments";
-import { VALIDATION_MESSAGES, isPhContactNumber, isSrn, normalizePhContactNumber, normalizeSrn } from "@/lib/validation";
+import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn, normalizeEmail, normalizePhContactNumber, normalizeSrn } from "@/lib/validation";
 
 const enrollmentInput = z.object({
   action: z.literal("create-enrollment"), existingTraineeId: z.string().uuid().nullable().optional(),
@@ -141,6 +141,14 @@ const rescheduleInput = z.object({ action: z.literal("enrollment-reschedule"), e
 const REQUIREMENT_CODES = ["valid_id", "seamans_book", "medical_certificate"] as const;
 const requirementCheckInput = z.object({ action: z.literal("requirement-check"), enrollmentId: z.string().uuid(), requirement: z.enum(REQUIREMENT_CODES), status: z.enum(["Verified", "Rejected"]), remarks: z.string().trim().max(500).optional() });
 const applicationEnrollInput = z.object({ action: z.literal("application-enroll"), enrollmentId: z.string().uuid() });
+// Registration edits a trainee's contact and work details from the profile.
+// Name, SRN and birth date identify the person and are not edited here.
+const optionalContact = z.string().trim().max(40).optional().refine((v) => !v || isPhContactNumber(v), VALIDATION_MESSAGES.contact);
+const traineeUpdateInput = z.object({ action: z.literal("trainee-update"), traineeId: z.string().uuid(),
+  mobile: z.string().trim().refine(isPhContactNumber, VALIDATION_MESSAGES.contact), email: z.string().trim().refine(isEmail, VALIDATION_MESSAGES.email),
+  address: z.string().trim().min(8, "Enter the complete address.").max(500), placeOfBirth: z.string().trim().max(160).optional(),
+  rank: z.string().trim().max(100).optional(), company: z.string().trim().max(160).optional(), suffix: z.string().trim().max(20).optional(),
+  emergencyContactName: z.string().trim().max(160).optional(), emergencyContactMobile: optionalContact });
 const applicationHandoverInput = z.object({ action: z.literal("application-handover"), enrollmentId: z.string().uuid() });
 const requestChargeInput = z.object({ action: z.literal("request-charge"), id: z.string().uuid(), chargeCatalogId: z.string().uuid().nullable().optional(), description: z.string().trim().max(200).optional(), amountCentavos: z.number().int().min(0), remarks: z.string().trim().max(500).optional() });
 // Course now, batch later (202610070005): the batch is optional.
@@ -152,7 +160,7 @@ const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-li
 const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional(), courseId: z.string().uuid().nullable().optional(), partnerOfferId: z.string().uuid().nullable().optional() });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -807,6 +815,22 @@ export async function POST(request: Request) {
       const { data: check, error } = await admin.from("enrollment_requirement_checks").insert(row).select("id,checked_at").single();
       if (error) throw error;
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "registration", action: "application.requirement_checked", record_type: "enrollment", record_id: input.enrollmentId, new_values: { ...row, id: check.id, checked_at: check.checked_at } });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "trainee-update") {
+      if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot edit trainee details." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: prior, error: findError } = await admin.from("trainees").select("id,mobile,email,address,place_of_birth,rank,company,suffix,emergency_contact").eq("id", input.traineeId).maybeSingle();
+      if (findError) throw findError;
+      if (!prior) return NextResponse.json({ error: "Trainee not found." }, { status: 404 });
+      const next = {
+        mobile: normalizePhContactNumber(input.mobile), email: normalizeEmail(input.email), address: input.address,
+        place_of_birth: input.placeOfBirth || null, rank: input.rank || null, company: input.company || null, suffix: input.suffix || null,
+        emergency_contact: input.emergencyContactName ? { name: input.emergencyContactName, mobile: input.emergencyContactMobile ? normalizePhContactNumber(input.emergencyContactMobile) : null } : {},
+      };
+      const { error } = await admin.from("trainees").update(next).eq("id", input.traineeId);
+      if (error) throw error;
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "registration", action: "trainee.updated", record_type: "trainee", record_id: input.traineeId, prior_values: prior, new_values: next });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "application-handover") {
