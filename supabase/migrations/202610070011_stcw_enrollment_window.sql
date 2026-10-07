@@ -16,9 +16,9 @@ begin;
 alter table public.courses add column if not exists late_enrollment boolean not null default false;
 update public.courses set late_enrollment = true where code = 'CCMD' and delivery_type = 'In-House';
 create or replace function public.allows_late_enrollment(target_course uuid)
-returns boolean language sql stable security definer set search_path = public as $
+returns boolean language sql stable security definer set search_path = public as $$
   select coalesce((select late_enrollment from public.courses where id = target_course), false)
-$;
+$$;
 grant execute on function public.allows_late_enrollment(uuid) to anon, authenticated, service_role;
 
 -- 24 seats per STCW batch.
