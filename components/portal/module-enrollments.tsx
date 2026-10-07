@@ -1300,10 +1300,10 @@ export function AdmissionInvoiceModal({
       }
     >
       <div className="form-grid">
-        <Field label="Assigned Registration Officer">
+        <Field label="Assigned registration officer">
           <input value={officer} onChange={(event) => setOfficer(event.target.value)} />
         </Field>
-        <Field label="Cashier Assigned">
+        <Field label="Cashier assigned">
           <input value={cashier} onChange={(event) => setCashier(event.target.value)} />
         </Field>
       </div>

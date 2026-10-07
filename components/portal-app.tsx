@@ -842,7 +842,7 @@ function RegistrationHub({ role, go }: { role: Role; go: (module: Module) => voi
       <div className="hub-tabs">
         {tabs.map((item) => (
           <button key={item} className={active === item ? "active" : ""} onClick={() => setTab(item)}>
-            {item === "Enrollments" ? "Enrollments Summary" : item}
+            {item === "Enrollments" ? "Enrollments summary" : item}
           </button>
         ))}
       </div>

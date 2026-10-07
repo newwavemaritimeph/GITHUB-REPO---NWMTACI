@@ -5,15 +5,24 @@
    ========================================================================== */
 
 :root {
+  /* Brand hues, unchanged. --orange is a FILL and large-type colour only:
+     on white it measures 3.43:1, below the 4.5:1 AA floor for normal text.
+     Use --orange-fill behind white labels (4.90:1) and --orange-text for
+     orange-coloured text on white (5.89:1). --cyan is 1.88:1: never text. */
   --orange: #f25615;
+  --orange-fill: #c8440e;
+  --orange-text: #b23d0c;
   --orange-dark: #c53b0a;
   --blue: #0571d0;
+  --blue-text: #0a5ba0;
   --blue-dark: #123f63;
   --cyan: #35ccfa;
   --cyan-soft: #e9faff;
-  --ink: #12354c;
-  --ink-soft: #35566c;
-  --muted: #62798a;
+  /* Text tones, measured against white: 16.3:1, 11.8:1, 6.7:1. The previous
+     --muted was 4.89:1 — a technical pass that read thin at small sizes. */
+  --ink: #0a2232;
+  --ink-soft: #1c3b4e;
+  --muted: #40606f;
   --paper: #f4f8fa;
   --surface: #ffffff;
   --line: #dde8ee;
@@ -70,7 +79,8 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--font-geist-sans), "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-ui), "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-variant-numeric: tabular-nums;
   font-size: 16px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -121,24 +131,20 @@ h1,
 h2,
 h3,
 h4,
-.eyebrow,
+/* Editorial direction: the serif carries headings and figures; small tracked
+   eyebrows stay in the UI face, where a serif would read as fussy. */
+h1, h2, h3,
 .tagline-lead,
 .tagline-sub {
-  font-family: var(--font-display), var(--font-geist-sans), "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  letter-spacing: -0.012em;
+}
+.eyebrow {
+  font-family: var(--font-ui), "Segoe UI", system-ui, sans-serif;
 }
 
-/* All data entries render in ALL CAPS (email/password/date/number keep their
-   case; placeholders stay in normal case for legibility). */
-input[type="text"],
-input[type="search"],
-input:not([type]),
-textarea {
-  text-transform: uppercase;
-}
-input::placeholder,
-textarea::placeholder {
-  text-transform: none;
-}
+/* Data entry renders exactly as typed — see the sentence-case note below. */
 
 img {
   max-width: 100%;
@@ -174,7 +180,7 @@ img {
 }
 
 .button-primary {
-  background: var(--orange);
+  background: var(--orange-fill);
   color: #fff;
   box-shadow: 0 8px 20px rgba(242, 86, 21, 0.22);
 }
@@ -506,6 +512,10 @@ img {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  /* The mark sits inside the rounded clip with a hair of room, so the wave's
+     lower edge is never cut by the corner radius. */
+  padding: 3px;
+  box-sizing: border-box;
 }
 
 .logo-copy {
@@ -2188,7 +2198,7 @@ img {
 }
 
 .wizard-steps li.current span {
-  background: var(--orange);
+  background: var(--orange-fill);
   color: #fff;
 }
 
@@ -2863,7 +2873,7 @@ code {
 
 .sidebar nav button small {
   margin-left: auto;
-  background: var(--orange);
+  background: var(--orange-fill);
   color: #fff;
   padding: 2px 7px;
   border-radius: 10px;
@@ -3052,7 +3062,7 @@ code {
   border-radius: 9px;
   display: grid;
   place-items: center;
-  background: var(--orange);
+  background: var(--orange-fill);
   color: #fff;
   font-size: 10px;
   font-weight: 700;
@@ -3205,9 +3215,10 @@ code {
 
 .primary-button,
 .portal-primary {
-  background: var(--orange);
+  background: var(--orange-fill);
   color: #fff;
-  box-shadow: 0 6px 16px rgba(242, 86, 21, 0.2);
+  /* Editorial: structure from rules and space, not coloured glows. */
+  box-shadow: none;
 }
 
 .primary-button:hover:not(:disabled),
@@ -4232,7 +4243,7 @@ code {
 }
 
 .stage-track li.current span {
-  background: var(--orange);
+  background: var(--orange-fill);
   color: #fff;
   box-shadow: 0 0 0 4px rgba(242, 86, 21, 0.15);
 }
@@ -4994,9 +5005,26 @@ code {
 }
 
 @media (max-width: 980px) {
+  /* The nav used to be hidden outright below 980px with no menu button, which
+     left About, Courses and Contact unreachable on a phone. Keep it visible as
+     a single scrollable row instead — the links are the point of the header. */
   .public-nav nav {
-    display: none;
+    display: flex;
+    gap: 18px;
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    scrollbar-width: none;
+    padding: 10px 0 2px;
+    border-top: 1px solid var(--line-soft);
+    margin-top: 10px;
   }
+  .public-nav nav::-webkit-scrollbar { display: none }
+  .public-nav nav a {
+    white-space: nowrap;
+    font-size: 14px;
+  }
+  .public-nav { flex-wrap: wrap }
   .hero {
     grid-template-columns: 1fr;
     padding-top: 52px;
@@ -5595,11 +5623,10 @@ code {
   padding-left: 3px;
 }
 
-.caps-heading { text-transform: uppercase; letter-spacing: 0.01em; }
+.caps-heading { letter-spacing: 0.01em; }
 
 /* All-caps entry inputs */
-.caps-form input { text-transform: uppercase; }
-.caps-form input[type="email"] { text-transform: none; }
+/* Form input renders as typed — see the sentence-case note above. */
 
 /* Terms and Conditions box — single combined block */
 .terms-box {
@@ -5868,23 +5895,518 @@ code {
 .config-picker .portal-field-inline { min-width: 260px; }
 
 /* =====================================================================
-   House typography: ALL-CAPS everywhere (owner directive, Aug 2026).
-   Display-only — stored values are untouched. The ONLY exemptions are
-   emails (typing or reading an address in caps is misleading) and
-   passwords. Wrap any element that shows an email address in .lc.
+   House typography: sentence case (CLAUDE.md, owner directive Oct 2026).
+   The blanket ALL-CAPS transform that used to live here is gone — body
+   copy, labels, buttons and form input now render in the case they are
+   written in. Uppercase is opted into per component for small eyebrows
+   and table headings, where it is a type treatment rather than shouting.
+   .lc is kept for emails, URLs and other verbatim values so they survive
+   any transform a component applies.
    ===================================================================== */
-body,
-input,
-select,
-textarea,
-button,
-::placeholder {
-  text-transform: uppercase;
-}
-input[type="email"],
-input[type="password"],
 a[href^="mailto:"],
 .lc,
 .lc * {
   text-transform: none !important;
+}
+
+/* ======================================================================
+   Home hero — built to the supplied mockup.
+   The headline is the one place that deliberately departs from the house
+   sentence case and the Editorial serif: the mockup calls for a heavy,
+   all-caps sans. The transform is display-only, so the DOM keeps real
+   sentence-case text for search engines and screen readers.
+   ====================================================================== */
+.nw-hero {
+  position: relative;
+  padding: clamp(18px, 3vw, 34px) var(--space-page) 0;
+  background: #fff;
+  overflow: hidden;
+}
+
+/* Light wave field bottom-left, drawn rather than imaged so it stays crisp
+   at any width and costs nothing to download. */
+.nw-hero-art {
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 54%;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 100% at 8% 100%, #eaf6fd 0%, #f4fbff 42%, #ffffff 72%);
+}
+.nw-hero-art::before,
+.nw-hero-art::after {
+  content: "";
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  bottom: 0;
+  height: 190px;
+  background: #dff0fb;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+.nw-hero-art::after {
+  bottom: -46px;
+  background: #c7e6f8;
+  opacity: 1;
+}
+
+.nw-hero-grid {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(0, 1fr);
+  gap: clamp(20px, 3vw, 46px);
+  align-items: center;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding-top: clamp(10px, 2vw, 26px);
+}
+
+.nw-eyebrow {
+  display: block;
+  font-size: clamp(13px, 1.1vw, 16px);
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--orange-text);
+}
+
+.nw-headline {
+  font-family: var(--font-ui), "Segoe UI", system-ui, sans-serif;
+  font-size: clamp(38px, 5.6vw, 82px);
+  line-height: 0.98;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  text-transform: uppercase;
+  color: var(--blue-dark);
+  margin: clamp(10px, 1.4vw, 18px) 0 0;
+  text-wrap: balance;
+}
+.nw-headline em {
+  font-style: normal;
+  color: var(--orange);
+}
+
+.nw-lede {
+  margin: clamp(14px, 1.6vw, 22px) 0 0;
+  max-width: 54ch;
+  font-size: clamp(15px, 1.2vw, 19px);
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+
+.nw-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: clamp(18px, 2vw, 28px);
+}
+.nw-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 28px;
+  border-radius: 10px;
+  font-size: clamp(14px, 1vw, 17px);
+  font-weight: 700;
+  text-decoration: none;
+  border: 2px solid transparent;
+}
+.nw-btn-primary {
+  background: var(--orange-fill);
+  color: #fff;
+}
+.nw-btn-ghost {
+  background: #fff;
+  color: var(--blue-text);
+  border-color: var(--blue);
+}
+
+/* ---- right-hand visual ---- */
+.nw-hero-visual {
+  position: relative;
+  min-height: clamp(280px, 34vw, 470px);
+}
+.nw-photo {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  /* Solid brand panel underneath, so a missing photo degrades to a clean
+     block instead of a broken-image icon. Drop the file in and it appears. */
+  background-color: #f3d9b1;
+  background-image: linear-gradient(90deg, #ffffff 0%, rgba(255, 255, 255, 0) 16%), url("/office.webp");
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat;
+  box-shadow: var(--shadow);
+}
+.nw-credentials {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  gap: 10px;
+}
+.nw-cred {
+  display: block;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--blue-dark);
+  line-height: 1.15;
+  text-align: center;
+}
+.nw-cred small {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+.nw-modality {
+  position: absolute;
+  top: 16%;
+  left: -34px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border-radius: 999px;
+  padding: 10px 20px 10px 10px;
+  box-shadow: var(--shadow-sm);
+}
+.nw-modality i {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--blue);
+  color: #fff;
+  font-style: normal;
+  font-size: 17px;
+}
+.nw-modality span {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+.nw-modality strong {
+  display: block;
+  font-size: 15px;
+  color: var(--blue-dark);
+}
+
+/* ---- fanned certificate strip ---- */
+.nw-certs {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: clamp(6px, 0.8vw, 14px);
+  width: min(60%, 880px);
+  margin: clamp(-54px, -4vw, -28px) 0 0 auto;
+  padding: 0 0 clamp(16px, 2vw, 28px);
+  list-style: none;
+}
+.nw-cert {
+  flex: 1 1 0;
+  max-width: 220px;
+  min-height: clamp(150px, 17vw, 215px);
+  background: #fdfcf7;
+  border: 1px solid #e4dcc6;
+  border-radius: 4px;
+  padding: 14px 12px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--shadow-sm);
+  /* Middle card sits proudest, matching the fan in the mockup. */
+  transform: translateY(calc(var(--i, 0) * 0px));
+}
+.nw-cert:nth-child(1) { transform: translateY(18px) rotate(-5deg) }
+.nw-cert:nth-child(2) { transform: translateY(7px) rotate(-2.5deg) }
+.nw-cert:nth-child(3) { transform: translateY(-10px); z-index: 2 }
+.nw-cert:nth-child(4) { transform: translateY(7px) rotate(2.5deg) }
+.nw-cert:nth-child(5) { transform: translateY(18px) rotate(5deg) }
+.nw-certs { gap: 0 }
+.nw-cert + .nw-cert { margin-left: -10px }
+/* Cards that carry a real scan show the certificate itself, with the number and
+   course title captioned beneath — the document's own type is far too small to
+   read at card width. */
+.nw-cert { padding: 0 }
+.nw-cert > a {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 8px 10px;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 4px;
+}
+.nw-cert > a:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px }
+.nw-cert img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #e8e2d2;
+  border-radius: 2px;
+}
+.nw-cert strong {
+  font-size: clamp(9px, 0.72vw, 11px);
+  line-height: 1.3;
+}
+
+.nw-cert-no {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--orange-text);
+  letter-spacing: 0.02em;
+}
+.nw-cert-kicker {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--blue-dark);
+  line-height: 1.3;
+}
+.nw-cert strong {
+  font-size: clamp(10px, 0.85vw, 12.5px);
+  line-height: 1.35;
+  color: var(--ink);
+  font-weight: 700;
+}
+.nw-cert-foot {
+  margin-top: auto;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+/* ---- trust strip ---- */
+.nw-trust {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(10px, 2vw, 32px);
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: clamp(18px, 2.4vw, 30px) var(--space-page) clamp(26px, 3vw, 44px);
+}
+.nw-trust > div {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-left: clamp(10px, 2vw, 28px);
+  border-left: 1px solid var(--line);
+}
+.nw-trust > div:first-child { border-left: 0 }
+.nw-trust i {
+  font-style: normal;
+  font-size: clamp(22px, 2.2vw, 32px);
+  color: var(--blue-dark);
+  line-height: 1;
+}
+.nw-trust strong {
+  display: block;
+  font-size: clamp(14px, 1.1vw, 18px);
+  color: var(--blue-dark);
+  font-weight: 700;
+  line-height: 1.2;
+}
+.nw-trust span {
+  display: block;
+  font-size: clamp(13px, 1vw, 16px);
+  color: var(--ink-soft);
+}
+
+@media (max-width: 1040px) {
+  .nw-hero-grid { grid-template-columns: 1fr }
+  .nw-certs { width: 100%; margin: 18px 0 0 }
+  .nw-modality { left: 10px; top: auto; bottom: -18px }
+  .nw-trust { grid-template-columns: repeat(2, minmax(0, 1fr)) }
+  .nw-trust > div:nth-child(odd) { border-left: 0 }
+}
+@media (max-width: 720px) {
+  .nw-certs {
+    flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; gap: 12px;
+    padding: 6px 2px 18px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+  }
+  .nw-cert { flex: 0 0 200px; max-width: none; transform: none !important; margin-left: 0; scroll-snap-align: start }
+  .nw-cert + .nw-cert { margin-left: 0 }
+  .nw-trust { grid-template-columns: 1fr }
+  .nw-trust > div { border-left: 0; padding-left: 0 }
+}
+
+/* ---- Exact-design pass: floating header pill, watermarks, wave band ---- */
+.public-header {
+  height: auto;
+  background: transparent;
+  border-bottom: 0;
+  backdrop-filter: none;
+  padding: 14px var(--space-page) 0;
+}
+.public-nav {
+  max-width: 1500px;
+  height: 72px;
+  padding: 0 10px 0 22px;
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  gap: 30px;
+}
+.public-nav nav { gap: 26px }
+.public-nav nav a {
+  position: relative;
+  font-size: 15.5px;
+  font-weight: 500;
+  color: var(--ink);
+  padding: 6px 0;
+}
+.public-nav nav a.is-active { color: var(--blue); font-weight: 700 }
+.public-nav nav a.is-active::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--blue);
+}
+.nav-search {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: var(--blue-dark);
+}
+.nav-search:hover { background: var(--line-soft) }
+.nav-enroll {
+  padding: 13px 24px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.nav-enroll span { font-size: 20px; line-height: 1 }
+
+/* Ship's wheel watermark top-left and ship silhouette bottom-left, drawn as
+   SVG data URIs so they cost no requests and tint with the palette. */
+.nw-hero-art::before {
+  height: 230px;
+  background: #cfe9f7;
+}
+.nw-hero-art::after {
+  height: 150px;
+  bottom: -40px;
+  background: #1f7fcf;
+  left: -6%;
+  right: -6%;
+  border-radius: 48% 52% 0 0 / 100% 100% 0 0;
+}
+.nw-hero::before,
+.nw-hero::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+/* wheel */
+.nw-hero::before {
+  left: -34px; top: 110px; width: 170px; height: 170px; opacity: 0.55;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23d9ecf6' stroke-width='1.6' stroke-linecap='round'><circle cx='12' cy='12' r='3.2'/><circle cx='12' cy='12' r='8'/><path d='M12 1.5v2.7M12 19.8v2.7M1.5 12h2.7M19.8 12h2.7M4.6 4.6l1.9 1.9M17.5 17.5l1.9 1.9M4.6 19.4l1.9-1.9M17.5 6.5l1.9-1.9M12 8.8V4.2M12 15.2v4.6M8.8 12H4.2M15.2 12h4.6'/></svg>");
+}
+/* ship */
+.nw-hero::after {
+  left: 0; bottom: 118px; width: 330px; height: 110px; opacity: 0.8; z-index: 0;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 330 110' fill='%23b9dcf0'><path d='M8 92 L322 92 L300 108 L30 108 Z'/><rect x='34' y='70' width='250' height='22' rx='2'/><rect x='70' y='48' width='120' height='22' rx='2'/><rect x='90' y='28' width='60' height='20' rx='2'/><rect x='200' y='52' width='60' height='18' rx='2'/><rect x='118' y='12' width='8' height='16'/><rect x='214' y='36' width='8' height='16'/><rect x='40' y='76' width='8' height='6' fill='%23ffffff'/><rect x='56' y='76' width='8' height='6' fill='%23ffffff'/><rect x='72' y='76' width='8' height='6' fill='%23ffffff'/><rect x='88' y='76' width='8' height='6' fill='%23ffffff'/><rect x='104' y='76' width='8' height='6' fill='%23ffffff'/><rect x='120' y='76' width='8' height='6' fill='%23ffffff'/></svg>");
+}
+.nw-hero-grid, .nw-certs { position: relative; z-index: 1 }
+
+.nw-trust i { color: var(--blue-dark); display: grid; place-items: center }
+.nw-trust svg { width: 36px; height: 36px }
+
+@media (max-width: 1040px) {
+  .nw-hero::after { display: none }
+  .public-nav { height: auto; padding: 12px 14px; border-radius: 14px }
+}
+
+/* ---- Mobile menu toggle (client nav) ---- */
+.nav-toggle {
+  display: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--line-soft);
+  color: var(--blue-dark);
+  place-items: center;
+  margin-left: auto;
+  cursor: pointer;
+}
+.nav-toggle:focus-visible,
+.public-nav nav a:focus-visible,
+.nav-search:focus-visible,
+.nav-enroll:focus-visible { outline: 3px solid var(--blue); outline-offset: 2px }
+@media (max-width: 1040px) {
+  .nav-toggle { display: grid }
+  .public-nav nav {
+    display: none;
+    order: 3;
+    width: 100%;
+    flex-direction: column;
+    gap: 2px;
+    overflow: visible;
+    padding: 8px 0 4px;
+    margin-top: 10px;
+    border-top: 1px solid var(--line-soft);
+  }
+  .public-nav nav.is-open { display: flex }
+  .public-nav nav a { padding: 12px 6px; font-size: 16px; min-height: 44px; display: flex; align-items: center }
+  .public-nav nav a.is-active::after { display: none }
+  .public-nav nav a.is-active { color: var(--blue) }
+  .public-nav-actions { gap: 8px }
+  .nav-enroll { padding: 11px 16px; font-size: 15px }
+}
+@media (max-width: 980px) {
+  /* Supersedes the earlier scrollable-row fallback now that a toggle exists. */
+  .public-nav nav { display: none }
+  .public-nav nav.is-open { display: flex }
+}
+
+/* ---- Accreditation gallery (About) ---- */
+.cert-gallery-head { margin-top: 30px }
+.cert-gallery-head h3 { font-size: clamp(18px, 1.6vw, 22px); color: var(--blue-dark); margin: 0 0 6px }
+.cert-gallery-head p { color: var(--muted); margin: 0; max-width: 70ch }
+.cert-gallery {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 18px;
+}
+.cert-gallery figure { margin: 0 }
+.cert-gallery a { display: block; border-radius: 4px }
+.cert-gallery a:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px }
+.cert-gallery img {
+  display: block; width: 100%; height: auto;
+  border: 1px solid #e3dccb; border-radius: 3px; background: #fdfcf7; box-shadow: var(--shadow-sm);
+}
+.cert-gallery figcaption { margin-top: 8px }
+.cert-gallery figcaption span { display: block; font-size: 12px; font-weight: 800; color: var(--orange-text) }
+.cert-gallery figcaption strong { display: block; font-size: 13px; line-height: 1.35; color: var(--ink); font-weight: 600 }
+
+@media (prefers-reduced-motion: reduce) {
+  .nw-cert, .nw-cert > a { transition: none }
 }

@@ -100,7 +100,7 @@ function Catalog() {
               <span className="schedule-status soon">Schedule to be announced</span>
             )}
             <Link className={`button button-primary button-small ${scheduleCount === 0 ? "button-muted" : ""}`} href="/register">
-              {scheduleCount > 0 ? "Enroll Now" : "Ask about schedule"}
+              {scheduleCount > 0 ? "Enroll now" : "Ask about schedule"}
             </Link>
           </article>
         ))}

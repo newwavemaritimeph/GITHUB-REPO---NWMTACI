@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { AuthForm } from "./auth-form";
 import { NewWaveLogo } from "./new-wave-logo";
+import { PublicNav } from "./public-nav";
 import { PublicCourseCatalog } from "./public-course-catalog";
 import { RegistrationForm } from "./registration-form";
 import { RegistrationStatus } from "./registration-status";
@@ -16,11 +17,66 @@ export type PublicPage =
   | "contact"
   | "staff-login";
 
+/* Mockup navigation. "Gallery" is omitted deliberately: there is no gallery
+ * page or imagery yet, and a nav item that 404s is worse than one absent.
+ * Schedules and Accreditation point at the sections that already hold that
+ * content rather than at new empty pages. */
 const nav = [
-  ["About New Wave", "/about"],
+  ["Home", "/"],
+  ["About", "/about"],
   ["Courses", "/courses"],
-  ["Enrollment Status", "/registration-search"],
+  ["Schedules", "/courses#schedules"],
+  ["Accreditation", "/about#accreditations"],
+  ["Gallery", "/about#facilities"],
+  ["Enrollment status", "/registration-search"],
+  ["Contact", "/contact"],
 ] as const;
+
+/* Route each public page renders at, so the header can underline the current
+   item. Section links (anything with a #hash) are never marked active. */
+const PAGE_PATH: Record<PublicPage, string> = {
+  home: "/", about: "/about", courses: "/courses", register: "/register",
+  "registration-search": "/registration-search", contact: "/contact", "staff-login": "/staff-login",
+};
+
+/* MARINA Certificates of Course Approval held by New Wave, transcribed from the
+ * issued documents. All five were issued 12 May 2026 under MARINA Circular
+ * No. SC-2021-09 and run to 12 May 2036. Order matches the approved layout.
+ *
+ * The thumbnails under public/certificates/ are unmodified web derivatives;
+ * the originals under public/certificates/originals/ are the files the user
+ * supplied, byte for byte, and are what every link opens. */
+const HERO_CERTIFICATES = [
+  { no: "ACC 2026-036", title: "Safety Training for Personnel Providing Direct Service to Passengers in Passengers Spaces", file: "acc-2026-036" },
+  { no: "ACC 2026-034", title: "Security Awareness Training and Seafarers with Designated Security Duties", file: "acc-2026-034" },
+  { no: "ACC 2026-035", title: "Ship Security Officers", file: "acc-2026-035" },
+  { no: "ACC 2026-037", title: "Passenger Ship Crowd Management Training", file: "acc-2026-037" },
+  { no: "ACC 2026-038", title: "Passenger Ship Crisis Management and Human Behaviour Training", file: "acc-2026-038" },
+] as const;
+
+const CERTIFICATE_VALIDITY = { issued: "12 May 2026", expires: "12 May 2036" } as const;
+
+const TRUST_STRIP = [
+  ["wheel", "MARINA", "Course approvals"],
+  ["iso", "ISO 9001:2015", "Certified"],
+  ["people", "Experienced", "Instructors"],
+  ["calendar", "Flexible", "Schedules"],
+] as const;
+
+/* Inline icons for the trust strip — drawn, so they take the brand colour and
+   stay crisp at any size. */
+function TrustIcon({ kind }: { kind: (typeof TRUST_STRIP)[number][0] }) {
+  const common = { width: 34, height: 34, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
+  if (kind === "wheel") return (
+    <svg {...common}><circle cx="12" cy="12" r="3.2" /><circle cx="12" cy="12" r="8" />
+      <path d="M12 1.5v2.7M12 19.8v2.7M1.5 12h2.7M19.8 12h2.7M4.6 4.6l1.9 1.9M17.5 17.5l1.9 1.9M4.6 19.4l1.9-1.9M17.5 6.5l1.9-1.9M12 8.8V4.2M12 15.2v4.6M8.8 12H4.2M15.2 12h4.6" /></svg>);
+  if (kind === "iso") return (
+    <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18M5 7.5h14M5 16.5h14" /></svg>);
+  if (kind === "people") return (
+    <svg {...common}><circle cx="8.5" cy="8" r="3" /><circle cx="16" cy="9" r="2.5" /><path d="M2.5 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5M13.5 18.5c.4-2.5 2.3-4 4.5-4 2.1 0 3.6 1.3 3.5 3.5" /></svg>);
+  return (
+    <svg {...common}><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M3 10h18M8 3v4M16 3v4M7 14h2M11 14h2M15 14h2M7 17.5h2M11 17.5h2" /></svg>);
+}
 
 /* New Wave's official details and public channels. Update the two social URLs
  * here if the Facebook page handle differs. */
@@ -47,12 +103,12 @@ const MISSION =
   "To provide high-quality, practical training that empowers seafarers with essential skills, knowledge, and confidence for a safe and rewarding career at sea — committed to fostering a supportive learning environment, upholding rigorous safety standards, and embracing innovation so our seafarers are well-prepared to meet the evolving demands of the maritime industry.";
 
 const CORE_VALUES = [
-  ["N", "Nurturing Growth", "An environment that encourages personal and professional development."],
+  ["N", "Nurturing growth", "An environment that encourages personal and professional development."],
   ["E", "Excellence", "The highest quality in every training program."],
   ["W", "Wisdom", "The value of knowledge and experience at sea."],
   ["W", "Workmanship", "A culture of skill and craftsmanship."],
   ["A", "Adaptability", "Flexibility and resilience in changing maritime environments."],
-  ["V", "Values of Safety", "Safety prioritized in all practices and training."],
+  ["V", "Values of safety", "Safety prioritized in all practices and training."],
   ["E", "Empowerment", "Trainees equipped with the skills and confidence to succeed."],
 ] as const;
 
@@ -102,23 +158,22 @@ function SocialLinks({ className = "" }: { className?: string }) {
   );
 }
 
-function Header() {
+function Header({ page }: { page: PublicPage }) {
+  const current = PAGE_PATH[page];
   return (
     <header className="public-header">
       <div className="public-nav">
         <Link href="/" aria-label="New Wave Maritime home" className="brand-link">
           <NewWaveLogo />
         </Link>
-        <nav aria-label="Public navigation">
-          {nav.map(([label, href]) => (
-            <Link key={href} href={href}>
-              {label}
-            </Link>
-          ))}
-        </nav>
+        <PublicNav items={nav} current={current} />
         <div className="public-nav-actions">
-          <Link className="button button-primary" href="/register">
-            Enroll Now
+          {/* The only lookup on the site is the enrollment-status search. */}
+          <Link href="/registration-search" className="nav-search" aria-label="Check enrollment status">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.8-3.8" /></svg>
+          </Link>
+          <Link className="button button-primary nav-enroll" href="/register">
+            Enroll Now <span aria-hidden="true">→</span>
           </Link>
         </div>
       </div>
@@ -162,80 +217,90 @@ function Footer() {
 }
 
 const highlights = [
-  ["⚓", "Professional Maritime Instructors", "Learn from supportive, highly experienced maritime professionals."],
+  ["⚓", "Professional maritime instructors", "Learn from supportive, highly experienced maritime professionals."],
   ["🛠️", "Quality-Standard Equipment", "Practical, simulator-based training on modern, standard equipment."],
-  ["🎓", "Recognized Certification", "MARINA- and TESDA-aligned training that opens doors to a career at sea."],
+  ["🎓", "Recognized certification", "MARINA- and TESDA-aligned training that opens doors to a career at sea."],
 ] as const;
 
 function Home() {
   return (
     <>
-      <section className="hero">
-        <div className="hero-copy">
-          <span className="eyebrow">MARINA-Accredited · ISO 9001:2015 Certified · TESDA</span>
-          <h1 className="tagline-hero">
-            <span className="tagline-lead">Ride the New Wave</span>
-            <span className="tagline-sub">of Maritime Excellence</span>
-          </h1>
-          <p>
-            New Wave Maritime Training and Assessment Center empowers Filipino seafarers with high-quality, practical
-            training — over <strong>100 Maritime and Catering Management courses</strong> available both online and
-            face-to-face.
-          </p>
-          <div className="hero-actions">
-            <Link className="button button-primary" href="/register">
-              Enroll Now <span aria-hidden="true">→</span>
-            </Link>
-            <Link className="button button-secondary" href="/courses">
-              Browse courses
-            </Link>
+      <section className="nw-hero">
+        <div className="nw-hero-art" aria-hidden="true" />
+        <div className="nw-hero-grid">
+          <div className="nw-hero-copy">
+            <span className="nw-eyebrow">MARINA-accredited courses</span>
+            {/* Written in sentence case; the all-caps look is a display
+                transform, so screen readers and search engines get real text. */}
+            <h1 className="nw-headline">
+              Quality<br />maritime training<br />for a <em>brighter<br />tomorrow</em>
+            </h1>
+            <p className="nw-lede">
+              Build your skills. Get certified. Be future-ready. Train with New Wave Maritime Training and
+              Assessment Center, Inc. through approved maritime training programs.
+            </p>
+            <div className="nw-hero-actions">
+              <Link className="nw-btn nw-btn-primary" href="/courses">
+                View Courses <span aria-hidden="true">→</span>
+              </Link>
+              <Link className="nw-btn nw-btn-ghost" href="/contact">
+                Inquire Now
+              </Link>
+            </div>
           </div>
-          <SocialLinks className="hero-social" />
-        </div>
-        <div className="hero-visual" aria-label="New Wave credentials">
-          <div className="wave-card main">
-            <span className="card-kicker">Trusted &amp; accredited</span>
-            <h2>Training built on recognized maritime standards.</h2>
-            <ul className="cred-badges">
-              {ACCREDITATIONS.map(([name, note]) => (
-                <li key={name}>
-                  <strong>{name}</strong>
-                  <small>{note}</small>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="float-card float-a">
-            <span>Modality</span>
-            <strong>Online &amp; Face-to-face</strong>
-          </div>
-          <div className="float-card float-b">
-            <span className="round-check">★</span>
-            <div>
-              <strong>Thousands of trainees</strong>
-              <small>Trained for safer work at sea</small>
+
+          <div className="nw-hero-visual">
+            {/* Drop a photograph at public/hero-reception.jpg and it appears here.
+                Until then the solid brand panel shows — never a broken image. */}
+            {/* The real reception, unaltered. No accreditation seals are composited
+                onto it: the MARINA course approvals are shown as the documents
+                themselves below, and ISO branding is not asserted by imagery. */}
+            <div className="nw-photo" role="img" aria-label="The New Wave Maritime Training and Assessment Center reception" />
+            <div className="nw-modality">
+              <i aria-hidden="true">🎓</i>
+              <div>
+                <span>Modality</span>
+                <strong>Online &amp; Face-to-face</strong>
+              </div>
             </div>
           </div>
         </div>
+
+        <ul className="nw-certs" aria-label="MARINA certificates of course approval">
+          {HERO_CERTIFICATES.map((cert) => (
+            <li key={cert.no} className="nw-cert">
+              <a
+                href={`/certificates/originals/${cert.file}.png`}
+                target="_blank"
+                rel="noopener"
+                aria-label={`View approval certificate ${cert.no}: ${cert.title} (opens the full image in a new tab)`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/certificates/${cert.file}.webp`}
+                  alt={`MARINA Certificate of Course Approval ${cert.no} for ${cert.title}`}
+                  loading="lazy"
+                  width={900}
+                  height={1108}
+                />
+                <span className="nw-cert-no">{cert.no}</span>
+                <strong>{cert.title}</strong>
+              </a>
+            </li>
+          ))}
+        </ul>
       </section>
 
-      <section className="proof-strip">
-        <div>
-          <strong>100+ courses</strong>
-          <span>Maritime &amp; Catering Management</span>
-        </div>
-        <div>
-          <strong>Online &amp; Face-to-face</strong>
-          <span>Flexible learning modalities</span>
-        </div>
-        <div>
-          <strong>Thousands of trainees</strong>
-          <span>Filipino seafarers trained</span>
-        </div>
-        <div>
-          <strong>MARINA · TESDA · ISO</strong>
-          <span>Accredited and certified</span>
-        </div>
+      <section className="nw-trust">
+        {TRUST_STRIP.map(([icon, title, note]) => (
+          <div key={title}>
+            <i><TrustIcon kind={icon} /></i>
+            <div>
+              <strong>{title}</strong>
+              <span>{note}</span>
+            </div>
+          </div>
+        ))}
       </section>
 
       <section className="section feature-section">
@@ -257,11 +322,11 @@ function Home() {
 
       <section className="section vision-mission">
         <article>
-          <span className="eyebrow">Our Vision</span>
+          <span className="eyebrow">Our vision</span>
           <p>{VISION}</p>
         </article>
         <article>
-          <span className="eyebrow">Our Mission</span>
+          <span className="eyebrow">Our mission</span>
           <p>{MISSION}</p>
         </article>
       </section>
@@ -392,6 +457,40 @@ function About() {
           Backed by our Certificate of Incorporation and Business Permit for the provision of maritime training and
           assessment services.
         </p>
+        <div className="cert-gallery-head">
+          <h3>MARINA course approval certificates</h3>
+          <p>
+            Five Certificates of Course Approval issued by the Maritime Industry Authority on {CERTIFICATE_VALIDITY.issued},
+            valid to {CERTIFICATE_VALIDITY.expires}. Each opens the full document.
+          </p>
+        </div>
+        <ul className="cert-gallery" aria-label="View course approval certificates">
+          {HERO_CERTIFICATES.map((cert) => (
+            <li key={cert.no}>
+              <figure>
+                <a
+                  href={`/certificates/originals/${cert.file}.png`}
+                  target="_blank"
+                  rel="noopener"
+                  aria-label={`View approval certificate ${cert.no}: ${cert.title} (opens the full image in a new tab)`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/certificates/${cert.file}.webp`}
+                    alt={`MARINA Certificate of Course Approval ${cert.no} for ${cert.title}`}
+                    loading="lazy"
+                    width={900}
+                    height={1108}
+                  />
+                </a>
+                <figcaption>
+                  <span>{cert.no}</span>
+                  <strong>{cert.title}</strong>
+                </figcaption>
+              </figure>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <div className="about-block" id="team">
@@ -459,7 +558,7 @@ function Courses() {
   return (
     <section className="inside-page">
       <div className="inside-hero compact">
-        <span className="eyebrow">New Wave course catalog</span>
+        <span className="eyebrow" id="schedules">New Wave course catalog</span>
         <h1>Find the training that fits your next step.</h1>
         <p>
           Browse all STCW and In-House courses in one list, filter by category, and see the available dates open for
@@ -646,7 +745,7 @@ export function PublicSite({ page }: { page: PublicPage }) {
     );
   return (
     <main className="public-site">
-      <Header />
+      <Header page={page} />
       {content}
       <Footer />
     </main>

@@ -1,13 +1,16 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Geist, Geist_Mono, Jost } from "next/font/google";
+import { Inter, Geist_Mono, Source_Serif_4 } from "next/font/google";
 import "./globals.css";
 import "./catalog.css";
 import "./portal-legacy.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Interface face. Inter is drawn for screen UI: it stays legible at the small
+// sizes the portal uses for table meta and field labels.
+const interSans = Inter({
+  variable: "--font-ui",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
 const geistMono = Geist_Mono({
@@ -15,12 +18,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// Display face for headings and branding — a thin, geometric, wide-tracked
-// uppercase look matching the New Wave typographic reference.
-const jost = Jost({
+// Display face for headings and figures (the "Editorial" direction). A serif
+// gives headings and numbers a considered, reported quality — fitting for
+// records that end in an accredited certificate.
+// Source Serif 4 is a VARIABLE font with an optical-size axis. Pinning static
+// weights here makes next/font emit no @font-face at all and the page silently
+// falls back to sans-serif. Omit `weight` so the whole variable range loads.
+const sourceSerif = Source_Serif_4({
   variable: "--font-display",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  display: "swap",
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -54,7 +61,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} ${jost.variable} antialiased`}>
+      <body className={`${interSans.variable} ${geistMono.variable} ${sourceSerif.variable} antialiased`}>
         {children}
       </body>
     </html>
