@@ -14,9 +14,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const db = createSupabaseAdminClient();
   const { data } = await db.from("enrollments")
-    .select("id,enrollment_number,course_id,created_at,scheduled_on,trainees(legal_first_name,legal_middle_name,legal_last_name),courses(name,code,google_classroom_link,delivery_type),batches(starts_on,ends_on,daily_start,daily_end,venue,classrooms(name))")
+    .select("id,enrollment_number,enrollment_status,course_id,created_at,scheduled_on,trainees(legal_first_name,legal_middle_name,legal_last_name),courses(name,code,google_classroom_link,delivery_type),batches(starts_on,ends_on,daily_start,daily_end,venue,classrooms(name))")
     .eq("id", id).maybeSingle();
   if (!data) return NextResponse.json({ error: "Enrollment not found." }, { status: 404 });
+  if (!["Enrolled", "Open Schedule"].includes(data.enrollment_status)) return NextResponse.json({ error: "Instructions are available once the trainee is paid and enrolled." }, { status: 400 });
   const trainee = one(data.trainees);
   const course = one(data.courses);
   const batch = one(data.batches);

@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import type { PortalData, Enrollment, Batch, Trainee } from "../portal-live-app";
 import { first, manilaToday, dueCentavos, balanceOf, pesos, addDays } from "@/lib/portal-format";
-import { Badge, Message, Modal, PageHead, Pager, Kpi, usePost, fullName, fmtDate, fmtClock, openAdmissionRecord } from "./shared-ui";
+import { Badge, Message, Modal, PageHead, Pager, Kpi, usePost, fullName, fmtDate, fmtClock } from "./shared-ui";
 import { RequestActionModal, type RequestType } from "./payment-actions";
 
 /**
@@ -11,11 +11,14 @@ import { RequestActionModal, type RequestType } from "./payment-actions";
  * amended by the July 2026 addendum and the owner's 7 Oct 2026 instruction).
  * Four sidebar modules, in order: Dashboard, Registration, Courses and
  * Instructions. New registrations come only from the website as Pending
- * applications; Registration screens them (three requirements, a verified
- * payment) and enrolls them. The role reads payment status but never writes a
- * payment; the only server actions reachable from here are requirement-check,
- * application-enroll, send-instructions and request-raise (plus the
- * instruction-template actions on the Instructions screen, in the parent).
+ * applications; Registration screens them (three requirements) and hands them
+ * to the Cashier. A paid applicant on a batch is enrolled automatically by the
+ * server. Registration generates training instructions (at most twice) but
+ * never prints the Training Admission Record — the Cashier does. The role reads
+ * payment status but never writes a payment; the server actions reachable from
+ * here are requirement-check, application-handover, send-instructions and
+ * request-raise (application-enroll stays as a fallback), plus the
+ * instruction-template actions on the Instructions screen, in the parent.
  */
 
 type RequestRow = PortalData["requests"][number];
@@ -65,7 +68,7 @@ function groupBy<T>(rows: T[], key: (r: T) => string): [string, T[]][] {
 export function RegistrationDashboard({ data, go }: { data: PortalData; go: (module: string) => void }) {
   const [allStcw, setAllStcw] = useState(false);
   const today = manilaToday(), now = new Date().toISOString();
-  const weekStart = addDays(today, -6), horizon = addDays(today, 14);
+  const weekStart = addDays(today, -6), tomorrow = addDays(today, 1);
   const courseById = new Map(data.courses.map((c) => [c.id, c]));
   const traineeById = new Map(data.trainees.map((t) => [t.id, t]));
   const batchById = new Map(data.batches.map((b) => [b.id, b]));
@@ -74,17 +77,17 @@ export function RegistrationDashboard({ data, go }: { data: PortalData; go: (mod
   const endOf = (e: Enrollment) => first(e.batches)?.ends_on ?? e.scheduled_on ?? null;
   const courseLabel = (e: Enrollment) => first(e.courses)?.name ?? courseById.get(e.course_id)?.name ?? "Course";
 
-  // New applications — last 7 days, newest first.
-  const recent = data.enrollments.filter((e) => day(e.created_at) >= weekStart).sort((a, b) => b.created_at.localeCompare(a.created_at));
+  // New registrations — applications still being screened (last 7 days, newest
+  // first). Once a trainee is enrolled they leave this list.
+  const recent = applicationsOf(data).filter((e) => day(e.created_at) >= weekStart).sort((a, b) => b.created_at.localeCompare(a.created_at));
   const newToday = recent.filter((e) => day(e.created_at) === today);
   const awaiting = applicantCount(data);
   const newNoCourse = awaitingCourseOf(data).filter((t) => day(t.registered_at) >= weekStart);
-  const stateFor = (e: Enrollment) => (e.enrollment_status === "Pending" ? stateOf(readinessOf(data, e)) : { text: e.enrollment_status, tone: statusTone(e.enrollment_status) });
+  const stateFor = (e: Enrollment) => stateOf(readinessOf(data, e));
 
-  // Upcoming trainings — trainees starting in the next 14 days, by start date.
-  const upcoming = live.filter((e) => { const s = startOf(e); return !!s && s > today && s <= horizon; });
-  const upcomingDays = groupBy([...upcoming].sort((a, b) => (startOf(a) ?? "").localeCompare(startOf(b) ?? "")), (e) => startOf(e) ?? "")
-    .map(([date, rows]) => [date, groupBy(rows, (e) => e.batch_id ?? `${e.course_id}|${date}`)] as const);
+  // Upcoming trainings — enrolled trainees in class tomorrow, grouped by batch.
+  const upcoming = live.filter((e) => { const s = startOf(e), t = endOf(e); return !!s && !!t && s <= tomorrow && tomorrow <= t; });
+  const upcomingClasses = groupBy([...upcoming].sort((a, b) => nameOf(a).localeCompare(nameOf(b))), (e) => e.batch_id ?? `${e.course_id}|tomorrow`);
 
   // STCW available slots — the next bookable batch per New Wave STCW course.
   const stcw = groupBy(data.batches.filter((b) => isBookable(b, today, now) && isStcwCourse(courseById.get(b.course_id))).sort((a, b) => a.starts_on.localeCompare(b.starts_on)), (b) => b.course_id);
@@ -95,8 +98,8 @@ export function RegistrationDashboard({ data, go }: { data: PortalData; go: (mod
   const todayClasses = groupBy([...todays].sort((a, b) => nameOf(a).localeCompare(nameOf(b))), (e) => e.batch_id ?? `${e.course_id}|today`);
 
   const tiles = [
-    { id: "rd-new", icon: "✎", label: "New applications", value: newToday.length + newNoCourse.filter((t) => day(t.registered_at) === today).length, hint: `today · ${awaiting} awaiting screening` },
-    { id: "rd-upcoming", icon: "◷", label: "Upcoming trainings", value: upcoming.length, hint: `${upcoming.length === 1 ? "trainee" : "trainees"} · next 14 days` },
+    { id: "rd-new", icon: "✎", label: "New registrations", value: newToday.length + newNoCourse.filter((t) => day(t.registered_at) === today).length, hint: `today · ${awaiting} not yet enrolled` },
+    { id: "rd-upcoming", icon: "◷", label: "Upcoming trainings", value: upcoming.length, hint: `${upcoming.length === 1 ? "trainee" : "trainees"} · tomorrow` },
     { id: "rd-stcw", icon: "⚓", label: "STCW slots open", value: stcwSeats, hint: `${plural(stcw.length, "course")} taking registrations` },
     { id: "rd-today", icon: "▦", label: "Today's trainees", value: todays.length, hint: `${plural(todayClasses.length, "class", "classes")} today` },
   ];
@@ -116,31 +119,30 @@ export function RegistrationDashboard({ data, go }: { data: PortalData; go: (mod
 
     <div className="rd-grid">
       <section className="portal-panel rd-panel" id="rd-new">
-        <div className="panel-heading"><div><h2>New applications</h2><p>Submitted on the website · last 7 days</p></div><button type="button" className="ghost-button" onClick={() => go("Applications")}>Screen →</button></div>
+        <div className="panel-heading"><div><h2>New registrations</h2><p>From the website, not yet enrolled · last 7 days</p></div><button type="button" className="ghost-button" onClick={() => go("Applications")}>Screen →</button></div>
         {newNoCourse.slice(0, 4).map((t) => <button type="button" className="rd-row" key={t.id} onClick={() => go("Applications")}>
           <span className="rd-main"><strong>{fullName(t)}</strong><small>{appNoOf(data, t.id) ? <span className="app-no">{appNoOf(data, t.id)}</span> : null}Course to be assigned</small></span>
           <Badge tone="pending">No course yet</Badge>
           <span className="rd-time">{day(t.registered_at) === today ? fmtClock(t.registered_at) : fmtShort(day(t.registered_at))}</span>
         </button>)}
-        {recent.slice(0, Math.max(0, 8 - Math.min(4, newNoCourse.length))).map((e) => { const c = first(e.courses), st = stateFor(e); return <button type="button" className="rd-row" key={e.id} onClick={() => go(e.enrollment_status === "Pending" ? "Applications" : "Enrollments")}>
+        {recent.slice(0, Math.max(0, 8 - Math.min(4, newNoCourse.length))).map((e) => { const c = first(e.courses), st = stateFor(e); return <button type="button" className="rd-row" key={e.id} onClick={() => go("Applications")}>
           <span className="rd-main"><strong>{nameOf(e)}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{c?.code ? `${c.code} · ` : ""}{courseLabel(e)}</small></span>
           <Badge tone={st.tone}>{st.text}</Badge>
           <span className="rd-time">{day(e.created_at) === today ? fmtClock(e.created_at) : fmtShort(day(e.created_at))}</span>
         </button>; })}
-        {!recent.length && !newNoCourse.length && <p className="rd-empty">No applications in the last 7 days.</p>}
+        {!recent.length && !newNoCourse.length && <p className="rd-empty">No new registrations waiting.</p>}
       </section>
 
       <section className="portal-panel rd-panel" id="rd-upcoming">
-        <div className="panel-heading"><div><h2>Upcoming trainings</h2><p>Enrolled trainees · next 14 days</p></div></div>
-        {upcomingDays.map(([date, classes]) => <div key={date}>
-          <div className="rd-group"><b>{fmtDay(date)}</b></div>
-          {classes.map(([key, rows]) => { const b = rows[0].batch_id ? batchById.get(rows[0].batch_id) : undefined; return <div className="rd-row" key={key}>
-            <span className="rd-main"><strong>{first(rows[0].batches)?.batch_number ?? "Scheduled date"}</strong><small>{courseLabel(rows[0])}</small></span>
-            {b && <span className="rd-time">{plural(seatsLeft(b), "seat")} left</span>}
-            <span className="rd-tag">{plural(rows.length, "trainee")}</span>
-          </div>; })}
-        </div>)}
-        {!upcoming.length && <p className="rd-empty">No trainings in the next 14 days.</p>}
+        <div className="panel-heading"><div><h2>Upcoming trainings</h2><p>Tomorrow · {fmtDay(tomorrow)}</p></div></div>
+        {upcomingClasses.map(([key, rows]) => { const b = first(rows[0].batches), batch = rows[0].batch_id ? batchById.get(rows[0].batch_id) : undefined; return <div key={key}>
+          <div className="rd-group"><b>{b?.batch_number ?? "Scheduled tomorrow"}</b><span>{[courseLabel(rows[0]), b?.venue, batch && b?.starts_on !== tomorrow ? `day ${Math.round((Date.parse(tomorrow) - Date.parse(b?.starts_on ?? tomorrow)) / 86400000) + 1}` : null].filter(Boolean).join(" · ")}</span><em>{rows.length}</em></div>
+          {rows.map((e) => { const missing = missingFor(traineeById.get(e.trainee_id)); return <button type="button" className="rd-row" key={e.id} onClick={() => go("Enrollments")}>
+            <span className="rd-main"><strong>{nameOf(e)}</strong></span>
+            <span className={`rd-dot${missing.length ? " warn" : ""}`}>{missing.length ? `Missing ${missing.join(", ")}` : "Record complete"}</span>
+          </button>; })}
+        </div>; })}
+        {!upcoming.length && <p className="rd-empty">No trainings tomorrow.</p>}
       </section>
 
       <section className="portal-panel rd-panel" id="rd-stcw">
@@ -194,11 +196,14 @@ export function applicationReadiness(e: Enrollment, checks: RequirementCheck[], 
   const paidCentavos = Number(e.verified_paid_centavos ?? 0);
   const paid = paidCentavos > 0;
   const ready = !missing.length && paid && !!e.batch_id;
-  const reason = !e.batch_id ? "No batch yet — place on a batch to enroll" : missing.length ? `Not verified yet: ${missing.join(", ")}` : !paid ? "No verified payment yet" : "Ready to enroll";
+  const reason = missing.length ? `Not verified yet: ${missing.join(", ")}` : !paid ? "No verified payment yet" : !e.batch_id ? "Paid — choose a batch to enroll" : "Paid — enrolling";
   const handed = !!handedAt;
   return { latest, verified: REQUIREMENTS.length - missing.length, missing, rejected, paid, paidCentavos, ready, reason, handed, handedAt: handedAt ?? null };
 }
-const stateOf = (r: ReturnType<typeof applicationReadiness>) => (r.ready ? { text: "Paid · ready to enroll", tone: "active" } : r.handed ? { text: "With Cashier", tone: "orange" } : r.rejected.length ? { text: "Needs attention", tone: "cancelled" } : { text: "Screening", tone: "pending" });
+/** Screening state of a Pending application. Paid and on a batch means the server enrolls it. */
+const stateOf = (r: ReturnType<typeof applicationReadiness>) => (r.ready ? { text: "Paid · enrolling", tone: "active" } : r.paid && !r.missing.length ? { text: "Paid · choose batch", tone: "active" } : r.paid ? { text: "Paid · requirements missing", tone: "cancelled" } : r.handed ? { text: "For payment", tone: "orange" } : r.rejected.length ? { text: "Needs attention", tone: "cancelled" } : { text: "Screening", tone: "pending" });
+/** Waiting at the Cashier: handed over and not yet paid. */
+const forPayment = (r: ReturnType<typeof applicationReadiness>) => r.handed && !r.paid;
 const readinessOf = (data: PortalData, e: Enrollment) => applicationReadiness(e, data.requirementChecks ?? [], data.handedToCashier?.[e.id] ?? null);
 /** The website enrollment number (NWMTACI-0000001) the applicant quotes on Facebook, if any. */
 const appNoOf = (data: PortalData, traineeId?: string | null) => (traineeId ? data.applicationNumbers?.[traineeId] ?? null : null);
@@ -207,8 +212,13 @@ const applicationsOf = (data: PortalData) => data.enrollments.filter((e) => e.en
 const awaitingCourseOf = (data: PortalData) => (data.awaitingCourseIds ?? []).map((id) => data.trainees.find((t) => t.id === id)).filter((t): t is Trainee => !!t).sort((a, b) => (b.registered_at ?? "").localeCompare(a.registered_at ?? ""));
 const applicantCount = (data: PortalData) => applicationsOf(data).length + awaitingCourseOf(data).length;
 
-const APP_FILTERS = ["All", "No course yet", "Screening", "With Cashier", "Ready to enroll"] as const;
-const inFilter = (f: (typeof APP_FILTERS)[number], r: ReturnType<typeof applicationReadiness>) => (f === "All" ? true : f === "No course yet" ? false : f === "Ready to enroll" ? r.ready : f === "With Cashier" ? r.handed && !r.ready : !r.handed && !r.ready);
+/** The three tabs of the Registration list (owner, 7 Oct 2026). */
+export const RECORD_FILTERS = ["All enrollments", "Screening", "For payment"] as const;
+type RecordFilter = (typeof RECORD_FILTERS)[number];
+const inFilter = (f: RecordFilter, r: ReturnType<typeof applicationReadiness> | null) => (f === "All enrollments" ? true : !r ? false : f === "For payment" ? forPayment(r) : !forPayment(r));
+/** Times instructions were generated for an enrollment (limit 2 for Registration). */
+export const INSTRUCTION_LIMIT = 2;
+const instructionsCountOf = (data: PortalData, e: Enrollment) => data.instructionsCount?.[e.id] ?? (e.instructions_sent_at ? 1 : 0);
 
 const NO_BATCH = "none";
 
@@ -290,29 +300,35 @@ function ChooseBatchModal({ data, enrollment, reload, onClose }: { data: PortalD
   </Modal>;
 }
 
-/** Website applications waiting to be screened, soonest training first. */
-function ApplicationQueue({ data, query, reload }: { data: PortalData; query: string; reload: () => Promise<void> }) {
-  const [filter, setFilter] = useState<(typeof APP_FILTERS)[number]>("All");
+/**
+ * Every enrollment in one list with three tabs: All enrollments, Screening
+ * (Pending applications Registration is working on, including paid ones that
+ * still need a batch) and For payment (handed to the Cashier, not yet paid).
+ * Applicants without a course sit above the table under All and Screening.
+ */
+function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; query: string; reload: () => Promise<void>; initial: RecordFilter }) {
+  const [filter, setFilter] = useState<RecordFilter>(initial);
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<Enrollment | null>(null);
-  const term = (q || query).trim().toLowerCase();
-  const all = applicationsOf(data).map((e) => ({ e, r: readinessOf(data, e) }));
   const [assigning, setAssigning] = useState<Trainee | null>(null);
-  const noCourse = awaitingCourseOf(data).filter((t) => !term || `${fullName(t)} ${t.trainee_number} ${appNoOf(data, t.id) ?? ""} ${t.email} ${t.mobile}`.toLowerCase().includes(term));
-  const matches = (x: (typeof all)[number]) => inFilter(filter, x.r);
+  const term = (q || query).trim().toLowerCase();
+  const all = data.enrollments.map((e) => ({ e, r: e.enrollment_status === "Pending" ? readinessOf(data, e) : null }));
+  const awaiting = awaitingCourseOf(data);
+  const noCourse = awaiting.filter((t) => !term || `${fullName(t)} ${t.trainee_number} ${appNoOf(data, t.id) ?? ""} ${t.email} ${t.mobile}`.toLowerCase().includes(term));
+  const rank = (x: (typeof all)[number]) => (x.r ? 0 : 1);
   const rows = all
-    .filter(matches)
+    .filter((x) => inFilter(filter, x.r))
     .filter(({ e }) => !term || `${nameOf(e)} ${e.enrollment_number} ${appNoOf(data, e.trainee_id) ?? ""} ${first(e.courses)?.name ?? ""} ${first(e.trainees)?.trainee_number ?? ""}`.toLowerCase().includes(term))
-    .sort((a, b) => (first(a.e.batches)?.starts_on ?? "9999").localeCompare(first(b.e.batches)?.starts_on ?? "9999") || a.e.created_at.localeCompare(b.e.created_at));
+    .sort((a, b) => rank(a) - rank(b) || (a.r ? (first(a.e.batches)?.starts_on ?? "9999").localeCompare(first(b.e.batches)?.starts_on ?? "9999") || a.e.created_at.localeCompare(b.e.created_at) : b.e.created_at.localeCompare(a.e.created_at)));
   const PER = 12;
   const pageRows = rows.slice((page - 1) * PER, page * PER);
   const current = open ? data.enrollments.find((e) => e.id === open.id) ?? open : null;
-  const count = (f: (typeof APP_FILTERS)[number]) => (f === "All" ? all.length + awaitingCourseOf(data).length : f === "No course yet" ? awaitingCourseOf(data).length : all.filter((x) => inFilter(f, x.r)).length);
+  const count = (f: RecordFilter) => all.filter((x) => inFilter(f, x.r)).length + (f === "For payment" ? 0 : awaiting.length);
   return <>
-    <div className="portal-tabs">{APP_FILTERS.map((f) => <button key={f} type="button" className={filter === f ? "active" : ""} onClick={() => { setFilter(f); setPage(1); }}>{f}<small style={{ marginLeft: 6, opacity: 0.7 }}>{count(f)}</small></button>)}</div>
+    <div className="portal-tabs">{RECORD_FILTERS.map((f) => <button key={f} type="button" className={filter === f ? "active" : ""} onClick={() => { setFilter(f); setPage(1); }}>{f}<small style={{ marginLeft: 6, opacity: 0.7 }}>{count(f)}</small></button>)}</div>
     <div style={{ display: "flex", gap: 10, padding: "0 0 10px" }}><label className="portal-field-inline" style={{ flex: 1, minWidth: 220 }}>Search<input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Name, NWMTACI number, SRN, course" /></label></div>
-    {(filter === "All" || filter === "No course yet") && noCourse.length > 0 && <section className="portal-panel nc-panel">
+    {filter !== "For payment" && noCourse.length > 0 && <section className="portal-panel nc-panel">
       <div className="panel-heading"><div><h2>No course yet</h2><p>Assign a course and schedule, then screen the application</p></div><span className="slot-count">{noCourse.length}</span></div>
       {noCourse.map((t) => <div className="rd-row" key={t.id}>
         <span className="rd-main"><strong>{fullName(t)}</strong><small>{appNoOf(data, t.id) ? <span className="app-no">{appNoOf(data, t.id)}</span> : null}{t.trainee_number} · <span className="lc">{t.email}</span> · {t.mobile}</small></span>
@@ -320,90 +336,46 @@ function ApplicationQueue({ data, query, reload }: { data: PortalData; query: st
         <button type="button" className="portal-primary" onClick={() => setAssigning(t)}>Assign course</button>
       </div>)}
     </section>}
-    <div className="portal-table portal-panel"><table><thead><tr><th>Applicant</th><th>Enrollment no.</th><th>Course &amp; schedule</th><th>Submitted</th><th>Requirements</th><th>Payment</th><th>State</th></tr></thead><tbody>
-      {pageRows.map(({ e, r }) => { const t = first(e.trainees), s = stateOf(r); return <tr key={e.id} className="row-clickable" onClick={() => setOpen(e)}>
+    <div className="portal-table portal-panel"><table><thead><tr><th>Trainee</th><th>Enrollment no.</th><th>Course &amp; schedule</th><th>Requirements</th><th>Payment</th><th>Status</th></tr></thead><tbody>
+      {pageRows.map(({ e, r }) => { const t = first(e.trainees), s = r ? stateOf(r) : { text: e.enrollment_status, tone: statusTone(e.enrollment_status) }, p = payState(e); return <tr key={e.id} className="row-clickable" onClick={() => setOpen(e)}>
         <td><strong>{t ? fullName(t) : "Unknown"}</strong><small>{t?.trainee_number}</small></td>
-        <td><strong className="app-no-cell">{appNoOf(data, e.trainee_id) ?? "—"}</strong><small>{e.enrollment_number}</small></td>
+        <td><strong className="app-no-cell">{appNoOf(data, e.trainee_id) ?? e.enrollment_number}</strong><small>{appNoOf(data, e.trainee_id) ? e.enrollment_number : fmtDate(day(e.created_at))}</small></td>
         <td>{first(e.courses)?.name ?? "—"}<small>{scheduleOf(e)}</small></td>
-        <td>{fmtDate(day(e.created_at))}<small>{e.source === "Public registration" ? "Website" : e.source ?? ""}</small></td>
-        <td><span className={`req-count${r.missing.length ? "" : " ok"}`}>{r.verified} of {REQUIREMENTS.length}</span>{r.rejected.length > 0 && <small>Rejected: {r.rejected.join(", ")}</small>}</td>
-        <td>{r.paid ? <><strong>{pesos(r.paidCentavos)}</strong><small>Verified</small></> : <span className="muted-text">{r.handed ? "With Cashier" : "Not yet"}</span>}</td>
+        <td>{r ? <><span className={`req-count${r.missing.length ? "" : " ok"}`}>{r.verified} of {REQUIREMENTS.length}</span>{r.rejected.length > 0 && <small>Rejected: {r.rejected.join(", ")}</small>}</> : <span className="muted-text">{e.enrollment_status === "Cancelled" ? "—" : "Complete"}</span>}</td>
+        <td>{r ? (r.paid ? <><strong>{pesos(r.paidCentavos)}</strong><small>Verified</small></> : <span className="muted-text">{r.handed ? "With Cashier" : "Not yet"}</span>) : <><Badge tone={p.tone}>{p.text}</Badge><small>{pesos(balanceOf(e))} balance</small></>}</td>
         <td><Badge tone={s.tone}>{s.text}</Badge></td>
       </tr>; })}
-    </tbody></table>{!rows.length && <p className="portal-empty-copy">{filter === "No course yet" ? "Applicants without a course are listed above." : all.length ? "No applications match." : "No applications with a course yet. New ones arrive from the website."}</p>}</div>
+    </tbody></table>{!rows.length && <p className="portal-empty-copy">{filter === "For payment" ? "Nobody is waiting at the Cashier." : filter === "Screening" ? (noCourse.length ? "Applicants without a course are listed above." : "No applications to screen. New ones arrive from the website.") : "No matching enrollments."}</p>}</div>
     <Pager page={page} total={rows.length} perPage={PER} onPage={setPage} />
     {current && <EnrollmentDrawer data={data} enrollment={current} reload={reload} onClose={() => setOpen(null)} />}
     {assigning && <AssignCourseModal data={data} trainee={assigning} reload={reload} onClose={() => setAssigning(null)} />}
   </>;
 }
 
-/* -------------------------------------------------------------- Enrollments */
-
-const ENROLLMENT_TABS = ["All", "Enrolled", "Open Schedule", "Cancelled"] as const;
-
-/** Applications that have been decided: enrolled, open schedule, or cancelled. Pending lives in Applications. */
-function EnrollmentList({ data, query, reload }: { data: PortalData; query: string; reload: () => Promise<void> }) {
-  const [status, setStatus] = useState<string>("All");
-  const [q, setQ] = useState("");
-  const [page, setPage] = useState(1);
-  const [open, setOpen] = useState<Enrollment | null>(null);
-  const term = (q || query).trim().toLowerCase();
-  const decided = data.enrollments.filter((e) => e.enrollment_status !== "Pending");
-  const rows = decided
-    .filter((e) => status === "All" || e.enrollment_status === status)
-    .filter((e) => !term || `${nameOf(e)} ${e.enrollment_number} ${first(e.courses)?.name ?? ""} ${first(e.trainees)?.trainee_number ?? ""}`.toLowerCase().includes(term))
-    .sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const PER = 12;
-  const pageRows = rows.slice((page - 1) * PER, page * PER);
-  const current = open ? data.enrollments.find((e) => e.id === open.id) ?? open : null;
-  return <>
-    <div className="portal-tabs">{ENROLLMENT_TABS.map((s) => <button key={s} type="button" className={status === s ? "active" : ""} onClick={() => { setStatus(s); setPage(1); }}>{s}<small style={{ marginLeft: 6, opacity: 0.7 }}>{s === "All" ? decided.length : decided.filter((e) => e.enrollment_status === s).length}</small></button>)}</div>
-    <div style={{ display: "flex", gap: 10, padding: "0 0 10px" }}><label className="portal-field-inline" style={{ flex: 1, minWidth: 220 }}>Search<input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Trainee, enrollment number, course" /></label></div>
-    <div className="portal-table portal-panel"><table><thead><tr><th>Trainee</th><th>Enrollment</th><th>Course</th><th>Schedule</th><th>Status</th><th>Payment</th><th>Balance</th></tr></thead><tbody>
-      {pageRows.map((e) => { const t = first(e.trainees), c = first(e.courses), p = payState(e); return <tr key={e.id} className="row-clickable" onClick={() => setOpen(e)}>
-        <td><strong>{t ? fullName(t) : "Unknown"}</strong><small>{t?.trainee_number}</small></td>
-        <td><strong>{e.enrollment_number}</strong><small>{fmtDate(day(e.created_at))}</small></td>
-        <td>{c?.name ?? "—"}<small>{first(first(e.partner_course_offers)?.partner_centers)?.name ?? "New Wave"}</small></td>
-        <td>{scheduleOf(e)}</td>
-        <td><Badge tone={statusTone(e.enrollment_status)}>{e.enrollment_status}</Badge></td>
-        <td><Badge tone={p.tone}>{p.text}</Badge></td>
-        <td><strong>{pesos(balanceOf(e))}</strong></td>
-      </tr>; })}
-    </tbody></table>{!rows.length && <p className="portal-empty-copy">No matching enrollments.</p>}</div>
-    <Pager page={page} total={rows.length} perPage={PER} onPage={setPage} />
-    {current && <EnrollmentDrawer data={data} enrollment={current} reload={reload} onClose={() => setOpen(null)} />}
-  </>;
-}
-
 /* -------------------------------------------------------------- Registration */
 
+/** "applications" opens the list on Screening, "enrollments" on All enrollments. */
 export type RecordsView = "applications" | "enrollments" | "trainees";
 
 /**
- * One sidebar tab for the people side of registration. Applications arrive only
- * from the website and are screened here; Enrollments holds the decided ones;
- * Trainees is the master record list, which lives in the parent with its
- * detail modal and so arrives as an element.
+ * One sidebar tab for the people side of registration: the enrollment list
+ * (All enrollments · Screening · For payment) and the trainee master records,
+ * which live in the parent with their detail modal and so arrive as an element.
  */
 export function RegistrationRecords({ data, query, reload, view, setView, trainees }: { data: PortalData; query: string; reload: () => Promise<void>; view: RecordsView; setView: (v: RecordsView) => void; trainees: ReactNode }) {
-  const copy: Record<RecordsView, string> = {
-    applications: "Applications from the website. Assign the course and batch, tick the requirements, hand to the Cashier for payment, then enroll.",
-    enrollments: "Enrolled, open-schedule and cancelled enrollments. Open one for documents, instructions or to request a change.",
-    trainees: "Trainee master records. Open one to see their details and enrollment history.",
-  };
-  const tabs: [RecordsView, string, number][] = [["applications", "Applications", applicantCount(data)], ["enrollments", "Enrollments", data.enrollments.filter((e) => e.enrollment_status !== "Pending").length], ["trainees", "Trainees", data.trainees.length]];
+  const onList = view !== "trainees";
+  const tabs: [RecordsView, string, number, boolean][] = [["enrollments", "Enrollments", data.enrollments.length + awaitingCourseOf(data).length, onList], ["trainees", "Trainees", data.trainees.length, !onList]];
   return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Applications · enrollments · trainees</span><h1>Registration</h1><p>{copy[view]}</p></div></div>
+    <div className="portal-heading"><div><span className="portal-eyebrow">Enrollments · trainees</span><h1>Registration</h1><p>{onList ? "Screen website applications, hand them to the Cashier, and follow every enrollment. A paid applicant on a batch is enrolled automatically." : "Trainee master records. Open one to see their details and enrollment history."}</p></div></div>
     <div className="rr-switch" role="tablist" aria-label="Records">
-      {tabs.map(([v, label, n]) => <button key={v} type="button" role="tab" aria-selected={view === v} className={view === v ? "active" : ""} onClick={() => setView(v)}>{label}<small>{n}</small></button>)}
+      {tabs.map(([v, label, n, on]) => <button key={v} type="button" role="tab" aria-selected={on} className={on ? "active" : ""} onClick={() => setView(v)}>{label}<small>{n}</small></button>)}
     </div>
-    {view === "applications" && <ApplicationQueue data={data} query={query} reload={reload} />}
-    {view === "enrollments" && <EnrollmentList data={data} query={query} reload={reload} />}
+    {onList && <EnrollmentQueue key={view} data={data} query={query} reload={reload} initial={view === "applications" ? "Screening" : "All enrollments"} />}
     {view === "trainees" && trainees}
   </div>;
 }
 
-/** Screening for a Pending application, at the top of its drawer: tick the requirements, hand to the Cashier, enroll once paid. */
+/** Screening for a Pending application, at the top of its drawer: tick the requirements and hand to the Cashier. Payment enrolls automatically. */
 function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<Record<string, unknown>> }) {
   const [unticking, setUnticking] = useState<string | null>(null);
   const [remarks, setRemarks] = useState("");
@@ -413,7 +385,7 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
   const check = (requirement: string, status: "Verified" | "Rejected", label: string) =>
     void post({ action: "requirement-check", enrollmentId: e.id, requirement, status, remarks: status === "Rejected" ? remarks.trim() : undefined }, `${label} ${status === "Verified" ? "ticked" : "unticked"}.`).then(() => { setUnticking(null); setRemarks(""); }).catch(() => undefined);
   return <div className="screen-box full">
-    <div className="screen-head"><div><strong>Screening</strong><small>Tick each requirement as it is received, hand the applicant to the Cashier, then enroll once paid.</small></div><Badge tone={s.tone}>{s.text}</Badge></div>
+    <div className="screen-head"><div><strong>Screening</strong><small>Tick each requirement as it is received and hand the applicant to the Cashier. Once paid and on a batch, they are enrolled automatically.</small></div><Badge tone={s.tone}>{s.text}</Badge></div>
     <ol className="screen-steps" aria-label="Application progress">
       {([["Requirements", `${r.verified} of ${REQUIREMENTS.length}`, allTicked], ["Cashier", r.handed ? `${fmtDate(day(r.handedAt))}` : "Not yet", r.handed], ["Payment", r.paid ? pesos(r.paidCentavos) : "Not yet", r.paid], ["Batch", first(e.batches)?.batch_number ?? "Not yet", !!e.batch_id], ["Enrolled", e.enrollment_status === "Enrolled" ? "Done" : "Not yet", e.enrollment_status === "Enrolled"]] as [string, string, boolean][]).map(([label, sub, done], i, list) => { const current = !done && list.slice(0, i).every((x) => x[2]); return <li key={label} className={done ? "done" : current ? "current" : ""}><i aria-hidden="true">{done ? "✓" : i + 1}</i><span><b>{label}</b><small>{sub}</small></span></li>; })}
     </ol>
@@ -428,10 +400,10 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
       </li>; })}
     </ul>
     <div className="screen-foot">
-      <small>{!allTicked ? `Still to tick: ${r.missing.join(", ")}` : !r.handed ? "All requirements received. Hand the applicant to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id ? "Paid. Place on a batch to enroll." : "Paid. Enrolling confirms the seat on this batch."}</small>
+      <small>{!allTicked ? `Still to tick: ${r.missing.join(", ")}` : !r.handed && !r.paid ? "All requirements received. Hand the applicant to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid and on a batch — enrolling. Refresh if the status has not changed."}</small>
       <span style={{ display: "inline-flex", gap: 8, flexWrap: "wrap" }}>
-        {!r.handed && <button type="button" className="portal-primary" disabled={busy || !allTicked} onClick={() => void post({ action: "application-handover", enrollmentId: e.id }, "Handed to the Cashier for payment.").catch(() => undefined)}>Hand to Cashier</button>}
-        <button type="button" className={r.handed ? "portal-primary" : "portal-secondary"} disabled={!r.ready || busy} onClick={() => void post({ action: "application-enroll", enrollmentId: e.id }, "Applicant enrolled.").catch(() => undefined)}>Enroll applicant</button>
+        {!r.handed && !r.paid && <button type="button" className="portal-primary" disabled={busy || !allTicked} onClick={() => void post({ action: "application-handover", enrollmentId: e.id }, "Handed to the Cashier for payment.").catch(() => undefined)}>Hand to Cashier</button>}
+        {r.ready && <button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "application-enroll", enrollmentId: e.id }, "Trainee enrolled.").catch(() => undefined)}>Enroll now</button>}
       </span>
     </div>
   </div>;
@@ -439,8 +411,8 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
 
 /** Everything about one enrollment, read-only on money. Requests go to Accounting. */
 export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void }) {
-  const { busy, msg, setMsg, post } = usePost(reload);
-  const printRecord = () => void openAdmissionRecord(e.trainee_id).catch((err) => setMsg({ kind: "error", text: err instanceof Error ? err.message : "Could not open the admission record." }));
+  const { busy, msg, post } = usePost(reload);
+  const generated = instructionsCountOf(data, e), atLimit = generated >= INSTRUCTION_LIMIT;
   const [req, setReq] = useState<RequestType | null>(null);
   const [addingCourse, setAddingCourse] = useState(false);
   const [choosingBatch, setChoosingBatch] = useState(false);
@@ -477,11 +449,13 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
       {payments.length > 0 && <div className="full"><small style={{ color: "var(--muted)", fontWeight: 700 }}>Trainee&apos;s payments</small>{payments.slice(0, 6).map((pm) => <div className="live-row-item" key={pm.id}><div><strong>{pm.payment_number}</strong><small>{pm.method}{pm.reference_number ? ` · ${pm.reference_number}` : ""} · {fmtDate(day(pm.received_at))} · {pm.verification_state}</small></div><span className="slot-count">{pesos(pm.amount_centavos)}</span></div>)}<p className="portal-form-note">Payments are recorded per trainee; which enrollment each one covers is on the receipt.</p></div>}
 
       <div className="full"><strong>Documents &amp; instructions</strong></div>
-      {hasDocuments ? <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
-        <button type="button" onClick={printRecord}>Print admission record</button>
-        <a href={`/api/documents/training-instructions/${e.id}`} target="_blank" rel="noreferrer">Instructions PDF</a>
-        <button type="button" disabled={busy} onClick={() => void post({ action: "send-instructions", enrollmentId: e.id }, e.instructions_sent_at ? "Instructions re-sent." : "Instructions sent.").catch(() => undefined)}>{e.instructions_sent_at ? `Resend instructions (sent ${fmtDate(day(e.instructions_sent_at))})` : "Send instructions"}</button>
-      </div> : <p className="portal-form-note full">{isApplication ? "The admission slip and training instructions become available once the applicant is enrolled." : "No documents for a cancelled enrollment."}</p>}
+      {hasDocuments ? <>
+        <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
+          <button type="button" disabled={busy || atLimit} title={atLimit ? "Instructions can be generated twice per enrollment" : undefined} onClick={() => void post({ action: "send-instructions", enrollmentId: e.id }, generated ? "Instructions generated again." : "Instructions generated and sent.").catch(() => undefined)}>{atLimit ? "Generated twice — limit reached" : generated ? `Generate again (${generated} of ${INSTRUCTION_LIMIT})` : "Generate instructions"}</button>
+          {generated > 0 && <a href={`/api/documents/training-instructions/${e.id}`} target="_blank" rel="noreferrer">Instructions PDF</a>}
+        </div>
+        <p className="portal-form-note full">{e.instructions_sent_at ? `Last generated ${fmtDate(day(e.instructions_sent_at))}. ` : ""}Instructions can be generated twice. The Training Admission Record is printed by the Cashier.</p>
+      </> : <p className="portal-form-note full">{isApplication ? "Training instructions become available once the trainee is paid and enrolled." : "No documents for a cancelled enrollment."}</p>}
 
       {isApplication && <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>{!e.batch_id && <button type="button" className="portal-primary" onClick={() => setChoosingBatch(true)}>Choose batch</button>}{traineeRecord && <button type="button" onClick={() => setAddingCourse(true)}>+ Add another course</button>}</div>}
 

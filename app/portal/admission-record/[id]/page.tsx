@@ -46,7 +46,7 @@ type BatchRow = { batch_number: string; starts_on: string; ends_on: string; dail
 type PaymentRow = { id: string; payment_number: string; received_at: string; method: string; reference_number: string | null; valid: boolean; cashier_id: string | null };
 
 export default async function AdmissionRecordPage({ params }: { params: Promise<{ id: string }> }) {
-  const staff = await requireStaff(["admin", "registration", "cashier", "accounting"]);
+  const staff = await requireStaff(["admin", "cashier", "accounting"]);
   if (!staff) redirect("/staff-login");
   const { id } = await params;
   const db = createSupabaseAdminClient();

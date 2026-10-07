@@ -1,15 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import type { PortalData } from "../portal-live-app";
-import { balanceOf, dueCentavos, first, pesos } from "@/lib/portal-format";
-import { Badge, Message, Modal, PageHead, fullName, fmtDate, fmtClock, usePost } from "./shared-ui";
+import type { PortalData, Enrollment } from "../portal-live-app";
+import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos } from "@/lib/portal-format";
+import { Badge, Message, Modal, PageHead, fullName, fmtDate, fmtClock, usePost, openAdmissionRecord } from "./shared-ui";
+import { RequestActionModal } from "./payment-actions";
 
 /**
  * Cashier pieces of the registration workflow (Oct 2026):
  * - "For payment": applicants Registration has screened and handed over. The
- *   Cashier records their payment with the existing payment form; Registration
- *   then enrolls them.
+ *   Cashier records their payment with the existing payment form; a paid
+ *   applicant on a batch is enrolled automatically.
+ * - The Training Admission Record: printed by the Cashier, twice at most; a
+ *   further reprint needs a "TAR reprint" request approved by the Accounting
+ *   Manager (each approval allows one more print).
  * - The charge step for change requests: Registration's requests come to the
  *   Cashier first, who adds the applicable fee (or "no charge") before the
  *   Accounting Manager decides.
@@ -18,13 +22,55 @@ import { Badge, Message, Modal, PageHead, fullName, fmtDate, fmtClock, usePost }
 type RequestRow = PortalData["requests"][number];
 const day = (v?: string | null) => (v ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(v)) : "");
 
-export function CashierPaymentQueue({ data, onPay }: { data: PortalData; onPay: (enrollmentId: string) => void }) {
+/** Free prints of the Training Admission Record before Accounting approval is needed. */
+export const TAR_FREE_PRINTS = 2;
+const PAID_STATUSES = ["Enrolled", "Open Schedule"];
+
+/**
+ * Print state of a trainee's TAR. A record covers the trainee's current set of
+ * paid enrollments; adding a paid course starts a new record (new AR number).
+ */
+export function tarState(data: PortalData, traineeId: string) {
+  const paid = data.enrollments.filter((e) => e.trainee_id === traineeId && PAID_STATUSES.includes(e.enrollment_status));
+  const ids = paid.map((e) => e.id).sort().join("|");
+  const record = (data.admissionRecords ?? []).find((r) => r.trainee_id === traineeId && [...r.enrollment_ids].sort().join("|") === ids) ?? null;
+  const allowed = TAR_FREE_PRINTS + Number(record?.reprints_approved ?? 0);
+  const printed = Number(record?.print_count ?? 0);
+  const pendingReprint = !!record && data.requests.some((r) => r.request_type === "TAR reprint" && r.status === "Pending" && record.enrollment_ids.includes(first(r.enrollments)?.id ?? ""));
+  return { paid, record, printed, allowed, left: Math.max(0, allowed - printed), pendingReprint };
+}
+
+/** Print the TAR, or — once the limit is reached — ask the Accounting Manager for one more print. */
+export function TarButton({ data, traineeId, reload, className = "portal-secondary" }: { data: PortalData; traineeId: string; reload?: () => Promise<void>; className?: string }) {
+  const s = tarState(data, traineeId);
+  const [error, setError] = useState("");
+  const [requesting, setRequesting] = useState<Enrollment | null>(null);
+  const { post } = usePost(reload ?? (async () => undefined));
+  const print = () => { setError(""); void openAdmissionRecord(traineeId).then(() => reload?.()).catch((e) => setError(e instanceof Error ? e.message : "Could not open the admission record.")); };
+  let button;
+  if (!s.paid.length) button = <button type="button" className={className} disabled title="The TAR prints once a course is paid">Print TAR</button>;
+  else if (s.left > 0) button = <button type="button" className={className} onClick={print}>{s.printed ? `Reprint TAR (${s.printed} of ${s.allowed} printed)` : "Print TAR"}</button>;
+  else if (s.pendingReprint) button = <button type="button" className={className} disabled>Reprint awaiting approval</button>;
+  else button = <button type="button" className={className} onClick={() => setRequesting(s.paid[0])}>Request TAR reprint</button>;
+  return <>
+    {button}
+    {error && <Message kind="error" text={error} />}
+    {requesting && <RequestActionModal data={data} enrollment={requesting} reqType="TAR reprint" onClose={() => setRequesting(null)} post={(body) => post(body, "Reprint request raised. Add the charge (or no charge) in Requests to send it for approval.")} />}
+  </>;
+}
+
+export function CashierPaymentQueue({ data, onPay, reload }: { data: PortalData; onPay: (enrollmentId: string) => void; reload: () => Promise<void> }) {
   const handed = data.handedToCashier ?? {};
   const rows = data.enrollments
     .filter((e) => e.enrollment_status === "Pending" && handed[e.id])
     .sort((a, b) => (handed[a.id] ?? "").localeCompare(handed[b.id] ?? ""));
+  // Trainees paid in the last 7 days whose courses are enrolled: print their TAR.
+  const since = addDays(manilaToday(), -6);
+  const paidRecently = new Set(data.payments.filter((p) => day(p.received_at) >= since).map((p) => p.trainee_id));
+  const toPrint = [...new Set(data.enrollments.filter((e) => PAID_STATUSES.includes(e.enrollment_status) && paidRecently.has(e.trainee_id)).map((e) => e.trainee_id))]
+    .map((id) => data.trainees.find((t) => t.id === id)).filter((t): t is PortalData["trainees"][number] => !!t);
   return <div className="portal-page">
-    <PageHead eyebrow="Collections" title="For payment" text="Applicants Registration has screened and handed over. Record their payment; Registration enrolls them once it is verified." />
+    <PageHead eyebrow="Collections" title="For payment" text="Applicants Registration has screened and handed over. Record their payment: once paid and on a batch they are enrolled automatically. Then print their Training Admission Record." />
     <div className="portal-table portal-panel"><table><thead><tr><th>Applicant</th><th>Course &amp; batch</th><th>Handed over</th><th>Total due</th><th>Paid</th><th>Balance</th><th></th></tr></thead><tbody>
       {rows.map((e) => {
         const t = first(e.trainees), b = first(e.batches), balance = balanceOf(e), paid = Number(e.verified_paid_centavos ?? e.paid_centavos);
@@ -36,10 +82,19 @@ export function CashierPaymentQueue({ data, onPay }: { data: PortalData; onPay: 
           <td>{pesos(dueCentavos(e))}</td>
           <td>{pesos(paid)}</td>
           <td><strong>{pesos(balance)}</strong></td>
-          <td>{paid > 0 ? <Badge tone="active">Paid · back to Registration</Badge> : <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record payment</button>}</td>
+          <td>{paid > 0 ? <Badge tone="active">{e.batch_id ? "Paid · enrolling" : "Paid · awaiting batch"}</Badge> : <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record payment</button>}</td>
         </tr>;
       })}
     </tbody></table>{!rows.length && <p className="portal-empty-copy">No applicants waiting for payment. Registration hands them over once their requirements are complete.</p>}</div>
+
+    <section className="portal-panel live-list" style={{ marginTop: 16 }}>
+      <div className="panel-heading"><div><h2>Paid · Training Admission Record</h2><p>Enrolled trainees paid in the last 7 days. The TAR prints twice; more needs the Accounting Manager&apos;s approval.</p></div><span className="slot-count">{toPrint.length}</span></div>
+      {toPrint.map((t) => { const s = tarState(data, t.id); return <div className="live-row-item" key={t.id}>
+        <div><strong>{fullName(t)}</strong><small>{data.applicationNumbers?.[t.id] ? <span className="app-no">{data.applicationNumbers[t.id]}</span> : null}{s.paid.map((e) => first(e.courses)?.code ?? first(e.courses)?.name).filter(Boolean).join(", ")}{s.record ? ` · ${s.record.ar_number} · printed ${s.printed} of ${s.allowed}` : " · not printed yet"}</small></div>
+        <div className="document-actions"><TarButton data={data} traineeId={t.id} reload={reload} className="portal-primary" /></div>
+      </div>; })}
+      {!toPrint.length && <p className="portal-empty-copy">No newly paid trainees.</p>}
+    </section>
   </div>;
 }
 

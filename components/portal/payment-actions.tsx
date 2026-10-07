@@ -11,7 +11,7 @@ import { Message, Modal, fmtDate } from "./shared-ui";
  * Shared by the Registration, Cashier and Accounting workspaces.
  */
 
-export type RequestType = "Cancellation" | "Refund" | "Make-up Class" | "Rescheduling" | "Reprinting" | "Change Course";
+export type RequestType = "Cancellation" | "Refund" | "Make-up Class" | "Rescheduling" | "Reprinting" | "Change Course" | "TAR reprint";
 
 /**
  * Raise a request against an enrollment. The server records it as Pending and
@@ -50,6 +50,7 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
   const inner = <div className="portal-form">
     {err && <Message kind="error" text={err} />}
     <p className="portal-form-note full">Goes to the Cashier, who adds any charge, then to the Accounting Manager for approval. On approval the change and its charge are applied automatically.</p>
+    {reqType === "TAR reprint" && <p className="portal-form-note full">The Training Admission Record has been printed twice. Each approval by the Accounting Manager allows one more print with the same AR number.</p>}
     {reqType === "Make-up Class" && <p className="portal-form-note full">Make-up classes are for courses of three days or more; the fee is Php 350.00 per training day (Terms, section 5).</p>}
     {reqType === "Rescheduling" && <label className="full">New batch<select value={batchId} onChange={(e) => setBatchId(e.target.value)}><option value="">Select a schedule</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.batch_number} · {fmtDate(b.starts_on)}–{fmtDate(b.ends_on)} · {b.capacity - b.confirmed_count} slots</option>)}</select></label>}
     {reqType === "Change Course" && <>
@@ -60,6 +61,6 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
     <label className="full">Reason<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why is this being requested?" /></label>
     <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={send}>{busy ? "Sending…" : "Request approval"}</button></div>
   </div>;
-  const title = reqType === "Rescheduling" ? "Change batch / reschedule" : reqType === "Make-up Class" ? "Make-up class" : reqType;
+  const title = reqType === "Rescheduling" ? "Change batch / reschedule" : reqType === "Make-up Class" ? "Make-up class" : reqType === "TAR reprint" ? "TAR reprint" : reqType;
   return embedded ? inner : <Modal title={`Request: ${title}`} onClose={onClose}>{inner}</Modal>;
 }

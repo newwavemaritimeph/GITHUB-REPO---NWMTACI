@@ -9,8 +9,9 @@ import { CoursesAndCenters, RegistrationDashboard, RegistrationRecords, applicat
  * Registration Officer workspace: renders every screen against a fixture and
  * pins the role boundary from MASTERPLAN §10 — this role reads payment status
  * but can never write a payment, charge, reschedule, or deletion — and the
- * 7 Oct 2026 rule that registrations come only from the website and are
- * screened (three requirements + a verified payment) before enrollment.
+ * 7 Oct 2026 rules: registrations come only from the website and are screened
+ * (three requirements); a paid applicant on a batch is enrolled automatically;
+ * Registration generates instructions (twice at most) but never prints the TAR.
  */
 
 const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
@@ -40,6 +41,7 @@ const fixture = {
     { id: "e2", enrollment_number: "ENR-0002", trainee_id: "t2", course_id: "c2", partner_offer_id: null, batch_id: null, enrollment_status: "Open Schedule", selling_price_centavos: 150000, rebate_centavos: 0, partner_payable_centavos: 0, paid_centavos: 0, created_at: nowIso, source: "Staff-assisted registration", trainees: { trainee_number: "NW-0002", legal_first_name: "Juan", legal_last_name: "Santos", email: "juan@example.test", mobile: "+639181234567" }, courses: { name: "Awareness on Basic Computer", code: "ABC" }, batches: null },
     { id: "e4", enrollment_number: "ENR-0004", trainee_id: "t1", course_id: "c1", partner_offer_id: null, batch_id: "b1", enrollment_status: "Pending", selling_price_centavos: 450000, rebate_centavos: 0, partner_payable_centavos: 0, paid_centavos: 100000, verified_paid_centavos: 100000, created_at: nowIso, source: "Public registration", trainees: { trainee_number: "NW-0001", legal_first_name: "Maria", legal_last_name: "Reyes", email: "maria@example.test", mobile: "+639171234567" }, courses: { name: "Ship Security Officers", code: "SSO" }, batches: { batch_number: "SSO-2610", starts_on: plus(5), ends_on: plus(7), mode: "Face-to-face", venue: "Room 1" } },
     { id: "e5", enrollment_number: "ENR-0005", trainee_id: "t2", course_id: "c1", partner_offer_id: null, batch_id: "b1", enrollment_status: "Pending", selling_price_centavos: 450000, rebate_centavos: 0, partner_payable_centavos: 0, paid_centavos: 0, verified_paid_centavos: 0, created_at: nowIso, source: "Public registration", trainees: { trainee_number: "NW-0002", legal_first_name: "Juan", legal_last_name: "Santos", email: "juan@example.test", mobile: "+639181234567" }, courses: { name: "Ship Security Officers", code: "SSO" }, batches: { batch_number: "SSO-2610", starts_on: plus(5), ends_on: plus(7), mode: "Face-to-face", venue: "Room 1" } },
+    { id: "e6", enrollment_number: "ENR-0006", trainee_id: "t3", course_id: "c1", partner_offer_id: null, batch_id: "b9", enrollment_status: "Enrolled", selling_price_centavos: 450000, rebate_centavos: 0, partner_payable_centavos: 0, paid_centavos: 450000, created_at: "2026-01-01T00:00:00Z", source: "Public registration", trainees: { trainee_number: "NW-0003", legal_first_name: "Pedro", legal_last_name: "Cruz", email: "pedro@example.test", mobile: "+639191234567" }, courses: { name: "Ship Security Officers", code: "SSO" }, batches: { batch_number: "SSO-TMRW", starts_on: plus(1), ends_on: plus(1), mode: "Face-to-face", venue: "Room 2" } },
     { id: "e3", enrollment_number: "ENR-0003", trainee_id: "t2", course_id: "c1", partner_offer_id: null, batch_id: null, enrollment_status: "Cancelled", selling_price_centavos: 450000, rebate_centavos: 0, partner_payable_centavos: 0, paid_centavos: 0, created_at: nowIso, trainees: { trainee_number: "NW-0002", legal_first_name: "Juan", legal_last_name: "Santos", email: "juan@example.test", mobile: "+639181234567" }, courses: { name: "Ship Security Officers", code: "SSO" }, batches: null },
   ],
   payments: [{ id: "p1", payment_number: "PAY-0001", trainee_id: "t1", amount_centavos: 200000, method: "GCash", receiving_account: "Main", reference_number: "GC123", received_at: nowIso, verification_state: "Pending" }],
@@ -53,6 +55,7 @@ const fixture = {
   requirementChecks: ["valid_id", "seamans_book", "medical_certificate"].map((requirement) => ({ enrollment_id: "e4", requirement, status: "Verified", remarks: null, checked_at: nowIso, checked_by_name: "Reg Officer" })),
   awaitingCourseIds: ["t3"],
   applicationNumbers: { t3: "NWMTACI-0000003", t1: "NWMTACI-0000001" },
+  instructionsCount: { e1: 2 },
   pendingCharges: [], employeeCharges: [], chargeEmployees: [], instructionTemplates: [], batchStaffing: [], myHr: null,
 } as unknown as PortalData;
 
@@ -62,7 +65,7 @@ const reload = async () => undefined;
 describe("Registration Officer workspace", () => {
   it("renders the four-part dashboard with no payment figures", () => {
     const html = renderToString(createElement(RegistrationDashboard, { data: fixture, go: noop }));
-    for (const title of ["New applications", "Upcoming trainings", "STCW slots open", "Today&#x27;s trainees", "STCW available slots"]) {
+    for (const title of ["New registrations", "Upcoming trainings", "STCW slots open", "Today&#x27;s trainees", "STCW available slots"]) {
       expect(html).toContain(title);
     }
     // STCW panel: SSO-2610 is bookable (21 seats); SSO-FULL is not; ABC is In-House, not STCW.
@@ -70,20 +73,28 @@ describe("Registration Officer workspace", () => {
     expect(html).not.toContain("SSO-FULL");
     expect(html).not.toContain("Awareness on Basic Computer</small></span><span class=\"rd-seat\"");
     expect(html).toMatch(/<strong>21<\/strong>/);
-    // New applications carry their screening state; nothing offers a staff intake.
-    expect(html).toContain("ready to enroll");
+    // New registrations list only applicants not yet enrolled; nothing offers a staff intake.
+    expect(html).toContain("Paid · enrolling");
     expect(html).not.toContain("Register a trainee");
+    const newPanel = html.slice(html.indexOf('id="rd-new"'), html.indexOf('id="rd-upcoming"'));
+    expect(newPanel).toContain("Juan Santos");
+    expect(newPanel).not.toContain(">Enrolled<");
+    // Upcoming trainings: only tomorrow's class (SSO-TMRW), not the one in 5 days.
+    const upcoming = html.slice(html.indexOf('id="rd-upcoming"'), html.indexOf('id="rd-stcw"'));
+    expect(upcoming).toContain("SSO-TMRW");
+    expect(upcoming).toContain("Pedro Cruz");
+    expect(upcoming).not.toContain("SSO-2610");
     // MASTERPLAN §10: payment states belong to the Cashier.
     expect(html).not.toMatch(/Unpaid|Partially paid/);
   });
 
-  it("lets an application be paid before it has a batch, but not enrolled", () => {
+  it("lets an application be paid before it has a batch, enrolling once the batch is chosen", () => {
     const e4 = fixture.enrollments.find((e) => e.id === "e4")!;
     const unplaced = applicationReadiness({ ...e4, batch_id: null, batches: null }, fixture.requirementChecks ?? [], "2026-10-07T03:00:00Z");
     expect(unplaced.missing).toHaveLength(0);
     expect(unplaced.paid).toBe(true);
     expect(unplaced.ready).toBe(false);
-    expect(unplaced.reason).toMatch(/No batch yet/);
+    expect(unplaced.reason).toMatch(/choose a batch/);
   });
 
   it("tracks the hand-over to the Cashier", () => {
@@ -104,15 +115,15 @@ describe("Registration Officer workspace", () => {
     expect(unpaid.reason).toBe("No verified payment yet");
   });
 
-  it("screens website applications and keeps decided enrollments separate", () => {
+  it("lists every enrollment under three tabs: All enrollments, Screening, For payment", () => {
     const props = { data: fixture, query: "", reload, setView: noop, trainees: createElement("p", null, "TRAINEE-LIST") };
     const apps = renderToString(createElement(RegistrationRecords, { ...props, view: "applications" }));
     expect(apps).toContain("ENR-0004");
     expect(apps).toContain("ENR-0005");
-    expect(apps).not.toContain("ENR-0001");
-    expect(apps).toContain("Paid · ready to enroll");
-    expect(apps).toContain("Screening");
-    expect(apps).toContain("With Cashier"); // filter chip for applicants handed over for payment
+    expect(apps).not.toContain("ENR-0001"); // Screening tab: enrolled trainees are not listed
+    expect(apps).toContain("Paid · enrolling");
+    for (const tab of ["All enrollments", "Screening", "For payment"]) expect(apps).toContain(tab);
+    for (const gone of ["Ready to enroll", "With Cashier", "No course yet<small"]) expect(apps).not.toContain(gone);
     expect(apps).not.toContain("Register a trainee");
     // A website applicant without a course waits for Registration to assign one.
     expect(apps).toContain("No course yet");
@@ -124,7 +135,7 @@ describe("Registration Officer workspace", () => {
     const enrolls = renderToString(createElement(RegistrationRecords, { ...props, view: "enrollments" }));
     expect(enrolls).toContain("ENR-0001");
     expect(enrolls).toContain("Open Schedule");
-    expect(enrolls).not.toContain("ENR-0004");
+    expect(enrolls).toContain("ENR-0004"); // All enrollments includes applications
     expect(enrolls).toContain("Partially paid");
     expect(enrolls).not.toContain("Record payment");
     expect(renderToString(createElement(RegistrationRecords, { ...props, view: "trainees" }))).toContain("TRAINEE-LIST");
@@ -143,6 +154,10 @@ describe("Registration Officer workspace", () => {
     // Sent directly from the Registration screens.
     const direct = new Set([...source.matchAll(/action: ?"([a-z-]+)"/g)].map((m) => m[1]));
     expect([...direct].sort()).toEqual(["application-assign", "application-enroll", "application-handover", "application-place-batch", "requirement-check", "send-instructions"]);
+    // The Training Admission Record is printed by the Cashier, never from here.
+    expect(source).not.toContain("admission-record-issue");
+    expect(source).not.toContain("openAdmissionRecord");
+    expect(source).not.toContain("Print admission record");
     // The only shared action component it may pull in is the request modal,
     // whose single action is request-raise. Payment, charge and discount
     // modals live in the same file and must never be imported here.
