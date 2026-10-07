@@ -86,20 +86,20 @@ export function RegistrationDashboard({ data, go }: { data: PortalData; go: (mod
 
   return <div className="portal-page">
     <div className="portal-heading">
-      <div><h1 style={{ margin: 0 }}>Registration Dashboard</h1><p>{fmtLong(today)}</p></div>
+      <div><h1 style={{ margin: 0 }}>Registration dashboard</h1><p>{fmtLong(today)}</p></div>
       <span style={{ display: "inline-flex", gap: 10, flexWrap: "wrap" }}>
-        <button type="button" className="portal-secondary" onClick={() => go("Trainees")}>Search Trainee</button>
-        <button type="button" className="portal-primary" onClick={() => go("Applications")}>Screen Applications{newCount ? ` (${newCount})` : ""}</button>
+        <button type="button" className="portal-secondary" onClick={() => go("Trainees")}>Search trainee</button>
+        <button type="button" className="portal-primary" onClick={() => go("Applications")}>Screen applications{newCount ? ` (${newCount})` : ""}</button>
       </span>
     </div>
 
     <div className="rd-two">
       <section className="portal-panel rd-panel" id="rd-new">
-        <div className="panel-heading"><div><h2>New Registrations</h2><p>From the website, not yet enrolled · {newToday} today</p></div><span className="rd-count">{newCount}</span></div>
+        <div className="panel-heading"><div><h2>New registrations</h2><p>From the website, not yet enrolled · {newToday} today</p></div><span className="rd-count">{newCount}</span></div>
         <div className="rd-scroll">
           {noCourse.map((t) => <button type="button" className="rd-row" key={t.id} onClick={() => go("Applications")}>
             <span className="rd-main"><strong>{fullName(t)}</strong><small>{appNoOf(data, t.id) ? <span className="app-no">{appNoOf(data, t.id)}</span> : null}Course to be assigned</small></span>
-            <Badge tone="pending">No Course Yet</Badge>
+            <Badge tone="pending">No course yet</Badge>
             <span className="rd-time">{day(t.registered_at) === today ? fmtClock(t.registered_at) : fmtShort(day(t.registered_at))}</span>
           </button>)}
           {applications.map((e) => { const st = stateOf(readinessOf(data, e)), c = first(e.courses); return <button type="button" className="rd-row" key={e.id} onClick={() => go("Applications")}>
@@ -109,7 +109,7 @@ export function RegistrationDashboard({ data, go }: { data: PortalData; go: (mod
           </button>; })}
           {!newCount && <p className="rd-empty">No new registrations waiting.</p>}
         </div>
-        <button type="button" className="ghost-button rd-more" onClick={() => go("Applications")}>View All →</button>
+        <button type="button" className="ghost-button rd-more" onClick={() => go("Applications")}>View all →</button>
       </section>
 
       <section className="portal-panel rd-panel" id="rd-enrolled">
@@ -128,7 +128,7 @@ export function RegistrationDashboard({ data, go }: { data: PortalData; go: (mod
           </button>; })}
           {!enrolled.length && <p className="rd-empty">No trainees were enrolled on {fmtDay(picked)}.</p>}
         </div>
-        <button type="button" className="ghost-button rd-more" onClick={() => go("Enrollments")}>All Enrollments →</button>
+        <button type="button" className="ghost-button rd-more" onClick={() => go("Enrollments")}>All enrollments →</button>
       </section>
     </div>
   </div>;
@@ -169,7 +169,7 @@ export function applicationReadiness(e: Enrollment, checks: RequirementCheck[], 
   return { latest, verified: REQUIREMENTS.length - missing.length, missing, rejected, paid, paidCentavos, ready, reason, handed, handedAt: handedAt ?? null };
 }
 /** Screening state of a Pending application. Paid and on a batch means the server enrolls it. */
-const stateOf = (r: ReturnType<typeof applicationReadiness>) => (r.ready ? { text: "Paid · Enrolling", tone: "active" } : r.paid && !r.missing.length ? { text: "Paid · Choose Batch", tone: "active" } : r.paid ? { text: "Paid · Requirements Missing", tone: "cancelled" } : r.handed ? { text: "For Payment", tone: "orange" } : r.rejected.length ? { text: "Needs Attention", tone: "cancelled" } : { text: "Screening", tone: "pending" });
+const stateOf = (r: ReturnType<typeof applicationReadiness>) => (r.ready ? { text: "Paid · Enrolling", tone: "active" } : r.paid && !r.missing.length ? { text: "Paid · Choose Batch", tone: "active" } : r.paid ? { text: "Paid · Requirements Missing", tone: "cancelled" } : r.handed ? { text: "For payment", tone: "orange" } : r.rejected.length ? { text: "Needs Attention", tone: "cancelled" } : { text: "Screening", tone: "pending" });
 /** Waiting at the Cashier: handed over and not yet paid. */
 const forPayment = (r: ReturnType<typeof applicationReadiness>) => r.handed && !r.paid;
 const readinessOf = (data: PortalData, e: Enrollment) => applicationReadiness(e, data.requirementChecks ?? [], data.handedToCashier?.[e.id] ?? null);
@@ -180,9 +180,9 @@ const applicationsOf = (data: PortalData) => data.enrollments.filter((e) => e.en
 const awaitingCourseOf = (data: PortalData) => (data.awaitingCourseIds ?? []).map((id) => data.trainees.find((t) => t.id === id)).filter((t): t is Trainee => !!t).sort((a, b) => (b.registered_at ?? "").localeCompare(a.registered_at ?? ""));
 
 /** The three tabs of the Registration list (owner, 7 Oct 2026). */
-export const RECORD_FILTERS = ["All Enrollments", "Screening", "For Payment"] as const;
+export const RECORD_FILTERS = ["All enrollments", "Screening", "For payment"] as const;
 type RecordFilter = (typeof RECORD_FILTERS)[number];
-const inFilter = (f: RecordFilter, r: ReturnType<typeof applicationReadiness> | null) => (f === "All Enrollments" ? true : !r ? false : f === "For Payment" ? forPayment(r) : !forPayment(r));
+const inFilter = (f: RecordFilter, r: ReturnType<typeof applicationReadiness> | null) => (f === "All enrollments" ? true : !r ? false : f === "For payment" ? forPayment(r) : !forPayment(r));
 /** Times instructions were generated for an enrollment (limit 2 for Registration). */
 export const INSTRUCTION_LIMIT = 2;
 const instructionsCountOf = (data: PortalData, e: Enrollment) => data.instructionsCount?.[e.id] ?? (e.instructions_sent_at ? 1 : 0);
@@ -201,7 +201,7 @@ const closesAt = (iso: string) => new Intl.DateTimeFormat("en-PH", { month: "sho
 export function BatchCards({ data, batches, selected, onSelect, allowNone }: { data: PortalData; batches: Batch[]; selected: string; onSelect: (id: string) => void; allowNone?: boolean }) {
   const staffing = new Map((data.batchStaffing ?? []).map((x) => [x.batch_id, x]));
   return <div className="bc-list" role="radiogroup" aria-label="Batch">
-    <div className="bc-head"><b>Choose a Batch</b><span>{batches.length ? `${batches.length} open · 24 seats each` : "No open batch for this course yet"}</span></div>
+    <div className="bc-head"><b>Choose a batch</b><span>{batches.length ? `${batches.length} open · 24 seats each` : "No open batch for this course yet"}</span></div>
     {batches.map((x) => {
       const left = seatsLeft(x), on = selected === x.id, low = left <= 3, st = staffing.get(x.id);
       const days = x.starts_on === x.ends_on ? weekdayOf(x.starts_on) : `${weekdayOf(x.starts_on)}–${weekdayOf(x.ends_on)}`;
@@ -214,7 +214,7 @@ export function BatchCards({ data, batches, selected, onSelect, allowNone }: { d
     })}
     {allowNone && <button type="button" role="radio" aria-checked={selected === NO_BATCH} className={`bc-card bc-none${selected === NO_BATCH ? " on" : ""}`} onClick={() => onSelect(NO_BATCH)}>
       <span className="bc-radio" aria-hidden="true" />
-      <span className="bc-main"><b>No Batch Yet — Place Later</b><small>{batches.length ? "Screen and take payment now; choose the batch from the application later." : "Screen and take payment now; place on a batch once one opens."}</small></span>
+      <span className="bc-main"><b>No batch yet — place later</b><small>{batches.length ? "Screen and take payment now; choose the batch from the application later." : "Screen and take payment now; place on a batch once one opens."}</small></span>
     </button>}
   </div>;
 }
@@ -245,13 +245,13 @@ export function AssignCourseModal({ data, trainee, reload, onClose }: { data: Po
     <div className="portal-form">
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
       <label className="full">Course<select value={courseId} onChange={(e) => { setCourseId(e.target.value); setBatchId(NO_BATCH); }}>
-        <option value="">Select a Course</option>
-        <optgroup label="STCW Courses">{courses.filter(isStcwCourse).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name} · {pesos(c.standard_price_centavos)}</option>)}</optgroup>
-        <optgroup label="Other Courses">{courses.filter((c) => !isStcwCourse(c)).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name} · {pesos(c.standard_price_centavos)}</option>)}</optgroup>
+        <option value="">Select a course</option>
+        <optgroup label="STCW courses">{courses.filter(isStcwCourse).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name} · {pesos(c.standard_price_centavos)}</option>)}</optgroup>
+        <optgroup label="Other courses">{courses.filter((c) => !isStcwCourse(c)).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name} · {pesos(c.standard_price_centavos)}</option>)}</optgroup>
       </select></label>
       {course && !dated && <div className="full"><BatchCards data={data} batches={batches} selected={batchId} onSelect={setBatchId} allowNone /></div>}
       {dated && course && <label className="full">Start Date (Optional)<input type="date" value={startDate} min={addDays(today, 1)} onChange={(e) => setStartDate(e.target.value)} /><small style={{ color: dateOk ? "var(--muted)" : "var(--red, #b42318)" }}>{!startDate ? `${course.duration_label} · Monday to Saturday, consecutive days in one week. Leave empty to set later.` : dateOk ? `Runs ${fmtDate(startDate)} to ${fmtDate(automaticEndDate(startDate, course.duration_label))}` : "Pick a later date that is not a Sunday and lets the course finish by Saturday of the same week."}</small></label>}
-      <div className="bc-foot full"><span>{course ? (withBatch ? batchSummary(data, batches.find((x) => x.id === batchId)) : `${course.code} · fee ${pesos(course.standard_price_centavos)} · no batch yet`) : "Choose a course first."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!courseId || busy || !dateOk} onClick={assign}>{busy ? "Assigning…" : withBatch ? "Assign Course & Batch" : "Assign Course"}</button></span></div>
+      <div className="bc-foot full"><span>{course ? (withBatch ? batchSummary(data, batches.find((x) => x.id === batchId)) : `${course.code} · fee ${pesos(course.standard_price_centavos)} · no batch yet`) : "Choose a course first."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!courseId || busy || !dateOk} onClick={assign}>{busy ? "Assigning…" : withBatch ? "Assign Course & Batch" : "Assign course"}</button></span></div>
     </div>
   </Modal>;
 }
@@ -268,7 +268,7 @@ function ChooseBatchModal({ data, enrollment, reload, onClose }: { data: PortalD
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
       <div className="full"><BatchCards data={data} batches={batches} selected={batchId} onSelect={setBatchId} /></div>
       {!batches.length && <p className="portal-form-note full">The application stays ready; place it once a batch opens.</p>}
-      <div className="bc-foot full"><span>{batchSummary(data, batches.find((x) => x.id === batchId)) || "Choose a batch."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!batchId || busy} onClick={place}>{busy ? "Placing…" : "Place on Batch"}</button></span></div>
+      <div className="bc-foot full"><span>{batchSummary(data, batches.find((x) => x.id === batchId)) || "Choose a batch."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!batchId || busy} onClick={place}>{busy ? "Placing…" : "Place on batch"}</button></span></div>
     </div>
   </Modal>;
 }
@@ -297,16 +297,16 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
   const PER = 12;
   const pageRows = rows.slice((page - 1) * PER, page * PER);
   const current = open ? data.enrollments.find((e) => e.id === open.id) ?? open : null;
-  const count = (f: RecordFilter) => all.filter((x) => inFilter(f, x.r)).length + (f === "For Payment" ? 0 : awaiting.length);
+  const count = (f: RecordFilter) => all.filter((x) => inFilter(f, x.r)).length + (f === "For payment" ? 0 : awaiting.length);
   return <>
     <div className="portal-tabs">{RECORD_FILTERS.map((f) => <button key={f} type="button" className={filter === f ? "active" : ""} onClick={() => { setFilter(f); setPage(1); }}>{f}<small style={{ marginLeft: 6, opacity: 0.7 }}>{count(f)}</small></button>)}</div>
     <div style={{ display: "flex", gap: 10, padding: "0 0 10px" }}><label className="portal-field-inline" style={{ flex: 1, minWidth: 220 }}>Search<input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Name, NWMTACI number, SRN, course" /></label></div>
-    {filter !== "For Payment" && noCourse.length > 0 && <section className="portal-panel nc-panel">
-      <div className="panel-heading"><div><h2>No Course Yet</h2><p>Assign a course and schedule, then screen the application</p></div><span className="slot-count">{noCourse.length}</span></div>
+    {filter !== "For payment" && noCourse.length > 0 && <section className="portal-panel nc-panel">
+      <div className="panel-heading"><div><h2>No course yet</h2><p>Assign a course and schedule, then screen the application</p></div><span className="slot-count">{noCourse.length}</span></div>
       {noCourse.map((t) => <div className="rd-row" key={t.id}>
         <span className="rd-main"><strong>{fullName(t)}</strong><small>{appNoOf(data, t.id) ? <span className="app-no">{appNoOf(data, t.id)}</span> : null}{t.trainee_number} · <span className="lc">{t.email}</span> · {t.mobile}</small></span>
         <span className="rd-time">{t.registered_at ? fmtShort(day(t.registered_at)) : ""}</span>
-        <button type="button" className="portal-primary" onClick={() => setAssigning(t)}>Assign Course</button>
+        <button type="button" className="portal-primary" onClick={() => setAssigning(t)}>Assign course</button>
       </div>)}
     </section>}
     <div className="portal-table portal-panel"><table><thead><tr><th>Trainee</th><th>Enrollment no.</th><th>Course &Amp; Schedule</th><th>Requirements</th><th>Payment</th><th>Status</th></tr></thead><tbody>
@@ -315,10 +315,10 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
         <td><strong className="app-no-cell">{appNoOf(data, e.trainee_id) ?? e.enrollment_number}</strong><small>{appNoOf(data, e.trainee_id) ? e.enrollment_number : fmtDate(day(e.created_at))}</small></td>
         <td>{first(e.courses)?.name ?? "—"}<small>{scheduleOf(e)}</small></td>
         <td>{r ? <><span className={`req-count${r.missing.length ? "" : " ok"}`}>{r.verified} of {REQUIREMENTS.length}</span>{r.rejected.length > 0 && <small>Rejected: {r.rejected.join(", ")}</small>}</> : <span className="muted-text">{e.enrollment_status === "Cancelled" ? "—" : "Complete"}</span>}</td>
-        <td>{r ? (r.paid ? <><strong>{pesos(r.paidCentavos)}</strong><small>Verified</small></> : <span className="muted-text">{r.handed ? "With Cashier" : "Not yet"}</span>) : <><Badge tone={p.tone}>{p.text}</Badge><small>{pesos(balanceOf(e))} balance</small></>}</td>
+        <td>{r ? (r.paid ? <><strong>{pesos(r.paidCentavos)}</strong><small>Verified</small></> : <span className="muted-text">{r.handed ? "With cashier" : "Not yet"}</span>) : <><Badge tone={p.tone}>{p.text}</Badge><small>{pesos(balanceOf(e))} balance</small></>}</td>
         <td><Badge tone={s.tone}>{s.text}</Badge></td>
       </tr>; })}
-    </tbody></table>{!rows.length && <p className="portal-empty-copy">{filter === "For Payment" ? "Nobody is waiting at the Cashier." : filter === "Screening" ? (noCourse.length ? "Applicants without a course are listed above." : "No applications to screen. New ones arrive from the website.") : "No matching enrollments."}</p>}</div>
+    </tbody></table>{!rows.length && <p className="portal-empty-copy">{filter === "For payment" ? "Nobody is waiting at the Cashier." : filter === "Screening" ? (noCourse.length ? "Applicants without a course are listed above." : "No applications to screen. New ones arrive from the website.") : "No matching enrollments."}</p>}</div>
     <Pager page={page} total={rows.length} perPage={PER} onPage={setPage} />
     {current && <EnrollmentDrawer data={data} enrollment={current} reload={reload} onClose={() => setOpen(null)} />}
     {assigning && <AssignCourseModal data={data} trainee={assigning} reload={reload} onClose={() => setAssigning(null)} />}
@@ -343,7 +343,7 @@ export function RegistrationRecords({ data, query, reload, view, setView, traine
     <div className="rr-switch" role="tablist" aria-label="Records">
       {tabs.map(([v, label, n, on]) => <button key={v} type="button" role="tab" aria-selected={on} className={on ? "active" : ""} onClick={() => setView(v)}>{label}<small>{n}</small></button>)}
     </div>
-    {onList && <EnrollmentQueue key={view} data={data} query={query} reload={reload} initial={view === "applications" ? "Screening" : "All Enrollments"} />}
+    {onList && <EnrollmentQueue key={view} data={data} query={query} reload={reload} initial={view === "applications" ? "Screening" : "All enrollments"} />}
     {view === "trainees" && trainees}
   </div>;
 }
@@ -364,7 +364,7 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
   // Trainee registers > Registration verifies > Cashier takes payment > paid = enrolled.
   const steps: [string, string, boolean][] = [
     ["Requirements", `${r.verified} of ${REQUIREMENTS.length}`, allTicked],
-    ["For Payment", r.paid ? pesos(r.paidCentavos) : r.handed ? `Since ${fmtDate(day(r.handedAt))}` : "Not Yet", r.paid],
+    ["For payment", r.paid ? pesos(r.paidCentavos) : r.handed ? `Since ${fmtDate(day(r.handedAt))}` : "Not Yet", r.paid],
     ["Enrolled", enrolled ? "Done" : "Once Paid", enrolled],
   ];
   return <div className="screen-box full">
@@ -389,8 +389,8 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
     <div className="screen-foot">
       <small>{!allTicked ? `Still to tick: ${r.missing.join(", ")}` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
       <span style={{ display: "inline-flex", gap: 8, flexWrap: "wrap" }}>
-        {!r.handed && !r.paid && <button type="button" className="portal-primary" disabled={busy || !allTicked} onClick={() => void post({ action: "application-handover", enrollmentId: e.id }, "Handed to the Cashier for payment.").catch(() => undefined)}>Hand to Cashier</button>}
-        {r.ready && <button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "application-enroll", enrollmentId: e.id }, "Trainee enrolled.").catch(() => undefined)}>Enroll Now</button>}
+        {!r.handed && !r.paid && <button type="button" className="portal-primary" disabled={busy || !allTicked} onClick={() => void post({ action: "application-handover", enrollmentId: e.id }, "Handed to the Cashier for payment.").catch(() => undefined)}>Hand to cashier</button>}
+        {r.ready && <button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "application-enroll", enrollmentId: e.id }, "Trainee enrolled.").catch(() => undefined)}>Enroll now</button>}
       </span>
     </div>
   </div>;
@@ -444,7 +444,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
         <p className="portal-form-note full">{emailStatusText(data.instructionEmails?.[e.id]) ? `${emailStatusText(data.instructionEmails?.[e.id])}. ` : t?.email ? `Generating emails the PDF and Google Classroom link to ${t.email}. ` : ""}{e.instructions_sent_at ? `Last generated ${fmtDate(day(e.instructions_sent_at))}. ` : ""}Instructions can be generated twice. The Training Admission Record is printed by the Cashier.</p>
       </> : <p className="portal-form-note full">{isApplication ? "Training instructions become available once the trainee is paid and enrolled." : "No documents for a cancelled enrollment."}</p>}
 
-      {isApplication && <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>{!e.batch_id && !e.scheduled_on && <button type="button" className="portal-primary" onClick={() => setChoosingBatch(true)}>Choose Batch</button>}{traineeRecord && <button type="button" onClick={() => setAddingCourse(true)}>+ Add another course</button>}</div>}
+      {isApplication && <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>{!e.batch_id && !e.scheduled_on && <button type="button" className="portal-primary" onClick={() => setChoosingBatch(true)}>Choose batch</button>}{traineeRecord && <button type="button" onClick={() => setAddingCourse(true)}>+ Add another course</button>}</div>}
 
       <div className="full"><strong>Request a change</strong> <small style={{ color: "var(--muted)" }}>goes to the Cashier for charges, then the Accounting Manager for approval</small></div>
       <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
@@ -507,13 +507,13 @@ export function CoursesAndCenters({ data, query }: { data: PortalData; query: st
     </article>; })}{!stcw.length && <p className="portal-empty-copy">No STCW courses match.</p>}</div>}
 
     {tab === "In-House courses" && <section className="portal-panel">
-      <div className="panel-heading"><div><h2>In-House Courses</h2><p>Online · trainees pick a start date; training runs on consecutive days, Monday to Saturday</p></div><label className="portal-field-inline">Category<select value={category} onChange={(e) => setCategory(e.target.value)}><option value="">All Categories</option>{categories.map((c) => <option key={c} value={c}>{c}</option>)}</select></label></div>
+      <div className="panel-heading"><div><h2>In-House courses</h2><p>Online · trainees pick a start date; training runs on consecutive days, Monday to Saturday</p></div><label className="portal-field-inline">Category<select value={category} onChange={(e) => setCategory(e.target.value)}><option value="">All categories</option>{categories.map((c) => <option key={c} value={c}>{c}</option>)}</select></label></div>
       <div className="portal-table"><table><thead><tr><th>Code</th><th>Course</th><th>Category</th><th>Duration</th><th>Modality</th><th>Fee</th></tr></thead><tbody>{others.filter((c) => !category || (first(c.course_categories)?.name ?? "In-House") === category).map((c) => <tr key={c.id}><td><strong>{c.code}</strong></td><td>{c.name}</td><td>{first(c.course_categories)?.name ?? "In-House"}</td><td>{c.duration_label}</td><td>Online</td><td>{pesos(c.standard_price_centavos)}</td></tr>)}</tbody></table>{!others.length && <p className="portal-empty-copy">No courses.</p>}</div>
     </section>}
 
     {tab === "Endorsed programs" && <section className="portal-panel">
-      <div className="panel-heading"><div><h2>Endorsed Programs</h2><p>Offered through partner centers</p></div><label className="portal-field-inline">Partner Center<select value={center} onChange={(e) => setCenter(e.target.value)}>{centers.map((c) => <option key={c}>{c}</option>)}{!centers.length && <option value="">None Yet</option>}</select></label></div>
-      <div className="portal-table"><table><thead><tr><th>Code</th><th>Course</th><th>Duration</th><th>Training Fee</th></tr></thead><tbody>{offers.map(({ offer, course }) => <tr key={offer.id}><td><strong>{course?.code}</strong></td><td>{course?.name}</td><td>{offer.duration_label}</td><td>{pesos(offer.training_fee_centavos)}</td></tr>)}</tbody></table>{!offers.length && <p className="portal-empty-copy">No programs for this center.</p>}</div>
+      <div className="panel-heading"><div><h2>Endorsed programs</h2><p>Offered through partner centers</p></div><label className="portal-field-inline">Partner center<select value={center} onChange={(e) => setCenter(e.target.value)}>{centers.map((c) => <option key={c}>{c}</option>)}{!centers.length && <option value="">None yet</option>}</select></label></div>
+      <div className="portal-table"><table><thead><tr><th>Code</th><th>Course</th><th>Duration</th><th>Training fee</th></tr></thead><tbody>{offers.map(({ offer, course }) => <tr key={offer.id}><td><strong>{course?.code}</strong></td><td>{course?.name}</td><td>{offer.duration_label}</td><td>{pesos(offer.training_fee_centavos)}</td></tr>)}</tbody></table>{!offers.length && <p className="portal-empty-copy">No programs for this center.</p>}</div>
     </section>}
   </div>;
 }

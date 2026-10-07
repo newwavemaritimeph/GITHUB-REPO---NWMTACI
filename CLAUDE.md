@@ -7,7 +7,7 @@ Read `MASTERPLAN.md` before changing the system. It is the product source of tru
 - Organization: New Wave Maritime Training and Assessment Center, Inc. (NWMTACI)
 - Tagline: Ride the New Wave of Maritime Excellence
 - Brand colors: orange `#F25615`, blue `#0571D0`, cyan `#35CCFA`, light cyan `#9EE3F1`, dark blue `#123F63`, and white
-- Use readable Geist/system sans-serif text, regular body weight, and mobile-friendly controls. Buttons, tabs, headings, labels and status chips use Title Case (owner decision, 7 Oct 2026, e.g. "Generate and Email"); paragraphs and hints stay as normal sentences.
+- Use readable Geist/system sans-serif text (Geist Mono for amounts and IDs), regular body weight, larger type and mobile-friendly controls. All portal text uses sentence case (owner decision, 7 Oct 2026, replacing the earlier Title Case rule): buttons, tabs, headings, labels and status chips, e.g. "Record payment". No descriptions under titles or panel headings; tags use formal, plain words. The staff portal uses a navy top bar with dropdown tabs (see design/cashier-prototype.html).
 - Never restore Tara Barko names, sample metadata, or identifiers.
 
 ## Architecture and invariants

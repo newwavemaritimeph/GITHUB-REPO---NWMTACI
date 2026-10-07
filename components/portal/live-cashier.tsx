@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { PortalData, Enrollment } from "../portal-live-app";
 import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos } from "@/lib/portal-format";
 import { Badge, Message, Modal, PageHead, fullName, fmtDate, fmtClock, usePost, openAdmissionRecord, submit } from "./shared-ui";
@@ -49,10 +49,10 @@ export function TarButton({ data, traineeId, reload, className = "portal-seconda
   const { post } = usePost(reload ?? (async () => undefined));
   const print = () => { setError(""); void openAdmissionRecord(traineeId).then(() => reload?.()).catch((e) => setError(e instanceof Error ? e.message : "Could not open the admission record.")); };
   let button;
-  if (!s.paid.length) button = <button type="button" className={className} disabled title="The TAR Prints Once a Course Is Paid">Print TAR</button>;
+  if (!s.paid.length) button = <button type="button" className={className} disabled title="The TAR prints once a course is paid">Print TAR</button>;
   else if (s.left > 0) button = <button type="button" className={className} onClick={print}>{s.printed ? `Reprint TAR (${s.printed} of ${s.allowed} printed)` : "Print TAR"}</button>;
-  else if (s.pendingReprint) button = <button type="button" className={className} disabled>Reprint Awaiting Approval</button>;
-  else button = <button type="button" className={className} onClick={() => setRequesting(s.paid[0])}>Request TAR Reprint</button>;
+  else if (s.pendingReprint) button = <button type="button" className={className} disabled>Reprint awaiting approval</button>;
+  else button = <button type="button" className={className} onClick={() => setRequesting(s.paid[0])}>Request TAR reprint</button>;
   return <>
     {button}
     {error && <Message kind="error" text={error} />}
@@ -71,8 +71,8 @@ export function CashierPaymentQueue({ data, onPay, reload }: { data: PortalData;
   const toPrint = [...new Set(data.enrollments.filter((e) => PAID_STATUSES.includes(e.enrollment_status) && paidRecently.has(e.trainee_id)).map((e) => e.trainee_id))]
     .map((id) => data.trainees.find((t) => t.id === id)).filter((t): t is PortalData["trainees"][number] => !!t);
   return <div className="portal-page">
-    <PageHead eyebrow="Collections" title="For Payment" text="Applicants Registration has screened and handed over. Record their payment: once paid and on a batch they are enrolled automatically. Then print their Training Admission Record." />
-    <div className="portal-table portal-panel"><table><thead><tr><th>Applicant</th><th>Course &Amp; Batch</th><th>Handed Over</th><th>Total Due</th><th>Paid</th><th>Balance</th><th></th></tr></thead><tbody>
+    <PageHead eyebrow="Collections" title="For payment" text="Applicants registration has screened and handed over. Record their payment: once paid and on a batch they are enrolled automatically. Then print their training admission record." />
+    <div className="portal-table portal-panel"><table><thead><tr><th>Applicant</th><th>Course &amp; batch</th><th>Handed over</th><th>Total due</th><th>Paid</th><th>Balance</th><th></th></tr></thead><tbody>
       {rows.map((e) => {
         const t = first(e.trainees), b = first(e.batches), balance = balanceOf(e), paid = Number(e.verified_paid_centavos ?? e.paid_centavos);
         const number = data.applicationNumbers?.[e.trainee_id];
@@ -83,13 +83,13 @@ export function CashierPaymentQueue({ data, onPay, reload }: { data: PortalData;
           <td>{pesos(dueCentavos(e))}</td>
           <td>{pesos(paid)}</td>
           <td><strong>{pesos(balance)}</strong></td>
-          <td>{paid > 0 ? <Badge tone="active">{e.batch_id ? "Paid · Enrolling" : "Paid · Awaiting Batch"}</Badge> : <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record Payment</button>}</td>
+          <td>{paid > 0 ? <Badge tone="active">{e.batch_id ? "Paid · Enrolling" : "Paid · Awaiting batch"}</Badge> : <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record payment</button>}</td>
         </tr>;
       })}
     </tbody></table>{!rows.length && <p className="portal-empty-copy">No applicants waiting for payment. Registration hands them over once their requirements are complete.</p>}</div>
 
     <section className="portal-panel live-list" style={{ marginTop: 16 }}>
-      <div className="panel-heading"><div><h2>Paid · Training Admission Record</h2><p>Enrolled trainees paid in the last 7 days. The TAR prints twice; more needs the Accounting Manager&apos;s approval.</p></div><span className="slot-count">{toPrint.length}</span></div>
+      <div className="panel-heading"><div><h2>Paid · Training admission record</h2><p>Enrolled trainees paid in the last 7 days. The TAR prints twice; more needs the accounting manager&apos;s approval.</p></div><span className="slot-count">{toPrint.length}</span></div>
       {toPrint.map((t) => { const s = tarState(data, t.id); return <div className="live-row-item" key={t.id}>
         <div><strong>{fullName(t)}</strong><small>{data.applicationNumbers?.[t.id] ? <span className="app-no">{data.applicationNumbers[t.id]}</span> : null}{s.paid.map((e) => first(e.courses)?.code ?? first(e.courses)?.name).filter(Boolean).join(", ")}{s.record ? ` · ${s.record.ar_number} · printed ${s.printed} of ${s.allowed}` : " · not printed yet"}</small></div>
         <div className="document-actions"><TarButton data={data} traineeId={t.id} reload={reload} className="portal-primary" /></div>
@@ -126,13 +126,13 @@ export function RequestChargeModal({ data, request, reload, onClose }: { data: P
       {request.request_type === "Cancellation" && <p className="portal-form-note full">Policy: 5+ days before training, Php 350.00 processing fee; within 5 days, 50% of the course fee plus Php 250.00.</p>}
       <label className="portal-check full"><input type="checkbox" checked={noCharge} onChange={(ev) => setNoCharge(ev.target.checked)} /><span>No charge for this request</span></label>
       {!noCharge && <>
-        <label className="full">Charge<select value={catalogId} onChange={(ev) => choose(ev.target.value)}><option value="">Custom Amount</option>{catalog.map((c) => <option key={c.id} value={c.id}>{c.name} · {pesos(c.default_amount_centavos)}</option>)}</select></label>
+        <label className="full">Charge<select value={catalogId} onChange={(ev) => choose(ev.target.value)}><option value="">Custom amount</option>{catalog.map((c) => <option key={c.id} value={c.id}>{c.name} · {pesos(c.default_amount_centavos)}</option>)}</select></label>
         <label>Description<input value={description} onChange={(ev) => setDescription(ev.target.value)} placeholder={`${typeLabel} fee`} /></label>
         <label>Amount (PHP)<input type="number" min="0" step="0.01" value={amount} onChange={(ev) => setAmount(ev.target.value)} /></label>
       </>}
-      <label className="full">Remarks (Optional)<input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="For the Accounting Manager" /></label>
-      <p className="portal-form-note full">The charge is added to the trainee&apos;s balance only when the Accounting Manager approves the request.</p>
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !valid} onClick={send}>{busy ? "Sending…" : "Send for Approval"}</button></div>
+      <label className="full">Remarks (Optional)<input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="For the accounting manager" /></label>
+      <p className="portal-form-note full">The charge is added to the trainee&apos;s balance only when the accounting manager approves the request.</p>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !valid} onClick={send}>{busy ? "Sending…" : "Send for approval"}</button></div>
     </div>
   </Modal>;
 }
@@ -144,119 +144,219 @@ const needsReference = (data: PortalData, method: string) => !!data.paymentMetho
 const traineeName = (e: Enrollment) => { const t = first(e.trainees); return t ? fullName(t) : e.enrollment_number; };
 const paidOf = (e: Enrollment) => Number(e.paid_centavos ?? 0);
 const scheduleText = (e: Enrollment) => { const b = first(e.batches); return b ? `${fmtDate(b.starts_on)}${b.ends_on !== b.starts_on ? ` – ${fmtDate(b.ends_on)}` : ""}` : e.scheduled_on ? fmtDate(e.scheduled_on) : "No schedule yet"; };
+const courseCode = (e: Enrollment) => first(e.courses)?.code ?? first(e.courses)?.name ?? "Course";
+const toCentavos = (v: string) => { const n = Math.round(Number(String(v).replace(/,/g, "")) * 100); return Number.isFinite(n) && n > 0 ? n : 0; };
+const MODE_COLORS: Record<string, string> = { Cash: "#0a7a3e", GCash: "#0571D0", PSBank: "#123F63", UnionBank: "#F25615" };
+
+/** One trainee with all of their enrollments, for the trainee-based lists. */
+type TraineeGroup = { traineeId: string; name: string; number: string; enrollments: Enrollment[]; due: number; paid: number; balance: number; since: string };
+function groupByTrainee(data: PortalData, list: Enrollment[], sinceOf: (e: Enrollment) => string = (e) => e.created_at): TraineeGroup[] {
+  const map = new Map<string, TraineeGroup>();
+  for (const e of list) {
+    const g = map.get(e.trainee_id) ?? { traineeId: e.trainee_id, name: traineeName(e), number: data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number ?? "", enrollments: [], due: 0, paid: 0, balance: 0, since: sinceOf(e) };
+    g.enrollments.push(e); g.due += dueCentavos(e); g.paid += paidOf(e); g.balance += balanceOf(e);
+    if (sinceOf(e) < g.since) g.since = sinceOf(e);
+    map.set(e.trainee_id, g);
+  }
+  return [...map.values()];
+}
+function CourseList({ list }: { list: Enrollment[] }) {
+  return <div className="cx-courses">{list.map((e) => <div key={e.id}><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small></div>)}</div>;
+}
+const Who = ({ name, number }: { name: string; number?: string }) => <><span className="cx-name">{name}</span>{number ? <span className="cx-id">{number}</span> : null}</>;
+const payState = (e: Enrollment) => (e.enrollment_status === "Cancelled" ? "Cancelled" : balanceOf(e) === 0 ? "Paid" : paidOf(e) > 0 ? "Partially paid" : "Unpaid");
+const PAY_TONE: Record<string, string> = { Paid: "active", "Partially paid": "orange", Unpaid: "red", Cancelled: "cancelled" };
+
+type ExtraLine = { key: string; chargeCatalogId: string | null; description: string; unit: number; quantity: number; enrollmentId: string; kind: "item" | "fee" };
 
 /**
- * Record a payment (training fee or charges): find the trainee, see the fee
- * breakdown, pick Cash / GCash / PSBank / UnionBank (a reference is required for
- * every mode except Cash), enter the amount. Receipts are issued by the server.
+ * Record payment for one trainee: the amount received is applied across their
+ * unpaid courses (split), plus any miscellaneous charges sold at the counter.
+ * One payment, one receipt. A reference is required for every mode except Cash.
  */
 export function RecordPaymentModal({ data, initialEnrollmentId, onClose, onSaved }: { data: PortalData; initialEnrollmentId?: string; onClose: () => void; onSaved: () => Promise<void> }) {
-  const eligible = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && balanceOf(e) > 0);
-  const [enrollmentId, setEnrollmentId] = useState(initialEnrollmentId && eligible.some((e) => e.id === initialEnrollmentId) ? initialEnrollmentId : "");
+  const initial = initialEnrollmentId ? data.enrollments.find((e) => e.id === initialEnrollmentId) : undefined;
+  const [traineeId, setTraineeId] = useState(initial?.trainee_id ?? "");
   const [search, setSearch] = useState("");
   const modes = modeNames(data);
   const [method, setMethod] = useState(modes[0] ?? "Cash");
   const [reference, setReference] = useState("");
-  const [amount, setAmount] = useState("");
+  const [received, setReceived] = useState("");
+  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  const [extras, setExtras] = useState<ExtraLine[]>([]);
+  const [addOpen, setAddOpen] = useState(false);
+  const extraSeq = useRef(0);
+  const [pick, setPick] = useState("");
+  const [otherName, setOtherName] = useState("");
+  const [otherAmount, setOtherAmount] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const [forEnrollment, setForEnrollment] = useState("");
   const [receivedAt, setReceivedAt] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
   const [remarks, setRemarks] = useState("");
   const [agencyId, setAgencyId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [posted, setPosted] = useState<{ id: string; amount: number } | null>(null);
-  const e = eligible.find((x) => x.id === enrollmentId);
+
+  const mine = data.enrollments.filter((e) => e.trainee_id === traineeId && e.enrollment_status !== "Cancelled");
+  const open = mine.filter((e) => balanceOf(e) > 0);
+  const catalog = data.charges.filter((c) => c.active);
+  const items = catalog.filter((c) => (c.kind ?? "fee") === "item"), fees = catalog.filter((c) => (c.kind ?? "fee") !== "item");
   const term = search.trim().toLowerCase();
-  const matches = eligible.filter((x) => !term || `${traineeName(x)} ${x.enrollment_number} ${first(x.courses)?.name ?? ""} ${data.applicationNumbers?.[x.trainee_id] ?? ""} ${first(x.trainees)?.trainee_number ?? ""}`.toLowerCase().includes(term)).slice(0, 8);
-  const balance = e ? balanceOf(e) : 0;
-  const centavos = Math.round(Number(amount || 0) * 100);
+  const candidates = groupByTrainee(data, data.enrollments.filter((e) => e.enrollment_status !== "Cancelled"))
+    .filter((g) => !term || `${g.name} ${g.number} ${g.enrollments.map((e) => `${courseCode(e)} ${e.enrollment_number}`).join(" ")}`.toLowerCase().includes(term))
+    .sort((a, b) => b.balance - a.balance || a.name.localeCompare(b.name)).slice(0, 8);
+  const group = traineeId ? groupByTrainee(data, mine)[0] : undefined;
+  const applied = open.reduce((s, e) => s + Math.min(toCentavos(amounts[e.id] ?? ""), balanceOf(e)), 0);
+  const extraTotal = extras.reduce((s, x) => s + x.unit * x.quantity, 0);
+  const total = applied + extraTotal;
+  const receivedCentavos = toCentavos(received);
+  const over = open.some((e) => toCentavos(amounts[e.id] ?? "") > balanceOf(e));
   const refRequired = needsReference(data, method);
-  const rebate = e && agencyId ? data.agencyCourseRebates.find((r) => r.agency_id === agencyId && r.course_id === e.course_id)?.rebate_centavos ?? null : null;
-  const valid = !!e && centavos > 0 && centavos <= balance && (!refRequired || reference.trim().length > 0);
+  const matches = receivedCentavos > 0 && receivedCentavos === total;
+  const valid = total > 0 && !over && matches && (!refRequired || reference.trim().length > 0);
+
+  function choose(id: string) { setTraineeId(id); setAmounts({}); setExtras([]); const firstOpen = data.enrollments.find((e) => e.trainee_id === id && e.enrollment_status !== "Cancelled"); setForEnrollment(firstOpen?.id ?? ""); if (!data.enrollments.some((e) => e.trainee_id === id && e.enrollment_status !== "Cancelled" && balanceOf(e) > 0)) setAddOpen(true); }
+  function fill(how: "all" | "spread" | "clear") {
+    if (how === "clear") { setAmounts({}); return; }
+    if (how === "all") { setAmounts(Object.fromEntries(open.map((e) => [e.id, (balanceOf(e) / 100).toFixed(2)]))); setReceived(((open.reduce((s, e) => s + balanceOf(e), 0) + extraTotal) / 100).toFixed(2)); return; }
+    let left = receivedCentavos - extraTotal;
+    setAmounts(Object.fromEntries(open.map((e) => { const a = Math.max(0, Math.min(left, balanceOf(e))); left -= a; return [e.id, a > 0 ? (a / 100).toFixed(2) : ""]; })));
+  }
+  function addExtra() {
+    const qty = Math.max(1, parseInt(quantity, 10) || 1);
+    const target = forEnrollment || mine[0]?.id;
+    if (!target) return;
+    let line: ExtraLine;
+    if (pick === "other") {
+      const unit = toCentavos(otherAmount);
+      if (!otherName.trim() || !unit) { setError("Enter the charge name and amount."); return; }
+      line = { key: `x${++extraSeq.current}`, chargeCatalogId: null, description: otherName.trim(), unit, quantity: qty, enrollmentId: target, kind: "item" };
+    } else {
+      const c = catalog.find((x) => x.id === pick);
+      if (!c || Number(c.default_amount_centavos) <= 0) { setError("Choose a charge with a price in the schedule of fees."); return; }
+      line = { key: `x${++extraSeq.current}`, chargeCatalogId: c.id, description: c.name, unit: Number(c.default_amount_centavos), quantity: qty, enrollmentId: target, kind: (c.kind ?? "fee") === "item" ? "item" : "fee" };
+    }
+    setError(""); setExtras((cur) => [...cur, line]); setReceived(((receivedCentavos + line.unit * line.quantity) / 100).toFixed(2)); setQuantity("1"); setOtherName(""); setOtherAmount("");
+  }
+  function removeExtra(key: string) { const x = extras.find((l) => l.key === key); setExtras((cur) => cur.filter((l) => l.key !== key)); if (x) setReceived((Math.max(0, receivedCentavos - x.unit * x.quantity) / 100).toFixed(2)); }
+
   async function post() {
-    if (!e) return;
     setBusy(true); setError("");
     try {
-      const result = await submit({ action: "post-payment", enrollmentId: e.id, amountCentavos: centavos, method, receivingAccount: method === "Cash" ? "Main cashier" : method, referenceNumber: reference.trim(), proofId: null, receivedAt: new Date(receivedAt).toISOString(), remarks }) as { payment?: { id?: string } | string };
-      if (agencyId) { try { await submit({ action: "record-agency-rebate", enrollmentId: e.id, agencyId }); } catch { /* the rebate never blocks the payment */ } }
+      const allocations = open.map((e) => ({ enrollmentId: e.id, amountCentavos: Math.min(toCentavos(amounts[e.id] ?? ""), balanceOf(e)) })).filter((a) => a.amountCentavos > 0);
+      const result = await submit({ action: "payment-split", allocations, items: extras.map((x) => ({ enrollmentId: x.enrollmentId, chargeCatalogId: x.chargeCatalogId, description: x.description, unitCentavos: x.unit, quantity: x.quantity })), method, receivingAccount: method === "Cash" ? "Main cashier" : method, referenceNumber: reference.trim(), receivedAt: new Date(receivedAt).toISOString(), remarks }) as { payment?: { id?: string } | string };
+      if (agencyId) for (const a of allocations) { try { await submit({ action: "record-agency-rebate", enrollmentId: a.enrollmentId, agencyId }); } catch { /* the rebate never blocks the payment */ } }
       const paymentId = typeof result.payment === "string" ? result.payment : result.payment?.id ?? "";
-      setPosted({ id: paymentId, amount: centavos });
+      setPosted({ id: paymentId, amount: total });
       await onSaved();
     } catch (err) { setError(err instanceof Error ? err.message : "Could not record the payment."); } finally { setBusy(false); }
   }
-  if (posted && e) return <Modal title="Payment Recorded" onClose={onClose}>
+
+  if (posted && group) return <Modal title="Payment recorded" onClose={onClose}>
     <div className="portal-form">
-      <div className="full"><Message kind="success" text={`${pesos(posted.amount)} recorded for ${traineeName(e)} (${e.enrollment_number}). A paid trainee on a batch is enrolled automatically.`} /></div>
+      <div className="full"><Message kind="success" text={`${pesos(posted.amount)} received from ${group.name}.`} /></div>
       <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
-        {posted.id && <a href={`/api/documents/payment/${posted.id}?type=receipt`} target="_blank" rel="noreferrer">Receipt</a>}
-        <TarButton data={data} traineeId={e.trainee_id} className="portal-secondary" />
+        {posted.id && <a className="portal-secondary" href={`/portal/payment-receipt/${posted.id}`} target="_blank" rel="noreferrer">Receipt</a>}
+        <TarButton data={data} traineeId={group.traineeId} className="portal-secondary" />
       </div>
       <div className="portal-form-actions full"><button type="button" className="portal-primary" onClick={onClose}>Done</button></div>
     </div>
   </Modal>;
-  return <Modal title="Record Payment" onClose={onClose} wide>
-    <div className="portal-form">
+
+  return <Modal title="Record payment" onClose={onClose} wide>
+    <div className="portal-form cx-pay">
       {error && <div className="full"><Message kind="error" text={error} /></div>}
-      {!e ? <div className="full pay-pick">
-        <label>Find Trainee<input autoFocus value={search} onChange={(ev) => setSearch(ev.target.value)} placeholder="Name, NWMTACI number, enrollment number or course" /></label>
-        <div className="pay-results">{matches.map((x) => <button type="button" key={x.id} className="pay-result" onClick={() => setEnrollmentId(x.id)}><span><b>{traineeName(x)}</b><small>{x.enrollment_number} · {first(x.courses)?.name ?? "Course"} · {scheduleText(x)}</small></span><strong>{pesos(balanceOf(x))}</strong></button>)}
-          {!matches.length && <p className="portal-empty-copy">No unpaid enrollment matches.</p>}</div>
+      {!group ? <div className="full cx-pick">
+        <label>Find trainee<input autoFocus value={search} onChange={(ev) => setSearch(ev.target.value)} placeholder="Name, NWMTACI number or course" /></label>
+        <div className="cx-results">{candidates.map((g) => { const unpaid = g.enrollments.filter((e) => balanceOf(e) > 0); return <button type="button" key={g.traineeId} onClick={() => choose(g.traineeId)}><span><b>{g.name}</b><small>{unpaid.length ? unpaid.map(courseCode).join(" · ") : "All courses paid"}</small></span><strong className="cx-amt">{pesos(g.balance)}</strong></button>; })}
+          {!candidates.length && <p className="portal-empty-copy">No trainee matches.</p>}</div>
       </div> : <>
-        <div className="pay-breakdown full">
-          <div className="pay-who"><b>{traineeName(e)}</b><small>{e.enrollment_number} · {first(e.courses)?.name ?? "Course"} · {scheduleText(e)}</small>{!initialEnrollmentId && <button type="button" className="ghost-button" onClick={() => { setEnrollmentId(""); setAmount(""); }}>Change</button>}</div>
-          <dl>
-            <div><dt>Training Fee</dt><dd>{pesos(e.selling_price_centavos)}</dd></div>
-            {Number(e.charges_centavos ?? 0) > 0 && <div><dt>Charges</dt><dd>+{pesos(Number(e.charges_centavos))}</dd></div>}
-            {Number(e.discounts_centavos ?? 0) > 0 && <div><dt>Discounts</dt><dd>−{pesos(Number(e.discounts_centavos))}</dd></div>}
-            <div><dt>Paid</dt><dd>{pesos(paidOf(e))}</dd></div>
-            <div className="due"><dt>Balance</dt><dd>{pesos(balance)}</dd></div>
-          </dl>
-        </div>
-        <div className="full"><span className="pay-label">Mode of Payment</span><div className="pay-modes" role="radiogroup" aria-label="Mode of payment">{modes.map((m) => <button type="button" role="radio" aria-checked={method === m} key={m} className={method === m ? "on" : ""} onClick={() => setMethod(m)}>{m}</button>)}</div></div>
-        <label>Amount (PHP)<input type="number" min="0.01" step="0.01" max={balance / 100} value={amount} onChange={(ev) => setAmount(ev.target.value)} /><span className="amount-shortcuts"><button type="button" onClick={() => setAmount(((balance / 100) * 0.5).toFixed(2))}>50%</button><button type="button" onClick={() => setAmount((balance / 100).toFixed(2))}>Full Balance</button></span></label>
-        {refRequired ? <label>Reference Number*<input value={reference} onChange={(ev) => setReference(ev.target.value.toUpperCase())} placeholder={`${method} reference`} /></label> : <label>Reference Number<input value={reference} onChange={(ev) => setReference(ev.target.value.toUpperCase())} placeholder="Not needed for cash" /></label>}
-        <label>Received At<input type="datetime-local" value={receivedAt} onChange={(ev) => setReceivedAt(ev.target.value)} /></label>
-        <label>Endorsing Agency (Optional)<select value={agencyId} onChange={(ev) => setAgencyId(ev.target.value)}><option value="">— None —</option>{data.agencies.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select>{rebate != null && <small className="portal-form-note">Rebate {pesos(rebate)} is recorded for the agency.</small>}</label>
-        <label className="full">Remarks<input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="Optional" /></label>
-        {centavos > balance && <p className="portal-form-note full" style={{ color: "#b42318" }}>The amount is more than the balance of {pesos(balance)}.</p>}
+        <div className="cx-whocard full"><div><Who name={group.name} number={group.number} /></div><div className="cx-right"><small>Balance</small><span className="cx-amt">{pesos(group.balance)}</span></div></div>
+        <label>Amount received (PHP)<input className="cx-mono" inputMode="decimal" value={received} onChange={(ev) => setReceived(ev.target.value)} placeholder="0.00" /></label>
+        <div><span className="pay-label">Apply the amount</span><div className="cx-choice"><button type="button" onClick={() => fill("all")}>Pay all in full</button><button type="button" onClick={() => fill("spread")}>Distribute in order</button><button type="button" onClick={() => fill("clear")}>Clear</button></div></div>
+        <div className="cx-lines full"><table><thead><tr><th>Course or charge</th><th className="r">Balance</th><th className="r">Apply</th></tr></thead><tbody>
+          {open.map((e) => { const v = amounts[e.id] ?? ""; const bad = toCentavos(v) > balanceOf(e); return <tr key={e.id} className={toCentavos(v) > 0 ? "sel" : ""}><td><span className="cx-code">{courseCode(e)}</span> <small>{first(e.courses)?.name} · {scheduleText(e)}</small></td><td className="r cx-amt">{pesos(balanceOf(e))}</td><td className="r"><input className="cx-apply" inputMode="decimal" value={v} placeholder="0.00" aria-label={`Amount for ${courseCode(e)}`} onChange={(ev) => setAmounts((cur) => ({ ...cur, [e.id]: ev.target.value }))} />{bad && <small className="cx-bad">More than the balance</small>}</td></tr>; })}
+          {extras.map((x) => { const e = mine.find((m) => m.id === x.enrollmentId); return <tr key={x.key} className="misc"><td><span className="cx-code misc">{x.kind === "item" ? "Item" : "Fee"}</span> <strong>{x.description}</strong>{x.quantity > 1 ? ` x ${x.quantity}` : ""} <small>For {e ? courseCode(e) : "course"}</small></td><td className="r cx-amt">{pesos(x.unit * x.quantity)}</td><td className="r"><button type="button" className="ghost-button" onClick={() => removeExtra(x.key)}>Remove</button></td></tr>; })}
+          {!open.length && !extras.length && <tr><td colSpan={3}><small>All courses are fully paid.</small></td></tr>}
+        </tbody></table></div>
+        <details className="cx-addbox full" open={addOpen} onToggle={(ev) => setAddOpen((ev.target as HTMLDetailsElement).open)}>
+          <summary>Add miscellaneous charges</summary>
+          <div className="portal-form">
+            <label>Charge<select value={pick} onChange={(ev) => setPick(ev.target.value)}><option value="">Select a charge</option>
+              {items.length > 0 && <optgroup label="Miscellaneous items">{items.map((c) => <option key={c.id} value={c.id}>{c.name} · {pesos(c.default_amount_centavos)}</option>)}</optgroup>}
+              {fees.length > 0 && <optgroup label="Service fees">{fees.map((c) => <option key={c.id} value={c.id}>{c.name} · {pesos(c.default_amount_centavos)}</option>)}</optgroup>}
+              <option value="other">Other charge</option></select></label>
+            <label>For course<select value={forEnrollment} onChange={(ev) => setForEnrollment(ev.target.value)}>{mine.map((e) => <option key={e.id} value={e.id}>{courseCode(e)} · {e.enrollment_number}</option>)}</select></label>
+            {pick === "other" && <><label>Charge name<input value={otherName} onChange={(ev) => setOtherName(ev.target.value)} /></label><label>Amount (PHP)<input className="cx-mono" inputMode="decimal" value={otherAmount} onChange={(ev) => setOtherAmount(ev.target.value)} /></label></>}
+            <label>Quantity<input className="cx-mono" inputMode="numeric" value={quantity} onChange={(ev) => setQuantity(ev.target.value)} /></label>
+            <div className="cx-addbtn"><button type="button" className="portal-secondary" disabled={!pick} onClick={addExtra}>Add to payment</button></div>
+          </div>
+        </details>
+        <div className={`cx-tally full ${matches ? "ok" : "no"}`}><span>Applied {pesos(total)} of {pesos(receivedCentavos)}</span><span>{!receivedCentavos ? "Enter the amount received" : matches ? "Ready to record" : total < receivedCentavos ? `${pesos(receivedCentavos - total)} not applied` : `${pesos(total - receivedCentavos)} over the amount received`}</span></div>
+        <div className="full"><span className="pay-label">Mode of payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{modes.map((m) => <button type="button" role="radio" aria-checked={method === m} key={m} className={method === m ? "on" : ""} onClick={() => setMethod(m)}>{m}</button>)}</div></div>
+        <label>{refRequired ? "Reference number (required)" : "Reference number"}<input className="cx-mono" value={reference} onChange={(ev) => setReference(ev.target.value.toUpperCase())} placeholder={refRequired ? `${method} reference` : "Not needed for cash"} /></label>
+        <label>Received at<input type="datetime-local" value={receivedAt} onChange={(ev) => setReceivedAt(ev.target.value)} /></label>
+        <label>Endorsing agency<select value={agencyId} onChange={(ev) => setAgencyId(ev.target.value)}><option value="">None</option>{data.agencies.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+        <label>Remarks<input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} /></label>
       </>}
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!valid || busy} onClick={() => void post()}>{busy ? "Recording…" : `Record ${centavos > 0 ? pesos(centavos) : "Payment"}`}</button></div>
+      <div className="portal-form-actions full">{group && !initial && <button type="button" className="portal-secondary cx-left" onClick={() => { setTraineeId(""); setAmounts({}); setExtras([]); }}>Change trainee</button>}<button type="button" className="portal-secondary" onClick={onClose}>Cancel</button>{group && <button type="button" className="portal-primary" disabled={!valid || busy} onClick={() => void post()}>{busy ? "Recording…" : `Record ${receivedCentavos > 0 ? pesos(receivedCentavos) : "payment"}`}</button>}</div>
     </div>
   </Modal>;
 }
 
 /**
- * Cashier dashboard (owner, 7 Oct 2026): only what needs collecting.
- * - For Payment: applicants Registration handed over.
- * - Unpaid Balances: training ended (or ends today) with a balance still due;
- *   the same list is emailed to the Cashier and Accounting Manager at 4:00 PM.
+ * Cashier dashboard: today's collections by mode, new enrollments endorsed by
+ * Registration (waiting for payment), trainees already paid and enrolled, and
+ * balances still due after training (emailed daily at 4:00 PM).
  */
 export function CashierDashboard({ data, onPay, reload }: { data: PortalData; onPay: (enrollmentId: string) => void; reload: () => Promise<void> }) {
   const today = manilaToday();
   const handed = data.handedToCashier ?? {};
-  const forPayment = data.enrollments.filter((e) => e.enrollment_status === "Pending" && handed[e.id] && Number(e.verified_paid_centavos ?? e.paid_centavos) === 0)
-    .sort((a, b) => (handed[a.id] ?? "").localeCompare(handed[b.id] ?? ""));
+  const todays = data.payments.filter((p) => day(p.received_at) === today);
+  const totalToday = todays.reduce((s, p) => s + Number(p.amount_centavos), 0);
+  const tileModes = [...new Set(["Cash", "GCash", "PSBank", "UnionBank", ...modeNames(data)])];
+  // New enrollments: handed over by Registration, nothing paid yet, grouped by trainee.
+  const awaiting = data.enrollments.filter((e) => e.enrollment_status === "Pending" && handed[e.id] && paidOf(e) === 0);
+  const freshIds = new Set(awaiting.map((e) => e.trainee_id));
+  const fresh = groupByTrainee(data, data.enrollments.filter((e) => freshIds.has(e.trainee_id) && e.enrollment_status !== "Cancelled" && (handed[e.id] || PAID_STATUSES.includes(e.enrollment_status))), (e) => handed[e.id] ?? e.created_at)
+    .filter((g) => g.paid === 0).sort((a, b) => a.since.localeCompare(b.since));
+  // Paid and enrolled: paid in the last 7 days.
+  const since = addDays(today, -6);
+  const paidRecently = new Set(data.payments.filter((p) => day(p.received_at) >= since).map((p) => p.trainee_id));
+  const paid = groupByTrainee(data, data.enrollments.filter((e) => paidRecently.has(e.trainee_id) && e.enrollment_status !== "Cancelled" && paidOf(e) > 0)).sort((a, b) => a.name.localeCompare(b.name));
   const durations = new Map(data.courses.map((c) => [c.id, c.duration_label]));
   const unpaid = unpaidAfterTraining(data.enrollments as unknown as BalanceEnrollment[], (id) => durations.get(id), today);
-  const total = unpaid.reduce((s, r) => s + r.balanceCentavos, 0);
+  const unpaidTotal = unpaid.reduce((s, r) => s + r.balanceCentavos, 0);
+  const firstOpen = (g: TraineeGroup) => (g.enrollments.find((e) => balanceOf(e) > 0) ?? g.enrollments[0]).id;
   const { busy, msg, post } = usePost(reload);
-  return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Collections</span><h1>Cashier Dashboard</h1><p>Payments to collect today, and balances still due after training.</p></div><button type="button" className="portal-primary" onClick={() => onPay("")}>Record Payment</button></div>
+  return <div className="portal-page cx">
+    <div className="cx-head"><div><span className="portal-eyebrow">{fmtDate(today)}</span><h1>Cashier dashboard</h1></div><button type="button" className="portal-primary" onClick={() => onPay("")}>Record payment</button></div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
-    <section className="portal-panel live-list">
-      <div className="panel-heading"><div><h2>For Payment</h2><p>Handed over by Registration · requirements complete</p></div><span className="slot-count">{forPayment.length}</span></div>
-      {forPayment.map((e) => <div className="live-row-item" key={e.id}><div><strong>{traineeName(e)}</strong><small>{data.applicationNumbers?.[e.trainee_id] ? <span className="app-no">{data.applicationNumbers[e.trainee_id]}</span> : null}{first(e.courses)?.name ?? "Course"} · {scheduleText(e)} · handed over {fmtDate(day(handed[e.id]))} {fmtClock(handed[e.id])}</small></div><div className="document-actions"><strong>{pesos(dueCentavos(e))}</strong><button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record Payment</button></div></div>)}
-      {!forPayment.length && <p className="portal-empty-copy">Nobody is waiting for payment.</p>}
+    <div className="cx-tiles">{tileModes.map((m) => { const list = todays.filter((p) => p.method === m); return <div className="cx-tile" key={m} style={{ ["--c" as string]: MODE_COLORS[m] ?? "#0571D0" }}><span>{m === "Cash" ? "Cash collected" : m}</span><b>{pesos(list.reduce((s, p) => s + Number(p.amount_centavos), 0))}</b><small>{list.length} receipt{list.length === 1 ? "" : "s"}</small></div>; })}</div>
+    <div className="cx-totalbar"><div><span>Total collected today</span><b>{pesos(totalToday)}</b></div><div className="cx-stats"><div><b>{fresh.length}</b><small>New enrollments</small></div><div><b>{paid.length}</b><small>Paid and enrolled</small></div><div><b>{pesos(unpaidTotal)}</b><small>Unpaid after training</small></div></div></div>
+
+    <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>New enrollments</h2></div><span className="slot-count">{fresh.length}</span></div>
+      {fresh.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Courses</th><th>Endorsed</th><th className="r">Total due</th><th></th></tr></thead><tbody>
+        {fresh.map((g) => <tr key={g.traineeId}><td data-l="" className="lead"><Who name={g.name} number={g.number} /></td><td data-l="Courses"><CourseList list={g.enrollments} /></td><td data-l="Endorsed">{fmtDate(day(g.since))}<small>{fmtClock(g.since)}</small></td><td data-l="Total due" className="r"><strong className="cx-amt">{pesos(g.due)}</strong><small>{g.enrollments.length} course{g.enrollments.length === 1 ? "" : "s"}</small></td><td data-l=""><div className="cx-acts"><button type="button" className="portal-primary" onClick={() => onPay(firstOpen(g))}>Record payment</button></div></td></tr>)}
+      </tbody></table></div> : <p className="portal-empty-copy">No new enrollments.</p>}
     </section>
-    <section className="portal-panel live-list" style={{ marginTop: 16 }}>
-      <div className="panel-heading"><div><h2>Unpaid Balances · 4:00 PM Summary</h2><p>Training ended or ends today, balance not settled · {unpaid.length} trainee{unpaid.length === 1 ? "" : "s"} · {pesos(total)} due · emailed daily at 4:00 PM</p></div>
-        <span className="document-actions"><button type="button" className="portal-secondary" onClick={() => window.print()}>Print / Save</button><button type="button" className="portal-secondary" disabled={busy} onClick={() => void post({ action: "balance-summary-send" }, "Summary emailed to the Cashier and Accounting Manager.").catch(() => undefined)}>Email Summary Now</button></span></div>
-      {unpaid.map((r) => <div className="live-row-item" key={r.id}><div><strong>{r.traineeName}</strong><small>{r.enrollmentNumber} · {r.course} · training {r.endsToday ? "ends today" : `ended ${fmtDate(r.trainingEnd)}`}</small></div><div className="document-actions">{r.endsToday ? <Badge tone="orange">Ends Today</Badge> : <Badge tone="cancelled">Past Due</Badge>}<span className="bal-cell">{pesos(r.balanceCentavos)}<small>of {pesos(r.dueCentavos)}</small></span><button type="button" className="portal-primary" onClick={() => onPay(r.id)}>Record Payment</button></div></div>)}
-      {!unpaid.length && <p className="portal-empty-copy">No unpaid balances after training. </p>}
+
+    <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Paid and enrolled</h2></div><span className="slot-count">{paid.length}</span></div>
+      {paid.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Courses</th><th className="r">Paid</th><th className="r">Balance</th><th>Status</th><th></th></tr></thead><tbody>
+        {paid.map((g) => { const latest = data.payments.filter((p) => p.trainee_id === g.traineeId).sort((a, b) => b.received_at.localeCompare(a.received_at))[0]; return <tr key={g.traineeId}><td data-l="" className="lead"><Who name={g.name} number={g.number} /></td><td data-l="Courses"><CourseList list={g.enrollments} /></td><td data-l="Paid" className="r cx-amt">{pesos(g.paid)}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(g.balance)}</strong></td><td data-l="Status"><Badge tone={g.balance === 0 ? "active" : "orange"}>{g.balance === 0 ? "Paid" : "Partially paid"}</Badge></td><td data-l=""><div className="cx-acts">{g.balance > 0 && <button type="button" className="portal-secondary" onClick={() => onPay(firstOpen(g))}>Collect balance</button>}{latest && <a className="portal-secondary" href={`/portal/payment-receipt/${latest.id}`} target="_blank" rel="noreferrer">Receipt</a>}<TarButton data={data} traineeId={g.traineeId} reload={reload} className="portal-primary" /></div></td></tr>; })}
+      </tbody></table></div> : <p className="portal-empty-copy">No paid trainees in the last 7 days.</p>}
+    </section>
+
+    <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Unpaid balances · 4:00 PM summary</h2></div><span className="document-actions"><button type="button" className="portal-secondary" disabled={busy} onClick={() => void post({ action: "balance-summary-send" }, "Summary emailed.").catch(() => undefined)}>Email summary now</button></span></div>
+      {unpaid.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Training</th><th>Status</th><th className="r">Balance</th><th></th></tr></thead><tbody>
+        {unpaid.map((r) => <tr key={r.id}><td data-l="" className="lead"><span className="cx-name">{r.traineeName}</span><span className="cx-id">{r.enrollmentNumber}</span></td><td data-l="Training">{r.course}<small>{r.endsToday ? "Ends today" : `Ended ${fmtDate(r.trainingEnd)}`}</small></td><td data-l="Status">{r.endsToday ? <Badge tone="orange">Ends today</Badge> : <Badge tone="cancelled">Past due</Badge>}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(r.balanceCentavos)}</strong><small>of {pesos(r.dueCentavos)}</small></td><td data-l=""><div className="cx-acts"><button type="button" className="portal-primary" onClick={() => onPay(r.id)}>Record payment</button></div></td></tr>)}
+      </tbody></table></div> : <p className="portal-empty-copy">No unpaid balances after training.</p>}
     </section>
   </div>;
 }
 
-const RANGES = ["Today", "This Week", "This Month", "Custom"] as const;
+const RANGES = ["Today", "This week", "This month", "Custom"] as const;
 /** Payment records: every payment with mode, reference and receipt, by date range. */
 export function CashierPayments({ data, onPay }: { data: PortalData; onPay: (enrollmentId: string) => void }) {
   const today = manilaToday();
@@ -264,7 +364,7 @@ export function CashierPayments({ data, onPay }: { data: PortalData; onPay: (enr
   const [from, setFrom] = useState(today), [to, setTo] = useState(today);
   const [mode, setMode] = useState("");
   const [q, setQ] = useState("");
-  const start = range === "Today" ? today : range === "This Week" ? addDays(today, -6) : range === "This Month" ? `${today.slice(0, 8)}01` : from;
+  const start = range === "Today" ? today : range === "This week" ? addDays(today, -6) : range === "This month" ? `${today.slice(0, 8)}01` : from;
   const end = range === "Custom" ? to : today;
   const term = q.trim().toLowerCase();
   const rows = data.payments.filter((p) => { const d = day(p.received_at); const t = first(p.trainees); return d >= start && d <= end && (!mode || p.method === mode) && (!term || `${p.payment_number} ${p.reference_number ?? ""} ${t ? `${t.legal_first_name} ${t.legal_last_name}` : ""}`.toLowerCase().includes(term)); })
@@ -272,18 +372,17 @@ export function CashierPayments({ data, onPay }: { data: PortalData; onPay: (enr
   const byMode = new Map<string, number>();
   for (const p of rows) byMode.set(p.method, (byMode.get(p.method) ?? 0) + Number(p.amount_centavos));
   const total = rows.reduce((s, p) => s + Number(p.amount_centavos), 0);
-  return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Collections</span><h1>Payments</h1><p>Record training fees and charges, and review every payment received.</p></div><button type="button" className="portal-primary" onClick={() => onPay("")}>Record Payment</button></div>
-    <div className="portal-tabs">{RANGES.map((r) => <button key={r} type="button" className={range === r ? "active" : ""} onClick={() => setRange(r)}>{r}</button>)}</div>
-    <div className="pay-filters">
-      {range === "Custom" && <><label>From<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label><label>To<input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} /></label></>}
-      <label>Mode<select value={mode} onChange={(e) => setMode(e.target.value)}><option value="">All Modes</option>{[...new Set([...modeNames(data), ...data.payments.map((p) => p.method)])].map((m) => <option key={m} value={m}>{m}</option>)}</select></label>
-      <label className="grow">Search<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Trainee, payment number or reference" /></label>
+  return <div className="portal-page cx">
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Payment records</h1></div><button type="button" className="portal-primary" onClick={() => onPay("")}>Record payment</button></div>
+    <div className="cx-bar"><div className="cx-seg">{RANGES.map((r) => <button key={r} type="button" className={range === r ? "on" : ""} onClick={() => setRange(r)}>{r}</button>)}</div>
+      {range === "Custom" && <><label className="cx-dt">From<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label><label className="cx-dt">To<input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} /></label></>}
+      <label className="cx-dt">Mode<select value={mode} onChange={(e) => setMode(e.target.value)}><option value="">All modes</option>{[...new Set([...modeNames(data), ...data.payments.map((p) => p.method)])].map((m) => <option key={m} value={m}>{m}</option>)}</select></label>
+      <input className="cx-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, receipt or reference" aria-label="Search payments" />
     </div>
-    <div className="pay-totals"><div><span>Total</span><b>{pesos(total)}</b><small>{rows.length} payment{rows.length === 1 ? "" : "s"}</small></div>{[...byMode.entries()].map(([m, v]) => <div key={m}><span>{m}</span><b>{pesos(v)}</b></div>)}</div>
-    <div className="portal-table portal-panel"><table><thead><tr><th>Payment</th><th>Trainee</th><th>Mode</th><th>Reference</th><th>Received</th><th>Status</th><th>Amount</th><th></th></tr></thead><tbody>
-      {rows.map((p) => { const t = first(p.trainees); return <tr key={p.id}><td><strong>{p.payment_number}</strong></td><td>{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</td><td>{p.method}</td><td>{p.reference_number || "—"}</td><td>{fmtDate(day(p.received_at))}<small>{fmtClock(p.received_at)}</small></td><td><Badge tone={p.verification_state === "Verified" ? "active" : "orange"}>{p.verification_state}</Badge></td><td><strong>{pesos(p.amount_centavos)}</strong></td><td><a href={`/api/documents/payment/${p.id}?type=receipt`} target="_blank" rel="noreferrer">Receipt</a></td></tr>; })}
-    </tbody></table>{!rows.length && <p className="portal-empty-copy">No payments in this range.</p>}</div>
+    <div className="cx-tiles">{[["Total", total, rows.length] as const, ...[...byMode.entries()].map(([m, v]) => [m, v, rows.filter((p) => p.method === m).length] as const)].map(([m, v, n]) => <div className="cx-tile" key={m} style={{ ["--c" as string]: MODE_COLORS[m] ?? "#123F63" }}><span>{m}</span><b>{pesos(v)}</b><small>{n} receipt{n === 1 ? "" : "s"}</small></div>)}</div>
+    <section className="portal-panel cx-panel">{rows.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Receipt</th><th>Trainee</th><th>Mode</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
+      {rows.map((p) => { const t = first(p.trainees); return <tr key={p.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{p.payment_number}</span><small>{fmtDate(day(p.received_at))} · {fmtClock(p.received_at)}</small></td><td data-l="Trainee">{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</td><td data-l="Mode">{p.method}{p.reference_number ? <small className="cx-mono">{p.reference_number}</small> : null}</td><td data-l="Status"><Badge tone={p.verification_state === "Verified" ? "active" : "orange"}>{p.verification_state === "Duplicate Review" ? "Duplicate reference" : p.verification_state}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos(p.amount_centavos)}</strong></td><td data-l=""><div className="cx-acts"><a className="portal-secondary" href={`/portal/payment-receipt/${p.id}`} target="_blank" rel="noreferrer">Receipt</a></div></td></tr>; })}
+    </tbody></table></div> : <p className="portal-empty-copy">No payments in this range.</p>}</section>
   </div>;
 }
 
@@ -298,43 +397,76 @@ export function DiscountRequests({ data, reload }: { data: PortalData; reload: (
   const e = open.find((x) => x.id === enrollmentId);
   const rebate = e && agencyId ? data.agencyCourseRebates.find((r) => r.agency_id === agencyId && r.course_id === e.course_id)?.rebate_centavos ?? null : null;
   const centavos = rebate ?? Math.round(Number(amount || 0) * 100);
-  const file = () => void post({ action: "discount-request", enrollmentId, amountCentavos: centavos, description: reason.trim() || undefined, agencyId: agencyId || null }, "Discount request sent to the Accounting Manager.").then(() => { setEnrollmentId(""); setAmount(""); setReason(""); setAgencyId(""); }).catch(() => undefined);
+  const file = () => void post({ action: "discount-request", enrollmentId, amountCentavos: centavos, description: reason.trim() || undefined, agencyId: agencyId || null }, "Discount request sent for approval.").then(() => { setEnrollmentId(""); setAmount(""); setReason(""); setAgencyId(""); }).catch(() => undefined);
   const enrollmentOf = (id: string) => data.enrollments.find((x) => x.id === id);
-  return <section className="portal-panel">
-    <div className="panel-heading"><div><h2>Discount Requests</h2><p>File a discount for a trainee; it changes the balance once the Accounting Manager approves it.</p></div></div>
-    {msg && <Message kind={msg.kind} text={msg.text} />}
-    <div className="portal-form">
-      <label className="full">Enrollment<select value={enrollmentId} onChange={(ev) => setEnrollmentId(ev.target.value)}><option value="">Select a trainee with a balance</option>{open.map((x) => <option key={x.id} value={x.id}>{traineeName(x)} · {x.enrollment_number} · {first(x.courses)?.name ?? ""} · {pesos(balanceOf(x))}</option>)}</select></label>
-      <label>Endorsing Agency (Optional)<select value={agencyId} onChange={(ev) => setAgencyId(ev.target.value)}><option value="">— None —</option>{data.agencies.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
-      <label>Discount Amount (PHP){rebate != null ? <input value={(rebate / 100).toFixed(2)} readOnly /> : <input type="number" min="0.01" step="0.01" value={amount} onChange={(ev) => setAmount(ev.target.value)} />}{rebate != null && <small className="portal-form-note">The agency&apos;s configured rebate is used.</small>}</label>
-      <label className="full">Reason<input value={reason} onChange={(ev) => setReason(ev.target.value)} placeholder="e.g. Agency rebate, promo, returning trainee" /></label>
-      <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || !e || centavos <= 0 || (e && centavos > balanceOf(e))} onClick={file}>{busy ? "Sending…" : "Request Discount"}</button></div>
-    </div>
-    <div className="live-list" style={{ marginTop: 12 }}>
-      <h3 className="review-subhead">Waiting for Approval</h3>
-      {data.pendingDiscounts.map((d) => { const x = enrollmentOf(d.enrollment_id); return <div className="live-row-item" key={d.id}><div><strong>{x ? traineeName(x) : "Enrollment"}</strong><small>{x?.enrollment_number} · {d.description} · filed {fmtDate(day(d.created_at))}</small></div><span className="slot-count">{pesos(d.amount_centavos)}</span></div>; })}
-      {!data.pendingDiscounts.length && <p className="portal-empty-copy">No discount requests waiting.</p>}
-    </div>
-  </section>;
+  return <div className="cx-stack">
+    <section className="portal-panel cx-panel">
+      <div className="panel-heading"><div><h2>New discount request</h2></div></div>
+      {msg && <Message kind={msg.kind} text={msg.text} />}
+      <div className="portal-form cx-formpad">
+        <label className="full">Enrollment<select value={enrollmentId} onChange={(ev) => setEnrollmentId(ev.target.value)}><option value="">Select a trainee with a balance</option>{open.map((x) => <option key={x.id} value={x.id}>{traineeName(x)} · {x.enrollment_number} · {courseCode(x)} · {pesos(balanceOf(x))}</option>)}</select></label>
+        <label>Endorsing agency<select value={agencyId} onChange={(ev) => setAgencyId(ev.target.value)}><option value="">None</option>{data.agencies.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+        <label>Discount amount (PHP){rebate != null ? <input value={(rebate / 100).toFixed(2)} readOnly /> : <input type="number" min="0.01" step="0.01" value={amount} onChange={(ev) => setAmount(ev.target.value)} />}</label>
+        <label className="full">Reason<input value={reason} onChange={(ev) => setReason(ev.target.value)} /></label>
+        <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || !e || centavos <= 0 || (e && centavos > balanceOf(e))} onClick={file}>{busy ? "Sending…" : "Request discount"}</button></div>
+      </div>
+    </section>
+    <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>For approval</h2></div><span className="slot-count">{data.pendingDiscounts.length}</span></div>
+      {data.pendingDiscounts.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Reason</th><th>Filed</th><th className="r">Discount</th></tr></thead><tbody>
+        {data.pendingDiscounts.map((d) => { const x = enrollmentOf(d.enrollment_id); return <tr key={d.id}><td data-l="" className="lead"><span className="cx-name">{x ? traineeName(x) : "Enrollment"}</span><span className="cx-id">{x?.enrollment_number}</span></td><td data-l="Reason">{d.description}</td><td data-l="Filed">{fmtDate(day(d.created_at))}</td><td data-l="Discount" className="r cx-amt">{pesos(d.amount_centavos)}</td></tr>; })}
+      </tbody></table></div> : <p className="portal-empty-copy">No discount requests for approval.</p>}
+    </section>
+  </div>;
 }
 
-const PAY_FILTERS = ["All", "Unpaid", "Partially Paid", "Paid", "Cancelled"] as const;
-/** Every enrollment with its payment state, for the Cashier. */
+const STATUS_ORDER = ["Unpaid", "Partially paid", "Paid", "Cancelled"] as const;
+/** Every enrollment with its payment status, filtered by status and enrolled date. */
 export function CashierEnrollments({ data, onPay, reload }: { data: PortalData; onPay: (enrollmentId: string) => void; reload: () => Promise<void> }) {
-  const [filter, setFilter] = useState<(typeof PAY_FILTERS)[number]>("All");
+  const today = manilaToday();
+  const [filter, setFilter] = useState<"All" | (typeof STATUS_ORDER)[number]>("All");
   const [q, setQ] = useState("");
-  const stateOf = (e: Enrollment) => (e.enrollment_status === "Cancelled" ? "Cancelled" : balanceOf(e) === 0 ? "Paid" : paidOf(e) > 0 ? "Partially Paid" : "Unpaid");
+  const [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today);
+  const dateOf = (e: Enrollment) => day(e.enrolled_at ?? e.created_at);
   const term = q.trim().toLowerCase();
-  const rows = data.enrollments.filter((e) => (filter === "All" || stateOf(e) === filter) && (!term || `${traineeName(e)} ${e.enrollment_number} ${first(e.courses)?.name ?? ""} ${data.applicationNumbers?.[e.trainee_id] ?? ""}`.toLowerCase().includes(term)))
-    .sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 300);
-  const count = (f: (typeof PAY_FILTERS)[number]) => data.enrollments.filter((e) => f === "All" || stateOf(e) === f).length;
-  return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Collections</span><h1>Enrollments</h1><p>Every enrollment with what was paid and what is still due.</p></div></div>
-    <div className="portal-tabs">{PAY_FILTERS.map((f) => <button key={f} type="button" className={filter === f ? "active" : ""} onClick={() => setFilter(f)}>{f}<small style={{ marginLeft: 6, opacity: 0.7 }}>{count(f)}</small></button>)}</div>
-    <div className="pay-filters"><label className="grow">Search<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Trainee, NWMTACI number, enrollment number, course" /></label></div>
-    <div className="portal-table portal-panel"><table><thead><tr><th>Trainee</th><th>Enrollment</th><th>Course &amp; Schedule</th><th>Status</th><th>Due</th><th>Paid</th><th>Balance</th><th></th></tr></thead><tbody>
-      {rows.map((e) => { const st = stateOf(e); return <tr key={e.id}><td><strong>{traineeName(e)}</strong><small>{data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number}</small></td><td>{e.enrollment_number}<small>{e.enrollment_status}</small></td><td>{first(e.courses)?.name ?? "—"}<small>{scheduleText(e)}</small></td><td><Badge tone={st === "Paid" ? "active" : st === "Partially Paid" ? "orange" : st === "Cancelled" ? "cancelled" : "red"}>{st}</Badge></td><td>{pesos(dueCentavos(e))}</td><td>{pesos(paidOf(e))}</td><td><strong>{pesos(e.enrollment_status === "Cancelled" ? 0 : balanceOf(e))}</strong></td><td className="document-actions">{st !== "Paid" && st !== "Cancelled" && <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record Payment</button>}{st !== "Unpaid" && st !== "Cancelled" && <TarButton data={data} traineeId={e.trainee_id} reload={reload} />}</td></tr>; })}
-    </tbody></table>{!rows.length && <p className="portal-empty-copy">No matching enrollments.</p>}</div>
+  const base = data.enrollments.filter((e) => { const d = dateOf(e); return (!from || d >= from) && (!to || d <= to) && (!term || `${traineeName(e)} ${e.enrollment_number} ${first(e.courses)?.name ?? ""} ${courseCode(e)} ${data.applicationNumbers?.[e.trainee_id] ?? ""}`.toLowerCase().includes(term)); });
+  const rows = base.filter((e) => filter === "All" || payState(e) === filter)
+    .sort((a, b) => STATUS_ORDER.indexOf(payState(a) as (typeof STATUS_ORDER)[number]) - STATUS_ORDER.indexOf(payState(b) as (typeof STATUS_ORDER)[number]) || dateOf(b).localeCompare(dateOf(a))).slice(0, 300);
+  const count = (f: string) => base.filter((e) => f === "All" || payState(e) === f).length;
+  return <div className="portal-page cx">
+    <div className="cx-head"><div><span className="portal-eyebrow">Trainees</span><h1>Enrollments</h1></div></div>
+    <div className="cx-status" role="tablist">{(["All", ...STATUS_ORDER] as const).map((f) => <button key={f} type="button" role="tab" aria-selected={filter === f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{f}<span>{count(f)}</span></button>)}</div>
+    <div className="cx-bar"><input className="cx-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, NWMTACI number or course" aria-label="Search enrollments" />
+      <label className="cx-dt">From<input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} /></label>
+      <label className="cx-dt">To<input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} /></label>
+      {(from || to) && <button type="button" className="ghost-button" onClick={() => { setFrom(""); setTo(""); }}>Clear dates</button>}
+    </div>
+    <section className="portal-panel cx-panel">{rows.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Enrolled</th><th>Course</th><th className="r">Total due</th><th className="r">Paid</th><th className="r">Balance</th><th>Status</th><th></th></tr></thead><tbody>
+      {rows.map((e) => { const st = payState(e); return <tr key={e.id}><td data-l="" className="lead"><Who name={traineeName(e)} number={data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number} /></td><td data-l="Enrolled">{fmtDate(dateOf(e))}</td><td data-l="Course"><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small></td><td data-l="Total due" className="r cx-amt">{pesos(dueCentavos(e))}</td><td data-l="Paid" className="r cx-amt">{pesos(paidOf(e))}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(e.enrollment_status === "Cancelled" ? 0 : balanceOf(e))}</strong></td><td data-l="Status"><Badge tone={PAY_TONE[st]}>{st}</Badge></td><td data-l=""><div className="cx-acts">{st !== "Paid" && st !== "Cancelled" && <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record payment</button>}{st !== "Unpaid" && st !== "Cancelled" && <TarButton data={data} traineeId={e.trainee_id} reload={reload} />}</div></td></tr>; })}
+    </tbody></table></div> : <p className="portal-empty-copy">No enrollments match these filters.</p>}</section>
+  </div>;
+}
+
+/** The schedule of fees: miscellaneous items sold at the counter and service fees for change requests. */
+export function ScheduleOfFees({ data }: { data: PortalData }) {
+  const active = data.charges.filter((c) => c.active);
+  const group = (kind: "item" | "fee", title: string) => { const list = active.filter((c) => ((c.kind ?? "fee") === "item" ? "item" : "fee") === kind); return <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>{title}</h2></div><span className="slot-count">{list.length}</span></div>
+    {list.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Name</th><th className="r">Price</th></tr></thead><tbody>{list.map((c) => <tr key={c.id}><td data-l="" className="lead"><span className="cx-name">{c.name}</span></td><td data-l="Price" className="r"><strong className="cx-amt">{Number(c.default_amount_centavos) > 0 ? pesos(c.default_amount_centavos) : "Set by the Cashier"}</strong></td></tr>)}</tbody></table></div> : <p className="portal-empty-copy">None yet.</p>}</section>; };
+  return <div className="portal-page cx">
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Schedule of fees</h1></div></div>
+    {group("item", "Miscellaneous items")}
+    {group("fee", "Service fees")}
+  </div>;
+}
+
+/** TAR reprint requests and their approval status. */
+export function TarReprints({ data }: { data: PortalData }) {
+  const rows = data.requests.filter((r) => r.request_type === "TAR reprint").sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const stageOf = (r: RequestRow) => (r.status !== "Pending" ? r.status : r.stage === "With cashier" ? "Add charge" : "For approval");
+  return <div className="portal-page cx">
+    <div className="cx-head"><div><span className="portal-eyebrow">Requests</span><h1>TAR reprints</h1></div></div>
+    <section className="portal-panel cx-panel">{rows.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Request</th><th>Trainee</th><th>Reason</th><th>Status</th></tr></thead><tbody>
+      {rows.map((r) => { const t = first(r.trainees); const st = stageOf(r); return <tr key={r.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{r.request_number}</span><small>{fmtDate(day(r.created_at))}</small></td><td data-l="Trainee">{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</td><td data-l="Reason">{r.reason}</td><td data-l="Status"><Badge tone={st === "Approved" ? "active" : st === "Rejected" ? "cancelled" : "orange"}>{st}</Badge></td></tr>; })}
+    </tbody></table></div> : <p className="portal-empty-copy">No TAR reprint requests.</p>}</section>
   </div>;
 }
 
@@ -345,28 +477,24 @@ export function CashierOpening({ data, reload }: { data: PortalData; reload: () 
   const { busy, msg, post } = usePost(reload);
   const [amount, setAmount] = useState("");
   const [remarks, setRemarks] = useState("");
-  return <section className="portal-panel" style={{ marginBottom: 16 }}>
-    <div className="panel-heading"><div><h2>Cashier Opening</h2><p>{fmtDate(today)} · record the cash in the drawer before the first payment.</p></div>{opening && <Badge tone="active">Opened</Badge>}</div>
+  return <section className="portal-panel cx-panel">
+    <div className="panel-heading"><div><h2>Opening</h2></div>{opening && <Badge tone="active">Recorded</Badge>}</div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
-    {opening ? <p className="portal-form-note">Opening cash {pesos(opening.opening_cash_centavos)} recorded {fmtClock(opening.created_at)}{opening.remarks ? ` · ${opening.remarks}` : ""}.</p>
-      : <div className="portal-form">
-        <label>Opening Cash (PHP)<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
-        <label>Remarks<input value={remarks} onChange={(e) => setRemarks(e.target.value)} placeholder="Optional" /></label>
-        <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || amount === ""} onClick={() => void post({ action: "cashier-open", openingCashCentavos: Math.round(Number(amount) * 100), remarks: remarks.trim() || undefined }, "Opening recorded.").catch(() => undefined)}>{busy ? "Saving…" : "Record Opening"}</button></div>
+    {opening ? <dl className="cx-sum"><div><dt>Opening cash</dt><dd>{pesos(opening.opening_cash_centavos)}</dd></div><div><dt>Recorded at</dt><dd>{fmtClock(opening.created_at)}</dd></div>{opening.remarks && <div><dt>Remarks</dt><dd>{opening.remarks}</dd></div>}</dl>
+      : <div className="portal-form cx-formpad">
+        <label>Opening cash (PHP)<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+        <label>Remarks<input value={remarks} onChange={(e) => setRemarks(e.target.value)} /></label>
+        <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || amount === ""} onClick={() => void post({ action: "cashier-open", openingCashCentavos: Math.round(Number(amount) * 100), remarks: remarks.trim() || undefined }, "Opening recorded.").catch(() => undefined)}>{busy ? "Saving…" : "Record opening"}</button></div>
       </div>}
   </section>;
 }
 
-/**
- * Summary Report (Cashier › Accounting): for a day or range, collections by
- * mode, expenses, net cash, the cash drawer, and balances still due after
- * training. Printable.
- */
+/** Summary report: collections by mode, expenses, net cash, the cash drawer and balances due after training. */
 export function CashierSummaryReport({ data }: { data: PortalData }) {
   const today = manilaToday();
   const [range, setRange] = useState<(typeof RANGES)[number]>("Today");
   const [from, setFrom] = useState(today), [to, setTo] = useState(today);
-  const start = range === "Today" ? today : range === "This Week" ? addDays(today, -6) : range === "This Month" ? `${today.slice(0, 8)}01` : from;
+  const start = range === "Today" ? today : range === "This week" ? addDays(today, -6) : range === "This month" ? `${today.slice(0, 8)}01` : from;
   const end = range === "Custom" ? to : today;
   const inRange = (iso?: string | null) => { const d = day(iso); return !!d && d >= start && d <= end; };
   const payments = data.payments.filter((p) => inRange(p.received_at));
@@ -382,36 +510,32 @@ export function CashierSummaryReport({ data }: { data: PortalData }) {
   const durations = new Map(data.courses.map((c) => [c.id, c.duration_label]));
   const unpaid = unpaidAfterTraining(data.enrollments as unknown as BalanceEnrollment[], (id) => durations.get(id), today);
   const unpaidTotal = unpaid.reduce((s, r) => s + r.balanceCentavos, 0);
-  return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Accounting</span><h1>Summary Report</h1><p>{singleDay ? fmtDate(start) : `${fmtDate(start)} – ${fmtDate(end)}`}</p></div><button type="button" className="portal-secondary" onClick={() => window.print()}>Print / Save</button></div>
-    <div className="portal-tabs">{RANGES.map((r) => <button key={r} type="button" className={range === r ? "active" : ""} onClick={() => setRange(r)}>{r}</button>)}</div>
-    {range === "Custom" && <div className="pay-filters"><label>From<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label><label>To<input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} /></label></div>}
-    <div className="pay-totals">
-      <div><span>Collections</span><b>{pesos(collected)}</b><small>{payments.length} payment{payments.length === 1 ? "" : "s"}</small></div>
-      <div><span>Expenses</span><b>{pesos(expenseTotal)}</b><small>{expenses.length} voucher{expenses.length === 1 ? "" : "s"}</small></div>
-      <div><span>Net</span><b>{pesos(collected - expenseTotal)}</b><small>Collections less expenses</small></div>
-      <div><span>Unpaid After Training</span><b>{pesos(unpaidTotal)}</b><small>{unpaid.length} trainee{unpaid.length === 1 ? "" : "s"}</small></div>
+  return <div className="portal-page cx">
+    <div className="cx-head"><div><span className="portal-eyebrow">{singleDay ? fmtDate(start) : `${fmtDate(start)} – ${fmtDate(end)}`}</span><h1>Summary report</h1></div></div>
+    <div className="cx-bar"><div className="cx-seg">{RANGES.map((r) => <button key={r} type="button" className={range === r ? "on" : ""} onClick={() => setRange(r)}>{r}</button>)}</div>
+      {range === "Custom" && <><label className="cx-dt">From<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label><label className="cx-dt">To<input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} /></label></>}</div>
+    <div className="cx-tiles">
+      <div className="cx-tile" style={{ ["--c" as string]: "#0571D0" }}><span>Collections</span><b>{pesos(collected)}</b><small>{payments.length} receipt{payments.length === 1 ? "" : "s"}</small></div>
+      <div className="cx-tile" style={{ ["--c" as string]: "#F25615" }}><span>Expenses</span><b>{pesos(expenseTotal)}</b><small>{expenses.length} voucher{expenses.length === 1 ? "" : "s"}</small></div>
+      <div className="cx-tile" style={{ ["--c" as string]: "#0a7a3e" }}><span>Net</span><b>{pesos(collected - expenseTotal)}</b></div>
+      <div className="cx-tile" style={{ ["--c" as string]: "#b42318" }}><span>Unpaid after training</span><b>{pesos(unpaidTotal)}</b><small>{unpaid.length} trainee{unpaid.length === 1 ? "" : "s"}</small></div>
     </div>
-    <div className="rd-two">
-      <section className="portal-panel"><div className="panel-heading"><div><h2>Collections by Mode</h2><p>Payments received in the period</p></div></div>
-        <div className="portal-table"><table><thead><tr><th>Mode</th><th>Payments</th><th>Total</th></tr></thead><tbody>{byMode.map((m) => <tr key={m.mode}><td><strong>{m.mode}</strong></td><td>{m.count}</td><td><strong>{pesos(m.total)}</strong></td></tr>)}<tr><td><strong>Total</strong></td><td>{payments.length}</td><td><strong>{pesos(collected)}</strong></td></tr></tbody></table></div>
+    <div className="cx-two">
+      <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Collections by mode</h2></div></div>
+        <div className="portal-table"><table><thead><tr><th>Mode</th><th className="r">Receipts</th><th className="r">Total</th></tr></thead><tbody>{byMode.map((m) => <tr key={m.mode}><td>{m.mode}</td><td className="r cx-mono">{m.count}</td><td className="r cx-amt">{pesos(m.total)}</td></tr>)}<tr><td><strong>Total</strong></td><td className="r cx-mono"><strong>{payments.length}</strong></td><td className="r cx-amt"><strong>{pesos(collected)}</strong></td></tr></tbody></table></div>
       </section>
-      <section className="portal-panel"><div className="panel-heading"><div><h2>Cash Drawer</h2><p>{singleDay ? "Opening, cash received and expenses for the day" : "Pick a single day to see the cash drawer"}</p></div></div>
-        {singleDay ? <dl className="sum-dl">
-          <div><dt>Opening Cash</dt><dd>{opening == null ? "Not recorded" : pesos(opening)}</dd></div>
-          <div><dt>Cash Received</dt><dd>+{pesos(cashIn)}</dd></div>
-          <div><dt>Expenses Paid</dt><dd>−{pesos(expenseTotal)}</dd></div>
-          <div className="due"><dt>Expected Cash</dt><dd>{pesos((opening ?? 0) + cashIn - expenseTotal)}</dd></div>
+      <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Cash drawer</h2></div></div>
+        {singleDay ? <dl className="cx-sum">
+          <div><dt>Opening cash</dt><dd>{opening == null ? "Not recorded" : pesos(opening)}</dd></div>
+          <div><dt>Cash received</dt><dd>+{pesos(cashIn)}</dd></div>
+          <div><dt>Expenses paid</dt><dd>−{pesos(expenseTotal)}</dd></div>
+          <div className="big"><dt>Expected cash</dt><dd>{pesos((opening ?? 0) + cashIn - expenseTotal)}</dd></div>
           <div><dt>Closing</dt><dd>{closing ? `${pesos(Number(closing.actual_cash_centavos ?? 0))} counted · variance ${pesos(Number(closing.variance_centavos ?? 0))}` : "Not yet closed"}</dd></div>
-        </dl> : <p className="portal-empty-copy">Choose Today or a single custom day.</p>}
+        </dl> : <p className="portal-empty-copy">Choose a single day.</p>}
       </section>
     </div>
-    <section className="portal-panel" style={{ marginTop: 16 }}><div className="panel-heading"><div><h2>Expenses</h2><p>Approved and paid expenses in the period</p></div></div>
-      <div className="portal-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Purpose</th><th>Status</th><th>Amount</th></tr></thead><tbody>{expenses.map((x) => <tr key={x.id}><td><strong>{x.expense_number}</strong></td><td>{x.payee}</td><td>{(x as { purpose?: string }).purpose ?? ""}</td><td>{x.status}</td><td><strong>{pesos(x.amount_centavos)}</strong></td></tr>)}</tbody></table>{!expenses.length && <p className="portal-empty-copy">No expenses in this period.</p>}</div>
-    </section>
-    <section className="portal-panel live-list" style={{ marginTop: 16 }}><div className="panel-heading"><div><h2>Unpaid Balances After Training</h2><p>As of today · also emailed daily at 4:00 PM</p></div></div>
-      {unpaid.map((r) => <div className="live-row-item" key={r.id}><div><strong>{r.traineeName}</strong><small>{r.enrollmentNumber} · {r.course} · training {r.endsToday ? "ends today" : `ended ${fmtDate(r.trainingEnd)}`}</small></div><span className="bal-cell">{pesos(r.balanceCentavos)}<small>of {pesos(r.dueCentavos)}</small></span></div>)}
-      {!unpaid.length && <p className="portal-empty-copy">No unpaid balances after training.</p>}
+    <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Expenses</h2></div></div>
+      {expenses.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Purpose</th><th>Status</th><th className="r">Amount</th></tr></thead><tbody>{expenses.map((x) => <tr key={x.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{x.expense_number}</span></td><td data-l="Payee">{x.payee}</td><td data-l="Purpose">{(x as { purpose?: string }).purpose ?? ""}</td><td data-l="Status">{x.status}</td><td data-l="Amount" className="r cx-amt">{pesos(x.amount_centavos)}</td></tr>)}</tbody></table></div> : <p className="portal-empty-copy">No expenses in this period.</p>}
     </section>
   </div>;
 }

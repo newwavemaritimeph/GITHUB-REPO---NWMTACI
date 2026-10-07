@@ -69,7 +69,7 @@ const notificationInput = z.object({ action: z.literal("mark-notifications-read"
 // Accounting Setup CRUD (Slice 1). Admin / Accounting only; applied with the
 // service-role admin client after an explicit role check.
 const channelInput = z.object({ action: z.literal("channel-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), code: z.string().trim().max(40).optional(), requiresReference: z.boolean().default(false), allowsProof: z.boolean().default(true), kind: z.enum(["receivable", "payable"]).optional(), active: z.boolean().optional() });
-const chargeInput = z.object({ action: z.literal("charge-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), defaultAmountCentavos: z.number().int().nonnegative().default(0), active: z.boolean().optional() });
+const chargeInput = z.object({ action: z.literal("charge-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), defaultAmountCentavos: z.number().int().nonnegative().default(0), active: z.boolean().optional(), kind: z.enum(["item", "fee"]).optional() });
 const expenseCategoryInput = z.object({ action: z.literal("expense-category-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), active: z.boolean().optional(), remove: z.boolean().optional() });
 const inventoryItemInput = z.object({ action: z.literal("inventory-item-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), category: z.string().trim().max(80).optional(), unit: z.string().trim().min(1).max(24).default("pc"), unitValueCentavos: z.number().int().nonnegative().default(0), active: z.boolean().optional(), remove: z.boolean().optional() });
 const inventoryMoveInput = z.object({ action: z.literal("inventory-move"), itemId: z.string().uuid(), movementType: z.enum(["in", "out"]), quantity: z.number().int().positive(), remarks: z.string().trim().max(240).optional() });
@@ -140,7 +140,10 @@ const offerRateInput = z.object({ action: z.literal("offer-rate-save"), offerId:
 const courseSaveInput = z.object({ action: z.literal("course-save"), id: z.string().uuid().nullable().optional(), code: z.string().trim().min(2).max(40), name: z.string().trim().min(2).max(240), categoryId: z.string().uuid(), deliveryType: z.enum(["In-House", "Partner or Endorsed"]), durationLabel: z.string().trim().min(1).max(60), durationDays: z.number().positive().max(365), mode: z.string().trim().min(2).max(80), priceCentavos: z.number().int().nonnegative() });
 const centerSaveInput = z.object({ action: z.literal("center-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(2).max(160), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
 // Cashier actions relocated into the Payments module.
-const paymentSplitInput = z.object({ action: z.literal("payment-split"), allocations: z.array(z.object({ enrollmentId: z.string().uuid(), amountCentavos: z.number().int().positive() })).min(1).max(10), method: z.string().trim().min(1).max(80), receivingAccount: z.string().trim().min(2).max(120), referenceNumber: z.string().trim().max(80).optional().default(""), receivedAt: z.string().datetime({ offset: true }), remarks: z.string().trim().max(500).optional().default("") });
+// Miscellaneous items (Schedule of fees, kind "item") sold with a payment. Each becomes an
+// enrollment charge that is approved because it is paid on the same receipt.
+const paymentItemInput = z.object({ enrollmentId: z.string().uuid(), chargeCatalogId: z.string().uuid().nullable().optional(), description: z.string().trim().min(1).max(120), unitCentavos: z.number().int().positive(), quantity: z.number().int().min(1).max(50) });
+const paymentSplitInput = z.object({ action: z.literal("payment-split"), allocations: z.array(z.object({ enrollmentId: z.string().uuid(), amountCentavos: z.number().int().positive() })).max(10).default([]), items: z.array(paymentItemInput).max(10).optional().default([]), method: z.string().trim().min(1).max(80), receivingAccount: z.string().trim().min(2).max(120), referenceNumber: z.string().trim().max(80).optional().default(""), receivedAt: z.string().datetime({ offset: true }), remarks: z.string().trim().max(500).optional().default("") });
 const courseChangeInput = z.object({ action: z.literal("enrollment-course-change"), enrollmentId: z.string().uuid(), courseId: z.string().uuid(), partnerOfferId: z.string().uuid().nullable().optional() });
 const rescheduleInput = z.object({ action: z.literal("enrollment-reschedule"), enrollmentId: z.string().uuid(), batchId: z.string().uuid().nullable() });
 // Screening a website application (owner instruction, 7 Oct 2026): a staff
@@ -488,6 +491,13 @@ export async function GET() {
 
   // Merge the payment-channel kind (receivable/payable) tolerantly — the column may not
   // be migrated yet, in which case every channel is treated as receivable.
+  // Schedule of fees kind (item | fee), 202610070016. A missing column makes every entry a fee.
+  const chargeKindUnit = (async () => {
+    const kinds = new Map<string, string>();
+    const { error, data } = await db.from("charge_catalog").select("id,kind");
+    if (!error) for (const r of data ?? []) kinds.set(r.id as string, (r as { kind?: string }).kind ?? "fee");
+    return kinds;
+  })();
   const methodKindUnit = (async () => {
     const kindByMethod = new Map<string, string>();
     const { error, data } = await db.from("payment_methods").select("id,kind");
@@ -570,9 +580,9 @@ export async function GET() {
     paymentMethods, charges, agencies, expenses, payables, cashierClosings, enrollmentCharges, classrooms, courseCategories, partnerCenters, agencyCourseRebates, agencyRebates, expenseCategories, inventoryItems, inventoryMovements, pendingDiscounts, announcements] = results;
 
   // Collect the concurrent units started before the core batch.
-  const [enrollmentExtras, feedbackByEnrollment, hr, certs, pendingCharges, requests, instructionTemplates, batchStaffing, kindByMethod, myHr, expenseExtras, employeeChargeData] = await Promise.all([
+  const [enrollmentExtras, feedbackByEnrollment, hr, certs, pendingCharges, requests, instructionTemplates, batchStaffing, kindByMethod, myHr, expenseExtras, employeeChargeData, chargeKinds] = await Promise.all([
     enrollmentExtrasUnit, feedbackUnit, hrUnit, certificateUnit, pendingChargesUnit, requestsUnit,
-    instructionTemplatesUnit, batchStaffingUnit, methodKindUnit, myHrUnit, expenseExtrasUnit, employeeChargeUnit,
+    instructionTemplatesUnit, batchStaffingUnit, methodKindUnit, myHrUnit, expenseExtrasUnit, employeeChargeUnit, chargeKindUnit,
   ]);
 
   // Collection status of pending Change Course / Rescheduling fees, shown to the
@@ -716,7 +726,7 @@ export async function GET() {
   return NextResponse.json({ profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
-    paymentMethods: paymentMethodsWithKind, charges: charges.data ?? [], agencies: agencies.data ?? [],
+    paymentMethods: paymentMethodsWithKind, charges: (charges.data ?? []).map((c) => ({ ...c, kind: chargeKinds.get((c as { id: string }).id) ?? "fee" })), agencies: agencies.data ?? [],
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
@@ -745,7 +755,7 @@ export async function POST(request: Request) {
     if (input.action === "charge-save") {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage charges." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      const row = { name: input.name, default_amount_centavos: input.defaultAmountCentavos, ...(input.active !== undefined ? { active: input.active } : {}) };
+      const row = { name: input.name, default_amount_centavos: input.defaultAmountCentavos, ...(input.active !== undefined ? { active: input.active } : {}), ...(input.kind ? { kind: input.kind } : {}) };
       const { error } = input.id ? await admin.from("charge_catalog").update(row).eq("id", input.id) : await admin.from("charge_catalog").insert(row);
       if (error) throw error;
       return NextResponse.json({ ok: true });
@@ -1603,11 +1613,13 @@ export async function POST(request: Request) {
       const admin = createSupabaseAdminClient();
       const splitModeProblem = await paymentModeProblem(admin, input.method, input.referenceNumber);
       if (splitModeProblem) return NextResponse.json({ error: splitModeProblem }, { status: 400 });
-      const ids = input.allocations.map((a) => a.enrollmentId);
-      const { data: enrs } = await admin.from("enrollments").select("id,trainee_id,selling_price_centavos").in("id", ids);
+      if (!input.allocations.length && !input.items.length) return NextResponse.json({ error: "Apply the payment to at least one course or charge." }, { status: 400 });
+      const ids = [...new Set([...input.allocations.map((a) => a.enrollmentId), ...input.items.map((i) => i.enrollmentId)])];
+      const { data: enrs } = await admin.from("enrollments").select("id,trainee_id,selling_price_centavos,enrollment_status").in("id", ids);
       if (!enrs || enrs.length !== new Set(ids).size) throw new Error("One or more enrollments were not found.");
       const traineeId = enrs[0].trainee_id;
       if (enrs.some((e) => e.trainee_id !== traineeId)) throw new Error("A split payment must be for a single trainee.");
+      if (enrs.some((e) => e.enrollment_status === "Cancelled" && input.items.some((i) => i.enrollmentId === e.id))) return NextResponse.json({ error: "Charges cannot be added to a cancelled enrollment." }, { status: 400 });
       const { data: allocs } = await admin.from("payment_allocations").select("enrollment_id,amount_centavos,payments!inner(valid)").in("enrollment_id", ids).eq("payments.valid", true);
       const { data: chgs } = await admin.from("enrollment_charges").select("enrollment_id,amount_centavos,event_type").in("enrollment_id", ids).eq("valid", true);
       for (const a of input.allocations) {
@@ -1618,12 +1630,32 @@ export async function POST(request: Request) {
         const balance = Number(e.selling_price_centavos) + charge - discount - paid;
         if (a.amountCentavos > balance) throw new Error(`A split amount exceeds the remaining balance on ${a.enrollmentId}.`);
       }
-      const total = input.allocations.reduce((s, a) => s + a.amountCentavos, 0);
-      const { error } = await db.rpc("post_payment", { target_trainee: traineeId, target_amount_centavos: total, target_method: input.method, target_receiving_account: input.receivingAccount, target_reference: input.referenceNumber || null, target_received_at: input.receivedAt, target_proof: null, target_allocations: input.allocations.map((a) => ({ enrollment_id: a.enrollmentId, amount_centavos: a.amountCentavos })), target_remarks: input.remarks || null });
-      if (error) throw error;
+      // Items are written as Pending and approved only after the payment posts, so a
+      // failed payment never leaves an unpaid charge on the balance.
+      const itemCharges: string[] = [];
+      for (const item of input.items) {
+        const description = item.quantity > 1 ? `${item.description} x ${item.quantity}` : item.description;
+        const { data: row, error: itemError } = await admin.from("enrollment_charges").insert({ enrollment_id: item.enrollmentId, charge_catalog_id: item.chargeCatalogId ?? null, description, amount_centavos: item.unitCentavos * item.quantity, event_type: "charge", valid: false, approval_status: "Pending", created_by: staff.user.id }).select("id").single();
+        if (itemError) throw itemError;
+        itemCharges.push(row.id as string);
+      }
+      const byEnrollment = new Map<string, number>();
+      for (const a of input.allocations) byEnrollment.set(a.enrollmentId, (byEnrollment.get(a.enrollmentId) ?? 0) + a.amountCentavos);
+      for (const i of input.items) byEnrollment.set(i.enrollmentId, (byEnrollment.get(i.enrollmentId) ?? 0) + i.unitCentavos * i.quantity);
+      const allocations = [...byEnrollment].map(([enrollment_id, amount_centavos]) => ({ enrollment_id, amount_centavos }));
+      const total = allocations.reduce((sum, a) => sum + a.amount_centavos, 0);
+      const { data: posted, error } = await db.rpc("post_payment", { target_trainee: traineeId, target_amount_centavos: total, target_method: input.method, target_receiving_account: input.receivingAccount, target_reference: input.referenceNumber || null, target_received_at: input.receivedAt, target_proof: null, target_allocations: allocations, target_remarks: input.remarks || null });
+      if (error) {
+        if (itemCharges.length) await admin.from("enrollment_charges").update({ approval_status: "Rejected" }).in("id", itemCharges);
+        throw error;
+      }
+      if (itemCharges.length) {
+        const { error: approveError } = await admin.from("enrollment_charges").update({ valid: true, approval_status: "Approved" }).in("id", itemCharges);
+        if (approveError) throw approveError;
+      }
       await autoSendInstructions(admin, ids);
       const enrolled = await tryAutoEnroll(admin, ids, staff.user.id);
-      return NextResponse.json({ ok: true, enrolled });
+      return NextResponse.json({ ok: true, enrolled, payment: posted });
     }
     if (input.action === "enrollment-delete") {
       if (!staff.roleCodes.includes("admin")) return NextResponse.json({ error: "Only Admin can delete enrollments." }, { status: 403 });

@@ -252,7 +252,7 @@ function PayrollTab({ data, nameOf, canManage, busy, post }: { data: HrData; nam
               <td><strong>{pesos(net)}</strong></td>
               <td>{p.status}{p.finalized_at ? " ·✓" : ""}</td>
               <td className="document-actions">
-                {canManage && p.status === "Draft" && <button disabled={busy} onClick={() => post({ action: "payroll-review", id: p.id })}>Mark Reviewed</button>}
+                {canManage && p.status === "Draft" && <button disabled={busy} onClick={() => post({ action: "payroll-review", id: p.id })}>Mark reviewed</button>}
                 {canManage && p.status === "Reviewed" && <button disabled={busy} onClick={() => post({ action: "payroll-finalize", id: p.id })}>Finalize</button>}
               </td>
             </tr>;

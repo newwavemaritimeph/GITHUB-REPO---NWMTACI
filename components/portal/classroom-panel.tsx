@@ -75,7 +75,7 @@ export function ClassroomPanel({ data, courseId, reload }: { data: PortalData; c
       {!courseId ? <small>Choose a course below to link it to a Google Classroom class.</small> : <>
         <span>Class for this course: <b>{linkedId ? (classes?.find((c) => c.id === linkedId)?.name ?? "Linked") : "Not linked"}</b></span>
         {classes === null
-          ? <button type="button" className="portal-secondary" disabled={busy} onClick={loadClasses}>{busy ? "Loading…" : linkedId ? "Change Class" : "Choose Class"}</button>
+          ? <button type="button" className="portal-secondary" disabled={busy} onClick={loadClasses}>{busy ? "Loading…" : linkedId ? "Change class" : "Choose class"}</button>
           : <span className="gc-pick">
             <select value={picked} onChange={(e) => setPicked(e.target.value)} aria-label="Google Classroom class">
               <option value="">No Class (Unlink)</option>

@@ -20,7 +20,7 @@ export function Message({ kind, text }: { kind: "success" | "error"; text: strin
 export function Modal({ title, children, onClose, wide }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
   return <div className="portal-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
     <section className="portal-modal" style={wide ? { width: "min(980px, 100%)" } : undefined} role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <header><div><span className="portal-eyebrow">Secure staff action</span><h2 id="modal-title">{title}</h2></div><button type="button" onClick={onClose} aria-label="Close dialog">×</button></header>
+      <header><div><h2 id="modal-title">{title}</h2></div><button type="button" onClick={onClose} aria-label="Close dialog">×</button></header>
       {children}
     </section>
   </div>;
@@ -31,12 +31,13 @@ export function Page({ embedded, head, children }: { embedded?: boolean; head: R
   return embedded ? <>{children}</> : <div className="portal-page">{head}{children}</div>;
 }
 
-export function PageHead({ eyebrow, title, text, action, onAction }: { eyebrow: string; title: string; text: string; action?: string; onAction?: () => void }) {
-  return <div className="portal-heading"><div><span className="portal-eyebrow">{eyebrow}</span><h1>{title}</h1><p>{text}</p></div>{action && <button className="portal-primary" onClick={onAction}>{action}</button>}</div>;
+/** Page title. `text` is accepted for older callers but not shown: titles carry no description (owner, 7 Oct 2026). */
+export function PageHead({ eyebrow, title, action, onAction }: { eyebrow: string; title: string; text?: string; action?: string; onAction?: () => void }) {
+  return <div className="portal-heading"><div><span className="portal-eyebrow">{eyebrow}</span><h1>{title}</h1></div>{action && <button className="portal-primary" onClick={onAction}>{action}</button>}</div>;
 }
 
 /** A clickable KPI card; place a row of them inside <div className="reg-kpis">. */
-export function Kpi({ icon, label, value, hint = "View all →", onClick }: { icon: string; label: string; value: number | string; hint?: string; onClick?: () => void }) {
+export function Kpi({ icon, label, value, hint = "View all", onClick }: { icon: string; label: string; value: number | string; hint?: string; onClick?: () => void }) {
   return <button type="button" onClick={onClick}><i>{icon}</i><span>{label}</span><strong>{value}</strong><small>{hint}</small></button>;
 }
 
@@ -48,8 +49,8 @@ export function Pager({ page, total, perPage, onPage }: { page: number; total: n
   return <div className="pager">
     <span>Showing {from}–{to} of {total}</span>
     <span style={{ display: "inline-flex", gap: 6 }}>
-      <button type="button" className="ghost-button" disabled={page <= 1} onClick={() => onPage(page - 1)}>← Previous</button>
-      <button type="button" className="ghost-button" disabled={page >= pages} onClick={() => onPage(page + 1)}>Next →</button>
+      <button type="button" className="ghost-button" disabled={page <= 1} onClick={() => onPage(page - 1)}>Previous</button>
+      <button type="button" className="ghost-button" disabled={page >= pages} onClick={() => onPage(page + 1)}>Next</button>
     </span>
   </div>;
 }

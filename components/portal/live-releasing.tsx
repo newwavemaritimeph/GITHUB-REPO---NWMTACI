@@ -139,7 +139,7 @@ export function ReleasingDashboard({ data, reload }: { data: ReleasingData; relo
         {!releasedToday.length && <p className="portal-empty-copy">No certificates released today.</p>}
       </section>
       <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Certificate corrections</h2><p>Returned for correction</p></div><span className="slot-count">{corrections.length}</span></div>
-        {corrections.slice(0, 12).map((c) => <div className="live-row-item" key={c.id}><div><strong>{nameOf(c)}</strong><small>{courseOf(c)} · {c.issue_note ?? "Correction requested"}{c.issue_reported_on ? ` · ${fmtDate(c.issue_reported_on)}` : ""}</small></div><button type="button" className="ghost-button" onClick={() => void post({ action: "certificate-issue-report", enrollmentId: c.enrollment_id, issueStatus: "Resolved" })}>Mark Resolved</button></div>)}
+        {corrections.slice(0, 12).map((c) => <div className="live-row-item" key={c.id}><div><strong>{nameOf(c)}</strong><small>{courseOf(c)} · {c.issue_note ?? "Correction requested"}{c.issue_reported_on ? ` · ${fmtDate(c.issue_reported_on)}` : ""}</small></div><button type="button" className="ghost-button" onClick={() => void post({ action: "certificate-issue-report", enrollmentId: c.enrollment_id, issueStatus: "Resolved" })}>Mark resolved</button></div>)}
         {!corrections.length && <p className="portal-empty-copy">No certificates flagged for correction.</p>}
       </section>
     </div>
@@ -250,7 +250,7 @@ export function LiveReleasing({ data, role, reload }: { data: ReleasingData; rol
           <td><strong>{traineeName(e)}</strong><small>{e.enrollment_number}</small></td>
           <td>{one(e.courses)?.name}<small>{one(e.courses)?.code}</small></td>
           <td><span className={`portal-badge ${paid ? "green" : "red"}`}>{paid ? "Paid" : "Balance"}</span></td>
-          <td><span className={`portal-badge ${e.feedback_submitted ? "green" : "orange"}`}>{e.feedback_submitted ? "Submitted" : "Pending"}</span>{e.feedback_token && <span className="document-actions" style={{ marginTop: 4 }}><button type="button" className="ghost-button" onClick={() => copyLink(e.feedback_token!)}>Copy Link</button><button type="button" className="ghost-button" disabled={busy} onClick={() => void sendFeedback(e)}>Email Form</button></span>}</td>
+          <td><span className={`portal-badge ${e.feedback_submitted ? "green" : "orange"}`}>{e.feedback_submitted ? "Submitted" : "Pending"}</span>{e.feedback_token && <span className="document-actions" style={{ marginTop: 4 }}><button type="button" className="ghost-button" onClick={() => copyLink(e.feedback_token!)}>Copy link</button><button type="button" className="ghost-button" disabled={busy} onClick={() => void sendFeedback(e)}>Email form</button></span>}</td>
           <td><strong>{c?.status ?? "Not issued"}</strong><small>{snap.certificate_number ? `No. ${snap.certificate_number}` : "—"}{c?.reprint_count ? ` · ${c.reprint_count} reprint(s)` : ""}</small></td>
           <td className="document-actions">
             <button type="button" disabled={busy || !paid} onClick={() => issue(e)}>{c ? "Re-issue #" : "Issue #"}</button>
@@ -268,7 +268,7 @@ export function LiveReleasing({ data, role, reload }: { data: ReleasingData; rol
 
       {tab === "Released report" && <div className="portal-page" style={{ padding: 0 }}>
         <div className="portal-tabs">{(["Daily", "Weekly", "Monthly", "All"] as const).map((s) => <button key={s} className={span === s ? "active" : ""} onClick={() => setSpan(s)}>{s}</button>)}</div>
-        <div className="panel-heading" style={{ padding: "8px 0" }}><div><h2 style={{ margin: 0, fontSize: 16 }}>Released Certificates</h2><p style={{ margin: "2px 0 0", color: "var(--muted)", fontSize: 13 }}>{span === "All" ? "All time" : `${from} → ${today}`} · {releaseRows.length}</p></div><button type="button" className="portal-secondary" disabled={!releaseRows.length} onClick={exportReleases}>Export CSV</button></div>
+        <div className="panel-heading" style={{ padding: "8px 0" }}><div><h2 style={{ margin: 0, fontSize: 16 }}>Released certificates</h2><p style={{ margin: "2px 0 0", color: "var(--muted)", fontSize: 13 }}>{span === "All" ? "All time" : `${from} → ${today}`} · {releaseRows.length}</p></div><button type="button" className="portal-secondary" disabled={!releaseRows.length} onClick={exportReleases}>Export CSV</button></div>
         <div className="portal-table portal-panel"><table><thead><tr><th>Date</th><th>Trainee</th><th>Course</th><th>Certificate #</th><th>Recipient</th></tr></thead><tbody>
           {releaseRows.map((r) => { const cert = one(r.certificates); const enr = one(cert?.enrollments); const snap = (cert?.snapshot ?? {}) as { certificate_number?: string }; const t = one(enr?.trainees ?? null); return <tr key={r.id}><td>{fmtDate(r.created_at)}</td><td><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</strong><small>{enr?.enrollment_number ?? ""}</small></td><td>{one(enr?.courses ?? null)?.name ?? "—"}</td><td>{snap.certificate_number ?? "—"}</td><td>{r.recipient_name ?? "—"}<small>{r.recipient_id_type ?? ""}</small></td></tr>; })}
           {!releaseRows.length && <tr><td colSpan={5}><span className="portal-empty-copy">No certificates released in this period.</span></td></tr>}
@@ -374,7 +374,7 @@ function TemplateUpload({ data, ownCourses, onSaved }: { data: ReleasingData; ow
   }
   return <div className="portal-panel" style={{ padding: 16 }}>
     <form className="portal-form" onSubmit={upload}>
-      <div className="full"><h2 style={{ margin: 0, fontSize: 16 }}>Upload Certificate Template</h2><p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: 13 }}>In-house courses only (Safety, Crowd, Crisis, SATSDSD, BT-PSSR, Ship&apos;s Security Officer, etc.). PDF or PNG/JPEG, ≤ 50 MB. The newest upload becomes the active template.</p></div>
+      <div className="full"><h2 style={{ margin: 0, fontSize: 16 }}>Upload certificate template</h2><p style={{ margin: "4px 0 0", color: "var(--muted)", fontSize: 13 }}>In-house courses only (Safety, Crowd, Crisis, SATSDSD, BT-PSSR, Ship&apos;s Security Officer, etc.). PDF or PNG/JPEG, ≤ 50 MB. The newest upload becomes the active template.</p></div>
       {message && <div className={`portal-message ${message.kind === "error" ? "error" : ""} full`}>{message.text}</div>}
       <label className="full">Course<select name="courseId" required><option value="">Select an in-house course</option>{ownCourses.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label>
       <label className="full">Template file<input name="template" type="file" accept="application/pdf,image/png,image/jpeg" required /></label>
@@ -388,7 +388,7 @@ function TemplateUpload({ data, ownCourses, onSaved }: { data: ReleasingData; ow
         <td><div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <button type="button" className="portal-secondary" onClick={() => preview(t.id)}>Preview</button>
           <button type="button" className="ghost-button" onClick={() => editFields(t)}>Edit</button>
-          {!t.active && <button type="button" className="ghost-button" onClick={() => setActive(t.id)}>Set Active</button>}
+          {!t.active && <button type="button" className="ghost-button" onClick={() => setActive(t.id)}>Set active</button>}
           <button type="button" className="ghost-button" onClick={() => removeTemplate(t)}>Remove</button>
         </div></td>
       </tr>)}

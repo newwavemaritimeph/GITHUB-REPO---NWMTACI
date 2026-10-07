@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Inter, Geist_Mono, Source_Serif_4, Plus_Jakarta_Sans, Space_Grotesk, Outfit } from "next/font/google";
+import { Inter, Geist, Geist_Mono, Source_Serif_4, Outfit } from "next/font/google";
 import "./globals.css";
 import "./catalog.css";
 import "./portal-legacy.css";
@@ -30,12 +30,11 @@ const sourceSerif = Source_Serif_4({
   display: "swap",
 });
 
-// Staff portal faces ("Bridge Compass" direction, Oct 2026): Plus Jakarta Sans
-// for the interface and headings, Space Grotesk for figures. Scoped to
-// .portal-shell in portal-legacy.css; the public site keeps Editorial.
-// Both are variable fonts, so no weight list (see the Source Serif note).
-const portalSans = Plus_Jakarta_Sans({ variable: "--font-portal", subsets: ["latin"], display: "swap" });
-const portalNumerals = Space_Grotesk({ variable: "--font-num", subsets: ["latin"], display: "swap" });
+// Staff portal faces (prototype design, 7 Oct 2026): Geist for words, Geist Mono
+// for amounts and identifiers. Scoped to .portal-shell in portal-legacy.css; the
+// public site keeps Editorial. Both are variable fonts, so no weight list.
+const portalSans = Geist({ variable: "--font-portal", subsets: ["latin"], display: "swap" });
+const portalNumerals = Geist_Mono({ variable: "--font-num", subsets: ["latin"], display: "swap" });
 // Registration form headings ("Quiet Checklist" direction). Variable font.
 const formDisplay = Outfit({ variable: "--font-form", subsets: ["latin"], display: "swap" });
 

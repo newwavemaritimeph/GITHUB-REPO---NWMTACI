@@ -17,6 +17,10 @@ const input=z.discriminatedUnion("action",[
   z.object({action:z.literal("set-user-role"),userId:z.string().uuid(),roleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","training_operations","hr","instructor"])}),
   z.object({action:z.literal("grant-role-by-email"),email:z.string().email(),completeName:z.string().trim().max(160).optional(),roleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","training_operations","hr","instructor"])}),
   z.object({action:z.literal("remove-user"),userId:z.string().uuid()}),
+  z.object({action:z.literal("update-user"),userId:z.string().uuid(),completeName:z.string().trim().min(2).max(160),position:z.string().trim().max(120).optional(),roleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","training_operations","hr","instructor"])}),
+  z.object({action:z.literal("set-password"),userId:z.string().uuid(),password:z.string().min(8).max(200)}),
+  z.object({action:z.literal("delete-user"),userId:z.string().uuid()}),
+  z.object({action:z.literal("restore-user"),userId:z.string().uuid(),roleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","training_operations","hr","instructor"])}),
   z.object({action:z.literal("create-user"),email:z.string().email(),password:z.string().min(6).max(200),completeName:z.string().trim().min(2).max(160),roleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","training_operations","hr","instructor"]),position:z.string().trim().max(120).optional()}),
 ]);
 const slug=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,50);
@@ -90,6 +94,36 @@ export async function POST(request:Request){const staff=await requireStaff(["sup
     }
     record={userId:uid,email:value.email,role:value.roleCode};
   }
+  else if(value.action==="update-user"){
+    // Edit an employee account: name, position and portal role.
+    const up=await db.from("profiles").update({complete_name:value.completeName}).eq("id",value.userId);if(up.error)throw up.error;
+    const {data:role}=await db.from("roles").select("id").eq("code",value.roleCode).single();if(!role)throw new Error("Role not found.");
+    if(value.userId===staff.user.id&&!["admin","super_admin"].includes(value.roleCode))throw new Error("You cannot remove your own Admin role.");
+    const del=await db.from("user_roles").delete().eq("user_id",value.userId);if(del.error)throw del.error;
+    const ins=await db.from("user_roles").insert({user_id:value.userId,role_id:role.id,assigned_by:staff.user.id});if(ins.error)throw ins.error;
+    if(value.position!==undefined){const {data:emp}=await db.from("employees").select("id").eq("profile_id",value.userId).maybeSingle();if(emp)await db.from("employees").update({position:value.position||"Staff",complete_name:value.completeName}).eq("id",emp.id)}
+    await db.auth.admin.updateUserById(value.userId,{user_metadata:{complete_name:value.completeName}});
+    record={userId:value.userId,completeName:value.completeName,role:value.roleCode}}
+  else if(value.action==="set-password"){
+    // The Admin sets a temporary password for the employee. It goes straight to
+    // Supabase Auth (stored as a hash) and is never saved or logged by the portal.
+    const {error}=await db.auth.admin.updateUserById(value.userId,{password:value.password});if(error)throw error;
+    record={userId:value.userId,passwordReset:true}}
+  else if(value.action==="delete-user"){
+    // Delete an employee account from the portal: roles removed, profile
+    // deactivated, sign-in blocked. Records they created (payments, audit
+    // entries) stay, so the history remains complete.
+    if(value.userId===staff.user.id)throw new Error("You cannot delete your own account.");
+    const del=await db.from("user_roles").delete().eq("user_id",value.userId);if(del.error)throw del.error;
+    const upd=await db.from("profiles").update({account_state:"Deactivated"}).eq("id",value.userId);if(upd.error)throw upd.error;
+    const ban=await db.auth.admin.updateUserById(value.userId,{ban_duration:"876000h"});if(ban.error)throw ban.error;
+    record={userId:value.userId,deleted:true}}
+  else if(value.action==="restore-user"){
+    const {data:role}=await db.from("roles").select("id").eq("code",value.roleCode).single();if(!role)throw new Error("Role not found.");
+    const ins=await db.from("user_roles").upsert({user_id:value.userId,role_id:role.id,assigned_by:staff.user.id});if(ins.error)throw ins.error;
+    const upd=await db.from("profiles").update({account_state:"Active"}).eq("id",value.userId);if(upd.error)throw upd.error;
+    const unban=await db.auth.admin.updateUserById(value.userId,{ban_duration:"none"});if(unban.error)throw unban.error;
+    record={userId:value.userId,restored:true}}
   else if(value.action==="remove-user"){
     // Revoke portal access (soft): strip roles and deactivate the profile. The
     // Supabase login is left intact — delete it in the dashboard if truly needed.
