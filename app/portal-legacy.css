@@ -1293,6 +1293,40 @@ button.rd-row:hover { background: #f6fafc; }
 .gc-link small{color:var(--muted,#5b7587)}
 .gc-pick{display:inline-flex;gap:8px;flex-wrap:wrap}
 .gc-pick select{height:40px;border:1px solid #cadce5;border-radius:9px;padding:0 10px;min-width:240px;background:#fff}
+/* Sidebar groups as dropdowns (Oct 2026) */
+.nav-group-toggle{display:flex;width:100%;align-items:center;justify-content:space-between;background:none;border:0;padding:0;cursor:pointer;color:inherit;font:inherit}
+.nav-group-toggle i{font-style:normal;font-size:11px;opacity:.7;transition:transform .15s ease}
+.nav-group.closed .nav-group-toggle i{transform:rotate(-90deg)}
+/* Cashier: record payment, payment records */
+.pay-pick label{display:flex;flex-direction:column;gap:6px;font-weight:600}
+.pay-results{display:grid;gap:6px;margin-top:10px;max-height:340px;overflow-y:auto}
+.pay-result{display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;border:1px solid #dbe7ec;border-radius:10px;background:#fff;padding:10px 12px;cursor:pointer;font:inherit}
+.pay-result:hover{border-color:var(--blue,#0571D0)}
+.pay-result b{display:block;color:var(--blue-dark,#123F63)}
+.pay-result small{color:var(--muted,#5b7587)}
+.pay-breakdown{border:1px solid #cfe6f2;background:#f3f9fc;border-radius:12px;padding:12px 14px}
+.pay-who{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin-bottom:8px}
+.pay-who b{color:var(--blue-dark,#123F63);font-size:16px}
+.pay-who small{color:var(--muted,#5b7587);flex:1}
+.pay-breakdown dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:0}
+.pay-breakdown dt{font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#5b7587)}
+.pay-breakdown dd{margin:2px 0 0;font-weight:700;color:var(--blue-dark,#123F63)}
+.pay-breakdown .due dd{color:#c8440e;font-size:17px}
+.pay-label{display:block;font-weight:600;margin-bottom:6px}
+.pay-modes{display:flex;flex-wrap:wrap;gap:8px}
+.pay-modes button{min-width:110px;height:42px;border:1px solid #cadce5;border-radius:10px;background:#fff;font:inherit;font-weight:600;color:var(--blue-dark,#123F63);cursor:pointer}
+.pay-modes button.on{background:var(--blue-dark,#123F63);border-color:var(--blue-dark,#123F63);color:#fff}
+.pay-filters{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 12px}
+.pay-filters label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;font-weight:600;color:var(--muted,#5b7587)}
+.pay-filters label.grow{flex:1;min-width:220px}
+.pay-filters input,.pay-filters select{height:40px;border:1px solid #cadce5;border-radius:9px;padding:0 10px;font:inherit;background:#fff}
+.pay-totals{display:flex;flex-wrap:wrap;gap:10px;margin:0 0 12px}
+.pay-totals>div{background:#fff;border:1px solid #dbe7ec;border-radius:12px;padding:10px 14px;min-width:140px}
+.pay-totals span{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted,#5b7587)}
+.pay-totals b{font-size:17px;color:var(--blue-dark,#123F63)}
+.pay-totals small{display:block;color:var(--muted,#5b7587)}
+.bal-cell{font-weight:700;color:#c8440e;text-align:right}
+.bal-cell small{display:block;font-weight:500;color:var(--muted,#5b7587)}
 /* Registration dashboard: two boxes (Oct 2026) */
 .rd-two{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
 .rd-count{min-width:34px;height:34px;padding:0 10px;border-radius:999px;background:#eaf3fa;color:var(--blue-dark,#123F63);font-weight:700;display:inline-grid;place-items:center}
@@ -1303,3 +1337,5 @@ button.rd-row:hover { background: #f6fafc; }
 .rd-datesum{margin-left:auto;font-size:13px;color:var(--muted,#5b7587);font-weight:600}
 .rd-time small{display:block;font-size:11.5px;color:var(--muted,#5b7587);font-weight:500}
 @media (max-width:980px){.rd-two{grid-template-columns:1fr}}
+.cashier-tabs{margin:24px 28px 0}
+.sum-dl{display:grid;gap:8px;margin:0}.sum-dl>div{display:flex;justify-content:space-between;gap:12px;border-bottom:1px solid #edf3f6;padding:6px 0}.sum-dl dt{color:var(--muted,#5b7587)}.sum-dl dd{margin:0;font-weight:700;color:var(--blue-dark,#123F63);text-align:right}.sum-dl .due dd{color:#c8440e}

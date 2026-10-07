@@ -6,7 +6,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { LiveAttendance } from "./portal/live-attendance";
 import { LiveAccounting, AccountingDashboard, ReceivablesModule, ApprovalsModule, PayablesModule, CashPositionModule, LiveVouchers, LiveInventory, LiveExpenses, SetupList } from "./portal/live-accounting";
 import { LiveCashierClosing } from "./portal/live-cashier-closing";
-import { CashierPaymentQueue, RequestChargeModal, TarButton } from "./portal/live-cashier";
+import { CashierPaymentQueue, RequestChargeModal, TarButton, RecordPaymentModal, CashierDashboard, CashierPayments, DiscountRequests, CashierEnrollments, CashierOpening, CashierSummaryReport } from "./portal/live-cashier";
 import { LiveHr, type HrData } from "./portal/live-hr";
 import { LiveTraining, type TrainingData } from "./portal/live-training";
 import { ReleasingDashboard, LiveReleasing } from "./portal/live-releasing";
@@ -23,7 +23,7 @@ import { emailStatusText } from "@/lib/instruction-email-status";
 import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, first, dueCentavos, balanceOf, isUnpaid, manilaToday } from "@/lib/portal-format";
 
-type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Setup" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment";
+type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Setup" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Search Trainee" | "Record Payment" | "Opening & Closing" | "Summary Report";
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -65,6 +65,8 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   instructionEmails?:Record<string,{state:string;to:string;sent_at:string|null;last_error:string|null;created_at:string}>;
   // Google Classroom class code per course id (202610070012).
   classroomCodes?:Record<string,string>;
+  // Cashier start-of-day opening cash (202610070015).
+  cashierOpenings?:{id:string;opening_date:string;opening_cash_centavos:number;remarks:string|null;created_at:string}[];
   // Google Classroom connection (202610070013): status only, never tokens.
   classroom?:{configured:boolean;connected:boolean;accountEmail:string|null;connectedAt:string|null};
   classroomCourseIds?:Record<string,string>;
@@ -78,7 +80,7 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
 // render order; a group disappears entirely when the role can see none of its items.
 // Invariant: ONE nav entry per label. The sidebar keys buttons by label and the
 // allow-lists filter by label, so a duplicate renders twice with a clashing key.
-const NAV_GROUPS = ["Work","Collections","Approvals","Payables & cash","Cashier control","Records","Finance","People","Configuration"] as const;
+const NAV_GROUPS = ["Work","Enrollments","Accounting","Collections","Approvals","Payables & cash","Cashier control","Records","Finance","People","Configuration"] as const;
 type NavGroup = (typeof NAV_GROUPS)[number];
 /**
  * Roles being rebuilt module by module.
@@ -106,8 +108,11 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   instructor: [],
   releasing_officer: [],
   hr: [],
-  // cashier and accounting are deliberately absent: an absent key keeps the
-  // legacy nav; a key with [] would empty the workspace.
+  // Cashier (Accounting Officer), owner's menu of 7 Oct 2026: Dashboard;
+  // Enrollments ▾ Search Trainee; Accounting ▾ Record Payment, Expenses,
+  // Opening & Closing, Summary Report.
+  cashier: ["Dashboard","Search Trainee","Record Payment","Expenses","Opening & Closing","Summary Report"],
+  // accounting is deliberately absent: an absent key keeps the legacy nav.
 };
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
@@ -121,10 +126,16 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Approvals",icon:"✓",roles:["accounting"],group:"Approvals"},
   {label:"Payables",icon:"▦",roles:["accounting"],group:"Payables & cash"},{label:"Cash position",icon:"◈",roles:["accounting"],group:"Payables & cash"},
   {label:"Cashier closing",icon:"⚖",roles:["cashier","accounting"],group:"Cashier control"},
+  // Cashier workspace (7 Oct 2026): Enrollments ▾ and Accounting ▾ dropdown groups.
+  {label:"Search Trainee",icon:"⌕",roles:["cashier"],group:"Enrollments"},
+  {label:"Record Payment",icon:"₱",roles:["cashier"],group:"Accounting"},{label:"Opening & Closing",icon:"⚖",roles:["cashier"],group:"Accounting"},{label:"Summary Report",icon:"∑",roles:["cashier"],group:"Accounting"},
   {label:"HR & payroll",icon:"♙",roles:["admin","hr"],group:"People"},{label:"MyHr",icon:"☺",group:"People"},
   {label:"Endorsed courses",icon:"◇",group:"Configuration"},{label:"Setup",icon:"⚙",roles:["super_admin","admin"],group:"Configuration"},
 ];
-const roleNames:Record<string,string>={super_admin:"Super Admin",admin:"Admin",accounting:"Accounting Manager",cashier:"Accounting Officer (Cashier)",releasing_officer:"Releasing Officer",training_operations:"Schedule Officer",registration:"Registration Officer",hr:"HR",instructor:"Instructor"};
+const WORKING_ROLES=["registration","cashier","accounting","admin"] as const;
+function workingRolesFor(roles:string[]){const isAdmin=roles.includes("admin")||roles.includes("super_admin");const held=WORKING_ROLES.filter(r=>isAdmin||roles.includes(r));return held.length?[...held]:roles.slice(0,1)}
+function defaultWorkingRole(roles:string[]){return roles.includes("admin")||roles.includes("super_admin")?"admin":workingRolesFor(roles)[0]??"admin"}
+const roleNames:Record<string,string>={registration:"Registration",cashier:"Cashier",accounting:"Accounting",admin:"Admin",super_admin:"Super Admin",releasing_officer:"Releasing Officer",training_operations:"Schedule Officer",hr:"HR",instructor:"Instructor"};
 const date=(value:string)=>new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",year:"numeric",timeZone:"Asia/Manila"}).format(new Date(`${value}T00:00:00+08:00`));
 
 // New Wave's own courses (delivery_type "In-House"), split into the two families
@@ -147,7 +158,7 @@ function ChangePasswordModal({onClose}:{onClose:()=>void}){const [pw,setPw]=useS
 
 export function PortalLiveApp(){
   const [data,setData]=useState<PortalData|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[active,setActive]=useState<Module>("Dashboard"),[recordsView,setRecordsView]=useState<RecordsView>("applications"),[role,setRole]=useState(""),[sidebar,setSidebar]=useState(false),[notices,setNotices]=useState(false),[modal,setModal]=useState<"enrollment"|"batch"|"payment"|null>(null),[payTarget,setPayTarget]=useState(""),[query,setQuery]=useState(""),[account,setAccount]=useState(false);
-  const load=useCallback(async()=>{setLoading(true);setError("");try{const response=await fetch("/api/staff/operations",{cache:"no-store"});const body=await response.json();if(!response.ok)throw new Error(body.error??"Unable to load staff records.");setData(body);setRole((current:string)=>body.roles.includes(current)?current:body.roles[0]??"admin")}catch(e){setError(e instanceof Error?e.message:"Unable to load staff records.")}finally{setLoading(false)}},[]);
+  const load=useCallback(async()=>{setLoading(true);setError("");try{const response=await fetch("/api/staff/operations",{cache:"no-store"});const body=await response.json();if(!response.ok)throw new Error(body.error??"Unable to load staff records.");setData(body);setRole((current:string)=>{const options=workingRolesFor(body.roles);return options.includes(current)?current:defaultWorkingRole(body.roles)})}catch(e){setError(e instanceof Error?e.message:"Unable to load staff records.")}finally{setLoading(false)}},[]);
   useEffect(()=>{void load()},[load]);
   // Admin keeps an oversight-only workspace: Dashboard, Search trainee, Enrollments,
   // Accounting, Enrollment summary, Reports, MyHr and Setup. Everything else is the
@@ -158,6 +169,10 @@ export function PortalLiveApp(){
   // the established role tags and hidden sets. (The registration, training
   // operations and releasing hidden sets are gone: those roles are allow-listed.)
   const rebuildModules=ROLE_MODULES[role];
+  // Sidebar groups open and close like dropdowns; the choice is remembered per browser.
+  const [closedGroups,setClosedGroups]=useState<string[]>([]);
+  useEffect(()=>{try{const saved=JSON.parse(window.localStorage.getItem("nw-nav-closed")??"[]");if(Array.isArray(saved))queueMicrotask(()=>setClosedGroups(saved))}catch{/* storage unavailable */}},[]);
+  const toggleGroup=(group:string)=>setClosedGroups(cur=>{const next=cur.includes(group)?cur.filter(g=>g!==group):[...cur,group];try{window.localStorage.setItem("nw-nav-closed",JSON.stringify(next))}catch{/* storage unavailable */}return next});
   const legacyNav=nav.filter(item=>(!item.roles||item.roles.includes(role)||(role==="super_admin"&&item.roles.includes("admin")))&&!(role==="admin"&&adminHidden.has(item.label))&&!(role==="accounting"&&accountingHidden.has(item.label)));
   const allowedNav=rebuildModules?nav.filter(item=>rebuildModules.includes(item.label)):legacyNav;
   // In a workspace with the combined Registration tab, the older
@@ -173,8 +188,11 @@ export function PortalLiveApp(){
   const canSchedule=["admin","super_admin","training_operations"].includes(role);
   const canPay=data.roles.some(item=>["admin","cashier","accounting"].includes(item));
   // An Admin can preview every role's workspace; other staff see only their own role(s).
-  const roleOptions=data.roles.includes("super_admin")?Object.keys(roleNames):data.roles.includes("admin")?Object.keys(roleNames).filter(r=>r!=="super_admin"):data.roles;
-  return <main className="portal-shell"><aside className={`portal-sidebar ${sidebar?"open":""}`}><div className="sidebar-brand"><NewWaveLogo inverted/></div><div className="role-picker"><span>Working as</span><select value={role} onChange={e=>{setRole(e.target.value);setActive("Dashboard");setRecordsView("applications")}} aria-label="Active role">{roleOptions.map(item=><option key={item} value={item}>{roleNames[item]??item}</option>)}</select></div><nav aria-label="Staff workspace">{NAV_GROUPS.map(group=>{const items=allowedNav.filter(item=>item.group===group);if(!items.length)return null;return <div className="nav-group" key={group}><b>{group}</b>{items.map(item=><button key={item.label} className={active===item.label?"active":""} onClick={()=>go(item.label)}><span>{item.icon}</span>{item.label}</button>)}</div>})}</nav><div className="sidebar-footer"><div className="user-dot">{data.profile.complete_name.split(" ").map(v=>v[0]).slice(0,2).join("").toUpperCase()}</div><div><strong>{data.profile.complete_name}</strong><span>{roleNames[role]??role}</span></div><button type="button" className="sidebar-account-button" onClick={()=>setAccount(true)} aria-label="Change your password" title="Change Your Password">⚿</button><form action="/auth/signout" method="post" style={{display:"inline"}}><button type="submit" aria-label="Sign out" style={{background:"none",border:0,color:"#99bfd1",fontSize:18,cursor:"pointer",padding:0}}>↗</button></form></div></aside><section className="portal-workspace"><header className="portal-topbar"><button className="menu-button" onClick={()=>setSidebar(!sidebar)}>☰</button><label className="top-search"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Filter the current workspace"/></label><div className="topbar-actions"><button onClick={()=>setNotices(!notices)} aria-label="Notifications">○{unread>0&&<span>{unread}</span>}</button><div className="today-block"><span>Live records</span><strong>{new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",timeZone:"Asia/Manila"}).format(new Date())}</strong></div></div>{notices&&<div className="notification-popover"><div><h3>Notifications</h3><button onClick={()=>void markRead()}>Mark All as Read</button></div>{data.notifications.length?data.notifications.map(item=><button key={item.id} onClick={()=>{if(item.deep_link)setNotices(false)}}><i style={{opacity:item.read_at?.length?0:1}}/><span><strong>{item.title}</strong><small>{item.body}</small></span></button>):<p className="portal-empty-copy">No notifications yet.</p>}</div>}</header>{error&&<div className="portal-inline-error"><Message kind="error" text={error}/></div>}<PortalContent modules={rebuildModules} recordsView={recordsView} setRecordsView={setRecordsView} active={active} role={role} data={data} query={query} go={go} open={setModal} onPay={(id:string)=>{setPayTarget(id);setModal("payment")}} canEnroll={canEnroll} canSchedule={canSchedule} canPay={canPay} reload={load}/></section>{sidebar&&<button className="sidebar-scrim" aria-label="Close menu" onClick={()=>setSidebar(false)}/>} {modal==="enrollment"&&<EnrollmentForm data={data} onClose={()=>setModal(null)} onSaved={load}/>} {modal==="batch"&&<BatchForm data={data} onClose={()=>setModal(null)} onSaved={load}/>} {modal==="payment"&&<PaymentForm data={data} initialEnrollmentId={payTarget} onClose={()=>{setModal(null);setPayTarget("")}} onSaved={load}/>} {account&&<ChangePasswordModal onClose={()=>setAccount(false)}/>}</main>;
+  // "Working as" shows only Registration, Cashier, Accounting and Admin, in that
+  // order (owner, 7 Oct 2026). Admins may switch to any of them; others see the
+  // ones they hold (or their own role when it is none of these).
+  const roleOptions=workingRolesFor(data.roles);
+  return <main className="portal-shell"><aside className={`portal-sidebar ${sidebar?"open":""}`}><div className="sidebar-brand"><NewWaveLogo inverted/></div><div className="role-picker"><span>Working as</span><select value={role} onChange={e=>{setRole(e.target.value);setActive("Dashboard");setRecordsView("applications")}} aria-label="Active role">{roleOptions.map(item=><option key={item} value={item}>{roleNames[item]??item}</option>)}</select></div><nav aria-label="Staff workspace">{NAV_GROUPS.map(group=>{const items=allowedNav.filter(item=>(role==="cashier"&&item.label==="Expenses"?"Accounting":item.group)===group);if(!items.length)return null;const closed=closedGroups.includes(group)&&!items.some(item=>item.label===active);return <div className={`nav-group${closed?" closed":""}`} key={group}><button type="button" className="nav-group-toggle" aria-expanded={!closed} onClick={()=>toggleGroup(group)}><b>{group}</b><i aria-hidden="true">▾</i></button>{!closed&&items.map(item=><button key={item.label} className={active===item.label?"active":""} onClick={()=>go(item.label)}><span>{item.icon}</span>{item.label}</button>)}</div>})}</nav><div className="sidebar-footer"><div className="user-dot">{data.profile.complete_name.split(" ").map(v=>v[0]).slice(0,2).join("").toUpperCase()}</div><div><strong>{data.profile.complete_name}</strong><span>{roleNames[role]??role}</span></div><button type="button" className="sidebar-account-button" onClick={()=>setAccount(true)} aria-label="Change your password" title="Change Your Password">⚿</button><form action="/auth/signout" method="post" style={{display:"inline"}}><button type="submit" aria-label="Sign out" style={{background:"none",border:0,color:"#99bfd1",fontSize:18,cursor:"pointer",padding:0}}>↗</button></form></div></aside><section className="portal-workspace"><header className="portal-topbar"><button className="menu-button" onClick={()=>setSidebar(!sidebar)}>☰</button><label className="top-search"><span>⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Filter the current workspace"/></label><div className="topbar-actions"><button onClick={()=>setNotices(!notices)} aria-label="Notifications">○{unread>0&&<span>{unread}</span>}</button><div className="today-block"><span>Live records</span><strong>{new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",timeZone:"Asia/Manila"}).format(new Date())}</strong></div></div>{notices&&<div className="notification-popover"><div><h3>Notifications</h3><button onClick={()=>void markRead()}>Mark All as Read</button></div>{data.notifications.length?data.notifications.map(item=><button key={item.id} onClick={()=>{if(item.deep_link)setNotices(false)}}><i style={{opacity:item.read_at?.length?0:1}}/><span><strong>{item.title}</strong><small>{item.body}</small></span></button>):<p className="portal-empty-copy">No notifications yet.</p>}</div>}</header>{error&&<div className="portal-inline-error"><Message kind="error" text={error}/></div>}<PortalContent modules={rebuildModules} recordsView={recordsView} setRecordsView={setRecordsView} active={active} role={role} data={data} query={query} go={go} open={setModal} onPay={(id:string)=>{setPayTarget(id);setModal("payment")}} canEnroll={canEnroll} canSchedule={canSchedule} canPay={canPay} reload={load}/></section>{sidebar&&<button className="sidebar-scrim" aria-label="Close menu" onClick={()=>setSidebar(false)}/>} {modal==="enrollment"&&<EnrollmentForm data={data} onClose={()=>setModal(null)} onSaved={load}/>} {modal==="batch"&&<BatchForm data={data} onClose={()=>setModal(null)} onSaved={load}/>} {modal==="payment"&&<RecordPaymentModal data={data} initialEnrollmentId={payTarget||undefined} onClose={()=>{setModal(null);setPayTarget("")}} onSaved={load}/>} {account&&<ChangePasswordModal onClose={()=>setAccount(false)}/>}</main>;
 }
 
 function RebuildingWorkspace(){
@@ -182,6 +200,24 @@ function RebuildingWorkspace(){
     <h2>This Workspace Is Being Rebuilt</h2>
     <p className="portal-empty-copy">Modules are being added back one at a time. Nothing has been deleted — the records are untouched and the other roles are unaffected.</p>
   </section></div>;
+}
+
+/** Cashier › Record Payment: payments and records, plus change-request charges and discount requests. */
+function CashierRecordPayment({data,onPay,reload}:{data:PortalData;onPay:(id:string)=>void;reload:()=>Promise<void>}){
+  const [tab,setTab]=useState<"Payments"|"Change Requests"|"Discount Requests">("Payments");
+  const toCharge=data.requests.filter(r=>r.status==="Pending"&&r.stage==="With cashier").length;
+  return <div><div className="portal-tabs cashier-tabs">{(["Payments","Change Requests","Discount Requests"] as const).map(t=><button key={t} type="button" className={tab===t?"active":""} onClick={()=>setTab(t)}>{t}{t==="Change Requests"&&toCharge>0?<small style={{marginLeft:6}}>{toCharge}</small>:null}</button>)}</div>
+    {tab==="Payments"&&<CashierPayments data={data} onPay={onPay}/>}
+    {tab==="Change Requests"&&<LiveRequests data={data} role="cashier" reload={reload}/>}
+    {tab==="Discount Requests"&&<div className="portal-page"><DiscountRequests data={data} reload={reload}/></div>}
+  </div>;
+}
+/** Cashier › Expenses: the expense report and voucher generation in one place. */
+function CashierExpenses({data,reload}:{data:PortalData;reload:()=>Promise<void>}){
+  const [tab,setTab]=useState<"Expenses"|"Vouchers">("Expenses");
+  return <div><div className="portal-tabs cashier-tabs">{(["Expenses","Vouchers"] as const).map(t=><button key={t} type="button" className={tab===t?"active":""} onClick={()=>setTab(t)}>{t}</button>)}</div>
+    {tab==="Expenses"?<LiveExpenses data={data} role="cashier" reload={reload}/>:<LiveVouchers data={data} role="cashier" reload={reload}/>}
+  </div>;
 }
 
 function PortalContent({modules,recordsView,setRecordsView,active,role,data,query,go,open,onPay,canEnroll,canSchedule,canPay,reload}:{modules?:Module[];recordsView:RecordsView;setRecordsView:(v:RecordsView)=>void;active:Module;role:string;data:PortalData;query:string;go:(module:Module)=>void;open:(value:"enrollment"|"batch"|"payment")=>void;onPay:(enrollmentId:string)=>void;canEnroll:boolean;canSchedule:boolean;canPay:boolean;reload:()=>Promise<void>}){
@@ -199,6 +235,14 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Trainee scheduling")return <TraineeScheduling data={data} reload={reload}/>;
   if(active==="Instructor assignment")return <InstructorAssignmentScreen data={data} role={gateRole} reload={reload}/>;
   if(active==="Schedule changes")return <ScheduleChanges data={data}/>;
+  if(gateRole==="cashier"){
+    if(active==="Dashboard")return <CashierDashboard data={data} onPay={onPay} reload={reload}/>;
+    if(active==="Record Payment")return <CashierRecordPayment data={data} onPay={onPay} reload={reload}/>;
+    if(active==="Search Trainee")return <CashierEnrollments data={data} onPay={onPay} reload={reload}/>;
+    if(active==="Summary Report")return <CashierSummaryReport data={data}/>;
+    if(active==="Opening & Closing")return <div className="portal-page"><CashierOpening data={data} reload={reload}/><LiveCashierClosing data={data} reload={reload} initialOpening={(data.cashierOpenings??[]).find(o=>o.opening_date===manilaToday())?.opening_cash_centavos}/></div>;
+    if(active==="Expenses")return <CashierExpenses data={data} reload={reload}/>;
+  }
   if(active==="Dashboard")return <Dashboard data={data} role={gateRole} open={open} canEnroll={canEnroll} canPay={canPay} reload={reload}/>;
   if(active==="Search trainee"&&gateRole==="admin")return <LiveSearchTrainee data={{trainees:data.trainees,enrollments:data.enrollments,payments:data.payments}}/>;
   if(active==="Trainees")return <Trainees data={data} query={query} reload={reload} role={gateRole}/>;

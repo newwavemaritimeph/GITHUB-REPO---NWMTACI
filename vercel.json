@@ -4,5 +4,8 @@
   "buildCommand": "next build",
   "installCommand": "npm install",
   "regions": ["sin1"],
-  "crons": [{ "path": "/api/jobs/email", "schedule": "0 1 * * *" }]
+  "crons": [
+    { "path": "/api/jobs/email", "schedule": "0 1 * * *" },
+    { "path": "/api/jobs/balance-summary", "schedule": "0 8 * * *" }
+  ]
 }

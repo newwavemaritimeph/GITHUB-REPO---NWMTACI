@@ -9,8 +9,9 @@ export type ClosingData = { payments: Payment[]; cashierClosings: Closing[] };
 const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format((Number(centavos) || 0) / 100);
 const todayManila = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date()); // YYYY-MM-DD
 
-export function LiveCashierClosing({ data, reload }: { data: ClosingData; reload: () => Promise<void> }) {
-  const [opening, setOpening] = useState("");
+export function LiveCashierClosing({ data, reload, initialOpening }: { data: ClosingData; reload: () => Promise<void>; initialOpening?: number }) {
+  // Starts from today's recorded opening cash, when there is one.
+  const [opening, setOpening] = useState(initialOpening != null ? (initialOpening / 100).toFixed(2) : "");
   const [actual, setActual] = useState("");
   const [remarks, setRemarks] = useState("");
   const [busy, setBusy] = useState(false);
