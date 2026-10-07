@@ -82,7 +82,10 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   registration: ["Dashboard","Registration","Courses","Instructions"],
   // Cleared on the owner's instruction (7 Oct 2026) ahead of the Registration,
   // Cashier and Accounting rebuilds. Their dashboards and modules stay on disk.
-  training_operations: [],
+  // Scheduler (Training Operations), reopened 7 Oct 2026: open batches each month,
+  // set classroom and instructor (Schedules → Edit, Instructor assignment).
+  // Attendance stays off until it is rebuilt.
+  training_operations: ["Dashboard","Schedules","Training calendar","Instructor assignment","Rooms & facilities","Trainee scheduling","Schedule changes"],
   instructor: [],
   releasing_officer: [],
   hr: [],
@@ -277,28 +280,53 @@ function Trainees({data,query,embedded}:{data:PortalData;query:string;embedded?:
   </Page>;
 }
 
-// Trainee details: identity, enrollments with payment status, and payments.
-// (The copy/paste info packet was removed on the owner's instruction.)
-function TraineeDetailModal({data,trainee,onClose}:{data:PortalData;trainee:Trainee;onClose:()=>void}){
+// Trainee details ("Profile & tabs", Oct 2026): header with totals, then
+// Overview / Enrollments / Payments / Requests. No copy/paste packet.
+type TraineeTab="Overview"|"Enrollments"|"Payments"|"Requests";
+export function TraineeDetailModal({data,trainee,onClose}:{data:PortalData;trainee:Trainee;onClose:()=>void}){
+  const [tab,setTab]=useState<TraineeTab>("Overview");
   const enrolls=data.enrollments.filter(e=>e.trainee_id===trainee.id).sort((a,b)=>b.created_at.localeCompare(a.created_at));
   const payments=data.payments.filter(p=>p.trainee_id===trainee.id).sort((a,b)=>b.received_at.localeCompare(a.received_at));
-  const centerOf=(offerId?:string|null)=>{if(!offerId)return null;const o=data.offers.find(x=>x.id===offerId);return o?first(o.partner_centers):null};
+  const requests=data.requests.filter(r=>first(r.enrollments)?.trainee_id===trainee.id).sort((a,b)=>b.created_at.localeCompare(a.created_at));
   const appNo=data.applicationNumbers?.[trainee.id];
-  return <Modal title="Trainee details" onClose={onClose}>
-    <div className="portal-form">
-      <div className="full"><strong>{fullName(trainee)}</strong> · {trainee.trainee_number}{appNo?<> · <span className="app-no">{appNo}</span></>:null}</div>
-      <label>SRN<input readOnly value={trainee.srn??"—"}/></label>
-      <label>Birth date<input readOnly value={trainee.birthdate?date(trainee.birthdate):"—"}/></label>
-      <label>Email<input className="lc" readOnly value={trainee.email}/></label>
-      <label>Mobile<input readOnly value={trainee.mobile}/></label>
-      <label className="full">Address<input readOnly value={trainee.address??"—"}/></label>
-      <div className="full"><strong>Enrollments</strong></div>
-      {enrolls.map(e=>{const c=first(e.courses),b=first(e.batches),center=centerOf(e.partner_offer_id),due=dueCentavos(e),paid=Number(e.paid_centavos),bal=balanceOf(e);return <div className="live-row-item full" key={e.id}><div><strong>{c?.name} · {e.enrollment_number}</strong><small>{b?`${date(b.starts_on)} - ${date(b.ends_on)}`:e.scheduled_on?date(e.scheduled_on):e.enrollment_status==="Pending"?"No batch yet":"Open schedule"}{center?` · Endorsed: ${center.name}`:""} · {pesos(paid)} paid of {pesos(due)}{bal>0?` · ${pesos(bal)} balance`:""}</small></div><Badge tone={e.enrollment_status==="Enrolled"?"green":e.enrollment_status==="Cancelled"?"red":"orange"}>{e.enrollment_status}</Badge></div>})}
-      {!enrolls.length&&<p className="portal-empty-copy full">No enrollments yet.</p>}
-      <div className="full"><strong>Payments</strong></div>
-      {payments.map(p=><div className="live-row-item full" key={p.id}><div><strong>{p.payment_number} · {pesos(p.amount_centavos)}</strong><small>{date(p.received_at.slice(0,10))} · {p.method}{p.reference_number?` · ${p.reference_number}`:""}</small></div><Badge tone={p.verification_state==="Verified"?"green":"orange"}>{p.verification_state}</Badge></div>)}
-      {!payments.length&&<p className="portal-empty-copy full">No payments yet.</p>}
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Close</button></div>
+  const handed=data.handedToCashier??{};
+  const totalPaid=payments.reduce((s,p)=>s+Number(p.amount_centavos),0);
+  const balance=enrolls.filter(e=>e.enrollment_status!=="Cancelled").reduce((s,e)=>s+balanceOf(e),0);
+  const initials=fullName(trainee).split(" ").filter(Boolean).slice(0,2).map(w=>w[0]).join("").toUpperCase();
+  const em=trainee.emergency_contact;
+  const statusOf=(e:Enrollment)=>e.enrollment_status==="Pending"&&handed[e.id]?{t:"With Cashier",c:"orange"}:e.enrollment_status==="Enrolled"?{t:"Enrolled",c:"green"}:e.enrollment_status==="Cancelled"?{t:"Cancelled",c:"red"}:{t:e.enrollment_status,c:"orange"};
+  const scheduleOfE=(e:Enrollment)=>{const b=first(e.batches);return b?`${date(b.starts_on)}${b.ends_on!==b.starts_on?` – ${date(b.ends_on)}`:""} · ${b.batch_number}`:e.scheduled_on?date(e.scheduled_on):e.enrollment_status==="Pending"?"No batch yet":"Open schedule"};
+  const reqStage=(r:PortalData["requests"][number])=>r.status!=="Pending"?{t:r.status,c:r.status==="Approved"?"green":"red"}:r.stage==="With cashier"?{t:"With Cashier",c:"orange"}:{t:"Awaiting approval",c:"orange"};
+  const reqType=(r:PortalData["requests"][number])=>r.request_type==="Rescheduling"?"Change batch / reschedule":r.request_type;
+  const openRequests=requests.filter(r=>r.status==="Pending");
+  const kv=(label:string,value?:string|null)=><div><span>{label}</span><b>{value||"—"}</b></div>;
+  const tabs:[TraineeTab,string][]=[["Overview","Overview"],["Enrollments",`Enrollments (${enrolls.length})`],["Payments",`Payments (${payments.length})`],["Requests",`Requests (${requests.length})`]];
+  return <Modal title="Trainee details" onClose={onClose} wide>
+    <div className="td-wrap">
+      <div className="td-head">
+        <div className="td-avatar" aria-hidden="true">{initials}</div>
+        <div className="td-id"><strong>{fullName(trainee)}</strong><small>{appNo&&<span className="app-no">{appNo}</span>}{trainee.trainee_number}{trainee.rank?` · ${trainee.rank}`:""}{trainee.registered_at?` · Registered ${date(trainee.registered_at.slice(0,10))}`:""}</small></div>
+        <div className="td-totals"><div><span>Enrollments</span><b>{enrolls.length}</b></div><div><span>Total paid</span><b>{pesos(totalPaid)}</b></div><div><span>Balance</span><b className={balance>0?"due":""}>{pesos(balance)}</b></div></div>
+      </div>
+      <div className="td-tabs" role="tablist">{tabs.map(([k,label])=><button key={k} type="button" role="tab" aria-selected={tab===k} className={tab===k?"active":""} onClick={()=>setTab(k)}>{label}</button>)}</div>
+
+      {tab==="Overview"&&<div className="td-grid">
+        <section className="td-card"><h4>Personal &amp; contact</h4><div className="td-kv">{kv("SRN",trainee.srn)}{kv("Rank",trainee.rank)}{kv("Born",[trainee.birthdate?date(trainee.birthdate):"",trainee.place_of_birth].filter(Boolean).join(" · "))}{kv("Company",trainee.company)}{kv("Mobile",trainee.mobile)}<div><span>Email</span><b className="lc">{trainee.email||"—"}</b></div><div className="wide"><span>Address</span><b>{trainee.address||"—"}</b></div><div className="wide"><span>Emergency contact</span><b>{em?.name?`${em.name}${em.mobile?` · ${em.mobile}`:""}`:"—"}</b></div></div></section>
+        <section className="td-card"><h4>Latest payments</h4>{payments.slice(0,4).map(p=><div className="td-line" key={p.id}><span><b className="td-mono">{p.payment_number}</b><small>{date(p.received_at.slice(0,10))} · {p.method}</small></span><span className="td-money">{pesos(p.amount_centavos)}</span></div>)}{!payments.length&&<p className="td-empty">No payments yet.</p>}
+          <h4 className="td-sub">Open requests</h4>{openRequests.map(r=>{const st=reqStage(r);return <div className="td-line" key={r.id}><span><b>{reqType(r)}</b><small>{first(r.enrollments)?.enrollment_number} · {r.reason}</small></span><Badge tone={st.c}>{st.t}</Badge></div>})}{!openRequests.length&&<p className="td-empty">No open requests.</p>}</section>
+      </div>}
+
+      {tab==="Enrollments"&&<section className="td-card"><div className="portal-table"><table><thead><tr><th>Course</th><th>Schedule</th><th>Status</th><th className="num">Due</th><th className="num">Paid</th><th className="num">Balance</th><th></th></tr></thead><tbody>
+        {enrolls.map(e=>{const st=statusOf(e),charges=Number(e.charges_centavos??0);return <tr key={e.id}><td><strong>{first(e.courses)?.name??"—"}</strong><small>{e.enrollment_number}</small></td><td>{scheduleOfE(e)}</td><td><Badge tone={st.c}>{st.t}</Badge></td><td className="num td-money">{pesos(dueCentavos(e))}{charges>0&&<small>incl. {pesos(charges)} charges</small>}</td><td className="num td-money">{pesos(e.paid_centavos)}</td><td className="num td-money">{pesos(e.enrollment_status==="Cancelled"?0:balanceOf(e))}</td><td>{e.enrollment_status==="Enrolled"&&<a href={`/api/documents/admission-invoice/${e.id}`} target="_blank" rel="noreferrer">Admission slip</a>}</td></tr>})}
+      </tbody></table>{!enrolls.length&&<p className="td-empty">No enrollments yet.</p>}</div></section>}
+
+      {tab==="Payments"&&<section className="td-card"><div className="portal-table"><table><thead><tr><th>Payment</th><th>Date</th><th>Method · reference</th><th>State</th><th className="num">Amount</th></tr></thead><tbody>
+        {payments.map(p=><tr key={p.id}><td className="td-mono">{p.payment_number}</td><td>{date(p.received_at.slice(0,10))}</td><td>{p.method}{p.reference_number&&<small className="td-mono">{p.reference_number}</small>}</td><td><Badge tone={p.verification_state==="Verified"?"green":"orange"}>{p.verification_state}</Badge></td><td className="num td-money">{pesos(p.amount_centavos)}</td></tr>)}
+      </tbody></table>{!payments.length&&<p className="td-empty">No payments yet.</p>}</div></section>}
+
+      {tab==="Requests"&&<section className="td-card">{requests.map(r=>{const st=reqStage(r),ch=first(r.enrollment_charges);return <div className="td-line" key={r.id}><span><b>{reqType(r)}</b> · {first(r.enrollments)?.enrollment_number}<small>{r.request_number} · {r.reason} · {date(r.created_at.slice(0,10))}{ch?` · charge ${pesos(ch.amount_centavos)}`:""}{r.decision_remarks?` · ${r.decision_remarks}`:""}</small></span><Badge tone={st.c}>{st.t}</Badge></div>})}{!requests.length&&<p className="td-empty">No requests.</p>}</section>}
+
+      <div className="portal-form-actions"><button type="button" className="portal-secondary" onClick={onClose}>Close</button></div>
     </div>
   </Modal>;
 }
