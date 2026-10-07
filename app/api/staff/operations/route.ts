@@ -8,6 +8,7 @@ import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn, normalizeEmail,
 import { emailConfigured, processEmailJobs } from "@/lib/email-jobs";
 import { classroomEmailBlocks } from "@/lib/classroom";
 import { loadInstructionDetails } from "@/lib/training-instructions";
+import { activeConnection, googleConfigured, inviteStudent, listClasses, revokeConnection } from "@/lib/google-classroom";
 
 const enrollmentInput = z.object({
   action: z.literal("create-enrollment"), existingTraineeId: z.string().uuid().nullable().optional(),
@@ -162,9 +163,12 @@ const sendInstructionsInput = z.object({ action: z.literal("send-instructions"),
 const instructionTemplateSaveInput = z.object({ action: z.literal("instruction-template-save"), courseId: z.string().uuid(), subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(8000) });
 const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-link-save"), courseId: z.string().uuid(), link: z.string().trim().max(500), code: z.string().trim().max(40).optional() });
 const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course", "TAR reprint"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional(), courseId: z.string().uuid().nullable().optional(), partnerOfferId: z.string().uuid().nullable().optional() });
+const classroomClassesInput = z.object({ action: z.literal("classroom-classes") });
+const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-link"), courseId: z.string().uuid(), classroomCourseId: z.string().trim().max(60).nullable() });
+const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -223,6 +227,26 @@ async function chargeCollection(admin: ReturnType<typeof createSupabaseAdminClie
   const collected = (allocations ?? []).reduce((sum, a) => sum + Number(a.amount_centavos), 0);
   const amount = Number(charge.amount_centavos);
   return { amount, collected, paid: collected >= amount };
+}
+
+/**
+ * Invite the trainee's email to the course's Google Classroom class, when New
+ * Wave has connected Classroom and linked the course to a class. Best-effort:
+ * the result is recorded and shown, and never blocks generating instructions.
+ */
+async function inviteToClassroom(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentId: string, actor: string) {
+  if (!googleConfigured()) return null;
+  const connection = await activeConnection(admin).catch(() => null);
+  if (!connection) return null;
+  const { data: row } = await admin.from("enrollments").select("course_id,trainees(email)").eq("id", enrollmentId).maybeSingle();
+  const email = first(row?.trainees as { email: string } | { email: string }[] | null)?.email;
+  if (!row || !email) return null;
+  const { data: course } = await admin.from("courses").select("google_classroom_course_id").eq("id", row.course_id).maybeSingle();
+  const classroomCourseId = (course as { google_classroom_course_id?: string | null } | null)?.google_classroom_course_id;
+  if (!classroomCourseId) return null;
+  const result = await inviteStudent(admin, classroomCourseId, email).catch((err: unknown) => ({ state: "Failed" as const, invitationId: null, error: err instanceof Error ? err.message : "Could not reach Google Classroom." }));
+  await admin.from("classroom_invitations").insert({ enrollment_id: enrollmentId, classroom_course_id: classroomCourseId, email, state: result.state, invitation_id: result.invitationId, error: result.error, created_by: actor });
+  return { state: result.state, email, error: result.error };
 }
 
 /** Queue and immediately try to send the training instructions email for one enrollment. */
@@ -557,6 +581,20 @@ export async function GET() {
   const applicationNumbers = Object.fromEntries((numberRows ?? []).map((row: { id: string; application_number: string }) => [row.id, row.application_number]));
   // How many times instructions were generated per enrollment, and the printed
   // admission records (202610070007). Missing columns yield none.
+  // Google Classroom connection status (no tokens leave the server), linked
+  // class per course, and the latest invite per enrollment (migration 202610070013).
+  const classroom = { configured: googleConfigured(), connected: false, accountEmail: null as string | null, connectedAt: null as string | null };
+  const classroomCourseIds: Record<string, string> = {};
+  const classroomInvites: Record<string, { state: string; email: string; error: string | null; created_at: string }> = {};
+  {
+    const admin = createSupabaseAdminClient();
+    const connection = await activeConnection(admin).catch(() => null);
+    if (connection) Object.assign(classroom, { connected: true, accountEmail: connection.account_email, connectedAt: connection.connected_at });
+    const { data: linkRows } = await db.from("courses").select("id,google_classroom_course_id").not("google_classroom_course_id", "is", null).limit(1000);
+    for (const r of (linkRows ?? []) as { id: string; google_classroom_course_id: string }[]) classroomCourseIds[r.id] = r.google_classroom_course_id;
+    const { data: inviteRows } = await admin.from("classroom_invitations").select("enrollment_id,state,email,error,created_at").order("created_at", { ascending: false }).limit(1000);
+    for (const r of (inviteRows ?? []) as { enrollment_id: string; state: string; email: string; error: string | null; created_at: string }[]) if (!classroomInvites[r.enrollment_id]) classroomInvites[r.enrollment_id] = r;
+  }
   // Google Classroom class codes per course (migration 202610070012; none without it).
   const { data: codeRows } = await db.from("courses").select("id,google_classroom_code").not("google_classroom_code", "is", null).limit(1000);
   const classroomCodes = Object.fromEntries(((codeRows ?? []) as { id: string; google_classroom_code: string }[]).map((r) => [r.id, r.google_classroom_code]));
@@ -651,7 +689,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -905,6 +943,28 @@ export async function POST(request: Request) {
       if (error) throw error;
       return NextResponse.json({ ok: true });
     }
+    if (input.action === "classroom-classes" || input.action === "classroom-course-link" || input.action === "classroom-disconnect") {
+      if (!staff.roleCodes.some((r) => ["admin", "registration"].includes(r))) return NextResponse.json({ error: "Your account cannot manage Google Classroom." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      if (input.action === "classroom-disconnect") {
+        await revokeConnection(admin);
+        await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "registration", action: "google_classroom.disconnected", record_type: "google_connection", record_id: "classroom", new_values: {} });
+        return NextResponse.json({ ok: true });
+      }
+      if (input.action === "classroom-classes") return NextResponse.json({ ok: true, classes: await listClasses(admin) });
+      // Link a New Wave course to one of the connected account's classes; the
+      // class link and code are copied so the email's join button matches.
+      if (!input.classroomCourseId) {
+        const { error } = await admin.from("courses").update({ google_classroom_course_id: null }).eq("id", input.courseId);
+        if (error) throw error;
+        return NextResponse.json({ ok: true });
+      }
+      const chosen = (await listClasses(admin)).find((c) => c.id === input.classroomCourseId);
+      if (!chosen) return NextResponse.json({ error: "That class was not found in the connected Google Classroom account." }, { status: 400 });
+      const { error } = await admin.from("courses").update({ google_classroom_course_id: chosen.id, google_classroom_link: chosen.alternateLink ?? null, google_classroom_code: chosen.enrollmentCode ?? null }).eq("id", input.courseId);
+      if (error) return NextResponse.json({ error: /google_classroom_(course_id|code)/i.test(error.message) ? "Apply database updates 202610070012 and 202610070013 first." : error.message }, { status: 400 });
+      return NextResponse.json({ ok: true, class: chosen });
+    }
     if (input.action === "course-classroom-link-save") {
       if (!staff.roleCodes.some((r) => ["admin", "registration", "training_operations"].includes(r))) return NextResponse.json({ error: "Your account cannot set the Google Classroom link." }, { status: 403 });
       const admin = createSupabaseAdminClient();
@@ -1066,7 +1126,8 @@ export async function POST(request: Request) {
       // trainee's registered address, then send it right away; anything not sent
       // now is retried by the daily email job. A failed email never undoes the generation.
       const email = await queueInstructionEmail(admin, input.enrollmentId, Number(generation ?? Date.now()), new URL(request.url).origin);
-      return NextResponse.json({ ok: true, email });
+      const classroom = await inviteToClassroom(admin, input.enrollmentId, staff.user.id);
+      return NextResponse.json({ ok: true, email, classroom });
     }
     if (input.action === "announcement-post") {
       if (!staff.roleCodes.some((r) => ["admin", "accounting"].includes(r))) return NextResponse.json({ error: "Only Admin or Accounting can post announcements." }, { status: 403 });

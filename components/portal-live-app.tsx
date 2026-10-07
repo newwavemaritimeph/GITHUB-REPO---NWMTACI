@@ -18,6 +18,7 @@ import { downloadCsv } from "@/lib/csv";
 import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer } from "./portal/live-registration";
 import { Badge, Message, Modal, Page, PageHead, submit, fullName } from "./portal/shared-ui";
 import { classroomJoin } from "@/lib/classroom";
+import { ClassroomPanel } from "./portal/classroom-panel";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, first, dueCentavos, balanceOf, isUnpaid, manilaToday } from "@/lib/portal-format";
@@ -64,6 +65,10 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   instructionEmails?:Record<string,{state:string;to:string;sent_at:string|null;last_error:string|null;created_at:string}>;
   // Google Classroom class code per course id (202610070012).
   classroomCodes?:Record<string,string>;
+  // Google Classroom connection (202610070013): status only, never tokens.
+  classroom?:{configured:boolean;connected:boolean;accountEmail:string|null;connectedAt:string|null};
+  classroomCourseIds?:Record<string,string>;
+  classroomInvites?:Record<string,{state:string;email:string;error:string|null;created_at:string}>;
   // Change Course / Rescheduling fee collection per pending request id (approval waits for payment).
   chargeCollected?:Record<string,{amount:number;collected:number;paid:boolean}>;
   // Printed Training Admission Records (Cashier, Accounting, Admin only; 202610070006/7).
@@ -679,14 +684,16 @@ function LiveInstructions({data,query,reload}:{data:PortalData;query:string;relo
   const countOf=(e:Enrollment)=>data.instructionsCount?.[e.id]??(e.instructions_sent_at?1:0);
   const activeRows=data.enrollments.filter(e=>e.enrollment_status==="Enrolled"||e.enrollment_status==="Open Schedule").filter(match);
   const ready=activeRows.filter(e=>!e.instructions_sent_at&&e.instructions_status!=="Acknowledged");
-  const sent=activeRows.filter(e=>e.instructions_sent_at&&e.instructions_status!=="Acknowledged");
-  const acknowledged=activeRows.filter(e=>e.instructions_status==="Acknowledged");
+  // One list: not yet generated first (soonest training first), then generated.
+  const startOf=(e:Enrollment)=>first(e.batches)?.starts_on??e.scheduled_on??"9999";
+  const isDone=(e:Enrollment)=>countOf(e)>0||!!e.instructions_sent_at;
+  const all=[...activeRows].sort((a,b)=>Number(isDone(a))-Number(isDone(b))||startOf(a).localeCompare(startOf(b)));
   const [notice,setNotice]=useState("");
-  async function send(id:string){setBusy(id);setMessage("");setNotice("");try{const r=await submit({action:"send-instructions",enrollmentId:id}) as {email?:{state:string;to?:string|null;error?:string}};const em=r.email;setNotice(!em?"Instructions generated.":em.state==="Sent"?`Instructions generated and emailed to ${em.to}.`:em.state==="Not configured"?"Instructions generated. Email is not set up yet, so nothing was emailed.":em.state==="No email"?"Instructions generated. The trainee has no email address on file.":`Instructions generated. The email to ${em.to} did not go out yet (${em.error??em.state}); it will retry automatically.`);await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not send instructions.")}finally{setBusy("")}}
+  async function send(id:string){setBusy(id);setMessage("");setNotice("");try{const r=await submit({action:"send-instructions",enrollmentId:id}) as {email?:{state:string;to?:string|null;error?:string};classroom?:{state:string;email:string;error:string|null}|null};const em=r.email,cr=r.classroom;const invite=!cr?"":cr.state==="Failed"?` Google Classroom invite failed: ${cr.error}.`:` Google Classroom invite sent to ${cr.email}.`;setNotice((!em?"Instructions generated.":em.state==="Sent"?`Instructions generated and emailed to ${em.to}.`:em.state==="Not configured"?"Instructions generated. Email is not set up yet, so nothing was emailed.":em.state==="No email"?"Instructions generated. The trainee has no email address on file.":`Instructions generated. The email to ${em.to} did not go out yet (${em.error??em.state}); it will retry automatically.`)+invite);await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not send instructions.")}finally{setBusy("")}}
   async function sendAll(){setBusy("all");setMessage("");try{for(const e of ready)await submit({action:"send-instructions",enrollmentId:e.id});await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not send instructions.")}finally{setBusy("")}}
   const scheduleOf=(e:Enrollment)=>{const b=first(e.batches);return b?`${date(b.starts_on)} - ${date(b.ends_on)}`:e.scheduled_on?date(e.scheduled_on):"Open schedule"};
   // Paid and enrolled trainees get an active Generate button; once generated it turns into "Generated" (Registration can generate again from the enrollment, twice in all).
-  const row=(e:Enrollment,sendable:boolean)=>{const t=first(e.trainees),c=first(e.courses),done=countOf(e)>0||!!e.instructions_sent_at,em=data.instructionEmails?.[e.id],emText=emailStatusText(em);return <div className="live-row-item" key={e.id}><div><strong>{t?fullName(t):"Unknown trainee"}</strong><small>{c?.name} · {e.enrollment_number} · {scheduleOf(e)}</small><small className={`email-line ${em?.state==="Sent"||em?.state==="Delivered"?"ok":em?"warn":""}`} title={em?.last_error??undefined}>{emText??(t?.email?`Will email ${t.email}`:"No email on file")}</small></div><div className="document-actions">{done&&<a href={`/api/documents/training-instructions/${e.id}`} target="_blank" rel="noreferrer">View PDF</a>}{e.instructions_status==="Acknowledged"&&<Badge tone="green">Acknowledged</Badge>}{sendable&&!done?<button className="portal-primary" disabled={!!busy} onClick={()=>send(e.id)}>{busy===e.id?"Generating…":"Generate & email"}</button>:<button type="button" className="portal-secondary is-generated" disabled>✓ Generated</button>}</div></div>};
+  const row=(e:Enrollment,sendable:boolean)=>{const t=first(e.trainees),c=first(e.courses),done=countOf(e)>0||!!e.instructions_sent_at,em=data.instructionEmails?.[e.id],emText=emailStatusText(em);return <div className="live-row-item" key={e.id}><div><strong>{t?fullName(t):"Unknown trainee"}</strong><small>{c?.name} · {e.enrollment_number} · {scheduleOf(e)}</small><small className={`email-line ${em?.state==="Sent"||em?.state==="Delivered"?"ok":em?"warn":""}`} title={em?.last_error??undefined}>{emText??(t?.email?`Will email ${t.email}`:"No email on file")}</small>{data.classroomInvites?.[e.id]&&<small className={`email-line ${data.classroomInvites[e.id].state==="Failed"?"warn":"ok"}`} title={data.classroomInvites[e.id].error??undefined}>{data.classroomInvites[e.id].state==="Failed"?"Classroom invite failed — generate again to retry":"Invited to Google Classroom"}</small>}</div><div className="document-actions">{done&&<a href={`/api/documents/training-instructions/${e.id}`} target="_blank" rel="noreferrer">View PDF</a>}{e.instructions_status==="Acknowledged"&&<Badge tone="green">Acknowledged</Badge>}{sendable&&!done?<button className="portal-primary" disabled={!!busy} onClick={()=>send(e.id)}>{busy===e.id?"Generating…":"Generate and Email"}</button>:<button type="button" className="portal-secondary is-generated" disabled>✓ Generated</button>}</div></div>};
 
   // Template editor state (in-house courses only).
   const inhouse=data.courses.filter(c=>c.delivery_type==="In-House");
@@ -701,10 +708,9 @@ function LiveInstructions({data,query,reload}:{data:PortalData;query:string;relo
   return <div className="portal-page"><PageHead eyebrow="Registration operations" title="Training instructions" text="Generate the reporting instructions for paid, enrolled trainees. Each one is emailed to the trainee with the PDF attached and a Join Google Classroom link."/>{message&&<Message kind="error" text={message}/>}{notice&&<Message kind="success" text={notice}/>}
     <div className="portal-tabs">{(["Send","Templates"] as const).map(t=><button key={t} className={tab===t?"active":""} onClick={()=>setTab(t)}>{t}</button>)}</div>
     {tab==="Send"?<>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Ready to generate</h2><p>Paid and enrolled · instructions not generated yet (twice per enrollment)</p></div>{ready.length>0&&<button className="portal-primary" disabled={!!busy} onClick={sendAll}>{busy==="all"?"Sending…":`Generate all (${ready.length})`}</button>}</div>{ready.map(e=>row(e,true))}{!ready.length&&<p className="portal-empty-copy">Nothing waiting to be sent.</p>}</section>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Generated · awaiting acknowledgment</h2><p>Sent — trainee has not confirmed</p></div><Badge tone="orange">{sent.length}</Badge></div>{sent.map(e=>row(e,false))}{!sent.length&&<p className="portal-empty-copy">No pending acknowledgments.</p>}</section>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Acknowledged</h2><p>Confirmed by the trainee</p></div><Badge tone="green">{acknowledged.length}</Badge></div>{acknowledged.map(e=>row(e,false))}{!acknowledged.length&&<p className="portal-empty-copy">None yet.</p>}</section>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Paid and Enrolled Trainees</h2><p>{ready.length} to generate · {all.length-ready.length} generated · each one is emailed with the PDF and a Google Classroom invite</p></div>{ready.length>0&&<button className="portal-primary" disabled={!!busy} onClick={sendAll}>{busy==="all"?"Sending…":`Generate and Email All (${ready.length})`}</button>}</div>{all.map(e=>row(e,true))}{!all.length&&<p className="portal-empty-copy">No paid and enrolled trainees yet.</p>}</section>
     </>:<section className="portal-panel"><div className="panel-heading"><div><h2>Per-course template</h2><p>In-house courses only. Trainee name, date, time, and classroom are merged automatically at send.</p></div></div>
+      <ClassroomPanel data={data} courseId={courseId} reload={reload}/>
       <div className="portal-form">
         <label className="full">Course<select value={courseId} onChange={e=>loadCourse(e.target.value)}><option value="">Select an in-house course</option>{inhouse.map(c=><option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label>
         {courseId&&<>
