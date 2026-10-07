@@ -1,6 +1,6 @@
 /* Training Admission Record — two copies (original and duplicate) on one legal
-   sheet (8.5 × 14 in). Each copy is the half-sheet design, scaled up 1.2× to
-   fill its 7 in half. */
+   sheet (8.5 × 14 in). Each copy is the half-sheet design, scaled up 1.12× to
+   fill its 7 in half inside safe print margins. */
 @page { size: 8.5in 14in; margin: 0; }
 
 .tar-screen { min-height: 100vh; background: #e9eef4; padding: 20px 16px 40px; display: flex; flex-direction: column; align-items: center; gap: 18px; font-family: var(--font-ui), "Libre Franklin", Arial, sans-serif; color: #0b1f33; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -15,8 +15,10 @@
 .tar-copy { position: relative; height: 7in; overflow: hidden; }
 .tar-copy + .tar-copy { border-top: 1.5px dashed #9aa9b3; }
 .tar-copy + .tar-copy::before { content: "✂"; position: absolute; left: .12in; top: -.11in; background: #fff; color: #9aa9b3; font-size: 11pt; padding: 0 3px; }
-.tar-sheet { position: relative; zoom: 1.2; width: calc(8.5in / 1.2); height: calc(7in / 1.2); overflow: hidden; background: #fff; padding: .14in .2in .12in; font-size: 6.4pt; line-height: 1.25; }
-.tar-copy-tag { position: absolute; top: .03in; right: .2in; font-size: 5.4pt; letter-spacing: .1em; color: #40606f; }
+/* Safe print margins: about 0.34 in top/bottom and 0.36 in left/right once
+   scaled, clear of the unprintable edge most printers leave. */
+.tar-sheet { position: relative; zoom: 1.12; width: calc(8.5in / 1.12); height: calc(7in / 1.12); overflow: hidden; background: #fff; padding: .3in .32in .28in; font-size: 6.4pt; line-height: 1.25; }
+.tar-copy-tag { position: absolute; top: .12in; right: .32in; font-size: 5.4pt; letter-spacing: .1em; color: #40606f; }
 .tar-copy-tag b { color: #b23d0c; }
 .tar-sheet table { width: 100%; border-collapse: collapse; }
 .tar-sheet .mono { font-family: var(--font-geist-mono), "IBM Plex Mono", ui-monospace, monospace; }
