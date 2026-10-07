@@ -26,7 +26,9 @@ const registrationSchema = z.object({
   termsAccepted: z.literal("on"),
 });
 // 1–5 chosen schedules (batch ids) per submission.
-const batchesSchema = z.array(z.string().uuid()).min(1, "Select at least one schedule.").max(5, "You can select up to 5 courses per submission.");
+// Schedules are optional: without one, Registration assigns the course and
+// schedule while screening (owner instruction, 7 Oct 2026).
+const batchesSchema = z.array(z.string().uuid()).max(5, "You can select up to 5 courses per submission.");
 
 export const runtime = "nodejs";
 export const maxDuration = 25;

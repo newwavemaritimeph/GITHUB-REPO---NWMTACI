@@ -28,6 +28,7 @@ const fixture = {
   offers: [{ id: "o1", course_id: "c3", duration_label: "2 days", training_fee_centavos: 800000, rebate_centavos: 50000, partner_payable_centavos: 750000, partner_centers: { name: "Partner Center A" } }],
   trainees: [
     { id: "t1", trainee_number: "NW-0001", legal_first_name: "Maria", legal_last_name: "Reyes", birthdate: "1990-01-01", email: "maria@example.test", mobile: "+639171234567", srn: "1234567890", account_state: "Active", registered_at: nowIso },
+    { id: "t3", trainee_number: "NW-0003", legal_first_name: "Pedro", legal_last_name: "Cruz", birthdate: "1995-03-03", email: "pedro@example.test", mobile: "+639191234567", srn: "2234567890", account_state: "Active", registered_at: nowIso },
     { id: "t2", trainee_number: "NW-0002", legal_first_name: "Juan", legal_last_name: "Santos", birthdate: "1992-02-02", email: "juan@example.test", mobile: "+639181234567", srn: null, account_state: "Active", registered_at: nowIso },
   ],
   batches: [
@@ -50,6 +51,7 @@ const fixture = {
   courseCategories: [], partnerCenters: [{ id: "pc1", name: "Partner Center A", active: true }],
   requests: [{ id: "r1", request_number: "REQ-0001", request_type: "Rescheduling", requested_values: null, reason: "Vessel schedule moved", status: "Pending", created_at: nowIso, trainees: { legal_first_name: "Maria", legal_last_name: "Reyes" }, enrollments: { enrollment_number: "ENR-0001", courses: { name: "Ship Security Officers" } } }],
   requirementChecks: ["valid_id", "seamans_book", "medical_certificate"].map((requirement) => ({ enrollment_id: "e4", requirement, status: "Verified", remarks: null, checked_at: nowIso, checked_by_name: "Reg Officer" })),
+  awaitingCourseIds: ["t3"],
   pendingCharges: [], employeeCharges: [], chargeEmployees: [], instructionTemplates: [], batchStaffing: [], myHr: null,
 } as unknown as PortalData;
 
@@ -95,6 +97,10 @@ describe("Registration Officer workspace", () => {
     expect(apps).toContain("Ready to enroll");
     expect(apps).toContain("Awaiting payment");
     expect(apps).not.toContain("Register a trainee");
+    // A website applicant without a course waits for Registration to assign one.
+    expect(apps).toContain("No course yet");
+    expect(apps).toContain("Pedro Cruz");
+    expect(apps).toContain("Assign course");
     const enrolls = renderToString(createElement(RegistrationRecords, { ...props, view: "enrollments" }));
     expect(enrolls).toContain("ENR-0001");
     expect(enrolls).toContain("Open Schedule");
@@ -116,7 +122,7 @@ describe("Registration Officer workspace", () => {
     const source = readFileSync(new URL("../components/portal/live-registration.tsx", import.meta.url), "utf8");
     // Sent directly from the Registration screens.
     const direct = new Set([...source.matchAll(/action: ?"([a-z-]+)"/g)].map((m) => m[1]));
-    expect([...direct].sort()).toEqual(["application-enroll", "requirement-check", "send-instructions"]);
+    expect([...direct].sort()).toEqual(["application-assign", "application-enroll", "requirement-check", "send-instructions"]);
     // The only shared action component it may pull in is the request modal,
     // whose single action is request-raise. Payment, charge and discount
     // modals live in the same file and must never be imported here.

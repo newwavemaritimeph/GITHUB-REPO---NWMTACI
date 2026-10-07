@@ -31,12 +31,19 @@ const emptyApplicant = {
   emergencyContactName: "", emergencyContactMobile: "",
 };
 
-const steps = ["Applicant details", "Course selection", "Review and consent"] as const;
+// The course step is off for the dry run (owner instruction, 7 Oct 2026): the
+// applicant sends personal details only and Registration assigns the course
+// and schedule while screening. Set NEXT_PUBLIC_REGISTRATION_COURSE_STEP=on to
+// bring it back.
+const COURSE_STEP = process.env.NEXT_PUBLIC_REGISTRATION_COURSE_STEP === "on";
+const STAGES = COURSE_STEP ? (["details", "courses", "review"] as const) : (["details", "review"] as const);
+const STAGE_LABELS = { details: "Applicant details", courses: "Course selection", review: "Review and consent" } as const;
 const upper = (value: string) => value.toUpperCase();
 const MAX_COURSES = 5;
 
 function Wizard() {
   const [step, setStep] = useState(0);
+  const stage = STAGES[step];
   const [applicant, setApplicant] = useState(emptyApplicant);
   const [courses, setCourses] = useState<Course[]>([]);
   const [selections, setSelections] = useState<Selection[]>([{ courseCode: "", scheduleId: "" }]);
@@ -55,7 +62,7 @@ function Wizard() {
   const set = <K extends keyof typeof emptyApplicant>(key: K, value: string) => setApplicant((current) => ({ ...current, [key]: value }));
 
   // Live bookable courses (with a published, open schedule this week).
-  useEffect(() => { let live = true; fetch("/api/public/courses").then((r) => r.json()).then((b) => { if (live) setCourses(b.courses ?? []); }).catch(() => {}); return () => { live = false; }; }, []);
+  useEffect(() => { if (!COURSE_STEP) return; let live = true; fetch("/api/public/courses").then((r) => r.json()).then((b) => { if (live) setCourses(b.courses ?? []); }).catch(() => {}); return () => { live = false; }; }, []);
 
   // Returning-applicant autofill: once a full 10-digit SRN is entered, look up the
   // saved trainee details and prefill the form (once per distinct SRN).
@@ -115,7 +122,7 @@ function Wizard() {
     applicant.emergencyContactName.trim().length >= 2 && emergencyMobileValid && applicant.srn.length === 10;
   const completeSelections = selections.filter((s) => s.courseCode && s.scheduleId);
   // Every row must be either fully complete or completely empty; at least one complete.
-  const selectionsValid = completeSelections.length >= 1 && selections.every((s) => (!s.courseCode && !s.scheduleId) || (Boolean(s.courseCode) && Boolean(s.scheduleId)));
+  const selectionsValid = !COURSE_STEP || completeSelections.length >= 1 && selections.every((s) => (!s.courseCode && !s.scheduleId) || (Boolean(s.courseCode) && Boolean(s.scheduleId)));
 
   async function submit() {
     setError("");
@@ -127,7 +134,7 @@ function Wizard() {
       fd.set("srn", applicant.srn); fd.set("email", applicant.email.toLowerCase()); fd.set("presentAddress", applicant.address); fd.set("mobile", applicant.mobile);
       fd.set("placeOfBirth", applicant.placeOfBirth); fd.set("birthDate", applicant.birthDate); fd.set("rank", rank); fd.set("company", applicant.company);
       fd.set("emergencyContactName", applicant.emergencyContactName); fd.set("emergencyContactMobile", applicant.emergencyContactMobile);
-      for (const s of completeSelections) fd.append("scheduleIds", s.scheduleId);
+      if (COURSE_STEP) for (const s of completeSelections) fd.append("scheduleIds", s.scheduleId);
       fd.set("termsAccepted", "on");
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 25000);
@@ -136,7 +143,7 @@ function Wizard() {
         response = await fetch("/api/public/registrations", { method: "POST", body: fd, signal: controller.signal });
       } finally { clearTimeout(timer); }
       const body = await response.json();
-      if (!response.ok) { setError(body.error ?? "We could not submit your enrollment. Please review your details and try again."); return; }
+      if (!response.ok) { setError(body.error ?? "We could not submit your application. Please review your details and try again."); return; }
       setReference(body.reference);
     } catch (e) {
       setError(e instanceof DOMException && e.name === "AbortError" ? "The server took too long to respond. Please try again in a moment." : "We could not reach the server. Please check your connection and try again.");
@@ -148,7 +155,7 @@ function Wizard() {
       <div className="reg-card reg-success">
         <span className="success-mark">✓</span>
         <h2>Application received</h2>
-        <p>Your seat is reserved while we screen your application. You are enrolled once your requirements and payment are verified. Keep this reference to track your application with your registered email or mobile number.</p>
+        <p>{COURSE_STEP ? "Your seat is reserved while we screen your application." : "Our Registration team will contact you to confirm your course and schedule."} You are enrolled once your requirements and payment are verified. Keep this reference to track your application with your registered email or mobile number.</p>
         <div className="reference-block"><span>Registration reference</span><strong>{reference}</strong></div>
 
         <div className="reg-next-steps" style={{ textAlign: "left", marginTop: 20 }}>
@@ -188,13 +195,13 @@ function Wizard() {
   return (
     <div className="reg-card">
       <ol className="wizard-steps">
-        {steps.map((label, index) => (
-          <li key={label} className={index === step ? "current" : index < step ? "done" : ""}><span>{index < step ? "✓" : index + 1}</span>{label}</li>
+        {STAGES.map((key, index) => (
+          <li key={key} className={index === step ? "current" : index < step ? "done" : ""}><span>{index < step ? "✓" : index + 1}</span>{STAGE_LABELS[key]}</li>
         ))}
       </ol>
       {error && <p className="form-message" role="alert">{error}</p>}
 
-      {step === 0 && (
+      {stage === "details" && (
         <>
           <section className="wizard-panel">
             <h2>Applicant details</h2>
@@ -226,7 +233,7 @@ function Wizard() {
         </>
       )}
 
-      {step === 1 && (
+      {stage === "courses" && (
         <section className="wizard-panel">
           <h2>Select your courses</h2>
           <p className="wizard-hint">Pick a course and an available schedule. You can add up to {MAX_COURSES} courses in one submission.</p>
@@ -265,9 +272,10 @@ function Wizard() {
         </section>
       )}
 
-      {step === 2 && (
+      {stage === "review" && (
         <section className="wizard-panel">
           <h2>Review and accept</h2>
+          {!COURSE_STEP && <p className="wizard-hint">After you submit, our Registration team will contact you to confirm your course and schedule, and to collect your requirements and payment.</p>}
           <div className="review-courses">
             {completeSelections.map((s, i) => (
               <div key={i} className="review-course"><div><strong>{nameOf(s.courseCode)}</strong><small>{labelOf(s.courseCode, s.scheduleId)}</small></div></div>
@@ -289,10 +297,10 @@ function Wizard() {
 
       <div className="wizard-actions">
         <button className="button button-secondary" type="button" disabled={step === 0 || submitting} onClick={() => setStep((s) => Math.max(0, s - 1))}>Back</button>
-        {step < 2 ? (
-          <button className="button button-primary" type="button" disabled={step === 0 ? !detailsValid : !selectionsValid} onClick={() => setStep((s) => s + 1)}>Continue</button>
+        {stage !== "review" ? (
+          <button className="button button-primary" type="button" disabled={stage === "details" ? !detailsValid : !selectionsValid} onClick={() => setStep((s) => s + 1)}>Continue</button>
         ) : (
-          <button className="button button-primary" type="button" disabled={!accepted || !selectionsValid || submitting} onClick={submit}>{submitting ? "Submitting…" : "Submit enrollment"}</button>
+          <button className="button button-primary" type="button" disabled={!accepted || !selectionsValid || submitting} onClick={submit}>{submitting ? "Submitting…" : "Submit application"}</button>
         )}
       </div>
     </div>
