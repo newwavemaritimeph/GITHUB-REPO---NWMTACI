@@ -220,7 +220,7 @@ function AccountingOperations({ data, role, reload, profileName }: { data: Accou
     {canManage && pendingVouchers.length > 0 && <section className="portal-panel" style={{ marginTop: 16 }}>
       <div className="panel-heading"><div><h2>Vouchers awaiting your approval</h2><p>Approve or reject without leaving the dashboard</p></div><span className="slot-count">{pendingVouchers.length}</span></div>
       <div className="portal-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Category</th><th>Amount</th><th>Action</th></tr></thead><tbody>
-        {pendingVouchers.slice(0, 8).map((e) => <tr key={e.id}><td><strong>{e.expense_number}</strong></td><td>{e.payee}</td><td>{e.category}</td><td>{money(e.amount_centavos)}</td><td className="document-actions"><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: e.id, approve: true })}>Approve</button><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: e.id, approve: false })}>Reject</button></td></tr>)}
+        {pendingVouchers.slice(0, 8).map((e) => <tr key={e.id}><td><strong>{e.expense_number}</strong></td><td>{e.payee}</td><td>{e.category}</td><td>{money(e.amount_centavos)}</td><td className="document-actions"><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: e.id, decision: "Approved" })}>Approve</button><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: e.id, decision: "Rejected" })}>Reject</button></td></tr>)}
       </tbody></table></div>
     </section>}
   </>;
@@ -656,8 +656,9 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
           <td><span className={`portal-badge ${tone(v.status)}`}>{v.status}</span></td>
           <td>{v.requested_by_name ?? "—"}<small>{manilaDay(v.created_at)}</small></td>
           {canDecide && <td className="document-actions">
-            {v.status === "Pending" && <><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: v.id, approve: true })}>Approve</button><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: v.id, approve: false })}>Reject</button></>}
-            {v.status === "Approved" && <button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: v.id, approve: true, markPaid: true })}>Mark paid</button>}
+            {/* The server takes `decision`, not a boolean — sending `approve` failed Zod validation and every approval 400'd. */}
+            {v.status === "Pending" && <><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: v.id, decision: "Approved" })}>Approve</button><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: v.id, decision: "Rejected" })}>Reject</button></>}
+            {v.status === "Approved" && <button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: v.id, decision: "Paid" })}>Mark paid</button>}
             {(v.status === "Paid" || v.status === "Rejected") && <span className="portal-empty-copy" style={{ margin: 0 }}>—</span>}
           </td>}
         </tr>)}
@@ -1306,7 +1307,7 @@ export function ApprovalsModule({ data, role, reload }: { data: AccountingData; 
     <div className="portal-heading"><div><span className="portal-eyebrow">Financial control</span><h1>Approvals</h1><p>Everything waiting on an Accounting Manager decision.</p></div><span className="portal-badge pending">{total} pending</span></div>
     {msg && <div className="portal-message error" role="alert">{msg}</div>}
     <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Expense vouchers</h2><p>Approve before the cashier can print</p></div><span className="slot-count">{vouchers.length}</span></div>
-      {vouchers.map((e) => <div className="live-row-item" key={e.id}><div><strong>{e.payee}</strong><small>{e.expense_number} · {e.category} · {peso2(e.amount_centavos)}</small></div><Actions onYes={() => void post({ action: "expense-decide", id: e.id, approve: true })} onNo={() => void post({ action: "expense-decide", id: e.id, approve: false })} /></div>)}
+      {vouchers.map((e) => <div className="live-row-item" key={e.id}><div><strong>{e.payee}</strong><small>{e.expense_number} · {e.category} · {peso2(e.amount_centavos)}</small></div><Actions onYes={() => void post({ action: "expense-decide", id: e.id, decision: "Approved" })} onNo={() => void post({ action: "expense-decide", id: e.id, decision: "Rejected" })} /></div>)}
       {!vouchers.length && <p className="portal-empty-copy">No vouchers pending.</p>}
     </section>
     <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Payment adjustments (charges)</h2><p>Added to a trainee&apos;s balance</p></div><span className="slot-count">{data.pendingCharges.length}</span></div>

@@ -941,3 +941,10 @@
 .quick-menu button:hover { background: #f4f9fc; }
 @media (max-width: 1200px) { .reg-kpis { grid-template-columns: repeat(3, 1fr); } .reg-main { grid-template-columns: 1fr; } }
 @media (max-width: 640px) { .reg-kpis { grid-template-columns: repeat(2, 1fr); } }
+
+/* Placeholder shown by RebuildingWorkspace for a role whose modules are being
+   rebuilt. .portal-empty-copy is forced to 10px/24px padding in globals.css,
+   hence the override. */
+.portal-empty { text-align: center; padding: 64px 24px; }
+.portal-empty h2 { margin: 0 0 8px; font-size: 20px; color: var(--blue-dark); }
+.portal-empty .portal-empty-copy { font-size: 14px; max-width: 520px; margin: 0 auto; padding: 0 !important; }

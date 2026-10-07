@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
 import { NewWaveLogo } from "./new-wave-logo";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { LiveAttendance } from "./portal/live-attendance";
@@ -14,21 +14,22 @@ import { automaticEndDate, batchPatternLabel, validBatchStart } from "@/lib/sche
 import { AdminConfiguration } from "./admin-configuration";
 import { DateReports } from "./date-reports";
 import { downloadCsv } from "@/lib/csv";
-import { RegistrationDashboard, RegistrationChanges } from "./portal/live-registration";
+import { RegistrationDashboard, RegistrationIntake, RegistrationEnrollments, CoursesAndCenters } from "./portal/live-registration";
+import { Badge, Message, Modal, PageHead, submit, fullName } from "./portal/shared-ui";
 import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, first, dueCentavos, balanceOf, isUnpaid, manilaToday } from "@/lib/portal-format";
 
-type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Setup" | "Registration changes" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments";
-type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
-type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
-type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
-type Batch = { id:string; batch_number:string; course_id:string; partner_offer_id?:string|null; starts_on:string; ends_on:string; daily_start?:string|null; daily_end?:string|null; mode:string; venue?:string|null; capacity:number; confirmed_count:number; enrollment_deadline:string; status:string; published_at?:string|null; courses?: {name:string;code:string}|{name:string;code:string}[]|null; partner_course_offers?: {partner_centers?:{name:string}|{name:string}[]|null}|{partner_centers?:{name:string}|{name:string}[]|null}[]|null };
-type Enrollment = { id:string; enrollment_number:string; trainee_id:string; course_id:string; partner_offer_id?:string|null; batch_id?:string|null; scheduled_on?:string|null; enrollment_status:string; instructions_status?:string; instructions_sent_at?:string|null; selling_price_centavos:number; rebate_centavos:number; partner_payable_centavos:number; paid_centavos:number; charges_centavos?:number; discounts_centavos?:number; created_at:string; trainees?: {trainee_number:string;legal_first_name:string;legal_middle_name?:string|null;legal_last_name:string;email:string;mobile:string}|{trainee_number:string;legal_first_name:string;legal_middle_name?:string|null;legal_last_name:string;email:string;mobile:string}[]|null; courses?:{name:string;code:string}|{name:string;code:string}[]|null; batches?:{batch_number:string;starts_on:string;ends_on:string;mode:string;venue?:string|null}|{batch_number:string;starts_on:string;ends_on:string;mode:string;venue?:string|null}[]|null; partner_course_offers?:{partner_centers?:{name:string}|{name:string}[]|null}|{partner_centers?:{name:string}|{name:string}[]|null}[]|null };
-type Payment = { id:string; payment_number:string; trainee_id:string; amount_centavos:number; method:string; receiving_account:string; reference_number?:string|null; proof_id?:string|null; received_at:string; verification_state:string; trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null };
-type Notification = { id:string; title:string; body:string; deep_link?:string|null; read_at?:string|null; created_at:string };
-type EnrollmentCharge = { id:string; enrollment_id:string; charge_catalog_id?:string|null; description:string; amount_centavos:number; event_type:string; created_at:string };
+type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Setup" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Registration" | "Courses & centers";
+export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
+export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
+export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
+export type Batch = { id:string; batch_number:string; course_id:string; partner_offer_id?:string|null; starts_on:string; ends_on:string; daily_start?:string|null; daily_end?:string|null; mode:string; venue?:string|null; capacity:number; confirmed_count:number; enrollment_deadline:string; status:string; published_at?:string|null; courses?: {name:string;code:string}|{name:string;code:string}[]|null; partner_course_offers?: {partner_centers?:{name:string}|{name:string}[]|null}|{partner_centers?:{name:string}|{name:string}[]|null}[]|null };
+export type Enrollment = { id:string; enrollment_number:string; trainee_id:string; course_id:string; partner_offer_id?:string|null; batch_id?:string|null; scheduled_on?:string|null; enrollment_status:string; instructions_status?:string; source?:string|null; instructions_sent_at?:string|null; selling_price_centavos:number; rebate_centavos:number; partner_payable_centavos:number; paid_centavos:number; charges_centavos?:number; discounts_centavos?:number; created_at:string; trainees?: {trainee_number:string;legal_first_name:string;legal_middle_name?:string|null;legal_last_name:string;email:string;mobile:string}|{trainee_number:string;legal_first_name:string;legal_middle_name?:string|null;legal_last_name:string;email:string;mobile:string}[]|null; courses?:{name:string;code:string}|{name:string;code:string}[]|null; batches?:{batch_number:string;starts_on:string;ends_on:string;mode:string;venue?:string|null}|{batch_number:string;starts_on:string;ends_on:string;mode:string;venue?:string|null}[]|null; partner_course_offers?:{partner_centers?:{name:string}|{name:string}[]|null}|{partner_centers?:{name:string}|{name:string}[]|null}[]|null };
+export type Payment = { id:string; payment_number:string; trainee_id:string; amount_centavos:number; method:string; receiving_account:string; reference_number?:string|null; proof_id?:string|null; received_at:string; verification_state:string; trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null };
+export type Notification = { id:string; title:string; body:string; deep_link?:string|null; read_at?:string|null; created_at:string };
+export type EnrollmentCharge = { id:string; enrollment_id:string; charge_catalog_id?:string|null; description:string; amount_centavos:number; event_type:string; created_at:string };
 type EmployeeCharge = { id:string; employee_id:string; category?:string|null; note?:string|null; amount_centavos:number; balance_centavos?:number|null; status:string; effective_on?:string|null; activated_at?:string|null; employees?:{complete_name:string;employee_number:string}|{complete_name:string;employee_number:string}[]|null };
-type PortalData = { profile:{complete_name:string;email:string}; roles:string[]; courses:Course[]; offers:Offer[]; trainees:Trainee[]; batches:Batch[]; enrollments:Enrollment[]; payments:Payment[]; notifications:Notification[];
+export type PortalData = { profile:{complete_name:string;email:string}; roles:string[]; courses:Course[]; offers:Offer[]; trainees:Trainee[]; batches:Batch[]; enrollments:Enrollment[]; payments:Payment[]; notifications:Notification[];
   paymentMethods:{id:string;code:string;name:string;requires_reference:boolean;allows_proof:boolean;active:boolean;kind?:string}[]; charges:{id:string;name:string;default_amount_centavos:number;active:boolean;used_count:number}[]; agencies:{id:string;name:string;contact_name?:string|null;email?:string|null;mobile?:string|null;active:boolean}[]; expenses:{id:string;expense_number:string;payee:string;category:string;amount_centavos:number;status:string;created_at:string}[]; payables:{id:string;description:string;amount_centavos:number;due_on?:string|null;status:string}[]; cashierClosings:{id:string;closing_date:string;opening_cash_centavos:number;cash_collections_centavos:number;online_collections_centavos:number;expenses_centavos:number;expected_cash_centavos:number;actual_cash_centavos?:number|null;variance_centavos?:number|null;status:string}[]; enrollmentCharges:EnrollmentCharge[];
   employees:HrData["employees"]; employeeAttendance:HrData["employeeAttendance"]; leaveRequests:HrData["leaveRequests"]; cashAdvances:HrData["cashAdvances"]; payrollPeriods:HrData["payrollPeriods"]; payrollItems:HrData["payrollItems"]; benefitRecords:HrData["benefitRecords"]; employmentContracts:HrData["employmentContracts"];
   classrooms:TrainingData["classrooms"]; certificates:TrainingData["certificates"]; certificateTemplates:TrainingData["certificateTemplates"]; certificateReleases:{id:string;certificate_id:string;event_type:string;recipient_name?:string|null;recipient_id_type?:string|null;reason?:string|null;created_at:string;certificates?:unknown}[]; certificateIssuanceEnabled:boolean;
@@ -47,6 +48,8 @@ type PortalData = { profile:{complete_name:string;email:string}; roles:string[];
 
 // Sidebar is grouped so a long role list stays scannable. Group order here is the
 // render order; a group disappears entirely when the role can see none of its items.
+// Invariant: ONE nav entry per label. The sidebar keys buttons by label and the
+// allow-lists filter by label, so a duplicate renders twice with a clashing key.
 const NAV_GROUPS = ["Work","Collections","Approvals","Payables & cash","Cashier control","Records","Finance","People","Configuration"] as const;
 type NavGroup = (typeof NAV_GROUPS)[number];
 /**
@@ -61,27 +64,34 @@ type NavGroup = (typeof NAV_GROUPS)[number];
  * reachable, so the existing panels stay available to rebuild from.
  */
 const ROLE_MODULES: Partial<Record<string, Module[]>> = {
-  // Registration: cleared, rebuilding from scratch.
-  registration: [],
+  // Registration Officer (rebuilt Oct 2026): the addendum's six modules, no more.
+  registration: ["Dashboard","Registration","Trainees","Enrollments","Courses & centers","Instructions"],
+  // Cleared on the owner's instruction (7 Oct 2026) ahead of the Registration,
+  // Cashier and Accounting rebuilds. Their dashboards and modules stay on disk.
+  training_operations: [],
+  instructor: [],
+  releasing_officer: [],
+  hr: [],
+  // cashier and accounting are deliberately absent: an absent key keeps the
+  // legacy nav; a key with [] would empty the workspace.
 };
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Dashboard",icon:"⌂",group:"Work"},{label:"Search trainee",icon:"⌕",roles:["admin"],group:"Work"},{label:"Trainee enrollments",icon:"◎",roles:["accounting"],group:"Work"},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting","training_operations"],group:"Work"},
-  {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting"],group:"Work"},
+  {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting"],group:"Work"},{label:"Registration",icon:"✎",roles:["registration"],group:"Work"},{label:"Courses & centers",icon:"◇",roles:["registration"],group:"Work"},
   {label:"Schedules",icon:"□",roles:["admin","registration","training_operations","instructor"],group:"Work"},{label:"Instructions",icon:"✉",roles:["admin","registration","training_operations"],group:"Work"},{label:"Attendance",icon:"✓",roles:["admin","training_operations","instructor"],group:"Work"},
   {label:"Rooms & facilities",icon:"▢",roles:["admin","training_operations"],group:"Work"},{label:"Training calendar",icon:"▦",roles:["admin","training_operations"],group:"Work"},{label:"Trainee scheduling",icon:"◎",roles:["admin","training_operations"],group:"Work"},{label:"Instructor assignment",icon:"♙",roles:["admin","training_operations"],group:"Work"},{label:"Schedule changes",icon:"↺",roles:["admin","training_operations"],group:"Records"},{label:"Certificates",icon:"◈",roles:["admin","releasing_officer"],group:"Work"},{label:"Requests",icon:"↺",roles:["admin","accounting","cashier"],group:"Work"},
-  {label:"Registration changes",icon:"↺",roles:["registration"],group:"Records"},{label:"Reports",icon:"↥",roles:["admin","accounting","releasing_officer","registration","training_operations","cashier"],group:"Records"},
-  {label:"Payments",icon:"₱",roles:["cashier"],group:"Finance"},{label:"Accounting",icon:"▥",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Expenses",icon:"◰",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Inventory",icon:"▦",roles:["admin","accounting"],group:"Finance"},{label:"Employee charges",icon:"₱",roles:["admin","accounting","hr"],group:"Finance"},
-  {label:"Receivables",icon:"◷",roles:["accounting"],group:"Collections"},{label:"Payments",icon:"₱",roles:["accounting"],group:"Collections"},
+  {label:"Reports",icon:"↥",roles:["admin","accounting","releasing_officer","registration","training_operations","cashier"],group:"Records"},
+  {label:"Accounting",icon:"▥",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Expenses",icon:"◰",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Inventory",icon:"▦",roles:["admin","accounting"],group:"Finance"},{label:"Employee charges",icon:"₱",roles:["admin","accounting","hr"],group:"Finance"},
+  {label:"Receivables",icon:"◷",roles:["accounting"],group:"Collections"},{label:"Payments",icon:"₱",roles:["cashier","accounting"],group:"Collections"},
   {label:"Approvals",icon:"✓",roles:["accounting"],group:"Approvals"},
   {label:"Payables",icon:"▦",roles:["accounting"],group:"Payables & cash"},{label:"Cash position",icon:"◈",roles:["accounting"],group:"Payables & cash"},
-  {label:"Cashier closing",icon:"⚖",roles:["accounting"],group:"Cashier control"},
+  {label:"Cashier closing",icon:"⚖",roles:["cashier","accounting"],group:"Cashier control"},
   {label:"HR & payroll",icon:"♙",roles:["admin","hr"],group:"People"},{label:"MyHr",icon:"☺",group:"People"},
   {label:"Endorsed courses",icon:"◇",group:"Configuration"},{label:"Setup",icon:"⚙",roles:["super_admin","admin"],group:"Configuration"},
 ];
 const roleNames:Record<string,string>={super_admin:"Super Admin",admin:"Admin",accounting:"Accounting Manager",cashier:"Accounting Officer (Cashier)",releasing_officer:"Releasing Officer",training_operations:"Schedule Officer",registration:"Registration Officer",hr:"HR",instructor:"Instructor"};
 const date=(value:string)=>new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",year:"numeric",timeZone:"Asia/Manila"}).format(new Date(`${value}T00:00:00+08:00`));
-const fullName=(person:{legal_first_name:string;legal_middle_name?:string|null;legal_last_name:string})=>`${person.legal_first_name} ${person.legal_middle_name??""} ${person.legal_last_name}`.replace(/\s+/g," ").trim();
 
 // New Wave's own courses (delivery_type "In-House"), split into the two families
 // staff think in: MARINA/STCW-accredited courses and the rest of the in-house catalog.
@@ -97,9 +107,7 @@ function CourseSelect({data,value,onChange,label="Course"}:{data:PortalData;valu
   </select></label>;
 }
 
-function Badge({children,tone}:{children:React.ReactNode;tone?:string}){return <span className={`portal-badge ${tone??String(children).toLowerCase().replaceAll(" ","-")}`}>{children}</span>}
-function Message({kind,text}:{kind:"success"|"error";text:string}){return <div className={`portal-message ${kind}`} role={kind==="error"?"alert":"status"}>{text}</div>}
-function Modal({title,children,onClose}:{title:string;children:React.ReactNode;onClose:()=>void}){return <div className="portal-modal-backdrop" role="presentation" onMouseDown={(e)=>{if(e.target===e.currentTarget)onClose()}}><section className="portal-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><header><div><span className="portal-eyebrow">Secure staff action</span><h2 id="modal-title">{title}</h2></div><button type="button" onClick={onClose} aria-label="Close dialog">×</button></header>{children}</section></div>}
+// Badge, Message and Modal now live in ./portal/shared-ui (imported above).
 
 function ChangePasswordModal({onClose}:{onClose:()=>void}){const [pw,setPw]=useState(""),[confirmPw,setConfirmPw]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState<{kind:"success"|"error";text:string}|null>(null);async function save(event:FormEvent<HTMLFormElement>){event.preventDefault();if(pw.length<8){setMessage({kind:"error",text:"Use at least 8 characters."});return}if(pw!==confirmPw){setMessage({kind:"error",text:"The two passwords do not match."});return}setBusy(true);setMessage(null);try{const supabase=createSupabaseBrowserClient();const {error}=await supabase.auth.updateUser({password:pw});if(error)throw error;setMessage({kind:"success",text:"Password updated. Use it the next time you sign in."});setPw("");setConfirmPw("")}catch(e){setMessage({kind:"error",text:e instanceof Error?e.message:"Could not update the password."})}finally{setBusy(false)}}return <Modal title="Change your password" onClose={onClose}><form className="portal-form" onSubmit={save}>{message&&<Message kind={message.kind} text={message.text}/>}<label className="full">New password<input type="password" autoComplete="new-password" value={pw} onChange={e=>setPw(e.target.value)} required minLength={8} placeholder="At least 8 characters"/></label><label className="full">Confirm new password<input type="password" autoComplete="new-password" value={confirmPw} onChange={e=>setConfirmPw(e.target.value)} required minLength={8}/></label><p className="portal-form-note full">This changes the password for your own account only. You stay signed in on this device.</p><div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Close</button><button className="portal-primary" disabled={busy}>{busy?"Updating…":"Update password"}</button></div></form></Modal>}
 
@@ -112,14 +120,11 @@ export function PortalLiveApp(){
   // day-to-day work of the specialised roles and is hidden here.
   const adminHidden=new Set<Module>(["Trainees","Instructions","Attendance","Inventory","Rooms & facilities","Certificates","HR & payroll","Schedules","Expenses","Endorsed courses","Employee charges","Requests","Training calendar","Trainee scheduling","Instructor assignment","Schedule changes"]);
   const accountingHidden=new Set<Module>(["Trainees","Enrollments"]);
-  // The Schedule Officer works from a scheduling-only workspace (owner directive).
-  const trainingOpsHidden=new Set<Module>(["Trainees","Instructions","Attendance","Endorsed courses"]);
-  const registrationHidden=new Set<Module>(["Instructions","Endorsed courses"]);
-  const releasingHidden=new Set<Module>(["Endorsed courses","Schedules"]);
   // A rebuilding role takes its modules from ROLE_MODULES; everyone else keeps
-  // the established role tags and hidden sets.
+  // the established role tags and hidden sets. (The registration, training
+  // operations and releasing hidden sets are gone: those roles are allow-listed.)
   const rebuildModules=ROLE_MODULES[role];
-  const legacyNav=nav.filter(item=>(!item.roles||item.roles.includes(role)||(role==="super_admin"&&item.roles.includes("admin")))&&!(role==="admin"&&adminHidden.has(item.label))&&!(role==="accounting"&&accountingHidden.has(item.label))&&!(role==="training_operations"&&trainingOpsHidden.has(item.label))&&!(role==="registration"&&registrationHidden.has(item.label))&&!(role==="releasing_officer"&&releasingHidden.has(item.label)));
+  const legacyNav=nav.filter(item=>(!item.roles||item.roles.includes(role)||(role==="super_admin"&&item.roles.includes("admin")))&&!(role==="admin"&&adminHidden.has(item.label))&&!(role==="accounting"&&accountingHidden.has(item.label)));
   const allowedNav=rebuildModules?nav.filter(item=>rebuildModules.includes(item.label)):legacyNav;
   const go=(module:Module)=>{setActive(module);setSidebar(false)};
   const unread=data?.notifications.filter(item=>!item.read_at).length??0;
@@ -136,10 +141,10 @@ export function PortalLiveApp(){
 }
 
 function RebuildingWorkspace(){
-  return <section className="portal-panel portal-empty">
+  return <div className="portal-page"><section className="portal-panel portal-empty">
     <h2>This workspace is being rebuilt</h2>
     <p className="portal-empty-copy">Modules are being added back one at a time. Nothing has been deleted — the records are untouched and the other roles are unaffected.</p>
-  </section>;
+  </section></div>;
 }
 
 function PortalContent({modules,active,role,data,query,go,open,onPay,canEnroll,canSchedule,canPay,reload}:{modules?:Module[];active:Module;role:string;data:PortalData;query:string;go:(module:Module)=>void;open:(value:"enrollment"|"batch"|"payment")=>void;onPay:(enrollmentId:string)=>void;canEnroll:boolean;canSchedule:boolean;canPay:boolean;reload:()=>Promise<void>}){
@@ -147,8 +152,10 @@ function PortalContent({modules,active,role,data,query,go,open,onPay,canEnroll,c
   // A role mid-rebuild only renders modules on its allow-list. Without this the
   // old workspace would still paint even though the sidebar is empty.
   if(modules&&!modules.includes(active))return <RebuildingWorkspace/>;
-  if(active==="Dashboard"&&gateRole==="registration")return <RegistrationDashboard data={data as unknown as Parameters<typeof RegistrationDashboard>[0]["data"]} go={m=>go(m as Module)} openEnrollment={()=>open("enrollment")}/>;
-  if(active==="Registration changes")return <RegistrationChanges data={data as unknown as Parameters<typeof RegistrationChanges>[0]["data"]} go={m=>go(m as Module)}/>;
+  if(active==="Dashboard"&&gateRole==="registration")return <RegistrationDashboard data={data} go={m=>go(m as Module)} openEnrollment={()=>go("Registration")}/>;
+  if(active==="Registration")return <RegistrationIntake data={data} reload={reload} go={m=>go(m as Module)}/>;
+  if(active==="Courses & centers")return <CoursesAndCenters data={data} query={query}/>;
+  if(active==="Enrollments"&&gateRole==="registration")return <RegistrationEnrollments data={data} query={query} reload={reload} go={m=>go(m as Module)}/>;
   if(active==="Dashboard"&&gateRole==="admin")return <AdminDashboard data={data} go={m=>go(m as Module)} openEnrollment={()=>open("enrollment")}/>;
   if(active==="Dashboard"&&gateRole==="training_operations")return <ScheduleOfficerDashboard data={data} go={m=>go(m as Module)} openBatch={()=>open("batch")}/>;
   if(active==="Training calendar")return <TrainingCalendar data={data}/>;
@@ -396,9 +403,7 @@ function Catalog({data,query,role}:{data:PortalData;query:string;role:string}){c
 
 function ConnectedModule({module,data}:{module:Module;data:PortalData}){const copy:Record<string,[string,string]>={Accounting:["Accounting","Financial controls use the posted payment ledger. Reversals and period locks require approved requests."],Attendance:["Attendance","QR attendance is secured by staff sessions and server-side timestamps."],Certificates:["Certificates","Eligibility is available; issuance remains disabled until an approved template is uploaded."],"HR & payroll":["HR & payroll","Employee and payroll tables are secured and ready for authorized configuration."],Reports:["Reports","Download the verified internal course catalog while operational report templates are configured."],Setup:["Setup","Complete organization details, email sending domain, legal copy, and the certificate template before launch."]};const [title,text]=copy[module]??[module,"This module is secured for authorized staff."];return <div className="portal-page"><PageHead eyebrow="Controlled module" title={title} text={text}/>{module==="Reports"?<div className="action-card portal-panel"><div><strong>Course catalog export</strong><p>New Wave and endorsed programs with staff-only financial fields.</p></div><a className="portal-primary" href="/api/reports/catalog">Download XLSX</a></div>:module==="Certificates"?<div className="certificate-lock"><span>◈</span><div><strong>Certificate issuance is disabled</strong><p>Printing and release remain blocked until an approved New Wave template is uploaded and the feature flag is enabled.</p></div><Badge tone="orange">Safety lock active</Badge></div>:<div className="empty-state portal-panel"><span>◎</span><h2>{title} is protected</h2><p>{text}</p><small>{data.roles.map(r=>roleNames[r]??r).join(" · ")}</small></div>}</div>}
 
-function PageHead({eyebrow,title,text,action,onAction}:{eyebrow:string;title:string;text:string;action?:string;onAction?:()=>void}){return <div className="portal-heading"><div><span className="portal-eyebrow">{eyebrow}</span><h1>{title}</h1><p>{text}</p></div>{action&&<button className="portal-primary" onClick={onAction}>{action}</button>}</div>}
-
-async function submit(body:unknown){const response=await fetch("/api/staff/operations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});const result=await response.json();if(!response.ok)throw new Error(result.error??"Unable to save the record.");return result}
+// PageHead and submit now live in ./portal/shared-ui (imported above).
 
 /**
  * MyHr, Option A (tabs): employee details first, then one request panel whose

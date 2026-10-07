@@ -4,11 +4,17 @@ import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hardDeleteEnrollment, pruneUnpaidEnrollments, deletePastEmptyBatches } from "@/lib/enrollments";
+import { VALIDATION_MESSAGES, isPhContactNumber, isSrn, normalizePhContactNumber, normalizeSrn } from "@/lib/validation";
 
 const enrollmentInput = z.object({
   action: z.literal("create-enrollment"), existingTraineeId: z.string().uuid().nullable().optional(),
   firstName: z.string().trim().max(80).optional().default(""), middleName: z.string().trim().max(80).optional().default(""), lastName: z.string().trim().max(80).optional().default(""),
   birthDate: z.string().date().optional(), email: z.string().email().optional(), mobile: z.string().trim().min(7).max(30).optional(),
+  // The staff intake mirrors the public form field for field (addendum). These
+  // are stored on the trainee after the enrollment RPC, which is unchanged.
+  suffix: z.string().trim().max(20).optional(), srn: z.string().trim().refine((v) => !v || isSrn(v), VALIDATION_MESSAGES.srn).optional(),
+  presentAddress: z.string().trim().max(500).optional(), placeOfBirth: z.string().trim().max(160).optional(), rank: z.string().trim().max(100).optional(), company: z.string().trim().max(160).optional(),
+  emergencyContactName: z.string().trim().max(160).optional(), emergencyContactMobile: z.string().trim().refine((v) => !v || isPhContactNumber(v), VALIDATION_MESSAGES.contact).optional(),
   courseId: z.string().uuid(), partnerOfferId: z.string().uuid().nullable().optional(), batchId: z.string().uuid().nullable().optional(),
   scheduledOn: z.string().date().nullable().optional(),
 });
@@ -248,12 +254,14 @@ export async function GET() {
   // three migrations. Read them in one query; if any column is missing the whole
   // select errors, so fall back to reading each on its own and omit what is absent.
   const enrollmentExtrasUnit = (async (): Promise<EnrollmentExtra[]> => {
-    const merged = await db.from("enrollments").select("id,scheduled_on,instructions_sent_at,feedback_token").limit(250);
+    // Ordered the same way as the main enrollments query, so these 250 rows are
+    // the same 250 rows; unordered, the extras could belong to a different set.
+    const merged = await db.from("enrollments").select("id,scheduled_on,instructions_sent_at,feedback_token").order("created_at", { ascending: false }).limit(250);
     if (!merged.error) return (merged.data ?? []) as EnrollmentExtra[];
     const parts = await Promise.all([
-      db.from("enrollments").select("id,scheduled_on").limit(250),
-      db.from("enrollments").select("id,instructions_sent_at").limit(250),
-      db.from("enrollments").select("id,feedback_token").limit(250),
+      db.from("enrollments").select("id,scheduled_on").order("created_at", { ascending: false }).limit(250),
+      db.from("enrollments").select("id,instructions_sent_at").order("created_at", { ascending: false }).limit(250),
+      db.from("enrollments").select("id,feedback_token").order("created_at", { ascending: false }).limit(250),
     ]);
     const byId = new Map<string, EnrollmentExtra>();
     for (const part of parts) {
@@ -404,9 +412,9 @@ export async function GET() {
     db.from("profiles").select("complete_name,email").eq("id", staff.user.id).maybeSingle(),
     db.from("courses").select("id,code,name,delivery_type,duration_label,duration_days,training_mode,category_id,standard_price_centavos,google_classroom_link,active,updated_at,course_categories(name)").eq("active", true).order("name"),
     db.from("partner_course_offers").select("id,course_id,duration_label,training_fee_centavos,rebate_centavos,partner_payable_centavos,updated_at,partner_centers(name,contact_details)").eq("active", true).order("training_fee_centavos"),
-    db.from("trainees").select("id,trainee_number,legal_first_name,legal_middle_name,legal_last_name,birthdate,sex,nationality,address,email,mobile,srn,account_state,registered_at").neq("account_state", "Deactivated").order("created_at", { ascending: false }).limit(250),
+    db.from("trainees").select("id,trainee_number,legal_first_name,legal_middle_name,legal_last_name,suffix,birthdate,sex,nationality,address,place_of_birth,rank,company,emergency_contact,email,mobile,srn,account_state,registered_at").neq("account_state", "Deactivated").order("created_at", { ascending: false }).limit(250),
     db.from("batches").select("id,batch_number,course_id,partner_offer_id,starts_on,ends_on,daily_start,daily_end,mode,venue,capacity,confirmed_count,enrollment_deadline,status,published_at,courses(name,code),partner_course_offers(partner_centers(name))").eq("active", true).order("starts_on", { ascending: true }).limit(250),
-    db.from("enrollments").select("id,enrollment_number,trainee_id,course_id,partner_offer_id,batch_id,enrollment_status,instructions_status,selling_price_centavos,rebate_centavos,partner_payable_centavos,created_at,trainees(trainee_number,legal_first_name,legal_middle_name,legal_last_name,email,mobile),courses(name,code),batches(batch_number,starts_on,ends_on,mode,venue),partner_course_offers(partner_centers(name))").order("created_at", { ascending: false }).limit(250),
+    db.from("enrollments").select("id,enrollment_number,trainee_id,course_id,partner_offer_id,batch_id,enrollment_status,instructions_status,source,selling_price_centavos,rebate_centavos,partner_payable_centavos,created_at,trainees(trainee_number,legal_first_name,legal_middle_name,legal_last_name,email,mobile),courses(name,code),batches(batch_number,starts_on,ends_on,mode,venue),partner_course_offers(partner_centers(name))").order("created_at", { ascending: false }).limit(250),
     db.from("payments").select("id,payment_number,trainee_id,amount_centavos,method,receiving_account,reference_number,proof_id,received_at,verification_state,remarks,valid,trainees(legal_first_name,legal_last_name)").eq("valid", true).order("received_at", { ascending: false }).limit(250),
     db.from("notifications").select("id,title,body,deep_link,read_at,created_at").eq("recipient_id", staff.user.id).order("created_at", { ascending: false }).limit(20),
     // Accounting datasets (Slice 1): channels, charges, agencies, expenses, payables.
@@ -1388,6 +1396,19 @@ export async function POST(request: Request) {
         const admin = createSupabaseAdminClient();
         const { error: dateError } = await admin.from("enrollments").update({ scheduled_on: input.scheduledOn }).eq("id", data.id);
         if (dateError) console.error("Could not save enrollment scheduled_on:", dateError.message);
+      }
+      // A newly created trainee gets the rest of the public-form fields. Master
+      // record only (no money, no status); a failure is logged, never fatal.
+      const newTraineeId = !input.existingTraineeId ? (data as { trainee_id?: string } | null)?.trainee_id : null;
+      if (newTraineeId && (input.srn || input.presentAddress || input.placeOfBirth || input.rank || input.company || input.suffix || input.emergencyContactName)) {
+        const admin = createSupabaseAdminClient();
+        const { error: profileError } = await admin.from("trainees").update({
+          suffix: input.suffix || null, srn: input.srn ? normalizeSrn(input.srn) : null, address: input.presentAddress || null,
+          place_of_birth: input.placeOfBirth || null, rank: input.rank || null, company: input.company || null,
+          // Column is jsonb NOT NULL (default {}), so an absent contact writes {} rather than null.
+          emergency_contact: input.emergencyContactName ? { name: input.emergencyContactName, mobile: input.emergencyContactMobile ? normalizePhContactNumber(input.emergencyContactMobile) : null } : {},
+        }).eq("id", newTraineeId);
+        if (profileError) console.error("Could not save trainee profile fields:", profileError.message);
       }
       return NextResponse.json({ ok: true, enrollment: data });
     }

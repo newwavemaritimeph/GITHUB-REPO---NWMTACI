@@ -39,3 +39,13 @@ export const balanceOf = (e: BillableEnrollment) => Math.max(0, dueCentavos(e) -
  * Enrollment summary, so the two reported different numbers for the same day.
  */
 export const isUnpaid = (e: BillableEnrollment) => e.enrollment_status !== "Cancelled" && balanceOf(e) > 0;
+
+/** Pesos with centavos shown — for ledgers and closings, where the cents matter. */
+export const pesos2 = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format((Number(centavos) || 0) / 100);
+
+/** Add n calendar days to a YYYY-MM-DD date, evaluated in Manila. */
+export const addDays = (iso: string, n: number) => {
+  const d = new Date(`${iso}T00:00:00+08:00`);
+  d.setDate(d.getDate() + n);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(d);
+};
