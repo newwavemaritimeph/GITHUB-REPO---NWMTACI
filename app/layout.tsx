@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Inter, Geist_Mono, Source_Serif_4, Plus_Jakarta_Sans, Space_Grotesk } from "next/font/google";
+import { Inter, Geist_Mono, Source_Serif_4, Plus_Jakarta_Sans, Space_Grotesk, Outfit } from "next/font/google";
 import "./globals.css";
 import "./catalog.css";
 import "./portal-legacy.css";
@@ -36,6 +36,8 @@ const sourceSerif = Source_Serif_4({
 // Both are variable fonts, so no weight list (see the Source Serif note).
 const portalSans = Plus_Jakarta_Sans({ variable: "--font-portal", subsets: ["latin"], display: "swap" });
 const portalNumerals = Space_Grotesk({ variable: "--font-num", subsets: ["latin"], display: "swap" });
+// Registration form headings ("Quiet Checklist" direction). Variable font.
+const formDisplay = Outfit({ variable: "--font-form", subsets: ["latin"], display: "swap" });
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -68,7 +70,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${interSans.variable} ${geistMono.variable} ${sourceSerif.variable} ${portalSans.variable} ${portalNumerals.variable} antialiased`}>
+      <body className={`${interSans.variable} ${geistMono.variable} ${sourceSerif.variable} ${portalSans.variable} ${portalNumerals.variable} ${formDisplay.variable} antialiased`}>
         {children}
       </body>
     </html>

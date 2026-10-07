@@ -17,17 +17,13 @@ export type PublicPage =
   | "contact"
   | "staff-login";
 
-/* Mockup navigation. "Gallery" is omitted deliberately: there is no gallery
- * page or imagery yet, and a nav item that 404s is worse than one absent.
- * Schedules and Accreditation point at the sections that already hold that
- * content rather than at new empty pages. */
+/* Public navigation. Schedules, Accreditation and Gallery were removed on the
+ * owner's instruction (7 Oct 2026); that content stays reachable from the
+ * Courses and About pages. */
 const nav = [
   ["Home", "/"],
   ["About", "/about"],
   ["Courses", "/courses"],
-  ["Schedules", "/courses#schedules"],
-  ["Accreditation", "/about#accreditations"],
-  ["Gallery", "/about#facilities"],
   ["Enrollment status", "/registration-search"],
   ["Contact", "/contact"],
 ] as const;
@@ -574,13 +570,13 @@ function Courses() {
 
 function Register() {
   return (
-    <section className="inside-page registration-page">
+    <section className="inside-page registration-page ql-page">
       <div className="registration-intro">
         <span className="eyebrow">Online registration</span>
-        <h1>Three steps to reserve your training slot.</h1>
+        <h1>Apply for training in a few short sections.</h1>
         <p>
-          Tell us about yourself once, choose a published schedule, and confirm. You will receive a reference you can use to
-          track payment, instructions, attendance, and your certificate.
+          Enter your details once. Our Registration team confirms your course and schedule, checks your requirements and
+          payment, then enrolls you. You will receive a reference to track your application.
         </p>
         <div className="privacy-note">
           <strong>Your privacy matters</strong>

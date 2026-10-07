@@ -36,14 +36,15 @@ const emptyApplicant = {
 // and schedule while screening. Set NEXT_PUBLIC_REGISTRATION_COURSE_STEP=on to
 // bring it back.
 const COURSE_STEP = process.env.NEXT_PUBLIC_REGISTRATION_COURSE_STEP === "on";
-const STAGES = COURSE_STEP ? (["details", "courses", "review"] as const) : (["details", "review"] as const);
-const STAGE_LABELS = { details: "Applicant details", courses: "Course selection", review: "Review and consent" } as const;
+// Layout ("Quiet Checklist", Oct 2026): one page of numbered sections that
+// collapse to a one-line summary once complete, a progress rail, and quiet
+// underline fields. Applicants can reopen any finished section to edit it.
+type SectionKey = "identification" | "personal" | "contact" | "emergency" | "courses" | "review";
 const upper = (value: string) => value.toUpperCase();
 const MAX_COURSES = 5;
 
 function Wizard() {
-  const [step, setStep] = useState(0);
-  const stage = STAGES[step];
+  const [open, setOpen] = useState<SectionKey>("identification");
   const [applicant, setApplicant] = useState(emptyApplicant);
   const [courses, setCourses] = useState<Course[]>([]);
   const [selections, setSelections] = useState<Selection[]>([{ courseCode: "", scheduleId: "" }]);
@@ -116,10 +117,10 @@ function Wizard() {
   const mobileValid = mobileDigits.length >= 7;
   const emergencyMobileValid = applicant.emergencyContactMobile.replace(/\D/g, "").length >= 7;
   const rankValid = applicant.rank !== "" && (applicant.rank !== "OTHER" || applicant.rankOther.trim().length >= 2);
-  const detailsValid =
-    applicant.firstName.trim().length >= 2 && applicant.lastName.trim().length >= 2 && Boolean(applicant.birthDate) &&
-    applicant.placeOfBirth.trim().length >= 2 && applicant.address.trim().length >= 8 && mobileValid && emailValid && rankValid &&
-    applicant.emergencyContactName.trim().length >= 2 && emergencyMobileValid && applicant.srn.length === 10;
+  const idValid = applicant.srn.length === 10;
+  const personalValid = applicant.firstName.trim().length >= 2 && applicant.lastName.trim().length >= 2 && Boolean(applicant.birthDate) && applicant.placeOfBirth.trim().length >= 2 && rankValid;
+  const contactValid = applicant.address.trim().length >= 8 && mobileValid && emailValid;
+  const emergencyValid = applicant.emergencyContactName.trim().length >= 2 && emergencyMobileValid;
   const completeSelections = selections.filter((s) => s.courseCode && s.scheduleId);
   // Every row must be either fully complete or completely empty; at least one complete.
   const selectionsValid = !COURSE_STEP || completeSelections.length >= 1 && selections.every((s) => (!s.courseCode && !s.scheduleId) || (Boolean(s.courseCode) && Boolean(s.scheduleId)));
@@ -192,116 +193,120 @@ function Wizard() {
     );
   }
 
+  const rankText = applicant.rank === "OTHER" ? applicant.rankOther : applicant.rank;
+  const nameText = [applicant.firstName, applicant.middleName, applicant.lastName, applicant.suffix].filter(Boolean).join(" ");
+  const sections: { key: SectionKey; title: string; hint: string; done: boolean; summary: string }[] = [
+    { key: "identification", title: "Identification", hint: "Start with your SRN. If you have trained with us before, we fill in your details.", done: idValid, summary: `SRN ${applicant.srn}${locked ? " · record found" : ""}` },
+    { key: "personal", title: "Personal details", hint: "As written on your seaman's book or passport.", done: personalValid, summary: [nameText, applicant.birthDate, applicant.placeOfBirth, rankText].filter(Boolean).join(" · ") },
+    { key: "contact", title: "Contact", hint: "How New Wave will reach you about your application.", done: contactValid, summary: [applicant.mobile, applicant.email].filter(Boolean).join(" · ") },
+    { key: "emergency", title: "Emergency contact", hint: "Someone we can call if we cannot reach you.", done: emergencyValid, summary: [applicant.emergencyContactName, applicant.emergencyContactMobile].filter(Boolean).join(" · ") },
+    ...(COURSE_STEP ? [{ key: "courses" as const, title: "Courses", hint: `Pick a course and an available schedule. Up to ${MAX_COURSES} per application.`, done: selectionsValid, summary: completeSelections.map((x) => x.courseCode).join(", ") }] : []),
+  ];
+  const doneCount = sections.filter((x) => x.done).length;
+  const allDone = doneCount === sections.length;
+  /** After saving a section, open the next unfinished one (or the review). */
+  function next(from: SectionKey) {
+    const i = sections.findIndex((x) => x.key === from);
+    const target = sections.slice(i + 1).find((x) => !x.done) ?? sections.find((x) => !x.done);
+    setOpen(target ? target.key : "review");
+  }
+
+  const body: Record<Exclude<SectionKey, "review">, React.ReactNode> = {
+    identification: <>
+      <div className="ql-grid caps-form">
+        <Field label="SRN / MISMO number*" wide><input value={applicant.srn} onChange={(e) => set("srn", e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" placeholder="10 digits" autoFocus /></Field>
+      </div>
+      {lookup && <p className={`ql-lookup ${lookup.kind}`}>{lookup.text}</p>}
+    </>,
+    personal: <div className="ql-grid caps-form">
+      <Field label={locked ? "First name (from your record)" : "First name*"}><input value={applicant.firstName} readOnly={locked} onChange={(e) => set("firstName", upper(e.target.value))} /></Field>
+      <Field label={locked ? "Middle name (from your record)" : "Middle name"}><input value={applicant.middleName} readOnly={locked} onChange={(e) => set("middleName", upper(e.target.value))} /></Field>
+      <Field label={locked ? "Last name (from your record)" : "Last name*"}><input value={applicant.lastName} readOnly={locked} onChange={(e) => set("lastName", upper(e.target.value))} /></Field>
+      <Field label="Suffix"><select value={applicant.suffix} disabled={locked} onChange={(e) => set("suffix", e.target.value)}>{SUFFIXES.map((item) => <option key={item || "none"} value={item}>{item || "None"}</option>)}</select></Field>
+      <Field label={locked ? "Date of birth (from your record)" : "Date of birth*"}><input type="date" value={applicant.birthDate} readOnly={locked} max={new Date().toISOString().slice(0, 10)} onChange={(e) => set("birthDate", e.target.value)} /></Field>
+      <Field label={locked ? "Place of birth (from your record)" : "Place of birth*"}><input value={applicant.placeOfBirth} readOnly={locked} onChange={(e) => set("placeOfBirth", upper(e.target.value))} /></Field>
+      <Field label="Rank*"><select value={applicant.rank} onChange={(e) => set("rank", e.target.value)}><option value="">Select</option>{RANKS.map((item) => <option key={item} value={item}>{item}</option>)}</select></Field>
+      {applicant.rank === "OTHER" && <Field label="Specify rank*"><input value={applicant.rankOther} onChange={(e) => set("rankOther", upper(e.target.value))} /></Field>}
+      <Field label="Company / manning agency" wide><input value={applicant.company} onChange={(e) => set("company", upper(e.target.value))} placeholder="Optional" /></Field>
+    </div>,
+    contact: <div className="ql-grid caps-form">
+      <Field label="Complete address*" wide><input value={applicant.address} onChange={(e) => set("address", upper(e.target.value))} /></Field>
+      <Field label="Mobile number*"><input value={applicant.mobile} onChange={(e) => set("mobile", e.target.value)} inputMode="tel" placeholder="09XX XXX XXXX" /></Field>
+      <Field label="Email address*"><input type="email" value={applicant.email} onChange={(e) => set("email", e.target.value)} /></Field>
+    </div>,
+    emergency: <div className="ql-grid caps-form">
+      <Field label="Contact person*"><input value={applicant.emergencyContactName} onChange={(e) => set("emergencyContactName", upper(e.target.value))} /></Field>
+      <Field label="Contact number*"><input value={applicant.emergencyContactMobile} onChange={(e) => set("emergencyContactMobile", e.target.value)} inputMode="tel" /></Field>
+    </div>,
+    courses: <>
+      {!courses.length && <div className="reg-notice"><strong>No published schedules are open this week</strong><p>Please check back soon or contact New Wave.</p></div>}
+      {selections.map((sel, index) => {
+        const list = schedulesByCourse[sel.courseCode] ?? [];
+        const available = courses.filter((c) => c.code === sel.courseCode || !selections.some((x) => x.courseCode === c.code));
+        return (
+          <div key={index} className="ql-course">
+            <div className="ql-grid"><Field label={`Course ${index + 1}*`} wide><select value={sel.courseCode} onChange={(e) => chooseCourse(index, e.target.value)}><option value="">Select a course</option>{available.map((item) => <option key={item.code} value={item.code}>{item.code} — {item.name}</option>)}</select></Field></div>
+            {sel.courseCode && (loadingCourse[sel.courseCode] ? <p className="wizard-hint">Loading schedules…</p> : list.length === 0 ? <div className="reg-notice"><strong>No schedule this week for this course</strong><p>Please choose another course.</p></div> :
+              <div className="schedule-picker">{list.map((batch) => <button key={batch.id} type="button" className={`schedule-option ${sel.scheduleId === batch.id ? "selected" : ""}`} onClick={() => chooseSchedule(index, batch.id)}><span className="schedule-body"><strong>{batch.label}</strong></span></button>)}</div>)}
+            {selections.length > 1 && <button type="button" className="ql-link" onClick={() => removeSelection(index)}>Remove course {index + 1}</button>}
+          </div>
+        );
+      })}
+      {selections.length < MAX_COURSES && courses.length > 0 && <button type="button" className="ql-link" onClick={addSelection}>+ Add another course ({selections.length}/{MAX_COURSES})</button>}
+    </>,
+  };
+
   return (
-    <div className="reg-card">
-      <ol className="wizard-steps">
-        {STAGES.map((key, index) => (
-          <li key={key} className={index === step ? "current" : index < step ? "done" : ""}><span>{index < step ? "✓" : index + 1}</span>{STAGE_LABELS[key]}</li>
-        ))}
-      </ol>
-      {error && <p className="form-message" role="alert">{error}</p>}
+    <div className="ql-form">
+      <aside className="ql-rail" aria-label="Application progress">
+        <strong>Your application</strong>
+        <span className="ql-rail-count">{doneCount} of {sections.length} sections done</span>
+        <span className="ql-bar" aria-hidden="true"><i style={{ width: `${Math.round((doneCount / sections.length) * 100)}%` }} /></span>
+        <ol>
+          {sections.map((x) => <li key={x.key}><button type="button" className={`${x.done ? "done" : ""} ${open === x.key ? "current" : ""}`} onClick={() => setOpen(x.key)}><i aria-hidden="true" />{x.title}</button></li>)}
+        </ol>
+        <button type="button" className="ql-rail-submit" disabled={!allDone} onClick={() => setOpen("review")}>Review and submit</button>
+      </aside>
 
-      {stage === "details" && (
-        <>
-          <section className="wizard-panel">
-            <h2>Applicant details</h2>
-            <p className="wizard-hint">All fields are required except the middle name, suffix, and company. Enter your 10-digit SRN — if you have enrolled before, we&apos;ll fill in your details automatically.</p>
-            {lookup && <p className="wizard-hint" style={{ color: lookup.kind === "found" ? "#0a7d3b" : "#9a5b00", fontWeight: 600 }}>{lookup.text}</p>}
-            <div className="reg-grid caps-form">
-              <Field label="SRN / MISMO number*" wide><input value={applicant.srn} onChange={(e) => set("srn", e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" placeholder="10 DIGITS" /></Field>
-              <Field label={locked ? "First name (from your record)" : "First name*"}><input value={applicant.firstName} readOnly={locked} onChange={(e) => set("firstName", upper(e.target.value))} /></Field>
-              <Field label={locked ? "Middle name (from your record)" : "Middle name"}><input value={applicant.middleName} readOnly={locked} onChange={(e) => set("middleName", upper(e.target.value))} /></Field>
-              <Field label={locked ? "Last name (from your record)" : "Last name*"}><input value={applicant.lastName} readOnly={locked} onChange={(e) => set("lastName", upper(e.target.value))} /></Field>
-              <Field label="Suffix"><select value={applicant.suffix} disabled={locked} onChange={(e) => set("suffix", e.target.value)}>{SUFFIXES.map((item) => <option key={item || "none"} value={item}>{item || "None"}</option>)}</select></Field>
-              <Field label={locked ? "Date of birth (from your record)" : "Date of birth*"}><input type="date" value={applicant.birthDate} readOnly={locked} max={new Date().toISOString().slice(0, 10)} onChange={(e) => set("birthDate", e.target.value)} /></Field>
-              <Field label={locked ? "Place of birth (from your record)" : "Place of birth*"}><input value={applicant.placeOfBirth} readOnly={locked} onChange={(e) => set("placeOfBirth", upper(e.target.value))} /></Field>
-              <Field label="Complete address*" wide><input value={applicant.address} onChange={(e) => set("address", upper(e.target.value))} /></Field>
-              <Field label="Mobile number*"><input value={applicant.mobile} onChange={(e) => set("mobile", e.target.value)} inputMode="tel" placeholder="09XX XXX XXXX" /></Field>
-              <Field label="Email address*"><input type="email" value={applicant.email} onChange={(e) => set("email", e.target.value)} /></Field>
-              <Field label="Rank*"><select value={applicant.rank} onChange={(e) => set("rank", e.target.value)}><option value="">SELECT</option>{RANKS.map((item) => <option key={item} value={item}>{item}</option>)}</select></Field>
-              {applicant.rank === "OTHER" && <Field label="Specify rank*"><input value={applicant.rankOther} onChange={(e) => set("rankOther", upper(e.target.value))} /></Field>}
-              <Field label="Company / manning agency" wide><input value={applicant.company} onChange={(e) => set("company", upper(e.target.value))} /></Field>
+      <div className="ql-sections">
+        {sections.map((x, index) => {
+          const isOpen = open === x.key;
+          return (
+            <section key={x.key} className={`ql-section${isOpen ? " open" : ""}${x.done ? " done" : ""}`}>
+              <button type="button" className="ql-head" onClick={() => setOpen(x.key)} aria-expanded={isOpen}>
+                <span className="ql-mark" aria-hidden="true">{x.done && !isOpen ? "✓" : index + 1}</span>
+                <span className="ql-title"><h2>{index + 1}. {x.title}</h2><span>{isOpen ? x.hint : x.done ? x.summary : "Not started"}</span></span>
+                {!isOpen && x.done && <span className="ql-edit">Edit</span>}
+              </button>
+              {isOpen && <div className="ql-body">
+                {body[x.key as Exclude<SectionKey, "review">]}
+                <div className="ql-actions"><button type="button" className="button button-primary" disabled={!x.done} onClick={() => next(x.key)}>Save and continue</button></div>
+              </div>}
+            </section>
+          );
+        })}
+
+        <section className={`ql-section ql-review${open === "review" ? " open" : ""}`}>
+          <button type="button" className="ql-head" onClick={() => allDone && setOpen("review")} aria-expanded={open === "review"} disabled={!allDone}>
+            <span className="ql-mark" aria-hidden="true">{sections.length + 1}</span>
+            <span className="ql-title"><h2>{sections.length + 1}. Review and submit</h2><span>{allDone ? "Accept the terms and send your application." : "Complete the sections above first."}</span></span>
+          </button>
+          {open === "review" && allDone && <div className="ql-body">
+            {COURSE_STEP ? <div className="review-courses">{completeSelections.map((x, i) => <div key={i} className="review-course"><div><strong>{nameOf(x.courseCode)}</strong><small>{labelOf(x.courseCode, x.scheduleId)}</small></div></div>)}</div>
+              : <p className="ql-note">After you submit, our Registration team will contact you to confirm your course and schedule, and to collect your requirements and payment.</p>}
+            <h3 className="review-subhead">Terms and conditions</h3>
+            <div className="terms-box">
+              {TERMS_SECTIONS.map((section) => <div key={section.heading} className="terms-section"><strong>{section.heading}</strong><ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul></div>)}
+              <p className="terms-footer">New Wave Maritime Training and Assessment Center reserves the right to amend, revise, or update these details without prior notice.</p>
             </div>
-          </section>
-          <section className="wizard-panel">
-            <h2>Emergency contact</h2>
-            <div className="reg-grid caps-form">
-              <Field label="Contact person*"><input value={applicant.emergencyContactName} onChange={(e) => set("emergencyContactName", upper(e.target.value))} /></Field>
-              <Field label="Contact number*"><input value={applicant.emergencyContactMobile} onChange={(e) => set("emergencyContactMobile", e.target.value)} inputMode="tel" /></Field>
-            </div>
-          </section>
-        </>
-      )}
-
-      {stage === "courses" && (
-        <section className="wizard-panel">
-          <h2>Select your courses</h2>
-          <p className="wizard-hint">Pick a course and an available schedule. You can add up to {MAX_COURSES} courses in one submission.</p>
-          {!courses.length && <div className="reg-notice"><strong>No published schedules are open this week</strong><p>Please check back soon or contact New Wave.</p></div>}
-          {selections.map((sel, index) => {
-            const list = schedulesByCourse[sel.courseCode] ?? [];
-            const available = courses.filter((c) => c.code === sel.courseCode || !selections.some((s) => s.courseCode === c.code));
-            return (
-              <div key={index} className="reg-selection" style={{ border: "1px solid #cfe6ef", borderRadius: 12, padding: 14, margin: "0 0 14px" }}>
-                <div className="reg-grid">
-                  <Field label={`Course ${index + 1}*`} wide>
-                    <select value={sel.courseCode} onChange={(e) => chooseCourse(index, e.target.value)}>
-                      <option value="">Select a course</option>
-                      {available.map((item) => <option key={item.code} value={item.code}>{item.code} — {item.name}</option>)}
-                    </select>
-                  </Field>
-                </div>
-                {sel.courseCode && (
-                  loadingCourse[sel.courseCode] ? <p className="wizard-hint">Loading schedules…</p> :
-                  list.length === 0 ? <div className="reg-notice"><strong>No schedule this week for this course</strong><p>Please choose another course.</p></div> :
-                  <div className="schedule-picker">
-                    {list.map((batch) => (
-                      <button key={batch.id} type="button" className={`schedule-option ${sel.scheduleId === batch.id ? "selected" : ""}`} onClick={() => chooseSchedule(index, batch.id)}>
-                        <span className="schedule-body"><strong>{batch.label}</strong></span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {selections.length > 1 && <button type="button" className="button button-secondary" style={{ marginTop: 10 }} onClick={() => removeSelection(index)}>Remove course {index + 1}</button>}
-              </div>
-            );
-          })}
-          {selections.length < MAX_COURSES && courses.length > 0 && (
-            <button type="button" className="button button-secondary" onClick={addSelection}>+ Add another course ({selections.length}/{MAX_COURSES})</button>
-          )}
+            <label className="consent-row">
+              <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
+              <span>I have read and accepted the New Wave Maritime Terms and Conditions, including the payment, cancellation, rescheduling, refund, make-up class, and certificate policies, and I confirm that the information I provided is complete and accurate.</span>
+            </label>
+            {error && <p className="form-message" role="alert">{error}</p>}
+            <div className="ql-actions"><button className="button button-primary" type="button" disabled={!accepted || !selectionsValid || submitting} onClick={submit}>{submitting ? "Submitting…" : "Submit application"}</button></div>
+          </div>}
         </section>
-      )}
-
-      {stage === "review" && (
-        <section className="wizard-panel">
-          <h2>Review and accept</h2>
-          {!COURSE_STEP && <p className="wizard-hint">After you submit, our Registration team will contact you to confirm your course and schedule, and to collect your requirements and payment.</p>}
-          <div className="review-courses">
-            {completeSelections.map((s, i) => (
-              <div key={i} className="review-course"><div><strong>{nameOf(s.courseCode)}</strong><small>{labelOf(s.courseCode, s.scheduleId)}</small></div></div>
-            ))}
-          </div>
-          <h3 className="review-subhead">Terms and Conditions</h3>
-          <div className="terms-box">
-            {TERMS_SECTIONS.map((section) => (
-              <div key={section.heading} className="terms-section"><strong>{section.heading}</strong><ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul></div>
-            ))}
-            <p className="terms-footer">New Wave Maritime Training and Assessment Center reserves the right to amend, revise, or update these details without prior notice.</p>
-          </div>
-          <label className="consent-row">
-            <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
-            <span>I have read and accepted the New Wave Maritime Terms and Conditions, including the payment, cancellation, rescheduling, refund, make-up class, and certificate policies, and I confirm that the information I provided is complete and accurate.</span>
-          </label>
-        </section>
-      )}
-
-      <div className="wizard-actions">
-        <button className="button button-secondary" type="button" disabled={step === 0 || submitting} onClick={() => setStep((s) => Math.max(0, s - 1))}>Back</button>
-        {stage !== "review" ? (
-          <button className="button button-primary" type="button" disabled={stage === "details" ? !detailsValid : !selectionsValid} onClick={() => setStep((s) => s + 1)}>Continue</button>
-        ) : (
-          <button className="button button-primary" type="button" disabled={!accepted || !selectionsValid || submitting} onClick={submit}>{submitting ? "Submitting…" : "Submit application"}</button>
-        )}
       </div>
     </div>
   );

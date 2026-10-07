@@ -6414,3 +6414,78 @@ a[href^="mailto:"],
 @media (prefers-reduced-motion: reduce) {
   .nw-cert, .nw-cert > a { transition: none }
 }
+
+/* =====================================================================
+   Registration form — "Quiet Checklist" (Oct 2026): Checklist sections
+   (one page, collapsible numbered sections, progress rail) with Quiet lines
+   fields (underline only, orange underline on focus). Outfit for headings,
+   Inter for entries.
+   ===================================================================== */
+.registration-page.ql-page { grid-template-columns: 1fr; gap: 26px; max-width: 1120px; }
+.registration-page.ql-page .registration-intro { position: static; padding-top: 10px; max-width: 760px; }
+.registration-page.ql-page .registration-intro h1 { font-family: var(--font-form), var(--font-ui), sans-serif; font-weight: 600; letter-spacing: -0.015em; }
+
+.ql-form { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 22px; align-items: start; font-family: var(--font-ui), sans-serif; }
+
+.ql-rail { position: sticky; top: 104px; background: #fff; border: 1px solid #dfe8ee; border-radius: 16px; padding: 18px; display: grid; gap: 6px; }
+.ql-rail > strong { font-family: var(--font-form), sans-serif; font-size: 17px; font-weight: 600; color: var(--blue-dark); }
+.ql-rail-count { font-size: 13px; color: var(--muted); }
+.ql-bar { display: block; height: 6px; border-radius: 99px; background: #e3ecf0; margin: 6px 0 8px; overflow: hidden; }
+.ql-bar i { display: block; height: 100%; background: var(--blue); border-radius: inherit; transition: width .25s ease; }
+.ql-rail ol { list-style: none; margin: 0; padding: 0; }
+.ql-rail ol button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 7px 2px; font: inherit; font-size: 14px; font-weight: 500; color: #6a808c; text-align: left; cursor: pointer; }
+.ql-rail ol button i { width: 9px; height: 9px; border-radius: 50%; background: #c9d6dd; flex: none; }
+.ql-rail ol button.done { color: #0a6a33; }
+.ql-rail ol button.done i { background: #0a7d3b; }
+.ql-rail ol button.current { color: var(--blue-dark); font-weight: 700; }
+.ql-rail ol button.current i { background: var(--orange); }
+.ql-rail-submit { margin-top: 10px; min-height: 42px; border-radius: 12px; border: 0; font: inherit; font-weight: 600; font-size: 14px; background: var(--orange-fill); color: #fff; cursor: pointer; }
+.ql-rail-submit:disabled { background: #e3ecf0; color: #7a909c; cursor: not-allowed; }
+
+.ql-sections { display: grid; gap: 12px; }
+.ql-section { background: #fff; border: 1px solid #dfe8ee; border-radius: 16px; transition: border-color .15s ease, box-shadow .15s ease; }
+.ql-section.open { border: 2px solid var(--blue); box-shadow: 0 8px 26px rgba(18, 63, 99, 0.08); }
+.ql-head { display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px 20px; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; border-radius: 16px; }
+.ql-head:disabled { cursor: default; }
+.ql-mark { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; flex: none; font-weight: 700; font-size: 13px; background: #edf3f6; color: var(--muted); }
+.ql-section.open .ql-mark { background: var(--blue); color: #fff; }
+.ql-section.done:not(.open) .ql-mark { background: #0a7d3b; color: #fff; }
+.ql-title { flex: 1; min-width: 0; }
+.ql-title h2 { margin: 0; font-family: var(--font-form), var(--font-ui), sans-serif; font-size: 18px; font-weight: 600; letter-spacing: -0.01em; color: var(--blue-dark); }
+.ql-title > span { display: block; margin-top: 2px; font-size: 13.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ql-section.open .ql-title > span { white-space: normal; }
+.ql-section:not(.open):not(.done) .ql-title h2 { color: #6a808c; }
+.ql-edit { font-size: 14px; font-weight: 600; color: var(--blue-text); }
+.ql-body { padding: 4px 24px 22px 64px; }
+
+/* Quiet lines: underline-only fields. */
+.ql-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 26px; }
+.ql-grid label { display: block; font-size: 13px; font-weight: 500; color: var(--muted); }
+.ql-grid .span-2 { grid-column: 1 / -1; }
+.ql-grid input,
+.ql-grid select { display: block; width: 100%; margin-top: 4px; min-height: 40px; padding: 6px 0 8px; border: 0; border-bottom: 1px solid #c3d2da; border-radius: 0; background: transparent; font: inherit; font-size: 16px; color: var(--ink); outline: 0; transition: border-color .15s ease, box-shadow .15s ease; }
+.ql-grid input::placeholder { color: #8aa0ad; text-transform: none; }
+.ql-grid input:focus,
+.ql-grid select:focus { border-bottom-color: var(--orange); box-shadow: 0 1px 0 0 var(--orange); }
+.ql-grid input[readonly] { color: var(--ink-soft); border-bottom-style: dashed; }
+.ql-lookup { margin: 14px 0 0; padding: 10px 12px; border-radius: 10px; font-size: 13.5px; line-height: 1.5; }
+.ql-lookup.found { background: #e9f7ef; color: #0a6a33; }
+.ql-lookup.none { background: #fdf3e7; color: #8a4b00; }
+.ql-actions { display: flex; justify-content: flex-end; margin-top: 22px; }
+.ql-actions .button:disabled { opacity: .45; cursor: not-allowed; }
+.ql-note { font-size: 14px; color: var(--ink-soft); line-height: 1.6; margin: 0 0 6px; }
+.ql-course { border: 1px solid #dfe8ee; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+.ql-link { border: 0; background: none; padding: 6px 0; font: inherit; font-size: 14px; font-weight: 600; color: var(--blue-text); cursor: pointer; }
+
+@media (max-width: 860px) {
+  .ql-form { grid-template-columns: 1fr; }
+  .ql-rail { position: static; }
+  .ql-rail ol { display: flex; flex-wrap: wrap; gap: 2px 14px; }
+  .ql-rail ol button { width: auto; }
+}
+@media (max-width: 560px) {
+  .ql-grid { grid-template-columns: 1fr; gap: 18px; }
+  .ql-head { padding: 14px 16px; }
+  .ql-body { padding: 2px 16px 18px; }
+  .ql-actions .button { width: 100%; justify-content: center; }
+}
