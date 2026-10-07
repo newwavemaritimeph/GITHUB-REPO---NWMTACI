@@ -460,6 +460,11 @@ export async function GET() {
   // A missing column (migration 202610070002 not yet applied) yields none.
   const { data: awaitingRows } = await db.from("trainees").select("id").eq("awaiting_course", true).limit(500);
   const awaitingCourseIds = (awaitingRows ?? []).map((row: { id: string }) => row.id);
+  // Website enrollment numbers (NWMTACI-0000001), keyed by trainee: what the
+  // applicant quotes on Facebook. A missing column (migration 202610070003 not
+  // yet applied) yields none.
+  const { data: numberRows } = await db.from("trainees").select("id,application_number").not("application_number", "is", null).limit(5000);
+  const applicationNumbers = Object.fromEntries((numberRows ?? []).map((row: { id: string; application_number: string }) => [row.id, row.application_number]));
 
   // Allocations drive paid_centavos, so they must cover every loaded enrollment
   // exactly. Scope them by id instead of capping with a limit: a cap would
@@ -533,7 +538,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {

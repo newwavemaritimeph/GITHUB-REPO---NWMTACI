@@ -52,6 +52,7 @@ const fixture = {
   requests: [{ id: "r1", request_number: "REQ-0001", request_type: "Rescheduling", requested_values: null, reason: "Vessel schedule moved", status: "Pending", created_at: nowIso, trainees: { legal_first_name: "Maria", legal_last_name: "Reyes" }, enrollments: { enrollment_number: "ENR-0001", courses: { name: "Ship Security Officers" } } }],
   requirementChecks: ["valid_id", "seamans_book", "medical_certificate"].map((requirement) => ({ enrollment_id: "e4", requirement, status: "Verified", remarks: null, checked_at: nowIso, checked_by_name: "Reg Officer" })),
   awaitingCourseIds: ["t3"],
+  applicationNumbers: { t3: "NWMTACI-0000003", t1: "NWMTACI-0000001" },
   pendingCharges: [], employeeCharges: [], chargeEmployees: [], instructionTemplates: [], batchStaffing: [], myHr: null,
 } as unknown as PortalData;
 
@@ -101,6 +102,9 @@ describe("Registration Officer workspace", () => {
     expect(apps).toContain("No course yet");
     expect(apps).toContain("Pedro Cruz");
     expect(apps).toContain("Assign course");
+    // Staff find applications by the NWMTACI number applicants quote on Facebook.
+    expect(apps).toContain("NWMTACI-0000003");
+    expect(apps).toContain("NWMTACI-0000001");
     const enrolls = renderToString(createElement(RegistrationRecords, { ...props, view: "enrollments" }));
     expect(enrolls).toContain("ENR-0001");
     expect(enrolls).toContain("Open Schedule");

@@ -115,12 +115,12 @@ export function RegistrationDashboard({ data, go }: { data: PortalData; go: (mod
       <section className="portal-panel rd-panel" id="rd-new">
         <div className="panel-heading"><div><h2>New applications</h2><p>Submitted on the website · last 7 days</p></div><button type="button" className="ghost-button" onClick={() => go("Applications")}>Screen →</button></div>
         {newNoCourse.slice(0, 4).map((t) => <button type="button" className="rd-row" key={t.id} onClick={() => go("Applications")}>
-          <span className="rd-main"><strong>{fullName(t)}</strong><small>Course to be assigned</small></span>
+          <span className="rd-main"><strong>{fullName(t)}</strong><small>{appNoOf(data, t.id) ? <span className="app-no">{appNoOf(data, t.id)}</span> : null}Course to be assigned</small></span>
           <Badge tone="pending">No course yet</Badge>
           <span className="rd-time">{day(t.registered_at) === today ? fmtClock(t.registered_at) : fmtShort(day(t.registered_at))}</span>
         </button>)}
         {recent.slice(0, Math.max(0, 8 - Math.min(4, newNoCourse.length))).map((e) => { const c = first(e.courses), st = stateFor(e); return <button type="button" className="rd-row" key={e.id} onClick={() => go(e.enrollment_status === "Pending" ? "Applications" : "Enrollments")}>
-          <span className="rd-main"><strong>{nameOf(e)}</strong><small>{c?.code ? `${c.code} · ` : ""}{courseLabel(e)}</small></span>
+          <span className="rd-main"><strong>{nameOf(e)}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{c?.code ? `${c.code} · ` : ""}{courseLabel(e)}</small></span>
           <Badge tone={st.tone}>{st.text}</Badge>
           <span className="rd-time">{day(e.created_at) === today ? fmtClock(e.created_at) : fmtShort(day(e.created_at))}</span>
         </button>; })}
@@ -195,6 +195,8 @@ export function applicationReadiness(e: Enrollment, checks: RequirementCheck[]) 
   return { latest, verified: REQUIREMENTS.length - missing.length, missing, rejected, paid, paidCentavos, ready, reason };
 }
 const stateOf = (r: ReturnType<typeof applicationReadiness>) => (r.ready ? { text: "Ready to enroll", tone: "active" } : r.rejected.length ? { text: "Needs attention", tone: "cancelled" } : { text: "Screening", tone: "pending" });
+/** The website enrollment number (NWMTACI-0000001) the applicant quotes on Facebook, if any. */
+const appNoOf = (data: PortalData, traineeId?: string | null) => (traineeId ? data.applicationNumbers?.[traineeId] ?? null : null);
 const applicationsOf = (data: PortalData) => data.enrollments.filter((e) => e.enrollment_status === "Pending");
 /** Website applicants with no course yet — Registration assigns one while screening. */
 const awaitingCourseOf = (data: PortalData) => (data.awaitingCourseIds ?? []).map((id) => data.trainees.find((t) => t.id === id)).filter((t): t is Trainee => !!t).sort((a, b) => (b.registered_at ?? "").localeCompare(a.registered_at ?? ""));
@@ -242,11 +244,11 @@ function ApplicationQueue({ data, query, reload }: { data: PortalData; query: st
   const term = (q || query).trim().toLowerCase();
   const all = applicationsOf(data).map((e) => ({ e, r: applicationReadiness(e, checks) }));
   const [assigning, setAssigning] = useState<Trainee | null>(null);
-  const noCourse = awaitingCourseOf(data).filter((t) => !term || `${fullName(t)} ${t.trainee_number} ${t.email} ${t.mobile}`.toLowerCase().includes(term));
+  const noCourse = awaitingCourseOf(data).filter((t) => !term || `${fullName(t)} ${t.trainee_number} ${appNoOf(data, t.id) ?? ""} ${t.email} ${t.mobile}`.toLowerCase().includes(term));
   const matches = (x: (typeof all)[number]) => filter !== "No course yet" && (filter === "All" || (filter === "Ready" ? x.r.ready : filter === "Missing requirements" ? x.r.missing.length > 0 : !x.r.paid));
   const rows = all
     .filter(matches)
-    .filter(({ e }) => !term || `${nameOf(e)} ${e.enrollment_number} ${first(e.courses)?.name ?? ""} ${first(e.trainees)?.trainee_number ?? ""}`.toLowerCase().includes(term))
+    .filter(({ e }) => !term || `${nameOf(e)} ${e.enrollment_number} ${appNoOf(data, e.trainee_id) ?? ""} ${first(e.courses)?.name ?? ""} ${first(e.trainees)?.trainee_number ?? ""}`.toLowerCase().includes(term))
     .sort((a, b) => (first(a.e.batches)?.starts_on ?? "9999").localeCompare(first(b.e.batches)?.starts_on ?? "9999") || a.e.created_at.localeCompare(b.e.created_at));
   const PER = 12;
   const pageRows = rows.slice((page - 1) * PER, page * PER);
@@ -254,18 +256,19 @@ function ApplicationQueue({ data, query, reload }: { data: PortalData; query: st
   const count = (f: (typeof APP_FILTERS)[number]) => (f === "All" ? all.length + awaitingCourseOf(data).length : f === "No course yet" ? awaitingCourseOf(data).length : all.filter((x) => (f === "Ready" ? x.r.ready : f === "Missing requirements" ? x.r.missing.length > 0 : !x.r.paid)).length);
   return <>
     <div className="portal-tabs">{APP_FILTERS.map((f) => <button key={f} type="button" className={filter === f ? "active" : ""} onClick={() => { setFilter(f); setPage(1); }}>{f}<small style={{ marginLeft: 6, opacity: 0.7 }}>{count(f)}</small></button>)}</div>
-    <div style={{ display: "flex", gap: 10, padding: "0 0 10px" }}><label className="portal-field-inline" style={{ flex: 1, minWidth: 220 }}>Search<input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Applicant, application number, course" /></label></div>
+    <div style={{ display: "flex", gap: 10, padding: "0 0 10px" }}><label className="portal-field-inline" style={{ flex: 1, minWidth: 220 }}>Search<input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Name, NWMTACI number, SRN, course" /></label></div>
     {(filter === "All" || filter === "No course yet") && noCourse.length > 0 && <section className="portal-panel nc-panel">
       <div className="panel-heading"><div><h2>No course yet</h2><p>Assign a course and schedule, then screen the application</p></div><span className="slot-count">{noCourse.length}</span></div>
       {noCourse.map((t) => <div className="rd-row" key={t.id}>
-        <span className="rd-main"><strong>{fullName(t)}</strong><small>{t.trainee_number} · <span className="lc">{t.email}</span> · {t.mobile}</small></span>
+        <span className="rd-main"><strong>{fullName(t)}</strong><small>{appNoOf(data, t.id) ? <span className="app-no">{appNoOf(data, t.id)}</span> : null}{t.trainee_number} · <span className="lc">{t.email}</span> · {t.mobile}</small></span>
         <span className="rd-time">{t.registered_at ? fmtShort(day(t.registered_at)) : ""}</span>
         <button type="button" className="portal-primary" onClick={() => setAssigning(t)}>Assign course</button>
       </div>)}
     </section>}
-    <div className="portal-table portal-panel"><table><thead><tr><th>Applicant</th><th>Course &amp; schedule</th><th>Submitted</th><th>Requirements</th><th>Payment</th><th>State</th></tr></thead><tbody>
+    <div className="portal-table portal-panel"><table><thead><tr><th>Applicant</th><th>Enrollment no.</th><th>Course &amp; schedule</th><th>Submitted</th><th>Requirements</th><th>Payment</th><th>State</th></tr></thead><tbody>
       {pageRows.map(({ e, r }) => { const t = first(e.trainees), s = stateOf(r); return <tr key={e.id} className="row-clickable" onClick={() => setOpen(e)}>
-        <td><strong>{t ? fullName(t) : "Unknown"}</strong><small>{e.enrollment_number}</small></td>
+        <td><strong>{t ? fullName(t) : "Unknown"}</strong><small>{t?.trainee_number}</small></td>
+        <td><strong className="app-no-cell">{appNoOf(data, e.trainee_id) ?? "—"}</strong><small>{e.enrollment_number}</small></td>
         <td>{first(e.courses)?.name ?? "—"}<small>{scheduleOf(e)}</small></td>
         <td>{fmtDate(day(e.created_at))}<small>{e.source === "Public registration" ? "Website" : e.source ?? ""}</small></td>
         <td><span className={`req-count${r.missing.length ? "" : " ok"}`}>{r.verified} of {REQUIREMENTS.length}</span>{r.rejected.length > 0 && <small>Rejected: {r.rejected.join(", ")}</small>}</td>
@@ -391,12 +394,12 @@ function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { data: Port
   const isApplication = e.enrollment_status === "Pending";
   const hasDocuments = e.enrollment_status === "Enrolled" || e.enrollment_status === "Open Schedule";
   const p = payState(e);
-  return <Modal title={isApplication ? `Application ${e.enrollment_number}` : e.enrollment_number} onClose={onClose} wide>
+  return <Modal title={isApplication ? `Application ${appNoOf(data, e.trainee_id) ?? e.enrollment_number}` : e.enrollment_number} onClose={onClose} wide>
     <div className="portal-form">
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
       {isApplication && <ScreeningPanel data={data} enrollment={e} busy={busy} post={post} />}
       <div className="kv-grid full">
-        <div><span>{isApplication ? "Applicant" : "Trainee"}</span><strong>{t ? fullName(t) : "—"}</strong><small>{t?.trainee_number} · <span className="lc">{t?.email}</span> · {t?.mobile}</small></div>
+        <div><span>{isApplication ? "Applicant" : "Trainee"}</span><strong>{t ? fullName(t) : "—"}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{t?.trainee_number} · <span className="lc">{t?.email}</span> · {t?.mobile}</small></div>
         <div><span>Course</span><strong>{c?.name ?? "—"}</strong><small>{c?.code}{center ? ` · endorsed: ${center}` : " · New Wave"}</small></div>
         <div><span>Schedule</span><strong>{scheduleOf(e)}</strong><small>{b ? `${b.batch_number}${b.mode ? ` · ${b.mode}` : ""}${b.venue ? ` · ${b.venue}` : ""}` : e.scheduled_on ? "Endorsed training date" : "Not yet placed on a batch"}</small></div>
         <div><span>Status</span><strong><Badge tone={statusTone(e.enrollment_status)}>{e.enrollment_status}</Badge></strong><small>{isApplication ? "Submitted" : "Created"} {fmtDate(day(e.created_at))}{e.source ? ` · ${e.source}` : ""}</small></div>

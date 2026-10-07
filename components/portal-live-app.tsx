@@ -48,7 +48,9 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   // Latest screening check per (enrollment, requirement); empty until migration 202610070001.
   requirementChecks?:{enrollment_id:string;requirement:string;status:string;remarks:string|null;checked_at:string;checked_by_name:string|null}[];
   // Website applicants with no course yet (Registration assigns it); empty until migration 202610070002.
-  awaitingCourseIds?:string[] };
+  awaitingCourseIds?:string[];
+  // Website enrollment number (NWMTACI-0000001) per trainee id; empty until migration 202610070003.
+  applicationNumbers?:Record<string,string> };
 
 // Sidebar is grouped so a long role list stays scannable. Group order here is the
 // render order; a group disappears entirely when the role can see none of its items.
@@ -255,12 +257,12 @@ function Trainees({data,query,embedded}:{data:PortalData;query:string;embedded?:
   const term=(lookup||query).toLowerCase();
   const rows=data.trainees.filter(t=>{
     const reg=(t.registered_at||"").slice(0,10);
-    const matchesTerm=!term||`${fullName(t)} ${t.trainee_number} ${t.email} ${t.mobile}`.toLowerCase().includes(term);
+    const matchesTerm=!term||`${fullName(t)} ${t.trainee_number} ${data.applicationNumbers?.[t.id]??""} ${t.email} ${t.mobile}`.toLowerCase().includes(term);
     return matchesTerm&&(!from||reg>=from)&&(!to||reg<=to);
   });
   const rangeLabel=from||to?`${from?date(from):"…"} – ${to?date(to):"…"}`:"All dates";
   return <Page embedded={embedded} head={<PageHead eyebrow="Central master records" title="Trainees" text="Persisted profiles used across enrollment and payments. Enroll trainees from the Enrollments tab."/>}>
-    <section className="portal-panel" style={{marginBottom:16}}><div className="panel-heading"><div><h2>Trainee lookup</h2><p>Find any trainee by name, number, email, or mobile</p></div></div><div className="portal-form" style={{padding:"0 0 4px"}}><label className="full">Search<input value={lookup} onChange={e=>setLookup(e.target.value)} placeholder="Search name, number, email, or mobile"/></label></div></section>
+    <section className="portal-panel" style={{marginBottom:16}}><div className="panel-heading"><div><h2>Trainee lookup</h2><p>Find any trainee by name, number, email, or mobile</p></div></div><div className="portal-form" style={{padding:"0 0 4px"}}><label className="full">Search<input value={lookup} onChange={e=>setLookup(e.target.value)} placeholder="Search name, NWMTACI number, email, or mobile"/></label></div></section>
     <section className="portal-panel"><div className="panel-heading"><div><h2>Trainee summary</h2><p>Date-sensitive · {rangeLabel}</p></div></div>
       <div className="portal-form" style={{padding:"0 0 8px"}}><label>Start date<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label><label>End date<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label>{(from||to)&&<label style={{alignSelf:"end"}}><button type="button" className="ghost-button" onClick={()=>{setFrom("");setTo("")}}>Clear dates</button></label>}</div>
       <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Contact</th><th>Status</th><th>Registered</th><th></th></tr></thead><tbody>{rows.map(t=>{const s=traineeEnrollmentStatus(data,t.id);return <tr key={t.id} className="row-clickable" onClick={()=>setSel(t)}><td><strong>{fullName(t)}</strong><small>{t.trainee_number}</small></td><td className="lc">{t.email}<small>{t.mobile}</small></td><td>{s?<Badge>{s}</Badge>:<span className="portal-empty-copy">—</span>}</td><td>{new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",year:"numeric",timeZone:"Asia/Manila"}).format(new Date(t.registered_at))}</td><td className="document-actions"><button type="button">View</button></td></tr>})}</tbody></table>{!rows.length&&<p className="portal-empty-copy">No matching trainees.</p>}</div>

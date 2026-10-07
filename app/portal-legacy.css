@@ -1150,3 +1150,6 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .rr-switch button { border-radius: 10px; }
 .portal-shell .rr-switch button.active { background: linear-gradient(90deg, #0571d0, #2a8fe6); box-shadow: 0 4px 10px rgba(5, 113, 208, 0.25); }
 .portal-shell .portal-table th { font-family: var(--font-portal), sans-serif; }
+/* Website enrollment number (NWMTACI-0000001) — what applicants quote on Facebook. */
+.app-no { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 5px; background: #fff1ea; color: var(--orange-text); font-family: var(--font-num), ui-monospace, monospace; font-weight: 600; font-size: 0.95em; letter-spacing: 0.02em; }
+.app-no-cell { font-family: var(--font-num), ui-monospace, monospace; letter-spacing: 0.02em; color: var(--orange-text); white-space: nowrap; }
