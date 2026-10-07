@@ -1,5 +1,7 @@
-/* Training Admission Record — one side of half a short bond sheet (8.5 × 5.5 in). */
-@page { size: 8.5in 5.5in; margin: 0; }
+/* Training Admission Record — two copies (original and duplicate) on one legal
+   sheet (8.5 × 14 in). Each copy is the half-sheet design, scaled up 1.2× to
+   fill its 7 in half. */
+@page { size: 8.5in 14in; margin: 0; }
 
 .tar-screen { min-height: 100vh; background: #e9eef4; padding: 20px 16px 40px; display: flex; flex-direction: column; align-items: center; gap: 18px; font-family: var(--font-ui), "Libre Franklin", Arial, sans-serif; color: #0b1f33; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .tar-toolbar { width: 8.5in; max-width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #fff; border: 1px solid #dfe8ee; border-radius: 12px; padding: 10px 14px; }
@@ -9,7 +11,13 @@
 .tar-toolbar button { height: 38px; padding: 0 16px; border-radius: 10px; border: 0; background: #c8440e; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
 .tar-toolbar button.ghost { background: #fff; color: #123f63; border: 1px solid #d3e1e8; }
 
-.tar-sheet { width: 8.5in; height: 5.5in; overflow: hidden; background: #fff; padding: .13in .2in; box-shadow: 0 10px 30px rgba(11, 31, 51, .15); font-size: 6.4pt; line-height: 1.25; }
+.tar-legal { width: 8.5in; height: 14in; background: #fff; box-shadow: 0 10px 30px rgba(11, 31, 51, .15); display: flex; flex-direction: column; }
+.tar-copy { position: relative; height: 7in; overflow: hidden; }
+.tar-copy + .tar-copy { border-top: 1.5px dashed #9aa9b3; }
+.tar-copy + .tar-copy::before { content: "✂"; position: absolute; left: .12in; top: -.11in; background: #fff; color: #9aa9b3; font-size: 11pt; padding: 0 3px; }
+.tar-sheet { position: relative; zoom: 1.2; width: calc(8.5in / 1.2); height: calc(7in / 1.2); overflow: hidden; background: #fff; padding: .14in .2in .12in; font-size: 6.4pt; line-height: 1.25; }
+.tar-copy-tag { position: absolute; top: .03in; right: .2in; font-size: 5.4pt; letter-spacing: .1em; color: #40606f; }
+.tar-copy-tag b { color: #b23d0c; }
 .tar-sheet table { width: 100%; border-collapse: collapse; }
 .tar-sheet .mono { font-family: var(--font-geist-mono), "IBM Plex Mono", ui-monospace, monospace; }
 .tar-sheet .accent { color: #b23d0c; font-weight: 700; }
@@ -52,7 +60,7 @@
 .tar-terms-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .tar-terms-head b { font-size: 6pt; letter-spacing: .08em; color: #123f63; }
 .tar-terms-head span { font-size: 5.2pt; color: #40606f; }
-.tar-terms-cols { columns: 3; column-gap: .14in; font-size: 6pt; line-height: 1.32; color: #1d2a33; margin-top: 1px; }
+.tar-terms-cols { columns: 3; column-gap: .16in; font-size: 6.4pt; line-height: 1.35; color: #1d2a33; margin-top: 1px; }
 .tar-terms-cols p { break-inside: avoid; margin: 0 0 2px; }
 .tar-terms-cols b { color: #123f63; }
 .tar-cont { margin-top: 6px; font-size: 6.4pt; }
@@ -61,6 +69,6 @@
   html, body { margin: 0 !important; background: #fff !important; }
   .tar-screen { padding: 0; gap: 0; background: #fff; display: block; min-height: 0; }
   .tar-toolbar { display: none !important; }
-  .tar-sheet { box-shadow: none; page-break-after: always; break-after: page; }
-  .tar-sheet:last-of-type { page-break-after: auto; break-after: auto; }
+  .tar-legal { box-shadow: none; page-break-after: always; break-after: page; }
+  .tar-legal:last-of-type { page-break-after: auto; break-after: auto; }
 }

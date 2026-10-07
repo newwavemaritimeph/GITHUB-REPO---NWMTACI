@@ -6,7 +6,7 @@ import "./admission-record.css";
 
 /**
  * Training Admission Record (Oct 2026, "Design 01 · classic official").
- * One side of half a short bond sheet (8.5 × 5.5 in): the trainee's admission
+ * Two copies (original and duplicate) on one legal sheet (8.5 × 14 in): the trainee's admission
  * slip and acknowledgement receipt with its AR number, every active course,
  * fees including miscellaneous charges, each payment received, and the terms
  * and conditions. Amounts are read live; the AR number comes from
@@ -29,14 +29,15 @@ function trainingDates(start?: string | null, end?: string | null) {
 }
 const hhmm = (t?: string | null) => (t ? String(Number(t.slice(0, 2))) + t.slice(2, 5) : "");
 
+// Short form of the terms the trainee accepted in full at registration.
 const TERMS: [string, string][] = [
-  ["1. Payment Terms", "Full payment or a minimum of 50% down payment is required upon enrollment. Full payment must be settled before the completion of the training. Full payment is required for a 1-day course of New Wave."],
-  ["2. Cancellation Policy", "Enrollment cancellations must be communicated to the Training Center prior to the scheduled training date. Applicable cancellation charges and deductions shall be in accordance with the Refund Policy of the Training Center."],
-  ["3. Rescheduling Policy", "Trainees unable to attend a scheduled session for courses of one (1) to two (2) days may request to have their training rescheduled. Rescheduling is subject to slot availability and approval of the Training Center. Applicable reschedule charges and deductions shall be in accordance with the Refund Policy of the Training Center."],
-  ["4. Refund Policy", "Refund requests made at least five (5) days before the scheduled training date shall be subject to a Php 350.00 processing fee. Refund requests made within five (5) days before the scheduled training date shall be subject to a deduction of 50% of the course fee plus a Php 250.00 processing fee."],
-  ["5. Make-up Class Policy", "Make-up classes are available only for courses of three (3) days or more, subject to schedule availability and approval. Trainees unable to attend a scheduled session due to valid reasons must immediately inform the Training Center. A make-up class fee of Php 350.00 per training day shall be charged."],
-  ["6. Issuance of Certificate of Completion", "Certificates of Completion shall be issued only to trainees who have successfully completed all course requirements and settled all outstanding balances."],
-  ["7. Miscellaneous", "Miscellaneous fees (such as the training uniform) are part of the total amount due. This record is the trainee's admission slip and acknowledgement receipt; a reprint keeps the same AR number. New Wave Maritime Training and Assessment Center reserves the right to amend, revise, or update these details without prior notice."],
+  ["1. Payment", "Full payment or at least 50% down payment on enrollment; settle in full before training ends. One-day courses are paid in full."],
+  ["2. Cancellation", "Notify the Training Center before the training date. Deductions follow the Refund Policy."],
+  ["3. Rescheduling", "One- to two-day courses may be rescheduled, subject to slots and approval. Charges follow the Refund Policy."],
+  ["4. Refund", "Five or more days before training: Php 350.00 processing fee. Within five days: 50% of the course fee plus Php 250.00."],
+  ["5. Make-up class", "For courses of three days or more, subject to schedule and approval. Php 350.00 per training day."],
+  ["6. Certificate", "Issued only when all course requirements are completed and all balances are settled."],
+  ["7. Miscellaneous", "Miscellaneous fees are part of the total due. This record is your admission slip and acknowledgement receipt. Terms may be updated without prior notice."],
 ];
 const ORG = "NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.";
 const ADDRESS = "Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000 · +63 948 847 6530 · (02) 8553 0310 · newwavemaritime@gmail.com · facebook.com/newwavemtc";
@@ -122,9 +123,10 @@ export default async function AdmissionRecordPage({ params }: { params: Promise<
     <div className="tar-title"><div><b>TRAINING ADMISSION RECORD</b> <span>· admission slip and acknowledgement receipt · issued {issued}{pages > 1 ? ` · page ${page} of ${pages}` : ""}</span></div><div><span>AR NO. </span><strong>{record.ar_number}</strong></div></div>
   </>;
 
-  return <main className="tar-screen">
-    <PrintControls arNumber={record.ar_number} />
-    <section className="tar-sheet">
+  // Page 1 (and page 2 when there are more than six courses). Each page is
+  // printed twice on one legal sheet: an original for the trainee and a
+  // duplicate for the file.
+  const page1 = <>
       {header(1)}
       <table className="tar-grid"><tbody>
         <tr><th>Name</th><td><b>{name}</b></td><th>Enrollment no.</th><td className="mono accent">{t.application_number ?? t.trainee_number}</td><th>SRN</th><td><b>{t.srn ?? "—"}</b></td></tr>
@@ -148,13 +150,22 @@ export default async function AdmissionRecordPage({ params }: { params: Promise<
           <div className="tar-sigs">{[["Registration officer", officer], ["Cashier", cashier], ["Trainee", ""]].map(([label, n]) => <div key={label}><span>{n}</span><small>{label}</small></div>)}</div>
         </div>
       </div>
-      <div className="tar-terms"><div className="tar-terms-head"><b>TERMS AND CONDITIONS</b><span>Accepted by the trainee at registration. Present this record with a valid ID on the first training day; report by 7:30 AM.</span></div>
+      <div className="tar-terms"><div className="tar-terms-head"><b>TERMS AND CONDITIONS (SUMMARY)</b><span>Full terms accepted at registration. Present this record with a valid ID on the first training day; report by 7:30 AM.</span></div>
         <div className="tar-terms-cols">{TERMS.map(([h, body]) => <p key={h}><b>{h}</b> {body}</p>)}</div></div>
-    </section>
-    {more.length > 0 && <section className="tar-sheet">
+  </>;
+  const page2 = more.length > 0 ? <>
       {header(2)}
       <table className="tar-table"><thead><tr><th className="c">#</th><th>Course</th><th>Training dates</th><th>Time</th><th>Room</th><th className="r">Fee</th></tr></thead><tbody>{courseRows(more, COURSES_ON_FRONT)}</tbody></table>
       <p className="dim tar-cont">Continuation of {record.ar_number} for {name}. Fees, payments and terms are on page 1.</p>
-    </section>}
+  </> : null;
+  const copies = [["ORIGINAL COPY", "Trainee"], ["DUPLICATE COPY", "Office file"]];
+
+  return <main className="tar-screen">
+    <PrintControls arNumber={record.ar_number} />
+    {[page1, page2].filter(Boolean).map((content, i) => <section className="tar-legal" key={i}>
+      {copies.map(([label, holder]) => <div className="tar-copy" key={label}>
+        <div className="tar-sheet"><span className="tar-copy-tag"><b>{label}</b> · {holder}</span>{content}</div>
+      </div>)}
+    </section>)}
   </main>;
 }

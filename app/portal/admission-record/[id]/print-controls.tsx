@@ -9,7 +9,7 @@ export function PrintControls({ arNumber }: { arNumber: string }) {
     return () => window.clearTimeout(timer);
   }, []);
   return <div className="tar-toolbar">
-    <div><b>Training Admission Record · {arNumber}</b><span>Print on half a short bond sheet (8.5 × 5.5 in), landscape, at 100% scale with no margins.</span></div>
+    <div><b>Training Admission Record · {arNumber}</b><span>Print on legal paper (8.5 × 14 in), portrait, at 100% scale with no margins. Cut along the dashed line: original for the trainee, duplicate for the file.</span></div>
     <span className="tar-toolbar-actions"><button type="button" onClick={() => window.print()}>Print</button><button type="button" className="ghost" onClick={() => window.close()}>Close</button></span>
   </div>;
 }
