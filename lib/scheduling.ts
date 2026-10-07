@@ -2,6 +2,29 @@ export function courseDays(durationLabel: string) {
   return Math.max(1, Math.ceil(Number.parseFloat(durationLabel) || 1));
 }
 
+/** The STCW courses New Wave schedules and publishes on the website (owner, 7 Oct 2026). */
+export const PUBLIC_STCW_CODES = ["UBT-PSSR", "STPPDSPPS", "PSCMT", "PSCMHBT", "CCMD"] as const;
+
+/**
+ * Whether an In-House course picked on the website can start on this date: no
+ * Sunday start, and its training days run consecutively within the same
+ * Monday–Saturday week (a 3-day course can start Monday to Thursday). Courses of
+ * six or more days start on Monday.
+ */
+export function fitsInWeek(start: string, durationLabel: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return false;
+  const day = new Date(`${start}T00:00:00Z`).getUTCDay();
+  if (day === 0) return false;
+  const days = courseDays(durationLabel);
+  if (days >= 6) return day === 1;
+  return day + days - 1 <= 6;
+}
+
+/** Last weekday (1=Mon … 6=Sat) a course of this duration may start on within its week. */
+export function lastStartWeekday(durationLabel: string) {
+  return Math.max(1, 7 - Math.min(6, courseDays(durationLabel)));
+}
+
 export function automaticEndDate(start: string, durationLabel: string) {
   if (!start) return "";
   const required = courseDays(durationLabel);
@@ -40,6 +63,7 @@ export function validBatchStart(code: string, durationLabel: string, start: stri
   if (code === "PSCMHBT") return day === 4;
   if (code === "UBT-PSSR") return day >= 1 && day <= 6;
   if (code === "CCMI") return day === 1;
+  if (code === "CCMD") return day === 1; // Crowd and Crisis Management - Domestic: Monday–Wednesday
   return startWeekdaysForDuration(durationLabel).includes(day);
 }
 

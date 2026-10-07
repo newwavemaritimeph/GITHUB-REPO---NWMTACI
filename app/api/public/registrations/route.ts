@@ -12,6 +12,7 @@ import {
   normalizePhContactNumber,
   normalizeSrn,
 } from "@/lib/validation";
+import { PUBLIC_STCW_CODES, fitsInWeek } from "@/lib/scheduling";
 
 const registrationSchema = z.object({
   firstName: z.string().trim().min(2).max(80), middleName: z.string().trim().max(80).optional().default(""), lastName: z.string().trim().min(2).max(80), suffix: z.string().trim().max(20).optional().default(""),
@@ -29,6 +30,9 @@ const registrationSchema = z.object({
 // Schedules are optional: without one, Registration assigns the course and
 // schedule while screening (owner instruction, 7 Oct 2026).
 const batchesSchema = z.array(z.string().uuid()).max(5, "You can select up to 5 courses per submission.");
+
+// An In-House course and start date picked on the public Courses page.
+const datedCourseSchema = z.object({ courseCode: z.string().trim().min(1).max(40), startDate: z.string().date() });
 
 const FIELD_LABELS: Record<string, string> = {
   firstName: "First name", middleName: "Middle name", lastName: "Last name", suffix: "Suffix", srn: "SRN", email: "Email address",
@@ -71,6 +75,7 @@ export async function POST(request: Request) {
     const form = await request.formData();
     const body = registrationSchema.parse(Object.fromEntries(form));
     const batches = batchesSchema.parse(form.getAll("scheduleIds").map((v) => String(v)).filter(Boolean));
+    const dated = form.get("courseCode") && form.get("startDate") ? datedCourseSchema.parse({ courseCode: form.get("courseCode"), startDate: form.get("startDate") }) : null;
     const db = createSupabaseAdminClient();
     const { data: terms } = await db.from("terms_documents").select("version").eq("active", true).lte("effective_from", new Date().toISOString().slice(0,10)).order("effective_from", { ascending: false }).limit(1).maybeSingle();
     if (!terms) throw new Error("No approved terms are active.");
@@ -82,6 +87,7 @@ export async function POST(request: Request) {
     }), 15000, "The registration service is busy (a previous submission may still be finalizing). Please try again in a minute.");
     if (error) throw error;
     const result = data as { application_number?:string;registration_reference:string;trainee_id:string;email:string;complete_name:string };
+    if (dated && !batches.length) await attachDatedCourse(db, result.trainee_id, dated);
     // Trainees have no portal account. They follow their enrollment through the
     // public status lookup using this reference plus their registered email.
     // application_number (NWMTACI-0000001) exists once migration 202610070003 is
@@ -92,4 +98,23 @@ export async function POST(request: Request) {
     if (status !== 429) console.error("Public registration failed:", error);
     return NextResponse.json({ error: status === 429 ? "Too many registration attempts. Please try again later." : applicantMessage(error) }, { status });
   }
+}
+
+/**
+ * Put the In-House course and start date the applicant picked onto their
+ * application (a Pending enrollment with scheduled_on, no batch). Best-effort:
+ * if anything does not check out, the application stays without a course and
+ * Registration assigns one while screening.
+ */
+async function attachDatedCourse(db: ReturnType<typeof createSupabaseAdminClient>, traineeId: string, pick: { courseCode: string; startDate: string }) {
+  try {
+    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+    if ((PUBLIC_STCW_CODES as readonly string[]).includes(pick.courseCode) || pick.startDate <= today) return;
+    const { data: course } = await db.from("courses").select("id,duration_label").eq("code", pick.courseCode).eq("delivery_type", "In-House").eq("active", true).maybeSingle();
+    if (!course || !fitsInWeek(pick.startDate, course.duration_label)) return;
+    const { data: enrollment, error } = await db.rpc("assign_application_course", { target_trainee: traineeId, target_course: course.id, target_batch: null, actor: null });
+    if (error || !enrollment) { console.error("Could not attach the picked course:", error?.message); return; }
+    const { error: dateError } = await db.from("enrollments").update({ scheduled_on: pick.startDate }).eq("id", (enrollment as { id: string }).id);
+    if (dateError) console.error("Could not set the picked start date:", dateError.message);
+  } catch (err) { console.error("Could not attach the picked course:", err instanceof Error ? err.message : err); }
 }

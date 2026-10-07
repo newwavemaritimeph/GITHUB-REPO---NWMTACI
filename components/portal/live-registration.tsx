@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from "react";
 import type { PortalData, Enrollment, Batch, Trainee } from "../portal-live-app";
 import { first, manilaToday, dueCentavos, balanceOf, pesos, addDays } from "@/lib/portal-format";
+import { automaticEndDate, fitsInWeek } from "@/lib/scheduling";
 import { Badge, Message, Modal, PageHead, Pager, Kpi, usePost, fullName, fmtDate, fmtClock } from "./shared-ui";
 import { RequestActionModal, type RequestType } from "./payment-actions";
 
@@ -42,6 +43,11 @@ const requestsFor = (data: PortalData, e: Enrollment) => data.requests.filter((r
 const MISSING_CHECKS: [string, (t: { srn?: string | null; email?: string; mobile?: string }) => boolean][] = [["SRN", (t) => !t.srn], ["Email", (t) => !t.email], ["Mobile", (t) => !t.mobile]];
 const missingFor = (t: { srn?: string | null; email?: string; mobile?: string } | null | undefined) => (t ? MISSING_CHECKS.filter(([, f]) => f(t)).map(([l]) => l) : []);
 
+/** One row per course: the catalog holds some courses twice (same code or same name). */
+function uniqueCourses<T extends { code: string; name: string }>(rows: T[]) {
+  const seen = new Set<string>();
+  return rows.filter((c) => { const keys = ["code:" + c.code.trim().toUpperCase(), "name:" + c.name.trim().toLowerCase().replace(/\s+/g, " ")]; if (keys.some((k) => seen.has(k))) return false; keys.forEach((k) => seen.add(k)); return true; });
+}
 /** STCW courses are the In-House courses filed under an STCW category. */
 const isStcwCourse = (c?: PortalData["courses"][number] | null) => (first(c?.course_categories)?.name ?? "").toLowerCase().includes("stcw");
 /** A New Wave batch a trainee can still be placed on: open, not started, before its deadline, with seats left. */
@@ -195,8 +201,9 @@ export function applicationReadiness(e: Enrollment, checks: RequirementCheck[], 
   const rejected = REQUIREMENTS.filter((r) => latest.get(r.code)?.status === "Rejected").map((r) => r.label);
   const paidCentavos = Number(e.verified_paid_centavos ?? 0);
   const paid = paidCentavos > 0;
-  const ready = !missing.length && paid && !!e.batch_id;
-  const reason = missing.length ? `Not verified yet: ${missing.join(", ")}` : !paid ? "No verified payment yet" : !e.batch_id ? "Paid — choose a batch to enroll" : "Paid — enrolling";
+  const scheduled = !!e.batch_id || !!e.scheduled_on;
+  const ready = !missing.length && paid && scheduled;
+  const reason = missing.length ? `Not verified yet: ${missing.join(", ")}` : !paid ? "No verified payment yet" : !scheduled ? "Paid — choose a batch to enroll" : "Paid — enrolling";
   const handed = !!handedAt;
   return { latest, verified: REQUIREMENTS.length - missing.length, missing, rejected, paid, paidCentavos, ready, reason, handed, handedAt: handedAt ?? null };
 }
@@ -264,11 +271,16 @@ export function AssignCourseModal({ data, trainee, reload, onClose }: { data: Po
   const [courseId, setCourseId] = useState("");
   const [batchId, setBatchId] = useState(NO_BATCH);
   const today = manilaToday(), now = new Date().toISOString();
-  const courses = data.courses.filter((c) => c.delivery_type === "In-House").sort((x, y) => x.name.localeCompare(y.name));
+  const courses = uniqueCourses(data.courses.filter((c) => c.delivery_type === "In-House")).sort((x, y) => x.name.localeCompare(y.name));
   const batches = data.batches.filter((x) => x.course_id === courseId && isBookable(x, today, now)).sort((x, y) => x.starts_on.localeCompare(y.starts_on));
   const course = courses.find((c) => c.id === courseId);
   const withBatch = batchId !== NO_BATCH;
-  const assign = () => void post({ action: "application-assign", traineeId: trainee.id, courseId, batchId: withBatch ? batchId : null }, withBatch ? "Course and batch assigned. Screening can start." : "Course assigned. Screening can start; place on a batch once one opens.").then(onClose).catch(() => undefined);
+  // Non-STCW in-house courses run on a picked start date (Sundays skipped,
+  // consecutive within the week) instead of a batch.
+  const [startDate, setStartDate] = useState("");
+  const dated = !!course && !isStcwCourse(course) && !batches.length;
+  const dateOk = !startDate || (startDate > today && fitsInWeek(startDate, course?.duration_label ?? "1"));
+  const assign = () => void post({ action: "application-assign", traineeId: trainee.id, courseId, batchId: withBatch ? batchId : null, scheduledOn: dated && startDate ? startDate : null }, withBatch ? "Course and batch assigned. Screening can start." : dated && startDate ? "Course and start date assigned. Screening can start." : "Course assigned. Screening can start; place on a batch once one opens.").then(onClose).catch(() => undefined);
   return <Modal title={`Assign a course · ${fullName(trainee)}`} onClose={onClose}>
     <div className="portal-form">
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
@@ -277,8 +289,9 @@ export function AssignCourseModal({ data, trainee, reload, onClose }: { data: Po
         <optgroup label="STCW courses">{courses.filter(isStcwCourse).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name} · {pesos(c.standard_price_centavos)}</option>)}</optgroup>
         <optgroup label="Other courses">{courses.filter((c) => !isStcwCourse(c)).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name} · {pesos(c.standard_price_centavos)}</option>)}</optgroup>
       </select></label>
-      {course && <div className="full"><BatchCards data={data} batches={batches} selected={batchId} onSelect={setBatchId} allowNone /></div>}
-      <div className="bc-foot full"><span>{course ? (withBatch ? batchSummary(data, batches.find((x) => x.id === batchId)) : `${course.code} · fee ${pesos(course.standard_price_centavos)} · no batch yet`) : "Choose a course first."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!courseId || busy} onClick={assign}>{busy ? "Assigning…" : withBatch ? "Assign course & batch" : "Assign course"}</button></span></div>
+      {course && !dated && <div className="full"><BatchCards data={data} batches={batches} selected={batchId} onSelect={setBatchId} allowNone /></div>}
+      {dated && course && <label className="full">Start date (optional)<input type="date" value={startDate} min={addDays(today, 1)} onChange={(e) => setStartDate(e.target.value)} /><small style={{ color: dateOk ? "var(--muted)" : "var(--red, #b42318)" }}>{!startDate ? `${course.duration_label} · Monday to Saturday, consecutive days in one week. Leave empty to set later.` : dateOk ? `Runs ${fmtDate(startDate)} to ${fmtDate(automaticEndDate(startDate, course.duration_label))}` : "Pick a later date that is not a Sunday and lets the course finish by Saturday of the same week."}</small></label>}
+      <div className="bc-foot full"><span>{course ? (withBatch ? batchSummary(data, batches.find((x) => x.id === batchId)) : `${course.code} · fee ${pesos(course.standard_price_centavos)} · no batch yet`) : "Choose a course first."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!courseId || busy || !dateOk} onClick={assign}>{busy ? "Assigning…" : withBatch ? "Assign course & batch" : "Assign course"}</button></span></div>
     </div>
   </Modal>;
 }
@@ -387,7 +400,7 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
   return <div className="screen-box full">
     <div className="screen-head"><div><strong>Screening</strong><small>Tick each requirement as it is received and hand the applicant to the Cashier. Once paid and on a batch, they are enrolled automatically.</small></div><Badge tone={s.tone}>{s.text}</Badge></div>
     <ol className="screen-steps" aria-label="Application progress">
-      {([["Requirements", `${r.verified} of ${REQUIREMENTS.length}`, allTicked], ["Cashier", r.handed ? `${fmtDate(day(r.handedAt))}` : "Not yet", r.handed], ["Payment", r.paid ? pesos(r.paidCentavos) : "Not yet", r.paid], ["Batch", first(e.batches)?.batch_number ?? "Not yet", !!e.batch_id], ["Enrolled", e.enrollment_status === "Enrolled" ? "Done" : "Not yet", e.enrollment_status === "Enrolled"]] as [string, string, boolean][]).map(([label, sub, done], i, list) => { const current = !done && list.slice(0, i).every((x) => x[2]); return <li key={label} className={done ? "done" : current ? "current" : ""}><i aria-hidden="true">{done ? "✓" : i + 1}</i><span><b>{label}</b><small>{sub}</small></span></li>; })}
+      {([["Requirements", `${r.verified} of ${REQUIREMENTS.length}`, allTicked], ["Cashier", r.handed ? `${fmtDate(day(r.handedAt))}` : "Not yet", r.handed], ["Payment", r.paid ? pesos(r.paidCentavos) : "Not yet", r.paid], ["Schedule", first(e.batches)?.batch_number ?? (e.scheduled_on ? fmtDate(e.scheduled_on) : "Not yet"), !!e.batch_id || !!e.scheduled_on], ["Enrolled", e.enrollment_status === "Enrolled" ? "Done" : "Not yet", e.enrollment_status === "Enrolled"]] as [string, string, boolean][]).map(([label, sub, done], i, list) => { const current = !done && list.slice(0, i).every((x) => x[2]); return <li key={label} className={done ? "done" : current ? "current" : ""}><i aria-hidden="true">{done ? "✓" : i + 1}</i><span><b>{label}</b><small>{sub}</small></span></li>; })}
     </ol>
     <ul className="req-list">
       {REQUIREMENTS.map((req) => { const c = r.latest.get(req.code); const ticked = c?.status === "Verified"; return <li className="req-row" key={req.code}>
@@ -400,7 +413,7 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
       </li>; })}
     </ul>
     <div className="screen-foot">
-      <small>{!allTicked ? `Still to tick: ${r.missing.join(", ")}` : !r.handed && !r.paid ? "All requirements received. Hand the applicant to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid and on a batch — enrolling. Refresh if the status has not changed."}</small>
+      <small>{!allTicked ? `Still to tick: ${r.missing.join(", ")}` : !r.handed && !r.paid ? "All requirements received. Hand the applicant to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid and on a batch — enrolling. Refresh if the status has not changed."}</small>
       <span style={{ display: "inline-flex", gap: 8, flexWrap: "wrap" }}>
         {!r.handed && !r.paid && <button type="button" className="portal-primary" disabled={busy || !allTicked} onClick={() => void post({ action: "application-handover", enrollmentId: e.id }, "Handed to the Cashier for payment.").catch(() => undefined)}>Hand to Cashier</button>}
         {r.ready && <button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "application-enroll", enrollmentId: e.id }, "Trainee enrolled.").catch(() => undefined)}>Enroll now</button>}
@@ -434,7 +447,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
       <div className="kv-grid kv-stack full">
         <div><span>{isApplication ? "Applicant" : "Trainee"}</span><strong>{t ? fullName(t) : "—"}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{t?.trainee_number} · <span className="lc">{t?.email}</span> · {t?.mobile}</small></div>
         <div><span>Course</span><strong>{c?.name ?? "—"}</strong><small>{c?.code}{center ? ` · endorsed: ${center}` : " · New Wave"}</small></div>
-        <div><span>Schedule</span><strong>{scheduleOf(e)}</strong><small>{b ? `${b.batch_number}${b.mode ? ` · ${b.mode}` : ""}${b.venue ? ` · ${b.venue}` : ""}` : e.scheduled_on ? "Endorsed training date" : "Not yet placed on a batch"}</small></div>
+        <div><span>Schedule</span><strong>{scheduleOf(e)}</strong><small>{b ? `${b.batch_number}${b.mode ? ` · ${b.mode}` : ""}${b.venue ? ` · ${b.venue}` : ""}` : e.scheduled_on ? (c && first(e.partner_course_offers) ? "Endorsed training date" : `Start date picked · ends ${fmtDate(automaticEndDate(e.scheduled_on, data.courses.find((x) => x.id === e.course_id)?.duration_label ?? "1"))}`) : "Not yet placed on a batch"}</small></div>
         <div><span>Status</span><strong><Badge tone={statusTone(e.enrollment_status)}>{e.enrollment_status}</Badge></strong><small>{isApplication ? "Submitted" : "Created"} {fmtDate(day(e.created_at))}{e.source ? ` · ${e.source}` : ""}</small></div>
       </div>
 
@@ -457,7 +470,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
         <p className="portal-form-note full">{e.instructions_sent_at ? `Last generated ${fmtDate(day(e.instructions_sent_at))}. ` : ""}Instructions can be generated twice. The Training Admission Record is printed by the Cashier.</p>
       </> : <p className="portal-form-note full">{isApplication ? "Training instructions become available once the trainee is paid and enrolled." : "No documents for a cancelled enrollment."}</p>}
 
-      {isApplication && <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>{!e.batch_id && <button type="button" className="portal-primary" onClick={() => setChoosingBatch(true)}>Choose batch</button>}{traineeRecord && <button type="button" onClick={() => setAddingCourse(true)}>+ Add another course</button>}</div>}
+      {isApplication && <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>{!e.batch_id && !e.scheduled_on && <button type="button" className="portal-primary" onClick={() => setChoosingBatch(true)}>Choose batch</button>}{traineeRecord && <button type="button" onClick={() => setAddingCourse(true)}>+ Add another course</button>}</div>}
 
       <div className="full"><strong>Request a change</strong> <small style={{ color: "var(--muted)" }}>goes to the Cashier for charges, then the Accounting Manager for approval</small></div>
       <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
@@ -478,7 +491,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
 /** Read-only catalog for Registration: fees and durations only — no rebate or partner payable. */
 export function CoursesAndCenters({ data, query }: { data: PortalData; query: string }) {
   const q = query.trim().toLowerCase();
-  const inHouse = data.courses.filter((c) => c.delivery_type === "In-House" && (!q || `${c.code} ${c.name}`.toLowerCase().includes(q))).sort((a, b) => a.name.localeCompare(b.name));
+  const inHouse = uniqueCourses(data.courses.filter((c) => c.delivery_type === "In-House" && (!q || `${c.code} ${c.name}`.toLowerCase().includes(q)))).sort((a, b) => a.name.localeCompare(b.name));
   const centers = [...new Set(data.offers.map((o) => first(o.partner_centers)?.name).filter(Boolean))] as string[];
   const [center, setCenter] = useState(centers[0] ?? "");
   const offers = data.offers.map((o) => ({ offer: o, course: data.courses.find((c) => c.id === o.course_id) })).filter(({ offer, course }) => (first(offer.partner_centers)?.name ?? "") === center && (!q || `${course?.code ?? ""} ${course?.name ?? ""}`.toLowerCase().includes(q)));

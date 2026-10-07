@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn } from "@/lib/validation";
+import { automaticEndDate } from "@/lib/scheduling";
 
 // Official New Wave channels shown on the application summary.
 const FACEBOOK_URL = "https://www.facebook.com/newwavemtc";
@@ -53,6 +54,10 @@ const COURSE_STEP = process.env.NEXT_PUBLIC_REGISTRATION_COURSE_STEP === "on";
 type SectionKey = "identification" | "personal" | "contact" | "emergency" | "courses" | "review";
 const upper = (value: string) => value.toUpperCase();
 const MAX_COURSES = 5;
+/** A course picked on the public Courses page: an STCW batch, or an In-House course and start date. */
+type Picked = { kind: "batch"; id: string } | { kind: "course"; code: string; start: string };
+const pickedDate = (iso: string) => new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
+const pickedRange = (start: string, end: string) => (start === end ? pickedDate(start) : `${pickedDate(start)} – ${pickedDate(end)}`);
 
 function Wizard() {
   const [open, setOpen] = useState<SectionKey>("identification");
@@ -68,6 +73,8 @@ function Wizard() {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [picked, setPicked] = useState<Picked | null>(null);
+  const [pickedLabel, setPickedLabel] = useState<{ course: string; dates: string } | null>(null);
   // Result of the SRN lookup: "found" locks the identity fields to the trainee's
   // existing record; "none" just tells the applicant to fill the form in.
   const [lookup, setLookup] = useState<{ kind: "found" | "none"; text: string } | null>(null);
@@ -78,6 +85,27 @@ function Wizard() {
 
   // Live bookable courses (with a published, open schedule this week).
   useEffect(() => { if (!COURSE_STEP) return; let live = true; fetch("/api/public/courses").then((r) => r.json()).then((b) => { if (live) setCourses(b.courses ?? []); }).catch(() => {}); return () => { live = false; }; }, []);
+
+  // The course chosen on the Courses page arrives in the URL (?batch= or ?course=&start=).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const batch = params.get("batch"), code = params.get("course"), start = params.get("start");
+    const pick: Picked | null = batch ? { kind: "batch", id: batch } : code && start && /^\d{4}-\d{2}-\d{2}$/.test(start) ? { kind: "course", code, start } : null;
+    if (!pick) return;
+    let live = true;
+    fetch("/api/public/catalog").then((r) => r.json()).then((b: { stcw?: { code: string; name: string; batches: { id: string; startsOn: string; endsOn: string }[] }[]; inHouse?: { code: string; name: string; duration: string }[] }) => {
+      if (!live) return;
+      if (pick.kind === "batch") {
+        const course = (b.stcw ?? []).find((c) => c.batches.some((x) => x.id === pick.id));
+        const found = course?.batches.find((x) => x.id === pick.id);
+        if (course && found) { setPicked(pick); setPickedLabel({ course: `${course.name} (${course.code})`, dates: pickedRange(found.startsOn, found.endsOn) }); }
+      } else {
+        const course = (b.inHouse ?? []).find((c) => c.code === pick.code);
+        if (course) { setPicked(pick); setPickedLabel({ course: `${course.name} (${course.code})`, dates: pickedRange(pick.start, automaticEndDate(pick.start, course.duration)) }); }
+      }
+    }).catch(() => undefined);
+    return () => { live = false; };
+  }, []);
 
   // Returning-applicant autofill: once a full 10-digit SRN is entered, look up the
   // saved trainee details and prefill the form (once per distinct SRN).
@@ -153,6 +181,8 @@ function Wizard() {
       fd.set("placeOfBirth", applicant.placeOfBirth); fd.set("birthDate", applicant.birthDate); fd.set("rank", rank); fd.set("company", applicant.company);
       fd.set("emergencyContactName", applicant.emergencyContactName); fd.set("emergencyContactMobile", applicant.emergencyContactMobile);
       if (COURSE_STEP) for (const s of completeSelections) fd.append("scheduleIds", s.scheduleId);
+      if (picked?.kind === "batch" && !COURSE_STEP) fd.append("scheduleIds", picked.id);
+      if (picked?.kind === "course") { fd.set("courseCode", picked.code); fd.set("startDate", picked.start); }
       fd.set("termsAccepted", "on");
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 25000);
@@ -196,6 +226,7 @@ function Wizard() {
                 <tr><th>Rank</th><td>{rank}</td></tr>
                 <tr><th>Mobile</th><td>{applicant.mobile}</td></tr>
                 <tr><th>Email</th><td className="lc">{applicant.email.toLowerCase()}</td></tr>
+                {pickedLabel && <tr><th>Training</th><td>{pickedLabel.course}<br />{pickedLabel.dates}</td></tr>}
                 <tr><th>Submitted</th><td>{submittedAt}</td></tr>
               </tbody></table>
               <div className="op-instructions">
@@ -312,6 +343,7 @@ function Wizard() {
       </aside>
 
       <div className="ql-sections">
+        {pickedLabel && <div className="ql-picked"><div><span>Selected training</span><strong>{pickedLabel.course}</strong><small>{pickedLabel.dates}</small></div><span className="ql-picked-actions"><Link href="/courses">Change</Link><button type="button" onClick={() => { setPicked(null); setPickedLabel(null); }}>Remove</button></span></div>}
         {sections.map((x, index) => {
           const isOpen = open === x.key;
           return (
@@ -336,7 +368,7 @@ function Wizard() {
           </button>
           {open === "review" && allDone && <div className="ql-body">
             {COURSE_STEP ? <div className="review-courses">{completeSelections.map((x, i) => <div key={i} className="review-course"><div><strong>{nameOf(x.courseCode)}</strong><small>{labelOf(x.courseCode, x.scheduleId)}</small></div></div>)}</div>
-              : <p className="ql-note">After you submit, our Registration team will contact you to confirm your course and schedule, and to collect your requirements and payment.</p>}
+              : <p className="ql-note">{pickedLabel ? `Requested training: ${pickedLabel.course}, ${pickedLabel.dates}. Our Registration team will confirm it, and collect your requirements and payment.` : "After you submit, our Registration team will contact you to confirm your course and schedule, and to collect your requirements and payment."}</p>}
             <h3 className="review-subhead">Terms and conditions</h3>
             <div className="terms-box">
               {TERMS_SECTIONS.map((section) => <div key={section.heading} className="terms-section"><strong>{section.heading}</strong><ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul></div>)}

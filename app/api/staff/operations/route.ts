@@ -153,7 +153,7 @@ const admissionRecordInput = z.object({ action: z.literal("admission-record-issu
 const applicationHandoverInput = z.object({ action: z.literal("application-handover"), enrollmentId: z.string().uuid() });
 const requestChargeInput = z.object({ action: z.literal("request-charge"), id: z.string().uuid(), chargeCatalogId: z.string().uuid().nullable().optional(), description: z.string().trim().max(200).optional(), amountCentavos: z.number().int().min(0), remarks: z.string().trim().max(500).optional() });
 // Course now, batch later (202610070005): the batch is optional.
-const applicationAssignInput = z.object({ action: z.literal("application-assign"), traineeId: z.string().uuid(), courseId: z.string().uuid(), batchId: z.string().uuid().nullable().optional() });
+const applicationAssignInput = z.object({ action: z.literal("application-assign"), traineeId: z.string().uuid(), courseId: z.string().uuid(), batchId: z.string().uuid().nullable().optional(), scheduledOn: z.string().date().nullable().optional() });
 const applicationPlaceBatchInput = z.object({ action: z.literal("application-place-batch"), enrollmentId: z.string().uuid(), batchId: z.string().uuid() });
 const sendInstructionsInput = z.object({ action: z.literal("send-instructions"), enrollmentId: z.string().uuid() });
 const instructionTemplateSaveInput = z.object({ action: z.literal("instruction-template-save"), courseId: z.string().uuid(), subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(8000) });
@@ -939,6 +939,11 @@ export async function POST(request: Request) {
       // The database checks the schedule is still bookable and holds the seat.
       const { data, error } = await admin.rpc("assign_application_course", { target_trainee: input.traineeId, target_course: input.courseId, target_batch: input.batchId ?? null, actor: staff.user.id });
       if (error) return NextResponse.json({ error: /function public.assign_application_course/i.test(error.message) ? "Apply database update 202610070005 to assign a course without a batch." : error.message }, { status: 400 });
+      // A non-STCW in-house course may run on a picked start date instead of a batch.
+      if (input.scheduledOn && !input.batchId && data) {
+        const { error: dateError } = await admin.from("enrollments").update({ scheduled_on: input.scheduledOn }).eq("id", (data as { id: string }).id);
+        if (dateError) throw dateError;
+      }
       return NextResponse.json({ ok: true, enrollment: data });
     }
     if (input.action === "application-place-batch") {
