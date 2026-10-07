@@ -30,6 +30,31 @@ const registrationSchema = z.object({
 // schedule while screening (owner instruction, 7 Oct 2026).
 const batchesSchema = z.array(z.string().uuid()).max(5, "You can select up to 5 courses per submission.");
 
+const FIELD_LABELS: Record<string, string> = {
+  firstName: "First name", middleName: "Middle name", lastName: "Last name", suffix: "Suffix", srn: "SRN", email: "Email address",
+  presentAddress: "Complete address", mobile: "Mobile number", placeOfBirth: "Place of birth", birthDate: "Date of birth", rank: "Rank",
+  company: "Company / manning agency", emergencyContactName: "Emergency contact person", emergencyContactMobile: "Emergency contact number",
+  termsAccepted: "Terms and conditions",
+};
+
+/**
+ * A message the applicant can act on. Field problems name the field; database
+ * errors (plain objects from Supabase, not Error instances) pass their message
+ * through instead of collapsing into a generic "review your details".
+ */
+function applicantMessage(error: unknown): string {
+  if (error instanceof z.ZodError) {
+    const issue = error.issues[0];
+    const field = FIELD_LABELS[String(issue?.path?.[0] ?? "")];
+    return field ? `${field}: ${issue.message}` : issue?.message ?? "Please review your details.";
+  }
+  const message = typeof error === "object" && error && "message" in error ? String((error as { message: unknown }).message) : "";
+  // The database still requires a schedule: migration 202610070002 (course-less
+  // applications) has not been applied yet.
+  if (/select at least one schedule/i.test(message)) return "Online applications are being updated. Please try again shortly, or contact New Wave to register.";
+  return message || "We could not submit your application. Please review your details and try again.";
+}
+
 export const runtime = "nodejs";
 export const maxDuration = 25;
 
@@ -62,6 +87,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ reference: result.registration_reference });
   } catch (error) {
     const status = error instanceof Error && error.message === "RATE_LIMITED" ? 429 : 400;
-    return NextResponse.json({ error: status === 429 ? "Too many registration attempts. Please try again later." : error instanceof Error ? error.message : "Please review your registration details." }, { status });
+    if (status !== 429) console.error("Public registration failed:", error);
+    return NextResponse.json({ error: status === 429 ? "Too many registration attempts. Please try again later." : applicantMessage(error) }, { status });
   }
 }
