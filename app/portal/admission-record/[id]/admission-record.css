@@ -1,0 +1,66 @@
+/* Training Admission Record — one side of half a short bond sheet (8.5 × 5.5 in). */
+@page { size: 8.5in 5.5in; margin: 0; }
+
+.tar-screen { min-height: 100vh; background: #e9eef4; padding: 20px 16px 40px; display: flex; flex-direction: column; align-items: center; gap: 18px; font-family: var(--font-ui), "Libre Franklin", Arial, sans-serif; color: #0b1f33; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+.tar-toolbar { width: 8.5in; max-width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 12px; background: #fff; border: 1px solid #dfe8ee; border-radius: 12px; padding: 10px 14px; }
+.tar-toolbar b { display: block; font-size: 14px; color: #123f63; }
+.tar-toolbar span { display: block; font-size: 12.5px; color: #40606f; }
+.tar-toolbar-actions { display: inline-flex !important; gap: 8px; }
+.tar-toolbar button { height: 38px; padding: 0 16px; border-radius: 10px; border: 0; background: #c8440e; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.tar-toolbar button.ghost { background: #fff; color: #123f63; border: 1px solid #d3e1e8; }
+
+.tar-sheet { width: 8.5in; height: 5.5in; overflow: hidden; background: #fff; padding: .13in .2in; box-shadow: 0 10px 30px rgba(11, 31, 51, .15); font-size: 6.4pt; line-height: 1.25; }
+.tar-sheet table { width: 100%; border-collapse: collapse; }
+.tar-sheet .mono { font-family: var(--font-geist-mono), "IBM Plex Mono", ui-monospace, monospace; }
+.tar-sheet .accent { color: #b23d0c; font-weight: 700; }
+.tar-sheet .dim { color: #5d5a50; }
+.tar-sheet .r { text-align: right; }
+.tar-sheet .c { text-align: center; width: 12px; }
+.tar-sheet .nw { white-space: nowrap; }
+.tar-sheet .b td, .tar-sheet td.b { font-weight: 700; }
+.tar-sheet td.due { color: #b23d0c; }
+
+.tar-letter { display: flex; align-items: center; gap: .08in; border-bottom: 2.5px double #123f63; padding-bottom: 2px; }
+.tar-letter img { width: .36in; height: .36in; }
+.tar-letter > div { flex: 1; text-align: center; }
+.tar-letter b { display: block; font-size: 9pt; font-weight: 800; color: #123f63; }
+.tar-letter span { display: block; font-size: 5.6pt; color: #40606f; }
+.tar-letter i { width: .36in; }
+.tar-title { display: flex; justify-content: space-between; align-items: flex-end; margin: 3px 0 2px; }
+.tar-title b { font-size: 9.6pt; font-weight: 800; color: #123f63; letter-spacing: .04em; }
+.tar-title span { font-size: 6pt; color: #40606f; }
+.tar-title strong { font-family: var(--font-geist-mono), "IBM Plex Mono", ui-monospace, monospace; font-size: 9.4pt; color: #b23d0c; }
+
+.tar-grid th, .tar-grid td { border: 1px solid #c9c2b3; padding: 1.5px 4px; text-align: left; }
+.tar-grid th { background: #f4f1e9; color: #5d5a50; font-weight: 400; width: 9%; }
+.tar-table { margin-top: 3px; }
+.tar-table th { border: 1px solid #c9c2b3; background: #123f63; color: #fff; padding: 1.5px 4px; text-align: left; font-size: 5.7pt; font-weight: 700; letter-spacing: .03em; }
+.tar-table td { border: 1px solid #c9c2b3; padding: 1.5px 4px; }
+.tar-money { display: grid; grid-template-columns: 1fr 1.3fr; gap: .1in; margin-top: 3px; }
+.tar-money .tar-table { margin-top: 0; }
+.tar-h { font-size: 5.8pt; font-weight: 800; letter-spacing: .08em; color: #123f63; }
+.tar-pay-head { display: flex; justify-content: space-between; align-items: center; }
+.tar-stamp { border: 1.5px solid; font-weight: 800; font-size: 6.4pt; letter-spacing: .1em; padding: 0 6px; transform: rotate(-2deg); }
+.tar-stamp.ok { border-color: #0a7d3b; color: #0a7d3b; }
+.tar-stamp.part { border-color: #c26a00; color: #a85500; }
+.tar-stamp.none { border-color: #b23d0c; color: #b23d0c; }
+.tar-sigs { display: flex; justify-content: space-between; margin-top: 7px; }
+.tar-sigs > div { width: .95in; text-align: center; }
+.tar-sigs span { display: flex; align-items: flex-end; justify-content: center; height: .2in; border-bottom: 1px solid #0b1f33; font-size: 6.6pt; }
+.tar-sigs small { display: block; font-size: 5.6pt; color: #40606f; margin-top: 1px; }
+.tar-terms { margin-top: 4px; border-top: 1px solid #123f63; padding-top: 2px; }
+.tar-terms-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.tar-terms-head b { font-size: 6pt; letter-spacing: .08em; color: #123f63; }
+.tar-terms-head span { font-size: 5.2pt; color: #40606f; }
+.tar-terms-cols { columns: 3; column-gap: .14in; font-size: 6pt; line-height: 1.32; color: #1d2a33; margin-top: 1px; }
+.tar-terms-cols p { break-inside: avoid; margin: 0 0 2px; }
+.tar-terms-cols b { color: #123f63; }
+.tar-cont { margin-top: 6px; font-size: 6.4pt; }
+
+@media print {
+  html, body { margin: 0 !important; background: #fff !important; }
+  .tar-screen { padding: 0; gap: 0; background: #fff; display: block; min-height: 0; }
+  .tar-toolbar { display: none !important; }
+  .tar-sheet { box-shadow: none; page-break-after: always; break-after: page; }
+  .tar-sheet:last-of-type { page-break-after: auto; break-after: auto; }
+}

@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import type { PortalData, Enrollment, Batch, Trainee } from "../portal-live-app";
 import { first, manilaToday, dueCentavos, balanceOf, pesos, addDays } from "@/lib/portal-format";
-import { Badge, Message, Modal, PageHead, Pager, Kpi, usePost, fullName, fmtDate, fmtClock } from "./shared-ui";
+import { Badge, Message, Modal, PageHead, Pager, Kpi, usePost, fullName, fmtDate, fmtClock, openAdmissionRecord } from "./shared-ui";
 import { RequestActionModal, type RequestType } from "./payment-actions";
 
 /**
@@ -439,7 +439,8 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
 
 /** Everything about one enrollment, read-only on money. Requests go to Accounting. */
 export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void }) {
-  const { busy, msg, post } = usePost(reload);
+  const { busy, msg, setMsg, post } = usePost(reload);
+  const printRecord = () => void openAdmissionRecord(e.trainee_id).catch((err) => setMsg({ kind: "error", text: err instanceof Error ? err.message : "Could not open the admission record." }));
   const [req, setReq] = useState<RequestType | null>(null);
   const [addingCourse, setAddingCourse] = useState(false);
   const [choosingBatch, setChoosingBatch] = useState(false);
@@ -477,7 +478,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
 
       <div className="full"><strong>Documents &amp; instructions</strong></div>
       {hasDocuments ? <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
-        <a href={`/api/documents/admission-invoice/${e.id}`} target="_blank" rel="noreferrer">Admission slip</a>
+        <button type="button" onClick={printRecord}>Print admission record</button>
         <a href={`/api/documents/training-instructions/${e.id}`} target="_blank" rel="noreferrer">Instructions PDF</a>
         <button type="button" disabled={busy} onClick={() => void post({ action: "send-instructions", enrollmentId: e.id }, e.instructions_sent_at ? "Instructions re-sent." : "Instructions sent.").catch(() => undefined)}>{e.instructions_sent_at ? `Resend instructions (sent ${fmtDate(day(e.instructions_sent_at))})` : "Send instructions"}</button>
       </div> : <p className="portal-form-note full">{isApplication ? "The admission slip and training instructions become available once the applicant is enrolled." : "No documents for a cancelled enrollment."}</p>}

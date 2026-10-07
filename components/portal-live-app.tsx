@@ -16,7 +16,7 @@ import { AdminConfiguration } from "./admin-configuration";
 import { DateReports } from "./date-reports";
 import { downloadCsv } from "@/lib/csv";
 import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer } from "./portal/live-registration";
-import { Badge, Message, Modal, Page, PageHead, submit, fullName } from "./portal/shared-ui";
+import { Badge, Message, Modal, Page, PageHead, submit, fullName, openAdmissionRecord } from "./portal/shared-ui";
 import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, first, dueCentavos, balanceOf, isUnpaid, manilaToday } from "@/lib/portal-format";
 
@@ -304,7 +304,9 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   // Registration (and Admin) can edit contact details, add a course, and open an
   // enrollment to screen it or request a change.
   const canEdit=!!reload&&["registration","admin","super_admin"].includes(role??"");
-  const [editing,setEditing]=useState(false),[addingCourse,setAddingCourse]=useState(false),[openEnrollment,setOpenEnrollment]=useState<string|null>(null);
+  const [editing,setEditing]=useState(false),[addingCourse,setAddingCourse]=useState(false),[openEnrollment,setOpenEnrollment]=useState<string|null>(null),[printError,setPrintError]=useState("");
+  const canPrint=["registration","admin","super_admin","cashier"].includes(role??"");
+  const printRecord=()=>{setPrintError("");void openAdmissionRecord(trainee.id).catch(e=>setPrintError(e instanceof Error?e.message:"Could not open the admission record."))};
   const enrolls=data.enrollments.filter(e=>e.trainee_id===trainee.id).sort((a,b)=>b.created_at.localeCompare(a.created_at));
   const payments=data.payments.filter(p=>p.trainee_id===trainee.id).sort((a,b)=>b.received_at.localeCompare(a.received_at));
   const requests=data.requests.filter(r=>first(r.enrollments)?.trainee_id===trainee.id).sort((a,b)=>b.created_at.localeCompare(a.created_at));
@@ -328,7 +330,8 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
         <div className="td-id"><strong>{fullName(trainee)}</strong><small>{appNo&&<span className="app-no">{appNo}</span>}{trainee.trainee_number}{trainee.rank?` · ${trainee.rank}`:""}{trainee.registered_at?` · Registered ${date(trainee.registered_at.slice(0,10))}`:""}</small></div>
         <div className="td-totals"><div><span>Enrollments</span><b>{enrolls.length}</b></div><div><span>Total paid</span><b>{pesos(totalPaid)}</b></div><div><span>Balance</span><b className={balance>0?"due":""}>{pesos(balance)}</b></div></div>
       </div>
-      {canEdit&&<div className="td-actions"><button type="button" className="portal-primary" onClick={()=>setAddingCourse(true)}>+ Add course</button><button type="button" className="portal-secondary" onClick={()=>{setTab("Overview");setEditing(true)}}>Edit details</button></div>}
+      {(canEdit||canPrint)&&<div className="td-actions">{canEdit&&<button type="button" className="portal-primary" onClick={()=>setAddingCourse(true)}>+ Add course</button>}{canPrint&&<button type="button" className="portal-secondary" disabled={!enrolls.some(e=>e.enrollment_status!=="Cancelled")} onClick={printRecord}>Print admission record</button>}{canEdit&&<button type="button" className="portal-secondary" onClick={()=>{setTab("Overview");setEditing(true)}}>Edit details</button>}</div>}
+      {printError&&<Message kind="error" text={printError}/>}
       <div className="td-tabs" role="tablist">{tabs.map(([k,label])=><button key={k} type="button" role="tab" aria-selected={tab===k} className={tab===k?"active":""} onClick={()=>setTab(k)}>{label}</button>)}</div>
 
       {tab==="Overview"&&<div className="td-grid">
@@ -341,7 +344,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
       </div>}
 
       {tab==="Enrollments"&&<section className="td-card"><div className="portal-table"><table><thead><tr><th>Course</th><th>Schedule</th><th>Status</th><th className="num">Due</th><th className="num">Paid</th><th className="num">Balance</th><th></th></tr></thead><tbody>
-        {enrolls.map(e=>{const st=statusOf(e),charges=Number(e.charges_centavos??0);return <tr key={e.id} className={canEdit?"row-clickable":undefined} onClick={canEdit?()=>setOpenEnrollment(e.id):undefined} title={canEdit?"Open to screen, choose a batch or request a change":undefined}><td><strong>{first(e.courses)?.name??"—"}</strong><small>{e.enrollment_number}</small></td><td>{scheduleOfE(e)}</td><td><Badge tone={st.c}>{st.t}</Badge></td><td className="num td-money">{pesos(dueCentavos(e))}{charges>0&&<small>incl. {pesos(charges)} charges</small>}</td><td className="num td-money">{pesos(e.paid_centavos)}</td><td className="num td-money">{pesos(e.enrollment_status==="Cancelled"?0:balanceOf(e))}</td><td>{e.enrollment_status==="Enrolled"&&<a href={`/api/documents/admission-invoice/${e.id}`} target="_blank" rel="noreferrer" onClick={ev=>ev.stopPropagation()}>Admission slip</a>}</td></tr>})}
+        {enrolls.map(e=>{const st=statusOf(e),charges=Number(e.charges_centavos??0);return <tr key={e.id} className={canEdit?"row-clickable":undefined} onClick={canEdit?()=>setOpenEnrollment(e.id):undefined} title={canEdit?"Open to screen, choose a batch or request a change":undefined}><td><strong>{first(e.courses)?.name??"—"}</strong><small>{e.enrollment_number}</small></td><td>{scheduleOfE(e)}</td><td><Badge tone={st.c}>{st.t}</Badge></td><td className="num td-money">{pesos(dueCentavos(e))}{charges>0&&<small>incl. {pesos(charges)} charges</small>}</td><td className="num td-money">{pesos(e.paid_centavos)}</td><td className="num td-money">{pesos(e.enrollment_status==="Cancelled"?0:balanceOf(e))}</td><td>{canPrint&&e.enrollment_status!=="Cancelled"&&<button type="button" className="ghost-button" onClick={ev=>{ev.stopPropagation();printRecord()}}>Admission record</button>}</td></tr>})}
       </tbody></table>{!enrolls.length&&<p className="td-empty">No enrollments yet.</p>}</div></section>}
 
       {tab==="Payments"&&<section className="td-card"><div className="portal-table"><table><thead><tr><th>Payment</th><th>Date</th><th>Method · reference</th><th>State</th><th className="num">Amount</th></tr></thead><tbody>
