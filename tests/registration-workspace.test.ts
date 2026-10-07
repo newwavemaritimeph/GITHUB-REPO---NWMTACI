@@ -77,6 +77,15 @@ describe("Registration Officer workspace", () => {
     expect(html).not.toMatch(/Unpaid|Partially paid/);
   });
 
+  it("lets an application be paid before it has a batch, but not enrolled", () => {
+    const e4 = fixture.enrollments.find((e) => e.id === "e4")!;
+    const unplaced = applicationReadiness({ ...e4, batch_id: null, batches: null }, fixture.requirementChecks ?? [], "2026-10-07T03:00:00Z");
+    expect(unplaced.missing).toHaveLength(0);
+    expect(unplaced.paid).toBe(true);
+    expect(unplaced.ready).toBe(false);
+    expect(unplaced.reason).toMatch(/No batch yet/);
+  });
+
   it("tracks the hand-over to the Cashier", () => {
     const e5 = fixture.enrollments.find((e) => e.id === "e5")!;
     expect(applicationReadiness(e5, [], "2026-10-07T03:00:00Z").handed).toBe(true);
@@ -133,7 +142,7 @@ describe("Registration Officer workspace", () => {
     const source = readFileSync(new URL("../components/portal/live-registration.tsx", import.meta.url), "utf8");
     // Sent directly from the Registration screens.
     const direct = new Set([...source.matchAll(/action: ?"([a-z-]+)"/g)].map((m) => m[1]));
-    expect([...direct].sort()).toEqual(["application-assign", "application-enroll", "application-handover", "requirement-check", "send-instructions"]);
+    expect([...direct].sort()).toEqual(["application-assign", "application-enroll", "application-handover", "application-place-batch", "requirement-check", "send-instructions"]);
     // The only shared action component it may pull in is the request modal,
     // whose single action is request-raise. Payment, charge and discount
     // modals live in the same file and must never be imported here.

@@ -30,7 +30,7 @@ const requestLabel = (type: RequestType, isApplication: boolean) => (type === "R
 /** Where a request is: with the Cashier for charges, with Accounting for approval, or decided. */
 const requestStage = (r: RequestRow) => (r.status !== "Pending" ? { text: r.status, tone: r.status === "Approved" ? "active" : "cancelled" } : r.stage === "With cashier" ? { text: "With Cashier", tone: "orange" } : { text: "Awaiting approval", tone: "pending" });
 
-const scheduleOf = (e: Enrollment) => { const b = first(e.batches); return b ? `${fmtDate(b.starts_on)}${b.ends_on !== b.starts_on ? ` – ${fmtDate(b.ends_on)}` : ""}` : e.scheduled_on ? fmtDate(e.scheduled_on) : "Open schedule"; };
+const scheduleOf = (e: Enrollment) => { const b = first(e.batches); return b ? `${fmtDate(b.starts_on)}${b.ends_on !== b.starts_on ? ` – ${fmtDate(b.ends_on)}` : ""}` : e.scheduled_on ? fmtDate(e.scheduled_on) : e.enrollment_status === "Pending" ? "No batch yet" : "Open schedule"; };
 const payState = (e: Enrollment) => { const paid = Number(e.paid_centavos), due = dueCentavos(e); if (e.enrollment_status === "Cancelled") return { text: "Cancelled", tone: "cancelled" }; if (due > 0 && paid >= due) return { text: "Paid", tone: "green" }; if (paid > 0) return { text: "Partially paid", tone: "orange" }; return { text: "Unpaid", tone: "red" }; };
 const statusTone = (s: string) => (s === "Enrolled" ? "active" : s === "Cancelled" ? "cancelled" : "pending");
 const requestsFor = (data: PortalData, e: Enrollment) => data.requests.filter((r) => first(r.enrollments)?.enrollment_number === e.enrollment_number);
@@ -194,7 +194,7 @@ export function applicationReadiness(e: Enrollment, checks: RequirementCheck[], 
   const paidCentavos = Number(e.verified_paid_centavos ?? 0);
   const paid = paidCentavos > 0;
   const ready = !missing.length && paid && !!e.batch_id;
-  const reason = !e.batch_id ? "No schedule chosen yet" : missing.length ? `Not verified yet: ${missing.join(", ")}` : !paid ? "No verified payment yet" : "Ready to enroll";
+  const reason = !e.batch_id ? "No batch yet — place on a batch to enroll" : missing.length ? `Not verified yet: ${missing.join(", ")}` : !paid ? "No verified payment yet" : "Ready to enroll";
   const handed = !!handedAt;
   return { latest, verified: REQUIREMENTS.length - missing.length, missing, rejected, paid, paidCentavos, ready, reason, handed, handedAt: handedAt ?? null };
 }
@@ -210,32 +210,54 @@ const applicantCount = (data: PortalData) => applicationsOf(data).length + await
 const APP_FILTERS = ["All", "No course yet", "Screening", "With Cashier", "Ready to enroll"] as const;
 const inFilter = (f: (typeof APP_FILTERS)[number], r: ReturnType<typeof applicationReadiness>) => (f === "All" ? true : f === "No course yet" ? false : f === "Ready to enroll" ? r.ready : f === "With Cashier" ? r.handed && !r.ready : !r.handed && !r.ready);
 
-/** Place a course-less applicant on a bookable New Wave batch; the seat is held from then on. */
+const NO_BATCH = "none";
+
+/**
+ * Assign a New Wave course to an applicant (course now, batch later). Any active
+ * in-house course can be chosen; open batches for it are offered, and "No batch
+ * yet" lets screening and payment go ahead before a batch opens.
+ */
 function AssignCourseModal({ data, trainee, reload, onClose }: { data: PortalData; trainee: Trainee; reload: () => Promise<void>; onClose: () => void }) {
   const { busy, msg, post } = usePost(reload);
   const [courseId, setCourseId] = useState("");
-  const [batchId, setBatchId] = useState("");
+  const [batchId, setBatchId] = useState(NO_BATCH);
   const today = manilaToday(), now = new Date().toISOString();
-  const bookable = data.batches.filter((b) => isBookable(b, today, now)).sort((a, b) => a.starts_on.localeCompare(b.starts_on));
-  const courses = data.courses.filter((c) => bookable.some((b) => b.course_id === c.id)).sort((a, b) => a.name.localeCompare(b.name));
-  const batches = bookable.filter((b) => b.course_id === courseId);
+  const courses = data.courses.filter((c) => c.delivery_type === "In-House").sort((x, y) => x.name.localeCompare(y.name));
+  const batches = data.batches.filter((x) => x.course_id === courseId && isBookable(x, today, now)).sort((x, y) => x.starts_on.localeCompare(y.starts_on));
   const course = courses.find((c) => c.id === courseId);
-  const assign = () => void post({ action: "application-assign", traineeId: trainee.id, batchId }, "Course assigned. Screening can start.").then(onClose).catch(() => undefined);
+  const withBatch = batchId !== NO_BATCH;
+  const assign = () => void post({ action: "application-assign", traineeId: trainee.id, courseId, batchId: withBatch ? batchId : null }, withBatch ? "Course and batch assigned. Screening can start." : "Course assigned. Screening can start; place on a batch once one opens.").then(onClose).catch(() => undefined);
   return <Modal title={`Assign a course · ${fullName(trainee)}`} onClose={onClose}>
     <div className="portal-form">
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
-      <p className="portal-form-note full">Only schedules still open for registration are listed. Assigning holds a seat; the application then goes through screening.</p>
-      <label className="full">Course<select value={courseId} onChange={(e) => { setCourseId(e.target.value); setBatchId(""); }}>
+      <label className="full">Course<select value={courseId} onChange={(e) => { setCourseId(e.target.value); setBatchId(NO_BATCH); }}>
         <option value="">Select a course</option>
-        <optgroup label="STCW courses">{courses.filter(isStcwCourse).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</optgroup>
-        <optgroup label="Other courses">{courses.filter((c) => !isStcwCourse(c)).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</optgroup>
+        <optgroup label="STCW courses">{courses.filter(isStcwCourse).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name} · {pesos(c.standard_price_centavos)}</option>)}</optgroup>
+        <optgroup label="Other courses">{courses.filter((c) => !isStcwCourse(c)).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name} · {pesos(c.standard_price_centavos)}</option>)}</optgroup>
       </select></label>
       {course && <div className="full">
-        <small style={{ color: "var(--muted)", fontWeight: 700 }}>Schedule · {pesos(course.standard_price_centavos)}</small>
-        {batches.map((b) => <label key={b.id} className="assign-batch"><input type="radio" name="batch" checked={batchId === b.id} onChange={() => setBatchId(b.id)} /><span><strong>{dateRange(b.starts_on, b.ends_on)} · {b.batch_number}</strong><small>{seatsLeft(b)} of {b.capacity} seats left · closes {fmtShort(day(b.enrollment_deadline))}{b.venue ? ` · ${b.venue}` : ""}</small></span></label>)}
+        <small style={{ color: "var(--muted)", fontWeight: 700 }}>Batch · fee {pesos(course.standard_price_centavos)}</small>
+        {batches.map((x) => <label key={x.id} className="assign-batch"><input type="radio" name="batch" checked={batchId === x.id} onChange={() => setBatchId(x.id)} /><span><strong>{dateRange(x.starts_on, x.ends_on)} · {x.batch_number}</strong><small>{seatsLeft(x)} of {x.capacity} seats left · closes {fmtShort(day(x.enrollment_deadline))}{x.venue ? ` · ${x.venue}` : ""}</small></span></label>)}
+        <label className="assign-batch"><input type="radio" name="batch" checked={!withBatch} onChange={() => setBatchId(NO_BATCH)} /><span><strong>No batch yet — place later</strong><small>{batches.length ? "Screen and take payment now; choose the batch from the application later." : "No batch is open for this course yet. Screen and take payment now; place on a batch once one opens."}</small></span></label>
       </div>}
-      {!courses.length && <p className="portal-form-note full">No schedule is open for registration right now. Ask the Schedule Officer to open a batch.</p>}
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!batchId || busy} onClick={assign}>{busy ? "Assigning…" : "Assign course"}</button></div>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!courseId || busy} onClick={assign}>{busy ? "Assigning…" : withBatch ? "Assign course & batch" : "Assign course"}</button></div>
+    </div>
+  </Modal>;
+}
+
+/** Put a Pending application that has no batch yet onto an open batch of its course. */
+function ChooseBatchModal({ data, enrollment, reload, onClose }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void }) {
+  const { busy, msg, post } = usePost(reload);
+  const [batchId, setBatchId] = useState("");
+  const today = manilaToday(), now = new Date().toISOString();
+  const batches = data.batches.filter((x) => x.course_id === enrollment.course_id && isBookable(x, today, now)).sort((x, y) => x.starts_on.localeCompare(y.starts_on));
+  const place = () => void post({ action: "application-place-batch", enrollmentId: enrollment.id, batchId }, "Placed on the batch.").then(onClose).catch(() => undefined);
+  return <Modal title={`Choose batch · ${first(enrollment.courses)?.name ?? "Course"}`} onClose={onClose}>
+    <div className="portal-form">
+      {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
+      <div className="full">{batches.map((x) => <label key={x.id} className="assign-batch"><input type="radio" name="batch" checked={batchId === x.id} onChange={() => setBatchId(x.id)} /><span><strong>{dateRange(x.starts_on, x.ends_on)} · {x.batch_number}</strong><small>{seatsLeft(x)} of {x.capacity} seats left · closes {fmtShort(day(x.enrollment_deadline))}{x.venue ? ` · ${x.venue}` : ""}</small></span></label>)}</div>
+      {!batches.length && <p className="portal-form-note full">No open batch for this course yet. The application stays ready; place it once a batch opens.</p>}
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!batchId || busy} onClick={place}>{busy ? "Placing…" : "Place on batch"}</button></div>
     </div>
   </Modal>;
 }
@@ -383,9 +405,9 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
       </li>
     </ul>
     <div className="screen-foot">
-      <small>{!e.batch_id ? "Assign a course and batch first." : !allTicked ? `Still to tick: ${r.missing.join(", ")}` : !r.handed ? "All requirements received. Hand the applicant to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : "Paid. Enrolling confirms the seat on this batch."}</small>
+      <small>{!allTicked ? `Still to tick: ${r.missing.join(", ")}` : !r.handed ? "All requirements received. Hand the applicant to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id ? "Paid. Place on a batch to enroll." : "Paid. Enrolling confirms the seat on this batch."}</small>
       <span style={{ display: "inline-flex", gap: 8, flexWrap: "wrap" }}>
-        {!r.handed && <button type="button" className="portal-primary" disabled={busy || !allTicked || !e.batch_id} onClick={() => void post({ action: "application-handover", enrollmentId: e.id }, "Handed to the Cashier for payment.").catch(() => undefined)}>Hand to Cashier</button>}
+        {!r.handed && <button type="button" className="portal-primary" disabled={busy || !allTicked} onClick={() => void post({ action: "application-handover", enrollmentId: e.id }, "Handed to the Cashier for payment.").catch(() => undefined)}>Hand to Cashier</button>}
         <button type="button" className={r.handed ? "portal-primary" : "portal-secondary"} disabled={!r.ready || busy} onClick={() => void post({ action: "application-enroll", enrollmentId: e.id }, "Applicant enrolled.").catch(() => undefined)}>Enroll applicant</button>
       </span>
     </div>
@@ -397,6 +419,7 @@ function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { data: Port
   const { busy, msg, post } = usePost(reload);
   const [req, setReq] = useState<RequestType | null>(null);
   const [addingCourse, setAddingCourse] = useState(false);
+  const [choosingBatch, setChoosingBatch] = useState(false);
   const t = first(e.trainees), c = first(e.courses), b = first(e.batches);
   const traineeRecord = data.trainees.find((x) => x.id === e.trainee_id) ?? null;
   const center = first(first(e.partner_course_offers)?.partner_centers)?.name;
@@ -436,7 +459,7 @@ function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { data: Port
         <button type="button" disabled={busy} onClick={() => void post({ action: "send-instructions", enrollmentId: e.id }, e.instructions_sent_at ? "Instructions re-sent." : "Instructions sent.").catch(() => undefined)}>{e.instructions_sent_at ? `Resend instructions (sent ${fmtDate(day(e.instructions_sent_at))})` : "Send instructions"}</button>
       </div> : <p className="portal-form-note full">{isApplication ? "The admission slip and training instructions become available once the applicant is enrolled." : "No documents for a cancelled enrollment."}</p>}
 
-      {isApplication && traineeRecord && <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}><button type="button" onClick={() => setAddingCourse(true)}>+ Add another course</button></div>}
+      {isApplication && <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>{!e.batch_id && <button type="button" className="portal-primary" onClick={() => setChoosingBatch(true)}>Choose batch</button>}{traineeRecord && <button type="button" onClick={() => setAddingCourse(true)}>+ Add another course</button>}</div>}
 
       <div className="full"><strong>Request a change</strong> <small style={{ color: "var(--muted)" }}>goes to the Cashier for charges, then the Accounting Manager for approval</small></div>
       <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
@@ -448,6 +471,7 @@ function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { data: Port
     </div>
     {req && <RequestActionModal data={data} enrollment={e} reqType={req} onClose={() => setReq(null)} post={(body) => post(body, "Request sent to the Cashier for charges.")} />}
     {addingCourse && traineeRecord && <AssignCourseModal data={data} trainee={traineeRecord} reload={reload} onClose={() => setAddingCourse(false)} />}
+    {choosingBatch && <ChooseBatchModal data={data} enrollment={e} reload={reload} onClose={() => setChoosingBatch(false)} />}
   </Modal>;
 }
 

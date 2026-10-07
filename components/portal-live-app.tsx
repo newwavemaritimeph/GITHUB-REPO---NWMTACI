@@ -277,40 +277,28 @@ function Trainees({data,query,embedded}:{data:PortalData;query:string;embedded?:
   </Page>;
 }
 
+// Trainee details: identity, enrollments with payment status, and payments.
+// (The copy/paste info packet was removed on the owner's instruction.)
 function TraineeDetailModal({data,trainee,onClose}:{data:PortalData;trainee:Trainee;onClose:()=>void}){
-  const [copied,setCopied]=useState(false);
-  const enrolls=data.enrollments.filter(e=>e.trainee_id===trainee.id);
+  const enrolls=data.enrollments.filter(e=>e.trainee_id===trainee.id).sort((a,b)=>b.created_at.localeCompare(a.created_at));
+  const payments=data.payments.filter(p=>p.trainee_id===trainee.id).sort((a,b)=>b.received_at.localeCompare(a.received_at));
   const centerOf=(offerId?:string|null)=>{if(!offerId)return null;const o=data.offers.find(x=>x.id===offerId);return o?first(o.partner_centers):null};
-  const packet=[
-    `Name: ${fullName(trainee)}`,
-    `Trainee no.: ${trainee.trainee_number}`,
-    `SRN: ${trainee.srn??"—"}`,
-    `Birth date: ${trainee.birthdate?date(trainee.birthdate):"—"}`,
-    `Sex: ${trainee.sex??"—"}`,
-    `Nationality: ${trainee.nationality??"—"}`,
-    `Email: ${trainee.email}`,
-    `Mobile: ${trainee.mobile}`,
-    `Address: ${trainee.address??"—"}`,
-    ``,
-    `Enrollments:`,
-    ...(enrolls.length?enrolls.map(e=>{const c=first(e.courses),b=first(e.batches),center=centerOf(e.partner_offer_id),cd=center?.contact_details;const sched=b?`${date(b.starts_on)} - ${date(b.ends_on)}`:e.scheduled_on?date(e.scheduled_on):"Open schedule";return `- ${c?.name??""} (${e.enrollment_number}) · ${sched}${center?` · Endorsed: ${center.name}${cd?.email?` <${cd.email}>`:""}${cd?.mobile?` ${cd.mobile}`:""}`:""}`}):["- None yet"]),
-  ].join("\n");
-  async function copy(){try{await navigator.clipboard.writeText(packet);setCopied(true);setTimeout(()=>setCopied(false),2000)}catch{const ta=document.getElementById("trainee-packet-text") as HTMLTextAreaElement|null;if(ta){ta.select();document.execCommand("copy");setCopied(true);setTimeout(()=>setCopied(false),2000)}}}
+  const appNo=data.applicationNumbers?.[trainee.id];
   return <Modal title="Trainee details" onClose={onClose}>
-    <div id="trainee-packet" className="portal-form">
-      <div className="full"><strong>{fullName(trainee)}</strong> · {trainee.trainee_number}</div>
+    <div className="portal-form">
+      <div className="full"><strong>{fullName(trainee)}</strong> · {trainee.trainee_number}{appNo?<> · <span className="app-no">{appNo}</span></>:null}</div>
       <label>SRN<input readOnly value={trainee.srn??"—"}/></label>
       <label>Birth date<input readOnly value={trainee.birthdate?date(trainee.birthdate):"—"}/></label>
-      <label>Sex<input readOnly value={trainee.sex??"—"}/></label>
-      <label>Nationality<input readOnly value={trainee.nationality??"—"}/></label>
       <label>Email<input className="lc" readOnly value={trainee.email}/></label>
       <label>Mobile<input readOnly value={trainee.mobile}/></label>
       <label className="full">Address<input readOnly value={trainee.address??"—"}/></label>
       <div className="full"><strong>Enrollments</strong></div>
-      {enrolls.map(e=>{const c=first(e.courses),b=first(e.batches),center=centerOf(e.partner_offer_id);const cd=center?.contact_details;return <div className="live-row-item full" key={e.id}><div><strong>{c?.name} · {e.enrollment_number}</strong><small>{b?`${date(b.starts_on)} - ${date(b.ends_on)}`:e.scheduled_on?date(e.scheduled_on):"Open schedule"}{center?` · Endorsed: ${center.name}${cd?.email?` (${cd.email})`:""}`:""}</small></div><Badge>{e.enrollment_status}</Badge></div>})}
+      {enrolls.map(e=>{const c=first(e.courses),b=first(e.batches),center=centerOf(e.partner_offer_id),due=dueCentavos(e),paid=Number(e.paid_centavos),bal=balanceOf(e);return <div className="live-row-item full" key={e.id}><div><strong>{c?.name} · {e.enrollment_number}</strong><small>{b?`${date(b.starts_on)} - ${date(b.ends_on)}`:e.scheduled_on?date(e.scheduled_on):e.enrollment_status==="Pending"?"No batch yet":"Open schedule"}{center?` · Endorsed: ${center.name}`:""} · {pesos(paid)} paid of {pesos(due)}{bal>0?` · ${pesos(bal)} balance`:""}</small></div><Badge tone={e.enrollment_status==="Enrolled"?"green":e.enrollment_status==="Cancelled"?"red":"orange"}>{e.enrollment_status}</Badge></div>})}
       {!enrolls.length&&<p className="portal-empty-copy full">No enrollments yet.</p>}
-      <label className="full">Info packet (copy &amp; paste to forward to the endorsed center)<textarea id="trainee-packet-text" className="lc" readOnly rows={enrolls.length+11} value={packet} onFocus={e=>e.currentTarget.select()}/></label>
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Close</button><button type="button" className="portal-primary" onClick={copy}>{copied?"Copied!":"Copy details"}</button></div>
+      <div className="full"><strong>Payments</strong></div>
+      {payments.map(p=><div className="live-row-item full" key={p.id}><div><strong>{p.payment_number} · {pesos(p.amount_centavos)}</strong><small>{date(p.received_at.slice(0,10))} · {p.method}{p.reference_number?` · ${p.reference_number}`:""}</small></div><Badge tone={p.verification_state==="Verified"?"green":"orange"}>{p.verification_state}</Badge></div>)}
+      {!payments.length&&<p className="portal-empty-copy full">No payments yet.</p>}
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Close</button></div>
     </div>
   </Modal>;
 }
