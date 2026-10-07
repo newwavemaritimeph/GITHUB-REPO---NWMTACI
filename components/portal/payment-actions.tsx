@@ -49,8 +49,9 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
   }
   const inner = <div className="portal-form">
     {err && <Message kind="error" text={err} />}
-    <p className="portal-form-note full">Sent to the Accounting Manager for approval. On approval the change is applied automatically.</p>
-    {reqType === "Rescheduling" && <label className="full">New schedule<select value={batchId} onChange={(e) => setBatchId(e.target.value)}><option value="">Select a schedule</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.batch_number} · {fmtDate(b.starts_on)}–{fmtDate(b.ends_on)} · {b.capacity - b.confirmed_count} slots</option>)}</select></label>}
+    <p className="portal-form-note full">Goes to the Cashier, who adds any charge, then to the Accounting Manager for approval. On approval the change and its charge are applied automatically.</p>
+    {reqType === "Make-up Class" && <p className="portal-form-note full">Make-up classes are for courses of three days or more; the fee is Php 350.00 per training day (Terms, section 5).</p>}
+    {reqType === "Rescheduling" && <label className="full">New batch<select value={batchId} onChange={(e) => setBatchId(e.target.value)}><option value="">Select a schedule</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.batch_number} · {fmtDate(b.starts_on)}–{fmtDate(b.ends_on)} · {b.capacity - b.confirmed_count} slots</option>)}</select></label>}
     {reqType === "Change Course" && <>
       <label className="full">New course<select value={courseId} onChange={(e) => { setCourseId(e.target.value); setOfferId(""); }}>{data.courses.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label>
       {newCourse?.delivery_type === "Partner or Endorsed" && <label className="full">Endorsed program<select value={offerId} onChange={(e) => setOfferId(e.target.value)}><option value="">Select rate</option>{offers.map((o) => <option key={o.id} value={o.id}>{first(o.partner_centers)?.name} · {o.duration_label} · {pesos(o.training_fee_centavos)}</option>)}</select></label>}
@@ -59,5 +60,6 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
     <label className="full">Reason<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why is this being requested?" /></label>
     <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={send}>{busy ? "Sending…" : "Request approval"}</button></div>
   </div>;
-  return embedded ? inner : <Modal title={`Request: ${reqType}`} onClose={onClose}>{inner}</Modal>;
+  const title = reqType === "Rescheduling" ? "Change batch / reschedule" : reqType === "Make-up Class" ? "Make-up class" : reqType;
+  return embedded ? inner : <Modal title={`Request: ${title}`} onClose={onClose}>{inner}</Modal>;
 }

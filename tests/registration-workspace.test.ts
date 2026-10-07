@@ -71,10 +71,16 @@ describe("Registration Officer workspace", () => {
     expect(html).not.toContain("Awareness on Basic Computer</small></span><span class=\"rd-seat\"");
     expect(html).toMatch(/<strong>21<\/strong>/);
     // New applications carry their screening state; nothing offers a staff intake.
-    expect(html).toContain("Ready to enroll");
+    expect(html).toContain("ready to enroll");
     expect(html).not.toContain("Register a trainee");
     // MASTERPLAN §10: payment states belong to the Cashier.
     expect(html).not.toMatch(/Unpaid|Partially paid/);
+  });
+
+  it("tracks the hand-over to the Cashier", () => {
+    const e5 = fixture.enrollments.find((e) => e.id === "e5")!;
+    expect(applicationReadiness(e5, [], "2026-10-07T03:00:00Z").handed).toBe(true);
+    expect(applicationReadiness(e5, []).handed).toBe(false);
   });
 
   it("works out whether an application is ready to enroll", () => {
@@ -95,8 +101,9 @@ describe("Registration Officer workspace", () => {
     expect(apps).toContain("ENR-0004");
     expect(apps).toContain("ENR-0005");
     expect(apps).not.toContain("ENR-0001");
-    expect(apps).toContain("Ready to enroll");
-    expect(apps).toContain("Awaiting payment");
+    expect(apps).toContain("Paid · ready to enroll");
+    expect(apps).toContain("Screening");
+    expect(apps).toContain("With Cashier"); // filter chip for applicants handed over for payment
     expect(apps).not.toContain("Register a trainee");
     // A website applicant without a course waits for Registration to assign one.
     expect(apps).toContain("No course yet");
@@ -126,7 +133,7 @@ describe("Registration Officer workspace", () => {
     const source = readFileSync(new URL("../components/portal/live-registration.tsx", import.meta.url), "utf8");
     // Sent directly from the Registration screens.
     const direct = new Set([...source.matchAll(/action: ?"([a-z-]+)"/g)].map((m) => m[1]));
-    expect([...direct].sort()).toEqual(["application-assign", "application-enroll", "requirement-check", "send-instructions"]);
+    expect([...direct].sort()).toEqual(["application-assign", "application-enroll", "application-handover", "requirement-check", "send-instructions"]);
     // The only shared action component it may pull in is the request modal,
     // whose single action is request-raise. Payment, charge and discount
     // modals live in the same file and must never be imported here.

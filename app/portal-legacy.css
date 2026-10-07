@@ -1153,3 +1153,7 @@ button.rd-row:hover { background: #f6fafc; }
 /* Website enrollment number (NWMTACI-0000001) — what applicants quote on Facebook. */
 .app-no { display: inline-block; margin-right: 6px; padding: 0 6px; border-radius: 5px; background: #fff1ea; color: var(--orange-text); font-family: var(--font-num), ui-monospace, monospace; font-weight: 600; font-size: 0.95em; letter-spacing: 0.02em; }
 .app-no-cell { font-family: var(--font-num), ui-monospace, monospace; letter-spacing: 0.02em; color: var(--orange-text); white-space: nowrap; }
+/* Requirements checklist: tick boxes (unticking asks for a reason). */
+.req-tick { display: flex; align-items: flex-start; gap: 10px; flex: 1; min-width: 200px; cursor: pointer; font-weight: 400; }
+.req-tick input { width: 18px; height: 18px; margin-top: 1px; accent-color: #0a7d3b; flex: none; cursor: pointer; }
+.req-tick input:disabled { cursor: wait; }

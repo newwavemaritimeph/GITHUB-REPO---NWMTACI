@@ -24,7 +24,11 @@ const fmtLong = (v: string) => new Intl.DateTimeFormat("en-PH", { weekday: "long
 const day = (v?: string | null) => (v ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(v)) : "");
 const nameOf = (e: Enrollment) => { const t = first(e.trainees); return t ? fullName(t) : e.enrollment_number; };
 /** Request types a Registration Officer may raise (addendum: rescheduling, change of course, cancellation). */
-const REG_REQUESTS: RequestType[] = ["Rescheduling", "Change Course", "Cancellation"];
+const REG_REQUESTS: RequestType[] = ["Rescheduling", "Change Course", "Make-up Class", "Cancellation"];
+/** Button label for each request type a Registration Officer can raise. */
+const requestLabel = (type: RequestType, isApplication: boolean) => (type === "Rescheduling" ? "Change batch / reschedule" : type === "Change Course" ? "Change course" : type === "Make-up Class" ? "Make-up class" : isApplication ? "Decline application" : "Cancel enrollment");
+/** Where a request is: with the Cashier for charges, with Accounting for approval, or decided. */
+const requestStage = (r: RequestRow) => (r.status !== "Pending" ? { text: r.status, tone: r.status === "Approved" ? "active" : "cancelled" } : r.stage === "With cashier" ? { text: "With Cashier", tone: "orange" } : { text: "Awaiting approval", tone: "pending" });
 
 const scheduleOf = (e: Enrollment) => { const b = first(e.batches); return b ? `${fmtDate(b.starts_on)}${b.ends_on !== b.starts_on ? ` – ${fmtDate(b.ends_on)}` : ""}` : e.scheduled_on ? fmtDate(e.scheduled_on) : "Open schedule"; };
 const payState = (e: Enrollment) => { const paid = Number(e.paid_centavos), due = dueCentavos(e); if (e.enrollment_status === "Cancelled") return { text: "Cancelled", tone: "cancelled" }; if (due > 0 && paid >= due) return { text: "Paid", tone: "green" }; if (paid > 0) return { text: "Partially paid", tone: "orange" }; return { text: "Unpaid", tone: "red" }; };
@@ -66,7 +70,6 @@ export function RegistrationDashboard({ data, go }: { data: PortalData; go: (mod
   const traineeById = new Map(data.trainees.map((t) => [t.id, t]));
   const batchById = new Map(data.batches.map((b) => [b.id, b]));
   const live = data.enrollments.filter((e) => e.enrollment_status === "Enrolled");
-  const checks = data.requirementChecks ?? [];
   const startOf = (e: Enrollment) => first(e.batches)?.starts_on ?? e.scheduled_on ?? null;
   const endOf = (e: Enrollment) => first(e.batches)?.ends_on ?? e.scheduled_on ?? null;
   const courseLabel = (e: Enrollment) => first(e.courses)?.name ?? courseById.get(e.course_id)?.name ?? "Course";
@@ -76,7 +79,7 @@ export function RegistrationDashboard({ data, go }: { data: PortalData; go: (mod
   const newToday = recent.filter((e) => day(e.created_at) === today);
   const awaiting = applicantCount(data);
   const newNoCourse = awaitingCourseOf(data).filter((t) => day(t.registered_at) >= weekStart);
-  const stateFor = (e: Enrollment) => (e.enrollment_status === "Pending" ? stateOf(applicationReadiness(e, checks)) : { text: e.enrollment_status, tone: statusTone(e.enrollment_status) });
+  const stateFor = (e: Enrollment) => (e.enrollment_status === "Pending" ? stateOf(readinessOf(data, e)) : { text: e.enrollment_status, tone: statusTone(e.enrollment_status) });
 
   // Upcoming trainings — trainees starting in the next 14 days, by start date.
   const upcoming = live.filter((e) => { const s = startOf(e); return !!s && s > today && s <= horizon; });
@@ -184,7 +187,7 @@ type RequirementCheck = NonNullable<PortalData["requirementChecks"]>[number];
  * a schedule. Only a hint for the screen — the database re-checks every rule
  * when the applicant is enrolled.
  */
-export function applicationReadiness(e: Enrollment, checks: RequirementCheck[]) {
+export function applicationReadiness(e: Enrollment, checks: RequirementCheck[], handedAt?: string | null) {
   const latest = new Map(checks.filter((c) => c.enrollment_id === e.id).map((c) => [c.requirement, c]));
   const missing = REQUIREMENTS.filter((r) => latest.get(r.code)?.status !== "Verified").map((r) => r.label);
   const rejected = REQUIREMENTS.filter((r) => latest.get(r.code)?.status === "Rejected").map((r) => r.label);
@@ -192,9 +195,11 @@ export function applicationReadiness(e: Enrollment, checks: RequirementCheck[]) 
   const paid = paidCentavos > 0;
   const ready = !missing.length && paid && !!e.batch_id;
   const reason = !e.batch_id ? "No schedule chosen yet" : missing.length ? `Not verified yet: ${missing.join(", ")}` : !paid ? "No verified payment yet" : "Ready to enroll";
-  return { latest, verified: REQUIREMENTS.length - missing.length, missing, rejected, paid, paidCentavos, ready, reason };
+  const handed = !!handedAt;
+  return { latest, verified: REQUIREMENTS.length - missing.length, missing, rejected, paid, paidCentavos, ready, reason, handed, handedAt: handedAt ?? null };
 }
-const stateOf = (r: ReturnType<typeof applicationReadiness>) => (r.ready ? { text: "Ready to enroll", tone: "active" } : r.rejected.length ? { text: "Needs attention", tone: "cancelled" } : { text: "Screening", tone: "pending" });
+const stateOf = (r: ReturnType<typeof applicationReadiness>) => (r.ready ? { text: "Paid · ready to enroll", tone: "active" } : r.handed ? { text: "With Cashier", tone: "orange" } : r.rejected.length ? { text: "Needs attention", tone: "cancelled" } : { text: "Screening", tone: "pending" });
+const readinessOf = (data: PortalData, e: Enrollment) => applicationReadiness(e, data.requirementChecks ?? [], data.handedToCashier?.[e.id] ?? null);
 /** The website enrollment number (NWMTACI-0000001) the applicant quotes on Facebook, if any. */
 const appNoOf = (data: PortalData, traineeId?: string | null) => (traineeId ? data.applicationNumbers?.[traineeId] ?? null : null);
 const applicationsOf = (data: PortalData) => data.enrollments.filter((e) => e.enrollment_status === "Pending");
@@ -202,7 +207,8 @@ const applicationsOf = (data: PortalData) => data.enrollments.filter((e) => e.en
 const awaitingCourseOf = (data: PortalData) => (data.awaitingCourseIds ?? []).map((id) => data.trainees.find((t) => t.id === id)).filter((t): t is Trainee => !!t).sort((a, b) => (b.registered_at ?? "").localeCompare(a.registered_at ?? ""));
 const applicantCount = (data: PortalData) => applicationsOf(data).length + awaitingCourseOf(data).length;
 
-const APP_FILTERS = ["All", "No course yet", "Ready", "Missing requirements", "Awaiting payment"] as const;
+const APP_FILTERS = ["All", "No course yet", "Screening", "With Cashier", "Ready to enroll"] as const;
+const inFilter = (f: (typeof APP_FILTERS)[number], r: ReturnType<typeof applicationReadiness>) => (f === "All" ? true : f === "No course yet" ? false : f === "Ready to enroll" ? r.ready : f === "With Cashier" ? r.handed && !r.ready : !r.handed && !r.ready);
 
 /** Place a course-less applicant on a bookable New Wave batch; the seat is held from then on. */
 function AssignCourseModal({ data, trainee, reload, onClose }: { data: PortalData; trainee: Trainee; reload: () => Promise<void>; onClose: () => void }) {
@@ -240,12 +246,11 @@ function ApplicationQueue({ data, query, reload }: { data: PortalData; query: st
   const [q, setQ] = useState("");
   const [page, setPage] = useState(1);
   const [open, setOpen] = useState<Enrollment | null>(null);
-  const checks = data.requirementChecks ?? [];
   const term = (q || query).trim().toLowerCase();
-  const all = applicationsOf(data).map((e) => ({ e, r: applicationReadiness(e, checks) }));
+  const all = applicationsOf(data).map((e) => ({ e, r: readinessOf(data, e) }));
   const [assigning, setAssigning] = useState<Trainee | null>(null);
   const noCourse = awaitingCourseOf(data).filter((t) => !term || `${fullName(t)} ${t.trainee_number} ${appNoOf(data, t.id) ?? ""} ${t.email} ${t.mobile}`.toLowerCase().includes(term));
-  const matches = (x: (typeof all)[number]) => filter !== "No course yet" && (filter === "All" || (filter === "Ready" ? x.r.ready : filter === "Missing requirements" ? x.r.missing.length > 0 : !x.r.paid));
+  const matches = (x: (typeof all)[number]) => inFilter(filter, x.r);
   const rows = all
     .filter(matches)
     .filter(({ e }) => !term || `${nameOf(e)} ${e.enrollment_number} ${appNoOf(data, e.trainee_id) ?? ""} ${first(e.courses)?.name ?? ""} ${first(e.trainees)?.trainee_number ?? ""}`.toLowerCase().includes(term))
@@ -253,7 +258,7 @@ function ApplicationQueue({ data, query, reload }: { data: PortalData; query: st
   const PER = 12;
   const pageRows = rows.slice((page - 1) * PER, page * PER);
   const current = open ? data.enrollments.find((e) => e.id === open.id) ?? open : null;
-  const count = (f: (typeof APP_FILTERS)[number]) => (f === "All" ? all.length + awaitingCourseOf(data).length : f === "No course yet" ? awaitingCourseOf(data).length : all.filter((x) => (f === "Ready" ? x.r.ready : f === "Missing requirements" ? x.r.missing.length > 0 : !x.r.paid)).length);
+  const count = (f: (typeof APP_FILTERS)[number]) => (f === "All" ? all.length + awaitingCourseOf(data).length : f === "No course yet" ? awaitingCourseOf(data).length : all.filter((x) => inFilter(f, x.r)).length);
   return <>
     <div className="portal-tabs">{APP_FILTERS.map((f) => <button key={f} type="button" className={filter === f ? "active" : ""} onClick={() => { setFilter(f); setPage(1); }}>{f}<small style={{ marginLeft: 6, opacity: 0.7 }}>{count(f)}</small></button>)}</div>
     <div style={{ display: "flex", gap: 10, padding: "0 0 10px" }}><label className="portal-field-inline" style={{ flex: 1, minWidth: 220 }}>Search<input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Name, NWMTACI number, SRN, course" /></label></div>
@@ -272,7 +277,7 @@ function ApplicationQueue({ data, query, reload }: { data: PortalData; query: st
         <td>{first(e.courses)?.name ?? "—"}<small>{scheduleOf(e)}</small></td>
         <td>{fmtDate(day(e.created_at))}<small>{e.source === "Public registration" ? "Website" : e.source ?? ""}</small></td>
         <td><span className={`req-count${r.missing.length ? "" : " ok"}`}>{r.verified} of {REQUIREMENTS.length}</span>{r.rejected.length > 0 && <small>Rejected: {r.rejected.join(", ")}</small>}</td>
-        <td>{r.paid ? <><strong>{pesos(r.paidCentavos)}</strong><small>Verified</small></> : <span className="muted-text">Awaiting payment</span>}</td>
+        <td>{r.paid ? <><strong>{pesos(r.paidCentavos)}</strong><small>Verified</small></> : <span className="muted-text">{r.handed ? "With Cashier" : "Not yet"}</span>}</td>
         <td><Badge tone={s.tone}>{s.text}</Badge></td>
       </tr>; })}
     </tbody></table>{!rows.length && <p className="portal-empty-copy">{filter === "No course yet" ? "Applicants without a course are listed above." : all.length ? "No applications match." : "No applications with a course yet. New ones arrive from the website."}</p>}</div>
@@ -332,7 +337,7 @@ export type RecordsView = "applications" | "enrollments" | "trainees";
  */
 export function RegistrationRecords({ data, query, reload, view, setView, trainees }: { data: PortalData; query: string; reload: () => Promise<void>; view: RecordsView; setView: (v: RecordsView) => void; trainees: ReactNode }) {
   const copy: Record<RecordsView, string> = {
-    applications: "Applications submitted on the website. Verify the requirements; once the Cashier has a verified payment, enroll the applicant.",
+    applications: "Applications from the website. Assign the course and batch, tick the requirements, hand to the Cashier for payment, then enroll.",
     enrollments: "Enrolled, open-schedule and cancelled enrollments. Open one for documents, instructions or to request a change.",
     trainees: "Trainee master records. Open one to see their details and enrollment history.",
   };
@@ -348,35 +353,42 @@ export function RegistrationRecords({ data, query, reload, view, setView, traine
   </div>;
 }
 
-/** Screening checklist for a Pending application, shown at the top of its drawer. */
+/** Screening for a Pending application, at the top of its drawer: tick the requirements, hand to the Cashier, enroll once paid. */
 function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<Record<string, unknown>> }) {
-  const [rejecting, setRejecting] = useState<string | null>(null);
+  const [unticking, setUnticking] = useState<string | null>(null);
   const [remarks, setRemarks] = useState("");
-  const r = applicationReadiness(e, data.requirementChecks ?? []);
+  const r = readinessOf(data, e);
   const s = stateOf(r);
+  const allTicked = r.missing.length === 0;
   const check = (requirement: string, status: "Verified" | "Rejected", label: string) =>
-    void post({ action: "requirement-check", enrollmentId: e.id, requirement, status, remarks: status === "Rejected" ? remarks.trim() : undefined }, `${label} ${status === "Verified" ? "verified" : "marked as rejected"}.`).then(() => { setRejecting(null); setRemarks(""); }).catch(() => undefined);
+    void post({ action: "requirement-check", enrollmentId: e.id, requirement, status, remarks: status === "Rejected" ? remarks.trim() : undefined }, `${label} ${status === "Verified" ? "ticked" : "unticked"}.`).then(() => { setUnticking(null); setRemarks(""); }).catch(() => undefined);
   return <div className="screen-box full">
-    <div className="screen-head"><div><strong>Screening</strong><small>Check each document, then enroll once a verified payment is in.</small></div><Badge tone={s.tone}>{s.text}</Badge></div>
+    <div className="screen-head"><div><strong>Screening</strong><small>Tick each requirement as it is received, hand the applicant to the Cashier, then enroll once paid.</small></div><Badge tone={s.tone}>{s.text}</Badge></div>
     <ul className="req-list">
-      {REQUIREMENTS.map((req) => { const c = r.latest.get(req.code); return <li className="req-row" key={req.code}>
-        <span className={`req-dot${c?.status === "Verified" ? " ok" : c?.status === "Rejected" ? " bad" : ""}`} aria-hidden="true" />
-        <span className="req-main"><strong>{req.label}</strong><small>{c ? `${c.status} · ${c.checked_by_name ?? "Staff"} · ${fmtDate(day(c.checked_at))}${c.remarks ? ` · ${c.remarks}` : ""}` : "Not checked yet"}</small></span>
-        <span className="req-actions">
-          {c?.status !== "Verified" && <button type="button" className="portal-secondary" disabled={busy} onClick={() => check(req.code, "Verified", req.label)}>Verify</button>}
-          <button type="button" className="ghost-button" disabled={busy} onClick={() => { setRejecting(rejecting === req.code ? null : req.code); setRemarks(""); }}>{c?.status === "Rejected" ? "Update reason" : "Reject"}</button>
-        </span>
-        {rejecting === req.code && <span className="req-reject">
-          <input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="Reason, e.g. medical certificate expired" aria-label={`Reason for rejecting ${req.label}`} autoFocus />
-          <button type="button" className="portal-primary" disabled={busy || !remarks.trim()} onClick={() => check(req.code, "Rejected", req.label)}>Save</button>
+      {REQUIREMENTS.map((req) => { const c = r.latest.get(req.code); const ticked = c?.status === "Verified"; return <li className="req-row" key={req.code}>
+        <label className="req-tick"><input type="checkbox" checked={ticked} disabled={busy} onChange={() => { if (ticked) { setUnticking(req.code); setRemarks(""); } else check(req.code, "Verified", req.label); }} /><span className="req-main"><strong>{req.label}</strong><small>{c ? `${ticked ? "Received" : "Unticked"} · ${c.checked_by_name ?? "Staff"} · ${fmtDate(day(c.checked_at))}${c.remarks ? ` · ${c.remarks}` : ""}` : "Not received yet"}</small></span></label>
+        {unticking === req.code && <span className="req-reject">
+          <input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="Reason for unticking, e.g. medical certificate expired" aria-label={`Reason for unticking ${req.label}`} autoFocus />
+          <button type="button" className="portal-primary" disabled={busy || !remarks.trim()} onClick={() => check(req.code, "Rejected", req.label)}>Untick</button>
+          <button type="button" className="ghost-button" onClick={() => setUnticking(null)}>Keep</button>
         </span>}
       </li>; })}
       <li className="req-row">
+        <span className={`req-dot${r.handed ? " ok" : ""}`} aria-hidden="true" />
+        <span className="req-main"><strong>Cashier</strong><small>{r.handed ? `Handed over ${fmtDate(day(r.handedAt))} ${fmtClock(r.handedAt ?? "")}` : "Not yet handed over"}</small></span>
+      </li>
+      <li className="req-row">
         <span className={`req-dot${r.paid ? " ok" : ""}`} aria-hidden="true" />
-        <span className="req-main"><strong>Payment</strong><small>{r.paid ? `${pesos(r.paidCentavos)} verified` : "No verified payment yet — the Cashier records payments"}</small></span>
+        <span className="req-main"><strong>Payment</strong><small>{r.paid ? `${pesos(r.paidCentavos)} verified` : r.handed ? "Waiting for the Cashier to record the payment" : "Recorded by the Cashier after hand-over"}</small></span>
       </li>
     </ul>
-    <div className="screen-foot"><small>{r.ready ? "Everything is in. Enrolling confirms the seat on this schedule." : r.reason}</small><button type="button" className="portal-primary" disabled={!r.ready || busy} onClick={() => void post({ action: "application-enroll", enrollmentId: e.id }, "Applicant enrolled.").catch(() => undefined)}>Enroll applicant</button></div>
+    <div className="screen-foot">
+      <small>{!e.batch_id ? "Assign a course and batch first." : !allTicked ? `Still to tick: ${r.missing.join(", ")}` : !r.handed ? "All requirements received. Hand the applicant to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : "Paid. Enrolling confirms the seat on this batch."}</small>
+      <span style={{ display: "inline-flex", gap: 8, flexWrap: "wrap" }}>
+        {!r.handed && <button type="button" className="portal-primary" disabled={busy || !allTicked || !e.batch_id} onClick={() => void post({ action: "application-handover", enrollmentId: e.id }, "Handed to the Cashier for payment.").catch(() => undefined)}>Hand to Cashier</button>}
+        <button type="button" className={r.handed ? "portal-primary" : "portal-secondary"} disabled={!r.ready || busy} onClick={() => void post({ action: "application-enroll", enrollmentId: e.id }, "Applicant enrolled.").catch(() => undefined)}>Enroll applicant</button>
+      </span>
+    </div>
   </div>;
 }
 
@@ -384,7 +396,9 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
 function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void }) {
   const { busy, msg, post } = usePost(reload);
   const [req, setReq] = useState<RequestType | null>(null);
+  const [addingCourse, setAddingCourse] = useState(false);
   const t = first(e.trainees), c = first(e.courses), b = first(e.batches);
+  const traineeRecord = data.trainees.find((x) => x.id === e.trainee_id) ?? null;
   const center = first(first(e.partner_course_offers)?.partner_centers)?.name;
   const paid = Number(e.paid_centavos), due = dueCentavos(e), balance = balanceOf(e), charges = Number(e.charges_centavos ?? 0), discounts = Number(e.discounts_centavos ?? 0);
   const payments = data.payments.filter((p) => p.trainee_id === e.trainee_id).sort((a, z) => z.received_at.localeCompare(a.received_at));
@@ -422,15 +436,18 @@ function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { data: Port
         <button type="button" disabled={busy} onClick={() => void post({ action: "send-instructions", enrollmentId: e.id }, e.instructions_sent_at ? "Instructions re-sent." : "Instructions sent.").catch(() => undefined)}>{e.instructions_sent_at ? `Resend instructions (sent ${fmtDate(day(e.instructions_sent_at))})` : "Send instructions"}</button>
       </div> : <p className="portal-form-note full">{isApplication ? "The admission slip and training instructions become available once the applicant is enrolled." : "No documents for a cancelled enrollment."}</p>}
 
-      <div className="full"><strong>Request a change</strong> <small style={{ color: "var(--muted)" }}>decided by the Accounting Manager</small></div>
+      {isApplication && traineeRecord && <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}><button type="button" onClick={() => setAddingCourse(true)}>+ Add another course</button></div>}
+
+      <div className="full"><strong>Request a change</strong> <small style={{ color: "var(--muted)" }}>goes to the Cashier for charges, then the Accounting Manager for approval</small></div>
       <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
-        {REG_REQUESTS.map((type) => <button key={type} type="button" disabled={!canRequest || pendingTypes.has(type)} title={pendingTypes.has(type) ? "A request of this type is already pending" : undefined} onClick={() => setReq(type)}>{type === "Rescheduling" ? "Change schedule" : type === "Change Course" ? "Change course" : isApplication ? "Decline application" : "Cancel enrollment"}</button>)}
+        {REG_REQUESTS.filter((type) => !(isApplication && type === "Make-up Class")).map((type) => <button key={type} type="button" disabled={!canRequest || pendingTypes.has(type)} title={pendingTypes.has(type) ? "A request of this type is already pending" : undefined} onClick={() => setReq(type)}>{requestLabel(type, isApplication)}</button>)}
       </div>
-      {history.length > 0 && <div className="full"><small style={{ color: "var(--muted)", fontWeight: 700 }}>Request history</small>{history.map((r: RequestRow) => <div className="live-row-item" key={r.id}><div><strong>{r.request_number} · {r.request_type}</strong><small>{r.reason} · filed {fmtDate(day(r.created_at))}{r.decided_at ? ` · decided ${fmtDate(day(r.decided_at))}` : ""}{r.decision_remarks ? ` · ${r.decision_remarks}` : ""}</small></div><Badge tone={r.status === "Approved" ? "active" : r.status === "Rejected" ? "cancelled" : "pending"}>{r.status}</Badge></div>)}</div>}
+      {history.length > 0 && <div className="full"><small style={{ color: "var(--muted)", fontWeight: 700 }}>Request history</small>{history.map((r: RequestRow) => { const st = requestStage(r); const charge = first(r.enrollment_charges); return <div className="live-row-item" key={r.id}><div><strong>{r.request_number} · {r.request_type === "Rescheduling" ? "Change batch / reschedule" : r.request_type}</strong><small>{r.reason} · filed {fmtDate(day(r.created_at))}{charge ? ` · charge ${pesos(charge.amount_centavos)}` : r.stage === "For approval" && r.status === "Pending" ? " · no charge" : ""}{r.decided_at ? ` · decided ${fmtDate(day(r.decided_at))}` : ""}{r.decision_remarks ? ` · ${r.decision_remarks}` : ""}</small></div><Badge tone={st.tone}>{st.text}</Badge></div>; })}</div>}
 
       <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Close</button></div>
     </div>
-    {req && <RequestActionModal data={data} enrollment={e} reqType={req} onClose={() => setReq(null)} post={(body) => post(body, "Request sent to the Accounting Manager.")} />}
+    {req && <RequestActionModal data={data} enrollment={e} reqType={req} onClose={() => setReq(null)} post={(body) => post(body, "Request sent to the Cashier for charges.")} />}
+    {addingCourse && traineeRecord && <AssignCourseModal data={data} trainee={traineeRecord} reload={reload} onClose={() => setAddingCourse(false)} />}
   </Modal>;
 }
 

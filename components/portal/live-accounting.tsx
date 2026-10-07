@@ -37,7 +37,7 @@ export type AccountingData = {
   inventoryItems: InventoryItem[]; inventoryMovements: InventoryMovement[];
   cashierClosings: { id: string; closing_date: string; opening_cash_centavos: number; cash_collections_centavos: number; online_collections_centavos: number; expenses_centavos: number; expected_cash_centavos: number; actual_cash_centavos?: number | null; variance_centavos?: number | null; status: string }[];
   profile?: { complete_name: string };
-  requests: { id: string; request_number: string; request_type: string; requested_values: { amountCentavos?: number } | null; reason: string; status: string; created_at: string; trainees?: { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null }[];
+  requests: { id: string; request_number: string; request_type: string; requested_values: { amountCentavos?: number; batchId?: string } | null; reason: string; status: string; created_at: string; trainees?: { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null; stage?: string; charge_id?: string | null; enrollment_charges?: { amount_centavos: number; description: string } | { amount_centavos: number; description: string }[] | null; enrollments?: { enrollment_number: string; courses?: { name: string } | { name: string }[] | null } | { enrollment_number: string; courses?: { name: string } | { name: string }[] | null }[] | null }[];
   trainees: TraineeRow[];
   pendingDiscounts: PendingDiscount[];
   pendingCharges: { id: string; enrollment_id: string; description: string; amount_centavos: number; created_at: string; enrollments?: { enrollment_number: string; trainees?: { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null; courses?: CourseRef | CourseRef[] | null } | { enrollment_number: string; trainees?: { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null; courses?: CourseRef | CourseRef[] | null }[] | null }[];
@@ -1298,8 +1298,13 @@ export function ApprovalsModule({ data, role, reload }: { data: AccountingData; 
     finally { setBusy(false); }
   }
   const vouchers = data.expenses.filter((e) => e.status === "Pending");
-  const refunds = data.requests.filter((r) => r.status === "Pending" && ["Refund", "Cancellation"].includes(r.request_type));
-  const total = vouchers.length + data.pendingCharges.length + data.pendingDiscounts.length + refunds.length;
+  // Every change request the Cashier has priced (stage "For approval"); requests
+  // still with the Cashier are not decidable yet. Charges linked to a request
+  // are approved together with it, so they are not listed separately.
+  const refunds = data.requests.filter((r) => r.status === "Pending" && r.stage !== "With cashier");
+  const linkedCharges = new Set(data.requests.map((r) => r.charge_id).filter(Boolean) as string[]);
+  const pendingCharges = data.pendingCharges.filter((ch) => !linkedCharges.has(ch.id));
+  const total = vouchers.length + pendingCharges.length + data.pendingDiscounts.length + refunds.length;
   const Actions = ({ onYes, onNo }: { onYes: () => void; onNo: () => void }) => canManage
     ? <div className="document-actions"><button type="button" disabled={busy} onClick={onYes}>Approve</button><button type="button" disabled={busy} onClick={onNo}>Reject</button></div>
     : <span className="portal-badge pending">Pending</span>;
@@ -1310,16 +1315,16 @@ export function ApprovalsModule({ data, role, reload }: { data: AccountingData; 
       {vouchers.map((e) => <div className="live-row-item" key={e.id}><div><strong>{e.payee}</strong><small>{e.expense_number} · {e.category} · {peso2(e.amount_centavos)}</small></div><Actions onYes={() => void post({ action: "expense-decide", id: e.id, decision: "Approved" })} onNo={() => void post({ action: "expense-decide", id: e.id, decision: "Rejected" })} /></div>)}
       {!vouchers.length && <p className="portal-empty-copy">No vouchers pending.</p>}
     </section>
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Payment adjustments (charges)</h2><p>Added to a trainee&apos;s balance</p></div><span className="slot-count">{data.pendingCharges.length}</span></div>
-      {data.pendingCharges.map((ch) => { const enr = one(ch.enrollments); const t = one(enr?.trainees ?? null); return <div className="live-row-item" key={ch.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : enr?.enrollment_number ?? "—"}</strong><small>{ch.description} · {peso2(ch.amount_centavos)}</small></div><Actions onYes={() => void post({ action: "charge-decide", id: ch.id, approve: true })} onNo={() => void post({ action: "charge-decide", id: ch.id, approve: false })} /></div>; })}
-      {!data.pendingCharges.length && <p className="portal-empty-copy">No adjustments pending.</p>}
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Payment adjustments (charges)</h2><p>Added to a trainee&apos;s balance</p></div><span className="slot-count">{pendingCharges.length}</span></div>
+      {pendingCharges.map((ch) => { const enr = one(ch.enrollments); const t = one(enr?.trainees ?? null); return <div className="live-row-item" key={ch.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : enr?.enrollment_number ?? "—"}</strong><small>{ch.description} · {peso2(ch.amount_centavos)}</small></div><Actions onYes={() => void post({ action: "charge-decide", id: ch.id, approve: true })} onNo={() => void post({ action: "charge-decide", id: ch.id, approve: false })} /></div>; })}
+      {!pendingCharges.length && <p className="portal-empty-copy">No adjustments pending.</p>}
     </section>
     <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Fee waivers &amp; discounts</h2><p>Deducted from a trainee&apos;s balance</p></div><span className="slot-count">{data.pendingDiscounts.length}</span></div>
       {data.pendingDiscounts.map((d) => { const enr = d.enrollments ?? null; const t = one(enr?.trainees ?? null); return <div className="live-row-item" key={d.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : enr?.enrollment_number ?? "—"}</strong><small>{d.description} · {peso2(d.amount_centavos)}</small></div><Actions onYes={() => void post({ action: "discount-decide", id: d.id, approve: true })} onNo={() => void post({ action: "discount-decide", id: d.id, approve: false })} /></div>; })}
       {!data.pendingDiscounts.length && <p className="portal-empty-copy">No waivers pending.</p>}
     </section>
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Cancellation &amp; refund requests</h2><p>Money leaving the business</p></div><span className="slot-count">{refunds.length}</span></div>
-      {refunds.map((r) => { const t = one(r.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null | undefined); const amt = r.requested_values?.amountCentavos; return <div className="live-row-item" key={r.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : r.request_number}</strong><small>{r.request_type}{amt ? ` · ${peso2(amt)}` : ""} · {r.reason}</small></div><Actions onYes={() => void post({ action: "request-decide", id: r.id, approve: true })} onNo={() => void post({ action: "request-decide", id: r.id, approve: false })} /></div>; })}
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Change requests</h2><p>Batch, course, make-up, cancellation and refund — priced by the Cashier</p></div><span className="slot-count">{refunds.length}</span></div>
+      {refunds.map((r) => { const t = one(r.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null | undefined); const amt = r.requested_values?.amountCentavos; const ch = one(r.enrollment_charges ?? null); const enr = one(r.enrollments ?? null); return <div className="live-row-item" key={r.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : r.request_number}</strong><small>{r.request_type === "Rescheduling" ? "Change batch / reschedule" : r.request_type}{enr ? ` · ${enr.enrollment_number}` : ""}{amt ? ` · refund ${peso2(amt)}` : ""}{ch ? ` · charge ${peso2(ch.amount_centavos)}` : r.stage === "For approval" ? " · no charge" : ""} · {r.reason}</small></div><Actions onYes={() => void post({ action: "request-decide", id: r.id, approve: true })} onNo={() => { const remarks = window.prompt("Reason for rejecting? (optional)") ?? undefined; void post({ action: "request-decide", id: r.id, approve: false, remarks }); }} /></div>; })}
       {!refunds.length && <p className="portal-empty-copy">No requests pending.</p>}
     </section>
   </div>;

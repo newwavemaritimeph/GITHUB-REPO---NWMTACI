@@ -6,6 +6,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { LiveAttendance } from "./portal/live-attendance";
 import { LiveAccounting, AccountingDashboard, ReceivablesModule, ApprovalsModule, PayablesModule, CashPositionModule, LiveVouchers, LiveInventory, LiveExpenses, SetupList } from "./portal/live-accounting";
 import { LiveCashierClosing } from "./portal/live-cashier-closing";
+import { CashierPaymentQueue, RequestChargeModal } from "./portal/live-cashier";
 import { LiveHr, type HrData } from "./portal/live-hr";
 import { LiveTraining, type TrainingData } from "./portal/live-training";
 import { ReleasingDashboard, LiveReleasing } from "./portal/live-releasing";
@@ -19,7 +20,7 @@ import { Badge, Message, Modal, Page, PageHead, submit, fullName } from "./porta
 import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, first, dueCentavos, balanceOf, isUnpaid, manilaToday } from "@/lib/portal-format";
 
-type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Setup" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration";
+type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Setup" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment";
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -39,7 +40,9 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   pendingDiscounts:{id:string;enrollment_id:string;description:string;amount_centavos:number;agency_id?:string|null;created_at:string}[];
   announcements:{id:string;title:string;body:string;audience_roles:string[];published_at?:string|null;expires_at?:string|null}[];
   courseCategories:{id:string;name:string}[]; partnerCenters:{id:string;name:string;active:boolean}[];
-  requests:{id:string;request_number:string;request_type:string;requested_values:{batchId?:string;amountCentavos?:number;paymentId?:string}|null;reason:string;status:string;decision_remarks?:string|null;created_at:string;decided_at?:string|null;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;enrollments?:{enrollment_number:string;courses?:{name:string}|{name:string}[]|null}|{enrollment_number:string;courses?:{name:string}|{name:string}[]|null}[]|null}[];
+  requests:{id:string;request_number:string;request_type:string;requested_values:{batchId?:string;amountCentavos?:number;paymentId?:string}|null;reason:string;status:string;decision_remarks?:string|null;created_at:string;decided_at?:string|null;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;enrollments?:{id?:string;enrollment_number:string;trainee_id?:string;courses?:{name:string}|{name:string}[]|null}|{id?:string;enrollment_number:string;trainee_id?:string;courses?:{name:string}|{name:string}[]|null}[]|null;
+    // Routing (202610070004): With cashier → For approval; the Cashier's charge, if any.
+    stage?:string;charge_id?:string|null;enrollment_charges?:{amount_centavos:number;description:string;approval_status:string}|{amount_centavos:number;description:string;approval_status:string}[]|null}[];
   pendingCharges:{id:string;enrollment_id:string;description:string;amount_centavos:number;created_at:string;enrollments?:{enrollment_number:string;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;courses?:{name:string}|{name:string}[]|null}|{enrollment_number:string;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;courses?:{name:string}|{name:string}[]|null}[]|null}[];
   myHr:{employee:{employee_number:string;complete_name:string;position:string;employment_status:string;date_hired?:string|null;pay_type?:string|null;base_rate_centavos?:number|null;work_email?:string|null;active:boolean};leave:{id:string;leave_type:string;starts_on:string;ends_on:string;reason:string;status:string;created_at:string}[];advances:{id:string;amount_centavos:number;requested_on:string;balance_centavos:number;status:string}[];charges:EmployeeCharge[];attendance:{id:string;attendance_date:string;checked_in_at?:string|null;checked_out_at?:string|null;minutes_late:number;minutes_undertime:number;status:string}[]}|null;
   employeeCharges:EmployeeCharge[]; chargeEmployees:{id:string;complete_name:string;employee_number:string;active:boolean}[];
@@ -50,7 +53,9 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   // Website applicants with no course yet (Registration assigns it); empty until migration 202610070002.
   awaitingCourseIds?:string[];
   // Website enrollment number (NWMTACI-0000001) per trainee id; empty until migration 202610070003.
-  applicationNumbers?:Record<string,string> };
+  applicationNumbers?:Record<string,string>;
+  // Pending applications Registration handed to the Cashier: enrollment id → when (202610070004).
+  handedToCashier?:Record<string,string> };
 
 // Sidebar is grouped so a long role list stays scannable. Group order here is the
 // render order; a group disappears entirely when the role can see none of its items.
@@ -92,7 +97,7 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Rooms & facilities",icon:"▢",roles:["admin","training_operations"],group:"Work"},{label:"Training calendar",icon:"▦",roles:["admin","training_operations"],group:"Work"},{label:"Trainee scheduling",icon:"◎",roles:["admin","training_operations"],group:"Work"},{label:"Instructor assignment",icon:"♙",roles:["admin","training_operations"],group:"Work"},{label:"Schedule changes",icon:"↺",roles:["admin","training_operations"],group:"Records"},{label:"Certificates",icon:"◈",roles:["admin","releasing_officer"],group:"Work"},{label:"Requests",icon:"↺",roles:["admin","accounting","cashier"],group:"Work"},
   {label:"Reports",icon:"↥",roles:["admin","accounting","releasing_officer","registration","training_operations","cashier"],group:"Records"},
   {label:"Accounting",icon:"▥",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Expenses",icon:"◰",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Inventory",icon:"▦",roles:["admin","accounting"],group:"Finance"},{label:"Employee charges",icon:"₱",roles:["admin","accounting","hr"],group:"Finance"},
-  {label:"Receivables",icon:"◷",roles:["accounting"],group:"Collections"},{label:"Payments",icon:"₱",roles:["cashier","accounting"],group:"Collections"},
+  {label:"Receivables",icon:"◷",roles:["accounting"],group:"Collections"},{label:"For payment",icon:"⇥",roles:["cashier"],group:"Collections"},{label:"Payments",icon:"₱",roles:["cashier","accounting"],group:"Collections"},
   {label:"Approvals",icon:"✓",roles:["accounting"],group:"Approvals"},
   {label:"Payables",icon:"▦",roles:["accounting"],group:"Payables & cash"},{label:"Cash position",icon:"◈",roles:["accounting"],group:"Payables & cash"},
   {label:"Cashier closing",icon:"⚖",roles:["cashier","accounting"],group:"Cashier control"},
@@ -166,6 +171,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(modules&&!modules.includes(active))return <RebuildingWorkspace/>;
   if(active==="Dashboard"&&gateRole==="registration")return <RegistrationDashboard data={data} go={m=>go(m as Module)}/>;
   if(active==="Courses")return <CoursesAndCenters data={data} query={query}/>;
+  if(active==="For payment")return <CashierPaymentQueue data={data} onPay={onPay}/>;
   if(active==="Registration")return <RegistrationRecords data={data} query={query} reload={reload} view={recordsView} setView={setRecordsView} trainees={<Trainees data={data} query={query} embedded/>}/>;
   if(active==="Dashboard"&&gateRole==="admin")return <AdminDashboard data={data} go={m=>go(m as Module)} openEnrollment={()=>open("enrollment")}/>;
   if(active==="Dashboard"&&gateRole==="training_operations")return <ScheduleOfficerDashboard data={data} go={m=>go(m as Module)} openBatch={()=>open("batch")}/>;
@@ -555,17 +561,29 @@ function EnrollmentSummary({data}:{data:PortalData}){
   </div>;
 }
 
+/**
+ * Change requests. Registration's requests reach the Cashier first ("With
+ * cashier"), who adds the charge or marks no charge; then the Accounting
+ * Manager approves or rejects ("For approval"). Approval applies the change and
+ * posts the charge.
+ */
 function LiveRequests({data,role,reload}:{data:PortalData;role:string;reload:()=>Promise<void>}){
   const canDecide=["admin","accounting"].includes(role);
-  const [busy,setBusy]=useState(""),[message,setMessage]=useState("");
+  const canCharge=["admin","cashier","accounting"].includes(role);
+  const [busy,setBusy]=useState(""),[message,setMessage]=useState(""),[charging,setCharging]=useState<PortalData["requests"][number]|null>(null);
   const pending=data.requests.filter(r=>r.status==="Pending");
+  const withCashier=pending.filter(r=>r.stage==="With cashier");
+  const forApproval=pending.filter(r=>r.stage!=="With cashier");
   const decided=data.requests.filter(r=>r.status!=="Pending");
   async function decide(id:string,approve:boolean){setBusy(id);setMessage("");try{const remarks=approve?undefined:(window.prompt("Reason for rejecting? (optional)")||undefined);await submit({action:"request-decide",id,approve,remarks});await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not update the request.")}finally{setBusy("")}}
-  const detailOf=(r:PortalData["requests"][number])=>{const rv=r.requested_values||{};const bits:string[]=[];if(rv.amountCentavos)bits.push(pesos(rv.amountCentavos));if(rv.batchId)bits.push("new schedule selected");return bits.join(" · ")};
-  const row=(r:PortalData["requests"][number],withActions:boolean)=>{const t=first(r.trainees),e=first(r.enrollments),c=e?first(e.courses):null;const extra=detailOf(r);return <div className="live-row-item" key={r.id}><div><strong>{t?fullName(t):"Unknown trainee"} · {r.request_type}</strong><small>{c?.name} · {e?.enrollment_number} · {r.reason}{extra?` · ${extra}`:""}</small></div>{withActions&&canDecide?<div className="document-actions"><button type="button" className="portal-primary" disabled={!!busy} onClick={()=>decide(r.id,true)}>{busy===r.id?"…":"Approve"}</button><button type="button" disabled={!!busy} onClick={()=>decide(r.id,false)}>Reject</button></div>:<Badge tone={r.status==="Approved"?"green":r.status==="Rejected"?"red":"orange"}>{r.status}</Badge>}</div>};
-  return <div className="portal-page"><PageHead eyebrow="Approvals" title="Requests" text="Cashier-raised cancellations, refunds, make-up classes, and reschedules routed to Accounting."/>{message&&<Message kind="error" text={message}/>}
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Pending approval</h2><p>{canDecide?"Approve or reject — approval applies the change automatically":"Waiting for accounting"}</p></div><Badge tone="orange">{pending.length}</Badge></div>{pending.map(r=>row(r,true))}{!pending.length&&<p className="portal-empty-copy">No pending requests.</p>}</section>
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Decided</h2><p>Recent history</p></div><Badge>{decided.length}</Badge></div>{decided.slice(0,20).map(r=>row(r,false))}{!decided.length&&<p className="portal-empty-copy">Nothing decided yet.</p>}</section>
+  const typeOf=(r:PortalData["requests"][number])=>r.request_type==="Rescheduling"?"Change batch / reschedule":r.request_type;
+  const detailOf=(r:PortalData["requests"][number])=>{const rv=r.requested_values||{};const bits:string[]=[];if(rv.amountCentavos)bits.push(pesos(rv.amountCentavos));if(rv.batchId)bits.push("new batch selected");const ch=first(r.enrollment_charges);if(ch)bits.push(`charge ${pesos(ch.amount_centavos)}`);else if(r.stage==="For approval"&&r.status==="Pending"&&r.charge_id===null)bits.push("no charge");return bits.join(" · ")};
+  const row=(r:PortalData["requests"][number],action:"charge"|"decide"|"none")=>{const t=first(r.trainees),e=first(r.enrollments),c=e?first(e.courses):null;const extra=detailOf(r);const no=e?.trainee_id?data.applicationNumbers?.[e.trainee_id]:undefined;return <div className="live-row-item" key={r.id}><div><strong>{t?fullName(t):"Unknown trainee"} · {typeOf(r)}</strong><small>{no?<span className="app-no">{no}</span>:null}{c?.name} · {e?.enrollment_number} · {r.reason}{extra?` · ${extra}`:""}</small></div>{action==="charge"?<button type="button" className="portal-primary" onClick={()=>setCharging(r)}>Add charge</button>:action==="decide"?<div className="document-actions"><button type="button" className="portal-primary" disabled={!!busy} onClick={()=>decide(r.id,true)}>{busy===r.id?"…":"Approve"}</button><button type="button" disabled={!!busy} onClick={()=>decide(r.id,false)}>Reject</button></div>:<Badge tone={r.status==="Approved"?"green":r.status==="Rejected"?"red":"orange"}>{r.status==="Pending"?(r.stage==="With cashier"?"With Cashier":"Awaiting approval"):r.status}</Badge>}</div>};
+  return <div className="portal-page"><PageHead eyebrow="Change requests" title="Requests" text="Change of batch, change of course, make-up classes and cancellations. The Cashier adds the charge; the Accounting Manager approves."/>{message&&<Message kind="error" text={message}/>}
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Needs charges</h2><p>{canCharge?"Add the applicable fee, or mark no charge, to send it for approval":"With the Cashier"}</p></div><Badge tone="orange">{withCashier.length}</Badge></div>{withCashier.map(r=>row(r,canCharge?"charge":"none"))}{!withCashier.length&&<p className="portal-empty-copy">Nothing waiting for charges.</p>}</section>
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>For approval</h2><p>{canDecide?"Approve or reject — approval applies the change and posts the charge":"Waiting for the Accounting Manager"}</p></div><Badge tone="orange">{forApproval.length}</Badge></div>{forApproval.map(r=>row(r,canDecide?"decide":"none"))}{!forApproval.length&&<p className="portal-empty-copy">No requests waiting for approval.</p>}</section>
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Decided</h2><p>Recent history</p></div><Badge>{decided.length}</Badge></div>{decided.slice(0,20).map(r=>row(r,"none"))}{!decided.length&&<p className="portal-empty-copy">Nothing decided yet.</p>}</section>
+    {charging&&<RequestChargeModal data={data} request={charging} reload={reload} onClose={()=>setCharging(null)}/>}
   </div>;
 }
 
