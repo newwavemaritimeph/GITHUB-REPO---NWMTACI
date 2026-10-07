@@ -1,7 +1,18 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn } from "@/lib/validation";
+
+// Official New Wave channels shown on the application summary.
+const FACEBOOK_URL = "https://www.facebook.com/newwavemtc";
+const OFFICE = {
+  address: "Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000",
+  mobile: "+63 948 847 6530",
+  telephone: "8553 0310",
+  email: "newwavemaritime@gmail.com",
+};
 
 const SUFFIXES = ["", "JR.", "SR.", "II", "III", "IV", "V"] as const;
 const RANKS = [
@@ -52,6 +63,9 @@ function Wizard() {
   const [loadingCourse, setLoadingCourse] = useState<Record<string, boolean>>({});
   const [accepted, setAccepted] = useState(false);
   const [reference, setReference] = useState("");
+  const [applicationNumber, setApplicationNumber] = useState("");
+  const [submittedAt, setSubmittedAt] = useState("");
+  const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   // Result of the SRN lookup: "found" locks the identity fields to the trainee's
@@ -112,12 +126,15 @@ function Wizard() {
   const nameOf = (code: string) => courses.find((c) => c.code === code)?.name ?? "";
   const labelOf = (code: string, id: string) => (schedulesByCourse[code] ?? []).find((s) => s.id === id)?.label ?? "";
 
-  const mobileDigits = applicant.mobile.replace(/\D/g, "");
-  const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(applicant.email);
-  const mobileValid = mobileDigits.length >= 7;
-  const emergencyMobileValid = applicant.emergencyContactMobile.replace(/\D/g, "").length >= 7;
+  // The same checks the server runs (lib/validation), so the form never sends
+  // something the server will reject with a vague error.
+  const emailValid = isEmail(applicant.email);
+  const mobileValid = isPhContactNumber(applicant.mobile);
+  const emergencyMobileValid = isPhContactNumber(applicant.emergencyContactMobile);
+  /** Message under a field, shown once something has been typed that does not pass. */
+  const hint = (value: string, ok: boolean, message: string) => (value.trim() && !ok ? <small className="ql-error">{message}</small> : null);
   const rankValid = applicant.rank !== "" && (applicant.rank !== "OTHER" || applicant.rankOther.trim().length >= 2);
-  const idValid = applicant.srn.length === 10;
+  const idValid = isSrn(applicant.srn);
   const personalValid = applicant.firstName.trim().length >= 2 && applicant.lastName.trim().length >= 2 && Boolean(applicant.birthDate) && applicant.placeOfBirth.trim().length >= 2 && rankValid;
   const contactValid = applicant.address.trim().length >= 8 && mobileValid && emailValid;
   const emergencyValid = applicant.emergencyContactName.trim().length >= 2 && emergencyMobileValid;
@@ -146,48 +163,74 @@ function Wizard() {
       const body = await response.json();
       if (!response.ok) { setError(body.error ?? "We could not submit your application. Please review your details and try again."); return; }
       setReference(body.reference);
+      setApplicationNumber(body.applicationNumber ?? "");
+      setSubmittedAt(new Intl.DateTimeFormat("en-PH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Manila" }).format(new Date()));
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       setError(e instanceof DOMException && e.name === "AbortError" ? "The server took too long to respond. Please try again in a moment." : "We could not reach the server. Please check your connection and try again.");
     } finally { setSubmitting(false); }
   }
 
   if (reference) {
+    // The enrollment number (NWMTACI-0000001) comes from migration 202610070003;
+    // before it is applied the registration reference stands in.
+    const number = applicationNumber || reference;
+    const rank = applicant.rank === "OTHER" ? applicant.rankOther : applicant.rank;
+    const fullNameText = [applicant.firstName, applicant.middleName, applicant.lastName, applicant.suffix].filter(Boolean).join(" ");
+    const message = `Hi New Wave! My enrollment number is ${number}. Attached are my registration screenshot and valid ID.`;
+    const copy = () => { void navigator.clipboard?.writeText(message).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }).catch(() => undefined); };
     return (
-      <div className="reg-card reg-success">
-        <span className="success-mark">✓</span>
-        <h2>Application received</h2>
-        <p>{COURSE_STEP ? "Your seat is reserved while we screen your application." : "Our Registration team will contact you to confirm your course and schedule."} You are enrolled once your requirements and payment are verified. Keep this reference to track your application with your registered email or mobile number.</p>
-        <div className="reference-block"><span>Registration reference</span><strong>{reference}</strong></div>
-
-        <div className="reg-next-steps" style={{ textAlign: "left", marginTop: 20 }}>
-          <h3 style={{ margin: "0 0 8px", color: "#123F63" }}>Next steps</h3>
-          <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 1.6 }}>
-            <li><strong>Screenshot this confirmation</strong> (with your registration reference).</li>
-            <li>Send the screenshot with your requirements — a <strong>valid ID or passport</strong>, your <strong>seaman&apos;s book (SIRB) or SRN</strong>, and your <strong>medical certificate</strong> — to our official Facebook page{" "}
-              <a href="https://web.facebook.com/newwavemtc" target="_blank" rel="noopener noreferrer">facebook.com/newwavemtc</a>{" "}
-              or email <a href="mailto:newwavemaritime@gmail.com">newwavemaritime@gmail.com</a>.</li>
-            <li>Settle your training fee through an official payment channel below, then send the payment screenshot for verification.</li>
-          </ol>
-        </div>
-
-        <div className="reg-payment-channels" style={{ textAlign: "left", marginTop: 18, padding: 14, border: "1px solid #9EE3F1", borderRadius: 10, background: "#F5FCFE" }}>
-          <h3 style={{ margin: "0 0 10px", color: "#F25615", letterSpacing: ".02em" }}>New Wave — Official payment channels</h3>
-          <div style={{ marginBottom: 10 }}>
-            <strong style={{ color: "#123F63" }}>UnionBank of the Philippines</strong>
-            <div>New Wave Maritime</div>
-            <div style={{ fontFamily: "monospace", fontSize: "1.05em", letterSpacing: ".04em" }}>002280021128</div>
-          </div>
+      <div className="op-page">
+        <div className="op-heading"><span className="op-check" aria-hidden="true">✓</span><h2>Application received</h2><p>Screenshot the card below and send it with your valid ID to our Facebook page.</p></div>
+        <div className="op-layout">
           <div>
-            <strong style={{ color: "#123F63" }}>GCash</strong>
-            <div>Ap**l C.</div>
-            <div style={{ fontFamily: "monospace", fontSize: "1.05em", letterSpacing: ".04em" }}>0993 380 2997</div>
+            <article className="op-pass" aria-label="Application acknowledgment">
+              <div className="op-top">
+                <div className="op-letterhead"><Image src="/brand/new-wave-emblem.png" alt="" width={34} height={34} unoptimized /><div><b>NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.</b><small>Online application acknowledgment</small></div></div>
+                <div className="op-number"><div><span>{applicationNumber ? "ENROLLMENT NO." : "REFERENCE NO."}</span><strong>{number}</strong></div><em>FOR SCREENING</em></div>
+              </div>
+              <div className="op-perf" aria-hidden="true"><i /><i /></div>
+              <table className="op-table"><tbody>
+                <tr><th>Name</th><td>{fullNameText}</td></tr>
+                <tr><th>SRN</th><td className="mono">{applicant.srn}</td></tr>
+                <tr><th>Rank</th><td>{rank}</td></tr>
+                <tr><th>Mobile</th><td>{applicant.mobile}</td></tr>
+                <tr><th>Email</th><td className="lc">{applicant.email.toLowerCase()}</td></tr>
+                <tr><th>Submitted</th><td>{submittedAt}</td></tr>
+              </tbody></table>
+              <div className="op-instructions">
+                <b>INSTRUCTIONS</b>
+                <ol>
+                  <li><strong>Screenshot</strong> this acknowledgment.</li>
+                  <li>Send it with a photo of your <strong>valid ID</strong> to <strong>facebook.com/newwavemtc</strong>.</li>
+                  <li>Type your enrollment number <strong className="mono">{number}</strong> in the message.</li>
+                </ol>
+                <p>Our Registration team will confirm your course, schedule and fee on Facebook before you pay.</p>
+              </div>
+            </article>
+            <div className="op-actions">
+              <a className="op-fb" href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer">Send on Facebook</a>
+              <button type="button" className="button button-secondary" onClick={() => window.print()}>Print or save</button>
+            </div>
           </div>
-          <p style={{ margin: "10px 0 0", fontSize: ".85em", color: "#456" }}>Always confirm the account name before sending. Keep your payment receipt for verification.</p>
-        </div>
-
-        <div className="reg-success-actions" style={{ marginTop: 18 }}>
-          <Link className="button button-primary" href="/registration-search">Check enrollment status</Link>
-          <Link className="button button-secondary" href="/courses">Browse courses</Link>
+          <div className="op-side">
+            <section className="op-panel">
+              <h3>Send to our Facebook page</h3>
+              <p>Message <strong>facebook.com/newwavemtc</strong> with your screenshot and a photo of your valid ID. Copy this message:</p>
+              <div className="op-message"><span>{message}</span><button type="button" onClick={copy}>{copied ? "Copied" : "Copy"}</button></div>
+              <a className="op-fb small" href={FACEBOOK_URL} target="_blank" rel="noopener noreferrer">Open Facebook page</a>
+            </section>
+            <section className="op-panel">
+              <h3>Contact details</h3>
+              <p>{OFFICE.address}<br />Mobile: {OFFICE.mobile} · Telephone: {OFFICE.telephone}<br />Email: <span className="lc">{OFFICE.email}</span><br />Facebook: facebook.com/newwavemtc</p>
+            </section>
+            <section className="op-panel">
+              <h3>Terms and conditions you accepted</h3>
+              <div className="op-terms">{TERMS_SECTIONS.map((section) => <div key={section.heading}><strong>{section.heading}</strong><ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul></div>)}</div>
+              <p className="op-fine">New Wave Maritime Training and Assessment Center reserves the right to amend, revise, or update these details without prior notice.</p>
+            </section>
+            <div className="reg-success-actions"><Link className="button button-secondary" href="/registration-search">Check application status</Link><Link className="button button-secondary" href="/courses">Browse courses</Link></div>
+          </div>
         </div>
       </div>
     );
@@ -214,7 +257,7 @@ function Wizard() {
   const body: Record<Exclude<SectionKey, "review">, React.ReactNode> = {
     identification: <>
       <div className="ql-grid caps-form">
-        <Field label="SRN / MISMO number*" wide><input value={applicant.srn} onChange={(e) => set("srn", e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" placeholder="10 digits" autoFocus /></Field>
+        <Field label="SRN / MISMO number*" wide><input value={applicant.srn} onChange={(e) => set("srn", e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" placeholder="10 digits" autoFocus />{hint(applicant.srn, idValid, VALIDATION_MESSAGES.srn)}</Field>
       </div>
       {lookup && <p className={`ql-lookup ${lookup.kind}`}>{lookup.text}</p>}
     </>,
@@ -231,12 +274,12 @@ function Wizard() {
     </div>,
     contact: <div className="ql-grid caps-form">
       <Field label="Complete address*" wide><input value={applicant.address} onChange={(e) => set("address", upper(e.target.value))} /></Field>
-      <Field label="Mobile number*"><input value={applicant.mobile} onChange={(e) => set("mobile", e.target.value)} inputMode="tel" placeholder="09XX XXX XXXX" /></Field>
-      <Field label="Email address*"><input type="email" value={applicant.email} onChange={(e) => set("email", e.target.value)} /></Field>
+      <Field label="Mobile number*"><input value={applicant.mobile} onChange={(e) => set("mobile", e.target.value)} inputMode="tel" placeholder="09XX XXX XXXX" />{hint(applicant.mobile, mobileValid, VALIDATION_MESSAGES.contact)}</Field>
+      <Field label="Email address*"><input type="email" value={applicant.email} onChange={(e) => set("email", e.target.value)} />{hint(applicant.email, emailValid, VALIDATION_MESSAGES.email)}</Field>
     </div>,
     emergency: <div className="ql-grid caps-form">
       <Field label="Contact person*"><input value={applicant.emergencyContactName} onChange={(e) => set("emergencyContactName", upper(e.target.value))} /></Field>
-      <Field label="Contact number*"><input value={applicant.emergencyContactMobile} onChange={(e) => set("emergencyContactMobile", e.target.value)} inputMode="tel" /></Field>
+      <Field label="Contact number*"><input value={applicant.emergencyContactMobile} onChange={(e) => set("emergencyContactMobile", e.target.value)} inputMode="tel" placeholder="09XX XXX XXXX" />{hint(applicant.emergencyContactMobile, emergencyMobileValid, VALIDATION_MESSAGES.contact)}</Field>
     </div>,
     courses: <>
       {!courses.length && <div className="reg-notice"><strong>No published schedules are open this week</strong><p>Please check back soon or contact New Wave.</p></div>}

@@ -81,10 +81,12 @@ export async function POST(request: Request) {
       target_batches: batches,target_terms_version: terms.version,target_ip_hash: ipHash,target_marketing_agency: null,
     }), 15000, "The registration service is busy (a previous submission may still be finalizing). Please try again in a minute.");
     if (error) throw error;
-    const result = data as { registration_reference:string;trainee_id:string;email:string;complete_name:string };
+    const result = data as { application_number?:string;registration_reference:string;trainee_id:string;email:string;complete_name:string };
     // Trainees have no portal account. They follow their enrollment through the
     // public status lookup using this reference plus their registered email.
-    return NextResponse.json({ reference: result.registration_reference });
+    // application_number (NWMTACI-0000001) exists once migration 202610070003 is
+    // applied; until then the summary falls back to the registration reference.
+    return NextResponse.json({ reference: result.registration_reference, applicationNumber: result.application_number ?? null });
   } catch (error) {
     const status = error instanceof Error && error.message === "RATE_LIMITED" ? 429 : 400;
     if (status !== 429) console.error("Public registration failed:", error);

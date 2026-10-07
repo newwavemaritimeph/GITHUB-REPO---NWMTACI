@@ -121,6 +121,13 @@ union all select 'payments', count(*) from public.payments
 union all select 'expenses', count(*) from public.expenses
 union all select 'cashier_closings', count(*) from public.cashier_closings;
 
+-- Website enrollment numbers start again at NWMTACI-0000001.
+do $$ begin
+  if to_regclass('public.application_number_seq') is not null then
+    execute 'alter sequence public.application_number_seq restart with 1';
+  end if;
+end $$;
+
 -- Optional: restart reference numbers (NWM-, REG-, ENR-, AR-, INV-, CV-, REQ- ...)
 -- from 1. Leaving it commented keeps numbers monotonic, which is safer if any
 -- printed document from before the reset is still around.

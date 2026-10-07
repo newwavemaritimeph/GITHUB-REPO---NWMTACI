@@ -6489,3 +6489,66 @@ a[href^="mailto:"],
   .ql-body { padding: 2px 16px 18px; }
   .ql-actions .button { width: 100%; justify-content: center; }
 }
+.ql-error { display: block; margin-top: 5px; font-size: 12.5px; font-weight: 500; color: var(--orange-text); }
+
+/* =====================================================================
+   Application summary — "Official pass" (Oct 2026): the boarding-pass card
+   with the official acknowledgment inside, built to fit one phone
+   screenshot. Letterhead in Libre Franklin-style caps, numbers monospaced.
+   ===================================================================== */
+.op-page { font-family: var(--font-ui), sans-serif; }
+.op-heading { text-align: center; margin: 0 auto 20px; max-width: 560px; }
+.op-check { display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: #0a7d3b; color: #fff; font-weight: 800; font-size: 20px; }
+.op-heading h2 { margin: 8px 0 4px; font-family: var(--font-form), var(--font-ui), sans-serif; font-weight: 600; font-size: 28px; color: var(--blue-dark); }
+.op-heading p { margin: 0; color: var(--muted); font-size: 15px; }
+.op-layout { display: grid; grid-template-columns: minmax(300px, 400px) minmax(0, 1fr); gap: 22px; align-items: start; }
+
+.op-pass { background: #fffefb; border-radius: 18px; overflow: hidden; box-shadow: 0 12px 30px rgba(18, 63, 99, 0.18); }
+.op-top { background: linear-gradient(135deg, #123f63, #0a5ba0 75%, #0571d0); color: #fff; padding: 16px 18px 18px; }
+.op-letterhead { display: flex; align-items: center; gap: 10px; padding-bottom: 11px; border-bottom: 1px solid rgba(255, 255, 255, 0.25); }
+.op-letterhead img { width: 36px; height: 36px; border-radius: 50%; background: #fff; padding: 2px; flex: none; }
+.op-letterhead b { display: block; font-size: 11.5px; font-weight: 800; line-height: 1.25; letter-spacing: 0.02em; }
+.op-letterhead small { display: block; font-size: 10.5px; opacity: 0.85; margin-top: 2px; }
+.op-number { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 8px; margin-top: 12px; }
+.op-number span { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.12em; opacity: 0.85; }
+.op-number strong { display: block; font-family: var(--font-geist-mono), ui-monospace, monospace; font-size: 25px; font-weight: 700; letter-spacing: 0.02em; margin-top: 2px; }
+.op-number em { font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; border: 1.5px solid #f25615; background: rgba(242, 86, 21, 0.2); padding: 3px 8px; border-radius: 4px; transform: rotate(-3deg); }
+.op-perf { height: 0; border-top: 2px dashed #cfdbe4; position: relative; margin: 0 14px; }
+.op-perf i { position: absolute; top: -10px; width: 20px; height: 20px; border-radius: 50%; background: var(--paper, #fff); }
+.op-perf i:first-child { left: -25px; }
+.op-perf i:last-child { right: -25px; }
+.op-table { width: calc(100% - 30px); margin: 14px 15px 6px; border-collapse: collapse; font-size: 13.5px; }
+.op-table th, .op-table td { border: 1px solid #ddd6c6; padding: 6px 9px; text-align: left; vertical-align: top; }
+.op-table th { width: 31%; background: #f6f3ea; color: #5d5a50; font-weight: 500; }
+.op-table td { font-weight: 700; color: #0b1f33; overflow-wrap: anywhere; }
+.op-table .mono, .op-instructions .mono { font-family: var(--font-geist-mono), ui-monospace, monospace; }
+.op-instructions { padding: 10px 16px 16px; font-size: 13px; line-height: 1.5; color: #1d2a33; }
+.op-instructions > b { font-size: 11.5px; letter-spacing: 0.1em; color: var(--blue-dark); }
+.op-instructions ol { margin: 5px 0 0; padding-left: 19px; }
+.op-instructions li { margin-bottom: 3px; }
+.op-instructions p { margin: 9px 0 0; background: #fff4ef; border-left: 3px solid #f25615; border-radius: 0 6px 6px 0; padding: 8px 10px; font-size: 12.5px; color: #5a2a12; }
+.op-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.op-fb { display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 18px; border-radius: 12px; background: #1877f2; color: #fff; font-weight: 700; text-decoration: none; }
+.op-fb:hover { background: #0f64d2; color: #fff; }
+.op-fb.small { min-height: 38px; font-size: 14px; margin-top: 10px; }
+.op-side { display: grid; gap: 14px; }
+.op-panel { background: #fffefb; border: 1px solid #ddd6c6; border-radius: 14px; padding: 16px 18px; }
+.op-panel h3 { margin: 0 0 6px; font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--blue-dark); font-family: var(--font-ui), sans-serif; }
+.op-panel p { margin: 0; font-size: 14px; line-height: 1.6; color: #1d2a33; }
+.op-message { display: flex; align-items: center; gap: 10px; margin-top: 10px; background: #f3f6fb; border: 1px solid #e1e8f1; border-radius: 10px; padding: 9px 11px; font-size: 13.5px; color: #1c3b4e; }
+.op-message span { flex: 1; }
+.op-message button { border: 0; background: none; font: inherit; font-weight: 700; color: var(--blue-text); cursor: pointer; }
+.op-terms { columns: 2; column-gap: 22px; font-size: 12.5px; line-height: 1.5; color: #1c3b4e; }
+.op-terms > div { break-inside: avoid; margin-bottom: 6px; }
+.op-terms strong { color: var(--blue-dark); }
+.op-terms ul { margin: 2px 0 0; padding-left: 16px; }
+.op-fine { margin-top: 8px !important; font-size: 12px !important; color: var(--muted) !important; }
+@media (max-width: 900px) { .op-layout { grid-template-columns: 1fr; } .op-layout > div:first-child { width: 100%; max-width: 440px; justify-self: center; } .op-terms { columns: 1; } }
+@media (max-width: 480px) { .op-number strong { font-size: 21px; } .op-table { font-size: 13px; } .op-actions .op-fb, .op-actions .button { flex: 1; } }
+
+/* Print or save: only the acknowledgment card. */
+@media print {
+  body * { visibility: hidden; }
+  .op-pass, .op-pass * { visibility: visible; }
+  .op-pass { position: absolute; left: 0; top: 0; width: 420px; box-shadow: none; }
+}
