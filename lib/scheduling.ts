@@ -4,6 +4,8 @@ export function courseDays(durationLabel: string) {
 
 /** The STCW courses New Wave schedules and publishes on the website (owner, 7 Oct 2026). */
 export const PUBLIC_STCW_CODES = ["UBT-PSSR", "STPPDSPPS", "PSCMT", "PSCMHBT", "CCMD"] as const;
+/** Courses that keep taking enrollments after training starts, until the last day (courses.late_enrollment). */
+export const LATE_ENROLLMENT_CODES: readonly string[] = ["CCMD"];
 
 /**
  * Whether an In-House course picked on the website can start on this date: no

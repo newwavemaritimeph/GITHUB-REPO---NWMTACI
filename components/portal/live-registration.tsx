@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import type { PortalData, Enrollment, Batch, Trainee } from "../portal-live-app";
 import { first, manilaToday, dueCentavos, balanceOf, pesos, addDays } from "@/lib/portal-format";
-import { automaticEndDate, fitsInWeek } from "@/lib/scheduling";
+import { LATE_ENROLLMENT_CODES, automaticEndDate, fitsInWeek } from "@/lib/scheduling";
 import { Badge, Message, Modal, PageHead, Pager, Kpi, usePost, fullName, fmtDate, fmtClock } from "./shared-ui";
 import { RequestActionModal, type RequestType } from "./payment-actions";
 
@@ -50,8 +50,8 @@ function uniqueCourses<T extends { code: string; name: string }>(rows: T[]) {
 }
 /** STCW courses are the In-House courses filed under an STCW category. */
 const isStcwCourse = (c?: PortalData["courses"][number] | null) => (first(c?.course_categories)?.name ?? "").toLowerCase().includes("stcw");
-/** A New Wave batch a trainee can still be placed on: open, not started, before its deadline, with seats left. */
-const isBookable = (b: Batch, today: string, now: string) => !b.partner_offer_id && b.status === "Open" && b.starts_on > today && b.enrollment_deadline > now && b.confirmed_count < b.capacity;
+/** A New Wave batch a trainee can still be placed on: open, not started (CCMD: not finished), before its deadline, with seats left. */
+const isBookable = (b: Batch, today: string, now: string) => !b.partner_offer_id && b.status === "Open" && (b.starts_on > today || (b.ends_on >= today && LATE_ENROLLMENT_CODES.includes(first(b.courses)?.code ?? ""))) && b.enrollment_deadline > now && b.confirmed_count < b.capacity;
 
 /* ------------------------------------------------------------------ Dashboard */
 
