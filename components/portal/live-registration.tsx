@@ -386,6 +386,9 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
     void post({ action: "requirement-check", enrollmentId: e.id, requirement, status, remarks: status === "Rejected" ? remarks.trim() : undefined }, `${label} ${status === "Verified" ? "ticked" : "unticked"}.`).then(() => { setUnticking(null); setRemarks(""); }).catch(() => undefined);
   return <div className="screen-box full">
     <div className="screen-head"><div><strong>Screening</strong><small>Tick each requirement as it is received, hand the applicant to the Cashier, then enroll once paid.</small></div><Badge tone={s.tone}>{s.text}</Badge></div>
+    <ol className="screen-steps" aria-label="Application progress">
+      {([["Requirements", `${r.verified} of ${REQUIREMENTS.length}`, allTicked], ["Cashier", r.handed ? `${fmtDate(day(r.handedAt))}` : "Not yet", r.handed], ["Payment", r.paid ? pesos(r.paidCentavos) : "Not yet", r.paid], ["Batch", first(e.batches)?.batch_number ?? "Not yet", !!e.batch_id], ["Enrolled", e.enrollment_status === "Enrolled" ? "Done" : "Not yet", e.enrollment_status === "Enrolled"]] as [string, string, boolean][]).map(([label, sub, done], i, list) => { const current = !done && list.slice(0, i).every((x) => x[2]); return <li key={label} className={done ? "done" : current ? "current" : ""}><i aria-hidden="true">{done ? "✓" : i + 1}</i><span><b>{label}</b><small>{sub}</small></span></li>; })}
+    </ol>
     <ul className="req-list">
       {REQUIREMENTS.map((req) => { const c = r.latest.get(req.code); const ticked = c?.status === "Verified"; return <li className="req-row" key={req.code}>
         <label className="req-tick"><input type="checkbox" checked={ticked} disabled={busy} onChange={() => { if (ticked) { setUnticking(req.code); setRemarks(""); } else check(req.code, "Verified", req.label); }} /><span className="req-main"><strong>{req.label}</strong><small>{c ? `${ticked ? "Received" : "Unticked"} · ${c.checked_by_name ?? "Staff"} · ${fmtDate(day(c.checked_at))}${c.remarks ? ` · ${c.remarks}` : ""}` : "Not received yet"}</small></span></label>
@@ -395,14 +398,6 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
           <button type="button" className="ghost-button" onClick={() => setUnticking(null)}>Keep</button>
         </span>}
       </li>; })}
-      <li className="req-row">
-        <span className={`req-dot${r.handed ? " ok" : ""}`} aria-hidden="true" />
-        <span className="req-main"><strong>Cashier</strong><small>{r.handed ? `Handed over ${fmtDate(day(r.handedAt))} ${fmtClock(r.handedAt ?? "")}` : "Not yet handed over"}</small></span>
-      </li>
-      <li className="req-row">
-        <span className={`req-dot${r.paid ? " ok" : ""}`} aria-hidden="true" />
-        <span className="req-main"><strong>Payment</strong><small>{r.paid ? `${pesos(r.paidCentavos)} verified` : r.handed ? "Waiting for the Cashier to record the payment" : "Recorded by the Cashier after hand-over"}</small></span>
-      </li>
     </ul>
     <div className="screen-foot">
       <small>{!allTicked ? `Still to tick: ${r.missing.join(", ")}` : !r.handed ? "All requirements received. Hand the applicant to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id ? "Paid. Place on a batch to enroll." : "Paid. Enrolling confirms the seat on this batch."}</small>
@@ -435,7 +430,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
     <div className="portal-form">
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
       {isApplication && <ScreeningPanel data={data} enrollment={e} busy={busy} post={post} />}
-      <div className="kv-grid full">
+      <div className="kv-grid kv-stack full">
         <div><span>{isApplication ? "Applicant" : "Trainee"}</span><strong>{t ? fullName(t) : "—"}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{t?.trainee_number} · <span className="lc">{t?.email}</span> · {t?.mobile}</small></div>
         <div><span>Course</span><strong>{c?.name ?? "—"}</strong><small>{c?.code}{center ? ` · endorsed: ${center}` : " · New Wave"}</small></div>
         <div><span>Schedule</span><strong>{scheduleOf(e)}</strong><small>{b ? `${b.batch_number}${b.mode ? ` · ${b.mode}` : ""}${b.venue ? ` · ${b.venue}` : ""}` : e.scheduled_on ? "Endorsed training date" : "Not yet placed on a batch"}</small></div>

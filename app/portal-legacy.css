@@ -1213,3 +1213,26 @@ button.rd-row:hover { background: #f6fafc; }
 .tl-date input { min-height: 40px !important; padding: 6px 10px !important; font-size: 14px; }
 .tl-count { margin-left: auto; font-size: 13px; color: var(--muted); align-self: center; }
 .tl-panel .num { text-align: right; }
+
+/* Screening box (Oct 2026): progress steps, compact requirement rows. */
+.portal-form .req-tick { display: flex; align-items: flex-start; gap: 12px; font-size: 14px; color: var(--ink); }
+.portal-form .req-tick input[type="checkbox"] { margin-top: 3px !important; }
+.portal-form .req-reject input { margin-top: 0; min-height: 40px; font-size: 14px; }
+.screen-box .req-row { padding: 9px 0; }
+.screen-box .req-main strong { font-size: 14.5px; }
+.screen-steps { list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; margin: 14px 0 6px; padding: 0; }
+.screen-steps li { position: relative; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid #e3eaf3; border-radius: 12px; background: #fff; min-width: 0; }
+.screen-steps i { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 12px; font-weight: 800; background: #edf3f6; color: var(--muted); }
+.screen-steps span { min-width: 0; }
+.screen-steps b { display: block; font-size: 12.5px; color: var(--ink); }
+.screen-steps small { display: block; font-size: 11.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.screen-steps li.done { border-color: #bfe3cc; background: #f3fbf6; }
+.screen-steps li.done i { background: #0a7d3b; color: #fff; }
+.screen-steps li.current { border-color: #0571d0; box-shadow: 0 0 0 1px #0571d0 inset; }
+.screen-steps li.current i { background: #0571d0; color: #fff; }
+.kv-grid.kv-stack { gap: 12px 18px; }
+.kv-grid.kv-stack > div { display: block; border-bottom: 0; padding: 0; }
+.kv-grid.kv-stack span { display: block; font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; margin-bottom: 3px; }
+.kv-grid.kv-stack strong { display: block; font-size: 15px; color: var(--ink); }
+.kv-grid.kv-stack small { display: block; margin-top: 3px; font-size: 13px; color: var(--muted); }
+@media (max-width: 760px) { .screen-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
