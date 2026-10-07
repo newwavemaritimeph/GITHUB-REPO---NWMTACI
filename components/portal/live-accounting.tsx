@@ -1369,3 +1369,47 @@ export function CashPositionModule({ data }: { data: AccountingData }) {
     </tbody></table>{!accounts.length && <p className="portal-empty-copy">No payments posted yet.</p>}</div>
   </div>;
 }
+
+type ConfigTrainee = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; email?: string | null; mobile?: string | null; srn?: string | null; company?: string | null; registered_at?: string | null };
+const CONFIG_SECTIONS = ["Agencies and consultancies", "Rebates per course", "Trainees"] as const;
+/**
+ * Accounting › Configuration (owner, 7 Oct 2026): the referring agencies and
+ * consultancies, the rebate each one earns per course, and the trainee list.
+ * Payment channels, course fees, charges and user accounts live in Admin.
+ */
+export function AccountingConfiguration({ data, trainees, applicationNumbers, reload }: { data: AccountingData; trainees: ConfigTrainee[]; applicationNumbers?: Record<string, string>; reload: () => Promise<void> }) {
+  const [section, setSection] = useState<(typeof CONFIG_SECTIONS)[number]>("Agencies and consultancies");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [q, setQ] = useState("");
+  async function post(body: Record<string, unknown>) {
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/staff/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not save.");
+      await reload();
+    } catch (e) { setError(e instanceof Error ? e.message : "Could not save."); throw e; } finally { setBusy(false); }
+  }
+  const term = q.trim().toLowerCase();
+  const people = trainees.filter((t) => !term || `${t.legal_first_name} ${t.legal_last_name} ${t.trainee_number} ${applicationNumbers?.[t.id] ?? ""} ${t.srn ?? ""} ${t.email ?? ""} ${t.company ?? ""}`.toLowerCase().includes(term))
+    .sort((a, b) => a.legal_last_name.localeCompare(b.legal_last_name)).slice(0, 400);
+  return <div className="portal-page cx">
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Configuration</h1></div></div>
+    <div className="cx-seg config-seg" role="tablist">{CONFIG_SECTIONS.map((s) => <button key={s} type="button" role="tab" aria-selected={section === s} className={section === s ? "on" : ""} onClick={() => setSection(s)}>{s}</button>)}</div>
+    {error && <div className="portal-message error">{error}</div>}
+    {section === "Agencies and consultancies" && <SetupList title="Agencies and consultancies" description="" entityLabel="agency or consultancy" canManage busy={busy}
+      fields={[{ key: "name", label: "Name" }, { key: "contactName", label: "Contact person", optional: true }, { key: "email", label: "Email", optional: true }, { key: "mobile", label: "Mobile", optional: true }]}
+      rows={data.agencies.map((a) => ({ id: a.id, primary: a.name, secondary: [a.contact_name, a.email, a.mobile].filter(Boolean).join(" · ") || "—", active: a.active, values: { name: a.name, contactName: a.contact_name || "", email: a.email || "", mobile: a.mobile || "" } }))}
+      onSubmit={(v, id) => post({ action: "agency-save", id, name: String(v.name), contactName: String(v.contactName || ""), email: String(v.email || ""), mobile: String(v.mobile || "") })}
+      onArchive={(id, active, name) => void post({ action: "agency-save", id, name, active: !active }).catch(() => undefined)} />}
+    {section === "Rebates per course" && <AgencyRebatesEditor data={data} canManage busy={busy} post={post} />}
+    {section === "Trainees" && <section className="portal-panel cx-panel">
+      <div className="panel-heading"><div><h2>Trainees</h2></div><span className="slot-count">{trainees.length}</span></div>
+      <div className="cx-formpad"><input className="cx-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, NWMTACI number, SRN or company" aria-label="Search trainees" /></div>
+      {people.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>SRN</th><th>Company</th><th>Contact</th><th>Registered</th></tr></thead><tbody>
+        {people.map((t) => <tr key={t.id}><td data-l="" className="lead"><span className="cx-name">{`${t.legal_last_name}, ${t.legal_first_name} ${t.legal_middle_name ?? ""}`.trim()}</span><span className="cx-id">{applicationNumbers?.[t.id] ?? t.trainee_number}</span></td><td data-l="SRN" className="cx-mono">{t.srn || "—"}</td><td data-l="Company">{t.company || "—"}</td><td data-l="Contact">{t.mobile || "—"}<small className="lc">{t.email}</small></td><td data-l="Registered">{t.registered_at ? new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(t.registered_at)) : "—"}</td></tr>)}
+      </tbody></table></div> : <p className="portal-empty-copy">No trainees match.</p>}
+    </section>}
+  </div>;
+}

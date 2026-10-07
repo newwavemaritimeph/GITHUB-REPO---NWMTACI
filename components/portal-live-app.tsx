@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { NewWaveLogo } from "./new-wave-logo";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { LiveAttendance } from "./portal/live-attendance";
-import { LiveAccounting, AccountingDashboard, ReceivablesModule, ApprovalsModule, PayablesModule, CashPositionModule, LiveVouchers, LiveInventory, LiveExpenses, SetupList } from "./portal/live-accounting";
+import { LiveAccounting, AccountingDashboard, ReceivablesModule, ApprovalsModule, PayablesModule, CashPositionModule, LiveVouchers, LiveInventory, LiveExpenses, SetupList, AccountingConfiguration } from "./portal/live-accounting";
 import { LiveCashierClosing } from "./portal/live-cashier-closing";
 import { CashierPaymentQueue, RequestChargeModal, TarButton, RecordPaymentModal, CashierDashboard, CashierPayments, DiscountRequests, CashierEnrollments, CashierOpening, CashierSummaryReport, ScheduleOfFees, TarReprints } from "./portal/live-cashier";
 import { LiveHr, type HrData } from "./portal/live-hr";
@@ -129,7 +129,7 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Payment records",icon:"₱",roles:["cashier"],group:"Accounting"},{label:"Opening and closing",icon:"⚖",roles:["cashier"],group:"Accounting"},{label:"Summary report",icon:"∑",roles:["cashier"],group:"Accounting"},{label:"Schedule of fees",icon:"▤",roles:["cashier"],group:"Accounting"},
   {label:"Vouchers",icon:"▤",roles:["cashier"],group:"Finance"},{label:"Change requests",icon:"↺",roles:["cashier"],group:"Work"},{label:"Discount requests",icon:"％",roles:["cashier"],group:"Work"},{label:"TAR reprints",icon:"⎙",roles:["cashier"],group:"Work"},
   {label:"HR & payroll",icon:"♙",roles:["admin","hr"],group:"People"},{label:"MyHr",icon:"☺",group:"People"},
-  {label:"Endorsed courses",icon:"◇",group:"Configuration"},{label:"Configuration",icon:"⚙",roles:["super_admin","admin"],group:"Configuration"},
+  {label:"Endorsed courses",icon:"◇",group:"Configuration"},{label:"Configuration",icon:"⚙",roles:["super_admin","admin","accounting"],group:"Configuration"},
 ];
 /**
  * Top tabs (prototype design, 7 Oct 2026). A tab with one module of the same name
@@ -303,6 +303,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="HR & payroll"&&["admin","hr"].includes(gateRole))return <LiveHr data={data} role={gateRole} reload={reload}/>;
   if(active==="Rooms & facilities"&&["admin","training_operations"].includes(gateRole))return <LiveTraining data={{classrooms:data.classrooms,certificates:data.certificates,batches:data.batches,enrollments:data.enrollments,courses:data.courses,certificateTemplates:data.certificateTemplates}} role={gateRole} reload={reload} initialTab="Classrooms"/>;
   if(active==="Certificates"&&["admin","releasing_officer"].includes(gateRole))return <LiveReleasing data={data as unknown as Parameters<typeof LiveReleasing>[0]["data"]} role={gateRole} reload={reload}/>;
+  if(active==="Configuration"&&gateRole==="accounting")return <AccountingConfiguration data={data as unknown as Parameters<typeof AccountingConfiguration>[0]["data"]} trainees={data.trainees} applicationNumbers={data.applicationNumbers} reload={reload}/>;
   if(active==="Configuration"&&["super_admin","admin"].includes(role))return <div className="portal-page"><PageHead eyebrow="Admin" title="Configuration"/><AdminConfiguration catalog={financeCatalogSections(data,reload)}/></div>;
   return <ConnectedModule module={active} data={data}/>;
 }
