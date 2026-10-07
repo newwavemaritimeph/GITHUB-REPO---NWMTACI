@@ -88,77 +88,98 @@ const INSTRUCTION_TERMS: [string, string[]][] = [
   ["Certificate", ["Issued only after completing all requirements and settling all balances."]],
 ];
 
-// Option 1 design: centered logo, minimal editorial letter, single page, Terms & Conditions
-// combined at the bottom (two compact columns).
+// Half of A4 (A5 portrait, 148 x 210 mm): letterhead band, training details
+// first, the letter, reminders as bullets, compact two-column terms and the
+// contact footer. Text scales down a little when a course template is long so
+// everything stays on one page.
 export async function createTrainingInstructionsPdf(snapshot: TrainingInstructionsSnapshot) {
   const pdf = await PDFDocument.create();
-  const page = pdf.addPage([595.28, 841.89]);
+  const W = 419.53, H = 595.28;
+  const page = pdf.addPage([W, H]);
   const reg = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const c = { orange: rgb(.949,.337,.082), blue: rgb(.02,.443,.816), cyan: rgb(.208,.8,.98), lightcyan: rgb(.62,.89,.945), darkblue: rgb(.071,.247,.388), muted: rgb(.42,.5,.56), line: rgb(.85,.92,.96), soft: rgb(.93,.985,1) };
-  const H = 841.89, mid = 595.28 / 2, left = 48, right = 547, width = right - left;
-  const text = (t: string, x: number, yy: number, size: number, font = reg, color = c.darkblue) => page.drawText(ascii(t), { x, y: yy, size, font, color });
-  const wrap = (t: string, x: number, yy: number, size: number, maxW: number, font = reg, color = c.darkblue, lead = 12) => {
-    let line = "";
-    for (const w of ascii(t).split(" ")) {
-      const test = line ? `${line} ${w}` : w;
-      if (font.widthOfTextAtSize(test, size) > maxW) { page.drawText(line, { x, y: yy, size, font, color }); yy -= lead; line = w; }
-      else line = test;
+  const c = { orange: rgb(.949, .337, .082), blue: rgb(.02, .443, .816), cyan: rgb(.208, .8, .98), lightcyan: rgb(.62, .89, .945), darkblue: rgb(.071, .247, .388), muted: rgb(.40, .48, .54), line: rgb(.85, .92, .96), soft: rgb(.94, .98, 1), white: rgb(1, 1, 1) };
+  const left = 30, right = W - 30, width = right - left, FOOT = 40;
+  let logo: Awaited<ReturnType<typeof pdf.embedPng>> | null = null;
+  if (snapshot.logoBytes) { try { logo = await pdf.embedPng(snapshot.logoBytes); } catch { logo = null; } }
+  const bodyLines = ((snapshot.body && snapshot.body.trim()) ? snapshot.body : DEFAULT_INSTRUCTIONS_BODY).split("\n");
+  const rows: [string, string][] = [["Course", snapshot.courseName], ["Date", snapshot.dateOfTraining], ["Time", snapshot.time], ["Classroom", snapshot.classroom]];
+
+  // Lays the page out at scale k; draws only when `draw` is true. Returns the lowest y used.
+  const layout = (k: number, draw: boolean) => {
+    const t = (s: string, x: number, y: number, size: number, font = reg, color = c.darkblue) => { if (draw) page.drawText(ascii(s), { x, y, size, font, color }); };
+    const wrap = (s: string, x: number, y: number, size: number, maxW: number, font = reg, color = c.darkblue, lead = size * 1.38) => {
+      let line = "";
+      for (const w of ascii(s).split(" ")) {
+        const test = line ? `${line} ${w}` : w;
+        if (font.widthOfTextAtSize(test, size) > maxW && line) { t(line, x, y, size, font, color); y -= lead; line = w; } else line = test;
+      }
+      if (line) { t(line, x, y, size, font, color); y -= lead; }
+      return y;
+    };
+    // Letterhead band.
+    if (draw) {
+      page.drawRectangle({ x: 0, y: H - 58, width: W, height: 58, color: c.darkblue });
+      page.drawRectangle({ x: 0, y: H - 61, width: W, height: 3, color: c.orange });
+      if (logo) { const d = logo.scale(36 / logo.width); page.drawRectangle({ x: left - 3, y: H - 50, width: 42, height: 42, color: c.white }); page.drawImage(logo, { x: left, y: H - 47, width: d.width, height: Math.min(d.height, 36) }); }
     }
-    if (line) { page.drawText(line, { x, y: yy, size, font, color }); yy -= lead; }
-    return yy;
+    t("NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", left + 50, H - 26, 7.6, bold, c.white);
+    t("Ride the New Wave of Maritime Excellence", left + 50, H - 37, 6.8, reg, c.lightcyan);
+    let y = H - 84;
+    t("TRAINING INSTRUCTIONS", left, y, 14 * k, bold, c.darkblue);
+    const ref = `${snapshot.reference ?? ""}${snapshot.reference ? "  |  " : ""}Issued ${snapshot.issuedAt}`;
+    t(ref, right - reg.widthOfTextAtSize(ascii(ref), 7), y + 2, 7, reg, c.muted);
+    y -= 18 * k;
+    // Training details box.
+    const rowH = 13 * k, boxH = 18 * k + rows.length * rowH;
+    if (draw) page.drawRectangle({ x: left, y: y - boxH + 10 * k, width, height: boxH, color: c.soft, borderColor: c.lightcyan, borderWidth: 0.8 });
+    t("YOUR TRAINING", left + 9, y, 7 * k, bold, c.blue);
+    let ry = y - 13 * k;
+    for (const [label, value] of rows) { t(label, left + 9, ry, 7.6 * k, reg, c.muted); wrap(value || "-", left + 70, ry, 8.2 * k, width - 80, bold, c.darkblue, rowH); ry -= rowH; }
+    y = y - boxH - 2 * k;
+    if (snapshot.googleClassroomLink) { t("Google Classroom:", left, y, 7.6 * k, bold); t(snapshot.googleClassroomLink, left + 70, y, 7.6 * k, reg, c.blue); y -= 13 * k; }
+    y -= 4 * k;
+    // Letter.
+    t(`Dear ${snapshot.traineeName || "Trainee"},`, left, y, 9 * k, bold); y -= 13 * k;
+    for (const raw of bodyLines) {
+      const line = raw.trimEnd();
+      if (!line) { y -= 4 * k; continue; }
+      if (/^IMPORTANT REMINDERS/i.test(line)) { y -= 1 * k; t(line.replace(/:$/, ""), left, y, 7.6 * k, bold, c.orange); y -= 11 * k; continue; }
+      if (/^[-•]\s/.test(line)) { if (draw) page.drawCircle({ x: left + 3, y: y + 2.6 * k, size: 1.4, color: c.cyan }); y = wrap(line.replace(/^[-•]\s*/, ""), left + 10, y, 7.8 * k, width - 10); continue; }
+      y = wrap(line, left, y, 7.9 * k, width);
+    }
+    y -= 6 * k;
+    // Terms (two columns).
+    if (draw) page.drawRectangle({ x: left, y: y - 4 * k, width, height: 14 * k, color: c.blue });
+    t("TERMS AND CONDITIONS (SUMMARY)", left + 7, y, 7.4 * k, bold, c.white);
+    y -= 16 * k;
+    const colW = (width - 14) / 2, colX = [left, left + colW + 14], colY = [y, y];
+    INSTRUCTION_TERMS.forEach(([h, items], i) => {
+      const ci = i < 3 ? 0 : 1; let cy = colY[ci];
+      t(`${i + 1}. ${h}`, colX[ci], cy, 7 * k, bold); cy -= 9 * k;
+      for (const it of items) cy = wrap(it, colX[ci] + 5, cy, 6.3 * k, colW - 5, reg, c.darkblue, 8 * k);
+      colY[ci] = cy - 3 * k;
+    });
+    y = Math.min(colY[0], colY[1]) - 2 * k;
+    y = wrap("New Wave reserves the right to amend, revise, or update the details stated above without prior notice.", left, y, 6.3 * k, width, bold, c.orange, 8 * k);
+    return y;
   };
-  let y = H - 26;
-  // Centered logo + orange rule + title.
-  if (snapshot.logoBytes) {
-    try { const logo = await pdf.embedPng(snapshot.logoBytes); const d = logo.scale(58 / logo.width); page.drawImage(logo, { x: mid - d.width / 2, y: y - d.height, width: d.width, height: d.height }); y -= d.height + 8; } catch { y -= 20; }
+  // Shrink a little for long templates so the page never overflows.
+  let k = 1;
+  for (const candidate of [1, 0.94, 0.88, 0.82, 0.76, 0.7]) { k = candidate; if (layout(k, false) >= FOOT + 6) break; }
+  const lowest = layout(k, true);
+  // Trainee acknowledgment, when there is room above the footer.
+  if (lowest > FOOT + 70) {
+    const ay = FOOT + 34;
+    page.drawText("I have read and understood these instructions and the terms above.", { x: left, y: ay + 18, size: 7.2, font: reg, color: c.darkblue });
+    page.drawLine({ start: { x: left, y: ay }, end: { x: left + 190, y: ay }, thickness: 0.6, color: c.darkblue });
+    page.drawLine({ start: { x: right - 110, y: ay }, end: { x: right, y: ay }, thickness: 0.6, color: c.darkblue });
+    page.drawText("Trainee signature over printed name", { x: left, y: ay - 9, size: 6.3, font: reg, color: c.muted });
+    page.drawText("Date", { x: right - 110, y: ay - 9, size: 6.3, font: reg, color: c.muted });
   }
-  page.drawRectangle({ x: mid - 34, y, width: 68, height: 2.5, color: c.orange });
-  y -= 22;
-  const title = "TRAINING INSTRUCTIONS";
-  text(title, mid - bold.widthOfTextAtSize(title, 15) / 2, y, 15, bold);
-  y -= 15;
-  const sub = `${snapshot.reference ?? ""}${snapshot.reference ? "  -  " : ""}Issued ${snapshot.issuedAt}`;
-  text(sub, mid - reg.widthOfTextAtSize(ascii(sub), 8) / 2, y, 8, reg, c.muted);
-  y -= 22;
-  text(`Dear ${snapshot.traineeName || "Trainee"},`, left, y, 10.5, bold);
-  y -= 15;
-  // Body (per-course template or default).
-  for (const rawLine of ((snapshot.body && snapshot.body.trim()) ? snapshot.body : DEFAULT_INSTRUCTIONS_BODY).split("\n")) {
-    if (rawLine === "") { y -= 6; continue; }
-    const isReminders = /^IMPORTANT REMINDERS/i.test(rawLine);
-    y = wrap(rawLine, left, y, 9, width, isReminders ? bold : reg, isReminders ? c.orange : c.darkblue, 12);
-  }
-  y -= 6;
-  // Training details box.
-  const rows: [string, string][] = [["Course", snapshot.courseName], ["Date of Training", snapshot.dateOfTraining], ["Time", snapshot.time], ["Classroom", snapshot.classroom]];
-  const boxH = 20 + rows.length * 17;
-  page.drawRectangle({ x: left, y: y - boxH + 12, width, height: boxH, color: c.soft, borderColor: c.lightcyan, borderWidth: 1 });
-  text("TRAINING DETAILS", left + 12, y - 1, 8.5, bold, c.blue);
-  let ry = y - 20;
-  for (const [k, v] of rows) { text(k, left + 12, ry, 8.5, reg, c.muted); text(v || "-", left + 140, ry, 9, bold); ry -= 17; }
-  y = y - boxH - 4;
-  if (snapshot.googleClassroomLink) {
-    text("Google Classroom (in-house):", left, y, 8.5, bold);
-    text(snapshot.googleClassroomLink, left + 150, y, 8.5, reg, c.blue);
-    y -= 16;
-  } else { y -= 4; }
-  // Terms & Conditions (two columns).
-  page.drawRectangle({ x: left, y: y - 15, width, height: 19, color: c.blue });
-  text("TERMS AND CONDITIONS", left + 10, y - 10, 10, bold, rgb(1, 1, 1));
-  text("Please read carefully.", right - reg.widthOfTextAtSize("Please read carefully.", 7.5) - 8, y - 9, 7.5, reg, rgb(1, 1, 1));
-  y -= 26;
-  const colW = (width - 20) / 2, colX = [left, left + colW + 20], colY = [y, y];
-  INSTRUCTION_TERMS.forEach(([h, items], i) => {
-    const ci = i < 3 ? 0 : 1, x = colX[ci]; let cy = colY[ci];
-    text(`${i + 1}. ${h}`, x, cy, 8.5, bold); cy -= 11;
-    for (const it of items) { text("-", x + 4, cy, 7.5, bold, c.cyan); cy = wrap(it, x + 12, cy, 7.5, colW - 12, reg, c.darkblue, 9.5); cy -= 1; }
-    cy -= 4; colY[ci] = cy;
-  });
-  const footY = Math.min(colY[0], colY[1]) - 4;
-  wrap("New Wave Maritime Training and Assessment Center reserves the right to amend, revise, or update the details stated above without prior notice.", left, footY, 7.5, width, bold, c.orange, 10);
-  page.drawLine({ start: { x: left, y: 50 }, end: { x: right, y: 50 }, thickness: 0.5, color: c.line });
-  text("Unit 103, Bel-Air Apartments, Roxas Boulevard, Ermita Manila   -   newwavemaritime@gmail.com   -   0948-847-6530", left, 38, 7, reg, c.muted);
+  page.drawLine({ start: { x: left, y: FOOT - 8 }, end: { x: right, y: FOOT - 8 }, thickness: 0.5, color: c.line });
+  const foot = "Unit 103, Bel-Air Apartments, Roxas Blvd., Ermita, Manila  |  0948-847-6530  |  newwavemaritime@gmail.com";
+  page.drawText(ascii(foot), { x: W / 2 - reg.widthOfTextAtSize(ascii(foot), 6.3) / 2, y: FOOT - 20, size: 6.3, font: reg, color: c.muted });
   return pdf.save();
 }
 

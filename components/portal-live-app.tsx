@@ -58,6 +58,8 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   handedToCashier?:Record<string,string>;
   // Times training instructions were generated per enrollment id (202610070007).
   instructionsCount?:Record<string,number>;
+  // Change Course / Rescheduling fee collection per pending request id (approval waits for payment).
+  chargeCollected?:Record<string,{amount:number;collected:number;paid:boolean}>;
   // Printed Training Admission Records (Cashier, Accounting, Admin only; 202610070006/7).
   admissionRecords?:{id:string;ar_number:string;trainee_id:string;enrollment_ids:string[];print_count:number;reprints_approved?:number;issued_at:string;last_printed_at:string}[] };
 
@@ -192,7 +194,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Enrollments")return <Enrollments data={data} query={query} open={open} canEnroll={canEnroll} role={gateRole} reload={reload}/>;
   if(active==="Trainee enrollments")return <TraineesEnrollments data={data} query={query} open={open} canEnroll={canEnroll} role={gateRole} reload={reload}/>;
   if(active==="Schedules")return <Schedules data={data} query={query} open={open} canSchedule={canSchedule} role={gateRole} reload={reload}/>;
-  if(active==="Instructions")return <LiveInstructions data={data} query={query} reload={reload} role={gateRole}/>;
+  if(active==="Instructions")return <LiveInstructions data={data} query={query} reload={reload}/>;
   if(active==="Requests")return <LiveRequests data={data} role={gateRole} reload={reload}/>;
   if(active==="MyHr")return <LiveMyHr data={data} reload={reload}/>;
   if(active==="Employee charges")return <EmployeeCharges data={data} reload={reload}/>;
@@ -650,7 +652,7 @@ function LiveRequests({data,role,reload}:{data:PortalData;role:string;reload:()=
   const decided=data.requests.filter(r=>r.status!=="Pending");
   async function decide(id:string,approve:boolean){setBusy(id);setMessage("");try{const remarks=approve?undefined:(window.prompt("Reason for rejecting? (optional)")||undefined);await submit({action:"request-decide",id,approve,remarks});await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not update the request.")}finally{setBusy("")}}
   const typeOf=(r:PortalData["requests"][number])=>r.request_type==="Rescheduling"?"Change batch / reschedule":r.request_type;
-  const detailOf=(r:PortalData["requests"][number])=>{const rv=r.requested_values||{};const bits:string[]=[];if(rv.amountCentavos)bits.push(pesos(rv.amountCentavos));if(rv.batchId)bits.push("new batch selected");const ch=first(r.enrollment_charges);if(ch)bits.push(`charge ${pesos(ch.amount_centavos)}`);else if(r.stage==="For approval"&&r.status==="Pending"&&r.charge_id===null)bits.push("no charge");return bits.join(" · ")};
+  const detailOf=(r:PortalData["requests"][number])=>{const rv=r.requested_values||{};const bits:string[]=[];if(rv.amountCentavos)bits.push(pesos(rv.amountCentavos));if(rv.batchId)bits.push("new batch selected");const ch=first(r.enrollment_charges);if(ch)bits.push(`charge ${pesos(ch.amount_centavos)}`);const cc=data.chargeCollected?.[r.id];if(cc)bits.push(cc.paid?"fee paid ✓":`collect the fee first (${pesos(cc.collected)} of ${pesos(cc.amount)} paid) — approval waits for payment`);if(!ch&&r.stage==="For approval"&&r.status==="Pending"&&r.charge_id===null)bits.push("no charge");return bits.join(" · ")};
   const row=(r:PortalData["requests"][number],action:"charge"|"decide"|"none")=>{const t=first(r.trainees),e=first(r.enrollments),c=e?first(e.courses):null;const extra=detailOf(r);const no=e?.trainee_id?data.applicationNumbers?.[e.trainee_id]:undefined;return <div className="live-row-item" key={r.id}><div><strong>{t?fullName(t):"Unknown trainee"} · {typeOf(r)}</strong><small>{no?<span className="app-no">{no}</span>:null}{c?.name} · {e?.enrollment_number} · {r.reason}{extra?` · ${extra}`:""}</small></div>{action==="charge"?<button type="button" className="portal-primary" onClick={()=>setCharging(r)}>Add charge</button>:action==="decide"?<div className="document-actions"><button type="button" className="portal-primary" disabled={!!busy} onClick={()=>decide(r.id,true)}>{busy===r.id?"…":"Approve"}</button><button type="button" disabled={!!busy} onClick={()=>decide(r.id,false)}>Reject</button></div>:<Badge tone={r.status==="Approved"?"green":r.status==="Rejected"?"red":"orange"}>{r.status==="Pending"?(r.stage==="With cashier"?"With Cashier":"Awaiting approval"):r.status}</Badge>}</div>};
   return <div className="portal-page"><PageHead eyebrow="Change requests" title="Requests" text="Change of batch, change of course, make-up classes and cancellations. The Cashier adds the charge; the Accounting Manager approves."/>{message&&<Message kind="error" text={message}/>}
     <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Needs charges</h2><p>{canCharge?"Add the applicable fee, or mark no charge, to send it for approval":"With the Cashier"}</p></div><Badge tone="orange">{withCashier.length}</Badge></div>{withCashier.map(r=>row(r,canCharge?"charge":"none"))}{!withCashier.length&&<p className="portal-empty-copy">Nothing waiting for charges.</p>}</section>
@@ -662,15 +664,13 @@ function LiveRequests({data,role,reload}:{data:PortalData;role:string;reload:()=
 
 const DEFAULT_INSTRUCTION_BODY = "Welcome aboard! Your enrollment has been confirmed. Please review your reporting details below and observe the reminders.\n\nIMPORTANT REMINDERS:\n- Check the printed name in your admission record and report any corrections immediately.\n- Arrive on time, observe proper conduct, and complete all requirements before training starts.\n- Bring your own tumbler - drinking water is available in the Training Room.\n- Wear the official training uniform during the training period (Php 150.00 uniform fee applies).\n\nNew Wave MTACI sincerely appreciates your trust in choosing us as your training provider.\n\nThank you!";
 
-function LiveInstructions({data,query,reload,role}:{data:PortalData;query:string;reload:()=>Promise<void>;role?:string}){
+function LiveInstructions({data,query,reload}:{data:PortalData;query:string;reload:()=>Promise<void>}){
   const [busy,setBusy]=useState(""),[message,setMessage]=useState(""),[tab,setTab]=useState<"Send"|"Templates">("Send");
   const term=query.toLowerCase();
   const match=(e:Enrollment)=>{const t=first(e.trainees),c=first(e.courses);return `${t?fullName(t):""} ${e.enrollment_number} ${c?.name??""}`.toLowerCase().includes(term)};
   // Instructions are generated for paid, enrolled trainees only; Registration may
   // generate them twice per enrollment (the server enforces it).
-  const limited=!["admin","super_admin","training_operations"].includes(role??"");
   const countOf=(e:Enrollment)=>data.instructionsCount?.[e.id]??(e.instructions_sent_at?1:0);
-  const atLimit=(e:Enrollment)=>limited&&countOf(e)>=2;
   const activeRows=data.enrollments.filter(e=>e.enrollment_status==="Enrolled"||e.enrollment_status==="Open Schedule").filter(match);
   const ready=activeRows.filter(e=>!e.instructions_sent_at&&e.instructions_status!=="Acknowledged");
   const sent=activeRows.filter(e=>e.instructions_sent_at&&e.instructions_status!=="Acknowledged");
@@ -678,7 +678,8 @@ function LiveInstructions({data,query,reload,role}:{data:PortalData;query:string
   async function send(id:string){setBusy(id);setMessage("");try{await submit({action:"send-instructions",enrollmentId:id});await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not send instructions.")}finally{setBusy("")}}
   async function sendAll(){setBusy("all");setMessage("");try{for(const e of ready)await submit({action:"send-instructions",enrollmentId:e.id});await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not send instructions.")}finally{setBusy("")}}
   const scheduleOf=(e:Enrollment)=>{const b=first(e.batches);return b?`${date(b.starts_on)} - ${date(b.ends_on)}`:e.scheduled_on?date(e.scheduled_on):"Open schedule"};
-  const row=(e:Enrollment,sendable:boolean)=>{const t=first(e.trainees),c=first(e.courses);return <div className="live-row-item" key={e.id}><div><strong>{t?fullName(t):"Unknown trainee"}</strong><small>{c?.name} · {e.enrollment_number} · {scheduleOf(e)}</small></div><div className="document-actions">{countOf(e)>0&&<a href={`/api/documents/training-instructions/${e.id}`} target="_blank" rel="noreferrer">View PDF</a>}{sendable?<button className="portal-primary" disabled={!!busy} onClick={()=>send(e.id)}>{busy===e.id?"Generating…":"Generate"}</button>:<><Badge tone={e.instructions_status==="Acknowledged"?"green":"orange"}>{e.instructions_status==="Acknowledged"?"Acknowledged":`Generated ${countOf(e)} of 2`}</Badge>{e.instructions_status!=="Acknowledged"&&<button className="portal-secondary" disabled={!!busy||atLimit(e)} title={atLimit(e)?"Instructions can be generated twice per enrollment":undefined} onClick={()=>send(e.id)}>{atLimit(e)?"Limit reached":busy===e.id?"Generating…":"Generate again"}</button>}</>}</div></div>};
+  // Paid and enrolled trainees get an active Generate button; once generated it turns into "Generated" (Registration can generate again from the enrollment, twice in all).
+  const row=(e:Enrollment,sendable:boolean)=>{const t=first(e.trainees),c=first(e.courses),done=countOf(e)>0||!!e.instructions_sent_at;return <div className="live-row-item" key={e.id}><div><strong>{t?fullName(t):"Unknown trainee"}</strong><small>{c?.name} · {e.enrollment_number} · {scheduleOf(e)}</small></div><div className="document-actions">{done&&<a href={`/api/documents/training-instructions/${e.id}`} target="_blank" rel="noreferrer">View PDF</a>}{e.instructions_status==="Acknowledged"&&<Badge tone="green">Acknowledged</Badge>}{sendable&&!done?<button className="portal-primary" disabled={!!busy} onClick={()=>send(e.id)}>{busy===e.id?"Generating…":"Generate"}</button>:<button type="button" className="portal-secondary is-generated" disabled>✓ Generated</button>}</div></div>};
 
   // Template editor state (in-house courses only).
   const inhouse=data.courses.filter(c=>c.delivery_type==="In-House");
@@ -693,7 +694,7 @@ function LiveInstructions({data,query,reload,role}:{data:PortalData;query:string
     <div className="portal-tabs">{(["Send","Templates"] as const).map(t=><button key={t} className={tab===t?"active":""} onClick={()=>setTab(t)}>{t}</button>)}</div>
     {tab==="Send"?<>
       <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Ready to generate</h2><p>Paid and enrolled · instructions not generated yet (twice per enrollment)</p></div>{ready.length>0&&<button className="portal-primary" disabled={!!busy} onClick={sendAll}>{busy==="all"?"Sending…":`Generate all (${ready.length})`}</button>}</div>{ready.map(e=>row(e,true))}{!ready.length&&<p className="portal-empty-copy">Nothing waiting to be sent.</p>}</section>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Awaiting acknowledgment</h2><p>Sent — trainee has not confirmed</p></div><Badge tone="orange">{sent.length}</Badge></div>{sent.map(e=>row(e,false))}{!sent.length&&<p className="portal-empty-copy">No pending acknowledgments.</p>}</section>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Generated · awaiting acknowledgment</h2><p>Sent — trainee has not confirmed</p></div><Badge tone="orange">{sent.length}</Badge></div>{sent.map(e=>row(e,false))}{!sent.length&&<p className="portal-empty-copy">No pending acknowledgments.</p>}</section>
       <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Acknowledged</h2><p>Confirmed by the trainee</p></div><Badge tone="green">{acknowledged.length}</Badge></div>{acknowledged.map(e=>row(e,false))}{!acknowledged.length&&<p className="portal-empty-copy">None yet.</p>}</section>
     </>:<section className="portal-panel"><div className="panel-heading"><div><h2>Per-course template</h2><p>In-house courses only. Trainee name, date, time, and classroom are merged automatically at send.</p></div></div>
       <div className="portal-form">

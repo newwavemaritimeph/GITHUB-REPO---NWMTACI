@@ -35,7 +35,7 @@ const TERMS_SECTIONS: { heading: string; items: string[] }[] = [
 ];
 
 /** Live catalog (/api/public/catalog): STCW courses with batches, In-House courses for a start date. */
-type CatalogBatch = { id: string; number: string; startsOn: string; endsOn: string; capacity: number; seatsLeft: number };
+type CatalogBatch = { id: string; number: string; startsOn: string; endsOn: string; full: boolean };
 type StcwCourse = { code: string; name: string; duration: string; modality: string; category: string; batches: CatalogBatch[] };
 type InHouseCourse = { code: string; name: string; duration: string; modality: string; category: string };
 type Catalog = { stcw: StcwCourse[]; inHouse: InHouseCourse[] };
@@ -95,7 +95,7 @@ function Wizard() {
       setCatalog(next);
       const params = new URLSearchParams(window.location.search);
       const batch = params.get("batch"), code = params.get("course"), start = params.get("start");
-      const course = batch ? next.stcw.find((c) => c.batches.some((x) => x.id === batch && x.seatsLeft > 0)) : null;
+      const course = batch ? next.stcw.find((c) => c.batches.some((x) => x.id === batch && !x.full)) : null;
       if (course && batch) setRows([{ code: course.code, batchId: batch, start: "" }]);
       else if (code && start && /^\d{4}-\d{2}-\d{2}$/.test(start) && next.inHouse.some((c) => c.code === code)) setRows([{ code, batchId: "", start }]);
     }).catch(() => { if (live) setCatalog({ stcw: [], inHouse: [] }); });
@@ -336,8 +336,8 @@ function Wizard() {
             </select>
             {st && (st.batches.length ? <div className="ql-chips" role="radiogroup" aria-label="Schedule">{st.batches.map((b) => {
               const conflict = orderConflict({ code: st.code, start: b.startsOn, end: b.endsOn }, others);
-              const disabled = !b.seatsLeft || !!conflict, on = row.batchId === b.id;
-              return <button type="button" role="radio" aria-checked={on} key={b.id} disabled={disabled && !on} className={`ql-chip${on ? " on" : ""}${disabled ? " off" : ""}`} onClick={() => setRow(index, { batchId: b.id })}><b>{on ? "✓ " : ""}{chipRange(b.startsOn, b.endsOn)}</b><small>{!b.seatsLeft ? "Full" : conflict ?? `${b.seatsLeft} seat${b.seatsLeft === 1 ? "" : "s"} left`}</small></button>;
+              const disabled = b.full || !!conflict, on = row.batchId === b.id;
+              return <button type="button" role="radio" aria-checked={on} key={b.id} disabled={disabled && !on} className={`ql-chip${on ? " on" : ""}${disabled ? " off" : ""}`} onClick={() => setRow(index, { batchId: b.id })}><b>{on ? "✓ " : ""}{chipRange(b.startsOn, b.endsOn)}</b><small>{b.full ? "Full" : conflict ?? "Open"}</small></button>;
             })}</div> : <p className="ql-error">No open schedule for this course yet. Please choose another course.</p>)}
             {ih && <div className="ql-dates">
               <label><span>Start date</span><input type="date" value={row.start} min={tomorrow} onChange={(e) => setRow(index, { start: e.target.value })} /></label>

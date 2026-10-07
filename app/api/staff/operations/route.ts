@@ -207,6 +207,21 @@ async function tryAutoEnroll(admin: ReturnType<typeof createSupabaseAdminClient>
   return enrolled;
 }
 
+// Change Course and Rescheduling are approved only after their fee is paid to
+// the Cashier (owner, 7 Oct 2026). Their charge is payable as soon as the
+// Cashier sets it; the Accounting Manager approves once it is collected.
+const PAY_FIRST_REQUESTS = ["Change Course", "Rescheduling"];
+/** How much of a request's charge has been collected: verified payments on the enrollment made after the charge was set. */
+async function chargeCollection(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentId: string, chargeId: string) {
+  const { data: charge } = await admin.from("enrollment_charges").select("amount_centavos,created_at").eq("id", chargeId).maybeSingle();
+  if (!charge) return { amount: 0, collected: 0, paid: true };
+  const { data: allocations } = await admin.from("payment_allocations").select("amount_centavos,payments!inner(valid,verification_state,created_at)")
+    .eq("enrollment_id", enrollmentId).eq("payments.valid", true).eq("payments.verification_state", "Verified").gte("payments.created_at", charge.created_at);
+  const collected = (allocations ?? []).reduce((sum, a) => sum + Number(a.amount_centavos), 0);
+  const amount = Number(charge.amount_centavos);
+  return { amount, collected, paid: collected >= amount };
+}
+
 // Registration may generate a trainee's training instructions at most twice.
 const INSTRUCTION_LIMIT = 2;
 // The Training Admission Record may be printed twice; further reprints need an
@@ -492,6 +507,16 @@ export async function GET() {
     instructionTemplatesUnit, batchStaffingUnit, methodKindUnit, myHrUnit, expenseExtrasUnit, employeeChargeUnit,
   ]);
 
+  // Collection status of pending Change Course / Rescheduling fees, shown to the
+  // Cashier and the Accounting Manager (approval waits for payment).
+  const chargeCollected: Record<string, { amount: number; collected: number; paid: boolean }> = {};
+  {
+    const admin = createSupabaseAdminClient();
+    const pendingPayFirst = (requests as { id: string; status: string; request_type: string; charge_id?: string | null; enrollments?: { id: string } | { id: string }[] | null }[])
+      .filter((r) => r.status === "Pending" && r.charge_id && PAY_FIRST_REQUESTS.includes(r.request_type));
+    await Promise.all(pendingPayFirst.map(async (r) => { const e = first(r.enrollments); if (e?.id && r.charge_id) chargeCollected[r.id] = await chargeCollection(admin, e.id, r.charge_id); }));
+  }
+
   const enrollmentRows = (enrollmentsResult.data ?? []) as { id: string }[];
 
   // Website applications still waiting for Registration to assign a course.
@@ -589,7 +614,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -787,6 +812,10 @@ export async function POST(request: Request) {
       if (found.error || !req) throw found.error ?? new Error("Request not found.");
       if (req.status !== "Pending") return NextResponse.json({ error: "This request has already been decided." }, { status: 400 });
       if (req.stage === "With cashier") return NextResponse.json({ error: "Waiting for the Cashier to add charges." }, { status: 400 });
+      if (input.approve && req.charge_id && PAY_FIRST_REQUESTS.includes(req.request_type)) {
+        const due = await chargeCollection(admin, req.enrollment_id, req.charge_id);
+        if (!due.paid) return NextResponse.json({ error: `The ${req.request_type === "Rescheduling" ? "reschedule" : "change of course"} fee is not paid yet (₱${(due.collected / 100).toFixed(2)} of ₱${(due.amount / 100).toFixed(2)} collected). Approve it once the trainee pays the Cashier.` }, { status: 400 });
+      }
       if (input.approve) {
         const rv = (req.requested_values ?? {}) as { batchId?: string; amountCentavos?: number; paymentId?: string; courseId?: string; partnerOfferId?: string };
         if (req.request_type === "Rescheduling") {
@@ -922,8 +951,11 @@ export async function POST(request: Request) {
       if (req.status !== "Pending" || req.stage !== "With cashier") return NextResponse.json({ error: "This request is not waiting for charges." }, { status: 400 });
       let chargeId: string | null = null;
       if (input.amountCentavos > 0) {
-        // Pending and invalid until the Accounting Manager approves the request.
-        const { data: charge, error: chargeError } = await admin.from("enrollment_charges").insert({ enrollment_id: req.enrollment_id, charge_catalog_id: input.chargeCatalogId ?? null, description: input.description || `${req.request_type} fee`, amount_centavos: input.amountCentavos, event_type: "charge", valid: false, approval_status: "Pending", created_by: staff.user.id }).select("id").single();
+        // Pending until the Accounting Manager decides. A Change Course or
+        // Rescheduling fee is payable right away (valid) so the Cashier can
+        // collect it before approval; other fees count only once approved.
+        const payFirst = PAY_FIRST_REQUESTS.includes(req.request_type);
+        const { data: charge, error: chargeError } = await admin.from("enrollment_charges").insert({ enrollment_id: req.enrollment_id, charge_catalog_id: input.chargeCatalogId ?? null, description: input.description || `${req.request_type} fee`, amount_centavos: input.amountCentavos, event_type: "charge", valid: payFirst, approval_status: "Pending", created_by: staff.user.id }).select("id").single();
         if (chargeError) throw chargeError;
         chargeId = charge.id;
       }

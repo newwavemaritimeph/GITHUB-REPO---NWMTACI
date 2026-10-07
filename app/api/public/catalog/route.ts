@@ -19,7 +19,7 @@ const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v)
  *   batches (published, open, not started, before the deadline, seats left).
  * - inHouse: every other active New Wave in-house course, for the date picker.
  * Read-only and anonymous; only names, codes, durations, modality, category,
- * batch dates and seats left leave the server (no prices, rebates or partner data).
+ * batch dates and an Open/Full flag leave the server (seat counts stay internal) (no prices, rebates or partner data).
  */
 export async function GET() {
   if (!isSupabaseConfigured()) return NextResponse.json({ stcw: [], inHouse: [] });
@@ -44,9 +44,9 @@ export async function GET() {
   for (const c of courses.data) idsByCode.set(c.code, (idsByCode.get(c.code) ?? new Set()).add(c.id));
   const stcw = PUBLIC_STCW_CODES.map((code) => courses.data.find((c) => c.code === code)).filter((c): c is NonNullable<typeof c> => !!c).map((c) => ({
     ...shape(c),
-    batches: (batches.data ?? []).filter((b) => idsByCode.get(c.code)?.has(b.course_id) && (b.starts_on > today || LATE_ENROLLMENT_CODES.includes(c.code)))
-      // Seats left are shown on the Courses page and the form; a full batch stays listed as "Full".
-      .map((b) => ({ id: b.id, number: b.batch_number, startsOn: b.starts_on, endsOn: b.ends_on, capacity: b.capacity, seatsLeft: b.status === "Full" ? 0 : Math.max(0, b.capacity - b.confirmed_count) })),
+    batches: (batches.data ?? []).filter((b) => idsByCode.get(c.code)?.has(b.course_id) && (b.starts_on >= today || LATE_ENROLLMENT_CODES.includes(c.code)))
+      // Seat counts stay internal (Registration sees them in the portal); the public only learns Open or Full.
+      .map((b) => ({ id: b.id, number: b.batch_number, startsOn: b.starts_on, endsOn: b.ends_on, full: b.status === "Full" || b.confirmed_count >= b.capacity })),
   }));
   // The In-House picker leaves out every STCW / MARINA Domestic course: only the five above are offered.
   const seen = new Set<string>();

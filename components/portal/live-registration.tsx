@@ -3,7 +3,7 @@
 import { useState, type ReactNode } from "react";
 import type { PortalData, Enrollment, Batch, Trainee } from "../portal-live-app";
 import { first, manilaToday, dueCentavos, balanceOf, pesos, addDays } from "@/lib/portal-format";
-import { LATE_ENROLLMENT_CODES, automaticEndDate, fitsInWeek } from "@/lib/scheduling";
+import { LATE_ENROLLMENT_CODES, PUBLIC_STCW_CODES, automaticEndDate, fitsInWeek } from "@/lib/scheduling";
 import { Badge, Message, Modal, PageHead, Pager, Kpi, usePost, fullName, fmtDate, fmtClock } from "./shared-ui";
 import { RequestActionModal, type RequestType } from "./payment-actions";
 
@@ -51,7 +51,7 @@ function uniqueCourses<T extends { code: string; name: string }>(rows: T[]) {
 /** STCW courses are the In-House courses filed under an STCW category. */
 const isStcwCourse = (c?: PortalData["courses"][number] | null) => (first(c?.course_categories)?.name ?? "").toLowerCase().includes("stcw");
 /** A New Wave batch a trainee can still be placed on: open, not started (CCMD: not finished), before its deadline, with seats left. */
-const isBookable = (b: Batch, today: string, now: string) => !b.partner_offer_id && b.status === "Open" && (b.starts_on > today || (b.ends_on >= today && LATE_ENROLLMENT_CODES.includes(first(b.courses)?.code ?? ""))) && b.enrollment_deadline > now && b.confirmed_count < b.capacity;
+const isBookable = (b: Batch, today: string, now: string) => !b.partner_offer_id && b.status === "Open" && (b.starts_on >= today || (b.ends_on >= today && LATE_ENROLLMENT_CODES.includes(first(b.courses)?.code ?? ""))) && b.enrollment_deadline > now && b.confirmed_count < b.capacity;
 
 /* ------------------------------------------------------------------ Dashboard */
 
@@ -488,21 +488,58 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
 
 /* ------------------------------------------------------- Courses & centers */
 
-/** Read-only catalog for Registration: fees and durations only — no rebate or partner payable. */
+/**
+ * Registration's Courses screen — the public Courses page layout (STCW cards
+ * with their open dates, In-House courses by category), plus what only staff
+ * see: seats left per batch and the fees. Endorsed programs keep their own tab.
+ * No rebate or partner payable figures.
+ */
+const COURSE_TABS = ["STCW schedules", "In-House courses", "Endorsed programs"] as const;
 export function CoursesAndCenters({ data, query }: { data: PortalData; query: string }) {
+  const [tab, setTab] = useState<(typeof COURSE_TABS)[number]>("STCW schedules");
   const q = query.trim().toLowerCase();
+  const today = manilaToday(), now = new Date().toISOString();
   const inHouse = uniqueCourses(data.courses.filter((c) => c.delivery_type === "In-House" && (!q || `${c.code} ${c.name}`.toLowerCase().includes(q)))).sort((a, b) => a.name.localeCompare(b.name));
+  const byCode = new Map(inHouse.map((c) => [c.code, c]));
+  const stcw = PUBLIC_STCW_CODES.map((code) => byCode.get(code)).filter((c): c is NonNullable<typeof c> => !!c);
+  const stcwCodes = new Set<string>(PUBLIC_STCW_CODES);
+  const others = inHouse.filter((c) => !stcwCodes.has(c.code));
+  const categories = [...new Set(others.map((c) => first(c.course_categories)?.name ?? "In-House"))];
+  const [category, setCategory] = useState("");
   const centers = [...new Set(data.offers.map((o) => first(o.partner_centers)?.name).filter(Boolean))] as string[];
   const [center, setCenter] = useState(centers[0] ?? "");
   const offers = data.offers.map((o) => ({ offer: o, course: data.courses.find((c) => c.id === o.course_id) })).filter(({ offer, course }) => (first(offer.partner_centers)?.name ?? "") === center && (!q || `${course?.code ?? ""} ${course?.name ?? ""}`.toLowerCase().includes(q)));
-  const table = (list: typeof inHouse) => <div className="portal-table"><table><thead><tr><th>Code</th><th>Course</th><th>Duration</th><th>Fee</th></tr></thead><tbody>{list.map((c) => <tr key={c.id}><td><strong>{c.code}</strong></td><td>{c.name}</td><td>{c.duration_label}</td><td>{pesos(c.standard_price_centavos)}</td></tr>)}</tbody></table>{!list.length && <p className="portal-empty-copy">No courses.</p>}</div>;
+  // Open and full batches still taking (or just closed to) enrollment, by course code.
+  const batchesOf = (code: string) => data.batches.filter((b) => first(b.courses)?.code === code && !b.partner_offer_id && (b.status === "Open" || b.status === "Full") && (b.starts_on >= today || (LATE_ENROLLMENT_CODES.includes(code) && b.ends_on >= today)))
+    .sort((a, b) => a.starts_on.localeCompare(b.starts_on));
+  const counts = { "STCW schedules": stcw.length, "In-House courses": others.length, "Endorsed programs": offers.length };
   return <div className="portal-page">
-    <PageHead eyebrow="Registration" title="Courses" text="New Wave's own courses and the endorsed programs offered through partner centers, with the fees quoted to trainees." />
-    <section className="portal-panel" style={{ marginBottom: 16 }}><div className="panel-heading"><div><h2>STCW courses</h2><p>MARINA-approved, delivered by New Wave</p></div></div>{table(inHouse.filter(isStcwCourse))}</section>
-    <section className="portal-panel" style={{ marginBottom: 16 }}><div className="panel-heading"><div><h2>In-House courses</h2><p>Delivered by New Wave</p></div></div>{table(inHouse.filter((c) => !isStcwCourse(c)))}</section>
-    <section className="portal-panel">
+    <PageHead eyebrow="Registration" title="Courses" text="The courses trainees see on the website, with the seats left in each batch and the fees. Enrollment for STCW batches closes at 7:00 AM on the training date (CCM Domestic: on the last day)." />
+    <div className="rr-switch" role="tablist" aria-label="Courses">{COURSE_TABS.map((t) => <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{t}<small>{counts[t]}</small></button>)}</div>
+
+    {tab === "STCW schedules" && <div className="course-grid">{stcw.map((c) => { const list = batchesOf(c.code); const open = list.filter((b) => b.status === "Open" && b.enrollment_deadline > now && seatsLeft(b) > 0).length; return <article key={c.id} className="course-card-public">
+      <span className="course-badge stcw">STCW</span>
+      <h3>{c.name}</h3>
+      <small className="course-code">{c.code}</small>
+      <dl className="course-facts"><div><dt>Duration</dt><dd>{c.duration_label}{list[0] ? ` · ${list[0].starts_on === list[0].ends_on ? weekdayOf(list[0].starts_on) : `${weekdayOf(list[0].starts_on)}–${weekdayOf(list[0].ends_on)}`}` : ""}</dd></div><div><dt>Fee</dt><dd>{pesos(c.standard_price_centavos)}</dd></div></dl>
+      {list.length ? <div className="course-schedules">
+        <span className="schedule-status open">● {open} open batch{open === 1 ? "" : "es"}</span>
+        <div className="slot-months">{groupBy(list, (b) => b.starts_on.slice(0, 7)).map(([month, rows]) => <div key={month}>
+          <span className="schedule-month-label">{tileMonth(rows[0].starts_on)} {rows[0].starts_on.slice(0, 4)}</span>
+          <ul className="slot-list">{rows.map((b) => { const left = seatsLeft(b), closed = b.enrollment_deadline <= now, full = b.status === "Full" || left === 0; return <li key={b.id} className={full || closed ? "full" : ""} title={`${b.batch_number} · closes ${closesAt(b.enrollment_deadline)}`}><b>{dateRange(b.starts_on, b.ends_on)} <span className="slot-batch">{b.batch_number}</span></b><i className={full ? "full" : closed ? "" : left <= 3 ? "low" : ""}>{full ? "Full · 24 of 24" : closed ? "Closed" : `${left} of ${b.capacity} left`}</i></li>; })}</ul>
+        </div>)}</div>
+      </div> : <span className="schedule-status soon">No batch opened yet</span>}
+      <p className="slot-foot">{LATE_ENROLLMENT_CODES.includes(c.code) ? "Late enrollment until 7:00 AM on the last training day" : "Enrollment closes 7:00 AM on the training date"}</p>
+    </article>; })}{!stcw.length && <p className="portal-empty-copy">No STCW courses match.</p>}</div>}
+
+    {tab === "In-House courses" && <section className="portal-panel">
+      <div className="panel-heading"><div><h2>In-House courses</h2><p>Online · trainees pick a start date; training runs on consecutive days, Monday to Saturday</p></div><label className="portal-field-inline">Category<select value={category} onChange={(e) => setCategory(e.target.value)}><option value="">All categories</option>{categories.map((c) => <option key={c} value={c}>{c}</option>)}</select></label></div>
+      <div className="portal-table"><table><thead><tr><th>Code</th><th>Course</th><th>Category</th><th>Duration</th><th>Modality</th><th>Fee</th></tr></thead><tbody>{others.filter((c) => !category || (first(c.course_categories)?.name ?? "In-House") === category).map((c) => <tr key={c.id}><td><strong>{c.code}</strong></td><td>{c.name}</td><td>{first(c.course_categories)?.name ?? "In-House"}</td><td>{c.duration_label}</td><td>Online</td><td>{pesos(c.standard_price_centavos)}</td></tr>)}</tbody></table>{!others.length && <p className="portal-empty-copy">No courses.</p>}</div>
+    </section>}
+
+    {tab === "Endorsed programs" && <section className="portal-panel">
       <div className="panel-heading"><div><h2>Endorsed programs</h2><p>Offered through partner centers</p></div><label className="portal-field-inline">Partner center<select value={center} onChange={(e) => setCenter(e.target.value)}>{centers.map((c) => <option key={c}>{c}</option>)}{!centers.length && <option value="">None yet</option>}</select></label></div>
       <div className="portal-table"><table><thead><tr><th>Code</th><th>Course</th><th>Duration</th><th>Training fee</th></tr></thead><tbody>{offers.map(({ offer, course }) => <tr key={offer.id}><td><strong>{course?.code}</strong></td><td>{course?.name}</td><td>{offer.duration_label}</td><td>{pesos(offer.training_fee_centavos)}</td></tr>)}</tbody></table>{!offers.length && <p className="portal-empty-copy">No programs for this center.</p>}</div>
-    </section>
+    </section>}
   </div>;
 }

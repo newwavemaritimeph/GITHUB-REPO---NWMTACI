@@ -160,6 +160,17 @@ function Header({ page }: { page: PublicPage }) {
   const current = PAGE_PATH[page];
   return (
     <header className="public-header">
+      {/* Slim brand strip: contact at a glance. The header scrolls with the page (not sticky). */}
+      <div className="public-topbar">
+        <div className="public-topbar-inner">
+          <span className="topbar-tag">MARINA-accredited maritime training · Ermita, Manila</span>
+          <span className="topbar-links">
+            <a href={`tel:${CONTACT.mobile.replace(/\s/g, "")}`}>{CONTACT.mobile}</a>
+            <a href={`mailto:${CONTACT.email}`} className="topbar-email">{CONTACT.email}</a>
+            <a href={CONTACT.facebook} target="_blank" rel="noopener noreferrer">Facebook</a>
+          </span>
+        </div>
+      </div>
       <div className="public-nav">
         <Link href="/" aria-label="New Wave Maritime home" className="brand-link">
           <NewWaveLogo />

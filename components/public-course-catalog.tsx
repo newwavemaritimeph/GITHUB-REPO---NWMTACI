@@ -6,12 +6,12 @@ import { courseDays } from "@/lib/scheduling";
 
 /**
  * Public Courses page (owner, 7 Oct 2026), read live from /api/public/catalog.
- * It only informs: STCW courses list their open dates with seats left, and
+ * It only informs: STCW courses list their dates as Open or Full (seat counts stay internal), and
  * In-House courses are listed by category with their duration. Trainees choose
  * their courses and schedules (up to five) inside the registration form.
  */
 
-type Batch = { id: string; number: string; startsOn: string; endsOn: string; capacity: number; seatsLeft: number };
+type Batch = { id: string; number: string; startsOn: string; endsOn: string; full: boolean };
 type StcwCourse = { code: string; name: string; duration: string; modality: string; category: string; batches: Batch[] };
 type InHouseCourse = { code: string; name: string; duration: string; modality: string; category: string };
 
@@ -38,7 +38,7 @@ function groupByMonth(batches: Batch[]) {
 function StcwCard({ course }: { course: StcwCourse }) {
   const [all, setAll] = useState(false);
   const list = all ? course.batches : course.batches.slice(0, SHOWN);
-  const open = course.batches.filter((b) => b.seatsLeft > 0).length;
+  const open = course.batches.filter((b) => !b.full).length;
   return <article className="course-card-public">
     <span className="course-badge stcw">STCW</span>
     <h3>{course.name}</h3>
@@ -52,7 +52,7 @@ function StcwCard({ course }: { course: StcwCourse }) {
       <div className="slot-months">
         {groupByMonth(list).map(([month, rows]) => <div key={month}>
           <span className="schedule-month-label">{month}</span>
-          <ul className="slot-list">{rows.map((b) => <li key={b.id} className={b.seatsLeft ? "" : "full"}><b>{dayRange(b.startsOn, b.endsOn)}</b><i className={!b.seatsLeft ? "full" : b.seatsLeft <= 3 ? "low" : ""}>{b.seatsLeft ? `${b.seatsLeft} of ${b.capacity} left` : "Full"}</i></li>)}</ul>
+          <ul className="slot-list">{rows.map((b) => <li key={b.id} className={b.full ? "full" : ""}><b>{dayRange(b.startsOn, b.endsOn)}</b><i className={b.full ? "full" : ""}>{b.full ? "Full" : "Open"}</i></li>)}</ul>
         </div>)}
       </div>
       {course.batches.length > SHOWN && <button type="button" className="slot-more" onClick={() => setAll((v) => !v)}>{all ? "Show fewer dates" : `+ ${course.batches.length - SHOWN} more dates`}</button>}
@@ -98,6 +98,6 @@ export function PublicCourseCatalog() {
         {!data.stcw.length && <div className="catalog-empty">No STCW schedules are open right now.</div>}
       </> : data.inHouse.length ? <InHouseList courses={data.inHouse} /> : <div className="catalog-empty">No in-house courses are listed right now.</div>}
     <div className="register-banner"><div><b>Ready to enroll?</b><span>Choose up to 5 courses and their schedules in one registration.</span></div><Link className="button button-primary" href="/register">Register now →</Link></div>
-    <p className="catalog-note">Dates and seats come from schedules published by New Wave. Course fees are confirmed by our Registration team during screening.</p>
+    <p className="catalog-note">Dates come from schedules published by New Wave. Enrollment for STCW courses closes at 7:00 AM on the training date. Course fees are confirmed by our Registration team during screening.</p>
   </div>;
 }

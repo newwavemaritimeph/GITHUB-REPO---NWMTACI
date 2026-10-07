@@ -5,7 +5,7 @@
 --
 -- Owner instruction (7 Oct 2026): Crowd and Crisis Management - Domestic
 -- (CCMD, 3 days) runs Monday–Wednesday, every week (lib/scheduling.ts).
--- CCMD takes late enrollment: it stays open until 08:00 on the last training day.
+-- CCMD takes late enrollment: it stays open until 07:00 on the last training day.
 -- Each batch: 24 seats, In-person, 08:00–17:00, Sundays skipped, published so
 -- it appears on the public registration form. Only dates still bookable are
 -- opened (from tomorrow to 31 October 2026). Dates already opened are skipped,
@@ -48,7 +48,7 @@ begin
           mode, venue, capacity, enrollment_deadline, published_at, created_by
         ) values (
           public.next_reference('BCH'), course_row.id, null, d, end_day, time '08:00', time '17:00',
-          'In-person', null, 24, (end_day + time '08:00') at time zone 'Asia/Manila', now(), null
+          'In-person', null, 24, (end_day + time '07:00') at time zone 'Asia/Manila', now(), null
         ) returning * into new_batch;
 
         training_day := d;

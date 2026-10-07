@@ -24,6 +24,7 @@ const fixture = {
   courses: [
     { id: "c1", code: "SSO", name: "Ship Security Officers", delivery_type: "In-House", duration_label: "3 days", standard_price_centavos: 450000, course_categories: { name: "STCW" } },
     { id: "c2", code: "ABC", name: "Awareness on Basic Computer", delivery_type: "In-House", duration_label: "1 day", standard_price_centavos: 150000, course_categories: { name: "In-House" } },
+    { id: "c5", code: "PSCMT", name: "Crowd Management Training", delivery_type: "In-House", duration_label: "2 days", standard_price_centavos: 160000, course_categories: null },
     { id: "c3", code: "END", name: "Endorsed Program", delivery_type: "Partner or Endorsed", duration_label: "2 days", standard_price_centavos: 0, course_categories: null },
   ],
   offers: [{ id: "o1", course_id: "c3", duration_label: "2 days", training_fee_centavos: 800000, rebate_centavos: 50000, partner_payable_centavos: 750000, partner_centers: { name: "Partner Center A" } }],
@@ -34,6 +35,7 @@ const fixture = {
   ],
   batches: [
     { id: "b1", batch_number: "SSO-2610", course_id: "c1", partner_offer_id: null, starts_on: plus(5), ends_on: plus(7), mode: "Face-to-face", venue: "Room 1", capacity: 24, confirmed_count: 3, enrollment_deadline: `${plus(4)}T23:59:59+08:00`, status: "Open", published_at: nowIso, courses: { name: "Ship Security Officers", code: "SSO" } },
+    { id: "b5", batch_number: "PSCMT-2610", course_id: "c5", partner_offer_id: null, starts_on: plus(6), ends_on: plus(7), mode: "Face-to-face", venue: null, capacity: 24, confirmed_count: 21, enrollment_deadline: `${plus(6)}T07:00:00+08:00`, status: "Open", published_at: nowIso, courses: { name: "Crowd Management Training", code: "PSCMT" } },
     { id: "b2", batch_number: "SSO-FULL", course_id: "c1", partner_offer_id: null, starts_on: plus(9), ends_on: plus(11), mode: "Face-to-face", venue: null, capacity: 24, confirmed_count: 24, enrollment_deadline: `${plus(8)}T23:59:59+08:00`, status: "Full", published_at: nowIso, courses: { name: "Ship Security Officers", code: "SSO" } },
   ],
   enrollments: [
@@ -141,10 +143,11 @@ describe("Registration Officer workspace", () => {
     expect(renderToString(createElement(RegistrationRecords, { ...props, view: "trainees" }))).toContain("TRAINEE-LIST");
   });
 
-  it("shows courses and centers without rebate or partner-payable figures", () => {
+  it("shows the website courses with seats left, and no rebate or partner-payable figures", () => {
     const html = renderToString(createElement(CoursesAndCenters, { data: fixture, query: "" }));
-    expect(html).toContain("SSO");
-    expect(html).toContain("Partner Center A");
+    expect(html).toContain("Crowd Management Training");
+    expect(html).toContain("3 of 24 left");
+    for (const tab of ["STCW schedules", "In-House courses", "Endorsed programs"]) expect(html).toContain(tab);
     expect(html).not.toContain("rebate");
     expect(html).not.toContain("payable");
   });
