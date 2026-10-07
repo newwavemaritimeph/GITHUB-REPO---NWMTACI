@@ -5,6 +5,9 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hardDeleteEnrollment, pruneUnpaidEnrollments, deletePastEmptyBatches } from "@/lib/enrollments";
 import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn, normalizeEmail, normalizePhContactNumber, normalizeSrn } from "@/lib/validation";
+import { emailConfigured, processEmailJobs } from "@/lib/email-jobs";
+import { classroomEmailBlocks } from "@/lib/classroom";
+import { loadInstructionDetails } from "@/lib/training-instructions";
 
 const enrollmentInput = z.object({
   action: z.literal("create-enrollment"), existingTraineeId: z.string().uuid().nullable().optional(),
@@ -157,7 +160,7 @@ const applicationAssignInput = z.object({ action: z.literal("application-assign"
 const applicationPlaceBatchInput = z.object({ action: z.literal("application-place-batch"), enrollmentId: z.string().uuid(), batchId: z.string().uuid() });
 const sendInstructionsInput = z.object({ action: z.literal("send-instructions"), enrollmentId: z.string().uuid() });
 const instructionTemplateSaveInput = z.object({ action: z.literal("instruction-template-save"), courseId: z.string().uuid(), subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(8000) });
-const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-link-save"), courseId: z.string().uuid(), link: z.string().trim().max(500) });
+const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-link-save"), courseId: z.string().uuid(), link: z.string().trim().max(500), code: z.string().trim().max(40).optional() });
 const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course", "TAR reprint"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional(), courseId: z.string().uuid().nullable().optional(), partnerOfferId: z.string().uuid().nullable().optional() });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
@@ -220,6 +223,27 @@ async function chargeCollection(admin: ReturnType<typeof createSupabaseAdminClie
   const collected = (allocations ?? []).reduce((sum, a) => sum + Number(a.amount_centavos), 0);
   const amount = Number(charge.amount_centavos);
   return { amount, collected, paid: collected >= amount };
+}
+
+/** Queue and immediately try to send the training instructions email for one enrollment. */
+async function queueInstructionEmail(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentId: string, generation: number, origin: string) {
+  const details = await loadInstructionDetails(admin, enrollmentId);
+  const to = details?.traineeEmail ?? null;
+  if (!details || !to) return { state: "No email", to };
+  if (!emailConfigured()) return { state: "Not configured", to };
+  const blocks = classroomEmailBlocks(details.join);
+  const { data: job, error } = await admin.from("email_jobs").insert({
+    idempotency_key: `instructions:${enrollmentId}:${generation}`, template_code: "training.instructions", recipient: to,
+    variables: { enrollment_id: enrollmentId, attach_instructions_for: enrollmentId, trainee_name: details.traineeName, course_name: details.courseName, dates: details.dates, time: details.time, classroom: details.classroom, enrollment_number: details.enrollmentNumber, classroom_join_url: details.join.url ?? "", class_code: details.join.code ?? "", classroom_block_html: blocks.html, classroom_block_text: blocks.text },
+  }).select("id").single();
+  if (error || !job) return { state: "Failed", to, error: error?.message ?? "Could not queue the email." };
+  try {
+    const { results } = await processEmailJobs(admin, { ids: [job.id], origin });
+    const result = results[0];
+    return { state: result?.state ?? "Queued", to, error: result?.error };
+  } catch (err) {
+    return { state: "Queued", to, error: err instanceof Error ? err.message : "Will retry" };
+  }
 }
 
 // Registration may generate a trainee's training instructions at most twice.
@@ -533,6 +557,19 @@ export async function GET() {
   const applicationNumbers = Object.fromEntries((numberRows ?? []).map((row: { id: string; application_number: string }) => [row.id, row.application_number]));
   // How many times instructions were generated per enrollment, and the printed
   // admission records (202610070007). Missing columns yield none.
+  // Google Classroom class codes per course (migration 202610070012; none without it).
+  const { data: codeRows } = await db.from("courses").select("id,google_classroom_code").not("google_classroom_code", "is", null).limit(1000);
+  const classroomCodes = Object.fromEntries(((codeRows ?? []) as { id: string; google_classroom_code: string }[]).map((r) => [r.id, r.google_classroom_code]));
+  // Latest training-instructions email per enrollment (who it went to, and whether it was sent).
+  const instructionEmails: Record<string, { state: string; to: string; sent_at: string | null; last_error: string | null; created_at: string }> = {};
+  {
+    const admin = createSupabaseAdminClient();
+    const { data: emailRows } = await admin.from("email_jobs").select("recipient,state,sent_at,last_error,created_at,variables").eq("template_code", "training.instructions").order("created_at", { ascending: false }).limit(1000);
+    for (const row of emailRows ?? []) {
+      const id = String((row.variables as { enrollment_id?: string } | null)?.enrollment_id ?? "");
+      if (id && !instructionEmails[id]) instructionEmails[id] = { state: row.state, to: row.recipient, sent_at: row.sent_at, last_error: row.last_error, created_at: row.created_at };
+    }
+  }
   const { data: instructionRows } = await db.from("enrollments").select("id,instructions_generated_count").gt("instructions_generated_count", 0).limit(5000);
   const instructionsCount = Object.fromEntries((instructionRows ?? []).map((row: { id: string; instructions_generated_count: number }) => [row.id, Number(row.instructions_generated_count)]));
   let admissionRecords: unknown[] = [];
@@ -614,7 +651,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -872,6 +909,11 @@ export async function POST(request: Request) {
       if (!staff.roleCodes.some((r) => ["admin", "registration", "training_operations"].includes(r))) return NextResponse.json({ error: "Your account cannot set the Google Classroom link." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { error } = await admin.from("courses").update({ google_classroom_link: input.link || null }).eq("id", input.courseId);
+      // The class code (migration 202610070012) is saved separately so a missing column never blocks the link.
+      if (!error && input.code !== undefined) {
+        const { error: codeError } = await admin.from("courses").update({ google_classroom_code: input.code || null }).eq("id", input.courseId);
+        if (codeError) return NextResponse.json({ error: /google_classroom_code/i.test(codeError.message) ? "Link saved. Apply database update 202610070012 to save the class code." : codeError.message }, { status: 400 });
+      }
       if (error) throw error;
       return NextResponse.json({ ok: true });
     }
@@ -1005,7 +1047,7 @@ export async function POST(request: Request) {
       // Count the generation; Registration is limited to two (202610070007).
       // Without the migration, fall back to stamping instructions_sent_at.
       const limited = !staff.roleCodes.some((r) => ["admin", "training_operations"].includes(r));
-      const { error: countError } = await admin.rpc("record_instructions_generated", { target_enrollment: input.enrollmentId, actor: staff.user.id, max_count: limited ? INSTRUCTION_LIMIT : null });
+      const { data: generation, error: countError } = await admin.rpc("record_instructions_generated", { target_enrollment: input.enrollmentId, actor: staff.user.id, max_count: limited ? INSTRUCTION_LIMIT : null });
       if (countError && /function public.record_instructions_generated/i.test(countError.message)) {
         const { error: sentError } = await admin.from("enrollments").update({ instructions_sent_at: new Date().toISOString() }).eq("id", input.enrollmentId);
         if (sentError) console.error("Could not set instructions_sent_at:", sentError.message);
@@ -1020,7 +1062,11 @@ export async function POST(request: Request) {
           title: "Your training instructions are ready", body: `Reporting instructions for ${course?.name ?? "your training"} (${enrollment.enrollment_number}) have been sent. Please review your portal for reporting details.`,
           related_record_type: "enrollment", related_record_id: input.enrollmentId }).then(({ error }) => { if (error) console.error("Instruction notification failed:", error.message); });
       }
-      return NextResponse.json({ ok: true });
+      // Email the instructions (PDF attached, Google Classroom join link) to the
+      // trainee's registered address, then send it right away; anything not sent
+      // now is retried by the daily email job. A failed email never undoes the generation.
+      const email = await queueInstructionEmail(admin, input.enrollmentId, Number(generation ?? Date.now()), new URL(request.url).origin);
+      return NextResponse.json({ ok: true, email });
     }
     if (input.action === "announcement-post") {
       if (!staff.roleCodes.some((r) => ["admin", "accounting"].includes(r))) return NextResponse.json({ error: "Only Admin or Accounting can post announcements." }, { status: 403 });
