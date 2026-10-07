@@ -11,7 +11,8 @@ export async function POST(request: Request) {
     await enforceRateLimit(request, "registration-search", 10, 15);
     const form = Object.fromEntries(await request.formData());
     const db = createSupabaseAdminClient();
-    const select = "registration_reference,profile_id,account_state,enrollments(enrollment_status)";
+    // awaiting_course / application_number come from migration 202610070003.
+    const select = "registration_reference,profile_id,account_state,awaiting_course,application_number,enrollments(enrollment_status)";
     let data;
     // SRN-only lookup, or the classic reference + email lookup.
     if (typeof form.srn === "string" && isSrn(form.srn)) {
@@ -22,8 +23,10 @@ export async function POST(request: Request) {
     }
     const enrollment = Array.isArray(data?.enrollments) ? data.enrollments[0] : data?.enrollments;
     const reference = data?.registration_reference ?? (typeof form.reference === "string" ? form.reference : "—");
-    // A Pending enrollment is a website application still being screened.
-    const screening = enrollment?.enrollment_status === "Pending";
-    return NextResponse.json(data ? { reference, status: screening ? "Application under screening" : enrollment?.enrollment_status ?? data.account_state, nextStep: screening ? "Send your valid ID or passport, seaman's book or SRN, medical certificate and payment screenshot. You are enrolled once these are verified." : data.profile_id ? "Sign in to your trainee account for full details." : "Check your email for the account activation link." } : { reference, status: "Not found", nextStep: "Check the details you entered." }, { status: data ? 200 : 404 });
+    // A website application still being screened: either no course assigned yet,
+    // or a Pending enrollment. Show the NWMTACI number the applicant quotes.
+    const row = data as { awaiting_course?: boolean; application_number?: string | null } | null;
+    const screening = !!row?.awaiting_course || enrollment?.enrollment_status === "Pending";
+    return NextResponse.json(data ? { reference: row?.application_number ?? reference, status: screening ? "Application under screening" : enrollment?.enrollment_status ?? data.account_state, nextStep: screening ? "Send your enrollment number with a photo of your valid ID to facebook.com/newwavemtc. Our Registration team will confirm your course, schedule and fee." : data.profile_id ? "Sign in to your trainee account for full details." : "Check your email for the account activation link." } : { reference, status: "Not found", nextStep: "Check the details you entered." }, { status: data ? 200 : 404 });
   } catch (error) { return NextResponse.json({ error: error instanceof Error && error.message === "RATE_LIMITED" ? "Too many attempts." : "Invalid search details." }, { status: 400 }); }
 }
