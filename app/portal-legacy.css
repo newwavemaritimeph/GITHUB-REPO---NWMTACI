@@ -1019,3 +1019,134 @@ button.rd-row:hover { background: #f6fafc; }
 .assign-batch strong { display: block; font-size: 14px; color: var(--ink); }
 .assign-batch small { display: block; font-size: 12.5px; color: var(--muted); }
 @media (max-width: 560px) { .nc-panel .rd-row { flex-wrap: wrap; } .nc-panel .rd-row .portal-primary { width: 100%; } }
+
+/* =====================================================================
+   BRIDGE COMPASS — chosen portal direction (7 Oct 2026).
+   Bridge Console's layout (navy top navigation with an orange active line,
+   full-width work area) with Compass's surface (Plus Jakarta Sans, Space
+   Grotesk figures, soft canvas, rounded cards, a navy-to-blue lead tile).
+   Overrides the earlier Signal Orange sidebar. Brand palette only; white
+   labels sit on #C8440E / #123F63 / #0571D0 for AA contrast.
+   ===================================================================== */
+
+.portal-shell {
+  font-family: var(--font-portal), var(--font-ui), system-ui, sans-serif;
+  background: #f3f6fb;
+}
+.portal-shell h1,
+.portal-shell h2,
+.portal-shell h3 {
+  font-family: var(--font-portal), var(--font-ui), system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.portal-shell .portal-heading h1 { color: #0b1f33; font-size: clamp(24px, 2.4vw, 30px); }
+.portal-shell .portal-eyebrow { color: var(--orange-text); letter-spacing: 0.12em; }
+.portal-workspace { background: #f3f6fb; }
+
+/* Navigation bar (navy). On phones the same element is the slide-out menu. */
+.portal-shell .portal-sidebar { background: #123f63; color: #cfe0ee; }
+.portal-shell .portal-sidebar nav button { color: #cfe0ee; }
+.portal-shell .portal-sidebar nav button > span { color: #8fb8d6; }
+.portal-shell .portal-sidebar nav button:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.portal-shell .portal-sidebar nav button.active { background: rgba(53, 204, 250, 0.14); color: #fff; box-shadow: inset 3px 0 0 #f25615; }
+.portal-shell .portal-sidebar nav button.active > span { color: #35ccfa; }
+.portal-shell .portal-sidebar .nav-group > b { color: #8fb8d6; }
+.portal-shell .portal-sidebar .role-picker span,
+.portal-shell .portal-sidebar .sidebar-footer > div span { color: #9cc3dd; }
+.portal-shell .portal-sidebar .role-picker select { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.2); color: #fff; }
+.portal-shell .portal-sidebar .user-dot { background: linear-gradient(135deg, #0571d0, #35ccfa); color: #fff; }
+.portal-shell .portal-sidebar .sidebar-account-button,
+.portal-shell .portal-sidebar .sidebar-footer button { color: #cfe0ee !important; }
+.portal-shell .portal-sidebar nav button small { background: #f25615; color: #fff; }
+
+@media (min-width: 981px) {
+  .portal-shell .portal-sidebar {
+    position: sticky;
+    top: 0;
+    inset: auto;
+    width: 100%;
+    height: 62px;
+    flex-direction: row;
+    align-items: center;
+    gap: 18px;
+    padding: 0 24px;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06), 0 6px 18px rgba(11, 31, 51, 0.12);
+  }
+  .portal-shell .portal-sidebar .sidebar-brand { padding: 0; border: 0; flex: none; }
+  .portal-shell .portal-sidebar .new-wave-logo .logo-image-wrap { width: 38px; height: 38px; padding: 3px; }
+  .portal-shell .portal-sidebar .logo-copy span { display: none; }
+  .portal-shell .portal-sidebar .logo-copy strong { color: #fff; font-size: 15px; }
+  .portal-shell .portal-sidebar nav {
+    flex: 1;
+    display: flex;
+    align-items: stretch;
+    height: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .portal-shell .portal-sidebar nav::-webkit-scrollbar { display: none; }
+  .portal-shell .portal-sidebar .nav-group { display: flex; margin: 0; }
+  .portal-shell .portal-sidebar .nav-group > b { display: none; }
+  .portal-shell .portal-sidebar nav button {
+    width: auto;
+    min-height: 0;
+    height: 100%;
+    margin: 0;
+    padding: 0 14px;
+    gap: 8px;
+    border-radius: 0;
+    font-size: 14.5px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .portal-shell .portal-sidebar nav button:hover { background: rgba(255, 255, 255, 0.06); }
+  .portal-shell .portal-sidebar nav button.active { background: transparent; box-shadow: inset 0 -3px 0 #f25615; }
+  .portal-shell .portal-sidebar .role-picker { order: 3; padding: 0; flex: none; }
+  .portal-shell .portal-sidebar .role-picker span { display: none; }
+  .portal-shell .portal-sidebar .role-picker select { width: auto; padding: 7px 10px; font-size: 13px; border-radius: 10px; }
+  .portal-shell .portal-sidebar .sidebar-footer { order: 4; margin: 0; padding: 0; border: 0; flex: none; gap: 10px; }
+  .portal-shell .portal-sidebar .sidebar-footer > div { flex: none; }
+  .portal-shell .portal-sidebar .sidebar-footer strong { color: #fff; font-size: 13px; }
+  .portal-shell .portal-sidebar .sidebar-footer .user-dot { width: 32px; height: 32px; }
+  .portal-workspace { margin-left: 0; }
+  .portal-shell .portal-topbar { top: 62px; height: 58px; background: rgba(243, 246, 251, 0.92); backdrop-filter: blur(6px); border-bottom: 1px solid #e3eaf3; }
+}
+@media (min-width: 981px) and (max-width: 1280px) {
+  .portal-shell .portal-sidebar .sidebar-footer > div,
+  .portal-shell .portal-sidebar nav button > span { display: none; }
+}
+
+/* Search and top-bar controls */
+.portal-shell .top-search { background: #fff; border-color: #e1e8f1; border-radius: 12px; }
+
+/* Cards, tiles and figures (Compass) */
+.portal-shell .portal-panel { border-color: #e6ecf4; border-radius: 16px; box-shadow: 0 4px 14px rgba(11, 31, 51, 0.06); }
+.portal-shell .reg-kpis button,
+.portal-shell .metric-grid article { border: 1px solid #e6ecf4; border-radius: 16px; box-shadow: 0 4px 14px rgba(11, 31, 51, 0.06); }
+.portal-shell .metric-grid article { border-left-width: 1px; }
+.portal-shell .reg-kpis button strong,
+.portal-shell .metric-grid article strong,
+.portal-shell .finance-hero strong,
+.portal-shell .slot-count,
+.portal-shell .rd-time,
+.portal-shell .req-count { font-family: var(--font-num), var(--font-portal), sans-serif; font-variant-numeric: tabular-nums; }
+.portal-shell .reg-kpis button strong { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; color: #0b1f33; }
+.portal-shell .reg-kpis button i { background: #eaf3fc; color: #0571d0; border-radius: 10px; }
+.portal-shell .reg-kpis button:hover { border-color: #0571d0; }
+/* Lead tile: the first figure on a dashboard. */
+.portal-shell .reg-kpis button:first-child { background: linear-gradient(135deg, #123f63, #0571d0); border-color: transparent; }
+.portal-shell .reg-kpis button:first-child strong,
+.portal-shell .reg-kpis button:first-child span { color: #fff; }
+.portal-shell .reg-kpis button:first-child small { color: #cfe6f8; }
+.portal-shell .reg-kpis button:first-child i { background: rgba(255, 255, 255, 0.16); color: #fff; }
+
+/* Controls */
+.portal-shell .portal-primary,
+.portal-shell .portal-secondary { border-radius: 10px; }
+.portal-shell .portal-tabs button.active { color: #0a5ba0; border-bottom-color: #0571d0; }
+.portal-shell .rr-switch { border-radius: 14px; border-color: #e1e8f1; }
+.portal-shell .rr-switch button { border-radius: 10px; }
+.portal-shell .rr-switch button.active { background: linear-gradient(90deg, #0571d0, #2a8fe6); box-shadow: 0 4px 10px rgba(5, 113, 208, 0.25); }
+.portal-shell .portal-table th { font-family: var(--font-portal), sans-serif; }
