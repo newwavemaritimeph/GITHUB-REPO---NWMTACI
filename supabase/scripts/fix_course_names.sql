@@ -1,0 +1,183 @@
+-- =====================================================================
+-- Reset New Wave course names to the official course catalog
+-- (lib/in-house-catalog.ts, 148 courses). Owner request, 7 Oct 2026.
+-- RUN ONCE in the Supabase SQL Editor (run the whole file).
+-- Matches New Wave (In-House) courses by code and corrects the name and the
+-- duration label where they differ. Partner / endorsed programs, prices,
+-- batches and enrollments are not touched. Each change is audited.
+-- =====================================================================
+
+begin;
+
+create temporary table official_courses(code text primary key, name text not null, duration_label text not null) on commit drop;
+insert into official_courses(code, name, duration_label) values
+  ('SATSDSD', 'Security Awareness Training and Seafarer with Designated Security Duties', '1 day'),
+  ('SSO', 'Ship Security Officer', '3 days'),
+  ('STPPDSPPS', 'Safety Training for Personnel Providing Direct Service to Passengers in Passenger Spaces', '1 day'),
+  ('PSCMT', 'Crowd Management Training', '2 days'),
+  ('PSCMHBT', 'Passenger Ship Crisis Management and Human Behavior Training', '3 days'),
+  ('UBT-PSSR', 'Updating Training on Basic Training - PSSR', '1 day'),
+  ('CCMI', 'Safety, Crowd and Crisis Package', '5.5 days'),
+  ('CCMD', 'Crowd and Crisis Management - Domestic', '3 days'),
+  ('ABC', 'Awareness on Basic Computer', '1 day'),
+  ('AHPR', 'Awareness on Harassment Prevention and Response', '2 days'),
+  ('APA', 'Anti Piracy Awareness', '1 day'),
+  ('AI', 'Accident Investigation', '1 day'),
+  ('AI/RA', 'Accident Investigation and Risk Assessment Course', '3 days'),
+  ('AIS', 'Automatic Identification System', '1 day'),
+  ('AIIRCA', 'Accident Investigation and Root Cause Analysis', '1 day'),
+  ('AMMS', 'Auxiliary Marine Machinery Systems', '1 day'),
+  ('ARPA', 'Automatic Radar Plotting Aids', '5 days'),
+  ('BAC', 'Basic Arabic Culture', '1 day'),
+  ('BNC', 'Basic Networking Course', '1 day'),
+  ('BMT', 'Banksman Training', '2 days'),
+  ('BBSC', 'Behavioral Based Safety Course', '2 days'),
+  ('BRM', 'Bridge Resources Management', '3 days'),
+  ('BRM-BTM', 'BRM with BTM', '5 days'),
+  ('RBTMBRM', 'Refresher for BRM and BTM', '3 days'),
+  ('BS', 'Banksman and Slinging', '2 days'),
+  ('BTM', 'Bridge Team Management', '2 days'),
+  ('BULKFAM', 'Bulk Carrier Familiarization and Safety', '2 days'),
+  ('BCAF', 'Bunkering Calculation and Familiarization', '3 days'),
+  ('CA', 'Collision Avoidance', '2 days'),
+  ('CE', 'Control Engineering', '1 day'),
+  ('CFC', 'Classification Familiarization Course', '2 days'),
+  ('CHCC', 'Cargo Handling and Care of Cargo', '5 days'),
+  ('CSA', 'Cyber Security Awareness', '1 day'),
+  ('CSF', 'Container Ship Familiarization', 'To be confirmed'),
+  ('CST', 'Crane Safety Training', '1 day'),
+  ('COC', 'Crane Operation Course', '2 days'),
+  ('COW', 'Crude Oil Washing System', '1 day'),
+  ('DCST', 'Deck Crane Safety Training', '2 days'),
+  ('DMA', 'Deck Machinery Awareness', '1 day'),
+  ('ECDIS', 'Operational Use of Electronic Chart, Display and Information System', '5 days'),
+  ('EPS', 'Electro Pneumatic System', '1 day'),
+  ('ESE', 'Enclosed Space Entry', '1 day'),
+  ('EMS', 'Environmental Management System', '1 day'),
+  ('ERTM', 'Engine Room Team Management', '3 days'),
+  ('ERRM', 'Engine Room Resource Management', '2 days'),
+  ('FRAMO', 'FRAMO Pump', '3 days'),
+  ('HAZMAT', 'Dangerous, Hazardous and Harmful Cargoes (HAZMAT)', '4 days'),
+  ('HAZMAT-CFR', 'HAZMAT with CFR', '2 days'),
+  ('HAZID', 'Hazard Identification', '1 day'),
+  ('HVT', 'High Voltage Training', '2 days'),
+  ('HPT', 'Hydraulic and Pneumatic Training', '1 day'),
+  ('H2S', 'Hydrogen Sulfide Awareness', '1 day'),
+  ('HSBAT', 'Hydrogen Sulfide Basic Awareness Training', '2 days'),
+  ('INCI', 'Incident Investigation', '1 day'),
+  ('IHM', 'Inventory of Hazardous Materials', '1 day'),
+  ('ISM', 'FRAMO Pump', '1 day'),
+  ('IP', 'Injury Prevention', '1 day'),
+  ('LCBOCT', 'Liquid Cargo and Ballast Operations for Chemical Tankers', '1 day'),
+  ('LMT', 'Leadership and Management Training', '1 day'),
+  ('LSC', 'Low Sulfur', '1 day'),
+  ('LSHB', 'Leadership and Human Behavior', '1 day'),
+  ('LT', 'Leadership and Teamwork', '1 day'),
+  ('MAEN', 'Maritime English', '1 day'),
+  ('MEA', 'Marine Environmental Awareness', '1 day'),
+  ('MARPOL', 'Consolidated MARPOL Annex I-VI', '3 days'),
+  ('MEFAR', 'Medical First Aid - Refresher', '1 day'),
+  ('MECAR', 'Medical Care - Refresher', '2 days'),
+  ('MHA', 'Mental Health Awareness', '2 days'),
+  ('MOSHA', 'Marine Occupational Safety and Health Awareness', '1 day'),
+  ('MLA', 'Maritime Law Awareness', '1 day'),
+  ('MLSO', 'Maritime Law for Ship Officers', '1 day'),
+  ('MLH', 'Marine Leadership and Human Behavior', '1 day'),
+  ('MP', 'Marine Positioning', '2 days'),
+  ('OPA', 'Oil Pollution Act', '2 days'),
+  ('OPESLOG', 'Orientation on Proper Entries on Ships'' Logbooks', '1 day'),
+  ('ORB', 'Oil Record Book', '1 day'),
+  ('PAMA', 'Paint Maintenance', '1 day'),
+  ('PADAMS', 'Prevention of Alcohol and Drug Abuse in the Maritime Sector', '2 days'),
+  ('PDS', 'Practical Deck Skill', '2 days'),
+  ('PP', 'Passage Planning', '2 days'),
+  ('PEVF', 'Personal Effectiveness and Values Formation', '2 days'),
+  ('PSA', 'Personal Safety Awareness', '1 day'),
+  ('PSC', 'Port State Control', '2 days'),
+  ('PPE', 'Personal Protective Equipment', '1 day'),
+  ('PAP', 'Preparation of Arrival in Port', '2 days'),
+  ('RNRPUA', 'Radar Navigation, Radar Plotting and Use of ARPA', '5 days'),
+  ('RADAROC', 'RADAR Operation Course', '3 days'),
+  ('RAM', 'Risk Assessment and Management', '1 day'),
+  ('RAC', 'Risk Assessment Course', '1 day'),
+  ('RAIA', 'Risk Assessment, Incident Investigation and Analysis', '3 days'),
+  ('RSDI', 'Rightship Inspection', '2 days'),
+  ('RCSHM', 'Refresher Course on Ship Handling and Maneuvering', '3 days'),
+  ('ROPA', 'Radar Observation and Plotting', '2 days'),
+  ('SAM', 'Stress and Anger Management', '2 days'),
+  ('SARTA', 'SART Awareness', '1 day'),
+  ('SMC', 'Stress Management Course', '1 day'),
+  ('SMO', 'Safe Mooring Operations', '1 day'),
+  ('SNCA', 'Safe Navigation and Collision Avoidance', '3 days'),
+  ('SNC', 'Safe Navigation Course', '4 days'),
+  ('SNT', 'Safe Navigation Training', '4 days'),
+  ('SSOR', 'Ship''s Security Officer - Refresher', '2 days'),
+  ('SOC', 'Safety Officer Course', '1 day'),
+  ('SSOC', 'Shipboard Safety Officer Course', '1 day'),
+  ('SOTC', 'Security Officer Training Course', '3 days'),
+  ('SOPEP', 'Shipboard Oil Pollution Emergency Plan', '3 days'),
+  ('SGS', 'Ship General Safety', '3 days'),
+  ('SHM', 'Ship Handling and Maneuvering', '5 days'),
+  ('SDC', 'Smoke Diving Course', '1 day'),
+  ('SVI', 'SIRE and Vetting Inspection', '2 days'),
+  ('TANKFAM', 'Tanker Familiarization and Safety', '2 days'),
+  ('TAS', 'Trim and Stability', '3 days'),
+  ('TI', 'Tank Inspection', '1 day'),
+  ('MRC', 'Media Response Course', '1 day'),
+  ('HCIM', 'Hatch Cover Inspection and Maintenance', '3 days'),
+  ('PFRBC', 'Proficiency in Fast Rescue Boat Coxswain', '3 days'),
+  ('COLREG', 'Collision Regulations on Rules of the Road', '3 days'),
+  ('VOC', 'Volatile Organic Compound', '1 day'),
+  ('VRM', 'Vessel Resource Management', '5 days'),
+  ('VP', 'Voyage Planning', '2 days'),
+  ('VPCC', 'Voyage Planning and Chart Correction', '2 days'),
+  ('WH', 'Working at Heights', '2 days'),
+  ('BAC-CAT', 'Basic Arabic Course', '2 days'),
+  ('BFH', 'Basic Food Hygiene', '2 days'),
+  ('BNHACCP', 'Basic Nutrition with HACCP', '2 days'),
+  ('BSFM', 'Basic Shipboard Food Management', '5 days'),
+  ('CHSM', 'Catering Health and Safety Management', '2 days'),
+  ('CM', 'Catering Management', '5 days'),
+  ('CCTC', 'Consumption Control Training Course', '3 days'),
+  ('FCM', 'Food and Catering Management', '5 days'),
+  ('FH', 'Food Hygiene', '2 days'),
+  ('FH-HACCP', 'Food Hygiene with HACCP', '2 days'),
+  ('FHS', 'Food Hygiene and Sanitation', '2 days'),
+  ('FSH', 'Food Safety and Hygiene', '2 days'),
+  ('FST', 'Food Safety Training', '2 days'),
+  ('GAC', 'Galley Awareness Course', '2 days'),
+  ('GAH', 'Galley Affairs and Housekeeping', '2 days'),
+  ('GHFS', 'Galley Hygiene and Food Sanitation', '2 days'),
+  ('GHH', 'Galley Hygiene with HACCP', '2 days'),
+  ('GHC', 'Good Housekeeping Course', '2 days'),
+  ('GPM', 'Galley (Provision) Management', '2 days'),
+  ('HACCP', 'Hazard Analysis and Critical Control Points', '1 day'),
+  ('HUPH', 'HACCP and United States Public Health', '2 days'),
+  ('MSC', 'Messman/Steward Course', '2 days'),
+  ('PHS', 'Public Health and Sanitation', '2 days'),
+  ('SC', 'Shipboard Culinary', '3 days'),
+  ('SCCM', 'Shipboard Culinary and Catering Management', '5 days'),
+  ('SFH', 'Safe Food Handling', '2 days'),
+  ('SV', 'Shipboard Victualling', '2 days');
+
+-- What changes (shown before the update is applied)
+select c.code, c.name as current_name, o.name as official_name, c.duration_label as current_duration, o.duration_label as official_duration
+from public.courses c join official_courses o on o.code = c.code
+where c.delivery_type = 'In-House' and (c.name is distinct from o.name or c.duration_label is distinct from o.duration_label)
+order by c.code;
+
+with changed as (
+  update public.courses c set name = o.name, duration_label = o.duration_label, updated_at = now()
+  from official_courses o
+  where o.code = c.code and c.delivery_type = 'In-House' and (c.name is distinct from o.name or c.duration_label is distinct from o.duration_label)
+  returning c.id, c.code, c.name, c.duration_label
+)
+insert into public.audit_logs(actor_id, actor_role, action, record_type, record_id, new_values)
+select null, 'system', 'course.renamed_to_catalog', 'course', id::text, jsonb_build_object('code', code, 'name', name, 'duration_label', duration_label) from changed;
+
+-- Check: the five STCW courses on the website now carry their official names.
+select code, name, duration_label from public.courses
+where delivery_type = 'In-House' and code in ('UBT-PSSR', 'STPPDSPPS', 'PSCMT', 'PSCMHBT', 'CCMD')
+order by code;
+
+commit;
