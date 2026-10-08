@@ -28,7 +28,7 @@ const nav = [
   ["Home", "/"],
   ["About", "/about"],
   ["Courses", "/courses"],
-  ["Trainee status", "/registration-search"],
+  ["Trainee Status", "/registration-search"],
   ["Contact", "/contact"],
 ] as const;
 
@@ -205,15 +205,15 @@ function Footer() {
         <strong>Explore</strong>
         <Link href="/about">About New Wave</Link>
         <Link href="/courses">Courses</Link>
-        <Link href="/register">Enrollment form</Link>
-        <Link href="/registration-search">Trainee status &amp; certificate check</Link>
-        <Link href="/certificate-delivery">Certificate delivery</Link>
+        <Link href="/register">Enrollment Form</Link>
+        <Link href="/registration-search">Trainee Status</Link>
+        <Link href="/certificate-delivery">Certificate Delivery</Link>
       </div>
       <div>
         <strong>Access</strong>
-        <Link href="/staff-login">Authorized staff</Link>
-        <Link href="/contact">Contact us</Link>
-        <Link href="/privacy">Data privacy notice</Link>
+        <Link href="/staff-login">Authorized Staff</Link>
+        <Link href="/contact">Contact Us</Link>
+        <Link href="/privacy">Data Privacy Notice</Link>
       </div>
       <div className="footer-status">
         <span className="status-dot" />
