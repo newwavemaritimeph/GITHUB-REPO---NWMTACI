@@ -6717,3 +6717,42 @@ a[href^="mailto:"],
 .ts-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
 .ts-due{color:#b42318;font-weight:600}.ts-ready{color:#15803d;font-weight:600}
 .ts-note{margin:8px 0 0;font-size:14px;color:#5f7180}
+/* Public spacing pass (owner, 8 Oct 2026): calmer rhythm on inside pages, forms, results and the footer. */
+.inside-page{padding:60px 28px 96px}
+.inside-hero{margin-bottom:40px}
+.inside-hero.compact{margin-bottom:32px}
+.inside-hero h1{margin-bottom:14px}
+.inside-hero p{max-width:66ch}
+.search-card,.contact-form,.login-card,.signin-card{padding:30px 32px}
+.search-card label{margin-bottom:18px}
+.search-card input{margin-top:8px}
+.search-card .button-block{margin-top:6px}
+.search-card > p{margin-top:16px;line-height:1.5}
+.status-tabs{margin-bottom:24px}
+.status-result{margin-top:22px;padding:26px 30px}
+.status-head{margin-bottom:6px}
+.status-result .review-list{margin-top:10px}
+.status-result .review-list > div{padding:10px 0}
+.ts-course{padding-top:18px;margin-top:18px}
+.ts-head{margin-bottom:8px}
+.ts-note{margin-top:10px}
+.status-help{margin-top:22px;text-align:center}
+.dr-layout{gap:28px;margin-top:8px}
+.dr-main{padding:28px 30px}
+.dr-tabs{margin-bottom:22px}
+.dr-form{gap:22px}
+.dr-form fieldset{gap:14px 16px}
+.dr-form legend{padding-bottom:6px}
+.dr-btn{margin-top:4px}
+.dr-btn:not(.primary):not(:disabled){background:#0571D0;color:#fff}
+.dr-side{padding:24px}
+.dr-side ol li{margin:2px 0}
+.dr-track{margin-top:22px;padding-top:20px}
+.dr-steps{margin:16px 0;gap:10px}
+.dr-pay{margin:12px 0;padding:14px 16px}
+.public-footer{gap:40px;padding-top:56px;padding-bottom:56px}
+.public-footer > div{gap:10px}
+.public-footer div > strong{margin-bottom:4px}
+.public-footer div > a{font-size:14px;line-height:1.45}
+@media (max-width:900px){.section{padding:72px 22px}.inside-page{padding:44px 20px 72px}.public-footer{grid-template-columns:1fr 1fr;gap:32px}}
+@media (max-width:560px){.section{padding:56px 16px}.inside-page{padding:32px 16px 60px}.inside-hero{margin-bottom:28px}.search-card,.contact-form,.login-card,.signin-card{padding:22px 18px}.status-result{padding:20px 18px}.dr-main{padding:20px 18px}.dr-side{padding:20px}.public-footer{grid-template-columns:1fr;gap:26px;padding:40px 18px}}
