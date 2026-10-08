@@ -9,28 +9,34 @@
  *        PORTAL_SECRET = (the same text as EVALUATION_WEBHOOK_SECRET in Vercel)
  *   4. Choose the function "setup" at the top and press Run. Allow the permissions Google asks for.
  *
- * Google allows only 20 triggers per script, so instead of one trigger per form a single
- * trigger checks every form whose title contains "EVALUATION" every 5 minutes and sends
- * the new submissions. New evaluation forms are picked up automatically.
+ * Google allows only 20 triggers per script, so one trigger runs every 10 minutes. It opens
+ * only the evaluation forms changed since the last run (a new response changes the form),
+ * plus every evaluation form once every 6 hours as a safety net, which keeps it inside
+ * Google's daily script time. A new form whose title contains "EVALUATION" is picked up
+ * automatically on its own — nothing to set up.
  * Only the fact that the trainee submitted (and who) is sent; the answers stay in Google Forms.
  * The portal works out the course from the form's title (e.g. "... - HPT-Hydraulic ...").
  */
 function setup() {
   ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('checkEvaluations').timeBased().everyMinutes(5).create();
+  ScriptApp.newTrigger('checkEvaluations').timeBased().everyMinutes(10).create();
   var props = PropertiesService.getScriptProperties();
   var now = new Date().toISOString();
-  var forms = evaluationForms();
+  var forms = evaluationForms(null);
   forms.forEach(function (form) {
     try { form.setCollectEmail(true); } catch (err) { console.log('Email setting not changed for ' + form.getTitle() + ': ' + err); }
     // Start from now: earlier submissions are not sent.
     if (!props.getProperty('since_' + form.getId())) props.setProperty('since_' + form.getId(), now);
   });
-  console.log('Watching ' + forms.length + ' evaluation forms every 5 minutes:\n' + forms.map(function (f) { return f.getTitle(); }).join('\n'));
+  props.setProperty('lastRun', now);
+  props.setProperty('lastFull', now);
+  console.log('Watching ' + forms.length + ' evaluation forms:\n' + forms.map(function (f) { return f.getTitle(); }).join('\n'));
 }
 
-function evaluationForms() {
-  var files = DriveApp.searchFiles('mimeType = "application/vnd.google-apps.form" and title contains "EVALUATION" and trashed = false');
+function evaluationForms(changedSince) {
+  var q = 'mimeType = "application/vnd.google-apps.form" and title contains "EVALUATION" and trashed = false';
+  if (changedSince) q += ' and modifiedDate > "' + changedSince + '"';
+  var files = DriveApp.searchFiles(q);
   var forms = [];
   while (files.hasNext()) {
     try { forms.push(FormApp.openById(files.next().getId())); } catch (err) { console.log(err); }
@@ -41,10 +47,20 @@ function evaluationForms() {
 function checkEvaluations() {
   var props = PropertiesService.getScriptProperties();
   var now = new Date().toISOString();
-  evaluationForms().forEach(function (form) {
+  var lastFull = props.getProperty('lastFull');
+  var full = !lastFull || Date.now() - new Date(lastFull).getTime() > 6 * 3600 * 1000;
+  // Look back 15 minutes before the last run so nothing falls between two runs.
+  var lastRun = props.getProperty('lastRun');
+  var changedSince = lastRun ? new Date(new Date(lastRun).getTime() - 15 * 60 * 1000).toISOString().slice(0, 19) : null;
+  evaluationForms(full ? null : changedSince).forEach(function (form) {
     var key = 'since_' + form.getId();
     var since = props.getProperty(key);
-    if (!since) { props.setProperty(key, now); return; } // a new form: start from now
+    if (!since) {
+      // A form added after setup: turn on email collection and start from now.
+      try { form.setCollectEmail(true); } catch (err) { console.log(err); }
+      props.setProperty(key, now);
+      return;
+    }
     var latest = since;
     form.getResponses(new Date(since)).forEach(function (response) {
       var ts = response.getTimestamp().toISOString();
@@ -53,6 +69,8 @@ function checkEvaluations() {
     });
     props.setProperty(key, latest);
   });
+  props.setProperty('lastRun', now);
+  if (full) props.setProperty('lastFull', now);
 }
 
 function send(form, response) {
