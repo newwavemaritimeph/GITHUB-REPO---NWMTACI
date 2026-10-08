@@ -13,6 +13,8 @@ import { activeConnection, googleConfigured, hasDriveScope, inviteStudent, listC
 import { sendBalanceSummary } from "@/lib/balance-summary";
 import { RULED_REQUESTS, requestFee } from "@/lib/request-fees";
 import { applyReferralRebates, suggestReferralCode } from "@/lib/referral";
+import { certificateContext, claimCertificateNumber, downloadDriveFile, ensureCertificate, trySendSoftCopy } from "@/lib/certificates";
+import { driveFileId, googleFormId } from "@/lib/certificate-rules";
 
 const manilaDate = (d = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(d);
 
@@ -119,6 +121,13 @@ const certificateReleasePlanInput = z.object({ action: z.literal("certificate-re
 // Certificate correction workflow (wrong spelling, wrong date, reprint needed).
 const certificateIssueInput2 = z.object({ action: z.literal("certificate-issue-report"), enrollmentId: z.string().uuid(), issueStatus: z.enum(["For Correction", "Resolved"]), note: z.string().trim().max(300).optional() });
 const certificateOverrideInput = z.object({ action: z.literal("certificate-override"), enrollmentId: z.string().uuid(), certificateNumber: z.string().trim().max(80).optional(), overrides: z.record(z.string(), z.string()).optional() });
+// Certificate controls (owner, 8 Oct 2026; migration 202610080030).
+const certificateSeriesInput = z.object({ action: z.literal("certificate-series-save"), courseId: z.string().uuid(), prefix: z.string().trim().max(30), nextNumber: z.number().int().min(1).max(99999999), pad: z.number().int().min(1).max(10), batchPrefix: z.string().trim().max(30), nextBatch: z.number().int().min(1).max(999999) });
+const certificateVoidRequestInput = z.object({ action: z.literal("certificate-void-request"), enrollmentId: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
+const certificateVoidDecideInput = z.object({ action: z.literal("certificate-void-decide"), enrollmentId: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(300).optional() });
+const certificateTemplateLinkInput = z.object({ action: z.literal("certificate-template-link"), courseId: z.string().uuid(), driveLink: z.string().trim().min(10).max(500) });
+const evaluationFormInput = z.object({ action: z.literal("course-evaluation-form-save"), courseId: z.string().uuid(), formLink: z.string().trim().max(500) });
+const certificateSoftCopyInput = z.object({ action: z.literal("certificate-soft-copy"), enrollmentId: z.string().uuid() });
 const certificateIssuanceToggleInput = z.object({ action: z.literal("certificate-issuance-toggle"), enabled: z.boolean() });
 const feedbackSendEmailInput = z.object({ action: z.literal("feedback-send-email"), enrollmentId: z.string().uuid() });
 
@@ -196,7 +205,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -206,6 +215,7 @@ const canManageHr = (roles: string[]) => roles.some((role) => ["admin", "hr"].in
 const canManageEmployeeCharges = (roles: string[]) => roles.some((role) => ["admin", "accounting", "hr"].includes(role));
 const canManageTraining = (roles: string[]) => roles.some((role) => ["admin", "training_operations"].includes(role));
 const canRelease = (roles: string[]) => roles.some((role) => ["admin", "releasing_officer"].includes(role));
+const isAdminRole = (roles: string[]) => roles.some((role) => ["admin", "super_admin"].includes(role));
 const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
 const minutesOfDay = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
@@ -280,9 +290,15 @@ async function applyApprovedRequest(admin: ReturnType<typeof createSupabaseAdmin
       const { error } = await admin.from("make_up_assignments").insert({ enrollment_id: req.enrollment_id, status: "Pending", assigned_by: actor });
       if (error) console.error("Make-up assignment insert failed (apply migration 202608020003):", error.message);
     } else if (req.request_type === "Reprinting") {
-      // Bump the certificate's reprint count so the reprint is tracked; best-effort (no cert yet is fine).
+      // A paid Reprinting request allows one more print of the same certificate (owner, 8 Oct 2026).
       const { data: cert } = await admin.from("certificates").select("id,reprint_count").eq("enrollment_id", req.enrollment_id).maybeSingle();
-      if (cert) await admin.from("certificates").update({ reprint_count: Number(cert.reprint_count ?? 0) + 1, status: "Printed" }).eq("id", cert.id);
+      if (!cert) throw new RequestNotApplicable("No certificate has been printed for this enrollment yet.");
+      const { data: allowed } = await admin.from("certificates").select("reprints_allowed").eq("id", cert.id).maybeSingle();
+      const patch: Record<string, unknown> = { reprint_count: Number(cert.reprint_count ?? 0) + 1 };
+      if (allowed) patch.reprints_allowed = Number((allowed as { reprints_allowed?: number }).reprints_allowed ?? 0) + 1;
+      const { error: reprintError } = await admin.from("certificates").update(patch).eq("id", cert.id);
+      if (reprintError) throw reprintError;
+      await admin.from("certificate_release_events").insert({ certificate_id: cert.id, event_type: "reprint", released_by: actor, reason: "Paid reprinting request" });
     } else if (req.request_type === "TAR reprint") {
       // One more print of the newest admission record that covers this enrollment.
       const { data: record, error: recordError } = await admin.from("admission_records").select("id,reprints_approved").contains("enrollment_ids", [req.enrollment_id]).order("issued_at", { ascending: false }).limit(1).maybeSingle();
@@ -553,7 +569,8 @@ export async function GET() {
   })();
 
   const certificateUnit = (async () => {
-    if (!seesCertificates) return { certificates: [] as unknown[], templates: [] as unknown[], releases: [] as unknown[], issuanceEnabled: false };
+    const empty = { certificates: [] as unknown[], templates: [] as unknown[], releases: [] as unknown[], issuanceEnabled: false, series: [] as unknown[], evaluationForms: {} as Record<string, string>, feedbackAt: {} as Record<string, string> };
+    if (!seesCertificates) return empty;
     const [base, extra, tpls, rel, settings] = await Promise.all([
       db.from("certificates").select("id,enrollment_id,status,printed_at,printed_by,reprint_count,snapshot,number_pool_id,template_id,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name,code))").order("created_at", { ascending: false }).limit(300),
       // Release/courier/correction fields ship in a later migration — merge tolerantly
@@ -566,12 +583,26 @@ export async function GET() {
       // Certificate issuance safety flag (admin-toggleable; read via service role).
       db.from("organization_settings").select("certificate_issuance_enabled").maybeSingle(),
     ]);
+    // Certificate controls (migration 202610080030): numbering, print counts, voids, Drive templates and
+    // Google Forms evaluations. Each read is separate so a database without the update still loads.
+    const [controls, series, tplLinks, forms, fbDates] = await Promise.all([
+      db.from("certificates").select("id,certificate_number,batch_label,print_count,reprints_allowed,soft_copy_sent_at,void_status,void_reason,void_requested_at,void_remarks").order("created_at", { ascending: false }).limit(300),
+      db.from("certificate_series").select("course_id,prefix,next_number,pad,batch_prefix,next_batch,set_at,profiles:set_by(complete_name)"),
+      db.from("certificate_templates").select("id,drive_link").order("created_at", { ascending: false }).limit(200),
+      db.from("courses").select("id,evaluation_form_id").not("evaluation_form_id", "is", null),
+      db.from("training_feedback").select("enrollment_id,submitted_at").order("submitted_at", { ascending: false }).limit(2000),
+    ]);
     let certificates = (base.data ?? []) as { id: string }[];
-    if (extra.data?.length) {
-      const byId = new Map((extra.data as { id: string }[]).map((r) => [r.id, r]));
+    for (const merge of [extra.data, controls.data]) {
+      if (!merge?.length) continue;
+      const byId = new Map((merge as { id: string }[]).map((r) => [r.id, r]));
       certificates = certificates.map((c) => ({ ...c, ...(byId.get(c.id) ?? {}) }));
     }
-    return { certificates: certificates as unknown[], templates: tpls.data ?? [], releases: rel.data ?? [], issuanceEnabled: Boolean(settings.data?.certificate_issuance_enabled) };
+    const linkById = new Map(((tplLinks.data ?? []) as { id: string; drive_link: string | null }[]).map((r) => [r.id, r.drive_link]));
+    const templates = ((tpls.data ?? []) as { id: string }[]).map((t) => ({ ...t, drive_link: linkById.get(t.id) ?? null }));
+    const evaluationForms = Object.fromEntries(((forms.data ?? []) as { id: string; evaluation_form_id: string }[]).map((r) => [r.id, r.evaluation_form_id]));
+    const feedbackAt = Object.fromEntries(((fbDates.data ?? []) as { enrollment_id: string; submitted_at: string }[]).map((r) => [r.enrollment_id, r.submitted_at]));
+    return { certificates: certificates as unknown[], templates, releases: rel.data ?? [], issuanceEnabled: Boolean(settings.data?.certificate_issuance_enabled), series: series.data ?? [], evaluationForms, feedbackAt };
   })();
 
   // Non-discount charges awaiting the Accounting Manager approval queue.
@@ -901,7 +932,7 @@ export async function GET() {
     paymentMethods: paymentMethodsWithKind, charges: (charges.data ?? []).map((c) => ({ ...c, kind: chargeKinds.get((c as { id: string }).id) ?? "fee" })), agencies: agencies.data ?? [],
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
-    classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
+    classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
     agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -1463,55 +1494,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, certificate: data });
     }
     if (input.action === "certificate-issue") {
+      // Numbers come only from the Admin's series; the PDF route also assigns one at the first preview.
       if (!canRelease(staff.roleCodes)) return NextResponse.json({ error: "Only Admin or the Releasing Officer can issue certificates." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      const { data: enrollment } = await admin.from("enrollments").select("id,course_id,courses(name,code,delivery_type),trainees(legal_first_name,legal_middle_name,legal_last_name)").eq("id", input.enrollmentId).maybeSingle();
-      if (!enrollment) throw new Error("Enrollment not found.");
-      const course = first(enrollment.courses) as { name?: string; code?: string; delivery_type?: string } | null;
-      if (course?.delivery_type !== "In-House") return NextResponse.json({ error: "Certificates are issued for In-House courses only." }, { status: 400 });
-      const { data: settings } = await admin.from("organization_settings").select("certificate_issuance_enabled").maybeSingle();
-      if (!settings?.certificate_issuance_enabled) return NextResponse.json({ error: "Certificate issuance is disabled. An admin must enable it in organization settings before certificates can be issued." }, { status: 400 });
-      const { data: tpl } = await admin.from("certificate_templates").select("id").eq("course_id", enrollment.course_id).eq("active", true).not("approved_at", "is", null).order("version", { ascending: false }).limit(1).maybeSingle();
-      if (!tpl) return NextResponse.json({ error: "Upload and approve an active certificate template for this course first." }, { status: 400 });
-      let certNumber = input.certificateNumber?.trim();
-      if (!certNumber) { const { data: ref, error: refErr } = await db.rpc("next_reference", { prefix: "CERT" }); if (refErr) throw refErr; certNumber = String(ref); }
-      const t = first(enrollment.trainees) as { legal_first_name?: string; legal_middle_name?: string | null; legal_last_name?: string } | null;
-      const defaultName = t ? [t.legal_first_name, t.legal_middle_name, t.legal_last_name].filter(Boolean).join(" ") : "";
-      const overrides = { name: defaultName, course_title: course?.name ?? "", ...(input.overrides ?? {}) };
-      const { data: existing } = await admin.from("certificates").select("id,snapshot").eq("enrollment_id", input.enrollmentId).maybeSingle();
-      const snapshot = { ...((existing?.snapshot as Record<string, unknown>) ?? {}), certificate_number: certNumber, overrides, template_id: tpl.id, issued_at: new Date().toISOString() };
-      if (existing) { const { error } = await admin.from("certificates").update({ template_id: tpl.id, snapshot, status: "Ready to Print" }).eq("id", existing.id); if (error) throw error; }
-      else { const { error } = await admin.from("certificates").insert({ enrollment_id: input.enrollmentId, template_id: tpl.id, snapshot, status: "Ready to Print" }); if (error) throw error; }
-      return NextResponse.json({ ok: true, certificateNumber: certNumber });
+      const ctx = await certificateContext(admin, input.enrollmentId);
+      if (!ctx) throw new Error("Enrollment not found.");
+      if (!["Due", "Printed", "Released"].includes(ctx.view.state)) return NextResponse.json({ error: `Not yet: ${ctx.view.state.toLowerCase()}.` }, { status: 400 });
+      const certId = await ensureCertificate(admin, ctx);
+      const certificateNumber = ctx.cert?.certificate_number ?? await claimCertificateNumber(admin, certId, staff.user.id);
+      return NextResponse.json({ ok: true, certificateNumber });
     }
     if (input.action === "certificate-print") {
-      if (!canRelease(staff.roleCodes)) return NextResponse.json({ error: "Only Admin or the Releasing Officer can print certificates." }, { status: 403 });
-      const admin = createSupabaseAdminClient();
-      const { data: cert } = await admin.from("certificates").select("id,status,reprint_count").eq("enrollment_id", input.enrollmentId).maybeSingle();
-      if (!cert) return NextResponse.json({ error: "Issue the certificate (assign a number) before printing." }, { status: 400 });
-      // Reprint path: already printed once — logged, no feedback re-check (feedback was required at first print).
-      if (cert.status === "Printed" || cert.status === "Released") {
-        if (!input.reprint) return NextResponse.json({ error: "This certificate was already printed. Choose Reprint (logged) or Void to re-issue." }, { status: 400 });
-        const { error } = await admin.from("certificates").update({ reprint_count: Number(cert.reprint_count ?? 0) + 1 }).eq("id", cert.id);
-        if (error) throw error;
-        await admin.from("certificate_release_events").insert({ certificate_id: cert.id, event_type: "reprint", released_by: staff.user.id, reason: "Reprint" });
-        return NextResponse.json({ ok: true, reprint: true });
-      }
-      // First print: issuance must be enabled, and In-House requires the trainee's submitted feedback.
-      const { data: settings } = await admin.from("organization_settings").select("certificate_issuance_enabled").maybeSingle();
-      if (!settings?.certificate_issuance_enabled) return NextResponse.json({ error: "Certificate issuance is disabled. An admin must enable it before certificates can be printed." }, { status: 400 });
-      const { data: enr } = await admin.from("enrollments").select("id,courses(delivery_type)").eq("id", input.enrollmentId).maybeSingle();
-      if ((first(enr?.courses) as { delivery_type?: string } | null)?.delivery_type === "In-House") {
-        // Tolerant of the pre-migration state: only enforce when the training_feedback table exists.
-        const { data: fb, error: fbErr } = await admin.from("training_feedback").select("id").eq("enrollment_id", input.enrollmentId).maybeSingle();
-        if (!fbErr && !fb) return NextResponse.json({ error: "The trainee must submit the feedback form (online-training attendance) before this certificate can be printed." }, { status: 400 });
-      }
-      const { error } = await db.rpc("set_certificate_status", { target_enrollment: input.enrollmentId, target_status: "Printed" });
-      if (error) throw error;
-      return NextResponse.json({ ok: true });
+      // Printing goes through the certificate PDF (/api/documents/certificate/[id]), which counts each print.
+      return NextResponse.json({ error: "Use Print in the certificate log. Each print is counted there." }, { status: 400 });
     }
     if (input.action === "certificate-void") {
-      if (!canRelease(staff.roleCodes)) return NextResponse.json({ error: "Only Admin or the Releasing Officer can void certificates." }, { status: 403 });
+      // A direct void (cancel the certificate) is for the Admin; the Releasing Officer requests one.
+      if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin can void a certificate. Use Request void." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { data: cert } = await admin.from("certificates").select("id,number_pool_id").eq("enrollment_id", input.enrollmentId).maybeSingle();
       if (!cert) return NextResponse.json({ error: "No certificate to void." }, { status: 400 });
@@ -1520,6 +1519,77 @@ export async function POST(request: Request) {
       if (cert.number_pool_id) await admin.from("certificate_number_pool").update({ state: "Voided", voided_at: new Date().toISOString() }).eq("id", cert.number_pool_id);
       await admin.from("certificate_release_events").insert({ certificate_id: cert.id, event_type: "void", released_by: staff.user.id, reason: input.reason ?? "Voided" });
       return NextResponse.json({ ok: true });
+    }
+    if (input.action === "certificate-void-request") {
+      if (!canRelease(staff.roleCodes)) return NextResponse.json({ error: "Only the Releasing Officer or Admin can request a void." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: cert, error: certError } = await admin.from("certificates").select("id,print_count,void_status").eq("enrollment_id", input.enrollmentId).maybeSingle();
+      if (certError) return NextResponse.json({ error: "Apply database update 202610080030 first." }, { status: 400 });
+      if (!cert || !Number(cert.print_count)) return NextResponse.json({ error: "Only a printed certificate can be voided for reprinting." }, { status: 400 });
+      if (cert.void_status === "Requested") return NextResponse.json({ error: "A void request is already waiting for the Admin." }, { status: 400 });
+      const { error } = await admin.from("certificates").update({ void_status: "Requested", void_reason: input.reason, void_requested_by: staff.user.id, void_requested_at: new Date().toISOString(), void_decided_by: null, void_decided_at: null, void_remarks: null }).eq("id", cert.id);
+      if (error) throw error;
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "releasing_officer", action: "certificate.void_requested", record_type: "certificate", record_id: cert.id, new_values: { reason: input.reason } });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "certificate-void-decide") {
+      if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin can decide void requests." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: cert } = await admin.from("certificates").select("id,void_status,reprints_allowed,certificate_number").eq("enrollment_id", input.enrollmentId).maybeSingle();
+      if (!cert || cert.void_status !== "Requested") return NextResponse.json({ error: "No void request is waiting." }, { status: 400 });
+      if (!input.approve && !input.remarks) return NextResponse.json({ error: "Add a reason for rejecting." }, { status: 400 });
+      const patch: Record<string, unknown> = { void_status: input.approve ? "Approved" : "Rejected", void_decided_by: staff.user.id, void_decided_at: new Date().toISOString(), void_remarks: input.remarks ?? null };
+      if (input.approve) patch.reprints_allowed = Number(cert.reprints_allowed ?? 0) + 1;
+      const { error } = await admin.from("certificates").update(patch).eq("id", cert.id);
+      if (error) throw error;
+      if (input.approve) await admin.from("certificate_release_events").insert({ certificate_id: cert.id, event_type: "void", released_by: staff.user.id, reason: "Void approved by the Admin; one more print allowed" });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: input.approve ? "certificate.void_approved" : "certificate.void_rejected", record_type: "certificate", record_id: cert.id, new_values: { certificate_number: cert.certificate_number, remarks: input.remarks ?? null } });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "certificate-series-save") {
+      if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin sets certificate numbering." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const row = { course_id: input.courseId, prefix: input.prefix, next_number: input.nextNumber, pad: input.pad, batch_prefix: input.batchPrefix, next_batch: input.nextBatch, set_by: staff.user.id, set_at: new Date().toISOString() };
+      const { data: prior } = await admin.from("certificate_series").select("*").eq("course_id", input.courseId).maybeSingle();
+      const { error } = await admin.from("certificate_series").upsert(row, { onConflict: "course_id" });
+      if (error) return NextResponse.json({ error: error.code === "42P01" ? "Apply database update 202610080030 first." : error.message }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: "certificate.series_set", record_type: "course", record_id: input.courseId, prior_values: prior ?? null, new_values: row });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "certificate-template-link") {
+      if (!canRelease(staff.roleCodes)) return NextResponse.json({ error: "Only the Releasing Officer or Admin can set templates." }, { status: 403 });
+      const fileId = driveFileId(input.driveLink);
+      if (!fileId) return NextResponse.json({ error: "Paste the Google Drive link of the template file." }, { status: 400 });
+      try { await downloadDriveFile(fileId); } catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : "The Drive file could not be read." }, { status: 400 }); }
+      const admin = createSupabaseAdminClient();
+      const { data: last } = await admin.from("certificate_templates").select("version").eq("course_id", input.courseId).order("version", { ascending: false }).limit(1).maybeSingle();
+      // Insert the new version first, then make it the only active one, so a failed insert never leaves the course without a template.
+      const { data: inserted, error } = await admin.from("certificate_templates").insert({ course_id: input.courseId, version: Number(last?.version ?? 0) + 1, storage_path: null, drive_link: input.driveLink, drive_file_id: fileId, active: false, approved_by: staff.user.id, approved_at: new Date().toISOString() }).select("id").single();
+      if (!error && inserted) {
+        await admin.from("certificate_templates").update({ active: false }).eq("course_id", input.courseId).neq("id", inserted.id);
+        await admin.from("certificate_templates").update({ active: true }).eq("id", inserted.id);
+      }
+      if (error) return NextResponse.json({ error: error.message.includes("drive_link") || error.message.includes("storage_path") ? "Apply database update 202610080030 first." : error.message }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "releasing_officer", action: "certificate.template_linked", record_type: "course", record_id: input.courseId, new_values: { drive_file_id: fileId } });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "course-evaluation-form-save") {
+      if (!canRelease(staff.roleCodes)) return NextResponse.json({ error: "Only the Releasing Officer or Admin can set evaluation forms." }, { status: 403 });
+      const formId = input.formLink ? googleFormId(input.formLink) : null;
+      if (input.formLink && !formId) return NextResponse.json({ error: "Paste the Google Form's edit link (docs.google.com/forms/d/…)." }, { status: 400 });
+      const admin = createSupabaseAdminClient();
+      const { error } = await admin.from("courses").update({ evaluation_form_id: formId }).eq("id", input.courseId);
+      if (error) return NextResponse.json({ error: "Apply database update 202610080030 first." }, { status: 400 });
+      return NextResponse.json({ ok: true, formId });
+    }
+    if (input.action === "certificate-soft-copy") {
+      if (!canRelease(staff.roleCodes)) return NextResponse.json({ error: "Only the Releasing Officer or Admin can email soft copies." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const soft = await trySendSoftCopy(admin, input.enrollmentId, { force: true, actor: staff.user.id });
+      if (soft.state === "Failed") return NextResponse.json({ error: soft.error }, { status: 400 });
+      if (soft.state !== "Queued") return NextResponse.json({ error: "The certificate is not ready, printing is turned off, or the trainee has no email." }, { status: 400 });
+      if (soft.jobId) await processEmailJobs(admin, { ids: [soft.jobId], origin: new URL(request.url).origin }).catch(() => undefined);
+      return NextResponse.json({ ok: true, to: soft.to });
     }
     if (input.action === "certificate-release-plan") {
       if (!canRelease(staff.roleCodes)) return NextResponse.json({ error: "Only Admin or the Releasing Officer can plan a release." }, { status: 403 });

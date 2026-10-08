@@ -148,7 +148,7 @@ export function ReleasingDashboard({ data, reload }: { data: ReleasingData; relo
 }
 
 /** Release confirmation: records who claimed it, the checks performed, and courier details. */
-function ReleaseConfirm({ target, onClose, onDone }: { target: { enrollmentId: string; name: string; course: string; certNo: string }; onClose: () => void; onDone: () => Promise<void> }) {
+export function ReleaseConfirm({ target, onClose, onDone }: { target: { enrollmentId: string; name: string; course: string; certNo: string }; onClose: () => void; onDone: () => Promise<void> }) {
   const [method, setMethod] = useState<"Pickup" | "Representative" | "Courier">("Pickup");
   const [name, setName] = useState(target.name), [rel, setRel] = useState(""), [idType, setIdType] = useState("");
   const [idOk, setIdOk] = useState(false), [spaOk, setSpaOk] = useState(false);

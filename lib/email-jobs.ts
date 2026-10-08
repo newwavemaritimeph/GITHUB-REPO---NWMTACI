@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { escapeHtml } from "@/lib/classroom";
 import { buildTrainingInstructionsPdf, loadInstructionDetails } from "@/lib/training-instructions";
+import { buildCertificatePdf, certificateContext } from "@/lib/certificates";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 type EmailJob = { id: string; template_code: string; recipient: string; variables: Record<string, unknown> | null; attempts: number | null };
@@ -53,6 +54,12 @@ export async function processEmailJobs(db: Admin, options: { limit?: number; ids
       if (typeof variables.attach_instructions_for === "string") {
         const details = await loadInstructionDetails(db, variables.attach_instructions_for);
         if (details) attachments.push({ filename: `training-instructions-${details.enrollmentNumber}.pdf`, content: Buffer.from(await buildTrainingInstructionsPdf(details, options.origin)) });
+      }
+      // Certificate soft copy (owner, 8 Oct 2026): the electronic copy of the trainee's certificate.
+      if (typeof variables.attach_certificate_for === "string") {
+        const ctx = await certificateContext(db, variables.attach_certificate_for);
+        if (!ctx) throw new Error("Certificate not found for the soft copy.");
+        attachments.push({ filename: `certificate-${ctx.cert?.certificate_number ?? ctx.enrollment.enrollment_number}.pdf`, content: Buffer.from(await buildCertificatePdf(db, ctx, "soft")) });
       }
       const response = await resend.emails.send({
         from: process.env.EMAIL_FROM!,
