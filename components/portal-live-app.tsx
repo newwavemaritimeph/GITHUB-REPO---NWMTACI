@@ -21,7 +21,7 @@ import { classroomJoin } from "@/lib/classroom";
 import { ClassroomPanel } from "./portal/classroom-panel";
 import { TraineeRequestModal, type RequestType } from "./portal/payment-actions";
 import { RejectInline } from "./portal/reject-inline";
-import { AccountingHome, AccountingApprovals, AccountingReports, AccountingPayments, AccountingExpenses } from "./portal/accounting-home";
+import { AccountingHome, AccountingApprovals, AccountingReports, AccountingPayments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, pesos2, first, dueCentavos, balanceOf, isUnpaid, manilaToday, addDays } from "@/lib/portal-format";
@@ -308,6 +308,9 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Reports")return <AccountingReports/>;
     if(active==="Payments")return <AccountingPayments/>;
     if(active==="Expenses")return <AccountingExpenses data={data}/>;
+    if(active==="Receivables")return <AccountingReceivables data={data}/>;
+    if(active==="Payables")return <AccountingPayables data={data} reload={reload}/>;
+    if(active==="Cash position")return <AccountingCashPosition data={data}/>;
   }
   if(gateRole==="cashier"){
     if(active==="Dashboard")return <CashierDashboard data={data} onPay={onPay} reload={reload}/>;

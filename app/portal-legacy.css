@@ -1843,3 +1843,11 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .ac-crow label{cursor:pointer;min-width:0}.portal-shell .ac-crow small{display:block;color:#5f7180;font-size:13.5px}
 .portal-shell .ac-clear{margin:12px 20px 4px;color:var(--nw-muted);font-size:14px}.portal-shell .ac-clear b{color:#15803d}
 @media (max-width:640px){.portal-shell .ac-crow{grid-template-columns:24px minmax(0,1fr)}.portal-shell .ac-crow>.cx-amt,.portal-shell .ac-crow>.cx-acts,.portal-shell .ac-crow>.ac-rejlabel{grid-column:2}}
+/* Transactions sub-tabs, summary rail (8 Oct 2026) */
+.portal-shell button.cx-tile.ac-pick{width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;background:var(--nw-surface)}
+.portal-shell button.cx-tile.ac-pick:hover{background:#f4f8fb}
+.portal-shell button.cx-tile.ac-pick.on{background:#e2effb}
+.portal-shell .ac-bar{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 12px}.portal-shell .ac-bar .vx-search{flex:1;min-width:180px}
+.portal-shell .ac-bar select{font:inherit;padding:8px 12px;border:1px solid var(--nw-line);border-radius:9px;background:var(--nw-surface);color:var(--nw-fg)}
+.portal-shell .ac-table tfoot td{border-top:2px solid var(--nw-fg);font-weight:600}
+.portal-shell .ac-check .ac-chipbar,.portal-shell .cx-panel>.ac-chipbar{margin-bottom:12px}
