@@ -1155,7 +1155,7 @@ export type CashierReportSnapshot = {
   position: { previousLabel: string; previousNote?: string; previousCentavos: number; cashCollectedCentavos: number; cashExpensesCentavos: number; onHandCentavos: number; countedCentavos: number | null; overShortCentavos: number | null };
   channels: string[];
   matrix: { source: string; cells: { channel: string; count: number; totalCentavos: number }[]; count: number; totalCentavos: number }[];
-  groups: { kind: string; name: string; rows: { receipt: string; time: string; trainee: string; course: string; channel: string; reference: string; amountCentavos: number }[]; subtotalCentavos: number }[];
+  groups: { kind: string; name: string; rows: { receipt: string; time: string; trainee: string; course: string; channel: string; reference: string; amountCentavos: number; proof?: boolean }[]; subtotalCentavos: number }[];
   expenses: { voucher: string; payee: string; category: string; channel: string; reference: string; status: string; amountCentavos: number }[];
   expenseTotals: { channel: string; totalCentavos: number }[];
 };

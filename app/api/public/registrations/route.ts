@@ -29,6 +29,8 @@ const registrationSchema = z.object({
   termsAccepted: z.literal("on"),
   // An agency or consultancy referral code (optional; 8 Oct 2026).
   referralCode: z.string().trim().max(40).optional().default(""),
+  // How the applicant is enrolling (8 Oct 2026); Agency needs a valid referral code.
+  enrollmentType: z.enum(["Online enrollment", "Walk-in", "Agency"]).optional().default("Online enrollment"),
 });
 // 1–5 chosen schedules (batch ids) per submission.
 // Schedules are optional: without one, Registration assigns the course and
@@ -87,7 +89,8 @@ export async function POST(request: Request) {
     const db = createSupabaseAdminClient();
     await checkCourseOrder(db, batches, dated);
     const startedAt = new Date().toISOString();
-    const referral = await agencyForCode(db, normaliseReferralCode(body.referralCode));
+    const referral = body.enrollmentType === "Agency" ? await agencyForCode(db, normaliseReferralCode(body.referralCode)) : null;
+    if (body.enrollmentType === "Agency" && !referral) throw new Error("Enter the referral code from your agency, or choose Online enrollment.");
     const { data: terms } = await db.from("terms_documents").select("version").eq("active", true).lte("effective_from", new Date().toISOString().slice(0,10)).order("effective_from", { ascending: false }).limit(1).maybeSingle();
     if (!terms) throw new Error("No approved terms are active.");
     const { data, error } = await withTimeout(db.rpc("submit_public_registration", {
@@ -100,6 +103,8 @@ export async function POST(request: Request) {
     const result = data as { application_number?:string;registration_reference:string;trainee_id:string;email:string;complete_name:string };
     for (const pick of dated) await attachDatedCourse(db, result.trainee_id, pick);
     if (referral) await tagReferral(db, result.trainee_id, referral.id, startedAt);
+    // Record the enrollment type on this submission's enrollments (shown to Registration and the Cashier).
+    await db.from("enrollments").update({ source: body.enrollmentType }).eq("trainee_id", result.trainee_id).gte("created_at", startedAt);
     // Trainees have no portal account. They follow their enrollment through the
     // public status lookup using this reference plus their registered email.
     // application_number (NWMTACI-0000001) exists once migration 202610070003 is

@@ -39,47 +39,120 @@ function useJson<T>(url: string | null) {
 
 /* ------------------------------------------------------------ approvals */
 
-type ApprovalTab = "Expenses" | "Voucher reprints" | "Discounts" | "Refunds" | "Closings";
-type Row = { id: string; title: string; detail: string; ref: string; who: string; when: string; amount: number; act: (approve: boolean) => Promise<unknown>; reviewOnly?: boolean };
+type Category = "Expense requests" | "Voucher reprints" | "Refunds" | "Discounts" | "Rebates owed to partners" | "Cashier closings";
+const CATEGORY_GROUPS: [string, Category[]][] = [["Money out", ["Expense requests", "Voucher reprints", "Refunds"]], ["Fees", ["Discounts", "Rebates owed to partners"]], ["Cash control", ["Cashier closings"]]];
+type Row = { id: string; title: string; detail: string; ref: string; who: string; when: string; amount: number; act: (approve: boolean) => Promise<unknown>; okLabel: string; canReject: boolean };
 
+/**
+ * Approvals by category (owner, 8 Oct 2026): money out (expense requests,
+ * voucher reprints, refunds), fees (discounts, rebates owed to partners) and
+ * cash control (cashier closings). Full page with a category list; on the
+ * dashboard the same lists sit under category tabs.
+ */
 export function AccountingApprovals({ data, reload, compact }: { data: PortalData; reload: () => Promise<void>; compact?: boolean }) {
   const { busy, msg, post } = usePost(reload);
-  const [tab, setTab] = useState<ApprovalTab>("Expenses");
+  const [cat, setCat] = useState<Category | "All">(compact ? "Expense requests" : "All");
   const remarks = (approve: boolean) => (approve ? undefined : window.prompt("Reason for rejecting? (optional)") || undefined);
+  const name = (t: { legal_first_name: string; legal_last_name: string } | null) => (t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : "Trainee");
   const expenses = (data.expenses as (PortalData["expenses"][number] & { purpose?: string; payment_channel?: string | null; request_number?: string | null; requested_by_name?: string | null; line_items?: unknown[] | null })[])
-    .filter((e) => e.status === "Pending").map((e): Row => ({ id: e.id, title: `${e.payee} · ${e.category}`, detail: [e.purpose, Array.isArray(e.line_items) && e.line_items.length ? `${e.line_items.length} line${e.line_items.length === 1 ? "" : "s"}` : "", e.payment_channel].filter(Boolean).join(" · "), ref: e.request_number ?? e.expense_number, who: e.requested_by_name ?? "Cashier", when: fmtDate(day(e.created_at)), amount: Number(e.amount_centavos),
+    .filter((e) => e.status === "Pending").map((e): Row => ({ id: e.id, title: `${e.payee} · ${e.category}`, detail: [e.purpose, Array.isArray(e.line_items) && e.line_items.length ? `${e.line_items.length} line${e.line_items.length === 1 ? "" : "s"}` : "", e.payment_channel].filter(Boolean).join(" · "), ref: e.request_number ?? e.expense_number, who: e.requested_by_name ?? "Cashier", when: fmtDate(day(e.created_at)), amount: Number(e.amount_centavos), okLabel: "Approve", canReject: true,
       act: (approve) => post({ action: "expense-decide", id: e.id, decision: approve ? "Approved" : "Rejected", remarks: remarks(approve) }, approve ? "Approved. The voucher number is issued." : "Rejected.") }));
   const byExpense = new Map((data.expenses as { id: string; payee: string; amount_centavos: number; voucher_number?: string | null; expense_number: string }[]).map((e) => [e.id, e]));
-  const reprints = (data.expenseReprints ?? []).filter((r) => r.status === "Pending").map((r): Row => { const e = byExpense.get(r.expense_id); return { id: r.id, title: `${e?.voucher_number ?? e?.expense_number ?? "Voucher"} · ${e?.payee ?? ""}`, detail: r.reason, ref: "Reprint", who: r.requested_by_name ?? "Cashier", when: fmtDate(day(r.requested_at)), amount: Number(e?.amount_centavos ?? 0),
+  const reprints = (data.expenseReprints ?? []).filter((r) => r.status === "Pending").map((r): Row => { const e = byExpense.get(r.expense_id); return { id: r.id, title: `${e?.voucher_number ?? e?.expense_number ?? "Voucher"} · ${e?.payee ?? ""}`, detail: `Reason: ${r.reason}`, ref: "Reprint", who: r.requested_by_name ?? "Cashier", when: fmtDate(day(r.requested_at)), amount: Number(e?.amount_centavos ?? 0), okLabel: "Approve", canReject: true,
     act: (approve) => post({ action: "expense-reprint-decide", requestId: r.id, decision: approve ? "Approved" : "Rejected", remarks: remarks(approve) }, approve ? "Reprint approved." : "Reprint request rejected.") }; });
-  const discounts = (data.pendingDiscounts as (PortalData["pendingDiscounts"][number] & { enrollments?: unknown; marketing_agencies?: unknown })[]).map((d): Row => {
+  const refunds = data.requests.filter((r) => r.request_type === "Refund" && r.status === "Pending" && r.stage !== "With cashier").map((r): Row => ({ id: r.id, title: `${name(first(r.trainees))} · Refund`, detail: r.reason, ref: first(r.enrollments)?.enrollment_number ?? r.request_number, who: "Cashier", when: fmtDate(day(r.created_at)), amount: Number(r.requested_values?.amountCentavos ?? 0), okLabel: "Approve", canReject: true,
+    act: (approve) => post({ action: "request-decide", id: r.id, approve, remarks: remarks(approve) }, approve ? "Refund approved." : "Refund rejected.") }));
+  const discounts = (data.pendingDiscounts as (PortalData["pendingDiscounts"][number] & { enrollments?: unknown })[]).map((d): Row => {
     const en = first(d.enrollments as { enrollment_number?: string; trainees?: unknown; courses?: unknown } | { enrollment_number?: string }[] | null) as { enrollment_number?: string; trainees?: unknown; courses?: unknown } | null;
-    const t = first(en?.trainees as { legal_first_name: string; legal_last_name: string } | null), c = first(en?.courses as { name: string } | null);
-    return { id: d.id, title: `${t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : "Trainee"}${c ? ` · ${c.name}` : ""}`, detail: d.description, ref: en?.enrollment_number ?? "", who: "Cashier", when: fmtDate(day(d.created_at)), amount: Number(d.amount_centavos),
+    const c = first(en?.courses as { name: string } | null);
+    return { id: d.id, title: `${name(first(en?.trainees as { legal_first_name: string; legal_last_name: string } | null))}${c ? ` · ${c.name}` : ""}`, detail: d.description, ref: en?.enrollment_number ?? "", who: "Cashier", when: fmtDate(day(d.created_at)), amount: Number(d.amount_centavos), okLabel: "Approve", canReject: true,
       act: (approve) => post({ action: "discount-decide", id: d.id, approve }, approve ? "Discount approved." : "Discount rejected.") };
   });
-  const refunds = data.requests.filter((r) => r.request_type === "Refund" && r.status === "Pending" && r.stage !== "With cashier").map((r): Row => { const t = first(r.trainees), en = first(r.enrollments); return { id: r.id, title: `${t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : "Trainee"} · Refund`, detail: r.reason, ref: en?.enrollment_number ?? r.request_number, who: "Cashier", when: fmtDate(day(r.created_at)), amount: Number(r.requested_values?.amountCentavos ?? 0),
-    act: (approve) => post({ action: "request-decide", id: r.id, approve, remarks: remarks(approve) }, approve ? "Refund approved." : "Refund rejected.") }; });
-  const closings = data.cashierClosings.filter((c) => c.status === "Submitted").map((c): Row => ({ id: c.id, title: `Cashier closing · ${fmtDate(c.closing_date)}`, detail: `Expected ${pesos2(c.expected_cash_centavos)} · counted ${pesos2(Number(c.actual_cash_centavos ?? 0))}`, ref: Number(c.variance_centavos ?? 0) === 0 ? "Balanced" : Number(c.variance_centavos) < 0 ? `Short ${pesos2(-Number(c.variance_centavos))}` : `Over ${pesos2(Number(c.variance_centavos))}`, who: "Cashier", when: fmtDate(c.closing_date), amount: Number(c.variance_centavos ?? 0), reviewOnly: true,
+  const rebates = (data.agencyRebates as (PortalData["agencyRebates"][number] & { marketing_agencies?: unknown; courses?: unknown; trainees?: unknown })[]).filter((r) => r.status === "Pending").map((r): Row => ({ id: r.id, title: `${first(r.marketing_agencies as { name: string } | null)?.name ?? "Partner"} · ${name(first(r.trainees as { legal_first_name: string; legal_last_name: string } | null))}`, detail: `${first(r.courses as { name: string } | null)?.name ?? "Course"} · rebate owed (no-deduction partner)`, ref: "Payable", who: "Recorded automatically", when: fmtDate(day(r.created_at)), amount: Number(r.rebate_centavos), okLabel: "Mark paid", canReject: false,
+    act: () => post({ action: "agency-rebate-settle", id: r.id, status: "Paid" }, "Rebate marked paid to the partner.") }));
+  const closings = data.cashierClosings.filter((c) => c.status === "Submitted").map((c): Row => ({ id: c.id, title: `Cashier closing · ${fmtDate(c.closing_date)}`, detail: `Expected ${pesos2(c.expected_cash_centavos)} · counted ${pesos2(Number(c.actual_cash_centavos ?? 0))}`, ref: Number(c.variance_centavos ?? 0) === 0 ? "Balanced" : Number(c.variance_centavos) < 0 ? `Short ${pesos2(-Number(c.variance_centavos))}` : `Over ${pesos2(Number(c.variance_centavos))}`, who: "Cashier", when: fmtDate(c.closing_date), amount: Number(c.variance_centavos ?? 0), okLabel: "Mark reviewed", canReject: false,
     act: () => post({ action: "cashier-closing-review", id: c.id }, "Closing marked reviewed.") }));
-  const lists: Record<ApprovalTab, Row[]> = { Expenses: expenses, "Voucher reprints": reprints, Discounts: discounts, Refunds: refunds, Closings: closings };
+  const lists: Record<Category, Row[]> = { "Expense requests": expenses, "Voucher reprints": reprints, Refunds: refunds, Discounts: discounts, "Rebates owed to partners": rebates, "Cashier closings": closings };
   const waiting = Object.values(lists).reduce((s, l) => s + l.length, 0);
-  const rows = lists[tab];
-  return <section className="portal-panel cx-panel ac-approvals">
-    <div className="panel-heading"><h2>For your approval</h2><Badge tone={waiting ? "orange" : undefined}>{waiting} waiting</Badge></div>
-    {msg && <Message kind={msg.kind} text={msg.text} />}
-    <div className="ac-tabs" role="tablist">{(Object.keys(lists) as ApprovalTab[]).map((k) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{k}<span className={lists[k].length ? "" : "zero"}>{lists[k].length}</span></button>)}</div>
-    {rows.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Request</th><th>Requested by</th><th className="r">Amount</th><th></th></tr></thead><tbody>
-      {(compact ? rows.slice(0, 6) : rows).map((r) => <tr key={r.id}>
-        <td data-l="" className="lead"><span className="cx-name">{r.title}</span>{r.detail && <small>{r.detail}</small>}{r.ref && <small className="cx-mono">{r.ref}</small>}</td>
-        <td data-l="Requested by">{r.who}<small>{r.when}</small></td>
-        <td data-l="Amount" className="r"><strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{pesos2(r.amount)}</strong></td>
-        <td data-l=""><div className="cx-acts">{r.reviewOnly
-          ? <button type="button" className="portal-primary" disabled={busy} onClick={() => void r.act(true).catch(() => undefined)}>Mark reviewed</button>
-          : <><button type="button" className="portal-primary" disabled={busy} onClick={() => void r.act(true).catch(() => undefined)}>Approve</button><button type="button" className="portal-secondary" disabled={busy} onClick={() => void r.act(false).catch(() => undefined)}>Reject</button></>}</div></td>
-      </tr>)}
-    </tbody></table></div> : <p className="portal-empty-copy">Nothing waiting.</p>}
-  </section>;
+  const rowsOf = (list: Row[]) => list.map((r) => <div className="ac-req" key={r.id}>
+    <div><strong>{r.title}</strong>{r.detail && <small>{r.detail}</small>}<small className="cx-mono">{[r.ref, r.who, r.when].filter(Boolean).join(" · ")}</small></div>
+    <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{pesos2(r.amount)}</strong>
+    <div className="cx-acts"><button type="button" className="portal-primary" disabled={busy} onClick={() => void r.act(true).catch(() => undefined)}>{r.okLabel}</button>{r.canReject && <button type="button" className="portal-secondary" disabled={busy} onClick={() => void r.act(false).catch(() => undefined)}>Reject</button>}</div>
+  </div>);
+  const groupOf = (c: Category) => CATEGORY_GROUPS.find(([, cs]) => cs.includes(c))?.[0] ?? "";
+  if (compact) {
+    const current = cat === "All" ? "Expense requests" : cat;
+    return <section className="portal-panel cx-panel ac-approvals">
+      <div className="panel-heading"><h2>For your approval</h2><Badge tone={waiting ? "orange" : undefined}>{waiting} waiting</Badge></div>
+      {msg && <Message kind={msg.kind} text={msg.text} />}
+      <div className="ac-tabs" role="tablist">{(Object.keys(lists) as Category[]).map((k) => <button key={k} type="button" role="tab" aria-selected={current === k} className={current === k ? "on" : ""} onClick={() => setCat(k)}>{k}<span className={lists[k].length ? "" : "zero"}>{lists[k].length}</span></button>)}</div>
+      {lists[current].length ? rowsOf(lists[current].slice(0, 6)) : <p className="portal-empty-copy">Nothing waiting.</p>}
+    </section>;
+  }
+  const shown = (Object.keys(lists) as Category[]).filter((k) => cat === "All" || cat === k);
+  return <div className="ac-layout">
+    <nav className="ac-cats" aria-label="Approval categories">
+      <button type="button" className={cat === "All" ? "on" : ""} onClick={() => setCat("All")}>All<span className={waiting ? "" : "zero"}>{waiting}</span></button>
+      {CATEGORY_GROUPS.map(([group, cats]) => <div key={group}><div className="ac-grp">{group}</div>{cats.map((k) => <button key={k} type="button" className={cat === k ? "on" : ""} onClick={() => setCat(k)}>{k}<span className={lists[k].length ? "" : "zero"}>{lists[k].length}</span></button>)}</div>)}
+    </nav>
+    <div className="ac-catlist">
+      {msg && <Message kind={msg.kind} text={msg.text} />}
+      {shown.map((k) => <section className="portal-panel cx-panel" key={k}><div className="panel-heading"><h2>{k}</h2><span className="muted-text">{groupOf(k)} · {lists[k].length} waiting</span></div>{lists[k].length ? rowsOf(lists[k]) : <p className="portal-empty-copy">Nothing waiting.</p>}</section>)}
+    </div>
+  </div>;
+}
+
+/* ------------------------------------------------------------ payments and expenses (view only) */
+
+type PayDay = Omit<CashierReportSnapshot, "logoBytes">;
+
+/** Payments for one day, view only (owner, 8 Oct 2026): totals per channel, then each receipt with source and proof. */
+export function AccountingPayments() {
+  const today = manilaToday();
+  const [date, setDate] = useState(today), [channel, setChannel] = useState(""), [q, setQ] = useState("");
+  const { data: r, error } = useJson<PayDay>(`/api/staff/cashier-report?date=${date}`);
+  const rows = r ? r.groups.flatMap((g) => g.rows.map((x) => ({ ...x, source: g.kind === "Direct walk-in" ? "Walk-in" : g.name || g.kind }))) : [];
+  const term = q.trim().toLowerCase();
+  const shown = rows.filter((x) => (!channel || x.channel === channel) && (!term || `${x.receipt} ${x.trainee} ${x.course} ${x.source}`.toLowerCase().includes(term)));
+  const sumOf = (c: string) => rows.filter((x) => x.channel === c).reduce((s, x) => s + x.amountCentavos, 0);
+  const countOf = (c: string) => rows.filter((x) => x.channel === c).length;
+  return <div className="portal-page cx ac">
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Payments</h1></div><DayPicker date={date} setDate={setDate} /></div>
+    <p className="ac-note">{longDay(date)} · <span className="ac-ro">View only — the Cashier records payments</span></p>
+    {error && <Message kind="error" text={error} />}
+    <div className="cx-tiles ac-tiles">{CHANNELS.map((c) => <div className="cx-tile" key={c} style={{ ["--c" as string]: COLORS[c] }}><span>{c}</span><b>{pesos2(sumOf(c))}</b><small>{countOf(c)} receipt{countOf(c) === 1 ? "" : "s"}</small></div>)}
+      <div className="cx-tile ac-total"><span>Total collected</span><b>{pesos2(rows.reduce((s, x) => s + x.amountCentavos, 0))}</b><small>{rows.length} receipt{rows.length === 1 ? "" : "s"}</small></div></div>
+    <div className="cx-bar"><label className="cx-dt">Channel<select value={channel} onChange={(e) => setChannel(e.target.value)}><option value="">All channels</option>{CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}</select></label><input className="vx-search" aria-label="Search payments" placeholder="Search receipt, trainee, course or partner" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+    <section className="portal-panel cx-panel">{!r ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Receipt</th><th>Trainee</th><th>Source</th><th>Channel</th><th>Reference and proof</th><th className="r">Amount</th></tr></thead><tbody>
+      {shown.map((x, i) => <tr key={`${x.receipt}-${i}`}><td data-l="" className="lead"><span className="cx-name cx-mono">{x.receipt}</span><small>{x.time}</small></td><td data-l="Trainee">{x.trainee}<small>{x.course}</small></td><td data-l="Source">{x.source}</td><td data-l="Channel">{x.channel}</td><td data-l="Reference and proof">{x.reference || "—"}<small className={x.proof ? "ac-up" : ""}>{x.proof ? "Screenshot uploaded" : "Manual entry"}</small></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(x.amountCentavos)}</strong></td></tr>)}
+    </tbody></table></div> : <p className="portal-empty-copy">No payments on this day.</p>}</section>
+  </div>;
+}
+
+/** Expenses for one day, view only (owner, 8 Oct 2026): released per channel, then every voucher recorded or released that day. */
+export function AccountingExpenses({ data }: { data: PortalData }) {
+  const today = manilaToday();
+  const [date, setDate] = useState(today);
+  type Ex = PortalData["expenses"][number] & { payment_channel?: string | null; reference_number?: string | null; voucher_number?: string | null; paid_at?: string | null; approved_at?: string | null };
+  const list = (data.expenses as Ex[]).filter((e) => day(e.created_at) === date || day(e.paid_at) === date || day(e.approved_at) === date).sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const released = list.filter((e) => e.status === "Paid" && day(e.paid_at) === date);
+  const sumOf = (c: string) => released.filter((e) => e.payment_channel === c).reduce((s, e) => s + Number(e.amount_centavos), 0);
+  const label = (e: Ex) => (e.status === "Paid" ? "Released" : e.status === "Approved" ? "Awaiting release" : e.status === "Pending" ? "For approval" : e.status);
+  return <div className="portal-page cx ac">
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Expenses</h1></div><DayPicker date={date} setDate={setDate} /></div>
+    <p className="ac-note">{longDay(date)} · <span className="ac-ro">View only — the Cashier records and releases expenses</span></p>
+    <div className="cx-tiles ac-tiles">{CHANNELS.map((c) => <div className="cx-tile" key={c} style={{ ["--c" as string]: COLORS[c] }}><span>{c}</span><b>{pesos2(sumOf(c))}</b><small>{released.filter((e) => e.payment_channel === c).length} released</small></div>)}
+      <div className="cx-tile ac-total"><span>Total released</span><b>{pesos2(released.reduce((s, e) => s + Number(e.amount_centavos), 0))}</b><small>{list.filter((e) => e.status === "Approved").length} awaiting release</small></div></div>
+    <section className="portal-panel cx-panel">{list.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Channel</th><th>Status</th><th className="r">Amount</th></tr></thead><tbody>
+      {list.map((e) => <tr key={e.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher_number ?? e.expense_number}</span><small>{fmtDate(day(e.created_at))}</small></td><td data-l="Payee"><strong>{e.payee}</strong><small>{e.category}</small></td><td data-l="Channel">{e.payment_channel || "—"}{e.reference_number ? <small className="cx-mono">{e.reference_number}</small> : null}</td><td data-l="Status"><Badge tone={e.status === "Paid" ? "green" : e.status === "Rejected" ? "red" : e.status === "Pending" ? "orange" : "blue"}>{label(e)}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(e.amount_centavos)}</strong></td></tr>)}
+    </tbody></table></div> : <p className="portal-empty-copy">No expenses on this day.</p>}</section>
+    <p className="ac-note">Expense requests waiting for your decision are in Approvals › Expense requests.</p>
+  </div>;
+}
+
+function DayPicker({ date, setDate }: { date: string; setDate: (d: string) => void }) {
+  const today = manilaToday();
+  return <div className="ac-day"><button type="button" aria-label="Previous day" onClick={() => setDate(addDays(date, -1))}>‹</button><input type="date" aria-label="Date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} /><button type="button" aria-label="Next day" disabled={date >= today} onClick={() => setDate(addDays(date, 1))}>›</button></div>;
 }
 
 /* ------------------------------------------------------------ dashboard */

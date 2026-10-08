@@ -46,7 +46,7 @@ const EMPTY_ROW: Row = { code: "", batchId: "", start: "" };
 
 const emptyApplicant = {
   srn: "", firstName: "", middleName: "", lastName: "", suffix: "", birthDate: "", placeOfBirth: "",
-  address: "", mobile: "", email: "", company: "", rank: "", rankOther: "", referralCode: "",
+  address: "", mobile: "", email: "", company: "", rank: "", rankOther: "", referralCode: "", enrollmentType: "",
   emergencyContactName: "", emergencyContactMobile: "",
 };
 
@@ -56,7 +56,9 @@ const emptyApplicant = {
 // Layout ("Quiet Checklist", Oct 2026): one page of numbered sections that
 // collapse to a one-line summary once complete, a progress rail, and quiet
 // underline fields. Applicants can reopen any finished section to edit it.
-type SectionKey = "identification" | "personal" | "contact" | "emergency" | "courses" | "review";
+/** Enrollment type (owner, 8 Oct 2026): the first question on the form. */
+const ENROLLMENT_TYPES: [string, string, string][] = [["Online enrollment", "Online enrollment", "I'm registering on my own, online"], ["Walk-in", "Walk-in", "I'm at the New Wave office"], ["Agency", "Agency", "My agency or consultancy sent me"]];
+type SectionKey = "enrollment" | "identification" | "personal" | "contact" | "emergency" | "courses" | "review";
 const upper = (value: string) => value.toUpperCase();
 const pickedDate = (iso: string) => new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
 const pickedRange = (start: string, end: string) => (start === end ? pickedDate(start) : `${pickedDate(start)} – ${pickedDate(end)}`);
@@ -65,7 +67,7 @@ const chipRange = (start: string, end: string) => { const f = (iso: string, o: I
 const manilaTomorrow = () => new Date(Date.now() + 8 * 3600000 + 86400000).toISOString().slice(0, 10);
 
 function Wizard() {
-  const [open, setOpen] = useState<SectionKey>("identification");
+  const [open, setOpen] = useState<SectionKey>("enrollment");
   const [applicant, setApplicant] = useState(emptyApplicant);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [rows, setRows] = useState<Row[]>([EMPTY_ROW]);
@@ -191,7 +193,7 @@ function Wizard() {
       const fd = new FormData();
       fd.set("firstName", applicant.firstName); fd.set("middleName", applicant.middleName); fd.set("lastName", applicant.lastName); fd.set("suffix", applicant.suffix);
       fd.set("srn", applicant.srn); fd.set("email", applicant.email.toLowerCase()); fd.set("presentAddress", applicant.address); fd.set("mobile", applicant.mobile);
-      fd.set("placeOfBirth", applicant.placeOfBirth); fd.set("birthDate", applicant.birthDate); fd.set("rank", rank); fd.set("company", applicant.company); if (referral.state === "ok") fd.set("referralCode", applicant.referralCode);
+      fd.set("placeOfBirth", applicant.placeOfBirth); fd.set("birthDate", applicant.birthDate); fd.set("rank", rank); fd.set("company", applicant.company); fd.set("enrollmentType", applicant.enrollmentType); if (applicant.enrollmentType === "Agency" && referral.state === "ok") fd.set("referralCode", applicant.referralCode);
       fd.set("emergencyContactName", applicant.emergencyContactName); fd.set("emergencyContactMobile", applicant.emergencyContactMobile);
       for (const r of rows) {
         if (!r.code || !rangeOf(r)) continue;
@@ -288,7 +290,9 @@ function Wizard() {
 
   const rankText = applicant.rank === "OTHER" ? applicant.rankOther : applicant.rank;
   const nameText = [applicant.firstName, applicant.middleName, applicant.lastName, applicant.suffix].filter(Boolean).join(" ");
+  const enrollmentValid = applicant.enrollmentType === "Online enrollment" || applicant.enrollmentType === "Walk-in" || (applicant.enrollmentType === "Agency" && referral.state === "ok");
   const sections: { key: SectionKey; title: string; hint: string; done: boolean; summary: string }[] = [
+    { key: "enrollment", title: "Enrollment type", hint: "How are you enrolling?", done: enrollmentValid, summary: applicant.enrollmentType === "Agency" && referral.name ? `Agency · ${referral.name}` : applicant.enrollmentType },
     { key: "identification", title: "Identification", hint: "Start with your SRN. If you have trained with us before, we fill in your details.", done: idValid, summary: `SRN ${applicant.srn}${locked ? " · record found" : ""}` },
     { key: "personal", title: "Personal details", hint: "As written on your seaman's book or passport.", done: personalValid, summary: [nameText, applicant.birthDate, applicant.placeOfBirth, rankText].filter(Boolean).join(" · ") },
     { key: "contact", title: "Contact", hint: "How New Wave will reach you about your application.", done: contactValid, summary: [applicant.mobile, applicant.email].filter(Boolean).join(" · ") },
@@ -305,6 +309,18 @@ function Wizard() {
   }
 
   const body: Record<Exclude<SectionKey, "review">, React.ReactNode> = {
+    enrollment: <>
+      <div className="ql-types" role="radiogroup" aria-label="Enrollment type">
+        {ENROLLMENT_TYPES.map(([value, title, text]) => <button key={value} type="button" role="radio" aria-checked={applicant.enrollmentType === value} className={applicant.enrollmentType === value ? "on" : ""} onClick={() => { set("enrollmentType", value); if (value !== "Agency") set("referralCode", ""); }}><b>{title}</b><small>{text}</small></button>)}
+      </div>
+      {applicant.enrollmentType === "Agency" && <div className="ql-grid caps-form" style={{ marginTop: 16 }}>
+        <Field label="Referral code*" wide><input value={applicant.referralCode} onChange={(e) => set("referralCode", e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} placeholder="Type the code from your agency" autoComplete="off" maxLength={24} autoFocus />
+          {referral.state === "ok" && <small className="ref-ok">✓ Referred by {referral.name}</small>}
+          {referral.state === "bad" && <small className="ref-bad">Code not recognised. Check with your agency.</small>}
+          {referral.state === "checking" && <small className="ref-wait">Checking…</small>}</Field>
+        <p className="wizard-hint span-2">No code? Ask your agency, or choose Online enrollment.</p>
+      </div>}
+    </>,
     identification: <>
       <div className="ql-grid caps-form">
         <Field label="SRN / MISMO Number*" wide><input value={applicant.srn} onChange={(e) => set("srn", e.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" placeholder="10 digits" autoFocus />{hint(applicant.srn, idValid, VALIDATION_MESSAGES.srn)}</Field>
@@ -321,10 +337,6 @@ function Wizard() {
       <Field label="Rank*"><select value={applicant.rank} onChange={(e) => set("rank", e.target.value)}><option value="">Select</option>{RANKS.map((item) => <option key={item} value={item}>{item}</option>)}</select></Field>
       {applicant.rank === "OTHER" && <Field label="Specify Rank*"><input value={applicant.rankOther} onChange={(e) => set("rankOther", upper(e.target.value))} /></Field>}
       <Field label="Company / Manning Agency" wide><input value={applicant.company} onChange={(e) => set("company", upper(e.target.value))} placeholder="Optional" /></Field>
-      <Field label="Referral code" wide><input value={applicant.referralCode} onChange={(e) => set("referralCode", e.target.value.toUpperCase().replace(/s/g, ""))} placeholder="Optional · from your agency or consultancy" autoComplete="off" maxLength={24} />
-        {referral.state === "ok" && <small className="ref-ok">✓ Referred by {referral.name}</small>}
-        {referral.state === "bad" && <small className="ref-bad">Code not recognised. Check with your agency.</small>}
-        {referral.state === "checking" && <small className="ref-wait">Checking…</small>}</Field>
     </div>,
     contact: <div className="ql-grid caps-form">
       <Field label="Complete Address*" wide><input value={applicant.address} onChange={(e) => set("address", upper(e.target.value))} /></Field>

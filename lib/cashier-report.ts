@@ -14,7 +14,7 @@ import type { CashierReportSnapshot } from "@/lib/documents";
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 export const SOURCES = ["Direct walk-ins", "Agencies", "Consultancies"] as const;
 export type SourceKind = "Direct walk-in" | "Agency" | "Consultancy";
-export type CollectionRow = { receipt: string; time: string; trainee: string; course: string; channel: string; reference: string; amountCentavos: number; kind: SourceKind; agency: string };
+export type CollectionRow = { receipt: string; time: string; trainee: string; course: string; channel: string; reference: string; amountCentavos: number; kind: SourceKind; agency: string; proof?: boolean };
 
 const sourceOf = (kind: SourceKind) => (kind === "Direct walk-in" ? "Direct walk-ins" : kind === "Agency" ? "Agencies" : "Consultancies");
 
@@ -64,9 +64,9 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
   const start = `${date}T00:00:00+08:00`, end = `${date}T23:59:59.999+08:00`;
 
   // Collections.
-  const { data: pay } = await db.from("payments").select("id,payment_number,amount_centavos,method,reference_number,received_at,trainees(legal_first_name,legal_middle_name,legal_last_name,marketing_agency_id)")
+  const { data: pay } = await db.from("payments").select("id,payment_number,amount_centavos,method,reference_number,received_at,proof_id,trainees(legal_first_name,legal_middle_name,legal_last_name,marketing_agency_id)")
     .eq("valid", true).gte("received_at", start).lte("received_at", end).order("received_at", { ascending: true }).limit(2000);
-  const payments = (pay ?? []) as unknown as { id: string; payment_number: string; amount_centavos: number; method: string; reference_number: string | null; received_at: string; trainees: unknown }[];
+  const payments = (pay ?? []) as unknown as { id: string; payment_number: string; amount_centavos: number; method: string; reference_number: string | null; received_at: string; proof_id: string | null; trainees: unknown }[];
   const ids = payments.map((p) => p.id);
   const [{ data: receipts }, { data: allocs }] = ids.length
     ? await Promise.all([
@@ -91,7 +91,7 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
     const agency = agencyId ? agencyById.get(agencyId) : undefined;
     const kind: SourceKind = !agency ? "Direct walk-in" : agency.kind === "Consultancy" ? "Consultancy" : "Agency";
     const courses = [...new Set(mine.map((a) => { const c = one(one(a.enrollments as { courses?: unknown } | null)?.courses as { code?: string; name?: string } | null); return c?.name ? `${c.name}${c.code ? ` (${c.code})` : ""}` : ""; }).filter(Boolean))];
-    return { receipt: receiptOf.get(p.id) ?? p.payment_number, time: manilaTime(p.received_at), trainee: nameOf(t), course: courses.join(", ") || "—", channel: p.method, reference: p.reference_number ?? "", amountCentavos: Number(p.amount_centavos), kind, agency: agency?.name ?? "" };
+    return { receipt: receiptOf.get(p.id) ?? p.payment_number, time: manilaTime(p.received_at), trainee: nameOf(t), course: courses.join(", ") || "—", channel: p.method, reference: p.reference_number ?? "", amountCentavos: Number(p.amount_centavos), kind, agency: agency?.name ?? "", proof: !!p.proof_id };
   });
   const { data: methods } = await db.from("payment_methods").select("name,active,sort_order").eq("active", true).order("sort_order");
   const receivable = (methods ?? []).map((m) => m.name as string).filter((n) => ["Cash", "GCash", "PSBank", "UnionBank"].includes(n));
@@ -138,7 +138,7 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
     dateLabel: longDate(date), preparedBy, logoBytes,
     position: { previousLabel: "Previous cash", previousNote, ...position },
     channels, matrix,
-    groups: groups.map((g) => ({ kind: g.kind, name: g.name, subtotalCentavos: g.subtotalCentavos, rows: g.rows.map((r) => ({ receipt: r.receipt, time: r.time, trainee: r.trainee, course: r.course, channel: r.channel, reference: r.reference, amountCentavos: r.amountCentavos })) })),
+    groups: groups.map((g) => ({ kind: g.kind, name: g.name, subtotalCentavos: g.subtotalCentavos, rows: g.rows.map((r) => ({ receipt: r.receipt, time: r.time, trainee: r.trainee, course: r.course, channel: r.channel, reference: r.reference, amountCentavos: r.amountCentavos, proof: r.proof })) })),
     expenses,
     expenseTotals: [...expenseByChannel].map(([channel, totalCentavos]) => ({ channel, totalCentavos })),
   };

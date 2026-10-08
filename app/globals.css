@@ -6672,3 +6672,13 @@ a[href^="mailto:"],
 .ql-grid small.ref-ok{color:#0a7a3e}
 .ql-grid small.ref-bad{color:#b42318}
 .ql-grid small.ref-wait{color:var(--muted)}
+
+/* Registration form: enrollment type (8 Oct 2026) */
+.ql-types{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.ql-types button{display:grid;gap:4px;text-align:left;padding:16px;border:2px solid var(--line,#dbe6ec);border-radius:12px;background:#fff;color:inherit;font:inherit;cursor:pointer}
+.ql-types button:hover{border-color:#9fc3e6}
+.ql-types button.on{border-color:#0571D0;background:#e5f1fb}
+.ql-types button:focus-visible{outline:2px solid #F25615;outline-offset:2px}
+.ql-types b{font-size:16px;color:#123F63}
+.ql-types small{color:var(--muted,#587184);font-size:13.5px}
+@media (max-width:720px){.ql-types{grid-template-columns:1fr}}

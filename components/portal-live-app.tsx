@@ -20,7 +20,7 @@ import { Badge, Message, Modal, Page, PageHead, submit, fullName } from "./porta
 import { classroomJoin } from "@/lib/classroom";
 import { ClassroomPanel } from "./portal/classroom-panel";
 import { TraineeRequestModal, type RequestType } from "./portal/payment-actions";
-import { AccountingHome, AccountingApprovals, AccountingReports } from "./portal/accounting-home";
+import { AccountingHome, AccountingApprovals, AccountingReports, AccountingPayments, AccountingExpenses } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, pesos2, first, dueCentavos, balanceOf, isUnpaid, manilaToday, addDays } from "@/lib/portal-format";
@@ -156,7 +156,9 @@ const ACCOUNTING_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
   {label:"Approvals",items:["Approvals"]},
   {label:"Reports",items:["Reports"]},
-  {label:"Money",items:["Payments","Expenses","Receivables","Payables","Cash position"]},
+  {label:"Payments",items:["Payments"]},
+  {label:"Expenses",items:["Expenses"]},
+  {label:"Money",items:["Receivables","Payables","Cash position"]},
   {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS]},
 ];
 function topTabsFor(role:string,allowed:Module[]):TopTab[]{
@@ -305,6 +307,8 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Dashboard")return <AccountingHome data={data} reload={reload} go={m=>go(m as Module)}/>;
     if(active==="Approvals")return <div className="portal-page cx ac"><div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Approvals</h1></div></div><AccountingApprovals data={data} reload={reload}/><p className="ac-note">Change requests such as cancellations and reschedules are applied automatically once their fee is paid, so they do not wait here.</p></div>;
     if(active==="Reports")return <AccountingReports/>;
+    if(active==="Payments")return <AccountingPayments/>;
+    if(active==="Expenses")return <AccountingExpenses data={data}/>;
   }
   if(gateRole==="cashier"){
     if(active==="Dashboard")return <CashierDashboard data={data} onPay={onPay} reload={reload}/>;

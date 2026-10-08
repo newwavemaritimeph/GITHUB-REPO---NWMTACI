@@ -311,7 +311,7 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
     </section>}
     <div className="portal-table portal-panel"><table><thead><tr><th>Trainee</th><th>Enrollment no.</th><th>Course and schedule</th><th>Requirements</th><th>Payment</th><th>Status</th></tr></thead><tbody>
       {pageRows.map(({ e, r }) => { const t = first(e.trainees), s = r ? stateOf(r) : { text: e.enrollment_status, tone: statusTone(e.enrollment_status) }, p = payState(e); return <tr key={e.id} className="row-clickable" onClick={() => setOpen(e)}>
-        <td><strong>{t ? fullName(t) : "Unknown"}</strong><small>{t?.trainee_number}</small></td>
+        <td><strong>{t ? fullName(t) : "Unknown"}</strong><small>{t?.trainee_number}</small>{enrollmentTypeOf(data, e) && <span className="et-chip">{enrollmentTypeOf(data, e)}</span>}</td>
         <td><strong className="app-no-cell">{appNoOf(data, e.trainee_id) ?? e.enrollment_number}</strong><small>{appNoOf(data, e.trainee_id) ? e.enrollment_number : fmtDate(day(e.created_at))}</small></td>
         <td>{first(e.courses)?.name ?? "—"}<small>{scheduleOf(e)}</small></td>
         <td>{r ? <><span className={`req-count${r.missing.length ? "" : " ok"}`}>{r.verified} of {REQUIREMENTS.length}</span>{r.rejected.length > 0 && <small>Rejected: {r.rejected.join(", ")}</small>}</> : <span className="muted-text">{e.enrollment_status === "Cancelled" ? "—" : "Complete"}</span>}</td>
@@ -326,6 +326,14 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
 }
 
 /* -------------------------------------------------------------- Registration */
+
+/** Enrollment type (8 Oct 2026): Online enrollment, Walk-in, or Agency with the partner's name. */
+function enrollmentTypeOf(data: PortalData, e: Enrollment) {
+  const agencyId = data.referralByEnrollment?.[e.id];
+  const agency = agencyId ? data.agencies.find((a) => a.id === agencyId)?.name : null;
+  if (agency) return `Agency · ${agency}`;
+  return e.source === "Online enrollment" || e.source === "Walk-in" || e.source === "Agency" ? e.source : e.source === "Public registration" ? "Online enrollment" : "";
+}
 
 /** "applications" opens the list on Screening, "enrollments" on All enrollments. */
 export type RecordsView = "applications" | "enrollments" | "trainees";
@@ -372,7 +380,7 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
     <div className="sc-band"><div className="sc-seal" aria-hidden="true">NW</div><div><b>Application screening</b><small>New Wave Maritime Training and Assessment Center, Inc.</small></div><div className="sc-no"><span>Application</span><b>{appNo}</b></div></div>
     <div className="sc-stripe" aria-hidden="true" />
     <div className="sc-ident">
-      <div><span className="sc-cap">Applicant</span><h3>{t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : "—"}</h3><p>{t?.trainee_number}{t?.mobile ? ` · ${t.mobile}` : ""}</p>{t?.email && <p className="lc">{t.email}</p>}</div>
+      <div><span className="sc-cap">Applicant{enrollmentTypeOf(data, e) ? ` · ${enrollmentTypeOf(data, e)}` : ""}</span><h3>{t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : "—"}</h3><p>{t?.trainee_number}{t?.mobile ? ` · ${t.mobile}` : ""}</p>{t?.email && <p className="lc">{t.email}</p>}</div>
       <div><span className="sc-cap">Training</span><b>{c?.name ?? "—"}</b><p>{scheduleOf(e)}{b ? ` · ${b.batch_number}` : ""}</p><p>{b?.mode ?? (c?.code ?? "")}</p></div>
       <div><span className="sc-cap">Payment</span><b className={r.paid ? "sc-good" : ""}>{r.paid ? `${pesos2(r.paidCentavos)} paid` : r.handed ? "With the Cashier" : "Not paid yet"}</b><p>Balance {pesos2(balance)}</p><p><Badge tone={s.tone}>{s.text}</Badge></p></div>
     </div>
