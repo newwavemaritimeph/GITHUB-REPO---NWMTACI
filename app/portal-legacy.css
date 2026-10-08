@@ -1904,3 +1904,16 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .cl-vreq{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 20px;border-top:1px solid var(--nw-line)}
 .nw-shell .cl-switch{display:inline-flex;gap:8px;align-items:center;font-weight:500}.nw-shell .cl-switch input{width:18px;height:18px;accent-color:#0571D0}
 .nw-shell .cl-admin-alarm{max-width:1500px;margin:0 auto;padding:20px 24px 0}.nw-shell .cl-admin-alarm:empty{display:none}
+/* Spacing pass 2 (owner, 8 Oct 2026): search and filter bars breathe; inputs have inner padding. */
+.nw-shell .vx-search,.nw-shell .cx-search,.nw-shell .ac-bar input,.nw-shell .ac-bar select{font:400 15px var(--font-portal),sans-serif;padding:11px 14px;border:1px solid var(--nw-line);border-radius:10px;background:var(--nw-surface);color:var(--nw-fg);line-height:1.3}
+.nw-shell .vx-search:focus,.nw-shell .cx-search:focus,.nw-shell .ac-bar input:focus,.nw-shell .ac-bar select:focus{outline:none;border-color:var(--nw-blue);box-shadow:0 0 0 3px rgba(5,113,208,.15)}
+.nw-shell .cx-panel>.ac-bar{margin:18px 20px 14px}
+.nw-shell .cx-panel>.ac-chipbar{margin:18px 20px 14px}
+.nw-shell .cx-panel>.panel-heading+.ac-bar,.nw-shell .cx-panel>.panel-heading+.ac-chipbar{margin-top:2px}
+.nw-shell .cx-panel>.ac-bar+.portal-empty-copy,.nw-shell .cx-panel>.ac-chipbar+.portal-empty-copy{padding:20px 20px 28px !important}
+.nw-shell .cx-panel>.ac-bar+.portal-table,.nw-shell .cx-panel>.ac-chipbar+.portal-table{border-top:1px solid var(--nw-line)}
+.nw-shell .ac-stack>.ac-bar{margin:0;gap:12px}
+.nw-shell .cx-bar{gap:12px;margin-bottom:16px}
+.nw-shell .ac-chip{padding:8px 14px}
+.nw-shell .cl-wrap{margin:4px 20px 22px}
+.nw-shell .cl-legend{margin:-10px 20px 20px}
