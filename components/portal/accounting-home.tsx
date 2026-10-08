@@ -5,6 +5,7 @@ import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
 import { Badge, Message, fmtDate, usePost } from "./shared-ui";
 import { BarChart, Donut, HBars } from "./charts";
+import { EXPENSE_REASONS, REQUEST_REASONS, RejectInline } from "./reject-inline";
 import { PERIODS, percentChange, type Period } from "@/lib/accounting-periods";
 import type { AccountingReport } from "@/lib/accounting-report";
 import type { CashierReportSnapshot } from "@/lib/documents";
@@ -41,7 +42,7 @@ function useJson<T>(url: string | null) {
 
 type Category = "Expense requests" | "Voucher reprints" | "Refunds" | "Discounts" | "Rebates owed to partners" | "Cashier closings";
 const CATEGORY_GROUPS: [string, Category[]][] = [["Money out", ["Expense requests", "Voucher reprints", "Refunds"]], ["Fees", ["Discounts", "Rebates owed to partners"]], ["Cash control", ["Cashier closings"]]];
-type Row = { id: string; title: string; detail: string; ref: string; who: string; when: string; amount: number; act: (approve: boolean) => Promise<unknown>; okLabel: string; canReject: boolean };
+type Row = { id: string; title: string; detail: string; ref: string; who: string; when: string; amount: number; act: (approve: boolean, remarks?: string) => Promise<unknown>; okLabel: string; canReject: boolean };
 
 /**
  * Approvals by category (owner, 8 Oct 2026): money out (expense requests,
@@ -52,16 +53,17 @@ type Row = { id: string; title: string; detail: string; ref: string; who: string
 export function AccountingApprovals({ data, reload, compact }: { data: PortalData; reload: () => Promise<void>; compact?: boolean }) {
   const { busy, msg, post } = usePost(reload);
   const [cat, setCat] = useState<Category | "All">(compact ? "Expense requests" : "All");
-  const remarks = (approve: boolean) => (approve ? undefined : window.prompt("Reason for rejecting? (optional)") || undefined);
+  // Rejecting opens a reason row in place (design 2); the reason is required.
+  const [rejecting, setRejecting] = useState<string | null>(null);
   const name = (t: { legal_first_name: string; legal_last_name: string } | null) => (t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : "Trainee");
   const expenses = (data.expenses as (PortalData["expenses"][number] & { purpose?: string; payment_channel?: string | null; request_number?: string | null; requested_by_name?: string | null; line_items?: unknown[] | null })[])
     .filter((e) => e.status === "Pending").map((e): Row => ({ id: e.id, title: `${e.payee} · ${e.category}`, detail: [e.purpose, Array.isArray(e.line_items) && e.line_items.length ? `${e.line_items.length} line${e.line_items.length === 1 ? "" : "s"}` : "", e.payment_channel].filter(Boolean).join(" · "), ref: e.request_number ?? e.expense_number, who: e.requested_by_name ?? "Cashier", when: fmtDate(day(e.created_at)), amount: Number(e.amount_centavos), okLabel: "Approve", canReject: true,
-      act: (approve) => post({ action: "expense-decide", id: e.id, decision: approve ? "Approved" : "Rejected", remarks: remarks(approve) }, approve ? "Approved. The voucher number is issued." : "Rejected.") }));
+      act: (approve, remarks) => post({ action: "expense-decide", id: e.id, decision: approve ? "Approved" : "Rejected", remarks }, approve ? "Approved. The voucher number is issued." : "Rejected.") }));
   const byExpense = new Map((data.expenses as { id: string; payee: string; amount_centavos: number; voucher_number?: string | null; expense_number: string }[]).map((e) => [e.id, e]));
   const reprints = (data.expenseReprints ?? []).filter((r) => r.status === "Pending").map((r): Row => { const e = byExpense.get(r.expense_id); return { id: r.id, title: `${e?.voucher_number ?? e?.expense_number ?? "Voucher"} · ${e?.payee ?? ""}`, detail: `Reason: ${r.reason}`, ref: "Reprint", who: r.requested_by_name ?? "Cashier", when: fmtDate(day(r.requested_at)), amount: Number(e?.amount_centavos ?? 0), okLabel: "Approve", canReject: true,
-    act: (approve) => post({ action: "expense-reprint-decide", requestId: r.id, decision: approve ? "Approved" : "Rejected", remarks: remarks(approve) }, approve ? "Reprint approved." : "Reprint request rejected.") }; });
+    act: (approve, remarks) => post({ action: "expense-reprint-decide", requestId: r.id, decision: approve ? "Approved" : "Rejected", remarks }, approve ? "Reprint approved." : "Reprint request rejected.") }; });
   const refunds = data.requests.filter((r) => r.request_type === "Refund" && r.status === "Pending" && r.stage !== "With cashier").map((r): Row => ({ id: r.id, title: `${name(first(r.trainees))} · Refund`, detail: r.reason, ref: first(r.enrollments)?.enrollment_number ?? r.request_number, who: "Cashier", when: fmtDate(day(r.created_at)), amount: Number(r.requested_values?.amountCentavos ?? 0), okLabel: "Approve", canReject: true,
-    act: (approve) => post({ action: "request-decide", id: r.id, approve, remarks: remarks(approve) }, approve ? "Refund approved." : "Refund rejected.") }));
+    act: (approve, remarks) => post({ action: "request-decide", id: r.id, approve, remarks }, approve ? "Refund approved." : "Refund rejected.") }));
   const discounts = (data.pendingDiscounts as (PortalData["pendingDiscounts"][number] & { enrollments?: unknown })[]).map((d): Row => {
     const en = first(d.enrollments as { enrollment_number?: string; trainees?: unknown; courses?: unknown } | { enrollment_number?: string }[] | null) as { enrollment_number?: string; trainees?: unknown; courses?: unknown } | null;
     const c = first(en?.courses as { name: string } | null);
@@ -74,10 +76,13 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
     act: () => post({ action: "cashier-closing-review", id: c.id }, "Closing marked reviewed.") }));
   const lists: Record<Category, Row[]> = { "Expense requests": expenses, "Voucher reprints": reprints, Refunds: refunds, Discounts: discounts, "Rebates owed to partners": rebates, "Cashier closings": closings };
   const waiting = Object.values(lists).reduce((s, l) => s + l.length, 0);
-  const rowsOf = (list: Row[]) => list.map((r) => <div className="ac-req" key={r.id}>
-    <div><strong>{r.title}</strong>{r.detail && <small>{r.detail}</small>}<small className="cx-mono">{[r.ref, r.who, r.when].filter(Boolean).join(" · ")}</small></div>
-    <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{pesos2(r.amount)}</strong>
-    <div className="cx-acts"><button type="button" className="portal-primary" disabled={busy} onClick={() => void r.act(true).catch(() => undefined)}>{r.okLabel}</button>{r.canReject && <button type="button" className="portal-secondary" disabled={busy} onClick={() => void r.act(false).catch(() => undefined)}>Reject</button>}</div>
+  const rowsOf = (list: Row[]) => list.map((r) => <div key={r.id} className={rejecting && rejecting !== r.id ? "ac-dim" : undefined}>
+    <div className={`ac-req${rejecting === r.id ? " ac-rejecting" : ""}`}>
+      <div><strong>{r.title}</strong>{r.detail && <small>{r.detail}</small>}<small className="cx-mono">{[r.ref, r.who, r.when].filter(Boolean).join(" · ")}</small></div>
+      <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{pesos2(r.amount)}</strong>
+      {rejecting === r.id ? <span className="ac-rejlabel">Rejecting</span> : <div className="cx-acts"><button type="button" className="portal-primary" disabled={busy || !!rejecting} onClick={() => void r.act(true).catch(() => undefined)}>{r.okLabel}</button>{r.canReject && <button type="button" className="portal-secondary" disabled={busy || !!rejecting} onClick={() => setRejecting(r.id)}>Reject</button>}</div>}
+    </div>
+    {rejecting === r.id && <RejectInline reasons={expenses.some((x) => x.id === r.id) ? EXPENSE_REASONS : REQUEST_REASONS} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
   </div>);
   const groupOf = (c: Category) => CATEGORY_GROUPS.find(([, cs]) => cs.includes(c))?.[0] ?? "";
   if (compact) {

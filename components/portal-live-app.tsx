@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, Fragment, useCallback, useEffect, useState } from "react";
 import { NewWaveLogo } from "./new-wave-logo";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { LiveAttendance } from "./portal/live-attendance";
@@ -20,6 +20,7 @@ import { Badge, Message, Modal, Page, PageHead, submit, fullName } from "./porta
 import { classroomJoin } from "@/lib/classroom";
 import { ClassroomPanel } from "./portal/classroom-panel";
 import { TraineeRequestModal, type RequestType } from "./portal/payment-actions";
+import { RejectInline } from "./portal/reject-inline";
 import { AccountingHome, AccountingApprovals, AccountingReports, AccountingPayments, AccountingExpenses } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
@@ -813,7 +814,8 @@ function LiveRequests({data,role,reload,embedded}:{data:PortalData;role:string;r
   const forApproval=charged.filter(r=>!unpaid(r));
   const since=addDays(manilaToday(),-30);
   const decided=data.requests.filter(r=>r.status!=="Pending"&&(r.decided_at??r.created_at).slice(0,10)>=since);
-  async function decide(id:string,approve:boolean){setBusy(id);setMessage("");try{const remarks=approve?undefined:(window.prompt("Reason for rejecting? (optional)")||undefined);await submit({action:"request-decide",id,approve,remarks});await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not update the request.")}finally{setBusy("")}}
+  const [rejecting,setRejecting]=useState<string|null>(null);
+  async function decide(id:string,approve:boolean,remarks?:string){setBusy(id);setMessage("");try{await submit({action:"request-decide",id,approve,remarks});setRejecting(null);await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not update the request.")}finally{setBusy("")}}
   const typeOf=(r:Req)=>r.request_type==="Rescheduling"?"Reschedule":r.request_type;
   const startOf=(r:Req)=>{const id=first(r.enrollments)?.id;const e=data.enrollments.find(x=>x.id===id);return e?(first(e.batches)?.starts_on??e.scheduled_on??null):null};
   const feeCell=(r:Req)=>{const ch=first(r.enrollment_charges),cc=data.chargeCollected?.[r.id];
@@ -825,9 +827,9 @@ function LiveRequests({data,role,reload,embedded}:{data:PortalData;role:string;r
     if(r.status!=="Pending")return r.decision_remarks?<small>{r.decision_remarks}</small>:null;
     if(r.stage==="With cashier")return canCharge?<button type="button" className="portal-primary" onClick={()=>setCharging(r)}>Add charge</button>:<small>With the Cashier</small>;
     if(unpaid(r))return canCharge&&first(r.enrollments)?.id?<button type="button" className="portal-primary" onClick={()=>{const cc=data.chargeCollected?.[r.id];setCollecting({enrollmentId:first(r.enrollments)?.id??"",amount:cc?Math.max(0,cc.amount-cc.collected):0})}}>Collect fee</button>:<small>Applied once the fee is paid</small>;
-    return canDecide?<div className="cx-acts"><button type="button" className="portal-primary" disabled={!!busy} onClick={()=>decide(r.id,true)}>{busy===r.id?"…":"Approve"}</button><button type="button" className="portal-secondary" disabled={!!busy} onClick={()=>decide(r.id,false)}>Reject</button></div>:<small>With the Accounting Manager</small>};
+    return canDecide?<div className="cx-acts"><button type="button" className="portal-primary" disabled={!!busy} onClick={()=>decide(r.id,true)}>{busy===r.id?"…":"Approve"}</button><button type="button" className="portal-secondary" disabled={!!busy||!!rejecting} onClick={()=>setRejecting(r.id)}>Reject</button></div>:<small>With the Accounting Manager</small>};
   const table=(list:Req[])=><div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Request</th><th>Course</th><th>Training starts</th><th>Requested on</th><th className="r">Fee</th><th>Status</th><th></th></tr></thead><tbody>
-    {list.map(r=>{const t=first(r.trainees),e=first(r.enrollments),c=e?first(e.courses):null,no=e?.trainee_id?data.applicationNumbers?.[e.trainee_id]:undefined,start=startOf(r);return <tr key={r.id}>
+    {list.map(r=>{const t=first(r.trainees),e=first(r.enrollments),c=e?first(e.courses):null,no=e?.trainee_id?data.applicationNumbers?.[e.trainee_id]:undefined,start=startOf(r);return <Fragment key={r.id}><tr className={rejecting&&rejecting!==r.id?"ac-dim":undefined}>
       <td data-l="" className="lead"><span className="cx-name">{t?fullName(t):"Unknown trainee"}</span>{no&&<small className="cx-mono">{no}</small>}</td>
       <td data-l="Request"><span className="req-type">{typeOf(r)}</span><small>{r.reason}</small></td>
       <td data-l="Course">{c?.name??"—"}<small className="cx-mono">{e?.enrollment_number}</small></td>
@@ -835,8 +837,8 @@ function LiveRequests({data,role,reload,embedded}:{data:PortalData;role:string;r
       <td data-l="Requested on">{date(r.requested_on??r.created_at.slice(0,10))}</td>
       <td data-l="Fee" className="r">{feeCell(r)}</td>
       <td data-l="Status">{stageChip(r)}</td>
-      <td data-l="">{action(r)}</td>
-    </tr>})}
+      <td data-l="">{rejecting===r.id?<span className="ac-rejlabel">Rejecting</span>:action(r)}</td>
+    </tr>{rejecting===r.id&&<tr className="rj-row"><td colSpan={8}><RejectInline busy={!!busy} onCancel={()=>setRejecting(null)} onReject={why=>void decide(r.id,false,why)}/></td></tr>}</Fragment>})}
   </tbody></table></div>;
   const section=(title:string,list:Req[])=>list.length?<section className="portal-panel cx-panel"><div className="panel-heading"><h2>{title}</h2><Badge tone="orange">{list.length}</Badge></div>{table(list)}</section>:null;
   return <div className={embedded?"":"portal-page cx"}>{!embedded&&<div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Requests</h1></div></div>}{message&&<Message kind="error" text={message}/>}

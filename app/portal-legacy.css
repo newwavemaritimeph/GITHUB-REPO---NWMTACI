@@ -1784,3 +1784,17 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .ac-req small{display:block;color:#5f7180;font-size:14px}
 @media (max-width:900px){.portal-shell .ac-layout{grid-template-columns:1fr}.portal-shell .ac-cats{position:static}}
 @media (max-width:560px){.portal-shell .ac-req{grid-template-columns:1fr}}
+
+/* Reject with a reason, inline (design 2, 8 Oct 2026) */
+.portal-shell .rj{display:grid;grid-template-columns:240px 1fr;gap:12px;padding:14px 20px 16px;border-top:3px solid #b42318;background:#fffafa}
+.portal-shell .rj label{display:grid;gap:6px;font-size:14px;color:#5f7180;font-weight:500}
+.portal-shell .rj select,.portal-shell .rj input{font:inherit;font-size:15px;padding:9px 11px;border:1px solid #d5e0e8;border-radius:10px;background:#fff;color:#13283a;width:100%;min-width:0}
+.portal-shell .rj-acts{grid-column:1/-1;display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap}
+.portal-shell .rj-err{margin-right:auto;color:#b42318;font-size:13.5px;font-weight:600}
+.portal-shell .rj-btn{font:inherit;font-weight:600;font-size:15px;padding:9px 16px;border-radius:10px;border:1px solid #b42318;background:#b42318;color:#fff;cursor:pointer}
+.portal-shell .rj-btn:disabled{opacity:.45;cursor:not-allowed}
+.portal-shell .rj-row td{padding:0 !important;background:none}
+.portal-shell .ac-dim{opacity:.5}
+.portal-shell .ac-rejecting{background:#fffafa}
+.portal-shell .ac-rejlabel{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#b42318}
+@media (max-width:640px){.portal-shell .rj{grid-template-columns:1fr}}
