@@ -213,15 +213,17 @@ type ExtraLine = { key: string; chargeCatalogId: string | null; description: str
  * unpaid courses (split), plus any miscellaneous charges sold at the counter.
  * One payment, one receipt. A reference is required for every mode except Cash.
  */
-export function RecordPaymentModal({ data, initialEnrollmentId, onClose, onSaved }: { data: PortalData; initialEnrollmentId?: string; onClose: () => void; onSaved: () => Promise<void> }) {
+export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCentavos, onClose, onSaved }: { data: PortalData; initialEnrollmentId?: string; initialAmountCentavos?: number; onClose: () => void; onSaved: () => Promise<void> }) {
   const initial = initialEnrollmentId ? data.enrollments.find((e) => e.id === initialEnrollmentId) : undefined;
   const [traineeId, setTraineeId] = useState(initial?.trainee_id ?? "");
   const [search, setSearch] = useState("");
   const modes = modeNames(data);
   const [method, setMethod] = useState(modes[0] ?? "Cash");
   const [reference, setReference] = useState("");
-  const [received, setReceived] = useState("");
-  const [amounts, setAmounts] = useState<Record<string, string>>({});
+  // "Collect fee" from Requests opens with the request fee filled in.
+  const preset = initialEnrollmentId && initialAmountCentavos ? (initialAmountCentavos / 100).toFixed(2) : "";
+  const [received, setReceived] = useState(preset);
+  const [amounts, setAmounts] = useState<Record<string, string>>(preset && initialEnrollmentId ? { [initialEnrollmentId]: preset } : {});
   const [extras, setExtras] = useState<ExtraLine[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   const extraSeq = useRef(0);
@@ -243,7 +245,9 @@ export function RecordPaymentModal({ data, initialEnrollmentId, onClose, onSaved
   const mine = data.enrollments.filter((e) => e.trainee_id === traineeId && e.enrollment_status !== "Cancelled");
   const open = mine.filter((e) => balanceOf(e) > 0);
   const catalog = data.charges.filter((c) => c.active);
-  const items = catalog.filter((c) => (c.kind ?? "fee") === "item"), fees = catalog.filter((c) => (c.kind ?? "fee") !== "item");
+  // Miscellaneous charges are only Uniform and Others (owner, 8 Oct 2026). Uniform's price comes from the schedule of fees, else ₱150.00.
+  const uniform = catalog.find((c) => /uniform/i.test(c.name) && Number(c.default_amount_centavos) > 0);
+  const uniformPrice = uniform ? Number(uniform.default_amount_centavos) : 15000;
   const term = search.trim().toLowerCase();
   const candidates = groupByTrainee(data, data.enrollments.filter((e) => e.enrollment_status !== "Cancelled"))
     .filter((g) => !term || `${g.name} ${g.number} ${g.enrollments.map((e) => `${courseCode(e)} ${e.enrollment_number}`).join(" ")}`.toLowerCase().includes(term))
@@ -270,7 +274,9 @@ export function RecordPaymentModal({ data, initialEnrollmentId, onClose, onSaved
     const target = forEnrollment || mine[0]?.id;
     if (!target) return;
     let line: ExtraLine;
-    if (pick === "other") {
+    if (pick === "uniform") {
+      line = { key: `x${++extraSeq.current}`, chargeCatalogId: uniform?.id ?? null, description: "Uniform", unit: uniformPrice, quantity: qty, enrollmentId: target, kind: "item" };
+    } else if (pick === "other") {
       const unit = toCentavos(otherAmount);
       if (!otherName.trim() || !unit) { setError("Enter the charge name and amount."); return; }
       line = { key: `x${++extraSeq.current}`, chargeCatalogId: null, description: otherName.trim(), unit, quantity: qty, enrollmentId: target, kind: "item" };
@@ -348,11 +354,10 @@ export function RecordPaymentModal({ data, initialEnrollmentId, onClose, onSaved
           <summary>Add miscellaneous charges</summary>
           <div className="portal-form">
             <label>Charge<select value={pick} onChange={(ev) => setPick(ev.target.value)}><option value="">Select a charge</option>
-              {items.length > 0 && <optgroup label="Miscellaneous items">{items.map((c) => <option key={c.id} value={c.id}>{c.name} · {pesos(c.default_amount_centavos)}</option>)}</optgroup>}
-              {fees.length > 0 && <optgroup label="Service fees">{fees.map((c) => <option key={c.id} value={c.id}>{c.name} · {pesos(c.default_amount_centavos)}</option>)}</optgroup>}
-              <option value="other">Other charge</option></select></label>
+              <option value="uniform">Uniform · {pesos(uniformPrice)}</option>
+              <option value="other">Others</option></select></label>
             <label>For course<select value={forEnrollment} onChange={(ev) => setForEnrollment(ev.target.value)}>{mine.map((e) => <option key={e.id} value={e.id}>{courseCode(e)} · {e.enrollment_number}</option>)}</select></label>
-            {pick === "other" && <><label>Charge name<input value={otherName} onChange={(ev) => setOtherName(ev.target.value)} /></label><label>Amount (PHP)<input className="cx-mono" inputMode="decimal" value={otherAmount} onChange={(ev) => setOtherAmount(ev.target.value)} /></label></>}
+            {pick === "other" && <><label>What is it?<input value={otherName} onChange={(ev) => setOtherName(ev.target.value)} /></label><label>Amount (PHP)<input className="cx-mono" inputMode="decimal" value={otherAmount} onChange={(ev) => setOtherAmount(ev.target.value)} /></label></>}
             <label>Quantity<input className="cx-mono" inputMode="numeric" value={quantity} onChange={(ev) => setQuantity(ev.target.value)} /></label>
             <div className="cx-addbtn"><button type="button" className="portal-secondary" disabled={!pick} onClick={addExtra}>Add to payment</button></div>
           </div>

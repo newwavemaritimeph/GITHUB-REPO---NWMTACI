@@ -19,6 +19,7 @@ import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAn
 import { Badge, Message, Modal, Page, PageHead, submit, fullName } from "./portal/shared-ui";
 import { classroomJoin } from "@/lib/classroom";
 import { ClassroomPanel } from "./portal/classroom-panel";
+import { TraineeRequestModal, type RequestType } from "./portal/payment-actions";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, first, dueCentavos, balanceOf, isUnpaid, manilaToday, addDays } from "@/lib/portal-format";
@@ -376,6 +377,7 @@ function TraineesEnrollments({data,query,open,canEnroll,role,reload}:{data:Porta
   return <><Trainees data={data} query={query}/><Enrollments data={data} query={query} open={open} canEnroll={canEnroll} role={role} reload={reload}/></>;
 }
 
+const TRAINEE_REQUESTS:[RequestType,string][]=[["Cancellation","Cancellation"],["Rescheduling","Reschedule"],["Change Course","Change course"],["Make-up Class","Make-up class"],["Reprinting","Reprinting"]];
 function Trainees({data,query,embedded,reload,role}:{data:PortalData;query:string;embedded?:boolean;reload?:()=>Promise<void>;role?:string}){
   const [lookup,setLookup]=useState(""),[from,setFrom]=useState(""),[to,setTo]=useState(""),[selId,setSelId]=useState<string|null>(null);
   const term=(lookup||query).trim().toLowerCase();
@@ -387,6 +389,12 @@ function Trainees({data,query,embedded,reload,role}:{data:PortalData;query:strin
   // Re-read the trainee from the latest data so the profile reflects edits.
   const sel=selId?data.trainees.find(t=>t.id===selId)??null:null;
   const coursesOf=(id:string)=>data.enrollments.filter(e=>e.trainee_id===id&&e.enrollment_status!=="Cancelled");
+  // Request ▾ (owner, 8 Oct 2026): Registration raises requests here; they go to the Cashier and apply once paid.
+  const canRequest=role==="registration"||role==="admin";
+  const [menuFor,setMenuFor]=useState<string|null>(null),[menuPos,setMenuPos]=useState<{top:number;left:number}>({top:0,left:0}),[reqFor,setReqFor]=useState<{traineeId:string;type:RequestType}|null>(null),[reqMsg,setReqMsg]=useState("");
+  useEffect(()=>{if(!menuFor)return;const close=(ev:MouseEvent)=>{if(!(ev.target as HTMLElement).closest(".req-dd"))setMenuFor(null)};const esc=(ev:KeyboardEvent)=>{if(ev.key==="Escape")setMenuFor(null)};const shut=()=>setMenuFor(null);document.addEventListener("mousedown",close);document.addEventListener("keydown",esc);window.addEventListener("resize",shut);window.addEventListener("scroll",shut,true);return()=>{document.removeEventListener("mousedown",close);document.removeEventListener("keydown",esc);window.removeEventListener("resize",shut);window.removeEventListener("scroll",shut,true)}},[menuFor]);
+  const openReqs=(id:string)=>data.requests.filter(r=>r.status==="Pending"&&first(r.enrollments)?.trainee_id===id).length;
+  const raise=async(body:Record<string,unknown>)=>{const r=await submit(body) as {feeCentavos?:number};setReqMsg(r.feeCentavos?`Sent to the Cashier. It is applied once the trainee pays ${pesos(r.feeCentavos)}.`:"Sent to the Cashier.");await reload?.();return r};
   return <Page embedded={embedded} head={<PageHead eyebrow="Central master records" title="Trainees" text="Every trainee record. Open one to see their enrollments, payments and requests."/>}>
     <section className="portal-panel tl-panel">
       <div className="tl-toolbar">
@@ -396,18 +404,21 @@ function Trainees({data,query,embedded,reload,role}:{data:PortalData;query:strin
         {(from||to)&&<button type="button" className="ghost-button" onClick={()=>{setFrom("");setTo("")}}>Clear</button>}
         <span className="tl-count">{rows.length} of {data.trainees.length}</span>
       </div>
-      <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Contact</th><th>Courses</th><th>Status</th><th className="num">Balance</th><th>Registered</th></tr></thead><tbody>
+      <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Contact</th><th>Courses</th><th>Status</th><th className="num">Balance</th>{canRequest&&<th>Request</th>}<th>Registered</th></tr></thead><tbody>
         {rows.map(t=>{const s=traineeEnrollmentStatus(data,t.id);const list=coursesOf(t.id);const bal=list.reduce((sum,e)=>sum+balanceOf(e),0);const no=data.applicationNumbers?.[t.id];return <tr key={t.id} className="row-clickable" onClick={()=>setSelId(t.id)}>
           <td><strong>{fullName(t)}</strong><small>{no&&<span className="app-no">{no}</span>}{t.trainee_number}</small></td>
           <td><span className="lc">{t.email}</span><small>{t.mobile}</small></td>
           <td>{list.length?<>{first(list[0].courses)?.code??first(list[0].courses)?.name}{list.length>1&&<small>+{list.length-1} more</small>}</>:<span className="muted-text">None yet</span>}</td>
           <td><Badge tone={s==="Enrolled"?"green":s==="Cancelled"?"red":"orange"}>{s}</Badge></td>
           <td className="num"><strong>{pesos(bal)}</strong></td>
+          {canRequest&&<td onClick={e=>e.stopPropagation()}>{list.length?<div className="req-dd"><button type="button" className="portal-secondary req-dd-btn" aria-haspopup="menu" aria-expanded={menuFor===t.id} onClick={ev=>{const r=ev.currentTarget.getBoundingClientRect();setMenuPos({top:r.bottom+6,left:Math.max(8,Math.min(r.left,window.innerWidth-216))});setMenuFor(menuFor===t.id?null:t.id)}}>Request ▾</button>{openReqs(t.id)>0&&<small className="req-dd-open">{openReqs(t.id)} with the Cashier</small>}{menuFor===t.id&&<div className="req-dd-menu" role="menu" style={{top:menuPos.top,left:menuPos.left}}>{TRAINEE_REQUESTS.map(([type,lbl])=><button key={type} type="button" role="menuitem" onClick={()=>{setMenuFor(null);setReqFor({traineeId:t.id,type})}}>{lbl}</button>)}</div>}</div>:<span className="muted-text">—</span>}</td>}
           <td>{t.registered_at?date(t.registered_at.slice(0,10)):"—"}</td>
         </tr>})}
       </tbody></table>{!rows.length&&<p className="portal-empty-copy">No trainees match.</p>}</div>
     </section>
+    {reqMsg&&<Message kind="success" text={reqMsg}/>}
     {sel&&<TraineeDetailModal data={data} trainee={sel} reload={reload} role={role} onClose={()=>setSelId(null)}/>}
+    {reqFor&&<TraineeRequestModal data={data} traineeId={reqFor.traineeId} reqType={reqFor.type} onClose={()=>setReqFor(null)} post={raise}/>}
   </Page>;
 }
 
@@ -751,7 +762,7 @@ function LiveRequests({data,role,reload,embedded}:{data:PortalData;role:string;r
   type Req=PortalData["requests"][number];
   const canDecide=["admin","accounting"].includes(role);
   const canCharge=["admin","cashier","accounting"].includes(role);
-  const [busy,setBusy]=useState(""),[message,setMessage]=useState(""),[charging,setCharging]=useState<Req|null>(null),[showDecided,setShowDecided]=useState(false);
+  const [busy,setBusy]=useState(""),[message,setMessage]=useState(""),[charging,setCharging]=useState<Req|null>(null),[showDecided,setShowDecided]=useState(false),[collecting,setCollecting]=useState<{enrollmentId:string;amount:number}|null>(null);
   const pending=data.requests.filter(r=>r.status==="Pending");
   const withCashier=pending.filter(r=>r.stage==="With cashier");
   const charged=pending.filter(r=>r.stage!=="With cashier");
@@ -771,7 +782,7 @@ function LiveRequests({data,role,reload,embedded}:{data:PortalData;role:string;r
   const action=(r:Req)=>{
     if(r.status!=="Pending")return r.decision_remarks?<small>{r.decision_remarks}</small>:null;
     if(r.stage==="With cashier")return canCharge?<button type="button" className="portal-primary" onClick={()=>setCharging(r)}>Add charge</button>:<small>With the Cashier</small>;
-    if(unpaid(r))return <small>Collect the fee in Record payment; it is applied once paid.</small>;
+    if(unpaid(r))return canCharge&&first(r.enrollments)?.id?<button type="button" className="portal-primary" onClick={()=>{const cc=data.chargeCollected?.[r.id];setCollecting({enrollmentId:first(r.enrollments)?.id??"",amount:cc?Math.max(0,cc.amount-cc.collected):0})}}>Collect fee</button>:<small>Applied once the fee is paid</small>;
     return canDecide?<div className="cx-acts"><button type="button" className="portal-primary" disabled={!!busy} onClick={()=>decide(r.id,true)}>{busy===r.id?"…":"Approve"}</button><button type="button" className="portal-secondary" disabled={!!busy} onClick={()=>decide(r.id,false)}>Reject</button></div>:<small>With the Accounting Manager</small>};
   const table=(list:Req[])=><div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Request</th><th>Course</th><th>Training starts</th><th>Requested on</th><th className="r">Fee</th><th>Status</th><th></th></tr></thead><tbody>
     {list.map(r=>{const t=first(r.trainees),e=first(r.enrollments),c=e?first(e.courses):null,no=e?.trainee_id?data.applicationNumbers?.[e.trainee_id]:undefined,start=startOf(r);return <tr key={r.id}>
@@ -793,6 +804,7 @@ function LiveRequests({data,role,reload,embedded}:{data:PortalData;role:string;r
     {!pending.length&&<section className="portal-panel cx-panel"><p className="portal-empty-copy">No open requests.</p></section>}
     {decided.length>0&&<section className="portal-panel cx-panel"><button type="button" className="cx-month-head" aria-expanded={showDecided} onClick={()=>setShowDecided(v=>!v)}><span className="cx-month-name">Decided</span><span className="cx-month-meta">last 30 days · {decided.length}</span><span aria-hidden="true" className="cx-month-caret" style={{marginLeft:"auto"}}>{showDecided?"▾":"▸"}</span></button>{showDecided&&table(decided)}</section>}
     {charging&&<RequestChargeModal data={data} request={charging} reload={reload} onClose={()=>setCharging(null)}/>}
+    {collecting&&<RecordPaymentModal data={data} initialEnrollmentId={collecting.enrollmentId} initialAmountCentavos={collecting.amount} onClose={()=>setCollecting(null)} onSaved={reload}/>}
   </div>;
 }
 

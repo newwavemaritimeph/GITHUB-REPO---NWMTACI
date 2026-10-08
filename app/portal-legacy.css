@@ -1563,3 +1563,11 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .cx-month-caret{color:#5f7180;width:16px}
 .portal-shell .cx-month .portal-table{border-top:1px solid #dbe5ec}
 @media (max-width:640px){.portal-shell .cx-month-head{flex-wrap:wrap;gap:4px 12px;padding:14px 16px}.portal-shell .cx-month-head b{margin-left:0}}
+
+/* Trainee list: Request ▾ beside Balance (8 Oct 2026) */
+.portal-shell .req-dd{position:relative;display:inline-block}
+.portal-shell .req-dd-btn{padding:7px 12px;font-size:14.5px;white-space:nowrap}
+.portal-shell .req-dd-open{display:block;color:#a2470b;font-size:13px;margin-top:4px;white-space:nowrap}
+.portal-shell .req-dd-menu{position:fixed;z-index:40;min-width:200px;display:grid;background:#fff;border:1px solid #dbe6ec;border-radius:12px;box-shadow:0 14px 34px rgba(0,0,0,.18);padding:6px}
+.portal-shell .req-dd-menu button{background:none;border:0;text-align:left;font:500 15.5px var(--font-portal,inherit);color:#0f2638;padding:10px 12px;border-radius:8px;cursor:pointer}
+.portal-shell .req-dd-menu button:hover,.portal-shell .req-dd-menu button:focus-visible{background:#eef4f8;outline:none}

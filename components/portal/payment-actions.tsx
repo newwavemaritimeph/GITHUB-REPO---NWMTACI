@@ -54,7 +54,7 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
   }
   const inner = <div className="portal-form">
     {err && <Message kind="error" text={err} />}
-    <p className="portal-form-note full">Goes to the Cashier, who adds any charge, then to the Accounting Manager for approval. On approval the change and its charge are applied automatically.</p>
+    <p className="portal-form-note full">Goes to the Cashier to collect the fee. The change is applied automatically once the fee is paid.</p>
     {reqType === "TAR reprint" && <p className="portal-form-note full">The Training Admission Record has been printed twice. Each approval by the Accounting Manager allows one more print with the same AR number.</p>}
     {reqType === "Make-up Class" && <p className="portal-form-note full">Make-up classes are for courses of three days or more; the fee is Php 350.00 per training day (Terms, section 5).</p>}
     {reqType === "Rescheduling" && <label className="full">New batch<select value={batchId} onChange={(e) => setBatchId(e.target.value)}><option value="">Select a schedule</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.batch_number} · {fmtDate(b.starts_on)}–{fmtDate(b.ends_on)} · {b.capacity - b.confirmed_count} slots</option>)}</select></label>}
@@ -66,8 +66,23 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
     <label>Date requested<input type="date" value={requestedOn} max={today} onChange={(e) => setRequestedOn(e.target.value)} /></label>
     {policyFee && <div className="rate-preview"><span>Fee by policy</span><strong>{pesos(policyFee.amountCentavos)}</strong><small>{policyFee.rule}</small></div>}
     <label className="full">Reason<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why is this being requested?" /></label>
-    <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={send}>{busy ? "Sending…" : "Request approval"}</button></div>
+    <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={send}>{busy ? "Sending…" : "Send to Cashier"}</button></div>
   </div>;
   const title = reqType === "Rescheduling" ? "Change batch / reschedule" : reqType === "Make-up Class" ? "Make-up class" : reqType === "TAR reprint" ? "TAR reprint" : reqType;
   return embedded ? inner : <Modal title={`Request: ${title}`} onClose={onClose}>{inner}</Modal>;
+}
+
+/** Request ▾ from the trainee list (owner, 8 Oct 2026): pick the course when the trainee has more than one, then the request form. */
+export function TraineeRequestModal({ data, traineeId, reqType, onClose, post }: { data: PortalData; traineeId: string; reqType: RequestType; onClose: () => void; post: (body: Record<string, unknown>) => Promise<unknown> }) {
+  const usable = data.enrollments.filter((e) => e.trainee_id === traineeId && e.enrollment_status !== "Cancelled");
+  const [enrollmentId, setEnrollmentId] = useState(usable.length === 1 ? usable[0].id : "");
+  const enrollment = usable.find((e) => e.id === enrollmentId);
+  const title = reqType === "Rescheduling" ? "Reschedule" : reqType === "Make-up Class" ? "Make-up class" : reqType === "Change Course" ? "Change course" : reqType;
+  return <Modal title={`Request: ${title}`} onClose={onClose}>
+    <div className="portal-form">
+      <label className="full">Course<select value={enrollmentId} onChange={(e) => setEnrollmentId(e.target.value)}>{usable.length !== 1 && <option value="">Choose the course</option>}{usable.map((e) => { const b = first(e.batches); return <option key={e.id} value={e.id}>{first(e.courses)?.name ?? e.enrollment_number} · {b ? `starts ${fmtDate(b.starts_on)}` : e.scheduled_on ? `starts ${fmtDate(e.scheduled_on)}` : "no schedule yet"}</option>; })}</select></label>
+      {!usable.length && <p className="portal-form-note full">This trainee has no active enrollment.</p>}
+    </div>
+    {enrollment && <RequestActionModal key={enrollment.id} data={data} enrollment={enrollment} reqType={reqType} onClose={onClose} post={post} embedded />}
+  </Modal>;
 }

@@ -292,6 +292,47 @@ async function applyApprovedRequest(admin: ReturnType<typeof createSupabaseAdmin
  * without waiting for the Accounting Manager. Requests with no fee still go to
  * Accounting. Failures (for example a full batch) leave the request pending.
  */
+/**
+ * Set a request's fee and send it on (owner, 8 Oct 2026). Rescheduling and
+ * cancellation fees come from the policy (lib/request-fees), worked out from the
+ * request date and the training start. The request is applied automatically
+ * once the fee is paid (autoImplementPaidRequests); with no fee it is applied now.
+ */
+async function chargeRequest(admin: ReturnType<typeof createSupabaseAdminClient>, req: ApprovableRequest, actor: string, opts: { amountCentavos: number; description?: string; chargeCatalogId?: string | null; remarks?: string | null }) {
+  let amountCentavos = opts.amountCentavos, description = opts.description, feeRule: string | null = null;
+  if ((RULED_REQUESTS as readonly string[]).includes(req.request_type)) {
+    const { data: en } = await admin.from("enrollments").select("selling_price_centavos,scheduled_on,batches(starts_on)").eq("id", req.enrollment_id).single();
+    const { data: dated } = await admin.from("enrollment_requests").select("requested_on").eq("id", req.id).maybeSingle();
+    const { data: made } = await admin.from("enrollment_requests").select("created_at").eq("id", req.id).single();
+    const e = en as { selling_price_centavos: number; scheduled_on?: string | null; batches?: { starts_on?: string | null } | { starts_on?: string | null }[] | null };
+    const batch = Array.isArray(e.batches) ? e.batches[0] : e.batches;
+    const fee = requestFee({ type: req.request_type, trainingFeeCentavos: Number(e.selling_price_centavos), startDate: batch?.starts_on ?? e.scheduled_on ?? null, requestedOn: (dated as { requested_on?: string | null } | null)?.requested_on ?? manilaDate(new Date((made as { created_at: string }).created_at)) });
+    if (fee) { amountCentavos = fee.amountCentavos; feeRule = fee.rule; description = `${req.request_type} fee (${fee.rule})`.slice(0, 200); }
+  }
+  const payFirst = PAY_FIRST_REQUESTS.includes(req.request_type);
+  let chargeId: string | null = null;
+  if (amountCentavos > 0) {
+    // Payable right away (valid) for pay-first requests, so the Cashier can collect it.
+    const { data: charge, error: chargeError } = await admin.from("enrollment_charges").insert({ enrollment_id: req.enrollment_id, charge_catalog_id: opts.chargeCatalogId ?? null, description: description || `${req.request_type} fee`, amount_centavos: amountCentavos, event_type: "charge", valid: payFirst, approval_status: "Pending", created_by: actor }).select("id").single();
+    if (chargeError) throw chargeError;
+    chargeId = charge.id;
+  }
+  const at = new Date().toISOString();
+  const { error } = await admin.from("enrollment_requests").update({ stage: "For approval", charge_id: chargeId, charged_by: actor, charged_at: at, updated_at: at }).eq("id", req.id);
+  if (error) throw error;
+  if (feeRule) await admin.from("enrollment_requests").update({ fee_rule: feeRule }).eq("id", req.id); // 202610080022; ignored before it
+  await admin.from("request_events").insert({ request_id: req.id, actor_id: actor, event_type: "charged", new_values: { charge_id: chargeId, amount_centavos: amountCentavos, fee_rule: feeRule }, remarks: opts.remarks ?? null });
+  // Nothing to pay: a pay-first request is applied at once.
+  let applied = false;
+  if (!chargeId && payFirst) {
+    await applyApprovedRequest(admin, req, actor, "Applied (no fee)");
+    await admin.from("enrollment_requests").update({ status: "Approved", decided_at: at, decision_remarks: "Applied (no fee)", assigned_approver_id: actor }).eq("id", req.id);
+    await admin.from("request_events").insert({ request_id: req.id, actor_id: actor, event_type: "approved", remarks: "Applied (no fee)" });
+    applied = true;
+  }
+  return { chargeId, amountCentavos, feeRule, applied };
+}
+
 async function autoImplementPaidRequests(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentIds: string[], actor: string) {
   if (!enrollmentIds.length) return [] as string[];
   const { data, error } = await admin.from("enrollment_requests").select("id,enrollment_id,request_type,requested_values,status,stage,charge_id").in("enrollment_id", enrollmentIds).eq("status", "Pending").not("charge_id", "is", null);
@@ -1089,6 +1130,11 @@ export async function POST(request: Request) {
       await admin.from("request_events").insert({ request_id: created.id, actor_id: staff.user.id, event_type: "raised", new_values: requested, remarks: input.reason });
       // The date the trainee asked (202610080022); ignored before it.
       await admin.from("enrollment_requests").update({ requested_on: input.requestedOn ?? manilaDate() }).eq("id", created.id);
+      // Rescheduling and cancellation: the policy fee is attached now, so the request goes straight to the Cashier to collect it.
+      if ((RULED_REQUESTS as readonly string[]).includes(input.requestType)) {
+        const charged = await chargeRequest(admin, { id: created.id, enrollment_id: input.enrollmentId, request_type: input.requestType, requested_values: requested }, staff.user.id, { amountCentavos: 0 });
+        return NextResponse.json({ ok: true, feeCentavos: charged.amountCentavos, feeRule: charged.feeRule });
+      }
       return NextResponse.json({ ok: true });
     }
     if (input.action === "request-decide") {
@@ -1235,38 +1281,12 @@ export async function POST(request: Request) {
     if (input.action === "request-charge") {
       if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Only the Cashier can add charges to a request." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      const { data: req, error: findError } = await admin.from("enrollment_requests").select("id,enrollment_id,request_type,status,stage").eq("id", input.id).maybeSingle();
+      const { data: req, error: findError } = await admin.from("enrollment_requests").select("id,enrollment_id,request_type,requested_values,status,stage").eq("id", input.id).maybeSingle();
       if (findError) throw findError;
       if (!req) return NextResponse.json({ error: "Request not found." }, { status: 404 });
       if (req.status !== "Pending" || req.stage !== "With cashier") return NextResponse.json({ error: "This request is not waiting for charges." }, { status: 400 });
-      // Rescheduling and cancellation fees follow the owner's rule (lib/request-fees), worked out here from
-      // the request date and the training start; the amount sent by the browser is not used for them.
-      let amountCentavos = input.amountCentavos, description = input.description, feeRule: string | null = null;
-      if ((RULED_REQUESTS as readonly string[]).includes(req.request_type)) {
-        const { data: en } = await admin.from("enrollments").select("selling_price_centavos,scheduled_on,created_at,batches(starts_on)").eq("id", req.enrollment_id).single();
-        const { data: dated } = await admin.from("enrollment_requests").select("requested_on").eq("id", req.id).maybeSingle();
-        const { data: made } = await admin.from("enrollment_requests").select("created_at").eq("id", req.id).single();
-        const e = en as { selling_price_centavos: number; scheduled_on?: string | null; batches?: { starts_on?: string | null } | { starts_on?: string | null }[] | null };
-        const batch = Array.isArray(e.batches) ? e.batches[0] : e.batches;
-        const fee = requestFee({ type: req.request_type, trainingFeeCentavos: Number(e.selling_price_centavos), startDate: batch?.starts_on ?? e.scheduled_on ?? null, requestedOn: (dated as { requested_on?: string | null } | null)?.requested_on ?? manilaDate(new Date((made as { created_at: string }).created_at)) });
-        if (fee) { amountCentavos = fee.amountCentavos; feeRule = fee.rule; description = `${req.request_type} fee (${fee.rule})`.slice(0, 200); }
-      }
-      let chargeId: string | null = null;
-      if (amountCentavos > 0) {
-        // Pending until the Accounting Manager decides. A Change Course or
-        // Rescheduling fee is payable right away (valid) so the Cashier can
-        // collect it before approval; other fees count only once approved.
-        const payFirst = PAY_FIRST_REQUESTS.includes(req.request_type);
-        const { data: charge, error: chargeError } = await admin.from("enrollment_charges").insert({ enrollment_id: req.enrollment_id, charge_catalog_id: input.chargeCatalogId ?? null, description: description || `${req.request_type} fee`, amount_centavos: amountCentavos, event_type: "charge", valid: payFirst, approval_status: "Pending", created_by: staff.user.id }).select("id").single();
-        if (chargeError) throw chargeError;
-        chargeId = charge.id;
-      }
-      const at = new Date().toISOString();
-      const { error } = await admin.from("enrollment_requests").update({ stage: "For approval", charge_id: chargeId, charged_by: staff.user.id, charged_at: at, updated_at: at }).eq("id", req.id).eq("stage", "With cashier");
-      if (error) throw error;
-      if (feeRule) await admin.from("enrollment_requests").update({ fee_rule: feeRule }).eq("id", req.id); // 202610080022; ignored before it
-      await admin.from("request_events").insert({ request_id: req.id, actor_id: staff.user.id, event_type: "charged", new_values: { charge_id: chargeId, amount_centavos: amountCentavos, fee_rule: feeRule }, remarks: input.remarks ?? null });
-      return NextResponse.json({ ok: true });
+      const result = await chargeRequest(admin, req as ApprovableRequest & { requested_values?: unknown }, staff.user.id, { amountCentavos: input.amountCentavos, description: input.description, chargeCatalogId: input.chargeCatalogId ?? null, remarks: input.remarks ?? null });
+      return NextResponse.json({ ok: true, applied: result.applied });
     }
     if (input.action === "application-assign") {
       if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot assign courses to applications." }, { status: 403 });
