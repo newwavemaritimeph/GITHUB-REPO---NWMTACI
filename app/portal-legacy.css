@@ -1966,3 +1966,11 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .live-row-item{padding:14px 20px;gap:14px}
 .nw-shell .portal-form{gap:14px 16px}
 @media (max-width:640px){.nw-shell .portal-page.ac{gap:14px}.nw-shell .portal-page.ac .ac-rail,.nw-shell .portal-page.ac .ac-stack{gap:14px}.nw-shell .portal-page{padding-left:16px;padding-right:16px}}
+/* For your approval (dashboard): category tabs wrap as chips instead of scrolling (owner, 8 Oct 2026). */
+.nw-shell .ac-approvals .ac-tabs{flex-wrap:wrap;overflow:visible;gap:8px;padding:2px 20px 16px;border-bottom:1px solid var(--nw-line)}
+.nw-shell .ac-approvals .ac-tabs button{font-size:14px;padding:7px 12px;border:1px solid var(--nw-line);border-radius:99px;background:var(--nw-surface);gap:7px}
+.nw-shell .ac-approvals .ac-tabs button:hover{border-color:#0571D0;color:#0571D0}
+.nw-shell .ac-approvals .ac-tabs button.on{background:#123F63;border-color:#123F63;color:#fff}
+.nw-shell .ac-approvals .ac-tabs button.on span{background:rgba(255,255,255,.2);color:#fff}
+.nw-shell .ac-approvals>.portal-empty-copy{padding:22px 20px 24px !important}
+.nw-shell .ac-approvals .ac-req{padding:14px 20px}
