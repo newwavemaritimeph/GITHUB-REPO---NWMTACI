@@ -167,6 +167,31 @@ const Who = ({ name, number }: { name: string; number?: string }) => <><span cla
 const payState = (e: Enrollment) => (e.enrollment_status === "Cancelled" ? "Cancelled" : balanceOf(e) === 0 ? "Paid" : paidOf(e) > 0 ? "Partially paid" : "Unpaid");
 const PAY_TONE: Record<string, string> = { Paid: "active", "Partially paid": "orange", Unpaid: "red", Cancelled: "cancelled" };
 
+/**
+ * Proofs go through the hosting platform, which refuses uploads over about
+ * 4.5 MB. Photos and screenshots are scaled down to at most 2000 px and saved
+ * as JPEG (stepping the quality down until under 3.5 MB); PDFs over the limit
+ * are refused with a plain message.
+ */
+const PROOF_LIMIT = 3.5 * 1024 * 1024;
+async function shrinkProof(file: File): Promise<File> {
+  if (file.size <= PROOF_LIMIT && file.type !== "image/heic") return file;
+  if (!file.type.startsWith("image/")) throw new Error("The PDF is too large. Use a PDF under 3.5 MB or a screenshot.");
+  const bitmap = await createImageBitmap(file).catch(() => { throw new Error("This image type can't be read here. Save it as JPEG or PNG and try again."); });
+  const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return file;
+  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  for (const quality of [0.85, 0.75, 0.6, 0.45]) {
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+    if (blob && blob.size <= PROOF_LIMIT) return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+  }
+  throw new Error("The image is still too large after shrinking. Crop it to the payment details and try again.");
+}
+
 type ExtraLine = { key: string; chargeCatalogId: string | null; description: string; unit: number; quantity: number; enrollmentId: string; kind: "item" | "fee" };
 
 /**
@@ -249,11 +274,15 @@ export function RecordPaymentModal({ data, initialEnrollmentId, onClose, onSaved
     if (!refRequired) return null;
     if (proof) return proof;
     if (!proofFile || !group) throw new Error("Attach the proof of payment.");
+    const upload = await shrinkProof(proofFile);
     const form = new FormData();
-    form.set("proof", proofFile); form.set("traineeId", group.traineeId); form.set("mode", method);
+    form.set("proof", upload); form.set("traineeId", group.traineeId); form.set("mode", method);
     form.set("receivedAt", new Date(receivedAt).toISOString()); form.set("reference", reference.trim());
     const response = await fetch("/api/staff/payment-proofs/drive", { method: "POST", body: form });
-    const body = await response.json() as { proofId?: string; driveLink?: string; drivePath?: string; duplicateReference?: boolean; error?: string };
+    // A non-JSON reply (e.g. the host's "Request Entity Too Large") becomes a plain message.
+    const text = await response.text();
+    let body: { proofId?: string; driveLink?: string; drivePath?: string; duplicateReference?: boolean; error?: string } = {};
+    try { body = JSON.parse(text); } catch { body = { error: response.status === 413 || /too large/i.test(text) ? "The proof file is too large. Use a screenshot or a PDF under 4 MB." : "Could not save the proof to Google Drive." }; }
     if (!response.ok || !body.proofId) throw new Error(body.error ?? "Could not save the proof to Google Drive.");
     const filed = { id: body.proofId, link: body.driveLink ?? "", path: body.drivePath ?? "", duplicate: !!body.duplicateReference };
     setProof(filed);

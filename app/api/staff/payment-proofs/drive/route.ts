@@ -29,7 +29,7 @@ export async function POST(request: Request) {
     const file = form.get("proof");
     if (!(file instanceof File)) return NextResponse.json({ error: "Choose the proof of payment." }, { status: 400 });
     if (!allowedTypes.has(file.type)) return NextResponse.json({ error: "Use a PNG, JPEG, WebP or PDF file." }, { status: 400 });
-    if (file.size <= 0 || file.size > 10 * 1024 * 1024) return NextResponse.json({ error: "The file must be smaller than 10 MB." }, { status: 400 });
+    if (file.size <= 0 || file.size > 4 * 1024 * 1024) return NextResponse.json({ error: "The proof file must be smaller than 4 MB." }, { status: 400 });
     const meta = metadataSchema.parse({ traineeId: form.get("traineeId"), mode: form.get("mode"), receivedAt: form.get("receivedAt"), reference: form.get("reference") });
     if (!googleConfigured()) return NextResponse.json({ error: "Google is not set up yet. Add the Google keys in Vercel, then connect Google." }, { status: 400 });
 
