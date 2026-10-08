@@ -6,11 +6,13 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { enforceRateLimit } from "@/lib/security";
 import { processEmailJobs } from "@/lib/email-jobs";
 import { trySendSoftCopy } from "@/lib/certificates";
+import { matchEvaluationEnrollment } from "@/lib/certificate-rules";
 
 export const runtime = "nodejs";
 
 const input = z.object({
   formId: z.string().trim().min(10).max(120),
+  formTitle: z.string().trim().max(300).optional(),
   responseId: z.string().trim().min(1).max(200),
   email: z.string().trim().email().max(254).optional().or(z.literal("")),
   nwmtaciNo: z.string().trim().max(40).optional(),
@@ -39,14 +41,11 @@ export async function POST(request: Request) {
   let body: z.infer<typeof input>;
   try { body = input.parse(await request.json()); } catch { return NextResponse.json({ error: "Invalid payload." }, { status: 400 }); }
   const db = createSupabaseAdminClient();
-  const { data: courses } = await db.from("courses").select("id").eq("evaluation_form_id", body.formId);
-  const courseIds = (courses ?? []).map((c) => c.id as string);
-  if (!courseIds.length) return NextResponse.json({ ok: false, reason: "No course uses this form. Add the form link in Releasing Officer › Templates." }, { status: 404 });
-
   // Trainee by NWMTACI number first, then by registered email.
+  const clean = (body.nwmtaciNo ?? "").replace(/[^A-Za-z0-9-]/g, "");
   let traineeIds: string[] = [];
-  if (body.nwmtaciNo) {
-    const { data } = await db.from("trainees").select("id").or(`application_number.eq.${body.nwmtaciNo.replace(/[^A-Za-z0-9-]/g, "")},trainee_number.eq.${body.nwmtaciNo.replace(/[^A-Za-z0-9-]/g, "")}`);
+  if (clean) {
+    const { data } = await db.from("trainees").select("id").or(`application_number.eq.${clean},trainee_number.eq.${clean}`);
     traineeIds = (data ?? []).map((t) => t.id as string);
   }
   if (!traineeIds.length && body.email) {
@@ -54,9 +53,21 @@ export async function POST(request: Request) {
     traineeIds = (data ?? []).map((t) => t.id as string);
   }
   if (!traineeIds.length) return NextResponse.json({ ok: false, reason: "No trainee matches this email or NWMTACI number." }, { status: 404 });
-  const { data: enrollments } = await db.from("enrollments").select("id,enrollment_status,created_at").in("trainee_id", traineeIds).in("course_id", courseIds).neq("enrollment_status", "Cancelled").order("created_at", { ascending: false }).limit(1);
-  const enrollment = enrollments?.[0];
-  if (!enrollment) return NextResponse.json({ ok: false, reason: "The trainee has no enrollment in this course." }, { status: 404 });
+
+  // The course: a course linked to this form, else the course code in the form's title
+  // (the shared STCW form goes to the trainee's STCW course).
+  const { data: rows } = await db.from("enrollments").select("id,created_at,course_id,courses(code,course_categories(name))").in("trainee_id", traineeIds).neq("enrollment_status", "Cancelled").order("created_at", { ascending: false }).limit(50);
+  const list = (rows ?? []) as unknown as { id: string; created_at: string; course_id: string; courses: { code: string; course_categories: { name: string } | { name: string }[] | null } | { code: string; course_categories: { name: string } | { name: string }[] | null }[] | null }[];
+  if (!list.length) return NextResponse.json({ ok: false, reason: "The trainee has no enrollment." }, { status: 404 });
+  const { data: linked } = await db.from("courses").select("id").eq("evaluation_form_id", body.formId);
+  const linkedIds = new Set((linked ?? []).map((c) => c.id as string));
+  const { data: done } = await db.from("training_feedback").select("enrollment_id").in("enrollment_id", list.map((e) => e.id));
+  const doneIds = new Set((done ?? []).map((d) => d.enrollment_id as string));
+  const one = <T,>(v: T | T[] | null | undefined) => (Array.isArray(v) ? v[0] ?? null : v ?? null);
+  const pool = linkedIds.size && list.some((e) => linkedIds.has(e.course_id)) ? list.filter((e) => linkedIds.has(e.course_id)) : list;
+  const matchedId = linkedIds.size && pool !== list ? (pool.find((e) => !doneIds.has(e.id)) ?? pool[0]).id : matchEvaluationEnrollment(body.formTitle ?? "", pool.map((e) => { const c = one(e.courses); return { id: e.id, code: c?.code ?? "", categoryName: one(c?.course_categories)?.name ?? null, createdAt: e.created_at, hasEvaluation: doneIds.has(e.id) }; }));
+  if (!matchedId) return NextResponse.json({ ok: false, reason: "Could not tell which course this evaluation is for. Put the course code in the form title." }, { status: 404 });
+  const enrollment = { id: matchedId };
 
   const submittedAt = body.submittedAt ?? new Date().toISOString();
   const row = { enrollment_id: enrollment.id, comments: "Submitted through Google Forms", submitted_at: submittedAt, source: "Google Form", respondent_email: body.email || null, response_id: body.responseId };

@@ -33,7 +33,7 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
     db.from("training_feedback").select("submitted_at").eq("enrollment_id", enrollmentId).maybeSingle(),
     db.from("organization_settings").select("certificate_issuance_enabled").maybeSingle(),
     db.from("certificates").select("id,status,snapshot,certificate_number,batch_label,print_count,reprints_allowed,void_status,soft_copy_sent_at").eq("enrollment_id", enrollmentId).maybeSingle(),
-    db.from("courses").select("evaluation_form_id").eq("id", e.course_id).maybeSingle(),
+    db.from("courses").select("evaluation_form_id,google_classroom_link").eq("id", e.course_id).maybeSingle(),
   ]);
   let cert = certRes.data as CertificateContext["cert"] | null;
   if (certRes.error) {
@@ -55,9 +55,12 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
   }
   let due = Number(e.selling_price_centavos ?? 0);
   for (const ch of charges ?? []) due += ch.event_type === "discount" ? -Number(ch.amount_centavos) : Number(ch.amount_centavos);
-  const evaluationFormId = formRes.error ? null : ((formRes.data as { evaluation_form_id?: string | null } | null)?.evaluation_form_id ?? null);
+  const formRow = formRes.error ? null : (formRes.data as { evaluation_form_id?: string | null; google_classroom_link?: string | null } | null);
+  const evaluationFormId = formRow?.evaluation_form_id ?? null;
+  // Google Classroom courses need the evaluation (it sits in their classwork); so does any course linked to a form.
+  const evaluationRequired = !!evaluationFormId || !!formRow?.google_classroom_link;
   const view = certificateState({
-    enrollmentStatus: e.enrollment_status, trainingEnd, balanceCentavos: Math.max(0, due - paid), evaluationRequired: !!evaluationFormId,
+    enrollmentStatus: e.enrollment_status, trainingEnd, balanceCentavos: Math.max(0, due - paid), evaluationRequired,
     evaluationOn: manilaDay((feedback as { submitted_at?: string } | null)?.submitted_at), paidOn: lastPaid,
     cert: cert ? { status: cert.status, printCount: Number(cert.print_count ?? 0), reprintsAllowed: Number(cert.reprints_allowed ?? 0), voidStatus: cert.void_status } : null,
   }, manilaToday());

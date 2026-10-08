@@ -63,3 +63,25 @@ export function driveFileId(input: string | null | undefined) {
   const m = v.match(/\/file\/d\/([A-Za-z0-9_-]{10,})/) ?? v.match(/[?&]id=([A-Za-z0-9_-]{10,})/);
   return m ? m[1] : /^[A-Za-z0-9_-]{20,}$/.test(v) ? v : null;
 }
+
+export type EvaluationCandidate = { id: string; code: string; categoryName: string | null; createdAt: string; hasEvaluation: boolean };
+
+/**
+ * Which enrollment a Google Forms evaluation belongs to, from the form's title
+ * (e.g. "ATTENDANCE AND TRAINING EVALUATION SURVEY FORM - HPT-Hydraulic and
+ * Pneumatic Training" → course code HPT; "POST TRAINING EVALUATION FORM - STCW
+ * COURSES" → the trainee's STCW course). Enrollments still without an
+ * evaluation come first, newest first. Null when it cannot be told apart.
+ */
+export function matchEvaluationEnrollment(title: string, candidates: EvaluationCandidate[]) {
+  const t = ` ${title.toUpperCase().replace(/[^A-Z0-9]+/g, " ")} `;
+  const order = (list: EvaluationCandidate[]) => [...list].sort((a, b) => Number(a.hasEvaluation) - Number(b.hasEvaluation) || b.createdAt.localeCompare(a.createdAt));
+  const byCode = candidates.filter((c) => { const code = c.code.toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim(); return code.length >= 2 && t.includes(` ${code} `); });
+  if (byCode.length) return order(byCode)[0].id;
+  if (t.includes(" STCW ")) {
+    const stcw = candidates.filter((c) => (c.categoryName ?? "").toUpperCase().includes("STCW"));
+    if (stcw.length) return order(stcw)[0].id;
+  }
+  const open = candidates.filter((c) => !c.hasEvaluation);
+  return open.length === 1 ? open[0].id : null;
+}

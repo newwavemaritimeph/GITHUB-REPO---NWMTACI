@@ -41,7 +41,8 @@ export function certificateLines(data: PortalData): CertificateLine[] {
     const b = first(e.batches);
     const ended = b?.ends_on ?? (e.scheduled_on ? automaticEndDate(e.scheduled_on, c.duration_label) : null);
     const cert = certs.get(e.id) ?? null;
-    const evalNeeded = !!d.evaluationForms?.[c.id];
+    // Google Classroom courses need the evaluation from their classwork; so does any course linked to a form.
+    const evalNeeded = !!d.evaluationForms?.[c.id] || !!c.google_classroom_link;
     const fb = d.feedbackAt?.[e.id] ?? null;
     const balance = Math.max(0, dueCentavos(e) - Number(e.paid_centavos));
     const view = certificateState({ enrollmentStatus: e.enrollment_status, trainingEnd: ended, balanceCentavos: balance, evaluationRequired: evalNeeded, evaluationOn: day(fb), paidOn: lastPaid.get(e.trainee_id) ?? null, cert: cert ? { status: cert.status, printCount: Number(cert.print_count ?? (["Printed", "Released"].includes(cert.status) ? 1 : 0)), reprintsAllowed: Number(cert.reprints_allowed ?? 0), voidStatus: cert.void_status } : null }, today);
