@@ -12,6 +12,7 @@ import { fileVoucherInDrive } from "@/lib/expense-voucher";
 import { activeConnection, googleConfigured, hasDriveScope, inviteStudent, listClasses, revokeConnection } from "@/lib/google-classroom";
 import { sendBalanceSummary } from "@/lib/balance-summary";
 import { RULED_REQUESTS, requestFee } from "@/lib/request-fees";
+import { applyReferralRebates, suggestReferralCode } from "@/lib/referral";
 
 const manilaDate = (d = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(d);
 
@@ -77,6 +78,7 @@ const chargeInput = z.object({ action: z.literal("charge-save"), id: z.string().
 const expenseCategoryInput = z.object({ action: z.literal("expense-category-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), active: z.boolean().optional(), remove: z.boolean().optional() });
 const inventoryItemInput = z.object({ action: z.literal("inventory-item-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), category: z.string().trim().max(80).optional(), unit: z.string().trim().min(1).max(24).default("pc"), unitValueCentavos: z.number().int().nonnegative().default(0), active: z.boolean().optional(), remove: z.boolean().optional() });
 const inventoryMoveInput = z.object({ action: z.literal("inventory-move"), itemId: z.string().uuid(), movementType: z.enum(["in", "out"]), quantity: z.number().int().positive(), remarks: z.string().trim().max(240).optional() });
+const agencyCodeInput = z.object({ action: z.literal("agency-code-regenerate"), id: z.string().uuid() });
 const agencyInput = z.object({ action: z.literal("agency-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), kind: z.enum(["Agency", "Consultancy"]).optional(), contactName: z.string().trim().max(120).optional(), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
 const payableInput = z.object({ action: z.literal("payable-save"), id: z.string().uuid().nullable().optional(), description: z.string().trim().min(1).max(200), amountCentavos: z.number().int().positive().optional(), dueOn: z.string().date().nullable().optional(), remove: z.boolean().optional() });
 const expenseCreateInput = z.object({ action: z.literal("expense-create"), payee: z.string().trim().min(1).max(120), category: z.string().trim().min(1).max(80), amountCentavos: z.number().int().positive(), purpose: z.string().trim().min(1).max(300), paymentChannel: z.string().trim().max(40).optional().default(""), referenceNumber: z.string().trim().max(80).optional().default(""),
@@ -189,7 +191,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -292,6 +294,17 @@ async function applyApprovedRequest(admin: ReturnType<typeof createSupabaseAdmin
  * without waiting for the Accounting Manager. Requests with no fee still go to
  * Accounting. Failures (for example a full batch) leave the request pending.
  */
+/** Give an agency a fresh, unique referral code (letters of its name + 6 digits). Null before migration 023. */
+async function assignReferralCode(admin: ReturnType<typeof createSupabaseAdminClient>, id: string, name: string) {
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const code = suggestReferralCode(name);
+    const { error } = await admin.from("marketing_agencies").update({ referral_code: code }).eq("id", id);
+    if (!error) return code;
+    if (!/duplicate|unique/i.test(error.message)) return null;
+  }
+  return null;
+}
+
 /**
  * Set a request's fee and send it on (owner, 8 Oct 2026). Rescheduling and
  * cancellation fees come from the policy (lib/request-fees), worked out from the
@@ -851,6 +864,10 @@ export async function GET() {
     return { ...merged, requested_by_name: expenseExtras.names.get(merged.requested_by ?? "") ?? null };
   });
 
+  // Referral agency per enrollment (202610080023); {} before it.
+  const referralByEnrollment: Record<string, string> = {};
+  { const { data: refs } = await db.from("enrollments").select("id,referral_agency_id").not("referral_agency_id", "is", null).order("created_at", { ascending: false }).limit(1000); for (const r of (refs ?? []) as { id: string; referral_agency_id: string }[]) referralByEnrollment[r.id] = r.referral_agency_id; }
+
   // Voucher reprint requests (202610080020), newest first; [] before it.
   let expenseReprints: { id: string; expense_id: string; reason: string; status: string; requested_by_name: string | null; requested_at: string; decision_remarks: string | null }[] = [];
   if (staff.roleCodes.some((role) => ["admin", "cashier", "accounting"].includes(role))) {
@@ -870,7 +887,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -932,7 +949,19 @@ export async function POST(request: Request) {
       if (error) throw error;
       // Agency or consultancy (202610080021); ignored before it.
       if (input.kind) await admin.from("marketing_agencies").update({ kind: input.kind }).eq("id", saved.id);
+      // A new agency gets its referral code automatically (202610080023).
+      if (!input.id) await assignReferralCode(admin, saved.id, input.name);
       return NextResponse.json({ ok: true });
+    }
+    if (input.action === "agency-code-regenerate") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage agencies." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: agency } = await admin.from("marketing_agencies").select("id,name").eq("id", input.id).maybeSingle();
+      if (!agency) return NextResponse.json({ error: "Agency not found." }, { status: 404 });
+      const code = await assignReferralCode(admin, agency.id, agency.name);
+      if (!code) return NextResponse.json({ error: "Apply database update 202610080023 first." }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "accounting", action: "agency.referral_code_changed", record_type: "marketing_agency", record_id: agency.id, new_values: { changed: true } });
+      return NextResponse.json({ ok: true, code });
     }
     if (input.action === "payable-save") {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage payables." }, { status: 403 });
@@ -1297,6 +1326,12 @@ export async function POST(request: Request) {
       const { data, error } = await admin.rpc("assign_application_course", { target_trainee: input.traineeId, target_course: input.courseId, target_batch: input.batchId ?? null, actor: staff.user.id });
       if (error) return NextResponse.json({ error: /function public.assign_application_course/i.test(error.message) ? "Apply database update 202610070005 to assign a course without a batch." : error.message }, { status: 400 });
       // A non-STCW in-house course may run on a picked start date instead of a batch.
+      // A referred trainee's new course carries the referral, and its rebate comes off the fee (202610080023).
+      if (data) {
+        const enrollmentId = (data as { id: string }).id;
+        const { data: tr } = await admin.from("trainees").select("marketing_agency_id").eq("id", input.traineeId).maybeSingle();
+        if (tr?.marketing_agency_id) { await admin.from("enrollments").update({ referral_agency_id: tr.marketing_agency_id }).eq("id", enrollmentId); await applyReferralRebates(admin, [enrollmentId], staff.user.id); }
+      }
       if (input.scheduledOn && !input.batchId && data) {
         const { error: dateError } = await admin.from("enrollments").update({ scheduled_on: input.scheduledOn }).eq("id", (data as { id: string }).id);
         if (dateError) throw dateError;
@@ -1779,6 +1814,8 @@ export async function POST(request: Request) {
       const admin = createSupabaseAdminClient();
       const splitModeProblem = await paymentModeProblem(admin, input.method, input.referenceNumber);
       if (splitModeProblem) return NextResponse.json({ error: splitModeProblem }, { status: 400 });
+      // Referral rebates come off the fee before any payment, partial or full.
+      await applyReferralRebates(admin, [...new Set([...input.allocations.map((a) => a.enrollmentId), ...(input.items ?? []).map((i) => i.enrollmentId)])], staff.user.id);
       if (!input.allocations.length && !input.items.length) return NextResponse.json({ error: "Apply the payment to at least one course or charge." }, { status: 400 });
       const ids = [...new Set([...input.allocations.map((a) => a.enrollmentId), ...input.items.map((i) => i.enrollmentId)])];
       const { data: enrs } = await admin.from("enrollments").select("id,trainee_id,selling_price_centavos,enrollment_status").in("id", ids);
@@ -2043,6 +2080,8 @@ export async function POST(request: Request) {
     const admin = createSupabaseAdminClient();
     const modeProblem = await paymentModeProblem(admin, input.method, input.referenceNumber);
     if (modeProblem) return NextResponse.json({ error: modeProblem }, { status: 400 });
+    // Referral rebate comes off the fee before any payment, partial or full.
+    await applyReferralRebates(admin, [input.enrollmentId], staff.user.id);
     const { data: enrollment, error: enrollmentError } = await admin.from("enrollments").select("id,trainee_id,selling_price_centavos").eq("id", input.enrollmentId).maybeSingle();
     if (enrollmentError || !enrollment) throw enrollmentError ?? new Error("Enrollment not found.");
     const { data: existingAllocations } = await admin.from("payment_allocations").select("amount_centavos,payments!inner(valid)").eq("enrollment_id", input.enrollmentId).eq("payments.valid", true);

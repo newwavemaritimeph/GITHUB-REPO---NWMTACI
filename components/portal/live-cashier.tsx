@@ -254,6 +254,8 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
     .filter((g) => !term || `${g.name} ${g.number} ${g.enrollments.map((e) => `${courseCode(e)} ${e.enrollment_number}`).join(" ")}`.toLowerCase().includes(term))
     .sort((a, b) => b.balance - a.balance || a.name.localeCompare(b.name)).slice(0, 8);
   const group = traineeId ? groupByTrainee(data, mine)[0] : undefined;
+  // Referral (8 Oct 2026): the agency's rebate is already deducted from these balances.
+  const referralAgency = (() => { const id = mine.map((e) => data.referralByEnrollment?.[e.id]).find(Boolean); return id ? data.agencies.find((a) => a.id === id) ?? null : null; })();
   const applied = open.reduce((s, e) => s + Math.min(toCentavos(amounts[e.id] ?? ""), balanceOf(e)), 0);
   const extraTotal = extras.reduce((s, x) => s + x.unit * x.quantity, 0);
   const total = applied + extraTotal;
@@ -343,7 +345,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
         <div className="cx-results">{candidates.map((g) => { const unpaid = g.enrollments.filter((e) => balanceOf(e) > 0); return <button type="button" key={g.traineeId} onClick={() => choose(g.traineeId)}><span><b>{g.name}</b><small>{unpaid.length ? unpaid.map(courseCode).join(" · ") : "All courses paid"}</small></span><strong className="cx-amt">{pesos(g.balance)}</strong></button>; })}
           {!candidates.length && <p className="portal-empty-copy">No trainee matches.</p>}</div>
       </div> : <>
-        <div className="cx-whocard full"><div><Who name={group.name} number={group.number} /></div><div className="cx-right"><small>Balance</small><span className="cx-amt">{pesos(group.balance)}</span></div></div>
+        <div className="cx-whocard full"><div><Who name={group.name} number={group.number} />{referralAgency && <span className="ref-chip">Referred by {referralAgency.name} · rebate deducted</span>}</div><div className="cx-right"><small>Balance</small><span className="cx-amt">{pesos(group.balance)}</span></div></div>
         <label>Amount received (PHP)<input className="cx-mono" inputMode="decimal" value={received} onChange={(ev) => setReceived(ev.target.value)} placeholder="0.00" /></label>
         <div><span className="pay-label">Apply the amount</span><div className="cx-choice"><button type="button" onClick={() => fill("all")}>Pay all in full</button><button type="button" onClick={() => fill("spread")}>Distribute in order</button><button type="button" onClick={() => fill("clear")}>Clear</button></div></div>
         <div className="cx-lines full"><table><thead><tr><th>Course or charge</th><th className="r">Balance</th><th className="r">Apply</th></tr></thead><tbody>

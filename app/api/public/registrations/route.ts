@@ -14,6 +14,7 @@ import {
 } from "@/lib/validation";
 import { PUBLIC_STCW_CODES, automaticEndDate, fitsInWeek } from "@/lib/scheduling";
 import { MAX_COURSES, firstOrderConflict, type PickRange } from "@/lib/course-selection";
+import { agencyForCode, applyReferralRebates, normaliseReferralCode } from "@/lib/referral";
 
 const registrationSchema = z.object({
   firstName: z.string().trim().min(2).max(80), middleName: z.string().trim().max(80).optional().default(""), lastName: z.string().trim().min(2).max(80), suffix: z.string().trim().max(20).optional().default(""),
@@ -26,6 +27,8 @@ const registrationSchema = z.object({
   emergencyContactName: z.string().trim().min(2).max(160),
   emergencyContactMobile: z.string().trim().refine(isPhContactNumber, VALIDATION_MESSAGES.contact),
   termsAccepted: z.literal("on"),
+  // An agency or consultancy referral code (optional; 8 Oct 2026).
+  referralCode: z.string().trim().max(40).optional().default(""),
 });
 // 1–5 chosen schedules (batch ids) per submission.
 // Schedules are optional: without one, Registration assigns the course and
@@ -83,17 +86,20 @@ export async function POST(request: Request) {
     if (batches.length + dated.length > MAX_COURSES) throw new Error(`You can choose up to ${MAX_COURSES} courses per application.`);
     const db = createSupabaseAdminClient();
     await checkCourseOrder(db, batches, dated);
+    const startedAt = new Date().toISOString();
+    const referral = await agencyForCode(db, normaliseReferralCode(body.referralCode));
     const { data: terms } = await db.from("terms_documents").select("version").eq("active", true).lte("effective_from", new Date().toISOString().slice(0,10)).order("effective_from", { ascending: false }).limit(1).maybeSingle();
     if (!terms) throw new Error("No approved terms are active.");
     const { data, error } = await withTimeout(db.rpc("submit_public_registration", {
       target_first_name: body.firstName,target_middle_name: body.middleName,target_last_name: body.lastName,target_suffix: body.suffix,target_srn: normalizeSrn(body.srn) ?? "",
       target_email: normalizeEmail(body.email),target_address: body.presentAddress,target_mobile: normalizePhContactNumber(body.mobile)!,target_place_of_birth: body.placeOfBirth,target_birthdate: body.birthDate,
       target_rank: body.rank,target_company: body.company,target_emergency_name: body.emergencyContactName,target_emergency_mobile: normalizePhContactNumber(body.emergencyContactMobile)!,
-      target_batches: batches,target_terms_version: terms.version,target_ip_hash: ipHash,target_marketing_agency: null,
+      target_batches: batches,target_terms_version: terms.version,target_ip_hash: ipHash,target_marketing_agency: referral?.id ?? null,
     }), 15000, "The registration service is busy (a previous submission may still be finalizing). Please try again in a minute.");
     if (error) throw error;
     const result = data as { application_number?:string;registration_reference:string;trainee_id:string;email:string;complete_name:string };
     for (const pick of dated) await attachDatedCourse(db, result.trainee_id, pick);
+    if (referral) await tagReferral(db, result.trainee_id, referral.id, startedAt);
     // Trainees have no portal account. They follow their enrollment through the
     // public status lookup using this reference plus their registered email.
     // application_number (NWMTACI-0000001) exists once migration 202610070003 is
@@ -104,6 +110,24 @@ export async function POST(request: Request) {
     if (status !== 429) console.error("Public registration failed:", error);
     return NextResponse.json({ error: status === 429 ? "Too many registration attempts. Please try again later." : applicantMessage(error) }, { status });
   }
+}
+
+/**
+ * Referral code (owner, 8 Oct 2026): tag this submission's enrollments with the
+ * agency (and an untagged trainee), then deduct the agency's rebate from the fee.
+ * Best-effort: the application is already saved.
+ */
+async function tagReferral(db: ReturnType<typeof createSupabaseAdminClient>, traineeId: string, agencyId: string, since: string) {
+  try {
+    await db.from("trainees").update({ marketing_agency_id: agencyId }).eq("id", traineeId).is("marketing_agency_id", null);
+    const { data: mine } = await db.from("enrollments").select("id").eq("trainee_id", traineeId).gte("created_at", since);
+    const ids = (mine ?? []).map((e) => e.id as string);
+    if (!ids.length) return;
+    const { error } = await db.from("enrollments").update({ referral_agency_id: agencyId }).in("id", ids);
+    if (error) console.error("Referral tag (apply database update 202610080023):", error.message);
+    await applyReferralRebates(db, ids, null);
+    await db.from("audit_logs").insert({ actor_id: null, actor_role: "public", action: "registration.referral", record_type: "trainee", record_id: traineeId, new_values: { agency_id: agencyId, enrollment_ids: ids } });
+  } catch (err) { console.error("Referral tag failed:", err instanceof Error ? err.message : err); }
 }
 
 /**

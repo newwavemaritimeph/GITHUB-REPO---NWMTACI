@@ -1380,6 +1380,34 @@ export type AccountingConfigSection = (typeof ACCOUNTING_CONFIG_SECTIONS)[number
  * consultancies, the rebate each one earns per course, and the trainee list.
  * Payment channels, course fees, charges and user accounts live in Admin.
  */
+/**
+ * Referral codes (owner, 8 Oct 2026): every agency and consultancy gets one
+ * automatically. Trainees type it on the public registration form; the
+ * agency's rebate is then deducted from what they pay.
+ */
+function ReferralCodes({ agencies, busy, post }: { agencies: (Agency & { kind?: string | null; referral_code?: string | null })[]; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
+  const [copied, setCopied] = useState("");
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const copy = (id: string, code: string) => { void navigator.clipboard?.writeText(code).then(() => { setCopied(id); window.setTimeout(() => setCopied(""), 1800); }).catch(() => undefined); };
+  const list = agencies.filter((a) => a.active);
+  return <section className="portal-panel cx-panel">
+    <div className="panel-heading"><h2>Referral codes</h2></div>
+    {list.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Agency or consultancy</th><th>Type</th><th>Referral code</th><th></th></tr></thead><tbody>
+      {list.map((a) => <tr key={a.id}>
+        <td data-l="" className="lead"><span className="cx-name">{a.name}</span></td>
+        <td data-l="Type">{a.kind || "Agency"}</td>
+        <td data-l="Referral code"><span className="cx-mono ref-code">{a.referral_code || "Not set yet"}</span></td>
+        <td data-l=""><div className="cx-acts">
+          {a.referral_code && <button type="button" className="portal-secondary" onClick={() => copy(a.id, a.referral_code!)}>{copied === a.id ? "Copied" : "Copy"}</button>}
+          {confirm === a.id
+            ? <><span className="muted-text">The old code will stop working.</span><button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "agency-code-regenerate", id: a.id }).then(() => setConfirm(null)).catch(() => undefined)}>Make new code</button><button type="button" className="portal-secondary" onClick={() => setConfirm(null)}>Keep</button></>
+            : <button type="button" className="portal-secondary" onClick={() => setConfirm(a.id)}>{a.referral_code ? "New code" : "Create code"}</button>}
+        </div></td>
+      </tr>)}
+    </tbody></table></div> : <p className="portal-empty-copy">Add an agency or consultancy above; its referral code is created automatically.</p>}
+  </section>;
+}
+
 export function AccountingConfiguration({ section, data, trainees, applicationNumbers, reload }: { section: AccountingConfigSection; data: AccountingData; trainees: ConfigTrainee[]; applicationNumbers?: Record<string, string>; reload: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -1421,6 +1449,7 @@ export function AccountingConfiguration({ section, data, trainees, applicationNu
       rows={data.agencies.map((a) => { const kind = (a as { kind?: string | null }).kind || "Agency"; return { id: a.id, primary: a.name, secondary: [kind, a.contact_name, a.email, a.mobile].filter(Boolean).join(" · "), active: a.active, values: { name: a.name, kind, contactName: a.contact_name || "", email: a.email || "", mobile: a.mobile || "" } }; })}
       onSubmit={(v, id) => post({ action: "agency-save", id, name: String(v.name), kind: v.kind === "Consultancy" ? "Consultancy" : "Agency", contactName: String(v.contactName || ""), email: String(v.email || ""), mobile: String(v.mobile || "") })}
       onArchive={(id, active, name) => void post({ action: "agency-save", id, name, active: !active }).catch(() => undefined)} />}
+    {section === "Agencies and consultancies" && <ReferralCodes agencies={data.agencies as (Agency & { kind?: string | null; referral_code?: string | null })[]} busy={busy} post={post} />}
     {section === "Expense categories" && <SetupList title="Expense categories" description="" entityLabel="category" canManage busy={busy}
       fields={[{ key: "name", label: "Category name" }]}
       rows={(data as unknown as { expenseCategories: { id: string; name: string; active: boolean }[] }).expenseCategories.map((c) => ({ id: c.id, primary: c.name, secondary: c.active ? "Active" : "Archived", active: c.active, values: { name: c.name } }))}

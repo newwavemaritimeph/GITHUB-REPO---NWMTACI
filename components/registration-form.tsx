@@ -46,7 +46,7 @@ const EMPTY_ROW: Row = { code: "", batchId: "", start: "" };
 
 const emptyApplicant = {
   srn: "", firstName: "", middleName: "", lastName: "", suffix: "", birthDate: "", placeOfBirth: "",
-  address: "", mobile: "", email: "", company: "", rank: "", rankOther: "",
+  address: "", mobile: "", email: "", company: "", rank: "", rankOther: "", referralCode: "",
   emergencyContactName: "", emergencyContactMobile: "",
 };
 
@@ -84,6 +84,19 @@ function Wizard() {
   const locked = lookup?.kind === "found";
 
   const set = <K extends keyof typeof emptyApplicant>(key: K, value: string) => setApplicant((current) => ({ ...current, [key]: value }));
+  // Referral code from an agency or consultancy (8 Oct 2026): checked as the applicant types; only the agency name comes back.
+  const referralInput = applicant.referralCode.replace(/[^A-Za-z0-9]/g, "");
+  const [checked, setChecked] = useState<{ code: string; name: string | null } | null>(null);
+  useEffect(() => {
+    if (referralInput.length < 4) return;
+    const timer = window.setTimeout(() => {
+      void fetch("/api/public/referral-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: referralInput }) })
+        .then(async (r) => { const body = await r.json().catch(() => ({})) as { name?: string }; setChecked({ code: referralInput, name: r.ok && body.name ? body.name : null }); })
+        .catch(() => setChecked({ code: referralInput, name: null }));
+    }, 600);
+    return () => window.clearTimeout(timer);
+  }, [referralInput]);
+  const referral: { state: "idle" | "checking" | "ok" | "bad"; name?: string } = referralInput.length < 4 ? { state: "idle" } : checked?.code !== referralInput ? { state: "checking" } : checked.name ? { state: "ok", name: checked.name } : { state: "bad" };
 
   // Live catalog; a course chosen earlier arrives in the URL (?batch= or ?course=&start=)
   // and fills the first row.
@@ -178,7 +191,7 @@ function Wizard() {
       const fd = new FormData();
       fd.set("firstName", applicant.firstName); fd.set("middleName", applicant.middleName); fd.set("lastName", applicant.lastName); fd.set("suffix", applicant.suffix);
       fd.set("srn", applicant.srn); fd.set("email", applicant.email.toLowerCase()); fd.set("presentAddress", applicant.address); fd.set("mobile", applicant.mobile);
-      fd.set("placeOfBirth", applicant.placeOfBirth); fd.set("birthDate", applicant.birthDate); fd.set("rank", rank); fd.set("company", applicant.company);
+      fd.set("placeOfBirth", applicant.placeOfBirth); fd.set("birthDate", applicant.birthDate); fd.set("rank", rank); fd.set("company", applicant.company); if (referral.state === "ok") fd.set("referralCode", applicant.referralCode);
       fd.set("emergencyContactName", applicant.emergencyContactName); fd.set("emergencyContactMobile", applicant.emergencyContactMobile);
       for (const r of rows) {
         if (!r.code || !rangeOf(r)) continue;
@@ -308,6 +321,10 @@ function Wizard() {
       <Field label="Rank*"><select value={applicant.rank} onChange={(e) => set("rank", e.target.value)}><option value="">Select</option>{RANKS.map((item) => <option key={item} value={item}>{item}</option>)}</select></Field>
       {applicant.rank === "OTHER" && <Field label="Specify Rank*"><input value={applicant.rankOther} onChange={(e) => set("rankOther", upper(e.target.value))} /></Field>}
       <Field label="Company / Manning Agency" wide><input value={applicant.company} onChange={(e) => set("company", upper(e.target.value))} placeholder="Optional" /></Field>
+      <Field label="Referral code" wide><input value={applicant.referralCode} onChange={(e) => set("referralCode", e.target.value.toUpperCase().replace(/s/g, ""))} placeholder="Optional · from your agency or consultancy" autoComplete="off" maxLength={24} />
+        {referral.state === "ok" && <small className="ref-ok">✓ Referred by {referral.name}</small>}
+        {referral.state === "bad" && <small className="ref-bad">Code not recognised. Check with your agency.</small>}
+        {referral.state === "checking" && <small className="ref-wait">Checking…</small>}</Field>
     </div>,
     contact: <div className="ql-grid caps-form">
       <Field label="Complete Address*" wide><input value={applicant.address} onChange={(e) => set("address", upper(e.target.value))} /></Field>

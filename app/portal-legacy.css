@@ -1588,3 +1588,5 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .rp-group+.rp-group{border-top:1px solid #dbe5ec}
 @media (max-width:900px){.portal-shell .rp-cash{grid-template-columns:repeat(3,minmax(0,1fr))}.portal-shell .rp-cash>div:nth-child(3){border-right:0}.portal-shell .rp-cash>div:nth-child(-n+3){border-bottom:1px solid #dbe5ec}}
 @media (max-width:520px){.portal-shell .rp-cash{grid-template-columns:repeat(2,minmax(0,1fr))}.portal-shell .rp-cash>div{border-bottom:1px solid #dbe5ec}.portal-shell .rp-cash>div:nth-child(odd){border-right:1px solid #dbe5ec}.portal-shell .rp-cash>div:nth-child(even){border-right:0}}
+.portal-shell .ref-code{font-size:16px;letter-spacing:.04em;color:#123F63}
+.portal-shell .ref-chip{display:inline-block;margin-top:4px;font-size:12.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:#e5f1fb;color:#0571D0}
