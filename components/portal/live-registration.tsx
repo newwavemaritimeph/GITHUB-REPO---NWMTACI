@@ -450,7 +450,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
       <div className="full"><strong>Documents &amp; instructions</strong></div>
       {hasDocuments ? <>
         <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
-          <button type="button" disabled={busy || atLimit} title={atLimit ? "Instructions can be generated twice per enrollment" : undefined} onClick={() => void post({ action: "send-instructions", enrollmentId: e.id }, generated ? "Instructions generated again and emailed to the trainee." : "Instructions generated and emailed to the trainee.").catch(() => undefined)}>{atLimit ? "Generated twice — limit reached" : generated ? `Generate again (${generated} of ${INSTRUCTION_LIMIT})` : "Generate instructions"}</button>
+          {!atLimit && <button type="button" disabled={busy} onClick={() => void post({ action: "send-instructions", enrollmentId: e.id }, generated ? "Instructions generated again and emailed to the trainee." : "Instructions generated and emailed to the trainee.").catch(() => undefined)}>Generate instructions</button>}
           {generated > 0 && <a href={`/api/documents/training-instructions/${e.id}`} target="_blank" rel="noreferrer">Instructions PDF</a>}
         </div>
         <p className="portal-form-note full">{emailStatusText(data.instructionEmails?.[e.id]) ? `${emailStatusText(data.instructionEmails?.[e.id])}. ` : t?.email ? `Generating emails the PDF and Google Classroom link to ${t.email}. ` : ""}{e.instructions_sent_at ? `Last generated ${fmtDate(day(e.instructions_sent_at))}. ` : ""}Instructions can be generated twice. The Training Admission Record is printed by the Cashier.</p>

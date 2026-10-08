@@ -59,7 +59,7 @@ export function tarState(data: PortalData, traineeId: string) {
 export function ReceiptButton({ data, paymentId, reload, className = "portal-secondary" }: { data: PortalData; paymentId: string; reload?: () => Promise<void>; className?: string }) {
   const printed = data.receiptPrints?.[paymentId] ?? 0;
   if (printed >= 2) return null;
-  return <a className={className} href={`/portal/payment-receipt/${paymentId}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload?.(), 2500)}>{printed ? `Print receipt (${printed} of 2 printed)` : "Print receipt"}</a>;
+  return <a className={className} href={`/portal/payment-receipt/${paymentId}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload?.(), 2500)}>Print receipt</a>;
 }
 
 /** Print TAR (owner, 8 Oct 2026): prints twice; after the second print the button is gone. */
@@ -71,7 +71,7 @@ export function TarButton({ data, traineeId, reload, className = "portal-seconda
   return <>
     {!s.paid.length
       ? <button type="button" className={className} disabled title="The TAR prints once a course is paid">Print TAR</button>
-      : <button type="button" className={className} onClick={print}>{s.printed ? `Print TAR (${s.printed} of ${s.allowed} printed)` : "Print TAR"}</button>}
+      : <button type="button" className={className} onClick={print}>Print TAR</button>}
     {error && <Message kind="error" text={error} />}
   </>;
 }
