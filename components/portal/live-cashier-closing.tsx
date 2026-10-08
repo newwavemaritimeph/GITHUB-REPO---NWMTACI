@@ -46,7 +46,7 @@ export function LiveCashierClosing({ data, reload, initialOpening }: { data: Clo
 
   return (
     <div className="portal-page">
-      <div className="portal-heading"><div><span className="portal-eyebrow">Cashier operations</span><h1>Opening / Closing</h1><p>Record the opening float and count out the drawer at end of day. Collections are computed from posted payments.</p></div></div>
+      <div className="portal-heading"><div><span className="portal-eyebrow">Cashier operations</span><h1>Opening / closing</h1><p>Record the opening float and count out the drawer at end of day. Collections are computed from posted payments.</p></div></div>
 
       <div className="finance-hero">
         <div><span>Expected cash · {today}</span><strong>{pesos(expected)}</strong><small>Opening + cash collections</small></div>
@@ -62,7 +62,7 @@ export function LiveCashierClosing({ data, reload, initialOpening }: { data: Clo
         <div className="panel-heading"><div><h2>Submit today&apos;s closing</h2><p>Paid expenses are deducted from expected cash on submit.</p></div></div>
         <div className="portal-form" style={{ padding: "4px 0" }}>
           <label>Opening Cash (PHP)<input type="number" min="0" step="0.01" value={opening} onChange={(e) => setOpening(e.target.value)} placeholder="0.00" /></label>
-          <label>Actual Counted Cash (PHP)<input type="number" min="0" step="0.01" value={actual} onChange={(e) => setActual(e.target.value)} placeholder="0.00" /></label>
+          <label>Actual counted cash (PHP)<input type="number" min="0" step="0.01" value={actual} onChange={(e) => setActual(e.target.value)} placeholder="0.00" /></label>
           <label className="full">Remarks<textarea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} /></label>
           <div className="full">
             <button className="portal-primary" disabled={busy || !opening || !actual} onClick={submit}>{busy ? "Submitting…" : alreadyClosed ? "Submit another closing" : "Submit closing"}</button>

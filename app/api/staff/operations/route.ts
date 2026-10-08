@@ -79,7 +79,7 @@ const expenseCategoryInput = z.object({ action: z.literal("expense-category-save
 const inventoryItemInput = z.object({ action: z.literal("inventory-item-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), category: z.string().trim().max(80).optional(), unit: z.string().trim().min(1).max(24).default("pc"), unitValueCentavos: z.number().int().nonnegative().default(0), active: z.boolean().optional(), remove: z.boolean().optional() });
 const inventoryMoveInput = z.object({ action: z.literal("inventory-move"), itemId: z.string().uuid(), movementType: z.enum(["in", "out"]), quantity: z.number().int().positive(), remarks: z.string().trim().max(240).optional() });
 const agencyCodeInput = z.object({ action: z.literal("agency-code-regenerate"), id: z.string().uuid() });
-const agencyInput = z.object({ action: z.literal("agency-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), kind: z.enum(["Agency", "Consultancy"]).optional(), contactName: z.string().trim().max(120).optional(), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
+const agencyInput = z.object({ action: z.literal("agency-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), kind: z.enum(["Agency", "Consultancy"]).optional(), rebateMode: z.enum(["Deducted", "No deduction"]).optional(), contactName: z.string().trim().max(120).optional(), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
 const payableInput = z.object({ action: z.literal("payable-save"), id: z.string().uuid().nullable().optional(), description: z.string().trim().min(1).max(200), amountCentavos: z.number().int().positive().optional(), dueOn: z.string().date().nullable().optional(), remove: z.boolean().optional() });
 const expenseCreateInput = z.object({ action: z.literal("expense-create"), payee: z.string().trim().min(1).max(120), category: z.string().trim().min(1).max(80), amountCentavos: z.number().int().positive(), purpose: z.string().trim().min(1).max(300), paymentChannel: z.string().trim().max(40).optional().default(""), referenceNumber: z.string().trim().max(80).optional().default(""),
   // Voucher lines (202610080019): particulars, quantity and unit cost; they must add up to the amount.
@@ -949,6 +949,8 @@ export async function POST(request: Request) {
       if (error) throw error;
       // Agency or consultancy (202610080021); ignored before it.
       if (input.kind) await admin.from("marketing_agencies").update({ kind: input.kind }).eq("id", saved.id);
+      // Deducted or No deduction (202610080024); ignored before it.
+      if (input.rebateMode) await admin.from("marketing_agencies").update({ rebate_mode: input.rebateMode }).eq("id", saved.id);
       // A new agency gets its referral code automatically (202610080023).
       if (!input.id) await assignReferralCode(admin, saved.id, input.name);
       return NextResponse.json({ ok: true });
@@ -1859,6 +1861,7 @@ export async function POST(request: Request) {
       await autoSendInstructions(admin, ids);
       const enrolled = await tryAutoEnroll(admin, ids, staff.user.id);
       const implemented = await autoImplementPaidRequests(admin, ids, staff.user.id);
+      await applyReferralRebates(admin, ids, staff.user.id, { paid: true }); // "No deduction" agencies: rebate owed once paid
       return NextResponse.json({ ok: true, enrolled, implemented, payment: posted });
     }
     if (input.action === "enrollment-delete") {
@@ -2103,6 +2106,7 @@ export async function POST(request: Request) {
     await autoSendInstructions(admin, [input.enrollmentId]);
     const enrolled = await tryAutoEnroll(admin, [input.enrollmentId], staff.user.id);
     const implemented = await autoImplementPaidRequests(admin, [input.enrollmentId], staff.user.id);
+    await applyReferralRebates(admin, [input.enrollmentId], staff.user.id, { paid: true }); // "No deduction" agencies: rebate owed once paid
     return NextResponse.json({ ok: true, payment: data, enrolled, implemented });
   } catch (error) {
     // Zod validation errors: report the specific field problems, not the raw JSON dump.

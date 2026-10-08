@@ -79,7 +79,7 @@ export function ClassroomPanel({ data, courseId, reload }: { data: PortalData; c
           ? <button type="button" className="portal-secondary" disabled={busy} onClick={loadClasses}>{busy ? "Loading…" : linkedId ? "Change class" : "Choose class"}</button>
           : <span className="gc-pick">
             <select value={picked} onChange={(e) => setPicked(e.target.value)} aria-label="Google Classroom class">
-              <option value="">No Class (Unlink)</option>
+              <option value="">No class (unlink)</option>
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}{c.section ? ` · ${c.section}` : ""}</option>)}
             </select>
             <button type="button" className="portal-primary" disabled={busy || picked === linkedId} onClick={link}>Save</button>

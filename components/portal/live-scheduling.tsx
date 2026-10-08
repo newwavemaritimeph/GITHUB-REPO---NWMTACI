@@ -161,7 +161,7 @@ export function InstructorAssignment({ data, onEdit }: { data: SchedulingData; o
   return <div className="portal-page">
     <div className="portal-heading"><div><span className="portal-eyebrow">Training operations</span><h1>Instructor assignment</h1><p>Who teaches each upcoming batch, and where. Edit a batch to assign or change.</p></div></div>
     <div className="portal-table portal-panel"><table><thead><tr><th>Schedule</th><th>Course</th><th>Instructor</th><th>Room / venue</th><th>Seats</th><th>Actions</th></tr></thead><tbody>
-      {rows.map((b) => { const s = staffing.get(b.id); return <tr key={b.id}><td><strong>{fmtDate(b.starts_on)}</strong><small>{b.batch_number}</small></td><td>{courseOf(b)}</td><td>{s?.instructor_name ?? <span className="portal-badge cancelled">Not assigned</span>}</td><td>{s?.room_name ?? b.venue ?? b.mode}</td><td>{b.confirmed_count}/{b.capacity}</td><td className="document-actions"><button type="button" onClick={() => onEdit(b.id)}>Assign / Edit</button></td></tr>; })}
+      {rows.map((b) => { const s = staffing.get(b.id); return <tr key={b.id}><td><strong>{fmtDate(b.starts_on)}</strong><small>{b.batch_number}</small></td><td>{courseOf(b)}</td><td>{s?.instructor_name ?? <span className="portal-badge cancelled">Not assigned</span>}</td><td>{s?.room_name ?? b.venue ?? b.mode}</td><td>{b.confirmed_count}/{b.capacity}</td><td className="document-actions"><button type="button" onClick={() => onEdit(b.id)}>Assign / edit</button></td></tr>; })}
     </tbody></table>{!rows.length && <p className="portal-empty-copy">No upcoming batches.</p>}</div>
   </div>;
 }

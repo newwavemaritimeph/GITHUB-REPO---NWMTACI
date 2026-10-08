@@ -62,7 +62,7 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
       <label className="full">New course<select value={courseId} onChange={(e) => { setCourseId(e.target.value); setOfferId(""); }}>{data.courses.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label>
       {newCourse?.delivery_type === "Partner or Endorsed" && <label className="full">Endorsed program<select value={offerId} onChange={(e) => setOfferId(e.target.value)}><option value="">Select rate</option>{offers.map((o) => <option key={o.id} value={o.id}>{first(o.partner_centers)?.name} · {o.duration_label} · {pesos(o.training_fee_centavos)}</option>)}</select></label>}
     </>}
-    {reqType === "Refund" && <label className="full">Refund Amount (PHP)<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>}
+    {reqType === "Refund" && <label className="full">Refund amount (PHP)<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>}
     <label>Date requested<input type="date" value={requestedOn} max={today} onChange={(e) => setRequestedOn(e.target.value)} /></label>
     {policyFee && <div className="rate-preview"><span>Fee by policy</span><strong>{pesos(policyFee.amountCentavos)}</strong><small>{policyFee.rule}</small></div>}
     <label className="full">Reason<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why is this being requested?" /></label>

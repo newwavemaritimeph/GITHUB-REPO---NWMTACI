@@ -107,7 +107,7 @@ describe("Registration Officer workspace", () => {
     // An optional "other" line never blocks.
     expect(applicationReadiness(e4, [...(fixture.requirementChecks ?? []), { enrollment_id: "e4", requirement: "other", status: "Rejected", remarks: "x", checked_at: nowIso, checked_by_name: null }]).ready).toBe(true);
     // Without the 2x2 photo the application is not complete.
-    expect(applicationReadiness(e4, (fixture.requirementChecks ?? []).filter((c) => c.requirement !== "photo_2x2")).missing).toEqual(["2x2 Photo"]);
+    expect(applicationReadiness(e4, (fixture.requirementChecks ?? []).filter((c) => c.requirement !== "photo_2x2")).missing).toEqual(["2x2 photo"]);
     expect(blocked.reason).toMatch(/^Not verified yet/);
     const unpaid = applicationReadiness({ ...e4, verified_paid_centavos: 0 }, fixture.requirementChecks ?? []);
     expect(unpaid.reason).toBe("No verified payment yet");
@@ -119,9 +119,9 @@ describe("Registration Officer workspace", () => {
     expect(apps).toContain("ENR-0004");
     expect(apps).toContain("ENR-0005");
     expect(apps).not.toContain("ENR-0001"); // Screening tab: enrolled trainees are not listed
-    expect(apps).toContain("Paid · Enrolling");
+    expect(apps).toContain("Paid · enrolling");
     for (const tab of ["All enrollments", "Screening", "For payment"]) expect(apps).toContain(tab);
-    for (const gone of ["Ready to enroll", "With Cashier", "No course yet<small>"]) expect(apps).not.toContain(gone);
+    for (const gone of ["Ready to enroll", "With the Cashier", "No course yet<small>"]) expect(apps).not.toContain(gone);
     expect(apps).not.toContain("Register a trainee");
     // A website applicant without a course waits for Registration to assign one.
     expect(apps).toContain("No course yet");

@@ -60,7 +60,7 @@ export function ReceiptSheets({ receiptNo, name, received, cashier, status, paym
   const copies = [["ORIGINAL COPY", "Trainee"], ["DUPLICATE COPY", "Office file"]];
 
   return <main className="tar-screen">
-    <PrintControls arNumber={receiptNo} title="Acknowledgement Receipt" />
+    <PrintControls arNumber={receiptNo} title="Acknowledgement receipt" />
     <section className="tar-legal">
       {copies.map(([label, holder]) => <div className="tar-copy" key={label}><div className="tar-sheet"><span className="tar-copy-tag"><b>{label}</b> · {holder}</span>{content}</div></div>)}
     </section>

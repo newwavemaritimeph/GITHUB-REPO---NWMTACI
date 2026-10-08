@@ -114,7 +114,7 @@ export function ReleasingDashboard({ data, reload }: { data: ReleasingData; relo
     <section className="portal-panel" style={{ marginTop: 16 }}>
       <div className="panel-heading"><div><h2>Ready for release</h2><p>Printed certificates that can be claimed</p></div><span className="slot-count">{ready.length}</span></div>
       <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Course</th><th>Training date</th><th>Certificate</th><th>Release method</th><th>Status</th><th>Action</th></tr></thead><tbody>
-        {ready.slice(0, 25).map((c) => { const ch = statusChip(c); return <tr key={c.id}><td><strong>{nameOf(c)}</strong></td><td>{courseOf(c)}</td><td>{trainingEnd(c) ? fmtDate(trainingEnd(c) as string) : "—"}</td><td>{certNo(c)}</td><td>{method(c)}</td><td><span className={`portal-badge ${ch.cls}`}>{ch.text}</span></td><td className="document-actions"><button type="button" onClick={() => setRelease({ enrollmentId: c.enrollment_id, name: nameOf(c), course: courseOf(c), certNo: certNo(c) })}>View / Release</button></td></tr>; })}
+        {ready.slice(0, 25).map((c) => { const ch = statusChip(c); return <tr key={c.id}><td><strong>{nameOf(c)}</strong></td><td>{courseOf(c)}</td><td>{trainingEnd(c) ? fmtDate(trainingEnd(c) as string) : "—"}</td><td>{certNo(c)}</td><td>{method(c)}</td><td><span className={`portal-badge ${ch.cls}`}>{ch.text}</span></td><td className="document-actions"><button type="button" onClick={() => setRelease({ enrollmentId: c.enrollment_id, name: nameOf(c), course: courseOf(c), certNo: certNo(c) })}>View / release</button></td></tr>; })}
       </tbody></table>{!ready.length && <p className="portal-empty-copy">Nothing ready for release.</p>}</div>
     </section>
     <div className="dashboard-panels">

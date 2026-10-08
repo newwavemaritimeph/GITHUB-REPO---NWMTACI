@@ -406,7 +406,8 @@ img {
   #admission-invoice-print.admission-slip-duplex .slip-head strong { font-size: 11px; }
   #admission-invoice-print.admission-slip-duplex .slip-logo { width: 42px; height: 42px; }
   #admission-invoice-print.admission-slip-duplex .slip-cut { margin: 2px 0; }
-  body * { visibility: hidden !important; }
+  /* Only when one of these printable sheets is on the page; otherwise printouts such as the TAR and receipt came out blank. */
+  body:has(#admission-slip-print, #admission-invoice-print, #invoice-print, #voucher-print) * { visibility: hidden !important; }
   #admission-slip-print, #admission-slip-print *,
   #admission-invoice-print, #admission-invoice-print *,
   #invoice-print, #invoice-print *,
@@ -6547,9 +6548,10 @@ a[href^="mailto:"],
 @media (max-width: 480px) { .op-number strong { font-size: 21px; } .op-table { font-size: 13px; } .op-actions .op-fb, .op-actions .button { flex: 1; } }
 
 /* Print or save: only the acknowledgment card. */
+/* Print only the application pass, and only on the page that shows it (this used to blank every other printout). */
 @media print {
-  body * { visibility: hidden; }
-  .op-pass, .op-pass * { visibility: visible; }
+  body:has(.op-pass) * { visibility: hidden; }
+  body:has(.op-pass) .op-pass, body:has(.op-pass) .op-pass * { visibility: visible; }
   .op-pass { position: absolute; left: 0; top: 0; width: 420px; box-shadow: none; }
 }
 

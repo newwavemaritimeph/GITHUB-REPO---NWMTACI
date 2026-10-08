@@ -96,7 +96,7 @@ export function CashierPaymentQueue({ data, onPay, reload }: { data: PortalData;
           <td>{pesos(dueCentavos(e))}</td>
           <td>{pesos(paid)}</td>
           <td><strong>{pesos(balance)}</strong></td>
-          <td>{paid > 0 ? <Badge tone="active">{e.batch_id ? "Paid · Enrolling" : "Paid · Awaiting batch"}</Badge> : <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record payment</button>}</td>
+          <td>{paid > 0 ? <Badge tone="active">{e.batch_id ? "Paid · enrolling" : "Paid · awaiting batch"}</Badge> : <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record payment</button>}</td>
         </tr>;
       })}
     </tbody></table>{!rows.length && <p className="portal-empty-copy">No applicants waiting for payment. Registration hands them over once their requirements are complete.</p>}</div>
@@ -145,7 +145,7 @@ export function RequestChargeModal({ data, request, reload, onClose }: { data: P
         <label>Amount (PHP)<input type="number" min="0" step="0.01" value={amount} onChange={(ev) => setAmount(ev.target.value)} /></label>
       </>}
       </>}
-      <label className="full">Remarks (Optional)<input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="For the accounting manager" /></label>
+      <label className="full">Remarks (optional)<input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="For the accounting manager" /></label>
       <p className="portal-form-note full">The charge is added to the trainee&apos;s balance only when the accounting manager approves the request.</p>
       <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || (!ruled && !valid)} onClick={send}>{busy ? "Sending…" : "Send for approval"}</button></div>
     </div>
@@ -345,7 +345,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
         <div className="cx-results">{candidates.map((g) => { const unpaid = g.enrollments.filter((e) => balanceOf(e) > 0); return <button type="button" key={g.traineeId} onClick={() => choose(g.traineeId)}><span><b>{g.name}</b><small>{unpaid.length ? unpaid.map(courseCode).join(" · ") : "All courses paid"}</small></span><strong className="cx-amt">{pesos(g.balance)}</strong></button>; })}
           {!candidates.length && <p className="portal-empty-copy">No trainee matches.</p>}</div>
       </div> : <>
-        <div className="cx-whocard full"><div><Who name={group.name} number={group.number} />{referralAgency && <span className="ref-chip">Referred by {referralAgency.name} · rebate deducted</span>}</div><div className="cx-right"><small>Balance</small><span className="cx-amt">{pesos(group.balance)}</span></div></div>
+        <div className="cx-whocard full"><div><Who name={group.name} number={group.number} />{referralAgency && <span className="ref-chip">Referred by {referralAgency.name} · {referralAgency.rebate_mode === "No deduction" ? "rebate paid to the agency later" : "rebate deducted"}</span>}</div><div className="cx-right"><small>Balance</small><span className="cx-amt">{pesos(group.balance)}</span></div></div>
         <label>Amount received (PHP)<input className="cx-mono" inputMode="decimal" value={received} onChange={(ev) => setReceived(ev.target.value)} placeholder="0.00" /></label>
         <div><span className="pay-label">Apply the amount</span><div className="cx-choice"><button type="button" onClick={() => fill("all")}>Pay all in full</button><button type="button" onClick={() => fill("spread")}>Distribute in order</button><button type="button" onClick={() => fill("clear")}>Clear</button></div></div>
         <div className="cx-lines full"><table><thead><tr><th>Course or charge</th><th className="r">Balance</th><th className="r">Apply</th></tr></thead><tbody>

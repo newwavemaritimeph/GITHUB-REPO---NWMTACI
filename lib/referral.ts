@@ -25,6 +25,16 @@ export function rebateFor(agencyId: string, courseId: string, matrix: { agency_i
   return Number(matrix.find((m) => m.agency_id === agencyId && m.course_id === courseId)?.rebate_centavos ?? 0);
 }
 
+/**
+ * What to do with a referral rebate (owner, 8 Oct 2026), per the agency's setting:
+ * "Deducted" → take it off the fee (any time, before payments too);
+ * "No deduction" → owe it to the agency, recorded once the trainee has paid.
+ */
+export function referralAction(mode: string | null | undefined, paid: boolean): "discount" | "payable" | "skip" {
+  if (mode === "No deduction") return paid ? "payable" : "skip";
+  return "discount";
+}
+
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 
 /** The active agency for a code, or null. */
@@ -36,12 +46,12 @@ export async function agencyForCode(db: Admin, code: string | null) {
 }
 
 /**
- * Deduct the referral rebate from each enrollment's fee, once (idempotent):
- * an approved discount on the enrollment, and the agency's rebate recorded as
- * settled by deduction. Enrollments without a referral or without a rebate set
- * for their course are left alone. Best-effort: never blocks a payment.
+ * Apply each enrollment's referral rebate once (idempotent; one agency_rebates row per enrollment).
+ * Deducted: an approved discount on the enrollment, recorded as settled by deduction.
+ * No deduction: a Pending rebate owed to the agency, only once the trainee has paid ({ paid: true }).
+ * Enrollments without a referral or a rebate for their course are left alone. Never blocks a payment.
  */
-export async function applyReferralRebates(db: Admin, enrollmentIds: string[], actor: string | null) {
+export async function applyReferralRebates(db: Admin, enrollmentIds: string[], actor: string | null, options: { paid?: boolean } = {}) {
   const applied: string[] = [];
   if (!enrollmentIds.length) return applied;
   try {
@@ -57,10 +67,15 @@ export async function applyReferralRebates(db: Admin, enrollmentIds: string[], a
       const { data: matrix } = await db.from("agency_course_rebates").select("agency_id,course_id,rebate_centavos").eq("agency_id", agencyId).eq("course_id", raw.course_id);
       const rebate = rebateFor(agencyId, raw.course_id, (matrix ?? []) as { agency_id: string; course_id: string; rebate_centavos: number }[]);
       if (rebate <= 0) continue;
-      // The payable row doubles as the "already deducted" marker (one per enrollment).
-      const { error: recordError } = await db.from("agency_rebates").insert({ agency_id: agencyId, enrollment_id: raw.id, trainee_id: raw.trainee_id, course_id: raw.course_id, rebate_centavos: rebate, status: "Paid", created_by: actor });
+      // Deducted or No deduction (202610080024); Deducted before it.
+      const { data: modeRow } = await db.from("marketing_agencies").select("rebate_mode").eq("id", agencyId).maybeSingle();
+      const action = referralAction((modeRow as { rebate_mode?: string } | null)?.rebate_mode, !!options.paid);
+      if (action === "skip") continue;
+      // The agency_rebates row doubles as the "already applied" marker (one per enrollment).
+      const { error: recordError } = await db.from("agency_rebates").insert({ agency_id: agencyId, enrollment_id: raw.id, trainee_id: raw.trainee_id, course_id: raw.course_id, rebate_centavos: rebate, status: action === "discount" ? "Paid" : "Pending", created_by: actor });
       if (recordError) continue; // another request got there first
-      await db.from("agency_rebates").update({ settlement: "Deducted from the trainee's payment" }).eq("enrollment_id", raw.id); // 202610080023; ignored before it
+      await db.from("agency_rebates").update({ settlement: action === "discount" ? "Deducted from the trainee's payment" : "Payable to the agency" }).eq("enrollment_id", raw.id); // 202610080023; ignored before it
+      if (action === "payable") { applied.push(raw.id); continue; }
       const { data: agency } = await db.from("marketing_agencies").select("name").eq("id", agencyId).maybeSingle();
       await db.from("enrollment_charges").insert({ enrollment_id: raw.id, description: `Referral rebate (${agency?.name ?? "agency"})`, amount_centavos: rebate, event_type: "discount", valid: true, approval_status: "Approved", agency_id: agencyId, created_by: actor, decided_by: actor, decided_at: new Date().toISOString() });
       applied.push(raw.id);

@@ -609,7 +609,7 @@ function RegistrationSearch() {
     <section className="inside-page narrow-page">
       <div className="inside-hero compact">
         <span className="eyebrow">New Wave Maritime</span>
-        <h1 className="caps-heading">Enrollment Status &Amp; Certificate Verification</h1>
+        <h1 className="caps-heading">Enrollment Status &amp; Certificate Verification</h1>
         <p>
           Track every course under one registration reference, or confirm a certificate&apos;s authenticity by its number. No
           trainee account is required.

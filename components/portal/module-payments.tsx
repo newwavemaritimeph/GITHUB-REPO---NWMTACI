@@ -519,7 +519,7 @@ function CashierDrawerPanel() {
   const variance = counted === null ? null : counted - expectedCentavos;
 
   return (
-    <Panel title="Opening / Closing" description="Report today's opening float and closing count. Received and disbursement are computed live.">
+    <Panel title="Opening / closing" description="Report today's opening float and closing count. Received and disbursement are computed live.">
       <div className="cashier-drawer">
         <div className="cashier-drawer-inputs">
           <Field label="Opening balance (₱)" hint="Cash float at the start of the day">

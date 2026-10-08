@@ -20,3 +20,14 @@ describe("referral codes", () => {
     expect(rebateFor("a", "c2", matrix)).toBe(0);
   });
 });
+
+import { referralAction } from "@/lib/referral";
+
+describe("rebate handling per agency", () => {
+  it("deducts at any time, or owes the agency once paid", () => {
+    expect(referralAction("Deducted", false)).toBe("discount");
+    expect(referralAction(undefined, true)).toBe("discount");
+    expect(referralAction("No deduction", false)).toBe("skip");
+    expect(referralAction("No deduction", true)).toBe("payable");
+  });
+});
