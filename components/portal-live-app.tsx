@@ -117,7 +117,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses,
   // Report (with opening and closing), Requests (CASHIER_TABS).
   cashier: ["Dashboard","Search trainee","Payments","Expenses","Report","Requests"],
-  // Accounting Manager (owner, 8 Oct 2026): Dashboard · Approvals · Reports · Money ▾ · Configuration ▾ (ACCOUNTING_TABS).
+  // Accounting Manager (owner, 8 Oct 2026): five tabs — Dashboard · Approvals · Transactions ▾ · Reports · Configuration ▾ (ACCOUNTING_TABS).
   accounting: ["Dashboard","Approvals","Reports","Payments","Expenses","Receivables","Payables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
 };
 
@@ -155,10 +155,8 @@ const GROUP_LABELS:Partial<Record<NavGroup,string>>={"Payables & cash":"Payables
 const ACCOUNTING_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
   {label:"Approvals",items:["Approvals"]},
+  {label:"Transactions",items:["Payments","Expenses","Receivables","Payables","Cash position"]},
   {label:"Reports",items:["Reports"]},
-  {label:"Payments",items:["Payments"]},
-  {label:"Expenses",items:["Expenses"]},
-  {label:"Money",items:["Receivables","Payables","Cash position"]},
   {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS]},
 ];
 function topTabsFor(role:string,allowed:Module[]):TopTab[]{
