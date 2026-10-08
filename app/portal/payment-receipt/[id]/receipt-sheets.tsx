@@ -34,15 +34,15 @@ export function ReceiptSheets({ receiptNo, name, received, cashier, status, paym
     <div className="tar-letter"><img src="/brand/new-wave-emblem.png" alt="" width={34} height={34} /><div><b>{ORG}</b><span>{ADDRESS}</span></div><i /></div>
     <div className="tar-title"><div><b>ACKNOWLEDGEMENT RECEIPT</b> <span>· payment received · {received}</span></div><div><span>RECEIPT NO. </span><strong>{receiptNo}</strong></div></div>
     <table className="tar-grid"><tbody>
-      <tr><th>Received from</th><td><b>{name}</b></td><th>Enrollment no.</th><td className="mono accent">{t.appNo}</td><th>SRN</th><td><b>{t.srn ?? "—"}</b></td></tr>
+      <tr><th>Received From</th><td><b>{name}</b></td><th>Enrollment no.</th><td className="mono accent">{t.appNo}</td><th>SRN</th><td><b>{t.srn ?? "—"}</b></td></tr>
       <tr><th>Rank</th><td><b>{t.rank ?? "—"}</b></td><th>Mobile</th><td><b>{t.mobile ?? "—"}</b></td><th>Company</th><td><b>{t.company || "—"}</b></td></tr>
     </tbody></table>
-    <table className="tar-table"><thead><tr><th>Payment no.</th><th>Date received</th><th>Mode of payment</th><th>Reference no.</th><th className="r">Amount received</th></tr></thead><tbody>
+    <table className="tar-table"><thead><tr><th>Payment no.</th><th>Date Received</th><th>Mode of Payment</th><th>Reference no.</th><th className="r">Amount Received</th></tr></thead><tbody>
       <tr><td className="mono">{payment.number}</td><td className="nw">{received}</td><td><b>{payment.method}</b></td><td className="mono">{payment.reference || "—"}</td><td className="r b">{peso(payment.amount)}</td></tr>
       <tr><td colSpan={5}><span className="dim">Amount in words:</span> <b>{inWords(payment.amount)}</b>{payment.remarks ? <span className="dim"> · {payment.remarks}</span> : null}</td></tr>
     </tbody></table>
     <div className="tar-money">
-      <div><div className="tar-h">APPLIED TO</div><table className="tar-table"><thead><tr><th>Course</th><th>Training dates</th><th className="r">Applied</th></tr></thead><tbody>
+      <div><div className="tar-h">APPLIED TO</div><table className="tar-table"><thead><tr><th>Course</th><th>Training Dates</th><th className="r">Applied</th></tr></thead><tbody>
         {appliedTo.map((r) => <tr key={r.id}><td><b>{r.name}</b> <span className="dim">({r.code} · {r.number})</span></td><td className="nw">{r.dates}</td><td className="r b">{peso(r.applied)}</td></tr>)}
         {!appliedTo.length && <tr><td colSpan={3} className="dim">Not applied to an enrollment.</td></tr>}
       </tbody></table></div>
@@ -60,7 +60,7 @@ export function ReceiptSheets({ receiptNo, name, received, cashier, status, paym
   const copies = [["ORIGINAL COPY", "Trainee"], ["DUPLICATE COPY", "Office file"]];
 
   return <main className="tar-screen">
-    <PrintControls arNumber={receiptNo} title="Acknowledgement receipt" />
+    <PrintControls arNumber={receiptNo} title="Acknowledgement Receipt" />
     <section className="tar-legal">
       {copies.map(([label, holder]) => <div className="tar-copy" key={label}><div className="tar-sheet"><span className="tar-copy-tag"><b>{label}</b> · {holder}</span>{content}</div></div>)}
     </section>

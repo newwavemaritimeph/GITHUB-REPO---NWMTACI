@@ -68,11 +68,11 @@ const reload = async () => undefined;
 describe("Registration Officer workspace", () => {
   it("renders the two-box dashboard: new registrations and enrollments by day", () => {
     const html = renderToString(createElement(RegistrationDashboard, { data: fixture, go: noop }));
-    for (const title of ["New registrations", "Enrollments", "Search trainee", "Screen applications"]) expect(html).toContain(title);
+    for (const title of ["New Registrations", "Enrollments", "Search Trainee", "Screen Applications"]) expect(html).toContain(title);
     // New Registrations: applicants not yet enrolled (and the one without a course).
     const box = html.slice(html.indexOf('id="rd-new"'), html.indexOf('id="rd-enrolled"'));
     expect(box).toContain("Juan Santos");
-    expect(box).toContain("No course yet");
+    expect(box).toContain("No Course Yet");
     expect(box).not.toContain("ENR-0001");
     // Enrollments: today by default, so ENR-0001 (enrolled today) and not ENR-0006 (January).
     const enrolled = html.slice(html.indexOf('id="rd-enrolled"'));
@@ -119,14 +119,14 @@ describe("Registration Officer workspace", () => {
     expect(apps).toContain("ENR-0004");
     expect(apps).toContain("ENR-0005");
     expect(apps).not.toContain("ENR-0001"); // Screening tab: enrolled trainees are not listed
-    expect(apps).toContain("Paid · enrolling");
-    for (const tab of ["All enrollments", "Screening", "For payment"]) expect(apps).toContain(tab);
+    expect(apps).toContain("Paid · Enrolling");
+    for (const tab of ["All Enrollments", "Screening", "For Payment"]) expect(apps).toContain(tab);
     for (const gone of ["Ready to enroll", "With the Cashier", "No course yet<small>"]) expect(apps).not.toContain(gone);
     expect(apps).not.toContain("Register a trainee");
     // A website applicant without a course waits for Registration to assign one.
-    expect(apps).toContain("No course yet");
+    expect(apps).toContain("No Course Yet");
     expect(apps).toContain("Pedro Cruz");
-    expect(apps).toContain("Assign course");
+    expect(apps).toContain("Assign Course");
     // Staff find applications by the NWMTACI number applicants quote on Facebook.
     expect(apps).toContain("NWMTACI-0000003");
     expect(apps).toContain("NWMTACI-0000001");
@@ -143,7 +143,7 @@ describe("Registration Officer workspace", () => {
     const html = renderToString(createElement(CoursesAndCenters, { data: fixture, query: "" }));
     expect(html).toContain("Crowd Management Training");
     expect(html).toContain("3 of 24 left");
-    for (const tab of ["STCW schedules", "In-House courses", "Endorsed programs"]) expect(html).toContain(tab);
+    for (const tab of ["STCW Schedules", "In-House Courses", "Endorsed Programs"]) expect(html).toContain(tab);
     expect(html).not.toContain("rebate");
     expect(html).not.toContain("payable");
   });

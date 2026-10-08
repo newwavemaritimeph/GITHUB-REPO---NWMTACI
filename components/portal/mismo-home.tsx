@@ -59,11 +59,11 @@ export function MismoDashboard({ go }: { go: (m: string) => void }) {
     {data && data.batches.length > 0 && (hour < 11
       ? <div className="ms-banner blue"><b>The 11:00 AM list opens at 11:00 AM.</b><span>Right now {owingNow.length} trainee{owingNow.length === 1 ? "" : "s"} still owe a balance.</span></div>
       : hour < 16
-        ? at11.length > 0 && <div className="ms-banner red"><b>{at11.length} trainee{at11.length === 1 ? "" : "s"} not settled as of 11:00 AM</b><span>Print the list and give it to the instructor so they send the trainees to the Cashier.</span><a className="ms-bbtn" href={pdfUrl(date, "unsettled")} target="_blank" rel="noreferrer">Print for the instructor</a></div>
-        : <div className="ms-banner green"><b>4:00 PM cut-off passed.</b><span>The final list for the MARINA MISMO Portal is ready. {submitted} of {data.batches.length} batches submitted.</span><button type="button" className="ms-bbtn" onClick={() => go("Final list")}>Open final list</button></div>)}
+        ? at11.length > 0 && <div className="ms-banner red"><b>{at11.length} trainee{at11.length === 1 ? "" : "s"} not settled as of 11:00 AM</b><span>Print the list and give it to the instructor so they send the trainees to the Cashier.</span><a className="ms-bbtn" href={pdfUrl(date, "unsettled")} target="_blank" rel="noreferrer">Print for the Instructor</a></div>
+        : <div className="ms-banner green"><b>4:00 PM cut-off passed.</b><span>The final list for the MARINA MISMO Portal is ready. {submitted} of {data.batches.length} batches submitted.</span><button type="button" className="ms-bbtn" onClick={() => go("Final list")}>Open Final List</button></div>)}
     <div className="ac-rail">
       <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Today&apos;s STCW trainees</h2></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Today&apos;s STCW Trainees</h2></div>
           <div className="cx-tiles ac-tiles ac-tiles-in">
             <div className="cx-tile ac-count" style={{ ["--c" as string]: "#0a7a3e" }}><span>Settled</span><b>{trainees.length - owingNow.length}</b></div>
             <div className={`cx-tile ac-count${owingNow.length ? " cl-overdue" : ""}`} style={{ ["--c" as string]: "#b42318" }}><span>{hour >= 16 ? "Not settled (left off)" : "Not settled yet"}</span><b>{owingNow.length}</b></div>
@@ -75,10 +75,10 @@ export function MismoDashboard({ go }: { go: (m: string) => void }) {
           <p className="ac-foot">After 4:00 PM, trainees who still owe are left off the MARINA list automatically.</p>
         </section>
       </div>
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Not settled as of 11:00 AM</h2>{hour >= 11 && at11.length > 0 && <a className="portal-secondary" href={pdfUrl(date, "unsettled")} target="_blank" rel="noreferrer">Print PDF</a>}</div>
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Not Settled as of 11:00 AM</h2>{hour >= 11 && at11.length > 0 && <a className="portal-secondary" href={pdfUrl(date, "unsettled")} target="_blank" rel="noreferrer">Print PDF</a>}</div>
         {!data ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : !data.batches.length ? <p className="portal-empty-copy">No STCW class on this day.</p> : hour < 11 ? <p className="portal-empty-copy">The list is taken at 11:00 AM.</p> : at11.length ? <>
-          <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee</th><th>Batch · course</th><th>Room · instructor</th><th>Balance at 11:00</th><th>Now</th></tr></thead><tbody>
-            {at11.map(({ t, b }, i) => <tr key={t.enrollmentId}><td className="cl-no">{i + 1}</td><td><b>{t.lastName}, {t.firstName}</b></td><td>{b.batchNumber} · {b.courseCode}</td><td>{b.room ?? "—"} · {b.instructor ?? "—"}</td><td className="cl-mono">{pesos2(balanceAt(t, "11"))}</td><td>{owesAt(t, "now") ? <Badge tone="red">{pesos2(balanceAt(t, "now"))} due</Badge> : <Badge tone="green">Paid since</Badge>}</td></tr>)}
+          <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee</th><th>Batch · Course</th><th>Room · Instructor</th><th>Balance at 11:00</th><th>Now</th></tr></thead><tbody>
+            {at11.map(({ t, b }, i) => <tr key={t.enrollmentId}><td className="cl-no">{i + 1}</td><td><b>{t.lastName}, {t.firstName}</b></td><td>{b.batchNumber} · {b.courseCode}</td><td>{b.room ?? "—"} · {b.instructor ?? "—"}</td><td className="cl-mono">{pesos2(balanceAt(t, "11"))}</td><td>{owesAt(t, "now") ? <Badge tone="red">{pesos2(balanceAt(t, "now"))} due</Badge> : <Badge tone="green">Paid Since</Badge>}</td></tr>)}
           </tbody></table></div></> : <p className="portal-empty-copy">Everyone in today&apos;s STCW classes had settled by 11:00 AM.</p>}
       </section>
     </div>
@@ -97,7 +97,7 @@ export function MismoFinalList() {
     window.setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
   return <div className="portal-page cx ac ms-page">
-    <Head title="Final list" date={date} setDate={setDate} />
+    <Head title="Final List" date={date} setDate={setDate} />
     <p className="ac-note">{longDay(date)} · trainees settled by 4:00 PM, for the MARINA MISMO Portal</p>
     {error && <Message kind="error" text={error} />}
     {msg && <Message kind={msg.kind} text={msg.text} />}
@@ -107,10 +107,10 @@ export function MismoFinalList() {
         <div className="panel-heading"><h2>{b.batchNumber} · {b.courseName}</h2><span className="cl-acts">
           <button type="button" className="portal-secondary" disabled={!ok.length} onClick={() => csv(b)}>Excel / CSV</button>
           <a className="portal-secondary" href={pdfUrl(date, "final", b.id)} target="_blank" rel="noreferrer">Print PDF</a>
-          {b.submittedAt ? <Badge tone="green">Submitted {fmt(b.submittedAt)}</Badge> : <button type="button" className="portal-primary" disabled={busy || !ok.length} onClick={() => void post({ action: "mismo-submit", batchId: b.id, listDate: date, enrollmentIds: ok.map((t) => t.enrollmentId) }, "Recorded as submitted to MARINA.").catch(() => undefined)}>Mark as submitted</button>}
+          {b.submittedAt ? <Badge tone="green">Submitted {fmt(b.submittedAt)}</Badge> : <button type="button" className="portal-primary" disabled={busy || !ok.length} onClick={() => void post({ action: "mismo-submit", batchId: b.id, listDate: date, enrollmentIds: ok.map((t) => t.enrollmentId) }, "Recorded as submitted to MARINA.").catch(() => undefined)}>Mark as Submitted</button>}
         </span></div>
         <p className="ms-sub"><b>{ok.length} trainee{ok.length === 1 ? "" : "s"} for MARINA</b> · {b.startsOn === b.endsOn ? b.startsOn : `${b.startsOn} to ${b.endsOn}`} · {b.room ?? "Room not set"} · {b.instructor ?? "Instructor not set"}{out.length ? ` · ${out.length} left off (unpaid at 4:00 PM)` : ""}</p>
-        <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Last name</th><th>First name</th><th>Middle name</th><th>Birth date</th><th>SRN</th><th>Rank</th><th>Course</th></tr></thead><tbody>
+        <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Last Name</th><th>First Name</th><th>Middle Name</th><th>Birth Date</th><th>SRN</th><th>Rank</th><th>Course</th></tr></thead><tbody>
           {ok.map((t, i) => <tr key={t.enrollmentId}><td className="cl-no">{i + 1}</td><td><b>{t.lastName}</b></td><td>{t.firstName}</td><td>{t.middleName || "—"}</td><td className="cl-mono">{t.birthdate ?? "—"}</td><td className="cl-mono">{t.srn ?? "—"}</td><td>{t.rank ?? "—"}</td><td>{b.courseCode}</td></tr>)}
           {out.map((t) => <tr key={t.enrollmentId} className="ms-out"><td className="cl-no">—</td><td>{t.lastName}</td><td>{t.firstName}</td><td>{t.middleName || "—"}</td><td className="cl-mono">{t.birthdate ?? "—"}</td><td className="cl-mono">{t.srn ?? "—"}</td><td>{t.rank ?? "—"}</td><td>Left off · {pesos2(balanceAt(t, "16"))} unpaid</td></tr>)}
         </tbody></table></div>
@@ -125,7 +125,7 @@ export function MismoSubmissions() {
     <Head title="Submissions" />
     {error && <Message kind="error" text={error} />}
     <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Submitted to the MARINA MISMO Portal</h2><span className="slot-count">{rows.length}</span></div>
-      {rows.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>List date</th><th>Batch</th><th>Course</th><th>Trainees</th><th>Submitted</th><th>By</th></tr></thead><tbody>
+      {rows.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>List Date</th><th>Batch</th><th>Course</th><th>Trainees</th><th>Submitted</th><th>By</th></tr></thead><tbody>
         {rows.map((h) => { const b = one(h.batches as { batch_number: string; courses: unknown } | null); const c = one(b?.courses as { name: string; code: string } | null); return <tr key={h.batch_id}><td>{h.list_date}</td><td className="cl-mono">{b?.batch_number ?? "—"}</td><td>{c?.code ?? "—"}</td><td className="cl-mono">{h.trainee_count}</td><td>{fmt(h.submitted_at)}</td><td>{one(h.profiles)?.complete_name ?? "—"}</td></tr>; })}
       </tbody></table></div> : <p className="portal-empty-copy">{data ? "Nothing submitted yet." : error ? "" : "Loading…"}</p>}
     </section>

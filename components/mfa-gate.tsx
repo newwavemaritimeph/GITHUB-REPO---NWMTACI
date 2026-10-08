@@ -151,7 +151,7 @@ export function MfaGate({ email, hasTotp, emailConfigured }: { email: string; ha
               <button className="button button-primary button-block" disabled={busy || code.length < 6} onClick={verifyEmailCode}>
                 {busy ? "Verifying…" : "Verify & continue"}
               </button>
-              <button className="text-button" type="button" disabled={busy} onClick={requestEmailCode}>Resend code</button>
+              <button className="text-button" type="button" disabled={busy} onClick={requestEmailCode}>Resend Code</button>
             </>
           )}
         </div>

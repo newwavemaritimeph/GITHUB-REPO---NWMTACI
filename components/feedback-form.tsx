@@ -62,7 +62,7 @@ export function FeedbackForm({ token }: { token: string }) {
     <main style={shell}>
       <div style={card}>
         <div style={{ fontSize: 13, letterSpacing: 1, textTransform: "uppercase", color: "#0571D0", fontWeight: 700 }}>New Wave Maritime Training</div>
-        <h1 style={{ color: "#123F63", margin: "6px 0 2px", fontSize: 24 }}>Training feedback</h1>
+        <h1 style={{ color: "#123F63", margin: "6px 0 2px", fontSize: 24 }}>Training Feedback</h1>
         <p style={{ color: "#35607a", marginTop: 4 }}>{ctx.courseName}</p>
         {done ? (
           <div style={{ marginTop: 18, padding: "18px 16px", background: "#eaf8ee", border: "1px solid #b6e3c4", borderRadius: 12 }}>
@@ -72,7 +72,7 @@ export function FeedbackForm({ token }: { token: string }) {
         ) : (
           <>
             <p style={{ color: "#35607a" }}>Hi <strong>{ctx.traineeName}</strong> — submitting this form records your attendance for the online training. Please rate your experience.</p>
-            <Stars label="Overall training experience" value={overall} onChange={setOverall} />
+            <Stars label="Overall Training Experience" value={overall} onChange={setOverall} />
             <Stars label="Instructor" value={instructor} onChange={setInstructor} />
             <label style={{ display: "block", margin: "14px 0" }}>
               <span style={{ fontSize: 14, fontWeight: 600, color: "#123F63" }}>Comments <span style={{ color: "#F25615" }}>*</span></span>

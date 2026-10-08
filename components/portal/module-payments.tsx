@@ -10,6 +10,7 @@ import { PageHeader, Panel } from "./shared";
 import { ExpenseVoucherPreviewModal } from "./module-others";
 import { PaymentModal, SplitPaymentModal, AddChargeModal, AdmissionInvoiceModal } from "./module-enrollments";
 import { resolveRange, withinRange, type ReportRangePreset } from "@/lib/reporting";
+import { tcl } from "@/lib/title-case";
 
 const filters = ["Verification queue", "Today", "All payments"] as const;
 const awaitRanges = ["Today", "Last 7 days", "This month", "All"] as const;
@@ -73,7 +74,7 @@ export function PaymentsModule({ role }: { role: Role }) {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Cashier operations"
+        eyebrow="Cashier Operations"
         title="Payments"
         description="Post collections, verify online proofs, issue receipts, and keep every balance current."
         actions={
@@ -103,14 +104,14 @@ export function PaymentsModule({ role }: { role: Role }) {
       </div>
 
       <div className="stat-grid stat-grid-3">
-        <StatCard label="Awaiting verification" value={String(pendingCount)} note="Online proofs to confirm" tone={1} icon="!" onClick={() => setFilter("Verification queue")} />
-        <StatCard label="Outstanding balances" value={pesos(outstanding)} note={`${all.filter((item) => item.balanceCentavos > 0).length} enrollments`} tone={5} icon="₱" />
-        <StatCard label="Receipts issued" value={String(payments.filter((entry) => entry.receiptNumber).length)} note="All time" tone={2} icon="◈" />
+        <StatCard label="Awaiting Verification" value={String(pendingCount)} note="Online proofs to confirm" tone={1} icon="!" onClick={() => setFilter("Verification queue")} />
+        <StatCard label="Outstanding Balances" value={pesos(outstanding)} note={`${all.filter((item) => item.balanceCentavos > 0).length} enrollments`} tone={5} icon="₱" />
+        <StatCard label="Receipts Issued" value={String(payments.filter((entry) => entry.receiptNumber).length)} note="All time" tone={2} icon="◈" />
       </div>
 
       {canRecordPayment && (
         <Panel
-          title="Enrollments awaiting payment"
+          title="Enrollments Awaiting Payment"
           description="Record or split payments, add charges, change the course/schedule, and generate the voucher — date-sensitive by enrollment date."
           action={<Segmented options={awaitRanges} value={awaitRange} onChange={setAwaitRange} />}
         >
@@ -214,7 +215,7 @@ export function PaymentsModule({ role }: { role: Role }) {
       {canRecordPayment && <ChannelHistoryPanel payments={payments} channels={state.paymentChannels.filter((c) => c.active && c.requiresReference)} />}
 
       {picker && (
-        <Panel title="Choose an enrollment to bill" description="Only enrollments with an open balance are listed.">
+        <Panel title="Choose an Enrollment to Bill" description="Only enrollments with an open balance are listed.">
           <div className="pick-list">
             {all
               .filter((item) => item.balanceCentavos > 0)
@@ -237,7 +238,7 @@ export function PaymentsModule({ role }: { role: Role }) {
                 </button>
               ))}
             {all.every((item) => item.balanceCentavos === 0) && (
-              <EmptyState icon="✓" title="Every enrollment is settled" text="There is no open balance to collect right now." />
+              <EmptyState icon="✓" title="Every Enrollment Is Settled" text="There is no open balance to collect right now." />
             )}
           </div>
           <button className="secondary-button" onClick={() => setPicker(false)}>
@@ -314,7 +315,7 @@ export function PaymentsModule({ role }: { role: Role }) {
       {editFor && (
         <Modal
           open
-          title="Change course / schedule"
+          title="Change Course / Schedule"
           description={`${editFor.enrollment.reference} · currently ${editFor.enrollment.courseName}`}
           onClose={() => setEditFor(null)}
           wide
@@ -325,7 +326,7 @@ export function PaymentsModule({ role }: { role: Role }) {
             </>
           }
         >
-          <Field label="New course &amp; schedule" full hint="Pick any open batch. This changes the course, schedule, and dates and re-prices the fee. Verified payments stay on the account.">
+          <Field label="New Course &Amp; Schedule" full hint="Pick any open batch. This changes the course, schedule, and dates and re-prices the fee. Verified payments stay on the account.">
             <select value={editBatchId} onChange={(event) => setEditBatchId(event.target.value)}>
               {state.batches.filter((batch) => batch.status === "Open" || batch.id === editFor.enrollment.batchId).sort((a, z) => a.startsOn.localeCompare(z.startsOn)).map((batch) => (
                 <option key={batch.id} value={batch.id}>{batch.courseName} · {batch.startsOn} → {batch.endsOn}</option>
@@ -351,9 +352,9 @@ export function ExpenseVouchersModule({ role }: { role: Role }) {
     <div className="page">
       <PageHeader
         eyebrow="Cashier / Accounting"
-        title="Expense vouchers"
+        title="Expense Vouchers"
         description="Raise cash and expense vouchers. Accounting approves them in the Requests module."
-        actions={canRaise ? <button className="primary-button" onClick={() => setOpen(true)}>+ Raise voucher</button> : undefined}
+        actions={canRaise ? <button className="primary-button" onClick={() => setOpen(true)}>+ Raise Voucher</button> : undefined}
       />
       <Panel padded={false}>
         <DataTable columns={["Voucher", "Payee", "Category", "Amount", "Status", "Raised", ""]} minWidth={940}>
@@ -423,7 +424,7 @@ function ExpenseVoucherModal({
   return (
     <Modal
       open
-      title="Expense voucher"
+      title="Expense Voucher"
       description="Auto-generates a voucher number and sends it to the Accounting Manager for approval."
       onClose={onClose}
       wide
@@ -457,7 +458,7 @@ function ExpenseVoucherModal({
         <Field label="Category">
           <select value={category} onChange={(event) => setCategory(event.target.value)}>
             {categories.map((item) => (
-              <option key={item}>{item}</option>
+              <option key={item}>{tcl(item)}</option>
             ))}
           </select>
         </Field>
@@ -467,11 +468,11 @@ function ExpenseVoucherModal({
         <Field label="Quantity">
           <input type="number" min={1} value={quantity} onChange={(event) => setQuantity(event.target.value)} />
         </Field>
-        <Field label="Mode of payment">
+        <Field label="Mode of Payment">
           <select value={modeOfPayment} onChange={(event) => setModeOfPayment(event.target.value)}>
             <option>Cash</option>
             <option>Check</option>
-            <option>Bank transfer</option>
+            <option value="Bank transfer">Bank Transfer</option>
             <option>GCash</option>
           </select>
         </Field>
@@ -519,21 +520,21 @@ function CashierDrawerPanel() {
   const variance = counted === null ? null : counted - expectedCentavos;
 
   return (
-    <Panel title="Opening / closing" description="Report today's opening float and closing count. Received and disbursement are computed live.">
+    <Panel title="Opening / Closing" description="Report today's opening float and closing count. Received and disbursement are computed live.">
       <div className="cashier-drawer">
         <div className="cashier-drawer-inputs">
-          <Field label="Opening balance (₱)" hint="Cash float at the start of the day">
+          <Field label="Opening Balance (₱)" hint="Cash float at the start of the day">
             <input type="number" min={0} step="1" value={openingPesos} placeholder="0.00" onChange={(event) => setOpeningPesos(event.target.value)} />
           </Field>
-          <Field label="Closing count (₱)" hint="Physical cash counted at end of day">
+          <Field label="Closing Count (₱)" hint="Physical cash counted at end of day">
             <input type="number" min={0} step="1" value={countedPesos} placeholder="0.00" onChange={(event) => setCountedPesos(event.target.value)} />
           </Field>
         </div>
         <div className="stat-grid stat-grid-4">
           <StatCard label="Opening" value={pesos(openingCentavos)} note="Reported float" tone={0} icon="₱" />
-          <StatCard label="Received today" value={pesos(receivedCentavos)} note="All channels · verified" tone={2} icon="↧" />
+          <StatCard label="Received Today" value={pesos(receivedCentavos)} note="All channels · verified" tone={2} icon="↧" />
           <StatCard label="Disbursement" value={pesos(disbursementCentavos)} note="Refunds + paid vouchers" tone={5} icon="↥" />
-          <StatCard label="Expected closing" value={pesos(expectedCentavos)} note="Opening + received − disbursed" tone={3} icon="◈" />
+          <StatCard label="Expected Closing" value={pesos(expectedCentavos)} note="Opening + received − disbursed" tone={3} icon="◈" />
         </div>
         {counted !== null && (
           <div className={`cashier-drawer-variance ${variance === 0 ? "ok" : variance! > 0 ? "over" : "short"}`}>
@@ -579,7 +580,7 @@ function ChannelHistoryPanel({
 
   return (
     <Panel
-      title="Transaction history"
+      title="Transaction History"
       description="Verified collections over the selected window."
       action={
         <button
@@ -624,7 +625,7 @@ function ChannelHistoryPanel({
         </div>
       </div>
       {history.length === 0 ? (
-        <EmptyState icon="₱" title="No received transactions" text={`No verified ${channel} collections in the selected window.`} />
+        <EmptyState icon="₱" title="No Received Transactions" text={`No verified ${channel} collections in the selected window.`} />
       ) : (
         <DataTable columns={["Payment", "Trainee", "Reference", "Received", "Amount", "Receipt"]} minWidth={860}>
           {history.map((entry) => (

@@ -18,7 +18,7 @@ export function InstructorsModule() {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="People operations"
+        eyebrow="People Operations"
         title="Instructors"
         description="Trainors and their personal details. Active instructors are selectable when scheduling a batch or assigning a classroom."
         actions={
@@ -30,7 +30,7 @@ export function InstructorsModule() {
 
       <Panel padded={false}>
         {state.instructors.length === 0 ? (
-          <EmptyState icon="◎" title="No instructors yet" text="Add a trainor so they can be scheduled to a batch." />
+          <EmptyState icon="◎" title="No Instructors Yet" text="Add a trainor so they can be scheduled to a batch." />
         ) : (
           <DataTable columns={["Instructor", "Contact", "Specialization", "License no.", "Status", ""]} minWidth={940}>
             {state.instructors.map((instructor) => (
@@ -102,7 +102,7 @@ export function InstructorsModule() {
       >
         {draft && (
           <div className="form-grid">
-            <Field label="Full name*" full>
+            <Field label="Full Name*" full>
               <input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
             </Field>
             <Field label="Mobile">
@@ -134,7 +134,7 @@ export function ClassroomsModule() {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Training delivery"
+        eyebrow="Training Delivery"
         title="Classrooms"
         description="Training rooms and their seating capacity. Active rooms are selectable as a batch venue."
         actions={
@@ -146,7 +146,7 @@ export function ClassroomsModule() {
 
       <Panel padded={false}>
         {state.classrooms.length === 0 ? (
-          <EmptyState icon="□" title="No classrooms yet" text="Add a room so batches can be assigned a venue." />
+          <EmptyState icon="□" title="No Classrooms Yet" text="Add a room so batches can be assigned a venue." />
         ) : (
           <DataTable columns={["Classroom", "Capacity", "Instructor", "Status", ""]} minWidth={760}>
             {state.classrooms.map((classroom) => (
@@ -211,10 +211,10 @@ export function ClassroomsModule() {
       >
         {draft && (
           <div className="form-grid">
-            <Field label="Room name*" full hint="e.g. Room 301, Simulation Lab">
+            <Field label="Room Name*" full hint="e.g. Room 301, Simulation Lab">
               <input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} />
             </Field>
-            <Field label="Capacity (seats)*">
+            <Field label="Capacity (Seats)*">
               <input type="number" min={1} step="1" value={draft.capacity} onChange={(event) => setDraft({ ...draft, capacity: event.target.value })} />
             </Field>
             <Field label="Instructor" hint="Assigned trainor. Instructors are managed in HR.">
@@ -251,8 +251,8 @@ export function TrainingSetupModule() {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Training delivery"
-        title="Training setup"
+        eyebrow="Training Delivery"
+        title="Training Setup"
         description="Draft the training instructions and certificate template for each New Wave STCW / in-house course."
       />
 
@@ -262,7 +262,7 @@ export function TrainingSetupModule() {
           <span className="toolbar-end catalog-count">{courses.length} course{courses.length === 1 ? "" : "s"}</span>
         </div>
         {courses.length === 0 ? (
-          <EmptyState icon="◇" title="No courses match" text="Adjust the search term." />
+          <EmptyState icon="◇" title="No Courses Match" text="Adjust the search term." />
         ) : (
           <DataTable columns={["Course", "Instructions", "Certificate template", ""]} minWidth={860}>
             {courses.map((course) => (
@@ -323,10 +323,10 @@ export function TrainingSetupModule() {
       >
         {draft && (
           <div className="form-grid">
-            <Field label="Training instructions" full hint="Reporting details, requirements, and reminders emailed to the trainee.">
+            <Field label="Training Instructions" full hint="Reporting details, requirements, and reminders emailed to the trainee.">
               <textarea rows={6} value={draft.instructionTemplate} onChange={(event) => setDraft({ ...draft, instructionTemplate: event.target.value })} />
             </Field>
-            <Field label="Certificate template" full hint="Template reference / layout name used when issuing this course's certificate.">
+            <Field label="Certificate Template" full hint="Template reference / layout name used when issuing this course's certificate.">
               <input value={draft.certificateTemplate} onChange={(event) => setDraft({ ...draft, certificateTemplate: event.target.value })} />
             </Field>
           </div>

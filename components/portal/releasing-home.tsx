@@ -8,6 +8,7 @@ import { canPrint, certificateState, formatCertificateNumber, type CertificateVi
 import { Badge, Message, fmtDate, usePost } from "./shared-ui";
 import { ReleaseConfirm } from "./live-releasing";
 import { DeliveryAlert } from "./delivery-home";
+import { tcl } from "@/lib/title-case";
 
 /**
  * Releasing Officer (owner, 8 Oct 2026): certificates due to print, printed
@@ -69,7 +70,7 @@ export function CertificateAlarm({ data, admin, onOpen }: { data: PortalData; ad
     {overdue.length > 0 && <b>{overdue.length} certificate{overdue.length === 1 ? "" : "s"} overdue to print</b>}
     {overdue.length > 0 && <span>{overdue.slice(0, 4).map((l) => l.name.split(",")[0]).join(", ")}{overdue.length > 4 ? ` and ${overdue.length - 4} more` : ""} · due since {short(overdue.map((l) => l.view.dueOn).filter(Boolean).sort()[0] ?? null)}</span>}
     {admin && voids > 0 && <span>{voids} void request{voids === 1 ? "" : "s"} waiting for you</span>}
-    {onOpen && <button type="button" onClick={onOpen}>{admin ? "Open certificate controls" : "Print now"}</button>}
+    {onOpen && <button type="button" onClick={onOpen}>{admin ? "Open Certificate Controls" : "Print Now"}</button>}
   </div>;
 }
 
@@ -77,8 +78,8 @@ function StateColumn({ lines, pick, onPick }: { lines: CertificateLine[]; pick?:
   const overdue = lines.filter((l) => l.view.overdue).length;
   return <div className="cx-tiles ac-tiles ac-tiles-in">
     {STATES.map(([s, c]) => { const n = lines.filter((l) => l.view.state === s).length; return onPick
-      ? <button type="button" key={s} className={`cx-tile ac-pick ac-count${pick === s ? " on" : ""}`} style={{ ["--c" as string]: c }} onClick={() => onPick(pick === s ? "" : s)}><span>{s}</span><b>{n}</b></button>
-      : <div key={s} className="cx-tile ac-count" style={{ ["--c" as string]: c }}><span>{s}</span><b>{n}</b></div>; })}
+      ? <button type="button" key={s} className={`cx-tile ac-pick ac-count${pick === s ? " on" : ""}`} style={{ ["--c" as string]: c }} onClick={() => onPick(pick === s ? "" : s)}><span>{tcl(s)}</span><b>{n}</b></button>
+      : <div key={s} className="cx-tile ac-count" style={{ ["--c" as string]: c }}><span>{tcl(s)}</span><b>{n}</b></div>; })}
     <div className={`cx-tile ac-count${overdue ? " cl-overdue" : ""}`} style={{ ["--c" as string]: "#b42318" }}><span>Overdue to print</span><b>{overdue}</b></div>
   </div>;
 }
@@ -95,7 +96,7 @@ function CertificateLog({ data, lines, reload }: { data: PortalData; lines: Cert
   if (!lines.length) return <p className="portal-empty-copy">Nothing here.</p>;
   return <>
     {msg && <Message kind={msg.kind} text={msg.text} />}
-    <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee · NWMTACI no.</th><th>Course · ended</th><th>Certificate No.</th><th>Paid</th><th>Eval.</th><th>Prints</th><th>Status</th><th>Action</th></tr></thead><tbody>
+    <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee · NWMTACI no.</th><th>Course · Ended</th><th>Certificate No.</th><th>Paid</th><th>Eval.</th><th>Prints</th><th>Status</th><th>Action</th></tr></thead><tbody>
       {lines.map((l, i) => { const printable = canPrint(l.view) && l.view.state !== "Void requested"; const printed = l.view.printCount > 0; return [
         <tr key={l.e.id}>
           <td className="cl-no">{i + 1}</td>
@@ -109,15 +110,15 @@ function CertificateLog({ data, lines, reload }: { data: PortalData; lines: Cert
           <td><span className="cl-acts">
             {(l.view.state === "Due" || printed) && <span className="cl-split"><a href={pdf(l, true)} target="_blank" rel="noreferrer" onClick={afterPrint}>Preview</a>{printable && <a className="go" href={pdf(l, false)} target="_blank" rel="noreferrer" onClick={afterPrint}>{printed ? "Reprint" : "Print"}</a>}</span>}
             {printed && l.view.state !== "Void requested" && <details className="cl-more"><summary aria-label="More actions">▾</summary><div>
-              <button type="button" disabled={busy} onClick={() => { setVoiding(l.e.id); setReason(""); }}>Request void</button>
-              <button type="button" disabled={busy} onClick={() => void post({ action: "certificate-soft-copy", enrollmentId: l.e.id }, "Soft copy emailed.").catch(() => undefined)}>Email soft copy</button>
+              <button type="button" disabled={busy} onClick={() => { setVoiding(l.e.id); setReason(""); }}>Request Void</button>
+              <button type="button" disabled={busy} onClick={() => void post({ action: "certificate-soft-copy", enrollmentId: l.e.id }, "Soft copy emailed.").catch(() => undefined)}>Email Soft Copy</button>
               {l.view.state === "Printed" && <button type="button" onClick={() => setReleasing(l)}>Release</button>}
             </div></details>}
             {l.view.state === "Void requested" && <span className="cl-sub">With the Admin</span>}
           </span></td>
         </tr>,
         voiding === l.e.id && <tr key={`${l.e.id}-void`} className="cl-voidrow"><td /><td colSpan={8}><div className="cl-void">
-          <label>Reason for voiding<input value={reason} autoFocus onChange={(ev) => setReason(ev.target.value)} placeholder="e.g. Misprint — wrong spelling of the name" /></label>
+          <label>Reason for Voiding<input value={reason} autoFocus onChange={(ev) => setReason(ev.target.value)} placeholder="e.g. Misprint — wrong spelling of the name" /></label>
           <button type="button" className="portal-secondary" onClick={() => setVoiding(null)}>Keep</button>
           <button type="button" className="cl-danger" disabled={busy || reason.trim().length < 3} onClick={() => void post({ action: "certificate-void-request", enrollmentId: l.e.id, reason: reason.trim() }, "Sent to the Admin for approval.").then(() => setVoiding(null)).catch(() => undefined)}>Send to the Admin</button>
         </div></td></tr>,
@@ -150,7 +151,7 @@ export function ReleasingHome({ data, reload, go }: { data: PortalData; reload: 
           <p className="ac-foot">Due means the training ended, the fee is settled and, for courses with a Google Form, the evaluation is in.</p>
         </section>
       </div>
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Due to print</h2><span className="slot-count">{due.length}</span></div><CertificateLog data={data} lines={due} reload={reload} /></section>
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Due to Print</h2><span className="slot-count">{due.length}</span></div><CertificateLog data={data} lines={due} reload={reload} /></section>
     </div>
   </div>;
 }
@@ -171,7 +172,7 @@ export function CertificatesWorkspace({ data, reload }: { data: PortalData; relo
         </section>
       </div>
       <section className="portal-panel cx-panel">
-        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search certificates" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, NWMTACI number or certificate number" />{pick && <button type="button" className="portal-secondary" onClick={() => setPick("")}>Show all</button>}</div>
+        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search certificates" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, NWMTACI number or certificate number" />{pick && <button type="button" className="portal-secondary" onClick={() => setPick("")}>Show All</button>}</div>
         <CertificateLog data={data} lines={shown} reload={reload} />
       </section>
     </div>
@@ -203,7 +204,7 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
       </div>
       <section className="portal-panel cx-panel">
         <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search any course by name or code" /></div>
-        <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th>Template (Google Drive link)</th><th>Evaluation form in Classroom (for matching)</th></tr></thead><tbody>
+        <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th>Template (Google Drive Link)</th><th>Evaluation Form in Classroom (For Matching)</th></tr></thead><tbody>
           {courses.map((c) => { const t = active.get(c.id); const link = links[c.id] ?? t?.drive_link ?? ""; const form = forms[c.id] ?? (d.evaluationForms?.[c.id] ? `https://docs.google.com/forms/d/${d.evaluationForms[c.id]}/edit` : ""); return <tr key={c.id}>
             <td><b>{c.name}</b><small className="cl-sub cl-block cl-mono">{c.code}</small></td>
             <td><span className="cl-field"><input aria-label={`Template link for ${c.name}`} value={link} onChange={(e) => setLinks({ ...links, [c.id]: e.target.value })} placeholder="https://drive.google.com/file/d/…" /><button type="button" className="portal-secondary" disabled={busy || !link || link === t?.drive_link} onClick={() => void post({ action: "certificate-template-link", courseId: c.id, driveLink: link }, "Template linked. The file was read successfully.").catch(() => undefined)}>Save</button></span>
@@ -233,7 +234,7 @@ export function ReleasedCertificates({ data, reload }: { data: PortalData; reloa
       </div>
       <section className="portal-panel cx-panel">
         {lines.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee · NWMTACI no.</th><th>Course</th><th>Certificate No.</th><th>Status</th><th>Action</th></tr></thead><tbody>
-          {lines.map((l, i) => <tr key={l.e.id}><td className="cl-no">{i + 1}</td><td><b>{l.name}</b> <span className="cl-mono cl-sub">{l.number.replace(/^NWMTACI-/, "")}</span></td><td title={l.course.name}>{l.course.code}</td><td className="cl-mono">{l.cert?.certificate_number ?? "—"}</td><td><Badge tone={l.view.state === "Released" ? undefined : "green"}>{l.view.state === "Released" ? "Released" : "Ready for release"}</Badge>{l.cert?.claimant_name && <small className="cl-sub cl-block">{l.cert.claimant_name}</small>}</td><td>{l.view.state === "Printed" && <button type="button" className="portal-primary" onClick={() => setReleasing(l)}>Release</button>}</td></tr>)}
+          {lines.map((l, i) => <tr key={l.e.id}><td className="cl-no">{i + 1}</td><td><b>{l.name}</b> <span className="cl-mono cl-sub">{l.number.replace(/^NWMTACI-/, "")}</span></td><td title={l.course.name}>{l.course.code}</td><td className="cl-mono">{l.cert?.certificate_number ?? "—"}</td><td><Badge tone={l.view.state === "Released" ? undefined : "green"}>{l.view.state === "Released" ? "Released" : "Ready for Release"}</Badge>{l.cert?.claimant_name && <small className="cl-sub cl-block">{l.cert.claimant_name}</small>}</td><td>{l.view.state === "Printed" && <button type="button" className="portal-primary" onClick={() => setReleasing(l)}>Release</button>}</td></tr>)}
         </tbody></table></div> : <p className="portal-empty-copy">No printed certificates yet.</p>}
       </section>
     </div>
@@ -256,24 +257,24 @@ export function AdminCertificateControls({ data, reload }: { data: PortalData; r
   const valueOf = (id: string) => { const s = series.get(id); return edit[id] ?? { prefix: s?.prefix ?? "", next: String(s?.next_number ?? 1), pad: String(s?.pad ?? 5), batchPrefix: s?.batch_prefix ?? "", nextBatch: String(s?.next_batch ?? 1) }; };
   const set = (id: string, k: string, v: string) => setEdit({ ...edit, [id]: { ...valueOf(id), [k]: v } });
   return <div className="portal-page cx ac">
-    <div className="cx-head"><div><span className="portal-eyebrow">Admin</span><h1>Certificate controls</h1></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Admin</span><h1>Certificate Controls</h1></div>
       <label className="cl-switch"><input type="checkbox" checked={!!data.certificateIssuanceEnabled} disabled={busy} onChange={(e) => void post({ action: "certificate-issuance-toggle", enabled: e.target.checked }, e.target.checked ? "Printing turned on." : "Printing turned off.").catch(() => undefined)} /><span>Certificate printing {data.certificateIssuanceEnabled ? "on" : "off"}</span></label></div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <CertificateAlarm data={data} admin />
     <div className="ac-rail">
       <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Void requests</h2><span className="slot-count">{voids.length}</span></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Void Requests</h2><span className="slot-count">{voids.length}</span></div>
           {voids.length ? voids.map((l) => <div key={l.e.id} className="cl-vreq">
             <div><b>{l.name}</b> · <span className="cl-mono">{l.cert?.certificate_number}</span><small className="cl-sub cl-block">{l.course.code} · {l.cert?.void_reason}{l.cert?.void_requested_at ? ` · ${fmtDate(day(l.cert.void_requested_at) ?? "")}` : ""}</small></div>
-            {rejecting === l.e.id ? <div className="cl-void"><label>Reason for rejecting<input value={remarks} autoFocus onChange={(e) => setRemarks(e.target.value)} /></label><button type="button" className="portal-secondary" onClick={() => setRejecting(null)}>Keep</button><button type="button" className="cl-danger" disabled={busy || remarks.trim().length < 3} onClick={() => void post({ action: "certificate-void-decide", enrollmentId: l.e.id, approve: false, remarks: remarks.trim() }, "Void request rejected.").then(() => setRejecting(null)).catch(() => undefined)}>Reject</button></div>
-              : <span className="cl-acts"><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setRejecting(l.e.id); setRemarks(""); }}>Reject</button><button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "certificate-void-decide", enrollmentId: l.e.id, approve: true }, "Void approved. One more print allowed with the same number.").catch(() => undefined)}>Approve void</button></span>}
+            {rejecting === l.e.id ? <div className="cl-void"><label>Reason for Rejecting<input value={remarks} autoFocus onChange={(e) => setRemarks(e.target.value)} /></label><button type="button" className="portal-secondary" onClick={() => setRejecting(null)}>Keep</button><button type="button" className="cl-danger" disabled={busy || remarks.trim().length < 3} onClick={() => void post({ action: "certificate-void-decide", enrollmentId: l.e.id, approve: false, remarks: remarks.trim() }, "Void request rejected.").then(() => setRejecting(null)).catch(() => undefined)}>Reject</button></div>
+              : <span className="cl-acts"><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setRejecting(l.e.id); setRemarks(""); }}>Reject</button><button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "certificate-void-decide", enrollmentId: l.e.id, approve: true }, "Void approved. One more print allowed with the same number.").catch(() => undefined)}>Approve Void</button></span>}
           </div>) : <p className="portal-empty-copy">No void requests.</p>}
           <p className="ac-foot">Approving voids the printed copy and allows one more print with the same certificate number.</p>
         </section>
       </div>
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Certificate numbering</h2></div>
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Certificate Numbering</h2></div>
         <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search any course by name or code" /></div>
-        <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th>Prefix</th><th>Next No.</th><th>Digits</th><th>Batch prefix</th><th>Next batch</th><th>Next certificate</th><th /></tr></thead><tbody>
+        <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th>Prefix</th><th>Next No.</th><th>Digits</th><th>Batch Prefix</th><th>Next Batch</th><th>Next Certificate</th><th /></tr></thead><tbody>
           {courses.map((c) => { const v = valueOf(c.id), s = series.get(c.id); const changed = !!edit[c.id]; return <tr key={c.id}>
             <td><b>{c.name}</b><small className="cl-sub cl-block">{s ? `Set ${fmtDate(day(s.set_at) ?? "")}${first(s.profiles)?.complete_name ? ` by ${first(s.profiles)?.complete_name}` : ""}` : "Not set — certificates for this course cannot be numbered yet"}</small></td>
             <td><input className="cl-in" aria-label="Prefix" value={v.prefix} onChange={(e) => set(c.id, "prefix", e.target.value)} placeholder="NWM-BT-" /></td>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CertificatePdfModal, type CertPdfTarget } from "./certificate-pdf-modal";
+import { tcl } from "@/lib/title-case";
 
 type Classroom = { id: string; name: string; venue: string; capacity: number; active: boolean };
 type CertEnrollment = { enrollment_number?: string; trainees?: unknown; courses?: unknown };
@@ -71,11 +72,11 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
   return (
     <div className="portal-page">
       <div className="portal-heading">
-        <div><span className="portal-eyebrow">Training operations</span><h1>Training delivery</h1><p>Upcoming batches, managed classrooms, and certificate status.</p></div>
+        <div><span className="portal-eyebrow">Training operations</span><h1>Training Delivery</h1><p>Upcoming batches, managed classrooms, and certificate status.</p></div>
       </div>
       <div className="portal-tabs">
         {(["Overview", "Classrooms", "Certificates"] as const).map((item) => (
-          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>
+          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{tcl(item)}</button>
         ))}
       </div>
       {message && <div className="portal-message error" role="alert">{message}</div>}
@@ -89,7 +90,7 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
             <article><span>Certificates</span><strong>{data.certificates.length}</strong><small>All statuses</small></article>
           </div>
           <section className="portal-panel">
-            <div className="panel-heading"><div><h2>Upcoming schedule</h2><p>Batches ending today or later</p></div></div>
+            <div className="panel-heading"><div><h2>Upcoming Schedule</h2><p>Batches ending today or later</p></div></div>
             <div className="portal-table"><table><thead><tr><th>Batch</th><th>Course</th><th>Dates</th><th>Venue</th><th>Seats</th><th>Status</th></tr></thead><tbody>
               {upcoming.map((b) => { const c = one(b.courses); return (
                 <tr key={b.id}><td><strong>{b.batch_number}</strong></td><td>{c?.name ?? "—"}<small>{c?.code}</small></td><td>{day(b.starts_on)} – {day(b.ends_on)}</td><td>{b.venue ?? b.mode}</td><td>{b.confirmed_count}/{b.capacity}</td><td>{b.status}</td></tr>
@@ -102,7 +103,7 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
 
       {tab === "Classrooms" && (
         <section className="portal-panel">
-          <div className="panel-heading"><div><h2>Classrooms</h2><p>Rooms available for scheduling</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => saveClassroom()}>+ Add classroom</button>}</div>
+          <div className="panel-heading"><div><h2>Classrooms</h2><p>Rooms available for scheduling</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => saveClassroom()}>+ Add Classroom</button>}</div>
           <div className="portal-table"><table><thead><tr><th>Name</th><th>Venue</th><th>Capacity</th><th>Status</th><th></th></tr></thead><tbody>
             {data.classrooms.map((c) => (
               <tr key={c.id} className={c.active ? "" : "row-muted"}>
@@ -127,27 +128,27 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
             ? <div className="portal-message" role="status">Issue and update certificate status below. In-house certificates require the trainee&apos;s completed feedback before release.</div>
             : <div className="certificate-lock"><span>◈</span><div><strong>Read-only</strong><p>Only Admin and Training Operations can issue or update certificates.</p></div><span className="portal-badge orange">Read-only</span></div>}
           <section className="portal-panel">
-            <div className="panel-heading"><div><h2>Certificate register</h2><p>Move a certificate through Draft → For Printing → Released</p></div></div>
-            <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Course</th><th>Enrollment</th><th>Certificate status</th><th>Printed</th>{canManage && <th></th>}</tr></thead><tbody>
+            <div className="panel-heading"><div><h2>Certificate Register</h2><p>Move a certificate through Draft → For Printing → Released</p></div></div>
+            <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Course</th><th>Enrollment</th><th>Certificate Status</th><th>Printed</th>{canManage && <th></th>}</tr></thead><tbody>
               {data.enrollments.filter((e) => e.enrollment_status !== "Cancelled").map((e) => {
                 const t = one(e.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null | undefined);
                 const c = one(e.courses as { name: string; code: string } | { name: string; code: string }[] | null | undefined);
                 const cert = data.certificates.find((x) => x.enrollment_id === e.id) ?? null;
                 return <tr key={e.id}><td><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</strong></td><td>{c?.name ?? "—"}</td><td>{e.enrollment_number}</td><td>{canManage
-                  ? <select value={cert?.status ?? ""} disabled={busy} onChange={(ev) => { void post({ action: "certificate-status", enrollmentId: e.id, status: ev.target.value }); }}><option value="" disabled>Not issued</option>{CERT_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+                  ? <select value={cert?.status ?? ""} disabled={busy} onChange={(ev) => { void post({ action: "certificate-status", enrollmentId: e.id, status: ev.target.value }); }}><option value="" disabled>Not Issued</option>{CERT_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
                   : (cert ? (CERT_STATUSES.find(([v]) => v === cert.status)?.[1] ?? cert.status) : "Not issued")}</td><td>{cert?.printed_at ? day(cert.printed_at) : "—"}</td>{canManage && <td className="document-actions">{(() => { const tid = activeTemplateFor(e.course_id); return <button disabled={busy || !tid} title={tid ? "Generate/view the certificate PDF (optional 2x2 photo)" : "Upload an active template for this course first"} onClick={() => setPdfTarget({ templateId: tid, traineeName: t ? `${t.legal_first_name} ${t.legal_last_name}` : "", courseName: c?.name ?? "", enrollmentNumber: e.enrollment_number, certificateNumber: null, conductedDate: cert?.printed_at ?? null })}>View PDF</button>; })()}</td>}</tr>;
               })}
               {!data.enrollments.filter((e) => e.enrollment_status !== "Cancelled").length && <tr><td colSpan={canManage ? 6 : 5}><span className="portal-empty-copy">No enrollments to certify yet.</span></td></tr>}
             </tbody></table></div>
           </section>
           {canManage && <section className="portal-panel">
-            <div className="panel-heading"><div><h2>Certificate templates</h2><p>Upload a sample template per course and set the fields to fill in (number, name, date…)</p></div></div>
+            <div className="panel-heading"><div><h2>Certificate Templates</h2><p>Upload a sample template per course and set the fields to fill in (number, name, date…)</p></div></div>
             <div className="portal-form" style={{ padding: "4px 0 10px" }}>
               {tplMsg && <div className="portal-message full" role="status">{tplMsg}</div>}
-              <label>Course<select value={tplCourse} onChange={(e) => setTplCourse(e.target.value)}><option value="">Select an in-house course…</option>{data.courses.filter((c) => c.delivery_type === "In-House").map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select><small className="portal-form-note">Only New Wave in-house courses (incl. STCW). Endorsed / partner trainings are excluded.</small></label>
-              <label>Template file (PDF/PNG/JPEG)<input type="file" accept="application/pdf,image/png,image/jpeg" onChange={(e) => setTplFile(e.target.files?.[0] ?? null)} /></label>
-              <label className="full">Editable fields (comma-separated)<input value={tplFields} onChange={(e) => setTplFields(e.target.value)} /></label>
-              <div className="full"><button type="button" className="portal-primary" disabled={tplBusy || !tplCourse || !tplFile} onClick={uploadTemplate}>{tplBusy ? "Uploading…" : "Upload template"}</button></div>
+              <label>Course<select value={tplCourse} onChange={(e) => setTplCourse(e.target.value)}><option value="">Select an in-House Course…</option>{data.courses.filter((c) => c.delivery_type === "In-House").map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select><small className="portal-form-note">Only New Wave in-house courses (incl. STCW). Endorsed / partner trainings are excluded.</small></label>
+              <label>Template File (PDF/PNG/JPEG)<input type="file" accept="application/pdf,image/png,image/jpeg" onChange={(e) => setTplFile(e.target.files?.[0] ?? null)} /></label>
+              <label className="full">Editable Fields (Comma-Separated)<input value={tplFields} onChange={(e) => setTplFields(e.target.value)} /></label>
+              <div className="full"><button type="button" className="portal-primary" disabled={tplBusy || !tplCourse || !tplFile} onClick={uploadTemplate}>{tplBusy ? "Uploading…" : "Upload Template"}</button></div>
             </div>
             <div className="portal-table"><table><thead><tr><th>Course</th><th>Version</th><th>Fields</th><th>Active</th></tr></thead><tbody>
               {data.certificateTemplates.map((tp) => <tr key={tp.id}><td><strong>{one(tp.courses as { name: string } | { name: string }[] | null | undefined)?.name ?? "—"}</strong></td><td>v{tp.version}</td><td>{(tp.fields ?? []).map((f) => f.label).join(", ") || "—"}</td><td>{tp.active ? "Active" : "—"}</td></tr>)}

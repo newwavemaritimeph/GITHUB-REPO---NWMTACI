@@ -132,7 +132,7 @@ export default async function AdmissionRecordPage({ params }: { params: Promise<
         <tr><th>Name</th><td><b>{name}</b></td><th>Enrollment no.</th><td className="mono accent">{t.application_number ?? t.trainee_number}</td><th>SRN</th><td><b>{t.srn ?? "—"}</b></td></tr>
         <tr><th>Rank</th><td><b>{t.rank ?? "—"}</b></td><th>Mobile</th><td><b>{t.mobile ?? "—"}</b></td><th>Company</th><td><b>{t.company || "—"}</b></td></tr>
       </tbody></table>
-      <table className="tar-table"><thead><tr><th className="c">#</th><th>Course</th><th>Training dates</th><th>Time</th><th>Room</th><th className="r">Fee</th></tr></thead><tbody>{courseRows(front, 0)}{more.length > 0 && <tr><td colSpan={6} className="dim">+ {more.length} more course{more.length === 1 ? "" : "s"} on page 2</td></tr>}</tbody></table>
+      <table className="tar-table"><thead><tr><th className="c">#</th><th>Course</th><th>Training Dates</th><th>Time</th><th>Room</th><th className="r">Fee</th></tr></thead><tbody>{courseRows(front, 0)}{more.length > 0 && <tr><td colSpan={6} className="dim">+ {more.length} more course{more.length === 1 ? "" : "s"} on page 2</td></tr>}</tbody></table>
       <div className="tar-money">
         <div><div className="tar-h">FEES</div><table className="tar-table"><tbody>
           <tr><td>Training fees ({courses.length} course{courses.length === 1 ? "" : "s"})</td><td className="r">{peso(feesTotal)}</td></tr>
@@ -155,7 +155,7 @@ export default async function AdmissionRecordPage({ params }: { params: Promise<
   </>;
   const page2 = more.length > 0 ? <>
       {header(2)}
-      <table className="tar-table"><thead><tr><th className="c">#</th><th>Course</th><th>Training dates</th><th>Time</th><th>Room</th><th className="r">Fee</th></tr></thead><tbody>{courseRows(more, COURSES_ON_FRONT)}</tbody></table>
+      <table className="tar-table"><thead><tr><th className="c">#</th><th>Course</th><th>Training Dates</th><th>Time</th><th>Room</th><th className="r">Fee</th></tr></thead><tbody>{courseRows(more, COURSES_ON_FRONT)}</tbody></table>
       <p className="dim tar-cont">Continuation of {record.ar_number} for {name}. Fees, payments and terms are on page 1.</p>
   </> : null;
   const copies = [["ORIGINAL COPY", "Trainee"], ["DUPLICATE COPY", "Office file"]];

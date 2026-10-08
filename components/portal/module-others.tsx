@@ -29,6 +29,7 @@ import {
 import type { CashAdvance, Employee, EnrollmentView, Expense, HrAttendanceRecord, LeaveRequest, Role, RequestType, Trainee } from "@/lib/system/types";
 import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn } from "@/lib/validation";
 import { PageHeader, Panel, StageBadge, simplifiedStage, type Module } from "./shared";
+import { tcl } from "@/lib/title-case";
 
 /* ---------------------------------------------------------------- trainees */
 
@@ -41,7 +42,7 @@ function FacebookEncoder({ trainee, onSave }: { trainee: Trainee; onSave: (link:
         <button className="secondary-button" onClick={() => onSave(value)}>Save</button>
       </div>
       {trainee.facebookLink ? (
-        <a className="fb-current" href={trainee.facebookLink} target="_blank" rel="noopener noreferrer">Open current profile ↗</a>
+        <a className="fb-current" href={trainee.facebookLink} target="_blank" rel="noopener noreferrer">Open Current Profile ↗</a>
       ) : (
         <small className="muted-text">Not yet encoded. Registration Officer records the trainee&apos;s Facebook profile URL.</small>
       )}
@@ -181,7 +182,7 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Central master records"
+        eyebrow="Central Master Records"
         title="Trainees"
         description={
           role === "Registration"
@@ -196,13 +197,13 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
       />
 
       <div className="stat-grid stat-grid-4">
-        <StatCard label="Trainee records" value={String(state.trainees.length)} note="All programs" tone={0} icon="◎" />
-        <StatCard label="With active enrollment" value={String(new Set(all.filter((item) => item.stage !== "Cancelled").map((item) => item.trainee.id)).size)} note="Currently in the pipeline" tone={3} icon="▤" />
-        <StatCard label="Possible duplicates" value={String(duplicateCount)} note="Same SRN or full name" tone={1} icon="!" onClick={() => setView("Possible duplicates")} />
-        <StatCard label="Certificates released" value={String(all.filter((item) => item.certificate?.status === "Released").length)} note="Completion records" tone={2} icon="✓" />
+        <StatCard label="Trainee Records" value={String(state.trainees.length)} note="All programs" tone={0} icon="◎" />
+        <StatCard label="With Active Enrollment" value={String(new Set(all.filter((item) => item.stage !== "Cancelled").map((item) => item.trainee.id)).size)} note="Currently in the pipeline" tone={3} icon="▤" />
+        <StatCard label="Possible Duplicates" value={String(duplicateCount)} note="Same SRN or full name" tone={1} icon="!" onClick={() => setView("Possible duplicates")} />
+        <StatCard label="Certificates Released" value={String(all.filter((item) => item.certificate?.status === "Released").length)} note="Completion records" tone={2} icon="✓" />
       </div>
 
-      <Panel title="Trainee lookup" description="Find any trainee on record by name, trainee number, email, or mobile.">
+      <Panel title="Trainee Lookup" description="Find any trainee on record by name, trainee number, email, or mobile.">
         <div className="toolbar toolbar-wrap">
           <Segmented options={["All trainees", "Possible duplicates"] as const} value={view} onChange={setView} />
           <SearchInput value={query} onChange={setQuery} placeholder="Search name, number, email, or mobile" />
@@ -210,9 +211,9 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
       </Panel>
 
       {view === "Possible duplicates" ? (
-        <Panel padded={false} title="Possible duplicates" description="Same SRN or an exact first, middle, and last name.">
+        <Panel padded={false} title="Possible Duplicates" description="Same SRN or an exact first, middle, and last name.">
           {groups.length === 0 ? (
-            <EmptyState icon="✓" title="No duplicates detected" text="No trainees share an SRN or an exact first, middle, and last name." />
+            <EmptyState icon="✓" title="No Duplicates Detected" text="No trainees share an SRN or an exact first, middle, and last name." />
           ) : (
             <div className="dup-list">
               {groups.map((group, index) => {
@@ -249,7 +250,7 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
           )}
         </Panel>
       ) : (
-        <Panel padded={false} title="Trainee summary" description={`Date-sensitive · ${summaryRange}`}>
+        <Panel padded={false} title="Trainee Summary" description={`Date-sensitive · ${summaryRange}`}>
           <div className="toolbar toolbar-wrap">
             <label className="inline-field">
               <span>Start date</span>
@@ -263,7 +264,7 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
               <span>Stage</span>
               <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as (typeof STAGE_FILTERS)[number])}>
                 {STAGE_FILTERS.map((item) => (
-                  <option key={item}>{item}</option>
+                  <option key={item}>{tcl(item)}</option>
                 ))}
               </select>
             </label>
@@ -358,7 +359,7 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
                 <dd>{selected.emergencyContactName ?? "—"}{selected.emergencyContactMobile ? ` · ${selected.emergencyContactMobile}` : ""}</dd>
               </div>
             </dl>
-            <h3 className="drawer-section">Facebook link</h3>
+            <h3 className="drawer-section">Facebook Link</h3>
             <FacebookEncoder
               key={selected.id}
               trainee={selected}
@@ -367,7 +368,7 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
                 toast("success", link ? "Facebook link saved." : "Facebook link cleared.");
               }}
             />
-            <h3 className="drawer-section">Enrollment history</h3>
+            <h3 className="drawer-section">Enrollment History</h3>
             {selectedViews.length === 0 ? (
               <p className="muted-text">No enrollment yet for this trainee.</p>
             ) : (
@@ -400,7 +401,7 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
 
       <Modal
         open={newOpen}
-        title="New trainee record"
+        title="New Trainee Record"
         onClose={() => setNewOpen(false)}
         footer={
           <>
@@ -436,13 +437,13 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
         }
       >
         <div className="form-grid">
-          <Field label="First name*">
+          <Field label="First Name*">
             <input value={draft.firstName} onChange={(event) => setDraft({ ...draft, firstName: event.target.value })} />
           </Field>
-          <Field label="Middle name">
+          <Field label="Middle Name">
             <input value={draft.middleName} onChange={(event) => setDraft({ ...draft, middleName: event.target.value })} />
           </Field>
-          <Field label="Last name*">
+          <Field label="Last Name*">
             <input value={draft.lastName} onChange={(event) => setDraft({ ...draft, lastName: event.target.value })} />
           </Field>
           <Field label="Suffix">
@@ -454,16 +455,16 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
           <Field label="Email*" hint={draft.email && !isEmail(draft.email) ? VALIDATION_MESSAGES.email : undefined}>
             <input type="email" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} />
           </Field>
-          <Field label="Present address*" full>
+          <Field label="Present Address*" full>
             <input value={draft.address} onChange={(event) => setDraft({ ...draft, address: event.target.value })} />
           </Field>
-          <Field label="Contact number*" hint={draft.mobile && !isPhContactNumber(draft.mobile) ? VALIDATION_MESSAGES.contact : undefined}>
+          <Field label="Contact Number*" hint={draft.mobile && !isPhContactNumber(draft.mobile) ? VALIDATION_MESSAGES.contact : undefined}>
             <input value={draft.mobile} onChange={(event) => setDraft({ ...draft, mobile: event.target.value })} placeholder="09XX XXX XXXX" />
           </Field>
-          <Field label="Place of birth*">
+          <Field label="Place of Birth*">
             <input value={draft.placeOfBirth} onChange={(event) => setDraft({ ...draft, placeOfBirth: event.target.value })} />
           </Field>
-          <Field label="Date of birth*">
+          <Field label="Date of Birth*">
             <input type="date" value={draft.birthDate} onChange={(event) => setDraft({ ...draft, birthDate: event.target.value })} />
           </Field>
           <Field label="Rank*">
@@ -472,13 +473,13 @@ export function TraineesModule({ role }: { go: (module: Module) => void; role: R
           <Field label="Company">
             <input value={draft.company} onChange={(event) => setDraft({ ...draft, company: event.target.value })} />
           </Field>
-          <Field label="Facebook link" full hint="Encoded by the Registration Officer — the trainee's Facebook profile URL">
+          <Field label="Facebook Link" full hint="Encoded by the Registration Officer — the trainee's Facebook profile URL">
             <input value={draft.facebookLink} onChange={(event) => setDraft({ ...draft, facebookLink: event.target.value })} placeholder="https://facebook.com/…" />
           </Field>
-          <Field label="Emergency contact person*">
+          <Field label="Emergency Contact Person*">
             <input value={draft.emergencyContactName} onChange={(event) => setDraft({ ...draft, emergencyContactName: event.target.value })} />
           </Field>
-          <Field label="Emergency contact number*" hint={draft.emergencyContactMobile && !isPhContactNumber(draft.emergencyContactMobile) ? VALIDATION_MESSAGES.contact : undefined}>
+          <Field label="Emergency Contact Number*" hint={draft.emergencyContactMobile && !isPhContactNumber(draft.emergencyContactMobile) ? VALIDATION_MESSAGES.contact : undefined}>
             <input value={draft.emergencyContactMobile} onChange={(event) => setDraft({ ...draft, emergencyContactMobile: event.target.value })} />
           </Field>
         </div>
@@ -642,8 +643,8 @@ export function CatalogModule({ role }: { role: Role }) {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Internal commercial catalog"
-        title="Endorsed courses"
+        eyebrow="Internal Commercial Catalog"
+        title="Endorsed Courses"
         description={
           canEdit
             ? "Add, edit, and archive New Wave courses and endorsed partner offers — no developer needed. Fees, rebates, and payables are staff-only."
@@ -669,9 +670,9 @@ export function CatalogModule({ role }: { role: Role }) {
             <label className="inline-field">
               <span>Center</span>
               <select value={center} onChange={(event) => setCenter(event.target.value)}>
-                <option>All centers</option>
+                <option value="All centers">All Centers</option>
                 {centers.map((item) => (
-                  <option key={item}>{item}</option>
+                  <option key={item}>{tcl(item)}</option>
                 ))}
               </select>
             </label>
@@ -823,16 +824,16 @@ export function CatalogModule({ role }: { role: Role }) {
       >
         {courseDraft && (
           <div className="form-grid">
-            <Field label="Course code*" hint="Unique, e.g. SATSDSD">
+            <Field label="Course Code*" hint="Unique, e.g. SATSDSD">
               <input value={courseDraft.code} onChange={(event) => setCourseDraft({ ...courseDraft, code: event.target.value.toUpperCase() })} />
             </Field>
-            <Field label="Course name*" full>
+            <Field label="Course Name*" full>
               <input value={courseDraft.course} onChange={(event) => setCourseDraft({ ...courseDraft, course: event.target.value })} />
             </Field>
             <Field label="Category">
               <select value={courseDraft.category} onChange={(event) => setCourseDraft({ ...courseDraft, category: event.target.value })}>
                 {COURSE_CATEGORIES.map((item) => (
-                  <option key={item}>{item}</option>
+                  <option key={item}>{tcl(item)}</option>
                 ))}
               </select>
             </Field>
@@ -842,14 +843,14 @@ export function CatalogModule({ role }: { role: Role }) {
             <Field label="Delivery">
               <select value={courseDraft.modality} onChange={(event) => setCourseDraft({ ...courseDraft, modality: event.target.value })}>
                 {COURSE_MODALITIES.map((item) => (
-                  <option key={item}>{item}</option>
+                  <option key={item}>{tcl(item)}</option>
                 ))}
               </select>
             </Field>
             <Field label="Fee (₱)*">
               <input type="number" min={0} step="1" value={courseDraft.price} onChange={(event) => setCourseDraft({ ...courseDraft, price: event.target.value })} />
             </Field>
-            <Field label="Instruction template" full hint="Sent to the trainee once enrolled and paid. Leave blank to use the generic instruction email.">
+            <Field label="Instruction Template" full hint="Sent to the trainee once enrolled and paid. Leave blank to use the generic instruction email.">
               <textarea
                 rows={4}
                 value={courseDraft.instructionTemplate}
@@ -857,7 +858,7 @@ export function CatalogModule({ role }: { role: Role }) {
                 onChange={(event) => setCourseDraft({ ...courseDraft, instructionTemplate: event.target.value })}
               />
             </Field>
-            <Field label="Certificate template" full hint="Reference for the New Wave certificate layout used when this course issues a certificate. Leave blank if none yet.">
+            <Field label="Certificate Template" full hint="Reference for the New Wave certificate layout used when this course issues a certificate. Leave blank if none yet.">
               <input
                 value={courseDraft.certificateTemplate}
                 placeholder="e.g. NWM-BT-CERT-A4"
@@ -888,7 +889,7 @@ export function CatalogModule({ role }: { role: Role }) {
       >
         {offerDraft && (
           <div className="form-grid">
-            <Field label="Training center*" hint="Pick an existing center or type a new one">
+            <Field label="Training Center*" hint="Pick an existing center or type a new one">
               <input list="partner-centers" value={offerDraft.center} onChange={(event) => setOfferDraft({ ...offerDraft, center: event.target.value })} />
               <datalist id="partner-centers">
                 {centers.map((item) => (
@@ -902,13 +903,13 @@ export function CatalogModule({ role }: { role: Role }) {
             <Field label="Duration*" hint="e.g. 5 days">
               <input value={offerDraft.duration} onChange={(event) => setOfferDraft({ ...offerDraft, duration: event.target.value })} />
             </Field>
-            <Field label="Training fee (₱)*">
+            <Field label="Training Fee (₱)*">
               <input type="number" min={0} step="1" value={offerDraft.fee} onChange={(event) => setOfferDraft({ ...offerDraft, fee: event.target.value })} />
             </Field>
-            <Field label="New Wave rebate (₱)*">
+            <Field label="New Wave Rebate (₱)*">
               <input type="number" min={0} step="1" value={offerDraft.rebate} onChange={(event) => setOfferDraft({ ...offerDraft, rebate: event.target.value })} />
             </Field>
-            <Field label="Partner payable">
+            <Field label="Partner Payable">
               <input readOnly value={pesos(Math.max(0, toCentavos(offerDraft.fee || "0") - toCentavos(offerDraft.rebate || "0")))} />
             </Field>
             {formError && <p className="form-error field-full">{formError}</p>}
@@ -1027,7 +1028,7 @@ function InvoiceSummary() {
 
   return (
     <Panel
-      title="Summary of invoices"
+      title="Summary of Invoices"
       description={`Collections per channel · ${describeRange(range)}`}
       action={
         <button
@@ -1052,7 +1053,7 @@ function InvoiceSummary() {
       <div className="summary-panel">
         <Segmented options={SUMMARY_RANGES} value={span} onChange={setSpan} />
         {invoices.length === 0 ? (
-          <EmptyState icon="₱" title="No invoices in this period" text="No verified collections in the selected window." />
+          <EmptyState icon="₱" title="No Invoices in This Period" text="No verified collections in the selected window." />
         ) : (
           <DataTable columns={["Channel", "Invoices", "Amount"]}>
             {byChannel.map((row) => (
@@ -1086,7 +1087,7 @@ function ExpenseVoucherSummary() {
 
   return (
     <Panel
-      title="Summary of expense vouchers"
+      title="Summary of Expense Vouchers"
       description={`Per category · ${describeRange(range)}`}
       action={
         <button
@@ -1112,7 +1113,7 @@ function ExpenseVoucherSummary() {
       <div className="summary-panel">
         <Segmented options={SUMMARY_RANGES} value={span} onChange={setSpan} />
         {vouchers.length === 0 ? (
-          <EmptyState icon="▥" title="No vouchers in this period" text="No expense vouchers raised in the selected window." />
+          <EmptyState icon="▥" title="No Vouchers in This Period" text="No expense vouchers raised in the selected window." />
         ) : (
           <DataTable columns={["Category", "Vouchers", "Amount"]}>
             {categories.map((row) => (
@@ -1205,7 +1206,7 @@ function BankReconciliation() {
 
   return (
     <Panel
-      title="Bank & GCash reconciliation"
+      title="Bank & GCash Reconciliation"
       description="Upload a channel's transaction history (PSBank, UnionBank, GCash) and match it against recorded collections."
       action={
         bankRows.length > 0 ? (
@@ -1246,17 +1247,17 @@ function BankReconciliation() {
         </div>
 
         {bankRows.length === 0 ? (
-          <EmptyState icon="◎" title="No file uploaded" text="Export a channel's transaction history (Payments → Transaction history) or upload a bank/GCash CSV with Date, Reference, and Amount columns." />
+          <EmptyState icon="◎" title="No File Uploaded" text="Export a channel's transaction history (Payments → Transaction history) or upload a bank/GCash CSV with Date, Reference, and Amount columns." />
         ) : (
           <>
             <div className="stat-grid stat-grid-3">
               <StatCard label="Matched" value={String(matched.length)} note={pesos(matched.reduce((s, m) => s + m.amountCentavos, 0))} tone={2} icon="✓" />
-              <StatCard label="In bank file only" value={String(bankOnly.length)} note={pesos(bankOnly.reduce((s, b) => s + b.amountCentavos, 0))} tone={5} icon="!" />
-              <StatCard label="In system only" value={String(systemOnly.length)} note={pesos(systemOnly.reduce((s, e) => s + e.amountCentavos, 0))} tone={1} icon="◎" />
+              <StatCard label="In Bank File Only" value={String(bankOnly.length)} note={pesos(bankOnly.reduce((s, b) => s + b.amountCentavos, 0))} tone={5} icon="!" />
+              <StatCard label="In System Only" value={String(systemOnly.length)} note={pesos(systemOnly.reduce((s, e) => s + e.amountCentavos, 0))} tone={1} icon="◎" />
             </div>
             {bankOnly.length > 0 && (
               <>
-                <h3 className="drawer-section">In bank file, not recorded</h3>
+                <h3 className="drawer-section">In Bank File, Not Recorded</h3>
                 <DataTable columns={["Reference", "Amount", "Date"]}>
                   {bankOnly.map((b, index) => (
                     <tr key={index}><td>{b.reference || "—"}</td><td>{pesos(b.amountCentavos)}</td><td>{b.date || "—"}</td></tr>
@@ -1266,7 +1267,7 @@ function BankReconciliation() {
             )}
             {systemOnly.length > 0 && (
               <>
-                <h3 className="drawer-section">Recorded, not in bank file</h3>
+                <h3 className="drawer-section">Recorded, Not in Bank File</h3>
                 <DataTable columns={["Payment", "Reference", "Amount"]}>
                   {systemOnly.map((s) => (
                     <tr key={s.id}><td><strong>{s.reference}</strong></td><td>{s.referenceNumber || "—"}</td><td>{pesos(s.amountCentavos)}</td></tr>
@@ -1309,12 +1310,12 @@ export function SuppliesModule({ role }: { role: Role }) {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Operations" title="Supplies & inventory" description="Simple stock list for office and training supplies. Adjust quantities as stock comes in or is issued." />
+      <PageHeader eyebrow="Operations" title="Supplies & Inventory" description="Simple stock list for office and training supplies. Adjust quantities as stock comes in or is issued." />
 
       <Panel
-        title="Stock on hand"
+        title="Stock on Hand"
         description={lowStock.length > 0 ? `${lowStock.length} item(s) at or below reorder level` : "All items above reorder level"}
-        action={canManage ? <button className="primary-button" onClick={() => setDraft({ ...EMPTY_SUPPLY })}>+ Add item</button> : undefined}
+        action={canManage ? <button className="primary-button" onClick={() => setDraft({ ...EMPTY_SUPPLY })}>+ Add Item</button> : undefined}
       >
         <label style={{ display: "inline-flex", gap: 6, alignItems: "center", marginBottom: 10, fontSize: 13, color: "var(--muted)" }}>
           <input type="checkbox" checked={showArchived} onChange={(e) => setShowArchived(e.target.checked)} /> Show archived
@@ -1359,13 +1360,13 @@ export function SuppliesModule({ role }: { role: Role }) {
           open
           title={draft.id ? "Edit supply item" : "Add supply item"}
           onClose={() => setDraft(null)}
-          footer={<><button className="secondary-button" onClick={() => setDraft(null)}>Cancel</button><button className="primary-button" disabled={!draft.name.trim() || !draft.unit.trim()} onClick={save}>{draft.id ? "Save changes" : "Add item"}</button></>}
+          footer={<><button className="secondary-button" onClick={() => setDraft(null)}>Cancel</button><button className="primary-button" disabled={!draft.name.trim() || !draft.unit.trim()} onClick={save}>{draft.id ? "Save Changes" : "Add Item"}</button></>}
         >
-          <Field label="Item name*"><input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
+          <Field label="Item Name*"><input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
           <Field label="Category"><input value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} /></Field>
           <Field label="Unit*" hint="box, pack, piece, bottle, ream…"><input value={draft.unit} onChange={(e) => setDraft({ ...draft, unit: e.target.value })} /></Field>
-          <Field label="Quantity on hand"><input type="number" min="0" value={draft.quantityOnHand} onChange={(e) => setDraft({ ...draft, quantityOnHand: e.target.value })} /></Field>
-          <Field label="Reorder level" hint="Flags 'LOW' at or below this quantity"><input type="number" min="0" value={draft.reorderLevel} onChange={(e) => setDraft({ ...draft, reorderLevel: e.target.value })} /></Field>
+          <Field label="Quantity on Hand"><input type="number" min="0" value={draft.quantityOnHand} onChange={(e) => setDraft({ ...draft, quantityOnHand: e.target.value })} /></Field>
+          <Field label="Reorder Level" hint="Flags 'LOW' at or below this quantity"><input type="number" min="0" value={draft.reorderLevel} onChange={(e) => setDraft({ ...draft, reorderLevel: e.target.value })} /></Field>
         </Modal>
       )}
     </div>
@@ -1419,7 +1420,7 @@ export function AccountingModule({ role }: { role: Role }) {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Financial control"
+        eyebrow="Financial Control"
         title="Accounting"
         description="Collections, receivables, reconciliation, expenses, and partner payables built from the same ledger the cashier posts to."
       />
@@ -1435,13 +1436,13 @@ export function AccountingModule({ role }: { role: Role }) {
       {tab === "Overview" && (
       <>
       <div className="stat-grid stat-grid-4">
-        <StatCard label="Gross collections" value={pesos(gross)} note={`${payments.length} verified payments`} tone={2} icon="₱" />
-        <StatCard label="Net collections" value={pesos(gross - refunds)} note={`${pesos(refunds)} refunded or reversed`} tone={0} icon="▥" />
+        <StatCard label="Gross Collections" value={pesos(gross)} note={`${payments.length} verified payments`} tone={2} icon="₱" />
+        <StatCard label="Net Collections" value={pesos(gross - refunds)} note={`${pesos(refunds)} refunded or reversed`} tone={0} icon="▥" />
         <StatCard label="Receivables" value={pesos(receivables)} note={`${all.filter((item) => item.balanceCentavos > 0).length} open balances`} tone={1} icon="!" />
         <StatCard label="Unreconciled" value={String(unreconciled.length)} note={pesos(unreconciled.reduce((sum, entry) => sum + entry.amountCentavos, 0))} tone={5} icon="◎" />
       </div>
 
-        <Panel title="Collections by channel" description="Verified payments only">
+        <Panel title="Collections by Channel" description="Verified payments only">
           <div className="bar-list">
             {state.paymentChannels.filter((channel) => channel.active).map((channel) => {
               const method = channel.name;
@@ -1460,7 +1461,7 @@ export function AccountingModule({ role }: { role: Role }) {
           </div>
         </Panel>
 
-      <Panel title="Receivables ageing" description="Open balances by enrollment" padded={false}>
+      <Panel title="Receivables Ageing" description="Open balances by enrollment" padded={false}>
         <DataTable columns={["Trainee", "Enrollment", "Charged", "Paid", "Balance", "Stage"]}>
           {all
             .filter((item) => item.balanceCentavos > 0)
@@ -1486,7 +1487,7 @@ export function AccountingModule({ role }: { role: Role }) {
             ))}
         </DataTable>
         {all.every((item) => item.balanceCentavos === 0) && (
-          <EmptyState icon="✓" title="No receivables" text="Every active enrollment is fully settled." />
+          <EmptyState icon="✓" title="No Receivables" text="Every active enrollment is fully settled." />
         )}
       </Panel>
       </>
@@ -1499,9 +1500,9 @@ export function AccountingModule({ role }: { role: Role }) {
           <ExpenseVoucherSummary />
         </div>
 
-        <Panel title="Expense vouchers" description="Approve or reject in the Requests module — each voucher raises an Expense request.">
+        <Panel title="Expense Vouchers" description="Approve or reject in the Requests module — each voucher raises an Expense request.">
           {state.expenses.length === 0 ? (
-            <EmptyState icon="✓" title="No vouchers yet" text="Expense vouchers raised from Payments appear here." />
+            <EmptyState icon="✓" title="No Vouchers Yet" text="Expense vouchers raised from Payments appear here." />
           ) : (
             <div className="history-list">
               {state.expenses.map((expense) => (
@@ -1531,7 +1532,7 @@ export function AccountingModule({ role }: { role: Role }) {
         </Panel>
 
         <Panel
-          title="Monthly payables"
+          title="Monthly Payables"
           description="Recurring bills tracked for the month — reminded on the Accounting and Admin dashboards."
           action={
             canManageCharges ? (
@@ -1542,7 +1543,7 @@ export function AccountingModule({ role }: { role: Role }) {
           }
         >
           {state.monthlyPayables.length === 0 ? (
-            <EmptyState icon="₱" title="No monthly payables" text="Add recurring bills (rent, utilities, remittances) to track them each month." />
+            <EmptyState icon="₱" title="No Monthly Payables" text="Add recurring bills (rent, utilities, remittances) to track them each month." />
           ) : (
             <div className="history-list">
               {[...state.monthlyPayables].sort((a, b) => a.dueDay - b.dueDay).map((payable) => (
@@ -1593,7 +1594,7 @@ export function AccountingModule({ role }: { role: Role }) {
 
       {tab === "Setup" && (
         <>
-          <Panel title="Training pricelist" description="Standard New Wave course prices — applies to new enrollments">
+          <Panel title="Training Pricelist" description="Standard New Wave course prices — applies to new enrollments">
             <table className="ledger-table" style={{ width: "100%" }}>
               <thead><tr><th>Course</th><th>Duration</th><th style={{ textAlign: "right" }}>Price</th><th /></tr></thead>
               <tbody>
@@ -1621,7 +1622,7 @@ export function AccountingModule({ role }: { role: Role }) {
             </table>
           </Panel>
 
-          <Panel title="Endorsement rates & rebates" description="Partner-endorsed offers — training fee, New Wave rebate, and partner payable (fee − rebate)">
+          <Panel title="Endorsement Rates & Rebates" description="Partner-endorsed offers — training fee, New Wave rebate, and partner payable (fee − rebate)">
             <table className="ledger-table" style={{ width: "100%" }}>
               <thead><tr><th>Course · Center</th><th>Duration</th><th style={{ textAlign: "right" }}>Training Fee</th><th style={{ textAlign: "right" }}>Rebate</th><th style={{ textAlign: "right" }}>Partner Payable</th><th /></tr></thead>
               <tbody>
@@ -1663,7 +1664,7 @@ export function AccountingModule({ role }: { role: Role }) {
       <>
       {canManage && (
           <Panel
-            title="Payment channels"
+            title="Payment Channels"
             description="Modes of payment offered at the cashier"
             action={
               <button className="link-button" onClick={() => setChannelDraft({ id: null, name: "", requiresReference: true })}>
@@ -1703,7 +1704,7 @@ export function AccountingModule({ role }: { role: Role }) {
 
       {canManageCharges && (
         <Panel
-          title="Other charges"
+          title="Other Charges"
           description="Admin-managed catalog the cashier can post (Uniform, Cancellation Fee, Reprinting, Make-Up Class)"
           action={
             <button className="link-button" onClick={() => setChargeDraft({ id: null, name: "", amount: "" })}>
@@ -1743,7 +1744,7 @@ export function AccountingModule({ role }: { role: Role }) {
 
       {canManageCharges && (
         <Panel
-          title="Expense categories"
+          title="Expense Categories"
           description="Admin-managed categories the cashier picks when raising an expense voucher."
           action={
             <button className="link-button" onClick={() => setCategoryDraft({ id: null, name: "" })}>
@@ -1775,7 +1776,7 @@ export function AccountingModule({ role }: { role: Role }) {
               </div>
             ))}
             {state.expenseCategories.length === 0 && (
-              <EmptyState icon="▥" title="No expense categories" text="Add a category so vouchers can be classified." />
+              <EmptyState icon="▥" title="No Expense Categories" text="Add a category so vouchers can be classified." />
             )}
           </div>
         </Panel>
@@ -1783,7 +1784,7 @@ export function AccountingModule({ role }: { role: Role }) {
 
       {canManageCharges && (
         <Panel
-          title="Marketing agencies"
+          title="Marketing Agencies"
           description="Admin-managed referral agencies with per-course rebates across the STCW and in-house catalog. The cashier picks one and the rebate for that course is applied as a trainee discount."
           action={
             <button className="link-button" onClick={() => setAgencyDraft({ id: null, name: "" })}>
@@ -1821,7 +1822,7 @@ export function AccountingModule({ role }: { role: Role }) {
               );
             })}
             {state.marketingAgencies.length === 0 && (
-              <EmptyState icon="◇" title="No marketing agencies" text="Add an agency so cashiers can apply its rebate." />
+              <EmptyState icon="◇" title="No Marketing Agencies" text="Add an agency so cashiers can apply its rebate." />
             )}
           </div>
         </Panel>
@@ -1864,10 +1865,10 @@ export function AccountingModule({ role }: { role: Role }) {
       >
         {chargeDraft && (
           <div className="form-grid">
-            <Field label="Charge name*" full hint="e.g. Uniform, Cancellation Fee, Reprinting, Make-Up Class">
+            <Field label="Charge Name*" full hint="e.g. Uniform, Cancellation Fee, Reprinting, Make-Up Class">
               <input value={chargeDraft.name} onChange={(event) => setChargeDraft({ ...chargeDraft, name: event.target.value })} />
             </Field>
-            <Field label="Default amount (₱)*">
+            <Field label="Default Amount (₱)*">
               <input type="number" min={0} step="1" value={chargeDraft.amount} onChange={(event) => setChargeDraft({ ...chargeDraft, amount: event.target.value })} />
             </Field>
           </div>
@@ -1908,7 +1909,7 @@ export function AccountingModule({ role }: { role: Role }) {
       >
         {categoryDraft && (
           <div className="form-grid">
-            <Field label="Category name*" full hint="e.g. Supplies, Utilities, Professional Fees">
+            <Field label="Category Name*" full hint="e.g. Supplies, Utilities, Professional Fees">
               <input value={categoryDraft.name} onChange={(event) => setCategoryDraft({ ...categoryDraft, name: event.target.value })} />
             </Field>
           </div>
@@ -1950,7 +1951,7 @@ export function AccountingModule({ role }: { role: Role }) {
       >
         {payableDraft && (
           <div className="form-grid">
-            <Field label="Payable name*" full hint="e.g. Office rent, Internet (PLDT), SSS remittance">
+            <Field label="Payable Name*" full hint="e.g. Office rent, Internet (PLDT), SSS remittance">
               <input value={payableDraft.name} onChange={(event) => setPayableDraft({ ...payableDraft, name: event.target.value })} />
             </Field>
             <Field label="Category">
@@ -1959,7 +1960,7 @@ export function AccountingModule({ role }: { role: Role }) {
             <Field label="Amount (PHP)*">
               <input inputMode="decimal" value={payableDraft.amount} onChange={(event) => setPayableDraft({ ...payableDraft, amount: event.target.value })} />
             </Field>
-            <Field label="Due day of month (1–31)*">
+            <Field label="Due Day of Month (1–31)*">
               <input inputMode="numeric" value={payableDraft.dueDay} onChange={(event) => setPayableDraft({ ...payableDraft, dueDay: event.target.value })} />
             </Field>
             <Field label="Notes" full>
@@ -2003,7 +2004,7 @@ export function AccountingModule({ role }: { role: Role }) {
       >
         {agencyDraft && (
           <div className="form-grid">
-            <Field label="Agency name*" full hint="e.g. Seafront Manning Agency">
+            <Field label="Agency Name*" full hint="e.g. Seafront Manning Agency">
               <input
                 value={agencyDraft.name}
                 onChange={(event) => setAgencyDraft({ ...agencyDraft, name: event.target.value })}
@@ -2055,7 +2056,7 @@ export function AccountingModule({ role }: { role: Role }) {
       >
         {channelDraft && (
           <div className="form-grid">
-            <Field label="Channel name*" full hint="e.g. UnionBank, PSBank, GCash, Cash">
+            <Field label="Channel Name*" full hint="e.g. UnionBank, PSBank, GCash, Cash">
               <input value={channelDraft.name} onChange={(event) => setChannelDraft({ ...channelDraft, name: event.target.value })} />
             </Field>
             <label className="inline-field inline-check field-full">
@@ -2124,7 +2125,7 @@ export function ExpenseVoucherPreviewModal({ expense, onClose }: { expense: Expe
   return (
     <Modal
       open
-      title="Expense voucher"
+      title="Expense Voucher"
       description={`${expense.expenseNumber} · ${expense.payee}`}
       onClose={onClose}
       wide
@@ -2155,7 +2156,7 @@ export function ExpenseVoucherPreviewModal({ expense, onClose }: { expense: Expe
           <span>Status <strong>{expense.status}</strong></span>
         </div>
 
-        <h3 className="slip-section">Voucher details</h3>
+        <h3 className="slip-section">Voucher Details</h3>
         <div className="slip-grid">
           <div><span>Payee</span><strong>{expense.payee}</strong></div>
           <div><span>Category</span><strong>{expense.category}</strong></div>
@@ -2201,8 +2202,8 @@ export function InstructionsModule() {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Trainee communication"
-        title="Training instructions"
+        eyebrow="Trainee Communication"
+        title="Training Instructions"
         description="Send reporting details to fully paid enrollments and track acknowledgment from the trainee portal."
         actions={
           <button
@@ -2220,8 +2221,8 @@ export function InstructionsModule() {
       />
 
       <div className="stat-grid stat-grid-3">
-        <StatCard label="Ready to send" value={String(ready.length)} note="Confirmed and fully paid" tone={1} icon="✉" />
-        <StatCard label="Awaiting acknowledgment" value={String(awaiting.length)} note="Follow-up active" tone={3} icon="□" />
+        <StatCard label="Ready to Send" value={String(ready.length)} note="Confirmed and fully paid" tone={1} icon="✉" />
+        <StatCard label="Awaiting Acknowledgment" value={String(awaiting.length)} note="Follow-up active" tone={3} icon="□" />
         <StatCard label="Acknowledged" value={String(acknowledged.length)} note="Confirmed by trainees" tone={2} icon="✓" />
       </div>
 
@@ -2231,7 +2232,7 @@ export function InstructionsModule() {
         </div>
         {rows.length === 0 ? (
           <EmptyState
-            title="Nothing in this list"
+            title="Nothing in This List"
             text="Instructions become available once an enrollment is fully paid. Post a payment first, then return here."
           />
         ) : (
@@ -2317,8 +2318,8 @@ export function RequestsModule({ role }: { role: Role }) {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Controlled changes"
-        title="Requests & approvals"
+        eyebrow="Controlled Changes"
+        title="Requests & Approvals"
         description={
           canDecide
             ? "Reschedules, corrections, reprinting, make-up, and course changes approved by the Accounting Manager."
@@ -2335,7 +2336,7 @@ export function RequestsModule({ role }: { role: Role }) {
 
       <div className="stat-grid stat-grid-4">
         <StatCard label="Pending" value={String(state.requests.filter((item) => item.status === "Pending").length)} note="Awaiting a decision" tone={1} icon="!" />
-        <StatCard label="For clarification" value={String(state.requests.filter((item) => item.status === "For clarification").length)} note="Returned to requester" tone={3} icon="↗" />
+        <StatCard label="For Clarification" value={String(state.requests.filter((item) => item.status === "For clarification").length)} note="Returned to requester" tone={3} icon="↗" />
         <StatCard label="Approved" value={String(state.requests.filter((item) => item.status === "Approved").length)} note="Applied to records" tone={2} icon="✓" />
         <StatCard label="Rejected" value={String(state.requests.filter((item) => item.status === "Rejected").length)} note="Reason recorded" tone={5} icon="✕" />
       </div>
@@ -2427,7 +2428,7 @@ export function RequestsModule({ role }: { role: Role }) {
 
       <Modal
         open={newOpen}
-        title="New change request"
+        title="New Change Request"
         description="Requests keep controlled changes auditable instead of editing records directly."
         onClose={() => setNewOpen(false)}
         footer={
@@ -2458,7 +2459,7 @@ export function RequestsModule({ role }: { role: Role }) {
         }
       >
         <div className="form-grid">
-          <Field label="Request type" full>
+          <Field label="Request Type" full>
             <select value={draft.type} onChange={(event) => setDraft({ ...draft, type: event.target.value as RequestType })}>
               {requestTypes.map((type) => (
                 <option key={type}>{type}</option>
@@ -2467,7 +2468,7 @@ export function RequestsModule({ role }: { role: Role }) {
           </Field>
           <Field label="Enrollment" full>
             <select value={draft.enrollmentId} onChange={(event) => setDraft({ ...draft, enrollmentId: event.target.value })}>
-              <option value="">Select an enrollment</option>
+              <option value="">Select an Enrollment</option>
               {all.map((item) => (
                 <option key={item.enrollment.id} value={item.enrollment.id}>
                   {item.enrollment.reference} — {fullName(item.trainee)} · {item.enrollment.courseName}
@@ -2490,7 +2491,7 @@ export function RequestsModule({ role }: { role: Role }) {
 export function UserSetupModule() {
   return (
     <div className="page">
-      <PageHeader eyebrow="People operations" title="User setup" description="Add, edit, and separate employee accounts with payroll setup." />
+      <PageHeader eyebrow="People Operations" title="User Setup" description="Add, edit, and separate employee accounts with payroll setup." />
       <HrUserSetup />
     </div>
   );
@@ -2507,14 +2508,14 @@ export function PayrollModule() {
   const endCutoff = new Date(now.getFullYear(), now.getMonth() + 1, 0);
   return (
     <div className="page">
-      <PageHeader eyebrow="People operations" title="Payroll" description="Attendance, payroll runs, payslips, and 13th-month pay." />
+      <PageHeader eyebrow="People Operations" title="Payroll" description="Attendance, payroll runs, payslips, and 13th-month pay." />
       <div className="inline-note note-blue">
         <strong>Semi-monthly cut-off — 15th &amp; 30th (end of month)</strong>
         <p>This month: 1st–15th paid on {formatDate(midCutoff.toISOString())}; 16th–end paid on {formatDate(endCutoff.toISOString())}.</p>
       </div>
       <div className="hub-tabs">
         {PAYROLL_TABS.map((item) => (
-          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>
+          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{tcl(item)}</button>
         ))}
       </div>
       {tab === "Attendance" && <HrAttendanceTab />}
@@ -2528,7 +2529,7 @@ export function PayrollModule() {
 export function HrRequestModule() {
   return (
     <div className="page">
-      <PageHeader eyebrow="People operations" title="Request" description="Employee leave, cash-advance requests, and absences (MyHR)." />
+      <PageHeader eyebrow="People Operations" title="Request" description="Employee leave, cash-advance requests, and absences (MyHR)." />
       <HrRequestsTab />
     </div>
   );
@@ -2557,7 +2558,7 @@ function HrUserSetup() {
 
   return (
     <>
-      <Panel padded={false} action={<button className="link-button" onClick={() => setDraft(emptyDraft)}>＋ Add employee</button>}>
+      <Panel padded={false} action={<button className="link-button" onClick={() => setDraft(emptyDraft)}>＋ Add Employee</button>}>
         <DataTable columns={["Employee", "Position / dept", "Type", "Pay", "Basic salary", "Status", ""]} minWidth={1040}>
           {state.employees.map((employee) => (
             <tr key={employee.id} className={employee.status === "Separated" ? "row-muted" : ""}>
@@ -2637,22 +2638,22 @@ function HrUserSetup() {
       >
         {draft && (
           <div className="form-grid">
-            <Field label="Full name*" full><input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
+            <Field label="Full Name*" full><input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} /></Field>
             <Field label="Position*"><input value={draft.position} onChange={(e) => setDraft({ ...draft, position: e.target.value })} /></Field>
             <Field label="Department"><input value={draft.department} onChange={(e) => setDraft({ ...draft, department: e.target.value })} /></Field>
             <Field label="Email"><input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></Field>
-            <Field label="Date hired"><input type="date" value={draft.dateHired} onChange={(e) => setDraft({ ...draft, dateHired: e.target.value })} /></Field>
+            <Field label="Date Hired"><input type="date" value={draft.dateHired} onChange={(e) => setDraft({ ...draft, dateHired: e.target.value })} /></Field>
             <Field label="Status">
               <select value={draft.employmentType} onChange={(e) => setDraft({ ...draft, employmentType: e.target.value as Employee["employmentType"] })}>
                 {EMPLOYMENT_TYPES.map((type) => <option key={type}>{type}</option>)}
               </select>
             </Field>
-            <Field label="Pay frequency">
+            <Field label="Pay Frequency">
               <select value={draft.payFrequency} onChange={(e) => setDraft({ ...draft, payFrequency: e.target.value as NonNullable<Employee["payFrequency"]> })}>
                 {PAY_FREQUENCIES.map((freq) => <option key={freq}>{freq}</option>)}
               </select>
             </Field>
-            <Field label="Basic salary (₱ / month)"><input type="number" min={0} value={draft.basic} onChange={(e) => setDraft({ ...draft, basic: e.target.value })} /></Field>
+            <Field label="Basic Salary (₱ / Month)"><input type="number" min={0} value={draft.basic} onChange={(e) => setDraft({ ...draft, basic: e.target.value })} /></Field>
             <Field label="Allowance (₱)"><input type="number" min={0} value={draft.allowance} onChange={(e) => setDraft({ ...draft, allowance: e.target.value })} /></Field>
             <Field label="SSS (₱)"><input type="number" min={0} value={draft.sss} onChange={(e) => setDraft({ ...draft, sss: e.target.value })} /></Field>
             <Field label="Pag-IBIG (₱)"><input type="number" min={0} value={draft.pagibig} onChange={(e) => setDraft({ ...draft, pagibig: e.target.value })} /></Field>
@@ -2748,8 +2749,8 @@ function HrRequestsTab() {
       </Panel>
 
       <div className="two-column">
-        <Panel title="Leave requests" description="Filed by / for this employee">
-          {leaves.length === 0 ? <EmptyState icon="✓" title="No leave" text="No leave requests on file." /> : leaves.map((leave) => (
+        <Panel title="Leave Requests" description="Filed by / for this employee">
+          {leaves.length === 0 ? <EmptyState icon="✓" title="No Leave" text="No leave requests on file." /> : leaves.map((leave) => (
             <div key={leave.id} className="activity-row">
               <div><strong>{leave.leaveType} · {formatDateRange(leave.startsOn, leave.endsOn)}</strong><small>{leave.reference} · {leave.reason}</small></div>
               <div className="cell-actions">
@@ -2764,8 +2765,8 @@ function HrRequestsTab() {
           ))}
         </Panel>
 
-        <Panel title="Cash advances" description="Payroll deduction on approval">
-          {advances.length === 0 ? <EmptyState icon="₱" title="No advances" text="No cash-advance requests on file." /> : advances.map((advance) => (
+        <Panel title="Cash Advances" description="Payroll deduction on approval">
+          {advances.length === 0 ? <EmptyState icon="₱" title="No Advances" text="No cash-advance requests on file." /> : advances.map((advance) => (
             <div key={advance.id} className="activity-row">
               <div><strong>{pesos(advance.amountCentavos)}</strong><small>{advance.reference} · {advance.reason}</small></div>
               <div className="cell-actions">
@@ -2782,14 +2783,14 @@ function HrRequestsTab() {
       </div>
 
       <Panel title="Absences" description="Days marked absent in attendance" padded={false}>
-        {absences.length === 0 ? <EmptyState icon="✓" title="No absences" text="This employee has no recorded absences." /> : (
+        {absences.length === 0 ? <EmptyState icon="✓" title="No Absences" text="This employee has no recorded absences." /> : (
           <DataTable columns={["Date", "Schedule", "Status"]}>
             {absences.map((item) => <tr key={item.id}><td>{formatDate(item.date)}</td><td>{item.scheduleIn} – {item.scheduleOut}</td><td><Pill tone="red">Absent</Pill></td></tr>)}
           </DataTable>
         )}
       </Panel>
 
-      <Modal open={leaveOpen} title="File leave" description={employee?.name} onClose={() => setLeaveOpen(false)} footer={
+      <Modal open={leaveOpen} title="File Leave" description={employee?.name} onClose={() => setLeaveOpen(false)} footer={
         <>
           <button className="secondary-button" onClick={() => setLeaveOpen(false)}>Cancel</button>
           <button className="primary-button" onClick={() => {
@@ -2800,14 +2801,14 @@ function HrRequestsTab() {
         </>
       }>
         <div className="form-grid">
-          <Field label="Leave type"><select value={leaveDraft.leaveType} onChange={(e) => setLeaveDraft({ ...leaveDraft, leaveType: e.target.value as LeaveRequest["leaveType"] })}><option>Vacation</option><option>Sick</option><option>Emergency</option><option>Unpaid</option></select></Field>
+          <Field label="Leave Type"><select value={leaveDraft.leaveType} onChange={(e) => setLeaveDraft({ ...leaveDraft, leaveType: e.target.value as LeaveRequest["leaveType"] })}><option>Vacation</option><option>Sick</option><option>Emergency</option><option>Unpaid</option></select></Field>
           <Field label="From"><input type="date" value={leaveDraft.startsOn} onChange={(e) => setLeaveDraft({ ...leaveDraft, startsOn: e.target.value })} /></Field>
           <Field label="To"><input type="date" value={leaveDraft.endsOn} onChange={(e) => setLeaveDraft({ ...leaveDraft, endsOn: e.target.value })} /></Field>
           <Field label="Reason" full><textarea rows={3} value={leaveDraft.reason} onChange={(e) => setLeaveDraft({ ...leaveDraft, reason: e.target.value })} /></Field>
         </div>
       </Modal>
 
-      <Modal open={advanceOpen} title="File cash advance" description={employee?.name} onClose={() => setAdvanceOpen(false)} footer={
+      <Modal open={advanceOpen} title="File Cash Advance" description={employee?.name} onClose={() => setAdvanceOpen(false)} footer={
         <>
           <button className="secondary-button" onClick={() => setAdvanceOpen(false)}>Cancel</button>
           <button className="primary-button" onClick={() => {
@@ -2834,7 +2835,7 @@ function HrPayrollTab() {
 
   return (
     <>
-      <Panel title="Payroll periods" description="Draft → review → finalize; finalizing posts a Paid payroll expense">
+      <Panel title="Payroll Periods" description="Draft → review → finalize; finalizing posts a Paid payroll expense">
         <div className="panel-padded">
           {state.payrollPeriods.map((period) => {
             const gross = period.items.reduce((sum, item) => sum + item.grossCentavos, 0);
@@ -3162,7 +3163,7 @@ export function ReportsModule({ role }: { role: Role }) {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Audited exports"
+        eyebrow="Audited Exports"
         title="Reports"
         description="Every report is generated from live records for a chosen period and downloads as a spreadsheet-ready CSV."
       />
@@ -3191,7 +3192,7 @@ export function ReportsModule({ role }: { role: Role }) {
 
       {showCashierReport && (
         <Panel
-          title="Cashier opening / closing"
+          title="Cashier Opening / Closing"
           description={`Received, disbursed, and enrollment breakdown for ${describeRange(range)}.`}
           action={
             <button
@@ -3219,16 +3220,16 @@ export function ReportsModule({ role }: { role: Role }) {
                 />
               </label>
               <div className="stat-grid stat-grid-4">
-                <StatCard label="Opening balance" value={pesos(openingCentavos)} note="Cashier-reported float" tone={0} icon="₱" />
-                <StatCard label="Total received" value={pesos(receivedCentavos)} note="All channels · verified" tone={2} icon="↧" />
-                <StatCard label="Total disbursement" value={pesos(disbursementCentavos)} note="Refunds + paid vouchers" tone={5} icon="↥" />
-                <StatCard label="Closing balance" value={pesos(closingCentavos)} note="Opening + received − disbursed" tone={3} icon="◈" />
+                <StatCard label="Opening Balance" value={pesos(openingCentavos)} note="Cashier-reported float" tone={0} icon="₱" />
+                <StatCard label="Total Received" value={pesos(receivedCentavos)} note="All channels · verified" tone={2} icon="↧" />
+                <StatCard label="Total Disbursement" value={pesos(disbursementCentavos)} note="Refunds + paid vouchers" tone={5} icon="↥" />
+                <StatCard label="Closing Balance" value={pesos(closingCentavos)} note="Opening + received − disbursed" tone={3} icon="◈" />
               </div>
             </div>
 
-            <h3 className="drawer-section">New Wave trainee enrollments</h3>
+            <h3 className="drawer-section">New Wave Trainee Enrollments</h3>
             {inHouseEnrollments.length === 0 ? (
-              <EmptyState title="No New Wave enrollments in this period" text="Widen the reporting period to see enrollments." />
+              <EmptyState title="No New Wave Enrollments in This Period" text="Widen the reporting period to see enrollments." />
             ) : (
               <DataTable columns={["Name", "Course", "Amount"]}>
                 {inHouseEnrollments.map((item) => (
@@ -3241,9 +3242,9 @@ export function ReportsModule({ role }: { role: Role }) {
               </DataTable>
             )}
 
-            <h3 className="drawer-section">Endorsed trainee enrollments</h3>
+            <h3 className="drawer-section">Endorsed Trainee Enrollments</h3>
             {endorsedEnrollments.length === 0 ? (
-              <EmptyState title="No endorsed enrollments in this period" text="Endorsed enrollments recorded by the cashier will appear here." />
+              <EmptyState title="No Endorsed Enrollments in This Period" text="Endorsed enrollments recorded by the cashier will appear here." />
             ) : (
               <DataTable columns={["Name", "Course", "Amount", "Rebate"]}>
                 {endorsedEnrollments.map(({ item, rebateCentavos }) => (
@@ -3281,7 +3282,7 @@ export function ReportsModule({ role }: { role: Role }) {
         });
         return (
           <Panel
-            title="Sales, disbursements & earnings"
+            title="Sales, Disbursements & Earnings"
             description={`Selected period ${describeRange(range)} · month-over-month trend`}
             action={
               <button className="secondary-button" onClick={() => {
@@ -3292,11 +3293,11 @@ export function ReportsModule({ role }: { role: Role }) {
           >
             <div className="summary-panel">
               <div className="stat-grid stat-grid-3">
-                <StatCard label="Total sales" value={pesos(rangeSales)} note="Verified collections" tone={2} icon="₱" />
-                <StatCard label="Total disbursements" value={pesos(rangeDisb)} note="Refunds + expenses" tone={5} icon="↥" />
-                <StatCard label="Net earnings" value={pesos(rangeSales - rangeDisb)} note={rangeSales - rangeDisb >= 0 ? "Earning this period" : "Loss this period"} tone={rangeSales - rangeDisb >= 0 ? 3 : 1} icon="◈" />
+                <StatCard label="Total Sales" value={pesos(rangeSales)} note="Verified collections" tone={2} icon="₱" />
+                <StatCard label="Total Disbursements" value={pesos(rangeDisb)} note="Refunds + expenses" tone={5} icon="↥" />
+                <StatCard label="Net Earnings" value={pesos(rangeSales - rangeDisb)} note={rangeSales - rangeDisb >= 0 ? "Earning this period" : "Loss this period"} tone={rangeSales - rangeDisb >= 0 ? 3 : 1} icon="◈" />
               </div>
-              <h3 className="drawer-section">Month-over-month</h3>
+              <h3 className="drawer-section">Month-Over-Month</h3>
               <DataTable columns={["Month", "Sales", "Disbursements", "Net earnings"]}>
                 {months.map((r) => (
                   <tr key={r.label}>
@@ -3340,9 +3341,9 @@ export function ReportsModule({ role }: { role: Role }) {
         })}
       </div>
 
-      <Panel title="Activity in this period" description={describeRange(range)} padded={false}>
+      <Panel title="Activity in This Period" description={describeRange(range)} padded={false}>
         {activity.length === 0 ? (
-          <EmptyState title="No activity in this period" text="Choose a wider reporting period to see recorded actions." />
+          <EmptyState title="No Activity in This Period" text="Choose a wider reporting period to see recorded actions." />
         ) : (
           <DataTable columns={["When", "Action", "Record", "Reference", "Actor"]}>
             {activity.slice(0, 25).map((entry) => (
@@ -3385,13 +3386,13 @@ export function SettingsModule() {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="System administration"
-        title="Settings & launch control"
+        eyebrow="System Administration"
+        title="Settings & Launch Control"
         description="Organization details, legal content, and the feature flags that gate production behavior."
       />
 
       <div className="two-column">
-        <Panel title="Launch readiness" description={`${complete} of ${checklist.length} required items complete`}>
+        <Panel title="Launch Readiness" description={`${complete} of ${checklist.length} required items complete`}>
           <div className="readiness">
             <div className="readiness-ring" style={{ ["--percent" as string]: `${readiness}%` }}>
               <strong>{readiness}%</strong>
@@ -3419,7 +3420,7 @@ export function SettingsModule() {
           </div>
         </Panel>
 
-        <Panel title="Feature flags" description="Controls that change what staff can do in production">
+        <Panel title="Feature Flags" description="Controls that change what staff can do in production">
           <div className="flag-row">
             <div>
               <strong>Certificate issuance</strong>
@@ -3458,9 +3459,9 @@ export function SettingsModule() {
         </Panel>
       </div>
 
-      <Panel title="Organization information" description="Shown on the public website, receipts, and generated documents">
+      <Panel title="Organization Information" description="Shown on the public website, receipts, and generated documents">
         <div className="form-grid">
-          <Field label="Organization name" full>
+          <Field label="Organization Name" full>
             <input value={settings.organizationName} onChange={(event) => updateSettings({ organizationName: event.target.value })} />
           </Field>
           <Field label="Address" full>
@@ -3478,7 +3479,7 @@ export function SettingsModule() {
         </div>
       </Panel>
 
-      <Panel title="Demo data" description="This build keeps records in your browser so the whole workflow is explorable end to end.">
+      <Panel title="Demo Data" description="This build keeps records in your browser so the whole workflow is explorable end to end.">
         <div className="inline-note note-amber">
           <strong>Reset the workspace</strong>
           <p>

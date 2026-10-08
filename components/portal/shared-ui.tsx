@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { tcl } from "@/lib/title-case";
 
 /**
  * Small UI pieces shared by every role workspace. They used to live inside
@@ -10,7 +11,7 @@ import { useState, type ReactNode } from "react";
  */
 
 export function Badge({ children, tone }: { children: ReactNode; tone?: string }) {
-  return <span className={`portal-badge ${tone ?? String(children).toLowerCase().replaceAll(" ", "-")}`}>{children}</span>;
+  return <span className={`portal-badge ${tone ?? String(children).toLowerCase().replaceAll(" ", "-")}`}>{tcl(children)}</span>;
 }
 
 export function Message({ kind, text }: { kind: "success" | "error"; text: string }) {
@@ -38,7 +39,7 @@ export function PageHead({ eyebrow, title, action, onAction }: { eyebrow: string
 
 /** A clickable KPI card; place a row of them inside <div className="reg-kpis">. */
 export function Kpi({ icon, label, value, hint = "View all", onClick }: { icon: string; label: string; value: number | string; hint?: string; onClick?: () => void }) {
-  return <button type="button" onClick={onClick}><i>{icon}</i><span>{label}</span><strong>{value}</strong><small>{hint}</small></button>;
+  return <button type="button" onClick={onClick}><i>{icon}</i><span>{tcl(label)}</span><strong>{value}</strong><small>{hint}</small></button>;
 }
 
 /** Page controls for long tables. Keeps the caption and buttons in one place. */

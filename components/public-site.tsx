@@ -612,7 +612,7 @@ function RegistrationSearch() {
     <section className="inside-page narrow-page">
       <div className="inside-hero compact">
         <span className="eyebrow">New Wave Maritime</span>
-        <h1 className="caps-heading">Trainee Status &amp; Certificate Verification</h1>
+        <h1 className="caps-heading">Trainee Status &Amp; Certificate Verification</h1>
         <p>
           See each of your courses, your enrollment status and balance, and whether your certificate is printed and ready for
           pick-up. Or confirm a certificate&apos;s authenticity by its number. No trainee account is required.
@@ -628,7 +628,7 @@ function CertificateDelivery() {
     <section className="inside-page">
       <div className="inside-hero compact">
         <span className="eyebrow">New Wave Maritime</span>
-        <h1>Certificate delivery</h1>
+        <h1>Certificate Delivery</h1>
         <p>Cannot claim your certificate at our office? We send it by LBC anywhere in the Philippines.</p>
       </div>
       <DeliveryRequest />

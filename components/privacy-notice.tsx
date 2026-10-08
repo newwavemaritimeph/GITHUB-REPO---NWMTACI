@@ -92,7 +92,7 @@ export function PrivacyNotice() {
     <section className="inside-page privacy-page">
       <div className="inside-hero">
         <span className="eyebrow">Data privacy</span>
-        <h1>Data privacy notice</h1>
+        <h1>Data Privacy Notice</h1>
         <p>Effective {EFFECTIVE}</p>
       </div>
       <div className="privacy-body">

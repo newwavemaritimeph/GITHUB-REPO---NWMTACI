@@ -55,7 +55,7 @@ function StatusTab() {
           Birth date
           <input type="date" value={birthdate} onChange={(event) => setBirthdate(event.target.value)} />
         </label>
-        <button className="button button-primary button-block" disabled={!canSearch || busy}>{busy ? "Checking…" : "Check my status"}</button>
+        <button className="button button-primary button-block" disabled={!canSearch || busy}>{busy ? "Checking…" : "Check My Status"}</button>
         <p className="muted-text" style={{ margin: "6px 0 0" }}>Your NWMTACI number is on your enrollment confirmation email.</p>
       </form>
 
@@ -138,7 +138,7 @@ function VerifyTab() {
           <div className="status-head">
             <div>
               <span className="eyebrow">{certificate.certificateNumber}</span>
-              <h2>Verified certificate</h2>
+              <h2>Verified Certificate</h2>
             </div>
             <Pill tone={certificate.status === "Released" ? "green" : certificate.status === "Cancelled" ? "red" : "amber"}>{certificate.status}</Pill>
           </div>

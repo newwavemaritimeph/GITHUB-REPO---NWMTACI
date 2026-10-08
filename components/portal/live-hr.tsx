@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { tcl } from "@/lib/title-case";
 
 /** Loose shapes for the HR slices of the staff-operations payload. */
 type Employee = { id: string; employee_number: string; complete_name: string; position: string; employment_status: string; date_hired: string; pay_type: string; base_rate_centavos: number; instructor_daily_rate_centavos?: number | null; work_email?: string | null; active: boolean };
@@ -81,11 +82,11 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
   return (
     <div className="portal-page">
       <div className="portal-heading">
-        <div><span className="portal-eyebrow">People operations</span><h1>HR &amp; payroll</h1><p>Employee directory, daily attendance, leave and cash-advance requests, and payroll periods.</p></div>
+        <div><span className="portal-eyebrow">People operations</span><h1>HR &Amp; Payroll</h1><p>Employee directory, daily attendance, leave and cash-advance requests, and payroll periods.</p></div>
       </div>
       <div className="portal-tabs">
         {(["Overview", "Directory", "Attendance", "Requests", "Benefits", "Contracts", "Payroll", "13th month"] as const).map((item) => (
-          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>
+          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{tcl(item)}</button>
         ))}
       </div>
       {message && <div className="portal-message error" role="alert">{message}</div>}
@@ -100,8 +101,8 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
           </div>
 
           <section className="portal-panel">
-            <div className="panel-heading"><div><h2>Attendance leaderboard</h2><p>Ranked by days present and on-time rate</p></div></div>
-            <div className="portal-table"><table><thead><tr><th>Employee</th><th>Days present</th><th>Logged days</th><th>On-time</th></tr></thead><tbody>
+            <div className="panel-heading"><div><h2>Attendance Leaderboard</h2><p>Ranked by days present and on-time rate</p></div></div>
+            <div className="portal-table"><table><thead><tr><th>Employee</th><th>Days Present</th><th>Logged Days</th><th>On-Time</th></tr></thead><tbody>
               {leaderboard.map((r) => <tr key={r.id}><td><strong>{r.name}</strong></td><td>{r.present}</td><td>{r.days}</td><td>{r.onTime}%</td></tr>)}
               {!leaderboard.length && <tr><td colSpan={4}><span className="portal-empty-copy">No attendance logged yet.</span></td></tr>}
             </tbody></table></div>
@@ -111,8 +112,8 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
 
       {tab === "Directory" && (
         <section className="portal-panel">
-          <div className="panel-heading"><div><h2>Employee directory</h2><p>Active and inactive staff on record</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => saveEmployee()}>+ Add employee</button>}</div>
-          <div className="portal-table"><table><thead><tr><th>Employee</th><th>Position</th><th>Status</th><th>Pay type</th><th>Base rate</th><th>Work email</th><th></th></tr></thead><tbody>
+          <div className="panel-heading"><div><h2>Employee Directory</h2><p>Active and inactive staff on record</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => saveEmployee()}>+ Add Employee</button>}</div>
+          <div className="portal-table"><table><thead><tr><th>Employee</th><th>Position</th><th>Status</th><th>Pay Type</th><th>Base Rate</th><th>Work Email</th><th></th></tr></thead><tbody>
             {data.employees.map((e) => (
               <tr key={e.id} className={e.active ? "" : "row-muted"}>
                 <td><strong>{e.complete_name}</strong><small>{e.employee_number} · hired {e.date_hired}</small></td>
@@ -138,7 +139,7 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
         <>
           <section className="portal-panel">
             <div className="panel-heading">
-              <div><h2>Leave requests</h2><p>File and decide employee leave</p></div>
+              <div><h2>Leave Requests</h2><p>File and decide employee leave</p></div>
               {canManage && <button className="portal-primary" disabled={busy} onClick={() => {
                 const employeeId = pickEmployee(data.employees); if (!employeeId) return;
                 const leaveType = window.prompt("Leave type? (e.g. Sick, Vacation, Emergency)", "Vacation"); if (!leaveType) return;
@@ -146,7 +147,7 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
                 const endsOn = window.prompt("End date (YYYY-MM-DD)?", startsOn); if (!endsOn) return;
                 const reason = window.prompt("Reason?"); if (!reason) return;
                 void post({ action: "leave-file", employeeId, leaveType, startsOn, endsOn, reason });
-              }}>+ File leave</button>}
+              }}>+ File Leave</button>}
             </div>
             <div className="portal-table"><table><thead><tr><th>Employee</th><th>Type</th><th>Dates</th><th>Reason</th><th>Status</th><th></th></tr></thead><tbody>
               {data.leaveRequests.map((l) => (
@@ -168,13 +169,13 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
 
           <section className="portal-panel">
             <div className="panel-heading">
-              <div><h2>Cash advances</h2><p>Salary advances against future payroll</p></div>
+              <div><h2>Cash Advances</h2><p>Salary advances against future payroll</p></div>
               {canManage && <button className="portal-primary" disabled={busy} onClick={() => {
                 const employeeId = pickEmployee(data.employees); if (!employeeId) return;
                 const amt = num(window.prompt("Advance amount (PHP)?")); if (!amt) return;
                 const requestedOn = window.prompt("Requested on (YYYY-MM-DD)?", todayManila()); if (!requestedOn) return;
                 void post({ action: "advance-file", employeeId, amountCentavos: amt, requestedOn });
-              }}>+ File advance</button>}
+              }}>+ File Advance</button>}
             </div>
             <div className="portal-table"><table><thead><tr><th>Employee</th><th>Requested</th><th>Amount</th><th>Balance</th><th>Status</th><th></th></tr></thead><tbody>
               {data.cashAdvances.map((a) => (
@@ -228,19 +229,19 @@ function PayrollTab({ data, nameOf, canManage, busy, post }: { data: HrData; nam
     <>
       {canManage && (
         <section className="portal-panel">
-          <div className="panel-heading"><div><h2>Open a payroll run</h2><p>Semi-monthly cut-off — 1–15 (paid 15th) and 16–EOM (paid EOM). Gross is computed per pay type; approved cash advances are deducted.</p></div></div>
+          <div className="panel-heading"><div><h2>Open a Payroll Run</h2><p>Semi-monthly cut-off — 1–15 (paid 15th) and 16–EOM (paid EOM). Gross is computed per pay type; approved cash advances are deducted.</p></div></div>
           <div className="portal-form" style={{ padding: "4px 0" }}>
-            <label>Covers from<input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} /></label>
+            <label>Covers From<input type="date" value={startsOn} onChange={(e) => setStartsOn(e.target.value)} /></label>
             <label>Covers to<input type="date" value={endsOn} onChange={(e) => setEndsOn(e.target.value)} /></label>
-            <label>Pay date<input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} /></label>
-            <div className="full"><button className="portal-primary" disabled={busy} onClick={() => post({ action: "payroll-open", startsOn, endsOn, payDate })}>{busy ? "Opening…" : "Open period & compute"}</button></div>
+            <label>Pay Date<input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} /></label>
+            <div className="full"><button className="portal-primary" disabled={busy} onClick={() => post({ action: "payroll-open", startsOn, endsOn, payDate })}>{busy ? "Opening…" : "Open Period & Compute"}</button></div>
           </div>
         </section>
       )}
 
       <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Payroll periods</h2><p>Draft → Reviewed → Finalized. Finalizing posts a Paid Payroll voucher to Accounting.</p></div></div>
-        <div className="portal-table"><table><thead><tr><th>Period</th><th>Covers</th><th>Pay date</th><th>Employees</th><th>Net total</th><th>Status</th><th></th></tr></thead><tbody>
+        <div className="panel-heading"><div><h2>Payroll Periods</h2><p>Draft → Reviewed → Finalized. Finalizing posts a Paid Payroll voucher to Accounting.</p></div></div>
+        <div className="portal-table"><table><thead><tr><th>Period</th><th>Covers</th><th>Pay Date</th><th>Employees</th><th>Net Total</th><th>Status</th><th></th></tr></thead><tbody>
           {data.payrollPeriods.map((p) => {
             const items = itemsByPeriod.get(p.id) ?? [];
             const net = items.reduce((s, i) => s + Number(i.net_centavos), 0);
@@ -252,7 +253,7 @@ function PayrollTab({ data, nameOf, canManage, busy, post }: { data: HrData; nam
               <td><strong>{pesos(net)}</strong></td>
               <td>{p.status}{p.finalized_at ? " ·✓" : ""}</td>
               <td className="document-actions">
-                {canManage && p.status === "Draft" && <button disabled={busy} onClick={() => post({ action: "payroll-review", id: p.id })}>Mark reviewed</button>}
+                {canManage && p.status === "Draft" && <button disabled={busy} onClick={() => post({ action: "payroll-review", id: p.id })}>Mark Reviewed</button>}
                 {canManage && p.status === "Reviewed" && <button disabled={busy} onClick={() => post({ action: "payroll-finalize", id: p.id })}>Finalize</button>}
               </td>
             </tr>;
@@ -299,22 +300,22 @@ function AttendanceTab({ data, nameOf, canManage, busy, post }: { data: HrData; 
     <>
       {canManage && (
         <section className="portal-panel">
-          <div className="panel-heading"><div><h2>Log attendance</h2><p>Late and undertime are computed from the schedule. Leave time-in blank to mark Absent.</p></div></div>
+          <div className="panel-heading"><div><h2>Log Attendance</h2><p>Late and undertime are computed from the schedule. Leave time-in blank to mark Absent.</p></div></div>
           <div className="portal-form" style={{ padding: "4px 0" }}>
-            <label>Employee<select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}><option value="">Select employee</option>{active.map((e) => <option key={e.id} value={e.id}>{e.complete_name}</option>)}</select></label>
+            <label>Employee<select value={employeeId} onChange={(e) => setEmployeeId(e.target.value)}><option value="">Select Employee</option>{active.map((e) => <option key={e.id} value={e.id}>{e.complete_name}</option>)}</select></label>
             <label>Date<input type="date" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} /></label>
             <label>Scheduled in<input type="time" value={scheduledIn} onChange={(e) => setScheduledIn(e.target.value)} /></label>
-            <label>Scheduled out<input type="time" value={scheduledOut} onChange={(e) => setScheduledOut(e.target.value)} /></label>
+            <label>Scheduled Out<input type="time" value={scheduledOut} onChange={(e) => setScheduledOut(e.target.value)} /></label>
             <label>Time in<input type="time" value={timeIn} onChange={(e) => setTimeIn(e.target.value)} /></label>
-            <label>Time out<input type="time" value={timeOut} onChange={(e) => setTimeOut(e.target.value)} /></label>
+            <label>Time Out<input type="time" value={timeOut} onChange={(e) => setTimeOut(e.target.value)} /></label>
             <label className="full">Remarks<input value={remarks} onChange={(e) => setRemarks(e.target.value)} /></label>
-            <div className="full"><button className="portal-primary" disabled={busy || !employeeId} onClick={submit}>{busy ? "Saving…" : "Save attendance"}</button></div>
+            <div className="full"><button className="portal-primary" disabled={busy || !employeeId} onClick={submit}>{busy ? "Saving…" : "Save Attendance"}</button></div>
           </div>
         </section>
       )}
 
       <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Recent attendance</h2><p>Most recent logged days</p></div></div>
+        <div className="panel-heading"><div><h2>Recent Attendance</h2><p>Most recent logged days</p></div></div>
         <div className="portal-table"><table><thead><tr><th>Date</th><th>Employee</th><th>In</th><th>Out</th><th>Late</th><th>Undertime</th><th>Status</th></tr></thead><tbody>
           {data.employeeAttendance.slice(0, 60).map((r) => (
             <tr key={r.id}>
@@ -345,8 +346,8 @@ function BenefitsTab({ data, nameOf, canManage, busy, post }: { data: HrData; na
   }
   return (
     <section className="portal-panel">
-      <div className="panel-heading"><div><h2>Government benefits</h2><p>SSS, PhilHealth, Pag-IBIG, and TIN records per employee</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => saveBenefit()}>+ Add benefit</button>}</div>
-      <div className="portal-table"><table><thead><tr><th>Employee</th><th>Benefit</th><th>Reference</th><th>Monthly amount</th><th>Effective</th><th></th></tr></thead><tbody>
+      <div className="panel-heading"><div><h2>Government Benefits</h2><p>SSS, PhilHealth, Pag-IBIG, and TIN records per employee</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => saveBenefit()}>+ Add Benefit</button>}</div>
+      <div className="portal-table"><table><thead><tr><th>Employee</th><th>Benefit</th><th>Reference</th><th>Monthly Amount</th><th>Effective</th><th></th></tr></thead><tbody>
         {data.benefitRecords.map((b) => (
           <tr key={b.id}>
             <td><strong>{nameOf.get(b.employee_id) ?? "—"}</strong></td>
@@ -380,7 +381,7 @@ function ContractsTab({ data, nameOf, canManage, busy, post }: { data: HrData; n
   }
   return (
     <section className="portal-panel">
-      <div className="panel-heading"><div><h2>Employment contracts</h2><p>Contract type, position, rate, and coverage dates per employee</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => saveContract()}>+ Add contract</button>}</div>
+      <div className="panel-heading"><div><h2>Employment Contracts</h2><p>Contract type, position, rate, and coverage dates per employee</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => saveContract()}>+ Add Contract</button>}</div>
       <div className="portal-table"><table><thead><tr><th>Employee</th><th>Type</th><th>Position</th><th>Rate</th><th>Coverage</th><th>Status</th><th></th></tr></thead><tbody>
         {data.employmentContracts.map((c) => (
           <tr key={c.id}>
@@ -421,7 +422,7 @@ function ThirteenthMonthTab({ data }: { data: HrData }) {
         <label style={{ alignSelf: "end" }}><button type="button" className="portal-secondary" onClick={csv}>Export CSV</button></label>
       </div>
       <p className="portal-empty-copy" style={{ margin: "0 0 8px" }}>Pro-rated from date hired: monthly basic x months employed in {year} / 12.</p>
-      <div className="portal-table portal-panel"><table><thead><tr><th>Employee</th><th>Pay type</th><th>Date hired</th><th>Monthly basic</th><th>Months</th><th>13th month</th></tr></thead><tbody>
+      <div className="portal-table portal-panel"><table><thead><tr><th>Employee</th><th>Pay Type</th><th>Date Hired</th><th>Monthly Basic</th><th>Months</th><th>13Th Month</th></tr></thead><tbody>
         {rows.map((r) => <tr key={r.e.id}><td><strong>{r.e.complete_name}</strong><small>{r.e.position}</small></td><td>{r.e.pay_type}</td><td>{r.e.date_hired}</td><td>{pesos(r.mb)}</td><td>{r.m}</td><td><strong>{pesos(r.amt)}</strong></td></tr>)}
         {!rows.length && <tr><td colSpan={6}><span className="portal-empty-copy">No active employees.</span></td></tr>}
       </tbody><tfoot><tr><td colSpan={5}><strong>Total</strong></td><td><strong>{pesos(total)}</strong></td></tr></tfoot></table></div>

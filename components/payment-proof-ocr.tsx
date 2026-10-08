@@ -39,7 +39,7 @@ export function PaymentProofOcr({ onFileChange = () => undefined, onReferenceDet
   return <section className="payment-proof-box full" aria-labelledby="ocr-title">
     <div className="ocr-callout">
       <span aria-hidden="true">▣</span><div><strong id="ocr-title">Payment screenshot (optional)</strong><p>Upload a screenshot for local reference reading, or leave it empty and type the reference manually.</p></div>
-      <button type="button" onClick={() => inputRef.current?.click()} disabled={state === "reading"}>{state === "reading" ? "Reading…" : state === "idle" ? "Choose screenshot" : "Replace"}</button>
+      <button type="button" onClick={() => inputRef.current?.click()} disabled={state === "reading"}>{state === "reading" ? "Reading…" : state === "idle" ? "Choose Screenshot" : "Replace"}</button>
       <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(event) => void readProof(event.target.files?.[0])} />
     </div>
     {state !== "idle" && <div className="ocr-result" aria-live="polite"><div><span>Selected proof</span><strong>{fileName}</strong></div>
@@ -47,7 +47,7 @@ export function PaymentProofOcr({ onFileChange = () => undefined, onReferenceDet
       {state === "ready" && <p>{detected ? <>Detected reference: <strong>{detected}</strong>. You may correct it in the reference field below.</> : "No reference was detected. Enter it manually below."}</p>}
       {state === "error" && <p>The screenshot could not be read automatically. Enter the reference manually below.</p>}
       {state !== "reading" && <label className="ocr-confirm"><input type="checkbox" checked={confirmed} onChange={(event) => { setConfirmed(event.target.checked); onConfirmedChange(event.target.checked); }}/><span>I compared the entered reference with the original screenshot.</span></label>}
-      <button type="button" className="text-button" onClick={clearProof}>Remove screenshot</button>
+      <button type="button" className="text-button" onClick={clearProof}>Remove Screenshot</button>
     </div>}
   </section>;
 }

@@ -8,6 +8,7 @@ import { Badge, Message, Modal, PageHead, fullName, fmtDate, fmtClock, usePost, 
 import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balances";
 import { requestFee } from "@/lib/request-fees";
 import type { CashierReportSnapshot } from "@/lib/documents";
+import { tcl } from "@/lib/title-case";
 
 /**
  * Cashier pieces of the registration workflow (Oct 2026):
@@ -59,7 +60,7 @@ export function tarState(data: PortalData, traineeId: string) {
 export function ReceiptButton({ data, paymentId, reload, className = "portal-secondary" }: { data: PortalData; paymentId: string; reload?: () => Promise<void>; className?: string }) {
   const printed = data.receiptPrints?.[paymentId] ?? 0;
   if (printed >= 2) return null;
-  return <a className={className} href={`/portal/payment-receipt/${paymentId}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload?.(), 2500)}>Print receipt</a>;
+  return <a className={className} href={`/portal/payment-receipt/${paymentId}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload?.(), 2500)}>Print Receipt</a>;
 }
 
 /** Print TAR (owner, 8 Oct 2026): prints twice; after the second print the button is gone. */
@@ -70,7 +71,7 @@ export function TarButton({ data, traineeId, reload, className = "portal-seconda
   if (s.paid.length && s.left <= 0) return null;
   return <>
     {!s.paid.length
-      ? <button type="button" className={className} disabled title="The TAR prints once a course is paid">Print TAR</button>
+      ? <button type="button" className={className} disabled title="The TAR Prints Once a Course Is Paid">Print TAR</button>
       : <button type="button" className={className} onClick={print}>Print TAR</button>}
     {error && <Message kind="error" text={error} />}
   </>;
@@ -87,8 +88,8 @@ export function CashierPaymentQueue({ data, onPay, reload }: { data: PortalData;
   const toPrint = [...new Set(data.enrollments.filter((e) => PAID_STATUSES.includes(e.enrollment_status) && paidRecently.has(e.trainee_id)).map((e) => e.trainee_id))]
     .map((id) => data.trainees.find((t) => t.id === id)).filter((t): t is PortalData["trainees"][number] => !!t);
   return <div className="portal-page">
-    <PageHead eyebrow="Collections" title="For payment" text="Applicants registration has screened and handed over. Record their payment: once paid and on a batch they are enrolled automatically. Then print their training admission record." />
-    <div className="portal-table portal-panel"><table><thead><tr><th>Applicant</th><th>Course &amp; batch</th><th>Handed over</th><th>Total due</th><th>Paid</th><th>Balance</th><th></th></tr></thead><tbody>
+    <PageHead eyebrow="Collections" title="For Payment" text="Applicants registration has screened and handed over. Record their payment: once paid and on a batch they are enrolled automatically. Then print their training admission record." />
+    <div className="portal-table portal-panel"><table><thead><tr><th>Applicant</th><th>Course &Amp; Batch</th><th>Handed Over</th><th>Total Due</th><th>Paid</th><th>Balance</th><th></th></tr></thead><tbody>
       {rows.map((e) => {
         const t = first(e.trainees), b = first(e.batches), balance = balanceOf(e), paid = Number(e.verified_paid_centavos ?? e.paid_centavos);
         const number = data.applicationNumbers?.[e.trainee_id];
@@ -99,13 +100,13 @@ export function CashierPaymentQueue({ data, onPay, reload }: { data: PortalData;
           <td>{pesos(dueCentavos(e))}</td>
           <td>{pesos(paid)}</td>
           <td><strong>{pesos(balance)}</strong></td>
-          <td>{paid > 0 ? <Badge tone="active">{e.batch_id ? "Paid · enrolling" : "Paid · awaiting batch"}</Badge> : <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record payment</button>}</td>
+          <td>{paid > 0 ? <Badge tone="active">{e.batch_id ? "Paid · Enrolling" : "Paid · Awaiting Batch"}</Badge> : <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record Payment</button>}</td>
         </tr>;
       })}
     </tbody></table>{!rows.length && <p className="portal-empty-copy">No applicants waiting for payment. Registration hands them over once their requirements are complete.</p>}</div>
 
     <section className="portal-panel live-list" style={{ marginTop: 16 }}>
-      <div className="panel-heading"><div><h2>Paid · Training admission record</h2><p>Enrolled trainees paid in the last 7 days. The TAR prints twice; more needs the accounting manager&apos;s approval.</p></div><span className="slot-count">{toPrint.length}</span></div>
+      <div className="panel-heading"><div><h2>Paid · Training Admission Record</h2><p>Enrolled trainees paid in the last 7 days. The TAR prints twice; more needs the accounting manager&apos;s approval.</p></div><span className="slot-count">{toPrint.length}</span></div>
       {toPrint.map((t) => { const s = tarState(data, t.id); return <div className="live-row-item" key={t.id}>
         <div><strong>{fullName(t)}</strong><small>{data.applicationNumbers?.[t.id] ? <span className="app-no">{data.applicationNumbers[t.id]}</span> : null}{s.paid.map((e) => first(e.courses)?.code ?? first(e.courses)?.name).filter(Boolean).join(", ")}{s.record ? ` · ${s.record.ar_number} · printed ${s.printed} of ${s.allowed}` : " · not printed yet"}</small></div>
         <div className="document-actions"><TarButton data={data} traineeId={t.id} reload={reload} className="portal-primary" /></div>
@@ -143,14 +144,14 @@ export function RequestChargeModal({ data, request, reload, onClose }: { data: P
       {ruled ? <div className="rate-preview full"><span>Fee by policy</span><strong>{pesos(ruled.amountCentavos)}</strong><small>Requested {fmtDate(ruled.requestedOn)}{ruled.startDate ? ` · training starts ${fmtDate(ruled.startDate)}` : ""} · {ruled.rule}</small></div> : <>
       <label className="portal-check full"><input type="checkbox" checked={noCharge} onChange={(ev) => setNoCharge(ev.target.checked)} /><span>No charge for this request</span></label>
       {!noCharge && <>
-        <label className="full">Charge<select value={catalogId} onChange={(ev) => choose(ev.target.value)}><option value="">Custom amount</option>{catalog.map((c) => <option key={c.id} value={c.id}>{c.name} · {pesos(c.default_amount_centavos)}</option>)}</select></label>
+        <label className="full">Charge<select value={catalogId} onChange={(ev) => choose(ev.target.value)}><option value="">Custom Amount</option>{catalog.map((c) => <option key={c.id} value={c.id}>{c.name} · {pesos(c.default_amount_centavos)}</option>)}</select></label>
         <label>Description<input value={description} onChange={(ev) => setDescription(ev.target.value)} placeholder={`${typeLabel} fee`} /></label>
         <label>Amount (PHP)<input type="number" min="0" step="0.01" value={amount} onChange={(ev) => setAmount(ev.target.value)} /></label>
       </>}
       </>}
-      <label className="full">Remarks (optional)<input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="For the accounting manager" /></label>
+      <label className="full">Remarks (Optional)<input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="For the accounting manager" /></label>
       <p className="portal-form-note full">The charge is added to the trainee&apos;s balance only when the accounting manager approves the request.</p>
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || (!ruled && !valid)} onClick={send}>{busy ? "Sending…" : "Send for approval"}</button></div>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || (!ruled && !valid)} onClick={send}>{busy ? "Sending…" : "Send for Approval"}</button></div>
     </div>
   </Modal>;
 }
@@ -328,7 +329,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
     } catch (err) { setError(err instanceof Error ? err.message : "Could not record the payment."); } finally { setBusy(false); }
   }
 
-  if (posted && group) return <Modal title="Payment recorded" onClose={onClose}>
+  if (posted && group) return <Modal title="Payment Recorded" onClose={onClose}>
     <div className="portal-form">
       <div className="full"><Message kind="success" text={`${pesos(posted.amount)} received from ${group.name}.`} /></div>
       {posted.drive && <p className="portal-form-note full cx-drive">Saved to Google Drive · {posted.drive.path.split(" / ").slice(1).join(" / ")} {posted.drive.link && <a href={posted.drive.link} target="_blank" rel="noreferrer">Open</a>}</p>}
@@ -340,44 +341,44 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
     </div>
   </Modal>;
 
-  return <Modal title="Record payment" onClose={onClose} wide>
+  return <Modal title="Record Payment" onClose={onClose} wide>
     <div className="portal-form cx-pay">
       {error && <div className="full"><Message kind="error" text={error} /></div>}
       {!group ? <div className="full cx-pick">
-        <label>Find trainee<input autoFocus value={search} onChange={(ev) => setSearch(ev.target.value)} placeholder="Name, NWMTACI number or course" /></label>
+        <label>Find Trainee<input autoFocus value={search} onChange={(ev) => setSearch(ev.target.value)} placeholder="Name, NWMTACI number or course" /></label>
         <div className="cx-results">{candidates.map((g) => { const unpaid = g.enrollments.filter((e) => balanceOf(e) > 0); return <button type="button" key={g.traineeId} onClick={() => choose(g.traineeId)}><span><b>{g.name}</b><small>{unpaid.length ? unpaid.map(courseCode).join(" · ") : "All courses paid"}</small></span><strong className="cx-amt">{pesos(g.balance)}</strong></button>; })}
           {!candidates.length && <p className="portal-empty-copy">No trainee matches.</p>}</div>
       </div> : <>
         <div className="cx-whocard full"><div><Who name={group.name} number={group.number} />{referralAgency && <span className="ref-chip">Referred by {referralAgency.name} · {referralAgency.rebate_mode === "No deduction" ? "rebate paid to the agency later" : "rebate deducted"}</span>}</div><div className="cx-right"><small>Balance</small><span className="cx-amt">{pesos(group.balance)}</span></div></div>
-        <label>Amount received (PHP)<input className="cx-mono" inputMode="decimal" value={received} onChange={(ev) => setReceived(ev.target.value)} placeholder="0.00" /></label>
-        <div><span className="pay-label">Apply the amount</span><div className="cx-choice"><button type="button" onClick={() => fill("all")}>Pay all in full</button><button type="button" onClick={() => fill("spread")}>Distribute in order</button><button type="button" onClick={() => fill("clear")}>Clear</button></div></div>
-        <div className="cx-lines full"><table><thead><tr><th>Course or charge</th><th className="r">Balance</th><th className="r">Apply</th></tr></thead><tbody>
+        <label>Amount Received (PHP)<input className="cx-mono" inputMode="decimal" value={received} onChange={(ev) => setReceived(ev.target.value)} placeholder="0.00" /></label>
+        <div><span className="pay-label">Apply the amount</span><div className="cx-choice"><button type="button" onClick={() => fill("all")}>Pay All in Full</button><button type="button" onClick={() => fill("spread")}>Distribute in Order</button><button type="button" onClick={() => fill("clear")}>Clear</button></div></div>
+        <div className="cx-lines full"><table><thead><tr><th>Course or Charge</th><th className="r">Balance</th><th className="r">Apply</th></tr></thead><tbody>
           {open.map((e) => { const v = amounts[e.id] ?? ""; const bad = toCentavos(v) > balanceOf(e); return <tr key={e.id} className={toCentavos(v) > 0 ? "sel" : ""}><td><span className="cx-code">{courseCode(e)}</span> <small>{first(e.courses)?.name} · {scheduleText(e)}</small></td><td className="r cx-amt">{pesos(balanceOf(e))}</td><td className="r"><input className="cx-apply" inputMode="decimal" value={v} placeholder="0.00" aria-label={`Amount for ${courseCode(e)}`} onChange={(ev) => setAmounts((cur) => ({ ...cur, [e.id]: ev.target.value }))} />{bad && <small className="cx-bad">More than the balance</small>}</td></tr>; })}
           {extras.map((x) => { const e = mine.find((m) => m.id === x.enrollmentId); return <tr key={x.key} className="misc"><td><span className="cx-code misc">{x.kind === "item" ? "Item" : "Fee"}</span> <strong>{x.description}</strong>{x.quantity > 1 ? ` x ${x.quantity}` : ""} <small>For {e ? courseCode(e) : "course"}</small></td><td className="r cx-amt">{pesos(x.unit * x.quantity)}</td><td className="r"><button type="button" className="ghost-button" onClick={() => removeExtra(x.key)}>Remove</button></td></tr>; })}
           {!open.length && !extras.length && <tr><td colSpan={3}><small>All courses are fully paid.</small></td></tr>}
         </tbody></table></div>
         <details className="cx-addbox full" open={addOpen} onToggle={(ev) => setAddOpen((ev.target as HTMLDetailsElement).open)}>
-          <summary>Add miscellaneous charges</summary>
+          <summary>Add Miscellaneous Charges</summary>
           <div className="portal-form">
-            <label>Charge<select value={pick} onChange={(ev) => setPick(ev.target.value)}><option value="">Select a charge</option>
+            <label>Charge<select value={pick} onChange={(ev) => setPick(ev.target.value)}><option value="">Select a Charge</option>
               <option value="uniform">Uniform · {pesos(uniformPrice)}</option>
               <option value="other">Others</option></select></label>
-            <label>For course<select value={forEnrollment} onChange={(ev) => setForEnrollment(ev.target.value)}>{mine.map((e) => <option key={e.id} value={e.id}>{courseCode(e)} · {e.enrollment_number}</option>)}</select></label>
+            <label>For Course<select value={forEnrollment} onChange={(ev) => setForEnrollment(ev.target.value)}>{mine.map((e) => <option key={e.id} value={e.id}>{courseCode(e)} · {e.enrollment_number}</option>)}</select></label>
             {pick === "other" && <><label>What is it?<input value={otherName} onChange={(ev) => setOtherName(ev.target.value)} /></label><label>Amount (PHP)<input className="cx-mono" inputMode="decimal" value={otherAmount} onChange={(ev) => setOtherAmount(ev.target.value)} /></label></>}
             <label>Quantity<input className="cx-mono" inputMode="numeric" value={quantity} onChange={(ev) => setQuantity(ev.target.value)} /></label>
-            <div className="cx-addbtn"><button type="button" className="portal-secondary" disabled={!pick} onClick={addExtra}>Add to payment</button></div>
+            <div className="cx-addbtn"><button type="button" className="portal-secondary" disabled={!pick} onClick={addExtra}>Add to Payment</button></div>
           </div>
         </details>
         <div className={`cx-tally full ${matches ? "ok" : "no"}`}><span>Applied {pesos(total)} of {pesos(receivedCentavos)}</span><span>{!receivedCentavos ? "Enter the amount received" : matches ? "Ready to record" : total < receivedCentavos ? `${pesos(receivedCentavos - total)} not applied` : `${pesos(total - receivedCentavos)} over the amount received`}</span></div>
         <div className="full"><span className="pay-label">Mode of payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{modes.map((m) => <button type="button" role="radio" aria-checked={method === m} key={m} className={method === m ? "on" : ""} onClick={() => { setMethod(m); setProof(null); }}>{m}</button>)}</div></div>
         <label>{refRequired ? "Reference number (required)" : "Reference number"}<input className="cx-mono" value={reference} onChange={(ev) => setReference(ev.target.value.toUpperCase())} placeholder={refRequired ? `${method} reference` : "Not needed for cash"} /></label>
-        {refRequired && <label>Proof of payment (required)<input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(ev) => { setProofFile(ev.target.files?.[0] ?? null); setProof(null); setDupWarning(false); setDupConfirmed(false); }} />{proof ? <small className="portal-form-note">Saved to Google Drive · {proof.path.split(" / ").slice(1).join(" / ")}</small> : <small className="portal-form-note">Filed in Google Drive under {method} › this month as the trainee&apos;s last name and date.</small>}</label>}
+        {refRequired && <label>Proof of Payment (Required)<input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(ev) => { setProofFile(ev.target.files?.[0] ?? null); setProof(null); setDupWarning(false); setDupConfirmed(false); }} />{proof ? <small className="portal-form-note">Saved to Google Drive · {proof.path.split(" / ").slice(1).join(" / ")}</small> : <small className="portal-form-note">Filed in Google Drive under {method} › this month as the trainee&apos;s last name and date.</small>}</label>}
         {dupWarning && <div className="full cx-dup"><Message kind="error" text={`Reference ${reference.trim()} was already used on another payment. Check the proof before recording it again.`} /><label className="portal-check"><input type="checkbox" checked={dupConfirmed} onChange={(ev) => setDupConfirmed(ev.target.checked)} /><span>I checked it; record this payment anyway</span></label></div>}
         <label>Received at<input type="datetime-local" value={receivedAt} onChange={(ev) => setReceivedAt(ev.target.value)} /></label>
-        <label>Endorsing agency<select value={agencyId} onChange={(ev) => setAgencyId(ev.target.value)}><option value="">None</option>{data.agencies.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+        <label>Endorsing Agency<select value={agencyId} onChange={(ev) => setAgencyId(ev.target.value)}><option value="">None</option>{data.agencies.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
         <label>Remarks<input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} /></label>
       </>}
-      <div className="portal-form-actions full">{group && !initial && <button type="button" className="portal-secondary cx-left" onClick={() => { setTraineeId(""); setAmounts({}); setExtras([]); }}>Change trainee</button>}<button type="button" className="portal-secondary" onClick={onClose}>Cancel</button>{group && <button type="button" className="portal-primary" disabled={!valid || busy} onClick={() => void post()}>{busy ? "Recording…" : `Record ${receivedCentavos > 0 ? pesos(receivedCentavos) : "payment"}`}</button>}</div>
+      <div className="portal-form-actions full">{group && !initial && <button type="button" className="portal-secondary cx-left" onClick={() => { setTraineeId(""); setAmounts({}); setExtras([]); }}>Change Trainee</button>}<button type="button" className="portal-secondary" onClick={onClose}>Cancel</button>{group && <button type="button" className="portal-primary" disabled={!valid || busy} onClick={() => void post()}>{busy ? "Recording…" : `Record ${receivedCentavos > 0 ? pesos(receivedCentavos) : "payment"}`}</button>}</div>
     </div>
   </Modal>;
 }
@@ -414,18 +415,18 @@ export function CashierDashboard({ data, onPay, reload }: { data: PortalData; on
   const releasedToday = released.reduce((s, e) => s + Number(e.amount_centavos), 0);
   const cashOut = released.filter((e) => e.payment_channel === "Cash").reduce((s, e) => s + Number(e.amount_centavos), 0);
   return <div className="portal-page cx">
-    <div className="cx-head"><div><span className="portal-eyebrow">{fmtDate(today)}</span><h1>Cashier dashboard</h1></div><button type="button" className="portal-primary" onClick={() => onPay("")}>Record payment</button></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">{fmtDate(today)}</span><h1>Cashier Dashboard</h1></div><button type="button" className="portal-primary" onClick={() => onPay("")}>Record Payment</button></div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
     {/* Summary rail (owner's choice, 8 Oct 2026): figures in one narrow column, work lists on the right. */}
     <div className="ac-rail">
       <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections today</h2><strong className="cx-mono">{pesos(totalToday)}</strong></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections Today</h2><strong className="cx-mono">{pesos(totalToday)}</strong></div>
           <div className="cx-tiles ac-tiles ac-tiles-in">
             {tileModes.map((m) => { const list = todays.filter((p) => p.method === m); return <div className="cx-tile" key={m} style={{ ["--c" as string]: MODE_COLORS[m] ?? "#0571D0" }}><span>{m}</span><b>{pesos(list.reduce((s, p) => s + Number(p.amount_centavos), 0))}</b><small>{list.length} receipt{list.length === 1 ? "" : "s"}</small></div>; })}
             <div className="cx-tile ac-total"><span>Total collected</span><b>{pesos(totalToday)}</b><small>{todays.length} receipt{todays.length === 1 ? "" : "s"}</small></div>
           </div>
         </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Cash drawer</h2><span className="muted-text">{closedToday ? "Closed" : "Not yet closed"}</span></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Cash Drawer</h2><span className="muted-text">{closedToday ? "Closed" : "Not yet closed"}</span></div>
           <dl className="ac-lines">
             <div><dt>Opening cash</dt><dd>{opening ? pesos(opening.opening_cash_centavos) : "Not recorded"}</dd></div>
             <div><dt>+ Cash collected</dt><dd className="plus">{pesos(cashIn)}</dd></div>
@@ -444,19 +445,19 @@ export function CashierDashboard({ data, onPay, reload }: { data: PortalData; on
         </section>
       </div>
       <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>New enrollments</h2></div><span className="slot-count">{fresh.length}</span></div>
-      {fresh.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Courses</th><th>Endorsed</th><th className="r">Total due</th><th></th></tr></thead><tbody>
-        {fresh.map((g) => <tr key={g.traineeId}><td data-l="" className="lead"><Who name={g.name} number={g.number} /></td><td data-l="Courses"><CourseList list={g.enrollments} /></td><td data-l="Endorsed">{fmtDate(day(g.since))}<small>{fmtClock(g.since)}</small></td><td data-l="Total due" className="r"><strong className="cx-amt">{pesos(g.due)}</strong><small>{g.enrollments.length} course{g.enrollments.length === 1 ? "" : "s"}</small></td><td data-l=""><div className="cx-acts"><button type="button" className="portal-primary" onClick={() => onPay(firstOpen(g))}>Record payment</button></div></td></tr>)}
+        <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>New Enrollments</h2></div><span className="slot-count">{fresh.length}</span></div>
+      {fresh.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Courses</th><th>Endorsed</th><th className="r">Total Due</th><th></th></tr></thead><tbody>
+        {fresh.map((g) => <tr key={g.traineeId}><td data-l="" className="lead"><Who name={g.name} number={g.number} /></td><td data-l="Courses"><CourseList list={g.enrollments} /></td><td data-l="Endorsed">{fmtDate(day(g.since))}<small>{fmtClock(g.since)}</small></td><td data-l="Total due" className="r"><strong className="cx-amt">{pesos(g.due)}</strong><small>{g.enrollments.length} course{g.enrollments.length === 1 ? "" : "s"}</small></td><td data-l=""><div className="cx-acts"><button type="button" className="portal-primary" onClick={() => onPay(firstOpen(g))}>Record Payment</button></div></td></tr>)}
       </tbody></table></div> : <p className="portal-empty-copy">No new enrollments.</p>}
     </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Paid and enrolled</h2></div><span className="slot-count">{paid.length}</span></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Paid and Enrolled</h2></div><span className="slot-count">{paid.length}</span></div>
       {paid.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Courses</th><th className="r">Paid</th><th className="r">Balance</th><th>Status</th><th></th></tr></thead><tbody>
-        {paid.map((g) => { const latest = data.payments.filter((p) => p.trainee_id === g.traineeId).sort((a, b) => b.received_at.localeCompare(a.received_at))[0]; return <tr key={g.traineeId}><td data-l="" className="lead"><Who name={g.name} number={g.number} /></td><td data-l="Courses"><CourseList list={g.enrollments} /></td><td data-l="Paid" className="r cx-amt">{pesos(g.paid)}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(g.balance)}</strong></td><td data-l="Status"><Badge tone={g.balance === 0 ? "active" : "orange"}>{g.balance === 0 ? "Paid" : "Partially paid"}</Badge></td><td data-l=""><div className="cx-acts">{g.balance > 0 && <button type="button" className="portal-secondary" onClick={() => onPay(firstOpen(g))}>Collect balance</button>}{latest && <ReceiptButton data={data} paymentId={latest.id} reload={reload} />}<TarButton data={data} traineeId={g.traineeId} reload={reload} className="portal-primary" /></div></td></tr>; })}
+        {paid.map((g) => { const latest = data.payments.filter((p) => p.trainee_id === g.traineeId).sort((a, b) => b.received_at.localeCompare(a.received_at))[0]; return <tr key={g.traineeId}><td data-l="" className="lead"><Who name={g.name} number={g.number} /></td><td data-l="Courses"><CourseList list={g.enrollments} /></td><td data-l="Paid" className="r cx-amt">{pesos(g.paid)}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(g.balance)}</strong></td><td data-l="Status"><Badge tone={g.balance === 0 ? "active" : "orange"}>{g.balance === 0 ? "Paid" : "Partially Paid"}</Badge></td><td data-l=""><div className="cx-acts">{g.balance > 0 && <button type="button" className="portal-secondary" onClick={() => onPay(firstOpen(g))}>Collect Balance</button>}{latest && <ReceiptButton data={data} paymentId={latest.id} reload={reload} />}<TarButton data={data} traineeId={g.traineeId} reload={reload} className="portal-primary" /></div></td></tr>; })}
       </tbody></table></div> : <p className="portal-empty-copy">No paid trainees in the last 7 days.</p>}
     </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Unpaid balances · 4:00 PM summary</h2></div><span className="document-actions"><button type="button" className="portal-secondary" disabled={busy} onClick={() => void post({ action: "balance-summary-send" }, "Summary emailed.").catch(() => undefined)}>Email summary now</button></span></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Unpaid Balances · 4:00 PM Summary</h2></div><span className="document-actions"><button type="button" className="portal-secondary" disabled={busy} onClick={() => void post({ action: "balance-summary-send" }, "Summary emailed.").catch(() => undefined)}>Email Summary Now</button></span></div>
       {unpaid.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Training</th><th>Status</th><th className="r">Balance</th><th></th></tr></thead><tbody>
-        {unpaid.map((r) => <tr key={r.id}><td data-l="" className="lead"><span className="cx-name">{r.traineeName}</span><span className="cx-id">{r.enrollmentNumber}</span></td><td data-l="Training">{r.course}<small>{r.endsToday ? "Ends today" : `Ended ${fmtDate(r.trainingEnd)}`}</small></td><td data-l="Status">{r.endsToday ? <Badge tone="orange">Ends today</Badge> : <Badge tone="cancelled">Past due</Badge>}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(r.balanceCentavos)}</strong><small>of {pesos(r.dueCentavos)}</small></td><td data-l=""><div className="cx-acts"><button type="button" className="portal-primary" onClick={() => onPay(r.id)}>Record payment</button></div></td></tr>)}
+        {unpaid.map((r) => <tr key={r.id}><td data-l="" className="lead"><span className="cx-name">{r.traineeName}</span><span className="cx-id">{r.enrollmentNumber}</span></td><td data-l="Training">{r.course}<small>{r.endsToday ? "Ends today" : `Ended ${fmtDate(r.trainingEnd)}`}</small></td><td data-l="Status">{r.endsToday ? <Badge tone="orange">Ends Today</Badge> : <Badge tone="cancelled">Past Due</Badge>}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(r.balanceCentavos)}</strong><small>of {pesos(r.dueCentavos)}</small></td><td data-l=""><div className="cx-acts"><button type="button" className="portal-primary" onClick={() => onPay(r.id)}>Record Payment</button></div></td></tr>)}
       </tbody></table></div> : <p className="portal-empty-copy">No unpaid balances after training.</p>}
     </section>
       </div>
@@ -481,15 +482,15 @@ export function CashierPayments({ data, onPay }: { data: PortalData; onPay: (enr
   for (const p of rows) byMode.set(p.method, (byMode.get(p.method) ?? 0) + Number(p.amount_centavos));
   const total = rows.reduce((s, p) => s + Number(p.amount_centavos), 0);
   return <div className="portal-page cx">
-    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Payments</h1></div><button type="button" className="portal-primary" onClick={() => onPay("")}>Record payment</button></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Payments</h1></div><button type="button" className="portal-primary" onClick={() => onPay("")}>Record Payment</button></div>
     <div className="cx-bar"><div className="cx-seg">{RANGES.map((r) => <button key={r} type="button" className={range === r ? "on" : ""} onClick={() => setRange(r)}>{r}</button>)}</div>
       {range === "Custom" && <><label className="cx-dt">From<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label><label className="cx-dt">To<input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} /></label></>}
-      <label className="cx-dt">Mode<select value={mode} onChange={(e) => setMode(e.target.value)}><option value="">All modes</option>{[...new Set([...modeNames(data), ...data.payments.map((p) => p.method)])].map((m) => <option key={m} value={m}>{m}</option>)}</select></label>
+      <label className="cx-dt">Mode<select value={mode} onChange={(e) => setMode(e.target.value)}><option value="">All Modes</option>{[...new Set([...modeNames(data), ...data.payments.map((p) => p.method)])].map((m) => <option key={m} value={m}>{m}</option>)}</select></label>
       <input className="cx-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, receipt or reference" aria-label="Search payments" />
     </div>
     <div className="cx-tiles">{[["Total", total, rows.length] as const, ...[...byMode.entries()].map(([m, v]) => [m, v, rows.filter((p) => p.method === m).length] as const)].map(([m, v, n]) => <div className="cx-tile" key={m} style={{ ["--c" as string]: MODE_COLORS[m] ?? "#123F63" }}><span>{m}</span><b>{pesos(v)}</b><small>{n} receipt{n === 1 ? "" : "s"}</small></div>)}</div>
     <section className="portal-panel cx-panel">{rows.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Receipt</th><th>Trainee</th><th>Mode</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
-      {rows.map((p) => { const t = first(p.trainees); return <tr key={p.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{p.payment_number}</span><small>{fmtDate(day(p.received_at))} · {fmtClock(p.received_at)}</small></td><td data-l="Trainee">{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</td><td data-l="Mode">{p.method}{p.reference_number ? <small className="cx-mono">{p.reference_number}</small> : null}</td><td data-l="Status"><Badge tone={p.verification_state === "Verified" ? "active" : "orange"}>{p.verification_state === "Duplicate Review" ? "Duplicate reference" : p.verification_state}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos(p.amount_centavos)}</strong></td><td data-l=""><div className="cx-acts"><ReceiptButton data={data} paymentId={p.id} className="portal-secondary" /></div></td></tr>; })}
+      {rows.map((p) => { const t = first(p.trainees); return <tr key={p.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{p.payment_number}</span><small>{fmtDate(day(p.received_at))} · {fmtClock(p.received_at)}</small></td><td data-l="Trainee">{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</td><td data-l="Mode">{p.method}{p.reference_number ? <small className="cx-mono">{p.reference_number}</small> : null}</td><td data-l="Status"><Badge tone={p.verification_state === "Verified" ? "active" : "orange"}>{p.verification_state === "Duplicate Review" ? "Duplicate Reference" : p.verification_state}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos(p.amount_centavos)}</strong></td><td data-l=""><div className="cx-acts"><ReceiptButton data={data} paymentId={p.id} className="portal-secondary" /></div></td></tr>; })}
     </tbody></table></div> : <p className="portal-empty-copy">No payments in this range.</p>}</section>
   </div>;
 }
@@ -509,17 +510,17 @@ export function DiscountRequests({ data, reload }: { data: PortalData; reload: (
   const enrollmentOf = (id: string) => data.enrollments.find((x) => x.id === id);
   return <div className="cx-stack">
     <section className="portal-panel cx-panel">
-      <div className="panel-heading"><div><h2>New discount request</h2></div></div>
+      <div className="panel-heading"><div><h2>New Discount Request</h2></div></div>
       {msg && <Message kind={msg.kind} text={msg.text} />}
       <div className="portal-form cx-formpad">
-        <label className="full">Enrollment<select value={enrollmentId} onChange={(ev) => setEnrollmentId(ev.target.value)}><option value="">Select a trainee with a balance</option>{open.map((x) => <option key={x.id} value={x.id}>{traineeName(x)} · {x.enrollment_number} · {courseCode(x)} · {pesos(balanceOf(x))}</option>)}</select></label>
-        <label>Endorsing agency<select value={agencyId} onChange={(ev) => setAgencyId(ev.target.value)}><option value="">None</option>{data.agencies.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
-        <label>Discount amount (PHP){rebate != null ? <input value={(rebate / 100).toFixed(2)} readOnly /> : <input type="number" min="0.01" step="0.01" value={amount} onChange={(ev) => setAmount(ev.target.value)} />}</label>
+        <label className="full">Enrollment<select value={enrollmentId} onChange={(ev) => setEnrollmentId(ev.target.value)}><option value="">Select a Trainee with a Balance</option>{open.map((x) => <option key={x.id} value={x.id}>{traineeName(x)} · {x.enrollment_number} · {courseCode(x)} · {pesos(balanceOf(x))}</option>)}</select></label>
+        <label>Endorsing Agency<select value={agencyId} onChange={(ev) => setAgencyId(ev.target.value)}><option value="">None</option>{data.agencies.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
+        <label>Discount Amount (PHP){rebate != null ? <input value={(rebate / 100).toFixed(2)} readOnly /> : <input type="number" min="0.01" step="0.01" value={amount} onChange={(ev) => setAmount(ev.target.value)} />}</label>
         <label className="full">Reason<input value={reason} onChange={(ev) => setReason(ev.target.value)} /></label>
-        <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || !e || centavos <= 0 || (e && centavos > balanceOf(e))} onClick={file}>{busy ? "Sending…" : "Request discount"}</button></div>
+        <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || !e || centavos <= 0 || (e && centavos > balanceOf(e))} onClick={file}>{busy ? "Sending…" : "Request Discount"}</button></div>
       </div>
     </section>
-    <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>For approval</h2></div><span className="slot-count">{data.pendingDiscounts.length}</span></div>
+    <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>For Approval</h2></div><span className="slot-count">{data.pendingDiscounts.length}</span></div>
       {data.pendingDiscounts.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Reason</th><th>Filed</th><th className="r">Discount</th></tr></thead><tbody>
         {data.pendingDiscounts.map((d) => { const x = enrollmentOf(d.enrollment_id); return <tr key={d.id}><td data-l="" className="lead"><span className="cx-name">{x ? traineeName(x) : "Enrollment"}</span><span className="cx-id">{x?.enrollment_number}</span></td><td data-l="Reason">{d.description}</td><td data-l="Filed">{fmtDate(day(d.created_at))}</td><td data-l="Discount" className="r cx-amt">{pesos(d.amount_centavos)}</td></tr>; })}
       </tbody></table></div> : <p className="portal-empty-copy">No discount requests for approval.</p>}
@@ -541,15 +542,15 @@ export function CashierEnrollments({ data, onPay, reload }: { data: PortalData; 
     .sort((a, b) => STATUS_ORDER.indexOf(payState(a) as (typeof STATUS_ORDER)[number]) - STATUS_ORDER.indexOf(payState(b) as (typeof STATUS_ORDER)[number]) || dateOf(b).localeCompare(dateOf(a))).slice(0, 300);
   const count = (f: string) => base.filter((e) => f === "All" || payState(e) === f).length;
   return <div className="portal-page cx">
-    <div className="cx-head"><div><span className="portal-eyebrow">Enrollments</span><h1>Search trainee</h1></div></div>
-    <div className="cx-status" role="tablist">{(["All", ...STATUS_ORDER] as const).map((f) => <button key={f} type="button" role="tab" aria-selected={filter === f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{f}<span>{count(f)}</span></button>)}</div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Enrollments</span><h1>Search Trainee</h1></div></div>
+    <div className="cx-status" role="tablist">{(["All", ...STATUS_ORDER] as const).map((f) => <button key={f} type="button" role="tab" aria-selected={filter === f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{tcl(f)}<span>{count(f)}</span></button>)}</div>
     <div className="cx-bar"><input className="cx-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, NWMTACI number or course" aria-label="Search enrollments" />
       <label className="cx-dt">From<input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} /></label>
       <label className="cx-dt">To<input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} /></label>
-      {(from || to) && <button type="button" className="ghost-button" onClick={() => { setFrom(""); setTo(""); }}>Clear dates</button>}
+      {(from || to) && <button type="button" className="ghost-button" onClick={() => { setFrom(""); setTo(""); }}>Clear Dates</button>}
     </div>
-    <section className="portal-panel cx-panel">{rows.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Enrolled</th><th>Course</th><th className="r">Total due</th><th className="r">Paid</th><th className="r">Balance</th><th>Status</th><th></th></tr></thead><tbody>
-      {rows.map((e) => { const st = payState(e); return <tr key={e.id}><td data-l="" className="lead"><Who name={traineeName(e)} number={data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number} /></td><td data-l="Enrolled">{fmtDate(dateOf(e))}</td><td data-l="Course"><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small></td><td data-l="Total due" className="r cx-amt">{pesos(dueCentavos(e))}</td><td data-l="Paid" className="r cx-amt">{pesos(paidOf(e))}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(e.enrollment_status === "Cancelled" ? 0 : balanceOf(e))}</strong></td><td data-l="Status"><Badge tone={PAY_TONE[st]}>{st}</Badge></td><td data-l=""><div className="cx-acts">{st !== "Paid" && st !== "Cancelled" && <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record payment</button>}{st !== "Unpaid" && st !== "Cancelled" && <TarButton data={data} traineeId={e.trainee_id} reload={reload} />}</div></td></tr>; })}
+    <section className="portal-panel cx-panel">{rows.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Enrolled</th><th>Course</th><th className="r">Total Due</th><th className="r">Paid</th><th className="r">Balance</th><th>Status</th><th></th></tr></thead><tbody>
+      {rows.map((e) => { const st = payState(e); return <tr key={e.id}><td data-l="" className="lead"><Who name={traineeName(e)} number={data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number} /></td><td data-l="Enrolled">{fmtDate(dateOf(e))}</td><td data-l="Course"><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small></td><td data-l="Total due" className="r cx-amt">{pesos(dueCentavos(e))}</td><td data-l="Paid" className="r cx-amt">{pesos(paidOf(e))}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(e.enrollment_status === "Cancelled" ? 0 : balanceOf(e))}</strong></td><td data-l="Status"><Badge tone={PAY_TONE[st]}>{st}</Badge></td><td data-l=""><div className="cx-acts">{st !== "Paid" && st !== "Cancelled" && <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record Payment</button>}{st !== "Unpaid" && st !== "Cancelled" && <TarButton data={data} traineeId={e.trainee_id} reload={reload} />}</div></td></tr>; })}
     </tbody></table></div> : <p className="portal-empty-copy">No enrollments match these filters.</p>}</section>
   </div>;
 }
@@ -560,7 +561,7 @@ export function ScheduleOfFees({ data }: { data: PortalData }) {
   const group = (kind: "item" | "fee", title: string) => { const list = active.filter((c) => ((c.kind ?? "fee") === "item" ? "item" : "fee") === kind); return <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>{title}</h2></div><span className="slot-count">{list.length}</span></div>
     {list.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Name</th><th className="r">Price</th></tr></thead><tbody>{list.map((c) => <tr key={c.id}><td data-l="" className="lead"><span className="cx-name">{c.name}</span></td><td data-l="Price" className="r"><strong className="cx-amt">{Number(c.default_amount_centavos) > 0 ? pesos(c.default_amount_centavos) : "Set by the Cashier"}</strong></td></tr>)}</tbody></table></div> : <p className="portal-empty-copy">None yet.</p>}</section>; };
   return <div className="portal-page cx">
-    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Schedule of fees</h1></div></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Schedule of Fees</h1></div></div>
     {group("item", "Miscellaneous items")}
     {group("fee", "Service fees")}
   </div>;
@@ -571,7 +572,7 @@ export function TarReprints({ data }: { data: PortalData }) {
   const rows = data.requests.filter((r) => r.request_type === "TAR reprint").sort((a, b) => b.created_at.localeCompare(a.created_at));
   const stageOf = (r: RequestRow) => (r.status !== "Pending" ? r.status : r.stage === "With cashier" ? "Add charge" : "For approval");
   return <div className="portal-page cx">
-    <div className="cx-head"><div><span className="portal-eyebrow">Requests</span><h1>TAR reprints</h1></div></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Requests</span><h1>TAR Reprints</h1></div></div>
     <section className="portal-panel cx-panel">{rows.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Request</th><th>Trainee</th><th>Reason</th><th>Status</th></tr></thead><tbody>
       {rows.map((r) => { const t = first(r.trainees); const st = stageOf(r); return <tr key={r.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{r.request_number}</span><small>{fmtDate(day(r.created_at))}</small></td><td data-l="Trainee">{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</td><td data-l="Reason">{r.reason}</td><td data-l="Status"><Badge tone={st === "Approved" ? "active" : st === "Rejected" ? "cancelled" : "orange"}>{st}</Badge></td></tr>; })}
     </tbody></table></div> : <p className="portal-empty-copy">No TAR reprint requests.</p>}</section>
@@ -590,9 +591,9 @@ export function CashierOpening({ data, reload }: { data: PortalData; reload: () 
     {msg && <Message kind={msg.kind} text={msg.text} />}
     {opening ? <dl className="cx-sum"><div><dt>Opening cash</dt><dd>{pesos(opening.opening_cash_centavos)}</dd></div><div><dt>Recorded at</dt><dd>{fmtClock(opening.created_at)}</dd></div>{opening.remarks && <div><dt>Remarks</dt><dd>{opening.remarks}</dd></div>}</dl>
       : <div className="portal-form cx-formpad">
-        <label>Opening cash (PHP)<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+        <label>Opening Cash (PHP)<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
         <label>Remarks<input value={remarks} onChange={(e) => setRemarks(e.target.value)} /></label>
-        <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || amount === ""} onClick={() => void post({ action: "cashier-open", openingCashCentavos: Math.round(Number(amount) * 100), remarks: remarks.trim() || undefined }, "Opening recorded.").catch(() => undefined)}>{busy ? "Saving…" : "Record opening"}</button></div>
+        <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || amount === ""} onClick={() => void post({ action: "cashier-open", openingCashCentavos: Math.round(Number(amount) * 100), remarks: remarks.trim() || undefined }, "Opening recorded.").catch(() => undefined)}>{busy ? "Saving…" : "Record Opening"}</button></div>
       </div>}
   </section>;
 }
@@ -632,13 +633,13 @@ export function CashierSummaryReport({ embedded }: { data?: PortalData; embedded
     {!embedded && <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Report</h1></div></div>}
     <div className="cx-bar">
       <label className="cx-dt">Date<input type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} /></label>
-      <a className="portal-primary" href={`/api/documents/cashier-report?date=${date}`} target="_blank" rel="noreferrer">Generate report (PDF)</a>
+      <a className="portal-primary" href={`/api/documents/cashier-report?date=${date}`} target="_blank" rel="noreferrer">Generate Report (PDF)</a>
       {shown && <span className="cx-mono muted-text">{shown.dateLabel}</span>}
     </div>
     {error && <Message kind="error" text={error} />}
     {!shown && !error && <p className="portal-empty-copy">Loading the report…</p>}
     {shown && p && <>
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Cash position</h2><span className="muted-text">Cash only</span></div>
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Cash Position</h2><span className="muted-text">Cash only</span></div>
         <div className="rp-cash">
           <div><span>{p.previousLabel}</span><b className="cx-mono">{pesos(p.previousCentavos)}</b><small>{p.previousNote}</small></div>
           <div className="plus"><span>+ Cash collected</span><b className="cx-mono">{pesos(p.cashCollectedCentavos)}</b></div>
@@ -649,14 +650,14 @@ export function CashierSummaryReport({ embedded }: { data?: PortalData; embedded
         </div>
       </section>
 
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections summary</h2><span className="cx-mono">{receipts} receipt{receipts === 1 ? "" : "s"} · {pesos(grand)}</span></div>
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections Summary</h2><span className="cx-mono">{receipts} receipt{receipts === 1 ? "" : "s"} · {pesos(grand)}</span></div>
         <div className="portal-table cx-cards"><table><thead><tr><th>Source</th>{shown.channels.map((c) => <th key={c} className="r">{c}</th>)}<th className="r">Total</th></tr></thead><tbody>
           {shown.matrix.map((r) => <tr key={r.source}><td data-l="" className="lead"><span className="cx-name">{r.source}</span></td>{shown.channels.map((c) => { const k = r.cells.find((x) => x.channel === c); return <td key={c} data-l={c} className="r">{cell(k?.count ?? 0, k?.totalCentavos ?? 0)}</td>; })}<td data-l="Total" className="r"><strong>{cell(r.count, r.totalCentavos)}</strong></td></tr>)}
           <tr className="rp-total"><td data-l="" className="lead"><strong>Total</strong></td>{shown.channels.map((c) => { const n = shown.matrix.reduce((s, r) => s + (r.cells.find((x) => x.channel === c)?.count ?? 0), 0), v = shown.matrix.reduce((s, r) => s + (r.cells.find((x) => x.channel === c)?.totalCentavos ?? 0), 0); return <td key={c} data-l={c} className="r"><strong>{cell(n, v)}</strong></td>; })}<td data-l="Total" className="r"><strong>{cell(receipts, grand)}</strong></td></tr>
         </tbody></table></div>
       </section>
 
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections detail</h2></div>
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections Detail</h2></div>
         {shown.groups.length ? shown.groups.map((g) => { const key = `${g.kind}|${g.name}`, isOpen = open[key] ?? true; return <div key={key} className="rp-group">
           <button type="button" className="cx-month-head" aria-expanded={isOpen} onClick={() => setOpen((o) => ({ ...o, [key]: !isOpen }))}><span className="cx-month-name">{g.kind}{g.name ? ` · ${g.name}` : ""}</span><span className="cx-month-meta">{g.rows.length} receipt{g.rows.length === 1 ? "" : "s"}</span><b className="cx-mono">{pesos(g.subtotalCentavos)}</b><span aria-hidden="true" className="cx-month-caret">{isOpen ? "▾" : "▸"}</span></button>
           {isOpen && <div className="portal-table cx-cards"><table><thead><tr><th>Receipt</th><th>Time</th><th>Trainee</th><th>Course</th><th>Channel</th><th>Reference</th><th className="r">Amount</th></tr></thead><tbody>
@@ -749,7 +750,7 @@ function VoucherDrawer({ e, reprints, isManager, onClose, onRelease, onRequestRe
   useEffect(() => { const esc = (ev: KeyboardEvent) => { if (ev.key === "Escape") onClose(); }; document.addEventListener("keydown", esc); return () => document.removeEventListener("keydown", esc); }, [onClose]);
   return <div className="vx-drawer" onClick={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
     <aside className="vx-panel" role="dialog" aria-label={`Voucher ${e.voucher_number ?? e.expense_number}`}>
-      <div className="vx-dh"><div><span className="portal-eyebrow">Expense voucher</span><h2 className="cx-mono">{e.voucher_number ?? e.expense_number}</h2><Badge tone={released ? "active" : "blue"}>{released ? "Released" : "Awaiting release"}</Badge></div><button type="button" className="vx-x" aria-label="Close" onClick={onClose}>×</button></div>
+      <div className="vx-dh"><div><span className="portal-eyebrow">Expense voucher</span><h2 className="cx-mono">{e.voucher_number ?? e.expense_number}</h2><Badge tone={released ? "active" : "blue"}>{released ? "Released" : "Awaiting Release"}</Badge></div><button type="button" className="vx-x" aria-label="Close" onClick={onClose}>×</button></div>
       <div className="vx-db">
         <dl className="vx-kv">
           <div><dt>Payee</dt><dd>{e.payee}</dd></div><div><dt>Category</dt><dd>{e.category}</dd></div>
@@ -760,15 +761,15 @@ function VoucherDrawer({ e, reprints, isManager, onClose, onRelease, onRequestRe
           {lines.map((l, i) => <tr key={i}><td>{l.description}</td><td className="r cx-mono">{l.quantity}</td><td className="r cx-mono">{pesos2(l.quantity * l.unitCentavos)}</td></tr>)}
         </tbody><tfoot><tr><td colSpan={2}>Total</td><td className="r cx-mono">{pesos2(e.amount_centavos)}</td></tr></tfoot></table></div>
         <p className="vx-words">{pesosInWords(Number(e.amount_centavos))}</p>
-        <div><span className="portal-eyebrow">History</span><ol className="vx-tl">{steps.map(([t, d, done]) => <li key={t} className={done ? "" : "todo"}><i aria-hidden="true">{done ? "✓" : ""}</i><div><strong>{t}</strong><small>{d}</small></div></li>)}</ol></div>
+        <div><span className="portal-eyebrow">History</span><ol className="vx-tl">{steps.map(([t, d, done]) => <li key={t} className={done ? "" : "todo"}><i aria-hidden="true">{done ? "✓" : ""}</i><div><strong>{tcl(t)}</strong><small>{d}</small></div></li>)}</ol></div>
       </div>
       <div className="vx-df">
-        <a className="portal-secondary" href={`/api/documents/expense/${e.id}?copy=1`} target="_blank" rel="noreferrer">View file copy</a>
+        <a className="portal-secondary" href={`/api/documents/expense/${e.id}?copy=1`} target="_blank" rel="noreferrer">View File Copy</a>
         {e.drive_link && <a className="portal-secondary" href={e.drive_link} target="_blank" rel="noreferrer">Open in Drive</a>}
-        {!released && !isManager && <button type="button" className="portal-primary" onClick={() => onRelease(e)}>Mark released</button>}
-        {p.state === "print" ? <a className="portal-primary" href={`/api/documents/expense/${e.id}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload(), 2500)}>{p.used ? "Print reprint" : "Print voucher"}</a>
+        {!released && !isManager && <button type="button" className="portal-primary" onClick={() => onRelease(e)}>Mark Released</button>}
+        {p.state === "print" ? <a className="portal-primary" href={`/api/documents/expense/${e.id}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload(), 2500)}>{p.used ? "Print Reprint" : "Print Voucher"}</a>
           : p.state === "pending" ? <span className="cx-chip">Reprint awaiting approval</span>
-          : <button type="button" className="portal-secondary" onClick={() => onRequestReprint(e)}>{p.state === "rejected" ? "Request reprint again" : "Request reprint"}</button>}
+          : <button type="button" className="portal-secondary" onClick={() => onRequestReprint(e)}>{p.state === "rejected" ? "Request Reprint Again" : "Request Reprint"}</button>}
       </div>
     </aside>
   </div>;
@@ -777,9 +778,9 @@ function VoucherDrawer({ e, reprints, isManager, onClose, onRelease, onRequestRe
 /** Print voucher, or the reprint step it needs (request, waiting, refused). */
 function VoucherPrint({ e, reprints, onRequest, reload }: { e: ExpenseRow; reprints: ReprintRow[]; onRequest: (e: ExpenseRow) => void; reload: () => Promise<void> }) {
   const p = voucherPrintState(e, reprints);
-  if (p.state === "print") return <a className="portal-secondary" href={`/api/documents/expense/${e.id}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload(), 2500)}>{p.used ? "Print reprint" : "Print voucher"}</a>;
+  if (p.state === "print") return <a className="portal-secondary" href={`/api/documents/expense/${e.id}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload(), 2500)}>{p.used ? "Print Reprint" : "Print Voucher"}</a>;
   if (p.state === "pending") return <span className="cx-chip">Reprint awaiting approval</span>;
-  return <button type="button" className="portal-secondary" onClick={() => onRequest(e)}>{p.state === "rejected" ? "Request reprint again" : "Request reprint"}</button>;
+  return <button type="button" className="portal-secondary" onClick={() => onRequest(e)}>{p.state === "rejected" ? "Request Reprint Again" : "Request Reprint"}</button>;
 }
 
 /**
@@ -826,7 +827,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   const printCell = (e: ExpenseRow) => <VoucherPrint e={e} reprints={reprints} onRequest={(x) => { setReprinting(x); setReason(""); }} reload={reload} />;
 
   return <div className="portal-page cx">
-    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Expenses</h1></div><button type="button" className="portal-primary" onClick={() => setRecording(true)}>Record expense</button></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Expenses</h1></div><button type="button" className="portal-primary" onClick={() => setRecording(true)}>Record Expense</button></div>
     <div className="cx-status cx-views" role="tablist">{(["Expenses", "Vouchers"] as const).map((v) => <button key={v} type="button" role="tab" aria-selected={view === v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{v}{v === "Vouchers" && pendingReprints.length ? <span>{pendingReprints.length}</span> : null}</button>)}</div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
 
@@ -834,13 +835,13 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
       <div className="cx-bar">
         <label className="cx-dt">From<input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} /></label>
         <label className="cx-dt">To<input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} /></label>
-        {from && to && <a className="portal-secondary" href={`/api/documents/expenses-summary?from=${from}&to=${to}`} target="_blank" rel="noreferrer">Generate summary (PDF)</a>}
+        {from && to && <a className="portal-secondary" href={`/api/documents/expenses-summary?from=${from}&to=${to}`} target="_blank" rel="noreferrer">Generate Summary (PDF)</a>}
       </div>
       <div className="cx-tiles">
         <div className="cx-tile" style={{ ["--c" as string]: "#123F63" }}><span>Total expenses</span><b>{pesos(total)}</b><small>{vouchers} voucher{vouchers === 1 ? "" : "s"}</small></div>
         {channels.map((c) => <div className="cx-tile" key={c.channel} style={{ ["--c" as string]: MODE_COLORS[c.channel] ?? "#0571D0" }}><span>{c.channel}</span><b>{pesos(c.total)}</b><small>{c.count} voucher{c.count === 1 ? "" : "s"}</small></div>)}
       </div>
-      <div className="cx-status" role="tablist">{EXPENSE_STATUSES.map((t) => <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>{t}<span>{count(t)}</span></button>)}</div>
+      <div className="cx-status" role="tablist">{EXPENSE_STATUSES.map((t) => <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>{tcl(t)}<span>{count(t)}</span></button>)}</div>
       <section className="portal-panel cx-panel">{shown.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Number</th><th>Payee</th><th>Category</th><th>Channel</th><th className="r">Amount</th><th>Status</th><th></th></tr></thead><tbody>
         {shown.map((e) => { const st = expenseState(e); return <tr key={e.id}>
           <td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher_number ?? e.expense_number}</span><small>{e.voucher_number && e.request_number && e.request_number !== e.voucher_number ? `${e.request_number} · ` : ""}{fmtDate(day(e.created_at))}</small></td>
@@ -852,7 +853,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
           <td data-l=""><div className="cx-acts">
             {st === "For approval" && canDecide && <><button type="button" className="portal-primary" disabled={busy} onClick={() => approve(e)}>Approve</button><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setRejecting(e); setReason(""); }}>Reject</button></>}
             {(st === "Approved" || st === "Released") && printCell(e)}
-            {st === "Approved" && <button type="button" className="portal-primary" onClick={() => setReleasing(e)}>Mark released</button>}
+            {st === "Approved" && <button type="button" className="portal-primary" onClick={() => setReleasing(e)}>Mark Released</button>}
             {e.drive_link && <a className="ghost-button" href={e.drive_link} target="_blank" rel="noreferrer">Drive</a>}
           </div></td>
         </tr>; })}
@@ -861,14 +862,14 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
 
     {view === "Vouchers" && <>
       {pendingReprints.length > 0 && <section className="portal-panel cx-panel">
-        <div className="panel-heading"><h2>Reprint requests</h2></div>
+        <div className="panel-heading"><h2>Reprint Requests</h2></div>
         <div className="portal-table cx-cards"><table><thead><tr><th>Voucher</th><th>Reason</th><th>Requested by</th><th></th></tr></thead><tbody>
           {pendingReprints.map((r) => { const e = byId.get(r.expense_id); return <tr key={r.id}>
             <td data-l="" className="lead"><span className="cx-name cx-mono">{e?.voucher_number ?? e?.expense_number ?? "—"}</span><small>{e ? `${e.payee} · ${pesos(e.amount_centavos)}` : ""}</small></td>
             <td data-l="Reason">{r.reason}</td>
             <td data-l="Requested by">{r.requested_by_name ?? "—"}<small>{fmtDate(day(r.requested_at))}</small></td>
             <td data-l=""><div className="cx-acts">{isManager
-              ? <><button type="button" className="portal-primary" disabled={busy} onClick={() => decideReprint(r, "Approved")}>Approve reprint</button><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setDeciding(r); setReason(""); }}>Reject</button></>
+              ? <><button type="button" className="portal-primary" disabled={busy} onClick={() => decideReprint(r, "Approved")}>Approve Reprint</button><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setDeciding(r); setReason(""); }}>Reject</button></>
               : <span className="cx-chip">Waiting for the Accounting Manager</span>}</div></td>
           </tr>; })}
         </tbody></table></div>
@@ -885,9 +886,9 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
         </div>;
       })()}
       <div className="cx-bar vx-filters">
-        <label className="cx-dt">Month<select value={month} onChange={(e) => setMonth(e.target.value)}><option value="">All months</option>{months.map((m) => <option key={m.month} value={m.month}>{m.label}</option>)}</select></label>
-        <div className="cx-seg" role="tablist">{VOUCHER_FILTERS.map((f) => <button key={f} type="button" className={vFilter === f ? "on" : ""} onClick={() => setVFilter(f)}>{f}<small>{months.filter((m) => !month || m.month === month).flatMap((m) => m.rows).filter((e) => voucherMatches(e, f, reprints)).length}</small></button>)}</div>
-        <label className="cx-dt">Channel<select value={vChannel} onChange={(e) => setVChannel(e.target.value)}><option value="">All channels</option>{expenseChannels(data).map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
+        <label className="cx-dt">Month<select value={month} onChange={(e) => setMonth(e.target.value)}><option value="">All Months</option>{months.map((m) => <option key={m.month} value={m.month}>{m.label}</option>)}</select></label>
+        <div className="cx-seg" role="tablist">{VOUCHER_FILTERS.map((f) => <button key={f} type="button" className={vFilter === f ? "on" : ""} onClick={() => setVFilter(f)}>{tcl(f)}<small>{months.filter((m) => !month || m.month === month).flatMap((m) => m.rows).filter((e) => voucherMatches(e, f, reprints)).length}</small></button>)}</div>
+        <label className="cx-dt">Channel<select value={vChannel} onChange={(e) => setVChannel(e.target.value)}><option value="">All Channels</option>{expenseChannels(data).map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
         <input className="vx-search" aria-label="Search vouchers" placeholder="Search voucher no., payee or category" value={vSearch} onChange={(e) => setVSearch(e.target.value)} />
       </div>
       {(() => {
@@ -905,10 +906,10 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
               <td data-l="Payee"><strong>{e.payee}</strong><small>{e.category}</small></td>
               <td data-l="Channel">{e.payment_channel || "—"}{e.reference_number ? <small className="cx-mono">{e.reference_number}</small> : null}</td>
               <td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(e.amount_centavos)}</strong></td>
-              <td data-l="Status"><Badge tone={EXPENSE_TONE[st]}>{st === "Approved" ? "Awaiting release" : st}</Badge></td>
+              <td data-l="Status"><Badge tone={EXPENSE_TONE[st]}>{st === "Approved" ? "Awaiting Release" : st}</Badge></td>
               <td data-l="Printing"><span className={`vx-print ${p.state === "print" ? "no" : p.state === "pending" ? "wait" : "ok"}`}>{p.state === "print" ? (p.used ? "Reprint allowed" : "Not printed yet") : p.state === "pending" ? "Reprint awaiting approval" : p.used > 1 ? `✓ Printed ${p.used}×` : "✓ Printed"}</span></td>
               <td data-l="" onClick={(ev) => ev.stopPropagation()}><div className="cx-acts">
-                {st === "Approved" && !isManager && <button type="button" className="portal-primary" onClick={() => setReleasing(e)}>Mark released</button>}
+                {st === "Approved" && !isManager && <button type="button" className="portal-primary" onClick={() => setReleasing(e)}>Mark Released</button>}
                 {printCell(e)}
                 <button type="button" className="portal-secondary" onClick={() => setSelected(e)}>Open</button>
               </div></td>
@@ -924,19 +925,19 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
     {rejecting && <Modal title={`Reject ${rejecting.expense_number}`} onClose={() => setRejecting(null)}>
       <div className="portal-form">
         <label className="full">Reason<input autoFocus value={reason} onChange={(ev) => setReason(ev.target.value)} /></label>
-        <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setRejecting(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={reject}>Reject expense</button></div>
+        <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setRejecting(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={reject}>Reject Expense</button></div>
       </div>
     </Modal>}
     {reprinting && <Modal title={`Request reprint of ${reprinting.voucher_number ?? reprinting.expense_number}`} onClose={() => setReprinting(null)}>
       <div className="portal-form">
-        <label className="full">Reason for reprinting<input autoFocus placeholder="e.g. Original was damaged" value={reason} onChange={(ev) => setReason(ev.target.value)} /></label>
+        <label className="full">Reason for Reprinting<input autoFocus placeholder="e.g. Original was damaged" value={reason} onChange={(ev) => setReason(ev.target.value)} /></label>
         <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setReprinting(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy || reason.trim().length < 3} onClick={requestReprint}>Send to Accounting</button></div>
       </div>
     </Modal>}
-    {deciding && <Modal title="Reject reprint request" onClose={() => setDeciding(null)}>
+    {deciding && <Modal title="Reject Reprint Request" onClose={() => setDeciding(null)}>
       <div className="portal-form">
         <label className="full">Reason<input autoFocus value={reason} onChange={(ev) => setReason(ev.target.value)} /></label>
-        <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setDeciding(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={() => decideReprint(deciding, "Rejected", reason.trim() || undefined)}>Reject request</button></div>
+        <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setDeciding(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={() => decideReprint(deciding, "Rejected", reason.trim() || undefined)}>Reject Request</button></div>
       </div>
     </Modal>}
   </div>;
@@ -958,7 +959,7 @@ function RecordExpenseModal({ data, onClose, post }: { data: PortalData; onClose
   const linesOk = filled.length > 0 && filled.every((l) => l.description && l.quantity > 0 && l.unitCentavos > 0);
   const ready = !!payee.trim() && !!category && linesOk && total > 0;
   const purpose = filled.map((l) => l.description).join("; ").slice(0, 300);
-  return <Modal title="Record expense" onClose={onClose}>
+  return <Modal title="Record Expense" onClose={onClose}>
     <div className="portal-form">
       <label>Payee<input value={payee} onChange={(e) => setPayee(e.target.value)} /></label>
       <label>Category<select value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></label>
@@ -972,15 +973,15 @@ function RecordExpenseModal({ data, onClose, post }: { data: PortalData; onClose
           <button type="button" className="portal-secondary cx-lines-x" aria-label={`Remove line ${i + 1}`} disabled={lines.length === 1} onClick={() => setLines((all) => all.filter((_, k) => k !== i))}>Remove</button>
         </div>)}
         <div className="cx-lines-foot">
-          <button type="button" className="portal-secondary" disabled={lines.length >= 10} onClick={() => setLines((all) => [...all, { description: "", quantity: "1", unit: "" }])}>Add line</button>
+          <button type="button" className="portal-secondary" disabled={lines.length >= 10} onClick={() => setLines((all) => [...all, { description: "", quantity: "1", unit: "" }])}>Add Line</button>
           <span>Total <b className="cx-mono">{pesos(total)}</b></span>
         </div>
       </div>
-      <label>Payment channel<select value={channel} onChange={(e) => setChannel(e.target.value)}>{channels.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
-      <label>Receipt or reference number<input value={reference} onChange={(e) => setReference(e.target.value)} /></label>
-      <label className="full">Supporting document<input placeholder="e.g. Meralco bill and official receipt" value={supporting} onChange={(e) => setSupporting(e.target.value)} /></label>
+      <label>Payment Channel<select value={channel} onChange={(e) => setChannel(e.target.value)}>{channels.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
+      <label>Receipt or Reference Number<input value={reference} onChange={(e) => setReference(e.target.value)} /></label>
+      <label className="full">Supporting Document<input placeholder="e.g. Meralco bill and official receipt" value={supporting} onChange={(e) => setSupporting(e.target.value)} /></label>
       {!categories.length && <p className="portal-form-note full">The Accounting Manager adds expense categories in Configuration.</p>}
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!ready} onClick={() => void post({ action: "expense-create", payee: payee.trim(), category, amountCentavos: total, purpose, lines: filled, paymentChannel: channel, referenceNumber: reference.trim(), supportingDocument: supporting.trim() }, "Expense recorded and sent for approval.").then(onClose).catch(() => undefined)}>Send for approval</button></div>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!ready} onClick={() => void post({ action: "expense-create", payee: payee.trim(), category, amountCentavos: total, purpose, lines: filled, paymentChannel: channel, referenceNumber: reference.trim(), supportingDocument: supporting.trim() }, "Expense recorded and sent for approval.").then(onClose).catch(() => undefined)}>Send for Approval</button></div>
     </div>
   </Modal>;
 }
@@ -993,9 +994,9 @@ function ReleaseExpenseModal({ data, expense, onClose, post }: { data: PortalDat
   return <Modal title={`Release ${expense.voucher_number ?? expense.expense_number}`} onClose={onClose}>
     <div className="portal-form">
       <div className="cx-whocard full"><div><span className="cx-name">{expense.payee}</span><small>{expense.category}</small></div><div className="cx-right"><span className="cx-amt">{pesos(expense.amount_centavos)}</span></div></div>
-      <label>Released through<select value={channel} onChange={(e) => setChannel(e.target.value)}>{channels.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
+      <label>Released Through<select value={channel} onChange={(e) => setChannel(e.target.value)}>{channels.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
       <label>{needsRef ? "Reference number (required)" : "Reference number"}<input className="cx-mono" value={reference} onChange={(e) => setReference(e.target.value.toUpperCase())} /></label>
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={needsRef && !reference.trim()} onClick={() => void post({ action: "expense-release", id: expense.id, paymentChannel: channel, referenceNumber: reference.trim() }, "Released and marked paid.").then(onClose).catch(() => undefined)}>Mark released</button></div>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={needsRef && !reference.trim()} onClick={() => void post({ action: "expense-release", id: expense.id, paymentChannel: channel, referenceNumber: reference.trim() }, "Released and marked paid.").then(onClose).catch(() => undefined)}>Mark Released</button></div>
     </div>
   </Modal>;
 }

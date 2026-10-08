@@ -119,7 +119,7 @@ export function CertificatePdfModal({ target, onClose }: { target: CertPdfTarget
   return (
     <div className="portal-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <section className="portal-modal" role="dialog" aria-modal="true" aria-labelledby="cert-pdf-title">
-        <header><div><span className="portal-eyebrow">Certificate</span><h2 id="cert-pdf-title">Generate certificate PDF</h2></div><button type="button" onClick={onClose} aria-label="Close dialog">×</button></header>
+        <header><div><span className="portal-eyebrow">Certificate</span><h2 id="cert-pdf-title">Generate Certificate PDF</h2></div><button type="button" onClick={onClose} aria-label="Close dialog">×</button></header>
         <div className="portal-form">
           {message && <div className="portal-message full" role="status">{message}</div>}
           <div className="full"><strong>{target.traineeName}</strong> — {target.courseName} · {target.enrollmentNumber}</div>
@@ -128,17 +128,17 @@ export function CertificatePdfModal({ target, onClose }: { target: CertPdfTarget
             <input type="file" accept="image/png,image/jpeg" onChange={(e) => void onPhoto(e.target.files?.[0])} />
           </label>
           {!autoBox && meta && !meta.error && (<>
-            <label>Photo — X (from left)<input type="number" value={px} onChange={(e) => setPx(Number(e.target.value))} /></label>
-            <label>Photo — Y (from top)<input type="number" value={py} onChange={(e) => setPy(Number(e.target.value))} /></label>
-            <label>Photo size (pt · 144 = 2in)<input type="number" value={psize} onChange={(e) => setPsize(Number(e.target.value))} /></label>
+            <label>Photo — X (From Left)<input type="number" value={px} onChange={(e) => setPx(Number(e.target.value))} /></label>
+            <label>Photo — Y (From Top)<input type="number" value={py} onChange={(e) => setPy(Number(e.target.value))} /></label>
+            <label>Photo Size (Pt · 144 = 2In)<input type="number" value={psize} onChange={(e) => setPsize(Number(e.target.value))} /></label>
           </>)}
           <label className="portal-check full"><input type="checkbox" checked={center} onChange={(e) => setCenter(e.target.checked)} /><span>Centre the trainee name horizontally</span></label>
-          <label>Name — Y (from top)<input type="number" value={ny} onChange={(e) => setNy(Number(e.target.value))} /></label>
-          <label>Name size<input type="number" value={nameSize} onChange={(e) => setNameSize(Number(e.target.value))} /></label>
+          <label>Name — Y (From Top)<input type="number" value={ny} onChange={(e) => setNy(Number(e.target.value))} /></label>
+          <label>Name Size<input type="number" value={nameSize} onChange={(e) => setNameSize(Number(e.target.value))} /></label>
           <p className="portal-form-note full">The PDF opens in a new tab to view or print. The 2x2 photo is embedded into this one PDF only and is never uploaded or stored.</p>
           <div className="portal-form-actions full">
             <button type="button" className="ghost-button" onClick={onClose}>Close</button>
-            <button type="button" className="portal-primary" disabled={busy || !meta?.url} onClick={() => void generate()}>{busy ? "Generating…" : "Generate & open PDF"}</button>
+            <button type="button" className="portal-primary" disabled={busy || !meta?.url} onClick={() => void generate()}>{busy ? "Generating…" : "Generate & Open PDF"}</button>
           </div>
         </div>
       </section>

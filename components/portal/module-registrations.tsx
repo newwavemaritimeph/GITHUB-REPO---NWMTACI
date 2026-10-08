@@ -61,16 +61,16 @@ export function RegistrationsModule({ go }: { go: (module: Module) => void }) {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Registration operations"
-        title="Online registrations"
+        eyebrow="Registration Operations"
+        title="Online Registrations"
         description="Each public submission may hold up to five course selections. Approve, hold, or return each course on its own."
       />
 
       <div className="stat-grid stat-grid-4">
-        <StatCard label="Awaiting review" value={String(pending)} note="Submissions from the website" tone={1} icon="!" />
-        <StatCard label="Possible duplicates" value={String(duplicates)} note="Matched an existing trainee" tone={5} icon="◎" />
-        <StatCard label="Courses approved today" value={String(approvedToday)} note="Converted to enrollments" tone={2} icon="✓" />
-        <StatCard label="Total submissions" value={String(state.submissions.length)} note="All time" tone={0} icon="▤" />
+        <StatCard label="Awaiting Review" value={String(pending)} note="Submissions from the website" tone={1} icon="!" />
+        <StatCard label="Possible Duplicates" value={String(duplicates)} note="Matched an existing trainee" tone={5} icon="◎" />
+        <StatCard label="Courses Approved Today" value={String(approvedToday)} note="Converted to enrollments" tone={2} icon="✓" />
+        <StatCard label="Total Submissions" value={String(state.submissions.length)} note="All time" tone={0} icon="▤" />
       </div>
 
       <Panel padded={false}>
@@ -80,7 +80,7 @@ export function RegistrationsModule({ go }: { go: (module: Module) => void }) {
         </div>
         {rows.length === 0 ? (
           <EmptyState
-            title="No submissions match"
+            title="No Submissions Match"
             text="Adjust the filter or search term, or submit an enrollment form from the public website to see it appear here instantly."
           />
         ) : (
@@ -163,7 +163,7 @@ export function RegistrationsModule({ go }: { go: (module: Module) => void }) {
               </div>
             )}
 
-            <h3 className="drawer-section">Course selections</h3>
+            <h3 className="drawer-section">Course Selections</h3>
             <div className="history-list">
               {activeSelections.map((selection) => {
                 const batch = state.batches.find((item) => item.id === selection.batchId);
@@ -225,7 +225,7 @@ export function RegistrationsModule({ go }: { go: (module: Module) => void }) {
               })}
             </div>
 
-            <h3 className="drawer-section">Consolidated same-day invoice</h3>
+            <h3 className="drawer-section">Consolidated Same-Day Invoice</h3>
             {(() => {
               const billable = activeSelections.filter((item) => item.status !== "Rejected" && item.status !== "Cancelled");
               if (billable.length === 0) {

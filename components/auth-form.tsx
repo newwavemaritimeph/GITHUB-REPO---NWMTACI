@@ -54,7 +54,7 @@ export function AuthForm({ portal }: { portal: "staff" | "trainee" }) {
 
   return (
     <form className="auth-form" onSubmit={submit}>
-      <label>Email address<input type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" /></label>
+      <label>Email Address<input type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" /></label>
       <label>Password<input type="password" required autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" /></label>
       {message && <p className="form-message" role="status">{message}</p>}
       <button className="button button-primary button-block" disabled={busy}>{busy ? "Signing in..." : `Sign in to ${portal} portal`}</button>

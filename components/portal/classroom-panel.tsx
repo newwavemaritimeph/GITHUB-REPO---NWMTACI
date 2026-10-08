@@ -67,7 +67,7 @@ export function ClassroomPanel({ data, courseId, reload }: { data: PortalData; c
         <small>{!status?.configured ? "Not set up yet: add the Google keys in Vercel (see the setup steps)." : status.connected ? `Connected as ${status.accountEmail}. Trainees are invited to the linked class when instructions are generated.` : "Connect the Gmail that owns New Wave's classes. You sign in on Google's own page; the portal never sees the password."}</small>
       </div>
       {status?.configured && (status.connected
-        ? <span className="document-actions">{!status.driveReady && <button type="button" className="portal-primary gc-connect" onClick={() => window.location.assign("/api/google/classroom/connect")}>Reconnect to allow Drive</button>}<button type="button" className="portal-secondary" disabled={busy} onClick={disconnect}>Disconnect</button></span>
+        ? <span className="document-actions">{!status.driveReady && <button type="button" className="portal-primary gc-connect" onClick={() => window.location.assign("/api/google/classroom/connect")}>Reconnect to Allow Drive</button>}<button type="button" className="portal-secondary" disabled={busy} onClick={disconnect}>Disconnect</button></span>
         : <button type="button" className="portal-primary gc-connect" onClick={() => window.location.assign("/api/google/classroom/connect")}>Connect Google</button>)}
     </div>
     {status?.connected && <small className="gc-drive">{status.driveReady ? "Google Drive: proofs of payment are filed in NWMTACI Payment Proofs." : "Google Drive is not allowed yet. Reconnect and tick the Drive permission so the Cashier can file proofs of payment."}</small>}
@@ -76,10 +76,10 @@ export function ClassroomPanel({ data, courseId, reload }: { data: PortalData; c
       {!courseId ? <small>Choose a course below to link it to a Google Classroom class.</small> : <>
         <span>Class for this course: <b>{linkedId ? (classes?.find((c) => c.id === linkedId)?.name ?? "Linked") : "Not linked"}</b></span>
         {classes === null
-          ? <button type="button" className="portal-secondary" disabled={busy} onClick={loadClasses}>{busy ? "Loading…" : linkedId ? "Change class" : "Choose class"}</button>
+          ? <button type="button" className="portal-secondary" disabled={busy} onClick={loadClasses}>{busy ? "Loading…" : linkedId ? "Change Class" : "Choose Class"}</button>
           : <span className="gc-pick">
             <select value={picked} onChange={(e) => setPicked(e.target.value)} aria-label="Google Classroom class">
-              <option value="">No class (unlink)</option>
+              <option value="">No Class (Unlink)</option>
               {classes.map((c) => <option key={c.id} value={c.id}>{c.name}{c.section ? ` · ${c.section}` : ""}</option>)}
             </select>
             <button type="button" className="portal-primary" disabled={busy || picked === linkedId} onClick={link}>Save</button>

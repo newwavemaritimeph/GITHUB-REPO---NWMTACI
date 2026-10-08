@@ -37,7 +37,7 @@ export function RegistrationDeliveries({ data, reload }: { data: PortalData; rel
   const shown = rows.filter((r) => show === "All" || r.status === "Requested");
   const fresh = rows.filter((r) => r.status === "Requested").length;
   return <div className="portal-page cx ac">
-    <div className="cx-head"><div><span className="portal-eyebrow">Registration</span><h1>Delivery requests</h1></div></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Registration</span><h1>Delivery Requests</h1></div></div>
     <p className="ac-note">From the website. Check that the certificate is printed, then send to the Cashier for the ₱500.00 LBC fee.</p>
     {msg && <Message kind={msg.kind} text={msg.text} />}
     {fresh > 0 && <div className="ms-banner blue"><b>{fresh} new delivery request{fresh === 1 ? "" : "s"}</b><span>waiting for your check</span></div>}
@@ -49,13 +49,13 @@ export function RegistrationDeliveries({ data, reload }: { data: PortalData; rel
           {shown.map((r, i) => { const w = who(r); return [
             <tr key={r.id}><td className="cl-no">{i + 1}</td>
               <td><b>{w.name}</b><small className="cl-sub cl-block cl-mono">{w.no} · {r.request_number}</small><small className="cl-sub cl-block">{courseOf(r)}</small></td>
-              <td>{r.certificate_number ? <span className="cl-mono">{r.certificate_number}</span> : null}{printed(r) ? <small className="cl-sub cl-block">Printed</small> : <Badge tone="orange">Not printed yet</Badge>}</td>
+              <td>{r.certificate_number ? <span className="cl-mono">{r.certificate_number}</span> : null}{printed(r) ? <small className="cl-sub cl-block">Printed</small> : <Badge tone="orange">Not Printed Yet</Badge>}</td>
               <td>{address(r)}<small className="cl-sub cl-block">{r.recipient_name} · {r.mobile}</small></td>
               <td>{when(r.created_at)}</td>
               <td>{r.status === "Requested" ? <span className="cl-acts"><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setDeclining(r.id); setReason(""); setNote(""); }}>Decline</button><button type="button" className="portal-primary" disabled={busy || !printed(r)} title={printed(r) ? undefined : "Wait until the certificate is printed"} onClick={() => void post({ action: "delivery-check", id: r.id }, "Sent to the Cashier. The trainee was emailed how to pay.").catch(() => undefined)}>Send to the Cashier</button></span> : <><Badge tone={tone(r.status)}>{r.status}</Badge>{r.decline_reason && <small className="cl-sub cl-block">{r.decline_reason}</small>}</>}</td>
             </tr>,
             declining === r.id && <tr key={`${r.id}-d`} className="cl-voidrow"><td /><td colSpan={5}><div className="cl-void">
-              <label>Reason (emailed to the trainee)<select value={reason} onChange={(e) => setReason(e.target.value)}><option value="">Choose a reason</option>{DECLINE_REASONS.map((x) => <option key={x}>{x}</option>)}</select></label>
+              <label>Reason (Emailed to the Trainee)<select value={reason} onChange={(e) => setReason(e.target.value)}><option value="">Choose a Reason</option>{DECLINE_REASONS.map((x) => <option key={x}>{x}</option>)}</select></label>
               {reason === "Other" && <label>Details<input value={note} onChange={(e) => setNote(e.target.value)} /></label>}
               <button type="button" className="portal-secondary" onClick={() => setDeclining(null)}>Keep</button>
               <button type="button" className="cl-danger" disabled={busy || !reason || (reason === "Other" && note.trim().length < 3)} onClick={() => void post({ action: "delivery-decline", id: r.id, reason: reason === "Other" ? note.trim() : reason }, "Declined. The trainee was emailed the reason.").then(() => setDeclining(null)).catch(() => undefined)}>Decline</button>
@@ -94,14 +94,14 @@ export function ReleasingDeliveries({ data, reload }: { data: PortalData; reload
               <td><b>{w.name}</b><small className="cl-sub cl-block">{courseOf(r)}</small><small className="cl-sub cl-block cl-mono">{r.request_number}</small></td>
               <td className="cl-mono">{r.certificate_number ?? "—"}</td>
               <td>{address(r)}<small className="cl-sub cl-block">{r.recipient_name} · {r.mobile}</small></td>
-              <td><Badge tone={tone(r.status)}>{r.status === "Paid" ? "Paid · to ship" : r.status}</Badge>{r.tracking_number && <small className="cl-sub cl-block cl-mono">{r.tracking_number}</small>}</td>
-              <td>{r.status === "Paid" ? <button type="button" className="portal-primary" disabled={busy} onClick={() => { setShipping(r.id); setTracking(""); setShippedOn(manilaToday()); }}>Mark shipped</button> : r.status === "Shipped" ? <button type="button" className="portal-secondary" disabled={busy} onClick={() => void post({ action: "delivery-delivered", id: r.id }, "Marked delivered.").catch(() => undefined)}>Mark delivered</button> : null}</td>
+              <td><Badge tone={tone(r.status)}>{r.status === "Paid" ? "Paid · to Ship" : r.status}</Badge>{r.tracking_number && <small className="cl-sub cl-block cl-mono">{r.tracking_number}</small>}</td>
+              <td>{r.status === "Paid" ? <button type="button" className="portal-primary" disabled={busy} onClick={() => { setShipping(r.id); setTracking(""); setShippedOn(manilaToday()); }}>Mark Shipped</button> : r.status === "Shipped" ? <button type="button" className="portal-secondary" disabled={busy} onClick={() => void post({ action: "delivery-delivered", id: r.id }, "Marked delivered.").catch(() => undefined)}>Mark Delivered</button> : null}</td>
             </tr>,
             shipping === r.id && <tr key={`${r.id}-s`} className="cl-voidrow"><td /><td colSpan={5}><div className="cl-void ms-ship">
-              <label>LBC tracking number (required)<input value={tracking} autoFocus onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 1234 5678 9012" /></label>
-              <label>Date sent<input type="date" value={shippedOn} max={manilaToday()} onChange={(e) => setShippedOn(e.target.value)} /></label>
+              <label>LBC Tracking Number (Required)<input value={tracking} autoFocus onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 1234 5678 9012" /></label>
+              <label>Date Sent<input type="date" value={shippedOn} max={manilaToday()} onChange={(e) => setShippedOn(e.target.value)} /></label>
               <button type="button" className="portal-secondary" onClick={() => setShipping(null)}>Cancel</button>
-              <button type="button" className="portal-primary" disabled={busy || tracking.trim().length < 4 || !shippedOn} onClick={() => void post({ action: "delivery-ship", id: r.id, trackingNumber: tracking.trim(), shippedOn }, "Shipped. The trainee was emailed the tracking number.").then(() => setShipping(null)).catch(() => undefined)}>Mark shipped</button>
+              <button type="button" className="portal-primary" disabled={busy || tracking.trim().length < 4 || !shippedOn} onClick={() => void post({ action: "delivery-ship", id: r.id, trackingNumber: tracking.trim(), shippedOn }, "Shipped. The trainee was emailed the tracking number.").then(() => setShipping(null)).catch(() => undefined)}>Mark Shipped</button>
             </div></td></tr>,
           ]; })}
         </tbody></table></div> : <p className="portal-empty-copy">No paid delivery requests yet.</p>}

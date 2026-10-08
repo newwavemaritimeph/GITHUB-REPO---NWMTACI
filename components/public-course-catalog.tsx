@@ -55,7 +55,7 @@ function StcwCard({ course }: { course: StcwCourse }) {
           <ul className="slot-list">{rows.map((b) => <li key={b.id} className={b.full ? "full" : ""}><b>{dayRange(b.startsOn, b.endsOn)}</b><i className={b.full ? "full" : ""}>{b.full ? "Full" : "Open"}</i></li>)}</ul>
         </div>)}
       </div>
-      {course.batches.length > SHOWN && <button type="button" className="slot-more" onClick={() => setAll((v) => !v)}>{all ? "Show fewer dates" : `+ ${course.batches.length - SHOWN} more dates`}</button>}
+      {course.batches.length > SHOWN && <button type="button" className="slot-more" onClick={() => setAll((v) => !v)}>{all ? "Show Fewer Dates" : `+ ${course.batches.length - SHOWN} more dates`}</button>}
     </div> : <span className="schedule-status soon">Schedule to be announced</span>}
     <p className="slot-foot">{LATE.has(course.code) ? "Late enrollment open until the last training day" : "Choose this course in the registration form"}</p>
   </article>;

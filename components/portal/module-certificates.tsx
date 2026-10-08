@@ -80,8 +80,8 @@ export function CertificatesModule({ go }: { go: (module: Module) => void }) {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Completion records"
-        title="Certificate management"
+        eyebrow="Completion Records"
+        title="Certificate Management"
         description="Eligibility is computed from verified attendance. Numbering, printing, and release are controlled and audited."
         actions={
           issuanceOn ? (
@@ -119,8 +119,8 @@ export function CertificatesModule({ go }: { go: (module: Module) => void }) {
       )}
 
       <div className="stat-grid stat-grid-4">
-        <StatCard label="Pending attendance" value={String(counts.pending)} note="Not yet eligible" tone={1} icon="□" onClick={() => setFilter("Pending")} />
-        <StatCard label="Ready to print" value={String(counts.ready)} note={issuanceOn ? "Numbering available" : "Template required"} tone={3} icon="◈" onClick={() => setFilter("Ready")} />
+        <StatCard label="Pending Attendance" value={String(counts.pending)} note="Not yet eligible" tone={1} icon="□" onClick={() => setFilter("Pending")} />
+        <StatCard label="Ready to Print" value={String(counts.ready)} note={issuanceOn ? "Numbering available" : "Template required"} tone={3} icon="◈" onClick={() => setFilter("Ready")} />
         <StatCard label="Printed" value={String(counts.printed)} note="Awaiting release" tone={0} icon="▤" onClick={() => setFilter("Printed")} />
         <StatCard label="Released" value={String(counts.released)} note="Release events recorded" tone={2} icon="✓" onClick={() => setFilter("Released")} />
       </div>
@@ -132,7 +132,7 @@ export function CertificatesModule({ go }: { go: (module: Module) => void }) {
         </div>
         {rows.length === 0 ? (
           <EmptyState
-            title="No certificates in this view"
+            title="No Certificates in This View"
             text="A certificate becomes ready once every attendance session of the batch is verified and the template is approved."
           />
         ) : (
@@ -238,7 +238,7 @@ export function CertificatesModule({ go }: { go: (module: Module) => void }) {
 
       <Modal
         open={Boolean(releaseFor)}
-        title="Release certificate"
+        title="Release Certificate"
         description={releaseFor ? `${releaseFor.certificate?.certificateNumber} · ${fullName(releaseFor.trainee)}` : ""}
         onClose={() => setReleaseFor(null)}
         footer={
@@ -269,9 +269,9 @@ export function CertificatesModule({ go }: { go: (module: Module) => void }) {
           <label className="field field-full">
             <span className="field-label">Identification presented</span>
             <select value={recipientType} onChange={(event) => setRecipientType(event.target.value)}>
-              <option>Trainee (valid ID presented)</option>
-              <option>Authorized representative (authorization letter)</option>
-              <option>Manning agency representative</option>
+              <option value="Trainee (valid ID presented)">Trainee (Valid ID Presented)</option>
+              <option value="Authorized representative (authorization letter)">Authorized Representative (Authorization Letter)</option>
+              <option value="Manning agency representative">Manning Agency Representative</option>
             </select>
           </label>
           <div className="form-full inline-note note-blue">

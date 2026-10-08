@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { first, manilaToday, manilaDay, isUnpaid, balanceOf } from "@/lib/portal-format";
+import { tcl } from "@/lib/title-case";
 
 /**
  * Schedule Officer workspace: dashboard, training calendar, trainee scheduling,
@@ -72,11 +73,11 @@ export function ScheduleOfficerDashboard({ data, go, openBatch }: { data: Schedu
     ...(d.unscheduled.length ? [{ label: "Unscheduled trainees", text: `${d.unscheduled.length} trainee${d.unscheduled.length === 1 ? "" : "s"} still need a schedule assignment`, tone: "orange" as const }] : []),
   ];
   return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Training operations</span><h1>Schedule officer</h1><p>Today&apos;s trainings, the next two weeks, and what needs attention.</p></div><button className="portal-primary" onClick={openBatch}>+ Create schedule</button></div>
+    <div className="portal-heading"><div><span className="portal-eyebrow">Training operations</span><h1>Schedule Officer</h1><p>Today&apos;s trainings, the next two weeks, and what needs attention.</p></div><button className="portal-primary" onClick={openBatch}>+ Create Schedule</button></div>
     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "0 0 16px" }}>
-      {[["Training calendar", "Training calendar"], ["Trainee scheduling", "Trainee scheduling"], ["Instructor assignment", "Instructor assignment"], ["Schedule changes", "Schedule changes"], ["Schedules", "Schedules / batches"]].map(([m, label]) => <button key={m} type="button" className="portal-secondary" onClick={() => go(m)}>{label}</button>)}
+      {[["Training calendar", "Training calendar"], ["Trainee scheduling", "Trainee scheduling"], ["Instructor assignment", "Instructor assignment"], ["Schedule changes", "Schedule changes"], ["Schedules", "Schedules / batches"]].map(([m, label]) => <button key={m} type="button" className="portal-secondary" onClick={() => go(m)}>{tcl(label)}</button>)}
     </div>
-    <div className="metric-grid">{stats.map(([label, value], i) => <article key={label}><div className={`metric-symbol symbol-${i}`}>{["□", "◎", "▤", "◈", "♙", "⚠"][i]}</div><span>{label}</span><strong>{value}</strong><small>{i >= 4 && value > 0 ? "Needs attention" : "Today"}</small></article>)}</div>
+    <div className="metric-grid">{stats.map(([label, value], i) => <article key={label}><div className={`metric-symbol symbol-${i}`}>{["□", "◎", "▤", "◈", "♙", "⚠"][i]}</div><span>{tcl(label)}</span><strong>{value}</strong><small>{i >= 4 && value > 0 ? "Needs attention" : "Today"}</small></article>)}</div>
     <section className="portal-panel live-list" style={{ marginTop: 16 }}>
       <div className="panel-heading"><div><h2>Today — {fmtDate(d.today)}</h2><p>Running trainings with staffing and seats</p></div><span className="slot-count">{d.todays.length}</span></div>
       {d.todays.map((b) => { const s = d.staffing.get(b.id); const left = b.capacity - b.confirmed_count; return <div className="live-row-item" key={b.id}><div><strong>{courseOf(b)}{dayN(b)}</strong><small>{fmtTime(b.daily_start)} – {fmtTime(b.daily_end)} · {s?.room_name ?? b.venue ?? b.mode} · Instructor: {s?.instructor_name ?? "not assigned"}</small></div><span className="slot-count" style={{ color: left <= 0 ? "#a52020" : undefined }}>{b.confirmed_count} / {b.capacity}{left > 0 ? ` → ${left} slot${left === 1 ? "" : "s"}` : " — FULL"}</span></div>; })}
@@ -84,12 +85,12 @@ export function ScheduleOfficerDashboard({ data, go, openBatch }: { data: Schedu
     </section>
     <div className="dashboard-panels">
       <section className="portal-panel live-list">
-        <div className="panel-heading"><div><h2>Upcoming trainings</h2><p>Next 14 days</p></div><span className="slot-count">{d.upcoming.length}</span></div>
+        <div className="panel-heading"><div><h2>Upcoming Trainings</h2><p>Next 14 days</p></div><span className="slot-count">{d.upcoming.length}</span></div>
         {d.upcoming.slice(0, 10).map((b) => { const s = d.staffing.get(b.id); return <div className="live-row-item" key={b.id}><div><strong>{courseOf(b)}</strong><small>{fmtDate(b.starts_on)}{b.ends_on !== b.starts_on ? ` – ${fmtDate(b.ends_on)}` : ""} · {s?.room_name ?? b.venue ?? b.mode} · {s?.instructor_name ?? "no instructor"}</small></div><span className="slot-count">{b.confirmed_count}/{b.capacity}</span></div>; })}
         {!d.upcoming.length && <p className="portal-empty-copy">Nothing scheduled in the next two weeks.</p>}
       </section>
       <section className="portal-panel live-list">
-        <div className="panel-heading"><div><h2>Needs attention</h2><p>Conflicts, gaps and capacity</p></div><span className="slot-count">{attention.length}</span></div>
+        <div className="panel-heading"><div><h2>Needs Attention</h2><p>Conflicts, gaps and capacity</p></div><span className="slot-count">{attention.length}</span></div>
         {attention.slice(0, 12).map((a, i) => <div className="live-row-item" key={i}><div><strong>{a.label}</strong><small>{a.text}</small></div><span className={`portal-badge ${a.tone === "red" ? "cancelled" : "pending"}`}>{a.tone === "red" ? "Fix" : "Watch"}</span></div>)}
         {!attention.length && <p className="portal-empty-copy">All clear — no conflicts or gaps found.</p>}
       </section>
@@ -113,10 +114,10 @@ export function TrainingCalendar({ data }: { data: SchedulingData }) {
   for (const day of days) for (const b of onDay(day)) { const c = first(b.courses); if (c) inView.set(c.code, c.name); }
   const label = view === "Week" ? `${fmtDate(days[0])} – ${fmtDate(days[6])}` : new Intl.DateTimeFormat("en-PH", { month: "long", year: "numeric" }).format(new Date(`${month}-01T00:00:00+08:00`));
   return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Training operations</span><h1>Training calendar</h1><p>Color-coded by course. Cancelled schedules are excluded.</p></div></div>
+    <div className="portal-heading"><div><span className="portal-eyebrow">Training operations</span><h1>Training Calendar</h1><p>Color-coded by course. Cancelled schedules are excluded.</p></div></div>
     <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", margin: "0 0 12px" }}>
       <button type="button" className="portal-secondary" onClick={() => shift(-1)}>←</button>
-      <strong style={{ fontSize: 17 }}>{label}</strong>
+      <strong style={{ fontSize: 17 }}>{tcl(label)}</strong>
       <button type="button" className="portal-secondary" onClick={() => shift(1)}>→</button>
       <div className="portal-tabs" style={{ margin: 0 }}>{(["Month", "Week"] as const).map((v) => <button key={v} type="button" className={view === v ? "active" : ""} onClick={() => setView(v)}>{v}</button>)}</div>
     </div>
@@ -144,10 +145,10 @@ export function TraineeScheduling({ data, reload }: { data: SchedulingData; relo
     finally { setBusy(""); }
   }
   return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Training operations</span><h1>Trainee scheduling</h1><p>Enrollments waiting to be assigned to a batch.</p></div></div>
+    <div className="portal-heading"><div><span className="portal-eyebrow">Training operations</span><h1>Trainee Scheduling</h1><p>Enrollments waiting to be assigned to a batch.</p></div></div>
     {msg && <div className="portal-message error" role="alert">{msg}</div>}
     <section className="portal-panel live-list">
-      <div className="panel-heading"><div><h2>Waiting for a schedule</h2><p>Open-schedule enrollments (endorsed trainings excluded)</p></div><span className="slot-count">{waiting.length}</span></div>
+      <div className="panel-heading"><div><h2>Waiting for a Schedule</h2><p>Open-schedule enrollments (endorsed trainings excluded)</p></div><span className="slot-count">{waiting.length}</span></div>
       {waiting.map((e) => { const t = first(e.trainees); const c = first(e.courses); const opts = options(e.course_id); return <div className="live-row-item" key={e.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : e.enrollment_number}</strong><small>{c ? `${c.code} · ${c.name}` : ""} · {e.enrollment_number}</small></div><span style={{ display: "inline-flex", gap: 8, alignItems: "center" }}><select value={choice[e.id] ?? ""} onChange={(ev) => setChoice((m) => ({ ...m, [e.id]: ev.target.value }))} style={{ maxWidth: 260 }}><option value="">{opts.length ? "Pick a schedule…" : "No open schedule for this course"}</option>{opts.map((b) => <option key={b.id} value={b.id}>{fmtDate(b.starts_on)}{b.ends_on !== b.starts_on ? ` – ${fmtDate(b.ends_on)}` : ""} · {b.capacity - b.confirmed_count} slots</option>)}</select><button type="button" className="portal-primary" disabled={busy === e.id || !choice[e.id]} onClick={() => assign(e.id)}>{busy === e.id ? "Assigning…" : "Assign"}</button></span></div>; })}
       {!waiting.length && <p className="portal-empty-copy">Every enrollment has a schedule.</p>}
     </section>
@@ -159,9 +160,9 @@ export function InstructorAssignment({ data, onEdit }: { data: SchedulingData; o
   const staffing = staffingMap(data);
   const rows = data.batches.filter((b) => b.status !== "Cancelled" && b.ends_on >= today).sort((a, z) => a.starts_on.localeCompare(z.starts_on));
   return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Training operations</span><h1>Instructor assignment</h1><p>Who teaches each upcoming batch, and where. Edit a batch to assign or change.</p></div></div>
-    <div className="portal-table portal-panel"><table><thead><tr><th>Schedule</th><th>Course</th><th>Instructor</th><th>Room / venue</th><th>Seats</th><th>Actions</th></tr></thead><tbody>
-      {rows.map((b) => { const s = staffing.get(b.id); return <tr key={b.id}><td><strong>{fmtDate(b.starts_on)}</strong><small>{b.batch_number}</small></td><td>{courseOf(b)}</td><td>{s?.instructor_name ?? <span className="portal-badge cancelled">Not assigned</span>}</td><td>{s?.room_name ?? b.venue ?? b.mode}</td><td>{b.confirmed_count}/{b.capacity}</td><td className="document-actions"><button type="button" onClick={() => onEdit(b.id)}>Assign / edit</button></td></tr>; })}
+    <div className="portal-heading"><div><span className="portal-eyebrow">Training operations</span><h1>Instructor Assignment</h1><p>Who teaches each upcoming batch, and where. Edit a batch to assign or change.</p></div></div>
+    <div className="portal-table portal-panel"><table><thead><tr><th>Schedule</th><th>Course</th><th>Instructor</th><th>Room / Venue</th><th>Seats</th><th>Actions</th></tr></thead><tbody>
+      {rows.map((b) => { const s = staffing.get(b.id); return <tr key={b.id}><td><strong>{fmtDate(b.starts_on)}</strong><small>{b.batch_number}</small></td><td>{courseOf(b)}</td><td>{s?.instructor_name ?? <span className="portal-badge cancelled">Not assigned</span>}</td><td>{s?.room_name ?? b.venue ?? b.mode}</td><td>{b.confirmed_count}/{b.capacity}</td><td className="document-actions"><button type="button" onClick={() => onEdit(b.id)}>Assign / Edit</button></td></tr>; })}
     </tbody></table>{!rows.length && <p className="portal-empty-copy">No upcoming batches.</p>}</div>
   </div>;
 }
@@ -174,12 +175,12 @@ export function ScheduleChanges({ data }: { data: SchedulingData }) {
   const CHANGE_TYPES = ["Rescheduling", "Change Course", "Cancellation", "Make-up Class"];
   const requests = data.requests.filter((r) => CHANGE_TYPES.includes(r.request_type)).sort((a, z) => z.created_at.localeCompare(a.created_at));
   return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Training operations</span><h1>Schedule changes</h1><p>Newly added, cancelled, and change requests from the last 14 days.</p></div></div>
+    <div className="portal-heading"><div><span className="portal-eyebrow">Training operations</span><h1>Schedule Changes</h1><p>Newly added, cancelled, and change requests from the last 14 days.</p></div></div>
     <div className="dashboard-panels">
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Newly added</h2><p>Published in the last 14 days</p></div><span className="slot-count">{added.length}</span></div>{added.slice(0, 12).map((b) => <div className="live-row-item" key={b.id}><div><strong>{courseOf(b)}</strong><small>{fmtDate(b.starts_on)}{b.ends_on !== b.starts_on ? ` – ${fmtDate(b.ends_on)}` : ""} · {b.batch_number}</small></div><span className="portal-badge active">Added</span></div>)}{!added.length && <p className="portal-empty-copy">No new schedules published recently.</p>}</section>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Cancelled schedules</h2><p>Batches marked cancelled</p></div><span className="slot-count">{cancelled.length}</span></div>{cancelled.slice(0, 12).map((b) => <div className="live-row-item" key={b.id}><div><strong>{courseOf(b)}</strong><small>{fmtDate(b.starts_on)} · {b.batch_number}</small></div><span className="portal-badge cancelled">Cancelled</span></div>)}{!cancelled.length && <p className="portal-empty-copy">No cancelled schedules.</p>}</section>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Newly Added</h2><p>Published in the last 14 days</p></div><span className="slot-count">{added.length}</span></div>{added.slice(0, 12).map((b) => <div className="live-row-item" key={b.id}><div><strong>{courseOf(b)}</strong><small>{fmtDate(b.starts_on)}{b.ends_on !== b.starts_on ? ` – ${fmtDate(b.ends_on)}` : ""} · {b.batch_number}</small></div><span className="portal-badge active">Added</span></div>)}{!added.length && <p className="portal-empty-copy">No new schedules published recently.</p>}</section>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Cancelled Schedules</h2><p>Batches marked cancelled</p></div><span className="slot-count">{cancelled.length}</span></div>{cancelled.slice(0, 12).map((b) => <div className="live-row-item" key={b.id}><div><strong>{courseOf(b)}</strong><small>{fmtDate(b.starts_on)} · {b.batch_number}</small></div><span className="portal-badge cancelled">Cancelled</span></div>)}{!cancelled.length && <p className="portal-empty-copy">No cancelled schedules.</p>}</section>
     </div>
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Change requests</h2><p>Rescheduling, course changes, cancellations and make-up classes</p></div><span className="slot-count">{requests.length}</span></div>{requests.slice(0, 15).map((r) => { const t = first(r.trainees); return <div className="live-row-item" key={r.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : r.request_number}</strong><small>{r.request_type} · {r.reason}</small></div><span className={`portal-badge ${r.status === "Approved" ? "active" : r.status === "Rejected" ? "cancelled" : "pending"}`}>{r.status}</span></div>; })}{!requests.length && <p className="portal-empty-copy">No change requests on record.</p>}</section>
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Change Requests</h2><p>Rescheduling, course changes, cancellations and make-up classes</p></div><span className="slot-count">{requests.length}</span></div>{requests.slice(0, 15).map((r) => { const t = first(r.trainees); return <div className="live-row-item" key={r.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : r.request_number}</strong><small>{r.request_type} · {r.reason}</small></div><span className={`portal-badge ${r.status === "Approved" ? "active" : r.status === "Rejected" ? "cancelled" : "pending"}`}>{r.status}</span></div>; })}{!requests.length && <p className="portal-empty-copy">No change requests on record.</p>}</section>
   </div>;
 }
 
@@ -223,7 +224,7 @@ export function AdminDashboard({ data, go, openEnrollment }: { data: SchedulingD
   ];
   const meterTone = (b: { confirmed_count: number; capacity: number }) => (b.confirmed_count >= b.capacity ? "#a52020" : b.confirmed_count >= b.capacity * 0.9 ? "#b45309" : "#0571d0");
   return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Live operations</span><h1>Admin dashboard</h1><p>{fmtDate(d.today)} · Daily operations overview</p></div><span style={{ display: "inline-flex", gap: 10 }}><button type="button" className="portal-secondary" onClick={() => go("Search trainee")}>Search trainee</button><button type="button" className="portal-primary" onClick={openEnrollment}>+ New enrollment</button></span></div>
+    <div className="portal-heading"><div><span className="portal-eyebrow">Live operations</span><h1>Admin Dashboard</h1><p>{fmtDate(d.today)} · Daily operations overview</p></div><span style={{ display: "inline-flex", gap: 10 }}><button type="button" className="portal-secondary" onClick={() => go("Search trainee")}>Search Trainee</button><button type="button" className="portal-primary" onClick={openEnrollment}>+ New Enrollment</button></span></div>
     <div className="metric-grid compact-metrics">
       <article><span>Trainees today</span><strong>{traineesToday}</strong><small>Across {d.todays.length} class{d.todays.length === 1 ? "" : "es"}</small></article>
       <article><span>New enrollments</span><strong>{newToday}</strong><small>Today</small></article>
@@ -231,32 +232,32 @@ export function AdminDashboard({ data, go, openEnrollment }: { data: SchedulingD
       <article><span>Certificates for release</span><strong>{printed}</strong><small>{readyToPrint} ready to print</small></article>
     </div>
     <section className="portal-panel" style={{ marginTop: 16 }}>
-      <div className="panel-heading"><div><h2>Today&apos;s training</h2><p>Live class and capacity monitoring</p></div><label className="portal-field-inline" style={{ minWidth: 180 }}>Class<select value={classFilter} onChange={(e) => setClassFilter(e.target.value)}><option value="">All classes</option>{[...new Map(d.todays.map((b) => [b.course_id, courseOf(b)])).entries()].map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label></div>
+      <div className="panel-heading"><div><h2>Today&apos;s Training</h2><p>Live class and capacity monitoring</p></div><label className="portal-field-inline" style={{ minWidth: 180 }}>Class<select value={classFilter} onChange={(e) => setClassFilter(e.target.value)}><option value="">All Classes</option>{[...new Map(d.todays.map((b) => [b.course_id, courseOf(b)])).entries()].map(([id, name]) => <option key={id} value={id}>{name}</option>)}</select></label></div>
       <div className="portal-table"><table><thead><tr><th>Course</th><th>Trainees</th><th>Room</th><th>Status</th></tr></thead><tbody>
         {todaysShown.map((b) => { const s = d.staffing.get(b.id); const full = b.confirmed_count >= b.capacity; return <tr key={b.id}><td><strong>{courseOf(b)}{dayN(b)}</strong><small>{fmtTime(b.daily_start)}–{fmtTime(b.daily_end)}</small></td><td><strong>{b.confirmed_count} / {b.capacity}</strong><span className="meter"><i style={{ width: `${Math.min(100, Math.round((b.confirmed_count / Math.max(1, b.capacity)) * 100))}%`, background: meterTone(b) }} /></span></td><td>{s?.room_name ?? b.venue ?? b.mode}</td><td><Chip cls={full ? "cancelled" : "ongoing"}>{full ? "FULL" : "Ongoing"}</Chip></td></tr>; })}
       </tbody></table>{!todaysShown.length && <p className="portal-empty-copy">No classes running today.</p>}</div>
     </section>
     <div className="dashboard-panels">
       <section className="portal-panel live-list">
-        <div className="panel-heading"><div><h2>Needs attention</h2><p>Items requiring admin action</p></div><span className="slot-count">{visibleNeeds.length}</span></div>
+        <div className="panel-heading"><div><h2>Needs Attention</h2><p>Items requiring admin action</p></div><span className="slot-count">{visibleNeeds.length}</span></div>
         {visibleNeeds.map(([n, label, module]) => <button type="button" className="needs-row" key={label} onClick={() => go(module)}><span><b>{n}</b> {label}</span><span aria-hidden>›</span></button>)}
         {!visibleNeeds.length && <p className="portal-empty-copy">All clear — nothing needs action.</p>}
       </section>
       <section className="portal-panel live-list">
-        <div className="panel-heading"><div><h2>Recent enrollments</h2><p>Latest trainee registrations</p></div><button type="button" className="ghost-button" onClick={() => go("Enrollments")}>View all</button></div>
+        <div className="panel-heading"><div><h2>Recent Enrollments</h2><p>Latest trainee registrations</p></div><button type="button" className="ghost-button" onClick={() => go("Enrollments")}>View All</button></div>
         {recent.map((e) => { const t = first(e.trainees); const c = first(e.courses); const ch = chip(e as SchedulingData["enrollments"][number] & { trainee_id?: string }); return <div className="live-row-item" key={e.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : e.enrollment_number}</strong><small>{c?.code ?? ""} · {manilaDay(e.created_at)}</small></div><Chip cls={ch.cls}>{ch.text}</Chip></div>; })}
         {!recent.length && <p className="portal-empty-copy">No enrollments yet.</p>}
       </section>
     </div>
     <div className="dashboard-panels">
       <section className="portal-panel live-list">
-        <div className="panel-heading"><div><h2>Upcoming training</h2><p>Next available classes</p></div><span className="slot-count">{d.upcoming.length}</span></div>
+        <div className="panel-heading"><div><h2>Upcoming Training</h2><p>Next available classes</p></div><span className="slot-count">{d.upcoming.length}</span></div>
         {d.upcoming.slice(0, 8).map((b) => { const left = b.capacity - b.confirmed_count; return <div className="live-row-item" key={b.id}><div style={{ display: "flex", gap: 12, alignItems: "center" }}><span className="date-block"><b>{b.starts_on.slice(8, 10)}</b><i>{new Intl.DateTimeFormat("en-PH", { month: "short", timeZone: "Asia/Manila" }).format(new Date(`${b.starts_on}T00:00:00+08:00`))}</i></span><div><strong>{courseOf(b)}</strong><small>{b.confirmed_count} / {b.capacity} trainees</small></div></div><Chip cls={left <= 0 ? "cancelled" : "ongoing"}>{left <= 0 ? "FULL" : `${left} slot${left === 1 ? "" : "s"}`}</Chip></div>; })}
         {!d.upcoming.length && <p className="portal-empty-copy">Nothing scheduled in the next two weeks.</p>}
       </section>
       <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Quick actions</h2><p>Most common daily admin tasks</p></div></div>
-        <div className="qa-grid">{actions.map(([icon, label, fn]) => <button type="button" key={label} onClick={fn}><em aria-hidden>{icon}</em>{label}</button>)}</div>
+        <div className="panel-heading"><div><h2>Quick Actions</h2><p>Most common daily admin tasks</p></div></div>
+        <div className="qa-grid">{actions.map(([icon, label, fn]) => <button type="button" key={label} onClick={fn}><em aria-hidden>{icon}</em>{tcl(label)}</button>)}</div>
       </section>
     </div>
   </div>;

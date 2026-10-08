@@ -31,7 +31,7 @@ export default async function MfaPage() {
   return (
     <main className="auth-page">
       <div className="auth-card">
-        <h1>Extra verification</h1>
+        <h1>Extra Verification</h1>
         <p className="auth-sub">This account requires a second step to sign in.</p>
         <MfaGate email={user.email ?? ""} hasTotp={hasTotp} emailConfigured={emailConfigured} />
       </div>

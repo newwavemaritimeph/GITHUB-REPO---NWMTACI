@@ -37,9 +37,9 @@ function MonthlyPayablesReminder({ payables }: { payables: MonthlyPayable[] }) {
   const total = active.reduce((sum, item) => sum + item.amountCentavos, 0);
   const todayDay = new Date().getDate();
   return (
-    <Panel title="Monthly payables — reminder" description="Recurring bills due this month">
+    <Panel title="Monthly Payables — Reminder" description="Recurring bills due this month">
       {active.length === 0 ? (
-        <div className="empty-block"><span aria-hidden="true">✓</span><h3>No payables set</h3><p>Add recurring bills in Accounting → Invoices &amp; Vouchers.</p></div>
+        <div className="empty-block"><span aria-hidden="true">✓</span><h3>No Payables Set</h3><p>Add recurring bills in Accounting → Invoices &amp; Vouchers.</p></div>
       ) : (
         <>
           <div className="finance-strip">
@@ -263,7 +263,7 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
 
       {(activeAnnouncements.length > 0 || canManageAnnouncements) && (
         <Panel
-          title="Announcement board"
+          title="Announcement Board"
           description="Posted by the Admin / Accounting Manager"
           action={
             canManageAnnouncements ? (
@@ -276,7 +276,7 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
           }
         >
           {activeAnnouncements.length === 0 ? (
-            <EmptyState icon="📣" title="No announcements" text="Post an update for all staff." />
+            <EmptyState icon="📣" title="No Announcements" text="Post an update for all staff." />
           ) : (
             activeAnnouncements.map((item) => (
               <div key={item.id} className="announcement-row">
@@ -356,7 +356,7 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
         }));
         return (
           <>
-            <Panel title="Daily collections" description="Verified collections across all payment channels — today">
+            <Panel title="Daily Collections" description="Verified collections across all payment channels — today">
               <div className="finance-strip">
                 <div className="finance-lead">
                   <span>Total collected today</span>
@@ -395,9 +395,9 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
             </Panel>
 
             <Panel
-              title="Opening / closing — today"
+              title="Opening / Closing — Today"
               description="Net cash movement today"
-              action={<button className="secondary-button" onClick={() => go("Reports")}>Open full report</button>}
+              action={<button className="secondary-button" onClick={() => go("Reports")}>Open Full Report</button>}
             >
               <div className="finance-strip">
                 <div className="finance-lead">
@@ -429,9 +429,9 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
         const certRows = all.filter((item) => item.certificate?.status === certStatus);
         return (
           <>
-            <Panel title="Trainees for upcoming schedules" description="Batches starting within the next 14 days">
+            <Panel title="Trainees for Upcoming Schedules" description="Batches starting within the next 14 days">
               {upcomingBatches.length === 0 ? (
-                <div className="empty-block"><span aria-hidden="true">□</span><h3>No upcoming batches</h3><p>Open or publish a batch to see its trainees here.</p></div>
+                <div className="empty-block"><span aria-hidden="true">□</span><h3>No Upcoming Batches</h3><p>Open or publish a batch to see its trainees here.</p></div>
               ) : (
                 upcomingBatches.map((batch) => {
                   const trainees = all.filter((item) => item.enrollment.batchId === batch.id && item.stage !== "Cancelled");
@@ -475,9 +475,9 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
                 )}
               </Panel>
 
-              <Panel title="This week's schedule" description={`${formatDate(weekStart)} – ${formatDate(weekEnd)}`}>
+              <Panel title="This Week's Schedule" description={`${formatDate(weekStart)} – ${formatDate(weekEnd)}`}>
                 {weekBatches.length === 0 ? (
-                  <div className="empty-block"><span aria-hidden="true">□</span><h3>No sessions this week</h3><p>Nothing is scheduled for the current week.</p></div>
+                  <div className="empty-block"><span aria-hidden="true">□</span><h3>No Sessions This Week</h3><p>Nothing is scheduled for the current week.</p></div>
                 ) : (
                   weekBatches.map((batch) => (
                     <div key={batch.id} className="activity-row">
@@ -503,18 +503,18 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
           .sort((a, b) => (a.batch?.startsOn ?? "").localeCompare(b.batch?.startsOn ?? ""));
         return (
           <Panel
-            title="Trainees with pending balances before training"
+            title="Trainees with Pending Balances Before Training"
             description="Follow up on unpaid balances ahead of the training date"
             action={
               <select value={dueWindow} onChange={(event) => setDueWindow(event.target.value as typeof dueWindow)}>
                 <option>Tomorrow</option>
-                <option>Within 3 days</option>
-                <option>This week</option>
+                <option value="Within 3 days">Within 3 Days</option>
+                <option value="This week">This Week</option>
               </select>
             }
           >
             {dueSoon.length === 0 ? (
-              <div className="empty-block"><span aria-hidden="true">✓</span><h3>Nothing due {dueWindow.toLowerCase()}</h3><p>No trainee has an outstanding balance for a training starting in this window.</p></div>
+              <div className="empty-block"><span aria-hidden="true">✓</span><h3>Nothing Due {dueWindow.toLowerCase()}</h3><p>No trainee has an outstanding balance for a training starting in this window.</p></div>
             ) : (
               dueSoon.map((item) => (
                 <button key={item.enrollment.id} className="activity-row row-clickable" onClick={() => go("Payments")}>
@@ -544,9 +544,9 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
         const maxScore = Math.max(1, ...board.map((row) => row.score));
         return (
           <div className="two-column">
-            <Panel title="Active employees" description={`${active.length} on the roster`}>
+            <Panel title="Active Employees" description={`${active.length} on the roster`}>
               {active.length === 0 ? (
-                <div className="empty-block"><span aria-hidden="true">◎</span><h3>No active employees</h3><p>Add employees under HR &amp; payroll → User setup.</p></div>
+                <div className="empty-block"><span aria-hidden="true">◎</span><h3>No Active Employees</h3><p>Add employees under HR &amp; payroll → User setup.</p></div>
               ) : (
                 active.map((employee) => (
                   <div key={employee.id} className="activity-row">
@@ -560,9 +560,9 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
               )}
             </Panel>
 
-            <Panel title="Performance leaderboard" description="Ranked by attendance (present days + on-time)">
+            <Panel title="Performance Leaderboard" description="Ranked by attendance (present days + on-time)">
               {board.every((row) => row.total === 0) ? (
-                <div className="empty-block"><span aria-hidden="true">▤</span><h3>No attendance yet</h3><p>Log daily attendance to build the leaderboard.</p></div>
+                <div className="empty-block"><span aria-hidden="true">▤</span><h3>No Attendance Yet</h3><p>Log daily attendance to build the leaderboard.</p></div>
               ) : (
                 board.map((row, index) => (
                   <div key={row.employee.id} className="leaderboard-row">
@@ -653,9 +653,9 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
       })()}
 
       {isRegistration && (
-        <Panel title="Requests requiring action" description="Trainee change requests still open">
+        <Panel title="Requests Requiring Action" description="Trainee change requests still open">
           {registrationRequests.length === 0 ? (
-            <div className="empty-block"><span aria-hidden="true">✓</span><h3>Nothing pending</h3><p>No trainee requests need attention right now.</p></div>
+            <div className="empty-block"><span aria-hidden="true">✓</span><h3>Nothing Pending</h3><p>No trainee requests need attention right now.</p></div>
           ) : (
             registrationRequests.map((request) => (
               <div key={request.id} className="activity-row">
@@ -673,11 +673,11 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
       {!isRegistration && !isAccounting && !isTrainingOps && !isCashier && !isHR && !isAdmin && (
       <>
       <div className="two-column">
-        <Panel title="Priority work" description="Built from live records, ordered by operational urgency" action={<Pill tone="amber">{tasks.length} actions</Pill>}>
+        <Panel title="Priority Work" description="Built from live records, ordered by operational urgency" action={<Pill tone="amber">{tasks.length} actions</Pill>}>
           {tasks.length === 0 ? (
             <div className="empty-block">
               <span aria-hidden="true">✓</span>
-              <h3>Everything is clear</h3>
+              <h3>Everything Is Clear</h3>
               <p>No registrations, payments, attendance, or certificates need attention right now.</p>
             </div>
           ) : (
@@ -697,7 +697,7 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
         </Panel>
 
         <Panel
-          title="Latest enrollments"
+          title="Latest Enrollments"
           description="Newest records across every course"
           action={
             <button className="link-button" onClick={() => go("Enrollments")}>
@@ -708,7 +708,7 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
           {all.length === 0 ? (
             <div className="empty-block">
               <span aria-hidden="true">▤</span>
-              <h3>No enrollments yet</h3>
+              <h3>No Enrollments Yet</h3>
               <p>Approve a registration to create the first enrollment.</p>
             </div>
           ) : (
@@ -730,10 +730,10 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
         </Panel>
       </div>
 
-      <Panel title="Today at the center" description="Sessions in progress and the latest audited activity" padded={false}>
+      <Panel title="Today at the Center" description="Sessions in progress and the latest audited activity" padded={false}>
         <div className="two-column two-column-flush">
           <div className="panel-padded">
-            <h3 className="sub-heading">Sessions today</h3>
+            <h3 className="sub-heading">Sessions Today</h3>
             {todaySessions.length === 0 ? (
               <p className="muted-text">No training session is scheduled for today.</p>
             ) : (
@@ -756,7 +756,7 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
             )}
           </div>
           <div className="panel-padded">
-            <h3 className="sub-heading">Recent activity</h3>
+            <h3 className="sub-heading">Recent Activity</h3>
             {state.activity.slice(0, 6).map((entry) => (
               <div key={entry.id} className="activity-row">
                 <div>
@@ -817,7 +817,7 @@ function Dashboard({ role, go }: { role: Role; go: (module: Module) => void }) {
             <Field label="Message*" full>
               <textarea rows={4} value={annDraft.body} onChange={(event) => setAnnDraft({ ...annDraft, body: event.target.value })} />
             </Field>
-            <Field label="Show until (optional)" hint="Auto-hides after this date">
+            <Field label="Show Until (Optional)" hint="Auto-hides after this date">
               <input type="date" value={annDraft.expiresOn} onChange={(event) => setAnnDraft({ ...annDraft, expiresOn: event.target.value })} />
             </Field>
             <label className="inline-field inline-check">

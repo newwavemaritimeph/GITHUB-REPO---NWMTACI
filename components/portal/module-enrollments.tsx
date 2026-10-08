@@ -20,6 +20,7 @@ import { createAdmissionInvoicePdf } from "@/lib/documents";
 import { formatDate, formatDateRange, formatDateTime, formatTime, fullName, todayIso, useSystem } from "@/lib/system/store";
 import type { EnrollmentView, RegistrationLifecycle, Role, RequestType } from "@/lib/system/types";
 import { PageHeader, Panel, StageBadge, StageTrack, type Module } from "./shared";
+import { tcl } from "@/lib/title-case";
 
 const filters = ["All", "Unpaid", "Awaiting verification", "Ready for instructions", "In training", "Completed"] as const;
 const REGISTRATION_STATUSES: RegistrationLifecycle[] = ["Waiting for Payment", "Enrolled", "Reschedule", "Generated Voucher", "Cancelled"];
@@ -125,7 +126,7 @@ export function EnrollmentsModule({
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Registration operations"
+        eyebrow="Registration Operations"
         title="Enrollments"
         description="Daily enrollments — pick a date range to see the schedule, payment status, and latest stage of each."
         actions={
@@ -151,7 +152,7 @@ export function EnrollmentsModule({
           status === "Paid" ? "green" : status === "Partially Paid" ? "amber" : status === "Cancelled" ? "red" : "slate";
         return (
           <Panel
-            title="Daily enrollments summary"
+            title="Daily Enrollments Summary"
             description="Trainee · Course · Payment status, grouped by enrollment date."
             action={
               <button
@@ -210,7 +211,7 @@ export function EnrollmentsModule({
           <span className="toolbar-end catalog-count">{rows.length} enrollment{rows.length === 1 ? "" : "s"}</span>
         </div>
         {rows.length === 0 ? (
-          <EmptyState title="No enrollments here" text="Change the filter, or approve a registration to create the first enrollment in this view." />
+          <EmptyState title="No Enrollments Here" text="Change the filter, or approve a registration to create the first enrollment in this view." />
         ) : (
           <DataTable columns={["Trainee", "Enrollment", "Course & batch", "Schedule", "Payment", "Balance", "Stage"]} minWidth={1040}>
             {rows.map((item) => (
@@ -314,7 +315,7 @@ export function EnrollmentsModule({
                     }}
                   >
                     {REGISTRATION_STATUSES.map((item) => (
-                      <option key={item}>{item}</option>
+                      <option key={item}>{tcl(item)}</option>
                     ))}
                   </select>
                 </dd>
@@ -437,7 +438,7 @@ export function EnrollmentsModule({
               )}
             </div>
 
-            <h3 className="drawer-section">Account ledger</h3>
+            <h3 className="drawer-section">Account Ledger</h3>
             <div className="ledger-list">
               {active.entries.map((entry) => (
                 <div key={entry.id} className={`ledger-row ledger-${entry.type}`}>
@@ -536,7 +537,7 @@ export function EnrollmentsModule({
 
       <Modal
         open={Boolean(requestFor)}
-        title="Request a change"
+        title="Request a Change"
         description={requestFor ? `${requestFor.enrollment.reference} · ${requestFor.enrollment.courseName}` : ""}
         onClose={() => setRequestFor(null)}
         footer={
@@ -568,7 +569,7 @@ export function EnrollmentsModule({
           <Field label="What is being requested?" full>
             <select value={requestType} onChange={(event) => setRequestType(event.target.value as RequestType)}>
               <option>Rescheduling</option>
-              <option>Make-up class</option>
+              <option value="Make-up class">Make-Up Class</option>
               <option>Change Course</option>
             </select>
           </Field>
@@ -580,7 +581,7 @@ export function EnrollmentsModule({
 
       <Modal
         open={Boolean(editFor)}
-        title="Change course / schedule"
+        title="Change Course / Schedule"
         description={editFor ? `${editFor.enrollment.reference} · currently ${editFor.enrollment.courseName}` : ""}
         onClose={() => setEditFor(null)}
         wide
@@ -607,7 +608,7 @@ export function EnrollmentsModule({
         {editFor && (
           <div className="form-grid">
             <Field
-              label="New course &amp; schedule"
+              label="New Course &Amp; Schedule"
               full
               hint="Pick any open batch. This changes the course, schedule, and dates, and re-prices the training fee. Verified payments stay on the account."
             >
@@ -740,7 +741,7 @@ export function PaymentModal({
   return (
     <Modal
       open={Boolean(target)}
-      title="Record payment"
+      title="Record Payment"
       description={target ? `${target.enrollment.reference} · balance ${pesos(target.balanceCentavos)}` : ""}
       onClose={onClose}
       footer={
@@ -777,14 +778,14 @@ export function PaymentModal({
         <Field label="Amount (PHP)" hint={target ? `Maximum ${pesos(target.balanceCentavos)}` : undefined}>
           <input inputMode="decimal" value={money.raw} onChange={(event) => money.setRaw(event.target.value)} placeholder="0.00" />
         </Field>
-        <Field label="Payment channel" hint="Channels are configured by the Admin under Payment channels.">
+        <Field label="Payment Channel" hint="Channels are configured by the Admin under Payment channels.">
           <select value={method} onChange={(event) => setMethod(event.target.value)}>
             {channels.map((channel) => (
               <option key={channel.id}>{channel.name}</option>
             ))}
           </select>
         </Field>
-        <Field label="Transaction reference" hint={requiresRef ? "Type or scan the reference — no screenshot needed" : "Not required for cash"}>
+        <Field label="Transaction Reference" hint={requiresRef ? "Type or scan the reference — no screenshot needed" : "Not required for cash"}>
           <input value={reference} onChange={(event) => setReference(event.target.value.toUpperCase())} disabled={!requiresRef} placeholder="Encode or scan reference" />
         </Field>
         <Field label="Remarks" full>
@@ -819,7 +820,7 @@ export function AddChargeModal({
   return (
     <Modal
       open
-      title="Add other charge"
+      title="Add Other Charge"
       description={`${view.enrollment.reference} · ${fullName(view.trainee)}`}
       onClose={onClose}
       footer={
@@ -842,10 +843,10 @@ export function AddChargeModal({
       }
     >
       {charges.length === 0 ? (
-        <EmptyState icon="₱" title="No charge types" text="Ask an Admin to add charge types under Accounting → Other charges." />
+        <EmptyState icon="₱" title="No Charge Types" text="Ask an Admin to add charge types under Accounting → Other charges." />
       ) : (
         <div className="form-grid">
-          <Field label="Charge type" full>
+          <Field label="Charge Type" full>
             <select
               value={chargeId}
               onChange={(event) => {
@@ -897,7 +898,7 @@ function AgencyRebateModal({
   return (
     <Modal
       open
-      title="Apply agency rebate"
+      title="Apply Agency Rebate"
       description={`${view.enrollment.reference} · ${fullName(view.trainee)}`}
       onClose={onClose}
       footer={
@@ -920,10 +921,10 @@ function AgencyRebateModal({
       }
     >
       {agencies.length === 0 ? (
-        <EmptyState icon="◇" title="No marketing agencies" text="Ask an Admin to add agencies under Accounting → Marketing agencies." />
+        <EmptyState icon="◇" title="No Marketing Agencies" text="Ask an Admin to add agencies under Accounting → Marketing agencies." />
       ) : (
         <div className="form-grid">
-          <Field label="Marketing agency" full hint={`Rebate shown is for ${view.enrollment.courseName} (${courseCode}).`}>
+          <Field label="Marketing Agency" full hint={`Rebate shown is for ${view.enrollment.courseName} (${courseCode}).`}>
             <select value={agencyId} onChange={(event) => setAgencyId(event.target.value)}>
               {agencies.map((agency) => (
                 <option key={agency.id} value={agency.id}>
@@ -1001,7 +1002,7 @@ export function SplitPaymentModal({
   return (
     <Modal
       open
-      title="Split payment across courses"
+      title="Split Payment Across Courses"
       description={`${fullName(trainee)} · ${trainee.traineeNumber}`}
       onClose={onClose}
       wide
@@ -1031,20 +1032,20 @@ export function SplitPaymentModal({
       {enrollments.length < 2 ? (
         <EmptyState
           icon="₱"
-          title="Only one unpaid course"
+          title="Only One Unpaid Course"
           text="Split payment needs at least two of this trainee's courses to have an outstanding balance. Use Record payment instead."
         />
       ) : (
         <>
           <div className="form-grid">
-            <Field label="Payment channel" hint="Channels are configured by the Admin.">
+            <Field label="Payment Channel" hint="Channels are configured by the Admin.">
               <select value={method} onChange={(event) => setMethod(event.target.value)}>
                 {channels.map((channel) => (
                   <option key={channel.id}>{channel.name}</option>
                 ))}
               </select>
             </Field>
-            <Field label="One reference number" hint={requiresRef ? "Shared by every course in this split" : "Not required for cash"}>
+            <Field label="One Reference Number" hint={requiresRef ? "Shared by every course in this split" : "Not required for cash"}>
               <input
                 value={reference}
                 disabled={!requiresRef}
@@ -1216,7 +1217,7 @@ export function AdmissionInvoiceModal({
         </tbody>
       </table>
 
-      <h3 className="slip-section">Courses enrolled{courseLines.length > 1 ? ` (${courseLines.length})` : ""}</h3>
+      <h3 className="slip-section">Courses Enrolled{courseLines.length > 1 ? ` (${courseLines.length})` : ""}</h3>
       <table className="slip-table">
         <thead><tr><th>Course</th><th>Schedule</th><th>Time</th><th>Classroom</th></tr></thead>
         <tbody>
@@ -1231,7 +1232,7 @@ export function AdmissionInvoiceModal({
         </tbody>
       </table>
 
-      <h3 className="slip-section">Charges &amp; payments</h3>
+      <h3 className="slip-section">Charges &Amp; Payments</h3>
       <table className="slip-table slip-table-money">
         <thead><tr><th>Description</th><th>Reference</th><th className="num">Amount</th></tr></thead>
         <tbody>
@@ -1252,8 +1253,8 @@ export function AdmissionInvoiceModal({
           {charges.length === 0 && payments.length === 0 && <tr><td colSpan={3} className="muted-text">No ledger entries yet.</td></tr>}
         </tbody>
         <tfoot>
-          <tr><td /><th className="num">Total due</th><td className="num">{pesos(dueCentavos)}</td></tr>
-          <tr><td /><th className="num">Total paid</th><td className="num">{pesos(paidCentavos)}</td></tr>
+          <tr><td /><th className="num">Total Due</th><td className="num">{pesos(dueCentavos)}</td></tr>
+          <tr><td /><th className="num">Total Paid</th><td className="num">{pesos(paidCentavos)}</td></tr>
           <tr className="slip-balance"><td /><th className="num">Balance</th><td className="num">{pesos(balanceCentavos)}</td></tr>
         </tfoot>
       </table>
@@ -1272,7 +1273,7 @@ export function AdmissionInvoiceModal({
   return (
     <Modal
       open
-      title="Trainee admission record"
+      title="Trainee Admission Record"
       description={courseLines.length > 1 ? `${trainee.traineeNumber} · ${courseLines.length} courses enrolled ${admissionDay}` : `${enrollment.reference} · ${enrollment.courseName}`}
       onClose={onClose}
       wide
@@ -1300,10 +1301,10 @@ export function AdmissionInvoiceModal({
       }
     >
       <div className="form-grid">
-        <Field label="Assigned registration officer">
+        <Field label="Assigned Registration Officer">
           <input value={officer} onChange={(event) => setOfficer(event.target.value)} />
         </Field>
-        <Field label="Cashier assigned">
+        <Field label="Cashier Assigned">
           <input value={cashier} onChange={(event) => setCashier(event.target.value)} />
         </Field>
       </div>
@@ -1350,7 +1351,7 @@ function NewEnrollmentModal({
   return (
     <Modal
       open={open}
-      title="New enrollment"
+      title="New Enrollment"
       description="Enroll an existing trainee into an in-house batch or an endorsed partner training. The training fee is charged automatically."
       onClose={onClose}
       footer={
@@ -1378,7 +1379,7 @@ function NewEnrollmentModal({
       <div className="form-grid">
         <Field label="Trainee" full>
           <select value={traineeId} onChange={(event) => setTraineeId(event.target.value)}>
-            <option value="">Select a trainee</option>
+            <option value="">Select a Trainee</option>
             {trainees.map((trainee) => (
               <option key={trainee.id} value={trainee.id}>
                 {trainee.traineeNumber} — {fullName(trainee)}
@@ -1386,13 +1387,13 @@ function NewEnrollmentModal({
             ))}
           </select>
         </Field>
-        <Field label="Training type" full>
+        <Field label="Training Type" full>
           <Segmented options={["In-house", "Endorsed"] as const} value={type} onChange={setType} />
         </Field>
         {type === "In-house" ? (
           <Field label="Batch" full>
             <select value={batchId} onChange={(event) => setBatchId(event.target.value)}>
-              <option value="">Select a batch</option>
+              <option value="">Select a Batch</option>
               {batches.map((batch) => {
                 const seat = seats(batch.id);
                 return (
@@ -1405,9 +1406,9 @@ function NewEnrollmentModal({
           </Field>
         ) : (
           <>
-            <Field label="Endorsed training" full hint="Scheduling is coordinated with the partner center — no New Wave batch.">
+            <Field label="Endorsed Training" full hint="Scheduling is coordinated with the partner center — no New Wave batch.">
               <select value={offerId} onChange={(event) => setOfferId(event.target.value)}>
-                <option value="">Select an endorsed training</option>
+                <option value="">Select an Endorsed Training</option>
                 {offers.map((offer) => (
                   <option key={offer.id} value={offer.id}>
                     {offer.course} — {offer.center} · {pesos(offer.trainingFeeCentavos)}
@@ -1415,7 +1416,7 @@ function NewEnrollmentModal({
                 ))}
               </select>
             </Field>
-            <Field label="Training date" full hint="Pick the agreed training date with the partner center.">
+            <Field label="Training Date" full hint="Pick the agreed training date with the partner center.">
               <input type="date" value={scheduledOn} onChange={(event) => setScheduledOn(event.target.value)} />
             </Field>
           </>

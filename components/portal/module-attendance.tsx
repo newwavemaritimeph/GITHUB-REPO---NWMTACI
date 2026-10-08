@@ -58,8 +58,8 @@ export function AttendanceModule() {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Staff-controlled attendance"
-        title="Attendance checker"
+        eyebrow="Staff-Controlled Attendance"
+        title="Attendance Checker"
         description="Open a session, record check-in and check-out, then submit and verify to unlock certificate eligibility."
       />
 
@@ -130,7 +130,7 @@ export function AttendanceModule() {
       {!session || roster.length === 0 ? (
         <Panel>
           <EmptyState
-            title="No attendance roster yet"
+            title="No Attendance Roster Yet"
             text="Pick a batch that already has enrollments, or approve a registration first so a trainee appears on this sheet."
           />
         </Panel>
@@ -140,7 +140,7 @@ export function AttendanceModule() {
             <StatCard label="Enrolled" value={String(roster.length)} note={batch?.venue ?? ""} tone={0} icon="◎" />
             <StatCard label="Present" value={String(present)} note={`${late} late`} tone={2} icon="✓" />
             <StatCard label="Absent" value={String(absent)} note="Needs make-up" tone={5} icon="!" />
-            <StatCard label="Not recorded" value={String(unrecorded)} note={session.state === "Verified" ? "Session locked" : "Awaiting entry"} tone={1} icon="□" />
+            <StatCard label="Not Recorded" value={String(unrecorded)} note={session.state === "Verified" ? "Session locked" : "Awaiting entry"} tone={1} icon="□" />
           </div>
 
           <Panel
@@ -194,7 +194,7 @@ export function AttendanceModule() {
             </div>
           </Panel>
 
-          <Panel title="Session progress" description="Certificates unlock only when every session of a batch is verified.">
+          <Panel title="Session Progress" description="Certificates unlock only when every session of a batch is verified.">
             <div className="session-strip">
               {sessions.map((item) => (
                 <button

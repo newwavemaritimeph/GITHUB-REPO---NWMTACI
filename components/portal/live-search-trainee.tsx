@@ -34,7 +34,7 @@ export function LiveSearchTrainee({ data }: { data: SearchData }) {
   return (
     <div className="portal-page">
       <div className="portal-heading">
-        <div><span className="portal-eyebrow">Administration</span><h1>Search trainee</h1><p>Look up any trainee by name, number, email, or mobile — then review their enrollments and payments.</p></div>
+        <div><span className="portal-eyebrow">Administration</span><h1>Search Trainee</h1><p>Look up any trainee by name, number, email, or mobile — then review their enrollments and payments.</p></div>
       </div>
 
       <section className="portal-panel">
@@ -62,7 +62,7 @@ export function LiveSearchTrainee({ data }: { data: SearchData }) {
           <section className="portal-panel">
             <div className="panel-heading">
               <div><h2>{fullName(selected)}</h2><p>{selected.trainee_number} · {selected.account_state}</p></div>
-              <button className="portal-secondary" onClick={() => { setSelectedId(null); }}>← Back to results</button>
+              <button className="portal-secondary" onClick={() => { setSelectedId(null); }}>← Back to Results</button>
             </div>
             <div className="finance-hero">
               <div><span>Email</span><strong className="lc" style={{ fontSize: 16 }}>{selected.email}</strong><small>{selected.mobile}</small></div>

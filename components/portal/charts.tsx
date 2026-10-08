@@ -1,4 +1,5 @@
 "use client";
+import { tcl } from "@/lib/title-case";
 
 /**
  * Small, dependency-free charts for the Accounting screens (8 Oct 2026).
@@ -46,7 +47,7 @@ export function Donut({ parts, label }: { parts: { name: string; color: string; 
 export function HBars({ rows }: { rows: { name: string; value: number; color?: string }[] }) {
   const max = Math.max(1, ...rows.map((r) => r.value));
   return <div className="ch ch-hbars">{rows.map((r) => <div key={r.name}>
-    <div className="ch-hrow"><span>{r.name}</span><b>{full(r.value)}</b></div>
+    <div className="ch-hrow"><span>{tcl(r.name)}</span><b>{full(r.value)}</b></div>
     <div className="ch-hbar"><div style={{ width: `${(100 * r.value) / max}%`, background: r.color ?? "#0571D0" }} /></div>
   </div>)}</div>;
 }

@@ -11,6 +11,7 @@ import type { AccountingReport } from "@/lib/accounting-report";
 import type { CashierReportSnapshot } from "@/lib/documents";
 import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balances";
 import { downloadCsv } from "@/lib/csv";
+import { tcl } from "@/lib/title-case";
 
 /**
  * Accounting Manager (owner, 8 Oct 2026): a view-first dashboard like the
@@ -92,9 +93,9 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
   if (compact) {
     const current = cat === "All" ? "Expense requests" : cat;
     return <section className="portal-panel cx-panel ac-approvals">
-      <div className="panel-heading"><h2>For your approval</h2><Badge tone={waiting ? "orange" : undefined}>{waiting} waiting</Badge></div>
+      <div className="panel-heading"><h2>For Your Approval</h2><Badge tone={waiting ? "orange" : undefined}>{waiting} waiting</Badge></div>
       {msg && <Message kind={msg.kind} text={msg.text} />}
-      <div className="ac-tabs" role="tablist">{(Object.keys(lists) as Category[]).map((k) => <button key={k} type="button" role="tab" aria-selected={current === k} className={current === k ? "on" : ""} onClick={() => setCat(k)}>{k}<span className={lists[k].length ? "" : "zero"}>{lists[k].length}</span></button>)}</div>
+      <div className="ac-tabs" role="tablist">{(Object.keys(lists) as Category[]).map((k) => <button key={k} type="button" role="tab" aria-selected={current === k} className={current === k ? "on" : ""} onClick={() => setCat(k)}>{tcl(k)}<span className={lists[k].length ? "" : "zero"}>{lists[k].length}</span></button>)}</div>
       {lists[current].length ? rowsOf(lists[current].slice(0, 6)) : <p className="portal-empty-copy">Nothing waiting.</p>}
     </section>;
   }
@@ -120,17 +121,17 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <div className="chips ac-chipbar">
       <button type="button" className={`ac-chip${cat === "All" ? " on" : ""}`} onClick={() => setCat("All")}>All<span className={waiting ? "has" : ""}>{waiting}</span></button>
-      {cats.map((k) => <button key={k} type="button" className={`ac-chip${cat === k ? " on" : ""}${lists[k].length ? "" : " zero"}`} onClick={() => setCat(k)}>{k}<span className={lists[k].length ? "has" : ""}>{lists[k].length}</span></button>)}
+      {cats.map((k) => <button key={k} type="button" className={`ac-chip${cat === k ? " on" : ""}${lists[k].length ? "" : " zero"}`} onClick={() => setCat(k)}>{tcl(k)}<span className={lists[k].length ? "has" : ""}>{lists[k].length}</span></button>)}
     </div>
     {waiting > 0 && <div className="ac-bulk">
       <span><b className="cx-mono">{chosen.length}</b> selected · <b className="cx-mono">{pesos2(chosenTotal)}</b></span>
       <span className="ac-bulk-sp">{bulk || doneNote}</span>
       <button type="button" disabled={busy || !!bulk || !visible.length} onClick={() => setPicked(chosen.length === visible.length && visible.every((r) => picked.has(r.id)) ? new Set() : new Set(visible.map((r) => r.id)))}>{visible.length && visible.every((r) => picked.has(r.id)) ? "Clear selection" : "Select all"}</button>
-      <button type="button" className="go" disabled={busy || !!bulk || !chosen.length} onClick={() => void approveChosen()}>Approve selected</button>
+      <button type="button" className="go" disabled={busy || !!bulk || !chosen.length} onClick={() => void approveChosen()}>Approve Selected</button>
     </div>}
     <section className="portal-panel cx-panel">
       {filled.length ? filled.map((k) => <div key={k} className="ac-group">
-        <div className="ac-ghead"><h2>{k}</h2><span className="muted-text">{groupOf(k)} · {lists[k].length} waiting</span></div>
+        <div className="ac-ghead"><h2>{tcl(k)}</h2><span className="muted-text">{groupOf(k)} · {lists[k].length} waiting</span></div>
         {lists[k].map((r) => <div key={r.id} className={rejecting && rejecting !== r.id ? "ac-dim" : undefined}>
           <div className={`ac-crow${rejecting === r.id ? " ac-rejecting" : ""}`}>
             <input type="checkbox" id={`ap-${r.id}`} checked={picked.has(r.id)} disabled={!!bulk} onChange={() => toggle(r.id)} aria-label={`Select ${r.title}`} />
@@ -141,7 +142,7 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
           {rejecting === r.id && <RejectInline reasons={expenses.some((x) => x.id === r.id) ? EXPENSE_REASONS : REQUEST_REASONS} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
         </div>)}
       </div>) : <p className="portal-empty-copy">{cat === "All" ? "Nothing waiting for your approval." : `No ${cat.toLowerCase()} waiting.`}</p>}
-      {empty.length > 0 && <p className="ac-clear"><b>✓ Nothing waiting:</b> {empty.join(", ")}.</p>}
+      {empty.length > 0 && <p className="ac-clear"><b>✓ Nothing Waiting:</b> {empty.join(", ")}.</p>}
     </section>
   </div>;
 }
@@ -157,8 +158,8 @@ function FigureColumn({ rows, unit, totalLabel, pick, onPick }: { rows: ColRow[]
   const total = rows.reduce((s, r) => s + r.amount, 0), count = rows.reduce((s, r) => s + r.count, 0);
   return <div className="cx-tiles ac-tiles ac-tiles-in">
     {rows.map((r) => onPick
-      ? <button type="button" key={r.name} className={`cx-tile ac-pick${pick === r.name ? " on" : ""}`} aria-pressed={pick === r.name} style={{ ["--c" as string]: r.color }} onClick={() => onPick(pick === r.name ? "" : r.name)}><span>{r.name}</span><b>{pesos2(r.amount)}</b><small>{n(r.count)}</small></button>
-      : <div key={r.name} className="cx-tile" style={{ ["--c" as string]: r.color }}><span>{r.name}</span><b>{pesos2(r.amount)}</b><small>{n(r.count)}</small></div>)}
+      ? <button type="button" key={r.name} className={`cx-tile ac-pick${pick === r.name ? " on" : ""}`} aria-pressed={pick === r.name} style={{ ["--c" as string]: r.color }} onClick={() => onPick(pick === r.name ? "" : r.name)}><span>{tcl(r.name)}</span><b>{pesos2(r.amount)}</b><small>{n(r.count)}</small></button>
+      : <div key={r.name} className="cx-tile" style={{ ["--c" as string]: r.color }}><span>{tcl(r.name)}</span><b>{pesos2(r.amount)}</b><small>{n(r.count)}</small></div>)}
     <div className="cx-tile ac-total"><span>{totalLabel}</span><b>{pesos2(total)}</b><small>{n(count)}</small></div>
   </div>;
 }
@@ -181,15 +182,15 @@ export function AccountingPayments() {
     {error && <Message kind="error" text={error} />}
     <div className="ac-rail">
       <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By channel</h2><span className="muted-text">tap to filter</span></div><FigureColumn rows={byChannel} unit="receipt" totalLabel="Total collected" pick={channel} onPick={setChannel} /></section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By source</h2></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By Channel</h2><span className="muted-text">tap to filter</span></div><FigureColumn rows={byChannel} unit="receipt" totalLabel="Total collected" pick={channel} onPick={setChannel} /></section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By Source</h2></div>
           <dl className="ac-lines">{r ? r.matrix.map((m) => <div key={m.source}><dt>{m.source}</dt><dd>{pesos2(m.totalCentavos)}</dd></div>) : <div><dt>Loading…</dt><dd /></div>}</dl></section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Proof of payment</h2></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Proof of Payment</h2></div>
           <dl className="ac-lines">{["Screenshot uploaded", "Manual entry", "Cash"].map((k) => <div key={k}><dt>{k === "Cash" ? "Cash (no proof needed)" : k}</dt><dd>{rows.filter((x) => proofOf(x) === k).length}</dd></div>)}</dl></section>
       </div>
       <section className="portal-panel cx-panel">
-        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search payments" placeholder="Search receipt, trainee, course or partner" value={q} onChange={(e) => setQ(e.target.value)} /><select aria-label="Channel" value={channel} onChange={(e) => setChannel(e.target.value)}><option value="">All channels</option>{CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
-        {!r ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Receipt</th><th>Trainee</th><th>Source</th><th>Channel and reference</th><th className="r">Amount</th></tr></thead><tbody>
+        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search payments" placeholder="Search receipt, trainee, course or partner" value={q} onChange={(e) => setQ(e.target.value)} /><select aria-label="Channel" value={channel} onChange={(e) => setChannel(e.target.value)}><option value="">All Channels</option>{CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
+        {!r ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Receipt</th><th>Trainee</th><th>Source</th><th>Channel and Reference</th><th className="r">Amount</th></tr></thead><tbody>
           {shown.map((x, i) => <tr key={`${x.receipt}-${i}`}><td data-l="" className="lead"><span className="cx-name cx-mono">{x.receipt}</span><small>{x.time}</small></td><td data-l="Trainee">{x.trainee}<small>{x.course}</small></td><td data-l="Source">{x.source}</td><td data-l="Channel">{x.channel}<small className="cx-mono">{x.reference || "—"}</small><small className={x.proof ? "ac-up" : ""}>{proofOf(x)}</small></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(x.amountCentavos)}</strong></td></tr>)}
         </tbody><tfoot><tr><td colSpan={4} data-l="">{shown.length} receipt{shown.length === 1 ? "" : "s"}{channel ? ` · ${channel}` : ""}</td><td data-l="Total" className="r cx-amt">{pesos2(shown.reduce((s, x) => s + x.amountCentavos, 0))}</td></tr></tfoot></table></div> : <p className="portal-empty-copy">No payments match.</p>}
       </section>
@@ -213,15 +214,15 @@ export function AccountingExpenses({ data }: { data: PortalData }) {
     <TxHead title="Expenses" right={<DayPicker date={date} setDate={setDate} />} note={<>{longDay(date)} · <span className="ac-ro">View only — the Cashier records and releases expenses</span></>} />
     <div className="ac-rail">
       <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Released by channel</h2></div><FigureColumn rows={byChannel} unit="voucher" totalLabel="Total released" /></section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By status</h2></div>
-          <dl className="ac-lines">{EXPENSE_STATES.slice(1).map((s) => { const l = list.filter((e) => label(e) === s); return <div key={s}><dt>{s}</dt><dd>{l.length} · {pesos2(l.reduce((a, e) => a + Number(e.amount_centavos), 0))}</dd></div>; })}</dl>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Released by Channel</h2></div><FigureColumn rows={byChannel} unit="voucher" totalLabel="Total released" /></section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By Status</h2></div>
+          <dl className="ac-lines">{EXPENSE_STATES.slice(1).map((s) => { const l = list.filter((e) => label(e) === s); return <div key={s}><dt>{tcl(s)}</dt><dd>{l.length} · {pesos2(l.reduce((a, e) => a + Number(e.amount_centavos), 0))}</dd></div>; })}</dl>
           <p className="ac-foot">Requests for your decision are in Approvals.</p></section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By category</h2></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By Category</h2></div>
           {cats.length ? <dl className="ac-lines">{cats.map((c) => <div key={c}><dt>{c}</dt><dd>{pesos2(list.filter((e) => e.category === c && e.status !== "Rejected").reduce((a, e) => a + Number(e.amount_centavos), 0))}</dd></div>)}</dl> : <p className="portal-empty-copy">No expenses on this day.</p>}</section>
       </div>
       <section className="portal-panel cx-panel">
-        <div className="ac-chipbar">{EXPENSE_STATES.map((s) => <button key={s} type="button" className={`ac-chip${st === s ? " on" : ""}`} onClick={() => setSt(s)}>{s}<span>{s === "All" ? list.length : list.filter((e) => label(e) === s).length}</span></button>)}</div>
+        <div className="ac-chipbar">{EXPENSE_STATES.map((s) => <button key={s} type="button" className={`ac-chip${st === s ? " on" : ""}`} onClick={() => setSt(s)}>{tcl(s)}<span>{s === "All" ? list.length : list.filter((e) => label(e) === s).length}</span></button>)}</div>
         {shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Channel</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
           {shown.map((e) => <tr key={e.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher_number ?? e.expense_number}</span><small>{fmtDate(day(e.created_at))}</small></td><td data-l="Payee"><strong>{e.payee}</strong><small>{e.category}</small></td><td data-l="Channel">{e.payment_channel || "—"}{e.reference_number ? <small className="cx-mono">{e.reference_number}</small> : null}</td><td data-l="Status"><Badge tone={tone(label(e))}>{label(e)}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(e.amount_centavos)}</strong></td><td data-l="">{e.voucher_number && <a className="portal-secondary" href={`/api/documents/expense/${e.id}?copy=1`} target="_blank" rel="noreferrer">View</a>}</td></tr>)}
         </tbody></table></div> : <p className="portal-empty-copy">{list.length ? "Nothing with this status." : "No expenses on this day."}</p>}
@@ -251,9 +252,9 @@ export function AccountingReceivables({ data }: { data: PortalData }) {
           <dl className="ac-lines"><div><dt>Training ends today</dt><dd>{all.filter((u) => u.endsToday).length}</dd></div><div><dt>Past due</dt><dd className="minus">{all.filter((u) => !u.endsToday).length}</dd></div><div><dt>Trainees</dt><dd>{new Set(all.map((u) => u.traineeId)).size}</dd></div></dl></section>
       </div>
       <section className="portal-panel cx-panel">
-        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search receivables" placeholder="Search trainee, course or enrollment" value={q} onChange={(e) => setQ(e.target.value)} />{bucket && <button type="button" className="portal-secondary" onClick={() => setBucket("")}>Show all</button>}</div>
-        {shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Trainee</th><th>Training ended</th><th className="r">Fee</th><th className="r">Paid</th><th className="r">Balance</th><th>Overdue</th></tr></thead><tbody>
-          {shown.map((u) => { const d = daysOf(u.trainingEnd); return <tr key={u.id}><td data-l="" className="lead"><span className="cx-name">{u.traineeName}</span><small>{u.course} · <span className="cx-mono">{u.enrollmentNumber}</span></small></td><td data-l="Training ended">{fmtDate(u.trainingEnd)}</td><td data-l="Fee" className="r cx-amt">{pesos2(u.dueCentavos)}</td><td data-l="Paid" className="r cx-amt">{pesos2(u.paidCentavos)}</td><td data-l="Balance" className="r"><strong className="cx-amt" style={{ color: "#c2410c" }}>{pesos2(u.balanceCentavos)}</strong></td><td data-l="Overdue">{u.endsToday ? <Badge tone="orange">Ends today</Badge> : <Badge tone={d > 60 ? "red" : d > 30 ? "orange" : undefined}>{d} day{d === 1 ? "" : "s"}</Badge>}</td></tr>; })}
+        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search receivables" placeholder="Search trainee, course or enrollment" value={q} onChange={(e) => setQ(e.target.value)} />{bucket && <button type="button" className="portal-secondary" onClick={() => setBucket("")}>Show All</button>}</div>
+        {shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Trainee</th><th>Training Ended</th><th className="r">Fee</th><th className="r">Paid</th><th className="r">Balance</th><th>Overdue</th></tr></thead><tbody>
+          {shown.map((u) => { const d = daysOf(u.trainingEnd); return <tr key={u.id}><td data-l="" className="lead"><span className="cx-name">{u.traineeName}</span><small>{u.course} · <span className="cx-mono">{u.enrollmentNumber}</span></small></td><td data-l="Training ended">{fmtDate(u.trainingEnd)}</td><td data-l="Fee" className="r cx-amt">{pesos2(u.dueCentavos)}</td><td data-l="Paid" className="r cx-amt">{pesos2(u.paidCentavos)}</td><td data-l="Balance" className="r"><strong className="cx-amt" style={{ color: "#c2410c" }}>{pesos2(u.balanceCentavos)}</strong></td><td data-l="Overdue">{u.endsToday ? <Badge tone="orange">Ends Today</Badge> : <Badge tone={d > 60 ? "red" : d > 30 ? "orange" : undefined}>{d} day{d === 1 ? "" : "s"}</Badge>}</td></tr>; })}
         </tbody><tfoot><tr><td colSpan={4} data-l="">{shown.length} enrollment{shown.length === 1 ? "" : "s"}</td><td data-l="Total" className="r cx-amt">{pesos2(shown.reduce((s, u) => s + u.balanceCentavos, 0))}</td><td /></tr></tfoot></table></div> : <p className="portal-empty-copy">No unpaid balances after training.</p>}
       </section>
     </div>
@@ -283,14 +284,14 @@ export function AccountingPayables({ data, reload }: { data: PortalData; reload:
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <div className="ac-rail">
       <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Owed now</h2></div><FigureColumn rows={kinds} unit="item" totalLabel="Total owed" /></section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Owed Now</h2></div><FigureColumn rows={kinds} unit="item" totalLabel="Total owed" /></section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Timing</h2></div>
           <dl className="ac-lines"><div><dt>Overdue</dt><dd className="minus">{sum(open.filter((i) => stateOf(i) === "Overdue"))}</dd></div><div><dt>Due this week</dt><dd className="warn">{sum(open.filter((i) => stateOf(i) === "Due this week"))}</dd></div><div><dt>Paid this month</dt><dd className="plus">{sum(items.filter((i) => i.paid && (i.paidOn ?? "") >= monthStart))}</dd></div></dl></section>
       </div>
       <section className="portal-panel cx-panel">
-        <div className="ac-chipbar">{PAYABLE_TABS.map((t) => <button key={t} type="button" className={`ac-chip${tab === t ? " on" : ""}`} onClick={() => setTab(t)}>{t}<span>{t === "Open" ? open.length : items.filter((i) => stateOf(i) === t).length}</span></button>)}</div>
+        <div className="ac-chipbar">{PAYABLE_TABS.map((t) => <button key={t} type="button" className={`ac-chip${tab === t ? " on" : ""}`} onClick={() => setTab(t)}>{tcl(t)}<span>{t === "Open" ? open.length : items.filter((i) => stateOf(i) === t).length}</span></button>)}</div>
         {shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Payee</th><th>Type</th><th>Due</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
-          {shown.map((i) => { const s = stateOf(i); return <tr key={`${i.kind}-${i.id}`}><td data-l="" className="lead"><span className="cx-name">{i.payee}</span>{i.what && <small>{i.what}</small>}</td><td data-l="Type">{i.kind === "Agency rebates" ? "Agency rebate" : "Bill or fee"}</td><td data-l="Due">{i.due ? fmtDate(i.due) : "—"}</td><td data-l="Status"><Badge tone={s === "Paid" ? "green" : s === "Overdue" ? "red" : s === "Due this week" ? "orange" : undefined}>{s}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(i.amount)}</strong></td><td data-l="">{!i.paid && <button type="button" className="portal-primary" disabled={busy} onClick={() => void i.settle().catch(() => undefined)}>Mark paid</button>}</td></tr>; })}
+          {shown.map((i) => { const s = stateOf(i); return <tr key={`${i.kind}-${i.id}`}><td data-l="" className="lead"><span className="cx-name">{i.payee}</span>{i.what && <small>{i.what}</small>}</td><td data-l="Type">{i.kind === "Agency rebates" ? "Agency rebate" : "Bill or fee"}</td><td data-l="Due">{i.due ? fmtDate(i.due) : "—"}</td><td data-l="Status"><Badge tone={s === "Paid" ? "green" : s === "Overdue" ? "red" : s === "Due this week" ? "orange" : undefined}>{tcl(s)}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(i.amount)}</strong></td><td data-l="">{!i.paid && <button type="button" className="portal-primary" disabled={busy} onClick={() => void i.settle().catch(() => undefined)}>Mark Paid</button>}</td></tr>; })}
         </tbody></table></div> : <p className="portal-empty-copy">Nothing here.</p>}
       </section>
     </div>
@@ -308,11 +309,11 @@ export function AccountingCashPosition({ data }: { data: PortalData }) {
   const closedOn = data.cashierClosings.find((c) => c.closing_date === date);
   const online = ["GCash", "PSBank", "UnionBank", "Cheque"].map((c) => { const total = r ? r.matrix.reduce((s, m) => s + (m.cells.find((x) => x.channel === c)?.totalCentavos ?? 0), 0) : 0; const count = r ? r.matrix.reduce((s, m) => s + (m.cells.find((x) => x.channel === c)?.count ?? 0), 0) : 0; return { name: c, color: COLORS[c], count, amount: total }; });
   return <div className="portal-page cx ac">
-    <TxHead title="Cash position" right={<DayPicker date={date} setDate={setDate} />} note={<>Cash only · {longDay(date)}</>} />
+    <TxHead title="Cash Position" right={<DayPicker date={date} setDate={setDate} />} note={<>Cash only · {longDay(date)}</>} />
     {error && <Message kind="error" text={error} />}
     <div className="ac-rail">
       <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>{date === today ? "Today" : fmtDate(date)}</h2><Badge tone={closedOn ? (closedOn.status === "Reviewed" ? "green" : "blue") : "orange"}>{closedOn ? closedOn.status : "Not yet closed"}</Badge></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>{date === today ? "Today" : fmtDate(date)}</h2><Badge tone={closedOn ? (closedOn.status === "Reviewed" ? "green" : "blue") : "orange"}>{closedOn ? closedOn.status : "Not Yet Closed"}</Badge></div>
           {p ? <dl className="ac-lines">
             <div><dt>Previous cash</dt><dd>{pesos2(p.previousCentavos)}</dd></div>
             <div><dt>+ Cash collected</dt><dd className="plus">{pesos2(p.cashCollectedCentavos)}</dd></div>
@@ -323,14 +324,14 @@ export function AccountingCashPosition({ data }: { data: PortalData }) {
           </dl> : <p className="portal-empty-copy">{error ? "" : "Loading…"}</p>}
           {p?.previousNote && <p className="ac-foot">{p.previousNote}</p>}
         </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Bank and e-wallet</h2><span className="muted-text">collected</span></div><FigureColumn rows={online} unit="receipt" totalLabel="Total non-cash" /><p className="ac-foot">Shown for reference; not part of cash on hand.</p></section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Bank and E-Wallet</h2><span className="muted-text">collected</span></div><FigureColumn rows={online} unit="receipt" totalLabel="Total non-cash" /><p className="ac-foot">Shown for reference; not part of cash on hand.</p></section>
       </div>
       <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Expected cash at closing</h2><span className="muted-text">last {trend.length} closing{trend.length === 1 ? "" : "s"}</span></div>
-          {trend.length ? <BarChart label="Expected cash at each closing" labels={trend.map((c) => fmtDate(c.closing_date).replace(/, \d{4}$/, ""))} series={[{ name: "Expected cash", color: "#0571D0", values: trend.map((c) => Number(c.expected_cash_centavos)) }, { name: "Counted", color: "#123F63", values: trend.map((c) => Number(c.actual_cash_centavos ?? 0)) }]} /> : <p className="portal-empty-copy">No closings yet.</p>}
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Expected Cash at Closing</h2><span className="muted-text">last {trend.length} closing{trend.length === 1 ? "" : "s"}</span></div>
+          {trend.length ? <BarChart label="Expected Cash at Each Closing" labels={trend.map((c) => fmtDate(c.closing_date).replace(/, \d{4}$/, ""))} series={[{ name: "Expected cash", color: "#0571D0", values: trend.map((c) => Number(c.expected_cash_centavos)) }, { name: "Counted", color: "#123F63", values: trend.map((c) => Number(c.actual_cash_centavos ?? 0)) }]} /> : <p className="portal-empty-copy">No closings yet.</p>}
         </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Daily closings</h2></div>
-          {closings.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Date</th><th className="r">Opening</th><th className="r">Cash in</th><th className="r">Cash out</th><th className="r">Expected</th><th className="r">Counted</th><th className="r">Over / short</th><th>Status</th></tr></thead><tbody>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Daily Closings</h2></div>
+          {closings.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Date</th><th className="r">Opening</th><th className="r">Cash in</th><th className="r">Cash Out</th><th className="r">Expected</th><th className="r">Counted</th><th className="r">Over / Short</th><th>Status</th></tr></thead><tbody>
             {closings.map((c) => { const v = c.variance_centavos == null ? null : Number(c.variance_centavos); return <tr key={c.id}><td data-l="" className="lead">{fmtDate(c.closing_date)}</td><td data-l="Opening" className="r cx-amt">{pesos2(c.opening_cash_centavos)}</td><td data-l="Cash in" className="r cx-amt">{pesos2(c.cash_collections_centavos)}</td><td data-l="Cash out" className="r cx-amt">{pesos2(c.expenses_centavos)}</td><td data-l="Expected" className="r cx-amt">{pesos2(c.expected_cash_centavos)}</td><td data-l="Counted" className="r cx-amt">{c.actual_cash_centavos == null ? "—" : pesos2(c.actual_cash_centavos)}</td><td data-l="Over / short" className="r cx-amt" style={v ? { color: v < 0 ? "#c2410c" : "#15803d" } : undefined}>{v == null ? "—" : v === 0 ? "Balanced" : pesos2(v)}</td><td data-l="Status"><Badge tone={c.status === "Reviewed" ? "green" : "blue"}>{c.status}</Badge></td></tr>; })}
           </tbody></table></div> : <p className="portal-empty-copy">No closings yet.</p>}
         </section>
@@ -376,7 +377,7 @@ export function AccountingHome({ data, reload, go }: { data: PortalData; reload:
           </div>
           {r && <p className="ac-split">{r.matrix.map((m) => <span key={m.source}>{m.source} <b className="cx-mono">{pesos2(m.totalCentavos)}</b></span>)}</p>}
         </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Cash position</h2><span className="muted-text">cash only</span></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Cash Position</h2><span className="muted-text">cash only</span></div>
           {p ? <dl className="ac-lines">
             <div><dt>Previous cash</dt><dd>{pesos2(p.previousCentavos)}</dd></div>
             <div><dt>+ Cash collected</dt><dd className="plus">{pesos2(p.cashCollectedCentavos)}</dd></div>
@@ -390,26 +391,26 @@ export function AccountingHome({ data, reload, go }: { data: PortalData; reload:
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Rebates</h2></div>
           <dl className="ac-lines"><div><dt>Deducted from payments</dt><dd>{pesos2(w?.current.rebatesDeducted ?? 0)}</dd></div><div><dt>Owed to agencies</dt><dd className="warn">{pesos2(w?.current.rebatesOwed ?? 0)}</dd></div></dl>
           {w && w.current.owedByAgency.length > 0 && <table className="ac-mini"><tbody>{w.current.owedByAgency.slice(0, 5).map((o) => <tr key={o.name}><td>{o.name}</td><td>{o.count} trainee{o.count === 1 ? "" : "s"}</td><td className="r cx-mono">{pesos2(o.total)}</td></tr>)}</tbody></table>}
-          <div className="ac-more"><button type="button" onClick={() => go("Payables")}>View payables</button></div>
+          <div className="ac-more"><button type="button" onClick={() => go("Payables")}>View Payables</button></div>
         </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Unpaid after training</h2></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Unpaid After Training</h2></div>
           <dl className="ac-lines"><div><dt>Balance</dt><dd className="minus">{pesos2(unpaid.reduce((s, u) => s + u.balanceCentavos, 0))}</dd></div><div><dt>Trainees</dt><dd>{new Set(unpaid.map((u) => u.traineeId)).size}</dd></div></dl>
-          <div className="ac-more"><button type="button" onClick={() => go("Receivables")}>View receivables</button></div>
+          <div className="ac-more"><button type="button" onClick={() => go("Receivables")}>View Receivables</button></div>
         </section>
       </div>
 
       <div className="ac-stack">
         <AccountingApprovals data={data} reload={reload} compact />
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Last 7 days</h2><span className="muted-text">collections and expenses</span></div>
-          {last7.length ? <BarChart label="Collections and expenses, last 7 days" labels={last7.map((b) => b.label)} series={[{ name: "Collections", color: "#0571D0", values: last7.map((b) => b.collections) }, { name: "Expenses released", color: "#F25615", values: last7.map((b) => b.expenses) }]} /> : <p className="portal-empty-copy">{week.error || "Loading…"}</p>}
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Last 7 Days</h2><span className="muted-text">collections and expenses</span></div>
+          {last7.length ? <BarChart label="Collections and Expenses, Last 7 Days" labels={last7.map((b) => b.label)} series={[{ name: "Collections", color: "#0571D0", values: last7.map((b) => b.collections) }, { name: "Expenses released", color: "#F25615", values: last7.map((b) => b.expenses) }]} /> : <p className="portal-empty-copy">{week.error || "Loading…"}</p>}
         </section>
         <div className="ac-grid2">
-          <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By channel</h2><span className="muted-text">{fmtDate(date)}</span></div>
-            <Donut label="Collections by channel" parts={CHANNELS.map((c) => ({ name: c, color: COLORS[c], value: colOf(c) }))} />
+          <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By Channel</h2><span className="muted-text">{fmtDate(date)}</span></div>
+            <Donut label="Collections by Channel" parts={CHANNELS.map((c) => ({ name: c, color: COLORS[c], value: colOf(c) }))} />
           </section>
-          <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Expenses released</h2><strong className="cx-mono">{pesos2(r ? r.expenses.reduce((s, e) => s + e.amountCentavos, 0) : 0)}</strong></div>
+          <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Expenses Released</h2><strong className="cx-mono">{pesos2(r ? r.expenses.reduce((s, e) => s + e.amountCentavos, 0) : 0)}</strong></div>
             {r && r.expenseTotals.length ? <HBars rows={r.expenseTotals.map((t) => ({ name: t.channel, value: t.totalCentavos, color: COLORS[t.channel] }))} /> : <p className="portal-empty-copy">No expenses released.</p>}
-            <div className="ac-more"><button type="button" onClick={() => go("Expenses")}>View vouchers</button></div>
+            <div className="ac-more"><button type="button" onClick={() => go("Expenses")}>View Vouchers</button></div>
           </section>
         </div>
       </div>
@@ -456,15 +457,15 @@ export function AccountingReports() {
         <li>{c.closings.count} cashier closing{c.closings.count === 1 ? "" : "s"}, {c.closings.reviewed} reviewed, total over / short <b>{pesos2(c.closings.overShort)}</b>.</li>
       </ul></section>
       <div className="ac-grid2">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections and expenses</h2><span className="muted-text">{period.toLowerCase()} trend</span></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections and Expenses</h2><span className="muted-text">{period.toLowerCase()} trend</span></div>
           <BarChart label={`${period} collections and expenses`} labels={rep.series.map((b) => b.label)} series={[{ name: "Collections", color: "#0571D0", values: rep.series.map((b) => b.collections) }, { name: "Expenses released", color: "#F25615", values: rep.series.map((b) => b.expenses) }]} /></section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections by channel</h2></div><Donut label="Collections by channel" parts={channels} /></section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections by Channel</h2></div><Donut label="Collections by Channel" parts={channels} /></section>
       </div>
       <div className="ac-grid2">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections by source</h2></div><HBars rows={Object.entries(c.bySource).map(([name, value]) => ({ name, value, color: SOURCE_COLORS[name] }))} /></section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Expenses by category</h2></div>{c.byCategory.length ? <HBars rows={c.byCategory.slice(0, 6).map((x, i) => ({ name: x.name, value: x.total, color: CATEGORY_COLORS[i] }))} /> : <p className="portal-empty-copy">No expenses released.</p>}</section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections by Source</h2></div><HBars rows={Object.entries(c.bySource).map(([name, value]) => ({ name, value, color: SOURCE_COLORS[name] }))} /></section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Expenses by Category</h2></div>{c.byCategory.length ? <HBars rows={c.byCategory.slice(0, 6).map((x, i) => ({ name: x.name, value: x.total, color: CATEGORY_COLORS[i] }))} /> : <p className="portal-empty-copy">No expenses released.</p>}</section>
       </div>
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Top courses by collections</h2></div>
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Top Courses by Collections</h2></div>
         {c.topCourses.length ? <div className="portal-table cx-cards"><table><tbody>{c.topCourses.map((x, i) => <tr key={x.name}><td data-l="" className="lead cx-mono">{i + 1}</td><td data-l="Course">{x.name}</td><td data-l="Collected" className="r cx-amt">{pesos2(x.total)}</td></tr>)}</tbody></table></div> : <p className="portal-empty-copy">No collections in this period.</p>}
       </section>
     </>}

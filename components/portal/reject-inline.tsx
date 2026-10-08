@@ -16,12 +16,12 @@ export function RejectInline({ reasons = REQUEST_REASONS, busy, onReject, onCanc
   const needsNote = reason === "Other" && !note.trim();
   const remarks = [reason === "Other" ? "" : reason, note.trim()].filter(Boolean).join(" — ");
   return <div className="rj" role="group" aria-label="Reject with a reason">
-    <label>Reason<select value={reason} autoFocus onChange={(e) => setReason(e.target.value)}><option value="">Choose a reason</option>{reasons.map((r) => <option key={r} value={r}>{r}</option>)}</select></label>
+    <label>Reason<select value={reason} autoFocus onChange={(e) => setReason(e.target.value)}><option value="">Choose a Reason</option>{reasons.map((r) => <option key={r} value={r}>{r}</option>)}</select></label>
     <label>Note for the Cashier<input value={note} onChange={(e) => setNote(e.target.value)} placeholder={reason === "Other" ? "Required for Other" : "e.g. Attach the official receipt and resubmit"} /></label>
     <div className="rj-acts">
       {needsNote && <span className="rj-err">Add a note for Other.</span>}
       <button type="button" className="portal-secondary" onClick={onCancel}>Keep</button>
-      <button type="button" className="rj-btn" disabled={busy || !reason || needsNote} onClick={() => onReject(remarks)}>Reject request</button>
+      <button type="button" className="rj-btn" disabled={busy || !reason || needsNote} onClick={() => onReject(remarks)}>Reject Request</button>
     </div>
   </div>;
 }

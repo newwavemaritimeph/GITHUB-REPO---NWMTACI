@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { tcl } from "@/lib/title-case";
 
 /**
  * Attendance for the live Supabase workspace.
@@ -142,7 +143,7 @@ export function LiveAttendance({ batches }: { batches: Batch[] }) {
       <div className="portal-heading">
         <div>
           <span className="portal-eyebrow">Staff-controlled attendance</span>
-          <h1>Attendance checker</h1>
+          <h1>Attendance Checker</h1>
           <p>Open a session, record check-in and check-out, then submit and verify to unlock certificate eligibility.</p>
         </div>
       </div>
@@ -207,7 +208,7 @@ export function LiveAttendance({ batches }: { batches: Batch[] }) {
       ) : !session || roster.length === 0 ? (
         <section className="portal-panel empty-state">
           <span aria-hidden="true">✓</span>
-          <h2>No attendance roster yet</h2>
+          <h2>No Attendance Roster Yet</h2>
           <p>Choose a batch that already has enrollments, or create an enrollment so a trainee appears on this sheet.</p>
         </section>
       ) : (
@@ -221,7 +222,7 @@ export function LiveAttendance({ batches }: { batches: Batch[] }) {
             ].map(([label, value, note, icon], index) => (
               <article key={label}>
                 <div className={`metric-symbol symbol-${index}`} aria-hidden="true">{icon}</div>
-                <span>{label}</span>
+                <span>{tcl(label)}</span>
                 <strong>{value}</strong>
                 <small>{note}</small>
               </article>
@@ -235,7 +236,7 @@ export function LiveAttendance({ batches }: { batches: Batch[] }) {
                   <th>Trainee</th>
                   <th>Enrollment</th>
                   <th>Check in</th>
-                  <th>Check out</th>
+                  <th>Check Out</th>
                   <th>QR</th>
                   <th>Status</th>
                 </tr>
@@ -304,7 +305,7 @@ export function LiveAttendance({ batches }: { batches: Batch[] }) {
           <section className="portal-panel" style={{ padding: 16, marginTop: 16 }}>
             <div className="panel-heading">
               <div>
-                <h2>Session progress</h2>
+                <h2>Session Progress</h2>
                 <p>A certificate only becomes eligible once every session of the batch is verified.</p>
               </div>
             </div>

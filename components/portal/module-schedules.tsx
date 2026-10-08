@@ -44,8 +44,8 @@ export function SchedulesModule({ role }: { role: Role }) {
   return (
     <div className="page">
       <PageHeader
-        eyebrow="Training operations"
-        title="Schedules & resources"
+        eyebrow="Training Operations"
+        title="Schedules & Resources"
         description={
           readOnly
             ? "View published batches, dates, venues, and capacity. Opening or changing batches is handled by Training Operations."
@@ -66,10 +66,10 @@ export function SchedulesModule({ role }: { role: Role }) {
       />
 
       <div className="stat-grid stat-grid-4">
-        <StatCard label="Open batches" value={String(state.batches.filter((batch) => batch.status === "Open").length)} note={`${openSeats} slots available`} tone={0} icon="□" />
-        <StatCard label="Running today" value={String(todayBatches.length)} note={todayBatches.map((batch) => batch.venue).join(", ") || "No class today"} tone={3} icon="◉" />
-        <StatCard label="Awaiting publication" value={String(state.batches.filter((batch) => batch.publishedAt === null && batch.status !== "Cancelled").length)} note="Hidden from the public site" tone={1} icon="!" />
-        <StatCard label="Full batches" value={String(state.batches.filter((batch) => batch.status === "Full").length)} note="Preserved for history" tone={2} icon="✓" />
+        <StatCard label="Open Batches" value={String(state.batches.filter((batch) => batch.status === "Open").length)} note={`${openSeats} slots available`} tone={0} icon="□" />
+        <StatCard label="Running Today" value={String(todayBatches.length)} note={todayBatches.map((batch) => batch.venue).join(", ") || "No class today"} tone={3} icon="◉" />
+        <StatCard label="Awaiting Publication" value={String(state.batches.filter((batch) => batch.publishedAt === null && batch.status !== "Cancelled").length)} note="Hidden from the public site" tone={1} icon="!" />
+        <StatCard label="Full Batches" value={String(state.batches.filter((batch) => batch.status === "Full").length)} note="Preserved for history" tone={2} icon="✓" />
       </div>
 
       <Panel padded={false}>
@@ -78,7 +78,7 @@ export function SchedulesModule({ role }: { role: Role }) {
           <Segmented options={filters} value={filter} onChange={setFilter} />
         </div>
         {rows.length === 0 ? (
-          <EmptyState title="No batches in this view" text="Create a batch and publish it so it appears on the public registration form." />
+          <EmptyState title="No Batches in This View" text="Create a batch and publish it so it appears on the public registration form." />
         ) : (
           <DataTable columns={["Batch", "Course", "Dates", "Venue & instructor", "Capacity", "Fee", "Status", ""]} minWidth={1080}>
             {rows.map((batch) => {
@@ -239,7 +239,7 @@ function NewBatchModal({
   return (
     <Modal
       open={open}
-      title="New training batch"
+      title="New Training Batch"
       description="Batches start as drafts. Publishing makes them selectable during public registration."
       onClose={onClose}
       wide
@@ -280,7 +280,7 @@ function NewBatchModal({
       <div className="form-grid">
         <Field label="Course" full>
           <select value={courseCode} onChange={(event) => setCourseCode(event.target.value)}>
-            <option value="">Select a course</option>
+            <option value="">Select a Course</option>
             {activeCourses.map((item) => (
               <option key={item.id} value={item.code}>
                 {item.code} — {item.course}
@@ -288,10 +288,10 @@ function NewBatchModal({
             ))}
           </select>
         </Field>
-        <Field label="Start date" hint="Must be a future date">
+        <Field label="Start Date" hint="Must be a future date">
           <input type="date" value={startsOn} min={todayIso()} onChange={(event) => setStartsOn(event.target.value)} />
         </Field>
-        <Field label="Training days" hint={endsOn ? `Ends ${formatDate(endsOn)}` : undefined}>
+        <Field label="Training Days" hint={endsOn ? `Ends ${formatDate(endsOn)}` : undefined}>
           <input type="number" min={1} max={20} value={days} onChange={(event) => setDays(Number(event.target.value))} />
         </Field>
         <Field label="Capacity">
@@ -378,7 +378,7 @@ function AutoOpenModal({
   return (
     <Modal
       open={open}
-      title="Auto-open schedules for a month"
+      title="Auto-Open Schedules for a Month"
       description="Generates and publishes every batch matching the course's start pattern in the chosen month."
       onClose={onClose}
       wide
@@ -400,7 +400,7 @@ function AutoOpenModal({
       <div className="form-grid">
         <Field label="Course" full>
           <select value={courseCode} onChange={(event) => setCourseCode(event.target.value)}>
-            <option value="">Select a course</option>
+            <option value="">Select a Course</option>
             {activeCourses.map((item) => (
               <option key={item.id} value={item.code}>
                 {item.code} — {item.course}

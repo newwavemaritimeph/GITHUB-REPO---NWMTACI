@@ -7,6 +7,7 @@ import { formatDateTime, fullName, useSystem } from "@/lib/system/store";
 import type { Role } from "@/lib/system/types";
 import { PageHeader, Panel, StageBadge } from "./shared";
 import { CatalogModule } from "./module-others";
+import { tcl } from "@/lib/title-case";
 
 const PORTAL_ROLES: Role[] = ["Admin", "Registration", "Cashier", "Accounting", "Training Operations", "HR", "Instructor"];
 
@@ -38,16 +39,16 @@ export function SearchTraineeModule() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="Central records" title="Search trainee" description="Look up a trainee to see their enrollments and payment record." />
+      <PageHeader eyebrow="Central Records" title="Search Trainee" description="Look up a trainee to see their enrollments and payment record." />
 
       <Panel padded={false}>
         <div className="toolbar">
           <SearchInput value={query} onChange={(value) => { setQuery(value); setSelectedId(null); }} placeholder="Search by name, trainee number, email, mobile, or SRN" />
         </div>
         {term.length < 2 ? (
-          <EmptyState icon="⌕" title="Start typing to search" text="Enter at least two characters. The roster is not shown until you search." />
+          <EmptyState icon="⌕" title="Start Typing to Search" text="Enter at least two characters. The roster is not shown until you search." />
         ) : matches.length === 0 ? (
-          <EmptyState icon="◎" title="No trainee found" text="No trainee matches that search." />
+          <EmptyState icon="◎" title="No Trainee Found" text="No trainee matches that search." />
         ) : (
           <div className="pick-list">
             {matches.map((match) => (
@@ -79,7 +80,7 @@ export function SearchTraineeModule() {
 
           <Panel title="Enrollments" description="Courses, payment status, and balance" padded={false}>
             {enrollments.length === 0 ? (
-              <EmptyState icon="▤" title="No enrollments" text="This trainee has no enrollment records." />
+              <EmptyState icon="▤" title="No Enrollments" text="This trainee has no enrollment records." />
             ) : (
               <DataTable columns={["Enrollment", "Course", "Charged", "Paid", "Balance", "Payment", "Stage"]} minWidth={940}>
                 {enrollments.map((item) => (
@@ -97,9 +98,9 @@ export function SearchTraineeModule() {
             )}
           </Panel>
 
-          <Panel title="Payment record" description="Posted payments across this trainee's enrollments" padded={false}>
+          <Panel title="Payment Record" description="Posted payments across this trainee's enrollments" padded={false}>
             {payments.length === 0 ? (
-              <EmptyState icon="₱" title="No payments" text="No payments have been posted for this trainee." />
+              <EmptyState icon="₱" title="No Payments" text="No payments have been posted for this trainee." />
             ) : (
               <DataTable columns={["Payment", "Method", "Reference", "Amount", "Verification", "Received"]} minWidth={860}>
                 {payments.map((entry) => (
@@ -132,10 +133,10 @@ export function SetupModule() {
 
   return (
     <div className="page">
-      <PageHeader eyebrow="System administration" title="Setup" description="Portal user accounts and the course / partner-center catalog." />
+      <PageHeader eyebrow="System Administration" title="Setup" description="Portal user accounts and the course / partner-center catalog." />
       <div className="hub-tabs">
         {(["User accounts", "Courses & centers"] as const).map((item) => (
-          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}</button>
+          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{tcl(item)}</button>
         ))}
       </div>
 
@@ -168,7 +169,7 @@ export function SetupModule() {
 
       <Modal
         open={Boolean(draft)}
-        title="Portal account"
+        title="Portal Account"
         description={draft?.name}
         onClose={() => setDraft(null)}
         footer={
@@ -192,7 +193,7 @@ export function SetupModule() {
           <div className="form-grid">
             <Field label="Email" full><input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} /></Field>
             <Field label="Password" hint="Simulated — the demo signs in via the role switcher."><input value={draft.password} onChange={(e) => setDraft({ ...draft, password: e.target.value })} /></Field>
-            <Field label="Portal role / access">
+            <Field label="Portal Role / Access">
               <select value={draft.portalRole} onChange={(e) => setDraft({ ...draft, portalRole: e.target.value as Role })}>
                 {PORTAL_ROLES.map((role) => <option key={role}>{role}</option>)}
               </select>

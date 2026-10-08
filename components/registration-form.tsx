@@ -314,7 +314,7 @@ function Wizard() {
         {ENROLLMENT_TYPES.map(([value, title, text]) => <button key={value} type="button" role="radio" aria-checked={applicant.enrollmentType === value} className={applicant.enrollmentType === value ? "on" : ""} onClick={() => { set("enrollmentType", value); if (value !== "Agency") set("referralCode", ""); }}><b>{title}</b><small>{text}</small></button>)}
       </div>
       {applicant.enrollmentType === "Agency" && <div className="ql-grid caps-form" style={{ marginTop: 16 }}>
-        <Field label="Referral code*" wide><input value={applicant.referralCode} onChange={(e) => set("referralCode", e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} placeholder="Type the code from your agency" autoComplete="off" maxLength={24} autoFocus />
+        <Field label="Referral Code*" wide><input value={applicant.referralCode} onChange={(e) => set("referralCode", e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} placeholder="Type the code from your agency" autoComplete="off" maxLength={24} autoFocus />
           {referral.state === "ok" && <small className="ref-ok">✓ Referred by {referral.name}</small>}
           {referral.state === "bad" && <small className="ref-bad">Code not recognised. Check with your agency.</small>}
           {referral.state === "checking" && <small className="ref-wait">Checking…</small>}</Field>
@@ -375,7 +375,7 @@ function Wizard() {
             {row.code && problem && <p className="ql-rule-note">{problem}</p>}
           </div>;
         })}
-        {rows.length < MAX_COURSES && <button type="button" className="ql-link" onClick={addRow}>+ Add another course ({rows.length}/{MAX_COURSES})</button>}
+        {rows.length < MAX_COURSES && <button type="button" className="ql-link" onClick={addRow}>+ Add Another Course ({rows.length}/{MAX_COURSES})</button>}
         {trainings.length > 0 && <div className="ql-schedule"><h4>Your Training Schedule</h4><table><thead><tr><th>#</th><th>Course</th><th>Dates</th></tr></thead><tbody>{trainings.map((t, i) => <tr key={t.code}><td>{i + 1}</td><td><b>{t.name}</b><small>{t.code} · {t.modality}</small></td><td>{pickedRange(t.start, t.end)}</td></tr>)}</tbody></table></div>}
       </>}
     </>,

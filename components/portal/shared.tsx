@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { Pill } from "@/components/ui/kit";
 import type { Stage } from "@/lib/system/types";
+import { tcl } from "@/lib/title-case";
 
 export type Module =
   | "Dashboard"
@@ -96,7 +97,7 @@ export function simplifiedStage(stage: Stage): LatestStage {
 export function StageBadge({ stage }: { stage: Stage }) {
   const label = simplifiedStage(stage);
   const tone = label === "In Training" ? "blue" : label === "Training Complete" ? "green" : label === "Certificate Release" ? "violet" : "slate";
-  return <Pill tone={tone}>{label}</Pill>;
+  return <Pill tone={tone}>{tcl(label)}</Pill>;
 }
 
 export const STAGE_ORDER: Stage[] = [
