@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Pill } from "@/components/ui/kit";
 import { SystemProvider, formatDate, fullName, useSystem } from "@/lib/system/store";
 
-/* ----------------------------------------------------- enrollment status --- */
+/* -------------------------------------------------------- trainee status --- */
 
 function maskName(name: string) {
   return name
@@ -14,74 +14,75 @@ function maskName(name: string) {
     .join(" ");
 }
 
-function StatusTab() {
-  const [srn, setSrn] = useState("");
-  const [reference, setReference] = useState("");
-  const [contact, setContact] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ reference: string; status: string; nextStep: string } | null>(null);
-  const [notFound, setNotFound] = useState(false);
-  const [error, setError] = useState("");
+type CourseStatus = { course: string; code: string; schedule: string; status: string; balanceCentavos: number; certificate: string | null; ready: boolean; delivery: string | null };
+type StatusResult = { firstName: string; nwmtaciNo: string; awaitingCourse: boolean; courses: CourseStatus[] };
+const peso = (c: number) => `₱${(c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-  const srnReady = srn.length === 10;
-  const refReady = reference.trim().length >= 6 && contact.trim().length >= 4;
-  const canSearch = srnReady || refReady;
+/**
+ * Trainee status (owner, 8 Oct 2026): with the NWMTACI number and birth date,
+ * each course with its schedule, enrollment status, balance, and whether the
+ * certificate is printed and ready for pick-up.
+ */
+function StatusTab() {
+  const [no, setNo] = useState("");
+  const [birthdate, setBirthdate] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<StatusResult | null>(null);
+  const [error, setError] = useState("");
+  const canSearch = no.trim().length >= 4 && !!birthdate;
 
   async function search() {
-    setBusy(true); setResult(null); setNotFound(false); setError("");
+    setBusy(true); setResult(null); setError("");
     try {
-      const fd = new FormData();
-      if (srnReady) fd.set("srn", srn);
-      else { fd.set("reference", reference.trim()); fd.set("email", contact.trim()); }
-      const response = await fetch("/api/public/registration-search", { method: "POST", body: fd });
+      const response = await fetch("/api/public/trainee-status", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ nwmtaciNo: no, birthdate }) });
       const body = await response.json();
-      if (response.status === 404 || body.status === "Not found") { setNotFound(true); return; }
       if (!response.ok) { setError(body.error ?? "We could not check your status. Please try again."); return; }
-      setResult({ reference: body.reference, status: body.status, nextStep: body.nextStep });
+      setResult(body as StatusResult);
     } catch { setError("We could not reach the server. Please try again in a moment."); }
     finally { setBusy(false); }
   }
 
-  const tone = (status: string) => (/enrolled|approved|released|active/i.test(status) ? "green" : /cancel|reject|not found/i.test(status) ? "red" : "amber");
+  const tone = (status: string) => (/enrolled/i.test(status) ? "green" : /cancel/i.test(status) ? "red" : "amber");
 
   return (
     <>
       <form className="search-card" onSubmit={(event) => { event.preventDefault(); if (canSearch && !busy) void search(); }}>
         <label>
-          SRN / MISMO number
-          <input value={srn} onChange={(event) => setSrn(event.target.value.replace(/\D/g, "").slice(0, 10))} inputMode="numeric" placeholder="10 DIGITS" autoComplete="off" />
-        </label>
-        <p className="muted-text" style={{ margin: "2px 0 8px" }}>Enter your SRN to check your status — or use your reference and registered email below.</p>
-        <label>
-          Registration reference
-          <input value={reference} onChange={(event) => setReference(event.target.value)} placeholder="REG-2026-000208" autoComplete="off" />
+          NWMTACI number
+          <input value={no} onChange={(event) => setNo(event.target.value)} placeholder="NWMTACI-2026-0000" autoComplete="off" />
         </label>
         <label>
-          Registered email
-          <input value={contact} onChange={(event) => setContact(event.target.value)} placeholder="name@example.com" />
+          Birth date
+          <input type="date" value={birthdate} onChange={(event) => setBirthdate(event.target.value)} />
         </label>
         <button className="button button-primary button-block" disabled={!canSearch || busy}>{busy ? "Checking…" : "Check my status"}</button>
+        <p className="muted-text" style={{ margin: "6px 0 0" }}>Your NWMTACI number is on your enrollment confirmation email.</p>
       </form>
 
-      {notFound && (
-        <div className="status-result status-warning">
-          <strong>No record matched</strong>
-          <p>Check your SRN, or the reference and registered email. They must match exactly.</p>
-        </div>
-      )}
       {error && (
         <div className="status-result status-warning">
-          <strong>Something went wrong</strong>
+          <strong>No record matched</strong>
           <p>{error}</p>
         </div>
       )}
       {result && (
         <div className="status-result">
           <div className="status-head">
-            <div><span className="eyebrow">{result.reference}</span><h2>Enrollment status</h2></div>
-            <Pill tone={tone(result.status)}>{result.status}</Pill>
+            <div><span className="eyebrow">{result.nwmtaciNo}</span><h2>Hello, {result.firstName}</h2></div>
           </div>
-          <p className="status-next"><strong>Next step:</strong> {result.nextStep}</p>
+          {result.awaitingCourse && !result.courses.length && <p className="status-next">Your application is being screened. Our Registration team will confirm your course, schedule and fee.</p>}
+          {result.courses.map((c, i) => (
+            <div className="ts-course" key={`${c.code}-${i}`}>
+              <div className="ts-head"><strong>{c.course}</strong><Pill tone={tone(c.status)}>{c.status}</Pill></div>
+              <dl className="review-list">
+                <div><dt>Schedule</dt><dd>{c.schedule}</dd></div>
+                <div><dt>Balance</dt><dd>{c.balanceCentavos > 0 ? <span className="ts-due">{peso(c.balanceCentavos)} to pay at the Cashier</span> : "Fully paid"}</dd></div>
+                {c.certificate && <div><dt>Certificate</dt><dd className={c.ready ? "ts-ready" : undefined}>{c.certificate}</dd></div>}
+                {c.delivery && <div><dt>Delivery request</dt><dd>{c.delivery}</dd></div>}
+              </dl>
+              {c.ready && !c.delivery && <p className="ts-note">Can&apos;t come to the office? <Link href="/certificate-delivery">Request delivery by LBC</Link>.</p>}
+            </div>
+          ))}
         </div>
       )}
     </>
@@ -162,7 +163,7 @@ function Page() {
     <div className="status-page-wrap">
       <div className="status-tabs" role="tablist">
         <button role="tab" aria-selected={tab === "status"} className={tab === "status" ? "active" : ""} onClick={() => setTab("status")}>
-          ENROLLMENT STATUS
+          TRAINEE STATUS
         </button>
         <button role="tab" aria-selected={tab === "verify"} className={tab === "verify" ? "active" : ""} onClick={() => setTab("verify")}>
           CERTIFICATE VERIFICATION

@@ -5,6 +5,7 @@ import { PublicNav } from "./public-nav";
 import { PublicCourseCatalog } from "./public-course-catalog";
 import { RegistrationForm } from "./registration-form";
 import { RegistrationStatus } from "./registration-status";
+import { DeliveryRequest } from "./delivery-request";
 import { PrivacyNotice } from "./privacy-notice";
 import { isDemoMode } from "@/lib/system/mode";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
@@ -15,6 +16,7 @@ export type PublicPage =
   | "courses"
   | "register"
   | "registration-search"
+  | "certificate-delivery"
   | "contact"
   | "staff-login"
   | "privacy";
@@ -26,7 +28,7 @@ const nav = [
   ["Home", "/"],
   ["About", "/about"],
   ["Courses", "/courses"],
-  ["Enrollment status", "/registration-search"],
+  ["Trainee status", "/registration-search"],
   ["Contact", "/contact"],
 ] as const;
 
@@ -34,7 +36,7 @@ const nav = [
    item. Section links (anything with a #hash) are never marked active. */
 const PAGE_PATH: Record<PublicPage, string> = {
   home: "/", about: "/about", courses: "/courses", register: "/register",
-  "registration-search": "/registration-search", contact: "/contact", "staff-login": "/staff-login", privacy: "/privacy",
+  "registration-search": "/registration-search", "certificate-delivery": "/certificate-delivery", contact: "/contact", "staff-login": "/staff-login", privacy: "/privacy",
 };
 
 /* MARINA Certificates of Course Approval held by New Wave, transcribed from the
@@ -180,7 +182,7 @@ function Header({ page }: { page: PublicPage }) {
         <PublicNav items={nav} current={current} />
         <div className="public-nav-actions">
           {/* The only lookup on the site is the enrollment-status search. */}
-          <Link href="/registration-search" className="nav-search" aria-label="Check enrollment status">
+          <Link href="/registration-search" className="nav-search" aria-label="Check trainee status">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.8-3.8" /></svg>
           </Link>
           <Link className="button button-primary nav-enroll" href="/register">
@@ -204,7 +206,8 @@ function Footer() {
         <Link href="/about">About New Wave</Link>
         <Link href="/courses">Courses</Link>
         <Link href="/register">Enrollment form</Link>
-        <Link href="/registration-search">Status &amp; certificate check</Link>
+        <Link href="/registration-search">Trainee status &amp; certificate check</Link>
+        <Link href="/certificate-delivery">Certificate delivery</Link>
       </div>
       <div>
         <strong>Access</strong>
@@ -609,13 +612,26 @@ function RegistrationSearch() {
     <section className="inside-page narrow-page">
       <div className="inside-hero compact">
         <span className="eyebrow">New Wave Maritime</span>
-        <h1 className="caps-heading">Enrollment Status &amp; Certificate Verification</h1>
+        <h1 className="caps-heading">Trainee Status &amp; Certificate Verification</h1>
         <p>
-          Track every course under one registration reference, or confirm a certificate&apos;s authenticity by its number. No
-          trainee account is required.
+          See each of your courses, your enrollment status and balance, and whether your certificate is printed and ready for
+          pick-up. Or confirm a certificate&apos;s authenticity by its number. No trainee account is required.
         </p>
       </div>
       <RegistrationStatus />
+    </section>
+  );
+}
+
+function CertificateDelivery() {
+  return (
+    <section className="inside-page">
+      <div className="inside-hero compact">
+        <span className="eyebrow">New Wave Maritime</span>
+        <h1>Certificate delivery</h1>
+        <p>Cannot claim your certificate at our office? We send it by LBC anywhere in the Philippines.</p>
+      </div>
+      <DeliveryRequest />
     </section>
   );
 }
@@ -750,6 +766,8 @@ export function PublicSite({ page }: { page: PublicPage }) {
       <Register />
     ) : page === "registration-search" ? (
       <RegistrationSearch />
+    ) : page === "certificate-delivery" ? (
+      <CertificateDelivery />
     ) : page === "contact" ? (
       <Contact />
     ) : page === "privacy" ? (

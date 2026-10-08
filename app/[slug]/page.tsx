@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { PublicSite, type PublicPage } from "@/components/public-site";
 
-const pages = new Set<PublicPage>(["about", "courses", "register", "registration-search", "contact", "staff-login", "privacy"]);
+const pages = new Set<PublicPage>(["about", "courses", "register", "registration-search", "certificate-delivery", "contact", "staff-login", "privacy"]);
 
 export default async function PublicPageRoute({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

@@ -16,6 +16,7 @@ export type CertificateContext = {
   cert: { id: string; status: string; certificate_number: string | null; batch_label: string | null; print_count: number; reprints_allowed: number; void_status: string | null; soft_copy_sent_at: string | null; snapshot: Record<string, unknown> | null } | null;
   view: CertificateView;
   issuanceEnabled: boolean;
+  balanceCentavos: number;
 };
 
 /**
@@ -69,7 +70,7 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
     trainee: { name: t ? [t.legal_first_name, t.legal_middle_name, t.legal_last_name].filter(Boolean).join(" ") : "Trainee", email: t?.email ?? null },
     course: { id: c?.id ?? e.course_id, name: c?.name ?? "Course", code: c?.code ?? "", evaluationFormId },
     batch: { starts_on: b?.starts_on ?? scheduled, ends_on: trainingEnd, batch_number: b?.batch_number ?? null },
-    cert, view, issuanceEnabled: Boolean((settings as { certificate_issuance_enabled?: boolean } | null)?.certificate_issuance_enabled),
+    cert, view, balanceCentavos: Math.max(0, due - paid), issuanceEnabled: Boolean((settings as { certificate_issuance_enabled?: boolean } | null)?.certificate_issuance_enabled),
   };
 }
 

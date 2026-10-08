@@ -7,6 +7,7 @@ import { automaticEndDate } from "@/lib/scheduling";
 import { canPrint, certificateState, formatCertificateNumber, type CertificateView } from "@/lib/certificate-rules";
 import { Badge, Message, fmtDate, usePost } from "./shared-ui";
 import { ReleaseConfirm } from "./live-releasing";
+import { DeliveryAlert } from "./delivery-home";
 
 /**
  * Releasing Officer (owner, 8 Oct 2026): certificates due to print, printed
@@ -140,6 +141,7 @@ export function ReleasingHome({ data, reload, go }: { data: PortalData; reload: 
   return <div className="portal-page cx ac">
     <Head title="Dashboard" note={new Intl.DateTimeFormat("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date())} />
     <CertificateAlarm data={data} onOpen={() => go("Certificates")} />
+    <DeliveryAlert data={data} onOpen={() => go("Delivery")} />
     <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Certificates</h2></div><StateColumn lines={lines} /></section>

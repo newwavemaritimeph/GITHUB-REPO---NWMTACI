@@ -6682,3 +6682,38 @@ a[href^="mailto:"],
 .ql-types b{font-size:16px;color:#123F63}
 .ql-types small{color:var(--muted,#587184);font-size:13.5px}
 @media (max-width:720px){.ql-types{grid-template-columns:1fr}}
+/* Certificate delivery (public, 8 Oct 2026) */
+.dr-layout{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr);gap:24px;align-items:start;margin-top:24px}
+.dr-main{background:#fff;border:1px solid #dfe7ee;border-radius:16px;padding:22px}
+.dr-tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.dr-tabs button{border:1px solid #cfd9e1;background:#fff;color:#123F63;font:600 14px inherit;padding:8px 16px;border-radius:99px;cursor:pointer}
+.dr-tabs button.on{background:#123F63;border-color:#123F63;color:#fff}
+.dr-form{display:flex;flex-direction:column;gap:14px}
+.dr-form fieldset{border:0;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end}
+.dr-form legend{grid-column:1/-1;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5f7180;font-weight:700;padding:0 0 4px}
+.dr-form label{display:flex;flex-direction:column;gap:5px;font-size:13.5px;color:#41566a;font-weight:500}
+.dr-form .full{grid-column:1/-1}
+.dr-form input,.dr-form select{font:400 15px inherit;padding:11px 12px;border:1px solid #cfd9e1;border-radius:10px;background:#fff;color:#0f2638;min-width:0}
+.dr-form input:focus,.dr-form select:focus{outline:none;border-color:#0571D0;box-shadow:0 0 0 3px rgba(5,113,208,.15)}
+.dr-btn{justify-self:start;border:1px solid #0571D0;background:#fff;color:#0571D0;font:600 15px inherit;padding:11px 20px;border-radius:10px;cursor:pointer}
+.dr-btn.primary{background:#F25615;border-color:#F25615;color:#fff;align-self:flex-start}
+.dr-btn:disabled{opacity:.45;cursor:not-allowed}
+.dr-agree{display:flex;gap:10px;align-items:flex-start;font-size:14px;color:#0f2638}.dr-agree input{margin-top:3px;width:18px;height:18px}
+.dr-ok{color:#15803d;font-weight:600;margin:0}.dr-err{color:#b42318;margin:0}.dr-muted{color:#5f7180;margin:4px 0}
+.dr-side{background:#f5f8fb;border:1px solid #e6edf2;border-radius:16px;padding:20px}
+.dr-side h3{margin:0 0 10px;color:#123F63}.dr-side ol{margin:0;padding-left:18px;color:#334;line-height:1.7}.dr-side p{color:#5f7180;font-size:14px;margin:12px 0 0}
+.dr-fee{display:flex;justify-content:space-between;border-top:1px solid #dfe7ee;margin-top:14px;padding-top:12px;color:#0f2638}
+.dr-track{margin-top:16px;border-top:1px solid #e6edf2;padding-top:16px}.dr-track h3{margin:0;color:#123F63}
+.dr-steps{list-style:none;padding:0;margin:14px 0;display:flex;flex-direction:column;gap:8px}
+.dr-steps li{position:relative;padding-left:28px;color:#8a9aa8}.dr-steps li::before{content:'';position:absolute;left:0;top:3px;width:16px;height:16px;border-radius:99px;border:2px solid #cfd9e1;background:#fff}
+.dr-steps li.done{color:#0f2638;font-weight:600}.dr-steps li.done::before{background:#15803d;border-color:#15803d}
+.dr-steps li.next{color:#F25615;font-weight:600}.dr-steps li.next::before{border-color:#F25615}
+.dr-steps li span{display:block;font-weight:400;color:#0f2638}
+.dr-pay{background:#fde7dc;color:#7a2e10;border-radius:10px;padding:12px 14px;margin:8px 0}
+@media (max-width:860px){.dr-layout{grid-template-columns:1fr}}
+@media (max-width:560px){.dr-form fieldset{grid-template-columns:1fr}.dr-main{padding:16px}}
+/* Trainee status (public, 8 Oct 2026) */
+.ts-course{border-top:1px solid #e6edf2;padding-top:14px;margin-top:14px}
+.ts-head{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px}
+.ts-due{color:#b42318;font-weight:600}.ts-ready{color:#15803d;font-weight:600}
+.ts-note{margin:8px 0 0;font-size:14px;color:#5f7180}

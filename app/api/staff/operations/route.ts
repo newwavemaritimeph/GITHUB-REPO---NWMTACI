@@ -128,6 +128,12 @@ const certificateVoidDecideInput = z.object({ action: z.literal("certificate-voi
 const certificateTemplateLinkInput = z.object({ action: z.literal("certificate-template-link"), courseId: z.string().uuid(), driveLink: z.string().trim().min(10).max(500) });
 const evaluationFormInput = z.object({ action: z.literal("course-evaluation-form-save"), courseId: z.string().uuid(), formLink: z.string().trim().max(500) });
 const certificateSoftCopyInput = z.object({ action: z.literal("certificate-soft-copy"), enrollmentId: z.string().uuid() });
+// Certificate delivery (website request → Registration → Cashier → Releasing Officer) and MARINA MISMO submissions (8 Oct 2026; migration 202610080031).
+const deliveryCheckInput = z.object({ action: z.literal("delivery-check"), id: z.string().uuid() });
+const deliveryDeclineInput = z.object({ action: z.literal("delivery-decline"), id: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
+const deliveryShipInput = z.object({ action: z.literal("delivery-ship"), id: z.string().uuid(), trackingNumber: z.string().trim().min(4).max(60), shippedOn: z.string().date() });
+const deliveryDeliveredInput = z.object({ action: z.literal("delivery-delivered"), id: z.string().uuid() });
+const mismoSubmitInput = z.object({ action: z.literal("mismo-submit"), batchId: z.string().uuid(), listDate: z.string().date(), enrollmentIds: z.array(z.string().uuid()).max(200) });
 const certificateIssuanceToggleInput = z.object({ action: z.literal("certificate-issuance-toggle"), enabled: z.boolean() });
 const feedbackSendEmailInput = z.object({ action: z.literal("feedback-send-email"), enrollmentId: z.string().uuid() });
 
@@ -205,7 +211,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -256,7 +262,7 @@ async function tryAutoEnroll(admin: ReturnType<typeof createSupabaseAdminClient>
 // Cancellation, Reprinting, TAR reprint) are approved only after their fee is
 // paid to the Cashier (owner, 7 Oct 2026). Their charge is payable as soon as the
 // Cashier sets it; the Accounting Manager approves once it is collected.
-const PAY_FIRST_REQUESTS = ["Change Course", "Rescheduling", "Make-up Class", "Cancellation", "Reprinting", "TAR reprint"];
+const PAY_FIRST_REQUESTS = ["Change Course", "Rescheduling", "Make-up Class", "Cancellation", "Reprinting", "TAR reprint", "Certificate delivery"];
 /** How much of a request's charge has been collected: verified payments on the enrollment made after the charge was set. */
 async function chargeCollection(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentId: string, chargeId: string) {
   const { data: charge } = await admin.from("enrollment_charges").select("amount_centavos,created_at").eq("id", chargeId).maybeSingle();
@@ -299,6 +305,10 @@ async function applyApprovedRequest(admin: ReturnType<typeof createSupabaseAdmin
       const { error: reprintError } = await admin.from("certificates").update(patch).eq("id", cert.id);
       if (reprintError) throw reprintError;
       await admin.from("certificate_release_events").insert({ certificate_id: cert.id, event_type: "reprint", released_by: actor, reason: "Paid reprinting request" });
+    } else if (req.request_type === "Certificate delivery") {
+      // The LBC fee is paid: the request moves to the Releasing Officer (owner, 8 Oct 2026).
+      const { error: deliveryError } = await admin.from("delivery_requests").update({ status: "Paid", paid_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("request_id", req.id).eq("status", "With the Cashier");
+      if (deliveryError) throw deliveryError;
     } else if (req.request_type === "TAR reprint") {
       // One more print of the newest admission record that covers this enrollment.
       const { data: record, error: recordError } = await admin.from("admission_records").select("id,reprints_approved").contains("enrollment_ids", [req.enrollment_id]).order("issued_at", { ascending: false }).limit(1).maybeSingle();
@@ -881,6 +891,21 @@ export async function GET() {
   const { data: enrolledRows } = await db.from("enrollments").select("id,enrolled_at").not("enrolled_at", "is", null).order("enrolled_at", { ascending: false }).limit(5000);
   const enrolledAt = new Map(((enrolledRows ?? []) as { id: string; enrolled_at: string }[]).map((r) => [r.id, r.enrolled_at]));
 
+  // Certificate delivery requests (migration 202610080031; empty without it).
+  let deliveryRequests: unknown[] = [];
+  if (staff.roleCodes.some((r) => ["admin", "super_admin", "registration", "releasing_officer", "cashier", "accounting"].includes(r))) {
+    const { data: deliveryRows } = await createSupabaseAdminClient().from("delivery_requests").select("id,request_number,status,recipient_name,mobile,address_line,city,province,zip,email,decline_reason,tracking_number,shipped_on,paid_at,created_at,enrollment_id,trainee_id,trainees(legal_first_name,legal_last_name,application_number,trainee_number),enrollments(enrollment_number,courses(name,code))").order("created_at", { ascending: false }).limit(300);
+    const rowsWithIds = (deliveryRows ?? []) as { enrollment_id: string }[];
+    const enrollmentIdsForCerts = [...new Set(rowsWithIds.map((r) => r.enrollment_id))];
+    const certByEnrollment = new Map<string, { status: string; certificate_number?: string | null }>();
+    if (enrollmentIdsForCerts.length) {
+      const admin = createSupabaseAdminClient();
+      let certRows = await admin.from("certificates").select("enrollment_id,status,certificate_number").in("enrollment_id", enrollmentIdsForCerts);
+      if (certRows.error) certRows = await admin.from("certificates").select("enrollment_id,status").in("enrollment_id", enrollmentIdsForCerts) as typeof certRows;
+      for (const c of (certRows.data ?? []) as { enrollment_id: string; status: string; certificate_number?: string | null }[]) certByEnrollment.set(c.enrollment_id, c);
+    }
+    deliveryRequests = rowsWithIds.map((r) => ({ ...r, certificate_status: certByEnrollment.get(r.enrollment_id)?.status ?? null, certificate_number: certByEnrollment.get(r.enrollment_id)?.certificate_number ?? null }));
+  }
   const extrasByEnrollment = new Map(enrollmentExtras.map((row) => [row.id, row]));
   const enrollments = (enrollmentsResult.data ?? []).map((row) => {
     const extra = extrasByEnrollment.get(row.id);
@@ -933,7 +958,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, deliveryRequests }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -1544,6 +1569,72 @@ export async function POST(request: Request) {
       if (error) throw error;
       if (input.approve) await admin.from("certificate_release_events").insert({ certificate_id: cert.id, event_type: "void", released_by: staff.user.id, reason: "Void approved by the Admin; one more print allowed" });
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: input.approve ? "certificate.void_approved" : "certificate.void_rejected", record_type: "certificate", record_id: cert.id, new_values: { certificate_number: cert.certificate_number, remarks: input.remarks ?? null } });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "delivery-check" || input.action === "delivery-decline") {
+      if (!staff.roleCodes.some((r) => ["admin", "super_admin", "registration"].includes(r))) return NextResponse.json({ error: "Only Registration can check delivery requests." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: dr } = await admin.from("delivery_requests").select("id,request_number,status,enrollment_id,trainee_id,email,city,province,address_line,zip,trainees(legal_first_name,legal_last_name),enrollments(courses(name))").eq("id", input.id).maybeSingle();
+      if (!dr) return NextResponse.json({ error: "Delivery request not found." }, { status: 404 });
+      if (dr.status !== "Requested") return NextResponse.json({ error: "This request was already handled." }, { status: 400 });
+      const t = first(dr.trainees as unknown as { legal_first_name: string; legal_last_name: string } | null);
+      const course = first(first(dr.enrollments as unknown as { courses: { name: string } | { name: string }[] | null } | null)?.courses ?? null)?.name ?? "your course";
+      const origin = process.env.APP_BASE_URL ?? new URL(request.url).origin;
+      const vars = { trainee_name: t ? `${t.legal_first_name} ${t.legal_last_name}` : "Trainee", request_number: dr.request_number, course_name: course, fee: "₱500.00", track_url: `${origin}/certificate-delivery?no=${dr.request_number}` };
+      if (input.action === "delivery-decline") {
+        await admin.from("delivery_requests").update({ status: "Declined", decline_reason: input.reason, checked_by: staff.user.id, checked_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", dr.id);
+        const { data: job } = await admin.from("email_jobs").insert({ idempotency_key: `delivery:${dr.request_number}:declined`, template_code: "delivery.declined", recipient: dr.email, variables: { ...vars, reason: input.reason } }).select("id").maybeSingle();
+        if (job?.id) await processEmailJobs(admin, { ids: [job.id], origin }).catch(() => undefined);
+        return NextResponse.json({ ok: true });
+      }
+      // The certificate must be printed before it can be sent.
+      const { data: cert } = await admin.from("certificates").select("status").eq("enrollment_id", dr.enrollment_id).maybeSingle();
+      if (!cert || !["Printed", "Released"].includes(cert.status)) return NextResponse.json({ error: "The certificate is not printed yet. Send this to the Cashier once it is." }, { status: 400 });
+      const { data: reference, error: refError } = await db.rpc("next_reference", { prefix: "REQ" });
+      if (refError) throw refError;
+      const { data: req, error: reqError } = await admin.from("enrollment_requests").insert({ request_number: reference, trainee_id: dr.trainee_id, enrollment_id: dr.enrollment_id, request_type: "Certificate delivery", requested_values: { deliveryRequestId: dr.id }, reason: `Certificate delivery by LBC to ${dr.city}, ${dr.province} (${dr.request_number})`, requester_id: staff.user.id, status: "Pending", stage: "With cashier" }).select("id").single();
+      if (reqError || !req) throw reqError ?? new Error("Could not create the delivery fee request.");
+      await admin.from("request_events").insert({ request_id: req.id, actor_id: staff.user.id, event_type: "raised", new_values: { deliveryRequestId: dr.id }, remarks: dr.request_number });
+      // Fixed fee from the schedule of fees: LBC ₱500.00. The request waits at the Cashier until it is paid.
+      await chargeRequest(admin, { id: req.id, enrollment_id: dr.enrollment_id, request_type: "Certificate delivery", requested_values: { deliveryRequestId: dr.id } }, staff.user.id, { amountCentavos: 50000, description: "Certificate delivery (LBC)" });
+      await admin.from("delivery_requests").update({ status: "With the Cashier", request_id: req.id, checked_by: staff.user.id, checked_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", dr.id);
+      const { data: job } = await admin.from("email_jobs").insert({ idempotency_key: `delivery:${dr.request_number}:payment`, template_code: "delivery.payment", recipient: dr.email, variables: vars }).select("id").maybeSingle();
+      if (job?.id) await processEmailJobs(admin, { ids: [job.id], origin }).catch(() => undefined);
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "delivery-ship" || input.action === "delivery-delivered") {
+      if (!canRelease(staff.roleCodes)) return NextResponse.json({ error: "Only the Releasing Officer can ship certificates." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: dr } = await admin.from("delivery_requests").select("id,request_number,status,enrollment_id,email,recipient_name,address_line,city,province,zip,trainees(legal_first_name,legal_last_name),enrollments(courses(name))").eq("id", input.id).maybeSingle();
+      if (!dr) return NextResponse.json({ error: "Delivery request not found." }, { status: 404 });
+      if (input.action === "delivery-delivered") {
+        if (dr.status !== "Shipped") return NextResponse.json({ error: "Mark it shipped first." }, { status: 400 });
+        await admin.from("delivery_requests").update({ status: "Delivered", delivered_at: new Date().toISOString(), updated_at: new Date().toISOString() }).eq("id", dr.id);
+        await admin.from("certificates").update({ courier_status: "Delivered" }).eq("enrollment_id", dr.enrollment_id);
+        return NextResponse.json({ ok: true });
+      }
+      if (dr.status !== "Paid") return NextResponse.json({ error: "Only paid delivery requests can be shipped." }, { status: 400 });
+      const address = [dr.address_line, dr.city, dr.province, dr.zip].filter(Boolean).join(", ");
+      await admin.from("delivery_requests").update({ status: "Shipped", tracking_number: input.trackingNumber, shipped_on: input.shippedOn, shipped_by: staff.user.id, updated_at: new Date().toISOString() }).eq("id", dr.id);
+      // The certificate leaves the office by courier: record it as released.
+      const { data: cert } = await admin.from("certificates").select("id").eq("enrollment_id", dr.enrollment_id).maybeSingle();
+      if (cert) {
+        await admin.from("certificates").update({ status: "Released", release_method: "Courier", courier_name: "LBC", tracking_number: input.trackingNumber, shipping_address: address, shipping_fee_status: "Paid", courier_status: "Shipped", claimant_name: dr.recipient_name }).eq("id", cert.id);
+        await admin.from("certificate_release_events").insert({ certificate_id: cert.id, event_type: "release", recipient_name: `LBC · ${input.trackingNumber}`, released_by: staff.user.id, reason: `Delivery ${dr.request_number}` });
+      }
+      const t = first(dr.trainees as unknown as { legal_first_name: string; legal_last_name: string } | null);
+      const course = first(first(dr.enrollments as unknown as { courses: { name: string } | { name: string }[] | null } | null)?.courses ?? null)?.name ?? "your course";
+      const origin = process.env.APP_BASE_URL ?? new URL(request.url).origin;
+      const { data: job } = await admin.from("email_jobs").insert({ idempotency_key: `delivery:${dr.request_number}:shipped`, template_code: "delivery.shipped", recipient: dr.email, variables: { trainee_name: t ? `${t.legal_first_name} ${t.legal_last_name}` : "Trainee", request_number: dr.request_number, course_name: course, tracking_number: input.trackingNumber, track_url: `${origin}/certificate-delivery?no=${dr.request_number}` } }).select("id").maybeSingle();
+      if (job?.id) await processEmailJobs(admin, { ids: [job.id], origin }).catch(() => undefined);
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "mismo-submit") {
+      if (!staff.roleCodes.some((r) => ["admin", "super_admin", "mismo_officer"].includes(r))) return NextResponse.json({ error: "Only the MISMO Compliance Officer can record submissions." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { error } = await admin.from("mismo_submissions").insert({ batch_id: input.batchId, list_date: input.listDate, enrollment_ids: input.enrollmentIds, trainee_count: input.enrollmentIds.length, submitted_by: staff.user.id });
+      if (error) return NextResponse.json({ error: error.code === "23505" ? "This batch was already recorded as submitted." : error.code === "42P01" ? "Apply database update 202610080031 first." : error.message }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "mismo_officer", action: "mismo.submitted", record_type: "batch", record_id: input.batchId, new_values: { list_date: input.listDate, trainee_count: input.enrollmentIds.length } });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "certificate-series-save") {
