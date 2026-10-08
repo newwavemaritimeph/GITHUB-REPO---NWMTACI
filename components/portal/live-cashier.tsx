@@ -1,12 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PortalData, Enrollment } from "../portal-live-app";
 import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos } from "@/lib/portal-format";
 import { Badge, Message, Modal, PageHead, fullName, fmtDate, fmtClock, usePost, openAdmissionRecord, submit } from "./shared-ui";
 import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balances";
 import { RequestActionModal } from "./payment-actions";
 import { requestFee } from "@/lib/request-fees";
+import type { CashierReportSnapshot } from "@/lib/documents";
 
 /**
  * Cashier pieces of the registration workflow (Oct 2026):
@@ -561,53 +562,80 @@ export function CashierOpening({ data, reload }: { data: PortalData; reload: () 
 }
 
 /** Summary report: collections by mode, expenses, net cash, the cash drawer and balances due after training. */
-export function CashierSummaryReport({ data, embedded }: { data: PortalData; embedded?: boolean }) {
+type ReportData = Omit<CashierReportSnapshot, "logoBytes">;
+/**
+ * Report (owner, 8 Oct 2026): one consolidated day, the same as the PDF.
+ * Cash position, collections by source and channel, receipts by source,
+ * expenses with voucher numbers.
+ */
+export function CashierSummaryReport({ embedded }: { data?: PortalData; embedded?: boolean }) {
   const today = manilaToday();
-  const [range, setRange] = useState<(typeof RANGES)[number]>("Today");
-  const [from, setFrom] = useState(today), [to, setTo] = useState(today);
-  const start = range === "Today" ? today : range === "This week" ? addDays(today, -6) : range === "This month" ? `${today.slice(0, 8)}01` : from;
-  const end = range === "Custom" ? to : today;
-  const inRange = (iso?: string | null) => { const d = day(iso); return !!d && d >= start && d <= end; };
-  const payments = data.payments.filter((p) => inRange(p.received_at));
-  const modes = [...new Set([...modeNames(data), ...payments.map((p) => p.method)])];
-  const byMode = modes.map((m) => { const list = payments.filter((p) => p.method === m); return { mode: m, count: list.length, total: list.reduce((s, p) => s + Number(p.amount_centavos), 0) }; });
-  const collected = payments.reduce((s, p) => s + Number(p.amount_centavos), 0);
-  const cashIn = byMode.find((m) => m.mode === "Cash")?.total ?? 0;
-  const expenses = data.expenses.filter((x) => (x.status === "Paid" || x.status === "Approved") && inRange((x as { paid_at?: string | null }).paid_at ?? x.created_at));
-  const expenseTotal = expenses.reduce((s, x) => s + Number(x.amount_centavos), 0);
-  const singleDay = start === end;
-  const opening = singleDay ? (data.cashierOpenings ?? []).find((o) => o.opening_date === start)?.opening_cash_centavos ?? null : null;
-  const closing = singleDay ? data.cashierClosings.find((c) => c.closing_date === start) ?? null : null;
-  const durations = new Map(data.courses.map((c) => [c.id, c.duration_label]));
-  const unpaid = unpaidAfterTraining(data.enrollments as unknown as BalanceEnrollment[], (id) => durations.get(id), today);
-  const unpaidTotal = unpaid.reduce((s, r) => s + r.balanceCentavos, 0);
+  const [date, setDate] = useState(today);
+  const [report, setReport] = useState<ReportData | null>(null);
+  const [error, setError] = useState("");
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    let live = true;
+    void (async () => {
+      try {
+        const response = await fetch(`/api/staff/cashier-report?date=${date}`, { cache: "no-store" });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error ?? "Could not load the report.");
+        if (live) { setReport(body as ReportData); setError(""); }
+      } catch (e) { if (live) setError(e instanceof Error ? e.message : "Could not load the report."); }
+    })();
+    return () => { live = false; };
+  }, [date]);
+  const shown = report && report.dateLabel ? report : null;
+  const p = shown?.position;
+  const grand = shown ? shown.matrix.reduce((s, r) => s + r.totalCentavos, 0) : 0;
+  const receipts = shown ? shown.matrix.reduce((s, r) => s + r.count, 0) : 0;
+  const expTotal = shown ? shown.expenses.reduce((s, e) => s + e.amountCentavos, 0) : 0;
+  const cell = (n: number, v: number) => (n ? <><span className="cx-amt">{pesos(v)}</span><small>{n} receipt{n === 1 ? "" : "s"}</small></> : <span className="muted-text">—</span>);
   return <div className={embedded ? "" : "portal-page cx"}>
-    {!embedded && <div className="cx-head"><div><span className="portal-eyebrow">{singleDay ? fmtDate(start) : `${fmtDate(start)} – ${fmtDate(end)}`}</span><h1>Summary report</h1></div></div>}
-    <div className="cx-bar"><div className="cx-seg">{RANGES.map((r) => <button key={r} type="button" className={range === r ? "on" : ""} onClick={() => setRange(r)}>{r}</button>)}</div>
-      {range === "Custom" && <><label className="cx-dt">From<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label><label className="cx-dt">To<input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} /></label></>}</div>
-    <div className="cx-tiles">
-      <div className="cx-tile" style={{ ["--c" as string]: "#0571D0" }}><span>Collections</span><b>{pesos(collected)}</b><small>{payments.length} receipt{payments.length === 1 ? "" : "s"}</small></div>
-      <div className="cx-tile" style={{ ["--c" as string]: "#F25615" }}><span>Expenses</span><b>{pesos(expenseTotal)}</b><small>{expenses.length} voucher{expenses.length === 1 ? "" : "s"}</small></div>
-      <div className="cx-tile" style={{ ["--c" as string]: "#0a7a3e" }}><span>Net</span><b>{pesos(collected - expenseTotal)}</b></div>
-      <div className="cx-tile" style={{ ["--c" as string]: "#b42318" }}><span>Unpaid after training</span><b>{pesos(unpaidTotal)}</b><small>{unpaid.length} trainee{unpaid.length === 1 ? "" : "s"}</small></div>
+    {!embedded && <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Report</h1></div></div>}
+    <div className="cx-bar">
+      <label className="cx-dt">Date<input type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} /></label>
+      <a className="portal-primary" href={`/api/documents/cashier-report?date=${date}`} target="_blank" rel="noreferrer">Generate report (PDF)</a>
+      {shown && <span className="cx-mono muted-text">{shown.dateLabel}</span>}
     </div>
-    <div className="cx-two">
-      <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Collections by mode</h2></div></div>
-        <div className="portal-table"><table><thead><tr><th>Mode</th><th className="r">Receipts</th><th className="r">Total</th></tr></thead><tbody>{byMode.map((m) => <tr key={m.mode}><td>{m.mode}</td><td className="r cx-mono">{m.count}</td><td className="r cx-amt">{pesos(m.total)}</td></tr>)}<tr><td><strong>Total</strong></td><td className="r cx-mono"><strong>{payments.length}</strong></td><td className="r cx-amt"><strong>{pesos(collected)}</strong></td></tr></tbody></table></div>
+    {error && <Message kind="error" text={error} />}
+    {!shown && !error && <p className="portal-empty-copy">Loading the report…</p>}
+    {shown && p && <>
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Cash position</h2><span className="muted-text">Cash only</span></div>
+        <div className="rp-cash">
+          <div><span>{p.previousLabel}</span><b className="cx-mono">{pesos(p.previousCentavos)}</b><small>{p.previousNote}</small></div>
+          <div className="plus"><span>+ Cash collected</span><b className="cx-mono">{pesos(p.cashCollectedCentavos)}</b></div>
+          <div className="minus"><span>− Cash expenses</span><b className="cx-mono">{pesos(p.cashExpensesCentavos)}</b></div>
+          <div className="eq"><span>= Cash on hand</span><b className="cx-mono">{pesos(p.onHandCentavos)}</b></div>
+          <div><span>Counted at closing</span><b className="cx-mono">{p.countedCentavos == null ? "Not yet" : pesos(p.countedCentavos)}</b></div>
+          <div className={p.overShortCentavos ? (p.overShortCentavos < 0 ? "minus" : "plus") : ""}><span>Over / short</span><b className="cx-mono">{p.overShortCentavos == null ? "—" : `${p.overShortCentavos > 0 ? "+" : ""}${pesos(p.overShortCentavos)}`}</b></div>
+        </div>
       </section>
-      <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Cash drawer</h2></div></div>
-        {singleDay ? <dl className="cx-sum">
-          <div><dt>Opening cash</dt><dd>{opening == null ? "Not recorded" : pesos(opening)}</dd></div>
-          <div><dt>Cash received</dt><dd>+{pesos(cashIn)}</dd></div>
-          <div><dt>Expenses paid</dt><dd>−{pesos(expenseTotal)}</dd></div>
-          <div className="big"><dt>Expected cash</dt><dd>{pesos((opening ?? 0) + cashIn - expenseTotal)}</dd></div>
-          <div><dt>Closing</dt><dd>{closing ? `${pesos(Number(closing.actual_cash_centavos ?? 0))} counted · variance ${pesos(Number(closing.variance_centavos ?? 0))}` : "Not yet closed"}</dd></div>
-        </dl> : <p className="portal-empty-copy">Choose a single day.</p>}
+
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections summary</h2><span className="cx-mono">{receipts} receipt{receipts === 1 ? "" : "s"} · {pesos(grand)}</span></div>
+        <div className="portal-table cx-cards"><table><thead><tr><th>Source</th>{shown.channels.map((c) => <th key={c} className="r">{c}</th>)}<th className="r">Total</th></tr></thead><tbody>
+          {shown.matrix.map((r) => <tr key={r.source}><td data-l="" className="lead"><span className="cx-name">{r.source}</span></td>{shown.channels.map((c) => { const k = r.cells.find((x) => x.channel === c); return <td key={c} data-l={c} className="r">{cell(k?.count ?? 0, k?.totalCentavos ?? 0)}</td>; })}<td data-l="Total" className="r"><strong>{cell(r.count, r.totalCentavos)}</strong></td></tr>)}
+          <tr className="rp-total"><td data-l="" className="lead"><strong>Total</strong></td>{shown.channels.map((c) => { const n = shown.matrix.reduce((s, r) => s + (r.cells.find((x) => x.channel === c)?.count ?? 0), 0), v = shown.matrix.reduce((s, r) => s + (r.cells.find((x) => x.channel === c)?.totalCentavos ?? 0), 0); return <td key={c} data-l={c} className="r"><strong>{cell(n, v)}</strong></td>; })}<td data-l="Total" className="r"><strong>{cell(receipts, grand)}</strong></td></tr>
+        </tbody></table></div>
       </section>
-    </div>
-    <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Expenses</h2></div></div>
-      {expenses.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Purpose</th><th>Status</th><th className="r">Amount</th></tr></thead><tbody>{expenses.map((x) => <tr key={x.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{x.expense_number}</span></td><td data-l="Payee">{x.payee}</td><td data-l="Purpose">{(x as { purpose?: string }).purpose ?? ""}</td><td data-l="Status">{x.status}</td><td data-l="Amount" className="r cx-amt">{pesos(x.amount_centavos)}</td></tr>)}</tbody></table></div> : <p className="portal-empty-copy">No expenses in this period.</p>}
-    </section>
+
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections detail</h2></div>
+        {shown.groups.length ? shown.groups.map((g) => { const key = `${g.kind}|${g.name}`, isOpen = open[key] ?? true; return <div key={key} className="rp-group">
+          <button type="button" className="cx-month-head" aria-expanded={isOpen} onClick={() => setOpen((o) => ({ ...o, [key]: !isOpen }))}><span className="cx-month-name">{g.kind}{g.name ? ` · ${g.name}` : ""}</span><span className="cx-month-meta">{g.rows.length} receipt{g.rows.length === 1 ? "" : "s"}</span><b className="cx-mono">{pesos(g.subtotalCentavos)}</b><span aria-hidden="true" className="cx-month-caret">{isOpen ? "▾" : "▸"}</span></button>
+          {isOpen && <div className="portal-table cx-cards"><table><thead><tr><th>Receipt</th><th>Time</th><th>Trainee</th><th>Course</th><th>Channel</th><th>Reference</th><th className="r">Amount</th></tr></thead><tbody>
+            {g.rows.map((r, i) => <tr key={`${r.receipt}-${i}`}><td data-l="" className="lead"><span className="cx-name cx-mono">{r.receipt}</span></td><td data-l="Time">{r.time}</td><td data-l="Trainee">{r.trainee}</td><td data-l="Course">{r.course}</td><td data-l="Channel">{r.channel}</td><td data-l="Reference" className="cx-mono">{r.reference || "—"}</td><td data-l="Amount" className="r cx-amt">{pesos(r.amountCentavos)}</td></tr>)}
+          </tbody></table></div>}
+        </div>; }) : <p className="portal-empty-copy">No collections on this day.</p>}
+      </section>
+
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Expenses</h2><span className="cx-mono">{shown.expenses.length} voucher{shown.expenses.length === 1 ? "" : "s"} · {pesos(expTotal)}</span></div>
+        {shown.expenses.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Voucher no.</th><th>Payee</th><th>Category</th><th>Channel</th><th>Reference</th><th className="r">Amount</th></tr></thead><tbody>
+          {shown.expenses.map((e, i) => <tr key={`${e.voucher}-${i}`}><td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher}</span></td><td data-l="Payee">{e.payee}</td><td data-l="Category">{e.category}</td><td data-l="Channel">{e.channel || "—"}</td><td data-l="Reference" className="cx-mono">{e.reference || "—"}</td><td data-l="Amount" className="r cx-amt">{pesos(e.amountCentavos)}</td></tr>)}
+          {shown.expenseTotals.map((t) => <tr key={t.channel} className="rp-sub"><td data-l="" className="lead"><span className="muted-text">Subtotal</span></td><td data-l="" /><td data-l="" /><td data-l="Channel">{t.channel}</td><td data-l="" /><td data-l="Amount" className="r cx-amt">{pesos(t.totalCentavos)}</td></tr>)}
+        </tbody></table></div> : <p className="portal-empty-copy">No expenses released on this day.</p>}
+      </section>
+    </>}
   </div>;
 }
 

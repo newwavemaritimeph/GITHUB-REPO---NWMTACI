@@ -1571,3 +1571,20 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .req-dd-menu{position:fixed;z-index:40;min-width:200px;display:grid;background:#fff;border:1px solid #dbe6ec;border-radius:12px;box-shadow:0 14px 34px rgba(0,0,0,.18);padding:6px}
 .portal-shell .req-dd-menu button{background:none;border:0;text-align:left;font:500 15.5px var(--font-portal,inherit);color:#0f2638;padding:10px 12px;border-radius:8px;cursor:pointer}
 .portal-shell .req-dd-menu button:hover,.portal-shell .req-dd-menu button:focus-visible{background:#eef4f8;outline:none}
+
+/* Report: consolidated cashier summary (8 Oct 2026) */
+.portal-shell .rp-cash{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:0;border-top:1px solid #dbe5ec}
+.portal-shell .rp-cash>div{padding:16px 18px;border-right:1px solid #dbe5ec;display:grid;gap:4px;min-width:0}
+.portal-shell .rp-cash>div:last-child{border-right:0}
+.portal-shell .rp-cash span{font-size:13px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#5f7180}
+.portal-shell .rp-cash b{font-size:20px;color:#123F63;overflow-wrap:anywhere}
+.portal-shell .rp-cash small{color:#5f7180;font-size:13px}
+.portal-shell .rp-cash .plus b{color:#0a7a3e}
+.portal-shell .rp-cash .minus b{color:#b42318}
+.portal-shell .rp-cash .eq{background:#eef6fb}
+.portal-shell .rp-cash .eq b{font-size:22px}
+.portal-shell .rp-total td{background:#eef6fb}
+.portal-shell .rp-sub td{color:#5f7180}
+.portal-shell .rp-group+.rp-group{border-top:1px solid #dbe5ec}
+@media (max-width:900px){.portal-shell .rp-cash{grid-template-columns:repeat(3,minmax(0,1fr))}.portal-shell .rp-cash>div:nth-child(3){border-right:0}.portal-shell .rp-cash>div:nth-child(-n+3){border-bottom:1px solid #dbe5ec}}
+@media (max-width:520px){.portal-shell .rp-cash{grid-template-columns:repeat(2,minmax(0,1fr))}.portal-shell .rp-cash>div{border-bottom:1px solid #dbe5ec}.portal-shell .rp-cash>div:nth-child(odd){border-right:1px solid #dbe5ec}.portal-shell .rp-cash>div:nth-child(even){border-right:0}}

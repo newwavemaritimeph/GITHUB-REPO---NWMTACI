@@ -77,7 +77,7 @@ const chargeInput = z.object({ action: z.literal("charge-save"), id: z.string().
 const expenseCategoryInput = z.object({ action: z.literal("expense-category-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), active: z.boolean().optional(), remove: z.boolean().optional() });
 const inventoryItemInput = z.object({ action: z.literal("inventory-item-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), category: z.string().trim().max(80).optional(), unit: z.string().trim().min(1).max(24).default("pc"), unitValueCentavos: z.number().int().nonnegative().default(0), active: z.boolean().optional(), remove: z.boolean().optional() });
 const inventoryMoveInput = z.object({ action: z.literal("inventory-move"), itemId: z.string().uuid(), movementType: z.enum(["in", "out"]), quantity: z.number().int().positive(), remarks: z.string().trim().max(240).optional() });
-const agencyInput = z.object({ action: z.literal("agency-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), contactName: z.string().trim().max(120).optional(), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
+const agencyInput = z.object({ action: z.literal("agency-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), kind: z.enum(["Agency", "Consultancy"]).optional(), contactName: z.string().trim().max(120).optional(), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
 const payableInput = z.object({ action: z.literal("payable-save"), id: z.string().uuid().nullable().optional(), description: z.string().trim().min(1).max(200), amountCentavos: z.number().int().positive().optional(), dueOn: z.string().date().nullable().optional(), remove: z.boolean().optional() });
 const expenseCreateInput = z.object({ action: z.literal("expense-create"), payee: z.string().trim().min(1).max(120), category: z.string().trim().min(1).max(80), amountCentavos: z.number().int().positive(), purpose: z.string().trim().min(1).max(300), paymentChannel: z.string().trim().max(40).optional().default(""), referenceNumber: z.string().trim().max(80).optional().default(""),
   // Voucher lines (202610080019): particulars, quantity and unit cost; they must add up to the amount.
@@ -686,7 +686,7 @@ export async function GET() {
     // Accounting datasets (Slice 1): channels, charges, agencies, expenses, payables.
     db.from("payment_methods").select("id,code,name,requires_reference,allows_proof,active,sort_order").order("sort_order"),
     db.from("charge_catalog").select("id,name,default_amount_centavos,active,used_count").order("name"),
-    db.from("marketing_agencies").select("id,name,contact_name,email,mobile,active").order("name"),
+    db.from("marketing_agencies").select("*").order("name"),
     db.from("expenses").select("id,expense_number,payee,category,amount_centavos,purpose,status,created_at").order("created_at", { ascending: false }).limit(250),
     db.from("payables").select("id,description,amount_centavos,due_on,status,partner_center_id,enrollment_id,created_at").order("created_at", { ascending: false }).limit(250),
     db.from("cashier_closings").select("id,closing_date,opening_cash_centavos,cash_collections_centavos,online_collections_centavos,refunds_centavos,expenses_centavos,expected_cash_centavos,actual_cash_centavos,variance_centavos,status,submitted_at").order("closing_date", { ascending: false }).limit(60),
@@ -928,8 +928,10 @@ export async function POST(request: Request) {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage agencies." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const row = { name: input.name, contact_name: input.contactName || null, email: input.email || null, mobile: input.mobile || null, ...(input.active !== undefined ? { active: input.active } : {}) };
-      const { error } = input.id ? await admin.from("marketing_agencies").update(row).eq("id", input.id) : await admin.from("marketing_agencies").insert(row);
+      const { data: saved, error } = input.id ? await admin.from("marketing_agencies").update(row).eq("id", input.id).select("id").single() : await admin.from("marketing_agencies").insert(row).select("id").single();
       if (error) throw error;
+      // Agency or consultancy (202610080021); ignored before it.
+      if (input.kind) await admin.from("marketing_agencies").update({ kind: input.kind }).eq("id", saved.id);
       return NextResponse.json({ ok: true });
     }
     if (input.action === "payable-save") {

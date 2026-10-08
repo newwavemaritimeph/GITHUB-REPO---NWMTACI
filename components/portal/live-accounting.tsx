@@ -1199,7 +1199,7 @@ function AgencyRebatesEditor({ data, canManage, busy, post }: { data: Accounting
 
 /* ---- Agency rebates payable — what New Wave owes referring consultancies ---- */
 
-type SetupField = { key: string; label: string; type?: "text" | "number" | "date" | "checkbox"; placeholder?: string; optional?: boolean };
+type SetupField = { key: string; label: string; type?: "text" | "number" | "date" | "checkbox" | "select"; options?: string[]; placeholder?: string; optional?: boolean };
 type SetupRow = { id: string; primary: string; secondary: string; active: boolean; values: Record<string, string | boolean> };
 type SetupDraft = { id?: string; values: Record<string, string | boolean> };
 export function SetupList({ title, description, entityLabel, rows, canManage, busy, fields, onSubmit, onArchive, onRemove, removable }: {
@@ -1209,7 +1209,7 @@ export function SetupList({ title, description, entityLabel, rows, canManage, bu
 }) {
   const [draft, setDraft] = useState<SetupDraft | null>(null);
   const [error, setError] = useState("");
-  function openAdd() { const v: Record<string, string | boolean> = {}; for (const f of fields) v[f.key] = f.type === "checkbox" ? false : ""; setError(""); setDraft({ values: v }); }
+  function openAdd() { const v: Record<string, string | boolean> = {}; for (const f of fields) v[f.key] = f.type === "checkbox" ? false : f.type === "select" ? f.options?.[0] ?? "" : ""; setError(""); setDraft({ values: v }); }
   function openEdit(row: SetupRow) { setError(""); setDraft({ id: row.id, values: { ...row.values } }); }
   async function save() {
     if (!draft) return;
@@ -1238,7 +1238,9 @@ export function SetupList({ title, description, entityLabel, rows, canManage, bu
       {draft && (
         <EditModal title={`${draft.id ? "Edit" : "Add"} ${entityLabel}`} busy={busy} onClose={() => setDraft(null)} onSave={save}>
           {error && <div className="portal-message error full">{error}</div>}
-          {fields.map((f) => f.type === "checkbox" ? (
+          {fields.map((f) => f.type === "select" ? (
+            <label key={f.key}>{f.label}<select value={String(draft.values[f.key] ?? "")} onChange={(e) => setDraft({ ...draft, values: { ...draft.values, [f.key]: e.target.value } })}>{(f.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}</select></label>
+          ) : f.type === "checkbox" ? (
             <label key={f.key} className="portal-check full"><input type="checkbox" checked={Boolean(draft.values[f.key])} onChange={(e) => setDraft({ ...draft, values: { ...draft.values, [f.key]: e.target.checked } })} /><span>{f.label}</span></label>
           ) : (
             <label key={f.key} className={f.type === "number" ? "" : "full"}>{f.label}
@@ -1415,9 +1417,9 @@ export function AccountingConfiguration({ section, data, trainees, applicationNu
         onArchive={(id, active, name) => void post({ action: "channel-save", id, name, kind: "payable", active: !active }).catch(() => undefined)} />
     </>}
     {section === "Agencies and consultancies" && <SetupList title="Agencies and consultancies" description="" entityLabel="agency or consultancy" canManage busy={busy}
-      fields={[{ key: "name", label: "Name" }, { key: "contactName", label: "Contact person", optional: true }, { key: "email", label: "Email", optional: true }, { key: "mobile", label: "Mobile", optional: true }]}
-      rows={data.agencies.map((a) => ({ id: a.id, primary: a.name, secondary: [a.contact_name, a.email, a.mobile].filter(Boolean).join(" · ") || "—", active: a.active, values: { name: a.name, contactName: a.contact_name || "", email: a.email || "", mobile: a.mobile || "" } }))}
-      onSubmit={(v, id) => post({ action: "agency-save", id, name: String(v.name), contactName: String(v.contactName || ""), email: String(v.email || ""), mobile: String(v.mobile || "") })}
+      fields={[{ key: "name", label: "Name" }, { key: "kind", label: "Type", type: "select", options: ["Agency", "Consultancy"] }, { key: "contactName", label: "Contact person", optional: true }, { key: "email", label: "Email", optional: true }, { key: "mobile", label: "Mobile", optional: true }]}
+      rows={data.agencies.map((a) => { const kind = (a as { kind?: string | null }).kind || "Agency"; return { id: a.id, primary: a.name, secondary: [kind, a.contact_name, a.email, a.mobile].filter(Boolean).join(" · "), active: a.active, values: { name: a.name, kind, contactName: a.contact_name || "", email: a.email || "", mobile: a.mobile || "" } }; })}
+      onSubmit={(v, id) => post({ action: "agency-save", id, name: String(v.name), kind: v.kind === "Consultancy" ? "Consultancy" : "Agency", contactName: String(v.contactName || ""), email: String(v.email || ""), mobile: String(v.mobile || "") })}
       onArchive={(id, active, name) => void post({ action: "agency-save", id, name, active: !active }).catch(() => undefined)} />}
     {section === "Expense categories" && <SetupList title="Expense categories" description="" entityLabel="category" canManage busy={busy}
       fields={[{ key: "name", label: "Category name" }]}
