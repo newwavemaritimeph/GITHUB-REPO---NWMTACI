@@ -94,8 +94,8 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
     return { receipt: receiptOf.get(p.id) ?? p.payment_number, time: manilaTime(p.received_at), trainee: nameOf(t), course: courses.join(", ") || "—", channel: p.method, reference: p.reference_number ?? "", amountCentavos: Number(p.amount_centavos), kind, agency: agency?.name ?? "", proof: !!p.proof_id };
   });
   const { data: methods } = await db.from("payment_methods").select("name,active,sort_order").eq("active", true).order("sort_order");
-  const receivable = (methods ?? []).map((m) => m.name as string).filter((n) => ["Cash", "GCash", "PSBank", "UnionBank"].includes(n));
-  const { channels, matrix, groups } = collectionsBySource(rows, receivable.length ? receivable : ["Cash", "GCash", "PSBank", "UnionBank"]);
+  const receivable = (methods ?? []).map((m) => m.name as string).filter((n) => ["Cash", "GCash", "PSBank", "UnionBank", "Cheque"].includes(n));
+  const { channels, matrix, groups } = collectionsBySource(rows, receivable.length ? receivable : ["Cash", "GCash", "PSBank", "UnionBank", "Cheque"]);
 
   // Expenses released (paid) that day, with voucher numbers.
   const { data: exBase } = await db.from("expenses").select("id,expense_number,payee,category,amount_centavos,status,paid_at")

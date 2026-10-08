@@ -1373,13 +1373,50 @@ export function CashPositionModule({ data }: { data: AccountingData }) {
 }
 
 type ConfigTrainee = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; email?: string | null; mobile?: string | null; srn?: string | null; company?: string | null; registered_at?: string | null };
-export const ACCOUNTING_CONFIG_SECTIONS = ["Schedule of fees", "Payment channels", "Expense categories", "Rebates per agency", "Partners"] as const;
+// Schedule of fees is fixed by the owner's ruling (Reprinting ₱500, Uniform ₱150, LBC ₱500), so it is not edited here.
+export const ACCOUNTING_CONFIG_SECTIONS = ["Payment channels", "Expense categories", "Rebates per agency", "Partners"] as const;
 export type AccountingConfigSection = (typeof ACCOUNTING_CONFIG_SECTIONS)[number];
 /**
  * Accounting › Configuration (owner, 7 Oct 2026): the referring agencies and
  * consultancies, the rebate each one earns per course, and the trainee list.
  * Payment channels, course fees, charges and user accounts live in Admin.
  */
+/**
+ * Rebates per agency (owner's ruling, 8 Oct 2026): one table of partners. The
+ * rebate is a percentage of the actual training fee on New Wave in-house
+ * courses (50% by default), either deducted from the trainee's payment or paid
+ * to the partner later.
+ */
+function PartnerRebates({ agencies, busy, post }: { agencies: (Agency & { kind?: string | null; rebate_mode?: string | null; rebate_percent?: number | null })[]; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
+  const [edit, setEdit] = useState<{ id: string; name: string; percent: string; mode: string } | null>(null);
+  const [error, setError] = useState("");
+  const list = agencies.filter((a) => a.active);
+  async function save() {
+    if (!edit) return;
+    const pct = Number(edit.percent);
+    if (!Number.isFinite(pct) || pct <= 0 || pct > 100) { setError("Enter a percentage from 1 to 100."); return; }
+    await post({ action: "agency-save", id: edit.id, name: edit.name, rebatePercent: pct, rebateMode: edit.mode });
+    setEdit(null);
+  }
+  return <section className="portal-panel cx-panel">
+    <div className="panel-heading"><h2>Rebates per agency</h2><span className="muted-text">In-house courses · % of the actual training fee</span></div>
+    {list.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Partner</th><th>Type</th><th className="r">Rebate</th><th>How it is given</th><th></th></tr></thead><tbody>
+      {list.map((a) => { const pct = Number(a.rebate_percent ?? 50), noDeduction = a.rebate_mode === "No deduction"; return <tr key={a.id}>
+        <td data-l="" className="lead"><span className="cx-name">{a.name}</span></td>
+        <td data-l="Type">{a.kind || "Agency"}</td>
+        <td data-l="Rebate" className="r"><strong className="cx-mono">{pct}%</strong><small>₱1,000 fee → {pesos(Math.round(100000 * pct / 100))}</small></td>
+        <td data-l="How it is given">{noDeduction ? "Paid to the partner later" : "Deducted from the trainee's payment"}</td>
+        <td data-l=""><div className="cx-acts"><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setError(""); setEdit({ id: a.id, name: a.name, percent: String(pct), mode: noDeduction ? "No deduction" : "Deducted" }); }}>Edit</button></div></td>
+      </tr>; })}
+    </tbody></table></div> : <p className="portal-empty-copy">Add a partner in Configuration › Partners; it starts at 50%.</p>}
+    {edit && <EditModal title="Edit rebate" subtitle={edit.name} busy={busy} onClose={() => setEdit(null)} onSave={save}>
+      {error && <div className="portal-message error full">{error}</div>}
+      <label>Rebate (% of the training fee)<input autoFocus type="number" min="1" max="100" step="0.5" value={edit.percent} onChange={(e) => setEdit({ ...edit, percent: e.target.value })} /></label>
+      <label>How it is given<select value={edit.mode} onChange={(e) => setEdit({ ...edit, mode: e.target.value })}><option value="Deducted">Deducted from the trainee&apos;s payment</option><option value="No deduction">Paid to the partner later</option></select></label>
+    </EditModal>}
+  </section>;
+}
+
 /**
  * Referral codes (owner, 8 Oct 2026): every agency and consultancy gets one
  * automatically. Trainees type it on the public registration form; the
@@ -1424,12 +1461,6 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
   return <div className="portal-page cx">
     <div className="cx-head"><div><span className="portal-eyebrow">Configuration</span><h1>{section}</h1></div></div>
     {error && <div className="portal-message error">{error}</div>}
-    {section === "Schedule of fees" && <SetupList title="Schedule of fees" description="" entityLabel="fee or item" canManage busy={busy}
-      fields={[{ key: "name", label: "Name" }, { key: "defaultAmount", label: "Price (PHP)", type: "number", optional: true }, { key: "isItem", label: "Miscellaneous item (paid at the counter)", type: "checkbox", optional: true }]}
-      rows={data.charges.map((c) => ({ id: c.id, primary: c.name, secondary: `${(c as { kind?: string }).kind === "item" ? "Miscellaneous item" : "Service fee"} · ${pesos(c.default_amount_centavos)}`, active: c.active, values: { name: c.name, defaultAmount: String(c.default_amount_centavos / 100), isItem: (c as { kind?: string }).kind === "item" } }))}
-      onSubmit={(v, id) => post({ action: "charge-save", id, name: String(v.name), defaultAmountCentavos: Math.round((Number(v.defaultAmount) || 0) * 100), kind: v.isItem ? "item" : "fee" })}
-      onArchive={(id, active, name) => void post({ action: "charge-save", id, name, active: !active }).catch(() => undefined)}
-      onRemove={(id) => void post({ action: "config-remove", entity: "charge", id }).catch(() => undefined)} removable />}
     {section === "Payment channels" && <>
       <SetupList title="For training fees" description="" entityLabel="payment channel" canManage busy={busy}
         fields={[{ key: "name", label: "Channel name" }, { key: "requiresReference", label: "Requires a reference number", type: "checkbox" }]}
@@ -1445,9 +1476,9 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
         onRemove={(id) => void post({ action: "config-remove", entity: "channel", id }).catch(() => undefined)} removable />
     </>}
     {section === "Partners" && <SetupList title="Partners" description="" entityLabel="partner" canManage busy={busy}
-      fields={[{ key: "name", label: "Name" }, { key: "kind", label: "Type", type: "select", options: ["Agency", "Consultancy"] }, { key: "rebateMode", label: "Rebate", type: "select", options: ["Deducted from payment", "No deduction (pay to the agency)"] }, { key: "rebatePercent", label: "Rebate % of training fee (in-house courses)", type: "number", optional: true, placeholder: "e.g. 50 · blank uses Rebates per course" }, { key: "contactName", label: "Contact person", optional: true }, { key: "email", label: "Email", optional: true }, { key: "mobile", label: "Mobile", optional: true }]}
+      fields={[{ key: "name", label: "Name" }, { key: "kind", label: "Type", type: "select", options: ["Agency", "Consultancy"] }, { key: "contactName", label: "Contact person", optional: true }, { key: "email", label: "Email", optional: true }, { key: "mobile", label: "Mobile", optional: true }]}
       rows={data.agencies.map((a) => { const kind = (a as { kind?: string | null }).kind || "Agency"; const noDeduction = (a as { rebate_mode?: string | null }).rebate_mode === "No deduction"; const pct = (a as { rebate_percent?: number | null }).rebate_percent; return { id: a.id, primary: a.name, secondary: [kind, noDeduction ? "Rebate paid to the agency" : "Rebate deducted", pct ? `${Number(pct)}% of the training fee` : "", a.contact_name, a.email, a.mobile].filter(Boolean).join(" · "), active: a.active, values: { name: a.name, kind, rebateMode: noDeduction ? "No deduction (pay to the agency)" : "Deducted from payment", rebatePercent: pct ? String(Number(pct)) : "", contactName: a.contact_name || "", email: a.email || "", mobile: a.mobile || "" } }; })}
-      onSubmit={(v, id) => post({ action: "agency-save", id, name: String(v.name), kind: v.kind === "Consultancy" ? "Consultancy" : "Agency", rebateMode: String(v.rebateMode).startsWith("No deduction") ? "No deduction" : "Deducted", rebatePercent: String(v.rebatePercent ?? "").trim() ? Number(v.rebatePercent) : null, contactName: String(v.contactName || ""), email: String(v.email || ""), mobile: String(v.mobile || "") })}
+      onSubmit={(v, id) => post({ action: "agency-save", id, name: String(v.name), kind: v.kind === "Consultancy" ? "Consultancy" : "Agency", contactName: String(v.contactName || ""), email: String(v.email || ""), mobile: String(v.mobile || "") })}
       onArchive={(id, active, name) => void post({ action: "agency-save", id, name, active: !active }).catch(() => undefined)}
       onRemove={(id) => void post({ action: "config-remove", entity: "partner", id }).catch(() => undefined)} removable />}
     {section === "Partners" && <ReferralCodes agencies={data.agencies as (Agency & { kind?: string | null; referral_code?: string | null; rebate_mode?: string | null; rebate_percent?: number | null })[]} busy={busy} post={post} />}
@@ -1457,6 +1488,6 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
       onSubmit={(v, id) => post({ action: "expense-category-save", id, name: String(v.name) })}
       onArchive={(id, active, name) => void post({ action: "expense-category-save", id, name, active: !active }).catch(() => undefined)}
       onRemove={(id) => void post({ action: "expense-category-save", id, name: "x", remove: true }).catch(() => undefined)} removable />}
-    {section === "Rebates per agency" && <AgencyRebatesEditor data={data} canManage busy={busy} post={post} />}
+    {section === "Rebates per agency" && <PartnerRebates agencies={data.agencies as (Agency & { kind?: string | null; rebate_mode?: string | null; rebate_percent?: number | null })[]} busy={busy} post={post} />}
   </div>;
 }

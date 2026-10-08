@@ -18,8 +18,8 @@ import { downloadCsv } from "@/lib/csv";
  * Payments and expenses are recorded by the Cashier; she approves and reviews.
  */
 
-const COLORS: Record<string, string> = { Cash: "#0a7a3e", GCash: "#0571D0", PSBank: "#F25615", UnionBank: "#7a3fb8" };
-const CHANNELS = ["Cash", "GCash", "PSBank", "UnionBank"];
+const COLORS: Record<string, string> = { Cash: "#0a7a3e", GCash: "#0571D0", PSBank: "#F25615", UnionBank: "#7a3fb8", Cheque: "#5d6f7e" };
+const CHANNELS = ["Cash", "GCash", "PSBank", "UnionBank", "Cheque"];
 const SOURCE_COLORS: Record<string, string> = { "Walk-ins": "#0571D0", Agencies: "#123F63", Consultancies: "#35CCFA" };
 const CATEGORY_COLORS = ["#F25615", "#c2410c", "#f59e0b", "#b45309", "#a16207", "#78716c"];
 const day = (v?: string | null) => (v ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(v)) : "");

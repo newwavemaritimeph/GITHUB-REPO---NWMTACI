@@ -164,7 +164,7 @@ const paidOf = (e: Enrollment) => Number(e.paid_centavos ?? 0);
 const scheduleText = (e: Enrollment) => { const b = first(e.batches); return b ? `${fmtDate(b.starts_on)}${b.ends_on !== b.starts_on ? ` – ${fmtDate(b.ends_on)}` : ""}` : e.scheduled_on ? fmtDate(e.scheduled_on) : "No schedule yet"; };
 const courseCode = (e: Enrollment) => first(e.courses)?.code ?? first(e.courses)?.name ?? "Course";
 const toCentavos = (v: string) => { const n = Math.round(Number(String(v).replace(/,/g, "")) * 100); return Number.isFinite(n) && n > 0 ? n : 0; };
-const MODE_COLORS: Record<string, string> = { Cash: "#0a7a3e", GCash: "#0571D0", PSBank: "#123F63", UnionBank: "#F25615" };
+const MODE_COLORS: Record<string, string> = { Cash: "#0a7a3e", GCash: "#0571D0", PSBank: "#123F63", UnionBank: "#F25615", Cheque: "#5d6f7e" };
 
 /** One trainee with all of their enrollments, for the trainee-based lists. */
 type TraineeGroup = { traineeId: string; name: string; number: string; enrollments: Enrollment[]; due: number; paid: number; balance: number; since: string };
