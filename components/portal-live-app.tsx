@@ -857,6 +857,7 @@ function LiveRequests({data,role,reload,embedded}:{data:PortalData;role:string;r
 
 const DEFAULT_INSTRUCTION_BODY = "Welcome aboard! Your enrollment has been confirmed. Please review your reporting details below and observe the reminders.\n\nIMPORTANT REMINDERS:\n- Check the printed name in your admission record and report any corrections immediately.\n- Arrive on time, observe proper conduct, and complete all requirements before training starts.\n- Bring your own tumbler - drinking water is available in the Training Room.\n- Wear the official training uniform during the training period (Php 150.00 uniform fee applies).\n\nNew Wave MTACI sincerely appreciates your trust in choosing us as your training provider.\n\nThank you!";
 
+const INSTRUCTION_STATES:[string,string][]=[["To generate","#0571D0"],["Emailed","#0a7a3e"],["Email not sent","#F25615"]];
 function LiveInstructions({data,query,reload}:{data:PortalData;query:string;reload:()=>Promise<void>}){
   const [busy,setBusy]=useState(""),[message,setMessage]=useState(""),[tab,setTab]=useState<"Send"|"Templates">("Send");
   const term=query.toLowerCase();
@@ -871,6 +872,14 @@ function LiveInstructions({data,query,reload}:{data:PortalData;query:string;relo
   const isDone=(e:Enrollment)=>countOf(e)>0||!!e.instructions_sent_at;
   const all=[...activeRows].sort((a,b)=>Number(isDone(a))-Number(isDone(b))||startOf(a).localeCompare(startOf(b)));
   const [notice,setNotice]=useState("");
+  // Summary rail (owner, 8 Oct 2026): status counts filter the list; limits and Classroom links beside it.
+  const [st,setSt]=useState("");
+  const stateOfRow=(e:Enrollment)=>{if(!isDone(e))return "To generate";const em=data.instructionEmails?.[e.id];return em&&em.state!=="Sent"&&em.state!=="Delivered"?"Email not sent":"Emailed"};
+  const shownRows=all.filter(e=>!st||stateOfRow(e)===st);
+  const soonEnd=addDays(manilaToday(),3);
+  const soon=all.filter(e=>!isDone(e)&&startOf(e)<=soonEnd).length;
+  const usedCourses=[...new Set(all.map(e=>e.course_id))];
+  const linked=usedCourses.filter(id=>!!data.courses.find(c=>c.id===id)?.google_classroom_link).length;
   async function send(id:string){setBusy(id);setMessage("");setNotice("");try{const r=await submit({action:"send-instructions",enrollmentId:id}) as {email?:{state:string;to?:string|null;error?:string};classroom?:{state:string;email:string;error:string|null}|null};const em=r.email,cr=r.classroom;const invite=!cr?"":cr.state==="Failed"?` Google Classroom invite failed: ${cr.error}.`:` Google Classroom invite sent to ${cr.email}.`;setNotice((!em?"Instructions generated.":em.state==="Sent"?`Instructions generated and emailed to ${em.to}.`:em.state==="Not configured"?"Instructions generated. Email is not set up yet, so nothing was emailed.":em.state==="No email"?"Instructions generated. The trainee has no email address on file.":`Instructions generated. The email to ${em.to} did not go out yet (${em.error??em.state}); it will retry automatically.`)+invite);await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not send instructions.")}finally{setBusy("")}}
   async function sendAll(){setBusy("all");setMessage("");try{for(const e of ready)await submit({action:"send-instructions",enrollmentId:e.id});await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not send instructions.")}finally{setBusy("")}}
   const scheduleOf=(e:Enrollment)=>{const b=first(e.batches);return b?`${date(b.starts_on)} - ${date(b.ends_on)}`:e.scheduled_on?date(e.scheduled_on):"Open schedule"};
@@ -889,9 +898,20 @@ function LiveInstructions({data,query,reload}:{data:PortalData;query:string;relo
 
   return <div className="portal-page"><PageHead eyebrow="Registration operations" title="Training instructions" text="Generate the reporting instructions for paid, enrolled trainees. Each one is emailed to the trainee with the PDF attached and a Join Google Classroom link."/>{message&&<Message kind="error" text={message}/>}{notice&&<Message kind="success" text={notice}/>}
     <div className="portal-tabs">{(["Send","Templates"] as const).map(t=><button key={t} className={tab===t?"active":""} onClick={()=>setTab(t)}>{t}</button>)}</div>
-    {tab==="Send"?<>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Paid and enrolled trainees</h2><p>{ready.length} to generate · {all.length-ready.length} generated · each one is emailed with the PDF and a Google Classroom invite</p></div>{ready.length>0&&<button className="portal-primary" disabled={!!busy} onClick={sendAll}>{busy==="all"?"Sending…":`Generate and Email All (${ready.length})`}</button>}</div>{all.map(e=>row(e,true))}{!all.length&&<p className="portal-empty-copy">No paid and enrolled trainees yet.</p>}</section>
-    </>:<section className="portal-panel"><div className="panel-heading"><div><h2>Per-Course template</h2><p>In-house courses only. Trainee name, date, time, and classroom are merged automatically at send.</p></div></div>
+    {tab==="Send"?<div className="ac-rail">
+      <div className="ac-stack">
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Status</h2><span className="muted-text">tap to filter</span></div>
+          <div className="cx-tiles ac-tiles ac-tiles-in">{INSTRUCTION_STATES.map(([k,c])=><button key={k} type="button" className={`cx-tile ac-pick ac-count${st===k?" on":""}`} style={{["--c" as string]:c}} onClick={()=>setSt(st===k?"":k)}><span>{k}</span><b>{all.filter(e=>stateOfRow(e)===k).length}</b></button>)}<div className="cx-tile ac-total ac-count"><span>Paid and enrolled</span><b>{all.length}</b></div></div>
+        </section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Limits</h2></div>
+          <dl className="ac-lines"><div><dt>Generated twice (limit)</dt><dd>{all.filter(e=>countOf(e)>=2).length}</dd></div><div><dt>Starting within 3 days, not sent</dt><dd className={soon?"warn":""}>{soon}</dd></div></dl>
+        </section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Google Classroom</h2></div>
+          <dl className="ac-lines"><div><dt>Courses in use with a class link</dt><dd>{linked} of {usedCourses.length}</dd></div></dl>
+        </section>
+      </div>
+      <section className="portal-panel cx-panel live-list"><div className="panel-heading"><h2>{st||"Paid and enrolled trainees"}</h2>{ready.length>0&&<button className="portal-primary" disabled={!!busy} onClick={sendAll}>{busy==="all"?"Sending…":`Generate and email all (${ready.length})`}</button>}</div>{shownRows.map(e=>row(e,true))}{!shownRows.length&&<p className="portal-empty-copy">{all.length?"Nothing with this status.":"No paid and enrolled trainees yet."}</p>}</section>
+    </div>:<section className="portal-panel"><div className="panel-heading"><div><h2>Per-Course template</h2><p>In-house courses only. Trainee name, date, time, and classroom are merged automatically at send.</p></div></div>
       <ClassroomPanel data={data} courseId={courseId} reload={reload}/>
       <div className="portal-form">
         <label className="full">Course<select value={courseId} onChange={e=>loadCourse(e.target.value)}><option value="">Select an in-House course</option>{inhouse.map(c=><option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label>

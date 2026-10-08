@@ -84,52 +84,78 @@ export function RegistrationDashboard({ data, go }: { data: PortalData; go: (mod
   const enrolledPaid = enrolled.reduce((sum, e) => sum + Number(e.verified_paid_centavos ?? e.paid_centavos ?? 0), 0);
   const shift = (days: number) => setPicked((d) => addDays(d, days));
 
-  return <div className="portal-page">
-    <div className="portal-heading">
-      <div><h1 style={{ margin: 0 }}>Registration dashboard</h1><p>{fmtLong(today)}</p></div>
+  // Summary rail (owner, 8 Oct 2026): figures on the left, the two working lists on the right.
+  const states = applications.map((e) => stateOf(readinessOf(data, e)).text);
+  const stateCount = (t: string) => states.filter((x) => x === t).length;
+  const queue: [string, string, number][] = [["Screening", "#0571D0", stateCount("Screening") + stateCount("Needs attention")], ["For payment", "#F25615", stateCount("For payment")], ["Paid · choose batch", "#7a3fb8", stateCount("Paid · choose batch") + stateCount("Paid · enrolling") + stateCount("Paid · requirements missing")], ["Course to assign", "#5d6f7e", noCourse.length]];
+  const now = new Date().toISOString(), tomorrow = addDays(today, 1);
+  const stcw = uniqueCourses(data.courses.filter((x) => x.delivery_type === "In-House" && isStcwCourse(x))).map((course) => ({ course, next: data.batches.filter((x) => x.course_id === course.id && isBookable(x, today, now)).sort((x, y) => x.starts_on.localeCompare(y.starts_on))[0] })).filter((x) => x.next);
+  const tomorrowBatches = data.batches.filter((x) => x.starts_on === tomorrow && x.status !== "Cancelled");
+  const tomorrowIds = new Set(tomorrowBatches.map((x) => x.id));
+  const tomorrowEnr = data.enrollments.filter((e) => e.batch_id && tomorrowIds.has(e.batch_id) && e.enrollment_status === "Enrolled");
+  const notSent = tomorrowEnr.filter((e) => instructionsCountOf(data, e) === 0).length;
+  return <div className="portal-page cx ac">
+    <div className="cx-head">
+      <div><span className="portal-eyebrow">Registration</span><h1>Dashboard</h1></div>
       <span style={{ display: "inline-flex", gap: 10, flexWrap: "wrap" }}>
         <button type="button" className="portal-secondary" onClick={() => go("Trainees")}>Search trainee</button>
         <button type="button" className="portal-primary" onClick={() => go("Applications")}>Screen applications{newCount ? ` (${newCount})` : ""}</button>
       </span>
     </div>
+    <p className="ac-note">{fmtLong(today)}</p>
 
-    <div className="rd-two">
-      <section className="portal-panel rd-panel" id="rd-new">
-        <div className="panel-heading"><div><h2>New registrations</h2><p>From the website, not yet enrolled · {newToday} today</p></div><span className="rd-count">{newCount}</span></div>
-        <div className="rd-scroll">
-          {noCourse.map((t) => <button type="button" className="rd-row" key={t.id} onClick={() => go("Applications")}>
-            <span className="rd-main"><strong>{fullName(t)}</strong><small>{appNoOf(data, t.id) ? <span className="app-no">{appNoOf(data, t.id)}</span> : null}Course to be assigned</small></span>
-            <Badge tone="pending">No course yet</Badge>
-            <span className="rd-time">{day(t.registered_at) === today ? fmtClock(t.registered_at) : fmtShort(day(t.registered_at))}</span>
-          </button>)}
-          {applications.map((e) => { const st = stateOf(readinessOf(data, e)), c = first(e.courses); return <button type="button" className="rd-row" key={e.id} onClick={() => go("Applications")}>
-            <span className="rd-main"><strong>{nameOf(e)}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{c?.code ? `${c.code} · ` : ""}{scheduleOf(e)}</small></span>
-            <Badge tone={st.tone}>{st.text}</Badge>
-            <span className="rd-time">{day(e.created_at) === today ? fmtClock(e.created_at) : fmtShort(day(e.created_at))}</span>
-          </button>; })}
-          {!newCount && <p className="rd-empty">No new registrations waiting.</p>}
-        </div>
-        <button type="button" className="ghost-button rd-more" onClick={() => go("Applications")}>View all →</button>
-      </section>
+    <div className="ac-rail">
+      <div className="ac-stack">
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Applications</h2><span className="muted-text">tap to open</span></div>
+          <div className="cx-tiles ac-tiles ac-tiles-in">{queue.map(([label, color, n]) => <button type="button" key={label} className="cx-tile ac-pick ac-count" style={{ ["--c" as string]: color }} onClick={() => go("Applications")}><span>{label}</span><b>{n}</b></button>)}
+            <div className="cx-tile ac-total ac-count"><span>New today</span><b>{newToday}</b></div></div>
+        </section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>STCW seats open</h2><span className="muted-text">next batch</span></div>
+          {stcw.length ? <div className="cx-tiles ac-tiles ac-tiles-in">{stcw.map(({ course, next }) => { const left = seatsLeft(next!); return <div key={course.id} className="cx-tile ac-count ac-seat" style={{ ["--c" as string]: left <= 3 ? "#F25615" : "#0571D0" }}><span>{course.name}<small>{dateRange(next!.starts_on, next!.ends_on)} · {next!.batch_number}</small><i className="ac-meter"><i style={{ width: `${Math.round((next!.confirmed_count / Math.max(1, next!.capacity)) * 100)}%` }} /></i></span><b>{left}</b></div>; })}
+            <div className="cx-tile ac-total ac-count"><span>Seats left</span><b>{stcw.reduce((sum, x) => sum + seatsLeft(x.next!), 0)}</b></div></div> : <p className="portal-empty-copy">No STCW batches open.</p>}
+        </section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Tomorrow</h2><span className="muted-text">{fmtShort(tomorrow)}</span></div>
+          <dl className="ac-lines"><div><dt>Trainees in class</dt><dd>{tomorrowEnr.length}</dd></div><div><dt>Batches</dt><dd>{tomorrowBatches.length}</dd></div><div><dt>Instructions not yet sent</dt><dd className={notSent ? "warn" : ""}>{notSent}</dd></div></dl>
+        </section>
+      </div>
+      <div className="ac-stack">
+        <section className="portal-panel rd-panel" id="rd-new">
+          <div className="panel-heading"><div><h2>New registrations</h2><p>From the website, not yet enrolled · {newToday} today</p></div><span className="rd-count">{newCount}</span></div>
+          <div className="rd-scroll">
+            {noCourse.map((t) => <button type="button" className="rd-row" key={t.id} onClick={() => go("Applications")}>
+              <span className="rd-main"><strong>{fullName(t)}</strong><small>{appNoOf(data, t.id) ? <span className="app-no">{appNoOf(data, t.id)}</span> : null}Course to be assigned</small></span>
+              <Badge tone="pending">No course yet</Badge>
+              <span className="rd-time">{day(t.registered_at) === today ? fmtClock(t.registered_at) : fmtShort(day(t.registered_at))}</span>
+            </button>)}
+            {applications.map((e) => { const st = stateOf(readinessOf(data, e)), c = first(e.courses); return <button type="button" className="rd-row" key={e.id} onClick={() => go("Applications")}>
+              <span className="rd-main"><strong>{nameOf(e)}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{c?.code ? `${c.code} · ` : ""}{scheduleOf(e)}</small></span>
+              <Badge tone={st.tone}>{st.text}</Badge>
+              <span className="rd-time">{day(e.created_at) === today ? fmtClock(e.created_at) : fmtShort(day(e.created_at))}</span>
+            </button>; })}
+            {!newCount && <p className="rd-empty">No new registrations waiting.</p>}
+          </div>
+          <button type="button" className="ghost-button rd-more" onClick={() => go("Applications")}>View all →</button>
+        </section>
 
-      <section className="portal-panel rd-panel" id="rd-enrolled">
-        <div className="panel-heading"><div><h2>Enrollments</h2><p>Trainees enrolled (paid) on the selected day</p></div><span className="rd-count">{enrolled.length}</span></div>
-        <div className="rd-datebar">
-          <button type="button" className="ghost-button" aria-label="Previous day" onClick={() => shift(-1)}>‹</button>
-          <input type="date" value={picked} max={today} onChange={(ev) => ev.target.value && setPicked(ev.target.value)} aria-label="Enrollment date" />
-          <button type="button" className="ghost-button" aria-label="Next day" disabled={picked >= today} onClick={() => shift(1)}>›</button>
-          {picked !== today && <button type="button" className="ghost-button" onClick={() => setPicked(today)}>Today</button>}
-          <span className="rd-datesum">{fmtDay(picked)} · {pesos(enrolledPaid)} paid</span>
-        </div>
-        <div className="rd-scroll">
-          {enrolled.map((e) => { const t = first(e.trainees); return <button type="button" className="rd-row" key={e.id} onClick={() => go("Enrollments")}>
-            <span className="rd-main"><strong>{nameOf(e)}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{courseLabel(e)} · {scheduleOf(e)}</small></span>
-            <span className="rd-time">{pesos(Number(e.verified_paid_centavos ?? e.paid_centavos ?? 0))}<small>{t?.trainee_number ?? e.enrollment_number}</small></span>
-          </button>; })}
-          {!enrolled.length && <p className="rd-empty">No trainees were enrolled on {fmtDay(picked)}.</p>}
-        </div>
-        <button type="button" className="ghost-button rd-more" onClick={() => go("Enrollments")}>All enrollments →</button>
-      </section>
+        <section className="portal-panel rd-panel" id="rd-enrolled">
+          <div className="panel-heading"><div><h2>Enrollments</h2><p>Trainees enrolled (paid) on the selected day</p></div><span className="rd-count">{enrolled.length}</span></div>
+          <div className="rd-datebar">
+            <button type="button" className="ghost-button" aria-label="Previous day" onClick={() => shift(-1)}>‹</button>
+            <input type="date" value={picked} max={today} onChange={(ev) => ev.target.value && setPicked(ev.target.value)} aria-label="Enrollment date" />
+            <button type="button" className="ghost-button" aria-label="Next day" disabled={picked >= today} onClick={() => shift(1)}>›</button>
+            {picked !== today && <button type="button" className="ghost-button" onClick={() => setPicked(today)}>Today</button>}
+            <span className="rd-datesum">{fmtDay(picked)} · {pesos(enrolledPaid)} paid</span>
+          </div>
+          <div className="rd-scroll">
+            {enrolled.map((e) => { const t = first(e.trainees); return <button type="button" className="rd-row" key={e.id} onClick={() => go("Enrollments")}>
+              <span className="rd-main"><strong>{nameOf(e)}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{courseLabel(e)} · {scheduleOf(e)}</small></span>
+              <span className="rd-time">{pesos(Number(e.verified_paid_centavos ?? e.paid_centavos ?? 0))}<small>{t?.trainee_number ?? e.enrollment_number}</small></span>
+            </button>; })}
+            {!enrolled.length && <p className="rd-empty">No trainees were enrolled on {fmtDay(picked)}.</p>}
+          </div>
+          <button type="button" className="ghost-button rd-more" onClick={() => go("Enrollments")}>All enrollments →</button>
+        </section>
+      </div>
     </div>
   </div>;
 }
@@ -298,28 +324,48 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
   const pageRows = rows.slice((page - 1) * PER, page * PER);
   const current = open ? data.enrollments.find((e) => e.id === open.id) ?? open : null;
   const count = (f: RecordFilter) => all.filter((x) => inFilter(f, x.r)).length + (f === "For payment" ? 0 : awaiting.length);
+  // Summary rail (owner, 8 Oct 2026): the filters, requirement counts and enrollment types on the left; the list on the right.
+  const pending = all.filter((x) => x.r);
+  const types = ["Online enrollment", "Walk-in", "Agency"].map((k) => [k, data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && (enrollmentTypeOf(data, e) || "").startsWith(k)).length] as const);
+  const FILTER_COLORS: Record<RecordFilter, string> = { "All enrollments": "#123F63", Screening: "#0571D0", "For payment": "#F25615" };
   return <>
-    <div className="portal-tabs">{RECORD_FILTERS.map((f) => <button key={f} type="button" className={filter === f ? "active" : ""} onClick={() => { setFilter(f); setPage(1); }}>{f}<small style={{ marginLeft: 6, opacity: 0.7 }}>{count(f)}</small></button>)}</div>
-    <div style={{ display: "flex", gap: 10, padding: "0 0 10px" }}><label className="portal-field-inline" style={{ flex: 1, minWidth: 220 }}>Search<input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Name, NWMTACI number, SRN, course" /></label></div>
-    {filter !== "For payment" && noCourse.length > 0 && <section className="portal-panel nc-panel">
-      <div className="panel-heading"><div><h2>No course yet</h2><p>Assign a course and schedule, then screen the application</p></div><span className="slot-count">{noCourse.length}</span></div>
-      {noCourse.map((t) => <div className="rd-row" key={t.id}>
-        <span className="rd-main"><strong>{fullName(t)}</strong><small>{appNoOf(data, t.id) ? <span className="app-no">{appNoOf(data, t.id)}</span> : null}{t.trainee_number} · <span className="lc">{t.email}</span> · {t.mobile}</small></span>
-        <span className="rd-time">{t.registered_at ? fmtShort(day(t.registered_at)) : ""}</span>
-        <button type="button" className="portal-primary" onClick={() => setAssigning(t)}>Assign course</button>
-      </div>)}
-    </section>}
-    <div className="portal-table portal-panel"><table><thead><tr><th>Trainee</th><th>Enrollment no.</th><th>Course and schedule</th><th>Requirements</th><th>Payment</th><th>Status</th></tr></thead><tbody>
-      {pageRows.map(({ e, r }) => { const t = first(e.trainees), s = r ? stateOf(r) : { text: e.enrollment_status, tone: statusTone(e.enrollment_status) }, p = payState(e); return <tr key={e.id} className="row-clickable" onClick={() => setOpen(e)}>
-        <td><strong>{t ? fullName(t) : "Unknown"}</strong><small>{t?.trainee_number}</small>{enrollmentTypeOf(data, e) && <span className="et-chip">{enrollmentTypeOf(data, e)}</span>}</td>
-        <td><strong className="app-no-cell">{appNoOf(data, e.trainee_id) ?? e.enrollment_number}</strong><small>{appNoOf(data, e.trainee_id) ? e.enrollment_number : fmtDate(day(e.created_at))}</small></td>
-        <td>{first(e.courses)?.name ?? "—"}<small>{scheduleOf(e)}</small></td>
-        <td>{r ? <><span className={`req-count${r.missing.length ? "" : " ok"}`}>{r.verified} of {REQUIREMENTS.length}</span>{r.rejected.length > 0 && <small>Rejected: {r.rejected.join(", ")}</small>}</> : <span className="muted-text">{e.enrollment_status === "Cancelled" ? "—" : "Complete"}</span>}</td>
-        <td>{r ? (r.paid ? <><strong>{pesos(r.paidCentavos)}</strong><small>Verified</small></> : <span className="muted-text">{r.handed ? "With cashier" : "Not yet"}</span>) : <><Badge tone={p.tone}>{p.text}</Badge><small>{pesos(balanceOf(e))} balance</small></>}</td>
-        <td><Badge tone={s.tone}>{s.text}</Badge></td>
-      </tr>; })}
-    </tbody></table>{!rows.length && <p className="portal-empty-copy">{filter === "For payment" ? "Nobody is waiting at the Cashier." : filter === "Screening" ? (noCourse.length ? "Applicants without a course are listed above." : "No applications to screen. New ones arrive from the website.") : "No matching enrollments."}</p>}</div>
-    <Pager page={page} total={rows.length} perPage={PER} onPage={setPage} />
+    <div className="ac-rail">
+      <div className="ac-stack">
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Queue</h2><span className="muted-text">tap to filter</span></div>
+          <div className="cx-tiles ac-tiles ac-tiles-in" role="tablist" aria-label="Enrollment filter">{RECORD_FILTERS.map((f) => <button key={f} type="button" role="tab" aria-selected={filter === f} className={`cx-tile ac-pick ac-count${filter === f ? " on" : ""}`} style={{ ["--c" as string]: FILTER_COLORS[f] }} onClick={() => { setFilter(f); setPage(1); }}><span>{f}</span><b>{count(f)}</b></button>)}</div>
+          {awaiting.length > 0 && <p className="ac-foot">{awaiting.length} applicant{awaiting.length === 1 ? "" : "s"} still need a course.</p>}
+        </section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Requirements</h2><span className="muted-text">applications</span></div>
+          <dl className="ac-lines">{REQUIREMENTS.map((req) => <div key={req.code}><dt>{req.label}</dt><dd>{pending.filter((x) => x.r!.latest.get(req.code)?.status === "Verified").length} of {pending.length}</dd></div>)}</dl>
+          <p className="ac-foot">Hand to the Cashier once all four are ticked.</p>
+        </section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By enrollment type</h2></div>
+          <dl className="ac-lines">{types.map(([k, n]) => <div key={k}><dt>{k}</dt><dd>{n}</dd></div>)}</dl>
+        </section>
+      </div>
+      <div className="ac-stack">
+        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search enrollments" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Name, NWMTACI number, SRN, course" /></div>
+        {filter !== "For payment" && noCourse.length > 0 && <section className="portal-panel nc-panel">
+          <div className="panel-heading"><div><h2>No course yet</h2><p>Assign a course and schedule, then screen the application</p></div><span className="slot-count">{noCourse.length}</span></div>
+          {noCourse.map((t) => <div className="rd-row" key={t.id}>
+            <span className="rd-main"><strong>{fullName(t)}</strong><small>{appNoOf(data, t.id) ? <span className="app-no">{appNoOf(data, t.id)}</span> : null}{t.trainee_number} · <span className="lc">{t.email}</span> · {t.mobile}</small></span>
+            <span className="rd-time">{t.registered_at ? fmtShort(day(t.registered_at)) : ""}</span>
+            <button type="button" className="portal-primary" onClick={() => setAssigning(t)}>Assign course</button>
+          </div>)}
+        </section>}
+        <div className="portal-table portal-panel"><table><thead><tr><th>Trainee</th><th>Enrollment no.</th><th>Course and schedule</th><th>Requirements</th><th>Payment</th><th>Status</th></tr></thead><tbody>
+          {pageRows.map(({ e, r }) => { const t = first(e.trainees), s = r ? stateOf(r) : { text: e.enrollment_status, tone: statusTone(e.enrollment_status) }, p = payState(e); return <tr key={e.id} className="row-clickable" onClick={() => setOpen(e)}>
+            <td><strong>{t ? fullName(t) : "Unknown"}</strong><small>{t?.trainee_number}</small>{enrollmentTypeOf(data, e) && <span className="et-chip">{enrollmentTypeOf(data, e)}</span>}</td>
+            <td><strong className="app-no-cell">{appNoOf(data, e.trainee_id) ?? e.enrollment_number}</strong><small>{appNoOf(data, e.trainee_id) ? e.enrollment_number : fmtDate(day(e.created_at))}</small></td>
+            <td>{first(e.courses)?.name ?? "—"}<small>{scheduleOf(e)}</small></td>
+            <td>{r ? <><span className={`req-count${r.missing.length ? "" : " ok"}`}>{r.verified} of {REQUIREMENTS.length}</span>{r.rejected.length > 0 && <small>Rejected: {r.rejected.join(", ")}</small>}</> : <span className="muted-text">{e.enrollment_status === "Cancelled" ? "—" : "Complete"}</span>}</td>
+            <td>{r ? (r.paid ? <><strong>{pesos(r.paidCentavos)}</strong><small>Verified</small></> : <span className="muted-text">{r.handed ? "With cashier" : "Not yet"}</span>) : <><Badge tone={p.tone}>{p.text}</Badge><small>{pesos(balanceOf(e))} balance</small></>}</td>
+            <td><Badge tone={s.tone}>{s.text}</Badge></td>
+          </tr>; })}
+        </tbody></table>{!rows.length && <p className="portal-empty-copy">{filter === "For payment" ? "Nobody is waiting at the Cashier." : filter === "Screening" ? (noCourse.length ? "Applicants without a course are listed above." : "No applications to screen. New ones arrive from the website.") : "No matching enrollments."}</p>}</div>
+        <Pager page={page} total={rows.length} perPage={PER} onPage={setPage} />
+      </div>
+    </div>
     {current && <EnrollmentDrawer data={data} enrollment={current} reload={reload} onClose={() => setOpen(null)} />}
     {assigning && <AssignCourseModal data={data} trainee={assigning} reload={reload} onClose={() => setAssigning(null)} />}
   </>;
@@ -346,13 +392,21 @@ export type RecordsView = "applications" | "enrollments" | "trainees";
 export function RegistrationRecords({ data, query, reload, view, setView, trainees }: { data: PortalData; query: string; reload: () => Promise<void>; view: RecordsView; setView: (v: RecordsView) => void; trainees: ReactNode }) {
   const onList = view !== "trainees";
   const tabs: [RecordsView, string, number, boolean][] = [["enrollments", "Enrollments", data.enrollments.length + awaitingCourseOf(data).length, onList], ["trainees", "Trainees", data.trainees.length, !onList]];
-  return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Enrollments · trainees</span><h1>Registration</h1><p>{onList ? "Screen website applications, hand them to the Cashier, and follow every enrollment. A paid applicant on a batch is enrolled automatically." : "Trainee master records. Open one to see their details and enrollment history."}</p></div></div>
+  const weekAgo = addDays(manilaToday(), -6);
+  return <div className="portal-page cx ac">
+    <div className="cx-head"><div><span className="portal-eyebrow">Registration</span><h1>{onList ? "Enrollments" : "Trainees"}</h1></div></div>
     <div className="rr-switch" role="tablist" aria-label="Records">
       {tabs.map(([v, label, n, on]) => <button key={v} type="button" role="tab" aria-selected={on} className={on ? "active" : ""} onClick={() => setView(v)}>{label}<small>{n}</small></button>)}
     </div>
     {onList && <EnrollmentQueue key={view} data={data} query={query} reload={reload} initial={view === "applications" ? "Screening" : "All enrollments"} />}
-    {view === "trainees" && trainees}
+    {view === "trainees" && <div className="ac-rail">
+      <div className="ac-stack">
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Trainee records</h2></div>
+          <dl className="ac-lines"><div><dt>All trainees</dt><dd>{data.trainees.length}</dd></div><div><dt>Registered this week</dt><dd>{data.trainees.filter((t) => day(t.registered_at) >= weekAgo).length}</dd></div><div><dt>Missing SRN</dt><dd className="warn">{data.trainees.filter((t) => !t.srn).length}</dd></div><div><dt>Waiting for a course</dt><dd>{awaitingCourseOf(data).length}</dd></div></dl>
+        </section>
+      </div>
+      <div className="ac-stack">{trainees}</div>
+    </div>}
   </div>;
 }
 

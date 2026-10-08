@@ -1851,3 +1851,18 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .ac-bar select{font:inherit;padding:8px 12px;border:1px solid var(--nw-line);border-radius:9px;background:var(--nw-surface);color:var(--nw-fg)}
 .portal-shell .ac-table tfoot td{border-top:2px solid var(--nw-fg);font-weight:600}
 .portal-shell .ac-check .ac-chipbar,.portal-shell .cx-panel>.ac-chipbar{margin-bottom:12px}
+/* Spacing pass (owner, 8 Oct 2026): panel contents sit 20px in from the edges, headings sit close to their content, empty states stay short. */
+.nw-shell .cx-panel>.panel-heading{margin-bottom:0;padding:16px 20px 12px}
+.nw-shell .cx-panel>.ac-tiles-in,.nw-shell .cx-panel>.ac-lines,.nw-shell .cx-panel>.ac-foot,.nw-shell .cx-panel>.ac-split,.nw-shell .cx-panel>.ac-more,.nw-shell .cx-panel>.ac-mini,.nw-shell .cx-panel>.ac-bar,.nw-shell .cx-panel>.ac-chipbar,.nw-shell .cx-panel>.ac-sum,.nw-shell .cx-panel>.ac-chart,.nw-shell .cx-panel>svg,.nw-shell .cx-panel>.hb-list{margin-left:20px;margin-right:20px}
+.nw-shell .cx-panel>:last-child:not(.portal-table):not(.portal-empty-copy){margin-bottom:20px}
+.nw-shell .cx-panel>.ac-bar,.nw-shell .cx-panel>.ac-chipbar{margin-top:4px}
+.nw-shell .cx-panel>.panel-heading+.portal-empty-copy{padding:8px 20px 22px !important}
+.nw-shell .cx-panel>.portal-empty-copy{padding:18px 20px !important}
+.nw-shell .ac-rail .ac-lines>div{padding:9px 0}
+.nw-shell .ac-rail,.nw-shell .ac-stack{gap:20px}
+.nw-shell .ac-stack>.cx-panel{margin-bottom:0}
+.nw-shell .ac-tiles .cx-tile.ac-count b{min-width:48px}
+.nw-shell .ac-seat span{display:flex;flex-direction:column;gap:2px}.nw-shell .ac-seat span small{font-size:12.5px}
+.nw-shell .ac-meter{display:block;height:5px;background:#e3ecf0;border-radius:99px;overflow:hidden;margin-top:4px}.nw-shell .ac-meter>i{display:block;height:100%;background:var(--c)}
+.nw-shell .ac-stack>.ac-bar{margin:0}
+.nw-shell .cx-panel>.ch{padding:4px 20px 20px}
