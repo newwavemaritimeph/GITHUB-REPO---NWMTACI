@@ -8,34 +8,56 @@
  *        PORTAL_URL    = https://newwavemaritimemtaci.com
  *        PORTAL_SECRET = (the same text as EVALUATION_WEBHOOK_SECRET in Vercel)
  *   4. Choose the function "setup" at the top and press Run. Allow the permissions Google asks for.
- *      It connects every form whose title contains "EVALUATION" and turns on "Collect email addresses".
- *   5. When you add a new evaluation form later, press Run on "setup" again.
  *
+ * Google allows only 20 triggers per script, so instead of one trigger per form a single
+ * trigger checks every form whose title contains "EVALUATION" every 5 minutes and sends
+ * the new submissions. New evaluation forms are picked up automatically.
  * Only the fact that the trainee submitted (and who) is sent; the answers stay in Google Forms.
  * The portal works out the course from the form's title (e.g. "... - HPT-Hydraulic ...").
  */
 function setup() {
-  var existing = {};
-  ScriptApp.getProjectTriggers().forEach(function (t) {
-    if (t.getHandlerFunction() === 'onEvaluationSubmit') existing[t.getTriggerSourceId()] = true;
+  ScriptApp.getProjectTriggers().forEach(function (t) { ScriptApp.deleteTrigger(t); });
+  ScriptApp.newTrigger('checkEvaluations').timeBased().everyMinutes(5).create();
+  var props = PropertiesService.getScriptProperties();
+  var now = new Date().toISOString();
+  var forms = evaluationForms();
+  forms.forEach(function (form) {
+    try { form.setCollectEmail(true); } catch (err) { console.log('Email setting not changed for ' + form.getTitle() + ': ' + err); }
+    // Start from now: earlier submissions are not sent.
+    if (!props.getProperty('since_' + form.getId())) props.setProperty('since_' + form.getId(), now);
   });
-  var files = DriveApp.searchFiles('mimeType = "application/vnd.google-apps.form" and title contains "EVALUATION" and trashed = false');
-  var connected = [];
-  while (files.hasNext()) {
-    var file = files.next();
-    var form = FormApp.openById(file.getId());
-    try { form.setCollectEmail(true); } catch (err) { console.log('Email setting not changed for ' + file.getName() + ': ' + err); }
-    if (!existing[file.getId()]) ScriptApp.newTrigger('onEvaluationSubmit').forForm(form).onFormSubmit().create();
-    connected.push(file.getName());
-  }
-  console.log('Connected ' + connected.length + ' evaluation forms:\n' + connected.join('\n'));
+  console.log('Watching ' + forms.length + ' evaluation forms every 5 minutes:\n' + forms.map(function (f) { return f.getTitle(); }).join('\n'));
 }
 
-function onEvaluationSubmit(e) {
+function evaluationForms() {
+  var files = DriveApp.searchFiles('mimeType = "application/vnd.google-apps.form" and title contains "EVALUATION" and trashed = false');
+  var forms = [];
+  while (files.hasNext()) {
+    try { forms.push(FormApp.openById(files.next().getId())); } catch (err) { console.log(err); }
+  }
+  return forms;
+}
+
+function checkEvaluations() {
+  var props = PropertiesService.getScriptProperties();
+  var now = new Date().toISOString();
+  evaluationForms().forEach(function (form) {
+    var key = 'since_' + form.getId();
+    var since = props.getProperty(key);
+    if (!since) { props.setProperty(key, now); return; } // a new form: start from now
+    var latest = since;
+    form.getResponses(new Date(since)).forEach(function (response) {
+      var ts = response.getTimestamp().toISOString();
+      if (ts <= since) return;
+      if (send(form, response)) { if (ts > latest) latest = ts; }
+    });
+    props.setProperty(key, latest);
+  });
+}
+
+function send(form, response) {
   var props = PropertiesService.getScriptProperties();
   var url = (props.getProperty('PORTAL_URL') || '').replace(/\/$/, '') + '/api/public/evaluation';
-  var form = e.source;
-  var response = e.response;
   var nwmtaci = '';
   response.getItemResponses().forEach(function (r) {
     if (/nwmtaci/i.test(r.getItem().getTitle())) nwmtaci = String(r.getResponse() || '').trim();
@@ -55,5 +77,8 @@ function onEvaluationSubmit(e) {
     payload: JSON.stringify(payload),
     muteHttpExceptions: true
   });
-  console.log(result.getResponseCode() + ' ' + result.getContentText());
+  var code = result.getResponseCode();
+  console.log(form.getTitle() + ' → ' + code + ' ' + result.getContentText());
+  // 2xx and "not found" (no matching trainee) are final; anything else is retried next run.
+  return code < 300 || code === 404 || code === 400;
 }
