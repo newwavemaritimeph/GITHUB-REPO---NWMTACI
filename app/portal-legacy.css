@@ -1942,3 +1942,27 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .ms-page .ac-lines>div{padding:10px 0}
 .nw-shell .ms-page .ac-foot{margin:12px 20px 18px;line-height:1.5}
 @media (max-width:640px){.nw-shell .ms-page{gap:14px}.nw-shell .ms-page .panel-heading .cl-acts{width:100%}.nw-shell .ms-page .ms-bbtn{margin-left:0}}
+/* Spacing pass 3 (owner, 8 Oct 2026): every summary-rail page (Accounting, Cashier, Registration, Releasing, Delivery, MISMO) */
+/* shares one rhythm — 18px between header, note, alerts and panels; 20px inside panels. */
+.nw-shell .portal-page.ac{display:flex;flex-direction:column;gap:18px}
+.nw-shell .portal-page.ac>*{margin-top:0 !important;margin-bottom:0 !important}
+.nw-shell .portal-page.ac>.cx-head{align-items:flex-end}
+.nw-shell .portal-page.ac>.ac-note{margin-top:-10px !important;font-size:14.5px;color:var(--nw-muted)}
+.nw-shell .portal-page.ac .ac-rail{gap:20px}
+.nw-shell .portal-page.ac .ac-stack{gap:20px}
+.nw-shell .portal-page.ac .panel-heading{padding:18px 20px 12px;gap:10px 14px}
+.nw-shell .portal-page.ac .panel-heading h2{min-width:0}
+.nw-shell .portal-page.ac .panel-heading .cl-acts{flex-wrap:wrap;gap:8px}
+.nw-shell .portal-page.ac .ac-lines>div{padding:10px 0}
+.nw-shell .portal-page.ac .ac-foot{line-height:1.5}
+.nw-shell .portal-page.ac .cl-log td{padding:9px 12px}.nw-shell .portal-page.ac .cl-log th{padding:10px 12px}
+.nw-shell .portal-page.ac .cl-alarm,.nw-shell .portal-page.ac .ms-banner{padding:14px 18px;gap:10px 16px}
+.nw-shell .portal-page.ac .portal-message{margin:0}
+.nw-shell .portal-page.ac .ac-grid2{gap:20px}
+.nw-shell .portal-page.ac .cx-tiles.ac-tiles-in .cx-tile{padding:11px 16px 11px 20px}
+/* Older screens: consistent page padding, panel gaps and table cells. */
+.nw-shell .portal-page>.portal-panel+.portal-panel,.nw-shell .portal-page>section+section{margin-top:16px}
+.nw-shell .portal-page .portal-tabs{margin-bottom:14px;gap:6px;flex-wrap:wrap}
+.nw-shell .live-row-item{padding:14px 20px;gap:14px}
+.nw-shell .portal-form{gap:14px 16px}
+@media (max-width:640px){.nw-shell .portal-page.ac{gap:14px}.nw-shell .portal-page.ac .ac-rail,.nw-shell .portal-page.ac .ac-stack{gap:14px}.nw-shell .portal-page{padding-left:16px;padding-right:16px}}
