@@ -1549,3 +1549,17 @@ button.rd-row:hover { background: #f6fafc; }
   .portal-shell .cx-lines-row input:first-child{grid-column:1/-1}
   .portal-shell .cx-lines-amt{text-align:left}
 }
+
+/* Expenses › Vouchers: months, print state (8 Oct 2026) */
+.portal-shell .cx-views{margin-bottom:4px}
+.portal-shell .cx-chip{display:inline-flex;align-items:center;min-height:36px;padding:0 12px;border-radius:999px;background:#fff1e9;color:#a33c0c;font-size:14px;font-weight:600;white-space:nowrap}
+.portal-shell .cx-month{padding:0;overflow:hidden}
+.portal-shell .cx-month-head{display:flex;align-items:center;gap:16px;width:100%;padding:16px 20px;background:none;border:0;cursor:pointer;text-align:left;font:inherit;color:inherit}
+.portal-shell .cx-month-head:hover{background:#f4f8fb}
+.portal-shell .cx-month-head:focus-visible{outline:2px solid #0571D0;outline-offset:-2px}
+.portal-shell .cx-month-name{font-size:19px;font-weight:600;color:#123F63}
+.portal-shell .cx-month-meta{color:#5f7180;font-size:15px}
+.portal-shell .cx-month-head b{margin-left:auto;font-size:17px;color:#123F63}
+.portal-shell .cx-month-caret{color:#5f7180;width:16px}
+.portal-shell .cx-month .portal-table{border-top:1px solid #dbe5ec}
+@media (max-width:640px){.portal-shell .cx-month-head{flex-wrap:wrap;gap:4px 12px;padding:14px 16px}.portal-shell .cx-month-head b{margin-left:0}}

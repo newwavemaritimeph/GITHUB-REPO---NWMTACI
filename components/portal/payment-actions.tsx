@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import type { PortalData, Enrollment } from "../portal-live-app";
-import { first, pesos } from "@/lib/portal-format";
+import { first, manilaToday, pesos } from "@/lib/portal-format";
+import { requestFee } from "@/lib/request-fees";
 import { Message, Modal, fmtDate } from "./shared-ui";
 
 /**
@@ -25,6 +26,10 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
   const [courseId, setCourseId] = useState(enrollment.course_id);
   const [offerId, setOfferId] = useState("");
   const [busy, setBusy] = useState(false), [err, setErr] = useState("");
+  // The date the trainee asked (owner, 8 Oct 2026); rescheduling and cancellation fees count from it.
+  const today = manilaToday();
+  const [requestedOn, setRequestedOn] = useState(today);
+  const policyFee = requestFee({ type: reqType, trainingFeeCentavos: Number(enrollment.selling_price_centavos), startDate: first(enrollment.batches)?.starts_on ?? enrollment.scheduled_on ?? null, requestedOn: requestedOn || today });
   const batches = data.batches.filter((b) => b.course_id === enrollment.course_id && b.id !== enrollment.batch_id && b.status === "Open" && b.confirmed_count < b.capacity);
   const newCourse = data.courses.find((c) => c.id === courseId);
   const offers = data.offers.filter((o) => o.course_id === courseId);
@@ -43,7 +48,7 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
         batchId: reqType === "Rescheduling" ? (batchId || null) : null,
         amountCentavos: reqType === "Refund" ? amt : undefined,
         courseId: reqType === "Change Course" ? courseId : undefined,
-        partnerOfferId: reqType === "Change Course" ? (offerId || null) : undefined });
+        partnerOfferId: reqType === "Change Course" ? (offerId || null) : undefined, requestedOn: requestedOn || today });
       onClose();
     } catch (e) { setErr(e instanceof Error ? e.message : "Failed."); } finally { setBusy(false); }
   }
@@ -58,6 +63,8 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
       {newCourse?.delivery_type === "Partner or Endorsed" && <label className="full">Endorsed program<select value={offerId} onChange={(e) => setOfferId(e.target.value)}><option value="">Select rate</option>{offers.map((o) => <option key={o.id} value={o.id}>{first(o.partner_centers)?.name} · {o.duration_label} · {pesos(o.training_fee_centavos)}</option>)}</select></label>}
     </>}
     {reqType === "Refund" && <label className="full">Refund Amount (PHP)<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>}
+    <label>Date requested<input type="date" value={requestedOn} max={today} onChange={(e) => setRequestedOn(e.target.value)} /></label>
+    {policyFee && <div className="rate-preview"><span>Fee by policy</span><strong>{pesos(policyFee.amountCentavos)}</strong><small>{policyFee.rule}</small></div>}
     <label className="full">Reason<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why is this being requested?" /></label>
     <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={send}>{busy ? "Sending…" : "Request approval"}</button></div>
   </div>;

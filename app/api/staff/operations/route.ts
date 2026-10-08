@@ -11,6 +11,9 @@ import { loadInstructionDetails } from "@/lib/training-instructions";
 import { fileVoucherInDrive } from "@/lib/expense-voucher";
 import { activeConnection, googleConfigured, hasDriveScope, inviteStudent, listClasses, revokeConnection } from "@/lib/google-classroom";
 import { sendBalanceSummary } from "@/lib/balance-summary";
+import { RULED_REQUESTS, requestFee } from "@/lib/request-fees";
+
+const manilaDate = (d = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(d);
 
 const enrollmentInput = z.object({
   action: z.literal("create-enrollment"), existingTraineeId: z.string().uuid().nullable().optional(),
@@ -82,6 +85,9 @@ const expenseCreateInput = z.object({ action: z.literal("expense-create"), payee
   supportingDocument: z.string().trim().max(160).optional().default("") });
 const expenseDecideInput = z.object({ action: z.literal("expense-decide"), id: z.string().uuid(), decision: z.enum(["Approved", "Rejected", "Paid"]), remarks: z.string().trim().max(300).optional() });
 // The Cashier releases an approved voucher (cash or transfer) and marks it paid.
+// Voucher print limit (202610080020): one print, more only after the Accounting Manager approves a reprint.
+const expenseReprintRequestInput = z.object({ action: z.literal("expense-reprint-request"), id: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
+const expenseReprintDecideInput = z.object({ action: z.literal("expense-reprint-decide"), requestId: z.string().uuid(), decision: z.enum(["Approved", "Rejected"]), remarks: z.string().trim().max(300).optional() });
 const expenseReleaseInput = z.object({ action: z.literal("expense-release"), id: z.string().uuid(), paymentChannel: z.string().trim().min(1).max(40), referenceNumber: z.string().trim().max(80).optional().default("") });
 const cashierOpenInput = z.object({ action: z.literal("cashier-open"), openingCashCentavos: z.number().int().nonnegative(), remarks: z.string().trim().max(300).optional() });
 const balanceSummaryInput = z.object({ action: z.literal("balance-summary-send") });
@@ -177,13 +183,13 @@ const applicationPlaceBatchInput = z.object({ action: z.literal("application-pla
 const sendInstructionsInput = z.object({ action: z.literal("send-instructions"), enrollmentId: z.string().uuid() });
 const instructionTemplateSaveInput = z.object({ action: z.literal("instruction-template-save"), courseId: z.string().uuid(), subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(8000) });
 const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-link-save"), courseId: z.string().uuid(), link: z.string().trim().max(500), code: z.string().trim().max(40).optional() });
-const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course", "TAR reprint"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional(), courseId: z.string().uuid().nullable().optional(), partnerOfferId: z.string().uuid().nullable().optional() });
+const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course", "TAR reprint"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional(), courseId: z.string().uuid().nullable().optional(), partnerOfferId: z.string().uuid().nullable().optional(), requestedOn: z.string().regex(/^d{4}-d{2}-d{2}$/).optional() });
 const classroomClassesInput = z.object({ action: z.literal("classroom-classes") });
 const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-link"), courseId: z.string().uuid(), classroomCourseId: z.string().trim().max(60).nullable() });
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -525,7 +531,13 @@ export async function GET() {
     const types = ["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course", "TAR reprint"];
     // stage / charge_id come from migration 202610070004; without it, fall back.
     const routed = await db.from("enrollment_requests").select(`${base},stage,charge_id,enrollment_charges!enrollment_requests_charge_id_fkey(amount_centavos,description,approval_status)`).in("request_type", types).order("created_at", { ascending: false }).limit(200);
-    if (!routed.error) return routed.data ?? [];
+    if (!routed.error) {
+      const list = (routed.data ?? []) as { id: string }[];
+      // Request date and fee rule (202610080022); ignored before it.
+      const { data: dated } = list.length ? await db.from("enrollment_requests").select("id,requested_on,fee_rule").in("id", list.map((r) => r.id)) : { data: [] };
+      const byId = new Map((dated ?? []).map((r) => [(r as { id: string }).id, r]));
+      return list.map((r) => ({ ...r, ...(byId.get(r.id) ?? {}) }));
+    }
     const { data } = await db.from("enrollment_requests").select(base).in("request_type", types).order("created_at", { ascending: false }).limit(200);
     return data ?? [];
   })();
@@ -599,7 +611,10 @@ export async function GET() {
     // Voucher flow fields (202610070018).
     const { data: flow } = await db.from("expenses").select("id,request_number,voucher_number,approved_at,decision_remarks,released_at,drive_link,paid_at").in("id", ex.map((r) => (r as { id: string }).id));
     const flowById = new Map((flow ?? []).map((r) => [(r as { id: string }).id, r]));
-    const rows = ex.map((r) => ({ ...r, ...(flowById.get((r as { id: string }).id) ?? {}) })) as { id: string }[];
+    // Print counts (202610080020); ignored before it.
+    const { data: prints } = await db.from("expenses").select("id,print_count,reprints_approved").in("id", ex.map((r) => (r as { id: string }).id));
+    const printsById = new Map((prints ?? []).map((r) => [(r as { id: string }).id, r]));
+    const rows = ex.map((r) => ({ ...r, ...(flowById.get((r as { id: string }).id) ?? {}), ...(printsById.get((r as { id: string }).id) ?? {}) })) as { id: string }[];
     // Resolve the requester's display name so the voucher list can show who raised it.
     const ids = [...new Set(ex.map((r) => (r as { requested_by?: string }).requested_by).filter(Boolean))] as string[];
     if (!ids.length) return { rows, names: new Map<string, string>() };
@@ -795,6 +810,18 @@ export async function GET() {
     return { ...merged, requested_by_name: expenseExtras.names.get(merged.requested_by ?? "") ?? null };
   });
 
+  // Voucher reprint requests (202610080020), newest first; [] before it.
+  let expenseReprints: { id: string; expense_id: string; reason: string; status: string; requested_by_name: string | null; requested_at: string; decision_remarks: string | null }[] = [];
+  if (staff.roleCodes.some((role) => ["admin", "cashier", "accounting"].includes(role))) {
+    const { data: rr } = await db.from("expense_reprint_requests").select("id,expense_id,reason,status,requested_by,requested_at,decision_remarks").order("requested_at", { ascending: false }).limit(100);
+    if (rr?.length) {
+      const ids = [...new Set(rr.map((r) => r.requested_by).filter(Boolean))] as string[];
+      const { data: people } = ids.length ? await db.from("profiles").select("id,complete_name").in("id", ids) : { data: [] };
+      const names = new Map((people ?? []).map((p) => [p.id as string, p.complete_name as string]));
+      expenseReprints = rr.map((r) => ({ id: r.id, expense_id: r.expense_id, reason: r.reason, status: r.status, requested_by_name: names.get(r.requested_by ?? "") ?? null, requested_at: r.requested_at, decision_remarks: r.decision_remarks }));
+    }
+  }
+
   return NextResponse.json({ profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
@@ -802,7 +829,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -910,6 +937,37 @@ export async function POST(request: Request) {
       if (error) return NextResponse.json({ error: /reject_expense/i.test(error.message) ? "Apply database update 202610070018 first." : error.message }, { status: 400 });
       return NextResponse.json({ ok: true });
     }
+    if (input.action === "expense-reprint-request") {
+      if (!staff.roleCodes.some((role) => ["admin", "cashier", "accounting"].includes(role))) return NextResponse.json({ error: "Your account cannot request voucher reprints." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: row, error: rowError } = await admin.from("expenses").select("id,status,print_count,reprints_approved").eq("id", input.id).maybeSingle();
+      if (rowError) return NextResponse.json({ error: /print_count|reprints_approved/i.test(rowError.message) ? "Apply database update 202610080020 first." : rowError.message }, { status: 400 });
+      if (!row) return NextResponse.json({ error: "Voucher not found." }, { status: 404 });
+      const r = row as { status: string; print_count: number; reprints_approved: number };
+      if (r.status !== "Approved" && r.status !== "Paid") return NextResponse.json({ error: "Only an approved voucher can be reprinted." }, { status: 400 });
+      if (r.print_count < 1 + r.reprints_approved) return NextResponse.json({ error: "This voucher can still be printed. No request is needed." }, { status: 400 });
+      const { data: created, error } = await admin.from("expense_reprint_requests").insert({ expense_id: input.id, reason: input.reason, requested_by: staff.user.id }).select("id").single();
+      if (error) return NextResponse.json({ error: /duplicate|expense_reprint_one_pending/i.test(error.message) ? "A reprint request for this voucher is already waiting for the Accounting Manager." : error.message }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("cashier") ? "cashier" : staff.roleCodes[0] ?? null, action: "expense_voucher.reprint_requested", record_type: "expense", record_id: input.id, new_values: { request_id: created.id }, reason: input.reason });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "expense-reprint-decide") {
+      if (!staff.roleCodes.includes("accounting")) return NextResponse.json({ error: "Only the Accounting Manager can approve voucher reprints." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: req } = await admin.from("expense_reprint_requests").select("id,expense_id,status").eq("id", input.requestId).maybeSingle();
+      if (!req) return NextResponse.json({ error: "Request not found." }, { status: 404 });
+      if (req.status !== "Pending") return NextResponse.json({ error: "This request was already decided." }, { status: 400 });
+      const now = new Date().toISOString();
+      const { data: decided, error } = await admin.from("expense_reprint_requests").update({ status: input.decision, decided_by: staff.user.id, decided_at: now, decision_remarks: input.remarks || null }).eq("id", input.requestId).eq("status", "Pending").select("id");
+      if (error) throw error;
+      if (!decided?.length) return NextResponse.json({ error: "This request was already decided." }, { status: 400 });
+      if (input.decision === "Approved") {
+        const { data: ex } = await admin.from("expenses").select("reprints_approved").eq("id", req.expense_id).single();
+        await admin.from("expenses").update({ reprints_approved: Number((ex as { reprints_approved: number }).reprints_approved) + 1 }).eq("id", req.expense_id);
+      }
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "accounting", action: input.decision === "Approved" ? "expense_voucher.reprint_approved" : "expense_voucher.reprint_rejected", record_type: "expense", record_id: req.expense_id, new_values: { request_id: req.id }, reason: input.remarks || null });
+      return NextResponse.json({ ok: true });
+    }
     if (input.action === "expense-release") {
       if (!staff.roleCodes.some((role) => ["admin", "cashier", "accounting"].includes(role))) return NextResponse.json({ error: "Your account cannot release vouchers." }, { status: 403 });
       const admin = createSupabaseAdminClient();
@@ -1003,6 +1061,7 @@ export async function POST(request: Request) {
       if (input.requestType === "Rescheduling" && !input.batchId) return NextResponse.json({ error: "Choose the new schedule for the reschedule request." }, { status: 400 });
       if (input.requestType === "Refund" && !input.amountCentavos) return NextResponse.json({ error: "Enter the refund amount." }, { status: 400 });
       if (input.requestType === "Change Course" && !input.courseId) return NextResponse.json({ error: "Choose the course to change to." }, { status: 400 });
+      if (input.requestedOn && input.requestedOn > manilaDate()) return NextResponse.json({ error: "The request date cannot be in the future." }, { status: 400 });
       if (input.requestType === "TAR reprint" && !canCashier(staff.roleCodes)) return NextResponse.json({ error: "Only the Cashier can request a TAR reprint." }, { status: 403 });
       if (input.requestType === "TAR reprint") {
         const pendingReprint = await createSupabaseAdminClient().from("enrollment_requests").select("id").eq("enrollment_id", input.enrollmentId).eq("request_type", "TAR reprint").eq("status", "Pending").limit(1);
@@ -1028,6 +1087,8 @@ export async function POST(request: Request) {
       const { data: created, error: insertError } = inserted;
       if (insertError || !created) throw insertError ?? new Error("Could not raise the request.");
       await admin.from("request_events").insert({ request_id: created.id, actor_id: staff.user.id, event_type: "raised", new_values: requested, remarks: input.reason });
+      // The date the trainee asked (202610080022); ignored before it.
+      await admin.from("enrollment_requests").update({ requested_on: input.requestedOn ?? manilaDate() }).eq("id", created.id);
       return NextResponse.json({ ok: true });
     }
     if (input.action === "request-decide") {
@@ -1178,20 +1239,33 @@ export async function POST(request: Request) {
       if (findError) throw findError;
       if (!req) return NextResponse.json({ error: "Request not found." }, { status: 404 });
       if (req.status !== "Pending" || req.stage !== "With cashier") return NextResponse.json({ error: "This request is not waiting for charges." }, { status: 400 });
+      // Rescheduling and cancellation fees follow the owner's rule (lib/request-fees), worked out here from
+      // the request date and the training start; the amount sent by the browser is not used for them.
+      let amountCentavos = input.amountCentavos, description = input.description, feeRule: string | null = null;
+      if ((RULED_REQUESTS as readonly string[]).includes(req.request_type)) {
+        const { data: en } = await admin.from("enrollments").select("selling_price_centavos,scheduled_on,created_at,batches(starts_on)").eq("id", req.enrollment_id).single();
+        const { data: dated } = await admin.from("enrollment_requests").select("requested_on").eq("id", req.id).maybeSingle();
+        const { data: made } = await admin.from("enrollment_requests").select("created_at").eq("id", req.id).single();
+        const e = en as { selling_price_centavos: number; scheduled_on?: string | null; batches?: { starts_on?: string | null } | { starts_on?: string | null }[] | null };
+        const batch = Array.isArray(e.batches) ? e.batches[0] : e.batches;
+        const fee = requestFee({ type: req.request_type, trainingFeeCentavos: Number(e.selling_price_centavos), startDate: batch?.starts_on ?? e.scheduled_on ?? null, requestedOn: (dated as { requested_on?: string | null } | null)?.requested_on ?? manilaDate(new Date((made as { created_at: string }).created_at)) });
+        if (fee) { amountCentavos = fee.amountCentavos; feeRule = fee.rule; description = `${req.request_type} fee (${fee.rule})`.slice(0, 200); }
+      }
       let chargeId: string | null = null;
-      if (input.amountCentavos > 0) {
+      if (amountCentavos > 0) {
         // Pending until the Accounting Manager decides. A Change Course or
         // Rescheduling fee is payable right away (valid) so the Cashier can
         // collect it before approval; other fees count only once approved.
         const payFirst = PAY_FIRST_REQUESTS.includes(req.request_type);
-        const { data: charge, error: chargeError } = await admin.from("enrollment_charges").insert({ enrollment_id: req.enrollment_id, charge_catalog_id: input.chargeCatalogId ?? null, description: input.description || `${req.request_type} fee`, amount_centavos: input.amountCentavos, event_type: "charge", valid: payFirst, approval_status: "Pending", created_by: staff.user.id }).select("id").single();
+        const { data: charge, error: chargeError } = await admin.from("enrollment_charges").insert({ enrollment_id: req.enrollment_id, charge_catalog_id: input.chargeCatalogId ?? null, description: description || `${req.request_type} fee`, amount_centavos: amountCentavos, event_type: "charge", valid: payFirst, approval_status: "Pending", created_by: staff.user.id }).select("id").single();
         if (chargeError) throw chargeError;
         chargeId = charge.id;
       }
       const at = new Date().toISOString();
       const { error } = await admin.from("enrollment_requests").update({ stage: "For approval", charge_id: chargeId, charged_by: staff.user.id, charged_at: at, updated_at: at }).eq("id", req.id).eq("stage", "With cashier");
       if (error) throw error;
-      await admin.from("request_events").insert({ request_id: req.id, actor_id: staff.user.id, event_type: "charged", new_values: { charge_id: chargeId, amount_centavos: input.amountCentavos }, remarks: input.remarks ?? null });
+      if (feeRule) await admin.from("enrollment_requests").update({ fee_rule: feeRule }).eq("id", req.id); // 202610080022; ignored before it
+      await admin.from("request_events").insert({ request_id: req.id, actor_id: staff.user.id, event_type: "charged", new_values: { charge_id: chargeId, amount_centavos: amountCentavos, fee_rule: feeRule }, remarks: input.remarks ?? null });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "application-assign") {

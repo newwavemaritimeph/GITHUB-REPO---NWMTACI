@@ -98,8 +98,8 @@ const DEFAULT_REMINDERS = [
 ];
 const INSTRUCTION_POLICIES: [string, string, string][] = [
   ["P", "Payment", "Full payment for 1-day courses; 50% down payment otherwise."],
-  ["R", "Reschedule", "Subject to slots and approval; fees per the refund policy."],
-  ["F", "Refund", "5+ days before: Php 350.00. Under 5 days: 50% + Php 250.00."],
+  ["R", "Reschedule", "3+ days before: Php 300.00. 1-2 days before: 50% of the fee + Php 250.00."],
+  ["F", "Cancellation", "5+ days before: Php 300.00. Under 5 days: 50% of the fee + Php 250.00."],
   ["M", "Make-up", "3-day and longer courses; Php 350.00 per training day."],
   ["C", "Certificate", "Released after all requirements and balances are complete."],
 ];
@@ -841,6 +841,8 @@ export type ExpenseVoucherSnapshot = {
   approvedAt?: string;
   releasedBy?: string;
   releasedAt?: string;
+  // Print limit (8 Oct 2026): "Reprint 1" etc. on copies after the first.
+  printLabel?: string;
 };
 
 /**
@@ -901,7 +903,7 @@ export async function createExpenseVoucherPdf(snapshot: ExpenseVoucherSnapshot) 
   page.drawRectangle({ x: X1 - titleW, y: y - headH, width: titleW, height: headH, color: c.navy });
   text("EXPENSE VOUCHER", X1 - titleW + PAD + 3, y - 14, 6.6, bold, c.cyan);
   text(snapshot.number, X1 - titleW + PAD + 3, y - 30, 12.5, monoBold, c.white);
-  text(snapshot.status, X1 - titleW + PAD + 3, y - 41, 6.6, bold, c.white);
+  text(snapshot.printLabel ? `${snapshot.status}  |  ${snapshot.printLabel}` : snapshot.status, X1 - titleW + PAD + 3, y - 41, 6.6, bold, c.white);
   y -= headH;
   page.drawLine({ start: { x: X0, y }, end: { x: X1, y }, thickness: 1.2, color: c.navy });
 
@@ -1143,4 +1145,179 @@ export async function createPaymentInvoicePdf(snapshot:PaymentSnapshot){
     {heading:"Billed to",rows:[{label:"Trainee",value:snapshot.traineeName},{label:"Trainee number",value:snapshot.traineeNumber},{label:"Address",value:snapshot.address||"-"},{label:"Enrollment",value:snapshot.enrollmentNumber}]},
     {heading:"Training and payment",rows:[{label:"Course",value:snapshot.course},{label:"Payment",value:snapshot.paymentNumber},{label:"Payment method",value:snapshot.method},{label:"Transaction reference",value:snapshot.referenceNumber||"Manual / none"},{label:"This payment",value:php(snapshot.amountCentavos)},{label:"Total course fee",value:php(snapshot.totalDueCentavos)},{label:"Total paid",value:php(snapshot.totalPaidCentavos)},{label:"Remaining balance",value:php(snapshot.balanceCentavos)}]},
   ],footer:"This invoice was generated automatically from an immutable payment snapshot. An acknowledgment receipt is issued separately."});
+}
+
+export type CashierReportSnapshot = {
+  dateLabel: string;
+  preparedBy: string;
+  checkedBy?: string;
+  logoBytes?: Uint8Array;
+  position: { previousLabel: string; previousNote?: string; previousCentavos: number; cashCollectedCentavos: number; cashExpensesCentavos: number; onHandCentavos: number; countedCentavos: number | null; overShortCentavos: number | null };
+  channels: string[];
+  matrix: { source: string; cells: { channel: string; count: number; totalCentavos: number }[]; count: number; totalCentavos: number }[];
+  groups: { kind: string; name: string; rows: { receipt: string; time: string; trainee: string; course: string; channel: string; reference: string; amountCentavos: number }[]; subtotalCentavos: number }[];
+  expenses: { voucher: string; payee: string; category: string; channel: string; reference: string; status: string; amountCentavos: number }[];
+  expenseTotals: { channel: string; totalCentavos: number }[];
+};
+
+/**
+ * Cashier summary report (owner, 8 Oct 2026): one consolidated A4 page per day
+ * (more pages only when the lists are long). Cash position (previous cash +
+ * today's cash − cash expenses), collections by source (direct walk-ins,
+ * agencies, consultancies) and payment channel, the receipts behind them,
+ * the expenses with voucher numbers, and signatures.
+ */
+export async function createCashierReportPdf(s: CashierReportSnapshot) {
+  const pdf = await PDFDocument.create();
+  const W = 595.28, H = 841.89, M = 32, CW = W - 2 * M;
+  const reg = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const mono = await pdf.embedFont(StandardFonts.Courier);
+  type Font = typeof reg;
+  const c = { navy: rgb(.071, .247, .388), orange: rgb(.949, .337, .082), blue: rgb(.02, .443, .816), cyan: rgb(.208, .8, .98), ink: rgb(.08, .16, .23), muted: rgb(.37, .44, .5), rule: rgb(.78, .83, .87), hair: rgb(.88, .91, .94), tint: rgb(.933, .965, .984), green: rgb(.04, .48, .24), red: rgb(.7, .14, .1), white: rgb(1, 1, 1) };
+  const money = (v: number) => `${v < 0 ? "-" : ""}${(Math.abs(v) / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  let logo: Awaited<ReturnType<typeof pdf.embedPng>> | null = null;
+  if (s.logoBytes) { try { logo = await pdf.embedPng(s.logoBytes); } catch { logo = null; } }
+  let page = pdf.addPage([W, H]);
+  let y = H - M;
+  let pageNo = 1;
+  const text = (t: string, x: number, yy: number, size: number, font: Font = reg, color = c.ink) => page.drawText(ascii(t), { x, y: yy, size, font, color });
+  const right = (t: string, xr: number, yy: number, size: number, font: Font = reg, color = c.ink) => text(t, xr - font.widthOfTextAtSize(ascii(t), size), yy, size, font, color);
+  const fit = (t: string, size: number, maxW: number, font: Font = reg) => {
+    let v = ascii(t ?? "");
+    if (font.widthOfTextAtSize(v, size) <= maxW) return v;
+    while (v.length > 1 && font.widthOfTextAtSize(`${v}...`, size) > maxW) v = v.slice(0, -1);
+    return `${v}...`;
+  };
+  const footer = () => {
+    text("Ride the New Wave of Maritime Excellence  |  Amounts in Philippine peso", M, 18, 6.5, reg, c.muted);
+    right(`Page ${pageNo}`, W - M, 18, 6.5, reg, c.muted);
+  };
+  const ensure = (need: number, again?: () => void) => {
+    if (y - need >= 70) return;
+    footer();
+    page = pdf.addPage([W, H]); pageNo += 1; y = H - M;
+    text(`Cashier summary report  |  ${s.dateLabel} (continued)`, M, y - 10, 8, bold, c.navy);
+    y -= 22;
+    again?.();
+  };
+  const section = (title: string, aside?: string) => {
+    ensure(40);
+    y -= 8;
+    text(title.toUpperCase(), M, y - 9, 8, bold, c.navy);
+    if (aside) right(aside, W - M, y - 9, 7.5, reg, c.muted);
+    y -= 14;
+    page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 1, color: c.navy });
+    y -= 2;
+  };
+  type Col = { label: string; w: number; align?: "right"; font?: Font };
+  const tableHead = (cols: Col[]) => {
+    page.drawRectangle({ x: M, y: y - 14, width: CW, height: 14, color: c.tint });
+    let x = M;
+    for (const col of cols) {
+      const w = CW * col.w;
+      if (col.align === "right") right(col.label.toUpperCase(), x + w - 4, y - 9.5, 6, bold, c.navy); else text(col.label.toUpperCase(), x + 4, y - 9.5, 6, bold, c.navy);
+      x += w;
+    }
+    y -= 14;
+  };
+  const tableRow = (cols: Col[], cells: string[], opts: { bold?: boolean; fill?: boolean } = {}) => {
+    const h = 13.5;
+    if (opts.fill) page.drawRectangle({ x: M, y: y - h, width: CW, height: h, color: c.tint });
+    let x = M;
+    cols.forEach((col, i) => {
+      const w = CW * col.w, font = opts.bold ? bold : col.font ?? reg, v = fit(cells[i] ?? "", 7.6, w - 8, font);
+      if (col.align === "right") right(v, x + w - 4, y - 9.5, 7.6, font); else text(v, x + 4, y - 9.5, 7.6, font);
+      x += w;
+    });
+    y -= h;
+    page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 0.4, color: c.hair });
+  };
+
+  // Letterhead.
+  page.drawRectangle({ x: M, y: y - 50, width: CW, height: 50, color: c.navy });
+  if (logo) { page.drawCircle({ x: M + 25, y: y - 25, size: 18, color: c.white }); const d = logo.scale(30 / Math.max(logo.width, logo.height)); page.drawImage(logo, { x: M + 25 - d.width / 2, y: y - 25 - d.height / 2, width: d.width, height: d.height }); }
+  text("New Wave Maritime Training and Assessment Center, Inc.", M + 52, y - 21, 10.5, bold, c.white);
+  text("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000", M + 52, y - 33, 6.6, reg, rgb(.62, .89, .945));
+  right("CASHIER SUMMARY REPORT", W - M - 12, y - 21, 11, bold, c.white);
+  right(s.dateLabel, W - M - 12, y - 34, 8, reg, rgb(.62, .89, .945));
+  y -= 50;
+  const third = CW / 3;
+  page.drawRectangle({ x: M, y: y - 3, width: third, height: 3, color: c.orange });
+  page.drawRectangle({ x: M + third, y: y - 3, width: third, height: 3, color: c.cyan });
+  page.drawRectangle({ x: M + 2 * third, y: y - 3, width: CW - 2 * third, height: 3, color: c.blue });
+  y -= 10;
+
+  // 1. Cash position.
+  section("1. Cash position", "Cash only");
+  const p = s.position;
+  const boxes: [string, string, typeof c.ink, string?][] = [
+    [p.previousLabel, money(p.previousCentavos), c.ink, p.previousNote],
+    ["+ Cash collected", money(p.cashCollectedCentavos), c.green],
+    ["- Cash expenses", money(p.cashExpensesCentavos), c.red],
+    ["= Cash on hand", money(p.onHandCentavos), c.navy],
+    ["Counted at closing", p.countedCentavos == null ? "Not yet" : money(p.countedCentavos), c.ink],
+    ["Over / short", p.overShortCentavos == null ? "-" : `${p.overShortCentavos > 0 ? "+" : ""}${money(p.overShortCentavos)}`, p.overShortCentavos ? (p.overShortCentavos < 0 ? c.red : c.green) : c.ink],
+  ];
+  const bw = CW / boxes.length, bh = 42;
+  boxes.forEach(([label, value, color, note], i) => {
+    const x = M + i * bw;
+    page.drawRectangle({ x, y: y - bh, width: bw, height: bh, borderColor: c.rule, borderWidth: 0.5, ...(i === 3 ? { color: c.tint } : {}) });
+    text(fit(label.toUpperCase(), 5.8, bw - 8, bold), x + 5, y - 11, 5.8, bold, c.muted);
+    text(fit(value, i === 3 ? 11 : 10, bw - 10, bold), x + 5, y - 27, i === 3 ? 11 : 10, bold, color);
+    if (note) text(fit(note, 6, bw - 10), x + 5, y - 37, 6, reg, c.muted);
+  });
+  y -= bh + 4;
+
+  // 2. Collections summary matrix.
+  const grand = s.matrix.reduce((t, r) => t + r.totalCentavos, 0), grandCount = s.matrix.reduce((t, r) => t + r.count, 0);
+  section("2. Collections summary", `${grandCount} receipt${grandCount === 1 ? "" : "s"}  |  PHP ${money(grand)}`);
+  const srcW = 0.22, chW = (1 - srcW - 0.16) / Math.max(1, s.channels.length);
+  const mCols: Col[] = [{ label: "Source", w: srcW }, ...s.channels.map((ch): Col => ({ label: ch, w: chW, align: "right" })), { label: "Total", w: 0.16, align: "right" }];
+  tableHead(mCols);
+  const cell = (n: number, t: number) => (n ? `${money(t)} (${n})` : "-");
+  for (const r of s.matrix) tableRow(mCols, [r.source, ...s.channels.map((ch) => { const k = r.cells.find((x) => x.channel === ch); return cell(k?.count ?? 0, k?.totalCentavos ?? 0); }), cell(r.count, r.totalCentavos)]);
+  tableRow(mCols, ["Total", ...s.channels.map((ch) => { const n = s.matrix.reduce((t, r) => t + (r.cells.find((x) => x.channel === ch)?.count ?? 0), 0), v = s.matrix.reduce((t, r) => t + (r.cells.find((x) => x.channel === ch)?.totalCentavos ?? 0), 0); return cell(n, v); }), cell(grandCount, grand)], { bold: true, fill: true });
+  text("Amounts in pesos; receipts in brackets.", M, y - 9, 6.2, reg, c.muted);
+  y -= 12;
+
+  // 3. Collections detail.
+  section("3. Collections detail");
+  const dCols: Col[] = [{ label: "Receipt", w: 0.165, font: mono }, { label: "Time", w: 0.08 }, { label: "Trainee", w: 0.195 }, { label: "Course", w: 0.2 }, { label: "Channel", w: 0.1 }, { label: "Reference", w: 0.12, font: mono }, { label: "Amount", w: 0.14, align: "right" }];
+  if (!s.groups.length) { text("No collections on this day.", M, y - 10, 8, reg, c.muted); y -= 16; }
+  for (const g of s.groups) {
+    ensure(48);
+    page.drawRectangle({ x: M, y: y - 15, width: CW, height: 15, color: rgb(.96, .97, .98) });
+    text(`${g.kind}${g.name && g.name !== g.kind ? `  |  ${g.name}` : ""}`, M + 4, y - 10.5, 8, bold, c.navy);
+    right(`${g.rows.length} receipt${g.rows.length === 1 ? "" : "s"}  |  PHP ${money(g.subtotalCentavos)}`, W - M - 4, y - 10.5, 7.6, bold, c.navy);
+    y -= 15;
+    tableHead(dCols);
+    for (const r of g.rows) { ensure(14, () => tableHead(dCols)); tableRow(dCols, [r.receipt, r.time, r.trainee, r.course, r.channel, r.reference || "-", money(r.amountCentavos)]); }
+    y -= 6;
+  }
+
+  // 4. Expenses.
+  const expTotal = s.expenses.reduce((t, e) => t + e.amountCentavos, 0);
+  section("4. Expenses", `${s.expenses.length} voucher${s.expenses.length === 1 ? "" : "s"}  |  PHP ${money(expTotal)}`);
+  const eCols: Col[] = [{ label: "Voucher no.", w: 0.15, font: mono }, { label: "Payee", w: 0.22 }, { label: "Category", w: 0.15 }, { label: "Channel", w: 0.1 }, { label: "Reference", w: 0.13, font: mono }, { label: "Status", w: 0.1 }, { label: "Amount", w: 0.15, align: "right" }];
+  if (!s.expenses.length) { text("No expenses on this day.", M, y - 10, 8, reg, c.muted); y -= 16; }
+  else {
+    tableHead(eCols);
+    for (const e of s.expenses) { ensure(14, () => tableHead(eCols)); tableRow(eCols, [e.voucher, e.payee, e.category, e.channel || "-", e.reference || "-", e.status, money(e.amountCentavos)]); }
+    for (const t of s.expenseTotals) tableRow(eCols, ["", "", "", t.channel, "", "Subtotal", money(t.totalCentavos)]);
+    tableRow(eCols, ["Total", "", "", "", "", "", money(expTotal)], { bold: true, fill: true });
+  }
+
+  // 5. Signatures.
+  ensure(70);
+  y -= 34;
+  const sw = (CW - 40) / 2;
+  [["Prepared by", s.preparedBy, "Cashier"], ["Checked by", s.checkedBy ?? "", "Accounting Manager"]].forEach(([label, name, role], i) => {
+    const x = M + i * (sw + 40);
+    if (name) text(name, x, y + 4, 9, bold);
+    page.drawLine({ start: { x, y }, end: { x: x + sw, y }, thickness: 0.6, color: c.ink });
+    text(`${label}  |  ${role}  |  signature over printed name, date`, x, y - 10, 6.6, reg, c.muted);
+  });
+  footer();
+  return pdf.save();
 }

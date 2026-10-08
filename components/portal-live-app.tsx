@@ -6,7 +6,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { LiveAttendance } from "./portal/live-attendance";
 import { LiveAccounting, AccountingDashboard, ReceivablesModule, ApprovalsModule, PayablesModule, CashPositionModule, LiveVouchers, LiveInventory, LiveExpenses, SetupList, AccountingConfiguration, ACCOUNTING_CONFIG_SECTIONS, type AccountingConfigSection } from "./portal/live-accounting";
 import { LiveCashierClosing } from "./portal/live-cashier-closing";
-import { CashierPaymentQueue, RequestChargeModal, TarButton, RecordPaymentModal, CashierDashboard, CashierPayments, DiscountRequests, CashierEnrollments, CashierOpening, CashierSummaryReport, ExpensesWorkspace } from "./portal/live-cashier";
+import { CashierPaymentQueue, RequestChargeModal, feeForRequest, TarButton, RecordPaymentModal, CashierDashboard, CashierPayments, DiscountRequests, CashierEnrollments, CashierOpening, CashierSummaryReport, ExpensesWorkspace } from "./portal/live-cashier";
 import { LiveHr, type HrData } from "./portal/live-hr";
 import { LiveTraining, type TrainingData } from "./portal/live-training";
 import { ReleasingDashboard, LiveReleasing } from "./portal/live-releasing";
@@ -21,7 +21,7 @@ import { classroomJoin } from "@/lib/classroom";
 import { ClassroomPanel } from "./portal/classroom-panel";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
-import { pesos, first, dueCentavos, balanceOf, isUnpaid, manilaToday } from "@/lib/portal-format";
+import { pesos, first, dueCentavos, balanceOf, isUnpaid, manilaToday, addDays } from "@/lib/portal-format";
 
 type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
@@ -43,7 +43,7 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   pendingDiscounts:{id:string;enrollment_id:string;description:string;amount_centavos:number;agency_id?:string|null;created_at:string}[];
   announcements:{id:string;title:string;body:string;audience_roles:string[];published_at?:string|null;expires_at?:string|null}[];
   courseCategories:{id:string;name:string}[]; partnerCenters:{id:string;name:string;active:boolean}[];
-  requests:{id:string;request_number:string;request_type:string;requested_values:{batchId?:string;amountCentavos?:number;paymentId?:string}|null;reason:string;status:string;decision_remarks?:string|null;created_at:string;decided_at?:string|null;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;enrollments?:{id?:string;enrollment_number:string;trainee_id?:string;courses?:{name:string}|{name:string}[]|null}|{id?:string;enrollment_number:string;trainee_id?:string;courses?:{name:string}|{name:string}[]|null}[]|null;
+  requests:{id:string;request_number:string;request_type:string;requested_values:{batchId?:string;amountCentavos?:number;paymentId?:string}|null;reason:string;status:string;decision_remarks?:string|null;created_at:string;decided_at?:string|null;requested_on?:string|null;fee_rule?:string|null;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;enrollments?:{id?:string;enrollment_number:string;trainee_id?:string;courses?:{name:string}|{name:string}[]|null}|{id?:string;enrollment_number:string;trainee_id?:string;courses?:{name:string}|{name:string}[]|null}[]|null;
     // Routing (202610070004): With cashier → For approval; the Cashier's charge, if any.
     stage?:string;charge_id?:string|null;enrollment_charges?:{amount_centavos:number;description:string;approval_status:string}|{amount_centavos:number;description:string;approval_status:string}[]|null}[];
   pendingCharges:{id:string;enrollment_id:string;description:string;amount_centavos:number;created_at:string;enrollments?:{enrollment_number:string;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;courses?:{name:string}|{name:string}[]|null}|{enrollment_number:string;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;courses?:{name:string}|{name:string}[]|null}[]|null}[];
@@ -71,6 +71,7 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   classroom?:{configured:boolean;connected:boolean;accountEmail:string|null;connectedAt:string|null;driveReady?:boolean};
   classroomCourseIds?:Record<string,string>;
   classroomInvites?:Record<string,{state:string;email:string;error:string|null;created_at:string}>;
+  expenseReprints?:{id:string;expense_id:string;reason:string;status:string;requested_by_name:string|null;requested_at:string;decision_remarks:string|null}[];
   // Change Course / Rescheduling fee collection per pending request id (approval waits for payment).
   chargeCollected?:Record<string,{amount:number;collected:number;paid:boolean}>;
   // Printed Training Admission Records (Cashier, Accounting, Admin only; 202610070006/7).
@@ -259,12 +260,13 @@ function SubTabs({eyebrow,title,tabs,render,action}:{eyebrow:string;title:string
     {render(tab)}</div>;
 }
 /** Requests by category. A request whose fee is paid is implemented automatically. */
-const REQUEST_CATEGORIES:[string,string|null][]=[["All",null],["Rescheduling","Rescheduling"],["Change course","Change Course"],["Make-up class","Make-up Class"],["Cancellation","Cancellation"],["Reprinting","Reprinting"],["TAR reprint","TAR reprint"],["Discount",null]];
+// Consolidated (8 Oct 2026): Changes = change course, rescheduling, reprinting and make-up class.
+const REQUEST_CATEGORIES:[string,string[]|null][]=[["All",null],["Changes",["Change Course","Rescheduling","Reprinting","Make-up Class"]],["Cancellation",["Cancellation"]],["TAR reprint",["TAR reprint"]],["Discount",null]];
 function CashierRequests({data,reload}:{data:PortalData;reload:()=>Promise<void>}){
   const [cat,setCat]=useState("All");
-  const type=REQUEST_CATEGORIES.find(([l])=>l===cat)?.[1]??null;
-  const open=(t:string|null)=>data.requests.filter(r=>r.status==="Pending"&&(!t||r.request_type===t)).length;
-  const scoped={...data,requests:type?data.requests.filter(r=>r.request_type===type):data.requests};
+  const types=REQUEST_CATEGORIES.find(([l])=>l===cat)?.[1]??null;
+  const open=(t:string[]|null)=>data.requests.filter(r=>r.status==="Pending"&&(!t||t.includes(r.request_type))).length;
+  const scoped={...data,requests:types?data.requests.filter(r=>types.includes(r.request_type)):data.requests};
   return <div className="portal-page cx"><div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Requests</h1></div></div>
     <div className="cx-status" role="tablist">{REQUEST_CATEGORIES.map(([label,t])=>{const n=label==="Discount"?data.pendingDiscounts.length:open(t);return <button key={label} type="button" role="tab" aria-selected={cat===label} className={cat===label?"on":""} onClick={()=>setCat(label)}>{label}{n>0&&<span>{n}</span>}</button>})}</div>
     {cat==="Discount"?<DiscountRequests data={data} reload={reload}/>:<LiveRequests data={scoped} role="cashier" reload={reload} embedded/>}
@@ -744,22 +746,52 @@ function EnrollmentSummary({data}:{data:PortalData}){
  * Manager approves or rejects ("For approval"). Approval applies the change and
  * posts the charge.
  */
+/** Requests (owner, 8 Oct 2026): one table per stage — needs charges, waiting for payment, for approval — and recent decisions. */
 function LiveRequests({data,role,reload,embedded}:{data:PortalData;role:string;reload:()=>Promise<void>;embedded?:boolean}){
+  type Req=PortalData["requests"][number];
   const canDecide=["admin","accounting"].includes(role);
   const canCharge=["admin","cashier","accounting"].includes(role);
-  const [busy,setBusy]=useState(""),[message,setMessage]=useState(""),[charging,setCharging]=useState<PortalData["requests"][number]|null>(null);
+  const [busy,setBusy]=useState(""),[message,setMessage]=useState(""),[charging,setCharging]=useState<Req|null>(null),[showDecided,setShowDecided]=useState(false);
   const pending=data.requests.filter(r=>r.status==="Pending");
   const withCashier=pending.filter(r=>r.stage==="With cashier");
-  const forApproval=pending.filter(r=>r.stage!=="With cashier");
-  const decided=data.requests.filter(r=>r.status!=="Pending");
+  const charged=pending.filter(r=>r.stage!=="With cashier");
+  const unpaid=(r:Req)=>{const cc=data.chargeCollected?.[r.id];return !!cc&&!cc.paid};
+  const waitingPayment=charged.filter(unpaid);
+  const forApproval=charged.filter(r=>!unpaid(r));
+  const since=addDays(manilaToday(),-30);
+  const decided=data.requests.filter(r=>r.status!=="Pending"&&(r.decided_at??r.created_at).slice(0,10)>=since);
   async function decide(id:string,approve:boolean){setBusy(id);setMessage("");try{const remarks=approve?undefined:(window.prompt("Reason for rejecting? (optional)")||undefined);await submit({action:"request-decide",id,approve,remarks});await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not update the request.")}finally{setBusy("")}}
-  const typeOf=(r:PortalData["requests"][number])=>r.request_type==="Rescheduling"?"Change batch / reschedule":r.request_type;
-  const detailOf=(r:PortalData["requests"][number])=>{const rv=r.requested_values||{};const bits:string[]=[];if(rv.amountCentavos)bits.push(pesos(rv.amountCentavos));if(rv.batchId)bits.push("new batch selected");const ch=first(r.enrollment_charges);if(ch)bits.push(`charge ${pesos(ch.amount_centavos)}`);const cc=data.chargeCollected?.[r.id];if(cc)bits.push(cc.paid?"fee paid ✓":`collect the fee first (${pesos(cc.collected)} of ${pesos(cc.amount)} paid) — approval waits for payment`);if(!ch&&r.stage==="For approval"&&r.status==="Pending"&&r.charge_id===null)bits.push("no charge");return bits.join(" · ")};
-  const row=(r:PortalData["requests"][number],action:"charge"|"decide"|"none")=>{const t=first(r.trainees),e=first(r.enrollments),c=e?first(e.courses):null;const extra=detailOf(r);const no=e?.trainee_id?data.applicationNumbers?.[e.trainee_id]:undefined;return <div className="live-row-item" key={r.id}><div><strong>{t?fullName(t):"Unknown trainee"} · {typeOf(r)}</strong><small>{no?<span className="app-no">{no}</span>:null}{c?.name} · {e?.enrollment_number} · {r.reason}{extra?` · ${extra}`:""}</small></div>{action==="charge"?<button type="button" className="portal-primary" onClick={()=>setCharging(r)}>Add charge</button>:action==="decide"?<div className="document-actions"><button type="button" className="portal-primary" disabled={!!busy} onClick={()=>decide(r.id,true)}>{busy===r.id?"…":"Approve"}</button><button type="button" disabled={!!busy} onClick={()=>decide(r.id,false)}>Reject</button></div>:<Badge tone={r.status==="Approved"?"green":r.status==="Rejected"?"red":"orange"}>{r.status==="Pending"?(r.stage==="With cashier"?"With Cashier":"Awaiting Approval"):r.status}</Badge>}</div>};
-  return <div className={embedded?"":"portal-page"}>{!embedded&&<PageHead eyebrow="Change requests" title="Requests"/>}{message&&<Message kind="error" text={message}/>}
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Needs charges</h2><p>{canCharge?"Add the applicable fee, or mark no charge, to send it for approval":"With the cashier"}</p></div><Badge tone="orange">{withCashier.length}</Badge></div>{withCashier.map(r=>row(r,canCharge?"charge":"none"))}{!withCashier.length&&<p className="portal-empty-copy">Nothing waiting for charges.</p>}</section>
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>For approval</h2><p>{canDecide?"Approve or reject — approval applies the change and posts the charge":"Waiting for the accounting manager"}</p></div><Badge tone="orange">{forApproval.length}</Badge></div>{forApproval.map(r=>row(r,canDecide?"decide":"none"))}{!forApproval.length&&<p className="portal-empty-copy">No requests waiting for approval.</p>}</section>
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Decided</h2><p>Recent history</p></div><Badge>{decided.length}</Badge></div>{decided.slice(0,20).map(r=>row(r,"none"))}{!decided.length&&<p className="portal-empty-copy">Nothing decided yet.</p>}</section>
+  const typeOf=(r:Req)=>r.request_type==="Rescheduling"?"Reschedule":r.request_type;
+  const startOf=(r:Req)=>{const id=first(r.enrollments)?.id;const e=data.enrollments.find(x=>x.id===id);return e?(first(e.batches)?.starts_on??e.scheduled_on??null):null};
+  const feeCell=(r:Req)=>{const ch=first(r.enrollment_charges),cc=data.chargeCollected?.[r.id];
+    if(ch)return <><strong className="cx-amt">{pesos(ch.amount_centavos)}</strong><small>{cc?(cc.paid?"Paid":`${pesos(cc.collected)} paid`):ch.approval_status==="Approved"?"Added to balance":"On approval"}</small></>;
+    if(r.stage==="With cashier"){const f=feeForRequest(data,r);return f?<><strong className="cx-amt">{pesos(f.amountCentavos)}</strong><small>By policy</small></>:<small>To be set</small>}
+    return <small>No charge</small>};
+  const stageChip=(r:Req)=>r.status!=="Pending"?<Badge tone={r.status==="Approved"?"green":"red"}>{r.status}</Badge>:r.stage==="With cashier"?<Badge tone="orange">Needs charges</Badge>:unpaid(r)?<Badge tone="orange">Waiting for payment</Badge>:<Badge tone="blue">For approval</Badge>;
+  const action=(r:Req)=>{
+    if(r.status!=="Pending")return r.decision_remarks?<small>{r.decision_remarks}</small>:null;
+    if(r.stage==="With cashier")return canCharge?<button type="button" className="portal-primary" onClick={()=>setCharging(r)}>Add charge</button>:<small>With the Cashier</small>;
+    if(unpaid(r))return <small>Collect the fee in Record payment; it is applied once paid.</small>;
+    return canDecide?<div className="cx-acts"><button type="button" className="portal-primary" disabled={!!busy} onClick={()=>decide(r.id,true)}>{busy===r.id?"…":"Approve"}</button><button type="button" className="portal-secondary" disabled={!!busy} onClick={()=>decide(r.id,false)}>Reject</button></div>:<small>With the Accounting Manager</small>};
+  const table=(list:Req[])=><div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Request</th><th>Course</th><th>Training starts</th><th>Requested on</th><th className="r">Fee</th><th>Status</th><th></th></tr></thead><tbody>
+    {list.map(r=>{const t=first(r.trainees),e=first(r.enrollments),c=e?first(e.courses):null,no=e?.trainee_id?data.applicationNumbers?.[e.trainee_id]:undefined,start=startOf(r);return <tr key={r.id}>
+      <td data-l="" className="lead"><span className="cx-name">{t?fullName(t):"Unknown trainee"}</span>{no&&<small className="cx-mono">{no}</small>}</td>
+      <td data-l="Request"><span className="req-type">{typeOf(r)}</span><small>{r.reason}</small></td>
+      <td data-l="Course">{c?.name??"—"}<small className="cx-mono">{e?.enrollment_number}</small></td>
+      <td data-l="Training starts">{start?date(start):"No date yet"}</td>
+      <td data-l="Requested on">{date(r.requested_on??r.created_at.slice(0,10))}</td>
+      <td data-l="Fee" className="r">{feeCell(r)}</td>
+      <td data-l="Status">{stageChip(r)}</td>
+      <td data-l="">{action(r)}</td>
+    </tr>})}
+  </tbody></table></div>;
+  const section=(title:string,list:Req[])=>list.length?<section className="portal-panel cx-panel"><div className="panel-heading"><h2>{title}</h2><Badge tone="orange">{list.length}</Badge></div>{table(list)}</section>:null;
+  return <div className={embedded?"":"portal-page cx"}>{!embedded&&<div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Requests</h1></div></div>}{message&&<Message kind="error" text={message}/>}
+    {section("Needs charges",withCashier)}
+    {section("Waiting for payment",waitingPayment)}
+    {section("For approval",forApproval)}
+    {!pending.length&&<section className="portal-panel cx-panel"><p className="portal-empty-copy">No open requests.</p></section>}
+    {decided.length>0&&<section className="portal-panel cx-panel"><button type="button" className="cx-month-head" aria-expanded={showDecided} onClick={()=>setShowDecided(v=>!v)}><span className="cx-month-name">Decided</span><span className="cx-month-meta">last 30 days · {decided.length}</span><span aria-hidden="true" className="cx-month-caret" style={{marginLeft:"auto"}}>{showDecided?"▾":"▸"}</span></button>{showDecided&&table(decided)}</section>}
     {charging&&<RequestChargeModal data={data} request={charging} reload={reload} onClose={()=>setCharging(null)}/>}
   </div>;
 }

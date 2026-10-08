@@ -20,7 +20,7 @@ const fmtTime = (value: string) => new Intl.DateTimeFormat("en-PH", { month: "sh
 async function logo() { try { return new Uint8Array(await readFile(path.join(process.cwd(), "public", "new-wave-emblem.png"))); } catch { return undefined; } }
 
 /** The voucher PDF bytes, or null when the expense has no voucher yet (not approved). */
-export async function buildExpenseVoucher(db: Admin, id: string) {
+export async function buildExpenseVoucher(db: Admin, id: string, options: { printNumber?: number; label?: string } = {}) {
   const { data } = await db.from("expenses")
     .select("id,expense_number,payee,category,amount_centavos,purpose,status,created_at,requester:profiles!expenses_requested_by_fkey(complete_name),approver:profiles!expenses_approved_by_fkey(complete_name)")
     .eq("id", id).maybeSingle();
@@ -50,6 +50,7 @@ export async function buildExpenseVoucher(db: Admin, id: string) {
     approvedBy: approver, approvedAt: `Accounting Manager · ${fmt(x.approved_at)}`,
     releasedBy: released ? (releaser as { complete_name?: string } | null)?.complete_name ?? "" : "",
     releasedAt: released && x.released_at ? `Cashier · ${fmtTime(x.released_at)}` : "Cashier",
+    printLabel: options.label ?? (options.printNumber && options.printNumber > 1 ? `Reprint ${options.printNumber - 1}` : undefined),
     logoBytes: await logo(),
   });
   return { bytes, voucherNumber, category: data.category, payee: data.payee, approvedAt: x.approved_at ?? data.created_at, driveFileId: x.drive_file_id ?? null };
