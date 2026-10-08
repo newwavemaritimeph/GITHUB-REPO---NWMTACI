@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import type { PortalData, Enrollment, Batch, Trainee } from "../portal-live-app";
-import { first, manilaToday, dueCentavos, balanceOf, pesos, addDays } from "@/lib/portal-format";
+import { first, manilaToday, dueCentavos, balanceOf, pesos, pesos2, addDays } from "@/lib/portal-format";
 import { LATE_ENROLLMENT_CODES, PUBLIC_STCW_CODES, automaticEndDate, fitsInWeek } from "@/lib/scheduling";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { Badge, Message, Modal, PageHead, Pager, usePost, fullName, fmtDate, fmtClock } from "./shared-ui";
@@ -348,48 +348,52 @@ export function RegistrationRecords({ data, query, reload, view, setView, traine
   </div>;
 }
 
-/** Screening for a Pending application, at the top of its drawer: tick the requirements and hand to the Cashier. Payment enrolls automatically. */
+/**
+ * Application screening (owner's choice, 8 Oct 2026): the Screening sheet
+ * combined with the Checklist with remarks — navy header, the applicant,
+ * training and payment first, then one requirements table (received, status,
+ * remarks, who received it), signature lines and the hand-over button.
+ */
 function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<Record<string, unknown>> }) {
   const [unticking, setUnticking] = useState<string | null>(null);
   const [remarks, setRemarks] = useState("");
-  const [otherNote, setOtherNote] = useState("");
+  const [notes, setNotes] = useState<Record<string, string>>({});
   const r = readinessOf(data, e);
   const s = stateOf(r);
   const allTicked = r.missing.length === 0;
-  const other = r.latest.get(OTHER_REQUIREMENT.code);
-  const otherTicked = other?.status === "Verified";
+  const t = first(e.trainees), c = first(e.courses), b = first(e.batches);
+  const appNo = appNoOf(data, e.trainee_id) ?? e.enrollment_number;
+  const balance = balanceOf(e);
   const check = (requirement: string, status: "Verified" | "Rejected", label: string, note?: string) =>
-    void post({ action: "requirement-check", enrollmentId: e.id, requirement, status, remarks: note ?? (status === "Rejected" ? remarks.trim() : undefined) }, `${label} ${status === "Verified" ? "ticked" : "unticked"}.`).then(() => { setUnticking(null); setRemarks(""); setOtherNote(""); }).catch(() => undefined);
-  const enrolled = e.enrollment_status === "Enrolled";
-  // Trainee registers > Registration verifies > Cashier takes payment > paid = enrolled.
-  const steps: [string, string, boolean][] = [
-    ["Requirements", `${r.verified} of ${REQUIREMENTS.length}`, allTicked],
-    ["For payment", r.paid ? pesos(r.paidCentavos) : r.handed ? `Since ${fmtDate(day(r.handedAt))}` : "Not yet", r.paid],
-    ["Enrolled", enrolled ? "Done" : "Once paid", enrolled],
-  ];
-  return <div className="screen-box full">
-    <div className="screen-head"><div><strong>Screening</strong><small>Tick the requirements, then hand the trainee to the Cashier. Once paid, the trainee is enrolled.</small></div><Badge tone={s.tone}>{s.text}</Badge></div>
-    <ol className="screen-steps" aria-label="Application progress">
-      {steps.map(([label, sub, done], i, list) => { const current = !done && list.slice(0, i).every((x) => x[2]); return <li key={label} className={done ? "done" : current ? "current" : ""}><i aria-hidden="true">{done ? "✓" : i + 1}</i><span><b>{label}</b><small>{sub}</small></span></li>; })}
-    </ol>
-    <ul className="req-list">
-      {REQUIREMENTS.map((req) => { const c = r.latest.get(req.code); const ticked = c?.status === "Verified"; return <li className="req-row" key={req.code}>
-        <label className="req-tick"><input type="checkbox" checked={ticked} disabled={busy} onChange={() => { if (ticked) { setUnticking(req.code); setRemarks(""); } else check(req.code, "Verified", req.label); }} /><span className="req-main"><strong>{req.label}</strong><small>{c ? `${ticked ? "Received" : "Unticked"} · ${c.checked_by_name ?? "Staff"} · ${fmtDate(day(c.checked_at))}${c.remarks ? ` · ${c.remarks}` : ""}` : "Not received yet"}</small></span></label>
-        {unticking === req.code && <span className="req-reject">
-          <input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="Reason for unticking, e.g. medical certificate expired" aria-label={`Reason for unticking ${req.label}`} autoFocus />
-          <button type="button" className="portal-primary" disabled={busy || !remarks.trim()} onClick={() => check(req.code, "Rejected", req.label)}>Untick</button>
-          <button type="button" className="ghost-button" onClick={() => setUnticking(null)}>Keep</button>
-        </span>}
-      </li>; })}
-      <li className="req-row req-other">
-        <label className="req-tick"><input type="checkbox" checked={otherTicked} disabled={busy || (!otherTicked && !otherNote.trim())} onChange={() => { if (otherTicked) check(OTHER_REQUIREMENT.code, "Rejected", OTHER_REQUIREMENT.label, "Removed"); else check(OTHER_REQUIREMENT.code, "Verified", OTHER_REQUIREMENT.label, otherNote.trim()); }} /><span className="req-main"><strong>Other <em>(Optional)</em></strong><small>{otherTicked ? `${other?.remarks ?? ""} · ${other?.checked_by_name ?? "Staff"} · ${fmtDate(day(other!.checked_at))}` : "Anything extra a course needs — does not block hand-over"}</small></span></label>
-        {!otherTicked && <span className="req-reject"><input value={otherNote} onChange={(ev) => setOtherNote(ev.target.value)} placeholder="What is it? e.g. COP for BT-PSSR" aria-label="Other requirement" /></span>}
-      </li>
-    </ul>
-    <div className="screen-foot">
+    void post({ action: "requirement-check", enrollmentId: e.id, requirement, status, remarks: note ?? (status === "Rejected" ? remarks.trim() : undefined) }, `${label} ${status === "Verified" ? "marked received" : "marked not received"}.`).then(() => { setUnticking(null); setRemarks(""); setNotes((n) => ({ ...n, [requirement]: "" })); }).catch(() => undefined);
+  const rows = [...REQUIREMENTS.map((q) => ({ ...q, optional: false })), { ...OTHER_REQUIREMENT, label: "Other (optional)", optional: true }];
+  const lastChecker = [...r.latest.values()].filter((x) => x.status === "Verified").sort((a, z) => z.checked_at.localeCompare(a.checked_at))[0];
+  return <div className="sc full">
+    <div className="sc-band"><div className="sc-seal" aria-hidden="true">NW</div><div><b>Application screening</b><small>New Wave Maritime Training and Assessment Center, Inc.</small></div><div className="sc-no"><span>Application</span><b>{appNo}</b></div></div>
+    <div className="sc-stripe" aria-hidden="true" />
+    <div className="sc-ident">
+      <div><span className="sc-cap">Applicant</span><h3>{t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : "—"}</h3><p>{t?.trainee_number}{t?.mobile ? ` · ${t.mobile}` : ""}</p>{t?.email && <p className="lc">{t.email}</p>}</div>
+      <div><span className="sc-cap">Training</span><b>{c?.name ?? "—"}</b><p>{scheduleOf(e)}{b ? ` · ${b.batch_number}` : ""}</p><p>{b?.mode ?? (c?.code ?? "")}</p></div>
+      <div><span className="sc-cap">Payment</span><b className={r.paid ? "sc-good" : ""}>{r.paid ? `${pesos2(r.paidCentavos)} paid` : r.handed ? "With the Cashier" : "Not paid yet"}</b><p>Balance {pesos2(balance)}</p><p><Badge tone={s.tone}>{s.text}</Badge></p></div>
+    </div>
+    <div className="sc-table"><table><thead><tr><th>Requirement</th><th>Received</th><th>Remarks</th><th>Received by</th></tr></thead><tbody>
+      {rows.map((q) => { const ck = r.latest.get(q.code); const ticked = ck?.status === "Verified"; const note = notes[q.code] ?? ""; const needsNote = q.optional && !ticked && !note.trim();
+        return <tr key={q.code} className={ticked ? "ok" : ""}>
+          <td><b>{q.label}</b>{!ticked && ck?.status === "Rejected" && <small className="sc-bad">Not accepted{ck.remarks ? `: ${ck.remarks}` : ""}</small>}</td>
+          <td><label className="sc-rec"><input type="checkbox" checked={ticked} disabled={busy || needsNote} onChange={() => { if (ticked) { if (q.optional) check(q.code, "Rejected", q.label, "Removed"); else { setUnticking(q.code); setRemarks(""); } } else check(q.code, "Verified", q.label, note.trim() || undefined); }} />{ticked ? "Received" : q.optional ? "Optional" : "Not yet"}</label></td>
+          <td>{ticked ? <span className="sc-note">{ck?.remarks || "—"}</span>
+            : unticking === q.code ? null
+            : <input className="sc-input" value={note} onChange={(ev) => setNotes((n) => ({ ...n, [q.code]: ev.target.value }))} placeholder={q.optional ? "What is it? e.g. COP for BT-PSSR" : q.code === "valid_id" ? "e.g. Passport, expires 2030" : q.code === "medical_peme" ? "Clinic and date" : "Optional"} aria-label={`Remarks for ${q.label}`} />}
+            {unticking === q.code && <span className="sc-untick"><input className="sc-input" value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="Reason, e.g. medical certificate expired" aria-label={`Reason for ${q.label}`} autoFocus /><button type="button" className="portal-primary" disabled={busy || !remarks.trim()} onClick={() => check(q.code, "Rejected", q.label)}>Mark not received</button><button type="button" className="ghost-button" onClick={() => setUnticking(null)}>Keep</button></span>}</td>
+          <td>{ck ? <><span>{ck.checked_by_name ?? "Staff"}</span><small>{fmtDate(day(ck.checked_at))}</small></> : <span className="muted-text">—</span>}</td>
+        </tr>; })}
+      <tr className="sc-total"><td>Received</td><td colSpan={3}>{r.verified} of {REQUIREMENTS.length}</td></tr>
+    </tbody></table></div>
+    <div className="sc-sig"><div><b>{lastChecker?.checked_by_name ?? " "}</b><span>Checked by · Registration officer</span></div><div><b>{lastChecker ? fmtDate(day(lastChecker.checked_at)) : " "}</b><span>Date</span></div></div>
+    <div className="sc-foot">
       <small>{!allTicked ? `Still to tick: ${r.missing.join(", ")}` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
-      <span style={{ display: "inline-flex", gap: 8, flexWrap: "wrap" }}>
-        {!r.handed && !r.paid && <button type="button" className="portal-primary" disabled={busy || !allTicked} onClick={() => void post({ action: "application-handover", enrollmentId: e.id }, "Handed to the Cashier for payment.").catch(() => undefined)}>Hand to cashier</button>}
+      <span className="sc-acts">
+        {!r.handed && !r.paid && <button type="button" className="portal-primary" disabled={busy || !allTicked} onClick={() => void post({ action: "application-handover", enrollmentId: e.id }, "Handed to the Cashier for payment.").catch(() => undefined)}>Hand to Cashier</button>}
         {r.ready && <button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "application-enroll", enrollmentId: e.id }, "Trainee enrolled.").catch(() => undefined)}>Enroll now</button>}
       </span>
     </div>
@@ -418,12 +422,12 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
     <div className="portal-form">
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
       {isApplication && <ScreeningPanel data={data} enrollment={e} busy={busy} post={post} />}
-      <div className="kv-grid kv-stack full">
+      {!isApplication && <div className="kv-grid kv-stack full">
         <div><span>{isApplication ? "Applicant" : "Trainee"}</span><strong>{t ? fullName(t) : "—"}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{t?.trainee_number} · <span className="lc">{t?.email}</span> · {t?.mobile}</small></div>
         <div><span>Course</span><strong>{c?.name ?? "—"}</strong><small>{c?.code}{center ? ` · endorsed: ${center}` : " · New Wave"}</small></div>
         <div><span>Schedule</span><strong>{scheduleOf(e)}</strong><small>{b ? `${b.batch_number}${b.mode ? ` · ${b.mode}` : ""}${b.venue ? ` · ${b.venue}` : ""}` : e.scheduled_on ? (c && first(e.partner_course_offers) ? "Endorsed training date" : `Start date picked · ends ${fmtDate(automaticEndDate(e.scheduled_on, data.courses.find((x) => x.id === e.course_id)?.duration_label ?? "1"))}`) : "Not yet placed on a batch"}</small></div>
         <div><span>Status</span><strong><Badge tone={statusTone(e.enrollment_status)}>{e.enrollment_status}</Badge></strong><small>{isApplication ? "Submitted" : "Created"} {fmtDate(day(e.created_at))}{e.source ? ` · ${e.source}` : ""}</small></div>
-      </div>
+      </div>}
 
       <div className="full"><strong>Payment status</strong> <small style={{ color: "var(--muted)" }}>read-only — payments are recorded by the Cashier</small></div>
       <div className="pill-row full">

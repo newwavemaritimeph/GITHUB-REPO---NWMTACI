@@ -1687,3 +1687,85 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .ch-hbar div{height:100%;border-radius:6px}
 @media (max-width:980px){.portal-shell .ac-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}.portal-shell .ac-grid2{grid-template-columns:1fr}}
 @media (max-width:560px){.portal-shell .ac-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.portal-shell .ac-total{grid-column:1/-1}.portal-shell .ac-sum{grid-template-columns:1fr}.portal-shell .ac-sum>div:nth-child(odd){border-right:0}}
+
+/* Trainee details: statement of account (8 Oct 2026) */
+.portal-shell .sa{display:grid;gap:0}
+.portal-shell .sa-head{display:grid;grid-template-columns:1fr auto;gap:16px;padding:4px 0 14px;border-bottom:3px double #123F63}
+.portal-shell .sa-org{display:flex;gap:12px;align-items:center}
+.portal-shell .sa-seal{width:44px;height:44px;border-radius:50%;border:2px solid #9a7b2f;display:grid;place-items:center;font:700 12px Georgia,"Times New Roman",serif;color:#9a7b2f;flex:none}
+.portal-shell .sa-org b{display:block;font:600 16px Georgia,"Times New Roman",serif;color:#123F63}
+.portal-shell .sa-org small{color:#5f7180;font-size:13px}
+.portal-shell .sa-doc{text-align:right}
+.portal-shell .sa-doc h2{font:600 24px Georgia,"Times New Roman",serif;color:#123F63;margin:0}
+.portal-shell .sa-doc small{color:#5f7180}
+.portal-shell .sa-meta{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;padding:16px 0}
+.portal-shell .sa-box{border:1px solid #cfdbe3;border-radius:10px;padding:14px 16px;min-width:0}
+.portal-shell .sa-cap{display:block;font-size:12px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#5f7180;margin-bottom:6px}
+.portal-shell .sa-name{font:600 22px Georgia,"Times New Roman",serif;color:#123F63;margin-bottom:4px}
+.portal-shell .sa-box p{margin:2px 0;color:#5f7180;font-size:14.5px;overflow-wrap:anywhere}
+.portal-shell .sa-sum>div{display:flex;justify-content:space-between;gap:12px;padding:5px 0;font-size:15px}
+.portal-shell .sa-sum b{font-family:var(--font-num,monospace)}
+.portal-shell .sa-sum .sa-due{border-top:1px solid #13283a;margin-top:6px;padding-top:9px;font-weight:700;font-size:16.5px}
+.portal-shell .sa-sum .owe{color:#a2470b}
+.portal-shell .sa-led{overflow-x:auto}
+.portal-shell .sa-led table{width:100%;border-collapse:collapse;font-size:15px}
+.portal-shell .sa-led th{background:#123F63;color:#fff;text-align:left;font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;padding:10px 14px}
+.portal-shell .sa-led td{padding:11px 14px;border-bottom:1px solid #e6edf2}
+.portal-shell .sa-led .r{text-align:right}
+.portal-shell .sa-mono{font-family:var(--font-num,monospace);font-variant-numeric:tabular-nums}
+.portal-shell .sa-click{cursor:pointer}
+.portal-shell .sa-click:hover td{background:#f4f8fb}
+.portal-shell .sa-total td{background:#f3f7fa;font-weight:700}
+.portal-shell .sa-empty{color:#5f7180;text-align:center}
+.portal-shell .sa-reqs{padding:14px 0 0}
+.portal-shell .sa-reqs p{margin:2px 0;font-size:14.5px}
+.portal-shell .sa-sig{display:grid;grid-template-columns:1fr 1fr;gap:28px;padding:34px 0 8px}
+.portal-shell .sa-sig div{border-top:1px solid #13283a;padding-top:6px;font-size:13.5px;color:#5f7180}
+.portal-shell .sa-foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-top:16px;margin-top:10px;border-top:1px solid #cfdbe3}
+.portal-shell .sa-acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.portal-shell .sa-navy{background:#123F63 !important;border-color:#123F63 !important}
+.portal-shell .sa-menu{position:absolute;left:0;bottom:calc(100% + 6px);z-index:30;min-width:200px;display:grid;background:#fff;border:1px solid #dbe6ec;border-radius:12px;box-shadow:0 14px 34px rgba(0,0,0,.18);padding:6px}
+.portal-shell .sa-menu button{background:none;border:0;text-align:left;font-size:15.5px;padding:10px 12px;border-radius:8px;cursor:pointer;color:#0f2638}
+.portal-shell .sa-menu button:hover{background:#eef4f8}
+@media (max-width:760px){.portal-shell .sa-head,.portal-shell .sa-meta{grid-template-columns:1fr}.portal-shell .sa-doc{text-align:left}.portal-shell .sa-sig{grid-template-columns:1fr}}
+
+/* Application screening: screening sheet + checklist with remarks (8 Oct 2026) */
+.portal-shell .sc{border:1px solid #cfdbe3;border-radius:12px;overflow:hidden;background:#fff}
+.portal-shell .sc-band{display:flex;align-items:center;gap:12px;background:#123F63;color:#fff;padding:12px 18px}
+.portal-shell .sc-seal{width:38px;height:38px;border-radius:50%;border:2px solid #e7c873;color:#e7c873;display:grid;place-items:center;font:700 11px Georgia,"Times New Roman",serif;flex:none}
+.portal-shell .sc-band b{display:block;font:600 17px Georgia,"Times New Roman",serif}
+.portal-shell .sc-band small{color:#b9d6ea;font-size:12.5px}
+.portal-shell .sc-no{margin-left:auto;text-align:right}
+.portal-shell .sc-no span{display:block;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:#b9d6ea}
+.portal-shell .sc-no b{font:600 16px var(--font-num,monospace)}
+.portal-shell .sc-stripe{height:4px;background:linear-gradient(90deg,#F25615 0 33%,#35CCFA 33% 66%,#0571D0 66%)}
+.portal-shell .sc-ident{display:grid;grid-template-columns:1.3fr 1fr 1fr;border-bottom:1px solid #cfdbe3}
+.portal-shell .sc-ident>div{padding:14px 18px;border-right:1px solid #e6edf2;min-width:0}
+.portal-shell .sc-ident>div:last-child{border-right:0}
+.portal-shell .sc-cap{display:block;font-size:11.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:#5f7180;margin-bottom:4px}
+.portal-shell .sc-ident h3{font:600 19px Georgia,"Times New Roman",serif;color:#123F63;margin:0 0 2px}
+.portal-shell .sc-ident b{display:block;font-weight:600;font-size:15px}
+.portal-shell .sc-ident p{margin:2px 0;color:#5f7180;font-size:14px;overflow-wrap:anywhere}
+.portal-shell .sc-good{color:#0a7a3e}
+.portal-shell .sc-table{overflow-x:auto;padding:4px 0 0}
+.portal-shell .sc-table table{width:100%;border-collapse:collapse;font-size:15px}
+.portal-shell .sc-table th{background:#123F63;color:#fff;text-align:left;font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;padding:9px 14px}
+.portal-shell .sc-table td{padding:10px 14px;border-bottom:1px solid #e6edf2;vertical-align:middle}
+.portal-shell .sc-table td small{display:block;color:#5f7180;font-size:13px}
+.portal-shell .sc-table tr.ok td{background:#f2faf5}
+.portal-shell .sc-bad{color:#b42318 !important}
+.portal-shell .sc-rec{display:flex;align-items:center;gap:8px;white-space:nowrap;font-size:14.5px;cursor:pointer}
+.portal-shell .sc-rec input{width:20px;height:20px;accent-color:#0a7a3e}
+.portal-shell .sc-input{width:100%;min-width:160px;padding:8px 10px;border:1px solid #cfdbe3;border-radius:8px;font:inherit;font-size:14.5px}
+.portal-shell .sc-note{color:#13283a}
+.portal-shell .sc-untick{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.portal-shell .sc-untick .sc-input{flex:1}
+.portal-shell .sc-total td{background:#f3f7fa;font-weight:700}
+.portal-shell .sc-sig{display:grid;grid-template-columns:1fr 1fr;gap:28px;padding:22px 18px 6px}
+.portal-shell .sc-sig div{border-top:1px solid #13283a;padding-top:6px;display:grid}
+.portal-shell .sc-sig b{order:-1;margin-top:-26px;padding-bottom:8px;font-weight:600;min-height:18px}
+.portal-shell .sc-sig span{font-size:13px;color:#5f7180}
+.portal-shell .sc-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 18px;border-top:1px solid #cfdbe3;background:#f3f7fa}
+.portal-shell .sc-foot small{color:#5f7180;font-size:14px}
+.portal-shell .sc-acts{display:inline-flex;gap:8px;flex-wrap:wrap}
+@media (max-width:760px){.portal-shell .sc-ident{grid-template-columns:1fr}.portal-shell .sc-ident>div{border-right:0;border-bottom:1px solid #e6edf2}.portal-shell .sc-sig{grid-template-columns:1fr}}
