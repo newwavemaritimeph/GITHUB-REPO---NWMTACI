@@ -1385,7 +1385,7 @@ export type AccountingConfigSection = (typeof ACCOUNTING_CONFIG_SECTIONS)[number
  * automatically. Trainees type it on the public registration form; the
  * agency's rebate is then deducted from what they pay.
  */
-function ReferralCodes({ agencies, busy, post }: { agencies: (Agency & { kind?: string | null; referral_code?: string | null; rebate_mode?: string | null })[]; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
+function ReferralCodes({ agencies, busy, post }: { agencies: (Agency & { kind?: string | null; referral_code?: string | null; rebate_mode?: string | null; rebate_percent?: number | null })[]; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
   const [copied, setCopied] = useState("");
   const [confirm, setConfirm] = useState<string | null>(null);
   const copy = (id: string, code: string) => { void navigator.clipboard?.writeText(code).then(() => { setCopied(id); window.setTimeout(() => setCopied(""), 1800); }).catch(() => undefined); };
@@ -1396,7 +1396,7 @@ function ReferralCodes({ agencies, busy, post }: { agencies: (Agency & { kind?: 
       {list.map((a) => <tr key={a.id}>
         <td data-l="" className="lead"><span className="cx-name">{a.name}</span></td>
         <td data-l="Type">{a.kind || "Agency"}</td>
-        <td data-l="Rebate">{a.rebate_mode === "No deduction" ? "Paid to the agency" : "Deducted from payment"}</td>
+        <td data-l="Rebate">{a.rebate_mode === "No deduction" ? "Paid to the agency" : "Deducted from payment"}{a.rebate_percent ? <small>{Number(a.rebate_percent)}% of the training fee</small> : null}</td>
         <td data-l="Referral code"><span className="cx-mono ref-code">{a.referral_code || "Not set yet"}</span></td>
         <td data-l=""><div className="cx-acts">
           {a.referral_code && <button type="button" className="portal-secondary" onClick={() => copy(a.id, a.referral_code!)}>{copied === a.id ? "Copied" : "Copy"}</button>}
@@ -1446,11 +1446,11 @@ export function AccountingConfiguration({ section, data, trainees, applicationNu
         onArchive={(id, active, name) => void post({ action: "channel-save", id, name, kind: "payable", active: !active }).catch(() => undefined)} />
     </>}
     {section === "Agencies and consultancies" && <SetupList title="Agencies and consultancies" description="" entityLabel="agency or consultancy" canManage busy={busy}
-      fields={[{ key: "name", label: "Name" }, { key: "kind", label: "Type", type: "select", options: ["Agency", "Consultancy"] }, { key: "rebateMode", label: "Rebate", type: "select", options: ["Deducted from payment", "No deduction (pay to the agency)"] }, { key: "contactName", label: "Contact person", optional: true }, { key: "email", label: "Email", optional: true }, { key: "mobile", label: "Mobile", optional: true }]}
-      rows={data.agencies.map((a) => { const kind = (a as { kind?: string | null }).kind || "Agency"; const noDeduction = (a as { rebate_mode?: string | null }).rebate_mode === "No deduction"; return { id: a.id, primary: a.name, secondary: [kind, noDeduction ? "Rebate paid to the agency" : "Rebate deducted", a.contact_name, a.email, a.mobile].filter(Boolean).join(" · "), active: a.active, values: { name: a.name, kind, rebateMode: noDeduction ? "No deduction (pay to the agency)" : "Deducted from payment", contactName: a.contact_name || "", email: a.email || "", mobile: a.mobile || "" } }; })}
-      onSubmit={(v, id) => post({ action: "agency-save", id, name: String(v.name), kind: v.kind === "Consultancy" ? "Consultancy" : "Agency", rebateMode: String(v.rebateMode).startsWith("No deduction") ? "No deduction" : "Deducted", contactName: String(v.contactName || ""), email: String(v.email || ""), mobile: String(v.mobile || "") })}
+      fields={[{ key: "name", label: "Name" }, { key: "kind", label: "Type", type: "select", options: ["Agency", "Consultancy"] }, { key: "rebateMode", label: "Rebate", type: "select", options: ["Deducted from payment", "No deduction (pay to the agency)"] }, { key: "rebatePercent", label: "Rebate % of training fee (in-house courses)", type: "number", optional: true, placeholder: "e.g. 50 · blank uses Rebates per course" }, { key: "contactName", label: "Contact person", optional: true }, { key: "email", label: "Email", optional: true }, { key: "mobile", label: "Mobile", optional: true }]}
+      rows={data.agencies.map((a) => { const kind = (a as { kind?: string | null }).kind || "Agency"; const noDeduction = (a as { rebate_mode?: string | null }).rebate_mode === "No deduction"; const pct = (a as { rebate_percent?: number | null }).rebate_percent; return { id: a.id, primary: a.name, secondary: [kind, noDeduction ? "Rebate paid to the agency" : "Rebate deducted", pct ? `${Number(pct)}% of the training fee` : "", a.contact_name, a.email, a.mobile].filter(Boolean).join(" · "), active: a.active, values: { name: a.name, kind, rebateMode: noDeduction ? "No deduction (pay to the agency)" : "Deducted from payment", rebatePercent: pct ? String(Number(pct)) : "", contactName: a.contact_name || "", email: a.email || "", mobile: a.mobile || "" } }; })}
+      onSubmit={(v, id) => post({ action: "agency-save", id, name: String(v.name), kind: v.kind === "Consultancy" ? "Consultancy" : "Agency", rebateMode: String(v.rebateMode).startsWith("No deduction") ? "No deduction" : "Deducted", rebatePercent: String(v.rebatePercent ?? "").trim() ? Number(v.rebatePercent) : null, contactName: String(v.contactName || ""), email: String(v.email || ""), mobile: String(v.mobile || "") })}
       onArchive={(id, active, name) => void post({ action: "agency-save", id, name, active: !active }).catch(() => undefined)} />}
-    {section === "Agencies and consultancies" && <ReferralCodes agencies={data.agencies as (Agency & { kind?: string | null; referral_code?: string | null; rebate_mode?: string | null })[]} busy={busy} post={post} />}
+    {section === "Agencies and consultancies" && <ReferralCodes agencies={data.agencies as (Agency & { kind?: string | null; referral_code?: string | null; rebate_mode?: string | null; rebate_percent?: number | null })[]} busy={busy} post={post} />}
     {section === "Expense categories" && <SetupList title="Expense categories" description="" entityLabel="category" canManage busy={busy}
       fields={[{ key: "name", label: "Category name" }]}
       rows={(data as unknown as { expenseCategories: { id: string; name: string; active: boolean }[] }).expenseCategories.map((c) => ({ id: c.id, primary: c.name, secondary: c.active ? "Active" : "Archived", active: c.active, values: { name: c.name } }))}

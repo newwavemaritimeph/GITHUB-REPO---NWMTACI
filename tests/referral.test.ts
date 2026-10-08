@@ -31,3 +31,14 @@ describe("rebate handling per agency", () => {
     expect(referralAction("No deduction", true)).toBe("payable");
   });
 });
+
+import { referralRebate } from "@/lib/referral";
+
+describe("rebate as a percentage of the training fee", () => {
+  it("uses 50% of the actual fee on in-house courses, else the peso table", () => {
+    expect(referralRebate({ percent: 50, inHouse: true, feeCentavos: 130000, matrixCentavos: 30000 })).toBe(65000);
+    expect(referralRebate({ percent: 50, inHouse: true, feeCentavos: 180001, matrixCentavos: 0 })).toBe(90001);
+    expect(referralRebate({ percent: 50, inHouse: false, feeCentavos: 130000, matrixCentavos: 30000 })).toBe(30000);
+    expect(referralRebate({ percent: null, inHouse: true, feeCentavos: 130000, matrixCentavos: 30000 })).toBe(30000);
+  });
+});

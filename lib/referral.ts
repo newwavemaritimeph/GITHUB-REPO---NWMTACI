@@ -20,6 +20,16 @@ export function suggestReferralCode(name: string, random: () => number = Math.ra
   return `${letters}${digits}`;
 }
 
+/**
+ * The rebate for one enrollment: a percentage of the actual training fee when the
+ * agency has one and the course is a New Wave in-house course (owner, 8 Oct 2026:
+ * 50% for some agencies), otherwise the peso amount in Rebates per course.
+ */
+export function referralRebate(input: { percent?: number | null; inHouse: boolean; feeCentavos: number; matrixCentavos: number }) {
+  if (input.percent && input.percent > 0 && input.inHouse) return Math.round((input.feeCentavos * input.percent) / 100);
+  return input.matrixCentavos;
+}
+
 /** The rebate configured for an agency and course (Configuration › Rebates per course), or 0. */
 export function rebateFor(agencyId: string, courseId: string, matrix: { agency_id: string; course_id: string; rebate_centavos: number }[]) {
   return Number(matrix.find((m) => m.agency_id === agencyId && m.course_id === courseId)?.rebate_centavos ?? 0);
@@ -55,17 +65,20 @@ export async function applyReferralRebates(db: Admin, enrollmentIds: string[], a
   const applied: string[] = [];
   if (!enrollmentIds.length) return applied;
   try {
-    const { data: rows, error } = await db.from("enrollments").select("id,course_id,trainee_id,referral_agency_id,enrollment_status,trainees(marketing_agency_id)").in("id", enrollmentIds);
+    const { data: rows, error } = await db.from("enrollments").select("id,course_id,trainee_id,referral_agency_id,enrollment_status,selling_price_centavos,courses(delivery_type),trainees(marketing_agency_id)").in("id", enrollmentIds);
     if (error || !rows?.length) return applied;
     const { data: done } = await db.from("agency_rebates").select("enrollment_id").in("enrollment_id", enrollmentIds);
     const already = new Set((done ?? []).map((r) => r.enrollment_id as string));
-    for (const raw of rows as unknown as { id: string; course_id: string; trainee_id: string; referral_agency_id: string | null; enrollment_status: string; trainees: { marketing_agency_id?: string | null } | { marketing_agency_id?: string | null }[] | null }[]) {
+    for (const raw of rows as unknown as { id: string; course_id: string; trainee_id: string; referral_agency_id: string | null; enrollment_status: string; selling_price_centavos: number; courses: { delivery_type?: string } | { delivery_type?: string }[] | null; trainees: { marketing_agency_id?: string | null } | { marketing_agency_id?: string | null }[] | null }[]) {
       if (already.has(raw.id) || raw.enrollment_status === "Cancelled") continue;
       const trainee = Array.isArray(raw.trainees) ? raw.trainees[0] : raw.trainees;
       const agencyId = raw.referral_agency_id ?? trainee?.marketing_agency_id ?? null;
       if (!agencyId) continue;
       const { data: matrix } = await db.from("agency_course_rebates").select("agency_id,course_id,rebate_centavos").eq("agency_id", agencyId).eq("course_id", raw.course_id);
-      const rebate = rebateFor(agencyId, raw.course_id, (matrix ?? []) as { agency_id: string; course_id: string; rebate_centavos: number }[]);
+      // Percentage of the fee (202610080025); the peso table before it or when not set.
+      const { data: pctRow } = await db.from("marketing_agencies").select("rebate_percent").eq("id", agencyId).maybeSingle();
+      const course = Array.isArray(raw.courses) ? raw.courses[0] : raw.courses;
+      const rebate = referralRebate({ percent: Number((pctRow as { rebate_percent?: number | null } | null)?.rebate_percent ?? 0) || null, inHouse: course?.delivery_type === "In-House", feeCentavos: Number(raw.selling_price_centavos), matrixCentavos: rebateFor(agencyId, raw.course_id, (matrix ?? []) as { agency_id: string; course_id: string; rebate_centavos: number }[]) });
       if (rebate <= 0) continue;
       // Deducted or No deduction (202610080024); Deducted before it.
       const { data: modeRow } = await db.from("marketing_agencies").select("rebate_mode").eq("id", agencyId).maybeSingle();
