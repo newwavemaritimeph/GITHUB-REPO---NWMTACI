@@ -1461,18 +1461,13 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
   return <div className="portal-page cx">
     <div className="cx-head"><div><span className="portal-eyebrow">Configuration</span><h1>{section}</h1></div></div>
     {error && <div className="portal-message error">{error}</div>}
+    {/* One list for both (owner, 8 Oct 2026): the Cashier and expenses use the same channels. */}
     {section === "Payment channels" && <>
-      <SetupList title="For training fees" description="" entityLabel="payment channel" canManage busy={busy}
+      <SetupList title="Training payments and expense payments" description="" entityLabel="payment channel" canManage busy={busy}
         fields={[{ key: "name", label: "Channel name" }, { key: "requiresReference", label: "Requires a reference number", type: "checkbox" }]}
-        rows={data.paymentMethods.filter((c) => c.kind !== "payable").map((c) => ({ id: c.id, primary: c.name, secondary: c.requires_reference ? "Reference required" : "No reference", active: c.active, values: { name: c.name, requiresReference: c.requires_reference } }))}
+        rows={data.paymentMethods.map((c) => ({ id: c.id, primary: c.name, secondary: `${c.requires_reference ? "Reference required" : "No reference"} · training and expenses`, active: c.active, values: { name: c.name, requiresReference: c.requires_reference } }))}
         onSubmit={(v, id) => post({ action: "channel-save", id, name: String(v.name), requiresReference: Boolean(v.requiresReference), allowsProof: true, kind: "receivable" })}
         onArchive={(id, active, name) => void post({ action: "channel-save", id, name, active: !active }).catch(() => undefined)}
-        onRemove={(id) => void post({ action: "config-remove", entity: "channel", id }).catch(() => undefined)} removable />
-      <SetupList title="For expenses" description="" entityLabel="payment channel" canManage busy={busy}
-        fields={[{ key: "name", label: "Channel name" }]}
-        rows={data.paymentMethods.filter((c) => c.kind === "payable").map((c) => ({ id: c.id, primary: c.name, secondary: c.code, active: c.active, values: { name: c.name } }))}
-        onSubmit={(v, id) => post({ action: "channel-save", id, name: String(v.name), kind: "payable" })}
-        onArchive={(id, active, name) => void post({ action: "channel-save", id, name, kind: "payable", active: !active }).catch(() => undefined)}
         onRemove={(id) => void post({ action: "config-remove", entity: "channel", id }).catch(() => undefined)} removable />
     </>}
     {section === "Partners" && <SetupList title="Partners" description="" entityLabel="partner" canManage busy={busy}

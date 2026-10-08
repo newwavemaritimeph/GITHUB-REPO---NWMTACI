@@ -933,6 +933,7 @@ export async function POST(request: Request) {
       const admin = createSupabaseAdminClient();
       const row = { name: input.name, code: (input.code || input.name).toUpperCase().replace(/[^A-Z0-9]+/g, "_").slice(0, 40), requires_reference: input.requiresReference, allows_proof: input.allowsProof, ...(input.kind ? { kind: input.kind } : {}), ...(input.active !== undefined ? { active: input.active } : {}) };
       const { error } = input.id ? await admin.from("payment_methods").update(row).eq("id", input.id) : await admin.from("payment_methods").insert(row);
+      if (error && /duplicate|unique/i.test(error.message)) return NextResponse.json({ error: "A channel with this name already exists. The same channels are used for training payments and expenses." }, { status: 400 });
       if (error) throw error;
       return NextResponse.json({ ok: true });
     }
