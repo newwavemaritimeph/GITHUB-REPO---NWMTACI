@@ -76,7 +76,10 @@ const inventoryItemInput = z.object({ action: z.literal("inventory-item-save"), 
 const inventoryMoveInput = z.object({ action: z.literal("inventory-move"), itemId: z.string().uuid(), movementType: z.enum(["in", "out"]), quantity: z.number().int().positive(), remarks: z.string().trim().max(240).optional() });
 const agencyInput = z.object({ action: z.literal("agency-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), contactName: z.string().trim().max(120).optional(), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
 const payableInput = z.object({ action: z.literal("payable-save"), id: z.string().uuid().nullable().optional(), description: z.string().trim().min(1).max(200), amountCentavos: z.number().int().positive().optional(), dueOn: z.string().date().nullable().optional(), remove: z.boolean().optional() });
-const expenseCreateInput = z.object({ action: z.literal("expense-create"), payee: z.string().trim().min(1).max(120), category: z.string().trim().min(1).max(80), amountCentavos: z.number().int().positive(), purpose: z.string().trim().min(1).max(300), paymentChannel: z.string().trim().max(40).optional().default(""), referenceNumber: z.string().trim().max(80).optional().default("") });
+const expenseCreateInput = z.object({ action: z.literal("expense-create"), payee: z.string().trim().min(1).max(120), category: z.string().trim().min(1).max(80), amountCentavos: z.number().int().positive(), purpose: z.string().trim().min(1).max(300), paymentChannel: z.string().trim().max(40).optional().default(""), referenceNumber: z.string().trim().max(80).optional().default(""),
+  // Voucher lines (202610080019): particulars, quantity and unit cost; they must add up to the amount.
+  lines: z.array(z.object({ description: z.string().trim().min(1).max(160), quantity: z.number().int().min(1).max(9999), unitCentavos: z.number().int().positive() })).max(10).optional().default([]),
+  supportingDocument: z.string().trim().max(160).optional().default("") });
 const expenseDecideInput = z.object({ action: z.literal("expense-decide"), id: z.string().uuid(), decision: z.enum(["Approved", "Rejected", "Paid"]), remarks: z.string().trim().max(300).optional() });
 // The Cashier releases an approved voucher (cash or transfer) and marks it paid.
 const expenseReleaseInput = z.object({ action: z.literal("expense-release"), id: z.string().uuid(), paymentChannel: z.string().trim().min(1).max(40), referenceNumber: z.string().trim().max(80).optional().default("") });
@@ -877,6 +880,7 @@ export async function POST(request: Request) {
     }
     if (input.action === "expense-create") {
       if (!staff.roleCodes.some((role) => ["admin", "accounting", "cashier"].includes(role))) return NextResponse.json({ error: "Your account cannot raise expense vouchers." }, { status: 403 });
+      if (input.lines.length && input.lines.reduce((sum, line) => sum + line.quantity * line.unitCentavos, 0) !== input.amountCentavos) return NextResponse.json({ error: "The lines do not add up to the total amount." }, { status: 400 });
       const admin = createSupabaseAdminClient();
       // A request number now; the voucher number (CV) is issued when the Accounting Manager approves.
       const { data: expenseNumber, error: numberError } = await admin.rpc("next_reference", { prefix: "ER", requested_year: Number(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric" }).format(new Date())) });
@@ -889,6 +893,7 @@ export async function POST(request: Request) {
         await admin.from("expenses").update({ payment_channel: input.paymentChannel || null, reference_number: input.referenceNumber || null }).eq("id", created.id);
       }
       await admin.from("expenses").update({ request_number: expenseNumber }).eq("id", created.id); // 202610070018; ignored before it
+      if (input.lines.length || input.supportingDocument) await admin.from("expenses").update({ line_items: input.lines, supporting_document: input.supportingDocument || null }).eq("id", created.id); // 202610080019; ignored before it
       return NextResponse.json({ ok: true, number: expenseNumber });
     }
     if (input.action === "expense-decide") {

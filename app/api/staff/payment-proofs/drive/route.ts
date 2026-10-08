@@ -53,6 +53,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ proofId: proof.id, driveLink: drive.link, drivePath: drive.path, duplicateReference: (count ?? 0) > 0 });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not save the proof to Google Drive.";
-    return NextResponse.json({ error: /not connected|revoked|expired/i.test(message) ? "Google is not connected. Ask Registration or Admin to connect Google (Instructions › Google Classroom)." : message }, { status: 400 });
+    return NextResponse.json({ error: /not connected|revoked|expired/i.test(message) ? "Google is not connected yet. Admin or Registration: open Instructions › Templates and click Connect Google, then tick every permission." : message }, { status: 400 });
   }
 }

@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { pesosInWords } from "@/lib/amount-words";
 
 export type DocumentSnapshot = {
   title: string;
@@ -813,6 +814,8 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
   return pdf.save();
 }
 
+export type ExpenseVoucherLine = { description: string; quantity: number; unitCentavos: number };
+
 export type ExpenseVoucherSnapshot = {
   number: string;
   issuedAt: string;
@@ -828,33 +831,174 @@ export type ExpenseVoucherSnapshot = {
   preparedBy: string;
   approvedBy: string;
   logoBytes?: Uint8Array;
+  // Design 2 "grid form" (owner's choice, 8 Oct 2026).
+  requestNumber?: string;
+  lines?: ExpenseVoucherLine[];
+  paymentChannel?: string;
+  referenceNumber?: string;
+  supportingDocument?: string;
+  preparedAt?: string;
+  approvedAt?: string;
+  releasedBy?: string;
+  releasedAt?: string;
 };
 
-/** Expense Voucher ("Expense Invoice") on the shared half-sheet layout. */
+/**
+ * Expense voucher, Design 2 "grid form" (owner's choice, 8 Oct 2026): half of
+ * A4 in landscape, one bordered grid like the training instruction form.
+ * Letterhead with the voucher number, a row of voucher details, payee and
+ * supporting document, a numbered table of expense lines (blank rows fill the
+ * sheet), the total with the amount in words, and four signatures:
+ * prepared, approved, released and received by.
+ */
 export async function createExpenseVoucherPdf(snapshot: ExpenseVoucherSnapshot) {
-  return createHalfSheetDocument({
-    title: "EXPENSE VOUCHER",
-    logoBytes: snapshot.logoBytes,
-    meta: [
-      { label: "Voucher", value: snapshot.number },
-      { label: "Issued", value: snapshot.issuedAt },
-      { label: "Status", value: snapshot.status },
-    ],
-    columns: [
-      { label: "Payee", value: snapshot.payee },
-      { label: "Category", value: snapshot.category },
-      { label: "Purpose", value: snapshot.purpose },
-      { label: "Mode of payment", value: snapshot.modeOfPayment || "-" },
-      { label: "Quantity / unit", value: `${snapshot.quantity ?? "-"} ${snapshot.unit ?? ""}`.trim() },
-      { label: "Requested by", value: snapshot.requestedBy || "-" },
-    ],
-    totals: [{ label: "Amount", value: php(snapshot.amountCentavos) }, { label: "Status", value: snapshot.status }],
-    signatures: [
-      { label: "Prepared by — Signature over Printed Name", name: snapshot.preparedBy },
-      { label: "Approved by — Signature over Printed Name", name: snapshot.approvedBy },
-    ],
-    footer: "Disbursement voucher — retain for accounting and audit. Amounts are in Philippine peso.",
+  const pdf = await PDFDocument.create();
+  const W = 595.28, H = 419.53;
+  const page = pdf.addPage([W, H]);
+  const reg = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const mono = await pdf.embedFont(StandardFonts.Courier);
+  const monoBold = await pdf.embedFont(StandardFonts.CourierBold);
+  type Font = typeof reg;
+  const c = { navy: rgb(.071, .247, .388), cyan: rgb(.208, .8, .98), ink: rgb(.08, .16, .23), muted: rgb(.37, .44, .5), rule: rgb(.73, .78, .83), hair: rgb(.86, .9, .93), tint: rgb(.933, .965, .984), white: rgb(1, 1, 1) };
+  const M = 20, FOOT = 18, X0 = M, X1 = W - M, CW = X1 - X0, PAD = 5;
+  const money = (v: number) => (v / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const text = (s: string, x: number, y: number, size: number, font: Font = reg, color = c.ink) => page.drawText(ascii(s), { x, y, size, font, color });
+  const right = (s: string, xr: number, y: number, size: number, font: Font = reg, color = c.ink) => text(s, xr - font.widthOfTextAtSize(ascii(s), size), y, size, font, color);
+  const fit = (s: string, size: number, maxW: number, font: Font = reg) => {
+    let t = ascii(s ?? "");
+    if (font.widthOfTextAtSize(t, size) <= maxW) return t;
+    while (t.length > 1 && font.widthOfTextAtSize(`${t}...`, size) > maxW) t = t.slice(0, -1);
+    return `${t}...`;
+  };
+  const wrap = (s: string, size: number, maxW: number, font: Font = reg, max = 2) => {
+    const out: string[] = []; let line = "";
+    for (const w of ascii(s ?? "").split(/\s+/).filter(Boolean)) {
+      const test = line ? `${line} ${w}` : w;
+      if (font.widthOfTextAtSize(test, size) > maxW && line) { out.push(line); line = w; } else line = test;
+    }
+    if (line) out.push(line);
+    if (out.length > max) { out.length = max; out[max - 1] = fit(`${out[max - 1]} ...`, size, maxW, font); }
+    return out.length ? out : [""];
+  };
+  const box = (x: number, y: number, w: number, h: number, fill?: typeof c.ink) => page.drawRectangle({ x, y, width: w, height: h, borderColor: c.rule, borderWidth: 0.5, ...(fill ? { color: fill } : {}) });
+  const cap = (s: string, x: number, y: number, color = c.muted) => text(s.toUpperCase(), x, y, 5.6, bold, color);
+
+  const lines: ExpenseVoucherLine[] = snapshot.lines?.length
+    ? snapshot.lines
+    : [{ description: snapshot.purpose, quantity: snapshot.quantity ?? 1, unitCentavos: Math.round(snapshot.amountCentavos / Math.max(1, snapshot.quantity ?? 1)) }];
+  const top = H - M, bottom = FOOT + 8;
+  let y = top;
+
+  // 1. Letterhead: logo · organisation · voucher number on navy.
+  const headH = 46, logoW = 50, titleW = 160;
+  box(X0, y - headH, logoW, headH);
+  if (snapshot.logoBytes) { try { const img = await pdf.embedPng(snapshot.logoBytes); const d = img.scaleToFit(36, 36); page.drawImage(img, { x: X0 + (logoW - d.width) / 2, y: y - headH + (headH - d.height) / 2, width: d.width, height: d.height }); } catch { /* logo optional */ } }
+  box(X0 + logoW, y - headH, CW - logoW - titleW, headH);
+  text("NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", X0 + logoW + PAD + 2, y - 19, 9.6, bold, c.navy);
+  text("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000", X0 + logoW + PAD + 2, y - 30, 6.4, reg, c.muted);
+  text("0948-847-6530  |  (02) 8553 0310  |  newwavemaritime@gmail.com", X0 + logoW + PAD + 2, y - 39, 6.4, reg, c.muted);
+  page.drawRectangle({ x: X1 - titleW, y: y - headH, width: titleW, height: headH, color: c.navy });
+  text("EXPENSE VOUCHER", X1 - titleW + PAD + 3, y - 14, 6.6, bold, c.cyan);
+  text(snapshot.number, X1 - titleW + PAD + 3, y - 30, 12.5, monoBold, c.white);
+  text(snapshot.status, X1 - titleW + PAD + 3, y - 41, 6.6, bold, c.white);
+  y -= headH;
+  page.drawLine({ start: { x: X0, y }, end: { x: X1, y }, thickness: 1.2, color: c.navy });
+
+  // 2. Voucher details.
+  const infoH = 27;
+  const info: [string, string, Font][] = [
+    ["Date issued", snapshot.issuedAt || "-", bold],
+    ["Request no.", snapshot.requestNumber || "-", monoBold],
+    ["Category", snapshot.category || "-", bold],
+    ["Mode of payment", snapshot.paymentChannel || "-", bold],
+    ["Reference no.", snapshot.referenceNumber || "-", monoBold],
+  ];
+  info.forEach(([label, value, font], i) => {
+    const w = CW / info.length, x = X0 + i * w;
+    box(x, y - infoH, w, infoH);
+    cap(label, x + PAD, y - 9);
+    text(fit(value, 8.6, w - 2 * PAD, font), x + PAD, y - 21, 8.6, font);
   });
+  y -= infoH;
+
+  // 3. Payee and supporting document.
+  const payH = 27, payW = CW * 0.58;
+  box(X0, y - payH, payW, payH); cap("Payee", X0 + PAD, y - 9); text(fit(snapshot.payee, 9, payW - 2 * PAD, bold), X0 + PAD, y - 21, 9, bold);
+  box(X0 + payW, y - payH, CW - payW, payH); cap("Supporting document", X0 + payW + PAD, y - 9); text(fit(snapshot.supportingDocument || "-", 8.6, CW - payW - 2 * PAD, bold), X0 + payW + PAD, y - 21, 8.6, bold);
+  y -= payH;
+
+  // 5 and 6 sizes first, so the lines table takes what is left.
+  const totalH = 34, sigH = 52;
+  const tableTop = y, tableBottom = bottom + sigH + totalH;
+  const cols = [
+    { label: "No.", w: CW * 0.07, align: "left" as const },
+    { label: "Particulars", w: CW * 0.45, align: "left" as const },
+    { label: "Qty", w: CW * 0.10, align: "right" as const },
+    { label: "Unit cost", w: CW * 0.17, align: "right" as const },
+    { label: "Amount (PHP)", w: CW * 0.21, align: "right" as const },
+  ];
+  const colX = cols.map((_, i) => X0 + cols.slice(0, i).reduce((s, k) => s + k.w, 0));
+  const headRow = 14, rowH = 14.5;
+  page.drawRectangle({ x: X0, y: tableTop - headRow, width: CW, height: headRow, color: c.tint });
+  cols.forEach((k, i) => {
+    if (k.align === "right") right(k.label.toUpperCase(), colX[i] + k.w - PAD, tableTop - 9.5, 5.8, bold, c.navy);
+    else text(k.label.toUpperCase(), colX[i] + PAD, tableTop - 9.5, 5.8, bold, c.navy);
+  });
+  let ry = tableTop - headRow;
+  page.drawLine({ start: { x: X0, y: ry }, end: { x: X1, y: ry }, thickness: 0.5, color: c.rule });
+  lines.forEach((ln, i) => {
+    const desc = wrap(ln.description, 8, cols[1].w - 2 * PAD, reg, 2);
+    const h = Math.max(rowH, 5 + desc.length * 9.6);
+    if (ry - h < tableBottom + 2) return; // never draw past the total row
+    const base = ry - 10;
+    text(String(i + 1), colX[0] + PAD, base, 8, mono);
+    desc.forEach((d, k) => text(d, colX[1] + PAD, base - k * 9.6, 8));
+    right(String(ln.quantity), colX[2] + cols[2].w - PAD, base, 8, mono);
+    right(money(ln.unitCentavos), colX[3] + cols[3].w - PAD, base, 8, mono);
+    right(money(ln.unitCentavos * ln.quantity), colX[4] + cols[4].w - PAD, base, 8, monoBold);
+    ry -= h;
+    page.drawLine({ start: { x: X0, y: ry }, end: { x: X1, y: ry }, thickness: 0.4, color: c.hair });
+  });
+  // Blank rows fill the rest of the table.
+  while (ry - rowH >= tableBottom + 0.5) { ry -= rowH; page.drawLine({ start: { x: X0, y: ry }, end: { x: X1, y: ry }, thickness: 0.4, color: c.hair }); }
+  colX.slice(1).forEach((x) => page.drawLine({ start: { x, y: tableTop }, end: { x, y: tableBottom }, thickness: 0.5, color: c.rule }));
+  page.drawRectangle({ x: X0, y: tableBottom, width: CW, height: tableTop - tableBottom, borderColor: c.rule, borderWidth: 0.5 });
+  y = tableBottom;
+
+  // 5. Total and amount in words.
+  const totW = 150;
+  page.drawRectangle({ x: X0, y: y - totalH, width: CW, height: totalH, color: c.tint });
+  box(X0, y - totalH, CW - totW, totalH);
+  cap("Amount in words", X0 + PAD, y - 9);
+  wrap(pesosInWords(snapshot.amountCentavos), 8.4, CW - totW - 2 * PAD, bold, 2).forEach((l, k) => text(l, X0 + PAD, y - 20 - k * 9.6, 8.4, bold));
+  box(X1 - totW, y - totalH, totW, totalH);
+  cap("Total amount", X1 - totW + PAD, y - 9);
+  right(`PHP ${money(snapshot.amountCentavos)}`, X1 - PAD, y - 26, 12.5, bold, c.navy);
+  y -= totalH;
+
+  // 6. Signatures.
+  const sigs = [
+    { label: "Prepared by", name: snapshot.preparedBy, note: [snapshot.preparedAt].filter(Boolean).join("") || "Cashier" },
+    { label: "Approved by", name: snapshot.approvedBy, note: snapshot.approvedAt || "Accounting Manager" },
+    { label: "Released by", name: snapshot.releasedBy ?? "", note: snapshot.releasedAt || "Cashier" },
+    { label: "Received by", name: "", note: "Payee signature over printed name, date" },
+  ];
+  sigs.forEach((s, i) => {
+    const w = CW / sigs.length, x = X0 + i * w;
+    box(x, y - sigH, w, sigH);
+    cap(s.label, x + PAD, y - 9);
+    const lineY = y - sigH + 17;
+    if (s.name) text(fit(s.name, 8.4, w - 2 * PAD, bold), x + PAD, lineY + 3, 8.4, bold);
+    page.drawLine({ start: { x: x + PAD, y: lineY }, end: { x: x + w - PAD, y: lineY }, thickness: 0.6, color: c.ink });
+    text(fit(s.note, 6, w - 2 * PAD), x + PAD, lineY - 9, 6, reg, c.muted);
+  });
+
+  // Outer frame and footer.
+  page.drawRectangle({ x: X0, y: bottom, width: CW, height: top - bottom, borderColor: c.navy, borderWidth: 1.2 });
+  text("Keep with the official receipt for accounting and audit. Amounts are in Philippine peso.", X0, FOOT - 4, 6, reg, c.muted);
+  right("Form EV-02  |  Ride the New Wave of Maritime Excellence", X1, FOOT - 4, 6, reg, c.muted);
+  return pdf.save();
 }
 
 export type DailyExpensesSnapshot = {

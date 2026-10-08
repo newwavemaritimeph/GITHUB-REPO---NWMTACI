@@ -682,20 +682,40 @@ const expenseChannels = (data: PortalData) => { const all = data.paymentMethods.
 function RecordExpenseModal({ data, onClose, post }: { data: PortalData; onClose: () => void; post: (body: Record<string, unknown>, ok?: string) => Promise<Record<string, unknown>> }) {
   const categories = data.expenseCategories.filter((c) => c.active);
   const channels = expenseChannels(data);
-  const [payee, setPayee] = useState(""), [category, setCategory] = useState(categories[0]?.name ?? ""), [amount, setAmount] = useState(""), [purpose, setPurpose] = useState("");
-  const [channel, setChannel] = useState(channels[0] ?? "Cash"), [reference, setReference] = useState("");
-  const cents = toCentavos(amount);
-  const ready = !!payee.trim() && !!category && cents > 0 && !!purpose.trim();
+  const [payee, setPayee] = useState(""), [category, setCategory] = useState(categories[0]?.name ?? "");
+  const [channel, setChannel] = useState(channels[0] ?? "Cash"), [reference, setReference] = useState(""), [supporting, setSupporting] = useState("");
+  // Voucher lines (Design 2): particulars, quantity and unit cost; the total is their sum.
+  const [lines, setLines] = useState([{ description: "", quantity: "1", unit: "" }]);
+  const setLine = (i: number, patch: Partial<{ description: string; quantity: string; unit: string }>) => setLines((all) => all.map((l, k) => (k === i ? { ...l, ...patch } : l)));
+  const parsed = lines.map((l) => ({ description: l.description.trim(), quantity: Math.max(0, Math.floor(Number(l.quantity) || 0)), unitCentavos: toCentavos(l.unit) }));
+  const filled = parsed.filter((l) => l.description || l.unitCentavos > 0);
+  const total = filled.reduce((s, l) => s + l.quantity * l.unitCentavos, 0);
+  const linesOk = filled.length > 0 && filled.every((l) => l.description && l.quantity > 0 && l.unitCentavos > 0);
+  const ready = !!payee.trim() && !!category && linesOk && total > 0;
+  const purpose = filled.map((l) => l.description).join("; ").slice(0, 300);
   return <Modal title="Record expense" onClose={onClose}>
     <div className="portal-form">
       <label>Payee<input value={payee} onChange={(e) => setPayee(e.target.value)} /></label>
       <label>Category<select value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></label>
-      <label>Amount (PHP)<input className="cx-mono" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+      <div className="full cx-lines">
+        <div className="cx-lines-head"><span>Particulars</span><span>Qty</span><span>Unit cost (PHP)</span><span>Amount</span><span /></div>
+        {lines.map((l, i) => <div className="cx-lines-row" key={i}>
+          <input aria-label={`Particulars, line ${i + 1}`} value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} />
+          <input aria-label={`Quantity, line ${i + 1}`} className="cx-mono" inputMode="numeric" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value.replace(/\D/g, "") })} />
+          <input aria-label={`Unit cost, line ${i + 1}`} className="cx-mono" inputMode="decimal" value={l.unit} onChange={(e) => setLine(i, { unit: e.target.value })} />
+          <span className="cx-mono cx-lines-amt" data-l="Amount">{pesos(parsed[i].quantity * parsed[i].unitCentavos)}</span>
+          <button type="button" className="portal-secondary cx-lines-x" aria-label={`Remove line ${i + 1}`} disabled={lines.length === 1} onClick={() => setLines((all) => all.filter((_, k) => k !== i))}>Remove</button>
+        </div>)}
+        <div className="cx-lines-foot">
+          <button type="button" className="portal-secondary" disabled={lines.length >= 10} onClick={() => setLines((all) => [...all, { description: "", quantity: "1", unit: "" }])}>Add line</button>
+          <span>Total <b className="cx-mono">{pesos(total)}</b></span>
+        </div>
+      </div>
       <label>Payment channel<select value={channel} onChange={(e) => setChannel(e.target.value)}>{channels.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
-      <label className="full">Purpose<input value={purpose} onChange={(e) => setPurpose(e.target.value)} /></label>
-      <label className="full">Receipt or reference number<input value={reference} onChange={(e) => setReference(e.target.value)} /></label>
+      <label>Receipt or reference number<input value={reference} onChange={(e) => setReference(e.target.value)} /></label>
+      <label className="full">Supporting document<input placeholder="e.g. Meralco bill and official receipt" value={supporting} onChange={(e) => setSupporting(e.target.value)} /></label>
       {!categories.length && <p className="portal-form-note full">The Accounting Manager adds expense categories in Configuration.</p>}
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!ready} onClick={() => void post({ action: "expense-create", payee: payee.trim(), category, amountCentavos: cents, purpose: purpose.trim(), paymentChannel: channel, referenceNumber: reference.trim() }, "Expense recorded and sent for approval.").then(onClose).catch(() => undefined)}>Send for approval</button></div>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!ready} onClick={() => void post({ action: "expense-create", payee: payee.trim(), category, amountCentavos: total, purpose, lines: filled, paymentChannel: channel, referenceNumber: reference.trim(), supportingDocument: supporting.trim() }, "Expense recorded and sent for approval.").then(onClose).catch(() => undefined)}>Send for approval</button></div>
     </div>
   </Modal>;
 }

@@ -1533,3 +1533,19 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .acct-danger-fill { background: #b42318; border-color: #b42318; }
 .acct-edit { padding: 8px 0; }
 .acct-foot { padding: 12px 20px; }
+
+/* Record expense: voucher lines (Design 2, 8 Oct 2026) */
+.portal-shell .cx-lines{display:grid;gap:8px;min-width:0}
+.portal-shell .cx-lines-head,.portal-shell .cx-lines-row{display:grid;grid-template-columns:minmax(0,1fr) 72px 140px 120px auto;gap:8px;align-items:center}
+.portal-shell .cx-lines-head span{font-size:13px;font-weight:600;color:var(--nw-muted,#5f7180)}
+.portal-shell .cx-lines-head span:nth-child(n+2):nth-child(-n+4),.portal-shell .cx-lines-amt{text-align:right}
+.portal-shell .cx-lines-row input{min-width:0;width:100%}
+.portal-shell .cx-lines-x{padding-inline:10px}
+.portal-shell .cx-lines-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.portal-shell .cx-lines-foot b{font-size:18px;margin-left:8px}
+@media (max-width:640px){
+  .portal-shell .cx-lines-head{display:none}
+  .portal-shell .cx-lines-row{grid-template-columns:1fr 1fr;padding-bottom:8px;border-bottom:1px solid #dbe5ec}
+  .portal-shell .cx-lines-row input:first-child{grid-column:1/-1}
+  .portal-shell .cx-lines-amt{text-align:left}
+}

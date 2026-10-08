@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { createExpenseVoucherPdf } from "@/lib/documents";
+import { createExpenseVoucherPdf, type ExpenseVoucherLine } from "@/lib/documents";
 import { googleConfigured } from "@/lib/google-classroom";
 import { fileInDrive, replaceDriveFile, voucherNaming, VOUCHER_ROOT } from "@/lib/google-drive";
 
@@ -15,6 +15,8 @@ type Admin = ReturnType<typeof createSupabaseAdminClient>;
 const one = <T,>(value: T | T[] | null | undefined): T | null => (Array.isArray(value) ? value[0] ?? null : value ?? null);
 const fmt = (value?: string | null) => (value ? new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(value)) : "");
 
+const fmtTime = (value: string) => new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(value));
+
 async function logo() { try { return new Uint8Array(await readFile(path.join(process.cwd(), "public", "new-wave-emblem.png"))); } catch { return undefined; } }
 
 /** The voucher PDF bytes, or null when the expense has no voucher yet (not approved). */
@@ -23,22 +25,32 @@ export async function buildExpenseVoucher(db: Admin, id: string) {
     .select("id,expense_number,payee,category,amount_centavos,purpose,status,created_at,requester:profiles!expenses_requested_by_fkey(complete_name),approver:profiles!expenses_approved_by_fkey(complete_name)")
     .eq("id", id).maybeSingle();
   if (!data) return null;
-  // Flow fields (202610070018) and channel (202608100001); tolerate their absence.
-  const { data: extra } = await db.from("expenses").select("voucher_number,request_number,approved_at,released_at,payment_channel,reference_number,drive_file_id").eq("id", id).maybeSingle();
-  const x = (extra ?? {}) as { voucher_number?: string | null; request_number?: string | null; approved_at?: string | null; released_at?: string | null; payment_channel?: string | null; reference_number?: string | null; drive_file_id?: string | null };
+  // Flow fields (202610070018), channel (202608100001) and lines (202610080019); tolerate their absence.
+  const { data: extra } = await db.from("expenses").select("voucher_number,request_number,approved_at,released_at,released_by,payment_channel,reference_number,drive_file_id").eq("id", id).maybeSingle();
+  const x = (extra ?? {}) as { voucher_number?: string | null; request_number?: string | null; approved_at?: string | null; released_at?: string | null; released_by?: string | null; payment_channel?: string | null; reference_number?: string | null; drive_file_id?: string | null };
+  const { data: lineData } = await db.from("expenses").select("line_items,supporting_document").eq("id", id).maybeSingle();
+  const l = (lineData ?? {}) as { line_items?: ExpenseVoucherLine[] | null; supporting_document?: string | null };
   if (data.status !== "Approved" && data.status !== "Paid") return null;
   const requester = one(data.requester as { complete_name: string } | { complete_name: string }[] | null)?.complete_name ?? "";
   const approver = one(data.approver as { complete_name: string } | { complete_name: string }[] | null)?.complete_name ?? "";
+  const released = data.status === "Paid";
+  const { data: releaser } = released && x.released_by ? await db.from("profiles").select("complete_name").eq("id", x.released_by).maybeSingle() : { data: null };
   const voucherNumber = x.voucher_number ?? data.expense_number;
-  const mode = [x.payment_channel, x.reference_number ? `Ref ${x.reference_number}` : "", data.status === "Paid" && x.released_at ? `released ${fmt(x.released_at)}` : ""].filter(Boolean).join(" · ");
   const bytes = await createExpenseVoucherPdf({
     number: voucherNumber,
+    requestNumber: x.request_number && x.request_number !== voucherNumber ? x.request_number : "",
     issuedAt: fmt(x.approved_at ?? data.created_at),
-    payee: data.payee, category: data.category,
-    purpose: x.request_number && x.request_number !== voucherNumber ? `${data.purpose} (request ${x.request_number})` : data.purpose,
+    payee: data.payee, category: data.category, purpose: data.purpose,
     amountCentavos: Number(data.amount_centavos),
-    requestedBy: requester, modeOfPayment: mode, status: data.status === "Paid" ? "Released" : "Approved",
-    preparedBy: requester, approvedBy: approver, logoBytes: await logo(),
+    lines: Array.isArray(l.line_items) ? l.line_items : [],
+    paymentChannel: x.payment_channel ?? "", referenceNumber: x.reference_number ?? "",
+    supportingDocument: l.supporting_document ?? "",
+    requestedBy: requester, modeOfPayment: x.payment_channel ?? "", status: released ? "Released" : "Approved",
+    preparedBy: requester, preparedAt: `Cashier · ${fmt(data.created_at)}`,
+    approvedBy: approver, approvedAt: `Accounting Manager · ${fmt(x.approved_at)}`,
+    releasedBy: released ? (releaser as { complete_name?: string } | null)?.complete_name ?? "" : "",
+    releasedAt: released && x.released_at ? `Cashier · ${fmtTime(x.released_at)}` : "Cashier",
+    logoBytes: await logo(),
   });
   return { bytes, voucherNumber, category: data.category, payee: data.payee, approvedAt: x.approved_at ?? data.created_at, driveFileId: x.drive_file_id ?? null };
 }

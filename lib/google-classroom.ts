@@ -20,10 +20,12 @@ export const CLASSROOM_SCOPES = [
   "https://www.googleapis.com/auth/drive.file",
 ];
 export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
-export const hasDriveScope = (scopes?: string | null) => (scopes ?? "").split(/s+/).includes(DRIVE_SCOPE);
+export const hasDriveScope = (scopes?: string | null) => (scopes ?? "").split(/\s+/).includes(DRIVE_SCOPE);
 
 export const googleConfigured = () => Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
-export const redirectUri = (origin: string) => `${process.env.APP_BASE_URL?.replace(/\/$/, "") || origin}/api/google/classroom/callback`;
+// The same address the Connect button was pressed on, so the sign-in cookie comes back with
+// Google's reply. Both portal addresses are registered as redirect URIs in Google Cloud.
+export const redirectUri = (origin: string) => `${origin}/api/google/classroom/callback`;
 
 /* -------- token encryption (AES-256-GCM, key derived from the client secret) -------- */
 const key = () => createHash("sha256").update(`${process.env.GOOGLE_CLIENT_SECRET ?? ""}:nwmtaci-classroom-token`).digest();
@@ -74,10 +76,15 @@ export async function activeConnection(db: Admin) {
 export async function googleAccessToken(db: Admin) { return accessToken(db); }
 async function accessToken(db: Admin) {
   const connection = await activeConnection(db);
-  if (!connection || !googleConfigured()) throw new Error("Google Classroom is not connected.");
+  if (!googleConfigured()) throw new Error("Google is not set up yet: add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel, then redeploy.");
+  if (!connection) throw new Error("Google Classroom is not connected.");
+  // A connection saved under an older client secret cannot be opened; ask for a fresh connection.
+  let refreshToken: string;
+  try { refreshToken = openToken(connection.refresh_token_encrypted); }
+  catch { throw new Error("Google Classroom access expired after the Google key changed. Connect it again."); }
   const response = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: process.env.GOOGLE_CLIENT_ID ?? "", client_secret: process.env.GOOGLE_CLIENT_SECRET ?? "", refresh_token: openToken(connection.refresh_token_encrypted), grant_type: "refresh_token" }),
+    body: new URLSearchParams({ client_id: process.env.GOOGLE_CLIENT_ID ?? "", client_secret: process.env.GOOGLE_CLIENT_SECRET ?? "", refresh_token: refreshToken, grant_type: "refresh_token" }),
   });
   const body = await response.json() as { access_token?: string; error?: string; error_description?: string };
   if (!response.ok || !body.access_token) {
