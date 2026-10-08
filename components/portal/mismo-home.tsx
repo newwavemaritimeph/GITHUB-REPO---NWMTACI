@@ -52,7 +52,7 @@ export function MismoDashboard({ go }: { go: (m: string) => void }) {
   const owingNow = trainees.filter(({ t }) => owesAt(t, hour >= 16 ? "16" : "now"));
   const at11 = trainees.filter(({ t }) => owesAt(t, "11"));
   const submitted = data ? data.batches.filter((b) => b.submittedAt).length : 0;
-  return <div className="portal-page cx ac">
+  return <div className="portal-page cx ac ms-page">
     <Head title="Dashboard" date={date} setDate={setDate} />
     <p className="ac-note">{longDay(date)}{data ? ` · STCW classes: ${data.batches.map((b) => b.courseCode).join(", ") || "none"}` : ""}</p>
     {error && <Message kind="error" text={error} />}
@@ -96,7 +96,7 @@ export function MismoFinalList() {
     const a = document.createElement("a"); a.href = url; a.download = `MISMO-${b.batchNumber}-${date}.csv`; a.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
-  return <div className="portal-page cx ac">
+  return <div className="portal-page cx ac ms-page">
     <Head title="Final list" date={date} setDate={setDate} />
     <p className="ac-note">{longDay(date)} · trainees settled by 4:00 PM, for the MARINA MISMO Portal</p>
     {error && <Message kind="error" text={error} />}
@@ -121,7 +121,7 @@ export function MismoFinalList() {
 export function MismoSubmissions() {
   const { data, error } = useMismo(manilaToday());
   const rows = data?.history ?? [];
-  return <div className="portal-page cx ac">
+  return <div className="portal-page cx ac ms-page">
     <Head title="Submissions" />
     {error && <Message kind="error" text={error} />}
     <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Submitted to the MARINA MISMO Portal</h2><span className="slot-count">{rows.length}</span></div>

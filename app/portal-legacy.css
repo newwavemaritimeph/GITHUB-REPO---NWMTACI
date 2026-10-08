@@ -1924,3 +1924,21 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .ms-sub{margin:0 20px 10px;color:var(--nw-muted);font-size:14px}.nw-shell .ms-sub b{color:var(--nw-fg)}
 .nw-shell .ms-out td{color:var(--nw-muted);text-decoration:line-through}
 .nw-shell .cl-void select{font:inherit;padding:7px 10px;border:1px solid var(--nw-line);border-radius:8px}
+/* MISMO spacing (8 Oct 2026): one 18px rhythm between header, note, banner and panels. */
+.nw-shell .ms-page{display:flex;flex-direction:column;gap:18px}
+.nw-shell .ms-page>*{margin-top:0 !important;margin-bottom:0 !important}
+.nw-shell .ms-page>.cx-head{align-items:flex-end}
+.nw-shell .ms-page>.ac-note{margin-top:-10px !important;color:var(--nw-muted);font-size:14.5px}
+.nw-shell .ms-page .ms-banner{padding:14px 18px;gap:10px 16px}
+.nw-shell .ms-page .ms-banner span{font-size:14.5px;line-height:1.45}
+.nw-shell .ms-page .ac-rail{gap:20px}
+.nw-shell .ms-page .panel-heading{padding:18px 20px 12px;gap:10px 14px}
+.nw-shell .ms-page .panel-heading h2{flex:1 1 260px;min-width:0}
+.nw-shell .ms-page .panel-heading .cl-acts{flex-wrap:wrap;gap:8px}
+.nw-shell .ms-page .ms-sub{margin:0 20px 14px;padding-bottom:12px;border-bottom:1px solid var(--nw-line);line-height:1.5}
+.nw-shell .ms-page .cl-wrap{margin:0 20px 22px}
+.nw-shell .ms-page .cl-log td{padding:9px 12px}.nw-shell .ms-page .cl-log th{padding:10px 12px}
+.nw-shell .ms-page .portal-empty-copy{padding:22px 20px 26px !important}
+.nw-shell .ms-page .ac-lines>div{padding:10px 0}
+.nw-shell .ms-page .ac-foot{margin:12px 20px 18px;line-height:1.5}
+@media (max-width:640px){.nw-shell .ms-page{gap:14px}.nw-shell .ms-page .panel-heading .cl-acts{width:100%}.nw-shell .ms-page .ms-bbtn{margin-left:0}}
