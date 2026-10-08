@@ -15,7 +15,7 @@ SSO|Ship Security Officer|3 days|Face-to-face|200000
 STPPDSPPS|Safety Training for Personnel Providing Direct Service to Passengers in Passenger Spaces|1 day|Face-to-face|120000
 PSCMT|Crowd Management Training|2 days|Face-to-face|160000
 PSCMHBT|Passenger Ship Crisis Management and Human Behavior Training|3 days|Face-to-face|160000
-UBT-PSSR|Updating Training on Basic Training - PSSR|1 day|Face-to-face|130000
+UBT-PSSR|Updating Basic Training - Personal Safety and Social Responsibilities|1 day|Face-to-face|130000
 CCMI|Safety, Crowd and Crisis Package|5.5 days|Face-to-face|420000
 #MARINA Domestic
 CCMD|Crowd and Crisis Management - Domestic|3 days|Blended|250000

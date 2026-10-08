@@ -16,7 +16,7 @@ insert into official_courses(code, name, duration_label) values
   ('STPPDSPPS', 'Safety Training for Personnel Providing Direct Service to Passengers in Passenger Spaces', '1 day'),
   ('PSCMT', 'Crowd Management Training', '2 days'),
   ('PSCMHBT', 'Passenger Ship Crisis Management and Human Behavior Training', '3 days'),
-  ('UBT-PSSR', 'Updating Training on Basic Training - PSSR', '1 day'),
+  ('UBT-PSSR', 'Updating Basic Training - Personal Safety and Social Responsibilities', '1 day'),
   ('CCMI', 'Safety, Crowd and Crisis Package', '5.5 days'),
   ('CCMD', 'Crowd and Crisis Management - Domestic', '3 days'),
   ('ABC', 'Awareness on Basic Computer', '1 day'),
