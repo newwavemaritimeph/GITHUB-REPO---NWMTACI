@@ -196,7 +196,10 @@ export function RecordPaymentModal({ data, initialEnrollmentId, onClose, onSaved
   const [agencyId, setAgencyId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [posted, setPosted] = useState<{ id: string; amount: number } | null>(null);
+  const [posted, setPosted] = useState<{ id: string; amount: number; drive: { link: string; path: string } | null } | null>(null);
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [proof, setProof] = useState<{ id: string; link: string; path: string; duplicate: boolean } | null>(null);
+  const [dupWarning, setDupWarning] = useState(false), [dupConfirmed, setDupConfirmed] = useState(false);
 
   const mine = data.enrollments.filter((e) => e.trainee_id === traineeId && e.enrollment_status !== "Cancelled");
   const open = mine.filter((e) => balanceOf(e) > 0);
@@ -214,7 +217,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, onClose, onSaved
   const over = open.some((e) => toCentavos(amounts[e.id] ?? "") > balanceOf(e));
   const refRequired = needsReference(data, method);
   const matches = receivedCentavos > 0 && receivedCentavos === total;
-  const valid = total > 0 && !over && matches && (!refRequired || reference.trim().length > 0);
+  const valid = total > 0 && !over && matches && (!refRequired || (reference.trim().length > 0 && (!!proofFile || !!proof)));
 
   function choose(id: string) { setTraineeId(id); setAmounts({}); setExtras([]); const firstOpen = data.enrollments.find((e) => e.trainee_id === id && e.enrollment_status !== "Cancelled"); setForEnrollment(firstOpen?.id ?? ""); if (!data.enrollments.some((e) => e.trainee_id === id && e.enrollment_status !== "Cancelled" && balanceOf(e) > 0)) setAddOpen(true); }
   function fill(how: "all" | "spread" | "clear") {
@@ -241,14 +244,31 @@ export function RecordPaymentModal({ data, initialEnrollmentId, onClose, onSaved
   }
   function removeExtra(key: string) { const x = extras.find((l) => l.key === key); setExtras((cur) => cur.filter((l) => l.key !== key)); if (x) setReceived((Math.max(0, receivedCentavos - x.unit * x.quantity) / 100).toFixed(2)); }
 
+  /** GCash, PSBank and UnionBank: file the proof in Google Drive first (Mode › Month, "LASTNAME - date"). */
+  async function fileProof() {
+    if (!refRequired) return null;
+    if (proof) return proof;
+    if (!proofFile || !group) throw new Error("Attach the proof of payment.");
+    const form = new FormData();
+    form.set("proof", proofFile); form.set("traineeId", group.traineeId); form.set("mode", method);
+    form.set("receivedAt", new Date(receivedAt).toISOString()); form.set("reference", reference.trim());
+    const response = await fetch("/api/staff/payment-proofs/drive", { method: "POST", body: form });
+    const body = await response.json() as { proofId?: string; driveLink?: string; drivePath?: string; duplicateReference?: boolean; error?: string };
+    if (!response.ok || !body.proofId) throw new Error(body.error ?? "Could not save the proof to Google Drive.");
+    const filed = { id: body.proofId, link: body.driveLink ?? "", path: body.drivePath ?? "", duplicate: !!body.duplicateReference };
+    setProof(filed);
+    return filed;
+  }
   async function post() {
     setBusy(true); setError("");
     try {
+      const filed = await fileProof();
+      if (filed?.duplicate && !dupConfirmed) { setDupWarning(true); return; }
       const allocations = open.map((e) => ({ enrollmentId: e.id, amountCentavos: Math.min(toCentavos(amounts[e.id] ?? ""), balanceOf(e)) })).filter((a) => a.amountCentavos > 0);
-      const result = await submit({ action: "payment-split", allocations, items: extras.map((x) => ({ enrollmentId: x.enrollmentId, chargeCatalogId: x.chargeCatalogId, description: x.description, unitCentavos: x.unit, quantity: x.quantity })), method, receivingAccount: method === "Cash" ? "Main cashier" : method, referenceNumber: reference.trim(), receivedAt: new Date(receivedAt).toISOString(), remarks }) as { payment?: { id?: string } | string };
+      const result = await submit({ action: "payment-split", allocations, items: extras.map((x) => ({ enrollmentId: x.enrollmentId, chargeCatalogId: x.chargeCatalogId, description: x.description, unitCentavos: x.unit, quantity: x.quantity })), method, receivingAccount: method === "Cash" ? "Main cashier" : method, referenceNumber: reference.trim(), receivedAt: new Date(receivedAt).toISOString(), remarks, proofId: filed?.id ?? null }) as { payment?: { id?: string } | string };
       if (agencyId) for (const a of allocations) { try { await submit({ action: "record-agency-rebate", enrollmentId: a.enrollmentId, agencyId }); } catch { /* the rebate never blocks the payment */ } }
       const paymentId = typeof result.payment === "string" ? result.payment : result.payment?.id ?? "";
-      setPosted({ id: paymentId, amount: total });
+      setPosted({ id: paymentId, amount: total, drive: filed ? { link: filed.link, path: filed.path } : null });
       await onSaved();
     } catch (err) { setError(err instanceof Error ? err.message : "Could not record the payment."); } finally { setBusy(false); }
   }
@@ -256,6 +276,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, onClose, onSaved
   if (posted && group) return <Modal title="Payment recorded" onClose={onClose}>
     <div className="portal-form">
       <div className="full"><Message kind="success" text={`${pesos(posted.amount)} received from ${group.name}.`} /></div>
+      {posted.drive && <p className="portal-form-note full cx-drive">Saved to Google Drive · {posted.drive.path.split(" / ").slice(1).join(" / ")} {posted.drive.link && <a href={posted.drive.link} target="_blank" rel="noreferrer">Open</a>}</p>}
       <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
         {posted.id && <a className="portal-secondary" href={`/portal/payment-receipt/${posted.id}`} target="_blank" rel="noreferrer">Receipt</a>}
         <TarButton data={data} traineeId={group.traineeId} className="portal-secondary" />
@@ -294,8 +315,10 @@ export function RecordPaymentModal({ data, initialEnrollmentId, onClose, onSaved
           </div>
         </details>
         <div className={`cx-tally full ${matches ? "ok" : "no"}`}><span>Applied {pesos(total)} of {pesos(receivedCentavos)}</span><span>{!receivedCentavos ? "Enter the amount received" : matches ? "Ready to record" : total < receivedCentavos ? `${pesos(receivedCentavos - total)} not applied` : `${pesos(total - receivedCentavos)} over the amount received`}</span></div>
-        <div className="full"><span className="pay-label">Mode of payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{modes.map((m) => <button type="button" role="radio" aria-checked={method === m} key={m} className={method === m ? "on" : ""} onClick={() => setMethod(m)}>{m}</button>)}</div></div>
+        <div className="full"><span className="pay-label">Mode of payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{modes.map((m) => <button type="button" role="radio" aria-checked={method === m} key={m} className={method === m ? "on" : ""} onClick={() => { setMethod(m); setProof(null); }}>{m}</button>)}</div></div>
         <label>{refRequired ? "Reference number (required)" : "Reference number"}<input className="cx-mono" value={reference} onChange={(ev) => setReference(ev.target.value.toUpperCase())} placeholder={refRequired ? `${method} reference` : "Not needed for cash"} /></label>
+        {refRequired && <label>Proof of payment (required)<input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(ev) => { setProofFile(ev.target.files?.[0] ?? null); setProof(null); setDupWarning(false); setDupConfirmed(false); }} />{proof ? <small className="portal-form-note">Saved to Google Drive · {proof.path.split(" / ").slice(1).join(" / ")}</small> : <small className="portal-form-note">Filed in Google Drive under {method} › this month as the trainee&apos;s last name and date.</small>}</label>}
+        {dupWarning && <div className="full cx-dup"><Message kind="error" text={`Reference ${reference.trim()} was already used on another payment. Check the proof before recording it again.`} /><label className="portal-check"><input type="checkbox" checked={dupConfirmed} onChange={(ev) => setDupConfirmed(ev.target.checked)} /><span>I checked it; record this payment anyway</span></label></div>}
         <label>Received at<input type="datetime-local" value={receivedAt} onChange={(ev) => setReceivedAt(ev.target.value)} /></label>
         <label>Endorsing agency<select value={agencyId} onChange={(ev) => setAgencyId(ev.target.value)}><option value="">None</option>{data.agencies.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
         <label>Remarks<input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} /></label>
@@ -538,4 +561,127 @@ export function CashierSummaryReport({ data, embedded }: { data: PortalData; emb
       {expenses.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Purpose</th><th>Status</th><th className="r">Amount</th></tr></thead><tbody>{expenses.map((x) => <tr key={x.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{x.expense_number}</span></td><td data-l="Payee">{x.payee}</td><td data-l="Purpose">{(x as { purpose?: string }).purpose ?? ""}</td><td data-l="Status">{x.status}</td><td data-l="Amount" className="r cx-amt">{pesos(x.amount_centavos)}</td></tr>)}</tbody></table></div> : <p className="portal-empty-copy">No expenses in this period.</p>}
     </section>
   </div>;
+}
+
+/* ====================================================== Expenses (Oct 2026) */
+
+type ExpenseRow = PortalData["expenses"][number] & { purpose?: string; payment_channel?: string | null; reference_number?: string | null; request_number?: string | null; voucher_number?: string | null; approved_at?: string | null; decision_remarks?: string | null; released_at?: string | null; paid_at?: string | null; drive_link?: string | null };
+export const EXPENSE_STATUSES = ["All", "For approval", "Approved", "Released", "Rejected"] as const;
+export const expenseState = (e: { status: string }) => (e.status === "Pending" ? "For approval" : e.status === "Paid" ? "Released" : e.status);
+/** Approved and released expenses in [from, to] (Manila dates), totalled per payment channel. */
+export function expenseTotalsByChannel(rows: { status: string; created_at: string; amount_centavos: number; payment_channel?: string | null }[], from: string, to: string) {
+  const map = new Map<string, { count: number; total: number }>();
+  for (const e of rows) {
+    const d = day(e.created_at);
+    if ((from && d < from) || (to && d > to) || (e.status !== "Approved" && e.status !== "Paid")) continue;
+    const k = e.payment_channel || "Not set";
+    const c = map.get(k) ?? { count: 0, total: 0 };
+    c.count += 1; c.total += Number(e.amount_centavos);
+    map.set(k, c);
+  }
+  return [...map].map(([channel, c]) => ({ channel, ...c })).sort((a, b) => b.total - a.total);
+}
+const EXPENSE_TONE: Record<string, string> = { "For approval": "orange", Approved: "blue", Released: "active", Rejected: "cancelled" };
+
+/**
+ * Expenses, one screen (owner, 7 Oct 2026). The Cashier records an expense
+ * (request number ER-…); the Accounting Manager approves it and the voucher
+ * number CV-… is issued; the Cashier prints the voucher and marks it released.
+ * Vouchers are filed in Google Drive automatically. The dashboard shows
+ * expenses per payment channel for a date range, with a summary PDF.
+ */
+export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; role: string; reload: () => Promise<void> }) {
+  const today = manilaToday();
+  const canDecide = role === "accounting" || role === "admin";
+  const [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today);
+  const [tab, setTab] = useState<(typeof EXPENSE_STATUSES)[number]>(canDecide ? "For approval" : "All");
+  const [recording, setRecording] = useState(false);
+  const [releasing, setReleasing] = useState<ExpenseRow | null>(null);
+  const [rejecting, setRejecting] = useState<ExpenseRow | null>(null);
+  const [reason, setReason] = useState("");
+  const { busy, msg, post } = usePost(reload);
+  const rows = (data.expenses as ExpenseRow[]).slice().sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const inRange = rows.filter((e) => { const d = day(e.created_at); return (!from || d >= from) && (!to || d <= to); });
+  const shown = inRange.filter((e) => tab === "All" || expenseState(e) === tab);
+  const channels = expenseTotalsByChannel(rows, from, to);
+  const total = channels.reduce((s, c) => s + c.total, 0), vouchers = channels.reduce((s, c) => s + c.count, 0);
+  const count = (t: string) => inRange.filter((e) => t === "All" || expenseState(e) === t).length;
+  const approve = (e: ExpenseRow) => void post({ action: "expense-decide", id: e.id, decision: "Approved" }, "Approved. The voucher number is issued and the voucher is filed in Google Drive.").catch(() => undefined);
+  const reject = () => { if (!rejecting) return; void post({ action: "expense-decide", id: rejecting.id, decision: "Rejected", remarks: reason.trim() || undefined }, "Rejected.").then(() => { setRejecting(null); setReason(""); }).catch(() => undefined); };
+  return <div className="portal-page cx">
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Expenses</h1></div><button type="button" className="portal-primary" onClick={() => setRecording(true)}>Record expense</button></div>
+    {msg && <Message kind={msg.kind} text={msg.text} />}
+    <div className="cx-bar">
+      <label className="cx-dt">From<input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} /></label>
+      <label className="cx-dt">To<input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} /></label>
+      {from && to && <a className="portal-secondary" href={`/api/documents/expenses-summary?from=${from}&to=${to}`} target="_blank" rel="noreferrer">Generate summary (PDF)</a>}
+    </div>
+    <div className="cx-tiles">
+      <div className="cx-tile" style={{ ["--c" as string]: "#123F63" }}><span>Total expenses</span><b>{pesos(total)}</b><small>{vouchers} voucher{vouchers === 1 ? "" : "s"}</small></div>
+      {channels.map((c) => <div className="cx-tile" key={c.channel} style={{ ["--c" as string]: MODE_COLORS[c.channel] ?? "#0571D0" }}><span>{c.channel}</span><b>{pesos(c.total)}</b><small>{c.count} voucher{c.count === 1 ? "" : "s"}</small></div>)}
+    </div>
+    <div className="cx-status" role="tablist">{EXPENSE_STATUSES.map((t) => <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>{t}<span>{count(t)}</span></button>)}</div>
+    <section className="portal-panel cx-panel">{shown.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Number</th><th>Payee</th><th>Category</th><th>Channel</th><th className="r">Amount</th><th>Status</th><th></th></tr></thead><tbody>
+      {shown.map((e) => { const st = expenseState(e); return <tr key={e.id}>
+        <td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher_number ?? e.expense_number}</span><small>{e.voucher_number && e.request_number && e.request_number !== e.voucher_number ? `${e.request_number} · ` : ""}{fmtDate(day(e.created_at))}</small></td>
+        <td data-l="Payee">{e.payee}<small>{e.purpose}</small></td>
+        <td data-l="Category">{e.category}</td>
+        <td data-l="Channel">{e.payment_channel || "—"}{e.reference_number ? <small className="cx-mono">{e.reference_number}</small> : null}</td>
+        <td data-l="Amount" className="r"><strong className="cx-amt">{pesos(e.amount_centavos)}</strong></td>
+        <td data-l="Status"><Badge tone={EXPENSE_TONE[st]}>{st}</Badge>{st === "Rejected" && e.decision_remarks ? <small>{e.decision_remarks}</small> : null}{st === "Released" && e.released_at ? <small>{fmtDate(day(e.released_at))}</small> : null}</td>
+        <td data-l=""><div className="cx-acts">
+          {st === "For approval" && canDecide && <><button type="button" className="portal-primary" disabled={busy} onClick={() => approve(e)}>Approve</button><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setRejecting(e); setReason(""); }}>Reject</button></>}
+          {(st === "Approved" || st === "Released") && <a className="portal-secondary" href={`/api/documents/expense/${e.id}`} target="_blank" rel="noreferrer">Print voucher</a>}
+          {st === "Approved" && <button type="button" className="portal-primary" onClick={() => setReleasing(e)}>Mark released</button>}
+          {e.drive_link && <a className="ghost-button" href={e.drive_link} target="_blank" rel="noreferrer">Drive</a>}
+        </div></td>
+      </tr>; })}
+    </tbody></table></div> : <p className="portal-empty-copy">No expenses in this view.</p>}</section>
+    {recording && <RecordExpenseModal data={data} onClose={() => setRecording(false)} post={post} />}
+    {releasing && <ReleaseExpenseModal data={data} expense={releasing} onClose={() => setReleasing(null)} post={post} />}
+    {rejecting && <Modal title={`Reject ${rejecting.expense_number}`} onClose={() => setRejecting(null)}>
+      <div className="portal-form">
+        <label className="full">Reason<input autoFocus value={reason} onChange={(ev) => setReason(ev.target.value)} /></label>
+        <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setRejecting(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={reject}>Reject expense</button></div>
+      </div>
+    </Modal>}
+  </div>;
+}
+
+const expenseChannels = (data: PortalData) => { const all = data.paymentMethods.filter((m) => m.active); const payable = all.filter((m) => m.kind === "payable"); return (payable.length ? payable : all).map((m) => m.name); };
+
+function RecordExpenseModal({ data, onClose, post }: { data: PortalData; onClose: () => void; post: (body: Record<string, unknown>, ok?: string) => Promise<Record<string, unknown>> }) {
+  const categories = data.expenseCategories.filter((c) => c.active);
+  const channels = expenseChannels(data);
+  const [payee, setPayee] = useState(""), [category, setCategory] = useState(categories[0]?.name ?? ""), [amount, setAmount] = useState(""), [purpose, setPurpose] = useState("");
+  const [channel, setChannel] = useState(channels[0] ?? "Cash"), [reference, setReference] = useState("");
+  const cents = toCentavos(amount);
+  const ready = !!payee.trim() && !!category && cents > 0 && !!purpose.trim();
+  return <Modal title="Record expense" onClose={onClose}>
+    <div className="portal-form">
+      <label>Payee<input value={payee} onChange={(e) => setPayee(e.target.value)} /></label>
+      <label>Category<select value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></label>
+      <label>Amount (PHP)<input className="cx-mono" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
+      <label>Payment channel<select value={channel} onChange={(e) => setChannel(e.target.value)}>{channels.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
+      <label className="full">Purpose<input value={purpose} onChange={(e) => setPurpose(e.target.value)} /></label>
+      <label className="full">Receipt or reference number<input value={reference} onChange={(e) => setReference(e.target.value)} /></label>
+      {!categories.length && <p className="portal-form-note full">The Accounting Manager adds expense categories in Configuration.</p>}
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!ready} onClick={() => void post({ action: "expense-create", payee: payee.trim(), category, amountCentavos: cents, purpose: purpose.trim(), paymentChannel: channel, referenceNumber: reference.trim() }, "Expense recorded and sent for approval.").then(onClose).catch(() => undefined)}>Send for approval</button></div>
+    </div>
+  </Modal>;
+}
+
+function ReleaseExpenseModal({ data, expense, onClose, post }: { data: PortalData; expense: ExpenseRow; onClose: () => void; post: (body: Record<string, unknown>, ok?: string) => Promise<Record<string, unknown>> }) {
+  const channels = expenseChannels(data);
+  const [channel, setChannel] = useState(expense.payment_channel && channels.includes(expense.payment_channel) ? expense.payment_channel : channels[0] ?? "Cash");
+  const [reference, setReference] = useState(expense.reference_number ?? "");
+  const needsRef = !!data.paymentMethods.find((m) => m.name === channel)?.requires_reference;
+  return <Modal title={`Release ${expense.voucher_number ?? expense.expense_number}`} onClose={onClose}>
+    <div className="portal-form">
+      <div className="cx-whocard full"><div><span className="cx-name">{expense.payee}</span><small>{expense.category}</small></div><div className="cx-right"><span className="cx-amt">{pesos(expense.amount_centavos)}</span></div></div>
+      <label>Released through<select value={channel} onChange={(e) => setChannel(e.target.value)}>{channels.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
+      <label>{needsRef ? "Reference number (required)" : "Reference number"}<input className="cx-mono" value={reference} onChange={(e) => setReference(e.target.value.toUpperCase())} /></label>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={needsRef && !reference.trim()} onClick={() => void post({ action: "expense-release", id: expense.id, paymentChannel: channel, referenceNumber: reference.trim() }, "Released and marked paid.").then(onClose).catch(() => undefined)}>Mark released</button></div>
+    </div>
+  </Modal>;
 }

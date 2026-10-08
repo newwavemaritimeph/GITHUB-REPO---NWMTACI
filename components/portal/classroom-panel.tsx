@@ -11,7 +11,7 @@ const RESULT_TEXT: Record<string, { kind: "success" | "error"; text: string }> =
   cancelled: { kind: "error", text: "Google sign-in was cancelled. Nothing changed." },
   invalid: { kind: "error", text: "The Google sign-in could not be verified. Please try Connect again." },
   "no-refresh": { kind: "error", text: "Google did not grant offline access. Remove New Wave's access in your Google Account › Security › Third-party access, then connect again." },
-  "missing-scope": { kind: "error", text: "Please tick every permission on Google's screen (classes and rosters), then connect again." },
+  "missing-scope": { kind: "error", text: "Please tick every permission on Google's screen (classes, rosters and Drive), then connect again." },
   "needs-migration": { kind: "error", text: "Apply database update 202610070013 first, then connect again." },
   "not-configured": { kind: "error", text: "Google Classroom is not set up yet: add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in Vercel." },
   error: { kind: "error", text: "Google Classroom could not be connected. Please try again." },
@@ -67,9 +67,10 @@ export function ClassroomPanel({ data, courseId, reload }: { data: PortalData; c
         <small>{!status?.configured ? "Not set up yet: add the Google keys in Vercel (see the setup steps)." : status.connected ? `Connected as ${status.accountEmail}. Trainees are invited to the linked class when instructions are generated.` : "Connect the Gmail that owns New Wave's classes. You sign in on Google's own page; the portal never sees the password."}</small>
       </div>
       {status?.configured && (status.connected
-        ? <button type="button" className="portal-secondary" disabled={busy} onClick={disconnect}>Disconnect</button>
-        : <button type="button" className="portal-primary gc-connect" onClick={() => window.location.assign("/api/google/classroom/connect")}>Connect Google Classroom</button>)}
+        ? <span className="document-actions">{!status.driveReady && <button type="button" className="portal-primary gc-connect" onClick={() => window.location.assign("/api/google/classroom/connect")}>Reconnect to allow Drive</button>}<button type="button" className="portal-secondary" disabled={busy} onClick={disconnect}>Disconnect</button></span>
+        : <button type="button" className="portal-primary gc-connect" onClick={() => window.location.assign("/api/google/classroom/connect")}>Connect Google</button>)}
     </div>
+    {status?.connected && <small className="gc-drive">{status.driveReady ? "Google Drive: proofs of payment are filed in NWMTACI Payment Proofs." : "Google Drive is not allowed yet. Reconnect and tick the Drive permission so the Cashier can file proofs of payment."}</small>}
     {msg && <Message kind={msg.kind} text={msg.text} />}
     {status?.connected && <div className="gc-link">
       {!courseId ? <small>Choose a course below to link it to a Google Classroom class.</small> : <>

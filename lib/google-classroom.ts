@@ -16,7 +16,11 @@ export const CLASSROOM_SCOPES = [
   "email",
   "https://www.googleapis.com/auth/classroom.courses.readonly",
   "https://www.googleapis.com/auth/classroom.rosters",
+  // Proof-of-payment uploads (7 Oct 2026): the portal can see only the files and folders it creates.
+  "https://www.googleapis.com/auth/drive.file",
 ];
+export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+export const hasDriveScope = (scopes?: string | null) => (scopes ?? "").split(/s+/).includes(DRIVE_SCOPE);
 
 export const googleConfigured = () => Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
 export const redirectUri = (origin: string) => `${process.env.APP_BASE_URL?.replace(/\/$/, "") || origin}/api/google/classroom/callback`;
@@ -66,6 +70,8 @@ export async function activeConnection(db: Admin) {
   return data as { id: string; account_email: string; refresh_token_encrypted: string; scopes: string; connected_at: string } | null;
 }
 
+/** A fresh access token from the stored Google connection (Classroom and Drive). */
+export async function googleAccessToken(db: Admin) { return accessToken(db); }
 async function accessToken(db: Admin) {
   const connection = await activeConnection(db);
   if (!connection || !googleConfigured()) throw new Error("Google Classroom is not connected.");

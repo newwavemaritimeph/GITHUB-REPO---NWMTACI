@@ -6,7 +6,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { LiveAttendance } from "./portal/live-attendance";
 import { LiveAccounting, AccountingDashboard, ReceivablesModule, ApprovalsModule, PayablesModule, CashPositionModule, LiveVouchers, LiveInventory, LiveExpenses, SetupList, AccountingConfiguration, ACCOUNTING_CONFIG_SECTIONS, type AccountingConfigSection } from "./portal/live-accounting";
 import { LiveCashierClosing } from "./portal/live-cashier-closing";
-import { CashierPaymentQueue, RequestChargeModal, TarButton, RecordPaymentModal, CashierDashboard, CashierPayments, DiscountRequests, CashierEnrollments, CashierOpening, CashierSummaryReport } from "./portal/live-cashier";
+import { CashierPaymentQueue, RequestChargeModal, TarButton, RecordPaymentModal, CashierDashboard, CashierPayments, DiscountRequests, CashierEnrollments, CashierOpening, CashierSummaryReport, ExpensesWorkspace } from "./portal/live-cashier";
 import { LiveHr, type HrData } from "./portal/live-hr";
 import { LiveTraining, type TrainingData } from "./portal/live-training";
 import { ReleasingDashboard, LiveReleasing } from "./portal/live-releasing";
@@ -68,7 +68,7 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   // Cashier start-of-day opening cash (202610070015).
   cashierOpenings?:{id:string;opening_date:string;opening_cash_centavos:number;remarks:string|null;created_at:string}[];
   // Google Classroom connection (202610070013): status only, never tokens.
-  classroom?:{configured:boolean;connected:boolean;accountEmail:string|null;connectedAt:string|null};
+  classroom?:{configured:boolean;connected:boolean;accountEmail:string|null;connectedAt:string|null;driveReady?:boolean};
   classroomCourseIds?:Record<string,string>;
   classroomInvites?:Record<string,{state:string;email:string;error:string|null;created_at:string}>;
   // Change Course / Rescheduling fee collection per pending request id (approval waits for payment).
@@ -182,7 +182,9 @@ function CourseSelect({data,value,onChange,label="Course"}:{data:PortalData;valu
 function ChangePasswordModal({onClose}:{onClose:()=>void}){const [pw,setPw]=useState(""),[confirmPw,setConfirmPw]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState<{kind:"success"|"error";text:string}|null>(null);async function save(event:FormEvent<HTMLFormElement>){event.preventDefault();if(pw.length<8){setMessage({kind:"error",text:"Use at least 8 characters."});return}if(pw!==confirmPw){setMessage({kind:"error",text:"The two passwords do not match."});return}setBusy(true);setMessage(null);try{const supabase=createSupabaseBrowserClient();const {error}=await supabase.auth.updateUser({password:pw});if(error)throw error;setMessage({kind:"success",text:"Password updated. Use it the next time you sign in."});setPw("");setConfirmPw("")}catch(e){setMessage({kind:"error",text:e instanceof Error?e.message:"Could not update the password."})}finally{setBusy(false)}}return <Modal title="Change your password" onClose={onClose}><form className="portal-form" onSubmit={save}>{message&&<Message kind={message.kind} text={message.text}/>}<label className="full">New password<input type="password" autoComplete="new-password" value={pw} onChange={e=>setPw(e.target.value)} required minLength={8} placeholder="At least 8 characters"/></label><label className="full">Confirm New password<input type="password" autoComplete="new-password" value={confirmPw} onChange={e=>setConfirmPw(e.target.value)} required minLength={8}/></label><p className="portal-form-note full">This changes the password for your own account only. You stay signed in on this device.</p><div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Close</button><button className="portal-primary" disabled={busy}>{busy?"Updating…":"Update password"}</button></div></form></Modal>}
 
 export function PortalLiveApp(){
-  const [data,setData]=useState<PortalData|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[active,setActive]=useState<Module>("Dashboard"),[recordsView,setRecordsView]=useState<RecordsView>("applications"),[role,setRole]=useState(""),[openTab,setOpenTab]=useState(""),[menuAt,setMenuAt]=useState({left:16,top:120}),[notices,setNotices]=useState(false),[modal,setModal]=useState<"enrollment"|"batch"|"payment"|null>(null),[payTarget,setPayTarget]=useState(""),[query,setQuery]=useState(""),[account,setAccount]=useState(false);
+  const [data,setData]=useState<PortalData|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[active,setActive]=useState<Module>("Dashboard"),[recordsView,setRecordsView]=useState<RecordsView>("applications"),[role,setRole]=useState(""),[openTab,setOpenTab]=useState(""),[menuAt,setMenuAt]=useState({left:16,top:120}),[notices,setNotices]=useState(false),[modal,setModal]=useState<"enrollment"|"batch"|"payment"|null>(null),[payTarget,setPayTarget]=useState(""),[account,setAccount]=useState(false);
+  // The top-bar "Search this page" box was removed (owner, 8 Oct 2026); screens keep their own search.
+  const query="";
   const load=useCallback(async()=>{setLoading(true);setError("");try{const response=await fetch("/api/staff/operations",{cache:"no-store"});const body=await response.json();if(!response.ok)throw new Error(body.error??"Unable to load staff records.");setData(body);setRole((current:string)=>{const options=workingRolesFor(body.roles);return options.includes(current)?current:defaultWorkingRole(body.roles)})}catch(e){setError(e instanceof Error?e.message:"Unable to load staff records.")}finally{setLoading(false)}},[]);
   useEffect(()=>{void load()},[load]);
   // Admin keeps an oversight-only workspace: Dashboard, Search trainee, Enrollments,
@@ -223,7 +225,7 @@ export function PortalLiveApp(){
       <div className="nw-bar-row">
         <div className="nw-brand"><NewWaveLogo inverted/></div>
         <div className="nw-tools">
-          <input className="nw-search" value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search this page" aria-label="Search this page"/><label className="nw-role"><span>Working as</span><select value={role} onChange={e=>{setRole(e.target.value);setActive("Dashboard");setRecordsView("applications");setOpenTab("")}} aria-label="Working as">{roleOptions.map(item=><option key={item} value={item}>{roleNames[item]??item}</option>)}</select></label>
+          <label className="nw-role"><span>Working as</span><select value={role} onChange={e=>{setRole(e.target.value);setActive("Dashboard");setRecordsView("applications");setOpenTab("")}} aria-label="Working as">{roleOptions.map(item=><option key={item} value={item}>{roleNames[item]??item}</option>)}</select></label>
           <button type="button" className="nw-icon" onClick={()=>setNotices(!notices)} aria-label="Notifications"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5-6.71V3.5a2 2 0 1 0-4 0v.79A7 7 0 0 0 5 11v5l-2 2v1h18v-1Z"/></svg>{unread>0&&<b>{unread}</b>}</button>
           <div className="nw-user"><span className="user-dot">{initials}</span><span className="nw-user-text"><strong>{data.profile.complete_name}</strong><small>{roleNames[role]??role}</small></span></div>
           <button type="button" className="nw-icon" onClick={()=>setAccount(true)} aria-label="Change password" title="Change password">⚿</button>
@@ -290,7 +292,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Payments")return <CashierPayments data={data} onPay={onPay}/>;
     if(active==="Report")return <SubTabs eyebrow="Accounting" title="Report" tabs={["Summary report","Opening and closing"]} render={t=>t==="Summary report"?<CashierSummaryReport data={data} embedded/>:<><CashierOpening data={data} reload={reload}/><LiveCashierClosing data={data} reload={reload} initialOpening={(data.cashierOpenings??[]).find(o=>o.opening_date===manilaToday())?.opening_cash_centavos}/></>}/>;
     if(active==="Requests")return <CashierRequests data={data} reload={reload}/>;
-    if(active==="Expenses")return <SubTabs eyebrow="Accounting" title="Expenses" tabs={["Expenses","Vouchers"]} render={t=>t==="Expenses"?<LiveExpenses data={data} role="cashier" reload={reload}/>:<LiveVouchers data={data} role="cashier" reload={reload}/>}/>;
+    if(active==="Expenses")return <ExpensesWorkspace data={data} role="cashier" reload={reload}/>;
   }
   if(active==="Dashboard")return <Dashboard data={data} role={gateRole} open={open} canEnroll={canEnroll} canPay={canPay} reload={reload}/>;
   if(active==="Search trainee"&&gateRole==="admin")return <LiveSearchTrainee data={{trainees:data.trainees,enrollments:data.enrollments,payments:data.payments}}/>;
@@ -313,7 +315,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Payables")return <PayablesModule data={data as unknown as Parameters<typeof PayablesModule>[0]["data"]}/>;
   if(active==="Cash position")return <CashPositionModule data={data as unknown as Parameters<typeof CashPositionModule>[0]["data"]}/>;
   if(active==="Accounting")return <LiveAccounting data={data} role={gateRole} reload={reload} go={m=>go(m as Module)}/>;
-  if(active==="Expenses")return <LiveExpenses data={data} role={gateRole} reload={reload}/>;
+  if(active==="Expenses")return <ExpensesWorkspace data={data} role={gateRole} reload={reload}/>;
   if(active==="Inventory")return <LiveInventory data={data} role={gateRole} reload={reload}/>;
   if(active==="HR & payroll"&&["admin","hr"].includes(gateRole))return <LiveHr data={data} role={gateRole} reload={reload}/>;
   if(active==="Rooms & facilities"&&["admin","training_operations"].includes(gateRole))return <LiveTraining data={{classrooms:data.classrooms,certificates:data.certificates,batches:data.batches,enrollments:data.enrollments,courses:data.courses,certificateTemplates:data.certificateTemplates}} role={gateRole} reload={reload} initialTab="Classrooms"/>;
@@ -667,11 +669,6 @@ function financeCatalogSections(data:PortalData,reload:()=>Promise<void>):{key:s
       rows={data.charges.map(c=>({id:c.id,primary:c.name,secondary:`${c.kind==="item"?"Miscellaneous item":"Service fee"} · ${pesos(c.default_amount_centavos)}`,active:c.active,values:{name:c.name,defaultAmount:String(c.default_amount_centavos/100),isItem:c.kind==="item"}}))}
       onSubmit={(v,id)=>post({action:"charge-save",id,name:String(v.name),defaultAmountCentavos:Math.round((Number(v.defaultAmount)||0)*100),kind:v.isItem?"item":"fee"})}
       onArchive={(id,active,name)=>post({action:"charge-save",id,name,active:!active})}/>},
-    {key:"expense categories",label:"expense categories",node:<SetupList title="Expense categories" description="Categories for expense vouchers" entityLabel="category" canManage busy={false}
-      fields={[{key:"name",label:"Category name"}]}
-      rows={data.expenseCategories.map(c=>({id:c.id,primary:c.name,secondary:c.active?"Active":"Archived",active:c.active,values:{name:c.name}}))}
-      onSubmit={(v,id)=>post({action:"expense-category-save",id,name:String(v.name)})}
-      onRemove={(id)=>post({action:"expense-category-save",id,name:"x",remove:true})} removable/>},
   ];
 }
 

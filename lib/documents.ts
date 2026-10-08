@@ -864,6 +864,9 @@ export type DailyExpensesSnapshot = {
   paidCentavos: number;
   preparedBy: string;
   logoBytes?: Uint8Array;
+  // Date-range summary (7 Oct 2026): a custom title and totals per payment channel.
+  title?: string;
+  channelTotals?: { channel: string; count: number; totalCentavos: number }[];
 };
 
 /** Daily expenses summary — one A4 portrait page (paginated) listing the day's
@@ -893,7 +896,7 @@ export async function createDailyExpensesPdf(snapshot: DailyExpensesSnapshot) {
   const header = async () => {
     if (snapshot.logoBytes) { try { const img = await doc.embedPng(snapshot.logoBytes); const d = img.scaleToFit(46, 46); page.drawImage(img, { x: margin, y: y - d.height + 6, width: d.width, height: d.height }); } catch { /* skip logo */ } }
     page.drawText("New Wave Maritime Training and Assessment Center, Inc.", { x: margin + 54, y: y - 8, size: 11, font: bold, color: dark });
-    page.drawText("Daily Expenses Summary", { x: margin + 54, y: y - 24, size: 15, font: bold, color: orange });
+    page.drawText(snapshot.title ?? "Daily Expenses Summary", { x: margin + 54, y: y - 24, size: 15, font: bold, color: orange });
     page.drawText(snapshot.dateLabel, { x: margin + 54, y: y - 40, size: 10, font, color: gray });
     y -= 66;
     drawHead();
@@ -915,11 +918,28 @@ export async function createDailyExpensesPdf(snapshot: DailyExpensesSnapshot) {
     y -= 15;
     page.drawLine({ start: { x: margin, y: y + 3 }, end: { x: W - margin, y: y + 3 }, thickness: 0.4, color: line });
   }
-  if (!snapshot.rows.length) { page.drawText("No expenses recorded for this day.", { x: margin, y, size: 9, font, color: gray }); y -= 15; }
+  if (!snapshot.rows.length) { page.drawText(snapshot.title ? "No expenses in this period." : "No expenses recorded for this day.", { x: margin, y, size: 9, font, color: gray }); y -= 15; }
   y -= 8;
   page.drawText(`Total expenses: ${php(snapshot.totalCentavos)}`, { x: margin, y, size: 10, font: bold, color: dark });
   page.drawText(`Paid: ${php(snapshot.paidCentavos)}`, { x: margin + 220, y, size: 10, font: bold, color: dark });
   page.drawText(`${snapshot.rows.length} voucher(s)`, { x: W - margin - font.widthOfTextAtSize(`${snapshot.rows.length} voucher(s)`, 9), y, size: 9, font, color: gray });
+  if (snapshot.channelTotals?.length) {
+    y -= 26;
+    if (y < margin + 40 + snapshot.channelTotals.length * 15) { page = doc.addPage([W, H]); y = H - margin; }
+    page.drawRectangle({ x: margin, y: y - 4, width: W - margin * 2, height: 18, color: rgb(0.96, 0.98, 0.99) });
+    page.drawText("Per payment channel", { x: margin + 2, y, size: 8, font: bold, color: dark });
+    page.drawText("Vouchers", { x: margin + 300, y, size: 8, font: bold, color: dark });
+    page.drawText("Total", { x: W - margin - bold.widthOfTextAtSize("Total", 8) - 2, y, size: 8, font: bold, color: dark });
+    y -= 18;
+    for (const c of snapshot.channelTotals) {
+      page.drawText(fit(c.channel || "Not set", font, 9, 280), { x: margin + 2, y, size: 9, font, color: rgb(0.15, 0.18, 0.22) });
+      page.drawText(String(c.count), { x: margin + 300, y, size: 9, font, color: rgb(0.15, 0.18, 0.22) });
+      const t = php(c.totalCentavos);
+      page.drawText(t, { x: W - margin - font.widthOfTextAtSize(t, 9) - 2, y, size: 9, font: bold, color: dark });
+      y -= 15;
+      page.drawLine({ start: { x: margin, y: y + 3 }, end: { x: W - margin, y: y + 3 }, thickness: 0.4, color: line });
+    }
+  }
   y -= 40;
   page.drawText(`Prepared by: ${snapshot.preparedBy || "—"}`, { x: margin, y, size: 9, font, color: rgb(0.15, 0.18, 0.22) });
   page.drawText("Amounts are in Philippine peso. Retain for accounting and audit.", { x: margin, y: margin - 12, size: 7.5, font, color: gray });

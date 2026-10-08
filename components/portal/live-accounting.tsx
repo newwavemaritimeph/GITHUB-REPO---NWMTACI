@@ -1371,7 +1371,7 @@ export function CashPositionModule({ data }: { data: AccountingData }) {
 }
 
 type ConfigTrainee = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; email?: string | null; mobile?: string | null; srn?: string | null; company?: string | null; registered_at?: string | null };
-export const ACCOUNTING_CONFIG_SECTIONS = ["Schedule of fees", "Payment channels", "Rebates per course", "Agencies and consultancies", "Trainee list"] as const;
+export const ACCOUNTING_CONFIG_SECTIONS = ["Schedule of fees", "Payment channels", "Expense categories", "Rebates per course", "Agencies and consultancies", "Trainee list"] as const;
 export type AccountingConfigSection = (typeof ACCOUNTING_CONFIG_SECTIONS)[number];
 /**
  * Accounting › Configuration (owner, 7 Oct 2026): the referring agencies and
@@ -1419,6 +1419,12 @@ export function AccountingConfiguration({ section, data, trainees, applicationNu
       rows={data.agencies.map((a) => ({ id: a.id, primary: a.name, secondary: [a.contact_name, a.email, a.mobile].filter(Boolean).join(" · ") || "—", active: a.active, values: { name: a.name, contactName: a.contact_name || "", email: a.email || "", mobile: a.mobile || "" } }))}
       onSubmit={(v, id) => post({ action: "agency-save", id, name: String(v.name), contactName: String(v.contactName || ""), email: String(v.email || ""), mobile: String(v.mobile || "") })}
       onArchive={(id, active, name) => void post({ action: "agency-save", id, name, active: !active }).catch(() => undefined)} />}
+    {section === "Expense categories" && <SetupList title="Expense categories" description="" entityLabel="category" canManage busy={busy}
+      fields={[{ key: "name", label: "Category name" }]}
+      rows={(data as unknown as { expenseCategories: { id: string; name: string; active: boolean }[] }).expenseCategories.map((c) => ({ id: c.id, primary: c.name, secondary: c.active ? "Active" : "Archived", active: c.active, values: { name: c.name } }))}
+      onSubmit={(v, id) => post({ action: "expense-category-save", id, name: String(v.name) })}
+      onArchive={(id, active, name) => void post({ action: "expense-category-save", id, name, active: !active }).catch(() => undefined)}
+      onRemove={(id) => void post({ action: "expense-category-save", id, name: "x", remove: true }).catch(() => undefined)} removable />}
     {section === "Rebates per course" && <AgencyRebatesEditor data={data} canManage busy={busy} post={post} />}
     {section === "Trainee list" && <section className="portal-panel cx-panel">
       <div className="panel-heading"><div><h2>Trainees</h2></div><span className="slot-count">{trainees.length}</span></div>

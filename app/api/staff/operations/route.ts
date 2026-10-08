@@ -8,7 +8,8 @@ import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn, normalizeEmail,
 import { emailConfigured, processEmailJobs } from "@/lib/email-jobs";
 import { classroomEmailBlocks } from "@/lib/classroom";
 import { loadInstructionDetails } from "@/lib/training-instructions";
-import { activeConnection, googleConfigured, inviteStudent, listClasses, revokeConnection } from "@/lib/google-classroom";
+import { fileVoucherInDrive } from "@/lib/expense-voucher";
+import { activeConnection, googleConfigured, hasDriveScope, inviteStudent, listClasses, revokeConnection } from "@/lib/google-classroom";
 import { sendBalanceSummary } from "@/lib/balance-summary";
 
 const enrollmentInput = z.object({
@@ -76,7 +77,9 @@ const inventoryMoveInput = z.object({ action: z.literal("inventory-move"), itemI
 const agencyInput = z.object({ action: z.literal("agency-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), contactName: z.string().trim().max(120).optional(), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
 const payableInput = z.object({ action: z.literal("payable-save"), id: z.string().uuid().nullable().optional(), description: z.string().trim().min(1).max(200), amountCentavos: z.number().int().positive().optional(), dueOn: z.string().date().nullable().optional(), remove: z.boolean().optional() });
 const expenseCreateInput = z.object({ action: z.literal("expense-create"), payee: z.string().trim().min(1).max(120), category: z.string().trim().min(1).max(80), amountCentavos: z.number().int().positive(), purpose: z.string().trim().min(1).max(300), paymentChannel: z.string().trim().max(40).optional().default(""), referenceNumber: z.string().trim().max(80).optional().default("") });
-const expenseDecideInput = z.object({ action: z.literal("expense-decide"), id: z.string().uuid(), decision: z.enum(["Approved", "Rejected", "Paid"]) });
+const expenseDecideInput = z.object({ action: z.literal("expense-decide"), id: z.string().uuid(), decision: z.enum(["Approved", "Rejected", "Paid"]), remarks: z.string().trim().max(300).optional() });
+// The Cashier releases an approved voucher (cash or transfer) and marks it paid.
+const expenseReleaseInput = z.object({ action: z.literal("expense-release"), id: z.string().uuid(), paymentChannel: z.string().trim().min(1).max(40), referenceNumber: z.string().trim().max(80).optional().default("") });
 const cashierOpenInput = z.object({ action: z.literal("cashier-open"), openingCashCentavos: z.number().int().nonnegative(), remarks: z.string().trim().max(300).optional() });
 const balanceSummaryInput = z.object({ action: z.literal("balance-summary-send") });
 const closingInput = z.object({ action: z.literal("cashier-close"), closingDate: z.string().date(), openingCashCentavos: z.number().int().nonnegative(), actualCashCentavos: z.number().int().nonnegative(), remarks: z.string().trim().max(500).optional().default("") });
@@ -143,7 +146,7 @@ const centerSaveInput = z.object({ action: z.literal("center-save"), id: z.strin
 // Miscellaneous items (Schedule of fees, kind "item") sold with a payment. Each becomes an
 // enrollment charge that is approved because it is paid on the same receipt.
 const paymentItemInput = z.object({ enrollmentId: z.string().uuid(), chargeCatalogId: z.string().uuid().nullable().optional(), description: z.string().trim().min(1).max(120), unitCentavos: z.number().int().positive(), quantity: z.number().int().min(1).max(50) });
-const paymentSplitInput = z.object({ action: z.literal("payment-split"), allocations: z.array(z.object({ enrollmentId: z.string().uuid(), amountCentavos: z.number().int().positive() })).max(10).default([]), items: z.array(paymentItemInput).max(10).optional().default([]), method: z.string().trim().min(1).max(80), receivingAccount: z.string().trim().min(2).max(120), referenceNumber: z.string().trim().max(80).optional().default(""), receivedAt: z.string().datetime({ offset: true }), remarks: z.string().trim().max(500).optional().default("") });
+const paymentSplitInput = z.object({ action: z.literal("payment-split"), allocations: z.array(z.object({ enrollmentId: z.string().uuid(), amountCentavos: z.number().int().positive() })).max(10).default([]), items: z.array(paymentItemInput).max(10).optional().default([]), proofId: z.string().uuid().nullable().optional(), method: z.string().trim().min(1).max(80), receivingAccount: z.string().trim().min(2).max(120), referenceNumber: z.string().trim().max(80).optional().default(""), receivedAt: z.string().datetime({ offset: true }), remarks: z.string().trim().max(500).optional().default("") });
 const courseChangeInput = z.object({ action: z.literal("enrollment-course-change"), enrollmentId: z.string().uuid(), courseId: z.string().uuid(), partnerOfferId: z.string().uuid().nullable().optional() });
 const rescheduleInput = z.object({ action: z.literal("enrollment-reschedule"), enrollmentId: z.string().uuid(), batchId: z.string().uuid().nullable() });
 // Screening a website application (owner instruction, 7 Oct 2026): a staff
@@ -177,7 +180,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -590,7 +593,10 @@ export async function GET() {
   const expenseExtrasUnit = (async () => {
     const { data: ex } = await db.from("expenses").select("id,payment_channel,reference_number,purpose,requested_by").order("created_at", { ascending: false }).limit(250);
     if (!ex) return { rows: [] as { id: string }[], names: new Map<string, string>() };
-    const rows = ex as { id: string }[];
+    // Voucher flow fields (202610070018).
+    const { data: flow } = await db.from("expenses").select("id,request_number,voucher_number,approved_at,decision_remarks,released_at,drive_link,paid_at").in("id", ex.map((r) => (r as { id: string }).id));
+    const flowById = new Map((flow ?? []).map((r) => [(r as { id: string }).id, r]));
+    const rows = ex.map((r) => ({ ...r, ...(flowById.get((r as { id: string }).id) ?? {}) })) as { id: string }[];
     // Resolve the requester's display name so the voucher list can show who raised it.
     const ids = [...new Set(ex.map((r) => (r as { requested_by?: string }).requested_by).filter(Boolean))] as string[];
     if (!ids.length) return { rows, names: new Map<string, string>() };
@@ -676,13 +682,13 @@ export async function GET() {
   // admission records (202610070007). Missing columns yield none.
   // Google Classroom connection status (no tokens leave the server), linked
   // class per course, and the latest invite per enrollment (migration 202610070013).
-  const classroom = { configured: googleConfigured(), connected: false, accountEmail: null as string | null, connectedAt: null as string | null };
+  const classroom = { configured: googleConfigured(), connected: false, accountEmail: null as string | null, connectedAt: null as string | null, driveReady: false };
   const classroomCourseIds: Record<string, string> = {};
   const classroomInvites: Record<string, { state: string; email: string; error: string | null; created_at: string }> = {};
   {
     const admin = createSupabaseAdminClient();
     const connection = await activeConnection(admin).catch(() => null);
-    if (connection) Object.assign(classroom, { connected: true, accountEmail: connection.account_email, connectedAt: connection.connected_at });
+    if (connection) Object.assign(classroom, { connected: true, accountEmail: connection.account_email, connectedAt: connection.connected_at, driveReady: hasDriveScope(connection.scopes) });
     const { data: linkRows } = await db.from("courses").select("id,google_classroom_course_id").not("google_classroom_course_id", "is", null).limit(1000);
     for (const r of (linkRows ?? []) as { id: string; google_classroom_course_id: string }[]) classroomCourseIds[r.id] = r.google_classroom_course_id;
     const { data: inviteRows } = await admin.from("classroom_invitations").select("enrollment_id,state,email,error,created_at").order("created_at", { ascending: false }).limit(1000);
@@ -824,7 +830,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "expense-category-save") {
-      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage expense categories." }, { status: 403 });
+      if (!staff.roleCodes.includes("accounting")) return NextResponse.json({ error: "Only the Accounting Manager can add, edit or remove expense categories." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       if (input.remove && input.id) { const { error } = await admin.from("expense_categories").delete().eq("id", input.id); if (error) throw error; return NextResponse.json({ ok: true }); }
       const row = { name: input.name, ...(input.active !== undefined ? { active: input.active } : {}) };
@@ -872,8 +878,9 @@ export async function POST(request: Request) {
     if (input.action === "expense-create") {
       if (!staff.roleCodes.some((role) => ["admin", "accounting", "cashier"].includes(role))) return NextResponse.json({ error: "Your account cannot raise expense vouchers." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      const { count } = await admin.from("expenses").select("id", { count: "exact", head: true });
-      const expenseNumber = `CV-${new Date().getFullYear()}-${String((count ?? 0) + 1).padStart(6, "0")}`;
+      // A request number now; the voucher number (CV) is issued when the Accounting Manager approves.
+      const { data: expenseNumber, error: numberError } = await admin.rpc("next_reference", { prefix: "ER", requested_year: Number(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric" }).format(new Date())) });
+      if (numberError || !expenseNumber) throw numberError ?? new Error("Could not number the expense request.");
       const { data: created, error } = await admin.from("expenses").insert({ expense_number: expenseNumber, payee: input.payee, category: input.category, amount_centavos: input.amountCentavos, purpose: input.purpose, status: "Pending", requested_by: staff.user.id }).select("id").single();
       if (error) throw error;
       // Deploy-safe: payment_channel/reference_number arrive with migration 202608100001.
@@ -881,17 +888,38 @@ export async function POST(request: Request) {
       if (input.paymentChannel || input.referenceNumber) {
         await admin.from("expenses").update({ payment_channel: input.paymentChannel || null, reference_number: input.referenceNumber || null }).eq("id", created.id);
       }
-      return NextResponse.json({ ok: true });
+      await admin.from("expenses").update({ request_number: expenseNumber }).eq("id", created.id); // 202610070018; ignored before it
+      return NextResponse.json({ ok: true, number: expenseNumber });
     }
     if (input.action === "expense-decide") {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot decide expenses." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      const patch = input.decision === "Paid"
-        ? { status: "Paid", paid_at: new Date().toISOString(), approved_by: staff.user.id }
-        : { status: input.decision, approved_by: staff.user.id };
-      const { error } = await admin.from("expenses").update(patch).eq("id", input.id);
-      if (error) throw error;
+      if (input.decision === "Paid") return NextResponse.json({ error: "The Cashier releases approved vouchers and marks them paid." }, { status: 400 });
+      if (input.decision === "Approved") {
+        const { data: voucherNumber, error } = await admin.rpc("approve_expense", { target: input.id, actor: staff.user.id, remarks: input.remarks ?? null });
+        if (error) return NextResponse.json({ error: /approve_expense/i.test(error.message) ? "Apply database update 202610070018 first." : error.message }, { status: 400 });
+        const drive = await fileVoucherInDrive(admin, input.id);
+        return NextResponse.json({ ok: true, voucherNumber, drive });
+      }
+      const { error } = await admin.rpc("reject_expense", { target: input.id, actor: staff.user.id, remarks: input.remarks ?? null });
+      if (error) return NextResponse.json({ error: /reject_expense/i.test(error.message) ? "Apply database update 202610070018 first." : error.message }, { status: 400 });
       return NextResponse.json({ ok: true });
+    }
+    if (input.action === "expense-release") {
+      if (!staff.roleCodes.some((role) => ["admin", "cashier", "accounting"].includes(role))) return NextResponse.json({ error: "Your account cannot release vouchers." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: row } = await admin.from("expenses").select("id,status").eq("id", input.id).maybeSingle();
+      if (!row) return NextResponse.json({ error: "Expense not found." }, { status: 404 });
+      if (row.status !== "Approved") return NextResponse.json({ error: row.status === "Paid" ? "This voucher is already released." : "Only an approved voucher can be released." }, { status: 400 });
+      const { data: channel } = await admin.from("payment_methods").select("name,requires_reference").eq("name", input.paymentChannel).maybeSingle();
+      if (channel?.requires_reference && !input.referenceNumber.trim()) return NextResponse.json({ error: `Enter the ${channel.name} reference number.` }, { status: 400 });
+      const now = new Date().toISOString();
+      const { error } = await admin.from("expenses").update({ status: "Paid", paid_at: now }).eq("id", input.id).eq("status", "Approved");
+      if (error) throw error;
+      await admin.from("expenses").update({ payment_channel: input.paymentChannel, reference_number: input.referenceNumber || null, released_by: staff.user.id, released_at: now }).eq("id", input.id);
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "cashier", action: "expense.released", record_type: "expense", record_id: input.id, new_values: { channel: input.paymentChannel, reference: input.referenceNumber || null } });
+      const drive = await fileVoucherInDrive(admin, input.id);
+      return NextResponse.json({ ok: true, drive });
     }
     if (input.action === "cashier-open") {
       if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot record a cashier opening." }, { status: 403 });
@@ -1681,7 +1709,7 @@ export async function POST(request: Request) {
       for (const i of input.items) byEnrollment.set(i.enrollmentId, (byEnrollment.get(i.enrollmentId) ?? 0) + i.unitCentavos * i.quantity);
       const allocations = [...byEnrollment].map(([enrollment_id, amount_centavos]) => ({ enrollment_id, amount_centavos }));
       const total = allocations.reduce((sum, a) => sum + a.amount_centavos, 0);
-      const { data: posted, error } = await db.rpc("post_payment", { target_trainee: traineeId, target_amount_centavos: total, target_method: input.method, target_receiving_account: input.receivingAccount, target_reference: input.referenceNumber || null, target_received_at: input.receivedAt, target_proof: null, target_allocations: allocations, target_remarks: input.remarks || null });
+      const { data: posted, error } = await db.rpc("post_payment", { target_trainee: traineeId, target_amount_centavos: total, target_method: input.method, target_receiving_account: input.receivingAccount, target_reference: input.referenceNumber || null, target_received_at: input.receivedAt, target_proof: input.proofId ?? null, target_allocations: allocations, target_remarks: input.remarks || null });
       if (error) {
         if (itemCharges.length) await admin.from("enrollment_charges").update({ approval_status: "Rejected" }).in("id", itemCharges);
         throw error;
