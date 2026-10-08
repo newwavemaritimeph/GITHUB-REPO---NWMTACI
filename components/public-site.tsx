@@ -5,6 +5,7 @@ import { PublicNav } from "./public-nav";
 import { PublicCourseCatalog } from "./public-course-catalog";
 import { RegistrationForm } from "./registration-form";
 import { RegistrationStatus } from "./registration-status";
+import { PrivacyNotice } from "./privacy-notice";
 import { isDemoMode } from "@/lib/system/mode";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 
@@ -15,7 +16,8 @@ export type PublicPage =
   | "register"
   | "registration-search"
   | "contact"
-  | "staff-login";
+  | "staff-login"
+  | "privacy";
 
 /* Public navigation. Schedules, Accreditation and Gallery were removed on the
  * owner's instruction (7 Oct 2026); that content stays reachable from the
@@ -32,7 +34,7 @@ const nav = [
    item. Section links (anything with a #hash) are never marked active. */
 const PAGE_PATH: Record<PublicPage, string> = {
   home: "/", about: "/about", courses: "/courses", register: "/register",
-  "registration-search": "/registration-search", contact: "/contact", "staff-login": "/staff-login",
+  "registration-search": "/registration-search", contact: "/contact", "staff-login": "/staff-login", privacy: "/privacy",
 };
 
 /* MARINA Certificates of Course Approval held by New Wave, transcribed from the
@@ -208,6 +210,7 @@ function Footer() {
         <strong>Access</strong>
         <Link href="/staff-login">Authorized staff</Link>
         <Link href="/contact">Contact us</Link>
+        <Link href="/privacy">Data privacy notice</Link>
       </div>
       <div className="footer-status">
         <span className="status-dot" />
@@ -749,6 +752,8 @@ export function PublicSite({ page }: { page: PublicPage }) {
       <RegistrationSearch />
     ) : page === "contact" ? (
       <Contact />
+    ) : page === "privacy" ? (
+      <PrivacyNotice />
     ) : (
       <StaffLogin />
     );
