@@ -1645,7 +1645,13 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .ac-tabs button span{font:600 12px var(--font-num,monospace);background:#fdf0e5;color:#a2470b;border-radius:10px;padding:1px 8px}
 .portal-shell .ac-tabs button span.zero{background:#eef4f8;color:#5f7180}
 .portal-shell .ac-table th,.portal-shell .ac-table td{padding-left:20px;padding-right:20px}
-.portal-shell .ac-tiles{grid-template-columns:repeat(5,minmax(0,1fr))}
+/* Collection and expense tiles as one compact column (owner, 8 Oct 2026): channel | receipts | amount per row, total last. */
+.portal-shell .ac-tiles{display:flex;flex-direction:column;gap:0;max-width:620px;border:1px solid var(--nw-line);border-radius:12px;overflow:hidden;background:var(--nw-surface)}
+.portal-shell .ac-tiles .cx-tile{flex-direction:row;align-items:center;gap:12px;border:0;border-radius:0;border-bottom:1px solid var(--nw-line);padding:9px 16px 9px 20px}
+.portal-shell .ac-tiles .cx-tile:last-child{border-bottom:0}
+.portal-shell .ac-tiles .cx-tile span{flex:1;font-size:15px}
+.portal-shell .ac-tiles .cx-tile small{order:2;font-size:13.5px}
+.portal-shell .ac-tiles .cx-tile b{order:3;font-size:17px;min-width:130px;text-align:right}
 .portal-shell .ac-total{background:#123F63;color:#fff;--c:#F25615}
 .portal-shell .ac-total span,.portal-shell .ac-total small{color:#c3dbea}
 .portal-shell .ac-total b{color:#fff}
@@ -1685,8 +1691,8 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .ch-hrow b{font-family:var(--font-num,monospace)}
 .portal-shell .ch-hbar{height:10px;background:#eef4f8;border-radius:6px;margin-top:4px;overflow:hidden}
 .portal-shell .ch-hbar div{height:100%;border-radius:6px}
-@media (max-width:980px){.portal-shell .ac-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}.portal-shell .ac-grid2{grid-template-columns:1fr}}
-@media (max-width:560px){.portal-shell .ac-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.portal-shell .ac-total{grid-column:1/-1}.portal-shell .ac-sum{grid-template-columns:1fr}.portal-shell .ac-sum>div:nth-child(odd){border-right:0}}
+@media (max-width:980px){.portal-shell .ac-grid2{grid-template-columns:1fr}}
+@media (max-width:560px){.portal-shell .ac-sum{grid-template-columns:1fr}.portal-shell .ac-sum>div:nth-child(odd){border-right:0}}
 
 /* Trainee details: statement of account (8 Oct 2026) */
 .portal-shell .sa{display:grid;gap:0}
@@ -1798,3 +1804,42 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .ac-rejecting{background:#fffafa}
 .portal-shell .ac-rejlabel{font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#b42318}
 @media (max-width:640px){.portal-shell .rj{grid-template-columns:1fr}}
+.portal-shell .ac-tiles.ac-tiles-in{max-width:none;margin-bottom:12px}
+/* Accounting dashboard, summary rail (design 2, 8 Oct 2026) */
+.portal-shell .ac-rail{display:grid;grid-template-columns:minmax(320px,380px) minmax(0,1fr);gap:16px;align-items:start}
+.portal-shell .ac-stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+.portal-shell .ac-stack>.portal-panel,.portal-shell .ac-stack>.ac-grid2{margin:0}
+.portal-shell .ac-lines{margin:0}
+.portal-shell .ac-lines>div{display:flex;justify-content:space-between;gap:12px;padding:8px 2px;border-bottom:1px solid var(--nw-line)}
+.portal-shell .ac-lines>div:last-child{border-bottom:0}
+.portal-shell .ac-lines dt{color:var(--nw-muted)}
+.portal-shell .ac-lines dd{margin:0;font:600 15px var(--font-num),monospace;font-variant-numeric:tabular-nums;color:var(--nw-fg)}
+.portal-shell .ac-lines .total{border-top:2px solid var(--nw-fg)}
+.portal-shell .ac-lines .total dt{color:var(--nw-fg);font-weight:600}
+.portal-shell .ac-lines .plus{color:#15803d}.portal-shell .ac-lines .minus{color:#c2410c}.portal-shell .ac-lines .eq{color:#0571D0}.portal-shell .ac-lines .warn{color:#b45309}
+.portal-shell .ac-foot{margin:8px 2px 0;font-size:13px;color:var(--nw-muted)}
+.portal-shell .ac-mini{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}
+.portal-shell .ac-mini td{padding:7px 2px;border-top:1px solid var(--nw-line)}.portal-shell .ac-mini td.r{text-align:right}
+.portal-shell .ac-rail .ac-tiles .cx-tile b{min-width:0}
+@media (max-width:1080px){.portal-shell .ac-rail{grid-template-columns:1fr}}
+/* Approvals: checklist with bulk approve (design 5, 8 Oct 2026) */
+.portal-shell .ac-check{display:flex;flex-direction:column;gap:14px}
+.portal-shell .ac-chipbar{display:flex;gap:6px;flex-wrap:wrap}
+.portal-shell .ac-chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--nw-line);background:var(--nw-surface);color:var(--nw-fg);font:500 14px var(--font-sans,inherit);padding:7px 12px;border-radius:99px;cursor:pointer}
+.portal-shell .ac-chip span{font:600 12px var(--font-num),monospace;padding:0 7px;border-radius:99px;background:#eef4f8;color:#5f7180}
+.portal-shell .ac-chip span.has{background:#fde7dc;color:#F25615}
+.portal-shell .ac-chip.zero{color:var(--nw-muted)}
+.portal-shell .ac-chip.on{background:#123F63;border-color:#123F63;color:#fff}.portal-shell .ac-chip.on span{background:rgba(255,255,255,.2);color:#fff}
+.portal-shell .ac-bulk{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;background:#123F63;color:#fff;border-radius:12px}
+.portal-shell .ac-bulk b{color:#fff}.portal-shell .ac-bulk-sp{flex:1;color:#c3dbea;font-size:14px}
+.portal-shell .ac-bulk button{border:1px solid #fff;background:transparent;color:#fff;font:500 14px inherit;padding:7px 14px;border-radius:8px;cursor:pointer}
+.portal-shell .ac-bulk button.go{background:#fff;color:#123F63;font-weight:600}
+.portal-shell .ac-bulk button:disabled{opacity:.45;cursor:not-allowed}
+.portal-shell .ac-group+.ac-group{margin-top:14px}
+.portal-shell .ac-ghead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:6px 20px 8px;border-bottom:2px solid var(--nw-fg)}
+.portal-shell .ac-ghead h2{margin:0;font-size:16px}
+.portal-shell .ac-crow{display:grid;grid-template-columns:24px minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:12px 20px;border-bottom:1px solid #e6edf2}
+.portal-shell .ac-crow input{width:18px;height:18px;accent-color:#0571D0}
+.portal-shell .ac-crow label{cursor:pointer;min-width:0}.portal-shell .ac-crow small{display:block;color:#5f7180;font-size:13.5px}
+.portal-shell .ac-clear{margin:12px 20px 4px;color:var(--nw-muted);font-size:14px}.portal-shell .ac-clear b{color:#15803d}
+@media (max-width:640px){.portal-shell .ac-crow{grid-template-columns:24px minmax(0,1fr)}.portal-shell .ac-crow>.cx-amt,.portal-shell .ac-crow>.cx-acts,.portal-shell .ac-crow>.ac-rejlabel{grid-column:2}}

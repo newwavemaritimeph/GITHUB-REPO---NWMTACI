@@ -55,6 +55,10 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
   const [cat, setCat] = useState<Category | "All">(compact ? "Expense requests" : "All");
   // Rejecting opens a reason row in place (design 2); the reason is required.
   const [rejecting, setRejecting] = useState<string | null>(null);
+  // Full page: tick several and approve them together (owner's choice, design 5, 8 Oct 2026).
+  const [picked, setPicked] = useState<Set<string>>(new Set());
+  const [bulk, setBulk] = useState("");
+  const [doneNote, setDoneNote] = useState("");
   const name = (t: { legal_first_name: string; legal_last_name: string } | null) => (t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : "Trainee");
   const expenses = (data.expenses as (PortalData["expenses"][number] & { purpose?: string; payment_channel?: string | null; request_number?: string | null; requested_by_name?: string | null; line_items?: unknown[] | null })[])
     .filter((e) => e.status === "Pending").map((e): Row => ({ id: e.id, title: `${e.payee} · ${e.category}`, detail: [e.purpose, Array.isArray(e.line_items) && e.line_items.length ? `${e.line_items.length} line${e.line_items.length === 1 ? "" : "s"}` : "", e.payment_channel].filter(Boolean).join(" · "), ref: e.request_number ?? e.expense_number, who: e.requested_by_name ?? "Cashier", when: fmtDate(day(e.created_at)), amount: Number(e.amount_centavos), okLabel: "Approve", canReject: true,
@@ -94,16 +98,51 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
       {lists[current].length ? rowsOf(lists[current].slice(0, 6)) : <p className="portal-empty-copy">Nothing waiting.</p>}
     </section>;
   }
-  const shown = (Object.keys(lists) as Category[]).filter((k) => cat === "All" || cat === k);
-  return <div className="ac-layout">
-    <nav className="ac-cats" aria-label="Approval categories">
-      <button type="button" className={cat === "All" ? "on" : ""} onClick={() => setCat("All")}>All<span className={waiting ? "" : "zero"}>{waiting}</span></button>
-      {CATEGORY_GROUPS.map(([group, cats]) => <div key={group}><div className="ac-grp">{group}</div>{cats.map((k) => <button key={k} type="button" className={cat === k ? "on" : ""} onClick={() => setCat(k)}>{k}<span className={lists[k].length ? "" : "zero"}>{lists[k].length}</span></button>)}</div>)}
-    </nav>
-    <div className="ac-catlist">
-      {msg && <Message kind={msg.kind} text={msg.text} />}
-      {shown.map((k) => <section className="portal-panel cx-panel" key={k}><div className="panel-heading"><h2>{k}</h2><span className="muted-text">{groupOf(k)} · {lists[k].length} waiting</span></div>{lists[k].length ? rowsOf(lists[k]) : <p className="portal-empty-copy">Nothing waiting.</p>}</section>)}
+  // Checklist with bulk approve: only categories with requests get a group; empty ones are listed in one line.
+  const cats = Object.keys(lists) as Category[];
+  const filled = cats.filter((k) => lists[k].length && (cat === "All" || cat === k));
+  const empty = cats.filter((k) => !lists[k].length);
+  const all = cats.flatMap((k) => lists[k]);
+  const chosen = all.filter((r) => picked.has(r.id));
+  const chosenTotal = chosen.filter((r) => !closings.includes(r)).reduce((s, r) => s + r.amount, 0);
+  const visible = filled.flatMap((k) => lists[k]);
+  const toggle = (id: string) => { setDoneNote(""); setPicked((p) => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; }); };
+  async function approveChosen() {
+    let done = 0;
+    for (const r of chosen) {
+      setBulk(`Approving ${done + 1} of ${chosen.length}…`);
+      try { await r.act(true); done += 1; } catch { break; }
+    }
+    setBulk(""); setPicked(new Set());
+    setDoneNote(done === chosen.length ? `${done} approved.` : `${done} of ${chosen.length} approved; the next one could not be completed.`);
+  }
+  return <div className="ac-check">
+    {msg && <Message kind={msg.kind} text={msg.text} />}
+    <div className="chips ac-chipbar">
+      <button type="button" className={`ac-chip${cat === "All" ? " on" : ""}`} onClick={() => setCat("All")}>All<span className={waiting ? "has" : ""}>{waiting}</span></button>
+      {cats.map((k) => <button key={k} type="button" className={`ac-chip${cat === k ? " on" : ""}${lists[k].length ? "" : " zero"}`} onClick={() => setCat(k)}>{k}<span className={lists[k].length ? "has" : ""}>{lists[k].length}</span></button>)}
     </div>
+    {waiting > 0 && <div className="ac-bulk">
+      <span><b className="cx-mono">{chosen.length}</b> selected · <b className="cx-mono">{pesos2(chosenTotal)}</b></span>
+      <span className="ac-bulk-sp">{bulk || doneNote}</span>
+      <button type="button" disabled={busy || !!bulk || !visible.length} onClick={() => setPicked(chosen.length === visible.length && visible.every((r) => picked.has(r.id)) ? new Set() : new Set(visible.map((r) => r.id)))}>{visible.length && visible.every((r) => picked.has(r.id)) ? "Clear selection" : "Select all"}</button>
+      <button type="button" className="go" disabled={busy || !!bulk || !chosen.length} onClick={() => void approveChosen()}>Approve selected</button>
+    </div>}
+    <section className="portal-panel cx-panel">
+      {filled.length ? filled.map((k) => <div key={k} className="ac-group">
+        <div className="ac-ghead"><h2>{k}</h2><span className="muted-text">{groupOf(k)} · {lists[k].length} waiting</span></div>
+        {lists[k].map((r) => <div key={r.id} className={rejecting && rejecting !== r.id ? "ac-dim" : undefined}>
+          <div className={`ac-crow${rejecting === r.id ? " ac-rejecting" : ""}`}>
+            <input type="checkbox" id={`ap-${r.id}`} checked={picked.has(r.id)} disabled={!!bulk} onChange={() => toggle(r.id)} aria-label={`Select ${r.title}`} />
+            <label htmlFor={`ap-${r.id}`}><strong>{r.title}</strong>{r.detail && <small>{r.detail}</small>}<small className="cx-mono">{[r.ref, r.who, r.when].filter(Boolean).join(" · ")}</small></label>
+            <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{pesos2(r.amount)}</strong>
+            {rejecting === r.id ? <span className="ac-rejlabel">Rejecting</span> : <div className="cx-acts">{r.canReject && <button type="button" className="portal-secondary" disabled={busy || !!rejecting || !!bulk} onClick={() => setRejecting(r.id)}>Reject</button>}<button type="button" className="portal-primary" disabled={busy || !!rejecting || !!bulk} onClick={() => void r.act(true).then(() => setPicked((p) => { const n = new Set(p); n.delete(r.id); return n; })).catch(() => undefined)}>{r.okLabel}</button></div>}
+          </div>
+          {rejecting === r.id && <RejectInline reasons={expenses.some((x) => x.id === r.id) ? EXPENSE_REASONS : REQUEST_REASONS} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
+        </div>)}
+      </div>) : <p className="portal-empty-copy">{cat === "All" ? "Nothing waiting for your approval." : `No ${cat.toLowerCase()} waiting.`}</p>}
+      {empty.length > 0 && <p className="ac-clear"><b>✓ Nothing waiting:</b> {empty.join(", ")}.</p>}
+    </section>
   </div>;
 }
 
@@ -181,52 +220,54 @@ export function AccountingHome({ data, reload, go }: { data: PortalData; reload:
     <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Dashboard</h1></div>
       <div className="ac-day"><button type="button" aria-label="Previous day" onClick={() => setDate(addDays(date, -1))}>‹</button><input type="date" aria-label="Date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} /><button type="button" aria-label="Next day" disabled={date >= today} onClick={() => setDate(addDays(date, 1))}>›</button></div></div>
     <p className="ac-note">{longDay(date)} · view only — the Cashier records payments and expenses.</p>
-    <AccountingApprovals data={data} reload={reload} compact />
-
-    <h3 className="ac-sec">Collections</h3>
     {dayReport.error && <Message kind="error" text={dayReport.error} />}
-    <div className="cx-tiles ac-tiles">
-      {CHANNELS.map((c) => <div className="cx-tile" key={c} style={{ ["--c" as string]: COLORS[c] }}><span>{c}</span><b>{pesos2(colOf(c))}</b><small>{countOf(c)} receipt{countOf(c) === 1 ? "" : "s"}</small></div>)}
-      <div className="cx-tile ac-total"><span>Total collected</span><b>{pesos2(total)}</b><small>{receipts} receipt{receipts === 1 ? "" : "s"}</small></div>
-    </div>
-    {r && <p className="ac-split">{r.matrix.map((m) => <span key={m.source}>{m.source} <b className="cx-mono">{pesos2(m.totalCentavos)}</b></span>)}</p>}
+    {/* Summary rail (owner's choice, design 2, 8 Oct 2026): figures in one narrow column, approvals and charts on the right. */}
+    <div className="ac-rail">
+      <div className="ac-stack">
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections</h2><strong className="cx-mono">{pesos2(total)}</strong></div>
+          <div className="cx-tiles ac-tiles ac-tiles-in">
+            {CHANNELS.map((c) => <div className="cx-tile" key={c} style={{ ["--c" as string]: COLORS[c] }}><span>{c}</span><b>{pesos2(colOf(c))}</b><small>{countOf(c)} receipt{countOf(c) === 1 ? "" : "s"}</small></div>)}
+            <div className="cx-tile ac-total"><span>Total collected</span><b>{pesos2(total)}</b><small>{receipts} receipt{receipts === 1 ? "" : "s"}</small></div>
+          </div>
+          {r && <p className="ac-split">{r.matrix.map((m) => <span key={m.source}>{m.source} <b className="cx-mono">{pesos2(m.totalCentavos)}</b></span>)}</p>}
+        </section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Cash position</h2><span className="muted-text">cash only</span></div>
+          {p ? <dl className="ac-lines">
+            <div><dt>Previous cash</dt><dd>{pesos2(p.previousCentavos)}</dd></div>
+            <div><dt>+ Cash collected</dt><dd className="plus">{pesos2(p.cashCollectedCentavos)}</dd></div>
+            <div><dt>− Cash expenses</dt><dd className="minus">{pesos2(p.cashExpensesCentavos)}</dd></div>
+            <div className="total"><dt>= Cash on hand</dt><dd className="eq">{pesos2(p.onHandCentavos)}</dd></div>
+            <div><dt>Counted at closing</dt><dd>{p.countedCentavos == null ? "Not yet" : pesos2(p.countedCentavos)}</dd></div>
+            <div><dt>Over / short</dt><dd className={p.overShortCentavos ? (p.overShortCentavos < 0 ? "minus" : "plus") : ""}>{p.overShortCentavos == null ? "—" : pesos2(p.overShortCentavos)}</dd></div>
+          </dl> : <p className="portal-empty-copy">Loading…</p>}
+          {p?.previousNote && <p className="ac-foot">{p.previousNote}</p>}
+        </section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Rebates</h2></div>
+          <dl className="ac-lines"><div><dt>Deducted from payments</dt><dd>{pesos2(w?.current.rebatesDeducted ?? 0)}</dd></div><div><dt>Owed to agencies</dt><dd className="warn">{pesos2(w?.current.rebatesOwed ?? 0)}</dd></div></dl>
+          {w && w.current.owedByAgency.length > 0 && <table className="ac-mini"><tbody>{w.current.owedByAgency.slice(0, 5).map((o) => <tr key={o.name}><td>{o.name}</td><td>{o.count} trainee{o.count === 1 ? "" : "s"}</td><td className="r cx-mono">{pesos2(o.total)}</td></tr>)}</tbody></table>}
+          <div className="ac-more"><button type="button" onClick={() => go("Payables")}>View payables</button></div>
+        </section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Unpaid after training</h2></div>
+          <dl className="ac-lines"><div><dt>Balance</dt><dd className="minus">{pesos2(unpaid.reduce((s, u) => s + u.balanceCentavos, 0))}</dd></div><div><dt>Trainees</dt><dd>{new Set(unpaid.map((u) => u.traineeId)).size}</dd></div></dl>
+          <div className="ac-more"><button type="button" onClick={() => go("Receivables")}>View receivables</button></div>
+        </section>
+      </div>
 
-    <div className="ac-grid2">
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Last 7 days</h2><span className="muted-text">collections and expenses</span></div>
-        {last7.length ? <BarChart label="Collections and expenses, last 7 days" labels={last7.map((b) => b.label)} series={[{ name: "Collections", color: "#0571D0", values: last7.map((b) => b.collections) }, { name: "Expenses released", color: "#F25615", values: last7.map((b) => b.expenses) }]} /> : <p className="portal-empty-copy">{week.error || "Loading…"}</p>}
-      </section>
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By channel</h2><span className="muted-text">{fmtDate(date)}</span></div>
-        <Donut label="Collections by channel" parts={CHANNELS.map((c) => ({ name: c, color: COLORS[c], value: colOf(c) }))} />
-      </section>
-    </div>
-
-    <div className="ac-grid2">
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Expenses released</h2><strong className="cx-mono">{pesos2(r ? r.expenses.reduce((s, e) => s + e.amountCentavos, 0) : 0)}</strong></div>
-        {r && r.expenseTotals.length ? <HBars rows={r.expenseTotals.map((t) => ({ name: t.channel, value: t.totalCentavos, color: COLORS[t.channel] }))} /> : <p className="portal-empty-copy">No expenses released.</p>}
-        <div className="ac-more"><button type="button" onClick={() => go("Expenses")}>View vouchers</button></div>
-      </section>
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Cash position</h2><span className="muted-text">cash only</span></div>
-        {p ? <dl className="ac-sum">
-          <div><dt>Previous cash</dt><dd>{pesos2(p.previousCentavos)}</dd><small>{p.previousNote}</small></div>
-          <div className="plus"><dt>+ Cash collected</dt><dd>{pesos2(p.cashCollectedCentavos)}</dd></div>
-          <div className="minus"><dt>− Cash expenses</dt><dd>{pesos2(p.cashExpensesCentavos)}</dd></div>
-          <div className="eq"><dt>= Cash on hand</dt><dd>{pesos2(p.onHandCentavos)}</dd></div>
-          <div><dt>Counted at closing</dt><dd>{p.countedCentavos == null ? "Not yet" : pesos2(p.countedCentavos)}</dd></div>
-          <div className={p.overShortCentavos ? (p.overShortCentavos < 0 ? "minus" : "plus") : ""}><dt>Over / short</dt><dd>{p.overShortCentavos == null ? "—" : pesos2(p.overShortCentavos)}</dd></div>
-        </dl> : <p className="portal-empty-copy">Loading…</p>}
-      </section>
-    </div>
-
-    <div className="ac-grid2">
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Rebates</h2></div>
-        <dl className="ac-sum"><div><dt>Deducted from payments</dt><dd>{pesos2(w?.current.rebatesDeducted ?? 0)}</dd><small>{fmtDate(date)}</small></div><div><dt>Owed to agencies</dt><dd className="warn">{pesos2(w?.current.rebatesOwed ?? 0)}</dd></div></dl>
-        {w && w.current.owedByAgency.length > 0 && <div className="portal-table cx-cards"><table><tbody>{w.current.owedByAgency.slice(0, 5).map((o) => <tr key={o.name}><td data-l="" className="lead">{o.name}</td><td data-l="Trainees">{o.count} trainee{o.count === 1 ? "" : "s"}</td><td data-l="Owed" className="r cx-amt">{pesos2(o.total)}</td></tr>)}</tbody></table></div>}
-        <div className="ac-more"><button type="button" onClick={() => go("Payables")}>View payables</button></div>
-      </section>
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Unpaid after training</h2></div>
-        <dl className="ac-sum"><div><dt>Balance</dt><dd className="bad">{pesos2(unpaid.reduce((s, u) => s + u.balanceCentavos, 0))}</dd></div><div><dt>Trainees</dt><dd>{new Set(unpaid.map((u) => u.traineeId)).size}</dd></div></dl>
-        <div className="ac-more"><button type="button" onClick={() => go("Receivables")}>View receivables</button></div>
-      </section>
+      <div className="ac-stack">
+        <AccountingApprovals data={data} reload={reload} compact />
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Last 7 days</h2><span className="muted-text">collections and expenses</span></div>
+          {last7.length ? <BarChart label="Collections and expenses, last 7 days" labels={last7.map((b) => b.label)} series={[{ name: "Collections", color: "#0571D0", values: last7.map((b) => b.collections) }, { name: "Expenses released", color: "#F25615", values: last7.map((b) => b.expenses) }]} /> : <p className="portal-empty-copy">{week.error || "Loading…"}</p>}
+        </section>
+        <div className="ac-grid2">
+          <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By channel</h2><span className="muted-text">{fmtDate(date)}</span></div>
+            <Donut label="Collections by channel" parts={CHANNELS.map((c) => ({ name: c, color: COLORS[c], value: colOf(c) }))} />
+          </section>
+          <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Expenses released</h2><strong className="cx-mono">{pesos2(r ? r.expenses.reduce((s, e) => s + e.amountCentavos, 0) : 0)}</strong></div>
+            {r && r.expenseTotals.length ? <HBars rows={r.expenseTotals.map((t) => ({ name: t.channel, value: t.totalCentavos, color: COLORS[t.channel] }))} /> : <p className="portal-empty-copy">No expenses released.</p>}
+            <div className="ac-more"><button type="button" onClick={() => go("Expenses")}>View vouchers</button></div>
+          </section>
+        </div>
+      </div>
     </div>
   </div>;
 }
