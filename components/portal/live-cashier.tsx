@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { PortalData, Enrollment } from "../portal-live-app";
-import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos } from "@/lib/portal-format";
+import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos, pesos2 } from "@/lib/portal-format";
+import { pesosInWords } from "@/lib/amount-words";
 import { Badge, Message, Modal, PageHead, fullName, fmtDate, fmtClock, usePost, openAdmissionRecord, submit } from "./shared-ui";
 import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balances";
-import { RequestActionModal } from "./payment-actions";
 import { requestFee } from "@/lib/request-fees";
 import type { CashierReportSnapshot } from "@/lib/documents";
 
@@ -55,21 +55,24 @@ export function tarState(data: PortalData, traineeId: string) {
 }
 
 /** Print the TAR, or — once the limit is reached — ask the Accounting Manager for one more print. */
+/** Print receipt (owner, 8 Oct 2026): prints twice; after the second print the button is gone. */
+export function ReceiptButton({ data, paymentId, reload, className = "portal-secondary" }: { data: PortalData; paymentId: string; reload?: () => Promise<void>; className?: string }) {
+  const printed = data.receiptPrints?.[paymentId] ?? 0;
+  if (printed >= 2) return null;
+  return <a className={className} href={`/portal/payment-receipt/${paymentId}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload?.(), 2500)}>{printed ? `Print receipt (${printed} of 2 printed)` : "Print receipt"}</a>;
+}
+
+/** Print TAR (owner, 8 Oct 2026): prints twice; after the second print the button is gone. */
 export function TarButton({ data, traineeId, reload, className = "portal-secondary" }: { data: PortalData; traineeId: string; reload?: () => Promise<void>; className?: string }) {
   const s = tarState(data, traineeId);
   const [error, setError] = useState("");
-  const [requesting, setRequesting] = useState<Enrollment | null>(null);
-  const { post } = usePost(reload ?? (async () => undefined));
   const print = () => { setError(""); void openAdmissionRecord(traineeId).then(() => reload?.()).catch((e) => setError(e instanceof Error ? e.message : "Could not open the admission record.")); };
-  let button;
-  if (!s.paid.length) button = <button type="button" className={className} disabled title="The TAR prints once a course is paid">Print TAR</button>;
-  else if (s.left > 0) button = <button type="button" className={className} onClick={print}>{s.printed ? `Reprint TAR (${s.printed} of ${s.allowed} printed)` : "Print TAR"}</button>;
-  else if (s.pendingReprint) button = <button type="button" className={className} disabled>Reprint awaiting approval</button>;
-  else button = <button type="button" className={className} onClick={() => setRequesting(s.paid[0])}>Request TAR reprint</button>;
+  if (s.paid.length && s.left <= 0) return null;
   return <>
-    {button}
+    {!s.paid.length
+      ? <button type="button" className={className} disabled title="The TAR prints once a course is paid">Print TAR</button>
+      : <button type="button" className={className} onClick={print}>{s.printed ? `Print TAR (${s.printed} of ${s.allowed} printed)` : "Print TAR"}</button>}
     {error && <Message kind="error" text={error} />}
-    {requesting && <RequestActionModal data={data} enrollment={requesting} reqType="TAR reprint" onClose={() => setRequesting(null)} post={(body) => post(body, "Reprint request raised. Add the charge (or no charge) in Requests to send it for approval.")} />}
   </>;
 }
 
@@ -330,7 +333,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
       <div className="full"><Message kind="success" text={`${pesos(posted.amount)} received from ${group.name}.`} /></div>
       {posted.drive && <p className="portal-form-note full cx-drive">Saved to Google Drive · {posted.drive.path.split(" / ").slice(1).join(" / ")} {posted.drive.link && <a href={posted.drive.link} target="_blank" rel="noreferrer">Open</a>}</p>}
       <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
-        {posted.id && <a className="portal-secondary" href={`/portal/payment-receipt/${posted.id}`} target="_blank" rel="noreferrer">Receipt</a>}
+        {posted.id && <ReceiptButton data={data} paymentId={posted.id} reload={onSaved} />}
         <TarButton data={data} traineeId={group.traineeId} className="portal-secondary" />
       </div>
       <div className="portal-form-actions full"><button type="button" className="portal-primary" onClick={onClose}>Done</button></div>
@@ -418,7 +421,7 @@ export function CashierDashboard({ data, onPay, reload }: { data: PortalData; on
 
     <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Paid and enrolled</h2></div><span className="slot-count">{paid.length}</span></div>
       {paid.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Courses</th><th className="r">Paid</th><th className="r">Balance</th><th>Status</th><th></th></tr></thead><tbody>
-        {paid.map((g) => { const latest = data.payments.filter((p) => p.trainee_id === g.traineeId).sort((a, b) => b.received_at.localeCompare(a.received_at))[0]; return <tr key={g.traineeId}><td data-l="" className="lead"><Who name={g.name} number={g.number} /></td><td data-l="Courses"><CourseList list={g.enrollments} /></td><td data-l="Paid" className="r cx-amt">{pesos(g.paid)}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(g.balance)}</strong></td><td data-l="Status"><Badge tone={g.balance === 0 ? "active" : "orange"}>{g.balance === 0 ? "Paid" : "Partially paid"}</Badge></td><td data-l=""><div className="cx-acts">{g.balance > 0 && <button type="button" className="portal-secondary" onClick={() => onPay(firstOpen(g))}>Collect balance</button>}{latest && <a className="portal-secondary" href={`/portal/payment-receipt/${latest.id}`} target="_blank" rel="noreferrer">Receipt</a>}<TarButton data={data} traineeId={g.traineeId} reload={reload} className="portal-primary" /></div></td></tr>; })}
+        {paid.map((g) => { const latest = data.payments.filter((p) => p.trainee_id === g.traineeId).sort((a, b) => b.received_at.localeCompare(a.received_at))[0]; return <tr key={g.traineeId}><td data-l="" className="lead"><Who name={g.name} number={g.number} /></td><td data-l="Courses"><CourseList list={g.enrollments} /></td><td data-l="Paid" className="r cx-amt">{pesos(g.paid)}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(g.balance)}</strong></td><td data-l="Status"><Badge tone={g.balance === 0 ? "active" : "orange"}>{g.balance === 0 ? "Paid" : "Partially paid"}</Badge></td><td data-l=""><div className="cx-acts">{g.balance > 0 && <button type="button" className="portal-secondary" onClick={() => onPay(firstOpen(g))}>Collect balance</button>}{latest && <ReceiptButton data={data} paymentId={latest.id} reload={reload} />}<TarButton data={data} traineeId={g.traineeId} reload={reload} className="portal-primary" /></div></td></tr>; })}
       </tbody></table></div> : <p className="portal-empty-copy">No paid trainees in the last 7 days.</p>}
     </section>
 
@@ -455,7 +458,7 @@ export function CashierPayments({ data, onPay }: { data: PortalData; onPay: (enr
     </div>
     <div className="cx-tiles">{[["Total", total, rows.length] as const, ...[...byMode.entries()].map(([m, v]) => [m, v, rows.filter((p) => p.method === m).length] as const)].map(([m, v, n]) => <div className="cx-tile" key={m} style={{ ["--c" as string]: MODE_COLORS[m] ?? "#123F63" }}><span>{m}</span><b>{pesos(v)}</b><small>{n} receipt{n === 1 ? "" : "s"}</small></div>)}</div>
     <section className="portal-panel cx-panel">{rows.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Receipt</th><th>Trainee</th><th>Mode</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
-      {rows.map((p) => { const t = first(p.trainees); return <tr key={p.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{p.payment_number}</span><small>{fmtDate(day(p.received_at))} · {fmtClock(p.received_at)}</small></td><td data-l="Trainee">{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</td><td data-l="Mode">{p.method}{p.reference_number ? <small className="cx-mono">{p.reference_number}</small> : null}</td><td data-l="Status"><Badge tone={p.verification_state === "Verified" ? "active" : "orange"}>{p.verification_state === "Duplicate Review" ? "Duplicate reference" : p.verification_state}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos(p.amount_centavos)}</strong></td><td data-l=""><div className="cx-acts"><a className="portal-secondary" href={`/portal/payment-receipt/${p.id}`} target="_blank" rel="noreferrer">Receipt</a></div></td></tr>; })}
+      {rows.map((p) => { const t = first(p.trainees); return <tr key={p.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{p.payment_number}</span><small>{fmtDate(day(p.received_at))} · {fmtClock(p.received_at)}</small></td><td data-l="Trainee">{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</td><td data-l="Mode">{p.method}{p.reference_number ? <small className="cx-mono">{p.reference_number}</small> : null}</td><td data-l="Status"><Badge tone={p.verification_state === "Verified" ? "active" : "orange"}>{p.verification_state === "Duplicate Review" ? "Duplicate reference" : p.verification_state}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos(p.amount_centavos)}</strong></td><td data-l=""><div className="cx-acts"><ReceiptButton data={data} paymentId={p.id} className="portal-secondary" /></div></td></tr>; })}
     </tbody></table></div> : <p className="portal-empty-copy">No payments in this range.</p>}</section>
   </div>;
 }
@@ -643,7 +646,7 @@ export function CashierSummaryReport({ embedded }: { data?: PortalData; embedded
 
 /* ====================================================== Expenses (Oct 2026) */
 
-type ExpenseRow = PortalData["expenses"][number] & { purpose?: string; payment_channel?: string | null; reference_number?: string | null; request_number?: string | null; voucher_number?: string | null; approved_at?: string | null; decision_remarks?: string | null; released_at?: string | null; paid_at?: string | null; drive_link?: string | null; print_count?: number | null; reprints_approved?: number | null };
+type ExpenseRow = PortalData["expenses"][number] & { purpose?: string; payment_channel?: string | null; reference_number?: string | null; request_number?: string | null; voucher_number?: string | null; approved_at?: string | null; decision_remarks?: string | null; released_at?: string | null; paid_at?: string | null; drive_link?: string | null; print_count?: number | null; reprints_approved?: number | null; line_items?: { description: string; quantity: number; unitCentavos: number }[] | null; supporting_document?: string | null; requested_by_name?: string | null; approved_by_name?: string | null; released_by_name?: string | null };
 type ReprintRow = NonNullable<PortalData["expenseReprints"]>[number];
 export const EXPENSE_STATUSES = ["All", "For approval", "Approved", "Released", "Rejected"] as const;
 export const expenseState = (e: { status: string }) => (e.status === "Pending" ? "For approval" : e.status === "Paid" ? "Released" : e.status);
@@ -692,6 +695,54 @@ export function vouchersByMonth<T extends { status: string; created_at: string; 
 }
 const EXPENSE_TONE: Record<string, string> = { "For approval": "orange", Approved: "blue", Released: "active", Rejected: "cancelled" };
 
+export const VOUCHER_FILTERS = ["All", "Awaiting release", "Released", "Reprint requests"] as const;
+/** Voucher list filter (owner, 8 Oct 2026). */
+export function voucherMatches(e: { id: string; status: string }, filter: (typeof VOUCHER_FILTERS)[number], reprints: { expense_id: string; status: string }[]) {
+  if (filter === "Awaiting release") return e.status === "Approved";
+  if (filter === "Released") return e.status === "Paid";
+  if (filter === "Reprint requests") return reprints.some((r) => r.expense_id === e.id && r.status === "Pending");
+  return true;
+}
+
+/** One voucher, opened from the Vouchers tab: details, lines, history and the actions it allows. */
+function VoucherDrawer({ e, reprints, isManager, onClose, onRelease, onRequestReprint, reload }: { e: ExpenseRow; reprints: ReprintRow[]; isManager: boolean; onClose: () => void; onRelease: (e: ExpenseRow) => void; onRequestReprint: (e: ExpenseRow) => void; reload: () => Promise<void> }) {
+  const p = voucherPrintState(e, reprints);
+  const lines = Array.isArray(e.line_items) && e.line_items.length ? e.line_items : [{ description: e.purpose ?? "Expense", quantity: 1, unitCentavos: Number(e.amount_centavos) }];
+  const released = e.status === "Paid";
+  const steps: [string, string, boolean][] = [
+    ["Recorded", `${e.request_number ?? e.expense_number}${e.requested_by_name ? ` · ${e.requested_by_name}` : ""} · ${fmtDate(day(e.created_at))}`, true],
+    ["Approved", e.approved_at ? `${e.approved_by_name ?? "Accounting Manager"} · ${fmtDate(day(e.approved_at))}` : "Waiting for the Accounting Manager", !!e.approved_at],
+    ["Printed", p.used ? `${p.used} print${p.used > 1 ? "s" : ""}${p.state === "pending" ? " · reprint requested" : ""}` : "Not yet", p.used > 0],
+    ["Released", released && e.released_at ? `${e.payment_channel ?? ""}${e.reference_number ? ` · ${e.reference_number}` : ""} · ${e.released_by_name ?? "Cashier"} · ${fmtDate(day(e.released_at))}` : "Waiting for the Cashier", released],
+  ];
+  useEffect(() => { const esc = (ev: KeyboardEvent) => { if (ev.key === "Escape") onClose(); }; document.addEventListener("keydown", esc); return () => document.removeEventListener("keydown", esc); }, [onClose]);
+  return <div className="vx-drawer" onClick={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
+    <aside className="vx-panel" role="dialog" aria-label={`Voucher ${e.voucher_number ?? e.expense_number}`}>
+      <div className="vx-dh"><div><span className="portal-eyebrow">Expense voucher</span><h2 className="cx-mono">{e.voucher_number ?? e.expense_number}</h2><Badge tone={released ? "active" : "blue"}>{released ? "Released" : "Awaiting release"}</Badge></div><button type="button" className="vx-x" aria-label="Close" onClick={onClose}>×</button></div>
+      <div className="vx-db">
+        <dl className="vx-kv">
+          <div><dt>Payee</dt><dd>{e.payee}</dd></div><div><dt>Category</dt><dd>{e.category}</dd></div>
+          <div><dt>Date issued</dt><dd>{fmtDate(day(e.approved_at ?? e.created_at))}</dd></div><div><dt>Request no.</dt><dd className="cx-mono">{e.request_number ?? "—"}</dd></div>
+          <div><dt>Mode of payment</dt><dd>{e.payment_channel || "—"}{e.reference_number ? ` · ${e.reference_number}` : ""}</dd></div><div><dt>Supporting document</dt><dd>{e.supporting_document || "—"}</dd></div>
+        </dl>
+        <div className="vx-lines"><table><thead><tr><th>Particulars</th><th className="r">Qty</th><th className="r">Amount</th></tr></thead><tbody>
+          {lines.map((l, i) => <tr key={i}><td>{l.description}</td><td className="r cx-mono">{l.quantity}</td><td className="r cx-mono">{pesos2(l.quantity * l.unitCentavos)}</td></tr>)}
+        </tbody><tfoot><tr><td colSpan={2}>Total</td><td className="r cx-mono">{pesos2(e.amount_centavos)}</td></tr></tfoot></table></div>
+        <p className="vx-words">{pesosInWords(Number(e.amount_centavos))}</p>
+        <div><span className="portal-eyebrow">History</span><ol className="vx-tl">{steps.map(([t, d, done]) => <li key={t} className={done ? "" : "todo"}><i aria-hidden="true">{done ? "✓" : ""}</i><div><strong>{t}</strong><small>{d}</small></div></li>)}</ol></div>
+      </div>
+      <div className="vx-df">
+        <a className="portal-secondary" href={`/api/documents/expense/${e.id}?copy=1`} target="_blank" rel="noreferrer">View file copy</a>
+        {e.drive_link && <a className="portal-secondary" href={e.drive_link} target="_blank" rel="noreferrer">Open in Drive</a>}
+        {!released && !isManager && <button type="button" className="portal-primary" onClick={() => onRelease(e)}>Mark released</button>}
+        {p.state === "print" ? <a className="portal-primary" href={`/api/documents/expense/${e.id}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload(), 2500)}>{p.used ? "Print reprint" : "Print voucher"}</a>
+          : p.state === "pending" ? <span className="cx-chip">Reprint awaiting approval</span>
+          : <button type="button" className="portal-secondary" onClick={() => onRequestReprint(e)}>{p.state === "rejected" ? "Request reprint again" : "Request reprint"}</button>}
+      </div>
+    </aside>
+  </div>;
+}
+
 /** Print voucher, or the reprint step it needs (request, waiting, refused). */
 function VoucherPrint({ e, reprints, onRequest, reload }: { e: ExpenseRow; reprints: ReprintRow[]; onRequest: (e: ExpenseRow) => void; reload: () => Promise<void> }) {
   const p = voucherPrintState(e, reprints);
@@ -721,6 +772,8 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   const [deciding, setDeciding] = useState<ReprintRow | null>(null);
   const [reason, setReason] = useState("");
   const [month, setMonth] = useState("");
+  const [vFilter, setVFilter] = useState<(typeof VOUCHER_FILTERS)[number]>("All"), [vChannel, setVChannel] = useState(""), [vSearch, setVSearch] = useState("");
+  const [selected, setSelected] = useState<ExpenseRow | null>(null);
   const [open, setOpen] = useState<Record<string, boolean>>({});
   const { busy, msg, post } = usePost(reload);
   const reprints = data.expenseReprints ?? [];
@@ -789,32 +842,52 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
           </tr>; })}
         </tbody></table></div>
       </section>}
-      <div className="cx-bar">
+      {(() => {
+        const cur = months.find((m) => m.month === (month || thisMonth)) ?? months[0];
+        const sumOf = (list: ExpenseRow[]) => list.reduce((s, e) => s + Number(e.amount_centavos), 0);
+        const released = cur ? cur.rows.filter((e) => e.status === "Paid") : [], waiting = cur ? cur.rows.filter((e) => e.status === "Approved") : [];
+        return <div className="cx-tiles">
+          <div className="cx-tile" style={{ ["--c" as string]: "#123F63" }}><span>{cur?.label ?? "This month"}</span><b>{pesos(cur?.total ?? 0)}</b><small>{cur?.rows.length ?? 0} voucher{cur?.rows.length === 1 ? "" : "s"}</small></div>
+          <div className="cx-tile" style={{ ["--c" as string]: "#0a7a3e" }}><span>Released</span><b>{pesos(sumOf(released))}</b><small>{released.length} paid out</small></div>
+          <div className="cx-tile" style={{ ["--c" as string]: "#F25615" }}><span>Awaiting release</span><b>{pesos(sumOf(waiting))}</b><small>{waiting.length} approved, not yet paid</small></div>
+          <div className="cx-tile" style={{ ["--c" as string]: "#a2470b" }}><span>Reprint requests</span><b>{pendingReprints.length}</b><small>{isManager ? "waiting for you" : "waiting for the Accounting Manager"}</small></div>
+        </div>;
+      })()}
+      <div className="cx-bar vx-filters">
         <label className="cx-dt">Month<select value={month} onChange={(e) => setMonth(e.target.value)}><option value="">All months</option>{months.map((m) => <option key={m.month} value={m.month}>{m.label}</option>)}</select></label>
+        <div className="cx-seg" role="tablist">{VOUCHER_FILTERS.map((f) => <button key={f} type="button" className={vFilter === f ? "on" : ""} onClick={() => setVFilter(f)}>{f}<small>{months.filter((m) => !month || m.month === month).flatMap((m) => m.rows).filter((e) => voucherMatches(e, f, reprints)).length}</small></button>)}</div>
+        <label className="cx-dt">Channel<select value={vChannel} onChange={(e) => setVChannel(e.target.value)}><option value="">All channels</option>{expenseChannels(data).map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
+        <input className="vx-search" aria-label="Search vouchers" placeholder="Search voucher no., payee or category" value={vSearch} onChange={(e) => setVSearch(e.target.value)} />
       </div>
-      {monthsShown.length ? monthsShown.map((m) => { const isOpen = open[m.month] ?? (month ? true : m.month === thisMonth || m.month === months[0]?.month); return <section className="portal-panel cx-panel cx-month" key={m.month}>
-        <button type="button" className="cx-month-head" aria-expanded={isOpen} onClick={() => setOpen((o) => ({ ...o, [m.month]: !isOpen }))}>
-          <span className="cx-month-name">{m.label}</span><span className="cx-month-meta">{m.rows.length} voucher{m.rows.length === 1 ? "" : "s"}</span><b className="cx-mono">{pesos(m.total)}</b><span aria-hidden="true" className="cx-month-caret">{isOpen ? "▾" : "▸"}</span>
-        </button>
-        {isOpen && <div className="portal-table cx-cards"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Category</th><th>Channel</th><th className="r">Amount</th><th>Status</th><th>Prints</th><th></th></tr></thead><tbody>
-          {m.rows.map((e) => { const st = expenseState(e), p = voucherPrintState(e, reprints); return <tr key={e.id}>
-            <td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher_number ?? e.expense_number}</span><small>{fmtDate(day(e.approved_at ?? e.created_at))}</small></td>
-            <td data-l="Payee">{e.payee}</td>
-            <td data-l="Category">{e.category}</td>
-            <td data-l="Channel">{e.payment_channel || "—"}</td>
-            <td data-l="Amount" className="r"><strong className="cx-amt">{pesos(e.amount_centavos)}</strong></td>
-            <td data-l="Status"><Badge tone={EXPENSE_TONE[st]}>{st}</Badge></td>
-            <td data-l="Prints">{p.used} of {p.allowed}</td>
-            <td data-l=""><div className="cx-acts">
-              <a className="ghost-button" href={`/api/documents/expense/${e.id}?copy=1`} target="_blank" rel="noreferrer">View</a>
-              {printCell(e)}
-              {e.drive_link && <a className="ghost-button" href={e.drive_link} target="_blank" rel="noreferrer">Drive</a>}
-            </div></td>
-          </tr>; })}
-        </tbody></table></div>}
-      </section>; }) : <section className="portal-panel cx-panel"><p className="portal-empty-copy">No vouchers yet. A voucher is issued when the Accounting Manager approves an expense.</p></section>}
+      {(() => {
+        const term = vSearch.trim().toLowerCase();
+        const groups = monthsShown.map((m) => ({ ...m, list: m.rows.filter((e) => voucherMatches(e, vFilter, reprints) && (!vChannel || e.payment_channel === vChannel) && (!term || `${e.voucher_number ?? e.expense_number} ${e.payee} ${e.category}`.toLowerCase().includes(term))) })).filter((m) => m.list.length);
+        if (!groups.length) return <section className="portal-panel cx-panel"><p className="portal-empty-copy">{months.length ? "No vouchers match." : "No vouchers yet. A voucher is issued when the Accounting Manager approves an expense."}</p></section>;
+        return groups.map((m) => { const isOpen = open[m.month] ?? (month ? true : m.month === thisMonth || m.month === months[0]?.month); const last = new Date(Number(m.month.slice(0, 4)), Number(m.month.slice(5, 7)), 0).getDate(); return <section className="portal-panel cx-panel cx-month" key={m.month}>
+          <div className="cx-month-head vx-mhead">
+            <button type="button" className="vx-mtoggle" aria-expanded={isOpen} onClick={() => setOpen((o) => ({ ...o, [m.month]: !isOpen }))}><span className="cx-month-name">{m.label}</span><span className="cx-month-meta">{m.list.length} voucher{m.list.length === 1 ? "" : "s"}</span><b className="cx-mono">{pesos(m.list.reduce((s, e) => s + Number(e.amount_centavos), 0))}</b><span aria-hidden="true" className="cx-month-caret">{isOpen ? "▾" : "▸"}</span></button>
+            <a className="portal-secondary vx-pdf" href={`/api/documents/expenses-summary?from=${m.month}-01&to=${m.month}-${String(last).padStart(2, "0")}`} target="_blank" rel="noreferrer">Summary PDF</a>
+          </div>
+          {isOpen && <div className="portal-table cx-cards vx-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Channel</th><th className="r">Amount</th><th>Status</th><th>Printing</th><th></th></tr></thead><tbody>
+            {m.list.map((e) => { const st = expenseState(e), p = voucherPrintState(e, reprints); return <tr key={e.id} className="vx-row" onClick={() => setSelected(e)}>
+              <td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher_number ?? e.expense_number}</span><small>{fmtDate(day(e.approved_at ?? e.created_at))}</small></td>
+              <td data-l="Payee"><strong>{e.payee}</strong><small>{e.category}</small></td>
+              <td data-l="Channel">{e.payment_channel || "—"}{e.reference_number ? <small className="cx-mono">{e.reference_number}</small> : null}</td>
+              <td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(e.amount_centavos)}</strong></td>
+              <td data-l="Status"><Badge tone={EXPENSE_TONE[st]}>{st === "Approved" ? "Awaiting release" : st}</Badge></td>
+              <td data-l="Printing"><span className={`vx-print ${p.state === "print" ? "no" : p.state === "pending" ? "wait" : "ok"}`}>{p.state === "print" ? (p.used ? "Reprint allowed" : "Not printed yet") : p.state === "pending" ? "Reprint awaiting approval" : p.used > 1 ? `✓ Printed ${p.used}×` : "✓ Printed"}</span></td>
+              <td data-l="" onClick={(ev) => ev.stopPropagation()}><div className="cx-acts">
+                {st === "Approved" && !isManager && <button type="button" className="portal-primary" onClick={() => setReleasing(e)}>Mark released</button>}
+                {printCell(e)}
+                <button type="button" className="portal-secondary" onClick={() => setSelected(e)}>Open</button>
+              </div></td>
+            </tr>; })}
+          </tbody></table></div>}
+        </section>; });
+      })()}
     </>}
 
+    {selected && <VoucherDrawer e={(data.expenses as ExpenseRow[]).find((x) => x.id === selected.id) ?? selected} reprints={reprints} isManager={isManager} reload={reload} onClose={() => setSelected(null)} onRelease={(x) => { setSelected(null); setReleasing(x); }} onRequestReprint={(x) => { setReprinting(x); setReason(""); }} />}
     {recording && <RecordExpenseModal data={data} onClose={() => setRecording(false)} post={post} />}
     {releasing && <ReleaseExpenseModal data={data} expense={releasing} onClose={() => setReleasing(null)} post={post} />}
     {rejecting && <Modal title={`Reject ${rejecting.expense_number}`} onClose={() => setRejecting(null)}>

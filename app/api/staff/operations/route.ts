@@ -93,6 +93,8 @@ const expenseReprintDecideInput = z.object({ action: z.literal("expense-reprint-
 const expenseReleaseInput = z.object({ action: z.literal("expense-release"), id: z.string().uuid(), paymentChannel: z.string().trim().min(1).max(40), referenceNumber: z.string().trim().max(80).optional().default("") });
 const cashierOpenInput = z.object({ action: z.literal("cashier-open"), openingCashCentavos: z.number().int().nonnegative(), remarks: z.string().trim().max(300).optional() });
 const balanceSummaryInput = z.object({ action: z.literal("balance-summary-send") });
+// The Accounting Manager marks a submitted cashier closing reviewed (8 Oct 2026).
+const closingReviewInput = z.object({ action: z.literal("cashier-closing-review"), id: z.string().uuid(), remarks: z.string().trim().max(300).optional() });
 const closingInput = z.object({ action: z.literal("cashier-close"), closingDate: z.string().date(), openingCashCentavos: z.number().int().nonnegative(), actualCashCentavos: z.number().int().nonnegative(), remarks: z.string().trim().max(500).optional().default("") });
 // Other charges + agency rebates posted to an enrollment ledger (enrollment_charges).
 // A charge adds to the amount due; a discount (rebate) subtracts. Both are append-only;
@@ -191,7 +193,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -668,9 +670,14 @@ export async function GET() {
     // Print counts (202610080020); ignored before it.
     const { data: prints } = await db.from("expenses").select("id,print_count,reprints_approved").in("id", ex.map((r) => (r as { id: string }).id));
     const printsById = new Map((prints ?? []).map((r) => [(r as { id: string }).id, r]));
-    const rows = ex.map((r) => ({ ...r, ...(flowById.get((r as { id: string }).id) ?? {}), ...(printsById.get((r as { id: string }).id) ?? {}) })) as { id: string }[];
-    // Resolve the requester's display name so the voucher list can show who raised it.
-    const ids = [...new Set(ex.map((r) => (r as { requested_by?: string }).requested_by).filter(Boolean))] as string[];
+    // Voucher lines and supporting document (202610080019); who approved and released (202610070018). Ignored before them.
+    const { data: lines } = await db.from("expenses").select("id,line_items,supporting_document").in("id", ex.map((r) => (r as { id: string }).id));
+    const linesById = new Map((lines ?? []).map((r) => [(r as { id: string }).id, r]));
+    const { data: people2 } = await db.from("expenses").select("id,approved_by,released_by").in("id", ex.map((r) => (r as { id: string }).id));
+    const peopleById = new Map((people2 ?? []).map((r) => [(r as { id: string }).id, r]));
+    const rows = ex.map((r) => ({ ...r, ...(flowById.get((r as { id: string }).id) ?? {}), ...(printsById.get((r as { id: string }).id) ?? {}), ...(linesById.get((r as { id: string }).id) ?? {}), ...(peopleById.get((r as { id: string }).id) ?? {}) })) as { id: string }[];
+    // Display names for who raised, approved and released each voucher.
+    const ids = [...new Set(rows.flatMap((r) => { const x = r as { requested_by?: string; approved_by?: string; released_by?: string }; return [x.requested_by, x.approved_by, x.released_by]; }).filter(Boolean))] as string[];
     if (!ids.length) return { rows, names: new Map<string, string>() };
     const { data: people } = await db.from("profiles").select("id,complete_name").in("id", ids);
     return { rows, names: new Map((people ?? []).map((p) => [p.id as string, p.complete_name as string])) };
@@ -861,8 +868,13 @@ export async function GET() {
   const expensesMerged = ((expenses.data ?? []) as Record<string, unknown>[]).map((e) => {
     const id = (e as { id: string }).id;
     const merged = { ...e, ...(expenseExtraById.get(id) ?? {}) } as Record<string, unknown> & { requested_by?: string };
-    return { ...merged, requested_by_name: expenseExtras.names.get(merged.requested_by ?? "") ?? null };
+    const m = merged as typeof merged & { approved_by?: string; released_by?: string };
+    return { ...merged, requested_by_name: expenseExtras.names.get(merged.requested_by ?? "") ?? null, approved_by_name: expenseExtras.names.get(m.approved_by ?? "") ?? null, released_by_name: expenseExtras.names.get(m.released_by ?? "") ?? null };
   });
+
+  // Receipt prints per payment (202610080026); {} before it.
+  const receiptPrints: Record<string, number> = {};
+  { const { data: rp } = await db.from("receipts").select("payment_id,print_count").gt("print_count", 0).order("issued_at", { ascending: false }).limit(2000); for (const r of (rp ?? []) as { payment_id: string; print_count: number }[]) receiptPrints[r.payment_id] = r.print_count; }
 
   // Referral agency per enrollment (202610080023); {} before it.
   const referralByEnrollment: Record<string, string> = {};
@@ -887,7 +899,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -1074,6 +1086,16 @@ export async function POST(request: Request) {
       const result = await sendBalanceSummary(createSupabaseAdminClient(), { origin: new URL(request.url).origin, manual: true });
       if (!result.configured) return NextResponse.json({ error: "Email is not set up yet (RESEND_API_KEY and EMAIL_FROM)." }, { status: 400 });
       return NextResponse.json({ ok: true, ...result });
+    }
+    if (input.action === "cashier-closing-review") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only the Accounting Manager can review closings." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const now = new Date().toISOString();
+      const { data: done, error } = await admin.from("cashier_closings").update({ status: "Reviewed", reviewed_by: staff.user.id, reviewed_at: now }).eq("id", input.id).eq("status", "Submitted").select("id");
+      if (error) throw error;
+      if (!done?.length) return NextResponse.json({ error: "This closing was already reviewed or is not submitted yet." }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "accounting", action: "cashier_closing.reviewed", record_type: "cashier_closing", record_id: input.id, new_values: { reviewed_at: now }, reason: input.remarks || null });
+      return NextResponse.json({ ok: true });
     }
     if (input.action === "cashier-close") {
       if (!staff.roleCodes.some((role) => ["admin", "cashier", "accounting"].includes(role))) return NextResponse.json({ error: "Your account cannot submit a cashier closing." }, { status: 403 });

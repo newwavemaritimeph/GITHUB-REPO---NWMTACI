@@ -20,6 +20,7 @@ import { Badge, Message, Modal, Page, PageHead, submit, fullName } from "./porta
 import { classroomJoin } from "@/lib/classroom";
 import { ClassroomPanel } from "./portal/classroom-panel";
 import { TraineeRequestModal, type RequestType } from "./portal/payment-actions";
+import { AccountingHome, AccountingApprovals, AccountingReports } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, first, dueCentavos, balanceOf, isUnpaid, manilaToday, addDays } from "@/lib/portal-format";
@@ -73,6 +74,7 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   classroomCourseIds?:Record<string,string>;
   classroomInvites?:Record<string,{state:string;email:string;error:string|null;created_at:string}>;
   referralByEnrollment?:Record<string,string>;
+  receiptPrints?:Record<string,number>;
   expenseReprints?:{id:string;expense_id:string;reason:string;status:string;requested_by_name:string|null;requested_at:string;decision_remarks:string|null}[];
   // Change Course / Rescheduling fee collection per pending request id (approval waits for payment).
   chargeCollected?:Record<string,{amount:number;collected:number;paid:boolean}>;
@@ -115,7 +117,8 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses,
   // Report (with opening and closing), Requests (CASHIER_TABS).
   cashier: ["Dashboard","Search trainee","Payments","Expenses","Report","Requests"],
-  // accounting is deliberately absent: an absent key keeps the legacy nav.
+  // Accounting Manager (owner, 8 Oct 2026): Dashboard · Approvals · Reports · Money ▾ · Configuration ▾ (ACCOUNTING_TABS).
+  accounting: ["Dashboard","Approvals","Reports","Payments","Expenses","Receivables","Payables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
 };
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
@@ -149,7 +152,15 @@ const CASHIER_TABS:TopTab[]=[
   {label:"Accounting",items:["Payments","Expenses","Report","Requests"]},
 ];
 const GROUP_LABELS:Partial<Record<NavGroup,string>>={"Payables & cash":"Payables and cash"};
+const ACCOUNTING_TABS:TopTab[]=[
+  {label:"Dashboard",items:["Dashboard"]},
+  {label:"Approvals",items:["Approvals"]},
+  {label:"Reports",items:["Reports"]},
+  {label:"Money",items:["Payments","Expenses","Receivables","Payables","Cash position"]},
+  {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS]},
+];
 function topTabsFor(role:string,allowed:Module[]):TopTab[]{
+  if(role==="accounting")return ACCOUNTING_TABS.map(tab=>({...tab,items:tab.items.filter(item=>allowed.includes(item))})).filter(tab=>tab.items.length);
   if(role==="cashier")return CASHIER_TABS.map(tab=>({...tab,items:tab.items.filter(item=>allowed.includes(item))})).filter(tab=>tab.items.length);
   const tabs:TopTab[]=[];
   for(const group of NAV_GROUPS){
@@ -290,6 +301,11 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Trainee scheduling")return <TraineeScheduling data={data} reload={reload}/>;
   if(active==="Instructor assignment")return <InstructorAssignmentScreen data={data} role={gateRole} reload={reload}/>;
   if(active==="Schedule changes")return <ScheduleChanges data={data}/>;
+  if(gateRole==="accounting"){
+    if(active==="Dashboard")return <AccountingHome data={data} reload={reload} go={m=>go(m as Module)}/>;
+    if(active==="Approvals")return <div className="portal-page cx ac"><div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Approvals</h1></div></div><AccountingApprovals data={data} reload={reload}/><p className="ac-note">Change requests such as cancellations and reschedules are applied automatically once their fee is paid, so they do not wait here.</p></div>;
+    if(active==="Reports")return <AccountingReports/>;
+  }
   if(gateRole==="cashier"){
     if(active==="Dashboard")return <CashierDashboard data={data} onPay={onPay} reload={reload}/>;
     if(active==="Search trainee")return <CashierEnrollments data={data} onPay={onPay} reload={reload}/>;

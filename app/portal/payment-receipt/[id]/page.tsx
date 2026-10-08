@@ -45,6 +45,12 @@ export default async function PaymentReceiptPage({ params }: { params: Promise<{
   ]);
   const t = traineeRes.data;
   if (!t) notFound();
+  // Two prints per receipt (202610080026); not limited before that update.
+  const { error: printError } = await db.rpc("record_receipt_print", { target_payment: id });
+  if (printError && !/record_receipt_print|does not exist|schema cache/i.test(printError.message)) {
+    return <main style={{ font: "16px/1.5 system-ui, sans-serif", color: "#123F63", padding: 32, maxWidth: 560 }}><h1 style={{ fontSize: 22 }}>Acknowledgement receipt</h1><p>{printError.message}</p><p style={{ color: "#5f7180" }}>Close this tab to go back to the portal.</p></main>;
+  }
+  if (!printError) await db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("cashier") ? "cashier" : staff.roleCodes[0] ?? null, action: "receipt.printed", record_type: "payment", record_id: id, new_values: { receipt: receiptRes.data?.receipt_number ?? null } });
   const enrollmentIds = (allocRes.data ?? []).map((a) => a.enrollment_id as string);
 
   // Each enrollment this payment covers, with its balance after all valid payments.

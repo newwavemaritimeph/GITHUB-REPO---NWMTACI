@@ -1590,3 +1590,100 @@ button.rd-row:hover { background: #f6fafc; }
 @media (max-width:520px){.portal-shell .rp-cash{grid-template-columns:repeat(2,minmax(0,1fr))}.portal-shell .rp-cash>div{border-bottom:1px solid #dbe5ec}.portal-shell .rp-cash>div:nth-child(odd){border-right:1px solid #dbe5ec}.portal-shell .rp-cash>div:nth-child(even){border-right:0}}
 .portal-shell .ref-code{font-size:16px;letter-spacing:.04em;color:#123F63}
 .portal-shell .ref-chip{display:inline-block;margin-top:4px;font-size:12.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:#e5f1fb;color:#0571D0}
+
+/* Expenses › Vouchers, improved (8 Oct 2026) */
+.portal-shell .vx-filters{flex-wrap:wrap;gap:10px}
+.portal-shell .vx-filters .cx-seg small{font:600 12px var(--font-num,monospace);opacity:.7;margin-left:6px}
+.portal-shell .vx-search{flex:1;min-width:220px}
+.portal-shell .vx-mhead{display:flex;align-items:center;gap:12px;padding:0 20px 0 0}
+.portal-shell .vx-mtoggle{display:flex;align-items:center;gap:16px;flex:1;min-width:0;padding:16px 20px;background:none;border:0;font:inherit;color:inherit;text-align:left;cursor:pointer}
+.portal-shell .vx-mtoggle b{margin-left:auto;font-size:17px;color:#123F63}
+.portal-shell .vx-pdf{padding:7px 12px;font-size:14.5px;white-space:nowrap}
+.portal-shell .vx-table th,.portal-shell .vx-table td{padding-left:20px;padding-right:20px}
+.portal-shell .vx-row{cursor:pointer}
+.portal-shell .vx-row:hover td{background:#f4f8fb}
+.portal-shell .vx-print{font-size:14.5px;font-weight:600;white-space:nowrap}
+.portal-shell .vx-print.ok{color:#0a7a3e}
+.portal-shell .vx-print.no{color:#5f7180}
+.portal-shell .vx-print.wait{color:#a2470b}
+.portal-shell .vx-drawer{position:fixed;inset:0;background:rgba(11,26,38,.55);display:flex;justify-content:flex-end;z-index:60}
+.portal-shell .vx-panel{background:#fff;width:min(560px,100%);height:100%;overflow:auto;display:flex;flex-direction:column;box-shadow:-20px 0 50px rgba(0,0,0,.25)}
+.portal-shell .vx-dh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:20px 22px;border-bottom:1px solid #dbe5ec}
+.portal-shell .vx-dh h2{font-size:22px;margin:2px 0 6px}
+.portal-shell .vx-x{background:none;border:0;font-size:26px;line-height:1;color:#5f7180;cursor:pointer}
+.portal-shell .vx-db{padding:18px 22px;display:grid;gap:16px}
+.portal-shell .vx-kv{display:grid;grid-template-columns:1fr 1fr;gap:12px 18px;margin:0}
+.portal-shell .vx-kv dt{font-size:12.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:#5f7180}
+.portal-shell .vx-kv dd{margin:2px 0 0;font-weight:600;overflow-wrap:anywhere}
+.portal-shell .vx-lines{border:1px solid #dbe5ec;border-radius:12px;overflow:hidden}
+.portal-shell .vx-lines table{width:100%;border-collapse:collapse}
+.portal-shell .vx-lines th,.portal-shell .vx-lines td{padding:10px 14px;border-bottom:1px solid #eef3f6;text-align:left}
+.portal-shell .vx-lines th.r,.portal-shell .vx-lines td.r{text-align:right}
+.portal-shell .vx-lines tfoot td{background:#eef6fb;font-weight:700;border-bottom:0}
+.portal-shell .vx-words{margin:-6px 0 0;color:#5f7180;font-size:14.5px}
+.portal-shell .vx-tl{list-style:none;margin:8px 0 0;padding:0}
+.portal-shell .vx-tl li{display:grid;grid-template-columns:22px 1fr;gap:10px;padding-bottom:14px;position:relative}
+.portal-shell .vx-tl li::before{content:"";position:absolute;left:10px;top:22px;bottom:0;width:2px;background:#dbe5ec}
+.portal-shell .vx-tl li:last-child::before{display:none}
+.portal-shell .vx-tl i{width:22px;height:22px;border-radius:50%;background:#0a7a3e;color:#fff;display:grid;place-items:center;font:700 12px sans-serif;font-style:normal}
+.portal-shell .vx-tl li.todo i{background:#eef4f8;border:2px solid #dbe5ec}
+.portal-shell .vx-tl small{display:block;color:#5f7180}
+.portal-shell .vx-df{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;padding:16px 22px;border-top:1px solid #dbe5ec}
+@media (max-width:640px){.portal-shell .vx-kv{grid-template-columns:1fr}.portal-shell .vx-search{min-width:0;width:100%}.portal-shell .vx-mhead{flex-wrap:wrap;padding:0 16px 12px 0}}
+
+/* Accounting Manager module (8 Oct 2026) */
+.portal-shell .ac-day{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #dbe5ec;border-radius:12px;padding:4px}
+.portal-shell .ac-day button{border:0;background:none;font:600 18px inherit;width:36px;height:36px;border-radius:9px;cursor:pointer;color:#0f2638}
+.portal-shell .ac-day button:hover:not(:disabled){background:#eef4f8}
+.portal-shell .ac-day button:disabled{opacity:.35;cursor:default}
+.portal-shell .ac-day input{border:0;width:auto}
+.portal-shell .ac-note{color:#5f7180;margin:-4px 0 4px}
+.portal-shell .ac-sec{font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#5f7180;margin:8px 2px -4px}
+.portal-shell .ac-tabs{display:flex;gap:4px;border-bottom:1px solid #dbe5ec;padding:0 12px;overflow-x:auto}
+.portal-shell .ac-tabs button{border:0;background:none;font-size:16px;font-weight:500;color:#5f7180;padding:12px 14px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:center}
+.portal-shell .ac-tabs button.on{color:#0571D0;border-bottom-color:#0571D0;font-weight:600}
+.portal-shell .ac-tabs button span{font:600 12px var(--font-num,monospace);background:#fdf0e5;color:#a2470b;border-radius:10px;padding:1px 8px}
+.portal-shell .ac-tabs button span.zero{background:#eef4f8;color:#5f7180}
+.portal-shell .ac-table th,.portal-shell .ac-table td{padding-left:20px;padding-right:20px}
+.portal-shell .ac-tiles{grid-template-columns:repeat(5,minmax(0,1fr))}
+.portal-shell .ac-total{background:#123F63;color:#fff;--c:#F25615}
+.portal-shell .ac-total span,.portal-shell .ac-total small{color:#c3dbea}
+.portal-shell .ac-total b{color:#fff}
+.portal-shell .ac-split{display:flex;gap:18px;flex-wrap:wrap;color:#5f7180;margin:-4px 2px 0}
+.portal-shell .ac-split b{color:#0f2638}
+.portal-shell .ac-grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.portal-shell .ac-grid2>*{min-width:0}
+.portal-shell .ac-sum{display:grid;grid-template-columns:1fr 1fr;margin:0}
+.portal-shell .ac-sum>div{padding:14px 20px;border-top:1px solid #dbe5ec}
+.portal-shell .ac-sum>div:nth-child(odd){border-right:1px solid #dbe5ec}
+.portal-shell .ac-sum dt{font-size:14px;color:#5f7180}
+.portal-shell .ac-sum dd{margin:2px 0 0;font:600 20px var(--font-num,monospace);color:#0f2638;overflow-wrap:anywhere}
+.portal-shell .ac-sum small{color:#5f7180;font-size:13px}
+.portal-shell .ac-sum .eq{background:#eef6fb}
+.portal-shell .ac-sum .plus dd{color:#0a7a3e}.portal-shell .ac-sum .minus dd,.portal-shell .ac-sum dd.bad{color:#b42318}.portal-shell .ac-sum dd.warn{color:#a2470b}
+.portal-shell .ac-more{padding:12px 20px;border-top:1px solid #dbe5ec}
+.portal-shell .ac-more button{background:none;border:0;color:#0571D0;font-weight:600;font-size:15px;cursor:pointer;padding:0}
+.portal-shell .ac-controls{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+.portal-shell .ac-up{color:#0a7a3e;font-weight:600}.portal-shell .ac-down{color:#b42318;font-weight:600}
+.portal-shell .ac-insights{margin:0;padding:6px 20px 16px;display:grid;gap:8px;list-style:none}
+.portal-shell .ac-insights li{position:relative;padding-left:18px;font-size:15.5px;line-height:1.5}
+.portal-shell .ac-insights li::before{content:"";position:absolute;left:0;top:9px;width:8px;height:8px;border-radius:50%;background:#0571D0}
+.portal-shell .ch{padding:12px 16px 16px}
+.portal-shell .ch svg{width:100%;height:auto;display:block}
+.portal-shell .ch-grid{stroke:#e3ecf0}
+.portal-shell .ch-axis{font-size:11px;fill:#5f7180}
+.portal-shell .ch-big{font:600 15px var(--font-num,monospace);fill:#0f2638}
+.portal-shell .ch-track{stroke:#eef4f8}
+.portal-shell .ch-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:#5f7180;padding-top:6px}
+.portal-shell .ch-legend i,.portal-shell .ch-donut i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.portal-shell .ch-donut{display:flex;gap:18px;align-items:center;flex-wrap:wrap}
+.portal-shell .ch-donut svg{max-width:180px}
+.portal-shell .ch-donut ul{list-style:none;margin:0;padding:0;display:grid;gap:8px;flex:1;min-width:160px}
+.portal-shell .ch-donut li{display:flex;justify-content:space-between;gap:8px;font-size:15px}
+.portal-shell .ch-hbars{display:grid;gap:12px}
+.portal-shell .ch-hrow{display:flex;justify-content:space-between;gap:8px;font-size:15px}
+.portal-shell .ch-hrow b{font-family:var(--font-num,monospace)}
+.portal-shell .ch-hbar{height:10px;background:#eef4f8;border-radius:6px;margin-top:4px;overflow:hidden}
+.portal-shell .ch-hbar div{height:100%;border-radius:6px}
+@media (max-width:980px){.portal-shell .ac-tiles{grid-template-columns:repeat(3,minmax(0,1fr))}.portal-shell .ac-grid2{grid-template-columns:1fr}}
+@media (max-width:560px){.portal-shell .ac-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.portal-shell .ac-total{grid-column:1/-1}.portal-shell .ac-sum{grid-template-columns:1fr}.portal-shell .ac-sum>div:nth-child(odd){border-right:0}}
