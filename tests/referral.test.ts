@@ -42,3 +42,21 @@ describe("rebate as a percentage of the training fee", () => {
     expect(referralRebate({ percent: null, inHouse: true, feeCentavos: 130000, matrixCentavos: 30000 })).toBe(30000);
   });
 });
+
+import { rebateRowsProblem, isStcwRebateCourse } from "@/lib/rebates";
+describe("Rebates per Agency, Design 3", () => {
+  it("uses the fixed peso amount for the five STCW courses, the percentage for other In-House courses", () => {
+    expect(referralRebate({ percent: 50, inHouse: true, feeCentavos: 180000, matrixCentavos: 30000, courseCode: "UBT-PSSR" })).toBe(30000);
+    expect(referralRebate({ percent: 50, inHouse: true, feeCentavos: 250000, matrixCentavos: 0, courseCode: "ccmd" })).toBe(0);
+    expect(referralRebate({ percent: 20, inHouse: true, feeCentavos: 150000, matrixCentavos: 30000, courseCode: "HPT" })).toBe(30000);
+    expect(isStcwRebateCourse("PSCMHBT")).toBe(true);
+    expect(isStcwRebateCourse("SFA")).toBe(false);
+  });
+  it("refuses a percentage outside 1–100 and an STCW rebate above the fee", () => {
+    const stcw = [{ courseId: "c", label: "BT-PSSR", feeCentavos: 180000, cents: 30000 }];
+    expect(rebateRowsProblem([{ name: "A", percent: 25, stcw }])).toBeNull();
+    expect(rebateRowsProblem([{ name: "A", percent: null, stcw }])).toBeNull();
+    expect(rebateRowsProblem([{ name: "A", percent: 120, stcw }])).toMatch(/1 to 100/);
+    expect(rebateRowsProblem([{ name: "A", percent: 10, stcw: [{ ...stcw[0], cents: 200000 }] }])).toMatch(/more than its training fee/);
+  });
+});

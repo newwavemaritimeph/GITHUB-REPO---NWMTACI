@@ -14,6 +14,7 @@ import { activeConnection, googleConfigured, hasDriveScope, inviteStudent, listC
 import { sendBalanceSummary } from "@/lib/balance-summary";
 import { RULED_REQUESTS, requestFee } from "@/lib/request-fees";
 import { applyReferralRebates, suggestReferralCode } from "@/lib/referral";
+import { isStcwRebateCourse } from "@/lib/rebates";
 import { certificateContext, claimCertificateNumber, downloadDriveFile, ensureCertificate, trySendSoftCopy } from "@/lib/certificates";
 import { driveFileId, googleFormId, isStcwCategory, canSetSeries } from "@/lib/certificate-rules";
 
@@ -83,6 +84,8 @@ const chargeInput = z.object({ action: z.literal("charge-save"), id: z.string().
 const expenseCategoryInput = z.object({ action: z.literal("expense-category-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), active: z.boolean().optional(), remove: z.boolean().optional() });
 const inventoryItemInput = z.object({ action: z.literal("inventory-item-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), category: z.string().trim().max(80).optional(), unit: z.string().trim().min(1).max(24).default("pc"), unitValueCentavos: z.number().int().nonnegative().default(0), active: z.boolean().optional(), remove: z.boolean().optional() });
 const inventoryMoveInput = z.object({ action: z.literal("inventory-move"), itemId: z.string().uuid(), movementType: z.enum(["in", "out"]), quantity: z.number().int().positive(), remarks: z.string().trim().max(240).optional() });
+// Rebates per Agency, Design 3 (owner, 9 Oct 2026): every partner's % for In-House courses and fixed STCW amounts, saved together.
+const partnerRebatesInput = z.object({ action: z.literal("partner-rebates-save"), rows: z.array(z.object({ agencyId: z.string().uuid(), percent: z.number().gt(0).max(100).nullable(), mode: z.enum(["Deducted", "No deduction"]), stcw: z.array(z.object({ courseId: z.string().uuid(), cents: z.number().int().min(0) })).max(10) })).min(1).max(200) });
 const agencyCodeInput = z.object({ action: z.literal("agency-code-regenerate"), id: z.string().uuid() });
 const agencyInput = z.object({ action: z.literal("agency-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), kind: z.enum(["Agency", "Consultancy"]).optional(), rebateMode: z.enum(["Deducted", "No deduction"]).optional(), rebatePercent: z.number().gt(0).max(100).nullable().optional(), contactName: z.string().trim().max(120).optional(), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
 const payableMarkPaidInput = z.object({ action: z.literal("payable-mark-paid"), id: z.string().uuid() });
@@ -237,7 +240,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -1134,6 +1137,43 @@ export async function POST(request: Request) {
       const { data, error } = await db.rpc("record_inventory_movement", { target_item: input.itemId, target_type: input.movementType, target_quantity: input.quantity, target_remarks: input.remarks ?? null });
       if (error) throw error;
       return NextResponse.json({ ok: true, item: data });
+    }
+    if (input.action === "partner-rebates-save") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or the Admin can set rebates." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const agencyIds = input.rows.map((r) => r.agencyId);
+      const courseIds = [...new Set(input.rows.flatMap((r) => r.stcw.map((x) => x.courseId)))];
+      const [{ data: agencies, error: agencyError }, { data: courses }, { data: prior }] = await Promise.all([
+        admin.from("marketing_agencies").select("id,name,rebate_percent,rebate_mode").in("id", agencyIds),
+        courseIds.length ? admin.from("courses").select("id,code,standard_price_centavos").in("id", courseIds) : Promise.resolve({ data: [] as { id: string; code: string; standard_price_centavos: number }[] }),
+        admin.from("agency_course_rebates").select("agency_id,course_id,rebate_centavos").in("agency_id", agencyIds),
+      ]);
+      if (agencyError) throw agencyError;
+      const byId = new Map((agencies ?? []).map((a) => [a.id as string, a]));
+      const courseById = new Map((courses ?? []).map((c) => [c.id as string, c]));
+      for (const r of input.rows) {
+        if (!byId.has(r.agencyId)) return NextResponse.json({ error: "A partner in the list no longer exists. Reload and try again." }, { status: 400 });
+        for (const x of r.stcw) {
+          const c = courseById.get(x.courseId);
+          if (!c || !isStcwRebateCourse(c.code as string)) return NextResponse.json({ error: "Fixed amounts are only for BT-PSSR, Safety, Crowd, Crisis and CCM Domestic." }, { status: 400 });
+          if (x.cents > Number(c.standard_price_centavos)) return NextResponse.json({ error: `The ${c.code} rebate for ${byId.get(r.agencyId)?.name} cannot be more than its training fee.` }, { status: 400 });
+        }
+      }
+      const priorMap = new Map((prior ?? []).map((p) => [`${p.agency_id}:${p.course_id}`, Number(p.rebate_centavos)]));
+      const now = new Date().toISOString();
+      for (const r of input.rows) {
+        const a = byId.get(r.agencyId)!;
+        const { error } = await admin.from("marketing_agencies").update({ rebate_percent: r.percent, rebate_mode: r.mode }).eq("id", r.agencyId);
+        if (error) return NextResponse.json({ error: /rebate_percent|rebate_mode/i.test(error.message) ? "Apply database updates 202610080024 and 202610080025 first." : error.message }, { status: 400 });
+        if (r.stcw.length) {
+          const { error: matrixError } = await admin.from("agency_course_rebates").upsert(r.stcw.map((x) => ({ agency_id: r.agencyId, course_id: x.courseId, rebate_centavos: x.cents, updated_by: staff.user.id, updated_at: now })), { onConflict: "agency_id,course_id" });
+          if (matrixError) throw matrixError;
+        }
+        await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("accounting") ? "accounting" : "admin", action: "agency.rebates_set", record_type: "marketing_agency", record_id: r.agencyId,
+          prior_values: { rebate_percent: a.rebate_percent ?? null, rebate_mode: a.rebate_mode ?? null, stcw: Object.fromEntries(r.stcw.map((x) => [courseById.get(x.courseId)?.code, priorMap.get(`${r.agencyId}:${x.courseId}`) ?? 0])) },
+          new_values: { rebate_percent: r.percent, rebate_mode: r.mode, stcw: Object.fromEntries(r.stcw.map((x) => [courseById.get(x.courseId)?.code, x.cents])) } });
+      }
+      return NextResponse.json({ ok: true, saved: input.rows.length });
     }
     if (input.action === "agency-save") {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage agencies." }, { status: 403 });

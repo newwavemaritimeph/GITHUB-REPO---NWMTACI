@@ -5,6 +5,7 @@ import { parseCsv, downloadCsv } from "@/lib/csv";
 import { pesos, first as one, dueCentavos as dueOf } from "@/lib/portal-format";
 import { LiveCashierClosing, type ClosingData } from "./live-cashier-closing";
 import { tcl } from "@/lib/title-case";
+import { REBATE_PRESETS, STCW_REBATE_COURSES, rebateRowsProblem } from "@/lib/rebates";
 
 /** Loose shapes for the accounting slices of the staff-operations payload. */
 type Payment = { payment_number?: string; method: string; receiving_account?: string | null; amount_centavos: number; reference_number?: string | null; received_at?: string; verification_state: string; trainee_id?: string };
@@ -1383,38 +1384,51 @@ export type AccountingConfigSection = (typeof ACCOUNTING_CONFIG_SECTIONS)[number
  * Payment channels, course fees, charges and user accounts live in Admin.
  */
 /**
- * Rebates per agency (owner's ruling, 8 Oct 2026): one table of partners. The
- * rebate is a percentage of the actual training fee on New Wave in-house
- * courses (50% by default), either deducted from the trainee's payment or paid
- * to the partner later.
+ * Rebates per Agency, Design 3 (owner, 9 Oct 2026): one matrix of every active
+ * partner. In-House courses: 10%, 20%, 30% or 50% of the actual training fee, or
+ * another percentage. BT-PSSR, Safety, Crowd, Crisis and CCM Domestic: a fixed
+ * peso amount per partner (blank = no rebate). Changes are saved together.
  */
-function PartnerRebates({ agencies, busy, post }: { agencies: (Agency & { kind?: string | null; rebate_mode?: string | null; rebate_percent?: number | null })[]; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
-  const [edit, setEdit] = useState<{ id: string; name: string; percent: string; mode: string } | null>(null);
-  const [error, setError] = useState("");
-  const list = agencies.filter((a) => a.active);
+type RebateDraft = { id: string; name: string; kind: string; percent: number | null; mode: string; stcw: Record<string, string> };
+function PartnerRebates({ data, busy, post }: { data: AccountingData; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
+  const agencies = (data.agencies as (Agency & { kind?: string | null; rebate_mode?: string | null; rebate_percent?: number | null })[]).filter((a) => a.active);
+  const stcw = STCW_REBATE_COURSES.map(([code, label]) => ({ code, label, course: data.courses.find((c) => c.code.toUpperCase() === code) ?? null })).filter((x) => x.course);
+  const saved = (): RebateDraft[] => agencies.map((a) => ({ id: a.id, name: a.name, kind: a.kind || "Agency", percent: a.rebate_percent == null ? null : Number(a.rebate_percent), mode: a.rebate_mode === "No deduction" ? "No deduction" : "Deducted",
+    stcw: Object.fromEntries(stcw.map((s) => { const v = data.agencyCourseRebates.find((r) => r.agency_id === a.id && r.course_id === s.course!.id)?.rebate_centavos ?? 0; return [s.course!.id, v ? (v / 100).toFixed(2) : ""]; })) }));
+  const [draft, setDraft] = useState<RebateDraft[] | null>(null);
+  const [problem, setProblem] = useState(""), [done, setDone] = useState("");
+  const base = saved(), rows = draft ?? base;
+  const key = (r: RebateDraft) => JSON.stringify([r.percent, r.mode, r.stcw]);
+  const dirty = rows.filter((r, i) => base[i] && key(r) !== key(base[i]));
+  const set = (i: number, patch: Partial<RebateDraft>) => { setDone(""); setProblem(""); setDraft(rows.map((r, j) => (j === i ? { ...r, ...patch } : r))); };
+  const cents = (v: string) => Math.round((Number(v) || 0) * 100);
   async function save() {
-    if (!edit) return;
-    const pct = Number(edit.percent);
-    if (!Number.isFinite(pct) || pct <= 0 || pct > 100) { setError("Enter a percentage from 1 to 100."); return; }
-    await post({ action: "agency-save", id: edit.id, name: edit.name, rebatePercent: pct, rebateMode: edit.mode });
-    setEdit(null);
+    const check = rebateRowsProblem(dirty.map((r) => ({ name: r.name, percent: r.percent, stcw: stcw.map((s) => ({ courseId: s.course!.id, label: s.label, feeCentavos: Number(s.course!.standard_price_centavos), cents: cents(r.stcw[s.course!.id] ?? "") })) })));
+    if (check) { setProblem(check); return; }
+    try {
+      await post({ action: "partner-rebates-save", rows: dirty.map((r) => ({ agencyId: r.id, percent: r.percent, mode: r.mode, stcw: stcw.map((s) => ({ courseId: s.course!.id, cents: cents(r.stcw[s.course!.id] ?? "") })) })) });
+      setDone(`Saved ${dirty.length} partner${dirty.length === 1 ? "" : "s"}.`); setDraft(null);
+    } catch { /* the page shows the error */ }
   }
-  return <section className="portal-panel cx-panel">
-    <div className="panel-heading"><h2>Rebates per Agency</h2><span className="muted-text">In-house courses · % of the actual training fee</span></div>
-    {list.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Partner</th><th>Type</th><th className="r">Rebate</th><th>How It Is Given</th><th></th></tr></thead><tbody>
-      {list.map((a) => { const pct = Number(a.rebate_percent ?? 50), noDeduction = a.rebate_mode === "No deduction"; return <tr key={a.id}>
-        <td data-l="" className="lead"><span className="cx-name">{a.name}</span></td>
-        <td data-l="Type">{a.kind || "Agency"}</td>
-        <td data-l="Rebate" className="r"><strong className="cx-mono">{pct}%</strong><small>₱1,000 fee → {pesos(Math.round(100000 * pct / 100))}</small></td>
-        <td data-l="How it is given">{noDeduction ? "Paid to the partner later" : "Deducted from the trainee's payment"}</td>
-        <td data-l=""><div className="cx-acts"><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setError(""); setEdit({ id: a.id, name: a.name, percent: String(pct), mode: noDeduction ? "No deduction" : "Deducted" }); }}>Edit</button></div></td>
-      </tr>; })}
-    </tbody></table></div> : <p className="portal-empty-copy">Add a partner in Configuration › Partners; it starts at 50%.</p>}
-    {edit && <EditModal title="Edit Rebate" subtitle={edit.name} busy={busy} onClose={() => setEdit(null)} onSave={save}>
-      {error && <div className="portal-message error full">{error}</div>}
-      <label>Rebate (% of the Training Fee)<input autoFocus type="number" min="1" max="100" step="0.5" value={edit.percent} onChange={(e) => setEdit({ ...edit, percent: e.target.value })} /></label>
-      <label>How It Is Given<select value={edit.mode} onChange={(e) => setEdit({ ...edit, mode: e.target.value })}><option value="Deducted">Deducted From the Trainee&apos;s Payment</option><option value="No deduction">Paid to the Partner Later</option></select></label>
-    </EditModal>}
+  if (!agencies.length) return <section className="portal-panel cx-panel"><p className="portal-empty-copy">Add a partner in Configuration › Partners first.</p></section>;
+  return <section className="portal-panel cx-panel rb3">
+    <div className="panel-heading"><h2>Rebates per Partner</h2><span className="muted-text">Change any cell, then Save Changes · a blank STCW cell gives no rebate</span></div>
+    {done && <div className="portal-message success">{done}</div>}
+    <div className="rb3-wrap"><table className="rb3-table"><thead><tr><th>Partner</th><th>In-House Courses<small>% of the training fee</small></th>
+      {stcw.map((s) => <th key={s.code} className="r">{s.label}<small>Fee {pesos(Number(s.course!.standard_price_centavos))}</small></th>)}<th>How It Is Given</th></tr></thead>
+      <tbody>{rows.map((r, i) => { const custom = r.percent != null && !(REBATE_PRESETS as readonly number[]).includes(r.percent); return <tr key={r.id} className={base[i] && key(r) !== key(base[i]) ? "dirty" : ""}>
+        <td><strong>{r.name}</strong><small>{r.kind}</small></td>
+        <td><div className="rb3-chips" role="radiogroup" aria-label={`In-House rebate for ${r.name}`}>
+          {REBATE_PRESETS.map((v) => <button key={v} type="button" role="radio" aria-checked={r.percent === v} className={r.percent === v ? "on" : ""} onClick={() => set(i, { percent: v })}>{v}%</button>)}
+          <label className={`rb3-other${custom ? " on" : ""}`}><input type="number" min="1" max="100" step="0.5" placeholder="Other" aria-label={`Other percentage for ${r.name}`} value={custom ? String(r.percent) : ""} onChange={(e) => set(i, { percent: e.target.value === "" ? (custom ? null : r.percent) : Number(e.target.value) })} />%</label>
+        </div>{r.percent == null && <small className="rb3-none">Not set</small>}</td>
+        {stcw.map((s) => <td key={s.code} className="r"><input className="rb3-amt" type="number" min="0" step="0.01" placeholder="—" aria-label={`${r.name} ${s.label} rebate`} value={r.stcw[s.course!.id] ?? ""} onChange={(e) => set(i, { stcw: { ...r.stcw, [s.course!.id]: e.target.value } })} /></td>)}
+        <td><select className="rb3-mode" value={r.mode} onChange={(e) => set(i, { mode: e.target.value })}><option value="Deducted">Deducted From Payment</option><option value="No deduction">Paid to the Partner Later</option></select></td>
+      </tr>; })}</tbody></table></div>
+    {problem && <div className="portal-message error">{problem}</div>}
+    <div className={`rb3-bar${dirty.length ? " on" : ""}`}><span>{dirty.length ? `${dirty.length} partner${dirty.length === 1 ? "" : "s"} changed` : "No changes"}</span>
+      <span className="cx-acts"><button type="button" className="portal-secondary" disabled={!dirty.length || busy} onClick={() => { setDraft(null); setProblem(""); }}>Discard</button><button type="button" className="portal-primary" disabled={!dirty.length || busy} onClick={() => void save()}>{busy ? "Saving…" : "Save Changes"}</button></span></div>
+    <p className="ac-note">Deducted: the trainee pays the fee less the rebate. Paid to the partner later: the trainee pays the full fee and the rebate goes to Payables › Agency Rebates. Accounting and the Admin edit the same settings; every change is recorded in the audit log.</p>
   </section>;
 }
 
@@ -1491,6 +1505,6 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
       onSubmit={(v, id) => post({ action: "requisition-item-save", id, name: String(v.name), unit: String(v.unit || "pc"), defaultCostCentavos: Math.round(Number(v.cost || 0) * 100) })}
       onArchive={(id, active, name) => void post({ action: "requisition-item-save", id, name, active: !active }).catch(() => undefined)}
       onRemove={(id) => void post({ action: "requisition-item-save", id, name: "x", remove: true }).catch(() => undefined)} removable />}
-    {section === "Rebates per agency" && <PartnerRebates agencies={data.agencies as (Agency & { kind?: string | null; rebate_mode?: string | null; rebate_percent?: number | null })[]} busy={busy} post={post} />}
+    {section === "Rebates per agency" && <PartnerRebates data={data} busy={busy} post={post} />}
   </div>;
 }

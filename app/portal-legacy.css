@@ -2124,3 +2124,25 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .ad-form .ad-void-actions{grid-column:1/-1}
 .nw-shell .ad-more{padding:0 20px 16px}
 @media (max-width:640px){.nw-shell .ad-notice{flex-direction:column;align-items:flex-start}.nw-shell .ad-grid{grid-template-columns:1fr}}
+
+/* Rebates per Agency, Design 3 (owner, 9 Oct 2026): matrix of partners, edited in place. */
+.nw-shell .rb3-wrap{overflow-x:auto;margin:0 20px 14px}
+.nw-shell .rb3-table{width:100%;border-collapse:collapse;font-size:14.5px}
+.nw-shell .rb3-table th{background:#123F63;color:#fff;font:600 11.5px var(--font-portal),sans-serif;letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:9px 10px;white-space:nowrap}
+.nw-shell .rb3-table th small{display:block;font-weight:500;text-transform:none;letter-spacing:0;opacity:.85}
+.nw-shell .rb3-table th.r,.nw-shell .rb3-table td.r{text-align:right}
+.nw-shell .rb3-table td{padding:9px 10px;border-bottom:1px solid #dbe5ec;vertical-align:middle}
+.nw-shell .rb3-table td small{display:block;color:#5f7180;font-size:12.5px}
+.nw-shell .rb3-table tr.dirty td{background:#e2effb}
+.nw-shell .rb3-chips{display:flex;gap:5px;align-items:center;flex-wrap:nowrap}
+.nw-shell .rb3-chips button{border:1px solid #dbe5ec;background:#fff;border-radius:99px;padding:4px 10px;font:600 13px var(--font-geist-mono),monospace;cursor:pointer;color:#0f2638}
+.nw-shell .rb3-chips button.on{background:#123F63;border-color:#123F63;color:#fff}
+.nw-shell .rb3-other{display:inline-flex;align-items:center;gap:2px;border:1px solid #dbe5ec;border-radius:99px;padding:1px 9px 1px 3px;font-size:13px}
+.nw-shell .rb3-other.on{border-color:#123F63;box-shadow:0 0 0 1px #123F63}
+.nw-shell .rb3-other input{width:60px;border:0;background:transparent;padding:4px 6px;text-align:right;font:inherit}
+.nw-shell .rb3-none{color:#b4480f!important;font-weight:600}
+.nw-shell .rb3-amt{width:104px;border:1px solid #dbe5ec;border-radius:9px;padding:7px 9px;text-align:right;font:500 14px var(--font-geist-mono),monospace}
+.nw-shell .rb3-mode{border:1px solid #dbe5ec;border-radius:9px;padding:7px 9px;font-size:14px;background:#fff}
+.nw-shell .rb3-bar{position:sticky;bottom:12px;margin:0 20px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #dbe5ec;background:#fff;border-radius:12px;padding:10px 14px;color:#5f7180;box-shadow:0 6px 20px rgba(6,20,32,.08)}
+.nw-shell .rb3-bar.on{border-color:#0571D0;color:#0f2638}
+.nw-shell .rb3 .portal-message{margin:0 20px 12px}
