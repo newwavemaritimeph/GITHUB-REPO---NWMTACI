@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/security";
 import { createMismoListPdf } from "@/lib/print/mismo-list";
@@ -23,7 +25,10 @@ export async function GET(request: Request) {
   const batches = day.batches.filter((b) => !batchId || b.id === batchId);
   if (!batches.length) return NextResponse.json({ error: "No STCW class on this day." }, { status: 404 });
 
-  const bytes = await createMismoListPdf(date, batches, list);
+  // Letterhead emblem and the name of the officer printing it (Prepared by).
+  const logo = await readFile(path.join(process.cwd(), "public", "new-wave-emblem.png")).then((b) => new Uint8Array(b)).catch(() => undefined);
+  const { data: me } = await db.from("profiles").select("complete_name").eq("id", staff.user.id).maybeSingle();
+  const bytes = await createMismoListPdf(date, batches, list, { logo, preparedBy: staff.roleCodes.includes("mismo_officer") ? (me?.complete_name as string | undefined) ?? null : null });
   await db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "mismo_officer", action: "report.exported", record_type: "mismo_list", record_id: `${date}:${batchId ?? "all"}`, new_values: { list } });
   return new Response(Buffer.from(bytes), { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="mismo-${list}-${date}.pdf"`, "cache-control": "no-store" } });
 }

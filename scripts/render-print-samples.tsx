@@ -179,8 +179,8 @@ const mismo = [{ id: "b1", batchNumber: "BCH-2026-002475", courseName: "Updating
   tr("2", "GARCIA", "Liza", "Marie", "1992-11-30", "SRN-2001983", "OS", 180000, 50000, 180000),
   tr("3", "FLORES", "Ken", null, "1993-03-27", "SRN-1901777", "Oiler", 180000, 180000, 180000),
   tr("4", "VILLAR", "Mark", "Santos", "1997-07-07", "SRN-2400112", "Wiper", 180000, 0, 0)] }];
-await save("12-mismo-final-list.pdf", "MARINA MISMO Final List (4:00 PM)", await createMismoListPdf("2026-10-12", mismo, "final"));
-await save("13-mismo-unsettled-11am.pdf", "Not Settled as of 11:00 AM (for the instructor)", await createMismoListPdf("2026-10-12", mismo, "unsettled"));
+await save("12-mismo-final-list.pdf", "MARINA MISMO Final List (4:00 PM)", await createMismoListPdf("2026-10-12", mismo, "final", { logo: logoBytes, preparedBy: "Ana Reyes" }));
+await save("13-mismo-unsettled-11am.pdf", "Not Settled as of 11:00 AM (for the instructor)", await createMismoListPdf("2026-10-12", mismo, "unsettled", { logo: logoBytes, preparedBy: "Ana Reyes" }));
 
 // ---- Payslip -----------------------------------------------------------------------
 await save("14-payslip.pdf", "Payslip", await createPayslipPdf({
