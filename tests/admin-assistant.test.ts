@@ -29,3 +29,23 @@ describe("resource planning", () => {
     expect(planIssues({ students: 5, startsOn: "2026-10-10", courseId: "c3", classroom: { capacity: 12 }, instructorId: null, accreditations: acc })).toEqual(["No instructor"]);
   });
 });
+
+import { planRows, rangesOverlap, isBlocking } from "@/lib/admin-assistant";
+describe("resource plan conflicts", () => {
+  const base = { courseName: "", students: 10, capacity: 24 };
+  const batches = [
+    { ...base, id: "a", batchNumber: "B1", courseId: "c1", courseCode: "UBT", startsOn: "2026-10-12", endsOn: "2026-10-12", classroomId: "r1", instructorId: "i1" },
+    { ...base, id: "b", batchNumber: "B2", courseId: "c2", courseCode: "CCMD", startsOn: "2026-10-12", endsOn: "2026-10-14", classroomId: "r1", instructorId: "i2" },
+    { ...base, id: "c", batchNumber: "B3", courseId: "c1", courseCode: "UBT", startsOn: "2026-10-15", endsOn: "2026-10-15", classroomId: "r1", instructorId: "i1" },
+  ];
+  const acc = [{ instructor_id: "i1", course_id: "c1", valid_until: null }, { instructor_id: "i2", course_id: "c2", valid_until: null }];
+  it("finds rooms booked twice on the same days", () => {
+    expect(rangesOverlap("2026-10-12", "2026-10-14", "2026-10-14", "2026-10-15")).toBe(true);
+    expect(rangesOverlap("2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15")).toBe(false);
+    const rows = planRows(batches, [{ id: "r1", name: "ROOM 101", capacity: 24 }], [{ id: "i1", complete_name: "Capt. A" }, { id: "i2", complete_name: "C/E B" }], acc);
+    expect(rows[0].roomClash?.id).toBe("b");
+    expect(rows[2].roomClash).toBeNull();
+    expect(rows[0].issues.some(isBlocking)).toBe(true);
+    expect(rows[2].issues).toEqual([]);
+  });
+});

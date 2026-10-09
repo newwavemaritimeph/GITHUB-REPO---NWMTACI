@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
-import { accreditationFor, planIssues, requisitionState, requisitionTotal, type Accreditation, type RequisitionLine, type RequisitionState } from "@/lib/admin-assistant";
+import { accreditationFor, isBlocking, planRows, rangesOverlap, requisitionState, requisitionTotal, type Accreditation, type PlanBatch, type PlanRow, type RequisitionLine, type RequisitionState } from "@/lib/admin-assistant";
 import { Badge, Message, fmtDate, usePost } from "./shared-ui";
 import { EXPENSE_REASONS, RejectInline } from "./reject-inline";
 import { CHANNELS, type Channel, type DaySummary, type ReconStatus } from "@/lib/reconciliation";
@@ -30,19 +30,15 @@ function Head({ title, children }: { title: string; children?: React.ReactNode }
   return <div className="cx-head"><div><span className="portal-eyebrow">Admin Assistant</span><h1>{title}</h1></div>{children}</div>;
 }
 
-/** Upcoming batches (not cancelled, not yet ended) with their planned room and instructor. */
-function upcoming(data: PortalData) {
+/** Upcoming batches (not cancelled, not yet ended) with their planned room, instructor and problems (shared rules). */
+function upcoming(data: PortalData): (PlanRow & { b: PortalData["batches"][number] })[] {
   const today = manilaToday();
   const plans = new Map((extra(data).batchResources ?? []).map((p) => [p.batch_id, p]));
-  const rooms = new Map(data.classrooms.map((c) => [c.id, c]));
-  const acc = extra(data).accreditations ?? [];
-  return data.batches.filter((b) => b.status !== "Cancelled" && b.ends_on >= today).sort((a, z) => a.starts_on.localeCompare(z.starts_on)).map((b) => {
-    const plan = plans.get(b.id);
-    const classroomId = plan?.classroom_id ?? (b as { classroom_id?: string | null }).classroom_id ?? null;
-    const room = classroomId ? rooms.get(classroomId) ?? null : null;
-    const issues = planIssues({ students: Number(b.confirmed_count ?? 0), startsOn: b.starts_on, courseId: b.course_id, classroom: room, instructorId: plan?.instructor_id ?? null, accreditations: acc });
-    return { b, plan, classroomId, room, issues };
-  });
+  const list = data.batches.filter((b) => b.status !== "Cancelled" && b.ends_on >= today).sort((a, z) => a.starts_on.localeCompare(z.starts_on));
+  const batches: PlanBatch[] = list.map((b) => { const c = first(b.courses); const plan = plans.get(b.id); return { id: b.id, batchNumber: b.batch_number, courseId: b.course_id, courseCode: c?.code ?? "—", courseName: c?.name ?? "", startsOn: b.starts_on, endsOn: b.ends_on, students: Number(b.confirmed_count ?? 0), capacity: Number(b.capacity ?? 24), classroomId: plan?.classroom_id ?? (b as { classroom_id?: string | null }).classroom_id ?? null, instructorId: plan?.instructor_id ?? null }; });
+  const rooms = data.classrooms.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name, capacity: Number(c.capacity) }));
+  const rows = planRows(batches, rooms, extra(data).instructors ?? [], extra(data).accreditations ?? []);
+  return rows.map((r, i) => ({ ...r, b: list[i] }));
 }
 
 export function AssistantDashboard({ data, go }: { data: PortalData; go: (m: string) => void }) {
@@ -140,29 +136,67 @@ export function AssistantRequisitions({ data, reload, canRaise, canDecide }: { d
   </div>;
 }
 
+/**
+ * Resource Planning (owner, 9 Oct 2026, design 3): batches with problems come
+ * first; pick one and choose its classroom and instructor from cards that show
+ * seats, accreditation and clashes with other batches on the same days.
+ */
 export function ResourcePlanning({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   const { busy, msg, post } = usePost(reload);
   const rows = upcoming(data);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [q, setQ] = useState("");
   const rooms = data.classrooms.filter((c) => c.active);
   const instructors = (extra(data).instructors ?? []).filter((i) => i.active);
   const acc = extra(data).accreditations ?? [];
-  const save = (batchId: string, classroomId: string | null, instructorId: string | null) => void post({ action: "resource-plan-save", batchId, classroomId, instructorId }, "Saved.").catch(() => undefined);
+  const today = manilaToday();
+  const term = q.trim().toLowerCase();
+  const queue = [...rows].filter((r) => !term || `${r.courseCode} ${r.courseName} ${r.batchNumber}`.toLowerCase().includes(term))
+    .sort((a, z) => Number(z.issues.some(isBlocking)) - Number(a.issues.some(isBlocking)) || Number(z.issues.length > 0) - Number(a.issues.length > 0) || a.startsOn.localeCompare(z.startsOn));
+  const sel = rows.find((r) => r.id === picked) ?? queue[0] ?? null;
+  const attention = rows.filter((r) => r.issues.length), conflicts = rows.filter((r) => r.roomClash || r.instructorClash || r.issues.some((x) => /exceed/i.test(x)));
+  const save = (classroomId: string | null, instructorId: string | null) => sel && void post({ action: "resource-plan-save", batchId: sel.id, classroomId, instructorId }, "Saved.").catch(() => undefined);
+  const dates = (r: PlanBatch) => (r.startsOn === r.endsOn ? fmtDate(r.startsOn) : `${fmtDate(r.startsOn)} – ${fmtDate(r.endsOn)}`);
+  const busyWith = (kind: "classroomId" | "instructorId", id: string) => sel ? rows.find((o) => o.id !== sel.id && o[kind] === id && rangesOverlap(o.startsOn, o.endsOn, sel.startsOn, sel.endsOn)) ?? null : null;
+  const tone = (r: PlanRow) => (r.issues.some(isBlocking) ? "red" : r.issues.length ? "orange" : "green");
+  const to = addDays(today, 13);
   return <div className="portal-page cx ac">
-    <Head title="Resource Planning" />
+    <Head title="Resource Planning"><a className="portal-secondary" href={`/api/documents/resource-plan?from=${today}&to=${to}`} target="_blank" rel="noreferrer">Print PDF</a></Head>
     {msg && <Message kind={msg.kind} text={msg.text} />}
-    <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Upcoming Batches</h2><span className="slot-count">{rows.length}</span></div>
-      {rows.length ? <div className="cl-wrap"><table className="cl-log aa-lines"><thead><tr><th>Course</th><th>Batch</th><th>Dates</th><th>Classroom</th><th>Students</th><th>Instructor</th></tr></thead><tbody>
-        {rows.map(({ b, plan, classroomId, issues }) => { const c = first(b.courses); return <tr key={b.id}>
-          <td><b>{c?.code ?? "—"}</b><small>{c?.name}</small></td><td className="cl-mono">{b.batch_number}</td><td>{b.starts_on === b.ends_on ? fmtDate(b.starts_on) : `${fmtDate(b.starts_on)} – ${fmtDate(b.ends_on)}`}</td>
-          <td><select aria-label="Classroom" disabled={busy} value={classroomId ?? ""} onChange={(e) => save(b.id, e.target.value || null, plan?.instructor_id ?? null)}><option value="">Choose Classroom</option>{rooms.map((r) => <option key={r.id} value={r.id}>{r.name} ({r.capacity} seats)</option>)}</select>
-            {issues.filter((x) => /room|classroom/i.test(x)).map((x) => <span key={x} className="aa-warn">{x}</span>)}</td>
-          <td className="cl-mono">{Number(b.confirmed_count ?? 0)} / {b.capacity}</td>
-          <td><select aria-label="Instructor" disabled={busy} value={plan?.instructor_id ?? ""} onChange={(e) => save(b.id, classroomId, e.target.value || null)}><option value="">Choose Instructor</option>{instructors.map((i) => { const s = accreditationFor(acc, i.id, b.course_id, b.starts_on); return <option key={i.id} value={i.id}>{i.complete_name}{s === "ok" ? " · Accredited" : s === "expired" ? " · Expired" : " · Not Accredited"}</option>; })}</select>
-            {issues.filter((x) => /instructor|accredit/i.test(x)).map((x) => <span key={x} className="aa-warn">{x}</span>)}</td>
-        </tr>; })}
-      </tbody></table></div> : <p className="portal-empty-copy">No upcoming batches.</p>}
-      <p className="ac-foot">Only instructors on the shortlist are listed; each shows whether they are accredited for the batch&apos;s course.</p>
-    </section>
+    <div className="rp-sum">
+      <div><b>{rows.length}</b><span>Upcoming batches</span></div>
+      <div className={attention.length ? "bad" : ""}><b>{attention.length}</b><span>Need attention</span></div>
+      <div><b>{rows.filter((r) => !r.classroomId).length}</b><span>No classroom</span></div>
+      <div><b>{rows.filter((r) => !r.instructorId).length}</b><span>No instructor</span></div>
+      <div className={conflicts.length ? "bad" : ""}><b>{conflicts.length}</b><span>Conflicts</span></div>
+    </div>
+    <div className="rp-split">
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Batches</h2><span className="muted-text">Problems first</span></div>
+        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search batches" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search course or batch number" /></div>
+        <div className="rp-queue">{queue.map((r) => <button type="button" key={r.id} className={`rp-qi${sel?.id === r.id ? " on" : ""}`} onClick={() => setPicked(r.id)}>
+          <span className="rp-qt"><b>{r.courseCode}</b><span className="cl-mono">{r.batchNumber}</span></span>
+          <Badge tone={tone(r)}>{r.issues.length ? `${r.issues.length} to fix` : "Ready"}</Badge>
+          <small>{dates(r)} · {r.students} student{r.students === 1 ? "" : "s"}</small>
+          <small className="rp-qr">{r.room?.name ?? "No room"} · {r.instructor?.complete_name ?? "No instructor"}</small>
+        </button>)}{!queue.length && <p className="portal-empty-copy">{rows.length ? "No batch matches." : "No upcoming batches."}</p>}</div>
+      </section>
+      {sel ? <section className="portal-panel cx-panel rp-editor">
+        <div className="panel-heading"><div><h2>{sel.courseCode} · <span className="cl-mono">{sel.batchNumber}</span></h2><span className="rp-sub">{sel.courseName} · {dates(sel)} · {sel.students} of {sel.capacity} seats booked</span></div><Badge tone={tone(sel)}>{sel.issues.length ? `${sel.issues.length} to fix` : "Ready"}</Badge></div>
+        {sel.issues.length > 0 && <ul className="rp-issues">{sel.issues.map((x) => <li key={x} className={isBlocking(x) ? "bad" : ""}>{x}</li>)}</ul>}
+        <h3 className="rp-h">Classroom</h3>
+        <div className="rp-cards">{rooms.map((r) => { const clash = busyWith("classroomId", r.id); const small = sel.students > Number(r.capacity); const on = sel.classroomId === r.id; return <button type="button" key={r.id} disabled={busy} className={`rp-card${on ? " on" : ""}${clash || small ? " warn" : ""}`} aria-pressed={on} onClick={() => save(on ? null : r.id, sel.instructorId)}>
+          <b>{r.name}</b><small>{r.capacity} seats{small ? ` · too small for ${sel.students}` : ""}</small>
+          <small className={clash ? "rp-bad" : ""}>{clash ? `Booked: ${clash.courseCode} ${dates(clash)}` : "Free on these dates"}</small></button>; })}
+          {!rooms.length && <p className="portal-empty-copy">No classrooms yet. The Admin adds them in Rooms and Facilities.</p>}</div>
+        <h3 className="rp-h">Instructor</h3>
+        <div className="rp-cards">{instructors.map((i) => { const state = accreditationFor(acc, i.id, sel.courseId, sel.startsOn); const until = acc.find((a) => a.instructor_id === i.id && a.course_id === sel.courseId)?.valid_until; const clash = busyWith("instructorId", i.id); const on = sel.instructorId === i.id; return <button type="button" key={i.id} disabled={busy} className={`rp-card${on ? " on" : ""}${state !== "ok" || clash ? " warn" : ""}`} aria-pressed={on} onClick={() => save(sel.classroomId, on ? null : i.id)}>
+          <b>{i.complete_name}</b>
+          <small className={state !== "ok" ? "rp-bad" : ""}>{state === "ok" ? (until ? `Accredited until ${fmtDate(until)}` : "Accredited") : state === "expired" ? `Accreditation expired ${until ? fmtDate(until) : ""}` : `Not accredited for ${sel.courseCode}`}</small>
+          <small className={clash ? "rp-bad" : ""}>{clash ? `Teaching ${clash.courseCode} ${dates(clash)}` : i.mobile ? i.mobile : "Free on these dates"}</small></button>; })}
+          {!instructors.length && <p className="portal-empty-copy">No instructors on the shortlist yet. Add them in Instructors.</p>}</div>
+        <p className="ac-foot">Click a card to assign it; click it again to clear. Changes save right away and show on the admission records and MISMO lists.</p>
+      </section> : <section className="portal-panel cx-panel"><p className="portal-empty-copy">No upcoming batches.</p></section>}
+    </div>
   </div>;
 }
 
