@@ -21,14 +21,15 @@ function ConfigList({values}:{values:string[]}){return <div className="config-li
 type Account=Data["users"][number];
 /** Employee accounts: the Admin registers, edits, resets passwords for and deletes portal accounts. */
 function UserAccounts({data,post}:{data:Data;onSubmit:(e:FormEvent<HTMLFormElement>)=>void;post:(payload:Record<string,unknown>,done?:string)=>Promise<boolean>}){
-  const [adding,setAdding]=useState(false),[editing,setEditing]=useState<string|null>(null),[resetting,setResetting]=useState<string|null>(null),[deleting,setDeleting]=useState<string|null>(null),[showRemoved,setShowRemoved]=useState(false);
+  const [adding,setAdding]=useState(false),[editing,setEditing]=useState<string|null>(null),[resetting,setResetting]=useState<string|null>(null),[deleting,setDeleting]=useState<string|null>(null);
   const [form,setForm]=useState({completeName:"",email:"",password:"",position:"",roleCode:"cashier",secondRoleCode:""});
   const [edit,setEdit]=useState({completeName:"",position:"",roleCode:"cashier",secondRoleCode:""});
   // An employee may hold two roles (owner, 9 Oct 2026); the second is optional.
   const secondRoleSelect=(first:string,value:string,set:(v:string)=>void)=><label>Second Role (Optional)<select value={value} onChange={e=>set(e.target.value)}><option value="">None</option>{ROLE_OPTIONS.filter(([code])=>code!==first).map(([code,label])=><option key={code} value={code}>{label}</option>)}</select></label>;
   const [temp,setTemp]=useState("");
   const roleLabel=(code?:string)=>ROLE_OPTIONS.find(o=>o[0]===code)?.[1]??code??"No Role";
-  const active=data.users.filter(u=>u.accountState!=="Deactivated"),removed=data.users.filter(u=>u.accountState==="Deactivated");
+  // Deleted accounts are hidden; registering the same email again reopens it (owner, 9 Oct 2026).
+  const active=data.users.filter(u=>u.accountState!=="Deactivated");
   const startEdit=(u:Account)=>{setEditing(u.id);setResetting(null);setDeleting(null);setEdit({completeName:u.completeName||"",position:u.position??"",roleCode:u.roles[0]??"cashier",secondRoleCode:u.roles[1]??""})};
   const row=(u:Account)=>{
     if(editing===u.id)return <tr key={u.id}><td colSpan={4}><div className="portal-form acct-edit">
@@ -49,7 +50,7 @@ function UserAccounts({data,post}:{data:Data;onSubmit:(e:FormEvent<HTMLFormEleme
           <button type="button" className="portal-secondary acct-danger" onClick={()=>{setDeleting(deleting===u.id?null:u.id);setResetting(null)}}>Delete</button></>}
       </div>
       {resetting===u.id&&<div className="acct-panel"><label>Temporary Password<input type="text" autoComplete="new-password" value={temp} onChange={e=>setTemp(e.target.value)} placeholder="At least 8 characters"/></label><div className="acct-actions"><button type="button" className="portal-primary" disabled={temp.length<8} onClick={()=>void post({action:"set-password",userId:u.id,password:temp},"Temporary password set. Give it to the employee privately.").then(ok=>{if(ok){setResetting(null);setTemp("")}})}>Set Password</button><button type="button" className="portal-secondary" onClick={()=>void post({action:"reset-password",email:u.email},"Reset link emailed.").then(ok=>{if(ok)setResetting(null)})}>Email Reset Link</button></div></div>}
-      {deleting===u.id&&<div className="acct-panel acct-confirm"><span>Delete this account? The employee can no longer sign in. Their past records stay.</span><div className="acct-actions"><button type="button" className="portal-secondary" onClick={()=>setDeleting(null)}>Cancel</button><button type="button" className="portal-primary acct-danger-fill" onClick={()=>void post({action:"delete-user",userId:u.id},"Account deleted.").then(ok=>{if(ok)setDeleting(null)})}>Delete Account</button></div></div>}
+      {deleting===u.id&&<div className="acct-panel acct-confirm"><span>Delete this account? The employee can no longer sign in. Their past records stay, and the email can be registered again.</span><div className="acct-actions"><button type="button" className="portal-secondary" onClick={()=>setDeleting(null)}>Cancel</button><button type="button" className="portal-primary acct-danger-fill" onClick={()=>void post({action:"delete-user",userId:u.id},"Account deleted.").then(ok=>{if(ok)setDeleting(null)})}>Delete Account</button></div></div>}
       </td></tr>;
   };
   return <div className="acct">
@@ -66,9 +67,7 @@ function UserAccounts({data,post}:{data:Data;onSubmit:(e:FormEvent<HTMLFormEleme
       <div className="portal-table"><table><thead><tr><th>Employee</th><th>Position</th><th>Roles</th><th className="r">Actions</th></tr></thead><tbody>
         {active.map(row)}
         {!active.length&&<tr><td colSpan={4}><span className="portal-empty-copy">No employee accounts yet.</span></td></tr>}
-        {showRemoved&&removed.map(row)}
       </tbody></table></div>
-      {removed.length>0&&<div className="acct-foot"><button type="button" className="ghost-button" onClick={()=>setShowRemoved(!showRemoved)}>{showRemoved?"Hide deleted accounts":`Show deleted accounts (${removed.length})`}</button></div>}
     </section>
   </div>;
 }

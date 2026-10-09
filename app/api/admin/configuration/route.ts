@@ -98,12 +98,29 @@ export async function POST(request:Request){const staff=await requireStaff(["adm
     // server-side via the service role. The plaintext password is used only to
     // create the account (Supabase stores a hash) and is never persisted or
     // logged by this app.
-    const created=await db.auth.admin.createUser({email:value.email,password:value.password,email_confirm:true,user_metadata:{complete_name:value.completeName}});
-    if(created.error||!created.data.user)throw new Error(created.error?.message?.includes("registered")?"That email already has a login. Use “Add or change a user by email” to assign its role instead.":created.error?.message??"Could not create the account.");
-    const uid=created.data.user.id;
+    // A deleted account (owner, 9 Oct 2026) can be registered again with the same
+    // email: its login is reopened with the new password, name and roles. The
+    // login is never erased, so payments and audit entries keep their author.
+    const pattern=value.email.trim().replace(/[\\%_]/g,m=>"\\"+m);
+    const {data:prior}=await db.from("profiles").select("id,account_state").ilike("email",pattern).limit(1).maybeSingle();
+    if(prior&&prior.account_state!=="Deactivated")throw new Error("That email already has an account. Use Edit on its row to change the roles.");
+    let uid=prior?.id as string|undefined;
+    if(!uid){
+      const created=await db.auth.admin.createUser({email:value.email,password:value.password,email_confirm:true,user_metadata:{complete_name:value.completeName}});
+      if(created.data.user)uid=created.data.user.id;
+      else if(created.error?.message?.includes("registered")){
+        // A login without a portal profile: find it and reuse it.
+        for(let page=1;page<=20&&!uid;page++){const list=await db.auth.admin.listUsers({page,perPage:1000});if(list.error)throw list.error;uid=list.data.users.find(u=>u.email?.toLowerCase()===value.email.trim().toLowerCase())?.id;if(list.data.users.length<1000)break}
+        if(!uid)throw new Error("That email already has a login that could not be found.");
+      }
+      else throw new Error(created.error?.message??"Could not create the account.");
+    }
+    const reopen=await db.auth.admin.updateUserById(uid,{password:value.password,ban_duration:"none",email_confirm:true,user_metadata:{complete_name:value.completeName}});if(reopen.error)throw reopen.error;
     const up=await db.from("profiles").upsert({id:uid,email:value.email,complete_name:value.completeName,account_state:"Active"});if(up.error)throw up.error;
     await setRoles(db,uid,[value.roleCode,value.secondRoleCode],staff.user.id);
-    if(value.position){
+    const {data:priorEmp}=await db.from("employees").select("id").eq("profile_id",uid).limit(1).maybeSingle();
+    if(priorEmp){await db.from("employees").update({complete_name:value.completeName,...(value.position?{position:value.position}:{})}).eq("id",priorEmp.id)}
+    else if(value.position){
       const {data:employeeNumber,error:numErr}=await db.rpc("next_reference",{prefix:"EMP",requested_year:new Date().getFullYear()});
       if(numErr)throw numErr;
       const emp=await db.from("employees").insert({profile_id:uid,employee_number:employeeNumber,complete_name:value.completeName,position:value.position,date_hired:new Date().toISOString().slice(0,10),pay_type:"Monthly",work_email:value.email});
