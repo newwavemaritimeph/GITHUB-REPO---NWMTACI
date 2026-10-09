@@ -2075,3 +2075,9 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .cn-drop label{cursor:pointer}
 .nw-shell .cn-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media (max-width:760px){.nw-shell .cn-grid{grid-template-columns:1fr}}
+
+/* MISMO: pending balances at 11:00 AM, per batch (owner, 9 Oct 2026). */
+.nw-shell .ms-batch{border-top:1px solid #e5edf2;padding-top:10px}
+.nw-shell .ms-bhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:0 20px 8px}
+.nw-shell .ms-bhead span{display:block;color:#5f7180;font-size:12.5px}
+.nw-shell .ms-btotal{display:inline!important;font-size:13.5px!important;color:#0f2638!important}

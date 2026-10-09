@@ -3,7 +3,7 @@ import { balanceAt, finalList, unsettledAt11, type MismoBatch } from "@/lib/mism
 
 const longDate = (d: string) => new Intl.DateTimeFormat("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T00:00:00+08:00`));
 const peso = (c: number) => `PHP ${(c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const ascii = (s: string) => s.replace(/·/g, "-").normalize("NFKD").replace(/[^\x20-\x7E]/g, "");
+const ascii = (s: string) => s.replace(/[–—]/g, "-").replace(/·/g, "-").normalize("NFKD").replace(/[^\x20-\x7E]/g, "");
 
 /** MARINA MISMO lists (owner, 8 Oct 2026): the 4:00 PM final list or the 11:00 AM unsettled list, one section per batch. A4 landscape. */
 export async function createMismoListPdf(date: string, batches: MismoBatch[], list: "final" | "unsettled") {
@@ -13,7 +13,7 @@ export async function createMismoListPdf(date: string, batches: MismoBatch[], li
   const W = 841.89, H = 595.28, M = 32; // A4 landscape
   const unsettled = list === "unsettled";
   const cols = unsettled
-    ? [["#", 26], ["Trainee", 250], ["Batch", 120], ["Course", 110], ["Room · instructor", 190], ["Balance at 11:00 AM", 90]] as const
+    ? [["#", 26], ["Trainee", 230], ["Batch", 110], ["Course", 100], ["Room · instructor", 200], ["Balance at 11 AM", 112]] as const
     : [["#", 26], ["Last name", 110], ["First name", 110], ["Middle name", 90], ["Birth date", 70], ["SRN", 110], ["Rank", 80], ["Course", 90], ["Training dates", 92]] as const;
   for (const b of batches) {
     const rows = unsettled ? unsettledAt11(b) : finalList(b);
@@ -52,7 +52,7 @@ export async function createMismoListPdf(date: string, batches: MismoBatch[], li
     });
     if (!rows.length) { page.drawText(unsettled ? "Everyone in this class had settled by 11:00 AM." : "No trainee settled by 4:00 PM.", { x: M + 5, y, size: 10, font: reg, color: muted }); y -= 17; }
     y -= 6;
-    page.drawText(ascii(`${rows.length} trainee${rows.length === 1 ? "" : "s"}${unsettled ? "" : ` · ${b.trainees.length - rows.length} left off (balance unpaid at 4:00 PM)`}`), { x: M, y, size: 9.5, font: bold, color: ink });
+    page.drawText(ascii(`${rows.length} trainee${rows.length === 1 ? "" : "s"}${unsettled ? ` · total pending ${peso(rows.reduce((s, t) => s + balanceAt(t, "11"), 0))}` : ` · ${b.trainees.length - rows.length} left off (balance unpaid at 4:00 PM)`}`), { x: M, y, size: 9.5, font: bold, color: ink });
     const sy = Math.max(M + 24, y - 54);
     page.drawLine({ start: { x: M, y: sy }, end: { x: M + 220, y: sy }, thickness: 0.8, color: ink });
     page.drawText(unsettled ? "Prepared by - MISMO Compliance Officer" : "Prepared by - MISMO Compliance Officer", { x: M, y: sy - 12, size: 9, font: reg, color: muted });

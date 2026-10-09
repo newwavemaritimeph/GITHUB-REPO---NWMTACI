@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { addDays, manilaToday, pesos2 } from "@/lib/portal-format";
-import { balanceAt, finalList, leftOff, mismoCsv, owesAt, type MismoDay } from "@/lib/mismo";
+import { balanceAt, finalList, leftOff, mismoCsv, owesAt, unsettledAt11, type MismoDay } from "@/lib/mismo";
 import { Badge, Message, usePost } from "./shared-ui";
 
 /**
@@ -75,11 +75,16 @@ export function MismoDashboard({ go }: { go: (m: string) => void }) {
           <p className="ac-foot">After 4:00 PM, trainees who still owe are left off the MARINA list automatically.</p>
         </section>
       </div>
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Not Settled as of 11:00 AM</h2>{hour >= 11 && at11.length > 0 && <a className="portal-secondary" href={pdfUrl(date, "unsettled")} target="_blank" rel="noreferrer">Print PDF</a>}</div>
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Pending Balances at 11:00 AM</h2>{hour >= 11 && at11.length > 0 && <a className="portal-secondary" href={pdfUrl(date, "unsettled")} target="_blank" rel="noreferrer">Print All Batches</a>}</div>
         {!data ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : !data.batches.length ? <p className="portal-empty-copy">No STCW class on this day.</p> : hour < 11 ? <p className="portal-empty-copy">The list is taken at 11:00 AM.</p> : at11.length ? <>
-          <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee</th><th>Batch · Course</th><th>Room · Instructor</th><th>Balance at 11:00</th><th>Now</th></tr></thead><tbody>
-            {at11.map(({ t, b }, i) => <tr key={t.enrollmentId}><td className="cl-no">{i + 1}</td><td><b>{t.lastName}, {t.firstName}</b></td><td>{b.batchNumber} · {b.courseCode}</td><td>{b.room ?? "—"} · {b.instructor ?? "—"}</td><td className="cl-mono">{pesos2(balanceAt(t, "11"))}</td><td>{owesAt(t, "now") ? <Badge tone="red">{pesos2(balanceAt(t, "now"))} due</Badge> : <Badge tone="green">Paid Since</Badge>}</td></tr>)}
-          </tbody></table></div></> : <p className="portal-empty-copy">Everyone in today&apos;s STCW classes had settled by 11:00 AM.</p>}
+          {/* Per batch (owner, 9 Oct 2026): each batch with its trainees still owing at 11:00 AM, their total, and its own print. */}
+          {data.batches.map((b) => { const owing = unsettledAt11(b); if (!owing.length) return null; const total = owing.reduce((s, t) => s + balanceAt(t, "11"), 0); return <div key={b.id} className="ms-batch">
+            <div className="ms-bhead"><div><b>{b.batchNumber} · {b.courseCode}</b><span>{b.room ?? "Room not set"} · {b.instructor ?? "Instructor not set"}</span></div><span className="cl-acts"><span className="ms-btotal">{owing.length} trainee{owing.length === 1 ? "" : "s"} · <b className="cl-mono">{pesos2(total)}</b></span><a className="portal-secondary" href={pdfUrl(date, "unsettled", b.id)} target="_blank" rel="noreferrer">Print</a></span></div>
+            <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee</th><th>Balance at 11:00</th><th>Now</th></tr></thead><tbody>
+              {owing.map((t, i) => <tr key={t.enrollmentId}><td className="cl-no">{i + 1}</td><td><b>{t.lastName}, {t.firstName}</b></td><td className="cl-mono">{pesos2(balanceAt(t, "11"))}</td><td>{owesAt(t, "now") ? <Badge tone="red">{pesos2(balanceAt(t, "now"))} due</Badge> : <Badge tone="green">Paid Since</Badge>}</td></tr>)}
+            </tbody></table></div>
+          </div>; })}
+          <p className="ac-foot">Total pending at 11:00 AM: {at11.length} trainee{at11.length === 1 ? "" : "s"} · {pesos2(at11.reduce((s, x) => s + balanceAt(x.t, "11"), 0))}. Print a batch and give it to its instructor.</p></> : <p className="portal-empty-copy">Everyone in today&apos;s STCW classes had settled by 11:00 AM.</p>}
       </section>
     </div>
   </div>;
