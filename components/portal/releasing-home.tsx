@@ -402,56 +402,52 @@ function CertificateCorrectionsPanel({ data, reload, mode }: { data: PortalData;
 
 /* ------------------------------------------------------------ certificate numbers (Admin) */
 
-type NumberSettings = { doc_last: number; doc_digits: number; reg_prefix: string; reg_last: number; reg_digits: number; set_at: string | null };
-type LegacyCert = { id: string; trainee_name: string; nwmtaci_number: string | null; course_code: string | null; enrollment_id: string | null; certificate_number: string | null; registration_number: string | null; doc_number: string | null; issued_on: string | null; recorded_at: string };
+type NumberSettings = { reg_prefix: string; reg_last: number; reg_digits: number; set_at: string | null };
+type LegacyCert = { id: string; trainee_name: string; nwmtaci_number: string | null; course_code: string | null; enrollment_id: string | null; certificate_number: string | null; registration_number: string | null; issued_on: string | null; recorded_at: string };
 /**
  * Admin › Certificate Numbers (owner, 9 Oct 2026): continue New Wave's existing
- * series — Doc. No. (one for all certificates), Registration No. (new on every
- * certificate, ending in the issue month and year) and Certificate No. per
- * course — and record certificates printed before the portal so their numbers
- * are never reused.
+ * series — Registration No. (new on every certificate, ending in the issue month
+ * and year) and Certificate No. per course — and record certificates printed
+ * before the portal so their numbers are never reused. The Doc. No. is written
+ * on the printed certificate by hand.
  */
 export function AdminCertificateNumbers({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   const d = data as CertData & { certificateNumberSettings?: NumberSettings | null; legacyCertificates?: LegacyCert[] };
   const { busy, msg, setMsg, post } = usePost(reload);
   const [tab, setTab] = useState<"numbering" | "legacy">("numbering");
   const ns = d.certificateNumberSettings;
-  const [form, setForm] = useState({ docLast: String(ns?.doc_last ?? 0), docDigits: String(ns?.doc_digits ?? 8), regPrefix: ns?.reg_prefix ?? "NWMTC", regLast: String(ns?.reg_last ?? 0), regDigits: String(ns?.reg_digits ?? 6) });
-  const [one, setOne] = useState<LegacyRow>({ traineeName: "", nwmtaciNumber: "", courseCode: "", certificateNumber: "", registrationNumber: "", docNumber: "", issuedOn: "" });
+  const [form, setForm] = useState({ regPrefix: ns?.reg_prefix ?? "NWMTC", regLast: String(ns?.reg_last ?? 0), regDigits: String(ns?.reg_digits ?? 6) });
+  const [one, setOne] = useState<LegacyRow>({ traineeName: "", nwmtaciNumber: "", courseCode: "", certificateNumber: "", registrationNumber: "", issuedOn: "" });
   const [preview, setPreview] = useState<{ file: string; rows: LegacyRow[]; missing: string[] } | null>(null);
   const [results, setResults] = useState<ImportResult[] | null>(null);
   const month = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit" }).format(new Date()).split("-");
-  const nextDoc = String((Number(form.docLast) || 0) + 1).padStart(Number(form.docDigits) || 8, "0");
   const nextReg = `${form.regPrefix.toUpperCase()}${String((Number(form.regLast) || 0) + 1).padStart(Number(form.regDigits) || 6, "0")}-${month[1]}${month[0]}`;
   const legacy = d.legacyCertificates ?? [];
-  const saveSeries = () => void post({ action: "certificate-number-settings-save", docLast: Number(form.docLast) || 0, docDigits: Number(form.docDigits) || 8, regPrefix: form.regPrefix.trim() || "NWMTC", regLast: Number(form.regLast) || 0, regDigits: Number(form.regDigits) || 6 }, `Saved. The next certificate prints Doc. No. ${nextDoc} and Registration No. ${nextReg}.`).catch(() => undefined);
+  const saveSeries = () => void post({ action: "certificate-number-settings-save", regPrefix: form.regPrefix.trim() || "NWMTC", regLast: Number(form.regLast) || 0, regDigits: Number(form.regDigits) || 6 }, `Saved. The next certificate prints Registration No. ${nextReg}.`).catch(() => undefined);
   const chooseCsv = async (file: File | undefined) => { setResults(null); if (!file) return; const parsed = legacyRowsFromCsv(await file.text()); setPreview({ file: file.name, ...parsed }); if (parsed.missing.length) setMsg({ kind: "error", text: `The spreadsheet needs these columns: ${parsed.missing.join(", ")}.` }); };
   const importRows = () => preview && void post({ action: "legacy-certificate-import", rows: preview.rows }).then((r) => { const res = (r as { results?: ImportResult[] }).results ?? []; setResults(res); setPreview(null); setMsg({ kind: "success", text: `${res.filter((x) => x.ok).length} of ${res.length} recorded · ${res.filter((x) => x.ok && x.matched).length} matched to a trainee's enrollment.` }); }).catch(() => undefined);
-  const addOne = () => void post({ action: "legacy-certificate-add", row: one }, "Recorded. These numbers are reserved.").then(() => setOne({ traineeName: "", nwmtaciNumber: "", courseCode: "", certificateNumber: "", registrationNumber: "", docNumber: "", issuedOn: "" })).catch(() => undefined);
+  const addOne = () => void post({ action: "legacy-certificate-add", row: one }, "Recorded. These numbers are reserved.").then(() => setOne({ traineeName: "", nwmtaciNumber: "", courseCode: "", certificateNumber: "", registrationNumber: "", issuedOn: "" })).catch(() => undefined);
   const field = (k: keyof LegacyRow, label: string, ph: string, type = "text") => <label>{label}<input type={type} className={type === "text" ? "cl-mono" : undefined} value={one[k]} placeholder={ph} onChange={(e) => setOne({ ...one, [k]: e.target.value })} /></label>;
   return <div className="portal-page cx ac">
     <div className="cx-head"><div><span className="portal-eyebrow">Admin</span><h1>Certificate Numbers</h1></div>
       <span className="cn-tabs" role="tablist"><button type="button" role="tab" aria-selected={tab === "numbering"} className={tab === "numbering" ? "on" : ""} onClick={() => setTab("numbering")}>Numbering</button><button type="button" role="tab" aria-selected={tab === "legacy"} className={tab === "legacy" ? "on" : ""} onClick={() => setTab("legacy")}>Issued Before the Portal{legacy.length ? ` · ${legacy.length}` : ""}</button></span></div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
     {tab === "numbering" ? <>
-      <p className="ac-note">Enter the <b>last number you already used</b> on paper. The portal continues from the next one at the moment a certificate is printed, and never reuses a number recorded below.</p>
+      <p className="ac-note">Enter the <b>last Registration No. you already used</b> on paper. The portal continues from the next one at the moment a certificate is printed, and never reuses a number recorded under Issued Before the Portal. The Doc. No. is written on the certificate by hand.</p>
       <div className="cn-series">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Doc. No.</h2><span className="muted-text">One series for every certificate</span></div>
-          <div className="portal-form cx-formpad"><label>Last Doc. No. Used<input type="number" min={0} className="cl-mono" value={form.docLast} onChange={(e) => setForm({ ...form, docLast: e.target.value })} /></label><label>Digits<input type="number" min={1} max={12} value={form.docDigits} onChange={(e) => setForm({ ...form, docDigits: e.target.value })} /></label></div>
-          <div className="cn-next"><span>Next certificate prints</span><b className="cl-mono">Doc. No. {nextDoc}</b></div></section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Registration No.</h2><span className="muted-text">New on every certificate</span></div>
           <div className="portal-form cx-formpad"><label>Prefix<input className="cl-mono" value={form.regPrefix} onChange={(e) => setForm({ ...form, regPrefix: e.target.value })} /></label><label>Last Number Used<input type="number" min={0} className="cl-mono" value={form.regLast} onChange={(e) => setForm({ ...form, regLast: e.target.value })} /></label><label>Digits<input type="number" min={1} max={12} value={form.regDigits} onChange={(e) => setForm({ ...form, regDigits: e.target.value })} /></label></div>
           <div className="cn-next"><span>Next certificate prints (issued this month)</span><b className="cl-mono">{nextReg}</b></div></section>
       </div>
-      <div className="cn-save"><span className="muted-text">{ns?.set_at ? `Last saved ${fmtDate(day(ns.set_at) ?? "")}` : "Not set yet — certificates cannot be printed until these are saved."}</span><button type="button" className="portal-primary" disabled={busy} onClick={saveSeries}>Save Doc. No. and Registration No.</button></div>
+      <div className="cn-save"><span className="muted-text">{ns?.set_at ? `Last saved ${fmtDate(day(ns.set_at) ?? "")}` : "Not set yet — certificates cannot be printed until this is saved."}</span><button type="button" className="portal-primary" disabled={busy} onClick={saveSeries}>Save Registration No.</button></div>
       <NumberingTable data={data} reload={reload} scope="all" />
     </> : <>
       <p className="ac-note">Record certificates you already printed, so their numbers are reserved and the trainees show as released. Upload your log as a CSV (save the Excel sheet as CSV), or add one at a time.</p>
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Upload Your Log</h2><span className="muted-text">Columns: Trainee (LAST, FIRST) · NWMTACI No. · Course · Certificate No. · Registration No. · Doc. No. · Date Issued</span></div>
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Upload Your Log</h2><span className="muted-text">Columns: Trainee (LAST, FIRST) · NWMTACI No. · Course · Certificate No. · Registration No. · Date Issued</span></div>
         <div className="cn-drop"><label className="portal-secondary">Choose CSV File<input type="file" accept=".csv,text/csv" hidden onChange={(e) => { void chooseCsv(e.target.files?.[0]); e.target.value = ""; }} /></label>
           <span className="muted-text">Each row is matched to the trainee and course in the portal; rows that do not match still reserve their numbers.</span></div>
-        {preview && <><div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee</th><th>Course</th><th>Certificate No.</th><th>Registration No.</th><th>Doc. No.</th><th>Issued</th></tr></thead><tbody>
-          {preview.rows.slice(0, 50).map((r, i) => <tr key={i}><td className="cl-no">{i + 1}</td><td>{r.traineeName}<small className="cl-sub cl-block">{r.nwmtaciNumber}</small></td><td>{r.courseCode || "—"}</td><td className="cl-mono">{r.certificateNumber || "—"}</td><td className="cl-mono">{r.registrationNumber || "—"}</td><td className="cl-mono">{r.docNumber || "—"}</td><td>{r.issuedOn ? fmtDate(r.issuedOn) : "—"}</td></tr>)}
+        {preview && <><div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee</th><th>Course</th><th>Certificate No.</th><th>Registration No.</th><th>Issued</th></tr></thead><tbody>
+          {preview.rows.slice(0, 50).map((r, i) => <tr key={i}><td className="cl-no">{i + 1}</td><td>{r.traineeName}<small className="cl-sub cl-block">{r.nwmtaciNumber}</small></td><td>{r.courseCode || "—"}</td><td className="cl-mono">{r.certificateNumber || "—"}</td><td className="cl-mono">{r.registrationNumber || "—"}</td><td>{r.issuedOn ? fmtDate(r.issuedOn) : "—"}</td></tr>)}
         </tbody></table></div>
           <div className="cn-save"><span className="muted-text">{preview.file}: {preview.rows.length} row{preview.rows.length === 1 ? "" : "s"}{preview.rows.length > 50 ? " (first 50 shown)" : ""}</span><span className="cl-acts"><button type="button" className="portal-secondary" onClick={() => setPreview(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !preview.rows.length || preview.missing.length > 0 || preview.rows.length > 500} onClick={importRows}>Record {preview.rows.length} Certificates</button></span></div></>}
         {results && results.some((r) => !r.ok || !r.matched) && <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Trainee</th><th>Certificate No.</th><th>Result</th></tr></thead><tbody>
@@ -461,12 +457,12 @@ export function AdminCertificateNumbers({ data, reload }: { data: PortalData; re
       <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Add One Certificate</h2></div>
         <div className="portal-form cx-formpad cn-grid">
           {field("traineeName", "Trainee (LAST, FIRST)", "DELA CRUZ, Juan")}{field("nwmtaciNumber", "NWMTACI No. (optional)", "NWMTACI-0000411")}{field("courseCode", "Course Code", "FSH")}
-          {field("certificateNumber", "Certificate No.", "FSH000053")}{field("registrationNumber", "Registration No.", "NWMTC007540-092026")}{field("docNumber", "Doc. No.", "00006870")}{field("issuedOn", "Date Issued", "", "date")}
-          <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || one.traineeName.trim().length < 2 || !(one.certificateNumber || one.registrationNumber || one.docNumber)} onClick={addOne}>Record Certificate</button></div>
+          {field("certificateNumber", "Certificate No.", "FSH000053")}{field("registrationNumber", "Registration No.", "NWMTC007540-092026")}{field("issuedOn", "Date Issued", "", "date")}
+          <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || one.traineeName.trim().length < 2 || !(one.certificateNumber || one.registrationNumber)} onClick={addOne}>Record Certificate</button></div>
         </div></section>
       <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Recorded</h2><span className="slot-count">{legacy.length}</span></div>
-        {legacy.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Trainee</th><th>Course</th><th>Certificate No.</th><th>Registration No.</th><th>Doc. No.</th><th>Issued</th><th>Portal Match</th></tr></thead><tbody>
-          {legacy.map((r) => <tr key={r.id}><td>{r.trainee_name}<small className="cl-sub cl-block">{r.nwmtaci_number ?? ""}</small></td><td>{r.course_code ?? "—"}</td><td className="cl-mono">{r.certificate_number ?? "—"}</td><td className="cl-mono">{r.registration_number ?? "—"}</td><td className="cl-mono">{r.doc_number ?? "—"}</td><td>{r.issued_on ? fmtDate(r.issued_on) : "—"}</td><td>{r.enrollment_id ? <Badge tone="green">Matched · Released</Badge> : <Badge tone="orange">Numbers reserved</Badge>}</td></tr>)}
+        {legacy.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Trainee</th><th>Course</th><th>Certificate No.</th><th>Registration No.</th><th>Issued</th><th>Portal Match</th></tr></thead><tbody>
+          {legacy.map((r) => <tr key={r.id}><td>{r.trainee_name}<small className="cl-sub cl-block">{r.nwmtaci_number ?? ""}</small></td><td>{r.course_code ?? "—"}</td><td className="cl-mono">{r.certificate_number ?? "—"}</td><td className="cl-mono">{r.registration_number ?? "—"}</td><td>{r.issued_on ? fmtDate(r.issued_on) : "—"}</td><td>{r.enrollment_id ? <Badge tone="green">Matched · Released</Badge> : <Badge tone="orange">Numbers reserved</Badge>}</td></tr>)}
         </tbody></table></div> : <p className="portal-empty-copy">Nothing recorded yet.</p>}
       </section>
     </>}

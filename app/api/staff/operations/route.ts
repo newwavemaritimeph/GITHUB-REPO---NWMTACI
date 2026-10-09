@@ -126,9 +126,9 @@ const certificateOverrideInput = z.object({ action: z.literal("certificate-overr
 const certificateSeriesInput = z.object({ action: z.literal("certificate-series-save"), courseId: z.string().uuid(), prefix: z.string().trim().max(30), nextNumber: z.number().int().min(1).max(99999999), pad: z.number().int().min(1).max(10), batchPrefix: z.string().trim().max(30), nextBatch: z.number().int().min(1).max(999999) });
 const certificateVoidRequestInput = z.object({ action: z.literal("certificate-void-request"), enrollmentId: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
 const certificateCorrectInput = z.object({ action: z.literal("certificate-correct"), enrollmentId: z.string().uuid(), name: z.string().trim().max(160).optional().default(""), courseName: z.string().trim().max(200).optional().default(""), batchLabel: z.string().trim().max(60).optional().default(""), startsOn: z.string().date().or(z.literal("")).optional().default(""), endsOn: z.string().date().or(z.literal("")).optional().default(""), issuedOn: z.string().date().or(z.literal("")).optional().default(""), reason: z.string().trim().min(3).max(300) });
-// Continue New Wave's existing numbers (owner, 9 Oct 2026): Doc. No. and Registration No. series, and certificates issued before the portal.
-const certNumberSettingsInput = z.object({ action: z.literal("certificate-number-settings-save"), docLast: z.number().int().min(0).max(999999999999), docDigits: z.number().int().min(1).max(12), regPrefix: z.string().trim().min(1).max(20), regLast: z.number().int().min(0).max(999999999999), regDigits: z.number().int().min(1).max(12) });
-const legacyCertRow = z.object({ traineeName: z.string().trim().min(2).max(160), nwmtaciNumber: z.string().trim().max(40).optional().default(""), courseCode: z.string().trim().max(40).optional().default(""), certificateNumber: z.string().trim().max(60).optional().default(""), registrationNumber: z.string().trim().max(60).optional().default(""), docNumber: z.string().trim().max(60).optional().default(""), issuedOn: z.string().date().or(z.literal("")).optional().default("") });
+// Continue New Wave's existing numbers (owner, 9 Oct 2026): the Registration No. series and certificates issued before the portal. The Doc. No. is written by hand.
+const certNumberSettingsInput = z.object({ action: z.literal("certificate-number-settings-save"), regPrefix: z.string().trim().min(1).max(20), regLast: z.number().int().min(0).max(999999999999), regDigits: z.number().int().min(1).max(12) });
+const legacyCertRow = z.object({ traineeName: z.string().trim().min(2).max(160), nwmtaciNumber: z.string().trim().max(40).optional().default(""), courseCode: z.string().trim().max(40).optional().default(""), certificateNumber: z.string().trim().max(60).optional().default(""), registrationNumber: z.string().trim().max(60).optional().default(""), issuedOn: z.string().date().or(z.literal("")).optional().default("") });
 const legacyCertAddInput = z.object({ action: z.literal("legacy-certificate-add"), row: legacyCertRow });
 const legacyCertImportInput = z.object({ action: z.literal("legacy-certificate-import"), rows: z.array(legacyCertRow).min(1).max(500) });
 const certificateNumberSetInput = z.object({ action: z.literal("certificate-number-set"), enrollmentId: z.string().uuid(), certificateNumber: z.string().trim().min(2).max(60), reason: z.string().trim().min(3).max(300) });
@@ -955,8 +955,8 @@ export async function GET() {
   if (isAdminRole(staff.roleCodes)) {
     const admin = createSupabaseAdminClient();
     const [ns, lc] = await Promise.all([
-      admin.from("certificate_number_settings").select("doc_last,doc_digits,reg_prefix,reg_last,reg_digits,set_at").maybeSingle(),
-      admin.from("legacy_certificates").select("id,trainee_name,nwmtaci_number,course_code,enrollment_id,certificate_number,registration_number,doc_number,issued_on,recorded_at").order("recorded_at", { ascending: false }).limit(500),
+      admin.from("certificate_number_settings").select("reg_prefix,reg_last,reg_digits,set_at").maybeSingle(),
+      admin.from("legacy_certificates").select("id,trainee_name,nwmtaci_number,course_code,enrollment_id,certificate_number,registration_number,issued_on,recorded_at").order("recorded_at", { ascending: false }).limit(500),
     ]);
     certificateNumberSettings = ns.error ? null : ns.data;
     legacyCertificates = lc.error ? [] : lc.data ?? [];
@@ -1022,10 +1022,10 @@ export async function GET() {
  * Released so it is never printed again. Returns a short outcome for the screen.
  */
 async function recordLegacyCertificate(admin: ReturnType<typeof createSupabaseAdminClient>, row: z.infer<typeof legacyCertRow>, actor: string): Promise<{ ok: boolean; matched: boolean; message: string }> {
-  if (!row.certificateNumber && !row.registrationNumber && !row.docNumber) return { ok: false, matched: false, message: "No number on this row." };
+  if (!row.certificateNumber && !row.registrationNumber) return { ok: false, matched: false, message: "No number on this row." };
   // Numbers already used on a portal certificate (another enrollment) are refused.
   const q = (v: string) => `"${v.replace(/["\\]/g, "")}"`;
-  const used = [row.certificateNumber && `certificate_number.eq.${q(row.certificateNumber)}`, row.registrationNumber && `registration_number.eq.${q(row.registrationNumber)}`, row.docNumber && `doc_number.eq.${q(row.docNumber)}`].filter(Boolean).join(",");
+  const used = [row.certificateNumber && `certificate_number.eq.${q(row.certificateNumber)}`, row.registrationNumber && `registration_number.eq.${q(row.registrationNumber)}`].filter(Boolean).join(",");
   // Find the trainee: NWMTACI number first, else "LAST, FIRST".
   let traineeIds: string[] = [];
   if (row.nwmtaciNumber) traineeIds = ((await admin.from("trainees").select("id").ilike("application_number", row.nwmtaciNumber)).data ?? []).map((t) => t.id as string);
@@ -1042,16 +1042,16 @@ async function recordLegacyCertificate(admin: ReturnType<typeof createSupabaseAd
     const { data: clash } = await admin.from("certificates").select("enrollment_id").or(used).limit(1);
     if (clash?.length && clash[0].enrollment_id !== enrollmentId) return { ok: false, matched: !!enrollmentId, message: "One of these numbers is already on another certificate." };
   }
-  const { error } = await admin.from("legacy_certificates").insert({ trainee_name: row.traineeName, nwmtaci_number: row.nwmtaciNumber || null, course_code: row.courseCode || null, enrollment_id: enrollmentId, certificate_number: row.certificateNumber || null, registration_number: row.registrationNumber || null, doc_number: row.docNumber || null, issued_on: row.issuedOn || null, recorded_by: actor });
+  const { error } = await admin.from("legacy_certificates").insert({ trainee_name: row.traineeName, nwmtaci_number: row.nwmtaciNumber || null, course_code: row.courseCode || null, enrollment_id: enrollmentId, certificate_number: row.certificateNumber || null, registration_number: row.registrationNumber || null, issued_on: row.issuedOn || null, recorded_by: actor });
   if (error) return { ok: false, matched: !!enrollmentId, message: error.code === "23505" ? "One of these numbers is already recorded." : /legacy_certificates/i.test(error.message) ? "Apply database update 202610090037 first." : error.message };
   if (enrollmentId) {
     const printedAt = row.issuedOn ? new Date(`${row.issuedOn}T12:00:00+08:00`).toISOString() : new Date().toISOString();
-    const fields = { status: "Released", print_count: 1, printed_at: printedAt, certificate_number: row.certificateNumber || null, registration_number: row.registrationNumber || null, doc_number: row.docNumber || null, updated_at: new Date().toISOString() };
+    const fields = { status: "Released", print_count: 1, printed_at: printedAt, certificate_number: row.certificateNumber || null, registration_number: row.registrationNumber || null, updated_at: new Date().toISOString() };
     const { data: cert } = await admin.from("certificates").select("id,print_count").eq("enrollment_id", enrollmentId).maybeSingle();
     const res = cert ? await admin.from("certificates").update(fields).eq("id", cert.id) : await admin.from("certificates").insert({ enrollment_id: enrollmentId, snapshot: { source: "Issued before the portal" }, ...fields });
     if (res.error) return { ok: true, matched: true, message: `Numbers reserved; the certificate record could not be updated: ${res.error.message}` };
   }
-  await admin.from("audit_logs").insert({ actor_id: actor, actor_role: "admin", action: "certificate.recorded_before_portal", record_type: "certificate", record_id: row.certificateNumber || row.docNumber || row.registrationNumber, new_values: { ...row, enrollment_id: enrollmentId } });
+  await admin.from("audit_logs").insert({ actor_id: actor, actor_role: "admin", action: "certificate.recorded_before_portal", record_type: "certificate", record_id: row.certificateNumber || row.registrationNumber, new_values: { ...row, enrollment_id: enrollmentId } });
   return { ok: true, matched: !!enrollmentId, message: enrollmentId ? "Recorded and matched to the trainee's enrollment." : "Numbers reserved; no matching trainee and course in the portal." };
 }
 
@@ -1781,10 +1781,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "certificate-number-settings-save") {
-      if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin sets the Doc. No. and Registration No." }, { status: 403 });
+      if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin sets the Registration No." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { data: prior } = await admin.from("certificate_number_settings").select("*").maybeSingle();
-      const row = { id: true, doc_last: input.docLast, doc_digits: input.docDigits, reg_prefix: input.regPrefix.toUpperCase(), reg_last: input.regLast, reg_digits: input.regDigits, set_by: staff.user.id, set_at: new Date().toISOString() };
+      const row = { id: true, reg_prefix: input.regPrefix.toUpperCase(), reg_last: input.regLast, reg_digits: input.regDigits, set_by: staff.user.id, set_at: new Date().toISOString() };
       const { error } = await admin.from("certificate_number_settings").upsert(row);
       if (error) return NextResponse.json({ error: /certificate_number_settings/i.test(error.message) ? "Apply database update 202610090037 first." : error.message }, { status: 400 });
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: "certificate.number_series_set", record_type: "settings", record_id: "certificate_number_settings", prior_values: prior ?? null, new_values: row });
