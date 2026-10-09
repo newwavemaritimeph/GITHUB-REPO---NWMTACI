@@ -8,6 +8,7 @@ import { withAuthTimeout } from "@/lib/supabase/config";
 
 // The seven portal roles (owner, 9 Oct 2026).
 const ROLE_CODES=z.enum(["admin","registration","cashier","accounting","releasing_officer","mismo_officer","admin_assistant"]);
+const ROLE_NAMES:Record<string,string>={admin:"Admin",registration:"Registration",cashier:"Cashier",accounting:"Accounting",releasing_officer:"Releasing Officer",mismo_officer:"MISMO Compliance Officer",admin_assistant:"Admin Assistant"};
 const input=z.discriminatedUnion("action",[
   z.object({action:z.literal("payment-method"),name:z.string().trim().min(2).max(80),requiresReference:z.boolean(),allowsProof:z.boolean()}),
   z.object({action:z.literal("marketing-agency"),name:z.string().trim().min(2).max(160),contactName:z.string().trim().max(160).optional(),email:z.string().email().optional().or(z.literal("")),mobile:z.string().trim().max(40).optional()}),
@@ -60,7 +61,14 @@ export async function GET(){const staff=await requireStaff(["admin"]);
 async function setRoles(db:ReturnType<typeof createSupabaseAdminClient>,userId:string,codes:(string|null|undefined)[],actor:string){
   const wanted=[...new Set(codes.filter((c):c is string=>!!c))].slice(0,2);
   if(!wanted.length)throw new Error("Choose a role.");
-  const {data:roles,error}=await db.from("roles").select("id,code").in("code",wanted);if(error)throw error;
+  let {data:roles,error}=await db.from("roles").select("id,code,active").in("code",wanted);if(error)throw error;
+  // A role row may be missing (its migration not run yet) or switched off: the
+  // seven portal roles are always allowed, so create or reactivate them here.
+  const missing=wanted.filter(code=>!(roles??[]).some(r=>r.code===code&&r.active));
+  if(missing.length){
+    const up=await db.from("roles").upsert(missing.map(code=>({code,name:ROLE_NAMES[code]??code,is_staff:true,active:true})),{onConflict:"code"});if(up.error)throw up.error;
+    ({data:roles,error}=await db.from("roles").select("id,code,active").in("code",wanted));if(error)throw error;
+  }
   if((roles??[]).length!==wanted.length)throw new Error("Role not found.");
   const del=await db.from("user_roles").delete().eq("user_id",userId);if(del.error)throw del.error;
   const ins=await db.from("user_roles").insert((roles??[]).map(r=>({user_id:userId,role_id:r.id,assigned_by:actor})));if(ins.error)throw ins.error;

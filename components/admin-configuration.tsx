@@ -27,7 +27,7 @@ function UserAccounts({data,post}:{data:Data;onSubmit:(e:FormEvent<HTMLFormEleme
   // An employee may hold two roles (owner, 9 Oct 2026); the second is optional.
   const secondRoleSelect=(first:string,value:string,set:(v:string)=>void)=><label>Second Role (Optional)<select value={value} onChange={e=>set(e.target.value)}><option value="">None</option>{ROLE_OPTIONS.filter(([code])=>code!==first).map(([code,label])=><option key={code} value={code}>{label}</option>)}</select></label>;
   const [temp,setTemp]=useState("");
-  const roleLabel=(code?:string)=>ROLE_OPTIONS.find(o=>o[0]===code)?.[1]??code??"No role";
+  const roleLabel=(code?:string)=>ROLE_OPTIONS.find(o=>o[0]===code)?.[1]??code??"No Role";
   const active=data.users.filter(u=>u.accountState!=="Deactivated"),removed=data.users.filter(u=>u.accountState==="Deactivated");
   const startEdit=(u:Account)=>{setEditing(u.id);setResetting(null);setDeleting(null);setEdit({completeName:u.completeName||"",position:u.position??"",roleCode:u.roles[0]??"cashier",secondRoleCode:u.roles[1]??""})};
   const row=(u:Account)=>{
