@@ -1,0 +1,42 @@
+/* Training Completion and Record of Assessment Report: A4 landscape, like the supplied form (AD NO. 05-00). */
+.tcr-page { background: #cfd8df; min-height: 100vh; padding: 16px; }
+.tcr-toolbar { max-width: 1123px; margin: 0 auto 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; background: #fff; border-radius: 12px; padding: 10px 14px; font: 14px Geist, system-ui, sans-serif; color: #0f2638; }
+.tcr-toolbar span { display: block; color: #5f7180; font-size: 13px; }
+.tcr-toolbar button { border: 0; background: #0571D0; color: #fff; border-radius: 9px; padding: 8px 15px; font: 600 14px Geist, system-ui, sans-serif; cursor: pointer; margin-left: 6px; }
+.tcr-toolbar button.ghost { background: #eef4f8; color: #0f2638; }
+.tcr-warn { max-width: 1123px; margin: 0 auto 12px; background: #fde9dd; color: #b4480f; border-radius: 10px; padding: 10px 14px; font: 14px Geist, system-ui, sans-serif; }
+
+.tcr-sheet { background: #fff; color: #000; width: 1123px; margin: 0 auto; padding: 26px 22px 18px; font: 8.4px/1.2 Arial, Helvetica, sans-serif; }
+.tcr-top { display: grid; grid-template-columns: 150px 110px 1fr; align-items: center; margin-bottom: 6px; }
+.tcr-doc { font-size: 6.4px; line-height: 1.35; }
+.tcr-logo { width: 62px; justify-self: center; }
+.tcr-top h3 { font: 700 14.5px Arial, Helvetica, sans-serif; margin: 0 0 0 30px; }
+.tcr { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.tcr td { border: 1px solid #000; padding: 1px 3px; vertical-align: middle; overflow: hidden; }
+.tcr .org { font-weight: 700; font-size: 9px; padding: 2px 3px; }
+.tcr .course { font-weight: 700; font-size: 10px; line-height: 1.2; vertical-align: top; height: 58px; }
+.tcr .b { font-weight: 700; } .tcr .c { text-align: center; } .tcr .sm { font-size: 7px; } .tcr .xs { font-size: 5.6px; }
+.tcr .task { font-size: 7.2px; text-align: center; line-height: 1.2; padding: 3px 6px; }
+.tcr .cls { font-size: 8px; line-height: 1.35; vertical-align: top; }
+.tcr .h2 td { height: 66px; } .tcr .h3 td { height: 46px; }
+.tcr .dp { display: flex; gap: 8px; justify-content: space-between; } .tcr .nt { margin-top: 6px; }
+.tcr .v { writing-mode: vertical-rl; transform: rotate(180deg); margin: 0 auto; font-size: 6.6px; line-height: 1.15; max-height: 110px; text-align: left; }
+.tcr .vi { font-style: italic; font-weight: 700; font-size: 7px; }
+.tcr .crit { font-size: 5.3px; max-height: 104px; white-space: normal; text-align: center; }
+.tcr .ln td { height: 13.4px; font-size: 8px; white-space: nowrap; }
+.tcr .ln .no { text-align: right; padding-right: 2px; border-right: 0; } .tcr .ln .nm { border-left: 0; } .tcr .nf { padding-left: 24px; }
+.tcr-foot { display: grid; grid-template-columns: 1.3fr .7fr 1.3fr .7fr 1.25fr; gap: 16px; align-items: end; margin-top: 12px; font-size: 7.6px; text-align: center; }
+.tcr-foot .sg { display: flex; flex-direction: column; align-items: center; line-height: 1.35; }
+.tcr-foot .cc { align-self: flex-start; margin-bottom: 8px; }
+.tcr-foot .sl { border-bottom: 1px solid #000; width: 100%; min-height: 30px; display: flex; align-items: flex-end; justify-content: center; padding-bottom: 1px; margin-top: 6px; }
+.tcr-foot .dt { align-self: end; margin-bottom: 31px; }
+.tcr-foot .legend { border-collapse: collapse; width: 100%; font-size: 6.4px; }
+.tcr-foot .legend td { border: 1px solid #000; padding: 1px 3px; }
+.tcr-foot .legend .i { font-style: italic; } .tcr-foot .legend .b { font-weight: 700; } .tcr-foot .legend .c { text-align: center; }
+
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+  .tcr-page { background: none; padding: 0; min-height: 0; }
+  .tcr-toolbar, .tcr-warn { display: none; }
+  .tcr-sheet { width: auto; padding: 0; }
+}

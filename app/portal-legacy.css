@@ -2149,3 +2149,30 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .rb3-bar{position:sticky;bottom:12px;margin:0 20px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid #dbe5ec;background:#fff;border-radius:12px;padding:10px 14px;color:#5f7180;box-shadow:0 6px 20px rgba(6,20,32,.08)}
 .nw-shell .rb3-bar.on{border-color:#0571D0;color:#0f2638}
 .nw-shell .rb3 .portal-message{margin:0 20px 12px}
+
+/* MISMO › Completion Records (owner, 9 Oct 2026). */
+.nw-shell .tcr-batches{display:flex;gap:8px;flex-wrap:wrap;padding:0 20px 16px}
+.nw-shell .tcr-bt{border:1px solid #dbe5ec;background:#fff;border-radius:12px;padding:9px 13px;text-align:left;min-width:230px;cursor:pointer;display:flex;flex-direction:column;gap:3px;align-items:flex-start;color:#0f2638}
+.nw-shell .tcr-bt.on{border-color:#123F63;box-shadow:0 0 0 1px #123F63}
+.nw-shell .tcr-bt small{color:#5f7180;font-size:12.5px}
+.nw-shell .tcr-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;padding:0 20px 18px}
+.nw-shell .tcr-form label,.nw-shell .tcr-task label,.nw-shell .tcr-fill label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:#5f7180;font-weight:500}
+.nw-shell .tcr-form input,.nw-shell .tcr-fill input{border:1px solid #dbe5ec;border-radius:9px;padding:8px 10px;font:inherit;font-size:14.5px;color:#0f2638;background:#fff}
+.nw-shell .tcr-ro{background:#eef4f8;border:1px solid #dbe5ec;border-radius:9px;padding:8px 10px;color:#0f2638;font-size:14.5px}
+.nw-shell .tcr-tasks{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:10px;padding:0 20px 18px}
+.nw-shell .tcr-task{border:1px solid #dbe5ec;border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.nw-shell .tcr-task small{color:#5f7180;font-size:12.5px}
+.nw-shell .tcr-task textarea{border:1px solid #dbe5ec;border-radius:8px;padding:7px 9px;min-height:64px;font:inherit;font-size:13.5px;color:#0f2638}
+.nw-shell .tcr-add{align-self:start}
+.nw-shell .tcr-fill{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.nw-shell .tcr-fill input{min-width:230px;font-family:var(--font-geist-mono),monospace}
+.nw-shell .tcr-grid th.c,.nw-shell .tcr-grid td.c{text-align:center}
+.nw-shell .tcr-all{display:block;margin:4px auto 0;border:1px solid #ffffff55;background:transparent;color:#fff;border-radius:6px;padding:1px 6px;font-size:11px;cursor:pointer}
+.nw-shell .tcr-pct{width:62px;border:1px solid #dbe5ec;border-radius:8px;padding:6px 7px;text-align:right;font:500 14px var(--font-geist-mono),monospace}
+.nw-shell .tcr-cert{min-width:210px;border:1px solid #dbe5ec;border-radius:8px;padding:6px 8px;font:500 13.5px var(--font-geist-mono),monospace}
+.nw-shell .tcr-tick{width:32px;height:32px;border-radius:8px;border:1px solid #dbe5ec;background:#fff;font-weight:700;cursor:pointer}
+.nw-shell .tcr-tick.yes{background:#e3f4ea;color:#0a7a3e;border-color:#0a7a3e}
+.nw-shell .tcr-tick.no{background:#fbe4dc;color:#b42318;border-color:#b42318}
+.nw-shell .tcr-p{color:#0a7a3e}.nw-shell .tcr-f{color:#b42318}
+.nw-shell .tcr-print{text-decoration:none;display:inline-flex;align-items:center}
+.nw-shell .tcr-print.off{opacity:.5;pointer-events:none}
