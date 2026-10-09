@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { parseCsv, downloadCsv } from "@/lib/csv";
 import { pesos, first as one, dueCentavos as dueOf } from "@/lib/portal-format";
 import { LiveCashierClosing, type ClosingData } from "./live-cashier-closing";
@@ -1376,7 +1376,7 @@ export function CashPositionModule({ data }: { data: AccountingData }) {
 
 type ConfigTrainee = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; email?: string | null; mobile?: string | null; srn?: string | null; company?: string | null; registered_at?: string | null };
 // Schedule of fees is fixed by the owner's ruling (Reprinting ₱500, Uniform ₱150, LBC ₱500), so it is not edited here.
-export const ACCOUNTING_CONFIG_SECTIONS = ["Payment channels", "Expense categories", "Requisition items", "Rebates per agency", "Partners"] as const;
+export const ACCOUNTING_CONFIG_SECTIONS = ["Payment channels", "Expense categories", "Requisition items", "Partners"] as const;
 export type AccountingConfigSection = (typeof ACCOUNTING_CONFIG_SECTIONS)[number];
 /**
  * Accounting › Configuration (owner, 7 Oct 2026): the referring agencies and
@@ -1384,81 +1384,100 @@ export type AccountingConfigSection = (typeof ACCOUNTING_CONFIG_SECTIONS)[number
  * Payment channels, course fees, charges and user accounts live in Admin.
  */
 /**
- * Rebates per Agency, Design 3 (owner, 9 Oct 2026): one matrix of every active
- * partner. In-House courses: 10%, 20%, 30% or 50% of the actual training fee, or
- * another percentage. BT-PSSR, Safety, Crowd, Crisis and CCM Domestic: a fixed
- * peso amount per partner (blank = no rebate). Changes are saved together.
+ * Configuration › Partners (owner, 9 Oct 2026): Partners and Partner Rebates in
+ * one module, using the Rebates matrix (Design 3). One row per partner: details,
+ * referral code, In-House % (10/20/30/50 or another), a fixed peso amount for
+ * BT-PSSR, Safety, Crowd, Crisis and CCM Domestic (blank = no rebate) and how the
+ * rebate is given. Edits are saved together; Accounting and the Admin share it.
  */
-type RebateDraft = { id: string; name: string; kind: string; percent: number | null; mode: string; stcw: Record<string, string> };
-function PartnerRebates({ data, busy, post }: { data: AccountingData; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
-  const agencies = (data.agencies as (Agency & { kind?: string | null; rebate_mode?: string | null; rebate_percent?: number | null })[]).filter((a) => a.active);
+type PartnerRow = Agency & { kind?: string | null; referral_code?: string | null; rebate_mode?: string | null; rebate_percent?: number | null };
+type PartnerDraft = { id: string; name: string; kind: string; contact: string; email: string; mobile: string; active: boolean; code: string; percent: number | null; mode: string; stcw: Record<string, string> };
+function PartnersModule({ data, busy, post }: { data: AccountingData; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
+  const agencies = data.agencies as PartnerRow[];
   const stcw = STCW_REBATE_COURSES.map(([code, label]) => ({ code, label, course: data.courses.find((c) => c.code.toUpperCase() === code) ?? null })).filter((x) => x.course);
-  const saved = (): RebateDraft[] => agencies.map((a) => ({ id: a.id, name: a.name, kind: a.kind || "Agency", percent: a.rebate_percent == null ? null : Number(a.rebate_percent), mode: a.rebate_mode === "No deduction" ? "No deduction" : "Deducted",
+  const base: PartnerDraft[] = agencies.map((a) => ({ id: a.id, name: a.name, kind: a.kind || "Agency", contact: a.contact_name ?? "", email: a.email ?? "", mobile: a.mobile ?? "", active: a.active, code: a.referral_code ?? "",
+    percent: a.rebate_percent == null ? null : Number(a.rebate_percent), mode: a.rebate_mode === "No deduction" ? "No deduction" : "Deducted",
     stcw: Object.fromEntries(stcw.map((s) => { const v = data.agencyCourseRebates.find((r) => r.agency_id === a.id && r.course_id === s.course!.id)?.rebate_centavos ?? 0; return [s.course!.id, v ? (v / 100).toFixed(2) : ""]; })) }));
-  const [draft, setDraft] = useState<RebateDraft[] | null>(null);
+  const [edits, setEdits] = useState<Record<string, PartnerDraft>>({});
+  const [filter, setFilter] = useState<"Active" | "Archived" | "All">("Active"), [query, setQuery] = useState("");
+  const [open, setOpen] = useState<string | null>(null), [codeAsk, setCodeAsk] = useState<string | null>(null), [copied, setCopied] = useState("");
+  const [adding, setAdding] = useState<{ name: string; kind: string; contact: string; email: string; mobile: string } | null>(null);
   const [problem, setProblem] = useState(""), [done, setDone] = useState("");
-  const base = saved(), rows = draft ?? base;
-  const key = (r: RebateDraft) => JSON.stringify([r.percent, r.mode, r.stcw]);
-  const dirty = rows.filter((r, i) => base[i] && key(r) !== key(base[i]));
-  const set = (i: number, patch: Partial<RebateDraft>) => { setDone(""); setProblem(""); setDraft(rows.map((r, j) => (j === i ? { ...r, ...patch } : r))); };
+  const rows = base.map((r) => edits[r.id] ?? r);
+  const key = (r: PartnerDraft) => JSON.stringify([r.name, r.kind, r.contact, r.email, r.mobile, r.active, r.percent, r.mode, r.stcw]);
+  const baseById = new Map(base.map((r) => [r.id, r]));
+  const dirty = rows.filter((r) => key(r) !== key(baseById.get(r.id)!));
+  const set = (id: string, patch: Partial<PartnerDraft>) => { setDone(""); setProblem(""); const cur = rows.find((r) => r.id === id)!; setEdits({ ...edits, [id]: { ...cur, ...patch } }); };
   const cents = (v: string) => Math.round((Number(v) || 0) * 100);
+  const q = query.trim().toLowerCase();
+  const shown = rows.filter((r) => (filter === "All" || (filter === "Active" ? r.active : !r.active)) && (!q || `${r.name} ${r.code} ${r.contact} ${r.kind}`.toLowerCase().includes(q)));
+  const count = (f: typeof filter) => rows.filter((r) => f === "All" || (f === "Active" ? r.active : !r.active)).length;
   async function save() {
+    if (dirty.some((r) => r.name.trim().length < 2)) { setProblem("Every partner needs a name."); return; }
     const check = rebateRowsProblem(dirty.map((r) => ({ name: r.name, percent: r.percent, stcw: stcw.map((s) => ({ courseId: s.course!.id, label: s.label, feeCentavos: Number(s.course!.standard_price_centavos), cents: cents(r.stcw[s.course!.id] ?? "") })) })));
     if (check) { setProblem(check); return; }
     try {
-      await post({ action: "partner-rebates-save", rows: dirty.map((r) => ({ agencyId: r.id, percent: r.percent, mode: r.mode, stcw: stcw.map((s) => ({ courseId: s.course!.id, cents: cents(r.stcw[s.course!.id] ?? "") })) })) });
-      setDone(`Saved ${dirty.length} partner${dirty.length === 1 ? "" : "s"}.`); setDraft(null);
+      await post({ action: "partner-rebates-save", rows: dirty.map((r) => ({ agencyId: r.id, percent: r.percent, mode: r.mode, stcw: stcw.map((s) => ({ courseId: s.course!.id, cents: cents(r.stcw[s.course!.id] ?? "") })),
+        details: { name: r.name.trim(), kind: r.kind === "Consultancy" ? "Consultancy" : "Agency", contactName: r.contact.trim(), email: r.email.trim(), mobile: r.mobile.trim(), active: r.active } })) });
+      setDone(`Saved ${dirty.length} partner${dirty.length === 1 ? "" : "s"}.`); setEdits({});
     } catch { /* the page shows the error */ }
   }
-  if (!agencies.length) return <section className="portal-panel cx-panel"><p className="portal-empty-copy">Add a partner in Configuration › Partners first.</p></section>;
-  return <section className="portal-panel cx-panel rb3">
-    <div className="panel-heading"><h2>Rebates per Partner</h2><span className="muted-text">Change any cell, then Save Changes · a blank STCW cell gives no rebate</span></div>
-    {done && <div className="portal-message success">{done}</div>}
-    <div className="rb3-wrap"><table className="rb3-table"><thead><tr><th>Partner</th><th>In-House Courses<small>% of the training fee</small></th>
-      {stcw.map((s) => <th key={s.code} className="r">{s.label}<small>Fee {pesos(Number(s.course!.standard_price_centavos))}</small></th>)}<th>How It Is Given</th></tr></thead>
-      <tbody>{rows.map((r, i) => { const custom = r.percent != null && !(REBATE_PRESETS as readonly number[]).includes(r.percent); return <tr key={r.id} className={base[i] && key(r) !== key(base[i]) ? "dirty" : ""}>
-        <td><strong>{r.name}</strong><small>{r.kind}</small></td>
-        <td><div className="rb3-chips" role="radiogroup" aria-label={`In-House rebate for ${r.name}`}>
-          {REBATE_PRESETS.map((v) => <button key={v} type="button" role="radio" aria-checked={r.percent === v} className={r.percent === v ? "on" : ""} onClick={() => set(i, { percent: v })}>{v}%</button>)}
-          <label className={`rb3-other${custom ? " on" : ""}`}><input type="number" min="1" max="100" step="0.5" placeholder="Other" aria-label={`Other percentage for ${r.name}`} value={custom ? String(r.percent) : ""} onChange={(e) => set(i, { percent: e.target.value === "" ? (custom ? null : r.percent) : Number(e.target.value) })} />%</label>
-        </div>{r.percent == null && <small className="rb3-none">Not set</small>}</td>
-        {stcw.map((s) => <td key={s.code} className="r"><input className="rb3-amt" type="number" min="0" step="0.01" placeholder="—" aria-label={`${r.name} ${s.label} rebate`} value={r.stcw[s.course!.id] ?? ""} onChange={(e) => set(i, { stcw: { ...r.stcw, [s.course!.id]: e.target.value } })} /></td>)}
-        <td><select className="rb3-mode" value={r.mode} onChange={(e) => set(i, { mode: e.target.value })}><option value="Deducted">Deducted From Payment</option><option value="No deduction">Paid to the Partner Later</option></select></td>
-      </tr>; })}</tbody></table></div>
-    {problem && <div className="portal-message error">{problem}</div>}
-    <div className={`rb3-bar${dirty.length ? " on" : ""}`}><span>{dirty.length ? `${dirty.length} partner${dirty.length === 1 ? "" : "s"} changed` : "No changes"}</span>
-      <span className="cx-acts"><button type="button" className="portal-secondary" disabled={!dirty.length || busy} onClick={() => { setDraft(null); setProblem(""); }}>Discard</button><button type="button" className="portal-primary" disabled={!dirty.length || busy} onClick={() => void save()}>{busy ? "Saving…" : "Save Changes"}</button></span></div>
-    <p className="ac-note">Deducted: the trainee pays the fee less the rebate. Paid to the partner later: the trainee pays the full fee and the rebate goes to Payables › Agency Rebates. Accounting and the Admin edit the same settings; every change is recorded in the audit log.</p>
-  </section>;
-}
-
-/**
- * Referral codes (owner, 8 Oct 2026): every agency and consultancy gets one
- * automatically. Trainees type it on the public registration form; the
- * agency's rebate is then deducted from what they pay.
- */
-function ReferralCodes({ agencies, busy, post }: { agencies: (Agency & { kind?: string | null; referral_code?: string | null; rebate_mode?: string | null; rebate_percent?: number | null })[]; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
-  const [copied, setCopied] = useState("");
-  const [confirm, setConfirm] = useState<string | null>(null);
+  async function addPartner() {
+    if (!adding || adding.name.trim().length < 2) { setProblem("Enter the partner name."); return; }
+    try { await post({ action: "agency-save", name: adding.name.trim(), kind: adding.kind === "Consultancy" ? "Consultancy" : "Agency", contactName: adding.contact.trim(), email: adding.email.trim(), mobile: adding.mobile.trim() }); setDone(`${adding.name.trim()} added; its referral code was made automatically. Set its rebates in the table.`); setAdding(null); setFilter("Active"); }
+    catch { /* the page shows the error */ }
+  }
   const copy = (id: string, code: string) => { void navigator.clipboard?.writeText(code).then(() => { setCopied(id); window.setTimeout(() => setCopied(""), 1800); }).catch(() => undefined); };
-  const list = agencies.filter((a) => a.active);
-  return <section className="portal-panel cx-panel">
-    <div className="panel-heading"><h2>Referral Codes</h2></div>
-    {list.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Partner</th><th>Type</th><th>Rebate</th><th>Referral Code</th><th></th></tr></thead><tbody>
-      {list.map((a) => <tr key={a.id}>
-        <td data-l="" className="lead"><span className="cx-name">{a.name}</span></td>
-        <td data-l="Type">{a.kind || "Agency"}</td>
-        <td data-l="Rebate">{a.rebate_mode === "No deduction" ? "Paid to the agency" : "Deducted from payment"}{a.rebate_percent ? <small>{Number(a.rebate_percent)}% of the training fee</small> : null}</td>
-        <td data-l="Referral code"><span className="cx-mono ref-code">{a.referral_code || "Not set yet"}</span></td>
-        <td data-l=""><div className="cx-acts">
-          {a.referral_code && <button type="button" className="portal-secondary" onClick={() => copy(a.id, a.referral_code!)}>{copied === a.id ? "Copied" : "Copy"}</button>}
-          {confirm === a.id
-            ? <><span className="muted-text">The old code will stop working.</span><button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "agency-code-regenerate", id: a.id }).then(() => setConfirm(null)).catch(() => undefined)}>Make New Code</button><button type="button" className="portal-secondary" onClick={() => setConfirm(null)}>Keep</button></>
-            : <button type="button" className="portal-secondary" onClick={() => setConfirm(a.id)}>{a.referral_code ? "New Code" : "Create Code"}</button>}
-        </div></td>
-      </tr>)}
-    </tbody></table></div> : <p className="portal-empty-copy">Add a partner above; its referral code is created automatically.</p>}
-  </section>;
+  const span = 5 + stcw.length;
+  return <>
+    <div className="pm-top">{!adding && <button type="button" className="portal-primary" onClick={() => { setAdding({ name: "", kind: "Agency", contact: "", email: "", mobile: "" }); setDone(""); setProblem(""); }}>Add Partner</button>}</div>
+    {adding && <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Add Partner</h2></div>
+      <div className="pm-form">
+        <label>Name<input autoFocus value={adding.name} maxLength={120} onChange={(e) => setAdding({ ...adding, name: e.target.value })} placeholder="e.g. Blue Anchor Consultancy" /></label>
+        <label>Type<select value={adding.kind} onChange={(e) => setAdding({ ...adding, kind: e.target.value })}><option>Agency</option><option>Consultancy</option></select></label>
+        <label>Contact Person<input value={adding.contact} maxLength={120} onChange={(e) => setAdding({ ...adding, contact: e.target.value })} /></label>
+        <label>Email<input type="email" value={adding.email} onChange={(e) => setAdding({ ...adding, email: e.target.value })} /></label>
+        <label>Mobile<input value={adding.mobile} maxLength={40} onChange={(e) => setAdding({ ...adding, mobile: e.target.value })} /></label>
+      </div>
+      <div className="pm-actions"><span className="muted-text">A referral code is made automatically. Set the rebates in the table after saving.</span><span className="cx-acts"><button type="button" className="portal-secondary" onClick={() => setAdding(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={() => void addPartner()}>Save Partner</button></span></div>
+    </section>}
+    <section className="portal-panel cx-panel rb3">
+      <div className="panel-heading"><h2>Partners and Rebates</h2>
+        <div className="pm-tools"><input className="pm-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search partner or referral code" aria-label="Search partners" />
+          <div className="cx-seg">{(["Active", "Archived", "All"] as const).map((f) => <button key={f} type="button" className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{f} <span className="cx-mono">{count(f)}</span></button>)}</div></div></div>
+      {done && <div className="portal-message success">{done}</div>}
+      <div className="rb3-wrap"><table className="rb3-table"><thead><tr><th>Partner</th><th>Referral Code</th><th>In-House Courses<small>% of the training fee</small></th>
+        {stcw.map((s) => <th key={s.code} className="r">{s.label}<small>Fee {pesos(Number(s.course!.standard_price_centavos))}</small></th>)}<th>How It Is Given</th><th>Status</th></tr></thead>
+        <tbody>{shown.map((r) => { const b = baseById.get(r.id)!; const changed = key(r) !== key(b); const custom = r.percent != null && !(REBATE_PRESETS as readonly number[]).includes(r.percent); return <Fragment key={r.id}>
+          <tr className={`${changed ? "dirty" : ""}${r.active ? "" : " pm-archived"}`}>
+            <td className="pm-name"><strong>{r.name}</strong><small>{r.kind}{r.contact ? ` · ${r.contact}` : ""}</small><button type="button" className="pm-link" onClick={() => setOpen(open === r.id ? null : r.id)}>{open === r.id ? "Hide Details" : "Details"}</button></td>
+            <td className="pm-code"><b className="cx-mono">{r.code || "Not set yet"}</b>
+              {codeAsk === r.id ? <span className="pm-ask">The old code stops working.<button type="button" className="pm-link" disabled={busy} onClick={() => void post({ action: "agency-code-regenerate", id: r.id }).then(() => { setCodeAsk(null); setDone(`New referral code made for ${r.name}.`); }).catch(() => undefined)}>Confirm</button><button type="button" className="pm-link" onClick={() => setCodeAsk(null)}>Cancel</button></span>
+                : <span>{r.code && <button type="button" className="pm-link" onClick={() => copy(r.id, r.code)}>{copied === r.id ? "Copied" : "Copy"}</button>}<button type="button" className="pm-link" onClick={() => setCodeAsk(r.id)}>{r.code ? "New Code" : "Create Code"}</button></span>}</td>
+            <td><div className="rb3-chips" role="radiogroup" aria-label={`In-House rebate for ${r.name}`}>
+              {REBATE_PRESETS.map((v) => <button key={v} type="button" role="radio" aria-checked={r.percent === v} className={r.percent === v ? "on" : ""} onClick={() => set(r.id, { percent: v })}>{v}%</button>)}
+              <label className={`rb3-other${custom ? " on" : ""}`}><input type="number" min="1" max="100" step="0.5" placeholder="Other" aria-label={`Other percentage for ${r.name}`} value={custom ? String(r.percent) : ""} onChange={(e) => set(r.id, { percent: e.target.value === "" ? (custom ? null : r.percent) : Number(e.target.value) })} />%</label>
+            </div>{r.percent == null && <small className="rb3-none">Not set</small>}</td>
+            {stcw.map((s) => <td key={s.code} className="r"><input className="rb3-amt" type="number" min="0" step="0.01" placeholder="—" aria-label={`${r.name} ${s.label} rebate`} value={r.stcw[s.course!.id] ?? ""} onChange={(e) => set(r.id, { stcw: { ...r.stcw, [s.course!.id]: e.target.value } })} /></td>)}
+            <td><select className="rb3-mode" value={r.mode} onChange={(e) => set(r.id, { mode: e.target.value })}><option value="Deducted">Deducted From Payment</option><option value="No deduction">Paid to the Partner Later</option></select></td>
+            <td><span className={`ac-chip ${r.active ? "ok" : "warn"}`}>{r.active ? "Active" : "Archived"}</span></td>
+          </tr>
+          {open === r.id && <tr className="pm-details"><td colSpan={span}><div className="pm-form">
+            <label>Name<input value={r.name} maxLength={120} onChange={(e) => set(r.id, { name: e.target.value })} /></label>
+            <label>Type<select value={r.kind} onChange={(e) => set(r.id, { kind: e.target.value })}><option>Agency</option><option>Consultancy</option></select></label>
+            <label>Contact Person<input value={r.contact} maxLength={120} onChange={(e) => set(r.id, { contact: e.target.value })} /></label>
+            <label>Email<input type="email" value={r.email} onChange={(e) => set(r.id, { email: e.target.value })} /></label>
+            <label>Mobile<input value={r.mobile} maxLength={40} onChange={(e) => set(r.id, { mobile: e.target.value })} /></label>
+            <div className="pm-arch"><button type="button" className="portal-secondary" onClick={() => set(r.id, { active: !r.active })}>{r.active ? "Archive Partner" : "Restore Partner"}</button></div>
+          </div><small className="muted-text">Archived partners keep their history; their referral code stops working on the website registration.</small></td></tr>}
+        </Fragment>; })}
+        {!shown.length && <tr><td colSpan={span}><span className="portal-empty-copy">No partners match.</span></td></tr>}</tbody></table></div>
+      {problem && <div className="portal-message error">{problem}</div>}
+      <div className={`rb3-bar${dirty.length ? " on" : ""}`}><span>{dirty.length ? `${dirty.length} partner${dirty.length === 1 ? "" : "s"} changed` : "No changes"}</span>
+        <span className="cx-acts"><button type="button" className="portal-secondary" disabled={!dirty.length || busy} onClick={() => { setEdits({}); setProblem(""); }}>Discard</button><button type="button" className="portal-primary" disabled={!dirty.length || busy} onClick={() => void save()}>{busy ? "Saving…" : "Save Changes"}</button></span></div>
+      <p className="ac-note">Trainees type the referral code on the website registration. Deducted: the trainee pays the fee less the rebate. Paid to the partner later: the trainee pays the full fee and the rebate goes to Payables › Agency Rebates. Every change is recorded in the audit log.</p>
+    </section>
+  </>;
 }
 
 export function AccountingConfiguration({ section, data, reload }: { section: AccountingConfigSection; data: AccountingData; trainees?: ConfigTrainee[]; applicationNumbers?: Record<string, string>; reload: () => Promise<void> }) {
@@ -1485,13 +1504,7 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
         onArchive={(id, active, name) => void post({ action: "channel-save", id, name, active: !active }).catch(() => undefined)}
         onRemove={(id) => void post({ action: "config-remove", entity: "channel", id }).catch(() => undefined)} removable />
     </>}
-    {section === "Partners" && <SetupList title="Partners" description="" entityLabel="partner" canManage busy={busy}
-      fields={[{ key: "name", label: "Name" }, { key: "kind", label: "Type", type: "select", options: ["Agency", "Consultancy"] }, { key: "contactName", label: "Contact person", optional: true }, { key: "email", label: "Email", optional: true }, { key: "mobile", label: "Mobile", optional: true }]}
-      rows={data.agencies.map((a) => { const kind = (a as { kind?: string | null }).kind || "Agency"; const noDeduction = (a as { rebate_mode?: string | null }).rebate_mode === "No deduction"; const pct = (a as { rebate_percent?: number | null }).rebate_percent; return { id: a.id, primary: a.name, secondary: [kind, noDeduction ? "Rebate paid to the agency" : "Rebate deducted", pct ? `${Number(pct)}% of the training fee` : "", a.contact_name, a.email, a.mobile].filter(Boolean).join(" · "), active: a.active, values: { name: a.name, kind, rebateMode: noDeduction ? "No deduction (pay to the agency)" : "Deducted from payment", rebatePercent: pct ? String(Number(pct)) : "", contactName: a.contact_name || "", email: a.email || "", mobile: a.mobile || "" } }; })}
-      onSubmit={(v, id) => post({ action: "agency-save", id, name: String(v.name), kind: v.kind === "Consultancy" ? "Consultancy" : "Agency", contactName: String(v.contactName || ""), email: String(v.email || ""), mobile: String(v.mobile || "") })}
-      onArchive={(id, active, name) => void post({ action: "agency-save", id, name, active: !active }).catch(() => undefined)}
-      onRemove={(id) => void post({ action: "config-remove", entity: "partner", id }).catch(() => undefined)} removable />}
-    {section === "Partners" && <ReferralCodes agencies={data.agencies as (Agency & { kind?: string | null; referral_code?: string | null; rebate_mode?: string | null; rebate_percent?: number | null })[]} busy={busy} post={post} />}
+    {section === "Partners" && <PartnersModule data={data} busy={busy} post={post} />}
     {section === "Expense categories" && <SetupList title="Expense Categories" description="" entityLabel="category" canManage busy={busy}
       fields={[{ key: "name", label: "Category name" }]}
       rows={(data as unknown as { expenseCategories: { id: string; name: string; active: boolean }[] }).expenseCategories.map((c) => ({ id: c.id, primary: c.name, secondary: c.active ? "Active" : "Archived", active: c.active, values: { name: c.name } }))}
@@ -1505,6 +1518,5 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
       onSubmit={(v, id) => post({ action: "requisition-item-save", id, name: String(v.name), unit: String(v.unit || "pc"), defaultCostCentavos: Math.round(Number(v.cost || 0) * 100) })}
       onArchive={(id, active, name) => void post({ action: "requisition-item-save", id, name, active: !active }).catch(() => undefined)}
       onRemove={(id) => void post({ action: "requisition-item-save", id, name: "x", remove: true }).catch(() => undefined)} removable />}
-    {section === "Rebates per agency" && <PartnerRebates data={data} busy={busy} post={post} />}
   </div>;
 }

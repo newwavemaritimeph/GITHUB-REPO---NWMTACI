@@ -85,7 +85,7 @@ const expenseCategoryInput = z.object({ action: z.literal("expense-category-save
 const inventoryItemInput = z.object({ action: z.literal("inventory-item-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), category: z.string().trim().max(80).optional(), unit: z.string().trim().min(1).max(24).default("pc"), unitValueCentavos: z.number().int().nonnegative().default(0), active: z.boolean().optional(), remove: z.boolean().optional() });
 const inventoryMoveInput = z.object({ action: z.literal("inventory-move"), itemId: z.string().uuid(), movementType: z.enum(["in", "out"]), quantity: z.number().int().positive(), remarks: z.string().trim().max(240).optional() });
 // Rebates per Agency, Design 3 (owner, 9 Oct 2026): every partner's % for In-House courses and fixed STCW amounts, saved together.
-const partnerRebatesInput = z.object({ action: z.literal("partner-rebates-save"), rows: z.array(z.object({ agencyId: z.string().uuid(), percent: z.number().gt(0).max(100).nullable(), mode: z.enum(["Deducted", "No deduction"]), stcw: z.array(z.object({ courseId: z.string().uuid(), cents: z.number().int().min(0) })).max(10) })).min(1).max(200) });
+const partnerRebatesInput = z.object({ action: z.literal("partner-rebates-save"), rows: z.array(z.object({ agencyId: z.string().uuid(), percent: z.number().gt(0).max(100).nullable(), mode: z.enum(["Deducted", "No deduction"]), stcw: z.array(z.object({ courseId: z.string().uuid(), cents: z.number().int().min(0) })).max(10), details: z.object({ name: z.string().trim().min(2).max(120), kind: z.enum(["Agency", "Consultancy"]), contactName: z.string().trim().max(120), email: z.string().trim().email().or(z.literal("")), mobile: z.string().trim().max(40), active: z.boolean() }).optional() })).min(1).max(200) });
 const agencyCodeInput = z.object({ action: z.literal("agency-code-regenerate"), id: z.string().uuid() });
 const agencyInput = z.object({ action: z.literal("agency-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), kind: z.enum(["Agency", "Consultancy"]).optional(), rebateMode: z.enum(["Deducted", "No deduction"]).optional(), rebatePercent: z.number().gt(0).max(100).nullable().optional(), contactName: z.string().trim().max(120).optional(), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
 const payableMarkPaidInput = z.object({ action: z.literal("payable-mark-paid"), id: z.string().uuid() });
@@ -1144,7 +1144,7 @@ export async function POST(request: Request) {
       const agencyIds = input.rows.map((r) => r.agencyId);
       const courseIds = [...new Set(input.rows.flatMap((r) => r.stcw.map((x) => x.courseId)))];
       const [{ data: agencies, error: agencyError }, { data: courses }, { data: prior }] = await Promise.all([
-        admin.from("marketing_agencies").select("id,name,rebate_percent,rebate_mode").in("id", agencyIds),
+        admin.from("marketing_agencies").select("id,name,kind,contact_name,email,mobile,active,rebate_percent,rebate_mode").in("id", agencyIds),
         courseIds.length ? admin.from("courses").select("id,code,standard_price_centavos").in("id", courseIds) : Promise.resolve({ data: [] as { id: string; code: string; standard_price_centavos: number }[] }),
         admin.from("agency_course_rebates").select("agency_id,course_id,rebate_centavos").in("agency_id", agencyIds),
       ]);
@@ -1163,15 +1163,17 @@ export async function POST(request: Request) {
       const now = new Date().toISOString();
       for (const r of input.rows) {
         const a = byId.get(r.agencyId)!;
-        const { error } = await admin.from("marketing_agencies").update({ rebate_percent: r.percent, rebate_mode: r.mode }).eq("id", r.agencyId);
+        // Partners module (9 Oct 2026): details and archive saved with the rebates.
+        const details = r.details ? { name: r.details.name, kind: r.details.kind, contact_name: r.details.contactName || null, email: r.details.email || null, mobile: r.details.mobile || null, active: r.details.active } : {};
+        const { error } = await admin.from("marketing_agencies").update({ rebate_percent: r.percent, rebate_mode: r.mode, ...details }).eq("id", r.agencyId);
         if (error) return NextResponse.json({ error: /rebate_percent|rebate_mode/i.test(error.message) ? "Apply database updates 202610080024 and 202610080025 first." : error.message }, { status: 400 });
         if (r.stcw.length) {
           const { error: matrixError } = await admin.from("agency_course_rebates").upsert(r.stcw.map((x) => ({ agency_id: r.agencyId, course_id: x.courseId, rebate_centavos: x.cents, updated_by: staff.user.id, updated_at: now })), { onConflict: "agency_id,course_id" });
           if (matrixError) throw matrixError;
         }
         await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("accounting") ? "accounting" : "admin", action: "agency.rebates_set", record_type: "marketing_agency", record_id: r.agencyId,
-          prior_values: { rebate_percent: a.rebate_percent ?? null, rebate_mode: a.rebate_mode ?? null, stcw: Object.fromEntries(r.stcw.map((x) => [courseById.get(x.courseId)?.code, priorMap.get(`${r.agencyId}:${x.courseId}`) ?? 0])) },
-          new_values: { rebate_percent: r.percent, rebate_mode: r.mode, stcw: Object.fromEntries(r.stcw.map((x) => [courseById.get(x.courseId)?.code, x.cents])) } });
+          prior_values: { name: a.name, kind: a.kind ?? null, contact_name: a.contact_name ?? null, email: a.email ?? null, mobile: a.mobile ?? null, active: a.active, rebate_percent: a.rebate_percent ?? null, rebate_mode: a.rebate_mode ?? null, stcw: Object.fromEntries(r.stcw.map((x) => [courseById.get(x.courseId)?.code, priorMap.get(`${r.agencyId}:${x.courseId}`) ?? 0])) },
+          new_values: { ...(r.details ?? {}), rebate_percent: r.percent, rebate_mode: r.mode, stcw: Object.fromEntries(r.stcw.map((x) => [courseById.get(x.courseId)?.code, x.cents])) } });
       }
       return NextResponse.json({ ok: true, saved: input.rows.length });
     }
