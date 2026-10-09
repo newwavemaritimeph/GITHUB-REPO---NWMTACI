@@ -30,7 +30,7 @@ export async function buildExpenseVoucher(db: Admin, id: string, options: { prin
   const x = (extra ?? {}) as { voucher_number?: string | null; request_number?: string | null; approved_at?: string | null; released_at?: string | null; released_by?: string | null; payment_channel?: string | null; reference_number?: string | null; drive_file_id?: string | null };
   const { data: lineData } = await db.from("expenses").select("line_items,supporting_document").eq("id", id).maybeSingle();
   const l = (lineData ?? {}) as { line_items?: ExpenseVoucherLine[] | null; supporting_document?: string | null };
-  if (data.status !== "Approved" && data.status !== "Paid") return null;
+  if (data.status !== "Approved" && data.status !== "Paid" && data.status !== "Void") return null;
   const requester = one(data.requester as { complete_name: string } | { complete_name: string }[] | null)?.complete_name ?? "";
   const approver = one(data.approver as { complete_name: string } | { complete_name: string }[] | null)?.complete_name ?? "";
   const released = data.status === "Paid";
@@ -45,12 +45,12 @@ export async function buildExpenseVoucher(db: Admin, id: string, options: { prin
     lines: Array.isArray(l.line_items) ? l.line_items : [],
     paymentChannel: x.payment_channel ?? "", referenceNumber: x.reference_number ?? "",
     supportingDocument: l.supporting_document ?? "",
-    requestedBy: requester, modeOfPayment: x.payment_channel ?? "", status: released ? "Released" : "Approved",
+    requestedBy: requester, modeOfPayment: x.payment_channel ?? "", status: data.status === "Void" ? "VOID" : released ? "Released" : "Approved",
     preparedBy: requester, preparedAt: `Cashier · ${fmt(data.created_at)}`,
     approvedBy: approver, approvedAt: `Accounting Manager · ${fmt(x.approved_at)}`,
     releasedBy: released ? (releaser as { complete_name?: string } | null)?.complete_name ?? "" : "",
     releasedAt: released && x.released_at ? `Cashier · ${fmtTime(x.released_at)}` : "Cashier",
-    printLabel: options.label ?? (options.printNumber && options.printNumber > 1 ? `Reprint ${options.printNumber - 1}` : undefined),
+    printLabel: data.status === "Void" ? "Voided by the Admin" : options.label ?? (options.printNumber && options.printNumber > 1 ? `Reprint ${options.printNumber - 1}` : undefined),
     logoBytes: await logo(),
   });
   return { bytes, voucherNumber, category: data.category, payee: data.payee, approvedAt: x.approved_at ?? data.created_at, driveFileId: x.drive_file_id ?? null };

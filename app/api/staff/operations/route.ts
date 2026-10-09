@@ -149,6 +149,14 @@ const requisitionItemInput = z.object({ action: z.literal("requisition-item-save
 const instructorSaveInput = z.object({ action: z.literal("instructor-save"), id: z.string().uuid().optional(), completeName: z.string().trim().min(2).max(160), mobile: z.string().trim().max(40).optional().default(""), email: z.string().trim().max(160).optional().default(""), notes: z.string().trim().max(300).optional().default(""), active: z.boolean().optional() });
 const accreditationInput = z.object({ action: z.literal("instructor-accreditation-save"), instructorId: z.string().uuid(), courseId: z.string().uuid(), accreditationNumber: z.string().trim().max(80).optional().default(""), validUntil: z.string().date().nullable().optional(), remove: z.boolean().optional() });
 const reconcileMarkInput = z.object({ action: z.literal("reconcile-mark"), paymentIds: z.array(z.string().uuid()).min(1).max(100), status: z.enum(["Reconciled", "Not in History"]), remarks: z.string().trim().max(300).optional() });
+// Admin voids and holidays (owner, 9 Oct 2026; migration 202610090038).
+const voidReason = z.string().trim().min(5, "Enter the reason (at least 5 characters).").max(500);
+const paymentVoidInput = z.object({ action: z.literal("payment-void"), paymentId: z.string().uuid(), reason: voidReason });
+const expenseVoidInput = z.object({ action: z.literal("expense-void"), id: z.string().uuid(), reason: voidReason });
+const enrollmentCancelInput = z.object({ action: z.literal("enrollment-cancel"), enrollmentId: z.string().uuid(), reason: voidReason });
+const holidaySaveInput = z.object({ action: z.literal("holiday-save"), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), name: z.string().trim().min(3).max(120), kind: z.enum(["Regular", "Special Non-Working", "Special Working", "Local"]) });
+const holidayDeleteInput = z.object({ action: z.literal("holiday-delete"), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
+const holidayMarinaInput = z.object({ action: z.literal("holiday-marina"), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), status: z.enum(["Not Sent", "Sent", "Approved", "Classes Moved"]), note: z.string().trim().max(300).optional() });
 const reconcileUndoInput = z.object({ action: z.literal("reconcile-undo"), paymentId: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
 const resourcePlanInput = z.object({ action: z.literal("resource-plan-save"), batchId: z.string().uuid(), classroomId: z.string().uuid().nullable(), instructorId: z.string().uuid().nullable() });
 const mismoSubmitInput = z.object({ action: z.literal("mismo-submit"), batchId: z.string().uuid(), listDate: z.string().date(), enrollmentIds: z.array(z.string().uuid()).max(200) });
@@ -229,7 +237,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -876,6 +884,7 @@ export async function GET() {
   const allocationChunks = await Promise.all(idChunks.map((ids) => db.from("payment_allocations").select("enrollment_id,amount_centavos,payments(verification_state,valid)").in("enrollment_id", ids)));
   for (const chunk of allocationChunks) {
     for (const allocation of chunk.data ?? []) {
+      if (first(allocation.payments as AllocationPayment | AllocationPayment[] | null)?.valid === false) continue;
       paidByEnrollment.set(allocation.enrollment_id, (paidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
       const payment = first(allocation.payments as AllocationPayment | AllocationPayment[] | null);
       if (payment?.verification_state === "Verified" && payment.valid) verifiedPaidByEnrollment.set(allocation.enrollment_id, (verifiedPaidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
@@ -961,6 +970,12 @@ export async function GET() {
     certificateNumberSettings = ns.error ? null : ns.data;
     legacyCertificates = lc.error ? [] : lc.data ?? [];
   }
+  // Holidays (migration 202610090038; empty without it): Admin dashboard reminders.
+  let holidays: unknown[] = [];
+  if (isAdminRole(staff.roleCodes)) {
+    const h = await createSupabaseAdminClient().from("holidays").select("holiday_date,name,kind,marina_status,marina_note,updated_at").order("holiday_date");
+    holidays = h.error ? [] : h.data ?? [];
+  }
   const extrasByEnrollment = new Map(enrollmentExtras.map((row) => [row.id, row]));
   const enrollments = (enrollmentsResult.data ?? []).map((row) => {
     const extra = extrasByEnrollment.get(row.id);
@@ -1013,7 +1028,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, certificatePhotos: certs.photos, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, deliveryRequests, requisitions, requisitionItems, instructors, accreditations, batchResources, certificateNumberSettings, legacyCertificates }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, deliveryRequests, requisitions, requisitionItems, instructors, accreditations, batchResources, certificateNumberSettings, legacyCertificates, holidays }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /**
@@ -1269,6 +1284,30 @@ export async function POST(request: Request) {
       if (input.remove) { const { error } = await admin.from("instructor_accreditations").delete().eq("instructor_id", input.instructorId).eq("course_id", input.courseId); if (error) throw error; return NextResponse.json({ ok: true }); }
       const { error } = await admin.from("instructor_accreditations").upsert({ instructor_id: input.instructorId, course_id: input.courseId, accreditation_number: input.accreditationNumber || null, valid_until: input.validUntil ?? null }, { onConflict: "instructor_id,course_id" });
       if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "payment-void" || input.action === "expense-void" || input.action === "enrollment-cancel") {
+      if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin can void or cancel." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const call = input.action === "payment-void" ? admin.rpc("void_payment", { target_payment: input.paymentId, actor: staff.user.id, reason: input.reason })
+        : input.action === "expense-void" ? admin.rpc("void_expense", { target_expense: input.id, actor: staff.user.id, reason: input.reason })
+        : admin.rpc("admin_cancel_enrollment", { target_enrollment: input.enrollmentId, actor: staff.user.id, reason: input.reason });
+      const { error } = await call;
+      if (error) return NextResponse.json({ error: /void_payment|void_expense|admin_cancel_enrollment|does not exist/i.test(error.message) ? "Apply database update 202610090038 first." : error.message }, { status: 400 });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "holiday-save" || input.action === "holiday-delete" || input.action === "holiday-marina") {
+      if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin keeps the holiday list." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const now = new Date().toISOString();
+      const { data: prior } = await admin.from("holidays").select("*").eq("holiday_date", input.date).maybeSingle();
+      const { error } = input.action === "holiday-save"
+        ? await admin.from("holidays").upsert({ holiday_date: input.date, name: input.name, kind: input.kind, updated_by: staff.user.id, updated_at: now }, { onConflict: "holiday_date" })
+        : input.action === "holiday-delete"
+          ? await admin.from("holidays").delete().eq("holiday_date", input.date)
+          : await admin.from("holidays").update({ marina_status: input.status, marina_note: input.note || null, updated_by: staff.user.id, updated_at: now }).eq("holiday_date", input.date);
+      if (error) return NextResponse.json({ error: /holidays/i.test(error.message) ? "Apply database update 202610090038 first." : error.message }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: input.action === "holiday-save" ? "holiday.saved" : input.action === "holiday-delete" ? "holiday.removed" : "holiday.marina_request", record_type: "holiday", record_id: input.date, prior_values: prior ?? null, new_values: input.action === "holiday-marina" ? { marina_status: input.status, marina_note: input.note ?? null } : input.action === "holiday-save" ? { name: input.name, kind: input.kind } : null });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "reconcile-mark") {

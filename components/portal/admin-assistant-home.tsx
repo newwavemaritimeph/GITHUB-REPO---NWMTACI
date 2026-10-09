@@ -22,7 +22,7 @@ type Instructor = { id: string; complete_name: string; mobile?: string | null; e
 type Plan = { batch_id: string; classroom_id?: string | null; instructor_id?: string | null };
 type AssistantData = { requisitions?: Requisition[]; requisitionItems?: Item[]; instructors?: Instructor[]; accreditations?: (Accreditation & { id: string })[]; batchResources?: Plan[] };
 const extra = (data: PortalData) => data as unknown as AssistantData;
-const TONE: Record<RequisitionState, string> = { "For Approval": "orange", Approved: "blue", Released: "green", Rejected: "red" };
+const TONE: Record<RequisitionState, string> = { "For Approval": "orange", Approved: "blue", Released: "green", Rejected: "red", Voided: "red" };
 const day = (v: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(v));
 const stateOf = (r: Requisition) => requisitionState({ status: r.status, expense_status: first(r.expenses)?.status });
 const itemsText = (r: Requisition) => (r.lines ?? []).map((l) => `${l.description} × ${l.quantity}`).join(", ");
@@ -31,7 +31,7 @@ function Head({ title, children }: { title: string; children?: React.ReactNode }
 }
 
 /** Upcoming batches (not cancelled, not yet ended) with their planned room, instructor and problems (shared rules). */
-function upcoming(data: PortalData): (PlanRow & { b: PortalData["batches"][number] })[] {
+export function upcoming(data: PortalData): (PlanRow & { b: PortalData["batches"][number] })[] {
   const today = manilaToday();
   const plans = new Map((extra(data).batchResources ?? []).map((p) => [p.batch_id, p]));
   const list = data.batches.filter((b) => b.status !== "Cancelled" && b.ends_on >= today).sort((a, z) => a.starts_on.localeCompare(z.starts_on));

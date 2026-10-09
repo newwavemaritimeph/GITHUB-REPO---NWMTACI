@@ -22,6 +22,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const db = createSupabaseAdminClient();
   const { data: row } = await db.from("expenses").select("id,status").eq("id", id).maybeSingle();
   if (!row) return notice("Voucher not found.", 404);
+  // A voided voucher (202610090038) opens as a VOID copy and is never counted as a print.
+  if (row.status === "Void") {
+    const voided = await buildExpenseVoucher(db, id);
+    if (!voided) return notice("Voucher not found.", 404);
+    return new Response(voided.bytes as BodyInit, { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="${voided.voucherNumber}-void.pdf"`, "cache-control": "private, no-store" } });
+  }
   if (row.status !== "Approved" && row.status !== "Paid") return notice("The voucher is issued once the Accounting Manager approves the expense.", 409);
 
   // ?copy=1: a file copy for viewing (Vouchers tab). Marked, and never counted as a print.
