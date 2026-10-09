@@ -32,7 +32,7 @@ import { pesos, pesos2, first, dueCentavos, balanceOf, isUnpaid, manilaToday, ad
 import { tcl } from "@/lib/title-case";
 import { AdminHome, AdminSearchTrainee, AdminEnrollments, AdminVouchers, AdminHolidays } from "./portal/admin-home";
 
-type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Requisitions" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "List of instructors" | "Classrooms" | "Certifications" | "Partner rebates" | "Holidays" | "Daily summary report" | "MISMO dashboard" | AccountingConfigSection;
+type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Requisitions" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Partner rebates" | "Holidays" | "Daily summary report" | "MISMO dashboard" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -126,7 +126,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   hr: [],
   // Admin (owner, 9 Oct 2026): Dashboard · Search Trainee · Enrollments · Resource Planning ·
   // Configuration ▾ · Requests · Reports ▾ · MISMO ▾ (ADMIN_TABS). Requisitions opens from the dashboard.
-  admin: ["Dashboard","Search trainee","Enrollments","Resource planning","Employee accounts","List of instructors","Classrooms","Certifications","Partners","Partner rebates","Holidays","Requests","Daily summary report","MISMO dashboard","Final list","Submissions","Requisitions"],
+  admin: ["Dashboard","Search trainee","Enrollments","Resource planning","Employee accounts","Instructors","Classrooms","Certifications","Partners","Partner rebates","Holidays","Requests","Daily summary report","MISMO dashboard","Final list","Submissions","Requisitions"],
   // Cashier (Accounting Officer), owner's menu of 7 Oct 2026, shown as top tabs:
   // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses,
   // Report (with opening and closing), Requests (CASHIER_TABS).
@@ -154,7 +154,7 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Requisitions",icon:"✎",roles:["admin_assistant","admin"],group:"Work"},{label:"Resource planning",icon:"▢",roles:["admin_assistant","admin"],group:"Work"},{label:"Instructors",icon:"♙",roles:["admin_assistant","admin"],group:"Work"},{label:"Reconciliation",icon:"✓",roles:["admin_assistant","admin"],group:"Work"},
   {label:"Final list",icon:"▤",roles:["mismo_officer"],group:"Work"},{label:"Submissions",icon:"✓",roles:["mismo_officer"],group:"Work"},
   {label:"Certificate controls",icon:"№",roles:["admin"],group:"Configuration"},{label:"Certificate numbers",icon:"№",roles:["admin"],group:"Configuration"},
-  {label:"Employee accounts",icon:"⚙",roles:["admin"],group:"Configuration"},{label:"List of instructors",icon:"♙",roles:["admin"],group:"Configuration"},{label:"Classrooms",icon:"▢",roles:["admin"],group:"Configuration"},{label:"Certifications",icon:"№",roles:["admin"],group:"Configuration"},{label:"Partner rebates",icon:"₱",roles:["admin"],group:"Configuration"},{label:"Holidays",icon:"▦",roles:["admin"],group:"Configuration"},
+  {label:"Employee accounts",icon:"⚙",roles:["admin"],group:"Configuration"},{label:"Classrooms",icon:"▢",roles:["admin"],group:"Configuration"},{label:"Certifications",icon:"№",roles:["admin"],group:"Configuration"},{label:"Partner rebates",icon:"₱",roles:["admin"],group:"Configuration"},{label:"Holidays",icon:"▦",roles:["admin"],group:"Configuration"},
   {label:"Daily summary report",icon:"∑",roles:["admin"],group:"Records"},{label:"MISMO dashboard",icon:"⌂",roles:["admin"],group:"Work"},
   {label:"Endorsed courses",icon:"◇",group:"Configuration"},{label:"Configuration",icon:"⚙",roles:["admin"],group:"Configuration"},
   // Accounting › Configuration ▾: one dropdown item per section (owner, 7 Oct 2026).
@@ -186,7 +186,7 @@ const ADMIN_TABS:TopTab[]=[
   {label:"Search trainee",items:["Search trainee"]},
   {label:"Enrollments",items:["Enrollments"]},
   {label:"Resource planning",items:["Resource planning"]},
-  {label:"Configuration",items:["Employee accounts","List of instructors","Classrooms","Certifications","Partners","Partner rebates","Holidays"]},
+  {label:"Configuration",items:["Employee accounts","Instructors","Classrooms","Certifications","Partners","Partner rebates","Holidays"]},
   {label:"Requests",items:["Requests"]},
   {label:"Reports",items:["Daily summary report"]},
   {label:"MISMO",items:["MISMO dashboard","Final list","Submissions"]},
@@ -228,7 +228,37 @@ function CourseSelect({data,value,onChange,label="Course"}:{data:PortalData;valu
 
 // Badge, Message and Modal now live in ./portal/shared-ui (imported above).
 
-function ChangePasswordModal({onClose}:{onClose:()=>void}){const [pw,setPw]=useState(""),[confirmPw,setConfirmPw]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState<{kind:"success"|"error";text:string}|null>(null);async function save(event:FormEvent<HTMLFormElement>){event.preventDefault();if(pw.length<8){setMessage({kind:"error",text:"Use at least 8 characters."});return}if(pw!==confirmPw){setMessage({kind:"error",text:"The two passwords do not match."});return}setBusy(true);setMessage(null);try{const supabase=createSupabaseBrowserClient();const {error}=await supabase.auth.updateUser({password:pw});if(error)throw error;setMessage({kind:"success",text:"Password updated. Use it the next time you sign in."});setPw("");setConfirmPw("")}catch(e){setMessage({kind:"error",text:e instanceof Error?e.message:"Could not update the password."})}finally{setBusy(false)}}return <Modal title="Change Your Password" onClose={onClose}><form className="portal-form" onSubmit={save}>{message&&<Message kind={message.kind} text={message.text}/>}<label className="full">New password<input type="password" autoComplete="new-password" value={pw} onChange={e=>setPw(e.target.value)} required minLength={8} placeholder="At least 8 characters"/></label><label className="full">Confirm New Password<input type="password" autoComplete="new-password" value={confirmPw} onChange={e=>setConfirmPw(e.target.value)} required minLength={8}/></label><p className="portal-form-note full">This changes the password for your own account only. You stay signed in on this device.</p><div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Close</button><button className="portal-primary" disabled={busy}>{busy?"Updating…":"Update Password"}</button></div></form></Modal>}
+/** Every employee changes their own password (owner, 9 Oct 2026): the current password is checked first. */
+function ChangePasswordModal({email,onClose}:{email:string;onClose:()=>void}){
+  const [current,setCurrent]=useState(""),[pw,setPw]=useState(""),[confirmPw,setConfirmPw]=useState(""),[busy,setBusy]=useState(false),[message,setMessage]=useState<{kind:"success"|"error";text:string}|null>(null);
+  async function save(event:FormEvent<HTMLFormElement>){
+    event.preventDefault();
+    if(!current){setMessage({kind:"error",text:"Enter your current password."});return}
+    if(pw.length<8){setMessage({kind:"error",text:"Use at least 8 characters."});return}
+    if(pw!==confirmPw){setMessage({kind:"error",text:"The two new passwords do not match."});return}
+    if(pw===current){setMessage({kind:"error",text:"Choose a password different from your current one."});return}
+    setBusy(true);setMessage(null);
+    try{
+      const supabase=createSupabaseBrowserClient();
+      // The sign-in email of this session (the profile email can differ).
+      const {data:session}=await supabase.auth.getUser();
+      const check=await supabase.auth.signInWithPassword({email:session.user?.email??email,password:current});
+      if(check.error){setMessage({kind:"error",text:"Your current password is not correct."});return}
+      const {error}=await supabase.auth.updateUser({password:pw});
+      if(error)throw error;
+      setMessage({kind:"success",text:"Password changed. Use the new password the next time you sign in."});setCurrent("");setPw("");setConfirmPw("");
+    }catch(e){setMessage({kind:"error",text:e instanceof Error?e.message:"Could not change the password."})}
+    finally{setBusy(false)}
+  }
+  return <Modal title="Change Password" onClose={onClose}><form className="portal-form" onSubmit={save}>{message&&<Message kind={message.kind} text={message.text}/>}
+    <label className="full">Account<input value={email} readOnly/></label>
+    <label className="full">Current Password<input type="password" autoComplete="current-password" value={current} onChange={e=>setCurrent(e.target.value)} required/></label>
+    <label className="full">New Password<input type="password" autoComplete="new-password" value={pw} onChange={e=>setPw(e.target.value)} required minLength={8} placeholder="At least 8 characters"/></label>
+    <label className="full">Confirm New Password<input type="password" autoComplete="new-password" value={confirmPw} onChange={e=>setConfirmPw(e.target.value)} required minLength={8}/></label>
+    <p className="portal-form-note full">This changes the password for your own account only. You stay signed in on this device.</p>
+    <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Close</button><button className="portal-primary" disabled={busy}>{busy?"Saving…":"Change Password"}</button></div>
+  </form></Modal>;
+}
 
 export function PortalLiveApp(){
   const [data,setData]=useState<PortalData|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[active,setActive]=useState<Module>("Dashboard"),[recordsView,setRecordsView]=useState<RecordsView>("applications"),[role,setRole]=useState(""),[openTab,setOpenTab]=useState(""),[menuAt,setMenuAt]=useState({left:16,top:120}),[notices,setNotices]=useState(false),[modal,setModal]=useState<"enrollment"|"batch"|"payment"|null>(null),[payTarget,setPayTarget]=useState(""),[account,setAccount]=useState(false);
@@ -277,7 +307,7 @@ export function PortalLiveApp(){
           <label className="nw-role"><span>Working as</span><select value={role} onChange={e=>{setRole(e.target.value);setActive("Dashboard");setRecordsView("applications");setOpenTab("")}} aria-label="Working as">{roleOptions.map(item=><option key={item} value={item}>{roleNames[item]??item}</option>)}</select></label>
           <button type="button" className="nw-icon" onClick={()=>setNotices(!notices)} aria-label="Notifications"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5-6.71V3.5a2 2 0 1 0-4 0v.79A7 7 0 0 0 5 11v5l-2 2v1h18v-1Z"/></svg>{unread>0&&<b>{unread}</b>}</button>
           <div className="nw-user"><span className="user-dot">{initials}</span><span className="nw-user-text"><strong>{data.profile.complete_name}</strong><small>{roleNames[role]??role}</small></span></div>
-          <button type="button" className="nw-icon" onClick={()=>setAccount(true)} aria-label="Change password" title="Change Password">⚿</button>
+          <button type="button" className="nw-account" onClick={()=>setAccount(true)} title="Change Password"><span aria-hidden="true">⚿</span><span className="nw-account-text">Change Password</span></button>
           <form action="/auth/signout" method="post"><button type="submit" className="nw-signout">Sign Out</button></form>
         </div>
       </div>
@@ -288,7 +318,7 @@ export function PortalLiveApp(){
       {notices&&<div className="notification-popover nw-notices"><div><h3>Notifications</h3><button onClick={()=>void markRead()}>Mark All as Read</button></div>{data.notifications.length?data.notifications.map(item=><button key={item.id} onClick={()=>{if(item.deep_link)setNotices(false)}}><i style={{opacity:item.read_at?.length?0:1}}/><span><strong>{item.title}</strong><small>{item.body}</small></span></button>):<p className="portal-empty-copy">No notifications yet.</p>}</div>}
     </header>
     <section className="portal-workspace">{error&&<div className="portal-inline-error"><Message kind="error" text={error}/></div>}<PortalContent modules={rebuildModules} recordsView={recordsView} setRecordsView={setRecordsView} active={active} role={role} data={data} query={query} go={go} open={setModal} onPay={(id:string)=>{setPayTarget(id);setModal("payment")}} canEnroll={canEnroll} canSchedule={canSchedule} canPay={canPay} reload={load}/></section>
-    {modal==="enrollment"&&<EnrollmentForm data={data} onClose={()=>setModal(null)} onSaved={load}/>} {modal==="batch"&&<BatchForm data={data} onClose={()=>setModal(null)} onSaved={load}/>} {modal==="payment"&&<RecordPaymentModal data={data} initialEnrollmentId={payTarget||undefined} onClose={()=>{setModal(null);setPayTarget("")}} onSaved={load}/>} {account&&<ChangePasswordModal onClose={()=>setAccount(false)}/>}
+    {modal==="enrollment"&&<EnrollmentForm data={data} onClose={()=>setModal(null)} onSaved={load}/>} {modal==="batch"&&<BatchForm data={data} onClose={()=>setModal(null)} onSaved={load}/>} {modal==="payment"&&<RecordPaymentModal data={data} initialEnrollmentId={payTarget||undefined} onClose={()=>{setModal(null);setPayTarget("")}} onSaved={load}/>} {account&&<ChangePasswordModal email={data.profile.email} onClose={()=>setAccount(false)}/>}
   </main>;
 }
 
@@ -336,7 +366,6 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Search trainee")return <AdminSearchTrainee data={data} reload={reload}/>;
     if(active==="Enrollments")return <AdminEnrollments data={data} reload={reload}/>;
     if(active==="Employee accounts")return <div className="portal-page"><PageHead eyebrow="Admin › Configuration" title="Employee Accounts"/><AdminConfiguration only="users"/></div>;
-    if(active==="List of instructors")return <InstructorShortlist data={data} reload={reload}/>;
     if(active==="Classrooms")return <LiveTraining data={{classrooms:data.classrooms,certificates:data.certificates,batches:data.batches,enrollments:data.enrollments,courses:data.courses,certificateTemplates:data.certificateTemplates}} role={gateRole} reload={reload} initialTab="Classrooms"/>;
     if(active==="Certifications")return <AdminCertifications data={data} reload={reload}/>;
     if(active==="Partner rebates")return <AccountingConfiguration section="Rebates per agency" data={data as unknown as Parameters<typeof AccountingConfiguration>[0]["data"]} trainees={data.trainees} applicationNumbers={data.applicationNumbers} reload={reload}/>;

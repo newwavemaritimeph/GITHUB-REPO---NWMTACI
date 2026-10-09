@@ -1375,6 +1375,9 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-user-text { display: flex; flex-direction: column; line-height: 1.2; }
 .nw-user-text strong { font-size: 15px; font-weight: 600; }
 .nw-user-text small { font-size: 13px; color: var(--nw-cyan-l); }
+.nw-account { display: inline-flex; align-items: center; gap: 7px; height: 40px; padding: 0 13px; border-radius: 10px; border: 1px solid #ffffff2a; background: #ffffff10; color: #fff; cursor: pointer; font: 500 14.5px var(--font-portal), sans-serif; white-space: nowrap; }
+.nw-account:hover { background: #ffffff22; }
+@media (max-width: 760px) { .nw-account-text { display: none; } .nw-account { width: 40px; padding: 0; justify-content: center; } }
 .nw-signout { background: none; border: 1px solid #ffffff33; color: #fff; border-radius: 9px; padding: 9px 14px; font: 500 15px var(--font-portal), sans-serif; cursor: pointer; }
 .nw-signout:hover { background: #ffffff18; }
 .nw-tabs { max-width: 1500px; margin: 14px auto 0; display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
