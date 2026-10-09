@@ -5,9 +5,10 @@
  * is in. It prints once; every paid Reprinting request or Admin-approved void
  * allows one more print. A due certificate not printed by the end of its due
  * day is overdue (red alarm for the Releasing Officer and the Admin).
+ * The trainee's 2x2 photo must be on file before it prints (9 Oct 2026).
  */
 
-export type CertificateState = "Training not finished" | "Waiting for payment" | "Waiting for evaluation" | "Due" | "Printed" | "Released" | "Void requested" | "Cancelled";
+export type CertificateState = "Training not finished" | "Waiting for payment" | "Waiting for evaluation" | "Waiting for photo" | "Due" | "Printed" | "Released" | "Void requested" | "Cancelled";
 
 export type CertificateFacts = {
   enrollmentStatus: string;
@@ -20,6 +21,8 @@ export type CertificateFacts = {
   /** Day the fee was fully settled (latest payment day), or null. */
   paidOn: string | null;
   cert: { status: string; printCount: number; reprintsAllowed: number; voidStatus?: string | null } | null;
+  /** False when the 2x2 photo is missing; undefined when photos are not tracked (before migration 202610090034). */
+  photoOnFile?: boolean;
 };
 
 export type CertificateView = { state: CertificateState; dueOn: string | null; overdue: boolean; printsLeft: number; printsAllowed: number; printCount: number };
@@ -38,6 +41,7 @@ export function certificateState(f: CertificateFacts, today: string): Certificat
   if (!f.trainingEnd || f.trainingEnd > today) return { ...base, state: "Training not finished", dueOn: null, overdue: false };
   if (f.balanceCentavos > 0) return { ...base, state: "Waiting for payment", dueOn: null, overdue: false };
   if (f.evaluationRequired && !f.evaluationOn) return { ...base, state: "Waiting for evaluation", dueOn: null, overdue: false };
+  if (f.photoOnFile === false) return { ...base, state: "Waiting for photo", dueOn: null, overdue: false };
   const dueOn = later(f.trainingEnd, f.paidOn, f.evaluationRequired ? f.evaluationOn : null);
   return { ...base, state: "Due", dueOn, overdue: !!dueOn && dueOn < today };
 }
@@ -85,3 +89,12 @@ export function matchEvaluationEnrollment(title: string, candidates: EvaluationC
   const open = candidates.filter((c) => !c.hasEvaluation);
   return open.length === 1 ? open[0].id : null;
 }
+
+/** STCW courses are told apart by their category name. */
+export const isStcwCategory = (categoryName: string | null | undefined) => (categoryName ?? "").toUpperCase().includes("STCW");
+
+/**
+ * Who sets a course's certificate numbering (owner, 9 Oct 2026): the Releasing
+ * Officer for In-House courses, the Admin for any course (STCW only the Admin).
+ */
+export const canSetSeries = (roles: string[], stcw: boolean) => roles.includes("admin") || (!stcw && roles.includes("releasing_officer"));

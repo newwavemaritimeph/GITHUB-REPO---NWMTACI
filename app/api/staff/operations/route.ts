@@ -14,7 +14,7 @@ import { sendBalanceSummary } from "@/lib/balance-summary";
 import { RULED_REQUESTS, requestFee } from "@/lib/request-fees";
 import { applyReferralRebates, suggestReferralCode } from "@/lib/referral";
 import { certificateContext, claimCertificateNumber, downloadDriveFile, ensureCertificate, trySendSoftCopy } from "@/lib/certificates";
-import { driveFileId, googleFormId } from "@/lib/certificate-rules";
+import { driveFileId, googleFormId, isStcwCategory, canSetSeries } from "@/lib/certificate-rules";
 
 const manilaDate = (d = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(d);
 
@@ -124,6 +124,8 @@ const certificateOverrideInput = z.object({ action: z.literal("certificate-overr
 // Certificate controls (owner, 8 Oct 2026; migration 202610080030).
 const certificateSeriesInput = z.object({ action: z.literal("certificate-series-save"), courseId: z.string().uuid(), prefix: z.string().trim().max(30), nextNumber: z.number().int().min(1).max(99999999), pad: z.number().int().min(1).max(10), batchPrefix: z.string().trim().max(30), nextBatch: z.number().int().min(1).max(999999) });
 const certificateVoidRequestInput = z.object({ action: z.literal("certificate-void-request"), enrollmentId: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
+const certificateCorrectInput = z.object({ action: z.literal("certificate-correct"), enrollmentId: z.string().uuid(), name: z.string().trim().max(160).optional().default(""), courseName: z.string().trim().max(200).optional().default(""), batchLabel: z.string().trim().max(60).optional().default(""), startsOn: z.string().date().or(z.literal("")).optional().default(""), endsOn: z.string().date().or(z.literal("")).optional().default(""), issuedOn: z.string().date().or(z.literal("")).optional().default(""), reason: z.string().trim().min(3).max(300) });
+const certificateNumberSetInput = z.object({ action: z.literal("certificate-number-set"), enrollmentId: z.string().uuid(), certificateNumber: z.string().trim().min(2).max(60), reason: z.string().trim().min(3).max(300) });
 const certificateVoidDecideInput = z.object({ action: z.literal("certificate-void-decide"), enrollmentId: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(300).optional() });
 const certificateTemplateLinkInput = z.object({ action: z.literal("certificate-template-link"), courseId: z.string().uuid(), driveLink: z.string().trim().min(10).max(500) });
 const evaluationFormInput = z.object({ action: z.literal("course-evaluation-form-save"), courseId: z.string().uuid(), formLink: z.string().trim().max(500) });
@@ -219,7 +221,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -588,7 +590,7 @@ export async function GET() {
   })();
 
   const certificateUnit = (async () => {
-    const empty = { certificates: [] as unknown[], templates: [] as unknown[], releases: [] as unknown[], issuanceEnabled: false, series: [] as unknown[], evaluationForms: {} as Record<string, string>, feedbackAt: {} as Record<string, string> };
+    const empty = { certificates: [] as unknown[], templates: [] as unknown[], releases: [] as unknown[], issuanceEnabled: false, series: [] as unknown[], evaluationForms: {} as Record<string, string>, feedbackAt: {} as Record<string, string>, photos: null as unknown[] | null };
     if (!seesCertificates) return empty;
     const [base, extra, tpls, rel, settings] = await Promise.all([
       db.from("certificates").select("id,enrollment_id,status,printed_at,printed_by,reprint_count,snapshot,number_pool_id,template_id,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name,code))").order("created_at", { ascending: false }).limit(300),
@@ -604,15 +606,18 @@ export async function GET() {
     ]);
     // Certificate controls (migration 202610080030): numbering, print counts, voids, Drive templates and
     // Google Forms evaluations. Each read is separate so a database without the update still loads.
-    const [controls, series, tplLinks, forms, fbDates] = await Promise.all([
+    const [controls, series, tplLinks, forms, fbDates, corr, photos] = await Promise.all([
       db.from("certificates").select("id,certificate_number,batch_label,print_count,reprints_allowed,soft_copy_sent_at,void_status,void_reason,void_requested_at,void_remarks").order("created_at", { ascending: false }).limit(300),
       db.from("certificate_series").select("course_id,prefix,next_number,pad,batch_prefix,next_batch,set_at,profiles:set_by(complete_name)"),
       db.from("certificate_templates").select("id,drive_link").order("created_at", { ascending: false }).limit(200),
       db.from("courses").select("id,evaluation_form_id").not("evaluation_form_id", "is", null),
       db.from("training_feedback").select("enrollment_id,submitted_at").order("submitted_at", { ascending: false }).limit(2000),
+      // 2x2 photos and Admin corrections (migration 202610090034).
+      db.from("certificates").select("id,corrections").order("created_at", { ascending: false }).limit(300),
+      createSupabaseAdminClient().from("certificate_photos").select("enrollment_id,file_name,background_white,uploaded_at,replaced_at,profiles:uploaded_by(complete_name)").limit(5000),
     ]);
     let certificates = (base.data ?? []) as { id: string }[];
-    for (const merge of [extra.data, controls.data]) {
+    for (const merge of [extra.data, controls.data, corr.error ? null : corr.data]) {
       if (!merge?.length) continue;
       const byId = new Map((merge as { id: string }[]).map((r) => [r.id, r]));
       certificates = certificates.map((c) => ({ ...c, ...(byId.get(c.id) ?? {}) }));
@@ -621,7 +626,7 @@ export async function GET() {
     const templates = ((tpls.data ?? []) as { id: string }[]).map((t) => ({ ...t, drive_link: linkById.get(t.id) ?? null }));
     const evaluationForms = Object.fromEntries(((forms.data ?? []) as { id: string; evaluation_form_id: string }[]).map((r) => [r.id, r.evaluation_form_id]));
     const feedbackAt = Object.fromEntries(((fbDates.data ?? []) as { enrollment_id: string; submitted_at: string }[]).map((r) => [r.enrollment_id, r.submitted_at]));
-    return { certificates: certificates as unknown[], templates, releases: rel.data ?? [], issuanceEnabled: Boolean(settings.data?.certificate_issuance_enabled), series: series.data ?? [], evaluationForms, feedbackAt };
+    return { certificates: certificates as unknown[], templates, releases: rel.data ?? [], issuanceEnabled: Boolean(settings.data?.certificate_issuance_enabled), series: series.data ?? [], evaluationForms, feedbackAt, photos: photos.error ? null : (photos.data ?? []) as unknown[] };
   })();
 
   // Non-discount charges awaiting the Accounting Manager approval queue.
@@ -988,7 +993,7 @@ export async function GET() {
     paymentMethods: paymentMethodsWithKind, charges: (charges.data ?? []).map((c) => ({ ...c, kind: chargeKinds.get((c as { id: string }).id) ?? "fee" })), agencies: agencies.data ?? [],
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
-    classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
+    classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, certificatePhotos: certs.photos, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
     agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, deliveryRequests, requisitions, requisitionItems, instructors, accreditations, batchResources }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -1692,6 +1697,40 @@ export async function POST(request: Request) {
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "releasing_officer", action: "certificate.void_requested", record_type: "certificate", record_id: cert.id, new_values: { reason: input.reason } });
       return NextResponse.json({ ok: true });
     }
+    if (input.action === "certificate-number-set") {
+      // Only the Admin changes a Certificate (document) Number (owner, 9 Oct 2026).
+      if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin can change a Certificate Number." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      let { data: cert } = await admin.from("certificates").select("id,certificate_number").eq("enrollment_id", input.enrollmentId).maybeSingle();
+      if (!cert) {
+        const created = await admin.from("certificates").insert({ enrollment_id: input.enrollmentId, status: "Ready to Print", snapshot: {} }).select("id,certificate_number").single();
+        if (created.error) return NextResponse.json({ error: created.error.message }, { status: 400 });
+        cert = created.data;
+      }
+      const prior = (cert as { certificate_number?: string | null }).certificate_number ?? null;
+      if (prior === input.certificateNumber) return NextResponse.json({ ok: true });
+      const { error } = await admin.from("certificates").update({ certificate_number: input.certificateNumber, updated_at: new Date().toISOString() }).eq("id", cert!.id);
+      if (error) return NextResponse.json({ error: error.code === "23505" ? "That Certificate Number is already used by another certificate." : error.message }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: "certificate.number_changed", record_type: "certificate", record_id: cert!.id, prior_values: { certificate_number: prior }, new_values: { certificate_number: input.certificateNumber }, reason: input.reason });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "certificate-correct") {
+      // The Releasing Officer corrects what prints (owner, 9 Oct 2026); the Certificate Number stays with the Admin. Blank fields use the portal value.
+      if (!staff.roleCodes.some((r) => ["admin", "releasing_officer"].includes(r))) return NextResponse.json({ error: "Only the Releasing Officer can correct certificate details." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      let { data: cert } = await admin.from("certificates").select("id,print_count,corrections").eq("enrollment_id", input.enrollmentId).maybeSingle();
+      if (!cert) {
+        const created = await admin.from("certificates").insert({ enrollment_id: input.enrollmentId, status: "Ready to Print", snapshot: {} }).select("id,print_count,corrections").single();
+        if (created.error) return NextResponse.json({ error: /corrections/i.test(created.error.message) ? "Apply database update 202610090034 first." : created.error.message }, { status: 400 });
+        cert = created.data;
+      }
+      const next = Object.fromEntries(Object.entries({ name: input.name, courseName: input.courseName, batchLabel: input.batchLabel, startsOn: input.startsOn, endsOn: input.endsOn, issuedOn: input.issuedOn }).filter(([, v]) => v));
+      const { error } = await admin.from("certificates").update({ corrections: { ...next, reason: input.reason }, updated_at: new Date().toISOString() }).eq("id", cert!.id);
+      if (error) return NextResponse.json({ error: /corrections/i.test(error.message) ? "Apply database update 202610090034 first." : error.message }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: isAdminRole(staff.roleCodes) ? "admin" : "releasing_officer", action: "certificate.corrected", record_type: "certificate", record_id: cert!.id, prior_values: (cert as { corrections?: unknown }).corrections ?? {}, new_values: next, reason: input.reason });
+      const printed = Number((cert as { print_count?: number | null }).print_count ?? 0) > 0;
+      return NextResponse.json({ ok: true, note: printed ? "Saved. This certificate was already printed: a corrected copy needs an approved void or a paid Reprinting request." : "Saved." });
+    }
     if (input.action === "certificate-void-decide") {
       if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin can decide void requests." }, { status: 403 });
       const admin = createSupabaseAdminClient();
@@ -1773,13 +1812,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "certificate-series-save") {
-      if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin sets certificate numbering." }, { status: 403 });
       const admin = createSupabaseAdminClient();
+      // In-House courses: the Releasing Officer; STCW courses: the Admin (owner, 9 Oct 2026).
+      const { data: courseRow } = await admin.from("courses").select("course_categories(name)").eq("id", input.courseId).maybeSingle();
+      const category = (courseRow as { course_categories?: { name?: string } | { name?: string }[] | null } | null)?.course_categories;
+      const stcw = isStcwCategory(Array.isArray(category) ? category[0]?.name : category?.name);
+      if (!canSetSeries(staff.roleCodes, stcw)) return NextResponse.json({ error: stcw ? "Only the Admin sets numbering for STCW courses." : "Only the Releasing Officer or the Admin sets certificate numbering." }, { status: 403 });
       const row = { course_id: input.courseId, prefix: input.prefix, next_number: input.nextNumber, pad: input.pad, batch_prefix: input.batchPrefix, next_batch: input.nextBatch, set_by: staff.user.id, set_at: new Date().toISOString() };
       const { data: prior } = await admin.from("certificate_series").select("*").eq("course_id", input.courseId).maybeSingle();
       const { error } = await admin.from("certificate_series").upsert(row, { onConflict: "course_id" });
       if (error) return NextResponse.json({ error: error.code === "42P01" ? "Apply database update 202610080030 first." : error.message }, { status: 400 });
-      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: "certificate.series_set", record_type: "course", record_id: input.courseId, prior_values: prior ?? null, new_values: row });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: isAdminRole(staff.roleCodes) ? "admin" : "releasing_officer", action: "certificate.series_set", record_type: "course", record_id: input.courseId, prior_values: prior ?? null, new_values: row });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "certificate-template-link") {

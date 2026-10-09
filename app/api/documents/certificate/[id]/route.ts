@@ -15,6 +15,7 @@ const WHY: Record<string, string> = {
   "Training not finished": "The training has not finished yet.",
   "Waiting for payment": "The training fee is not settled. The Cashier must record the balance first.",
   "Waiting for evaluation": "The trainee has not submitted the evaluation form yet.",
+  "Waiting for photo": "Upload the trainee's 2x2 photo first.",
   "Void requested": "A void request is waiting for the Admin.",
   Cancelled: "This certificate is cancelled.",
 };
@@ -34,7 +35,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const db = createSupabaseAdminClient();
   let ctx = await certificateContext(db, id);
   if (!ctx) return notice("Enrollment not found.", 404);
-  if (WHY[ctx.view.state]) return notice(WHY[ctx.view.state], 409);
+  if (WHY[ctx.view.state] && !(preview && ctx.view.state === "Waiting for photo")) return notice(WHY[ctx.view.state], 409);
   if (!preview && !canPrint(ctx.view)) return notice("This certificate was already printed. A reprint needs a paid Reprinting request or an Admin-approved void.", 409);
   if (!preview && !ctx.issuanceEnabled) return notice("Certificate printing is turned off. The Admin turns it on in Certificate numbering.", 409);
   try {

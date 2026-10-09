@@ -2,6 +2,7 @@ import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { automaticEndDate } from "@/lib/scheduling";
 import { certificateState, type CertificateView } from "@/lib/certificate-rules";
+import { corrected, type CertificateCorrections } from "@/lib/certificate-photo";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -10,13 +11,16 @@ export const manilaToday = () => manilaDay(new Date().toISOString())!;
 
 export type CertificateContext = {
   enrollment: { id: string; enrollment_number: string; course_id: string; trainee_id: string; enrollment_status: string };
-  trainee: { name: string; email: string | null };
+  trainee: { name: string; email: string | null; firstName: string; middleName: string | null; lastName: string };
   course: { id: string; name: string; code: string; evaluationFormId: string | null };
   batch: { starts_on: string | null; ends_on: string | null; batch_number: string | null };
   cert: { id: string; status: string; certificate_number: string | null; batch_label: string | null; print_count: number; reprints_allowed: number; void_status: string | null; soft_copy_sent_at: string | null; snapshot: Record<string, unknown> | null } | null;
   view: CertificateView;
   issuanceEnabled: boolean;
   balanceCentavos: number;
+  /** The 2x2 photo (migration 202610090034); undefined before it. */
+  photo?: { storage_path: string; file_name: string } | null;
+  corrections: CertificateCorrections;
 };
 
 /**
@@ -27,7 +31,7 @@ export type CertificateContext = {
 export async function certificateContext(db: Admin, enrollmentId: string): Promise<CertificateContext | null> {
   const { data: e } = await db.from("enrollments").select("id,enrollment_number,course_id,trainee_id,enrollment_status,selling_price_centavos,batch_id,batches(starts_on,ends_on,batch_number),courses(id,name,code,duration_label),trainees(legal_first_name,legal_middle_name,legal_last_name,email)").eq("id", enrollmentId).maybeSingle();
   if (!e) return null;
-  const [{ data: extra }, { data: allocations }, { data: charges }, { data: feedback }, { data: settings }, certRes, formRes] = await Promise.all([
+  const [{ data: extra }, { data: allocations }, { data: charges }, { data: feedback }, { data: settings }, certRes, formRes, photoRes, corrRes] = await Promise.all([
     db.from("enrollments").select("scheduled_on").eq("id", enrollmentId).maybeSingle(),
     db.from("payment_allocations").select("amount_centavos,payments(received_at,valid)").eq("enrollment_id", enrollmentId),
     db.from("enrollment_charges").select("amount_centavos,event_type").eq("enrollment_id", enrollmentId).eq("valid", true),
@@ -35,7 +39,11 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
     db.from("organization_settings").select("certificate_issuance_enabled").maybeSingle(),
     db.from("certificates").select("id,status,snapshot,certificate_number,batch_label,print_count,reprints_allowed,void_status,soft_copy_sent_at").eq("enrollment_id", enrollmentId).maybeSingle(),
     db.from("courses").select("evaluation_form_id,google_classroom_link").eq("id", e.course_id).maybeSingle(),
+    db.from("certificate_photos").select("storage_path,file_name").eq("enrollment_id", enrollmentId).maybeSingle(),
+    db.from("certificates").select("corrections").eq("enrollment_id", enrollmentId).maybeSingle(),
   ]);
+  const photo = photoRes.error ? undefined : (photoRes.data as { storage_path: string; file_name: string } | null);
+  const corrections = (corrRes.error ? {} : ((corrRes.data as { corrections?: CertificateCorrections } | null)?.corrections ?? {})) as CertificateCorrections;
   let cert = certRes.data as CertificateContext["cert"] | null;
   if (certRes.error) {
     const { data: basic } = await db.from("certificates").select("id,status,snapshot,reprint_count").eq("enrollment_id", enrollmentId).maybeSingle();
@@ -64,13 +72,14 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
     enrollmentStatus: e.enrollment_status, trainingEnd, balanceCentavos: Math.max(0, due - paid), evaluationRequired,
     evaluationOn: manilaDay((feedback as { submitted_at?: string } | null)?.submitted_at), paidOn: lastPaid,
     cert: cert ? { status: cert.status, printCount: Number(cert.print_count ?? 0), reprintsAllowed: Number(cert.reprints_allowed ?? 0), voidStatus: cert.void_status } : null,
+    photoOnFile: photo === undefined ? undefined : !!photo,
   }, manilaToday());
   return {
     enrollment: { id: e.id, enrollment_number: e.enrollment_number, course_id: e.course_id, trainee_id: e.trainee_id, enrollment_status: e.enrollment_status },
-    trainee: { name: t ? [t.legal_first_name, t.legal_middle_name, t.legal_last_name].filter(Boolean).join(" ") : "Trainee", email: t?.email ?? null },
+    trainee: { name: t ? [t.legal_first_name, t.legal_middle_name, t.legal_last_name].filter(Boolean).join(" ") : "Trainee", email: t?.email ?? null, firstName: t?.legal_first_name ?? "", middleName: t?.legal_middle_name ?? null, lastName: t?.legal_last_name ?? "" },
     course: { id: c?.id ?? e.course_id, name: c?.name ?? "Course", code: c?.code ?? "", evaluationFormId },
     batch: { starts_on: b?.starts_on ?? scheduled, ends_on: trainingEnd, batch_number: b?.batch_number ?? null },
-    cert, view, balanceCentavos: Math.max(0, due - paid), issuanceEnabled: Boolean((settings as { certificate_issuance_enabled?: boolean } | null)?.certificate_issuance_enabled),
+    cert, view, photo, corrections, balanceCentavos: Math.max(0, due - paid), issuanceEnabled: Boolean((settings as { certificate_issuance_enabled?: boolean } | null)?.certificate_issuance_enabled),
   };
 }
 
@@ -143,17 +152,34 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
     page.drawImage(image, { x: 0, y: 0, width: image.width, height: image.height });
   }
   const W = page.getWidth(), H = page.getHeight();
-  const f = (tpl.fields && !Array.isArray(tpl.fields) ? tpl.fields : {}) as { nameY?: number; nameSize?: number; lineY?: number };
+  const f = (tpl.fields && !Array.isArray(tpl.fields) ? tpl.fields : {}) as { nameY?: number; nameSize?: number; lineY?: number; photoX?: number; photoY?: number; photoSize?: number };
+  // What prints: the Admin's correction where there is one, else the portal value (owner, 9 Oct 2026).
+  const fix = ctx.corrections ?? {};
+  const traineeName = corrected(ctx.trainee.name, fix.name), courseName = corrected(ctx.course.name, fix.courseName);
+  const batchLabel = corrected(ctx.cert?.batch_label ?? null, fix.batchLabel);
+  const startsOn = corrected(ctx.batch.starts_on, fix.startsOn), endsOn = corrected(ctx.batch.ends_on, fix.endsOn);
+  const issuedOn = corrected(manilaToday(), fix.issuedOn);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold), reg = await pdf.embedFont(StandardFonts.Helvetica);
   const centre = (text: string, y: number, size: number, font = reg, color = rgb(0.18, 0.25, 0.32)) => page.drawText(text, { x: (W - font.widthOfTextAtSize(text, size)) / 2, y, size, font, color });
   const nameY = H - (f.nameY ?? H * 0.42), nameSize = f.nameSize ?? Math.round(W / 26);
-  centre(ctx.trainee.name.toUpperCase(), nameY, nameSize, bold, rgb(0.07, 0.25, 0.39));
+  centre(String(traineeName).toUpperCase(), nameY, nameSize, bold, rgb(0.07, 0.25, 0.39));
   const lineY = f.lineY ? H - f.lineY : nameY - nameSize * 1.1;
-  centre(ctx.course.name, lineY, Math.round(nameSize * 0.55), bold);
+  centre(String(courseName), lineY, Math.round(nameSize * 0.55), bold);
   const number = ctx.cert?.certificate_number ?? "";
-  const meta = [number && `Certificate No. ${number}`, ctx.cert?.batch_label && `Batch ${ctx.cert.batch_label}`, ctx.batch.ends_on && `Conducted ${range(ctx.batch.starts_on, ctx.batch.ends_on)}`].filter(Boolean).join("   ·   ");
+  const meta = [number && `Certificate No. ${number}`, batchLabel && `Batch ${batchLabel}`, endsOn && `Conducted ${range(startsOn, endsOn)}`].filter(Boolean).join("   ·   ");
   if (meta) centre(meta, lineY - nameSize * 0.9, Math.round(nameSize * 0.42));
-  centre(`Issued ${longDate(manilaToday())}`, lineY - nameSize * 1.55, Math.round(nameSize * 0.38));
+  centre(`Issued ${longDate(issuedOn)}`, lineY - nameSize * 1.55, Math.round(nameSize * 0.38));
+  // The 2x2 photo: 2 in square (144 pt), lower right by default; calibrated per template through fields.
+  if (ctx.photo) {
+    const file = await db.storage.from("certificate-photos").download(ctx.photo.storage_path);
+    if (!file.error && file.data) {
+      const img = await pdf.embedJpg(new Uint8Array(await file.data.arrayBuffer()));
+      const size = f.photoSize ?? 144, margin = W * 0.06;
+      const x = f.photoX ?? W - margin - size, y = f.photoY !== undefined ? H - f.photoY - size : margin;
+      page.drawImage(img, { x, y, width: size, height: size });
+      page.drawRectangle({ x, y, width: size, height: size, borderColor: rgb(0.6, 0.66, 0.72), borderWidth: 0.6 });
+    }
+  }
   if (mode === "preview") {
     const text = "PREVIEW - NOT FOR RELEASE", size = Math.round(W / 14);
     page.drawText(text, { x: W * 0.12, y: H * 0.25, size, font: bold, color: rgb(0.71, 0.14, 0.09), opacity: 0.18, rotate: degrees(20) });

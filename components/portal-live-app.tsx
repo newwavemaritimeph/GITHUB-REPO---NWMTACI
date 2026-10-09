@@ -24,14 +24,14 @@ import { RejectInline } from "./portal/reject-inline";
 import { MismoDashboard, MismoFinalList, MismoSubmissions } from "./portal/mismo-home";
 import { AssistantDashboard, AssistantRequisitions, ResourcePlanning, InstructorShortlist } from "./portal/admin-assistant-home";
 import { RegistrationDeliveries, ReleasingDeliveries } from "./portal/delivery-home";
-import { ReleasingHome, CertificatesWorkspace, CertificateTemplates, ReleasedCertificates, AdminCertificateControls, CertificateAlarm } from "./portal/releasing-home";
+import { ReleasingHome, CertificatesWorkspace, CertificateTemplates, ReleasedCertificates, AdminCertificateControls, CertificateAlarm, ReleasingNumbering } from "./portal/releasing-home";
 import { AccountingHome, AccountingApprovals, AccountingReports, AccountingPayments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, pesos2, first, dueCentavos, balanceOf, isUnpaid, manilaToday, addDays } from "@/lib/portal-format";
 import { tcl } from "@/lib/title-case";
 
-type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Requisitions" | "Resource planning" | "Instructors" | AccountingConfigSection;
+type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Requisitions" | "Resource planning" | "Instructors" | "Numbering" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -117,7 +117,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // Attendance stays off until it is rebuilt.
   instructor: [],
   // Releasing Officer (owner, 8 Oct 2026): Dashboard · Certificates · Templates · Released (RELEASING_TABS).
-  releasing_officer: ["Dashboard","Certificates","Templates","Released","Delivery"],
+  releasing_officer: ["Dashboard","Certificates","Templates","Numbering","Released","Delivery"],
   // MARINA MISMO Compliance Officer (owner, 8 Oct 2026): STCW trainees owing at 11:00 AM, the 4:00 PM final list, submissions.
   mismo_officer: ["Dashboard","Final list","Submissions"],
   // Admin Assistant (owner, 9 Oct 2026): requisitions, resource planning, instructor shortlist.
@@ -145,7 +145,7 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   // Cashier workspace (7 Oct 2026); the top tabs come from CASHIER_TABS.
   {label:"Report",icon:"∑",roles:["cashier"],group:"Accounting"},
   {label:"HR & payroll",icon:"♙",roles:["admin"],group:"People"},{label:"MyHr",icon:"☺",group:"People"},
-  {label:"Templates",icon:"▤",roles:["releasing_officer"],group:"Work"},{label:"Released",icon:"⇥",roles:["releasing_officer"],group:"Work"},{label:"Delivery",icon:"⇥",roles:["releasing_officer"],group:"Work"},
+  {label:"Templates",icon:"▤",roles:["releasing_officer"],group:"Work"},{label:"Numbering",icon:"№",roles:["releasing_officer"],group:"Work"},{label:"Released",icon:"⇥",roles:["releasing_officer"],group:"Work"},{label:"Delivery",icon:"⇥",roles:["releasing_officer"],group:"Work"},
   {label:"Delivery requests",icon:"⇥",roles:["registration"],group:"Work"},
   {label:"Requisitions",icon:"✎",roles:["admin_assistant","admin"],group:"Work"},{label:"Resource planning",icon:"▢",roles:["admin_assistant","admin"],group:"Work"},{label:"Instructors",icon:"♙",roles:["admin_assistant","admin"],group:"Work"},
   {label:"Final list",icon:"▤",roles:["mismo_officer"],group:"Work"},{label:"Submissions",icon:"✓",roles:["mismo_officer"],group:"Work"},
@@ -174,7 +174,7 @@ const ACCOUNTING_TABS:TopTab[]=[
   {label:"Reports",items:["Reports"]},
   {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS]},
 ];
-const RELEASING_TABS:TopTab[]=[{label:"Dashboard",items:["Dashboard"]},{label:"Certificates",items:["Certificates"]},{label:"Templates",items:["Templates"]},{label:"Released",items:["Released"]},{label:"Delivery",items:["Delivery"]}];
+const RELEASING_TABS:TopTab[]=[{label:"Dashboard",items:["Dashboard"]},{label:"Certificates",items:["Certificates"]},{label:"Templates",items:["Templates"]},{label:"Numbering",items:["Numbering"]},{label:"Released",items:["Released"]},{label:"Delivery",items:["Delivery"]}];
 function topTabsFor(role:string,allowed:Module[]):TopTab[]{
   if(role==="releasing_officer")return RELEASING_TABS.filter(tab=>tab.items.every(item=>allowed.includes(item)));
   if(role==="accounting")return ACCOUNTING_TABS.map(tab=>({...tab,items:tab.items.filter(item=>allowed.includes(item))})).filter(tab=>tab.items.length);
@@ -318,6 +318,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Dashboard")return <ReleasingHome data={data} reload={reload} go={m=>go(m as Module)}/>;
     if(active==="Certificates")return <CertificatesWorkspace data={data} reload={reload}/>;
     if(active==="Templates")return <CertificateTemplates data={data} reload={reload}/>;
+    if(active==="Numbering")return <ReleasingNumbering data={data} reload={reload}/>;
     if(active==="Released")return <ReleasedCertificates data={data} reload={reload}/>;
     if(active==="Delivery")return <ReleasingDeliveries data={data} reload={reload}/>;
   }
