@@ -2,8 +2,8 @@ import { NextResponse } from "next/server";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { loadGcashDay } from "@/lib/reconciliation-server";
-import { manilaDay } from "@/lib/reconciliation";
+import { loadReconDay } from "@/lib/reconciliation-server";
+import { manilaDay, parseChannel } from "@/lib/reconciliation";
 
 export const runtime = "nodejs";
 
@@ -20,22 +20,23 @@ export async function GET(request: Request) {
   const staff = await requireStaff();
   if (!staff || !staff.roleCodes.some((r) => ["admin", "admin_assistant", "accounting"].includes(r))) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   const today = manilaDay(new Date().toISOString());
-  const date = new URL(request.url).searchParams.get("date") ?? today;
+  const params = new URL(request.url).searchParams;
+  const date = params.get("date") ?? today, channel = parseChannel(params.get("channel"));
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: "Invalid date." }, { status: 400 });
   const db = createSupabaseAdminClient();
-  const day = await loadGcashDay(db, date, today);
+  const day = await loadReconDay(db, date, today, channel);
   const pdf = await PDFDocument.create();
   const reg = await pdf.embedFont(StandardFonts.Helvetica), bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const navy = rgb(0.07, 0.25, 0.39), muted = rgb(0.37, 0.44, 0.5), ink = rgb(0.06, 0.15, 0.22), rule = rgb(0.85, 0.89, 0.92), green = rgb(0.04, 0.48, 0.24), red = rgb(0.71, 0.14, 0.09);
   const W = 595.28, H = 841.89, M = 32; // A4 portrait
-  const cols = [["#", 22], ["Time", 50], ["Receipt No.", 90], ["Trainee", 150], ["GCash Ref. No.", 105], ["Amount", 74], ["In History", 40]] as const;
+  const cols = [["#", 22], ["Time", 50], ["Receipt No.", 90], ["Trainee", 150], [`${channel} Ref. No.`, 105], ["Amount", 74], ["In History", 40]] as const;
   const total = day.rows.reduce((s, r) => s + r.amount_centavos, 0);
   let page = pdf.addPage([W, H]);
   let y = H - M;
   const header = () => {
     page.drawText("NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", { x: M, y, size: 9, font: bold, color: navy });
     y -= 20;
-    page.drawText("GCash Reconciliation - Day Sheet", { x: M, y, size: 15, font: bold, color: ink });
+    page.drawText(`${channel} Reconciliation - Day Sheet`, { x: M, y, size: 15, font: bold, color: ink });
     y -= 16;
     page.drawText(ascii(`${longDate(date)}  -  ${day.rows.length} payment${day.rows.length === 1 ? "" : "s"}  -  ${peso(total)}`), { x: M, y, size: 10, font: reg, color: muted });
     y -= 22;
@@ -64,11 +65,11 @@ export async function GET(request: Request) {
     page.drawLine({ start: { x: M, y: y - 6 }, end: { x: W - M, y: y - 6 }, thickness: 0.5, color: rule });
     y -= 18;
   });
-  if (!day.rows.length) { page.drawText("No GCash payments on this day.", { x: M, y, size: 10, font: reg, color: muted }); y -= 18; }
+  if (!day.rows.length) { page.drawText(`No ${channel} payments on this day.`, { x: M, y, size: 10, font: reg, color: muted }); y -= 18; }
   y -= 40;
   const sig = (label: string, x: number) => { page.drawLine({ start: { x, y }, end: { x: x + 200, y }, thickness: 0.7, color: ink }); page.drawText(label, { x, y: y - 12, size: 8.5, font: reg, color: muted }); };
   sig("Checked by (Admin Assistant)", M);
   sig("Noted by (Accounting Manager)", W - M - 200);
-  await db.from("audit_logs").insert({ actor_id: staff.user.id, action: "report.exported", record_type: "report", record_id: `gcash-reconciliation:${date}`, new_values: { date, payments: day.rows.length } });
-  return new Response(Buffer.from(await pdf.save()), { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="gcash-reconciliation-${date}.pdf"`, "cache-control": "no-store" } });
+  await db.from("audit_logs").insert({ actor_id: staff.user.id, action: "report.exported", record_type: "report", record_id: `reconciliation:${channel}:${date}`, new_values: { date, channel, payments: day.rows.length } });
+  return new Response(Buffer.from(await pdf.save()), { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="${channel.toLowerCase()}-reconciliation-${date}.pdf"`, "cache-control": "no-store" } });
 }

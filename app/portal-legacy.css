@@ -2035,3 +2035,10 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .rc-alert{background:#fbe4dc;border:1px solid #f3c2b3;border-radius:12px;padding:10px 16px}
 .nw-shell .rc-alert summary{cursor:pointer;display:flex;gap:12px;flex-wrap:wrap;align-items:baseline;color:#b42318}.nw-shell .rc-alert summary span{color:#5f7180;font-size:13px}
 .nw-shell .rc-alert .cl-wrap{margin-top:10px;background:#fff}
+.nw-shell .rc-chips{display:flex;gap:8px;flex-wrap:wrap}
+.nw-shell .rc-chip{display:inline-flex;align-items:center;gap:8px;border:1px solid #dfe7ee;background:#fff;color:#0f2638;border-radius:99px;padding:7px 14px;font:600 14px inherit;cursor:pointer}
+.nw-shell .rc-chip.on{background:#123F63;color:#fff;border-color:#123F63}
+.nw-shell .rc-chip i{font-style:normal;font-size:12px;padding:1px 8px;border-radius:99px;background:#fde7dc;color:#c2410c}
+.nw-shell .rc-chip i.ok{background:#e3f4ea;color:#0a7a3e}.nw-shell .rc-chip.on i{background:#fff;color:#123F63}
+.nw-shell .rc-stackalert{display:flex;flex-direction:column;gap:10px}
+.nw-shell .rc-note{font-size:12.5px;opacity:.85;margin-left:auto}

@@ -23,3 +23,23 @@ describe("GCash reconciliation", () => {
     expect(isGcash("PSBank")).toBe(false);
   });
 });
+
+import { channelOf, groupOverdue, parseChannel } from "@/lib/reconciliation";
+describe("reconciliation channels and reminders", () => {
+  it("knows the three reconciled channels", () => {
+    expect(channelOf("psbank")).toBe("PSBank");
+    expect(channelOf("Union Bank")).toBe("UnionBank");
+    expect(channelOf("Cash")).toBeNull();
+    expect(parseChannel("nonsense")).toBe("GCash");
+  });
+  it("counts payments from before today that are not reconciled", () => {
+    const g = groupOverdue([
+      { amount_centavos: 100, received_at: "2026-10-07T02:00:00Z", status: null },
+      { amount_centavos: 200, received_at: "2026-10-07T03:00:00Z", status: "Reconciled" },
+      { amount_centavos: 300, received_at: "2026-10-08T03:00:00Z", status: "Not in History" },
+      { amount_centavos: 400, received_at: "2026-10-08T05:00:00Z", status: null },
+      { amount_centavos: 500, received_at: "2026-10-09T01:00:00Z", status: null },
+    ], "2026-10-09");
+    expect(g).toEqual([{ day: "2026-10-07", count: 1, total: 100 }, { day: "2026-10-08", count: 1, total: 400 }]);
+  });
+});

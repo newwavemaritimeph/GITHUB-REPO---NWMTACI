@@ -1,7 +1,16 @@
 /**
- * GCash reconciliation rules (owner, 9 Oct 2026), shared by the server, the
- * screen and the day sheet.
+ * Payment reconciliation rules (owner, 9 Oct 2026): GCash, PSBank and
+ * UnionBank payments checked against each printed transaction history. Shared
+ * by the server, the screen, the day sheet and the Accounting reminder.
  */
+
+export const CHANNELS = ["GCash", "PSBank", "UnionBank"] as const;
+export type Channel = (typeof CHANNELS)[number];
+const squash = (v: string | null | undefined) => (v ?? "").replace(/\s+/g, "").toLowerCase();
+/** The reconciled channel a payment method belongs to, or null (Cash and others are not reconciled here). */
+export const channelOf = (method: string | null | undefined): Channel | null => CHANNELS.find((c) => squash(c) === squash(method)) ?? null;
+/** A channel name from a query string, defaulting to GCash. */
+export const parseChannel = (v: string | null | undefined): Channel => channelOf(v) ?? "GCash";
 
 export type ReconStatus = "Reconciled" | "Not in History";
 export type ReconLine = { amount_centavos: number; received_at: string; status?: ReconStatus | null };
@@ -39,4 +48,23 @@ export function summarizeDays(lines: ReconLine[], days: string[]): DaySummary[] 
 }
 
 /** Whether a payment method is GCash (stored as the channel name). */
-export const isGcash = (method: string | null | undefined) => (method ?? "").replace(/\s+/g, "").toLowerCase() === "gcash";
+export const isGcash = (method: string | null | undefined) => channelOf(method) === "GCash";
+
+export type OverdueDay = { day: string; count: number; total: number };
+
+/**
+ * Payments still not reconciled from before today (owner, 9 Oct 2026: overdue
+ * from the next day), grouped by day, oldest first.
+ */
+export function groupOverdue(lines: ReconLine[], today: string): OverdueDay[] {
+  const by = new Map<string, OverdueDay>();
+  for (const l of lines) {
+    if (l.status) continue;
+    const day = manilaDay(l.received_at);
+    if (day >= today) continue;
+    const d = by.get(day) ?? { day, count: 0, total: 0 };
+    d.count++; d.total += Number(l.amount_centavos);
+    by.set(day, d);
+  }
+  return [...by.values()].sort((a, b) => a.day.localeCompare(b.day));
+}

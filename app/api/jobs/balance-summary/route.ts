@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { emailConfigured, processEmailJobs } from "@/lib/email-jobs";
 import { sendBalanceSummary } from "@/lib/balance-summary";
+import { sendReconciliationReminder } from "@/lib/reconciliation-alert";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -9,7 +10,8 @@ export const maxDuration = 60;
 /**
  * Daily at 4:00 PM Manila (Vercel cron, 08:00 UTC): email the Cashier and the
  * Accounting Manager the trainees whose training ended (or ends today) with a
- * balance still due, then send any other queued emails.
+ * balance still due, remind Accounting of payments not reconciled, then send
+ * any other queued emails.
  */
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
@@ -19,6 +21,8 @@ export async function GET(request: Request) {
   const db = createSupabaseAdminClient();
   const origin = new URL(request.url).origin;
   const summary = await sendBalanceSummary(db, { origin });
+  // Accounting reminder for GCash, PSBank and UnionBank payments not reconciled (owner, 9 Oct 2026).
+  const reconciliation = await sendReconciliationReminder(db, { origin }).catch(() => ({ configured: true, recipients: 0, payments: 0 }));
   const queued = await processEmailJobs(db, { limit: 20, origin }).catch(() => ({ results: [] }));
-  return NextResponse.json({ ...summary, otherEmails: queued.results.length });
+  return NextResponse.json({ ...summary, reconciliation, otherEmails: queued.results.length });
 }

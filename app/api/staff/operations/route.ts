@@ -9,6 +9,7 @@ import { emailConfigured, processEmailJobs } from "@/lib/email-jobs";
 import { classroomEmailBlocks } from "@/lib/classroom";
 import { loadInstructionDetails } from "@/lib/training-instructions";
 import { fileVoucherInDrive } from "@/lib/expense-voucher";
+import { channelOf } from "@/lib/reconciliation";
 import { activeConnection, googleConfigured, hasDriveScope, inviteStudent, listClasses, revokeConnection } from "@/lib/google-classroom";
 import { sendBalanceSummary } from "@/lib/balance-summary";
 import { RULED_REQUESTS, requestFee } from "@/lib/request-fees";
@@ -1216,14 +1217,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "reconcile-mark") {
-      // GCash reconciliation (owner, 9 Oct 2026): checked against the printed GCash history.
-      if (!canAssist(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin Assistant reconciles GCash payments." }, { status: 403 });
+      // Payment reconciliation (owner, 9 Oct 2026): GCash, PSBank and UnionBank, checked against each printed history.
+      if (!canAssist(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin Assistant reconciles payments." }, { status: 403 });
       if (input.status === "Not in History" && (input.remarks ?? "").length < 3) return NextResponse.json({ error: "Write what you found." }, { status: 400 });
       const admin = createSupabaseAdminClient();
       const { data: pays, error: payError } = await admin.from("payments").select("id,method,valid").in("id", input.paymentIds);
       if (payError) throw payError;
-      const ok = (pays ?? []).filter((p) => p.valid && String(p.method ?? "").replace(/\s+/g, "").toLowerCase() === "gcash").map((p) => p.id as string);
-      if (!ok.length) return NextResponse.json({ error: "Those payments are not GCash payments." }, { status: 400 });
+      const ok = (pays ?? []).filter((p) => p.valid && channelOf(p.method as string)).map((p) => p.id as string);
+      if (!ok.length) return NextResponse.json({ error: "Only GCash, PSBank and UnionBank payments are reconciled here." }, { status: 400 });
       const now = new Date().toISOString();
       const { error } = await admin.from("payment_reconciliations").upsert(ok.map((id) => ({ payment_id: id, status: input.status, remarks: input.remarks || null, checked_by: staff.user.id, checked_at: now })));
       if (error) return NextResponse.json({ error: /payment_reconciliations/i.test(error.message) ? "Apply database update 202610090035 first." : error.message }, { status: 400 });
@@ -1231,7 +1232,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, count: ok.length });
     }
     if (input.action === "reconcile-undo") {
-      if (!canAssist(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin Assistant reconciles GCash payments." }, { status: 403 });
+      if (!canAssist(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin Assistant reconciles payments." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { data: prior } = await admin.from("payment_reconciliations").select("status,remarks").eq("payment_id", input.paymentId).maybeSingle();
       if (!prior) return NextResponse.json({ ok: true });

@@ -6,7 +6,7 @@ import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
 import { accreditationFor, planIssues, requisitionState, requisitionTotal, type Accreditation, type RequisitionLine, type RequisitionState } from "@/lib/admin-assistant";
 import { Badge, Message, fmtDate, usePost } from "./shared-ui";
 import { EXPENSE_REASONS, RejectInline } from "./reject-inline";
-import type { DaySummary, ReconStatus } from "@/lib/reconciliation";
+import { CHANNELS, type Channel, type DaySummary, type ReconStatus } from "@/lib/reconciliation";
 
 /**
  * Admin Assistant (owner, 9 Oct 2026): requisitions of supplies (approved by the
@@ -54,13 +54,10 @@ export function AssistantDashboard({ data, go }: { data: PortalData; go: (m: str
   const gaps = plan.filter((p) => p.issues.length);
   const names = new Map((extra(data).instructors ?? []).map((i) => [i.id, i.complete_name]));
   const courses = new Map(data.courses.map((c) => [c.id, c.code]));
-  const gcash = useGcash(manilaToday());
-  const behind = (gcash.data?.summary ?? []).filter((d) => d.toCheck > 0);
-  const toReconcile = behind.reduce((s, d) => s + d.toCheck, 0);
   const expiring = (extra(data).accreditations ?? []).filter((a) => a.valid_until && a.valid_until <= soon).sort((a, z) => (a.valid_until ?? "").localeCompare(z.valid_until ?? ""));
   return <div className="portal-page cx ac">
     <Head title="Dashboard"><button type="button" className="portal-primary" onClick={() => go("Requisitions")}>New Requisition</button></Head>
-    {toReconcile > 0 && <div className={`ms-banner ${behind[behind.length - 1].day < manilaToday() ? "red" : "amber"}`}><b>{toReconcile} GCash payment{toReconcile === 1 ? "" : "s"} to reconcile</b><span>Oldest: {fmtDate(behind[behind.length - 1].day)}</span><button type="button" className="ms-bbtn" onClick={() => go("Reconciliation")}>Open Reconciliation</button></div>}
+    <ReconcileBanner go={go} />
     {gaps.length > 0 && <div className="ms-banner red"><b>{gaps.length} batch{gaps.length === 1 ? "" : "es"} this week need a classroom, an instructor or a check</b><button type="button" className="ms-bbtn" onClick={() => go("Resource planning")}>Open Resource Planning</button></div>}
     <div className="ac-rail">
       <div className="ac-stack">
@@ -209,37 +206,42 @@ export function InstructorShortlist({ data, reload }: { data: PortalData; reload
   </div>;
 }
 
-/* ------------------------------------------------------------ GCash reconciliation */
+/* ------------------------------------------------------------ payment reconciliation */
 
 type ReconRow = { id: string; payment_number: string; receipt_number: string | null; received_at: string; amount_centavos: number; reference_number: string | null; trainee: string; recorded_by: string | null; proof_link: string | null; status: ReconStatus | null; remarks: string | null; checked_by: string | null; checked_at: string | null };
-type Missing = { payment_id: string; remarks: string | null; checked_at: string; payment_number: string; received_at: string; amount_centavos: number; reference_number: string | null; trainee: string };
-type ReconDay = { day: string; today: string; tracked: boolean; rows: ReconRow[]; summary: DaySummary[]; missing: Missing[] };
+type Missing = { payment_id: string; channel: Channel | null; remarks: string | null; checked_at: string; payment_number: string; received_at: string; amount_centavos: number; reference_number: string | null; trainee: string };
+type Overdue = { channel: Channel; days: { day: string; count: number; total: number }[]; count: number; total: number };
+type ReconDay = { day: string; today: string; channel: Channel; tracked: boolean; rows: ReconRow[]; summary: DaySummary[]; toCheck: Record<Channel, number>; overdue: Overdue[]; missing: Missing[] };
 const clock = (iso: string) => new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso));
 const shortDay = (d: string) => new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T12:00:00+08:00`));
 
-function useGcash(date: string) {
+function useRecon(date: string, channel: Channel) {
   const [state, setState] = useState<{ key: string; data: ReconDay | null; error: string }>({ key: "", data: null, error: "" });
   const [tick, setTick] = useState(0);
-  const key = `${date}:${tick}`;
+  const key = `${channel}:${date}:${tick}`;
   useEffect(() => {
     let live = true;
-    void fetch(`/api/staff/reconciliation?date=${date}`, { cache: "no-store" }).then(async (r) => { const b = await r.json(); if (!r.ok) throw new Error(b.error ?? "Could not load."); if (live) setState({ key: `${date}:${tick}`, data: b as ReconDay, error: "" }); })
-      .catch((e) => { if (live) setState({ key: `${date}:${tick}`, data: null, error: e instanceof Error ? e.message : "Could not load." }); });
+    const k = `${channel}:${date}:${tick}`;
+    void fetch(`/api/staff/reconciliation?date=${date}&channel=${channel}`, { cache: "no-store" }).then(async (r) => { const b = await r.json(); if (!r.ok) throw new Error(b.error ?? "Could not load."); if (live) setState({ key: k, data: b as ReconDay, error: "" }); })
+      .catch((e) => { if (live) setState({ key: k, data: null, error: e instanceof Error ? e.message : "Could not load." }); });
     return () => { live = false; };
-  }, [date, tick]);
+  }, [date, channel, tick]);
   const fresh = state.key === key;
-  return { data: fresh ? state.data : state.data && state.data.day === date ? state.data : null, error: fresh ? state.error : "", reload: async () => setTick((t) => t + 1) };
+  const same = state.data && state.data.day === date && state.data.channel === channel;
+  return { data: fresh || same ? state.data : null, error: fresh ? state.error : "", reload: async () => setTick((t) => t + 1) };
 }
 
 /**
- * GCash Reconciliation (owner, 9 Oct 2026): every GCash payment, sorted by day.
- * The Admin Assistant ticks the ones found on the printed GCash transaction
- * history and marks them Reconciled; missing ones go to Accounting.
+ * Payment Reconciliation (owner, 9 Oct 2026): GCash, PSBank and UnionBank
+ * payments, sorted by day. The Admin Assistant ticks the ones found on each
+ * printed transaction history and marks them Reconciled; missing ones go to
+ * Accounting as Not in History.
  */
 export function GcashReconciliation({ canCheck }: { canCheck: boolean }) {
   const today = manilaToday();
   const [date, setDate] = useState(today);
-  const { data, error, reload } = useGcash(date);
+  const [channel, setChannel] = useState<Channel>("GCash");
+  const { data, error, reload } = useRecon(date, channel);
   const { busy, msg, post } = usePost(reload);
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [q, setQ] = useState("");
@@ -252,38 +254,41 @@ export function GcashReconciliation({ canCheck }: { canCheck: boolean }) {
   const ok = rows.filter((r) => r.status === "Reconciled"), missing = rows.filter((r) => r.status === "Not in History");
   const pick = (id: string, on: boolean) => setPicked((p) => { const n = new Set(p); if (on) n.add(id); else n.delete(id); return n; });
   const go = (d: string) => { setDate(d); setPicked(new Set()); setNoting(null); };
+  const switchTo = (c: Channel) => { setChannel(c); setPicked(new Set()); setNoting(null); setQ(""); };
   const markOk = () => void post({ action: "reconcile-mark", paymentIds: [...picked], status: "Reconciled" }, `${picked.size} marked reconciled.`).then(() => setPicked(new Set())).catch(() => undefined);
   const saveNote = () => { if (!noting) return; const body = noting.kind === "missing" ? { action: "reconcile-mark", paymentIds: [noting.id], status: "Not in History", remarks: note.trim() } : { action: "reconcile-undo", paymentId: noting.id, reason: note.trim() };
     void post(body, noting.kind === "missing" ? "Marked Not in History. Accounting will see it." : "Back to To Check.").then(() => { setNoting(null); setNote(""); pick(noting.id, false); }).catch(() => undefined); };
+  const cols = canCheck ? 11 : 9;
   return <div className="portal-page cx ac">
-    <div className="cx-head"><div><span className="portal-eyebrow">Admin Assistant</span><h1>GCash Reconciliation</h1></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Admin Assistant</span><h1>Payment Reconciliation</h1></div>
       <span className="cl-acts"><span className="ac-day"><button type="button" aria-label="Previous day" onClick={() => go(addDays(date, -1))}>‹</button><input type="date" aria-label="Date" value={date} max={today} onChange={(e) => e.target.value && e.target.value <= today && go(e.target.value)} /><button type="button" aria-label="Next day" disabled={date >= today} onClick={() => go(addDays(date, 1))}>›</button></span>
-        <a className="portal-secondary" href={`/api/documents/reconciliation?date=${date}`} target="_blank" rel="noreferrer">Print Day Sheet</a></span></div>
+        <a className="portal-secondary" href={`/api/documents/reconciliation?date=${date}&channel=${channel}`} target="_blank" rel="noreferrer">Print Day Sheet</a></span></div>
+    <div className="rc-chips" role="tablist" aria-label="Payment channel">{CHANNELS.map((c) => { const n = data?.toCheck?.[c] ?? 0; return <button type="button" role="tab" aria-selected={c === channel} key={c} className={`rc-chip${c === channel ? " on" : ""}`} onClick={() => switchTo(c)}>{c}<i className={n ? "" : "ok"}>{n ? `${n} to check` : "✓"}</i></button>; })}</div>
     {error && <Message kind="error" text={error} />}
     {msg && <Message kind={msg.kind} text={msg.text} />}
     {data && !data.tracked && <Message kind="error" text="Apply database update 202610090035 to start reconciling." />}
     <div className="ac-rail">
       <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>{date === today ? "Today" : fmtDate(date)}</h2><span className="muted-text">GCash</span></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>{date === today ? "Today" : fmtDate(date)}</h2><span className="muted-text">{channel}</span></div>
           <div className="cx-tiles ac-tiles ac-tiles-in">
-            <div className="cx-tile ac-count" style={{ ["--c" as string]: "#0571D0" }}><span>GCash Received · {rows.length}</span><b>{pesos2(rows.reduce((s, r) => s + r.amount_centavos, 0))}</b></div>
+            <div className="cx-tile ac-count" style={{ ["--c" as string]: "#0571D0" }}><span>{channel} Received · {rows.length}</span><b>{pesos2(rows.reduce((s, r) => s + r.amount_centavos, 0))}</b></div>
             <div className="cx-tile ac-count" style={{ ["--c" as string]: "#0a7a3e" }}><span>Reconciled · {ok.length}</span><b>{pesos2(ok.reduce((s, r) => s + r.amount_centavos, 0))}</b></div>
             <div className={`cx-tile ac-count${open.length && date < today ? " cl-overdue" : ""}`} style={{ ["--c" as string]: "#F25615" }}><span>To Check</span><b>{open.length}</b></div>
             <div className="cx-tile ac-count" style={{ ["--c" as string]: "#b42318" }}><span>Not in History</span><b>{missing.length}</b></div>
           </div>
         </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Last 14 Days</h2></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Last 14 Days</h2><span className="muted-text">{channel}</span></div>
           <div className="rc-days">{(data?.summary ?? []).map((d) => <button type="button" key={d.day} className={`rc-day${d.day === date ? " on" : ""}`} onClick={() => go(d.day)}>
             <b>{d.day === today ? "Today" : shortDay(d.day)}</b><span className="cl-mono">{pesos2(d.total)}</span>
-            <small>{d.count} GCash payment{d.count === 1 ? "" : "s"}</small>
+            <small>{d.count} {channel} payment{d.count === 1 ? "" : "s"}</small>
             <span className={`rc-st ${d.toCheck ? (d.day < today ? "late" : "todo") : d.missing ? "late" : "ok"}`}>{d.toCheck ? `${d.toCheck} to check` : d.missing ? `${d.missing} not in history` : d.count ? "All reconciled ✓" : "None"}</span>
           </button>)}</div>
         </section>
       </div>
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>GCash Payments</h2><span className="slot-count">{rows.length}</span></div>
-        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Find a payment" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find by GCash reference no. or amount" />
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>{channel} Payments</h2><span className="slot-count">{rows.length}</span></div>
+        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Find a payment" value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Find by ${channel} reference no. or amount`} />
           {canCheck && <><span className="muted-text">{picked.size} ticked</span><button type="button" className="portal-primary" disabled={busy || !picked.size || !data?.tracked} onClick={markOk}>Mark Reconciled</button></>}</div>
-        {!data ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : rows.length ? <div className="cl-wrap"><table className="cl-log rc-log"><thead><tr>{canCheck && <th className="rc-ck"><input type="checkbox" aria-label="Tick all to check" checked={open.length > 0 && open.every((r) => picked.has(r.id))} onChange={(e) => setPicked(e.target.checked ? new Set(open.map((r) => r.id)) : new Set())} /></th>}<th>#</th><th>Time</th><th>Receipt No.</th><th>Trainee</th><th>GCash Ref. No.</th><th>Amount</th><th>Proof</th><th>Recorded By</th><th>Status</th>{canCheck && <th />}</tr></thead><tbody>
+        {!data ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : rows.length ? <div className="cl-wrap"><table className="cl-log rc-log"><thead><tr>{canCheck && <th className="rc-ck"><input type="checkbox" aria-label="Tick all to check" checked={open.length > 0 && open.every((r) => picked.has(r.id))} onChange={(e) => setPicked(e.target.checked ? new Set(open.map((r) => r.id)) : new Set())} /></th>}<th>#</th><th>Time</th><th>Receipt No.</th><th>Trainee</th><th>{channel} Ref. No.</th><th>Amount</th><th>Proof</th><th>Recorded By</th><th>Status</th>{canCheck && <th />}</tr></thead><tbody>
           {rows.map((r, i) => [<tr key={r.id} className={`${r.status === "Reconciled" ? "rc-done" : r.status ? "rc-miss" : ""}${hit(r) ? " rc-hit" : ""}`}>
             {canCheck && <td className="rc-ck">{!r.status && <input type="checkbox" aria-label={`Tick ${r.reference_number ?? r.payment_number}`} checked={picked.has(r.id)} onChange={(e) => pick(r.id, e.target.checked)} />}</td>}
             <td className="cl-no">{i + 1}</td><td className="cl-mono">{clock(r.received_at)}</td><td className="cl-mono">{r.receipt_number ?? r.payment_number}</td><td>{r.trainee}</td><td className="cl-mono"><b>{r.reference_number ?? "—"}</b></td><td className="cl-mono">{pesos2(r.amount_centavos)}</td>
@@ -291,23 +296,42 @@ export function GcashReconciliation({ canCheck }: { canCheck: boolean }) {
             <td>{r.status === "Reconciled" ? <Badge tone="green">Reconciled</Badge> : r.status ? <Badge tone="red">Not in History</Badge> : <Badge tone="orange">To Check</Badge>}{r.checked_by && <small className="cl-sub cl-block">{r.checked_by}</small>}</td>
             {canCheck && <td>{r.status ? <button type="button" className="rc-mini" onClick={() => { setNoting({ id: r.id, kind: "undo" }); setNote(""); }}>Undo</button> : <button type="button" className="rc-mini" onClick={() => { setNoting({ id: r.id, kind: "missing" }); setNote(""); }}>Not in History</button>}</td>}
           </tr>,
-          noting?.id === r.id && <tr key={`${r.id}-note`}><td colSpan={canCheck ? 11 : 9}><div className="cl-void"><label>{noting.kind === "missing" ? "What did you find?" : "Reason for undoing"}<input value={note} autoFocus onChange={(e) => setNote(e.target.value)} placeholder={noting.kind === "missing" ? "e.g. Not on the printout — ask the Cashier" : "e.g. Ticked by mistake"} /></label><button type="button" className="portal-secondary" onClick={() => setNoting(null)}>Cancel</button><button type="button" className={noting.kind === "missing" ? "cl-danger" : "portal-primary"} disabled={busy || note.trim().length < 3} onClick={saveNote}>{noting.kind === "missing" ? "Mark Not in History" : "Undo"}</button></div></td></tr>,
-          r.status === "Not in History" && r.remarks && noting?.id !== r.id && <tr key={`${r.id}-rm`}><td colSpan={canCheck ? 11 : 9} className="rc-remark">↳ {r.remarks}</td></tr>])}
-        </tbody></table></div> : <p className="portal-empty-copy">No GCash payments on this day.</p>}
-        <p className="ac-foot">Tick the payments you find on the printed GCash history, then Mark Reconciled. Payments missing from the history go to Accounting as Not in History.</p>
+          noting?.id === r.id && <tr key={`${r.id}-note`}><td colSpan={cols}><div className="cl-void"><label>{noting.kind === "missing" ? "What did you find?" : "Reason for undoing"}<input value={note} autoFocus onChange={(e) => setNote(e.target.value)} placeholder={noting.kind === "missing" ? "e.g. Not on the printout — ask the Cashier" : "e.g. Ticked by mistake"} /></label><button type="button" className="portal-secondary" onClick={() => setNoting(null)}>Cancel</button><button type="button" className={noting.kind === "missing" ? "cl-danger" : "portal-primary"} disabled={busy || note.trim().length < 3} onClick={saveNote}>{noting.kind === "missing" ? "Mark Not in History" : "Undo"}</button></div></td></tr>,
+          r.status === "Not in History" && r.remarks && noting?.id !== r.id && <tr key={`${r.id}-rm`}><td colSpan={cols} className="rc-remark">↳ {r.remarks}</td></tr>])}
+        </tbody></table></div> : <p className="portal-empty-copy">No {channel} payments on this day.</p>}
+        <p className="ac-foot">Tick the payments you find on the printed {channel} history, then Mark Reconciled. Payments missing from the history go to Accounting as Not in History.</p>
       </section>
     </div>
   </div>;
 }
 
-/** Accounting dashboard line: GCash payments the Admin Assistant could not find in the GCash history. */
+/** Admin Assistant dashboard banner: payments left to reconcile, per channel. */
+export function ReconcileBanner({ go }: { go: (m: string) => void }) {
+  const { data } = useRecon(manilaToday(), "GCash");
+  const total = data ? CHANNELS.reduce((s, c) => s + (data.toCheck?.[c] ?? 0), 0) : 0;
+  if (!total) return null;
+  const late = (data?.overdue ?? []).length > 0;
+  const oldest = (data?.overdue ?? []).flatMap((o) => o.days.map((d) => d.day)).sort()[0];
+  return <div className={`ms-banner ${late ? "red" : "amber"}`}><b>{total} payment{total === 1 ? "" : "s"} to reconcile</b><span>{CHANNELS.filter((c) => data?.toCheck?.[c]).map((c) => `${c} ${data?.toCheck?.[c]}`).join(" · ")}{oldest ? ` · oldest ${fmtDate(oldest)}` : ""}</span><button type="button" className="ms-bbtn" onClick={() => go("Reconciliation")}>Open Reconciliation</button></div>;
+}
+
+/**
+ * Accounting dashboard (owner, 9 Oct 2026): payments from before today not yet
+ * reconciled, per channel, and payments the Admin Assistant could not find in
+ * the history. The same summary is emailed daily at 4:00 PM.
+ */
 export function GcashNotInHistory() {
-  const { data } = useGcash(manilaToday());
+  const { data } = useRecon(manilaToday(), "GCash");
   const list = data?.missing ?? [];
-  if (!list.length) return null;
-  return <details className="rc-alert"><summary><b>{list.length} GCash payment{list.length === 1 ? "" : "s"} not in the GCash history</b><span>Checked by the Admin Assistant · tap to see</span></summary>
-    <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Date</th><th>Receipt No.</th><th>Trainee</th><th>GCash Ref. No.</th><th>Amount</th><th>Note</th></tr></thead><tbody>
-      {list.map((m) => <tr key={m.payment_id}><td>{m.received_at ? fmtDate(day(m.received_at)) : "—"}</td><td className="cl-mono">{m.payment_number}</td><td>{m.trainee}</td><td className="cl-mono">{m.reference_number ?? "—"}</td><td className="cl-mono">{pesos2(m.amount_centavos)}</td><td className="rc-remark">{m.remarks}</td></tr>)}
-    </tbody></table></div>
-  </details>;
+  const overdue = data?.overdue ?? [];
+  const late = overdue.reduce((s, o) => s + o.count, 0);
+  if (!list.length && !late) return null;
+  return <div className="rc-stackalert">
+    {late > 0 && <div className="ms-banner red"><b>{late} payment{late === 1 ? "" : "s"} not reconciled</b><span>{overdue.map((o) => `${o.channel} ${o.count} (oldest ${fmtDate(o.days[0].day)})`).join(" · ")}</span><span className="rc-note">Also emailed daily at 4:00 PM</span></div>}
+    {list.length > 0 && <details className="rc-alert"><summary><b>{list.length} payment{list.length === 1 ? "" : "s"} not in the transaction history</b><span>Checked by the Admin Assistant · tap to see</span></summary>
+      <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Date</th><th>Channel</th><th>Receipt No.</th><th>Trainee</th><th>Ref. No.</th><th>Amount</th><th>Note</th></tr></thead><tbody>
+        {list.map((m) => <tr key={m.payment_id}><td>{m.received_at ? fmtDate(day(m.received_at)) : "—"}</td><td>{m.channel ?? "—"}</td><td className="cl-mono">{m.payment_number}</td><td>{m.trainee}</td><td className="cl-mono">{m.reference_number ?? "—"}</td><td className="cl-mono">{pesos2(m.amount_centavos)}</td><td className="rc-remark">{m.remarks}</td></tr>)}
+      </tbody></table></div>
+    </details>}
+  </div>;
 }
