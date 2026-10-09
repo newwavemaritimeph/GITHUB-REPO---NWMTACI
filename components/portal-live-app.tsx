@@ -24,14 +24,14 @@ import { RejectInline } from "./portal/reject-inline";
 import { MismoDashboard, MismoFinalList, MismoSubmissions } from "./portal/mismo-home";
 import { AssistantDashboard, AssistantRequisitions, ResourcePlanning, InstructorShortlist, GcashReconciliation, GcashNotInHistory } from "./portal/admin-assistant-home";
 import { RegistrationDeliveries, ReleasingDeliveries } from "./portal/delivery-home";
-import { ReleasingHome, CertificatesWorkspace, CertificateTemplates, ReleasedCertificates, AdminCertificateControls, CertificateAlarm, ReleasingNumbering } from "./portal/releasing-home";
+import { ReleasingHome, CertificatesWorkspace, CertificateTemplates, ReleasedCertificates, AdminCertificateControls, CertificateAlarm, ReleasingNumbering, AdminCertificateNumbers } from "./portal/releasing-home";
 import { AccountingHome, AccountingApprovals, AccountingReports, AccountingPayments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, pesos2, first, dueCentavos, balanceOf, isUnpaid, manilaToday, addDays } from "@/lib/portal-format";
 import { tcl } from "@/lib/title-case";
 
-type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Requisitions" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | AccountingConfigSection;
+type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Requisitions" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -149,7 +149,7 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Delivery requests",icon:"⇥",roles:["registration"],group:"Work"},
   {label:"Requisitions",icon:"✎",roles:["admin_assistant","admin"],group:"Work"},{label:"Resource planning",icon:"▢",roles:["admin_assistant","admin"],group:"Work"},{label:"Instructors",icon:"♙",roles:["admin_assistant","admin"],group:"Work"},{label:"Reconciliation",icon:"✓",roles:["admin_assistant","admin"],group:"Work"},
   {label:"Final list",icon:"▤",roles:["mismo_officer"],group:"Work"},{label:"Submissions",icon:"✓",roles:["mismo_officer"],group:"Work"},
-  {label:"Certificate controls",icon:"№",roles:["admin"],group:"Configuration"},
+  {label:"Certificate controls",icon:"№",roles:["admin"],group:"Configuration"},{label:"Certificate numbers",icon:"№",roles:["admin"],group:"Configuration"},
   {label:"Endorsed courses",icon:"◇",group:"Configuration"},{label:"Configuration",icon:"⚙",roles:["admin"],group:"Configuration"},
   // Accounting › Configuration ▾: one dropdown item per section (owner, 7 Oct 2026).
   ...ACCOUNTING_CONFIG_SECTIONS.map(label=>({label,icon:"⚙",roles:["accounting"],group:"Configuration" as NavGroup})),
@@ -334,6 +334,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Reconciliation")return <GcashReconciliation canCheck={["admin_assistant","admin"].includes(gateRole)}/>;
   if(active==="Delivery requests")return <RegistrationDeliveries data={data} reload={reload}/>;
   if(active==="Certificate controls"&&gateRole==="admin")return <AdminCertificateControls data={data} reload={reload}/>;
+  if(active==="Certificate numbers"&&gateRole==="admin")return <AdminCertificateNumbers data={data} reload={reload}/>;
   if(active==="Training calendar")return <TrainingCalendar data={data}/>;
   if(active==="Trainee scheduling")return <TraineeScheduling data={data} reload={reload}/>;
   if(active==="Instructor assignment")return <InstructorAssignmentScreen data={data} role={gateRole} reload={reload}/>;

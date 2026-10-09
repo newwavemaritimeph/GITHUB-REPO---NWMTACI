@@ -2062,3 +2062,16 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .rp-card:hover{border-color:#0571D0}.nw-shell .rp-card.on{border-color:#0571D0;box-shadow:inset 0 0 0 2px #0571D0;background:#f2f8fe}
 .nw-shell .rp-card.warn:not(.on){opacity:.72}.nw-shell .rp-card small{color:#5f7180;font-size:12.5px}.nw-shell .rp-card .rp-bad{color:#b42318;font-weight:600}
 @media (max-width:1000px){.nw-shell .rp-split{grid-template-columns:1fr}.nw-shell .rp-queue{max-height:none}}
+
+/* Admin › Certificate Numbers (owner, 9 Oct 2026). */
+.nw-shell .cn-tabs{display:inline-flex;border:1px solid #dfe7ee;border-radius:10px;overflow:hidden;background:#fff}
+.nw-shell .cn-tabs button{border:0;background:none;padding:8px 14px;font:600 13.5px inherit;color:#0f2638;cursor:pointer}
+.nw-shell .cn-tabs button.on{background:#123F63;color:#fff}
+.nw-shell .cn-series{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.nw-shell .cn-next{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 20px 18px;background:#f2f7fb;border-radius:10px;padding:10px 14px}
+.nw-shell .cn-next span{color:#5f7180;font-size:13px}.nw-shell .cn-next b{font-size:18px;color:#0571D0}
+.nw-shell .cn-save{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:4px 2px}
+.nw-shell .cn-drop{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:0 20px 16px;border:2px dashed #dfe7ee;border-radius:12px;padding:16px}
+.nw-shell .cn-drop label{cursor:pointer}
+.nw-shell .cn-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media (max-width:760px){.nw-shell .cn-grid{grid-template-columns:1fr}}

@@ -44,6 +44,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       await claimCertificateNumber(db, certId, staff.user.id);
       ctx = (await certificateContext(db, id))!;
     }
+    // Doc. No. and Registration No. are taken at the print itself (migration 202610090037; skipped before it).
+    if (!preview && (!ctx.numbers.doc || !ctx.numbers.reg)) {
+      const { error: numError } = await db.rpc("claim_certificate_doc_numbers", { target_certificate: certId, actor: staff.user.id });
+      if (numError && !/claim_certificate_doc_numbers|does not exist|schema cache/i.test(numError.message)) return notice(numError.message, 409);
+      if (!numError) ctx = (await certificateContext(db, id))!;
+    }
     // Build first so a template problem never uses up the print.
     const bytes = await buildCertificatePdf(db, ctx, preview ? "preview" : "print");
     if (!preview) {

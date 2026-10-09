@@ -22,6 +22,8 @@ export type CertificateContext = {
   /** The 2x2 photo (migration 202610090034); undefined before it. */
   photo?: { storage_path: string; file_name: string } | null;
   corrections: CertificateCorrections;
+  /** Doc. No. and Registration No. (migration 202610090037): assigned at print; "next" is what the next print takes. */
+  numbers: { doc: string | null; reg: string | null; nextDoc: string | null; nextReg: string | null };
 };
 
 /**
@@ -32,7 +34,7 @@ export type CertificateContext = {
 export async function certificateContext(db: Admin, enrollmentId: string): Promise<CertificateContext | null> {
   const { data: e } = await db.from("enrollments").select("id,enrollment_number,course_id,trainee_id,enrollment_status,selling_price_centavos,batch_id,batches(starts_on,ends_on,batch_number),courses(id,name,code,duration_label),trainees(legal_first_name,legal_middle_name,legal_last_name,email)").eq("id", enrollmentId).maybeSingle();
   if (!e) return null;
-  const [{ data: extra }, { data: allocations }, { data: charges }, { data: feedback }, { data: settings }, certRes, formRes, photoRes, corrRes] = await Promise.all([
+  const [{ data: extra }, { data: allocations }, { data: charges }, { data: feedback }, { data: settings }, certRes, formRes, photoRes, corrRes, numRes, seriesRes] = await Promise.all([
     db.from("enrollments").select("scheduled_on").eq("id", enrollmentId).maybeSingle(),
     db.from("payment_allocations").select("amount_centavos,payments(received_at,valid)").eq("enrollment_id", enrollmentId),
     db.from("enrollment_charges").select("amount_centavos,event_type").eq("enrollment_id", enrollmentId).eq("valid", true),
@@ -42,7 +44,17 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
     db.from("courses").select("evaluation_form_id,google_classroom_link").eq("id", e.course_id).maybeSingle(),
     db.from("certificate_photos").select("storage_path,file_name").eq("enrollment_id", enrollmentId).maybeSingle(),
     db.from("certificates").select("corrections").eq("enrollment_id", enrollmentId).maybeSingle(),
+    db.from("certificates").select("doc_number,registration_number").eq("enrollment_id", enrollmentId).maybeSingle(),
+    db.from("certificate_number_settings").select("doc_last,doc_digits,reg_prefix,reg_last,reg_digits,set_at").maybeSingle(),
   ]);
+  const own = (numRes.error ? null : numRes.data) as { doc_number?: string | null; registration_number?: string | null } | null;
+  const ns = (seriesRes.error ? null : seriesRes.data) as { doc_last: number; doc_digits: number; reg_prefix: string; reg_last: number; reg_digits: number; set_at: string | null } | null;
+  const month = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit" }).format(new Date()).split("-");
+  const numbers = {
+    doc: own?.doc_number ?? null, reg: own?.registration_number ?? null,
+    nextDoc: ns?.set_at ? String(Number(ns.doc_last) + 1).padStart(ns.doc_digits, "0") : null,
+    nextReg: ns?.set_at ? `${ns.reg_prefix}${String(Number(ns.reg_last) + 1).padStart(ns.reg_digits, "0")}-${month[1]}${month[0]}` : null,
+  };
   const photo = photoRes.error ? undefined : (photoRes.data as { storage_path: string; file_name: string } | null);
   const corrections = (corrRes.error ? {} : ((corrRes.data as { corrections?: CertificateCorrections } | null)?.corrections ?? {})) as CertificateCorrections;
   let cert = certRes.data as CertificateContext["cert"] | null;
@@ -80,7 +92,7 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
     trainee: { name: t ? [t.legal_first_name, t.legal_middle_name, t.legal_last_name].filter(Boolean).join(" ") : "Trainee", email: t?.email ?? null, firstName: t?.legal_first_name ?? "", middleName: t?.legal_middle_name ?? null, lastName: t?.legal_last_name ?? "" },
     course: { id: c?.id ?? e.course_id, name: c?.name ?? "Course", code: c?.code ?? "", evaluationFormId },
     batch: { starts_on: b?.starts_on ?? scheduled, ends_on: trainingEnd, batch_number: b?.batch_number ?? null },
-    cert, view, photo, corrections, balanceCentavos: Math.max(0, due - paid), issuanceEnabled: Boolean((settings as { certificate_issuance_enabled?: boolean } | null)?.certificate_issuance_enabled),
+    cert, view, photo, corrections, numbers, balanceCentavos: Math.max(0, due - paid), issuanceEnabled: Boolean((settings as { certificate_issuance_enabled?: boolean } | null)?.certificate_issuance_enabled),
   };
 }
 
@@ -167,9 +179,22 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
   const lineY = f.lineY ? H - f.lineY : nameY - nameSize * 1.1;
   centre(String(courseName), lineY, Math.round(nameSize * 0.55), bold);
   const number = ctx.cert?.certificate_number ?? "";
-  const meta = [number && `Certificate No. ${number}`, batchLabel && `Batch ${batchLabel}`, endsOn && `Conducted ${range(startsOn, endsOn)}`].filter(Boolean).join("   ·   ");
+  const meta = [batchLabel && `Batch ${batchLabel}`, endsOn && `Conducted ${range(startsOn, endsOn)}`].filter(Boolean).join("   ·   ");
   if (meta) centre(meta, lineY - nameSize * 0.9, Math.round(nameSize * 0.42));
   centre(`Issued ${longDate(issuedOn)}`, lineY - nameSize * 1.55, Math.round(nameSize * 0.38));
+  // New Wave's three numbers (owner, 9 Oct 2026): Certificate No. and Registration No. at the lower left,
+  // Doc. No. along the right edge. A preview shows the numbers the next print takes.
+  const preview = mode === "preview";
+  const regNo = ctx.numbers?.reg ?? (preview ? ctx.numbers?.nextReg : null);
+  const docNo = ctx.numbers?.doc ?? (preview ? ctx.numbers?.nextDoc : null);
+  const small = Math.max(8, Math.round(W / 70)), ink2 = rgb(0.12, 0.17, 0.23), left = W * 0.07;
+  const rowsNo = [["Certificate No :", number], ["Registration No :", regNo ?? ""]].filter(([, v]) => v);
+  rowsNo.forEach(([label, value], i) => {
+    const y = H * 0.07 + (rowsNo.length - 1 - i) * small * 1.6;
+    page.drawText(label as string, { x: left, y, size: small, font: bold, color: ink2 });
+    page.drawText(value as string, { x: left + small * 8.2, y, size: small, font: bold, color: ink2 });
+  });
+  if (docNo) page.drawText(`Doc. No. ${docNo}`, { x: W - W * 0.025, y: H * 0.5 - small * 5, size: small * 0.9, font: reg, color: ink2, rotate: degrees(90) });
   // The 2x2 photo goes inside the box found on the template (owner, 9 Oct 2026); without one,
   // a 2 in square (144 pt) at the lower right. Manual fields still win when set.
   if (ctx.photo) {
