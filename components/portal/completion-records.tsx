@@ -38,7 +38,7 @@ export function CompletionRecords({ eyebrow = "MISMO" }: { eyebrow?: string }) {
   return <div className="portal-page cx ac tcr-ui">
     <div className="cx-head"><div><span className="portal-eyebrow">{eyebrow}</span><h1>Completion Records</h1></div></div>
     {list.error && <Message kind="error" text={list.error} />}
-    {list.data && !list.data.ready && <Message kind="error" text="Apply database update 202610090039 to save completion records." />}
+    {list.data && !list.data.ready && <Message kind="error" text="The Completion Records tables are not in the database yet. Run database updates 202610090039 and 202610090040 (Supabase SQL Editor), then reload this page." />}
     <section className="portal-panel cx-panel"><div className="panel-heading"><h2>STCW Batches</h2>
       <div className="cx-seg">{["All", "To Do", "Ready", "Printed"].map((f) => <button key={f} type="button" className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{f === "Ready" ? "Ready to Print" : f}</button>)}</div></div>
       {shown.length ? <div className="tcr-batches">{shown.map((b) => <button key={b.id} type="button" className={`tcr-bt${pick === b.id ? " on" : ""}`} onClick={() => setPick(b.id)}>
@@ -47,6 +47,16 @@ export function CompletionRecords({ eyebrow = "MISMO" }: { eyebrow?: string }) {
     </section>
     {pick && <RecordEditor key={pick} batchId={pick} onSaved={() => setTick((t) => t + 1)} />}
   </div>;
+}
+
+/** One sentence about the Google Drive filing that came back with a save. */
+function driveNote(d: { state?: string; path?: string | null; error?: string } | null | undefined) {
+  if (!d) return "";
+  if (d.state === "Filed") return `Filed in Google Drive: ${d.path ?? "TCROA"}.`;
+  if (d.state === "Updated") return "The copy in Google Drive › TCROA was updated.";
+  if (d.state === "Failed") return `Google Drive did not take it (${d.error ?? "connection problem"}); use Upload Again.`;
+  if (d.state === "Not configured") return "Google Drive is not connected yet (Admin › Configuration).";
+  return "";
 }
 
 function RecordEditor({ batchId, onSaved }: { batchId: string; onSaved: () => void }) {
@@ -66,11 +76,12 @@ function RecordEditor({ batchId, onSaved }: { batchId: string; onSaved: () => vo
   const cycle = (id: string, j: number) => { const r = rs[id] ?? emptyResult(n); const ticks = [...r.ticks]; ticks[j] = ticks[j] === null || ticks[j] === undefined ? true : ticks[j] === true ? false : null; setR(id, { ticks }); };
   async function post(body: Record<string, unknown>, ok: string) {
     setBusy(true); setMsg(null);
-    try { const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); const b = await r.json(); if (!r.ok) throw new Error(b.error ?? "Could not save."); setMsg({ kind: "success", text: ok }); return true; }
-    catch (e) { setMsg({ kind: "error", text: e instanceof Error ? e.message : "Could not save." }); return false; }
+    try { const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); const b = await r.json(); if (!r.ok) throw new Error(b.error ?? "Could not save."); setMsg({ kind: "success", text: [ok, driveNote(b.drive)].filter(Boolean).join(" ") }); return b as Record<string, unknown>; }
+    catch (e) { setMsg({ kind: "error", text: e instanceof Error ? e.message : "Could not save." }); return null; }
     finally { setBusy(false); }
   }
   async function save() { if (await post({ action: "save", batchId, fields: f, results: rs }, problems.length ? "Draft saved. Finish the missing items before printing." : "Saved. The record is complete and ready to print.")) { setFields(null); setResults(null); setTick((t) => t + 1); onSaved(); } }
+  async function upload() { if (await post({ action: "drive", batchId }, "")) setTick((t) => t + 1); }
   async function saveTasks() { if (!editTasks) return; const clean = editTasks.filter((t) => t.title.trim()); if (await post({ action: "tasks", courseId: data!.batch.courseId, batchId, tasks: clean }, `Assessment tasks saved for ${data!.batch.courseCode}.`)) { setEditTasks(null); setResults(null); setTick((t) => t + 1); } }
   const fillNumbers = () => { const competent = data.trainees.filter((t) => resultOf(rs[t.enrollmentId] ?? emptyResult(n), n) === "C"); const series = numberSeries(first, competent.length); if (!series) { setMsg({ kind: "error", text: "Type the first MTI certificate number, e.g. MTI-094-609-26-002382." }); return; } const next = { ...rs }; competent.forEach((t, i) => { next[t.enrollmentId] = { ...next[t.enrollmentId], cert: series[i] }; }); setResults(next); setMsg({ kind: "success", text: `${competent.length} numbers filled from ${first.trim()}. Change any of them by hand, then Save.` }); };
   const useLast = () => { const l = data.lastSignatories; setFields({ ...f, assessor: f.assessor || l?.assessor || "", coaValidity: f.coaValidity || l?.coaValidity || "", director: f.director || l?.director || "", assessedOn: f.assessedOn || data.batch.endsOn, directorOn: f.directorOn || data.batch.endsOn }); };
@@ -80,7 +91,11 @@ function RecordEditor({ batchId, onSaved }: { batchId: string; onSaved: () => vo
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>{data.batch.batchNumber} · {data.batch.courseCode}</h2><small>{data.batch.courseName} · {durationText(data.batch.startsOn, data.batch.endsOn)}</small></div>
       <div className="cx-acts"><button type="button" className="portal-secondary" disabled={busy || !dirty} onClick={() => { setFields(null); setResults(null); }}>Discard</button><button type="button" className="portal-primary" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</button>
-        <a className={`portal-secondary tcr-print${problems.length || dirty || data.status === "Not Started" ? " off" : ""}`} href={`/portal/completion-record/${batchId}`} target="_blank" rel="noreferrer" aria-disabled={!!problems.length || dirty}>Preview and Print</a></div></div>
+        <a className={`portal-secondary tcr-print${problems.length || dirty || data.status === "Not Started" ? " off" : ""}`} href={`/portal/completion-record/${batchId}`} target="_blank" rel="noreferrer" aria-disabled={!!problems.length || dirty}>Preview and Print</a>
+        <a className={`portal-secondary tcr-print${problems.length || dirty || data.status === "Not Started" ? " off" : ""}`} href={`/api/documents/completion-record/${batchId}`} target="_blank" rel="noreferrer" aria-disabled={!!problems.length || dirty}>Download PDF</a></div></div>
+      <div className="tcr-drive">{data.drive ? <><Badge tone="green">In Google Drive</Badge><span>{data.drive.path ?? "TCROA"}{data.drive.filedAt ? ` · updated ${new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(data.drive.filedAt))}` : ""}</span>{data.drive.link && <a href={data.drive.link} target="_blank" rel="noreferrer">Open in Drive</a>}</>
+        : <><Badge tone="orange">Not in Google Drive Yet</Badge><span>{problems.length || data.status === "Not Started" ? "It is filed in TCROA automatically once the record is complete and saved." : "Not filed yet."}</span></>}
+        {!problems.length && data.status !== "Not Started" && !dirty && <button type="button" className="portal-secondary" disabled={busy} onClick={() => void upload()}>Upload Again</button>}</div>
       <div className="tcr-form">
         <label>Training Course<span className="tcr-ro">{data.batch.courseName}</span></label>
         <label>Training Duration<span className="tcr-ro">{durationText(data.batch.startsOn, data.batch.endsOn)}</span></label>

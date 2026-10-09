@@ -5,6 +5,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { manilaDay } from "@/lib/reconciliation";
 import { cleanTasks, listCompletionBatches, loadCompletion } from "@/lib/completion-record-server";
 import { completionProblems, fitResult } from "@/lib/completion-record";
+import { fileCompletionInDrive } from "@/lib/completion-drive";
 
 export const runtime = "nodejs";
 
@@ -26,7 +27,8 @@ const saveInput = z.object({
 });
 const tasksInput = z.object({ action: z.literal("tasks"), courseId: z.string().uuid(), batchId: z.string().uuid().optional(), tasks: z.array(task).max(8) });
 const printInput = z.object({ action: z.literal("printed"), batchId: z.string().uuid() });
-const input = z.discriminatedUnion("action", [saveInput, tasksInput, printInput]);
+const driveInput = z.object({ action: z.literal("drive"), batchId: z.string().uuid() });
+const input = z.discriminatedUnion("action", [saveInput, tasksInput, printInput, driveInput]);
 const missing = (m: string) => /training_completion_records|course_assessment_tasks|does not exist|schema cache/i.test(m);
 
 export async function GET(request: Request) {
@@ -69,6 +71,13 @@ export async function POST(request: Request) {
   if (!current) return NextResponse.json({ error: "Batch not found." }, { status: 404 });
   if (!current.ready) return NextResponse.json({ error: MIGRATION }, { status: 400 });
 
+  // Upload Again: file (or refresh) the PDF in Google Drive › TCROA.
+  if (body.action === "drive") {
+    const drive = await fileCompletionInDrive(db, body.batchId);
+    if (drive.state === "Not complete") return NextResponse.json({ error: "Complete the record first; only a complete record is filed in Google Drive." }, { status: 400 });
+    return NextResponse.json({ ok: drive.state !== "Failed", drive });
+  }
+
   if (body.action === "printed") {
     if (current.status === "Not Started") return NextResponse.json({ error: "Save the record first." }, { status: 400 });
     const problems = completionProblems(current.fields, current.trainees, current.results, current.tasks.length);
@@ -76,7 +85,8 @@ export async function POST(request: Request) {
     const { error } = await db.from("training_completion_records").update({ status: "Printed", print_count: current.printCount + 1, printed_at: now, printed_by: staff.user.id }).eq("batch_id", body.batchId);
     if (error) throw error;
     await db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: role, action: "completion_record.printed", record_type: "batch", record_id: body.batchId, new_values: { print: current.printCount + 1, class_no: current.fields.classNo } });
-    return NextResponse.json({ ok: true });
+    const drive = await fileCompletionInDrive(db, body.batchId);
+    return NextResponse.json({ ok: true, drive });
   }
 
   // Save: only trainees enrolled in the batch; results fitted to the record's tasks.
@@ -92,5 +102,7 @@ export async function POST(request: Request) {
   const { error } = await db.from("training_completion_records").upsert(row, { onConflict: "batch_id" });
   if (error) return NextResponse.json({ error: missing(error.message) ? MIGRATION : error.message }, { status: 400 });
   await db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: role, action: "completion_record.saved", record_type: "batch", record_id: body.batchId, prior_values: current.status === "Not Started" ? null : { fields: current.fields, results: current.results }, new_values: { fields: f, results: merged } });
-  return NextResponse.json({ ok: true, status: row.status });
+  // A complete record is filed (or refreshed) in Google Drive › TCROA automatically.
+  const drive = row.status === "Draft" ? null : await fileCompletionInDrive(db, body.batchId);
+  return NextResponse.json({ ok: true, status: row.status, drive });
 }

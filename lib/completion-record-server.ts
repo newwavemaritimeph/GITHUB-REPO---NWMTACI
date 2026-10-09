@@ -20,6 +20,8 @@ export type CompletionPayload = {
   printCount: number;
   printedAt: string | null;
   lastSignatories: Pick<CompletionFields, "assessor" | "coaValidity" | "director"> | null;
+  /** The PDF filed in Google Drive › TCROA (migration 202610090040); null until filed. */
+  drive: { fileId: string; link: string | null; path: string | null; filedAt: string | null } | null;
 };
 
 const EMPTY: CompletionFields = { classNo: "", resitClassNo: "", resitDuration: "", writtenPlace: "", practicalPlace: "", assessor: "", coaValidity: "", assessedOn: "", director: "", directorOn: "" };
@@ -83,5 +85,6 @@ export async function loadCompletion(db: Admin, batchId: string): Promise<Comple
     tasks, courseTasks, trainees, fields, results,
     status: (r?.status as CompletionBatch["status"]) ?? "Not Started",
     printCount: Number(r?.print_count ?? 0), printedAt: (r?.printed_at as string | null) ?? null, lastSignatories,
+    drive: r?.drive_file_id ? { fileId: String(r.drive_file_id), link: (r.drive_link as string | null) ?? null, path: (r.drive_path as string | null) ?? null, filedAt: (r.drive_filed_at as string | null) ?? null } : null,
   };
 }

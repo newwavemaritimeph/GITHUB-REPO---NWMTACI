@@ -29,3 +29,12 @@ describe("Training Completion Record", () => {
     expect(fitResult(undefined, 2)).toEqual({ pct: null, ticks: [null, null], cert: "" });
   });
 });
+
+import { completionNaming } from "@/lib/completion-drive";
+describe("TCROA filing in Google Drive", () => {
+  it("files by course and month, named by date, batch and class", () => {
+    expect(completionNaming({ courseCode: "UBT-PSSR", endsOn: "2026-10-08", batchNumber: "BCH-2026-002475", classNo: "26-609-118" }))
+      .toEqual({ folders: [{ key: "tcroa/UBT-PSSR", name: "UBT-PSSR" }, { key: "tcroa/UBT-PSSR/2026-10", name: "2026-10 October" }], base: "2026-10-08 BCH-2026-002475 Class 26-609-118" });
+    expect(completionNaming({ courseCode: "ccmd", endsOn: "2026-11-30", batchNumber: "BCH/1", classNo: "" }).base).toBe("2026-11-30 BCH 1");
+  });
+});
