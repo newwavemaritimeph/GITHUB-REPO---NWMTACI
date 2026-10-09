@@ -245,7 +245,8 @@ function ChangePasswordModal({email,onClose}:{email:string;onClose:()=>void}){
       const {data:session}=await supabase.auth.getUser();
       const check=await supabase.auth.signInWithPassword({email:session.user?.email??email,password:current});
       if(check.error){setMessage({kind:"error",text:"Your current password is not correct."});return}
-      const {error}=await supabase.auth.updateUser({password:pw});
+      // Supabase "secure password change" needs the current password with the new one.
+      const {error}=await supabase.auth.updateUser({password:pw,current_password:current});
       if(error)throw error;
       setMessage({kind:"success",text:"Password changed. Use the new password the next time you sign in."});setCurrent("");setPw("");setConfirmPw("");
     }catch(e){setMessage({kind:"error",text:e instanceof Error?e.message:"Could not change the password."})}
