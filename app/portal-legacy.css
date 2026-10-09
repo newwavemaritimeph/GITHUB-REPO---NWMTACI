@@ -1975,3 +1975,19 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .ac-approvals>.portal-empty-copy{padding:22px 20px 24px !important}
 .nw-shell .ac-approvals .ac-req{padding:14px 20px}
 .nw-shell .acct-roles{display:inline-flex;gap:6px;flex-wrap:wrap}
+
+/* Admin Assistant (owner, 9 Oct 2026): requisitions, resource planning, instructor shortlist. */
+.nw-shell .aa-warn{display:block;color:#b42318;font-size:12.5px;font-weight:600;margin-top:4px;white-space:normal}
+.nw-shell td.aa-warn{display:table-cell}
+.nw-shell .aa-lines td{white-space:normal;vertical-align:top}
+.nw-shell .aa-lines select,.nw-shell .aa-lines input{font:inherit;font-size:14px;padding:7px 10px;border:1px solid #d5e0e8;border-radius:8px;background:#fff;min-width:0;width:100%;max-width:280px}
+.nw-shell .aa-lines input+select,.nw-shell .aa-lines select+input{margin-top:6px}
+.nw-shell .aa-total{display:flex;align-items:center;justify-content:flex-end;gap:12px;flex-wrap:wrap;padding:12px 20px 18px}
+.nw-shell .aa-total>span{margin-right:auto;margin-left:12px;font-size:15px}.nw-shell .aa-total>span b{font-size:18px}
+.nw-shell .aa-total>button:first-child{margin-right:0}
+.nw-shell .aa-chips{display:flex;flex-wrap:wrap;gap:6px;white-space:normal}
+.nw-shell .aa-chip{display:inline-flex;align-items:center;gap:2px}
+.nw-shell .aa-chip button{border:0;background:none;color:#5f7180;font-size:16px;line-height:1;cursor:pointer;padding:2px 4px;border-radius:6px}
+.nw-shell .aa-chip button:hover{color:#b42318;background:#fbe4dc}
+.nw-shell .aa-accform{padding:8px 4px}
+@media (max-width:640px){.nw-shell .aa-total>span{margin-left:0;width:100%}}

@@ -28,7 +28,7 @@ const WHY: Record<string, string> = {
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const staff = await requireStaff();
-  if (!staff || !staff.roleCodes.some((role) => ["admin", "super_admin", "releasing_officer"].includes(role))) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+  if (!staff || !staff.roleCodes.some((role) => ["admin", "releasing_officer"].includes(role))) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   const { id } = await params;
   const preview = new URL(request.url).searchParams.get("preview") === "1";
   const db = createSupabaseAdminClient();

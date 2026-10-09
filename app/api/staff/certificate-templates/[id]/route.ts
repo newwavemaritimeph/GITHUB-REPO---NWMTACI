@@ -43,7 +43,7 @@ async function detectPhotoBox(bytes: Uint8Array) {
 // browser can fetch the template file to render a certificate PDF client-side.
 // Training Operations / Admin only.
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const staff = await requireStaff(["admin", "training_operations", "releasing_officer"]);
+  const staff = await requireStaff(["admin", "releasing_officer"]);
   if (!staff) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   const { id } = await params;
   const db = createSupabaseAdminClient();
@@ -74,7 +74,7 @@ function parseFields(raw: unknown): { key: string; label: string }[] {
 
 // Edit a template: change overlay fields and/or set it active (Admin / Training Ops / Releasing Officer).
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const staff = await requireStaff(["admin", "training_operations", "releasing_officer"]);
+  const staff = await requireStaff(["admin", "releasing_officer"]);
   if (!staff) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   const { id } = await params;
   const db = createSupabaseAdminClient();
@@ -97,7 +97,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
 // Remove a template + its stored file. Blocked once certificates have been issued from it.
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const staff = await requireStaff(["admin", "training_operations", "releasing_officer"]);
+  const staff = await requireStaff(["admin", "releasing_officer"]);
   if (!staff) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   const { id } = await params;
   const db = createSupabaseAdminClient();

@@ -6,7 +6,7 @@ import { hashValue, requireStaff } from "@/lib/security";
 const scanSchema = z.object({ sessionId: z.string().uuid(), token: z.string().min(32).max(512), scanType: z.enum(["check-in","check-out"]), idempotencyKey: z.string().uuid() });
 
 export async function POST(request: Request) {
-  const staff = await requireStaff(["admin","training_operations","instructor"]);
+  const staff = await requireStaff(["admin"]);
   if (!staff) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   try {
     const input = scanSchema.parse(await request.json());

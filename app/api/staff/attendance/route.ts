@@ -12,7 +12,7 @@ import { suggestAttendanceStatus } from "@/lib/domain";
  * Submitted → Verified, and only a verified session counts towards a certificate.
  */
 
-const READ_ROLES = ["admin", "training_operations", "instructor"];
+const READ_ROLES = ["admin"];
 
 type Session = {
   id: string;
@@ -88,7 +88,7 @@ export async function GET(request: Request) {
     sessions: sessions ?? [],
     records: records ?? [],
     roster: roster ?? [],
-    canVerify: staff.roleCodes.some((role) => ["admin", "training_operations"].includes(role)),
+    canVerify: staff.roleCodes.some((role) => ["admin"].includes(role)),
   });
 }
 
@@ -125,7 +125,7 @@ export async function POST(request: Request) {
     if (!session) return NextResponse.json({ error: "Attendance session not found." }, { status: 404 });
 
     if (input.action === "set-state") {
-      if (input.state === "Verified" && !staff.roleCodes.some((role) => ["admin", "training_operations"].includes(role))) {
+      if (input.state === "Verified" && !staff.roleCodes.some((role) => ["admin"].includes(role))) {
         return NextResponse.json({ error: "Only Training Operations may verify attendance." }, { status: 403 });
       }
       if (input.state === "Submitted" && session.state !== "Open") {

@@ -41,8 +41,8 @@ function useJson<T>(url: string | null) {
 
 /* ------------------------------------------------------------ approvals */
 
-type Category = "Expense requests" | "Voucher reprints" | "Refunds" | "Discounts" | "Rebates owed to partners" | "Cashier closings";
-const CATEGORY_GROUPS: [string, Category[]][] = [["Money out", ["Expense requests", "Voucher reprints", "Refunds"]], ["Fees", ["Discounts", "Rebates owed to partners"]], ["Cash control", ["Cashier closings"]]];
+type Category = "Expense requests" | "Requisitions" | "Voucher reprints" | "Refunds" | "Discounts" | "Rebates owed to partners" | "Cashier closings";
+const CATEGORY_GROUPS: [string, Category[]][] = [["Money out", ["Expense requests", "Requisitions", "Voucher reprints", "Refunds"]], ["Fees", ["Discounts", "Rebates owed to partners"]], ["Cash control", ["Cashier closings"]]];
 type Row = { id: string; title: string; detail: string; ref: string; who: string; when: string; amount: number; act: (approve: boolean, remarks?: string) => Promise<unknown>; okLabel: string; canReject: boolean };
 
 /**
@@ -79,7 +79,11 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
     act: () => post({ action: "agency-rebate-settle", id: r.id, status: "Paid" }, "Rebate marked paid to the partner.") }));
   const closings = data.cashierClosings.filter((c) => c.status === "Submitted").map((c): Row => ({ id: c.id, title: `Cashier closing · ${fmtDate(c.closing_date)}`, detail: `Expected ${pesos2(c.expected_cash_centavos)} · counted ${pesos2(Number(c.actual_cash_centavos ?? 0))}`, ref: Number(c.variance_centavos ?? 0) === 0 ? "Balanced" : Number(c.variance_centavos) < 0 ? `Short ${pesos2(-Number(c.variance_centavos))}` : `Over ${pesos2(Number(c.variance_centavos))}`, who: "Cashier", when: fmtDate(c.closing_date), amount: Number(c.variance_centavos ?? 0), okLabel: "Mark reviewed", canReject: false,
     act: () => post({ action: "cashier-closing-review", id: c.id }, "Closing marked reviewed.") }));
-  const lists: Record<Category, Row[]> = { "Expense requests": expenses, "Voucher reprints": reprints, Refunds: refunds, Discounts: discounts, "Rebates owed to partners": rebates, "Cashier closings": closings };
+  // Admin Assistant requisitions (owner, 9 Oct 2026): approval issues a voucher for the Cashier.
+  type Req = { id: string; requisition_number: string; purpose: string; lines?: { description: string; quantity: number }[]; total_centavos: number; status: string; created_at: string; requester?: { complete_name: string } | { complete_name: string }[] | null };
+  const requisitions = ((data as unknown as { requisitions?: Req[] }).requisitions ?? []).filter((r) => r.status === "For Approval").map((r): Row => ({ id: r.id, title: `Requisition · ${r.purpose}`, detail: (r.lines ?? []).map((l) => `${l.description} × ${l.quantity}`).join(", "), ref: r.requisition_number, who: first(r.requester)?.complete_name ?? "Admin Assistant", when: fmtDate(day(r.created_at)), amount: Number(r.total_centavos), okLabel: "Approve", canReject: true,
+    act: (approve, remarks) => post({ action: "requisition-decide", id: r.id, approve, remarks }, approve ? "Approved. The voucher is with the Cashier." : "Rejected.") }));
+  const lists: Record<Category, Row[]> = { "Expense requests": expenses, Requisitions: requisitions, "Voucher reprints": reprints, Refunds: refunds, Discounts: discounts, "Rebates owed to partners": rebates, "Cashier closings": closings };
   const waiting = Object.values(lists).reduce((s, l) => s + l.length, 0);
   const rowsOf = (list: Row[]) => list.map((r) => <div key={r.id} className={rejecting && rejecting !== r.id ? "ac-dim" : undefined}>
     <div className={`ac-req${rejecting === r.id ? " ac-rejecting" : ""}`}>
@@ -87,7 +91,7 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
       <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{pesos2(r.amount)}</strong>
       {rejecting === r.id ? <span className="ac-rejlabel">Rejecting</span> : <div className="cx-acts"><button type="button" className="portal-primary" disabled={busy || !!rejecting} onClick={() => void r.act(true).catch(() => undefined)}>{r.okLabel}</button>{r.canReject && <button type="button" className="portal-secondary" disabled={busy || !!rejecting} onClick={() => setRejecting(r.id)}>Reject</button>}</div>}
     </div>
-    {rejecting === r.id && <RejectInline reasons={expenses.some((x) => x.id === r.id) ? EXPENSE_REASONS : REQUEST_REASONS} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
+    {rejecting === r.id && <RejectInline reasons={expenses.some((x) => x.id === r.id) || requisitions.some((x) => x.id === r.id) ? EXPENSE_REASONS : REQUEST_REASONS} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
   </div>);
   const groupOf = (c: Category) => CATEGORY_GROUPS.find(([, cs]) => cs.includes(c))?.[0] ?? "";
   if (compact) {
@@ -139,7 +143,7 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
             <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{pesos2(r.amount)}</strong>
             {rejecting === r.id ? <span className="ac-rejlabel">Rejecting</span> : <div className="cx-acts">{r.canReject && <button type="button" className="portal-secondary" disabled={busy || !!rejecting || !!bulk} onClick={() => setRejecting(r.id)}>Reject</button>}<button type="button" className="portal-primary" disabled={busy || !!rejecting || !!bulk} onClick={() => void r.act(true).then(() => setPicked((p) => { const n = new Set(p); n.delete(r.id); return n; })).catch(() => undefined)}>{r.okLabel}</button></div>}
           </div>
-          {rejecting === r.id && <RejectInline reasons={expenses.some((x) => x.id === r.id) ? EXPENSE_REASONS : REQUEST_REASONS} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
+          {rejecting === r.id && <RejectInline reasons={expenses.some((x) => x.id === r.id) || requisitions.some((x) => x.id === r.id) ? EXPENSE_REASONS : REQUEST_REASONS} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
         </div>)}
       </div>) : <p className="portal-empty-copy">{cat === "All" ? "Nothing waiting for your approval." : `No ${cat.toLowerCase()} waiting.`}</p>}
       {empty.length > 0 && <p className="ac-clear"><b>✓ Nothing Waiting:</b> {empty.join(", ")}.</p>}

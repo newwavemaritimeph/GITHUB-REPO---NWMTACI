@@ -1375,7 +1375,7 @@ export function CashPositionModule({ data }: { data: AccountingData }) {
 
 type ConfigTrainee = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; email?: string | null; mobile?: string | null; srn?: string | null; company?: string | null; registered_at?: string | null };
 // Schedule of fees is fixed by the owner's ruling (Reprinting ₱500, Uniform ₱150, LBC ₱500), so it is not edited here.
-export const ACCOUNTING_CONFIG_SECTIONS = ["Payment channels", "Expense categories", "Rebates per agency", "Partners"] as const;
+export const ACCOUNTING_CONFIG_SECTIONS = ["Payment channels", "Expense categories", "Requisition items", "Rebates per agency", "Partners"] as const;
 export type AccountingConfigSection = (typeof ACCOUNTING_CONFIG_SECTIONS)[number];
 /**
  * Accounting › Configuration (owner, 7 Oct 2026): the referring agencies and
@@ -1484,6 +1484,13 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
       onSubmit={(v, id) => post({ action: "expense-category-save", id, name: String(v.name) })}
       onArchive={(id, active, name) => void post({ action: "expense-category-save", id, name, active: !active }).catch(() => undefined)}
       onRemove={(id) => void post({ action: "expense-category-save", id, name: "x", remove: true }).catch(() => undefined)} removable />}
+    {/* Items the Admin Assistant can request (owner, 9 Oct 2026). */}
+    {section === "Requisition items" && <SetupList title="Requisition Items" description="" entityLabel="item" canManage busy={busy}
+      fields={[{ key: "name", label: "Item name" }, { key: "unit", label: "Unit", placeholder: "pc, box, pack of 50" }, { key: "cost", label: "Default cost (₱)", type: "number" }]}
+      rows={((data as unknown as { requisitionItems?: { id: string; name: string; unit: string; default_cost_centavos: number; active: boolean }[] }).requisitionItems ?? []).map((i) => ({ id: i.id, primary: i.name, secondary: `${i.unit} · ₱${(i.default_cost_centavos / 100).toFixed(2)}${i.active ? "" : " · Archived"}`, active: i.active, values: { name: i.name, unit: i.unit, cost: (i.default_cost_centavos / 100).toFixed(2) } }))}
+      onSubmit={(v, id) => post({ action: "requisition-item-save", id, name: String(v.name), unit: String(v.unit || "pc"), defaultCostCentavos: Math.round(Number(v.cost || 0) * 100) })}
+      onArchive={(id, active, name) => void post({ action: "requisition-item-save", id, name, active: !active }).catch(() => undefined)}
+      onRemove={(id) => void post({ action: "requisition-item-save", id, name: "x", remove: true }).catch(() => undefined)} removable />}
     {section === "Rebates per agency" && <PartnerRebates agencies={data.agencies as (Agency & { kind?: string | null; rebate_mode?: string | null; rebate_percent?: number | null })[]} busy={busy} post={post} />}
   </div>;
 }

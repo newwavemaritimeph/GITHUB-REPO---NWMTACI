@@ -22,15 +22,16 @@ import { ClassroomPanel } from "./portal/classroom-panel";
 import { TraineeRequestModal, type RequestType } from "./portal/payment-actions";
 import { RejectInline } from "./portal/reject-inline";
 import { MismoDashboard, MismoFinalList, MismoSubmissions } from "./portal/mismo-home";
+import { AssistantDashboard, AssistantRequisitions, ResourcePlanning, InstructorShortlist } from "./portal/admin-assistant-home";
 import { RegistrationDeliveries, ReleasingDeliveries } from "./portal/delivery-home";
 import { ReleasingHome, CertificatesWorkspace, CertificateTemplates, ReleasedCertificates, AdminCertificateControls, CertificateAlarm } from "./portal/releasing-home";
 import { AccountingHome, AccountingApprovals, AccountingReports, AccountingPayments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
-import { ScheduleOfficerDashboard, AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
+import { AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, pesos2, first, dueCentavos, balanceOf, isUnpaid, manilaToday, addDays } from "@/lib/portal-format";
 import { tcl } from "@/lib/title-case";
 
-type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | AccountingConfigSection;
+type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Requisitions" | "Resource planning" | "Instructors" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -114,12 +115,13 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // Scheduler (Training Operations), reopened 7 Oct 2026: open batches each month,
   // set classroom and instructor (Schedules → Edit, Instructor assignment).
   // Attendance stays off until it is rebuilt.
-  training_operations: ["Dashboard","Schedules","Training calendar","Instructor assignment","Rooms & facilities","Trainee scheduling","Schedule changes"],
   instructor: [],
   // Releasing Officer (owner, 8 Oct 2026): Dashboard · Certificates · Templates · Released (RELEASING_TABS).
   releasing_officer: ["Dashboard","Certificates","Templates","Released","Delivery"],
   // MARINA MISMO Compliance Officer (owner, 8 Oct 2026): STCW trainees owing at 11:00 AM, the 4:00 PM final list, submissions.
   mismo_officer: ["Dashboard","Final list","Submissions"],
+  // Admin Assistant (owner, 9 Oct 2026): requisitions, resource planning, instructor shortlist.
+  admin_assistant: ["Dashboard","Requisitions","Resource planning","Instructors"],
   hr: [],
   // Cashier (Accounting Officer), owner's menu of 7 Oct 2026, shown as top tabs:
   // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses,
@@ -130,24 +132,25 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
 };
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
-  {label:"Dashboard",icon:"⌂",group:"Work"},{label:"Search trainee",icon:"⌕",roles:["admin"],group:"Work"},{label:"Trainee enrollments",icon:"◎",roles:["accounting"],group:"Work"},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting","training_operations"],group:"Work"},
+  {label:"Dashboard",icon:"⌂",group:"Work"},{label:"Search trainee",icon:"⌕",roles:["admin"],group:"Work"},{label:"Trainee enrollments",icon:"◎",roles:["accounting"],group:"Work"},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting"],group:"Work"},
   {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting"],group:"Work"},{label:"Registration",icon:"✎",roles:["registration"],group:"Work"},{label:"Courses",icon:"◇",roles:["registration"],group:"Work"},
-  {label:"Schedules",icon:"□",roles:["admin","registration","training_operations","instructor"],group:"Work"},{label:"Instructions",icon:"✉",roles:["admin","registration","training_operations"],group:"Work"},{label:"Attendance",icon:"✓",roles:["admin","training_operations","instructor"],group:"Work"},
-  {label:"Rooms & facilities",icon:"▢",roles:["admin","training_operations"],group:"Work"},{label:"Training calendar",icon:"▦",roles:["admin","training_operations"],group:"Work"},{label:"Trainee scheduling",icon:"◎",roles:["admin","training_operations"],group:"Work"},{label:"Instructor assignment",icon:"♙",roles:["admin","training_operations"],group:"Work"},{label:"Schedule changes",icon:"↺",roles:["admin","training_operations"],group:"Records"},{label:"Certificates",icon:"◈",roles:["admin","releasing_officer"],group:"Work"},{label:"Requests",icon:"↺",roles:["admin","accounting","cashier"],group:"Work"},
-  {label:"Reports",icon:"↥",roles:["admin","accounting","releasing_officer","registration","training_operations","cashier"],group:"Records"},
-  {label:"Accounting",icon:"▥",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Expenses",icon:"◰",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Inventory",icon:"▦",roles:["admin","accounting"],group:"Finance"},{label:"Employee charges",icon:"₱",roles:["admin","accounting","hr"],group:"Finance"},
+  {label:"Schedules",icon:"□",roles:["admin","registration"],group:"Work"},{label:"Instructions",icon:"✉",roles:["admin","registration"],group:"Work"},{label:"Attendance",icon:"✓",roles:["admin"],group:"Work"},
+  {label:"Rooms & facilities",icon:"▢",roles:["admin"],group:"Work"},{label:"Training calendar",icon:"▦",roles:["admin"],group:"Work"},{label:"Trainee scheduling",icon:"◎",roles:["admin"],group:"Work"},{label:"Instructor assignment",icon:"♙",roles:["admin"],group:"Work"},{label:"Schedule changes",icon:"↺",roles:["admin"],group:"Records"},{label:"Certificates",icon:"◈",roles:["admin","releasing_officer"],group:"Work"},{label:"Requests",icon:"↺",roles:["admin","accounting","cashier"],group:"Work"},
+  {label:"Reports",icon:"↥",roles:["admin","accounting","releasing_officer","registration","cashier"],group:"Records"},
+  {label:"Accounting",icon:"▥",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Expenses",icon:"◰",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Inventory",icon:"▦",roles:["admin","accounting"],group:"Finance"},{label:"Employee charges",icon:"₱",roles:["admin","accounting"],group:"Finance"},
   {label:"Receivables",icon:"◷",roles:["accounting"],group:"Collections"},{label:"For payment",icon:"⇥",roles:["cashier"],group:"Collections"},{label:"Payments",icon:"₱",roles:["cashier","accounting"],group:"Collections"},
   {label:"Approvals",icon:"✓",roles:["accounting"],group:"Approvals"},
   {label:"Payables",icon:"▦",roles:["accounting"],group:"Payables & cash"},{label:"Cash position",icon:"◈",roles:["accounting"],group:"Payables & cash"},
   {label:"Cashier closing",icon:"⚖",roles:["cashier","accounting"],group:"Cashier control"},
   // Cashier workspace (7 Oct 2026); the top tabs come from CASHIER_TABS.
   {label:"Report",icon:"∑",roles:["cashier"],group:"Accounting"},
-  {label:"HR & payroll",icon:"♙",roles:["admin","hr"],group:"People"},{label:"MyHr",icon:"☺",group:"People"},
+  {label:"HR & payroll",icon:"♙",roles:["admin"],group:"People"},{label:"MyHr",icon:"☺",group:"People"},
   {label:"Templates",icon:"▤",roles:["releasing_officer"],group:"Work"},{label:"Released",icon:"⇥",roles:["releasing_officer"],group:"Work"},{label:"Delivery",icon:"⇥",roles:["releasing_officer"],group:"Work"},
   {label:"Delivery requests",icon:"⇥",roles:["registration"],group:"Work"},
+  {label:"Requisitions",icon:"✎",roles:["admin_assistant","admin"],group:"Work"},{label:"Resource planning",icon:"▢",roles:["admin_assistant","admin"],group:"Work"},{label:"Instructors",icon:"♙",roles:["admin_assistant","admin"],group:"Work"},
   {label:"Final list",icon:"▤",roles:["mismo_officer"],group:"Work"},{label:"Submissions",icon:"✓",roles:["mismo_officer"],group:"Work"},
-  {label:"Certificate controls",icon:"№",roles:["admin","super_admin"],group:"Configuration"},
-  {label:"Endorsed courses",icon:"◇",group:"Configuration"},{label:"Configuration",icon:"⚙",roles:["super_admin","admin"],group:"Configuration"},
+  {label:"Certificate controls",icon:"№",roles:["admin"],group:"Configuration"},
+  {label:"Endorsed courses",icon:"◇",group:"Configuration"},{label:"Configuration",icon:"⚙",roles:["admin"],group:"Configuration"},
   // Accounting › Configuration ▾: one dropdown item per section (owner, 7 Oct 2026).
   ...ACCOUNTING_CONFIG_SECTIONS.map(label=>({label,icon:"⚙",roles:["accounting"],group:"Configuration" as NavGroup})),
 ];
@@ -185,11 +188,11 @@ function topTabsFor(role:string,allowed:Module[]):TopTab[]{
   }
   return tabs;
 }
-const WORKING_ROLES=["registration","cashier","accounting","releasing_officer","mismo_officer","admin"] as const;
+const WORKING_ROLES=["registration","cashier","accounting","releasing_officer","mismo_officer","admin_assistant","admin"] as const;
 // An employee may hold two roles (9 Oct 2026): "Working as" lists every role they hold; Admin can view all workspaces.
-function workingRolesFor(roles:string[]){const isAdmin=roles.includes("admin")||roles.includes("super_admin");const held:string[]=isAdmin?[...WORKING_ROLES]:roles.filter(r=>r in roleNames);return held.length?held:roles.slice(0,1)}
-function defaultWorkingRole(roles:string[]){return roles.includes("admin")||roles.includes("super_admin")?"admin":workingRolesFor(roles)[0]??"admin"}
-const roleNames:Record<string,string>={registration:"Registration",cashier:"Cashier",accounting:"Accounting",admin:"Admin",super_admin:"Super Admin",releasing_officer:"Releasing Officer",mismo_officer:"MISMO Compliance Officer",training_operations:"Schedule Officer",hr:"HR",instructor:"Instructor"};
+function workingRolesFor(roles:string[]){const isAdmin=roles.includes("admin");const held:string[]=isAdmin?[...WORKING_ROLES]:roles.filter(r=>r in roleNames);return held.length?held:roles.slice(0,1)}
+function defaultWorkingRole(roles:string[]){return roles.includes("admin")?"admin":workingRolesFor(roles)[0]??"admin"}
+const roleNames:Record<string,string>={registration:"Registration",cashier:"Cashier",accounting:"Accounting",admin:"Admin",releasing_officer:"Releasing Officer",mismo_officer:"MISMO Compliance Officer",admin_assistant:"Admin Assistant"};
 const date=(value:string)=>new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",year:"numeric",timeZone:"Asia/Manila"}).format(new Date(`${value}T00:00:00+08:00`));
 
 // New Wave's own courses (delivery_type "In-House"), split into the two families
@@ -227,7 +230,7 @@ export function PortalLiveApp(){
   const rebuildModules=ROLE_MODULES[role];
   // A dropdown closes on a click outside the tabs, on Escape, and on resize.
   useEffect(()=>{if(!openTab)return;const close=(e:Event)=>{if(e instanceof KeyboardEvent&&e.key!=="Escape")return;if(e instanceof PointerEvent&&(e.target as HTMLElement|null)?.closest?.(".nw-tab"))return;setOpenTab("")};window.addEventListener("pointerdown",close);window.addEventListener("keydown",close);window.addEventListener("resize",close);return()=>{window.removeEventListener("pointerdown",close);window.removeEventListener("keydown",close);window.removeEventListener("resize",close)}},[openTab]);
-  const legacyNav=nav.filter(item=>(!item.roles||item.roles.includes(role)||(role==="super_admin"&&item.roles.includes("admin")))&&!(role==="admin"&&adminHidden.has(item.label))&&!(role==="accounting"&&accountingHidden.has(item.label)));
+  const legacyNav=nav.filter(item=>(!item.roles||item.roles.includes(role))&&!(role==="admin"&&adminHidden.has(item.label))&&!(role==="accounting"&&accountingHidden.has(item.label)));
   const allowedNav=rebuildModules?nav.filter(item=>rebuildModules.includes(item.label)):legacyNav;
   // In a workspace with the combined Registration tab, the older
   // module names open the matching view of that tab instead.
@@ -238,8 +241,8 @@ export function PortalLiveApp(){
   if(loading&&!data)return <main className="portal-loading"><div className="portal-spinner"/><strong>Loading secure staff records…</strong></main>;
   if(error&&!data)return <main className="portal-loading"><Message kind="error" text={error}/><button className="portal-primary" onClick={()=>void load()}>Try Again</button></main>;
   if(!data)return null;
-  const canEnroll=data.roles.some(item=>["admin","registration","training_operations"].includes(item));
-  const canSchedule=["admin","super_admin","training_operations"].includes(role);
+  const canEnroll=data.roles.some(item=>["admin","registration"].includes(item));
+  const canSchedule=["admin"].includes(role);
   const canPay=data.roles.some(item=>["admin","cashier","accounting"].includes(item));
   // An Admin can preview every role's workspace; other staff see only their own role(s).
   // "Working as" shows only Registration, Cashier, Accounting and Admin, in that
@@ -302,7 +305,7 @@ function CashierRequests({data,reload}:{data:PortalData;reload:()=>Promise<void>
 }
 
 function PortalContent({modules,recordsView,setRecordsView,active,role,data,query,go,open,onPay,canEnroll,canSchedule,canPay,reload}:{modules?:Module[];recordsView:RecordsView;setRecordsView:(v:RecordsView)=>void;active:Module;role:string;data:PortalData;query:string;go:(module:Module)=>void;open:(value:"enrollment"|"batch"|"payment")=>void;onPay:(enrollmentId:string)=>void;canEnroll:boolean;canSchedule:boolean;canPay:boolean;reload:()=>Promise<void>}){
-  const gateRole=role==="super_admin"?"admin":role;
+  const gateRole=role;
   // A role mid-rebuild only renders modules on its allow-list. Without this the
   // old workspace would still paint even though the sidebar is empty.
   if(modules&&!modules.includes(active))return <RebuildingWorkspace/>;
@@ -323,9 +326,12 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Final list")return <MismoFinalList/>;
     if(active==="Submissions")return <MismoSubmissions/>;
   }
+  if(gateRole==="admin_assistant"&&active==="Dashboard")return <AssistantDashboard data={data} go={m=>go(m as Module)}/>;
+  if(active==="Requisitions")return <AssistantRequisitions data={data} reload={reload} canRaise={["admin_assistant","admin"].includes(gateRole)} canDecide={["admin","accounting"].includes(gateRole)}/>;
+  if(active==="Resource planning")return <ResourcePlanning data={data} reload={reload}/>;
+  if(active==="Instructors")return <InstructorShortlist data={data} reload={reload}/>;
   if(active==="Delivery requests")return <RegistrationDeliveries data={data} reload={reload}/>;
   if(active==="Certificate controls"&&gateRole==="admin")return <AdminCertificateControls data={data} reload={reload}/>;
-  if(active==="Dashboard"&&gateRole==="training_operations")return <ScheduleOfficerDashboard data={data} go={m=>go(m as Module)} openBatch={()=>open("batch")}/>;
   if(active==="Training calendar")return <TrainingCalendar data={data}/>;
   if(active==="Trainee scheduling")return <TraineeScheduling data={data} reload={reload}/>;
   if(active==="Instructor assignment")return <InstructorAssignmentScreen data={data} role={gateRole} reload={reload}/>;
@@ -371,11 +377,11 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Accounting")return <LiveAccounting data={data} role={gateRole} reload={reload} go={m=>go(m as Module)}/>;
   if(active==="Expenses")return <ExpensesWorkspace data={data} role={gateRole} reload={reload}/>;
   if(active==="Inventory")return <LiveInventory data={data} role={gateRole} reload={reload}/>;
-  if(active==="HR & payroll"&&["admin","hr"].includes(gateRole))return <LiveHr data={data} role={gateRole} reload={reload}/>;
-  if(active==="Rooms & facilities"&&["admin","training_operations"].includes(gateRole))return <LiveTraining data={{classrooms:data.classrooms,certificates:data.certificates,batches:data.batches,enrollments:data.enrollments,courses:data.courses,certificateTemplates:data.certificateTemplates}} role={gateRole} reload={reload} initialTab="Classrooms"/>;
+  if(active==="HR & payroll"&&["admin"].includes(gateRole))return <LiveHr data={data} role={gateRole} reload={reload}/>;
+  if(active==="Rooms & facilities"&&["admin"].includes(gateRole))return <LiveTraining data={{classrooms:data.classrooms,certificates:data.certificates,batches:data.batches,enrollments:data.enrollments,courses:data.courses,certificateTemplates:data.certificateTemplates}} role={gateRole} reload={reload} initialTab="Classrooms"/>;
   if(active==="Certificates"&&["admin","releasing_officer"].includes(gateRole))return <LiveReleasing data={data as unknown as Parameters<typeof LiveReleasing>[0]["data"]} role={gateRole} reload={reload}/>;
   if((ACCOUNTING_CONFIG_SECTIONS as readonly string[]).includes(active))return <AccountingConfiguration section={active as AccountingConfigSection} data={data as unknown as Parameters<typeof AccountingConfiguration>[0]["data"]} trainees={data.trainees} applicationNumbers={data.applicationNumbers} reload={reload}/>;
-  if(active==="Configuration"&&["super_admin","admin"].includes(role))return <div className="portal-page"><PageHead eyebrow="Admin" title="Configuration"/><AdminConfiguration catalog={financeCatalogSections(data,reload)}/></div>;
+  if(active==="Configuration"&&["admin"].includes(role))return <div className="portal-page"><PageHead eyebrow="Admin" title="Configuration"/><AdminConfiguration catalog={financeCatalogSections(data,reload)}/></div>;
   return <ConnectedModule module={active} data={data}/>;
 }
 
@@ -398,7 +404,7 @@ function Dashboard({data,role,open,canEnroll,canPay,reload}:{data:PortalData;rol
   const pendingInstructions=data.enrollments.filter(e=>e.instructions_status==="Pending"&&e.enrollment_status!=="Cancelled");
   const duePayables=data.payables.filter(p=>p.status!=="Paid");
   const metrics=[["Active trainees",data.trainees.length,"Persisted master records"],["Enrollments",data.enrollments.length,"All current statuses"],["Collections",pesos(collections),`${data.payments.length} posted payments`],["Outstanding",pesos(outstanding),"Derived from ledger allocations"],["Published schedules",data.batches.filter(b=>b.published_at).length,`${openSlots} available slots`],["Courses",data.courses.length,"Current active catalog"]];
-  return <div className="portal-page"><div className="portal-heading"><div><span className="portal-eyebrow">Live operations</span><h1>Good Day, {data.profile.complete_name.split(" ")[0]}.</h1><p>These figures are calculated from Supabase, not sample records.</p></div>{canEnroll&&role!=="cashier"?<button className="portal-primary" onClick={()=>open("enrollment")}>+ New Enrollment</button>:null}</div><AnnouncementBoard data={data} role={role} reload={reload}/>{role!=="registration"&&role!=="cashier"&&<div className="metric-grid">{metrics.map(([label,value,note],index)=><article key={String(label)}><div className={`metric-symbol symbol-${index}`}>{["◎","▤","₱","↗","□","◇"][index]}</div><span>{tcl(label)}</span><strong>{value}</strong><small>{note}</small></article>)}</div>}{role==="cashier"?<CashierDashboardPanels data={data}/>:<><div className="dashboard-panels"><section className="portal-panel live-list"><div className="panel-heading"><div><h2>Recent Enrollments</h2><p>Newest operational records</p></div><Badge tone="blue">Live</Badge></div>{recent.map(e=>{const trainee=first(e.trainees),course=first(e.courses);return <div className="live-row-item" key={e.id}><div><strong>{trainee?fullName(trainee):"Unknown trainee"}</strong><small>{course?.name} · {e.enrollment_number}</small></div><Badge>{e.enrollment_status}</Badge></div>})}{!data.enrollments.length&&<p className="portal-empty-copy">Create the first enrollment to begin.</p>}</section>{role==="registration"?<RegistrationUpcomingPanel data={data}/>:<section className="portal-panel live-list"><div className="panel-heading"><div><h2>Upcoming Schedules</h2><p>Published and internal batches</p></div><Badge tone="green">{upcomingBatches.length}</Badge></div>{upcomingBatches.map(b=><div className="live-row-item" key={b.id}><div><strong>{first(b.courses)?.name}</strong><small>{date(b.starts_on)} · {b.venue||b.mode}</small></div><span className="slot-count">{b.capacity-b.confirmed_count} slots</span></div>)}{!data.batches.length&&<p className="portal-empty-copy">No schedules yet. Training operations can create one.</p>}</section>}</div>{role==="training_operations"&&<section className="portal-panel live-list"><div className="panel-heading"><div><h2>Enrollments with Pending Instructions</h2><p>Training instructions not yet sent</p></div><Badge tone="orange">{pendingInstructions.length}</Badge></div>{pendingInstructions.slice(0,8).map(e=>{const t=first(e.trainees),c=first(e.courses),b=first(e.batches);return <div className="live-row-item" key={e.id}><div><strong>{t?fullName(t):"Unknown trainee"}</strong><small>{c?.name} · {b?date(b.starts_on):e.scheduled_on?date(e.scheduled_on):"Open schedule"}</small></div><Badge tone="orange">Pending</Badge></div>})}{!pendingInstructions.length&&<p className="portal-empty-copy">No pending instructions.</p>}</section>}{(role==="admin"||role==="accounting")&&duePayables.length>0&&<section className="portal-panel live-list"><div className="panel-heading"><div><h2>Monthly Payables — Reminder</h2><p>Recurring bills due</p></div><Badge tone="orange">{duePayables.length}</Badge></div>{duePayables.slice(0,6).map(p=><div className="live-row-item" key={p.id}><div><strong>{p.description}</strong><small>{p.due_on?`Due ${p.due_on}`:"No due date"} · {p.status}</small></div><span className="slot-count">{pesos(p.amount_centavos)}</span></div>)}</section>}</>}</div>;
+  return <div className="portal-page"><div className="portal-heading"><div><span className="portal-eyebrow">Live operations</span><h1>Good Day, {data.profile.complete_name.split(" ")[0]}.</h1><p>These figures are calculated from Supabase, not sample records.</p></div>{canEnroll&&role!=="cashier"?<button className="portal-primary" onClick={()=>open("enrollment")}>+ New Enrollment</button>:null}</div><AnnouncementBoard data={data} role={role} reload={reload}/>{role!=="registration"&&role!=="cashier"&&<div className="metric-grid">{metrics.map(([label,value,note],index)=><article key={String(label)}><div className={`metric-symbol symbol-${index}`}>{["◎","▤","₱","↗","□","◇"][index]}</div><span>{tcl(label)}</span><strong>{value}</strong><small>{note}</small></article>)}</div>}{role==="cashier"?<CashierDashboardPanels data={data}/>:<><div className="dashboard-panels"><section className="portal-panel live-list"><div className="panel-heading"><div><h2>Recent Enrollments</h2><p>Newest operational records</p></div><Badge tone="blue">Live</Badge></div>{recent.map(e=>{const trainee=first(e.trainees),course=first(e.courses);return <div className="live-row-item" key={e.id}><div><strong>{trainee?fullName(trainee):"Unknown trainee"}</strong><small>{course?.name} · {e.enrollment_number}</small></div><Badge>{e.enrollment_status}</Badge></div>})}{!data.enrollments.length&&<p className="portal-empty-copy">Create the first enrollment to begin.</p>}</section>{role==="registration"?<RegistrationUpcomingPanel data={data}/>:<section className="portal-panel live-list"><div className="panel-heading"><div><h2>Upcoming Schedules</h2><p>Published and internal batches</p></div><Badge tone="green">{upcomingBatches.length}</Badge></div>{upcomingBatches.map(b=><div className="live-row-item" key={b.id}><div><strong>{first(b.courses)?.name}</strong><small>{date(b.starts_on)} · {b.venue||b.mode}</small></div><span className="slot-count">{b.capacity-b.confirmed_count} slots</span></div>)}{!data.batches.length&&<p className="portal-empty-copy">No schedules yet. The Admin can create one.</p>}</section>}</div>{role==="admin"&&<section className="portal-panel live-list"><div className="panel-heading"><div><h2>Enrollments with Pending Instructions</h2><p>Training instructions not yet sent</p></div><Badge tone="orange">{pendingInstructions.length}</Badge></div>{pendingInstructions.slice(0,8).map(e=>{const t=first(e.trainees),c=first(e.courses),b=first(e.batches);return <div className="live-row-item" key={e.id}><div><strong>{t?fullName(t):"Unknown trainee"}</strong><small>{c?.name} · {b?date(b.starts_on):e.scheduled_on?date(e.scheduled_on):"Open schedule"}</small></div><Badge tone="orange">Pending</Badge></div>})}{!pendingInstructions.length&&<p className="portal-empty-copy">No pending instructions.</p>}</section>}{(role==="admin"||role==="accounting")&&duePayables.length>0&&<section className="portal-panel live-list"><div className="panel-heading"><div><h2>Monthly Payables — Reminder</h2><p>Recurring bills due</p></div><Badge tone="orange">{duePayables.length}</Badge></div>{duePayables.slice(0,6).map(p=><div className="live-row-item" key={p.id}><div><strong>{p.description}</strong><small>{p.due_on?`Due ${p.due_on}`:"No due date"} · {p.status}</small></div><span className="slot-count">{pesos(p.amount_centavos)}</span></div>)}</section>}</>}</div>;
 }
 
 function CashierDashboardPanels({data}:{data:PortalData}){
@@ -481,10 +487,10 @@ function Trainees({data,query,embedded,reload,role}:{data:PortalData;query:strin
  * charges and payments, signature lines, and the actions underneath.
  */
 export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:PortalData;trainee:Trainee;onClose:()=>void;reload?:()=>Promise<void>;role?:string}){
-  const canEdit=!!reload&&["registration","admin","super_admin"].includes(role??"");
+  const canEdit=!!reload&&["registration","admin"].includes(role??"");
   const [editing,setEditing]=useState(false),[addingCourse,setAddingCourse]=useState(false),[openEnrollment,setOpenEnrollment]=useState<string|null>(null);
   const [menu,setMenu]=useState(false),[reqType,setReqType]=useState<RequestType|null>(null),[note,setNote]=useState("");
-  const canPrint=["admin","super_admin","cashier"].includes(role??"");
+  const canPrint=["admin","cashier"].includes(role??"");
   const enrolls=data.enrollments.filter(e=>e.trainee_id===trainee.id).sort((a,b)=>a.created_at.localeCompare(b.created_at));
   const payments=data.payments.filter(p=>p.trainee_id===trainee.id).sort((a,b)=>a.received_at.localeCompare(b.received_at));
   const requests=data.requests.filter(r=>first(r.enrollments)?.trainee_id===trainee.id&&r.status==="Pending");

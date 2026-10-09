@@ -8,6 +8,7 @@ Read `MASTERPLAN.md` before changing the system. It is the product source of tru
 - Tagline: Ride the New Wave of Maritime Excellence
 - Brand colors: orange `#F25615`, blue `#0571D0`, cyan `#35CCFA`, light cyan `#9EE3F1`, dark blue `#123F63`, and white
 - Use readable Geist/system sans-serif text (Geist Mono for amounts and IDs), regular body weight, larger type and mobile-friendly controls. All portal and website labels use Title Case (owner decision, 8 Oct 2026, replacing the 7 Oct sentence-case rule): buttons, tabs, headings, labels, menus and status chips, e.g. "Record Payment". Small words (a, an, and, as, at, by, for, in, of, on, or, the, to, with) stay lowercase unless first; sentences, hints and messages stay normal sentences. Use `titleCase`/`tcl` from lib/title-case.ts for labels built from data. No descriptions under titles or panel headings; tags use formal, plain words. The staff portal uses a navy top bar with dropdown tabs (see design/cashier-prototype.html).
+- Portal roles (owner, 9 Oct 2026): Registration, Cashier, Accounting, Releasing Officer, MISMO Compliance Officer, Admin Assistant, Admin. An employee may hold up to two and switches in "Working as". Super Admin, Scheduler, HR and Instructor are retired; user management belongs to Admin.
 - Never restore Tara Barko names, sample metadata, or identifiers.
 
 ## Architecture and invariants

@@ -9,7 +9,7 @@ const one = <T,>(value: T | T[] | null | undefined): T | null => (Array.isArray(
 /** Employee payslip (half-sheet) generated from a finalized payroll item. HR/Admin only. */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const staff = await requireStaff();
-  if (!staff || !staff.roleCodes.some((role) => ["admin", "hr"].includes(role))) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
+  if (!staff || !staff.roleCodes.some((role) => ["admin"].includes(role))) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   const { id } = await params;
   const db = createSupabaseAdminClient();
   const { data: item } = await db.from("payroll_items")

@@ -33,7 +33,7 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
   const [tab, setTab] = useState<"Overview" | "Directory" | "Attendance" | "Requests" | "Benefits" | "Contracts" | "Payroll" | "13th month">("Overview");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const canManage = role === "admin" || role === "hr";
+  const canManage = role === "admin";
   const nameOf = useMemo(() => new Map(data.employees.map((e) => [e.id, e.complete_name])), [data.employees]);
 
   async function post(body: Record<string, unknown>) {

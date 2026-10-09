@@ -6,26 +6,28 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { withAuthTimeout } from "@/lib/supabase/config";
 
+// The seven portal roles (owner, 9 Oct 2026).
+const ROLE_CODES=z.enum(["admin","registration","cashier","accounting","releasing_officer","mismo_officer","admin_assistant"]);
 const input=z.discriminatedUnion("action",[
   z.object({action:z.literal("payment-method"),name:z.string().trim().min(2).max(80),requiresReference:z.boolean(),allowsProof:z.boolean()}),
   z.object({action:z.literal("marketing-agency"),name:z.string().trim().min(2).max(160),contactName:z.string().trim().max(160).optional(),email:z.string().email().optional().or(z.literal("")),mobile:z.string().trim().max(40).optional()}),
   z.object({action:z.literal("partner"),name:z.string().trim().min(2).max(160),email:z.string().email().optional().or(z.literal("")),mobile:z.string().trim().max(40).optional()}),
   z.object({action:z.literal("course"),id:z.string().uuid().optional(),code:z.string().trim().min(2).max(40),name:z.string().trim().min(2).max(240),categoryId:z.string().uuid(),deliveryType:z.enum(["In-House","Partner or Endorsed"]),durationLabel:z.string().trim().min(2).max(60),durationDays:z.number().positive().max(365),mode:z.string().trim().min(2).max(80),priceCentavos:z.number().int().nonnegative()}),
   z.object({action:z.literal("offer-rate"),id:z.string().uuid(),durationLabel:z.string().trim().min(2).max(60),trainingFeeCentavos:z.number().int().nonnegative(),rebateCentavos:z.number().int().nonnegative()}),
-  z.object({action:z.literal("invite-user"),employeeId:z.string().uuid().optional(),completeName:z.string().trim().min(2).max(160),email:z.string().email(),roleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","mismo_officer","training_operations","hr","instructor"]),secondRoleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","mismo_officer","training_operations","hr","instructor"]).nullable().optional()}),
+  z.object({action:z.literal("invite-user"),employeeId:z.string().uuid().optional(),completeName:z.string().trim().min(2).max(160),email:z.string().email(),roleCode:ROLE_CODES,secondRoleCode:ROLE_CODES.nullable().optional()}),
   z.object({action:z.literal("reset-password"),email:z.string().email()}),
-  z.object({action:z.literal("set-user-role"),userId:z.string().uuid(),roleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","mismo_officer","training_operations","hr","instructor"]),secondRoleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","mismo_officer","training_operations","hr","instructor"]).nullable().optional()}),
-  z.object({action:z.literal("grant-role-by-email"),email:z.string().email(),completeName:z.string().trim().max(160).optional(),roleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","mismo_officer","training_operations","hr","instructor"]),secondRoleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","mismo_officer","training_operations","hr","instructor"]).nullable().optional()}),
+  z.object({action:z.literal("set-user-role"),userId:z.string().uuid(),roleCode:ROLE_CODES,secondRoleCode:ROLE_CODES.nullable().optional()}),
+  z.object({action:z.literal("grant-role-by-email"),email:z.string().email(),completeName:z.string().trim().max(160).optional(),roleCode:ROLE_CODES,secondRoleCode:ROLE_CODES.nullable().optional()}),
   z.object({action:z.literal("remove-user"),userId:z.string().uuid()}),
-  z.object({action:z.literal("update-user"),userId:z.string().uuid(),completeName:z.string().trim().min(2).max(160),position:z.string().trim().max(120).optional(),roleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","mismo_officer","training_operations","hr","instructor"]),secondRoleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","mismo_officer","training_operations","hr","instructor"]).nullable().optional()}),
+  z.object({action:z.literal("update-user"),userId:z.string().uuid(),completeName:z.string().trim().min(2).max(160),position:z.string().trim().max(120).optional(),roleCode:ROLE_CODES,secondRoleCode:ROLE_CODES.nullable().optional()}),
   z.object({action:z.literal("set-password"),userId:z.string().uuid(),password:z.string().min(8).max(200)}),
   z.object({action:z.literal("delete-user"),userId:z.string().uuid()}),
-  z.object({action:z.literal("restore-user"),userId:z.string().uuid(),roleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","mismo_officer","training_operations","hr","instructor"]),secondRoleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","mismo_officer","training_operations","hr","instructor"]).nullable().optional()}),
-  z.object({action:z.literal("create-user"),email:z.string().email(),password:z.string().min(6).max(200),completeName:z.string().trim().min(2).max(160),roleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","mismo_officer","training_operations","hr","instructor"]),secondRoleCode:z.enum(["super_admin","admin","registration","cashier","accounting","releasing_officer","mismo_officer","training_operations","hr","instructor"]).nullable().optional(),position:z.string().trim().max(120).optional()}),
+  z.object({action:z.literal("restore-user"),userId:z.string().uuid(),roleCode:ROLE_CODES,secondRoleCode:ROLE_CODES.nullable().optional()}),
+  z.object({action:z.literal("create-user"),email:z.string().email(),password:z.string().min(6).max(200),completeName:z.string().trim().min(2).max(160),roleCode:ROLE_CODES,secondRoleCode:ROLE_CODES.nullable().optional(),position:z.string().trim().max(120).optional()}),
 ]);
 const slug=(value:string)=>value.toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_|_$/g,"").slice(0,50);
 
-export async function GET(){const staff=await requireStaff(["super_admin"]);
+export async function GET(){const staff=await requireStaff(["admin"]);
   if(!staff){
     // Self-diagnostic: report which cookies the route received, who is signed
     // in, and what roles the DB actually holds (read via service role so RLS
@@ -64,7 +66,7 @@ async function setRoles(db:ReturnType<typeof createSupabaseAdminClient>,userId:s
   const ins=await db.from("user_roles").insert((roles??[]).map(r=>({user_id:userId,role_id:r.id,assigned_by:actor})));if(ins.error)throw ins.error;
   return wanted;
 }
-export async function POST(request:Request){const staff=await requireStaff(["super_admin"]);if(!staff)return NextResponse.json({error:"Super Admin access required."},{status:403});try{const value=input.parse(await request.json()),db=createSupabaseAdminClient();let record:unknown,recordType=value.action;
+export async function POST(request:Request){const staff=await requireStaff(["admin"]);if(!staff)return NextResponse.json({error:"Admin access required."},{status:403});try{const value=input.parse(await request.json()),db=createSupabaseAdminClient();let record:unknown,recordType=value.action;
   // Build auth-email redirects from the live request origin so links never fall back to localhost.
   const authRedirect=`${process.env.APP_BASE_URL??new URL(request.url).origin}/auth/callback?next=/portal`;
   if(value.action==="payment-method"){const {data,error}=await db.from("payment_methods").upsert({code:slug(value.name),name:value.name,requires_reference:value.requiresReference,allows_proof:value.allowsProof,active:true},{onConflict:"code"}).select().single();if(error)throw error;record=data}
@@ -104,7 +106,7 @@ export async function POST(request:Request){const staff=await requireStaff(["sup
   else if(value.action==="update-user"){
     // Edit an employee account: name, position and portal role.
     const up=await db.from("profiles").update({complete_name:value.completeName}).eq("id",value.userId);if(up.error)throw up.error;
-    if(value.userId===staff.user.id&&![value.roleCode,value.secondRoleCode].some(c=>c==="admin"||c==="super_admin"))throw new Error("You cannot remove your own Admin role.");
+    if(value.userId===staff.user.id&&![value.roleCode,value.secondRoleCode].some(c=>c==="admin"))throw new Error("You cannot remove your own Admin role.");
     await setRoles(db,value.userId,[value.roleCode,value.secondRoleCode],staff.user.id);
     if(value.position!==undefined){const {data:emp}=await db.from("employees").select("id").eq("profile_id",value.userId).maybeSingle();if(emp)await db.from("employees").update({position:value.position||"Staff",complete_name:value.completeName}).eq("id",emp.id)}
     await db.auth.admin.updateUserById(value.userId,{user_metadata:{complete_name:value.completeName}});

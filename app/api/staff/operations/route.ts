@@ -133,6 +133,14 @@ const deliveryCheckInput = z.object({ action: z.literal("delivery-check"), id: z
 const deliveryDeclineInput = z.object({ action: z.literal("delivery-decline"), id: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
 const deliveryShipInput = z.object({ action: z.literal("delivery-ship"), id: z.string().uuid(), trackingNumber: z.string().trim().min(4).max(60), shippedOn: z.string().date() });
 const deliveryDeliveredInput = z.object({ action: z.literal("delivery-delivered"), id: z.string().uuid() });
+// Admin Assistant (owner, 9 Oct 2026): requisitions, instructor shortlist, resource planning.
+const requisitionLine = z.object({ description: z.string().trim().min(1).max(160), quantity: z.number().int().min(1).max(9999), unitCentavos: z.number().int().positive() });
+const requisitionCreateInput = z.object({ action: z.literal("requisition-create"), purpose: z.string().trim().min(2).max(300), neededBy: z.string().date().nullable().optional(), lines: z.array(requisitionLine).min(1).max(10) });
+const requisitionDecideInput = z.object({ action: z.literal("requisition-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(300).optional() });
+const requisitionItemInput = z.object({ action: z.literal("requisition-item-save"), id: z.string().uuid().optional(), name: z.string().trim().min(1).max(120), unit: z.string().trim().max(40).optional(), defaultCostCentavos: z.number().int().min(0).optional(), active: z.boolean().optional(), remove: z.boolean().optional() });
+const instructorSaveInput = z.object({ action: z.literal("instructor-save"), id: z.string().uuid().optional(), completeName: z.string().trim().min(2).max(160), mobile: z.string().trim().max(40).optional().default(""), email: z.string().trim().max(160).optional().default(""), notes: z.string().trim().max(300).optional().default(""), active: z.boolean().optional() });
+const accreditationInput = z.object({ action: z.literal("instructor-accreditation-save"), instructorId: z.string().uuid(), courseId: z.string().uuid(), accreditationNumber: z.string().trim().max(80).optional().default(""), validUntil: z.string().date().nullable().optional(), remove: z.boolean().optional() });
+const resourcePlanInput = z.object({ action: z.literal("resource-plan-save"), batchId: z.string().uuid(), classroomId: z.string().uuid().nullable(), instructorId: z.string().uuid().nullable() });
 const mismoSubmitInput = z.object({ action: z.literal("mismo-submit"), batchId: z.string().uuid(), listDate: z.string().date(), enrollmentIds: z.array(z.string().uuid()).max(200) });
 const certificateIssuanceToggleInput = z.object({ action: z.literal("certificate-issuance-toggle"), enabled: z.boolean() });
 const feedbackSendEmailInput = z.object({ action: z.literal("feedback-send-email"), enrollmentId: z.string().uuid() });
@@ -211,17 +219,18 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
-const canManageHr = (roles: string[]) => roles.some((role) => ["admin", "hr"].includes(role));
+const canAssist = (roles: string[]) => roles.some((role) => ["admin", "admin_assistant"].includes(role));
+const canManageHr = (roles: string[]) => roles.some((role) => ["admin"].includes(role));
 // Employee-charge management: the Accounting Manager owns it; admin + HR (who run payroll) included.
-const canManageEmployeeCharges = (roles: string[]) => roles.some((role) => ["admin", "accounting", "hr"].includes(role));
-const canManageTraining = (roles: string[]) => roles.some((role) => ["admin", "training_operations"].includes(role));
+const canManageEmployeeCharges = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
+const canManageTraining = (roles: string[]) => roles.some((role) => ["admin"].includes(role));
 const canRelease = (roles: string[]) => roles.some((role) => ["admin", "releasing_officer"].includes(role));
-const isAdminRole = (roles: string[]) => roles.some((role) => ["admin", "super_admin"].includes(role));
+const isAdminRole = (roles: string[]) => roles.some((role) => ["admin"].includes(role));
 const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
 const minutesOfDay = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
@@ -893,7 +902,7 @@ export async function GET() {
 
   // Certificate delivery requests (migration 202610080031; empty without it).
   let deliveryRequests: unknown[] = [];
-  if (staff.roleCodes.some((r) => ["admin", "super_admin", "registration", "releasing_officer", "cashier", "accounting"].includes(r))) {
+  if (staff.roleCodes.some((r) => ["admin", "registration", "releasing_officer", "cashier", "accounting"].includes(r))) {
     const { data: deliveryRows } = await createSupabaseAdminClient().from("delivery_requests").select("id,request_number,status,recipient_name,mobile,address_line,city,province,zip,email,decline_reason,tracking_number,shipped_on,paid_at,created_at,enrollment_id,trainee_id,trainees(legal_first_name,legal_last_name,application_number,trainee_number),enrollments(enrollment_number,courses(name,code))").order("created_at", { ascending: false }).limit(300);
     const rowsWithIds = (deliveryRows ?? []) as { enrollment_id: string }[];
     const enrollmentIdsForCerts = [...new Set(rowsWithIds.map((r) => r.enrollment_id))];
@@ -905,6 +914,28 @@ export async function GET() {
       for (const c of (certRows.data ?? []) as { enrollment_id: string; status: string; certificate_number?: string | null }[]) certByEnrollment.set(c.enrollment_id, c);
     }
     deliveryRequests = rowsWithIds.map((r) => ({ ...r, certificate_status: certByEnrollment.get(r.enrollment_id)?.status ?? null, certificate_number: certByEnrollment.get(r.enrollment_id)?.certificate_number ?? null }));
+  }
+  // Admin Assistant data (migration 202610090033; empty without it).
+  let requisitions: unknown[] = [], requisitionItems: unknown[] = [], instructors: unknown[] = [], accreditations: unknown[] = [], batchResources: unknown[] = [];
+  if (staff.roleCodes.some((r) => ["admin", "admin_assistant", "accounting", "cashier"].includes(r))) {
+    const admin = createSupabaseAdminClient();
+    const [rq, items] = await Promise.all([
+      admin.from("requisitions").select("id,requisition_number,purpose,needed_by,lines,total_centavos,status,decision_remarks,decided_at,created_at,expense_id,requester:profiles!requisitions_requested_by_fkey(complete_name),expenses(status,voucher_number,expense_number)").order("created_at", { ascending: false }).limit(300),
+      admin.from("requisition_items").select("id,name,unit,default_cost_centavos,active").order("name"),
+    ]);
+    requisitions = rq.error ? [] : rq.data ?? [];
+    requisitionItems = items.error ? [] : items.data ?? [];
+  }
+  if (canAssist(staff.roleCodes)) {
+    const admin = createSupabaseAdminClient();
+    const [ins, acc, res] = await Promise.all([
+      admin.from("instructors").select("id,complete_name,mobile,email,notes,active").order("complete_name"),
+      admin.from("instructor_accreditations").select("id,instructor_id,course_id,accreditation_number,valid_until"),
+      admin.from("batch_resources").select("batch_id,classroom_id,instructor_id,updated_at"),
+    ]);
+    instructors = ins.error ? [] : ins.data ?? [];
+    accreditations = acc.error ? [] : acc.data ?? [];
+    batchResources = res.error ? [] : res.data ?? [];
   }
   const extrasByEnrollment = new Map(enrollmentExtras.map((row) => [row.id, row]));
   const enrollments = (enrollmentsResult.data ?? []).map((row) => {
@@ -958,7 +989,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, deliveryRequests }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, deliveryRequests, requisitions, requisitionItems, instructors, accreditations, batchResources }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -1105,6 +1136,110 @@ export async function POST(request: Request) {
       }
       const { error } = await admin.rpc("reject_expense", { target: input.id, actor: staff.user.id, remarks: input.remarks ?? null });
       if (error) return NextResponse.json({ error: /reject_expense/i.test(error.message) ? "Apply database update 202610070018 first." : error.message }, { status: 400 });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "requisition-create") {
+      if (!canAssist(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin Assistant can raise requisitions." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const total = input.lines.reduce((sum, l) => sum + l.quantity * l.unitCentavos, 0);
+      const year = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric" }).format(new Date()));
+      const { data: number, error: numberError } = await admin.rpc("next_reference", { prefix: "RQ", requested_year: year });
+      if (numberError || !number) return NextResponse.json({ error: numberError?.message ?? "Could not number the requisition." }, { status: 400 });
+      const { error } = await admin.from("requisitions").insert({ requisition_number: number, requested_by: staff.user.id, purpose: input.purpose, needed_by: input.neededBy ?? null, lines: input.lines, total_centavos: total });
+      if (error) return NextResponse.json({ error: /requisitions/i.test(error.message) ? "Apply database update 202610090033 first." : error.message }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "requisition.created", record_type: "requisition", record_id: String(number), new_values: { total_centavos: total, lines: input.lines } });
+      return NextResponse.json({ ok: true, number });
+    }
+    if (input.action === "requisition-decide") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin or the Accounting Manager can decide requisitions." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      // Claim it first so two approvers can't both act on it.
+      const { data: claimed, error: claimError } = await admin.from("requisitions").update({ status: input.approve ? "Approved" : "Rejected", decided_by: staff.user.id, decided_at: new Date().toISOString(), decision_remarks: input.remarks ?? null })
+        .eq("id", input.id).eq("status", "For Approval").select("id,requisition_number,purpose,lines,total_centavos,requested_by").maybeSingle();
+      if (claimError) throw claimError;
+      if (!claimed) return NextResponse.json({ error: "This requisition was already decided." }, { status: 409 });
+      if (!input.approve) {
+        await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "requisition.rejected", record_type: "requisition", record_id: claimed.requisition_number, reason: input.remarks ?? null });
+        return NextResponse.json({ ok: true });
+      }
+      // Approval becomes an expense voucher the Cashier releases (owner's choice).
+      const lines = (claimed.lines ?? []) as { description: string; quantity: number; unitCentavos: number }[];
+      const year = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric" }).format(new Date()));
+      const undo = async (message: string) => { await admin.from("requisitions").update({ status: "For Approval", decided_by: null, decided_at: null, decision_remarks: null }).eq("id", claimed.id); return NextResponse.json({ error: message }, { status: 400 }); };
+      const { data: expenseNumber, error: numberError } = await admin.rpc("next_reference", { prefix: "ER", requested_year: year });
+      if (numberError || !expenseNumber) return undo(numberError?.message ?? "Could not number the expense.");
+      const purpose = `${claimed.purpose} (Requisition ${claimed.requisition_number}: ${lines.map((l) => `${l.description} × ${l.quantity}`).join(", ")})`.slice(0, 300);
+      const { data: expense, error: expenseError } = await admin.from("expenses").insert({ expense_number: expenseNumber, payee: `Requisition ${claimed.requisition_number}`, category: "Supplies", amount_centavos: claimed.total_centavos, purpose, status: "Pending", requested_by: claimed.requested_by ?? staff.user.id }).select("id").single();
+      if (expenseError) return undo(expenseError.message);
+      await admin.from("expenses").update({ request_number: expenseNumber }).eq("id", expense.id);
+      await admin.from("expenses").update({ line_items: lines }).eq("id", expense.id);
+      const { data: voucherNumber, error: approveError } = await admin.rpc("approve_expense", { target: expense.id, actor: staff.user.id, remarks: `Requisition ${claimed.requisition_number}` });
+      if (approveError) {
+        await admin.rpc("reject_expense", { target: expense.id, actor: staff.user.id, remarks: "Requisition approval did not complete" });
+        return undo(approveError.message);
+      }
+      await admin.from("requisitions").update({ expense_id: expense.id }).eq("id", claimed.id);
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "requisition.approved", record_type: "requisition", record_id: claimed.requisition_number, new_values: { expense_id: expense.id, voucher_number: voucherNumber } });
+      const drive = await fileVoucherInDrive(admin, expense.id);
+      return NextResponse.json({ ok: true, voucherNumber, drive });
+    }
+    if (input.action === "requisition-item-save") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or the Admin can edit requisition items." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      if (input.remove && input.id) { const { error } = await admin.from("requisition_items").delete().eq("id", input.id); if (error) throw error; return NextResponse.json({ ok: true }); }
+      const row = { name: input.name, ...(input.unit === undefined ? {} : { unit: input.unit || "pc" }), ...(input.defaultCostCentavos === undefined ? {} : { default_cost_centavos: input.defaultCostCentavos }), ...(input.active === undefined ? {} : { active: input.active }) };
+      const { error } = input.id ? await admin.from("requisition_items").update(row).eq("id", input.id) : await admin.from("requisition_items").insert(row);
+      if (error) return NextResponse.json({ error: error.code === "23505" ? "That item is already on the list." : /requisition_items/i.test(error.message) ? "Apply database update 202610090033 first." : error.message }, { status: 400 });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "instructor-save") {
+      if (!canAssist(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin Assistant can edit the instructor shortlist." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const row = { complete_name: input.completeName, mobile: input.mobile || null, email: input.email ? input.email.toLowerCase() : null, notes: input.notes || null, ...(input.active === undefined ? {} : { active: input.active }) };
+      const { error } = input.id ? await admin.from("instructors").update(row).eq("id", input.id) : await admin.from("instructors").insert(row);
+      if (error) return NextResponse.json({ error: /instructors/i.test(error.message) ? "Apply database update 202610090033 first." : error.message }, { status: 400 });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "instructor-accreditation-save") {
+      if (!canAssist(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin Assistant can edit accreditations." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      if (input.remove) { const { error } = await admin.from("instructor_accreditations").delete().eq("instructor_id", input.instructorId).eq("course_id", input.courseId); if (error) throw error; return NextResponse.json({ ok: true }); }
+      const { error } = await admin.from("instructor_accreditations").upsert({ instructor_id: input.instructorId, course_id: input.courseId, accreditation_number: input.accreditationNumber || null, valid_until: input.validUntil ?? null }, { onConflict: "instructor_id,course_id" });
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "resource-plan-save") {
+      if (!canAssist(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin Assistant can plan resources." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: batch } = await admin.from("batches").select("id,status").eq("id", input.batchId).maybeSingle();
+      if (!batch) return NextResponse.json({ error: "That batch no longer exists." }, { status: 404 });
+      if (batch.status === "Cancelled") return NextResponse.json({ error: "Cancelled batches cannot be planned." }, { status: 400 });
+      const { error } = await admin.from("batch_resources").upsert({ batch_id: input.batchId, classroom_id: input.classroomId, instructor_id: input.instructorId, updated_by: staff.user.id, updated_at: new Date().toISOString() });
+      if (error) return NextResponse.json({ error: /batch_resources/i.test(error.message) ? "Apply database update 202610090033 first." : error.message }, { status: 400 });
+      if (input.classroomId) await admin.from("batches").update({ classroom_id: input.classroomId, updated_at: new Date().toISOString() }).eq("id", input.batchId);
+      // Mirror into resource assignments so slips, the MISMO list and staffing show the instructor and room.
+      const { data: dates } = await admin.from("batch_training_dates").select("id").eq("batch_id", input.batchId);
+      const dateIds = (dates ?? []).map((d) => d.id as string);
+      if (dateIds.length) {
+        await admin.from("resource_assignments").delete().in("batch_training_date_id", dateIds);
+        if (input.instructorId) {
+          const { data: ins } = await admin.from("instructors").select("id,complete_name,email,employee_id").eq("id", input.instructorId).maybeSingle();
+          if (!ins) return NextResponse.json({ error: "That instructor is not on the shortlist." }, { status: 404 });
+          let employeeId = ins.employee_id as string | null;
+          if (!employeeId && ins.email) employeeId = ((await admin.from("employees").select("id").ilike("work_email", ins.email).limit(1).maybeSingle()).data?.id as string | undefined) ?? null;
+          if (!employeeId) {
+            const { data: empNo } = await admin.rpc("next_reference", { prefix: "EMP" });
+            const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+            const { data: emp, error: empError } = await admin.from("employees").insert({ employee_number: empNo, complete_name: ins.complete_name, position: "Instructor", employment_status: "Active", date_hired: today, pay_type: "Daily", base_rate_centavos: 0, work_email: ins.email || null }).select("id").single();
+            if (empError) return NextResponse.json({ error: empError.message }, { status: 400 });
+            employeeId = emp.id as string;
+          }
+          await admin.from("instructors").update({ employee_id: employeeId }).eq("id", ins.id);
+          const { error: assignError } = await admin.from("resource_assignments").insert(dateIds.map((id) => ({ batch_training_date_id: id, instructor_id: employeeId, classroom_id: input.classroomId })));
+          if (assignError) return NextResponse.json({ error: assignError.message }, { status: 400 });
+        }
+      }
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "batch.resources_planned", record_type: "batch", record_id: input.batchId, new_values: { classroom_id: input.classroomId, instructor_id: input.instructorId } });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "expense-reprint-request") {
@@ -1303,7 +1438,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "instruction-template-save") {
-      if (!staff.roleCodes.some((r) => ["admin", "registration", "training_operations"].includes(r))) return NextResponse.json({ error: "Your account cannot edit instruction templates." }, { status: 403 });
+      if (!staff.roleCodes.some((r) => ["admin", "registration"].includes(r))) return NextResponse.json({ error: "Your account cannot edit instruction templates." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { data: course } = await admin.from("courses").select("id,delivery_type").eq("id", input.courseId).maybeSingle();
       if (!course) throw new Error("Course not found.");
@@ -1338,7 +1473,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, class: chosen });
     }
     if (input.action === "course-classroom-link-save") {
-      if (!staff.roleCodes.some((r) => ["admin", "registration", "training_operations"].includes(r))) return NextResponse.json({ error: "Your account cannot set the Google Classroom link." }, { status: 403 });
+      if (!staff.roleCodes.some((r) => ["admin", "registration"].includes(r))) return NextResponse.json({ error: "Your account cannot set the Google Classroom link." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { error } = await admin.from("courses").update({ google_classroom_link: input.link || null }).eq("id", input.courseId);
       // The class code (migration 202610070012) is saved separately so a missing column never blocks the link.
@@ -1463,7 +1598,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, enrollment: data });
     }
     if (input.action === "send-instructions") {
-      if (!staff.roleCodes.some((r) => ["admin", "registration", "training_operations"].includes(r))) return NextResponse.json({ error: "Your account cannot send training instructions." }, { status: 403 });
+      if (!staff.roleCodes.some((r) => ["admin", "registration"].includes(r))) return NextResponse.json({ error: "Your account cannot send training instructions." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { data: enrollment, error: findError } = await admin.from("enrollments")
         .select("id,enrollment_number,trainee_id,enrollment_status,trainees(profile_id,legal_first_name),courses(name)")
@@ -1472,7 +1607,7 @@ export async function POST(request: Request) {
       if (!["Enrolled", "Open Schedule"].includes(enrollment.enrollment_status)) return NextResponse.json({ error: "Instructions are generated once the trainee is paid and enrolled." }, { status: 400 });
       // Count the generation; Registration is limited to two (202610070007).
       // Without the migration, fall back to stamping instructions_sent_at.
-      const limited = !staff.roleCodes.some((r) => ["admin", "training_operations"].includes(r));
+      const limited = !staff.roleCodes.some((r) => ["admin"].includes(r));
       const { data: generation, error: countError } = await admin.rpc("record_instructions_generated", { target_enrollment: input.enrollmentId, actor: staff.user.id, max_count: limited ? INSTRUCTION_LIMIT : null });
       if (countError && /function public.record_instructions_generated/i.test(countError.message)) {
         const { error: sentError } = await admin.from("enrollments").update({ instructions_sent_at: new Date().toISOString() }).eq("id", input.enrollmentId);
@@ -1510,7 +1645,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "certificate-status") {
-      if (!staff.roleCodes.some((r) => ["admin", "training_operations", "releasing_officer"].includes(r))) return NextResponse.json({ error: "Only Admin, Training Operations, or the Releasing Officer can manage certificates." }, { status: 403 });
+      if (!staff.roleCodes.some((r) => ["admin", "releasing_officer"].includes(r))) return NextResponse.json({ error: "Only the Admin or the Releasing Officer can manage certificates." }, { status: 403 });
       // Printing and release must go through the gated certificate-print / certificate-release
       // actions (feedback + issuance checks); this action cannot flip a cert to Printed/Released.
       if (input.status === "Printed" || input.status === "Released") return NextResponse.json({ error: "Use the Print or Release action in the certificates module." }, { status: 400 });
@@ -1572,7 +1707,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "delivery-check" || input.action === "delivery-decline") {
-      if (!staff.roleCodes.some((r) => ["admin", "super_admin", "registration"].includes(r))) return NextResponse.json({ error: "Only Registration can check delivery requests." }, { status: 403 });
+      if (!staff.roleCodes.some((r) => ["admin", "registration"].includes(r))) return NextResponse.json({ error: "Only Registration can check delivery requests." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { data: dr } = await admin.from("delivery_requests").select("id,request_number,status,enrollment_id,trainee_id,email,city,province,address_line,zip,trainees(legal_first_name,legal_last_name),enrollments(courses(name))").eq("id", input.id).maybeSingle();
       if (!dr) return NextResponse.json({ error: "Delivery request not found." }, { status: 404 });
@@ -1630,7 +1765,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "mismo-submit") {
-      if (!staff.roleCodes.some((r) => ["admin", "super_admin", "mismo_officer"].includes(r))) return NextResponse.json({ error: "Only the MISMO Compliance Officer can record submissions." }, { status: 403 });
+      if (!staff.roleCodes.some((r) => ["admin", "mismo_officer"].includes(r))) return NextResponse.json({ error: "Only the MISMO Compliance Officer can record submissions." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { error } = await admin.from("mismo_submissions").insert({ batch_id: input.batchId, list_date: input.listDate, enrollment_ids: input.enrollmentIds, trainee_count: input.enrollmentIds.length, submitted_by: staff.user.id });
       if (error) return NextResponse.json({ error: error.code === "23505" ? "This batch was already recorded as submitted." : error.code === "42P01" ? "Apply database update 202610080031 first." : error.message }, { status: 400 });
@@ -2154,7 +2289,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "create-batch") {
-      if (!staff.roleCodes.some((role) => ["admin", "training_operations"].includes(role))) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
+      if (!staff.roleCodes.some((role) => ["admin"].includes(role))) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
       const { data, error } = await db.rpc("create_training_batch", { target_course: input.courseId, target_partner_offer: input.partnerOfferId ?? null,
         target_instructor_name: input.instructorName, target_instructor_email: input.instructorEmail, target_room_name: input.roomName,
         target_starts_on: input.startsOn, target_ends_on: input.endsOn, target_daily_start: input.dailyStart, target_daily_end: input.dailyEnd,
@@ -2163,13 +2298,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, batch: data });
     }
     if (input.action === "auto-open-batches") {
-      if (!staff.roleCodes.some((role) => ["admin", "training_operations"].includes(role))) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
+      if (!staff.roleCodes.some((role) => ["admin"].includes(role))) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
       const { data, error } = await db.rpc("auto_open_training_batches", { target_course: input.courseId, target_year: input.year, target_month: input.month });
       if (error) throw error;
       return NextResponse.json({ ok: true, created: data });
     }
     if (input.action === "auto-open-all-batches") {
-      if (!staff.roleCodes.some((role) => ["admin", "training_operations"].includes(role))) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
+      if (!staff.roleCodes.some((role) => ["admin"].includes(role))) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { data: courses } = await admin.from("courses").select("id,name").eq("active", true).eq("delivery_type", "In-House");
       const ids = (courses ?? []).map((c) => c.id as string);
@@ -2189,7 +2324,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, created, published, courses: (courses ?? []).length, failed });
     }
     if (input.action === "auto-open-week" || input.action === "auto-open-all-week") {
-      if (!staff.roleCodes.some((role) => ["admin", "training_operations"].includes(role))) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
+      if (!staff.roleCodes.some((role) => ["admin"].includes(role))) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
       // range_end = weekStart + 6 days (plain-date math, no timezone drift). The range RPC
       // publishes the batches it creates, so they are immediately publicly bookable.
       const [wy, wm, wd] = input.weekStart.split("-").map(Number);
@@ -2210,7 +2345,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, created, published: created, courses: (courses ?? []).length, failed });
     }
     if (input.action === "batch-update") {
-      if (!staff.roleCodes.some((role) => ["admin", "training_operations"].includes(role))) return NextResponse.json({ error: "Your account cannot edit schedules." }, { status: 403 });
+      if (!staff.roleCodes.some((role) => ["admin"].includes(role))) return NextResponse.json({ error: "Your account cannot edit schedules." }, { status: 403 });
       const { data, error } = await db.rpc("update_training_batch", { target_batch: input.batchId,
         target_instructor_name: input.instructorName, target_instructor_email: input.instructorEmail, target_room_name: input.roomName, target_venue: input.venue,
         target_daily_start: input.dailyStart, target_daily_end: input.dailyEnd, target_mode: input.mode, target_enrollment_deadline: input.enrollmentDeadline, target_publish: input.publish });
@@ -2224,7 +2359,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, batch: data });
     }
     if (input.action === "batch-delete") {
-      if (!staff.roleCodes.some((role) => ["admin", "training_operations"].includes(role))) return NextResponse.json({ error: "Your account cannot remove schedules." }, { status: 403 });
+      if (!staff.roleCodes.some((role) => ["admin"].includes(role))) return NextResponse.json({ error: "Your account cannot remove schedules." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { data: batch } = await admin.from("batches").select("id,batch_number").eq("id", input.batchId).maybeSingle();
       if (!batch) return NextResponse.json({ error: "That schedule no longer exists." }, { status: 404 });
@@ -2258,7 +2393,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, rebate: data });
     }
     if (input.action === "create-enrollment") {
-      if (!staff.roleCodes.some((role) => ["admin", "registration", "training_operations"].includes(role))) return NextResponse.json({ error: "Your account cannot create enrollments." }, { status: 403 });
+      if (!staff.roleCodes.some((role) => ["admin", "registration"].includes(role))) return NextResponse.json({ error: "Your account cannot create enrollments." }, { status: 403 });
       if (!input.existingTraineeId && (!input.birthDate || !input.email || !input.mobile || input.firstName.length < 2 || input.lastName.length < 2)) {
         return NextResponse.json({ error: "Complete the trainee's name, birth date, email, and mobile number." }, { status: 400 });
       }
