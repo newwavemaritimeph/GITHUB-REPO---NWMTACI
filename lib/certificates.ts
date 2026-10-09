@@ -3,6 +3,7 @@ import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { automaticEndDate } from "@/lib/scheduling";
 import { certificateState, type CertificateView } from "@/lib/certificate-rules";
 import { corrected, type CertificateCorrections } from "@/lib/certificate-photo";
+import { detectPhotoBox } from "@/lib/certificate-template";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -169,15 +170,22 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
   const meta = [number && `Certificate No. ${number}`, batchLabel && `Batch ${batchLabel}`, endsOn && `Conducted ${range(startsOn, endsOn)}`].filter(Boolean).join("   ·   ");
   if (meta) centre(meta, lineY - nameSize * 0.9, Math.round(nameSize * 0.42));
   centre(`Issued ${longDate(issuedOn)}`, lineY - nameSize * 1.55, Math.round(nameSize * 0.38));
-  // The 2x2 photo: 2 in square (144 pt), lower right by default; calibrated per template through fields.
+  // The 2x2 photo goes inside the box found on the template (owner, 9 Oct 2026); without one,
+  // a 2 in square (144 pt) at the lower right. Manual fields still win when set.
   if (ctx.photo) {
     const file = await db.storage.from("certificate-photos").download(ctx.photo.storage_path);
     if (!file.error && file.data) {
       const img = await pdf.embedJpg(new Uint8Array(await file.data.arrayBuffer()));
-      const size = f.photoSize ?? 144, margin = W * 0.06;
-      const x = f.photoX ?? W - margin - size, y = f.photoY !== undefined ? H - f.photoY - size : margin;
-      page.drawImage(img, { x, y, width: size, height: size });
-      page.drawRectangle({ x, y, width: size, height: size, borderColor: rgb(0.6, 0.66, 0.72), borderWidth: 0.6 });
+      const found = f.photoX === undefined && isPdf(tpl.bytes) ? await detectPhotoBox(tpl.bytes) : null;
+      if (found) {
+        const inset = 1.5, size = Math.min(found.w, found.h) - inset * 2;
+        page.drawImage(img, { x: found.x + (found.w - size) / 2, y: found.y + (found.h - size) / 2, width: size, height: size });
+      } else {
+        const size = f.photoSize ?? 144, margin = W * 0.06;
+        const x = f.photoX ?? W - margin - size, y = f.photoY !== undefined ? H - f.photoY - size : margin;
+        page.drawImage(img, { x, y, width: size, height: size });
+        page.drawRectangle({ x, y, width: size, height: size, borderColor: rgb(0.6, 0.66, 0.72), borderWidth: 0.6 });
+      }
     }
   }
   if (mode === "preview") {

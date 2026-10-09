@@ -214,7 +214,8 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
       const body = await r.json();
       if (!r.ok) throw new Error(body.error ?? "The template could not be uploaded.");
       await reload();
-      setMsg({ kind: "success", text: `Template version ${body.version} uploaded and now in use.` });
+      const box = body.photoBox as { w: number; h: number } | null;
+      setMsg({ kind: "success", text: `Template version ${body.version} uploaded and now in use. ${box ? `2x2 photo box found (${(box.w / 72).toFixed(1)} × ${(box.h / 72).toFixed(1)} in): the photo prints inside it.` : "No 2x2 photo box was found on this PDF: the photo prints at the lower right. Preview a certificate to check."}` });
     } catch (e) { setMsg({ kind: "error", text: e instanceof Error ? e.message : "The template could not be uploaded." }); } finally { setUploading(null); }
   }
   async function view(id: string) {

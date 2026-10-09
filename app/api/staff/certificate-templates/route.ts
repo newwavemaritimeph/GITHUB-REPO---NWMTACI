@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { detectPhotoBox } from "@/lib/certificate-template";
 
 export const runtime = "nodejs";
 
@@ -47,7 +48,9 @@ export async function POST(request: Request) {
       course_id: courseId, version, storage_path: path, active: true, fields, approved_by: staff.user.id, approved_at: new Date().toISOString(),
     }).select("id").single();
     if (insertError) { await db.storage.from("certificate-templates").remove([path]); throw insertError; }
-    return NextResponse.json({ templateId: tpl.id, version });
+    // Tell the uploader whether the 2x2 photo box was found (it is used automatically when printing).
+    const photoBox = file.type === "application/pdf" ? await detectPhotoBox(new Uint8Array(await file.arrayBuffer())) : null;
+    return NextResponse.json({ templateId: tpl.id, version, photoBox: photoBox ? { w: Math.round(photoBox.w), h: Math.round(photoBox.h), source: photoBox.source } : null });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to store the template." }, { status: 400 });
   }
