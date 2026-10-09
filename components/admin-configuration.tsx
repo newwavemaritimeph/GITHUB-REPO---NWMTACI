@@ -21,23 +21,26 @@ type Account=Data["users"][number];
 /** Employee accounts: the Admin registers, edits, resets passwords for and deletes portal accounts. */
 function UserAccounts({data,post}:{data:Data;onSubmit:(e:FormEvent<HTMLFormElement>)=>void;post:(payload:Record<string,unknown>,done?:string)=>Promise<boolean>}){
   const [adding,setAdding]=useState(false),[editing,setEditing]=useState<string|null>(null),[resetting,setResetting]=useState<string|null>(null),[deleting,setDeleting]=useState<string|null>(null),[showRemoved,setShowRemoved]=useState(false);
-  const [form,setForm]=useState({completeName:"",email:"",password:"",position:"",roleCode:"cashier"});
-  const [edit,setEdit]=useState({completeName:"",position:"",roleCode:"cashier"});
+  const [form,setForm]=useState({completeName:"",email:"",password:"",position:"",roleCode:"cashier",secondRoleCode:""});
+  const [edit,setEdit]=useState({completeName:"",position:"",roleCode:"cashier",secondRoleCode:""});
+  // An employee may hold two roles (owner, 9 Oct 2026); the second is optional.
+  const secondRoleSelect=(first:string,value:string,set:(v:string)=>void)=><label>Second Role (Optional)<select value={value} onChange={e=>set(e.target.value)}><option value="">None</option>{ROLE_OPTIONS.filter(([code])=>code!==first).map(([code,label])=><option key={code} value={code}>{label}</option>)}</select></label>;
   const [temp,setTemp]=useState("");
   const roleLabel=(code?:string)=>ROLE_OPTIONS.find(o=>o[0]===code)?.[1]??code??"No role";
   const active=data.users.filter(u=>u.accountState!=="Deactivated"),removed=data.users.filter(u=>u.accountState==="Deactivated");
-  const startEdit=(u:Account)=>{setEditing(u.id);setResetting(null);setDeleting(null);setEdit({completeName:u.completeName||"",position:u.position??"",roleCode:u.roles[0]??"cashier"})};
+  const startEdit=(u:Account)=>{setEditing(u.id);setResetting(null);setDeleting(null);setEdit({completeName:u.completeName||"",position:u.position??"",roleCode:u.roles[0]??"cashier",secondRoleCode:u.roles[1]??""})};
   const row=(u:Account)=>{
     if(editing===u.id)return <tr key={u.id}><td colSpan={4}><div className="portal-form acct-edit">
       <label>Complete Name<input value={edit.completeName} onChange={e=>setEdit({...edit,completeName:e.target.value})}/></label>
       <label>Position<input value={edit.position} onChange={e=>setEdit({...edit,position:e.target.value})}/></label>
-      <label>Role<select value={edit.roleCode} onChange={e=>setEdit({...edit,roleCode:e.target.value})}>{ROLE_OPTIONS.map(([code,label])=><option key={code} value={code}>{label}</option>)}</select></label>
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={()=>setEditing(null)}>Cancel</button><button type="button" className="portal-primary" disabled={edit.completeName.trim().length<2} onClick={()=>void post({action:"update-user",userId:u.id,...edit},"Account updated.").then(ok=>{if(ok)setEditing(null)})}>Save Changes</button></div>
+      <label>Role<select value={edit.roleCode} onChange={e=>setEdit({...edit,roleCode:e.target.value,secondRoleCode:edit.secondRoleCode===e.target.value?"":edit.secondRoleCode})}>{ROLE_OPTIONS.map(([code,label])=><option key={code} value={code}>{label}</option>)}</select></label>
+      {secondRoleSelect(edit.roleCode,edit.secondRoleCode,v=>setEdit({...edit,secondRoleCode:v}))}
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={()=>setEditing(null)}>Cancel</button><button type="button" className="portal-primary" disabled={edit.completeName.trim().length<2} onClick={()=>void post({action:"update-user",userId:u.id,completeName:edit.completeName,position:edit.position,roleCode:edit.roleCode,secondRoleCode:edit.secondRoleCode||null},"Account updated.").then(ok=>{if(ok)setEditing(null)})}>Save Changes</button></div>
     </div></td></tr>;
     return <tr key={u.id}>
       <td><strong>{u.completeName||u.email}</strong><small className="lc">{u.email}</small></td>
       <td>{u.position||"—"}</td>
-      <td>{u.accountState==="Deactivated"?<span className="portal-badge cancelled">Deleted</span>:<span className="portal-badge active">{roleLabel(u.roles[0])}</span>}</td>
+      <td>{u.accountState==="Deactivated"?<span className="portal-badge cancelled">Deleted</span>:<span className="acct-roles">{(u.roles.length?u.roles:[undefined]).slice(0,2).map((r,i)=><span key={r??i} className="portal-badge active">{roleLabel(r)}</span>)}</span>}</td>
       <td><div className="acct-actions">
         {u.accountState==="Deactivated"?<button type="button" className="portal-secondary" onClick={()=>void post({action:"restore-user",userId:u.id,roleCode:"cashier"},"Account restored as Cashier. Change the role with Edit.")}>Restore</button>:<>
           <button type="button" className="portal-secondary" onClick={()=>startEdit(u)}>Edit</button>
@@ -55,8 +58,9 @@ function UserAccounts({data,post}:{data:Data;onSubmit:(e:FormEvent<HTMLFormEleme
         <label>Email<input type="email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})}/></label>
         <label>Temporary Password<input type="text" autoComplete="new-password" value={form.password} onChange={e=>setForm({...form,password:e.target.value})} placeholder="At least 8 characters"/></label>
         <label>Position<input value={form.position} onChange={e=>setForm({...form,position:e.target.value})}/></label>
-        <label>Role<select value={form.roleCode} onChange={e=>setForm({...form,roleCode:e.target.value})}>{ROLE_OPTIONS.map(([code,label])=><option key={code} value={code}>{label}</option>)}</select></label>
-        <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={form.completeName.trim().length<2||!form.email.includes("@")||form.password.length<8} onClick={()=>void post({action:"create-user",completeName:form.completeName.trim(),email:form.email.trim(),password:form.password,position:form.position.trim()||undefined,roleCode:form.roleCode},"Account created. Give the temporary password to the employee privately.").then(ok=>{if(ok){setForm({completeName:"",email:"",password:"",position:"",roleCode:"cashier"});setAdding(false)}})}>Create Account</button></div>
+        <label>Role<select value={form.roleCode} onChange={e=>setForm({...form,roleCode:e.target.value,secondRoleCode:form.secondRoleCode===e.target.value?"":form.secondRoleCode})}>{ROLE_OPTIONS.map(([code,label])=><option key={code} value={code}>{label}</option>)}</select></label>
+        {secondRoleSelect(form.roleCode,form.secondRoleCode,v=>setForm({...form,secondRoleCode:v}))}
+        <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={form.completeName.trim().length<2||!form.email.includes("@")||form.password.length<8} onClick={()=>void post({action:"create-user",completeName:form.completeName.trim(),email:form.email.trim(),password:form.password,position:form.position.trim()||undefined,roleCode:form.roleCode,secondRoleCode:form.secondRoleCode||null},"Account created. Give the temporary password to the employee privately.").then(ok=>{if(ok){setForm({completeName:"",email:"",password:"",position:"",roleCode:"cashier",secondRoleCode:""});setAdding(false)}})}>Create Account</button></div>
       </div>}
       <div className="portal-table"><table><thead><tr><th>Employee</th><th>Position</th><th>Role</th><th className="r">Actions</th></tr></thead><tbody>
         {active.map(row)}

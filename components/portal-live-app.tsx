@@ -186,7 +186,8 @@ function topTabsFor(role:string,allowed:Module[]):TopTab[]{
   return tabs;
 }
 const WORKING_ROLES=["registration","cashier","accounting","releasing_officer","mismo_officer","admin"] as const;
-function workingRolesFor(roles:string[]){const isAdmin=roles.includes("admin")||roles.includes("super_admin");const held=WORKING_ROLES.filter(r=>isAdmin||roles.includes(r));return held.length?[...held]:roles.slice(0,1)}
+// An employee may hold two roles (9 Oct 2026): "Working as" lists every role they hold; Admin can view all workspaces.
+function workingRolesFor(roles:string[]){const isAdmin=roles.includes("admin")||roles.includes("super_admin");const held:string[]=isAdmin?[...WORKING_ROLES]:roles.filter(r=>r in roleNames);return held.length?held:roles.slice(0,1)}
 function defaultWorkingRole(roles:string[]){return roles.includes("admin")||roles.includes("super_admin")?"admin":workingRolesFor(roles)[0]??"admin"}
 const roleNames:Record<string,string>={registration:"Registration",cashier:"Cashier",accounting:"Accounting",admin:"Admin",super_admin:"Super Admin",releasing_officer:"Releasing Officer",mismo_officer:"MISMO Compliance Officer",training_operations:"Schedule Officer",hr:"HR",instructor:"Instructor"};
 const date=(value:string)=>new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",year:"numeric",timeZone:"Asia/Manila"}).format(new Date(`${value}T00:00:00+08:00`));

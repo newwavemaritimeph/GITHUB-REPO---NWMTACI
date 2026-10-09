@@ -1974,3 +1974,4 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .ac-approvals .ac-tabs button.on span{background:rgba(255,255,255,.2);color:#fff}
 .nw-shell .ac-approvals>.portal-empty-copy{padding:22px 20px 24px !important}
 .nw-shell .ac-approvals .ac-req{padding:14px 20px}
+.nw-shell .acct-roles{display:inline-flex;gap:6px;flex-wrap:wrap}
