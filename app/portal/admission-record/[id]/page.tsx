@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { PrintControls } from "./print-controls";
+import { TarSheets } from "./tar-sheets";
 import "./admission-record.css";
 
 /**
@@ -16,7 +16,6 @@ import "./admission-record.css";
 export const dynamic = "force-dynamic";
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
-const peso = (c: number) => "₱" + (c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const manila = (opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-PH", { timeZone: "Asia/Manila", ...opts });
 const dayOf = (iso: string) => new Date(`${iso}T00:00:00+08:00`);
 function trainingDates(start?: string | null, end?: string | null) {
@@ -29,19 +28,6 @@ function trainingDates(start?: string | null, end?: string | null) {
 }
 const hhmm = (t?: string | null) => (t ? String(Number(t.slice(0, 2))) + t.slice(2, 5) : "");
 
-// Short form of the terms the trainee accepted in full at registration.
-const TERMS: [string, string][] = [
-  ["1. Payment", "Full payment or at least 50% down payment on enrollment; settle in full before training ends. One-day courses are paid in full."],
-  ["2. Cancellation", "Notify the Training Center before the training date. Deductions follow the Refund Policy."],
-  ["3. Rescheduling", "One- to two-day courses may be rescheduled, subject to slots and approval. Charges follow the Refund Policy."],
-  ["4. Refund", "Five or more days before training: Php 350.00 processing fee. Within five days: 50% of the course fee plus Php 250.00."],
-  ["5. Make-up class", "For courses of three days or more, subject to schedule and approval. Php 350.00 per training day."],
-  ["6. Certificate", "Issued only when all course requirements are completed and all balances are settled."],
-  ["7. Miscellaneous", "Miscellaneous fees are part of the total due. This record is your admission slip and acknowledgement receipt. Terms may be updated without prior notice."],
-];
-const ORG = "NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.";
-const ADDRESS = "Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000 · +63 948 847 6530 · (02) 8553 0310 · newwavemaritime@gmail.com · facebook.com/newwavemtc";
-const COURSES_ON_FRONT = 6;
 type BatchRow = { batch_number: string; starts_on: string; ends_on: string; daily_start: string | null; daily_end: string | null; venue: string | null };
 type PaymentRow = { id: string; payment_number: string; received_at: string; method: string; reference_number: string | null; valid: boolean; cashier_id: string | null };
 
@@ -113,59 +99,10 @@ export default async function AdmissionRecordPage({ params }: { params: Promise<
   const name = `${t.legal_last_name}, ${[t.legal_first_name, t.legal_middle_name, t.suffix].filter(Boolean).join(" ")}`.toUpperCase();
   const issued = manila({ dateStyle: "medium", timeStyle: "short" }).format(new Date(record.issued_at));
   const officer = (officerRes.data as { complete_name?: string } | null)?.complete_name ?? "";
-  const front = courses.slice(0, COURSES_ON_FRONT), more = courses.slice(COURSES_ON_FRONT);
-  const pages = more.length ? 2 : 1;
   const payDate = manila({ day: "numeric", month: "short" });
-
-  const courseRows = (list: typeof courses, offset: number) => list.map((c, i) => <tr key={c.id}><td className="c">{offset + i + 1}</td><td><b>{c.name}</b> <span className="dim">({c.code})</span></td><td className="nw">{c.dates}</td><td className="nw">{c.time}</td><td className="nw">{c.room}</td><td className="r nw">{peso(c.fee)}</td></tr>);
-  const header = (page: number) => <>
-    <div className="tar-letter"><img src="/brand/new-wave-emblem.png" alt="" width={34} height={34} /><div><b>{ORG}</b><span>{ADDRESS}</span></div><i /></div>
-    <div className="tar-title"><div><b>TRAINING ADMISSION RECORD</b> <span>· admission slip and acknowledgement receipt · issued {issued}{pages > 1 ? ` · page ${page} of ${pages}` : ""}</span></div><div><span>AR NO. </span><strong>{record.ar_number}</strong></div></div>
-  </>;
-
-  // Page 1 (and page 2 when there are more than six courses). Each page is
-  // printed twice on one legal sheet: an original for the trainee and a
-  // duplicate for the file.
-  const page1 = <>
-      {header(1)}
-      <table className="tar-grid"><tbody>
-        <tr><th>Name</th><td><b>{name}</b></td><th>Enrollment no.</th><td className="mono accent">{t.application_number ?? t.trainee_number}</td><th>SRN</th><td><b>{t.srn ?? "—"}</b></td></tr>
-        <tr><th>Rank</th><td><b>{t.rank ?? "—"}</b></td><th>Mobile</th><td><b>{t.mobile ?? "—"}</b></td><th>Company</th><td><b>{t.company || "—"}</b></td></tr>
-      </tbody></table>
-      <table className="tar-table"><thead><tr><th className="c">#</th><th>Course</th><th>Training Dates</th><th>Time</th><th>Room</th><th className="r">Fee</th></tr></thead><tbody>{courseRows(front, 0)}{more.length > 0 && <tr><td colSpan={6} className="dim">+ {more.length} more course{more.length === 1 ? "" : "s"} on page 2</td></tr>}</tbody></table>
-      <div className="tar-money">
-        <div><div className="tar-h">FEES</div><table className="tar-table"><tbody>
-          <tr><td>Training fees ({courses.length} course{courses.length === 1 ? "" : "s"})</td><td className="r">{peso(feesTotal)}</td></tr>
-          {misc.map((m, i) => <tr key={`m${i}`}><td>Misc · {m.label}</td><td className="r">{peso(m.amount)}</td></tr>)}
-          {discounts.length ? discounts.map((d, i) => <tr key={`d${i}`}><td>Less · {d.label}</td><td className="r">−{peso(d.amount)}</td></tr>) : <tr><td>Discounts</td><td className="r">{peso(0)}</td></tr>}
-          <tr className="b"><td>Total amount due</td><td className="r">{peso(due)}</td></tr>
-          <tr className="b"><td>Total received</td><td className="r">{peso(paid)}</td></tr>
-          <tr className="b"><td>Balance</td><td className={`r${balance > 0 ? " due" : ""}`}>{peso(balance)}</td></tr>
-        </tbody></table></div>
-        <div><div className="tar-pay-head"><div className="tar-h">PAYMENTS RECEIVED ({payments.length})</div><span className={`tar-stamp ${status === "FULLY PAID" ? "ok" : status === "UNPAID" ? "none" : "part"}`}>{status}</span></div>
-          <table className="tar-table"><thead><tr><th>Payment</th><th>Date</th><th>Method</th><th>Reference</th><th className="r">Amount</th></tr></thead><tbody>
-            {payments.map((p) => <tr key={p.id}><td className="mono">{p.number}</td><td className="nw">{payDate.format(new Date(p.date))}</td><td>{p.method}</td><td className="mono">{p.ref}</td><td className="r b">{peso(p.amount)}</td></tr>)}
-            {!payments.length && <tr><td colSpan={5} className="dim">No payment recorded yet.</td></tr>}
-          </tbody></table>
-          <div className="tar-sigs">{[["Registration officer", officer], ["Cashier", cashier], ["Trainee", ""]].map(([label, n]) => <div key={label}><span>{n}</span><small>{label}</small></div>)}</div>
-        </div>
-      </div>
-      <div className="tar-terms"><div className="tar-terms-head"><b>TERMS AND CONDITIONS (SUMMARY)</b><span>Full terms accepted at registration. Present this record with a valid ID on the first training day; report by 7:30 AM.</span></div>
-        <div className="tar-terms-cols">{TERMS.map(([h, body]) => <p key={h}><b>{h}</b> {body}</p>)}</div></div>
-  </>;
-  const page2 = more.length > 0 ? <>
-      {header(2)}
-      <table className="tar-table"><thead><tr><th className="c">#</th><th>Course</th><th>Training Dates</th><th>Time</th><th>Room</th><th className="r">Fee</th></tr></thead><tbody>{courseRows(more, COURSES_ON_FRONT)}</tbody></table>
-      <p className="dim tar-cont">Continuation of {record.ar_number} for {name}. Fees, payments and terms are on page 1.</p>
-  </> : null;
-  const copies = [["ORIGINAL COPY", "Trainee"], ["DUPLICATE COPY", "Office file"]];
-
-  return <main className="tar-screen">
-    <PrintControls arNumber={record.ar_number} />
-    {[page1, page2].filter(Boolean).map((content, i) => <section className="tar-legal" key={i}>
-      {copies.map(([label, holder]) => <div className="tar-copy" key={label}>
-        <div className="tar-sheet"><span className="tar-copy-tag"><b>{label}</b> · {holder}</span>{content}</div>
-      </div>)}
-    </section>)}
-  </main>;
+  return <TarSheets arNumber={record.ar_number} issued={issued} name={name}
+    trainee={{ appNo: t.application_number ?? t.trainee_number, srn: t.srn, rank: t.rank, mobile: t.mobile, company: t.company }}
+    courses={courses} misc={misc} discounts={discounts}
+    payments={payments.map((p) => ({ id: p.id, number: p.number, dateLabel: payDate.format(new Date(p.date)), method: p.method, ref: p.ref, amount: p.amount }))}
+    feesTotal={feesTotal} due={due} paid={paid} balance={balance} status={status} officer={officer} cashier={cashier} />;
 }
