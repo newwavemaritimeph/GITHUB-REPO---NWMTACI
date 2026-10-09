@@ -59,7 +59,7 @@ const HERO_CERTIFICATES = [
 const CERTIFICATE_VALIDITY = { issued: "12 May 2026", expires: "12 May 2036" } as const;
 
 const TRUST_STRIP = [
-  ["wheel", "MARINA", "Course approvals"],
+  ["wheel", "MARINA", "Course Approvals"],
   ["iso", "ISO 9001:2015", "Certified"],
   ["people", "Experienced", "Instructors"],
   ["calendar", "Flexible", "Schedules"],
@@ -105,22 +105,22 @@ const MISSION =
   "To provide high-quality, practical training that empowers seafarers with essential skills, knowledge, and confidence for a safe and rewarding career at sea — committed to fostering a supportive learning environment, upholding rigorous safety standards, and embracing innovation so our seafarers are well-prepared to meet the evolving demands of the maritime industry.";
 
 const CORE_VALUES = [
-  ["N", "Nurturing growth", "An environment that encourages personal and professional development."],
+  ["N", "Nurturing Growth", "An environment that encourages personal and professional development."],
   ["E", "Excellence", "The highest quality in every training program."],
   ["W", "Wisdom", "The value of knowledge and experience at sea."],
   ["W", "Workmanship", "A culture of skill and craftsmanship."],
   ["A", "Adaptability", "Flexibility and resilience in changing maritime environments."],
-  ["V", "Values of safety", "Safety prioritized in all practices and training."],
+  ["V", "Values of Safety", "Safety prioritized in all practices and training."],
   ["E", "Empowerment", "Trainees equipped with the skills and confidence to succeed."],
 ] as const;
 
 const BUSINESS_FOCUS = [
-  ["STCW-compliant courses", "Basic safety and STCW training aligned with international standards."],
-  ["Advanced shipboard courses", "Specialized and upgrading programs for seafarers and officers."],
-  ["In-house maritime programs", "New Wave's own catalog across deck, engine, and catering tracks."],
-  ["Competency assessments", "Assessment and certification for maritime and technical skills."],
-  ["Simulator-based instruction", "Practical, hands-on training on quality-standard equipment."],
-  ["Documentation assistance", "Support for seafarers' certificates and requirements."],
+  ["STCW-Compliant Courses", "Basic safety and STCW training aligned with international standards."],
+  ["Advanced Shipboard Courses", "Specialized and upgrading programs for seafarers and officers."],
+  ["In-House Maritime Programs", "New Wave's own catalog across deck, engine, and catering tracks."],
+  ["Competency Assessments", "Assessment and certification for maritime and technical skills."],
+  ["Simulator-Based Instruction", "Practical, hands-on training on quality-standard equipment."],
+  ["Documentation Assistance", "Support for seafarers' certificates and requirements."],
 ] as const;
 
 const TESTIMONIALS = [
@@ -167,7 +167,7 @@ function Header({ page }: { page: PublicPage }) {
       {/* Slim brand strip: contact at a glance. The header scrolls with the page (not sticky). */}
       <div className="public-topbar">
         <div className="public-topbar-inner">
-          <span className="topbar-tag">MARINA-accredited maritime training · Ermita, Manila</span>
+          <span className="topbar-tag">MARINA-Accredited Maritime Training · Ermita, Manila</span>
           <span className="topbar-links">
             <a href={`tel:${CONTACT.mobile.replace(/\s/g, "")}`}>{CONTACT.mobile}</a>
             <a href={`mailto:${CONTACT.email}`} className="topbar-email">{CONTACT.email}</a>
@@ -232,9 +232,9 @@ function Footer() {
 }
 
 const highlights = [
-  ["⚓", "Professional maritime instructors", "Learn from supportive, highly experienced maritime professionals."],
+  ["⚓", "Professional Maritime Instructors", "Learn from supportive, highly experienced maritime professionals."],
   ["🛠️", "Quality-Standard Equipment", "Practical, simulator-based training on modern, standard equipment."],
-  ["🎓", "Recognized certification", "MARINA- and TESDA-aligned training that opens doors to a career at sea."],
+  ["🎓", "Recognized Certification", "MARINA- and TESDA-aligned training that opens doors to a career at sea."],
 ] as const;
 
 function Home() {
@@ -248,7 +248,7 @@ function Home() {
             {/* Written in sentence case; the all-caps look is a display
                 transform, so screen readers and search engines get real text. */}
             <h1 className="nw-headline">
-              Quality<br />maritime training<br />for a <em>brighter<br />tomorrow</em>
+              Quality<br />Maritime Training<br />for a <em>Brighter<br />Tomorrow</em>
             </h1>
             <p className="nw-lede">
               Build your skills. Get certified. Be future-ready. Train with New Wave Maritime Training and
@@ -596,7 +596,7 @@ function Register() {
           and payment, then enrolls you. You will receive a summary of your trainings and a reference to track your application.
         </p>
         <div className="privacy-note">
-          <strong>Your privacy matters</strong>
+          <strong>Your Privacy Matters</strong>
           <span>
             Information is used only for registration, training coordination, records, and required communication.
           </span>
@@ -647,19 +647,19 @@ function Contact() {
       <div className="contact-layout">
         <form className="contact-form" action="/api/public/contact" method="post">
           <label>
-            Complete name
+            Complete Name
             <input name="name" required />
           </label>
           <label>
-            Email address
+            Email Address
             <input name="email" type="email" required />
           </label>
           <label>
-            Mobile number
+            Mobile Number
             <input name="mobile" />
           </label>
           <label>
-            How can we help?
+            How Can We Help?
             <textarea name="message" rows={6} required />
           </label>
           <button className="button button-primary">Send Message</button>

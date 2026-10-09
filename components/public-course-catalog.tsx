@@ -97,7 +97,7 @@ export function PublicCourseCatalog() {
         <div className="course-grid">{data.stcw.map((c) => <StcwCard key={c.code} course={c} />)}</div>
         {!data.stcw.length && <div className="catalog-empty">No STCW schedules are open right now.</div>}
       </> : data.inHouse.length ? <InHouseList courses={data.inHouse} /> : <div className="catalog-empty">No in-house courses are listed right now.</div>}
-    <div className="register-banner"><div><b>Ready to enroll?</b><span>Choose up to 5 courses and their schedules in one registration.</span></div><Link className="button button-primary" href="/register">Register now →</Link></div>
+    <div className="register-banner"><div><b>Ready to enroll?</b><span>Choose up to 5 courses and their schedules in one registration.</span></div><Link className="button button-primary" href="/register">Register Now →</Link></div>
     <p className="catalog-note">Dates come from schedules published by New Wave. Enrollment for STCW courses closes at 7:00 AM on the training date. Course fees are confirmed by our Registration team during screening.</p>
   </div>;
 }

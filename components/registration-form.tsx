@@ -57,7 +57,7 @@ const emptyApplicant = {
 // collapse to a one-line summary once complete, a progress rail, and quiet
 // underline fields. Applicants can reopen any finished section to edit it.
 /** Enrollment type (owner, 8 Oct 2026): the first question on the form. */
-const ENROLLMENT_TYPES: [string, string, string][] = [["Online enrollment", "Online enrollment", "I'm registering on my own, online"], ["Walk-in", "Walk-in", "I'm at the New Wave office"], ["Agency", "Agency", "My agency or consultancy sent me"]];
+const ENROLLMENT_TYPES: [string, string, string][] = [["Online enrollment", "Online Enrollment", "I'm registering on my own, online"], ["Walk-in", "Walk-In", "I'm at the New Wave office"], ["Agency", "Agency", "My agency or consultancy sent me"]];
 type SectionKey = "enrollment" | "identification" | "personal" | "contact" | "emergency" | "courses" | "review";
 const upper = (value: string) => value.toUpperCase();
 const pickedDate = (iso: string) => new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
@@ -292,11 +292,11 @@ function Wizard() {
   const nameText = [applicant.firstName, applicant.middleName, applicant.lastName, applicant.suffix].filter(Boolean).join(" ");
   const enrollmentValid = applicant.enrollmentType === "Online enrollment" || applicant.enrollmentType === "Walk-in" || (applicant.enrollmentType === "Agency" && referral.state === "ok");
   const sections: { key: SectionKey; title: string; hint: string; done: boolean; summary: string }[] = [
-    { key: "enrollment", title: "Enrollment type", hint: "How are you enrolling?", done: enrollmentValid, summary: applicant.enrollmentType === "Agency" && referral.name ? `Agency · ${referral.name}` : applicant.enrollmentType },
+    { key: "enrollment", title: "Enrollment Type", hint: "How are you enrolling?", done: enrollmentValid, summary: applicant.enrollmentType === "Agency" && referral.name ? `Agency · ${referral.name}` : applicant.enrollmentType },
     { key: "identification", title: "Identification", hint: "Start with your SRN. If you have trained with us before, we fill in your details.", done: idValid, summary: `SRN ${applicant.srn}${locked ? " · record found" : ""}` },
-    { key: "personal", title: "Personal details", hint: "As written on your seaman's book or passport.", done: personalValid, summary: [nameText, applicant.birthDate, applicant.placeOfBirth, rankText].filter(Boolean).join(" · ") },
+    { key: "personal", title: "Personal Details", hint: "As written on your seaman's book or passport.", done: personalValid, summary: [nameText, applicant.birthDate, applicant.placeOfBirth, rankText].filter(Boolean).join(" · ") },
     { key: "contact", title: "Contact", hint: "How New Wave will reach you about your application.", done: contactValid, summary: [applicant.mobile, applicant.email].filter(Boolean).join(" · ") },
-    { key: "emergency", title: "Emergency contact", hint: "Someone we can call if we cannot reach you.", done: emergencyValid, summary: [applicant.emergencyContactName, applicant.emergencyContactMobile].filter(Boolean).join(" · ") },
+    { key: "emergency", title: "Emergency Contact", hint: "Someone we can call if we cannot reach you.", done: emergencyValid, summary: [applicant.emergencyContactName, applicant.emergencyContactMobile].filter(Boolean).join(" · ") },
     { key: "courses", title: "Courses", hint: `Choose up to ${MAX_COURSES} courses and a schedule for each. ${ORDER_RULE_TEXT}`, done: selectionsValid, summary: trainings.map((t) => `${t.code} ${pickedRange(t.start, t.end)}`).join(" · ") },
   ];
   const doneCount = sections.filter((x) => x.done).length;
@@ -384,7 +384,7 @@ function Wizard() {
   return (
     <div className="ql-form">
       <aside className="ql-rail" aria-label="Application progress">
-        <strong>Your application</strong>
+        <strong>Your Application</strong>
         <span className="ql-rail-count">{doneCount} of {sections.length} sections done</span>
         <span className="ql-bar" aria-hidden="true"><i style={{ width: `${Math.round((doneCount / sections.length) * 100)}%` }} /></span>
         <ol>
