@@ -21,7 +21,7 @@ import { legacyRowsFromCsv, type ImportResult, type LegacyRow } from "@/lib/lega
  */
 
 type CertRow = { id: string; enrollment_id: string; status: string; certificate_number?: string | null; batch_label?: string | null; print_count?: number | null; reprints_allowed?: number | null; void_status?: string | null; void_reason?: string | null; void_requested_at?: string | null; soft_copy_sent_at?: string | null; snapshot?: Record<string, unknown> | null; claimant_name?: string | null; release_method?: string | null };
-type Series = { course_id: string; prefix: string; next_number: number; pad: number; batch_prefix: string; next_batch: number; set_at: string; profiles?: { complete_name: string } | { complete_name: string }[] | null };
+type Series = { course_id: string; prefix: string; next_number: number; pad: number; batch_prefix: string; next_batch: number; set_at: string; reg_prefix?: string; reg_next?: number | null; reg_digits?: number; reg_style?: "month-number" | "number-month"; profiles?: { complete_name: string } | { complete_name: string }[] | null };
 type Template = { id: string; course_id: string; version: number; active: boolean; drive_link?: string | null; storage_path?: string | null; approved_at?: string | null };
 const stcwCourse = (c: { course_categories?: unknown }) => isStcwCategory((Array.isArray(c.course_categories) ? c.course_categories[0] : c.course_categories as { name?: string } | null)?.name);
 type Photo = { enrollment_id: string; file_name: string; background_white: boolean; uploaded_at: string; replaced_at?: string | null; profiles?: { complete_name: string } | { complete_name: string }[] | null };
@@ -357,18 +357,20 @@ function NumberingTable({ data, reload, scope }: { data: PortalData; reload: () 
   const d = data as CertData;
   const { busy, msg, post } = usePost(reload);
   const [q, setQ] = useState("");
-  const [edit, setEdit] = useState<Record<string, { prefix: string; next: string; pad: string; batchPrefix: string; nextBatch: string }>>({});
+  const [edit, setEdit] = useState<Record<string, { prefix: string; next: string; pad: string; batchPrefix: string; nextBatch: string; regPrefix: string; regNext: string; regDigits: string; regStyle: string }>>({});
+  // The Registration No. fields appear once migration 202610130042 is in (the series rows then carry reg_prefix).
+  const regReady = (d.certificateSeries ?? []).length === 0 || (d.certificateSeries ?? []).some((s) => s.reg_prefix !== undefined);
   const roles = scope === "in-house" ? ["releasing_officer"] : ["admin"];
   const series = new Map((d.certificateSeries ?? []).map((s) => [s.course_id, s]));
   const used = new Set(data.enrollments.map((e) => e.course_id));
   const term = q.trim().toLowerCase();
   const courses = data.courses.filter((c) => c.delivery_type === "In-House" && (scope === "all" ? true : scope === "stcw" ? (term ? true : stcwCourse(c)) : !stcwCourse(c)) && (term ? `${c.code} ${c.name}`.toLowerCase().includes(term) : scope === "stcw" || used.has(c.id) || series.has(c.id))).sort((a, b) => a.name.localeCompare(b.name));
-  const valueOf = (id: string) => { const s = series.get(id); return edit[id] ?? { prefix: s?.prefix ?? "", next: String(s?.next_number ?? 1), pad: String(s?.pad ?? 5), batchPrefix: s?.batch_prefix ?? "", nextBatch: String(s?.next_batch ?? 1) }; };
+  const valueOf = (id: string) => { const s = series.get(id); return edit[id] ?? { prefix: s?.prefix ?? "", next: String(s?.next_number ?? 1), pad: String(s?.pad ?? 5), batchPrefix: s?.batch_prefix ?? "", nextBatch: String(s?.next_batch ?? 1), regPrefix: s?.reg_prefix ?? "NWMTC", regNext: s?.reg_next ? String(s.reg_next) : "", regDigits: String(s?.reg_digits ?? 4), regStyle: s?.reg_style ?? "month-number" }; };
   const set = (id: string, k: string, v: string) => setEdit({ ...edit, [id]: { ...valueOf(id), [k]: v } });
   return <section className="portal-panel cx-panel"><div className="panel-heading"><h2>{scope === "all" ? "Certificate No. per Course" : scope === "stcw" ? "Certificate Numbering" : "In-House Certificate Numbering"}</h2></div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} placeholder={scope === "stcw" ? "STCW courses shown; search any course" : "Search any In-House course by name or code"} /></div>
-    <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th>Prefix</th><th>Next No.</th><th>Digits</th><th>Batch Prefix</th><th>Next Batch</th><th>Next Certificate</th><th /></tr></thead><tbody>
+    <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th>Prefix</th><th>Next No.</th><th>Digits</th><th>Batch Prefix</th><th>Next Batch</th><th>Next Certificate</th>{regReady && <><th>Reg. Prefix</th><th>Next Reg. No.</th><th>Digits</th><th>Reg. Style</th><th>Next Registration</th></>}<th /></tr></thead><tbody>
       {courses.map((c) => { const v = valueOf(c.id), s = series.get(c.id); const changed = !!edit[c.id]; const can = canSetSeries(roles, stcwCourse(c)); return <tr key={c.id}>
         <td><b>{c.name}</b><small className="cl-sub cl-block">{s ? `Set ${fmtDate(day(s.set_at) ?? "")}${first(s.profiles)?.complete_name ? ` by ${first(s.profiles)?.complete_name}` : ""}` : "Not set — certificates for this course cannot be numbered yet"}</small></td>
         <td><input className="cl-in" aria-label="Prefix" disabled={!can} value={v.prefix} onChange={(e) => set(c.id, "prefix", e.target.value)} placeholder="NWM-HPT-" /></td>
@@ -377,17 +379,32 @@ function NumberingTable({ data, reload, scope }: { data: PortalData; reload: () 
         <td><input className="cl-in" aria-label="Batch prefix" disabled={!can} value={v.batchPrefix} onChange={(e) => set(c.id, "batchPrefix", e.target.value)} placeholder="HPT-" /></td>
         <td><input className="cl-in cl-num" aria-label="Next batch number" disabled={!can} type="number" min={1} value={v.nextBatch} onChange={(e) => set(c.id, "nextBatch", e.target.value)} /></td>
         <td className="cl-mono cl-next">{formatCertificateNumber(v.prefix, Number(v.next) || 1, Number(v.pad) || 5)}</td>
-        <td>{can ? <button type="button" className="portal-primary" disabled={busy || !changed} onClick={() => void post({ action: "certificate-series-save", courseId: c.id, prefix: v.prefix.trim(), nextNumber: Math.max(1, Number(v.next) || 1), pad: Math.min(10, Math.max(1, Number(v.pad) || 5)), batchPrefix: v.batchPrefix.trim(), nextBatch: Math.max(1, Number(v.nextBatch) || 1) }, "Numbering saved. The next certificate continues from here.").then(() => setEdit((e) => { const n = { ...e }; delete n[c.id]; return n; })).catch(() => undefined)}>Save</button> : <span className="cl-sub">Set by the Admin</span>}</td>
+        {regReady && <>
+          <td><input className="cl-in" aria-label="Registration prefix" disabled={!can} value={v.regPrefix} onChange={(e) => set(c.id, "regPrefix", e.target.value)} placeholder="NWMTC" /></td>
+          <td><input className="cl-in cl-num" aria-label="Next registration number" disabled={!can} type="number" min={1} value={v.regNext} onChange={(e) => set(c.id, "regNext", e.target.value)} placeholder="e.g. 2291" /></td>
+          <td><input className="cl-in cl-tiny" aria-label="Registration digits" disabled={!can} type="number" min={1} max={12} value={v.regDigits} onChange={(e) => set(c.id, "regDigits", e.target.value)} /></td>
+          <td><select className="cl-in" aria-label="Registration style" disabled={!can} value={v.regStyle} onChange={(e) => set(c.id, "regStyle", e.target.value)}><option value="month-number">Month First</option><option value="number-month">Number First</option></select></td>
+          <td className="cl-mono cl-next">{v.regNext ? registrationPreview(v.regPrefix || "NWMTC", Number(v.regNext) || 1, Number(v.regDigits) || 4, v.regStyle) : <span className="cl-sub">Not set</span>}</td>
+        </>}
+        <td>{can ? <button type="button" className="portal-primary" disabled={busy || !changed} onClick={() => void post({ action: "certificate-series-save", courseId: c.id, prefix: v.prefix.trim(), nextNumber: Math.max(1, Number(v.next) || 1), pad: Math.min(10, Math.max(1, Number(v.pad) || 5)), batchPrefix: v.batchPrefix.trim(), nextBatch: Math.max(1, Number(v.nextBatch) || 1), ...(regReady ? { regPrefix: v.regPrefix.trim() || "NWMTC", regNext: v.regNext ? Math.max(1, Number(v.regNext) || 1) : null, regDigits: Math.min(12, Math.max(1, Number(v.regDigits) || 4)), regStyle: v.regStyle === "number-month" ? "number-month" : "month-number" } : {}) }, "Numbering saved. Enrolled trainees without numbers got theirs in enrollment order; new enrollments continue from here.").then(() => setEdit((e) => { const n = { ...e }; delete n[c.id]; return n; })).catch(() => undefined)}>Save</button> : <span className="cl-sub">Set by the Admin</span>}</td>
       </tr>; })}
     </tbody></table></div>
     {!courses.length && <p className="portal-empty-copy">{term ? "No courses match." : "No In-House course has trainees yet. Search a course to set its numbering."}</p>}
+    <p className="cl-legend">Numbers are given when a trainee is enrolled, in enrollment order. Certificate No.: one per enrollment. Registration No.: one per trainee per course, kept for retakes of the same course. Month First gives NWMTC102026-2291; Number First gives NWMTC2291-102026 (month and year of the day the number is given).</p>
   </section>;
+}
+
+/** The Registration No. a course's next trainee gets, using this month. */
+function registrationPreview(prefix: string, next: number, digits: number, style: string) {
+  const [y, m] = manilaToday().split("-");
+  const n = String(next).padStart(digits, "0");
+  return style === "number-month" ? `${prefix}${n}-${m}${y}` : `${prefix}${Number(m)}${y}-${n}`;
 }
 
 /** Releasing Officer › Numbering (owner, 9 Oct 2026): starting Certificate No. and batch number for In-House courses. */
 export function ReleasingNumbering({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   return <div className="portal-page cx ac">
-    <Head title="Numbering" note="Set the starting Certificate No. and batch number for each In-House course; the system continues from there. STCW numbering is set by the Admin." />
+    <Head title="Numbering" note="Set the starting Certificate No., Registration No. and batch number for each In-House course; the system continues from there. STCW numbering is set by the Admin." />
     <NumberingTable data={data} reload={reload} scope="in-house" />
   </div>;
 }

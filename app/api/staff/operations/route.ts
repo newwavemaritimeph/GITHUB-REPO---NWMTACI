@@ -127,7 +127,7 @@ const certificateReleasePlanInput = z.object({ action: z.literal("certificate-re
 const certificateIssueInput2 = z.object({ action: z.literal("certificate-issue-report"), enrollmentId: z.string().uuid(), issueStatus: z.enum(["For Correction", "Resolved"]), note: z.string().trim().max(300).optional() });
 const certificateOverrideInput = z.object({ action: z.literal("certificate-override"), enrollmentId: z.string().uuid(), certificateNumber: z.string().trim().max(80).optional(), overrides: z.record(z.string(), z.string()).optional() });
 // Certificate controls (owner, 8 Oct 2026; migration 202610080030).
-const certificateSeriesInput = z.object({ action: z.literal("certificate-series-save"), courseId: z.string().uuid(), prefix: z.string().trim().max(30), nextNumber: z.number().int().min(1).max(99999999), pad: z.number().int().min(1).max(10), batchPrefix: z.string().trim().max(30), nextBatch: z.number().int().min(1).max(999999) });
+const certificateSeriesInput = z.object({ action: z.literal("certificate-series-save"), courseId: z.string().uuid(), prefix: z.string().trim().max(30), nextNumber: z.number().int().min(1).max(99999999), pad: z.number().int().min(1).max(10), batchPrefix: z.string().trim().max(30), nextBatch: z.number().int().min(1).max(999999), regPrefix: z.string().trim().max(30).optional(), regNext: z.number().int().min(1).max(99999999).nullable().optional(), regDigits: z.number().int().min(1).max(12).optional(), regStyle: z.enum(["month-number", "number-month"]).optional() });
 const certificateVoidRequestInput = z.object({ action: z.literal("certificate-void-request"), enrollmentId: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
 const certificateCorrectInput = z.object({ action: z.literal("certificate-correct"), enrollmentId: z.string().uuid(), name: z.string().trim().max(160).optional().default(""), courseName: z.string().trim().max(200).optional().default(""), batchLabel: z.string().trim().max(60).optional().default(""), startsOn: z.string().date().or(z.literal("")).optional().default(""), endsOn: z.string().date().or(z.literal("")).optional().default(""), issuedOn: z.string().date().or(z.literal("")).optional().default(""), reason: z.string().trim().min(3).max(300) });
 // Continue New Wave's existing numbers (owner, 9 Oct 2026): the Registration No. series and certificates issued before the portal. The Doc. No. is written by hand.
@@ -628,7 +628,7 @@ export async function GET() {
     ]);
     // Certificate controls (migration 202610080030): numbering, print counts, voids, Drive templates and
     // Google Forms evaluations. Each read is separate so a database without the update still loads.
-    const [controls, series, tplLinks, forms, fbDates, corr, photos] = await Promise.all([
+    const [controls, series, tplLinks, forms, fbDates, corr, photos, regSeries] = await Promise.all([
       db.from("certificates").select("id,certificate_number,batch_label,print_count,reprints_allowed,soft_copy_sent_at,void_status,void_reason,void_requested_at,void_remarks").order("created_at", { ascending: false }).limit(300),
       db.from("certificate_series").select("course_id,prefix,next_number,pad,batch_prefix,next_batch,set_at,profiles:set_by(complete_name)"),
       db.from("certificate_templates").select("id,drive_link").order("created_at", { ascending: false }).limit(200),
@@ -637,7 +637,10 @@ export async function GET() {
       // 2x2 photos and Admin corrections (migration 202610090034).
       db.from("certificates").select("id,corrections").order("created_at", { ascending: false }).limit(300),
       createSupabaseAdminClient().from("certificate_photos").select("enrollment_id,file_name,background_white,uploaded_at,replaced_at,profiles:uploaded_by(complete_name)").limit(5000),
+      db.from("certificate_series").select("course_id,reg_prefix,reg_next,reg_digits,reg_style"),
     ]);
+    const regByCourse = new Map(((regSeries.error ? [] : regSeries.data ?? []) as { course_id: string }[]).map((r) => [r.course_id, r]));
+    const seriesRows = ((series.data ?? []) as { course_id: string }[]).map((s) => ({ ...s, ...(regByCourse.get(s.course_id) ?? {}) }));
     let certificates = (base.data ?? []) as { id: string }[];
     for (const merge of [extra.data, controls.data, corr.error ? null : corr.data]) {
       if (!merge?.length) continue;
@@ -648,7 +651,7 @@ export async function GET() {
     const templates = ((tpls.data ?? []) as { id: string }[]).map((t) => ({ ...t, drive_link: linkById.get(t.id) ?? null }));
     const evaluationForms = Object.fromEntries(((forms.data ?? []) as { id: string; evaluation_form_id: string }[]).map((r) => [r.id, r.evaluation_form_id]));
     const feedbackAt = Object.fromEntries(((fbDates.data ?? []) as { enrollment_id: string; submitted_at: string }[]).map((r) => [r.enrollment_id, r.submitted_at]));
-    return { certificates: certificates as unknown[], templates, releases: rel.data ?? [], issuanceEnabled: Boolean(settings.data?.certificate_issuance_enabled), series: series.data ?? [], evaluationForms, feedbackAt, photos: photos.error ? null : (photos.data ?? []) as unknown[] };
+    return { certificates: certificates as unknown[], templates, releases: rel.data ?? [], issuanceEnabled: Boolean(settings.data?.certificate_issuance_enabled), series: seriesRows, evaluationForms, feedbackAt, photos: photos.error ? null : (photos.data ?? []) as unknown[] };
   })();
 
   // Non-discount charges awaiting the Accounting Manager approval queue.
@@ -2018,12 +2021,16 @@ export async function POST(request: Request) {
       const category = (courseRow as { course_categories?: { name?: string } | { name?: string }[] | null } | null)?.course_categories;
       const stcw = isStcwCategory(Array.isArray(category) ? category[0]?.name : category?.name);
       if (!canSetSeries(staff.roleCodes, stcw)) return NextResponse.json({ error: stcw ? "Only the Admin sets numbering for STCW courses." : "Only the Releasing Officer or the Admin sets certificate numbering." }, { status: 403 });
-      const row = { course_id: input.courseId, prefix: input.prefix, next_number: input.nextNumber, pad: input.pad, batch_prefix: input.batchPrefix, next_batch: input.nextBatch, set_by: staff.user.id, set_at: new Date().toISOString() };
+      // Registration No. per course (migration 202610130042): sent only when the screen has the fields.
+      const reg: Record<string, string | number | null> = input.regNext === undefined ? {} : { reg_prefix: input.regPrefix || "NWMTC", reg_next: input.regNext, reg_digits: input.regDigits ?? 4, reg_style: input.regStyle ?? "month-number" };
+      const row = { course_id: input.courseId, prefix: input.prefix, next_number: input.nextNumber, pad: input.pad, batch_prefix: input.batchPrefix, next_batch: input.nextBatch, ...reg, set_by: staff.user.id, set_at: new Date().toISOString() };
       const { data: prior } = await admin.from("certificate_series").select("*").eq("course_id", input.courseId).maybeSingle();
       const { error } = await admin.from("certificate_series").upsert(row, { onConflict: "course_id" });
-      if (error) return NextResponse.json({ error: error.code === "42P01" ? "Apply database update 202610080030 first." : error.message }, { status: 400 });
+      if (error) return NextResponse.json({ error: error.code === "42P01" ? "Apply database update 202610080030 first." : /reg_(prefix|next|digits|style)/.test(error.message) ? "Apply database update 202610130042 first." : error.message }, { status: 400 });
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: isAdminRole(staff.roleCodes) ? "admin" : "releasing_officer", action: "certificate.series_set", record_type: "course", record_id: input.courseId, prior_values: prior ?? null, new_values: row });
-      return NextResponse.json({ ok: true });
+      // Enrolled trainees still without numbers get them now, in enrollment order (owner, 13 Oct 2026).
+      const { data: numbered } = await admin.rpc("assign_course_numbers", { target_course: input.courseId });
+      return NextResponse.json({ ok: true, numbered: typeof numbered === "number" ? numbered : 0 });
     }
     if (input.action === "certificate-template-link") {
       if (!canRelease(staff.roleCodes)) return NextResponse.json({ error: "Only the Releasing Officer or Admin can set templates." }, { status: 403 });
