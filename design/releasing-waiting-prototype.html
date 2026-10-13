@@ -1,0 +1,168 @@
+<title>Releasing Officer Waiting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Releasing Officer: certificates still waiting (in training, payment, photo, evaluation), each with its checklist and the next step. Builds on releasing-officer-prototype.html. */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA;
+  --bg:#f3f6fa; --surface:#ffffff; --line:#dfe7ee; --fg:#0f2638; --muted:#5f7180; --soft:#eef4f8; --warnbg:#fde7dc; --okbg:#e3f4ea; --badbg:#fbe4dc; --infobg:#e2effb;
+  --green:#15803d; --red:#b42318; --amber:#b45309; --violet:#7c3aed; --slate:#64748b;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}
+.top{background:var(--navy);color:#fff;padding:14px 24px 0}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand b{font-size:19px;color:var(--cyan)} .brand small{display:block;font-size:10px;letter-spacing:.06em;color:#cfe3f1}
+.who{display:flex;align-items:center;gap:8px;font-size:14px;color:#cfe3f1}
+.who select{font:500 14px var(--sans);padding:6px 10px;border-radius:8px;border:1px solid #3b6a90;background:transparent;color:#fff}
+.who select option{color:#0f2638}
+.tabs{display:flex;gap:4px;margin-top:14px;overflow-x:auto}
+.tabs button{padding:10px 18px;color:#d6e6f2;font:500 15px var(--sans);border-radius:10px 10px 0 0;white-space:nowrap;background:none;border:0;cursor:pointer}
+.tabs button.on{background:var(--bg);color:var(--fg)}
+.page{max-width:1240px;margin:0 auto;padding-block:20px 48px;padding-inline:24px;display:flex;flex-direction:column;gap:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}
+h1{margin:2px 0 0;font-size:28px;line-height:1.2}
+.note{margin:-8px 0 0;color:var(--muted);font-size:14px}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 14px var(--sans);padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.org{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600}
+.btn.red{color:var(--red)}
+.btn.sm{padding:6px 11px;font-size:13.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.rail{display:grid;grid-template-columns:minmax(300px,350px) minmax(0,1fr);gap:20px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 20px 20px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}
+.ph h2{margin:0;font-size:17px;font-weight:600} .ph .m{color:var(--muted);font-size:13.5px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.col{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.crow{display:grid;grid-template-columns:10px 1fr auto;gap:12px;align-items:center;padding:10px 14px;border:0;border-bottom:1px solid var(--line);width:100%;background:none;font:inherit;color:inherit;text-align:left}
+.crow:last-child{border-bottom:0}
+button.crow{cursor:pointer} button.crow:hover{background:var(--soft)} button.crow.sel{background:var(--infobg)}
+.dot{width:10px;height:10px;border-radius:3px;background:var(--c);display:inline-block}
+.crow b{font:600 16px var(--mono);text-align:right}
+.crow.alarm{background:var(--badbg)} .crow.alarm b,.crow.alarm span{color:var(--red);font-weight:600}
+.crow.tot{background:var(--navy);color:#fff} .crow.tot .dot{background:var(--orange)}
+.lines{margin:0}
+.lines>div{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.lines>div:last-child{border-bottom:0} .lines dt{color:var(--muted)} .lines dd{margin:0;font:600 15px var(--mono)}
+.foot{margin:10px 0 0;font-size:13px;color:var(--muted)}
+.alarmbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--red);color:#fff;border-radius:12px;padding:12px 16px}
+.alarmbar b{font-size:16px} .alarmbar span{opacity:.9;font-size:14px} .alarmbar .sp{flex:1}
+.alarmbar .btn{background:#fff;color:var(--red);border-color:#fff}
+@media (prefers-reduced-motion:no-preference){.alarmbar .pulse{width:10px;height:10px;border-radius:99px;background:#fff;animation:p 1.4s infinite}@keyframes p{50%{opacity:.25}}}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.bar input{font:400 14px var(--sans);padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg);flex:1;min-width:180px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+td small{display:block;color:var(--muted);font-size:13px}
+.acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.pill{display:inline-block;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.p-ok{background:var(--okbg);color:var(--green)} .p-warn{background:var(--warnbg);color:var(--orange)} .p-bad{background:var(--badbg);color:var(--red)} .p-info{background:var(--infobg);color:var(--blue)} .p-mute{background:var(--soft);color:var(--muted)}
+.ck{font-size:13px;color:var(--muted)} .ck.y{color:var(--green)} .ck.n{color:var(--orange)}
+.empty{color:var(--muted);text-align:center;padding:18px 0 8px}
+.form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:10px;align-items:end}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:500}
+.form input,.form select,.inp{font:400 14px var(--sans);padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);min-width:0}
+.next{font:600 15px var(--mono);color:var(--blue)}
+.rj{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end;background:var(--badbg);border-radius:10px;padding:12px;margin-top:8px}
+.rj label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:500}
+/* preview */
+.scrim{position:fixed;inset:0;background:rgba(10,25,40,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:9}
+.sheetwrap{background:var(--surface);border-radius:16px;max-width:860px;width:100%;max-height:100%;overflow:auto;padding:18px 20px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
+.cert{position:relative;aspect-ratio:1.414/1;max-width:100%;background:#fffdf7;border:10px double #123F63;border-radius:4px;color:#0f2638;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4% 6%;overflow:hidden}
+.cert .org{font:600 clamp(10px,1.6vw,15px) var(--sans);letter-spacing:.12em;color:#123F63}
+.cert .t{font:700 clamp(18px,3.6vw,34px) Georgia,serif;margin:2% 0 1%;color:#123F63}
+.cert .nm{font:700 clamp(16px,3vw,28px) Georgia,serif;border-bottom:1px solid #123F63;padding:0 4% 1%;margin:2% 0}
+.cert .c{font:400 clamp(10px,1.5vw,14px) var(--sans)} .cert .meta{display:flex;gap:6%;margin-top:4%;font:500 clamp(9px,1.2vw,12px) var(--mono);color:#334}
+.wm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:800 clamp(28px,7vw,72px) var(--sans);color:rgba(180,35,24,.16);transform:rotate(-18deg);pointer-events:none;text-transform:uppercase;letter-spacing:.06em}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;z-index:10}
+@media (max-width:1040px){.rail{grid-template-columns:1fr}.form{grid-template-columns:1fr 1fr}}
+@media (max-width:700px){
+  .cards thead{display:none}.cards tr{display:block;padding:10px 0;border-bottom:1px solid var(--line)}.cards tbody tr:last-child{border-bottom:0}
+  .cards td{display:flex;justify-content:space-between;gap:12px;border:0;padding:3px 4px;text-align:right}
+  .cards td::before{content:attr(data-l);color:var(--muted);font-size:13px;text-align:left}
+  .cards td.lead{display:block;text-align:left;font-weight:600}.cards td.lead::before{content:none}
+  .acts{justify-content:flex-start}.rj{grid-template-columns:1fr}}
+@media (max-width:480px){.page{padding-inline:16px}.top{padding-inline:16px}.form{grid-template-columns:1fr}}
+.steps{display:flex;gap:6px;flex-wrap:wrap}
+.step{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:600;padding:3px 9px;border-radius:99px;white-space:nowrap}
+.step.y{background:var(--okbg);color:var(--green)} .step.n{background:var(--warnbg);color:var(--orange)} .step.w{background:var(--soft);color:var(--muted)}
+.next-step{font-weight:600} .next-step small{font-weight:400}
+tr.soon td{background:var(--infobg)}
+td.lead small.mono{white-space:nowrap}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+</style>
+
+<header class="top">
+  <div class="brand"><div><b>New Wave</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div>
+    <div class="who">Working as <select aria-label="Working as"><option>Releasing Officer</option></select></div></div>
+  <nav class="tabs" id="tabs"></nav>
+</header>
+<main class="page" id="page"></main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const TODAY="2026-10-13", TOMORROW="2026-10-14";
+const S={tab:"Waiting",f:"",q:""};
+// Sample data. Harvie is the dry-run trainee; the others are invented.
+let C=[
+ {id:1,n:"RIVERA, Harvie",nw:"NWMTACI-0000002",co:"HAZMAT with CFR",starts:"2026-10-14",ends:"2026-10-15",paid:false,bal:"₱500.00",photo:false,evalNeeded:false,evalDone:false},
+ {id:2,n:"CRUZ, Ana",nw:"NWMTACI-0000447",co:"Updating Basic Training - PSSR",starts:"2026-10-12",ends:"2026-10-13",paid:true,photo:false,evalNeeded:false,evalDone:false},
+ {id:3,n:"LIM, Rosa",nw:"NWMTACI-0000452",co:"Ship Security Officer (In-House)",starts:"2026-10-09",ends:"2026-10-10",paid:true,photo:true,evalNeeded:true,evalDone:false},
+ {id:4,n:"NAVARRO, Dino",nw:"NWMTACI-0000440",co:"Crowd Management",starts:"2026-10-12",ends:"2026-10-12",paid:false,bal:"₱450.00",photo:true,evalNeeded:false,evalDone:false},
+ {id:5,n:"SANTOS, Mia",nw:"NWMTACI-0000461",co:"Enclosed Space Entry",starts:"2026-10-14",ends:"2026-10-14",paid:true,photo:true,evalNeeded:true,evalDone:false},
+ {id:6,n:"REYES, Paolo",nw:"NWMTACI-0000455",co:"Crisis Management",starts:"2026-10-13",ends:"2026-10-13",paid:true,photo:true,evalNeeded:false,evalDone:false},
+ {id:7,n:"DIAZ, Joy",nw:"NWMTACI-0000430",co:"Engine Room Resource Management",starts:"2026-10-19",ends:"2026-10-20",paid:false,bal:"₱2,000.00",photo:false,evalNeeded:false,evalDone:false},
+];
+const fmt=d=>new Date(d+"T00:00:00+08:00").toLocaleDateString("en-PH",{month:"short",day:"numeric"});
+const range=c=>c.starts===c.ends?fmt(c.starts):`${fmt(c.starts)} – ${fmt(c.ends)}`;
+// Same order as the portal's certificate rules: training, payment, evaluation, photo.
+function state(c){if(c.ends>TODAY)return "In training";if(!c.paid)return "Waiting for payment";if(c.evalNeeded&&!c.evalDone)return "Waiting for evaluation";if(!c.photo)return "Waiting for photo";return "Due";}
+const steps=c=>[["Training ended",c.ends<=TODAY,c.ends>TODAY?"ends "+fmt(c.ends):""],["Fee paid",c.paid,c.bal||""],["2x2 photo",c.photo,""],...(c.evalNeeded?[["Evaluation",c.evalDone,""]]:[])];
+const missing=c=>[!c.paid&&"payment",!c.photo&&"photo",c.evalNeeded&&!c.evalDone&&"evaluation"].filter(Boolean);
+function nextStep(c){const s=state(c);
+ if(s==="In training")return `Training ends ${fmt(c.ends)}<small>${missing(c).length?"Also needs: "+missing(c).join(", "):"Nothing else missing"}</small>`;
+ if(s==="Waiting for payment")return `Cashier collects ${c.bal}<small>${missing(c).length>1?"Then: "+missing(c).slice(1).join(", "):"Then it is Due"}</small>`;
+ if(s==="Waiting for evaluation")return `Trainee submits the evaluation<small>Google Form link was emailed</small>`;
+ if(s==="Waiting for photo")return `Upload the 2x2 photo<small>White background</small>`;
+ return "Ready to print";}
+const WAIT=[["In training","--slate"],["Waiting for payment","--orange"],["Waiting for evaluation","--violet"],["Waiting for photo","--amber"]];
+const pill=s=>({"In training":"p-mute","Waiting for payment":"p-warn","Waiting for evaluation":"p-mute","Waiting for photo":"p-warn","Due":"p-info"})[s];
+const label=s=>({"In training":"In Training","Waiting for payment":"Payment","Waiting for evaluation":"Evaluation","Waiting for photo":"Photo Needed","Due":"Due"})[s];
+const head=(eb,t,note)=>`<div class="head"><div><div class="eyebrow">${eb}</div><h1>${t}</h1></div></div>${note?`<p class="note">${note}</p>`:""}`;
+const waiting=()=>C.filter(c=>state(c)!=="Due");
+const soon=c=>state(c)!=="Due"&&c.ends<=TOMORROW;
+function actions(c){const s=state(c);
+ if(s==="Waiting for photo"||(!c.photo&&s!=="Due"))return `<button class="btn sm pri" data-photo="${c.id}">Upload Photo</button>`;
+ if(s==="Due")return `<button class="btn sm" data-toast="Opens the PDF with a PREVIEW watermark">Preview</button><button class="btn sm org" data-toast="Printed">Print</button>`;
+ return `<button class="btn sm" data-toast="Opens the PDF with a PREVIEW watermark">Preview</button>`;}
+const table=list=>list.length?`<div class="scroll"><table class="cards"><thead><tr><th>Trainee</th><th>Training</th><th>Checklist</th><th>Next Step</th><th></th></tr></thead><tbody>${list.map(c=>`<tr class="${soon(c)?"soon":""}"><td class="lead">${c.n}<small class="mono">${c.nw}</small><small>${c.co}</small></td><td data-l="Training">${range(c)}<small><span class="pill ${pill(state(c))}">${label(state(c))}</span></small></td><td data-l="Checklist"><div class="steps">${steps(c).map(([k,ok,x])=>`<span class="step ${ok?"y":k==="Training ended"?"w":"n"}">${ok?"✓ "+k:k==="Training ended"?"◷ "+x[0].toUpperCase()+x.slice(1):"✗ "+k+(x?" · "+x:"")}</span>`).join("")}</div></td><td data-l="Next" class="next-step">${nextStep(c)}</td><td data-l=""><div class="acts">${actions(c)}</div></td></tr>`).join("")}</tbody></table></div>`:`<p class="empty">Nothing waiting.</p>`;
+const counts=()=>`<div class="col">${WAIT.map(([s,c])=>{const n=C.filter(x=>state(x)===s).length;return `<button class="crow ${S.f===s?"sel":""}" data-f="${s}" style="--c:var(${c})"><span class="dot"></span><span>${label(s)}</span><b>${n}</b></button>`;}).join("")}<div class="crow tot"><span class="dot"></span><span>Waiting</span><b>${waiting().length}</b></div></div>`;
+const P={
+Waiting(){const q=S.q.toLowerCase();const list=waiting().filter(c=>(!S.f||state(c)===S.f)&&(!q||`${c.n} ${c.nw} ${c.co}`.toLowerCase().includes(q))).sort((a,b)=>a.ends.localeCompare(b.ends));
+ return head("Releasing Officer","Waiting","Certificates that cannot print yet and what each one still needs. Highlighted rows can be ready by tomorrow.")+`<div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>Waiting For</h2><span class="m">tap to filter</span></div>${counts()}</section>
+ <section class="panel"><div class="ph"><h2>Ready Soon</h2></div><dl class="lines"><div><dt>Training ends today</dt><dd>${C.filter(c=>c.ends===TODAY).length}</dd></div><div><dt>Ends tomorrow</dt><dd>${C.filter(c=>c.ends===TOMORROW).length}</dd></div><div><dt>Balances to collect</dt><dd>${C.filter(c=>!c.paid).length}</dd></div><div><dt>Photos missing</dt><dd>${C.filter(c=>!c.photo).length}</dd></div></dl><p class="foot">A certificate moves to Certificates › Due on its own once every check is green.</p></section></div>
+ <section class="panel"><div class="bar"><input id="q" placeholder="Search trainee, NWMTACI number or course" value="${S.q}">${S.f?`<button class="btn" data-f="">Show All</button>`:""}</div>${table(list)}</section></div>`;},
+Certificates(){const list=C.filter(c=>state(c)==="Due");return head("Releasing Officer","Certificates","Due to print. Everything still waiting is under Waiting.")+`<section class="panel"><div class="ph"><h2>Due to Print</h2><span class="m">${list.length}</span></div>${table(list)}</section>`;}
+};
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,2200);}
+function draw(focus){document.getElementById("tabs").innerHTML=["Dashboard","Certificates","Waiting","Templates","Released"].map(t=>`<button class="${S.tab===t?"on":""}" data-tab="${t}">${t==="Waiting"?`Waiting (${waiting().length})`:t}</button>`).join("");
+ document.getElementById("page").innerHTML=P[S.tab]();
+ if(focus){const q=document.getElementById("q");if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length);}}}
+document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;const d=b.dataset;
+ if(d.tab){if(!P[d.tab]){toast("Not part of this prototype");return;}S.tab=d.tab;S.f="";}
+ else if(d.f!==undefined){S.f=S.f===d.f?"":d.f;}
+ else if(d.photo){const c=C.find(x=>x.id===+d.photo);c.photo=true;toast(`Photo saved. ${c.n.split(",")[0]} is now ${label(state(c))}.`);}
+ else if(d.toast){toast(d.toast);return;}
+ draw();});
+document.addEventListener("input",e=>{if(e.target.id==="q"){S.q=e.target.value;draw(true);}});
+draw();
+</script>

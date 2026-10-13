@@ -266,7 +266,8 @@ export function AssignCourseModal({ data, trainee, reload, onClose }: { data: Po
   // consecutive within the week) instead of a batch.
   const [startDate, setStartDate] = useState("");
   const dated = !!course && !isStcwCourse(course) && !batches.length;
-  const dateOk = !startDate || (startDate > today && fitsInWeek(startDate, course?.duration_label ?? "1"));
+  // Backdating is allowed (owner, 13 Oct 2026): a course already held can be recorded on its real dates.
+  const dateOk = !startDate || fitsInWeek(startDate, course?.duration_label ?? "1");
   const assign = () => void post({ action: "application-assign", traineeId: trainee.id, courseId, batchId: withBatch ? batchId : null, scheduledOn: dated && startDate ? startDate : null }, withBatch ? "Course and batch assigned. Screening can start." : dated && startDate ? "Course and start date assigned. Screening can start." : "Course assigned. Screening can start; place on a batch once one opens.").then(onClose).catch(() => undefined);
   return <Modal title={`Assign a course · ${fullName(trainee)}`} onClose={onClose}>
     <div className="portal-form">
@@ -277,7 +278,7 @@ export function AssignCourseModal({ data, trainee, reload, onClose }: { data: Po
         <optgroup label="Other Courses">{courses.filter((c) => !isStcwCourse(c)).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name} · {pesos(c.standard_price_centavos)}</option>)}</optgroup>
       </select></label>
       {course && !dated && <div className="full"><BatchCards data={data} batches={batches} selected={batchId} onSelect={setBatchId} allowNone /></div>}
-      {dated && course && <label className="full">Start Date (Optional)<input type="date" value={startDate} min={addDays(today, 1)} onChange={(e) => setStartDate(e.target.value)} /><small style={{ color: dateOk ? "var(--muted)" : "var(--red, #b42318)" }}>{!startDate ? `${course.duration_label} · Monday to Saturday, consecutive days in one week. Leave empty to set later.` : dateOk ? `Runs ${fmtDate(startDate)} to ${fmtDate(automaticEndDate(startDate, course.duration_label))}` : "Pick a later date that is not a Sunday and lets the course finish by Saturday of the same week."}</small></label>}
+      {dated && course && <label className="full">Start Date (Optional)<input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /><small style={{ color: dateOk ? "var(--muted)" : "var(--red, #b42318)" }}>{!startDate ? `${course.duration_label} · Monday to Saturday, consecutive days in one week. Leave empty to set later.` : dateOk ? `${startDate < today ? "Backdated · ran" : "Runs"} ${fmtDate(startDate)} to ${fmtDate(automaticEndDate(startDate, course.duration_label))}` : "Pick a date that is not a Sunday and lets the course finish by Saturday of the same week."}</small></label>}
       <div className="bc-foot full"><span>{course ? (withBatch ? batchSummary(data, batches.find((x) => x.id === batchId)) : `${course.code} · fee ${pesos(course.standard_price_centavos)} · no batch yet`) : "Choose a course first."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!courseId || busy || !dateOk} onClick={assign}>{busy ? "Assigning…" : withBatch ? "Assign Course and Batch" : "Assign Course"}</button></span></div>
     </div>
   </Modal>;
@@ -464,6 +465,24 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
 }
 
 /** Everything about one enrollment, read-only on money. Requests go to Accounting. */
+/**
+ * Change the start date of an in-house course that runs on a picked date (no
+ * batch). Any day is allowed, past included (owner, 13 Oct 2026), as long as
+ * the training days fit Monday to Saturday of one week.
+ */
+function StartDateEditor({ data, enrollment: e, busy, post }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, ok: string) => Promise<unknown> }) {
+  const course = data.courses.find((c) => c.id === e.course_id);
+  const [value, setValue] = useState(e.scheduled_on ?? "");
+  if (!course || course.delivery_type !== "In-House" || first(e.batches) || e.partner_offer_id || e.enrollment_status === "Cancelled") return null;
+  const today = manilaToday(), ok = !!value && fitsInWeek(value, course.duration_label), changed = value !== (e.scheduled_on ?? "");
+  const ends = ok ? automaticEndDate(value, course.duration_label) : "";
+  return <div className="full sd-edit">
+    <label>Start Date<input type="date" value={value} onChange={(ev) => setValue(ev.target.value)} /></label>
+    <button type="button" className="portal-secondary" disabled={busy || !ok || !changed} onClick={() => void post({ action: "enrollment-set-start", enrollmentId: e.id, scheduledOn: value }, ends < today ? "Start date changed. The training is now finished, so the certificate can move on." : "Start date changed.").catch(() => undefined)}>Change Start Date</button>
+    <small style={{ color: !value || ok ? "var(--muted)" : "var(--red, #b42318)" }}>{!value ? `${course.duration_label} · Monday to Saturday, one week.` : !ok ? "Pick a day that is not a Sunday and lets the course finish by Saturday of the same week." : `${value < today ? "Backdated · " : ""}${fmtDate(value)} to ${fmtDate(ends)}`}</small>
+  </div>;
+}
+
 export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void }) {
   const { busy, msg, post } = usePost(reload);
   const generated = instructionsCountOf(data, e), atLimit = generated >= INSTRUCTION_LIMIT;
@@ -491,6 +510,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
         <div><span>Schedule</span><strong>{scheduleOf(e)}</strong><small>{b ? `${b.batch_number}${b.mode ? ` · ${b.mode}` : ""}${b.venue ? ` · ${b.venue}` : ""}` : e.scheduled_on ? (c && first(e.partner_course_offers) ? "Endorsed training date" : `Start date picked · ends ${fmtDate(automaticEndDate(e.scheduled_on, data.courses.find((x) => x.id === e.course_id)?.duration_label ?? "1"))}`) : "Not yet placed on a batch"}</small></div>
         <div><span>Status</span><strong><Badge tone={statusTone(e.enrollment_status)}>{e.enrollment_status}</Badge></strong><small>{isApplication ? "Submitted" : "Created"} {fmtDate(day(e.created_at))}{e.source ? ` · ${e.source}` : ""}</small></div>
       </div>}
+      <StartDateEditor data={data} enrollment={e} busy={busy} post={post} />
 
       <div className="full"><strong>Payment status</strong> <small style={{ color: "var(--muted)" }}>read-only — payments are recorded by the Cashier</small></div>
       <div className="pill-row full">

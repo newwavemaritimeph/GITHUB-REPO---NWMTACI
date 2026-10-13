@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { PortalData, Enrollment } from "../portal-live-app";
-import { first, manilaToday, dueCentavos, pesos2 } from "@/lib/portal-format";
+import { addDays, first, manilaToday, dueCentavos, pesos2 } from "@/lib/portal-format";
 import { automaticEndDate } from "@/lib/scheduling";
 import { canPrint, canSetSeries, certificateState, formatCertificateNumber, isStcwCategory, type CertificateView } from "@/lib/certificate-rules";
 import { Badge, Message, fmtDate, usePost } from "./shared-ui";
@@ -27,13 +27,17 @@ const stcwCourse = (c: { course_categories?: unknown }) => isStcwCategory((Array
 type Photo = { enrollment_id: string; file_name: string; background_white: boolean; uploaded_at: string; replaced_at?: string | null; profiles?: { complete_name: string } | { complete_name: string }[] | null };
 type CertData = PortalData & { certificateSeries?: Series[]; evaluationForms?: Record<string, string>; feedbackAt?: Record<string, string>; certificatePhotos?: Photo[] | null };
 
-export type CertificateLine = { e: Enrollment; cert: CertRow | null; view: CertificateView; name: string; number: string; course: { id: string; name: string; code: string }; ended: string | null; evalNeeded: boolean; evalDone: boolean; balance: number; photo: Photo | null; fileName: string };
+export type CertificateLine = { e: Enrollment; cert: CertRow | null; view: CertificateView; name: string; number: string; course: { id: string; name: string; code: string }; starts: string | null; ended: string | null; evalNeeded: boolean; evalDone: boolean; balance: number; photo: Photo | null; fileName: string };
 
 const day = (v?: string | null) => (v ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(v)) : null);
 const short = (d: string | null) => (d ? new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T00:00:00+08:00`)) : "—");
 
-/** Every New Wave enrollment whose training has ended, with its certificate state. */
-export function certificateLines(data: PortalData): CertificateLine[] {
+/**
+ * Every New Wave enrollment whose training has ended, with its certificate state.
+ * "inTrainingDays" also keeps trainings still running or starting soon that end
+ * within that many days (the Waiting tab, owner 13 Oct 2026).
+ */
+export function certificateLines(data: PortalData, opts: { inTrainingDays?: number } = {}): CertificateLine[] {
   const d = data as CertData;
   const today = manilaToday();
   const courses = new Map(data.courses.map((c) => [c.id, c]));
@@ -55,10 +59,11 @@ export function certificateLines(data: PortalData): CertificateLine[] {
     const fb = d.feedbackAt?.[e.id] ?? null;
     const balance = Math.max(0, dueCentavos(e) - Number(e.paid_centavos));
     const view = certificateState({ enrollmentStatus: e.enrollment_status, trainingEnd: ended, balanceCentavos: balance, evaluationRequired: evalNeeded, evaluationOn: day(fb), paidOn: lastPaid.get(e.trainee_id) ?? null, cert: cert ? { status: cert.status, printCount: Number(cert.print_count ?? (["Printed", "Released"].includes(cert.status) ? 1 : 0)), reprintsAllowed: Number(cert.reprints_allowed ?? 0), voidStatus: cert.void_status } : null, photoOnFile: photos ? photos.has(e.id) : undefined }, today);
-    if (view.state === "Training not finished" || view.state === "Cancelled") continue;
+    if (view.state === "Cancelled") continue;
+    if (view.state === "Training not finished" && (opts.inTrainingDays === undefined || !ended || ended > addDays(today, opts.inTrainingDays))) continue;
     const t = first(e.trainees);
     const fileName = photoFileName({ lastName: t?.legal_last_name ?? "TRAINEE", firstName: t?.legal_first_name ?? "", middleName: (t as { legal_middle_name?: string | null } | null)?.legal_middle_name, courseCode: c.code, batchNumber: b?.batch_number ?? null, date: ended ?? today });
-    lines.push({ e, cert, view, photo: photos?.get(e.id) ?? null, fileName, name: t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : e.enrollment_number, number: data.applicationNumbers?.[e.trainee_id] ?? t?.trainee_number ?? e.enrollment_number, course: { id: c.id, name: c.name, code: c.code }, ended, evalNeeded, evalDone: !!fb, balance });
+    lines.push({ e, cert, view, photo: photos?.get(e.id) ?? null, fileName, name: t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : e.enrollment_number, number: data.applicationNumbers?.[e.trainee_id] ?? t?.trainee_number ?? e.enrollment_number, course: { id: c.id, name: c.name, code: c.code }, starts: b?.starts_on ?? e.scheduled_on ?? null, ended, evalNeeded, evalDone: !!fb, balance });
   }
   const rank = (l: CertificateLine) => (l.view.overdue ? 0 : l.view.state === "Due" ? 1 : l.view.state === "Waiting for photo" ? 2 : l.view.state === "Void requested" ? 2 : l.view.state === "Waiting for payment" || l.view.state === "Waiting for evaluation" ? 3 : 4);
   return lines.sort((a, b) => rank(a) - rank(b) || (a.ended ?? "").localeCompare(b.ended ?? ""));
@@ -189,6 +194,73 @@ export function CertificatesWorkspace({ data, reload }: { data: PortalData; relo
       </section>
     </div>
     <CertificateCorrectionsPanel data={data} reload={reload} mode="details" />
+  </div>;
+}
+
+/** What each waiting certificate is held up by, in the order the rules check them. */
+const WAITING: [CertificateView["state"], string, string][] = [["Training not finished", "In Training", "#64748b"], ["Waiting for payment", "Payment", "#F25615"], ["Waiting for evaluation", "Evaluation", "#7a3fb8"], ["Waiting for photo", "Photo Needed", "#c2410c"]];
+const WAIT_DAYS = 14;
+
+/**
+ * Waiting (owner, 13 Oct 2026; design/releasing-waiting-prototype.html):
+ * certificates that cannot print yet — training still running (ending within
+ * two weeks), balance, evaluation or photo — each with a checklist and the
+ * next step. A line moves to Certificates › Due by itself once every check passes.
+ */
+export function WaitingCertificates({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
+  const [pick, setPick] = useState(""), [q, setQ] = useState("");
+  const [uploading, setUploading] = useState<CertificateLine | null>(null);
+  const today = manilaToday(), tomorrow = addDays(today, 1);
+  const tracked = (data as CertData).certificatePhotos != null;
+  const lines = certificateLines(data, { inTrainingDays: WAIT_DAYS }).filter((l) => WAITING.some(([s]) => s === l.view.state)).sort((a, b) => (a.ended ?? "").localeCompare(b.ended ?? ""));
+  const term = q.trim().toLowerCase();
+  const shown = lines.filter((l) => (!pick || l.view.state === pick) && (!term || `${l.name} ${l.number} ${l.course.name} ${l.course.code}`.toLowerCase().includes(term)));
+  const range = (l: CertificateLine) => !l.starts || l.starts === l.ended ? short(l.ended) : `${short(l.starts)} – ${short(l.ended)}`;
+  const missing = (l: CertificateLine) => [l.balance > 0 && "payment", l.evalNeeded && !l.evalDone && "evaluation", tracked && !l.photo && "photo"].filter(Boolean) as string[];
+  const next = (l: CertificateLine): [string, string] => {
+    const m = missing(l);
+    if (l.view.state === "Training not finished") return [`Training ends ${short(l.ended)}`, m.length ? `Also needs: ${m.join(", ")}` : "Nothing else missing"];
+    if (l.view.state === "Waiting for payment") return [`Cashier collects ${pesos2(l.balance)}`, m.length > 1 ? `Then: ${m.slice(1).join(", ")}` : "Then it is Due"];
+    if (l.view.state === "Waiting for evaluation") return ["Trainee submits the evaluation", m.includes("photo") ? "Then: photo" : "Google Form link was emailed"];
+    return ["Upload the 2x2 photo", "White background"];
+  };
+  const steps = (l: CertificateLine): [string, "y" | "n" | "w"][] => [
+    l.view.state === "Training not finished" ? [`Ends ${short(l.ended)}`, "w"] : ["Training ended", "y"],
+    [l.balance > 0 ? `Fee · ${pesos2(l.balance)} due` : "Fee paid", l.balance > 0 ? "n" : "y"],
+    ...(tracked ? [["2x2 photo", l.photo ? "y" : "n"] as [string, "y" | "n"]] : []),
+    ...(l.evalNeeded ? [["Evaluation", l.evalDone ? "y" : "n"] as [string, "y" | "n"]] : []),
+  ];
+  return <div className="portal-page cx ac">
+    <Head title="Waiting" note="Certificates that cannot print yet and what each one still needs. Shaded lines can be ready by tomorrow." />
+    <div className="ac-rail">
+      <div className="ac-stack">
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Waiting For</h2><span className="muted-text">tap to filter</span></div>
+          <div className="cx-tiles ac-tiles ac-tiles-in">
+            {WAITING.map(([s, text, c]) => <button type="button" key={s} className={`cx-tile ac-pick ac-count${pick === s ? " on" : ""}`} style={{ ["--c" as string]: c }} onClick={() => setPick(pick === s ? "" : s)}><span>{text}</span><b>{lines.filter((l) => l.view.state === s).length}</b></button>)}
+            <div className="cx-tile ac-count" style={{ ["--c" as string]: "#123F63" }}><span>Waiting</span><b>{lines.length}</b></div>
+          </div>
+        </section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Ready Soon</h2></div>
+          <dl className="ac-lines"><div><dt>Training ends today</dt><dd>{lines.filter((l) => l.ended === today).length}</dd></div><div><dt>Ends tomorrow</dt><dd>{lines.filter((l) => l.ended === tomorrow).length}</dd></div><div><dt>Balances to collect</dt><dd>{lines.filter((l) => l.balance > 0).length}</dd></div>{tracked && <div><dt>Photos missing</dt><dd>{lines.filter((l) => !l.photo).length}</dd></div>}</dl>
+          <p className="ac-foot">Trainings ending within {WAIT_DAYS} days are listed. A certificate moves to Certificates › Due by itself once every check is green.</p>
+        </section>
+      </div>
+      <section className="portal-panel cx-panel">
+        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search waiting certificates" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, NWMTACI number or course" />{pick && <button type="button" className="portal-secondary" onClick={() => setPick("")}>Show All</button>}</div>
+        {!shown.length ? <p className="portal-empty-copy">Nothing waiting.</p> : <div className="cl-wrap"><table className="cl-log wt-log"><thead><tr><th>#</th><th>Trainee · NWMTACI no.</th><th>Course</th><th>Training</th><th>Checklist</th><th>Next Step</th>{tracked && <th>Action</th>}</tr></thead><tbody>
+          {shown.map((l, i) => { const [step, then] = next(l); const label = WAITING.find(([s]) => s === l.view.state)?.[1] ?? l.view.state; return <tr key={l.e.id} className={l.ended && l.ended <= tomorrow ? "wt-soon" : undefined}>
+            <td className="cl-no">{i + 1}</td>
+            <td><b>{l.name}</b> <span className="cl-mono cl-sub">{l.number.replace(/^NWMTACI-/, "")}</span></td>
+            <td title={l.course.name}>{l.course.code}</td>
+            <td>{range(l)}<small className="cl-block"><Badge tone={l.view.state === "Training not finished" || l.view.state === "Waiting for evaluation" ? undefined : "orange"}>{label}</Badge></small></td>
+            <td><span className="wt-steps">{steps(l).map(([t, k]) => <span key={t} className={`wt-step ${k}`}>{k === "y" ? "✓" : k === "w" ? "◷" : "✗"} {t}</span>)}</span></td>
+            <td className="wt-next"><b>{step}</b><small className="cl-sub cl-block">{then}</small></td>
+            {tracked && <td>{l.photo ? <button type="button" className="cl-photo" title={l.photo.file_name} onClick={() => void openCertificatePhoto(l.e.id)}>✓ On File</button> : <button type="button" className="portal-secondary cl-upload" onClick={() => setUploading(l)}>Upload Photo</button>}</td>}
+          </tr>; })}
+        </tbody></table></div>}
+      </section>
+    </div>
+    {uploading && <CertificatePhotoModal enrollmentId={uploading.e.id} traineeName={uploading.name} fileName={uploading.fileName} onClose={() => setUploading(null)} onDone={async () => { setUploading(null); await reload(); }} />}
   </div>;
 }
 

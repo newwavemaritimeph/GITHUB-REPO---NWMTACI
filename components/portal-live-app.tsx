@@ -24,7 +24,7 @@ import { RejectInline } from "./portal/reject-inline";
 import { MismoDashboard, MismoFinalList, MismoSubmissions } from "./portal/mismo-home";
 import { AssistantDashboard, AssistantRequisitions, ResourcePlanning, InstructorShortlist, GcashReconciliation, GcashNotInHistory } from "./portal/admin-assistant-home";
 import { RegistrationDeliveries, ReleasingDeliveries } from "./portal/delivery-home";
-import { ReleasingHome, CertificatesWorkspace, CertificateTemplates, ReleasedCertificates, AdminCertificateControls, CertificateAlarm, ReleasingNumbering, AdminCertificateNumbers } from "./portal/releasing-home";
+import { ReleasingHome, CertificatesWorkspace, WaitingCertificates, CertificateTemplates, ReleasedCertificates, AdminCertificateControls, CertificateAlarm, ReleasingNumbering, AdminCertificateNumbers } from "./portal/releasing-home";
 import { AccountingHome, AccountingApprovals, AccountingReports, AccountingPayments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
@@ -33,7 +33,7 @@ import { tcl } from "@/lib/title-case";
 import { CompletionRecords } from "./portal/completion-records";
 import { AdminHome, AdminSearchTrainee, AdminEnrollments, AdminVouchers, AdminHolidays } from "./portal/admin-home";
 
-type Module = "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Requisitions" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "MISMO dashboard" | "Completion records" | AccountingConfigSection;
+type Module = "Dashboard" | "Waiting" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Requisitions" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "MISMO dashboard" | "Completion records" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -119,7 +119,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // Attendance stays off until it is rebuilt.
   instructor: [],
   // Releasing Officer (owner, 8 Oct 2026): Dashboard · Certificates · Templates · Released (RELEASING_TABS).
-  releasing_officer: ["Dashboard","Certificates","Templates","Numbering","Released","Delivery"],
+  releasing_officer: ["Dashboard","Certificates","Waiting","Templates","Numbering","Released","Delivery"],
   // MARINA MISMO Compliance Officer (owner, 8 Oct 2026): STCW trainees owing at 11:00 AM, the 4:00 PM final list, submissions.
   mismo_officer: ["Dashboard","Final list","Submissions","Completion records"],
   // Admin Assistant (owner, 9 Oct 2026): requisitions, resource planning, instructor shortlist.
@@ -150,7 +150,7 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   // Cashier workspace (7 Oct 2026); the top tabs come from CASHIER_TABS.
   {label:"Report",icon:"∑",roles:["cashier"],group:"Accounting"},
   {label:"HR & payroll",icon:"♙",roles:["admin"],group:"People"},{label:"MyHr",icon:"☺",group:"People"},
-  {label:"Templates",icon:"▤",roles:["releasing_officer"],group:"Work"},{label:"Numbering",icon:"№",roles:["releasing_officer"],group:"Work"},{label:"Released",icon:"⇥",roles:["releasing_officer"],group:"Work"},{label:"Delivery",icon:"⇥",roles:["releasing_officer"],group:"Work"},
+  {label:"Waiting",icon:"◷",roles:["releasing_officer"],group:"Work"},{label:"Templates",icon:"▤",roles:["releasing_officer"],group:"Work"},{label:"Numbering",icon:"№",roles:["releasing_officer"],group:"Work"},{label:"Released",icon:"⇥",roles:["releasing_officer"],group:"Work"},{label:"Delivery",icon:"⇥",roles:["releasing_officer"],group:"Work"},
   {label:"Delivery requests",icon:"⇥",roles:["registration"],group:"Work"},
   {label:"Requisitions",icon:"✎",roles:["admin_assistant","admin"],group:"Work"},{label:"Resource planning",icon:"▢",roles:["admin_assistant","admin"],group:"Work"},{label:"Instructors",icon:"♙",roles:["admin_assistant","admin"],group:"Work"},{label:"Reconciliation",icon:"✓",roles:["admin_assistant","admin"],group:"Work"},
   {label:"Final list",icon:"▤",roles:["mismo_officer"],group:"Work"},{label:"Submissions",icon:"✓",roles:["mismo_officer"],group:"Work"},{label:"Completion records",icon:"▤",roles:["mismo_officer","admin"],group:"Work"},
@@ -181,7 +181,7 @@ const ACCOUNTING_TABS:TopTab[]=[
   {label:"Reports",items:["Reports"]},
   {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS]},
 ];
-const RELEASING_TABS:TopTab[]=[{label:"Dashboard",items:["Dashboard"]},{label:"Certificates",items:["Certificates"]},{label:"Templates",items:["Templates"]},{label:"Numbering",items:["Numbering"]},{label:"Released",items:["Released"]},{label:"Delivery",items:["Delivery"]}];
+const RELEASING_TABS:TopTab[]=[{label:"Dashboard",items:["Dashboard"]},{label:"Certificates",items:["Certificates"]},{label:"Waiting",items:["Waiting"]},{label:"Templates",items:["Templates"]},{label:"Numbering",items:["Numbering"]},{label:"Released",items:["Released"]},{label:"Delivery",items:["Delivery"]}];
 const ADMIN_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
   {label:"Search trainee",items:["Search trainee"]},
@@ -381,6 +381,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(gateRole==="releasing_officer"){
     if(active==="Dashboard")return <ReleasingHome data={data} reload={reload} go={m=>go(m as Module)}/>;
     if(active==="Certificates")return <CertificatesWorkspace data={data} reload={reload}/>;
+    if(active==="Waiting")return <WaitingCertificates data={data} reload={reload}/>;
     if(active==="Templates")return <CertificateTemplates data={data} reload={reload}/>;
     if(active==="Numbering")return <ReleasingNumbering data={data} reload={reload}/>;
     if(active==="Released")return <ReleasedCertificates data={data} reload={reload}/>;
@@ -575,7 +576,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   const discounts=live.reduce((s,e)=>s+Number(e.discounts_centavos??0),0);
   const paid=payments.reduce((s,p)=>s+Number(p.amount_centavos),0);
   const due=fees-discounts-paid;
-  const day=(iso:string)=>new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",timeZone:"Asia/Manila"}).format(new Date(iso));
+  const day=(iso:string)=>new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",year:"numeric",timeZone:"Asia/Manila"}).format(new Date(iso));
   const schedule=(e:Enrollment)=>{const b=first(e.batches);return b?`${date(b.starts_on)} batch`:e.scheduled_on?`starts ${date(e.scheduled_on)}`:"no batch yet"};
   // One ledger: each course fee (with its extra charges and discounts), then each payment, by date.
   type Line={key:string;at:string;text:string;ref:string;charge:number;payment:number;enrollmentId?:string;note?:string};
@@ -595,35 +596,40 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
     <div className="sa">
       <div className="sa-head">
         <div className="sa-org"><div className="sa-seal" aria-hidden="true">NW</div><div><b>New Wave Maritime Training and Assessment Center, Inc.</b><small>Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila</small></div></div>
-        <div className="sa-doc"><h2>Trainee Account</h2><small>As of {date(manilaToday())}</small></div>
+        <div className="sa-doc"><h2>Statement of Account</h2><small>As of {date(manilaToday())}</small></div>
       </div>
       {note&&<Message kind="success" text={note}/>}
       <div className="sa-meta">
         {editing&&reload?<div className="sa-box"><TraineeEditForm trainee={trainee} reload={reload} onDone={()=>setEditing(false)}/></div>:<div className="sa-box">
           <span className="sa-cap">Trainee</span>
-          <div className="sa-name">{`${(trainee.legal_last_name??"").toUpperCase()}, ${trainee.legal_first_name??""}${trainee.legal_middle_name?` ${trainee.legal_middle_name.charAt(0)}.`:""}`}</div>
-          <p>{[appNo,trainee.trainee_number,trainee.srn?`SRN ${trainee.srn}`:""].filter(Boolean).join(" · ")}</p>
-          <p>{[trainee.rank,trainee.mobile,trainee.email].filter(Boolean).join(" · ")}</p>
-          <p>{[trainee.birthdate?`Born ${date(trainee.birthdate)}${trainee.place_of_birth?`, ${trainee.place_of_birth}`:""}`:"",trainee.company].filter(Boolean).join(" · ")}</p>
-          {trainee.address&&<p>{trainee.address}</p>}
-          {em?.name&&<p>Emergency: {em.name}{em.mobile?` · ${em.mobile}`:""}</p>}
+          <div className="sa-who"><div className="sa-name">{`${(trainee.legal_last_name??"").toUpperCase()}, ${trainee.legal_first_name??""}${trainee.legal_middle_name?` ${trainee.legal_middle_name.charAt(0)}.`:""}`}</div>{trainee.rank&&<span className="sa-rank">{trainee.rank}</span>}</div>
+          {/* One labelled field per detail; empty ones are left out. */}
+          <dl className="sa-kv">
+            {([["NWMTACI No.",appNo,"sa-mono"],["Trainee No.",trainee.trainee_number,"sa-mono"],["SRN",trainee.srn,"sa-mono"],
+              ["Mobile",trainee.mobile,"sa-mono"],["Email",trainee.email,"sa-two"],
+              ["Birthday",trainee.birthdate?date(trainee.birthdate):"",""],["Place of Birth",trainee.place_of_birth,""],["Company",trainee.company,""]] as [string,string|null|undefined,string][])
+              .filter(([,v])=>v).map(([k,v,cls])=><div key={k} className={cls==="sa-two"?cls:undefined}><dt>{k}</dt><dd className={cls==="sa-mono"?cls:undefined}>{v}</dd></div>)}
+            {trainee.address&&<div className="sa-wide"><dt>Address</dt><dd>{trainee.address}</dd></div>}
+            {em?.name&&<div className="sa-wide sa-em"><dt>Emergency Contact</dt><dd>{em.name}{em.mobile&&<span className="sa-mono"> · {em.mobile}</span>}</dd></div>}
+          </dl>
         </div>}
-        <div className="sa-box sa-sum"><span className="sa-cap">Account summary</span>
-          <div><span>Training fees</span><b>{pesos2(fees)}</b></div>
-          <div><span>Discounts and rebates</span><b>{pesos2(discounts)}</b></div>
-          <div><span>Payments received</span><b>({pesos2(paid)})</b></div>
-          <div className="sa-due"><span>Balance due</span><b className={due>0?"owe":""}>{pesos2(due)}</b></div>
+        <div className="sa-box sa-sum"><span className="sa-cap">Account Summary</span>
+          <div><span>Training Fees</span><b>{pesos2(fees)}</b></div>
+          <div><span>Discounts and Rebates</span><b className="sa-less">({pesos2(discounts)})</b></div>
+          <div><span>Payments Received</span><b className="sa-less">({pesos2(paid)})</b></div>
+          <div className="sa-due"><span>Balance Due</span><b className={due>0?"owe":"settled"}>{pesos2(due)}</b></div>
+          {due<=0&&fees>0&&<span className="sa-paid">Paid in Full</span>}
         </div>
       </div>
-      <div className="sa-led"><table><thead><tr><th>Date</th><th>Particulars</th><th>Reference</th><th className="r">Charge</th><th className="r">Payment</th><th className="r">Balance</th></tr></thead><tbody>
+      <div className="sa-led"><table><thead><tr><th>Date</th><th>Particulars</th><th>Reference</th><th className="r">Charges</th><th className="r">Credits</th><th className="r">Balance</th></tr></thead><tbody>
         {lines.map(l=>{running+=l.charge-l.payment;const click=canEdit&&l.enrollmentId;return <tr key={l.key} className={click?"sa-click":undefined} onClick={click?()=>setOpenEnrollment(l.enrollmentId!):undefined} title={click?"Open this enrollment":undefined}>
-          <td>{day(l.at)}</td><td>{l.text}{l.note&&<> <Badge tone="red">{l.note}</Badge></>}</td><td className="sa-mono">{l.ref}</td>
-          <td className="r sa-mono">{l.charge?money(l.charge):""}</td><td className="r sa-mono">{l.payment?money(l.payment):""}</td><td className="r sa-mono">{money(running)}</td></tr>})}
+          <td className="sa-date">{day(l.at)}</td><td>{l.text}{l.note&&<> <Badge tone="red">{l.note}</Badge></>}</td><td className="sa-mono">{l.ref}</td>
+          <td className="r sa-mono">{l.charge?money(l.charge):""}</td><td className={`r sa-mono${l.payment?" sa-cr":""}`}>{l.payment?`(${money(l.payment)})`:""}</td><td className="r sa-mono">{money(running)}</td></tr>})}
         {!lines.length&&<tr><td colSpan={6} className="sa-empty">No courses or payments yet.</td></tr>}
-        <tr className="sa-total"><td colSpan={5}>Balance due</td><td className="r sa-mono">{pesos2(due)}</td></tr>
+        <tr className="sa-total"><td colSpan={5}>Balance Due</td><td className="r sa-mono">{pesos2(due)}</td></tr>
       </tbody></table></div>
       {requests.length>0&&<div className="sa-reqs"><span className="sa-cap">Open requests</span>{requests.map(r=><p key={r.id}><b>{r.request_type==="Rescheduling"?"Reschedule":r.request_type}</b> · {first(r.enrollments)?.enrollment_number} · {r.reason}</p>)}</div>}
-      <div className="sa-sig"><div>Prepared by · Registration</div><div>Received by · Trainee signature, date</div></div>
+      <div className="sa-sig"><div><b>{data.profile.complete_name}</b>Prepared by</div><div><b>&nbsp;</b>Received by · Trainee Signature over Printed Name · Date</div></div>
       <div className="sa-foot">
         <div className="sa-acts">
           {canEdit&&<button type="button" className="portal-primary" onClick={()=>setAddingCourse(true)}>Add Course</button>}

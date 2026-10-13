@@ -4,6 +4,7 @@ import { automaticEndDate } from "@/lib/scheduling";
 import { certificateState, type CertificateView } from "@/lib/certificate-rules";
 import { corrected, type CertificateCorrections } from "@/lib/certificate-photo";
 import { detectPhotoBox } from "@/lib/certificate-template";
+import { certificateLayout, isHazmatCfr } from "@/lib/certificate-layouts";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -34,7 +35,7 @@ export type CertificateContext = {
 export async function certificateContext(db: Admin, enrollmentId: string): Promise<CertificateContext | null> {
   const { data: e } = await db.from("enrollments").select("id,enrollment_number,course_id,trainee_id,enrollment_status,selling_price_centavos,batch_id,batches(starts_on,ends_on,batch_number),courses(id,name,code,duration_label),trainees(legal_first_name,legal_middle_name,legal_last_name,email)").eq("id", enrollmentId).maybeSingle();
   if (!e) return null;
-  const [{ data: extra }, { data: allocations }, { data: charges }, { data: feedback }, { data: settings }, certRes, formRes, photoRes, corrRes, numRes, seriesRes] = await Promise.all([
+  const [{ data: extra }, { data: allocations }, { data: charges }, { data: feedback }, { data: settings }, certRes, formRes, photoRes, corrRes, numRes, seriesRes, styleRes] = await Promise.all([
     db.from("enrollments").select("scheduled_on").eq("id", enrollmentId).maybeSingle(),
     db.from("payment_allocations").select("amount_centavos,payments(received_at,valid)").eq("enrollment_id", enrollmentId),
     db.from("enrollment_charges").select("amount_centavos,event_type").eq("enrollment_id", enrollmentId).eq("valid", true),
@@ -46,13 +47,18 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
     db.from("certificates").select("corrections").eq("enrollment_id", enrollmentId).maybeSingle(),
     db.from("certificates").select("registration_number").eq("enrollment_id", enrollmentId).maybeSingle(),
     db.from("certificate_number_settings").select("reg_prefix,reg_last,reg_digits,set_at").maybeSingle(),
+    db.from("courses").select("registration_no_style").eq("id", e.course_id).maybeSingle(),
   ]);
   const own = (numRes.error ? null : numRes.data) as { registration_number?: string | null } | null;
   const ns = (seriesRes.error ? null : seriesRes.data) as { reg_prefix: string; reg_last: number; reg_digits: number; set_at: string | null } | null;
   const month = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit" }).format(new Date()).split("-");
+  // HAZMAT with CFR puts the issue month first (migration 202610130041): NWMTC32026-2290.
+  const c0 = first(e.courses as unknown as { code: string; name: string } | null);
+  const style = (styleRes.error ? null : (styleRes.data as { registration_no_style?: string | null } | null)?.registration_no_style) ?? (c0 && isHazmatCfr(c0) ? "month-number" : "number-month");
+  const nextNo = ns ? Number(ns.reg_last) + 1 : 0;
   const numbers = {
     reg: own?.registration_number ?? null,
-    nextReg: ns?.set_at ? `${ns.reg_prefix}${String(Number(ns.reg_last) + 1).padStart(ns.reg_digits, "0")}-${month[1]}${month[0]}` : null,
+    nextReg: !ns?.set_at ? null : style === "month-number" ? `${ns.reg_prefix}${Number(month[1])}${month[0]}-${nextNo}` : `${ns.reg_prefix}${String(nextNo).padStart(ns.reg_digits, "0")}-${month[1]}${month[0]}`,
   };
   const photo = photoRes.error ? undefined : (photoRes.data as { storage_path: string; file_name: string } | null);
   const corrections = (corrRes.error ? {} : ((corrRes.data as { corrections?: CertificateCorrections } | null)?.corrections ?? {})) as CertificateCorrections;
@@ -171,27 +177,33 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
   const batchLabel = corrected(ctx.cert?.batch_label ?? null, fix.batchLabel);
   const startsOn = corrected(ctx.batch.starts_on, fix.startsOn), endsOn = corrected(ctx.batch.ends_on, fix.endsOn);
   const issuedOn = corrected(manilaToday(), fix.issuedOn);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold), reg = await pdf.embedFont(StandardFonts.Helvetica);
-  const centre = (text: string, y: number, size: number, font = reg, color = rgb(0.18, 0.25, 0.32)) => page.drawText(text, { x: (W - font.widthOfTextAtSize(text, size)) / 2, y, size, font, color });
-  const nameY = H - (f.nameY ?? H * 0.42), nameSize = f.nameSize ?? Math.round(W / 26);
-  centre(String(traineeName).toUpperCase(), nameY, nameSize, bold, rgb(0.07, 0.25, 0.39));
-  const lineY = f.lineY ? H - f.lineY : nameY - nameSize * 1.1;
-  centre(String(courseName), lineY, Math.round(nameSize * 0.55), bold);
-  const number = ctx.cert?.certificate_number ?? "";
-  const meta = [batchLabel && `Batch ${batchLabel}`, endsOn && `Conducted ${range(startsOn, endsOn)}`].filter(Boolean).join("   ·   ");
-  if (meta) centre(meta, lineY - nameSize * 0.9, Math.round(nameSize * 0.42));
-  centre(`Issued ${longDate(issuedOn)}`, lineY - nameSize * 1.55, Math.round(nameSize * 0.38));
-  // Certificate No. and Registration No. at the lower left (owner, 9 Oct 2026); the Doc. No. is written by hand.
-  // A preview shows the Registration No. the next print takes.
   const preview = mode === "preview";
   const regNo = ctx.numbers?.reg ?? (preview ? ctx.numbers?.nextReg : null);
-  const small = Math.max(8, Math.round(W / 70)), ink2 = rgb(0.12, 0.17, 0.23), left = W * 0.07;
-  const rowsNo = [["Certificate No :", number], ["Registration No :", regNo ?? ""]].filter(([, v]) => v);
-  rowsNo.forEach(([label, value], i) => {
-    const y = H * 0.07 + (rowsNo.length - 1 - i) * small * 1.6;
-    page.drawText(label as string, { x: left, y, size: small, font: bold, color: ink2 });
-    page.drawText(value as string, { x: left + small * 8.2, y, size: small, font: bold, color: ink2 });
-  });
+  const number = ctx.cert?.certificate_number ?? "";
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold), reg = await pdf.embedFont(StandardFonts.Helvetica);
+  // A course with its own layout (HAZMAT with CFR) is filled like New Wave's sample certificate.
+  const layout = certificateLayout(ctx.course);
+  if (layout) {
+    await layout(pdf, page, { name: String(traineeName), startsOn: startsOn ?? null, endsOn: endsOn ?? null, issuedOn: String(issuedOn), certificateNumber: number, registrationNumber: regNo ?? "" });
+  } else {
+    const centre = (text: string, y: number, size: number, font = reg, color = rgb(0.18, 0.25, 0.32)) => page.drawText(text, { x: (W - font.widthOfTextAtSize(text, size)) / 2, y, size, font, color });
+    const nameY = H - (f.nameY ?? H * 0.42), nameSize = f.nameSize ?? Math.round(W / 26);
+    centre(String(traineeName).toUpperCase(), nameY, nameSize, bold, rgb(0.07, 0.25, 0.39));
+    const lineY = f.lineY ? H - f.lineY : nameY - nameSize * 1.1;
+    centre(String(courseName), lineY, Math.round(nameSize * 0.55), bold);
+    const meta = [batchLabel && `Batch ${batchLabel}`, endsOn && `Conducted ${range(startsOn, endsOn)}`].filter(Boolean).join("   ·   ");
+    if (meta) centre(meta, lineY - nameSize * 0.9, Math.round(nameSize * 0.42));
+    centre(`Issued ${longDate(issuedOn)}`, lineY - nameSize * 1.55, Math.round(nameSize * 0.38));
+    // Certificate No. and Registration No. at the lower left (owner, 9 Oct 2026); the Doc. No. is written by hand.
+    // A preview shows the Registration No. the next print takes.
+    const small = Math.max(8, Math.round(W / 70)), ink2 = rgb(0.12, 0.17, 0.23), left = W * 0.07;
+    const rowsNo = [["Certificate No :", number], ["Registration No :", regNo ?? ""]].filter(([, v]) => v);
+    rowsNo.forEach(([label, value], i) => {
+      const y = H * 0.07 + (rowsNo.length - 1 - i) * small * 1.6;
+      page.drawText(label as string, { x: left, y, size: small, font: bold, color: ink2 });
+      page.drawText(value as string, { x: left + small * 8.2, y, size: small, font: bold, color: ink2 });
+    });
+  }
   // The 2x2 photo goes inside the box found on the template (owner, 9 Oct 2026); without one,
   // a 2 in square (144 pt) at the lower right. Manual fields still win when set.
   if (ctx.photo) {
