@@ -2221,3 +2221,5 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .wt-next b{font-weight:600}
 .nw-shell .wt-log td{vertical-align:top}
 .nw-shell .wt-log tr.wt-soon td{background:#eef6fd}
+.nw-shell .cl-log tr.nb-group td{background:#eef4f8;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#123F63}
+.nw-shell .cl-log td.nb-course{min-width:240px}

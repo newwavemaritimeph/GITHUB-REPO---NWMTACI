@@ -353,6 +353,9 @@ export function ReleasedCertificates({ data, reload }: { data: PortalData; reloa
 }
 
 /** Admin: certificate numbering per course, void requests, and the printing switch. */
+/** STCW courses whose certificates New Wave numbers (owner, 13 Oct 2026): BT-PSSR, Safety, Crowd, Crisis, SATSDSD, Ship Security Officer. */
+const ADMIN_STCW_CODES = ["UBT-PSSR", "STPPDSPPS", "PSCMT", "PSCMHBT", "SATSDSD", "SSO"];
+
 function NumberingTable({ data, reload, scope }: { data: PortalData; reload: () => Promise<void>; scope: "in-house" | "stcw" | "all" }) {
   const d = data as CertData;
   const { busy, msg, post } = usePost(reload);
@@ -364,15 +367,19 @@ function NumberingTable({ data, reload, scope }: { data: PortalData; reload: () 
   const series = new Map((d.certificateSeries ?? []).map((s) => [s.course_id, s]));
   const used = new Set(data.enrollments.map((e) => e.course_id));
   const term = q.trim().toLowerCase();
-  const courses = data.courses.filter((c) => c.delivery_type === "In-House" && (scope === "all" ? true : scope === "stcw" ? (term ? true : stcwCourse(c)) : !stcwCourse(c)) && (term ? `${c.code} ${c.name}`.toLowerCase().includes(term) : scope === "stcw" || used.has(c.id) || series.has(c.id))).sort((a, b) => a.name.localeCompare(b.name));
+  // Admin (owner, 13 Oct 2026): the six STCW courses New Wave numbers itself first, then every In-House course.
+  const featured = (c: { code: string }) => ADMIN_STCW_CODES.indexOf(c.code);
+  const courses = data.courses.filter((c, i, all) => c.delivery_type === "In-House" && all.findIndex((x) => x.id === c.id) === i && (scope === "all" ? (term ? true : featured(c) >= 0 || !stcwCourse(c)) : scope === "stcw" ? (term ? true : stcwCourse(c)) : !stcwCourse(c)) && (term ? `${c.code} ${c.name}`.toLowerCase().includes(term) : scope === "all" || scope === "stcw" || used.has(c.id) || series.has(c.id)))
+    .sort((a, b) => scope === "all" ? ((featured(a) < 0 ? 99 : featured(a)) - (featured(b) < 0 ? 99 : featured(b)) || a.name.localeCompare(b.name)) : a.name.localeCompare(b.name));
+  const groupOf = (c: { code: string }) => scope !== "all" ? "" : featured(c) >= 0 ? "STCW Courses" : "In-House Courses";
   const valueOf = (id: string) => { const s = series.get(id); return edit[id] ?? { prefix: s?.prefix ?? "", next: String(s?.next_number ?? 1), pad: String(s?.pad ?? 5), batchPrefix: s?.batch_prefix ?? "", nextBatch: String(s?.next_batch ?? 1), regPrefix: s?.reg_prefix ?? "NWMTC", regNext: s?.reg_next ? String(s.reg_next) : "", regDigits: String(s?.reg_digits ?? 4), regStyle: s?.reg_style ?? "month-number" }; };
   const set = (id: string, k: string, v: string) => setEdit({ ...edit, [id]: { ...valueOf(id), [k]: v } });
   return <section className="portal-panel cx-panel"><div className="panel-heading"><h2>{scope === "all" ? "Certificate No. per Course" : scope === "stcw" ? "Certificate Numbering" : "In-House Certificate Numbering"}</h2></div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} placeholder={scope === "stcw" ? "STCW courses shown; search any course" : "Search any In-House course by name or code"} /></div>
     <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th>Prefix</th><th>Next No.</th><th>Digits</th><th>Batch Prefix</th><th>Next Batch</th><th>Next Certificate</th>{regReady && <><th>Reg. Prefix</th><th>Next Reg. No.</th><th>Digits</th><th>Reg. Style</th><th>Next Registration</th></>}<th /></tr></thead><tbody>
-      {courses.map((c) => { const v = valueOf(c.id), s = series.get(c.id); const changed = !!edit[c.id]; const can = canSetSeries(roles, stcwCourse(c)); return <tr key={c.id}>
-        <td><b>{c.name}</b><small className="cl-sub cl-block">{s ? `Set ${fmtDate(day(s.set_at) ?? "")}${first(s.profiles)?.complete_name ? ` by ${first(s.profiles)?.complete_name}` : ""}` : "Not set — certificates for this course cannot be numbered yet"}</small></td>
+      {courses.map((c, i) => { const v = valueOf(c.id), s = series.get(c.id); const changed = !!edit[c.id]; const can = canSetSeries(roles, stcwCourse(c)); const head = groupOf(c) && groupOf(c) !== groupOf(courses[i - 1] ?? { code: "" }) ? groupOf(c) : ""; return [head && <tr key={`${head}-head`} className="nb-group"><td colSpan={regReady ? 13 : 8}><b>{head}</b> <span className="cl-sub">{courses.filter((x) => groupOf(x) === head).length}</span></td></tr>, <tr key={c.id}>
+        <td className="nb-course"><b>{c.name}</b><small className="cl-sub cl-block"><span className="cl-mono">{c.code}</span> · {s ? `Set ${fmtDate(day(s.set_at) ?? "")}${first(s.profiles)?.complete_name ? ` by ${first(s.profiles)?.complete_name}` : ""}` : "Not set yet"}</small></td>
         <td><input className="cl-in" aria-label="Prefix" disabled={!can} value={v.prefix} onChange={(e) => set(c.id, "prefix", e.target.value)} placeholder="NWM-HPT-" /></td>
         <td><input className="cl-in cl-num" aria-label="Next certificate number" disabled={!can} type="number" min={1} value={v.next} onChange={(e) => set(c.id, "next", e.target.value)} /></td>
         <td><input className="cl-in cl-tiny" aria-label="Digits" disabled={!can} type="number" min={1} max={10} value={v.pad} onChange={(e) => set(c.id, "pad", e.target.value)} /></td>
@@ -387,7 +394,7 @@ function NumberingTable({ data, reload, scope }: { data: PortalData; reload: () 
           <td className="cl-mono cl-next">{v.regNext ? registrationPreview(v.regPrefix || "NWMTC", Number(v.regNext) || 1, Number(v.regDigits) || 4, v.regStyle) : <span className="cl-sub">Not set</span>}</td>
         </>}
         <td>{can ? <button type="button" className="portal-primary" disabled={busy || !changed} onClick={() => void post({ action: "certificate-series-save", courseId: c.id, prefix: v.prefix.trim(), nextNumber: Math.max(1, Number(v.next) || 1), pad: Math.min(10, Math.max(1, Number(v.pad) || 5)), batchPrefix: v.batchPrefix.trim(), nextBatch: Math.max(1, Number(v.nextBatch) || 1), ...(regReady ? { regPrefix: v.regPrefix.trim() || "NWMTC", regNext: v.regNext ? Math.max(1, Number(v.regNext) || 1) : null, regDigits: Math.min(12, Math.max(1, Number(v.regDigits) || 4)), regStyle: v.regStyle === "number-month" ? "number-month" : "month-number" } : {}) }, "Numbering saved. Enrolled trainees without numbers got theirs in enrollment order; new enrollments continue from here.").then(() => setEdit((e) => { const n = { ...e }; delete n[c.id]; return n; })).catch(() => undefined)}>Save</button> : <span className="cl-sub">Set by the Admin</span>}</td>
-      </tr>; })}
+      </tr>]; })}
     </tbody></table></div>
     {!courses.length && <p className="portal-empty-copy">{term ? "No courses match." : "No In-House course has trainees yet. Search a course to set its numbering."}</p>}
     <p className="cl-legend">Numbers are given when a trainee is enrolled, in enrollment order. Certificate No.: one per enrollment. Registration No.: one per trainee per course, kept for retakes of the same course. Month First gives NWMTC102026-2291; Number First gives NWMTC2291-102026 (month and year of the day the number is given).</p>
@@ -524,7 +531,7 @@ export function AdminCertificateNumbers({ data, reload }: { data: PortalData; re
     {tab === "numbering" ? <>
       <p className="ac-note">Enter the <b>last Registration No. you already used</b> on paper. The portal continues from the next one at the moment a certificate is printed, and never reuses a number recorded under Issued Before the Portal. The Doc. No. is written on the certificate by hand.</p>
       <div className="cn-series">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Registration No.</h2><span className="muted-text">New on every certificate</span></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Registration No.</h2><span className="muted-text">For courses without their own Reg. No. in the table below</span></div>
           <div className="portal-form cx-formpad"><label>Prefix<input className="cl-mono" value={form.regPrefix} onChange={(e) => setForm({ ...form, regPrefix: e.target.value })} /></label><label>Last Number Used<input type="number" min={0} className="cl-mono" value={form.regLast} onChange={(e) => setForm({ ...form, regLast: e.target.value })} /></label><label>Digits<input type="number" min={1} max={12} value={form.regDigits} onChange={(e) => setForm({ ...form, regDigits: e.target.value })} /></label></div>
           <div className="cn-next"><span>Next certificate prints (issued this month)</span><b className="cl-mono">{nextReg}</b></div></section>
       </div>
