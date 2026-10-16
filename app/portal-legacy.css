@@ -2223,3 +2223,5 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .wt-log tr.wt-soon td{background:#eef6fd}
 .nw-shell .cl-log tr.nb-group td{background:#eef4f8;font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:#123F63}
 .nw-shell .cl-log td.nb-course{min-width:240px}
+/* Admin tables: the second line (trainee no., schedule date, reason) sits under the first. */
+.nw-shell .ad .cl-log td small{display:block;margin-top:2px;color:#5f7180;font-size:12.5px;line-height:1.35}
