@@ -2273,3 +2273,17 @@ button.rd-row:hover { background: #f6fafc; }
   .nw-shell .cl-log td small{display:block;margin-top:1px;color:#5f7180;font-size:12.5px;line-height:1.35}
   .nw-shell .cl-log td,.nw-shell .rb3-table td{line-height:1.35}
 }
+
+/* Compact forms and pop-ups (owner, 19 Oct 2026): less padding, tighter gaps, shorter fields. */
+.nw-shell .portal-modal>header{padding:14px 20px 12px}
+.nw-shell .portal-modal h2{font-size:19px;margin:0}
+.nw-shell .portal-modal>header>button{width:30px;height:30px;font-size:18px}
+.nw-shell .portal-form{gap:10px 14px;padding:14px 20px 16px}
+.nw-shell .portal-form label{font-size:13.5px;line-height:1.3}
+.nw-shell .portal-form input,.nw-shell .portal-form select,.nw-shell .portal-form textarea{font-size:14.5px;padding:7px 10px;min-height:38px;margin-top:4px}
+.nw-shell .portal-form textarea{min-height:64px}
+.nw-shell .portal-form-actions{padding-top:2px;gap:8px}
+.nw-shell .portal-form-actions button,.nw-shell .portal-form-actions a{padding:8px 14px}
+.nw-shell .portal-form .portal-form-note{margin:0;font-size:13px}
+.nw-shell .portal-field-inline select,.nw-shell .portal-field-inline input{min-height:38px;font-size:14.5px;padding:7px 10px}
+@media (max-width:680px){.nw-shell .portal-form{padding:14px 16px}.nw-shell .portal-form input,.nw-shell .portal-form select{min-height:42px}}
