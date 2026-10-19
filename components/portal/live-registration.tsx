@@ -355,10 +355,10 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
             <button type="button" className="portal-primary" onClick={() => setAssigning(t)}>Assign Course</button>
           </div>)}
         </section>}
-        <div className="portal-table portal-panel rq-table"><table><thead><tr><th>Trainee</th><th>Enrollment no.</th><th>Course and Schedule</th><th>Requirements</th><th>Payment</th><th>Status</th></tr></thead><tbody>
+        <div className="portal-table portal-panel tbl-compact"><table><thead><tr><th>Trainee</th><th>Enrollment no.</th><th>Course and Schedule</th><th>Requirements</th><th>Payment</th><th>Status</th></tr></thead><tbody>
           {pageRows.map(({ e, r }) => { const t = first(e.trainees), s = r ? stateOf(r) : { text: e.enrollment_status, tone: statusTone(e.enrollment_status) }, p = payState(e); return <tr key={e.id} className="row-clickable" onClick={() => setOpen(e)}>
-            <td><strong>{t ? fullName(t) : "Unknown"}</strong><small>{t?.trainee_number}</small>{enrollmentTypeOf(data, e) && <span className="et-chip">{enrollmentTypeOf(data, e)}</span>}</td>
-            <td><strong className="app-no-cell">{appNoOf(data, e.trainee_id) ?? e.enrollment_number}</strong><small>{appNoOf(data, e.trainee_id) ? e.enrollment_number : fmtDate(day(e.created_at))}</small></td>
+            <td><strong>{t ? fullName(t) : "Unknown"}</strong>{enrollmentTypeOf(data, e) && <span className="et-chip">{enrollmentTypeOf(data, e)}</span>}<small className="tc-mono">{t?.trainee_number}</small></td>
+            <td><strong className="app-no-cell">{appNoOf(data, e.trainee_id) ?? e.enrollment_number}</strong><small className="tc-mono">{appNoOf(data, e.trainee_id) ? e.enrollment_number : fmtDate(day(e.created_at))}</small></td>
             <td>{first(e.courses)?.name ?? "—"}<small>{scheduleOf(e)}</small></td>
             <td>{r ? <><span className={`req-count${r.missing.length ? "" : " ok"}`}>{r.verified} of {REQUIREMENTS.length}</span>{r.rejected.length > 0 && <small>Rejected: {r.rejected.join(", ")}</small>}</> : <span className="muted-text">{e.enrollment_status === "Cancelled" ? "—" : "Complete"}</span>}</td>
             <td>{r ? (r.paid ? <><strong>{pesos(r.paidCentavos)}</strong><small>Verified</small></> : <span className="muted-text">{r.handed ? "With cashier" : "Not yet"}</span>) : <><Badge tone={p.tone}>{p.text}</Badge><small>{pesos(balanceOf(e))} balance</small></>}</td>

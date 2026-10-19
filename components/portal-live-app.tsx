@@ -536,15 +536,15 @@ function Trainees({data,query,embedded,reload,role}:{data:PortalData;query:strin
         {(from||to)&&<button type="button" className="ghost-button" onClick={()=>{setFrom("");setTo("")}}>Clear</button>}
         <span className="tl-count">{rows.length} of {data.trainees.length}</span>
       </div>
-      <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Contact</th><th>Courses</th><th>Status</th><th className="num">Balance</th>{canRequest&&<th>Request</th>}<th>Registered</th></tr></thead><tbody>
+      <div className="portal-table tbl-compact"><table><thead><tr><th>Trainee</th><th>Contact</th><th>Courses</th><th>Status</th><th className="num">Balance</th>{canRequest&&<th>Request</th>}<th>Registered</th></tr></thead><tbody>
         {rows.map(t=>{const s=traineeEnrollmentStatus(data,t.id);const list=coursesOf(t.id);const bal=list.reduce((sum,e)=>sum+balanceOf(e),0);const no=data.applicationNumbers?.[t.id];return <tr key={t.id} className="row-clickable" onClick={()=>setSelId(t.id)}>
-          <td><strong>{fullName(t)}</strong><small>{no&&<span className="app-no">{no}</span>}{t.trainee_number}</small>{(()=>{const aid=list.map(e=>data.referralByEnrollment?.[e.id]).find(Boolean);const ag=aid?data.agencies.find(a=>a.id===aid):null;return ag?<span className="ref-chip">Referred by {ag.name}</span>:null})()}</td>
+          <td><strong>{fullName(t)}</strong><small>{no&&<><span className="app-no">{no}</span> · </>}<span className="tc-mono">{t.trainee_number}</span></small>{(()=>{const aid=list.map(e=>data.referralByEnrollment?.[e.id]).find(Boolean);const ag=aid?data.agencies.find(a=>a.id===aid):null;return ag?<span className="ref-chip">Referred by {ag.name}</span>:null})()}</td>
           <td><span className="lc">{t.email}</span><small>{t.mobile}</small></td>
           <td>{list.length?<>{first(list[0].courses)?.code??first(list[0].courses)?.name}{list.length>1&&<small>+{list.length-1} more</small>}</>:<span className="muted-text">None yet</span>}</td>
           <td><Badge tone={s==="Enrolled"?"green":s==="Cancelled"?"red":"orange"}>{tcl(s)}</Badge></td>
           <td className="num"><strong>{pesos(bal)}</strong></td>
           {canRequest&&<td onClick={e=>e.stopPropagation()}>{list.length?<div className="req-dd"><button type="button" className="portal-secondary req-dd-btn" aria-haspopup="menu" aria-expanded={menuFor===t.id} onClick={ev=>{const r=ev.currentTarget.getBoundingClientRect();setMenuPos({top:r.bottom+6,left:Math.max(8,Math.min(r.left,window.innerWidth-216))});setMenuFor(menuFor===t.id?null:t.id)}}>Request ▾</button>{openReqs(t.id)>0&&<small className="req-dd-open">{openReqs(t.id)} with the Cashier</small>}{menuFor===t.id&&<div className="req-dd-menu" role="menu" style={{top:menuPos.top,left:menuPos.left}}>{TRAINEE_REQUESTS.map(([type,lbl])=><button key={type} type="button" role="menuitem" onClick={()=>{setMenuFor(null);setReqFor({traineeId:t.id,type})}}>{lbl}</button>)}</div>}</div>:<span className="muted-text">—</span>}</td>}
-          <td>{t.registered_at?date(t.registered_at.slice(0,10)):"—"}</td>
+          <td className="tc-nowrap">{t.registered_at?date(t.registered_at.slice(0,10)):"—"}</td>
         </tr>})}
       </tbody></table>{!rows.length&&<p className="portal-empty-copy">No trainees match.</p>}</div>
     </section>
