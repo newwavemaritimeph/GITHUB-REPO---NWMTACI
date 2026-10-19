@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { PrintControls } from "../../admission-record/[id]/print-controls";
 
 /** The acknowledgement receipt sheets (TAR layout): original and duplicate on one legal page. */
@@ -25,7 +26,7 @@ export type ReceiptProps = {
   receiptNo: string; name: string; received: string; cashier: string; status: string;
   payment: { number: string; method: string; reference: string | null; amount: number; remarks: string | null };
   trainee: { appNo: string; srn: string | null; rank: string | null; mobile: string | null; company: string | null };
-  appliedTo: { id: string; number: string; code: string; name: string; dates: string; applied: number }[];
+  appliedTo: { id: string; number: string; code: string; name: string; dates: string; applied: number; feeApplied?: number; misc?: { label: string; amount: number }[] }[];
   totalDue: number; totalPaid: number; balance: number;
 };
 
@@ -43,7 +44,10 @@ export function ReceiptSheets({ receiptNo, name, received, cashier, status, paym
     </tbody></table>
     <div className="tar-money">
       <div><div className="tar-h">APPLIED TO</div><table className="tar-table"><thead><tr><th>Course</th><th>Training Dates</th><th className="r">Applied</th></tr></thead><tbody>
-        {appliedTo.map((r) => <tr key={r.id}><td><b>{r.name}</b> <span className="dim">({r.code} · {r.number})</span></td><td className="nw">{r.dates}</td><td className="r b">{peso(r.applied)}</td></tr>)}
+        {appliedTo.map((r) => <Fragment key={r.id}>
+          <tr><td><b>{r.name}</b> <span className="dim">({r.code} · {r.number})</span>{r.misc?.length ? <span className="dim"> · training fee</span> : null}</td><td className="nw">{r.dates}</td><td className="r b">{peso(r.misc?.length ? r.feeApplied ?? r.applied : r.applied)}</td></tr>
+          {(r.misc ?? []).map((m, i) => <tr key={i}><td colSpan={2}>Miscellaneous · {m.label}</td><td className="r b">{peso(m.amount)}</td></tr>)}
+        </Fragment>)}
         {!appliedTo.length && <tr><td colSpan={3} className="dim">Not applied to an enrollment.</td></tr>}
       </tbody></table></div>
       <div><div className="tar-pay-head"><div className="tar-h">ACCOUNT AFTER THIS PAYMENT</div><span className={`tar-stamp ${status === "FULLY PAID" ? "ok" : status === "VOID" ? "none" : "part"}`}>{status}</span></div>

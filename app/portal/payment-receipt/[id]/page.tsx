@@ -35,7 +35,7 @@ export default async function PaymentReceiptPage({ params }: { params: Promise<{
   const { id } = await params;
   const db = createSupabaseAdminClient();
 
-  const { data: payment } = await db.from("payments").select("id,payment_number,trainee_id,amount_centavos,method,receiving_account,reference_number,received_at,verification_state,valid,cashier_id,remarks").eq("id", id).maybeSingle();
+  const { data: payment } = await db.from("payments").select("id,payment_number,trainee_id,amount_centavos,method,receiving_account,reference_number,received_at,verification_state,valid,cashier_id,remarks,created_at").eq("id", id).maybeSingle();
   if (!payment) notFound();
   const [traineeRes, receiptRes, allocRes, cashierRes] = await Promise.all([
     db.from("trainees").select("trainee_number,legal_first_name,legal_middle_name,legal_last_name,suffix,srn,rank,mobile,company,application_number").eq("id", payment.trainee_id).maybeSingle(),
@@ -56,7 +56,7 @@ export default async function PaymentReceiptPage({ params }: { params: Promise<{
   // Each enrollment this payment covers, with its balance after all valid payments.
   const [enrollRes, chargeRes, paidRes] = enrollmentIds.length ? await Promise.all([
     db.from("enrollments").select("id,enrollment_number,selling_price_centavos,courses(code,name),batches(starts_on,ends_on)").in("id", enrollmentIds),
-    db.from("enrollment_charges").select("enrollment_id,amount_centavos,event_type").in("enrollment_id", enrollmentIds).eq("valid", true),
+    db.from("enrollment_charges").select("enrollment_id,description,amount_centavos,event_type,created_by,created_at").in("enrollment_id", enrollmentIds).eq("valid", true),
     db.from("payment_allocations").select("enrollment_id,amount_centavos,payments!inner(valid)").in("enrollment_id", enrollmentIds).eq("payments.valid", true),
   ]) : [{ data: [] }, { data: [] }, { data: [] }];
   const appliedTo = (enrollRes.data ?? []).map((e) => {
@@ -65,7 +65,13 @@ export default async function PaymentReceiptPage({ params }: { params: Promise<{
     const due = Number(e.selling_price_centavos) + charges.filter((x) => x.event_type !== "discount").reduce((s, x) => s + Number(x.amount_centavos), 0) - charges.filter((x) => x.event_type === "discount").reduce((s, x) => s + Number(x.amount_centavos), 0);
     const paid = (paidRes.data ?? []).filter((x) => x.enrollment_id === e.id).reduce((s, x) => s + Number(x.amount_centavos), 0);
     const applied = (allocRes.data ?? []).filter((a) => a.enrollment_id === e.id).reduce((s, a) => s + Number(a.amount_centavos), 0);
-    return { id: e.id, number: e.enrollment_number as string, code: c?.code ?? "", name: c?.name ?? "Course", dates: trainingDates(b?.starts_on, b?.ends_on), due, paid, applied, balance: Math.max(0, due - paid) };
+    // Miscellaneous items sold with this payment (owner, 19 Oct 2026): the Cashier adds them just before
+    // posting it, so they are this enrollment's charges by the same Cashier in the two minutes before.
+    const posted = Date.parse(payment.created_at as string);
+    const misc = charges.filter((x) => x.event_type === "charge" && x.created_by === payment.cashier_id && Date.parse(x.created_at as string) <= posted + 5000 && Date.parse(x.created_at as string) >= posted - 120000)
+      .map((x) => ({ label: x.description as string, amount: Number(x.amount_centavos) }));
+    const miscTotal = misc.reduce((s, m) => s + m.amount, 0);
+    return { id: e.id, number: e.enrollment_number as string, code: c?.code ?? "", name: c?.name ?? "Course", dates: trainingDates(b?.starts_on, b?.ends_on), due, paid, applied, misc: miscTotal <= applied ? misc : [], feeApplied: miscTotal <= applied ? applied - miscTotal : applied, balance: Math.max(0, due - paid) };
   });
   const totalDue = appliedTo.reduce((s, r) => s + r.due, 0), totalPaid = appliedTo.reduce((s, r) => s + r.paid, 0), balance = Math.max(0, totalDue - totalPaid);
   const status = !payment.valid ? "VOID" : totalDue > 0 && totalPaid >= totalDue ? "FULLY PAID" : "PARTIALLY PAID";
