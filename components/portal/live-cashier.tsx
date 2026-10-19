@@ -964,7 +964,7 @@ function RecordExpenseModal({ data, onClose, post }: { data: PortalData; onClose
       <label>Payee<input value={payee} onChange={(e) => setPayee(e.target.value)} /></label>
       <label>Category<select value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></label>
       <div className="full cx-lines">
-        <div className="cx-lines-head"><span>Particulars</span><span>Qty</span><span>Unit cost (PHP)</span><span>Amount</span><span /></div>
+        <div className="cx-lines-head"><span>Particulars</span><span>Qty</span><span>Unit Cost (PHP)</span><span>Amount</span><span /></div>
         {lines.map((l, i) => <div className="cx-lines-row" key={i}>
           <input aria-label={`Particulars, line ${i + 1}`} value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} />
           <input aria-label={`Quantity, line ${i + 1}`} className="cx-mono" inputMode="numeric" value={l.quantity} onChange={(e) => setLine(i, { quantity: e.target.value.replace(/\D/g, "") })} />

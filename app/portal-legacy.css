@@ -2225,3 +2225,12 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .cl-log td.nb-course{min-width:240px}
 /* Admin tables: the second line (trainee no., schedule date, reason) sits under the first. */
 .nw-shell .ad .cl-log td small{display:block;margin-top:2px;color:#5f7180;font-size:12.5px;line-height:1.35}
+/* Expense lines (Record Expense): inner padding, numbers aligned under their headings. */
+.portal-shell .portal-form .cx-lines{padding:12px 14px;gap:10px;overflow:visible;background:var(--nw-soft,#f5f8fa)}
+.portal-shell .cx-lines-head,.portal-shell .cx-lines-row{grid-template-columns:minmax(0,1fr) 76px 150px 110px 92px;gap:10px}
+.portal-shell .cx-lines-head span{font-size:13.5px;color:#405d70}
+.portal-shell .cx-lines-row input{background:#fff}
+.portal-shell .cx-lines-row input.cx-mono{text-align:right}
+.portal-shell .cx-lines-amt{font-size:15px;padding-right:2px}
+.portal-shell .cx-lines-x{width:100%}
+.portal-shell .cx-lines-foot{padding-top:10px;border-top:1px solid var(--nw-line,#dbe5ec)}
