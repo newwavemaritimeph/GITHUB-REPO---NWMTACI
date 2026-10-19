@@ -2306,3 +2306,18 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .oi-proof{color:#0571D0;font-weight:600;margin-right:8px}
 .nw-shell .oi-void{display:inline-flex;gap:6px;align-items:center}
 .nw-shell .oi-void input{border:1px solid #dbe5ec;border-radius:8px;padding:5px 8px;width:150px}
+
+/* Portal colours, Design 2 · Ocean Wave (owner, 19 Oct 2026): a blue-to-cyan top bar taken from the logo's wave,
+   white text, the active tab marked in orange, orange main buttons, light-cyan table headers. */
+.nw-shell { --nw-bg: #f2f9fc; --nw-line: #d6e9f1; --nw-soft: #e6f6fd; --nw-info-bg: #e6f6fd; }
+.nw-bar { background: linear-gradient(100deg, #0571D0 0%, #2aa6ec 60%, #35CCFA 100%); box-shadow: 0 2px 0 #9EE3F1; }
+.nw-role, .nw-user-text small { color: #e6f6fd; }
+.nw-role select, .nw-icon, .nw-account { background: #ffffff1f; border-color: #ffffff59; }
+.nw-tab > button { color: #eaf7fd; }
+.nw-tab > button:hover { background: #ffffff26; color: #fff; }
+.nw-tab.on > button { background: var(--nw-bg); color: #0571D0; box-shadow: inset 0 3px 0 #F25615; }
+.nw-shell .portal-table th { background: #e6f6fd; color: #0b4f8f; }
+.nw-shell .cl-log th, .nw-shell .rb3-table th { background: #e6f6fd; color: #0b4f8f; border-right-color: #d6e9f1; }
+.nw-shell .rb3-table th small { opacity: .8; }
+.nw-shell .tcr-all { border-color: #0b4f8f55; color: #0b4f8f; }
+.nw-shell .portal-secondary { border-color: #b9dcec; color: #0571D0; }
