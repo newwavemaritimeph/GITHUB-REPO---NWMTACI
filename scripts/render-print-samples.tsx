@@ -59,9 +59,9 @@ const tar: TarProps = {
     { id: "1", code: "UBT-PSSR", name: "Updating Training on Basic Training – PSSR", dates: "12 Oct (Mon)", time: "8:00–17:00", room: "ROOM 101", fee: 180000 },
     { id: "2", code: "PSCMT", name: "Crowd Management Training", dates: "13–14 Oct (Tue–Wed)", time: "8:00–17:00", room: "ROOM 102", fee: 130000 },
   ],
-  misc: [{ label: "T-Shirt", amount: 15000 }], discounts: [{ label: "Referral rebate (Qapla Maritime)", amount: 20000 }],
+  misc: [{ label: "Uniform", amount: 15000 }, { label: "ID Lace x 2", amount: 10000 }], discounts: [{ label: "Referral rebate (Qapla Maritime)", amount: 20000 }],
   payments: [{ id: "p1", number: "PAY-2026-001498", dateLabel: "12 Oct", method: "GCash", ref: "7012345678901", amount: 200000 }],
-  feesTotal: 310000, due: 305000, paid: 200000, balance: 105000, status: "PARTIALLY PAID", officer: "Sophia Ugadan", cashier: "Karen Mallari",
+  feesTotal: 310000, due: 315000, paid: 200000, balance: 115000, status: "PARTIALLY PAID", officer: "Sophia Ugadan", cashier: "Karen Mallari",
 };
 await printHtml("01-training-admission-record.pdf", "Training Admission Record", <TarSheets {...tar} />);
 const many = ["UBT-PSSR|Updating Training on Basic Training – PSSR", "STPPDSPPS|Ship Security Awareness", "PSCMT|Crowd Management Training", "PSCMHBT|Crisis Management and Human Behavior", "CCMD|Crisis Management – Domestic", "HPT|Hydraulic and Pneumatic Training", "SFA|Standard First Aid", "BOSH|Basic Occupational Safety and Health"]

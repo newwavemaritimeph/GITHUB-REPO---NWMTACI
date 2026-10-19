@@ -54,7 +54,7 @@ export function TarSheets(p: TarProps) {
       <div className="tar-money">
         <div><div className="tar-h">FEES</div><table className="tar-table"><tbody>
           <tr><td>Training fees ({p.courses.length} course{p.courses.length === 1 ? "" : "s"})</td><td className="r">{peso(p.feesTotal)}</td></tr>
-          {p.misc.map((m, i) => <tr key={`m${i}`}><td>Misc · {m.label}</td><td className="r">{peso(m.amount)}</td></tr>)}
+          {p.misc.map((m, i) => <tr key={`m${i}`}><td>Miscellaneous · {m.label}</td><td className="r">{peso(m.amount)}</td></tr>)}
           {p.discounts.length ? p.discounts.map((d, i) => <tr key={`d${i}`}><td>Less · {d.label}</td><td className="r">−{peso(d.amount)}</td></tr>) : <tr><td>Discounts</td><td className="r">{peso(0)}</td></tr>}
           <tr className="b"><td>Total amount due</td><td className="r">{peso(p.due)}</td></tr>
           <tr className="b"><td>Total received</td><td className="r">{peso(p.paid)}</td></tr>

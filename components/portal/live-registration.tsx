@@ -444,7 +444,7 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
       {rows.map((q) => { const ck = r.latest.get(q.code); const ticked = ck?.status === "Verified"; const note = notes[q.code] ?? ""; const needsNote = q.optional && !ticked && !note.trim();
         return <tr key={q.code} className={ticked ? "ok" : ""}>
           <td><b>{q.label}</b>{!ticked && ck?.status === "Rejected" && <small className="sc-bad">Not accepted{ck.remarks ? `: ${ck.remarks}` : ""}</small>}</td>
-          <td><label className="sc-rec"><input type="checkbox" checked={ticked} disabled={busy || needsNote} onChange={() => { if (ticked) { if (q.optional) check(q.code, "Rejected", q.label, "Removed"); else { setUnticking(q.code); setRemarks(""); } } else check(q.code, "Verified", q.label, note.trim() || undefined); }} />{ticked ? "Received" : q.optional ? "Optional" : "Not yet"}</label></td>
+          <td><label className="sc-rec"><input type="checkbox" checked={ticked} disabled={busy || needsNote} onChange={() => { if (ticked) { if (q.optional) check(q.code, "Rejected", q.label, "Removed"); else { setUnticking(q.code); setRemarks(""); } } else check(q.code, "Verified", q.label, note.trim() || undefined); }} />{q.optional && !ticked ? "Optional" : "Received"}</label></td>
           <td>{ticked ? <span className="sc-note">{ck?.remarks || "—"}</span>
             : unticking === q.code ? null
             : <input className="sc-input" value={note} onChange={(ev) => setNotes((n) => ({ ...n, [q.code]: ev.target.value }))} placeholder={q.optional ? "What is it? e.g. COP for BT-PSSR" : q.code === "valid_id" ? "e.g. Passport, expires 2030" : q.code === "medical_peme" ? "Clinic and date" : "Optional"} aria-label={`Remarks for ${q.label}`} />}
