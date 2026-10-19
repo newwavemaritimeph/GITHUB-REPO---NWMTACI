@@ -30,6 +30,9 @@ export async function buildExpenseVoucher(db: Admin, id: string, options: { prin
   const x = (extra ?? {}) as { voucher_number?: string | null; request_number?: string | null; approved_at?: string | null; released_at?: string | null; released_by?: string | null; payment_channel?: string | null; reference_number?: string | null; drive_file_id?: string | null };
   const { data: lineData } = await db.from("expenses").select("line_items,supporting_document").eq("id", id).maybeSingle();
   const l = (lineData ?? {}) as { line_items?: ExpenseVoucherLine[] | null; supporting_document?: string | null };
+  // Receipt photos (202610190044); ignored before it.
+  const { data: receiptData } = await db.from("expenses").select("receipt_files").eq("id", id).maybeSingle();
+  const receiptCount = Array.isArray((receiptData as { receipt_files?: unknown[] } | null)?.receipt_files) ? (receiptData as { receipt_files: unknown[] }).receipt_files.length : 0;
   if (data.status !== "Approved" && data.status !== "Paid" && data.status !== "Void") return null;
   const requester = one(data.requester as { complete_name: string } | { complete_name: string }[] | null)?.complete_name ?? "";
   const approver = one(data.approver as { complete_name: string } | { complete_name: string }[] | null)?.complete_name ?? "";
@@ -44,7 +47,7 @@ export async function buildExpenseVoucher(db: Admin, id: string, options: { prin
     amountCentavos: Number(data.amount_centavos),
     lines: Array.isArray(l.line_items) ? l.line_items : [],
     paymentChannel: x.payment_channel ?? "", referenceNumber: x.reference_number ?? "",
-    supportingDocument: l.supporting_document ?? "",
+    supportingDocument: l.supporting_document || (receiptCount ? `${receiptCount} receipt photo${receiptCount === 1 ? "" : "s"} attached (Google Drive)` : ""),
     requestedBy: requester, modeOfPayment: x.payment_channel ?? "", status: data.status === "Void" ? "VOID" : released ? "Released" : "Approved",
     preparedBy: requester, preparedAt: `Cashier · ${fmt(data.created_at)}`,
     approvedBy: approver, approvedAt: `Accounting Manager · ${fmt(x.approved_at)}`,

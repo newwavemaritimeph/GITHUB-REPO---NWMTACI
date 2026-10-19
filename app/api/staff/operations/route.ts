@@ -94,6 +94,8 @@ const payableInput = z.object({ action: z.literal("payable-save"), id: z.string(
 const expenseCreateInput = z.object({ action: z.literal("expense-create"), payee: z.string().trim().min(1).max(120), category: z.string().trim().min(1).max(80), amountCentavos: z.number().int().positive(), purpose: z.string().trim().min(1).max(300), paymentChannel: z.string().trim().max(40).optional().default(""), referenceNumber: z.string().trim().max(80).optional().default(""),
   // Voucher lines (202610080019): particulars, quantity and unit cost; they must add up to the amount.
   lines: z.array(z.object({ description: z.string().trim().min(1).max(160), quantity: z.number().int().min(1).max(9999), unitCentavos: z.number().int().positive() })).max(10).optional().default([]),
+  // Receipt photos filed in Google Drive (202610190044), required (owner, 19 Oct 2026).
+  receiptFiles: z.array(z.object({ fileId: z.string().trim().min(5).max(200), link: z.string().url().max(500).refine((u) => /^https:\/\/(drive|docs)\.google\.com\//.test(u), "Receipt links must be Google Drive links."), name: z.string().trim().max(255), mime: z.string().trim().max(80) })).max(10).optional().default([]),
   supportingDocument: z.string().trim().max(160).optional().default("") });
 const expenseDecideInput = z.object({ action: z.literal("expense-decide"), id: z.string().uuid(), decision: z.enum(["Approved", "Rejected", "Paid"]), remarks: z.string().trim().max(300).optional() });
 // The Cashier releases an approved voucher (cash or transfer) and marks it paid.
@@ -756,9 +758,12 @@ export async function GET() {
     // Voucher lines and supporting document (202610080019); who approved and released (202610070018). Ignored before them.
     const { data: lines } = await db.from("expenses").select("id,line_items,supporting_document").in("id", ex.map((r) => (r as { id: string }).id));
     const linesById = new Map((lines ?? []).map((r) => [(r as { id: string }).id, r]));
+    // Receipt photos (202610190044); ignored before it.
+    const { data: receipts } = await db.from("expenses").select("id,receipt_files").in("id", ex.map((r) => (r as { id: string }).id));
+    const receiptsById = new Map((receipts ?? []).map((r) => [(r as { id: string }).id, r]));
     const { data: people2 } = await db.from("expenses").select("id,approved_by,released_by").in("id", ex.map((r) => (r as { id: string }).id));
     const peopleById = new Map((people2 ?? []).map((r) => [(r as { id: string }).id, r]));
-    const rows = ex.map((r) => ({ ...r, ...(flowById.get((r as { id: string }).id) ?? {}), ...(printsById.get((r as { id: string }).id) ?? {}), ...(linesById.get((r as { id: string }).id) ?? {}), ...(peopleById.get((r as { id: string }).id) ?? {}) })) as { id: string }[];
+    const rows = ex.map((r) => ({ ...r, ...(flowById.get((r as { id: string }).id) ?? {}), ...(printsById.get((r as { id: string }).id) ?? {}), ...(linesById.get((r as { id: string }).id) ?? {}), ...(receiptsById.get((r as { id: string }).id) ?? {}), ...(peopleById.get((r as { id: string }).id) ?? {}) })) as { id: string }[];
     // Display names for who raised, approved and released each voucher.
     const ids = [...new Set(rows.flatMap((r) => { const x = r as { requested_by?: string; approved_by?: string; released_by?: string }; return [x.requested_by, x.approved_by, x.released_by]; }).filter(Boolean))] as string[];
     if (!ids.length) return { rows, names: new Map<string, string>() };
@@ -1234,6 +1239,8 @@ export async function POST(request: Request) {
     }
     if (input.action === "expense-create") {
       if (!staff.roleCodes.some((role) => ["admin", "accounting", "cashier"].includes(role))) return NextResponse.json({ error: "Your account cannot raise expense vouchers." }, { status: 403 });
+      if (!input.receiptFiles.length) return NextResponse.json({ error: "Attach at least one receipt photo." }, { status: 400 });
+      { const probe = await createSupabaseAdminClient().from("expenses").select("receipt_files").limit(1); if (probe.error) return NextResponse.json({ error: "Apply database update 202610190044 first. The receipt photos are already in Google Drive." }, { status: 400 }); }
       if (input.lines.length && input.lines.reduce((sum, line) => sum + line.quantity * line.unitCentavos, 0) !== input.amountCentavos) return NextResponse.json({ error: "The lines do not add up to the total amount." }, { status: 400 });
       const admin = createSupabaseAdminClient();
       // A request number now; the voucher number (CV) is issued when the Accounting Manager approves.
@@ -1247,7 +1254,8 @@ export async function POST(request: Request) {
         await admin.from("expenses").update({ payment_channel: input.paymentChannel || null, reference_number: input.referenceNumber || null }).eq("id", created.id);
       }
       await admin.from("expenses").update({ request_number: expenseNumber }).eq("id", created.id); // 202610070018; ignored before it
-      if (input.lines.length || input.supportingDocument) await admin.from("expenses").update({ line_items: input.lines, supporting_document: input.supportingDocument || null }).eq("id", created.id); // 202610080019; ignored before it
+      if (input.lines.length || input.supportingDocument) await admin.from("expenses").update({ line_items: input.lines, supporting_document: input.supportingDocument || null }).eq("id", created.id);
+      { const { error: receiptError } = await admin.from("expenses").update({ receipt_files: input.receiptFiles }).eq("id", created.id); if (receiptError) throw receiptError; } // 202610080019; ignored before it
       return NextResponse.json({ ok: true, number: expenseNumber });
     }
     if (input.action === "expense-decide") {

@@ -678,7 +678,8 @@ export function CashierSummaryReport({ embedded }: { data?: PortalData; embedded
 
 /* ====================================================== Expenses (Oct 2026) */
 
-type ExpenseRow = PortalData["expenses"][number] & { purpose?: string; payment_channel?: string | null; reference_number?: string | null; request_number?: string | null; voucher_number?: string | null; approved_at?: string | null; decision_remarks?: string | null; released_at?: string | null; paid_at?: string | null; drive_link?: string | null; print_count?: number | null; reprints_approved?: number | null; line_items?: { description: string; quantity: number; unitCentavos: number }[] | null; supporting_document?: string | null; requested_by_name?: string | null; approved_by_name?: string | null; released_by_name?: string | null };
+type ReceiptFile = { fileId: string; link: string; name: string; mime: string };
+type ExpenseRow = PortalData["expenses"][number] & { receipt_files?: ReceiptFile[] | null; purpose?: string; payment_channel?: string | null; reference_number?: string | null; request_number?: string | null; voucher_number?: string | null; approved_at?: string | null; decision_remarks?: string | null; released_at?: string | null; paid_at?: string | null; drive_link?: string | null; print_count?: number | null; reprints_approved?: number | null; line_items?: { description: string; quantity: number; unitCentavos: number }[] | null; supporting_document?: string | null; requested_by_name?: string | null; approved_by_name?: string | null; released_by_name?: string | null };
 type ReprintRow = NonNullable<PortalData["expenseReprints"]>[number];
 export const EXPENSE_STATUSES = ["All", "For approval", "Approved", "Released", "Rejected"] as const;
 export const expenseState = (e: { status: string }) => (e.status === "Pending" ? "For approval" : e.status === "Paid" ? "Released" : e.status);
@@ -755,7 +756,7 @@ function VoucherDrawer({ e, reprints, isManager, onClose, onRelease, onRequestRe
         <dl className="vx-kv">
           <div><dt>Payee</dt><dd>{e.payee}</dd></div><div><dt>Category</dt><dd>{e.category}</dd></div>
           <div><dt>Date issued</dt><dd>{fmtDate(day(e.approved_at ?? e.created_at))}</dd></div><div><dt>Request no.</dt><dd className="cx-mono">{e.request_number ?? "—"}</dd></div>
-          <div><dt>Mode of payment</dt><dd>{e.payment_channel || "—"}{e.reference_number ? ` · ${e.reference_number}` : ""}</dd></div><div><dt>Supporting document</dt><dd>{e.supporting_document || "—"}</dd></div>
+          <div><dt>Mode of payment</dt><dd>{e.payment_channel || "—"}{e.reference_number ? ` · ${e.reference_number}` : ""}</dd></div><div><dt>Receipts</dt><dd>{e.receipt_files?.length ? <ReceiptLinks files={e.receipt_files} /> : "—"}</dd></div><div><dt>Supporting document</dt><dd>{e.supporting_document || "—"}</dd></div>
         </dl>
         <div className="vx-lines"><table><thead><tr><th>Particulars</th><th className="r">Qty</th><th className="r">Amount</th></tr></thead><tbody>
           {lines.map((l, i) => <tr key={i}><td>{l.description}</td><td className="r cx-mono">{l.quantity}</td><td className="r cx-mono">{pesos2(l.quantity * l.unitCentavos)}</td></tr>)}
@@ -943,6 +944,21 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   </div>;
 }
 
+/** Receipt links that open in Google Drive. */
+function ReceiptLinks({ files }: { files: ReceiptFile[] }) {
+  return <span className="cx-receipt-links">{files.map((f, i) => <a key={f.fileId} href={f.link} target="_blank" rel="noreferrer">Receipt {i + 1}</a>)}</span>;
+}
+/** Phone photos over 4 MB are scaled down (longest side 2000 px, JPEG) so they fit the upload limit. */
+async function shrinkPhoto(file: File): Promise<File> {
+  if (file.size <= 4 * 1024 * 1024 || !file.type.startsWith("image/")) return file;
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext("2d")!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+  return blob ? new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }) : file;
+}
 const isInstructorCategory = (name: string) => /^instructors?$/i.test(name.trim());
 const expenseChannels = (data: PortalData) => { const all = data.paymentMethods.filter((m) => m.active); const payable = all.filter((m) => m.kind === "payable"); return (payable.length ? payable : all).map((m) => m.name); };
 
@@ -964,7 +980,27 @@ function RecordExpenseModal({ data, onClose, post }: { data: PortalData; onClose
   const instructor = isInstructorCategory(category);
   const [amount, setAmount] = useState(""), [note, setNote] = useState("");
   const single = toCentavos(amount);
-  const ready = !!payee.trim() && !!category && (instructor ? single > 0 : linesOk && total > 0);
+  // Receipt photos (owner, 19 Oct 2026): required; each is filed in Google Drive as soon as it is picked.
+  const [receipts, setReceipts] = useState<(ReceiptFile & { key: string })[]>([]);
+  const [uploading, setUploading] = useState<{ key: string; name: string; error?: string }[]>([]);
+  async function attach(files: FileList | null) {
+    for (const original of Array.from(files ?? []).slice(0, Math.max(0, 10 - receipts.length))) {
+      const key = `${Date.now()}-${original.name}`;
+      setUploading((u) => [...u, { key, name: original.name }]);
+      try {
+        const file = await shrinkPhoto(original);
+        const form = new FormData(); form.set("file", file); form.set("payee", payee);
+        const r = await fetch("/api/staff/expense-receipts", { method: "POST", body: form });
+        const b = await r.json();
+        if (!r.ok) throw new Error(b.error ?? "Could not upload the receipt.");
+        setReceipts((all) => [...all, { ...(b as ReceiptFile), key }]);
+        setUploading((u) => u.filter((x) => x.key !== key));
+      } catch (e) {
+        setUploading((u) => u.map((x) => (x.key === key ? { ...x, error: e instanceof Error ? e.message : "Could not upload the receipt." } : x)));
+      }
+    }
+  }
+  const ready = !!payee.trim() && !!category && (instructor ? single > 0 : linesOk && total > 0) && receipts.length > 0 && !uploading.some((u) => !u.error);
   const purpose = instructor ? (note.trim() || "Instructor's fee").slice(0, 300) : filled.map((l) => l.description).join("; ").slice(0, 300);
   return <Modal title="Record Expense" onClose={onClose}>
     <div className="portal-form">
@@ -989,9 +1025,17 @@ function RecordExpenseModal({ data, onClose, post }: { data: PortalData; onClose
       </div>}
       <label>Payment Channel<select value={channel} onChange={(e) => setChannel(e.target.value)}>{channels.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
       <label>Receipt or Reference Number<input value={reference} onChange={(e) => setReference(e.target.value)} /></label>
-      <label className="full">Supporting Document<input placeholder="e.g. Meralco bill and official receipt" value={supporting} onChange={(e) => setSupporting(e.target.value)} /></label>
+      <div className="full cx-receipts">
+        <label className="cx-receipts-pick">Receipt Photos (Required)<input type="file" accept="image/*,application/pdf" multiple onChange={(e) => { void attach(e.target.files); e.target.value = ""; }} disabled={receipts.length >= 10} /></label>
+        {(receipts.length > 0 || uploading.length > 0) && <ul>
+          {receipts.map((f) => <li key={f.key}><a href={f.link} target="_blank" rel="noreferrer">✓ {f.name}</a><button type="button" className="portal-secondary" onClick={() => setReceipts((all) => all.filter((x) => x.key !== f.key))}>Remove</button></li>)}
+          {uploading.map((u) => <li key={u.key} className={u.error ? "err" : ""}><span>{u.error ? `${u.name}: ${u.error}` : `Uploading ${u.name}…`}</span>{u.error && <button type="button" className="portal-secondary" onClick={() => setUploading((all) => all.filter((x) => x.key !== u.key))}>Dismiss</button>}</li>)}
+        </ul>}
+        <small>A photo or screenshot of the receipt or bill, e.g. a Shopee order receipt. Saved in Google Drive for Accounting.</small>
+      </div>
+      <label className="full">Supporting Document (Optional Note)<input placeholder="e.g. Meralco bill and official receipt" value={supporting} onChange={(e) => setSupporting(e.target.value)} /></label>
       {!categories.length && <p className="portal-form-note full">The Accounting Manager adds expense categories in Configuration.</p>}
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!ready} onClick={() => void post({ action: "expense-create", payee: payee.trim(), category, amountCentavos: instructor ? single : total, purpose, lines: instructor ? [] : filled, paymentChannel: channel, referenceNumber: reference.trim(), supportingDocument: supporting.trim() }, "Expense recorded and sent for approval.").then(onClose).catch(() => undefined)}>Send for Approval</button></div>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!ready} onClick={() => void post({ action: "expense-create", payee: payee.trim(), category, amountCentavos: instructor ? single : total, purpose, lines: instructor ? [] : filled, receiptFiles: receipts.map((f) => ({ fileId: f.fileId, link: f.link, name: f.name, mime: f.mime })), paymentChannel: channel, referenceNumber: reference.trim(), supportingDocument: supporting.trim() }, "Expense recorded and sent for approval.").then(onClose).catch(() => undefined)}>Send for Approval</button></div>
     </div>
   </Modal>;
 }

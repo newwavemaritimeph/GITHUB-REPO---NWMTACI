@@ -2234,3 +2234,15 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .cx-lines-amt{font-size:15px;padding-right:2px}
 .portal-shell .cx-lines-x{width:100%}
 .portal-shell .cx-lines-foot{padding-top:10px;border-top:1px solid var(--nw-line,#dbe5ec)}
+/* Receipt photos on expenses (owner, 19 Oct 2026). */
+.portal-shell .cx-receipts{display:flex;flex-direction:column;gap:8px;border:1px dashed #9fb6c6;border-radius:12px;padding:12px 14px;background:#f7fafc}
+.portal-shell .cx-receipts-pick{display:flex;flex-direction:column;gap:6px;font-weight:600}
+.portal-shell .cx-receipts small{color:#5f7180;font-size:13px}
+.portal-shell .cx-receipts ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.portal-shell .cx-receipts li{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px}
+.portal-shell .cx-receipts li a{color:#0a7a3e;font-weight:600;word-break:break-all}
+.portal-shell .cx-receipts li.err span{color:#b42318}
+.portal-shell .cx-receipts li button{padding:4px 10px;font-size:13px}
+.portal-shell .cx-receipt-links,.portal-shell .ap-receipts{display:flex;gap:10px;flex-wrap:wrap}
+.portal-shell .cx-receipt-links a,.portal-shell .ap-receipts a{color:#0571D0;font-weight:600}
+.portal-shell .ap-receipts.none{color:#b4480f}

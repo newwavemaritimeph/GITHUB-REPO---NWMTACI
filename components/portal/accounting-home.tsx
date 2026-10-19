@@ -43,7 +43,13 @@ function useJson<T>(url: string | null) {
 
 type Category = "Expense requests" | "Requisitions" | "Voucher reprints" | "Refunds" | "Discounts" | "Rebates owed to partners" | "Cashier closings";
 const CATEGORY_GROUPS: [string, Category[]][] = [["Money out", ["Expense requests", "Requisitions", "Voucher reprints", "Refunds"]], ["Fees", ["Discounts", "Rebates owed to partners"]], ["Cash control", ["Cashier closings"]]];
-type Row = { id: string; title: string; detail: string; ref: string; who: string; when: string; amount: number; act: (approve: boolean, remarks?: string) => Promise<unknown>; okLabel: string; canReject: boolean };
+/** Receipt photos the Cashier attached (owner, 19 Oct 2026), opened in Google Drive. */
+function ApprovalReceipts({ files }: { files: { fileId: string; link: string }[] }) {
+  return files.length
+    ? <small className="ap-receipts">{files.map((f, i) => <a key={f.fileId} href={f.link} target="_blank" rel="noreferrer" onClick={(ev) => ev.stopPropagation()}>Receipt {i + 1}</a>)}</small>
+    : <small className="ap-receipts none">No receipt photo</small>;
+}
+type Row = { id: string; title: string; detail: string; receipts?: { fileId: string; link: string }[]; ref: string; who: string; when: string; amount: number; act: (approve: boolean, remarks?: string) => Promise<unknown>; okLabel: string; canReject: boolean };
 
 /**
  * Approvals by category (owner, 8 Oct 2026): money out (expense requests,
@@ -61,8 +67,8 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
   const [bulk, setBulk] = useState("");
   const [doneNote, setDoneNote] = useState("");
   const name = (t: { legal_first_name: string; legal_last_name: string } | null) => (t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : "Trainee");
-  const expenses = (data.expenses as (PortalData["expenses"][number] & { purpose?: string; payment_channel?: string | null; request_number?: string | null; requested_by_name?: string | null; line_items?: unknown[] | null })[])
-    .filter((e) => e.status === "Pending").map((e): Row => ({ id: e.id, title: `${e.payee} · ${e.category}`, detail: [e.purpose, Array.isArray(e.line_items) && e.line_items.length ? `${e.line_items.length} line${e.line_items.length === 1 ? "" : "s"}` : "", e.payment_channel].filter(Boolean).join(" · "), ref: e.request_number ?? e.expense_number, who: e.requested_by_name ?? "Cashier", when: fmtDate(day(e.created_at)), amount: Number(e.amount_centavos), okLabel: "Approve", canReject: true,
+  const expenses = (data.expenses as (PortalData["expenses"][number] & { purpose?: string; payment_channel?: string | null; request_number?: string | null; requested_by_name?: string | null; line_items?: unknown[] | null; receipt_files?: { fileId: string; link: string }[] | null })[])
+    .filter((e) => e.status === "Pending").map((e): Row => ({ id: e.id, receipts: e.receipt_files ?? [], title: `${e.payee} · ${e.category}`, detail: [e.purpose, Array.isArray(e.line_items) && e.line_items.length ? `${e.line_items.length} line${e.line_items.length === 1 ? "" : "s"}` : "", e.payment_channel].filter(Boolean).join(" · "), ref: e.request_number ?? e.expense_number, who: e.requested_by_name ?? "Cashier", when: fmtDate(day(e.created_at)), amount: Number(e.amount_centavos), okLabel: "Approve", canReject: true,
       act: (approve, remarks) => post({ action: "expense-decide", id: e.id, decision: approve ? "Approved" : "Rejected", remarks }, approve ? "Approved. The voucher number is issued." : "Rejected.") }));
   const byExpense = new Map((data.expenses as { id: string; payee: string; amount_centavos: number; voucher_number?: string | null; expense_number: string }[]).map((e) => [e.id, e]));
   const reprints = (data.expenseReprints ?? []).filter((r) => r.status === "Pending").map((r): Row => { const e = byExpense.get(r.expense_id); return { id: r.id, title: `${e?.voucher_number ?? e?.expense_number ?? "Voucher"} · ${e?.payee ?? ""}`, detail: `Reason: ${r.reason}`, ref: "Reprint", who: r.requested_by_name ?? "Cashier", when: fmtDate(day(r.requested_at)), amount: Number(e?.amount_centavos ?? 0), okLabel: "Approve", canReject: true,
@@ -87,7 +93,7 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
   const waiting = Object.values(lists).reduce((s, l) => s + l.length, 0);
   const rowsOf = (list: Row[]) => list.map((r) => <div key={r.id} className={rejecting && rejecting !== r.id ? "ac-dim" : undefined}>
     <div className={`ac-req${rejecting === r.id ? " ac-rejecting" : ""}`}>
-      <div><strong>{r.title}</strong>{r.detail && <small>{r.detail}</small>}<small className="cx-mono">{[r.ref, r.who, r.when].filter(Boolean).join(" · ")}</small></div>
+      <div><strong>{r.title}</strong>{r.detail && <small>{r.detail}</small>}{r.receipts && <ApprovalReceipts files={r.receipts} />}<small className="cx-mono">{[r.ref, r.who, r.when].filter(Boolean).join(" · ")}</small></div>
       <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{pesos2(r.amount)}</strong>
       {rejecting === r.id ? <span className="ac-rejlabel">Rejecting</span> : <div className="cx-acts"><button type="button" className="portal-primary" disabled={busy || !!rejecting} onClick={() => void r.act(true).catch(() => undefined)}>{r.okLabel}</button>{r.canReject && <button type="button" className="portal-secondary" disabled={busy || !!rejecting} onClick={() => setRejecting(r.id)}>Reject</button>}</div>}
     </div>
@@ -139,7 +145,7 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
         {lists[k].map((r) => <div key={r.id} className={rejecting && rejecting !== r.id ? "ac-dim" : undefined}>
           <div className={`ac-crow${rejecting === r.id ? " ac-rejecting" : ""}`}>
             <input type="checkbox" id={`ap-${r.id}`} checked={picked.has(r.id)} disabled={!!bulk} onChange={() => toggle(r.id)} aria-label={`Select ${r.title}`} />
-            <label htmlFor={`ap-${r.id}`}><strong>{r.title}</strong>{r.detail && <small>{r.detail}</small>}<small className="cx-mono">{[r.ref, r.who, r.when].filter(Boolean).join(" · ")}</small></label>
+            <label htmlFor={`ap-${r.id}`}><strong>{r.title}</strong>{r.detail && <small>{r.detail}</small>}{r.receipts && <ApprovalReceipts files={r.receipts} />}<small className="cx-mono">{[r.ref, r.who, r.when].filter(Boolean).join(" · ")}</small></label>
             <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{pesos2(r.amount)}</strong>
             {rejecting === r.id ? <span className="ac-rejlabel">Rejecting</span> : <div className="cx-acts">{r.canReject && <button type="button" className="portal-secondary" disabled={busy || !!rejecting || !!bulk} onClick={() => setRejecting(r.id)}>Reject</button>}<button type="button" className="portal-primary" disabled={busy || !!rejecting || !!bulk} onClick={() => void r.act(true).then(() => setPicked((p) => { const n = new Set(p); n.delete(r.id); return n; })).catch(() => undefined)}>{r.okLabel}</button></div>}
           </div>
