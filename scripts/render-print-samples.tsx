@@ -73,10 +73,10 @@ await printHtml("02-training-admission-record-multi-course.pdf", "Training Admis
 // ---- Acknowledgement receipt -----------------------------------------------------
 const receipt: ReceiptProps = {
   receiptNo: "AR-2026-001198", name: "GARCIA, LIZA MARIE", received: "Oct 12, 2026, 9:30 AM", cashier: "Karen Mallari", status: "PARTIALLY PAID",
-  payment: { number: "PAY-2026-001498", method: "PSBank", reference: "PSB-55120931", amount: 50000, remarks: null },
+  payment: { number: "PAY-2026-001498", method: "PSBank", reference: "PSB-55120931", amount: 75000, remarks: null },
   trainee: { appNo: "NWMTACI-0000409", srn: "SRN-2001983", rank: "Ordinary Seaman", mobile: "0917 100 2004", company: null },
-  appliedTo: [{ id: "e5", number: "ENR-2026-000862", code: "UBT-PSSR", name: "Updating Training on Basic Training – PSSR", dates: "12 Oct", applied: 50000 }],
-  totalDue: 180000, totalPaid: 50000, balance: 130000,
+  appliedTo: [{ id: "e5", number: "ENR-2026-000862", code: "UBT-PSSR", name: "Updating Training on Basic Training – PSSR", dates: "12 Oct", applied: 75000, feeApplied: 50000, misc: [{ label: "Uniform", amount: 15000 }, { label: "ID Lace x 2", amount: 10000 }] }],
+  totalDue: 205000, totalPaid: 75000, balance: 130000,
 };
 await printHtml("03-acknowledgement-receipt.pdf", "Acknowledgement Receipt", <ReceiptSheets {...receipt} />);
 
