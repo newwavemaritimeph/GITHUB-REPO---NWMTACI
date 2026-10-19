@@ -2258,3 +2258,18 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .tbl-compact .et-chip,.portal-shell .tbl-compact .ref-chip{display:inline-block;margin:0 0 0 6px;padding:0 7px;border-radius:99px;background:#eef4f8;color:#5f7180;font-size:11px;font-weight:600;line-height:1.6;white-space:nowrap;vertical-align:1px}
 .portal-shell .tbl-compact .tc-nowrap{white-space:nowrap}
 .portal-shell .tbl-compact .req-dd-btn{padding:4px 10px;font-size:13px}
+
+/* Design 1 · Compact on every portal table (owner, 19 Oct 2026): tighter rows, the first column's name on one
+   line, second lines small and grey, NWMTACI no. inline in orange mono, tags small and beside the name.
+   Wider screens only: phones keep their card layout. */
+@media (min-width:641px){
+  .nw-shell .portal-table th{padding:9px 12px}
+  .nw-shell .portal-table td{padding:9px 12px;line-height:1.35;font-size:14.5px}
+  .nw-shell .portal-table td small{font-size:12.5px;margin-top:1px;line-height:1.35}
+  .nw-shell .portal-table td:first-child strong{white-space:nowrap}
+  .nw-shell .portal-table td .app-no{display:inline;background:none;padding:0;margin:0 4px 0 0;color:#F25615;font-family:var(--font-geist-mono),monospace;font-weight:600}
+  .nw-shell .portal-table .et-chip,.nw-shell .portal-table .ref-chip{display:inline-block;margin:0 0 0 6px;padding:0 7px;border-radius:99px;font-size:11px;font-weight:600;line-height:1.6;white-space:nowrap;vertical-align:1px}
+  .nw-shell .portal-table .req-dd-btn{padding:4px 10px;font-size:13px}
+  .nw-shell .cl-log td small{display:block;margin-top:1px;color:#5f7180;font-size:12.5px;line-height:1.35}
+  .nw-shell .cl-log td,.nw-shell .rb3-table td{line-height:1.35}
+}
