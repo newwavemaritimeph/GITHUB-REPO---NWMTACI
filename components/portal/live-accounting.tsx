@@ -1564,14 +1564,13 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
     <div className="cx-head"><div><span className="portal-eyebrow">Configuration</span><h1>{tcl(section)}</h1></div></div>
     {error && <div className="portal-message error">{error}</div>}
     {/* One list for both (owner, 8 Oct 2026): the Cashier and expenses use the same channels. */}
-    {section === "Payment channels" && <>
-      <SetupList title="Training Payments and Expense Payments" description="" entityLabel="payment channel" canManage busy={busy}
-        fields={[{ key: "name", label: "Channel name" }, { key: "requiresReference", label: "Requires a reference number", type: "checkbox" }]}
-        rows={data.paymentMethods.map((c) => ({ id: c.id, primary: c.name, secondary: `${c.requires_reference ? "Reference required" : "No reference"} · training and expenses`, active: c.active, values: { name: c.name, requiresReference: c.requires_reference } }))}
-        onSubmit={(v, id) => post({ action: "channel-save", id, name: String(v.name), requiresReference: Boolean(v.requiresReference), allowsProof: true, kind: "receivable" })}
-        onArchive={(id, active, name) => void post({ action: "channel-save", id, name, active: !active }).catch(() => undefined)}
-        onRemove={(id) => void post({ action: "config-remove", entity: "channel", id }).catch(() => undefined)} removable />
-    </>}
+    {section === "Payment channels" && <ConfigMatrix title="Payment Channels" entity="channel" busy={busy}
+      cols={[{ key: "name", label: "Channel", kind: "text", placeholder: "e.g. GCash" }, { key: "ref", label: "Reference Number", kind: "select", options: [["yes", "Required"], ["no", "Not Needed"]] }]}
+      rows={data.paymentMethods.map((c) => ({ id: c.id, active: c.active, values: { name: c.name, ref: c.requires_reference ? "yes" : "no" } }))}
+      onSave={(r) => post({ action: "channel-save", id: r.id, name: r.values.name.trim(), requiresReference: r.values.ref === "yes", allowsProof: true, active: r.active })}
+      onAdd={(v) => post({ action: "channel-save", name: v.name.trim(), requiresReference: v.ref === "yes", allowsProof: true, kind: "receivable" })}
+      onRemove={(r) => post({ action: "config-remove", entity: "channel", id: r.id })}
+      note="One list for training payments and expense payments. A channel that needs a reference number also needs a proof of payment when the Cashier records it." />}
     {section === "Partners" && <PartnersModule data={data} busy={busy} post={post} />}
     {section === "Expense categories" && <ConfigMatrix title="Expense Categories" entity="category" busy={busy}
       cols={[{ key: "name", label: "Category", kind: "text", placeholder: "e.g. Office Supplies" }]}
@@ -1589,11 +1588,12 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
       onRemove={(r) => post({ action: "config-remove", entity: "charge", id: r.id })}
       note="Miscellaneous items (e.g. Uniform, ID Lace) are added to a payment in Record Payment and print on the receipt and TAR. Service fees (e.g. Reprinting, Cancellation, Rescheduling, Make-up Class) are charged through Requests. A blank price is typed when charging." />}
     {/* Items the Admin Assistant can request (owner, 9 Oct 2026). */}
-    {section === "Requisition items" && <SetupList title="Requisition Items" description="" entityLabel="item" canManage busy={busy}
-      fields={[{ key: "name", label: "Item name" }, { key: "unit", label: "Unit", placeholder: "pc, box, pack of 50" }, { key: "cost", label: "Default cost (₱)", type: "number" }]}
-      rows={((data as unknown as { requisitionItems?: { id: string; name: string; unit: string; default_cost_centavos: number; active: boolean }[] }).requisitionItems ?? []).map((i) => ({ id: i.id, primary: i.name, secondary: `${i.unit} · ₱${(i.default_cost_centavos / 100).toFixed(2)}${i.active ? "" : " · Archived"}`, active: i.active, values: { name: i.name, unit: i.unit, cost: (i.default_cost_centavos / 100).toFixed(2) } }))}
-      onSubmit={(v, id) => post({ action: "requisition-item-save", id, name: String(v.name), unit: String(v.unit || "pc"), defaultCostCentavos: Math.round(Number(v.cost || 0) * 100) })}
-      onArchive={(id, active, name) => void post({ action: "requisition-item-save", id, name, active: !active }).catch(() => undefined)}
-      onRemove={(id) => void post({ action: "requisition-item-save", id, name: "x", remove: true }).catch(() => undefined)} removable />}
+    {section === "Requisition items" && <ConfigMatrix title="Requisition Items" entity="item" busy={busy}
+      cols={[{ key: "name", label: "Item", kind: "text", placeholder: "e.g. Coffee Cups" }, { key: "unit", label: "Unit", kind: "text", placeholder: "pc, box, pack of 50" }, { key: "cost", label: "Default Cost (PHP)", kind: "money" }]}
+      rows={((data as unknown as { requisitionItems?: { id: string; name: string; unit: string; default_cost_centavos: number; active: boolean }[] }).requisitionItems ?? []).map((i) => ({ id: i.id, active: i.active, values: { name: i.name, unit: i.unit || "pc", cost: Number(i.default_cost_centavos) ? (Number(i.default_cost_centavos) / 100).toFixed(2) : "" } }))}
+      onSave={(r) => post({ action: "requisition-item-save", id: r.id, name: r.values.name.trim(), unit: r.values.unit.trim() || "pc", defaultCostCentavos: Math.round((Number(r.values.cost) || 0) * 100), active: r.active })}
+      onAdd={(v) => post({ action: "requisition-item-save", name: v.name.trim(), unit: v.unit.trim() || "pc", defaultCostCentavos: Math.round((Number(v.cost) || 0) * 100) })}
+      onRemove={(r) => post({ action: "requisition-item-save", id: r.id, name: "x", remove: true })}
+      note="Items the Admin Assistant can request. The default cost fills in on a new requisition and can be changed there." />}
   </div>;
 }
