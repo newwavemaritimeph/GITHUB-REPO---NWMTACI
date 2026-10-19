@@ -943,10 +943,13 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   </div>;
 }
 
+const isInstructorCategory = (name: string) => /^instructors?$/i.test(name.trim());
 const expenseChannels = (data: PortalData) => { const all = data.paymentMethods.filter((m) => m.active); const payable = all.filter((m) => m.kind === "payable"); return (payable.length ? payable : all).map((m) => m.name); };
 
 function RecordExpenseModal({ data, onClose, post }: { data: PortalData; onClose: () => void; post: (body: Record<string, unknown>, ok?: string) => Promise<Record<string, unknown>> }) {
-  const categories = data.expenseCategories.filter((c) => c.active);
+  // "Instructors" is always offered (owner, 19 Oct 2026), even before it is added in Configuration.
+  const active = data.expenseCategories.filter((c) => c.active);
+  const categories = active.some((c) => isInstructorCategory(c.name)) ? active : [...active, { id: "instructors", name: "Instructors", active: true }];
   const channels = expenseChannels(data);
   const [payee, setPayee] = useState(""), [category, setCategory] = useState(categories[0]?.name ?? "");
   const [channel, setChannel] = useState(channels[0] ?? "Cash"), [reference, setReference] = useState(""), [supporting, setSupporting] = useState("");
@@ -957,13 +960,20 @@ function RecordExpenseModal({ data, onClose, post }: { data: PortalData; onClose
   const filled = parsed.filter((l) => l.description || l.unitCentavos > 0);
   const total = filled.reduce((s, l) => s + l.quantity * l.unitCentavos, 0);
   const linesOk = filled.length > 0 && filled.every((l) => l.description && l.quantity > 0 && l.unitCentavos > 0);
-  const ready = !!payee.trim() && !!category && linesOk && total > 0;
-  const purpose = filled.map((l) => l.description).join("; ").slice(0, 300);
+  // Instructors: no line items, just the payee and one amount.
+  const instructor = isInstructorCategory(category);
+  const [amount, setAmount] = useState(""), [note, setNote] = useState("");
+  const single = toCentavos(amount);
+  const ready = !!payee.trim() && !!category && (instructor ? single > 0 : linesOk && total > 0);
+  const purpose = instructor ? (note.trim() || "Instructor's fee").slice(0, 300) : filled.map((l) => l.description).join("; ").slice(0, 300);
   return <Modal title="Record Expense" onClose={onClose}>
     <div className="portal-form">
       <label>Payee<input value={payee} onChange={(e) => setPayee(e.target.value)} /></label>
       <label>Category<select value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></label>
-      <div className="full cx-lines">
+      {instructor ? <>
+        <label>Amount (PHP)<input className="cx-mono" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" /></label>
+        <label>Purpose<input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Instructor's fee, BT-PSSR Oct 12" /></label>
+      </> : <div className="full cx-lines">
         <div className="cx-lines-head"><span>Particulars</span><span>Qty</span><span>Unit Cost (PHP)</span><span>Amount</span><span /></div>
         {lines.map((l, i) => <div className="cx-lines-row" key={i}>
           <input aria-label={`Particulars, line ${i + 1}`} value={l.description} onChange={(e) => setLine(i, { description: e.target.value })} />
@@ -976,12 +986,12 @@ function RecordExpenseModal({ data, onClose, post }: { data: PortalData; onClose
           <button type="button" className="portal-secondary" disabled={lines.length >= 10} onClick={() => setLines((all) => [...all, { description: "", quantity: "1", unit: "" }])}>Add Line</button>
           <span>Total <b className="cx-mono">{pesos(total)}</b></span>
         </div>
-      </div>
+      </div>}
       <label>Payment Channel<select value={channel} onChange={(e) => setChannel(e.target.value)}>{channels.map((c) => <option key={c} value={c}>{c}</option>)}</select></label>
       <label>Receipt or Reference Number<input value={reference} onChange={(e) => setReference(e.target.value)} /></label>
       <label className="full">Supporting Document<input placeholder="e.g. Meralco bill and official receipt" value={supporting} onChange={(e) => setSupporting(e.target.value)} /></label>
       {!categories.length && <p className="portal-form-note full">The Accounting Manager adds expense categories in Configuration.</p>}
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!ready} onClick={() => void post({ action: "expense-create", payee: payee.trim(), category, amountCentavos: total, purpose, lines: filled, paymentChannel: channel, referenceNumber: reference.trim(), supportingDocument: supporting.trim() }, "Expense recorded and sent for approval.").then(onClose).catch(() => undefined)}>Send for Approval</button></div>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!ready} onClick={() => void post({ action: "expense-create", payee: payee.trim(), category, amountCentavos: instructor ? single : total, purpose, lines: instructor ? [] : filled, paymentChannel: channel, referenceNumber: reference.trim(), supportingDocument: supporting.trim() }, "Expense recorded and sent for approval.").then(onClose).catch(() => undefined)}>Send for Approval</button></div>
     </div>
   </Modal>;
 }
