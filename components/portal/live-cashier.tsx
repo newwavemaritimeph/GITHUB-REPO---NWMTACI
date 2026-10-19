@@ -668,6 +668,11 @@ export function CashierSummaryReport({ embedded }: { data?: PortalData; embedded
         </div>; }) : <p className="portal-empty-copy">No collections on this day.</p>}
       </section>
 
+      {(shown.otherIncome ?? []).length > 0 && <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Other Income</h2><span className="cx-mono">{shown.otherIncome!.length} receipt{shown.otherIncome!.length === 1 ? "" : "s"} · {pesos(shown.otherIncome!.reduce((t, i) => t + i.amountCentavos, 0))}</span></div>
+        <div className="portal-table cx-cards"><table><thead><tr><th>Income no.</th><th>Source</th><th>Received From</th><th>Channel</th><th>Reference</th><th className="r">Amount</th></tr></thead><tbody>
+          {shown.otherIncome!.map((i) => <tr key={i.number}><td data-l="" className="lead"><span className="cx-name cx-mono">{i.number}</span></td><td data-l="Source">{i.source}</td><td data-l="Received from">{i.payer}</td><td data-l="Channel">{i.channel}</td><td data-l="Reference" className="cx-mono">{i.reference || "—"}</td><td data-l="Amount" className="r cx-mono">{pesos(i.amountCentavos)}</td></tr>)}
+        </tbody></table></div></section>}
+
       <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Expenses</h2><span className="cx-mono">{shown.expenses.length} voucher{shown.expenses.length === 1 ? "" : "s"} · {pesos(expTotal)}</span></div>
         {shown.expenses.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Voucher no.</th><th>Payee</th><th>Category</th><th>Channel</th><th>Reference</th><th className="r">Amount</th></tr></thead><tbody>
           {shown.expenses.map((e, i) => <tr key={`${e.voucher}-${i}`}><td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher}</span></td><td data-l="Payee">{e.payee}</td><td data-l="Category">{e.category}</td><td data-l="Channel">{e.channel || "—"}</td><td data-l="Reference" className="cx-mono">{e.reference || "—"}</td><td data-l="Amount" className="r cx-amt">{pesos(e.amountCentavos)}</td></tr>)}
@@ -951,7 +956,7 @@ function ReceiptLinks({ files }: { files: ReceiptFile[] }) {
   return <span className="cx-receipt-links">{files.map((f, i) => <a key={f.fileId} href={f.link} target="_blank" rel="noreferrer">Receipt {i + 1}</a>)}</span>;
 }
 /** Phone photos over 4 MB are scaled down (longest side 2000 px, JPEG) so they fit the upload limit. */
-async function shrinkPhoto(file: File): Promise<File> {
+export async function shrinkPhoto(file: File): Promise<File> {
   if (file.size <= 4 * 1024 * 1024 || !file.type.startsWith("image/")) return file;
   const bitmap = await createImageBitmap(file);
   const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));

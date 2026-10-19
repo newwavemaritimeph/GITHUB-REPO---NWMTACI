@@ -27,12 +27,15 @@ export async function POST(request: Request) {
     if (file.size <= 0 || file.size > 4 * 1024 * 1024) return NextResponse.json({ error: "Each receipt file must be smaller than 4 MB." }, { status: 400 });
     if (!googleConfigured()) return NextResponse.json({ error: "Google is not set up yet. Add the Google keys in Vercel, then connect Google." }, { status: 400 });
     const payee = String(form.get("payee") ?? "").normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[\/\\:*?"<>|]+/g, " ").replace(/\s+/g, " ").trim().toUpperCase().slice(0, 60) || "EXPENSE";
+    // folder=income files proofs of other income (19 Oct 2026) under Expense Vouchers / Other Income.
+    const income = form.get("folder") === "income";
+    const sub = income ? { key: "income", name: "Other Income" } : { key: "receipts", name: "Receipts" };
     const date = manilaDate(new Date().toISOString());
     const [year, month] = date.split("-");
     const filed = await fileInDrive(createSupabaseAdminClient(), {
       rootKey: VOUCHER_ROOT.key, rootName: VOUCHER_ROOT.name,
-      folders: [{ key: `${VOUCHER_ROOT.key}/receipts`, name: "Receipts" }, { key: `${VOUCHER_ROOT.key}/receipts/${year}-${month}`, name: `${year}-${month} ${MONTHS[Number(month) - 1]}` }],
-      base: `${date} ${payee} - receipt`, ext, mime: file.type, bytes: new Uint8Array(await file.arrayBuffer()),
+      folders: [{ key: `${VOUCHER_ROOT.key}/${sub.key}`, name: sub.name }, { key: `${VOUCHER_ROOT.key}/${sub.key}/${year}-${month}`, name: `${year}-${month} ${MONTHS[Number(month) - 1]}` }],
+      base: `${date} ${payee} - ${income ? "proof" : "receipt"}`, ext, mime: file.type, bytes: new Uint8Array(await file.arrayBuffer()),
     });
     return NextResponse.json({ fileId: filed.fileId, link: filed.link, name: filed.path.split(" / ").pop() ?? file.name, mime: file.type });
   } catch (error) {

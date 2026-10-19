@@ -112,6 +112,10 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
   const expenseByChannel = new Map<string, number>();
   for (const e of expenses) expenseByChannel.set(e.channel || "Not set", (expenseByChannel.get(e.channel || "Not set") ?? 0) + e.amountCentavos);
 
+  // Other income received that day (202610190045; none before it).
+  const { data: incRows } = await db.from("other_income").select("income_number,source,payer,channel,reference,amount_centavos").eq("received_on", date).is("voided_at", null).order("created_at", { ascending: true });
+  const otherIncome = (incRows ?? []).map((i) => ({ number: i.income_number as string, source: i.source as string, payer: i.payer as string, channel: i.channel as string, reference: (i.reference as string | null) ?? "", amountCentavos: Number(i.amount_centavos) }));
+
   // Cash position: the last counted closing before today, else today's opening.
   const { data: prevClosing } = await db.from("cashier_closings").select("closing_date,actual_cash_centavos").lt("closing_date", date).not("actual_cash_centavos", "is", null).order("closing_date", { ascending: false }).limit(20);
   const lastDate = prevClosing?.[0]?.closing_date as string | undefined;
@@ -127,7 +131,7 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
   const counted = (todayClosing ?? []).filter((c) => c.actual_cash_centavos != null);
   const position = cashPosition({
     previousCentavos,
-    cashCollectedCentavos: rows.filter((r) => r.channel === "Cash").reduce((s, r) => s + r.amountCentavos, 0),
+    cashCollectedCentavos: rows.filter((r) => r.channel === "Cash").reduce((s, r) => s + r.amountCentavos, 0) + otherIncome.filter((i) => i.channel === "Cash").reduce((s, i) => s + i.amountCentavos, 0),
     cashExpensesCentavos: expenses.filter((e) => e.channel === "Cash").reduce((s, e) => s + e.amountCentavos, 0),
     countedCentavos: counted.length ? counted.reduce((s, c) => s + Number(c.actual_cash_centavos), 0) : null,
   });
@@ -141,5 +145,6 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
     groups: groups.map((g) => ({ kind: g.kind, name: g.name, subtotalCentavos: g.subtotalCentavos, rows: g.rows.map((r) => ({ receipt: r.receipt, time: r.time, trainee: r.trainee, course: r.course, channel: r.channel, reference: r.reference, amountCentavos: r.amountCentavos, proof: r.proof })) })),
     expenses,
     expenseTotals: [...expenseByChannel].map(([channel, totalCentavos]) => ({ channel, totalCentavos })),
+    otherIncome,
   };
 }

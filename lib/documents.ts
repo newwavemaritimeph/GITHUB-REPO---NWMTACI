@@ -1158,6 +1158,8 @@ export type CashierReportSnapshot = {
   groups: { kind: string; name: string; rows: { receipt: string; time: string; trainee: string; course: string; channel: string; reference: string; amountCentavos: number; proof?: boolean }[]; subtotalCentavos: number }[];
   expenses: { voucher: string; payee: string; category: string; channel: string; reference: string; status: string; amountCentavos: number }[];
   expenseTotals: { channel: string; totalCentavos: number }[];
+  /** Other income received that day (202610190045): endorsement rebates, rental, etc. */
+  otherIncome?: { number: string; source: string; payer: string; channel: string; reference: string; amountCentavos: number }[];
 };
 
 /**
@@ -1293,6 +1295,18 @@ export async function createCashierReportPdf(s: CashierReportSnapshot) {
     y -= 15;
     tableHead(dCols);
     for (const r of g.rows) { ensure(14, () => tableHead(dCols)); tableRow(dCols, [r.receipt, r.time, r.trainee, r.course, r.channel, r.reference || "-", money(r.amountCentavos)]); }
+    y -= 6;
+  }
+
+  // Other income (19 Oct 2026), apart from trainee fees.
+  const inc = s.otherIncome ?? [];
+  if (inc.length) {
+    const incTotal = inc.reduce((t, i) => t + i.amountCentavos, 0);
+    section("Other Income", `${inc.length} receipt${inc.length === 1 ? "" : "s"}  |  PHP ${money(incTotal)}`);
+    const iCols: Col[] = [{ label: "Income no.", w: 0.15, font: mono }, { label: "Source", w: 0.17 }, { label: "Received from", w: 0.3 }, { label: "Channel", w: 0.1 }, { label: "Reference", w: 0.13, font: mono }, { label: "Amount", w: 0.15, align: "right", font: mono }];
+    tableHead(iCols);
+    for (const i of inc) { ensure(14, () => tableHead(iCols)); tableRow(iCols, [i.number, i.source, i.payer, i.channel, i.reference || "-", money(i.amountCentavos)]); }
+    tableRow(iCols, ["Total", "", "", "", "", money(incTotal)], { bold: true, fill: true });
     y -= 6;
   }
 

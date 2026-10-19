@@ -31,9 +31,10 @@ import { AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignme
 import { pesos, pesos2, first, dueCentavos, balanceOf, isUnpaid, manilaToday, addDays } from "@/lib/portal-format";
 import { tcl } from "@/lib/title-case";
 import { CompletionRecords } from "./portal/completion-records";
+import { OtherIncome } from "./portal/other-income";
 import { AdminHome, AdminSearchTrainee, AdminEnrollments, AdminVouchers, AdminHolidays } from "./portal/admin-home";
 
-type Module = "Dashboard" | "Waiting" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Requisitions" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "MISMO dashboard" | "Completion records" | AccountingConfigSection;
+type Module = "Dashboard" | "Waiting" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Requisitions" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "MISMO dashboard" | "Completion records" | "Other income" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -131,9 +132,9 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // Cashier (Accounting Officer), owner's menu of 7 Oct 2026, shown as top tabs:
   // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses,
   // Report (with opening and closing), Requests (CASHIER_TABS).
-  cashier: ["Dashboard","Search trainee","Payments","Expenses","Report","Requests"],
+  cashier: ["Dashboard","Search trainee","Payments","Other income","Expenses","Report","Requests"],
   // Accounting Manager (owner, 8 Oct 2026): five tabs — Dashboard · Approvals · Transactions ▾ · Reports · Configuration ▾ (ACCOUNTING_TABS).
-  accounting: ["Dashboard","Approvals","Reports","Payments","Expenses","Receivables","Payables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
+  accounting: ["Dashboard","Approvals","Reports","Payments","Other income","Expenses","Receivables","Payables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
 };
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
@@ -146,7 +147,7 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Receivables",icon:"◷",roles:["accounting"],group:"Collections"},{label:"For payment",icon:"⇥",roles:["cashier"],group:"Collections"},{label:"Payments",icon:"₱",roles:["cashier","accounting"],group:"Collections"},
   {label:"Approvals",icon:"✓",roles:["accounting"],group:"Approvals"},
   {label:"Payables",icon:"▦",roles:["accounting"],group:"Payables & cash"},{label:"Cash position",icon:"◈",roles:["accounting"],group:"Payables & cash"},
-  {label:"Cashier closing",icon:"⚖",roles:["cashier","accounting"],group:"Cashier control"},
+  {label:"Cashier closing",icon:"⚖",roles:["cashier","accounting"],group:"Cashier control"},{label:"Other income",icon:"₱",roles:["cashier","accounting"],group:"Accounting"},
   // Cashier workspace (7 Oct 2026); the top tabs come from CASHIER_TABS.
   {label:"Report",icon:"∑",roles:["cashier"],group:"Accounting"},
   {label:"HR & payroll",icon:"♙",roles:["admin"],group:"People"},{label:"MyHr",icon:"☺",group:"People"},
@@ -171,13 +172,13 @@ type TopTab={label:string;items:Module[]};
 const CASHIER_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
   {label:"Enrollments",items:["Search trainee"]},
-  {label:"Accounting",items:["Payments","Expenses","Report","Requests"]},
+  {label:"Accounting",items:["Payments","Other income","Expenses","Report","Requests"]},
 ];
 const GROUP_LABELS:Partial<Record<NavGroup,string>>={"Payables & cash":"Payables and cash"};
 const ACCOUNTING_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
   {label:"Approvals",items:["Approvals"]},
-  {label:"Transactions",items:["Payments","Expenses","Receivables","Payables","Cash position"]},
+  {label:"Transactions",items:["Payments","Other income","Expenses","Receivables","Payables","Cash position"]},
   {label:"Reports",items:["Reports"]},
   {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS]},
 ];
@@ -358,6 +359,8 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   // A role mid-rebuild only renders modules on its allow-list. Without this the
   // old workspace would still paint even though the sidebar is empty.
   if(modules&&!modules.includes(active))return <RebuildingWorkspace/>;
+  // Other income (owner, 19 Oct 2026): endorsement rebates and other income; the Cashier records, Accounting views, the Admin voids.
+  if(active==="Other income")return <OtherIncome data={data} reload={reload} canRecord={["cashier","admin"].includes(gateRole)} canVoid={data.roles.includes("admin")}/>;
   // Training Completion and Record of Assessment Report (owner, 9 Oct 2026): MISMO Compliance Officer and Admin.
   if(active==="Completion records"&&["mismo_officer","admin"].includes(gateRole))return <CompletionRecords/>;
   if(active==="Dashboard"&&gateRole==="registration")return <RegistrationDashboard data={data} go={m=>go(m as Module)}/>;

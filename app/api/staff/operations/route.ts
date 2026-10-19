@@ -87,6 +87,10 @@ const inventoryItemInput = z.object({ action: z.literal("inventory-item-save"), 
 const inventoryMoveInput = z.object({ action: z.literal("inventory-move"), itemId: z.string().uuid(), movementType: z.enum(["in", "out"]), quantity: z.number().int().positive(), remarks: z.string().trim().max(240).optional() });
 // Rebates per Agency, Design 3 (owner, 9 Oct 2026): every partner's % for In-House courses and fixed STCW amounts, saved together.
 const partnerRebatesInput = z.object({ action: z.literal("partner-rebates-save"), rows: z.array(z.object({ agencyId: z.string().uuid(), percent: z.number().gt(0).max(100).nullable(), mode: z.enum(["Deducted", "No deduction"]), stcw: z.array(z.object({ courseId: z.string().uuid(), cents: z.number().int().min(0) })).max(10), details: z.object({ name: z.string().trim().min(2).max(120), kind: z.enum(["Agency", "Consultancy"]), contactName: z.string().trim().max(120), email: z.string().trim().email().or(z.literal("")), mobile: z.string().trim().max(40), active: z.boolean() }).optional() })).min(1).max(200) });
+// Other income (owner, 19 Oct 2026; migration 202610190045).
+const incomeProof = z.object({ fileId: z.string().trim().min(5).max(200), link: z.string().url().max(500).refine((u) => /^https:\/\/(drive|docs)\.google\.com\//.test(u), "Proof links must be Google Drive links."), name: z.string().trim().max(255), mime: z.string().trim().max(80) });
+const incomeRecordInput = z.object({ action: z.literal("income-record"), source: z.string().trim().min(2).max(60), partnerCenterId: z.string().uuid().nullable().optional(), payer: z.string().trim().min(2).max(160), amountCentavos: z.number().int().positive(), channel: z.string().trim().min(2).max(40), reference: z.string().trim().max(80).optional().default(""), receivedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), notes: z.string().trim().max(300).optional().default(""), proofFiles: z.array(incomeProof).min(1, "Attach the proof photo.").max(10), enrollmentIds: z.array(z.string().uuid()).max(200).optional().default([]) });
+const incomeVoidInput = z.object({ action: z.literal("income-void"), id: z.string().uuid(), reason: z.string().trim().min(5, "Enter the reason (at least 5 characters).").max(500) });
 const agencyCodeInput = z.object({ action: z.literal("agency-code-regenerate"), id: z.string().uuid() });
 const agencyInput = z.object({ action: z.literal("agency-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), kind: z.enum(["Agency", "Consultancy"]).optional(), rebateMode: z.enum(["Deducted", "No deduction"]).optional(), rebatePercent: z.number().gt(0).max(100).nullable().optional(), contactName: z.string().trim().max(120).optional(), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
 const payableMarkPaidInput = z.object({ action: z.literal("payable-mark-paid"), id: z.string().uuid() });
@@ -245,7 +249,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -990,6 +994,17 @@ export async function GET() {
     const h = await createSupabaseAdminClient().from("holidays").select("holiday_date,name,kind,marina_status,marina_note,updated_at").order("holiday_date");
     holidays = h.error ? [] : h.data ?? [];
   }
+  // Other income (migration 202610190045; empty without it): Cashier, Accounting and Admin.
+  let otherIncome: unknown[] = [], rebatesReceived: Record<string, string> = {};
+  if (canCashier(staff.roleCodes)) {
+    const admin = createSupabaseAdminClient();
+    const [inc, links] = await Promise.all([
+      admin.from("other_income").select("id,income_number,source,partner_center_id,payer,amount_centavos,channel,reference,received_on,notes,proof_files,created_at,void_reason,voided_at,partner_centers(name)").order("received_on", { ascending: false }).order("created_at", { ascending: false }).limit(300),
+      admin.from("other_income_rebates").select("enrollment_id,other_income(income_number)").limit(5000),
+    ]);
+    otherIncome = inc.error ? [] : inc.data ?? [];
+    if (!links.error) for (const l of links.data ?? []) rebatesReceived[l.enrollment_id as string] = first(l.other_income as unknown as { income_number: string } | null)?.income_number ?? "Received";
+  }
   const extrasByEnrollment = new Map(enrollmentExtras.map((row) => [row.id, row]));
   const enrollments = (enrollmentsResult.data ?? []).map((row) => {
     const extra = extrasByEnrollment.get(row.id);
@@ -1042,7 +1057,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, certificatePhotos: certs.photos, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, deliveryRequests, requisitions, requisitionItems, instructors, accreditations, batchResources, certificateNumberSettings, legacyCertificates, holidays }, { headers: { "Cache-Control": "no-store" } });
+    agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, deliveryRequests, requisitions, requisitionItems, instructors, accreditations, batchResources, certificateNumberSettings, legacyCertificates, holidays, otherIncome, rebatesReceived }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /**
@@ -1148,6 +1163,52 @@ export async function POST(request: Request) {
       const { data, error } = await db.rpc("record_inventory_movement", { target_item: input.itemId, target_type: input.movementType, target_quantity: input.quantity, target_remarks: input.remarks ?? null });
       if (error) throw error;
       return NextResponse.json({ ok: true, item: data });
+    }
+    if (input.action === "income-record") {
+      if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Only the Cashier, Accounting or the Admin records income." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const rebate = input.enrollmentIds.length > 0;
+      if (input.channel !== "Cash" && !input.reference.trim()) return NextResponse.json({ error: "Enter the reference number." }, { status: 400 });
+      // Endorsement rebates: endorsed enrollments of one partner center, not received before.
+      let rebateRows: { id: string; rebate: number }[] = [];
+      if (rebate) {
+        const { data: ens, error: enError } = await admin.from("enrollments").select("id,rebate_centavos,enrollment_status,partner_offer_id,partner_course_offers(partner_center_id)").in("id", input.enrollmentIds);
+        if (enError) throw enError;
+        const bad = (ens ?? []).find((e) => !e.partner_offer_id || e.enrollment_status === "Cancelled");
+        if (bad || (ens ?? []).length !== input.enrollmentIds.length) return NextResponse.json({ error: "Only endorsed enrollments that are not cancelled can be marked as rebate received." }, { status: 400 });
+        const centers = new Set((ens ?? []).map((e) => (first(e.partner_course_offers as unknown as { partner_center_id: string } | null))?.partner_center_id));
+        if (centers.size !== 1 || (input.partnerCenterId && !centers.has(input.partnerCenterId))) return NextResponse.json({ error: "Record one partner center at a time." }, { status: 400 });
+        const { data: taken, error: takenError } = await admin.from("other_income_rebates").select("enrollment_id").in("enrollment_id", input.enrollmentIds);
+        if (takenError) return NextResponse.json({ error: /other_income/i.test(takenError.message) ? "Apply database update 202610190045 first. The proof photo is already in Google Drive." : takenError.message }, { status: 400 });
+        if ((taken ?? []).length) return NextResponse.json({ error: "Some of these rebates were already recorded as received. Reload the page." }, { status: 400 });
+        rebateRows = (ens ?? []).map((e) => ({ id: e.id as string, rebate: Number(e.rebate_centavos ?? 0) }));
+      }
+      const year = Number(input.receivedOn.slice(0, 4));
+      const { data: number, error: numberError } = await admin.rpc("next_reference", { prefix: "INC", requested_year: year });
+      if (numberError || !number) throw numberError ?? new Error("Could not number the income.");
+      const center = rebate ? (await admin.from("enrollments").select("partner_course_offers(partner_center_id)").eq("id", input.enrollmentIds[0]).maybeSingle()).data : null;
+      const partnerCenterId = input.partnerCenterId ?? (first((center?.partner_course_offers ?? null) as unknown as { partner_center_id: string } | null)?.partner_center_id ?? null);
+      const { data: row, error } = await admin.from("other_income").insert({ income_number: number, source: rebate ? "Endorsement Rebate" : input.source, partner_center_id: partnerCenterId, payer: input.payer, amount_centavos: input.amountCentavos, channel: input.channel, reference: input.reference || null, received_on: input.receivedOn, notes: input.notes || null, proof_files: input.proofFiles, recorded_by: staff.user.id }).select("id").single();
+      if (error) return NextResponse.json({ error: /other_income/i.test(error.message) ? "Apply database update 202610190045 first. The proof photo is already in Google Drive." : error.message }, { status: 400 });
+      if (rebateRows.length) {
+        const { error: linkError } = await admin.from("other_income_rebates").insert(rebateRows.map((r) => ({ income_id: row.id, enrollment_id: r.id, amount_centavos: r.rebate })));
+        if (linkError) { await admin.from("other_income").delete().eq("id", row.id); return NextResponse.json({ error: linkError.message }, { status: 400 }); }
+      }
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("cashier") ? "cashier" : staff.roleCodes[0] ?? null, action: "income.recorded", record_type: "other_income", record_id: row.id, new_values: { income_number: number, source: rebate ? "Endorsement Rebate" : input.source, payer: input.payer, amount_centavos: input.amountCentavos, channel: input.channel, enrollments: input.enrollmentIds } });
+      return NextResponse.json({ ok: true, incomeNumber: number });
+    }
+    if (input.action === "income-void") {
+      if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin can void income." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: prior } = await admin.from("other_income").select("id,income_number,amount_centavos,voided_at").eq("id", input.id).maybeSingle();
+      if (!prior) return NextResponse.json({ error: "Income not found." }, { status: 404 });
+      if (prior.voided_at) return NextResponse.json({ error: "This income is already void." }, { status: 400 });
+      const { error } = await admin.from("other_income").update({ void_reason: input.reason, voided_by: staff.user.id, voided_at: new Date().toISOString() }).eq("id", input.id).is("voided_at", null);
+      if (error) throw error;
+      // The covered rebates become due again.
+      await admin.from("other_income_rebates").delete().eq("income_id", input.id);
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: "income.voided", record_type: "other_income", record_id: input.id, prior_values: prior, reason: input.reason });
+      return NextResponse.json({ ok: true });
     }
     if (input.action === "partner-rebates-save") {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or the Admin can set rebates." }, { status: 403 });
@@ -1508,7 +1569,10 @@ export async function POST(request: Request) {
       const { data: dayExpenses } = await admin.from("expenses").select("amount_centavos").eq("status", "Paid").gte("paid_at", start).lte("paid_at", end);
       const expensesTotal = (dayExpenses ?? []).reduce((s, e) => s + Number(e.amount_centavos), 0);
       const refunds = 0;
-      const expected = input.openingCashCentavos + cash - expensesTotal - refunds;
+      // Cash other income (202610190045) is in the drawer too; ignored before it.
+      const { data: dayIncome } = await admin.from("other_income").select("amount_centavos,channel").is("voided_at", null).eq("received_on", input.closingDate);
+      const incomeCash = (dayIncome ?? []).filter((i) => i.channel === "Cash").reduce((s, i) => s + Number(i.amount_centavos), 0);
+      const expected = input.openingCashCentavos + cash + incomeCash - expensesTotal - refunds;
       const variance = input.actualCashCentavos - expected;
       const { error } = await admin.from("cashier_closings").insert({ cashier_id: staff.user.id, closing_date: input.closingDate, opening_cash_centavos: input.openingCashCentavos, cash_collections_centavos: cash, online_collections_centavos: online, refunds_centavos: refunds, expenses_centavos: expensesTotal, expected_cash_centavos: expected, actual_cash_centavos: input.actualCashCentavos, variance_centavos: variance, status: "Submitted", submitted_at: new Date().toISOString(), remarks: input.remarks || null });
       if (error) throw error;

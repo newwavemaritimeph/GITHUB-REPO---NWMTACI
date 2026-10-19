@@ -2292,3 +2292,17 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .rb3-table td.cm-acts{white-space:nowrap}
 .nw-shell .rb3-table .cm-acts .pm-link+.pm-link,.nw-shell .rb3-table .cm-acts .pm-ask{margin-left:12px}
 .nw-shell .rb3-table .cm-remove{color:#b42318}
+/* Other Income (owner, 19 Oct 2026). */
+.nw-shell .oi-partner-head{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 16px;background:#eef4f8;border-top:1px solid #dbe5ec;flex-wrap:wrap}
+.nw-shell .oi-partner .portal-table{margin:0;border-radius:0;border:0}
+.nw-shell .portal-table tr.oi-sel td{background:#e2effb}
+.nw-shell .portal-table tr.oi-done td{opacity:.65}
+.nw-shell .oi-form{border-top:1px solid #dbe5ec;padding:12px 0 4px}
+.nw-shell .oi-form h3{margin:0 20px 10px;font-size:15px}
+.nw-shell .oi-form .oi-wide{grid-column:1/-1}
+.nw-shell .oi-warn{margin:0 20px 8px;color:#b4480f;font-size:13px}
+.nw-shell .oi-err{margin:0 20px 8px;color:#b42318;font-weight:600;font-size:13.5px}
+.nw-shell .oi-err-inline{color:#b42318}
+.nw-shell .oi-proof{color:#0571D0;font-weight:600;margin-right:8px}
+.nw-shell .oi-void{display:inline-flex;gap:6px;align-items:center}
+.nw-shell .oi-void input{border:1px solid #dbe5ec;border-radius:8px;padding:5px 8px;width:150px}
