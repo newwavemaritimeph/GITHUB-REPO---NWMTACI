@@ -2227,7 +2227,7 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .ad .cl-log td small{display:block;margin-top:2px;color:#5f7180;font-size:12.5px;line-height:1.35}
 /* Expense lines (Record Expense): inner padding, numbers aligned under their headings. */
 .portal-shell .portal-form .cx-lines{padding:12px 14px;gap:10px;overflow:visible;background:var(--nw-soft,#f5f8fa)}
-.portal-shell .cx-lines-head,.portal-shell .cx-lines-row{grid-template-columns:minmax(0,1fr) 76px 150px 110px 92px;gap:10px}
+@media (min-width:641px){.portal-shell .cx-lines-head,.portal-shell .cx-lines-row{grid-template-columns:minmax(0,1fr) 76px 150px 110px 92px;gap:10px}}
 .portal-shell .cx-lines-head span{font-size:13.5px;color:#405d70}
 .portal-shell .cx-lines-row input{background:#fff}
 .portal-shell .cx-lines-row input.cx-mono{text-align:right}
