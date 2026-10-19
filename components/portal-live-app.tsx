@@ -127,7 +127,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   hr: [],
   // Admin (owner, 9 Oct 2026): Dashboard · Search Trainee · Enrollments · Resource Planning ·
   // Configuration ▾ · Requests · Reports ▾ · MISMO ▾ (ADMIN_TABS). Requisitions opens from the dashboard.
-  admin: ["Dashboard","Search trainee","Enrollments","Resource planning","Employee accounts","Instructors","Classrooms","Certifications","Partners","Holidays","Requests","Daily summary report","MISMO dashboard","Final list","Submissions","Completion records","Requisitions"],
+  admin: ["Dashboard","Search trainee","Enrollments","Resource planning","Employee accounts","Instructors","Classrooms","Certifications","Partners","Schedule of fees","Holidays","Requests","Daily summary report","MISMO dashboard","Final list","Submissions","Completion records","Requisitions"],
   // Cashier (Accounting Officer), owner's menu of 7 Oct 2026, shown as top tabs:
   // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses,
   // Report (with opening and closing), Requests (CASHIER_TABS).
@@ -187,7 +187,7 @@ const ADMIN_TABS:TopTab[]=[
   {label:"Search trainee",items:["Search trainee"]},
   {label:"Enrollments",items:["Enrollments"]},
   {label:"Resource planning",items:["Resource planning"]},
-  {label:"Configuration",items:["Employee accounts","Instructors","Classrooms","Certifications","Partners","Holidays"]},
+  {label:"Configuration",items:["Employee accounts","Instructors","Classrooms","Certifications","Partners","Schedule of fees","Holidays"]},
   {label:"Requests",items:["Requests"]},
   {label:"Reports",items:["Daily summary report"]},
   {label:"MISMO",items:["MISMO dashboard","Final list","Submissions","Completion records"]},

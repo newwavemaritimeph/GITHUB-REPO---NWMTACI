@@ -362,6 +362,8 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
           <div className="portal-form">
             <label>Charge<select value={pick} onChange={(ev) => setPick(ev.target.value)}><option value="">Select a Charge</option>
               <option value="uniform">Uniform · {pesos(uniformPrice)}</option>
+              {/* Other miscellaneous items in Configuration › Schedule of Fees (19 Oct 2026). */}
+              {catalog.filter((c) => c.kind === "item" && c.id !== uniform?.id && !/uniform/i.test(c.name) && Number(c.default_amount_centavos) > 0).map((c) => <option key={c.id} value={c.id}>{c.name} · {pesos(Number(c.default_amount_centavos))}</option>)}
               <option value="other">Others</option></select></label>
             <label>For Course<select value={forEnrollment} onChange={(ev) => setForEnrollment(ev.target.value)}>{mine.map((e) => <option key={e.id} value={e.id}>{courseCode(e)} · {e.enrollment_number}</option>)}</select></label>
             {pick === "other" && <><label>What is it?<input value={otherName} onChange={(ev) => setOtherName(ev.target.value)} /></label><label>Amount (PHP)<input className="cx-mono" inputMode="decimal" value={otherAmount} onChange={(ev) => setOtherAmount(ev.target.value)} /></label></>}

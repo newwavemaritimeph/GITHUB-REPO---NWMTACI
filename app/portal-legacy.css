@@ -2287,3 +2287,8 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .portal-form .portal-form-note{margin:0;font-size:13px}
 .nw-shell .portal-field-inline select,.nw-shell .portal-field-inline input{min-height:38px;font-size:14.5px;padding:7px 10px}
 @media (max-width:680px){.nw-shell .portal-form{padding:14px 16px}.nw-shell .portal-form input,.nw-shell .portal-form select{min-height:42px}}
+/* Configuration lists in the Partners layout (Expense Categories, Schedule of Fees). */
+.nw-shell .rb3-table .cm-text{width:100%;min-width:220px;border:1px solid #dbe5ec;border-radius:9px;padding:7px 9px;font:inherit;font-size:14px;color:#0f2638;background:#fff}
+.nw-shell .rb3-table td.cm-acts{white-space:nowrap}
+.nw-shell .rb3-table .cm-acts .pm-link+.pm-link,.nw-shell .rb3-table .cm-acts .pm-ask{margin-left:12px}
+.nw-shell .rb3-table .cm-remove{color:#b42318}

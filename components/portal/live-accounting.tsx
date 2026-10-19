@@ -13,7 +13,7 @@ type Enrollment = { id: string; enrollment_number: string; trainee_id?: string; 
 type TraineeRow = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; srn?: string | null; email?: string | null; mobile?: string | null };
 /** Amount due = base price + other charges − rebates/discounts. */
 type Channel = { id: string; code: string; name: string; requires_reference: boolean; allows_proof: boolean; active: boolean; kind?: string };
-type Charge = { id: string; name: string; default_amount_centavos: number; active: boolean; used_count: number };
+type Charge = { id: string; name: string; default_amount_centavos: number; active: boolean; used_count: number; kind?: string | null };
 type Agency = { id: string; name: string; contact_name?: string | null; email?: string | null; mobile?: string | null; active: boolean };
 type Expense = { id: string; expense_number: string; payee: string; category: string; amount_centavos: number; status: string; created_at: string; payment_channel?: string | null; reference_number?: string | null; purpose?: string | null; requested_by_name?: string | null };
 const EXPENSE_CHANNELS = ["Cash", "GCash", "Unionbank", "Cheque", "PSBank", "Other"];
@@ -1376,7 +1376,7 @@ export function CashPositionModule({ data }: { data: AccountingData }) {
 
 type ConfigTrainee = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; email?: string | null; mobile?: string | null; srn?: string | null; company?: string | null; registered_at?: string | null };
 // Schedule of fees is fixed by the owner's ruling (Reprinting ₱500, Uniform ₱150, LBC ₱500), so it is not edited here.
-export const ACCOUNTING_CONFIG_SECTIONS = ["Payment channels", "Expense categories", "Requisition items", "Partners"] as const;
+export const ACCOUNTING_CONFIG_SECTIONS = ["Payment channels", "Expense categories", "Schedule of fees", "Requisition items", "Partners"] as const;
 export type AccountingConfigSection = (typeof ACCOUNTING_CONFIG_SECTIONS)[number];
 /**
  * Accounting › Configuration (owner, 7 Oct 2026): the referring agencies and
@@ -1480,6 +1480,74 @@ function PartnersModule({ data, busy, post }: { data: AccountingData; busy: bool
   </>;
 }
 
+/**
+ * A configuration list in the Partners layout (owner, 19 Oct 2026): search,
+ * Active / Archived / All, Add, every field edited in the table, Archive or
+ * Restore per row, and one Save Changes bar for all edits.
+ */
+type CfgCol = { key: string; label: string; kind: "text" | "money" | "select"; options?: [string, string][]; placeholder?: string };
+type CfgRow = { id: string; active: boolean; values: Record<string, string>; used?: number };
+function ConfigMatrix({ title, entity, cols, rows, busy, onSave, onAdd, onRemove, note }: {
+  title: string; entity: string; cols: CfgCol[]; rows: CfgRow[]; busy: boolean; note?: string;
+  onSave: (row: CfgRow) => Promise<void>; onAdd: (values: Record<string, string>) => Promise<void>; onRemove?: (row: CfgRow) => Promise<void>;
+}) {
+  const blank = () => Object.fromEntries(cols.map((c) => [c.key, c.kind === "select" ? c.options?.[0]?.[0] ?? "" : ""]));
+  const [edits, setEdits] = useState<Record<string, CfgRow>>({});
+  const [filter, setFilter] = useState<"Active" | "Archived" | "All">("Active"), [query, setQuery] = useState("");
+  const [adding, setAdding] = useState<Record<string, string> | null>(null), [removing, setRemoving] = useState<string | null>(null);
+  const [problem, setProblem] = useState(""), [done, setDone] = useState("");
+  const current = rows.map((r) => edits[r.id] ?? r);
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const key = (r: CfgRow) => JSON.stringify([r.active, r.values]);
+  const dirty = current.filter((r) => key(r) !== key(byId.get(r.id)!));
+  const set = (r: CfgRow, patch: Partial<CfgRow>) => { setDone(""); setProblem(""); setEdits({ ...edits, [r.id]: { ...r, ...patch } }); };
+  const q = query.trim().toLowerCase();
+  const shown = current.filter((r) => (filter === "All" || (filter === "Active" ? r.active : !r.active)) && (!q || Object.values(r.values).join(" ").toLowerCase().includes(q)));
+  const count = (f: typeof filter) => current.filter((r) => f === "All" || (f === "Active" ? r.active : !r.active)).length;
+  const bad = (v: Record<string, string>) => cols.find((c) => (c.kind === "text" && !v[c.key]?.trim()) || (c.kind === "money" && v[c.key] !== "" && !(Number(v[c.key]) >= 0)));
+  async function save() {
+    const wrong = dirty.find((r) => bad(r.values));
+    if (wrong) { setProblem(`Check ${bad(wrong.values)!.label.toLowerCase()} for ${wrong.values[cols[0].key] || `the ${entity}`}.`); return; }
+    try { for (const r of dirty) await onSave(r); setDone(`Saved ${dirty.length} ${entity}${dirty.length === 1 ? "" : "s"}.`); setEdits({}); } catch { /* the page shows the error */ }
+  }
+  async function add() {
+    if (!adding) return;
+    const wrong = bad(adding);
+    if (wrong) { setProblem(`Enter the ${wrong.label.toLowerCase()}.`); return; }
+    try { await onAdd(adding); setDone(`${adding[cols[0].key]} added.`); setAdding(null); setFilter("Active"); } catch { /* the page shows the error */ }
+  }
+  const input = (c: CfgCol, value: string, change: (v: string) => void, label: string) => c.kind === "select"
+    ? <select className="rb3-mode" aria-label={label} value={value} onChange={(e) => change(e.target.value)}>{c.options!.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+    : <input className={c.kind === "money" ? "rb3-amt" : "cm-text"} aria-label={label} inputMode={c.kind === "money" ? "decimal" : undefined} placeholder={c.placeholder ?? (c.kind === "money" ? "0.00" : "")} value={value} onChange={(e) => change(e.target.value)} />;
+  return <>
+    <div className="pm-top">{!adding && <button type="button" className="portal-primary" onClick={() => { setAdding(blank()); setDone(""); setProblem(""); }}>Add {tcl(entity)}</button>}</div>
+    {adding && <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Add {tcl(entity)}</h2></div>
+      <div className="pm-form">{cols.map((c) => <label key={c.key}>{c.label}{input(c, adding[c.key] ?? "", (v) => setAdding({ ...adding, [c.key]: v }), c.label)}</label>)}</div>
+      <div className="pm-actions"><span /><span className="cx-acts"><button type="button" className="portal-secondary" onClick={() => setAdding(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={() => void add()}>Save {tcl(entity)}</button></span></div>
+    </section>}
+    <section className="portal-panel cx-panel rb3">
+      <div className="panel-heading"><h2>{title}</h2>
+        <div className="pm-tools"><input className="pm-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${title.toLowerCase()}`} aria-label={`Search ${title}`} />
+          <div className="cx-seg">{(["Active", "Archived", "All"] as const).map((f) => <button key={f} type="button" className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{f} <span className="cx-mono">{count(f)}</span></button>)}</div></div></div>
+      {done && <div className="portal-message success">{done}</div>}
+      <div className="rb3-wrap"><table className="rb3-table"><thead><tr>{cols.map((c) => <th key={c.key} className={c.kind === "money" ? "r" : ""}>{c.label}</th>)}<th>Status</th><th /></tr></thead>
+        <tbody>{shown.map((r) => { const changed = key(r) !== key(byId.get(r.id)!); return <tr key={r.id} className={`${changed ? "dirty" : ""}${r.active ? "" : " pm-archived"}`}>
+          {cols.map((c) => <td key={c.key} className={c.kind === "money" ? "r" : ""}>{input(c, r.values[c.key] ?? "", (v) => set(r, { values: { ...r.values, [c.key]: v } }), `${c.label} for ${r.values[cols[0].key]}`)}</td>)}
+          <td><span className={`ac-chip ${r.active ? "ok" : "warn"}`}>{r.active ? "Active" : "Archived"}</span></td>
+          <td className="cm-acts"><button type="button" className="pm-link" onClick={() => set(r, { active: !r.active })}>{r.active ? "Archive" : "Restore"}</button>
+            {onRemove && (removing === r.id
+              ? <span className="pm-ask">Remove for good?<button type="button" className="pm-link" disabled={busy} onClick={() => void onRemove(r).then(() => setRemoving(null)).catch(() => undefined)}>Remove</button><button type="button" className="pm-link" onClick={() => setRemoving(null)}>Keep</button></span>
+              : <button type="button" className="pm-link cm-remove" onClick={() => setRemoving(r.id)}>Remove</button>)}</td>
+        </tr>; })}
+        {!shown.length && <tr><td colSpan={cols.length + 2}><span className="portal-empty-copy">Nothing to show.</span></td></tr>}</tbody></table></div>
+      {problem && <div className="portal-message error">{problem}</div>}
+      <div className={`rb3-bar${dirty.length ? " on" : ""}`}><span>{dirty.length ? `${dirty.length} ${entity}${dirty.length === 1 ? "" : "s"} changed` : "No changes"}</span>
+        <span className="cx-acts"><button type="button" className="portal-secondary" disabled={!dirty.length || busy} onClick={() => { setEdits({}); setProblem(""); }}>Discard</button><button type="button" className="portal-primary" disabled={!dirty.length || busy} onClick={() => void save()}>{busy ? "Saving…" : "Save Changes"}</button></span></div>
+      {note && <p className="ac-note">{note}</p>}
+    </section>
+  </>;
+}
+
 export function AccountingConfiguration({ section, data, reload }: { section: AccountingConfigSection; data: AccountingData; trainees?: ConfigTrainee[]; applicationNumbers?: Record<string, string>; reload: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -1493,7 +1561,7 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
     } catch (e) { setError(e instanceof Error ? e.message : "Could not save."); throw e; } finally { setBusy(false); }
   }
   return <div className="portal-page cx">
-    <div className="cx-head"><div><span className="portal-eyebrow">Configuration</span><h1>{section}</h1></div></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Configuration</span><h1>{tcl(section)}</h1></div></div>
     {error && <div className="portal-message error">{error}</div>}
     {/* One list for both (owner, 8 Oct 2026): the Cashier and expenses use the same channels. */}
     {section === "Payment channels" && <>
@@ -1505,12 +1573,21 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
         onRemove={(id) => void post({ action: "config-remove", entity: "channel", id }).catch(() => undefined)} removable />
     </>}
     {section === "Partners" && <PartnersModule data={data} busy={busy} post={post} />}
-    {section === "Expense categories" && <SetupList title="Expense Categories" description="" entityLabel="category" canManage busy={busy}
-      fields={[{ key: "name", label: "Category name" }]}
-      rows={(data as unknown as { expenseCategories: { id: string; name: string; active: boolean }[] }).expenseCategories.map((c) => ({ id: c.id, primary: c.name, secondary: c.active ? "Active" : "Archived", active: c.active, values: { name: c.name } }))}
-      onSubmit={(v, id) => post({ action: "expense-category-save", id, name: String(v.name) })}
-      onArchive={(id, active, name) => void post({ action: "expense-category-save", id, name, active: !active }).catch(() => undefined)}
-      onRemove={(id) => void post({ action: "expense-category-save", id, name: "x", remove: true }).catch(() => undefined)} removable />}
+    {section === "Expense categories" && <ConfigMatrix title="Expense Categories" entity="category" busy={busy}
+      cols={[{ key: "name", label: "Category", kind: "text", placeholder: "e.g. Office Supplies" }]}
+      rows={((data as unknown as { expenseCategories: { id: string; name: string; active: boolean }[] }).expenseCategories).map((c) => ({ id: c.id, active: c.active, values: { name: c.name } }))}
+      onSave={(r) => post({ action: "expense-category-save", id: r.id, name: r.values.name.trim(), active: r.active })}
+      onAdd={(v) => post({ action: "expense-category-save", name: v.name.trim() })}
+      onRemove={(r) => post({ action: "expense-category-save", id: r.id, name: "x", remove: true })}
+      note="Categories the Cashier picks when recording an expense. Archive one to hide it without losing past expenses." />}
+    {/* Schedule of fees (owner, 19 Oct 2026): miscellaneous items sold at the counter and service fees such as Reprinting and Cancellation. */}
+    {section === "Schedule of fees" && <ConfigMatrix title="Schedule of Fees" entity="fee" busy={busy}
+      cols={[{ key: "name", label: "Name", kind: "text", placeholder: "e.g. Reprinting" }, { key: "kind", label: "Type", kind: "select", options: [["fee", "Service Fee"], ["item", "Miscellaneous Item"]] }, { key: "price", label: "Price (PHP)", kind: "money" }]}
+      rows={data.charges.map((c) => ({ id: c.id, active: c.active, values: { name: c.name, kind: c.kind === "item" ? "item" : "fee", price: Number(c.default_amount_centavos) ? (Number(c.default_amount_centavos) / 100).toFixed(2) : "" } }))}
+      onSave={(r) => post({ action: "charge-save", id: r.id, name: r.values.name.trim(), defaultAmountCentavos: Math.round((Number(r.values.price) || 0) * 100), kind: r.values.kind === "item" ? "item" : "fee", active: r.active })}
+      onAdd={(v) => post({ action: "charge-save", name: v.name.trim(), defaultAmountCentavos: Math.round((Number(v.price) || 0) * 100), kind: v.kind === "item" ? "item" : "fee" })}
+      onRemove={(r) => post({ action: "config-remove", entity: "charge", id: r.id })}
+      note="Miscellaneous items (e.g. Uniform, ID Lace) are added to a payment in Record Payment and print on the receipt and TAR. Service fees (e.g. Reprinting, Cancellation, Rescheduling, Make-up Class) are charged through Requests. A blank price is typed when charging." />}
     {/* Items the Admin Assistant can request (owner, 9 Oct 2026). */}
     {section === "Requisition items" && <SetupList title="Requisition Items" description="" entityLabel="item" canManage busy={busy}
       fields={[{ key: "name", label: "Item name" }, { key: "unit", label: "Unit", placeholder: "pc, box, pack of 50" }, { key: "cost", label: "Default cost (₱)", type: "number" }]}
