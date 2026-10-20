@@ -1,5 +1,7 @@
+/** Training days from a duration label: "3 days" → 3; "40 Hours" → 5 (8 hours a day; owner, 20 Oct 2026). */
 export function courseDays(durationLabel: string) {
-  return Math.max(1, Math.ceil(Number.parseFloat(durationLabel) || 1));
+  const n = Number.parseFloat(durationLabel) || 1;
+  return Math.max(1, Math.ceil(/hour|hrs?/i.test(durationLabel) ? n / 8 : n));
 }
 
 /** The STCW courses New Wave schedules and publishes on the website (owner, 7 Oct 2026). */

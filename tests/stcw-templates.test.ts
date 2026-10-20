@@ -21,3 +21,13 @@ describe("STCW certificate templates (Safety, Crowd, Crisis)", () => {
     expect(all.every((f) => f.photo && f.photo.w > 100 && f.photo.h > 100)).toBe(true);
   });
 });
+
+describe("duration labels in hours", () => {
+  it("counts 8 hours a day", async () => {
+    const { courseDays } = await import("../lib/scheduling");
+    expect(courseDays("40 Hours")).toBe(5);
+    expect(courseDays("8 hours")).toBe(1);
+    expect(courseDays("3 days")).toBe(3);
+    expect(courseDays("1.5 days")).toBe(2);
+  });
+});
