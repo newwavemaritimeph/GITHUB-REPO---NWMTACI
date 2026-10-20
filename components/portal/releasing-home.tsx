@@ -211,6 +211,7 @@ const WAIT_DAYS = 14;
 export function WaitingCertificates({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   const [pick, setPick] = useState(""), [q, setQ] = useState("");
   const [uploading, setUploading] = useState<CertificateLine | null>(null);
+  const { busy, msg, post } = usePost(reload);
   const today = manilaToday(), tomorrow = addDays(today, 1);
   const tracked = (data as CertData).certificatePhotos != null;
   const lines = certificateLines(data, { inTrainingDays: WAIT_DAYS }).filter((l) => l.balance === 0 && WAITING.some(([s]) => s === l.view.state)).sort((a, b) => (a.ended ?? "").localeCompare(b.ended ?? ""));
@@ -233,6 +234,7 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
   ];
   return <div className="portal-page cx ac">
     <Head title="Waiting" note="Certificates that cannot print yet and what each one still needs. Shaded lines can be ready by tomorrow." />
+    {msg && <Message kind={msg.kind} text={msg.text} />}
     <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Waiting For</h2><span className="muted-text">tap to filter</span></div>
@@ -255,7 +257,7 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
             <td title={l.course.name}>{l.course.code}</td>
             <td>{range(l)}<small className="cl-block"><Badge tone={l.view.state === "Training not finished" || l.view.state === "Waiting for evaluation" ? undefined : "orange"}>{label}</Badge></small></td>
             <td><span className="wt-steps">{steps(l).map(([t, k]) => <span key={t} className={`wt-step ${k}`}>{k === "y" ? "✓" : k === "w" ? "◷" : "✗"} {t}</span>)}</span></td>
-            <td className="wt-next"><b>{step}</b><small className="cl-sub cl-block">{then}</small></td>
+            <td className="wt-next"><b>{step}</b><small className="cl-sub cl-block">{then}</small>{l.view.state === "Waiting for evaluation" && <button type="button" className="portal-secondary cl-upload" disabled={busy} onClick={() => void post({ action: "feedback-send-email", enrollmentId: l.e.id }, `Evaluation link emailed to ${l.name}.`).catch(() => undefined)}>Email Evaluation Link</button>}</td>
             {tracked && <td>{l.photo ? <button type="button" className="cl-photo" title={l.photo.file_name} onClick={() => void openCertificatePhoto(l.e.id)}>✓ On File</button> : <button type="button" className="portal-secondary cl-upload" onClick={() => setUploading(l)}>Upload Photo</button>}</td>}
           </tr>; })}
         </tbody></table></div>}
