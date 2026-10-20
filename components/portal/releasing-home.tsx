@@ -229,13 +229,17 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
     if (l.view.state === "Waiting for evaluation") return ["Trainee submits the evaluation", m.includes("photo") ? "Then: photo" : "From the Trainee Status page"];
     return ["Upload the 2x2 photo", "White background"];
   };
-  const steps = (l: CertificateLine): [string, "y" | "n" | "w"][] => [
-    l.view.state === "Training not finished" ? [`Ends ${short(l.ended)}`, "w"] : ["Training ended", "y"],
-    [l.balance > 0 ? `Fee · ${pesos2(l.balance)} due` : "Fee paid", l.balance > 0 ? "n" : "y"],
-    ...(tracked ? [["2x2 photo", l.photo ? "y" : "n"] as [string, "y" | "n"]] : []),
-    ...(l.postTest?.required ? [[l.postTest.passed ? "Post-test passed" : "Post-test", l.postTest.passed ? "y" : "n"] as [string, "y" | "n"]] : []),
-    ...(l.evalNeeded ? [["Evaluation", l.evalDone ? "y" : "n"] as [string, "y" | "n"]] : []),
-  ];
+  // Progress Steps (owner, 20 Oct 2026; design/waiting-layout-designs.html #1): done ✓, missing ✗, not yet due ◷.
+  const steps = (l: CertificateLine): [string, "y" | "n" | "w"][] => {
+    const training = l.view.state === "Training not finished", after = (done: boolean): "y" | "n" | "w" => done ? "y" : training ? "w" : "n";
+    return [
+      ["Training", training ? "w" : "y"],
+      ["Paid", l.balance > 0 ? "n" : "y"],
+      ...(tracked ? [["Photo", l.photo ? "y" : "n"] as [string, "y" | "n"]] : []),
+      ...(l.postTest?.required ? [["Post-Test", after(!!l.postTest.passed)] as [string, "y" | "n" | "w"]] : []),
+      ...(l.evalNeeded ? [["Evaluation", after(!!l.evalDone)] as [string, "y" | "n" | "w"]] : []),
+    ];
+  };
   return <div className="portal-page cx ac">
     <Head title="Waiting" note="Certificates that cannot print yet and what each one still needs. Shaded lines can be ready by tomorrow." />
     {msg && <Message kind={msg.kind} text={msg.text} />}
@@ -254,15 +258,15 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
       </div>
       <section className="portal-panel cx-panel">
         <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search waiting certificates" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, NWMTACI number or course" />{pick && <button type="button" className="portal-secondary" onClick={() => setPick("")}>Show All</button>}</div>
-        {!shown.length ? <p className="portal-empty-copy">Nothing waiting.</p> : <div className="cl-wrap"><table className="cl-log wt-log"><thead><tr><th>#</th><th>Trainee · NWMTACI no.</th><th>Course</th><th>Training</th><th>Checklist</th><th>Next Step</th>{tracked && <th>Action</th>}</tr></thead><tbody>
+        {!shown.length ? <p className="portal-empty-copy">Nothing waiting.</p> : <div className="cl-wrap"><table className="cl-log wt-log"><thead><tr><th>#</th><th>Trainee · NWMTACI No.</th><th>Course · Training</th><th>Progress</th><th>Next Step</th></tr></thead><tbody>
           {shown.map((l, i) => { const [step, then] = next(l); const label = WAITING.find(([s]) => s === l.view.state)?.[1] ?? l.view.state; return <tr key={l.e.id} className={l.ended && l.ended <= tomorrow ? "wt-soon" : undefined}>
             <td className="cl-no">{i + 1}</td>
             <td><b>{l.name}</b> <span className="cl-mono cl-sub">{l.number.replace(/^NWMTACI-/, "")}</span></td>
-            <td title={l.course.name}>{l.course.code}</td>
-            <td>{range(l)}<small className="cl-block"><Badge tone={l.view.state === "Training not finished" || l.view.state === "Waiting for evaluation" ? undefined : "orange"}>{label}</Badge></small></td>
-            <td><span className="wt-steps">{steps(l).map(([t, k]) => <span key={t} className={`wt-step ${k}`}>{k === "y" ? "✓" : k === "w" ? "◷" : "✗"} {t}</span>)}</span></td>
-            <td className="wt-next"><b>{step}</b><small className="cl-sub cl-block">{then}</small>{(l.view.state === "Waiting for evaluation" || (l.postTest?.required && !l.postTest.passed)) && l.view.state !== "Training not finished" && <button type="button" className="portal-secondary cl-upload" disabled={busy} onClick={() => void post({ action: "training-end-email", enrollmentId: l.e.id }, `Post-test and evaluation email sent to ${l.name}.`).catch(() => undefined)}>Email Post-Test and Evaluation</button>}</td>
-            {tracked && <td>{l.photo ? <button type="button" className="cl-photo" title={l.photo.file_name} onClick={() => void openCertificatePhoto(l.e.id)}>✓ On File</button> : <button type="button" className="portal-secondary cl-upload" onClick={() => setUploading(l)}>Upload Photo</button>}</td>}
+            <td title={l.course.name}><b>{l.course.code}</b><small className="cl-sub cl-block">{range(l)} · {label}</small></td>
+            <td><ol className="wt-prog" aria-label="Progress">{steps(l).map(([t, k]) => <li key={t} className={k} title={`${t}: ${k === "y" ? "done" : k === "w" ? "not yet" : "missing"}`}>{t === "Photo" && l.photo ? <button type="button" className="wt-dot" title={l.photo.file_name} onClick={() => void openCertificatePhoto(l.e.id)}>✓</button> : <span className="wt-dot">{k === "y" ? "✓" : k === "w" ? "◷" : "✗"}</span>}<span>{t}</span></li>)}</ol></td>
+            <td className="wt-next"><b>{step}</b><small className="cl-sub cl-block">{then}</small>
+              {(l.view.state === "Waiting for evaluation" || (l.postTest?.required && !l.postTest.passed)) && l.view.state !== "Training not finished" && <button type="button" className="portal-secondary cl-upload" disabled={busy} onClick={() => void post({ action: "training-end-email", enrollmentId: l.e.id }, `Post-test and evaluation email sent to ${l.name}.`).catch(() => undefined)}>Email Post-Test and Evaluation</button>}
+              {tracked && !l.photo && <button type="button" className={l.view.state === "Waiting for photo" ? "portal-primary cl-upload" : "portal-secondary cl-upload"} onClick={() => setUploading(l)}>Upload Photo</button>}</td>
           </tr>; })}
         </tbody></table></div>}
       </section>
@@ -502,11 +506,10 @@ function NumberingTable({ data, reload, scope }: { data: PortalData; reload: () 
   const [edit, setEdit] = useState<Record<string, { prefix: string; last: string; pad: string; batchPrefix: string; nextBatch: string }>>({});
   const roles = scope === "in-house" ? ["releasing_officer"] : ["admin"];
   const series = new Map((d.certificateSeries ?? []).map((s) => [s.course_id, s]));
-  const used = new Set(data.enrollments.map((e) => e.course_id));
   const term = q.trim().toLowerCase();
   // Admin (owner, 13 Oct 2026): the six STCW courses New Wave numbers itself first, then every In-House course.
   const featured = (c: { code: string }) => ADMIN_STCW_CODES.indexOf(c.code);
-  const courses = data.courses.filter((c, i, all) => c.delivery_type === "In-House" && all.findIndex((x) => x.id === c.id) === i && (scope === "all" ? (term ? true : featured(c) >= 0 || !stcwCourse(c)) : scope === "stcw" ? (term ? true : stcwCourse(c)) : !stcwCourse(c)) && (term ? `${c.code} ${c.name}`.toLowerCase().includes(term) : scope === "all" || scope === "stcw" || used.has(c.id) || series.has(c.id)))
+  const courses = data.courses.filter((c, i, all) => c.delivery_type === "In-House" && all.findIndex((x) => x.id === c.id) === i && (scope === "all" ? (term ? true : featured(c) >= 0 || !stcwCourse(c)) : scope === "stcw" ? (term ? true : stcwCourse(c)) : !stcwCourse(c)) && (term ? `${c.code} ${c.name}`.toLowerCase().includes(term) : true))
     .sort((a, b) => scope === "all" ? ((featured(a) < 0 ? 99 : featured(a)) - (featured(b) < 0 ? 99 : featured(b)) || a.name.localeCompare(b.name)) : a.name.localeCompare(b.name));
   const groupOf = (c: { code: string }) => scope !== "all" ? "" : featured(c) >= 0 ? "STCW Courses" : "In-House Courses";
   const valueOf = (id: string) => { const s = series.get(id); return edit[id] ?? { prefix: s?.prefix ?? "", last: s && s.next_number > 1 ? String(s.next_number - 1) : "", pad: String(s?.pad ?? 5), batchPrefix: s?.batch_prefix ?? "", nextBatch: String(s?.next_batch ?? 1) }; };
@@ -514,25 +517,23 @@ function NumberingTable({ data, reload, scope }: { data: PortalData; reload: () 
   return <section className="portal-panel cx-panel"><div className="panel-heading"><h2>{scope === "all" ? "Certificate No. per Course" : scope === "stcw" ? "Certificate Numbering" : "In-House Certificate Numbering"}</h2></div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} placeholder={scope === "stcw" ? "STCW courses shown; search any course" : "Search any In-House course by name or code"} /></div>
-    <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th>Prefix</th><th>Last No. Used</th><th>Digits</th><th>Batch Prefix</th><th>Next Batch</th><th>Next Certificate</th><th /></tr></thead><tbody>
-      {courses.map((c, i) => { const v = valueOf(c.id), s = series.get(c.id); const changed = !!edit[c.id]; const can = canSetSeries(roles, stcwCourse(c)); const head = groupOf(c) && groupOf(c) !== groupOf(courses[i - 1] ?? { code: "" }) ? groupOf(c) : ""; return [head && <tr key={`${head}-head`} className="nb-group"><td colSpan={8}><b>{head}</b> <span className="cl-sub">{courses.filter((x) => groupOf(x) === head).length}</span></td></tr>, <tr key={c.id}>
+    <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th>Prefix</th><th>Last No. Used</th><th>Digits</th><th>Next Certificate</th><th /></tr></thead><tbody>
+      {courses.map((c, i) => { const v = valueOf(c.id), s = series.get(c.id); const changed = !!edit[c.id]; const can = canSetSeries(roles, stcwCourse(c)); const head = groupOf(c) && groupOf(c) !== groupOf(courses[i - 1] ?? { code: "" }) ? groupOf(c) : ""; return [head && <tr key={`${head}-head`} className="nb-group"><td colSpan={6}><b>{head}</b> <span className="cl-sub">{courses.filter((x) => groupOf(x) === head).length}</span></td></tr>, <tr key={c.id}>
         <td className="nb-course"><b>{c.name}</b><small className="cl-sub cl-block"><span className="cl-mono">{c.code}</span> · {s ? `Set ${fmtDate(day(s.set_at) ?? "")}${first(s.profiles)?.complete_name ? ` by ${first(s.profiles)?.complete_name}` : ""}` : "Not set yet"}</small></td>
         <td><input className="cl-in" aria-label="Prefix" disabled={!can} value={v.prefix} onChange={(e) => set(c.id, "prefix", e.target.value)} placeholder="NWM-HPT-" /></td>
         <td><input className="cl-in cl-num" aria-label="Last certificate number used" disabled={!can} type="number" min={0} value={v.last} onChange={(e) => set(c.id, "last", e.target.value)} placeholder="e.g. 149" /></td>
         <td><input className="cl-in cl-tiny" aria-label="Digits" disabled={!can} type="number" min={1} max={10} value={v.pad} onChange={(e) => set(c.id, "pad", e.target.value)} /></td>
-        <td><input className="cl-in" aria-label="Batch prefix" disabled={!can} value={v.batchPrefix} onChange={(e) => set(c.id, "batchPrefix", e.target.value)} placeholder="HPT-" /></td>
-        <td><input className="cl-in cl-num" aria-label="Next batch number" disabled={!can} type="number" min={1} value={v.nextBatch} onChange={(e) => set(c.id, "nextBatch", e.target.value)} /></td>
         <td className="cl-mono cl-next">{formatCertificateNumber(v.prefix, nextOf(v.last), Number(v.pad) || 5)}</td>
         <td>{can ? <button type="button" className="portal-primary" disabled={busy || !changed} onClick={() => void post({ action: "certificate-series-save", courseId: c.id, prefix: v.prefix.trim(), nextNumber: nextOf(v.last), pad: Math.min(10, Math.max(1, Number(v.pad) || 5)), batchPrefix: v.batchPrefix.trim(), nextBatch: Math.max(1, Number(v.nextBatch) || 1) }, `Numbering saved. The next certificate is ${formatCertificateNumber(v.prefix.trim(), nextOf(v.last), Number(v.pad) || 5)}; enrolled trainees without a number got theirs in enrollment order.`).then(() => setEdit((e) => { const n = { ...e }; delete n[c.id]; return n; })).catch(() => undefined)}>Save</button> : <span className="cl-sub">Set by the Admin</span>}</td>
       </tr>]; })}
     </tbody></table></div>
-    {!courses.length && <p className="portal-empty-copy">{term ? "No courses match." : "No In-House course has trainees yet. Search a course to set its numbering."}</p>}
+    {!courses.length && <p className="portal-empty-copy">{term ? "No courses match." : "No In-House courses."}</p>}
     <p className="cl-legend">Type the last Certificate No. already used for each course once; the portal continues from the next number, in enrollment order. Registration No. is given automatically from one New Wave series when a certificate is printed, and a trainee keeps it for re-prints and retakes of the same course.</p>
   </section>;
 }
 
 
-/** Releasing Officer › Numbering (owner, 9 Oct 2026): starting Certificate No. and batch number for In-House courses. */
+/** Releasing Officer › Numbering: the last Certificate No. used for every In-House course (owner, 20 Oct 2026: all courses, no batch numbers). */
 export function ReleasingNumbering({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   return <div className="portal-page cx ac">
     <Head title="Numbering" note="Type the last Certificate No. used for each In-House course once; the portal continues from there. Registration No. is automatic. STCW numbering is set by the Admin." />

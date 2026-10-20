@@ -19,7 +19,7 @@ export type TemplateFieldsV2 = {
   /** A template whose hours line was left blank (CSF "[__] Hours"): covered and printed. */
   hours?: { cx: number; y: number; size: number; text: string; cover: { x: number; y: number; w: number; h: number } };
 };
-export type OverlayFill = { name: string; startsOn: string | null; endsOn: string | null; issuedOn: string; certificateNumber: string; registrationNumber: string; verifyUrl: string | null; copyNo?: number;
+export type OverlayFill = { name: string; startsOn: string | null; endsOn: string | null; issuedOn: string; certificateNumber: string; registrationNumber: string; verifyUrl: string | null;
   /** Template view (owner, 20 Oct 2026): the description with blank dates, a "TRAINEE NAME" guide, no numbers or QR. */
   blank?: boolean };
 
@@ -71,11 +71,7 @@ export async function drawTemplateFields(pdf: PDFDocument, page: PDFPage, f: Tem
   }
   if (f.certNo && fill.certificateNumber && !fill.blank) page.drawText(safe(fill.certificateNumber), { x: f.certNo.x, y: f.certNo.y, size: f.certNo.size, font: reg, color: INK });
   if (f.regNo && fill.registrationNumber && !fill.blank) page.drawText(safe(fill.registrationNumber), { x: f.regNo.x, y: f.regNo.y, size: f.regNo.size, font: reg, color: INK });
-  // A reprint says so under the numbers (owner's QR plan, 20 Oct 2026).
-  if (fill.copyNo && fill.copyNo > 1) {
-    const at = f.regNo ?? f.certNo;
-    if (at) page.drawText(`REPRINT - COPY ${fill.copyNo}`, { x: at.x, y: at.y - at.size * 1.25, size: Math.max(6, at.size - 1.5), font: bold, color: rgb(0.45, 0.1, 0.05) });
-  }
+  // Reprints are not marked on the certificate (owner, 20 Oct 2026): the copy number stays internal, in the print audit.
   if (f.qr && fill.verifyUrl && !fill.blank) {
     // Generated at print, never stored: error correction M, quiet zone 1, 600 px.
     const png = await QRCode.toBuffer(fill.verifyUrl, { errorCorrectionLevel: "M", margin: 1, width: 600, type: "png" });

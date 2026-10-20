@@ -220,7 +220,7 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
   // the bundled positions for that converted file (they carry fixes, e.g. CSF hours), else the upload's.
   const v2 = bundledLayout(tpl.storagePath) ?? (isFieldsV2(tpl.fields) ? tpl.fields : null);
   if (v2) {
-    await drawTemplateFields(pdf, page, v2, { name: String(traineeName), startsOn: startsOn ?? null, endsOn: endsOn ?? null, issuedOn: String(issuedOn), certificateNumber: number, registrationNumber: regNo ?? "", verifyUrl: ctx.cert?.verify_code ? verifyUrl(ctx.cert.verify_code) : null, copyNo: mode === "print" ? Number(ctx.cert?.print_count ?? 0) + 1 : undefined });
+    await drawTemplateFields(pdf, page, v2, { name: String(traineeName), startsOn: startsOn ?? null, endsOn: endsOn ?? null, issuedOn: String(issuedOn), certificateNumber: number, registrationNumber: regNo ?? "", verifyUrl: ctx.cert?.verify_code ? verifyUrl(ctx.cert.verify_code) : null });
   } else if (layout) {
     await layout(pdf, page, { name: String(traineeName), startsOn: startsOn ?? null, endsOn: endsOn ?? null, issuedOn: String(issuedOn), certificateNumber: number, registrationNumber: regNo ?? "" });
   } else {
