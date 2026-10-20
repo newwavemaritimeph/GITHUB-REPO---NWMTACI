@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { PortalData } from "../portal-live-app";
 import { first, manilaToday, pesos2 } from "@/lib/portal-format";
-import { Badge, Message, fmtDate, usePost as useRawPost } from "./shared-ui";
+import { Badge, Message, fmtDate, usePost as useRawPost, usePaged } from "./shared-ui";
 import { shrinkPhoto } from "./live-cashier";
 
 /**
@@ -28,6 +28,7 @@ function usePost(reload: () => Promise<void>) {
 export function OtherIncome({ data, reload, canRecord, canVoid }: { data: PortalData; reload: () => Promise<void>; canRecord: boolean; canVoid: boolean }) {
   const x = data as unknown as Extra;
   const incomes = x.otherIncome ?? [];
+  const incP = usePaged(incomes);
   const received = x.rebatesReceived ?? {};
   const [tab, setTab] = useState<"Endorsement Rebates" | "Other Income">("Endorsement Rebates");
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -135,7 +136,7 @@ export function OtherIncome({ data, reload, canRecord, canVoid }: { data: Portal
       <div className="panel-heading"><h2>Other Income</h2>{canRecord && !form ? <button type="button" className="portal-primary" onClick={() => open(0)}>Record Income</button> : <small>All income received outside trainee fees</small>}</div>
       {formView(false)}
       {incomes.length ? <div className="portal-table"><table><thead><tr><th>Income No.</th><th>Date</th><th>Source</th><th>Received From</th><th>Channel</th><th className="r">Amount</th><th>Proof</th>{canVoid && <th />}</tr></thead><tbody>
-        {incomes.map((i) => <tr key={i.id} className={i.voided_at ? "oi-done" : ""}>
+        {incP.shown.map((i) => <tr key={i.id} className={i.voided_at ? "oi-done" : ""}>
           <td className="cx-mono"><strong>{i.income_number}</strong></td><td className="tc-nowrap">{fmtDate(i.received_on)}</td>
           <td><Badge tone={i.source === "Endorsement Rebate" ? "blue" : "green"}>{i.source}</Badge></td>
           <td>{i.payer}{i.notes && <small>{i.notes}</small>}</td>
@@ -146,7 +147,7 @@ export function OtherIncome({ data, reload, canRecord, canVoid }: { data: Portal
             ? <span className="oi-void"><input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason" aria-label="Reason for the void" /><button type="button" className="portal-secondary" disabled={busy || reason.trim().length < 5} onClick={() => void post({ action: "income-void", id: i.id, reason: reason.trim() }, `${i.income_number} voided.`).then((ok) => { if (ok) { setVoiding(null); setReason(""); } })}>Void</button><button type="button" className="pm-link" onClick={() => setVoiding(null)}>Keep</button></span>
             : <button type="button" className="pm-link cm-remove" onClick={() => { setVoiding(i.id); setReason(""); }}>Void</button>)}</td>}
         </tr>)}
-      </tbody></table></div> : <p className="portal-empty-copy">No other income recorded yet.</p>}
+      </tbody></table>{incP.pager}</div> : <p className="portal-empty-copy">No other income recorded yet.</p>}
     </section>}
     <p className="ac-note">Endorsement rebates are what partner centers pay New Wave for trainees endorsed to them. Every receipt gets an income number and a proof photo in Google Drive, and appears in the Daily Summary Report under Other Income. Cash received counts in the cash drawer at closing.</p>
   </div>;

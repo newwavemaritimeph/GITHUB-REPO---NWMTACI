@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
-import { Badge, Message, fmtDate, usePost } from "./shared-ui";
+import { Badge, Message, fmtDate, usePost, usePaged } from "./shared-ui";
 import { BarChart, Donut, HBars } from "./charts";
 import { EXPENSE_REASONS, REQUEST_REASONS, RejectInline } from "./reject-inline";
 import { PERIODS, percentChange, type Period } from "@/lib/accounting-periods";
@@ -185,6 +185,7 @@ export function AccountingPayments() {
   const rows = r ? r.groups.flatMap((g) => g.rows.map((x) => ({ ...x, source: g.kind === "Direct walk-in" ? "Walk-in" : g.name || g.kind }))) : [];
   const term = q.trim().toLowerCase();
   const shown = rows.filter((x) => (!channel || x.channel === channel) && (!term || `${x.receipt} ${x.trainee} ${x.course} ${x.source}`.toLowerCase().includes(term)));
+  const pg = usePaged(shown);
   const byChannel = CHANNELS.map((c) => { const l = rows.filter((x) => x.channel === c); return { name: c, color: COLORS[c], count: l.length, amount: l.reduce((s, x) => s + x.amountCentavos, 0) }; });
   const proofOf = (x: (typeof rows)[number]) => (x.channel === "Cash" ? "Cash" : x.proof ? "Screenshot uploaded" : "Manual entry");
   return <div className="portal-page cx ac">
@@ -201,8 +202,8 @@ export function AccountingPayments() {
       <section className="portal-panel cx-panel">
         <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search payments" placeholder="Search receipt, trainee, course or partner" value={q} onChange={(e) => setQ(e.target.value)} /><select aria-label="Channel" value={channel} onChange={(e) => setChannel(e.target.value)}><option value="">All Channels</option>{CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
         {!r ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Receipt</th><th>Trainee</th><th>Source</th><th>Channel and Reference</th><th className="r">Amount</th></tr></thead><tbody>
-          {shown.map((x, i) => <tr key={`${x.receipt}-${i}`}><td data-l="" className="lead"><span className="cx-name cx-mono">{x.receipt}</span><small>{x.time}</small></td><td data-l="Trainee">{x.trainee}<small>{x.course}</small></td><td data-l="Source">{x.source}</td><td data-l="Channel">{x.channel}<small className="cx-mono">{x.reference || "—"}</small><small className={x.proof ? "ac-up" : ""}>{proofOf(x)}</small></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(x.amountCentavos)}</strong></td></tr>)}
-        </tbody><tfoot><tr><td colSpan={4} data-l="">{shown.length} receipt{shown.length === 1 ? "" : "s"}{channel ? ` · ${channel}` : ""}</td><td data-l="Total" className="r cx-amt">{pesos2(shown.reduce((s, x) => s + x.amountCentavos, 0))}</td></tr></tfoot></table></div> : <p className="portal-empty-copy">No payments match.</p>}
+          {pg.shown.map((x, i) => <tr key={`${x.receipt}-${i}`}><td data-l="" className="lead"><span className="cx-name cx-mono">{x.receipt}</span><small>{x.time}</small></td><td data-l="Trainee">{x.trainee}<small>{x.course}</small></td><td data-l="Source">{x.source}</td><td data-l="Channel">{x.channel}<small className="cx-mono">{x.reference || "—"}</small><small className={x.proof ? "ac-up" : ""}>{proofOf(x)}</small></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(x.amountCentavos)}</strong></td></tr>)}
+        </tbody><tfoot><tr><td colSpan={4} data-l="">{shown.length} receipt{shown.length === 1 ? "" : "s"}{channel ? ` · ${channel}` : ""}</td><td data-l="Total" className="r cx-amt">{pesos2(shown.reduce((s, x) => s + x.amountCentavos, 0))}</td></tr></tfoot></table>{pg.pager}</div> : <p className="portal-empty-copy">No payments match.</p>}
       </section>
     </div>
   </div>;
@@ -219,6 +220,7 @@ export function AccountingExpenses({ data }: { data: PortalData }) {
   const byChannel = CHANNELS.map((c) => { const l = released.filter((e) => e.payment_channel === c); return { name: c, color: COLORS[c], count: l.length, amount: l.reduce((s, e) => s + Number(e.amount_centavos), 0) }; });
   const cats = [...new Set(list.filter((e) => e.status !== "Rejected").map((e) => e.category))];
   const shown = list.filter((e) => st === "All" || label(e) === st);
+  const pg = usePaged(shown);
   const tone = (s: string) => (s === "Released" ? "green" : s === "Rejected" ? "red" : s === "For approval" ? "orange" : "blue");
   return <div className="portal-page cx ac">
     <TxHead title="Expenses" right={<DayPicker date={date} setDate={setDate} />} note={<>{longDay(date)} · <span className="ac-ro">View only — the Cashier records and releases expenses</span></>} />
@@ -234,8 +236,8 @@ export function AccountingExpenses({ data }: { data: PortalData }) {
       <section className="portal-panel cx-panel">
         <div className="ac-chipbar">{EXPENSE_STATES.map((s) => <button key={s} type="button" className={`ac-chip${st === s ? " on" : ""}`} onClick={() => setSt(s)}>{tcl(s)}<span>{s === "All" ? list.length : list.filter((e) => label(e) === s).length}</span></button>)}</div>
         {shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Channel</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
-          {shown.map((e) => <tr key={e.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher_number ?? e.expense_number}</span><small>{fmtDate(day(e.created_at))}</small></td><td data-l="Payee"><strong>{e.payee}</strong><small>{e.category}</small></td><td data-l="Channel">{e.payment_channel || "—"}{e.reference_number ? <small className="cx-mono">{e.reference_number}</small> : null}</td><td data-l="Status"><Badge tone={tone(label(e))}>{label(e)}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(e.amount_centavos)}</strong></td><td data-l="">{e.voucher_number && <a className="portal-secondary" href={`/api/documents/expense/${e.id}?copy=1`} target="_blank" rel="noreferrer">View</a>}</td></tr>)}
-        </tbody></table></div> : <p className="portal-empty-copy">{list.length ? "Nothing with this status." : "No expenses on this day."}</p>}
+          {pg.shown.map((e) => <tr key={e.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher_number ?? e.expense_number}</span><small>{fmtDate(day(e.created_at))}</small></td><td data-l="Payee"><strong>{e.payee}</strong><small>{e.category}</small></td><td data-l="Channel">{e.payment_channel || "—"}{e.reference_number ? <small className="cx-mono">{e.reference_number}</small> : null}</td><td data-l="Status"><Badge tone={tone(label(e))}>{label(e)}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(e.amount_centavos)}</strong></td><td data-l="">{e.voucher_number && <a className="portal-secondary" href={`/api/documents/expense/${e.id}?copy=1`} target="_blank" rel="noreferrer">View</a>}</td></tr>)}
+        </tbody></table>{pg.pager}</div> : <p className="portal-empty-copy">{list.length ? "Nothing with this status." : "No expenses on this day."}</p>}
       </section>
     </div>
   </div>;
@@ -253,6 +255,7 @@ export function AccountingReceivables({ data }: { data: PortalData }) {
   const rows = AGING.map(([name, color, lo, hi]) => { const l = all.filter((u) => inB(u.trainingEnd, [name, color, lo, hi])); return { name, color, count: l.length, amount: l.reduce((s, u) => s + u.balanceCentavos, 0) }; });
   const term = q.trim().toLowerCase();
   const shown = all.filter((u) => (!bucket || inB(u.trainingEnd, AGING.find((b) => b[0] === bucket)!)) && (!term || `${u.traineeName} ${u.course} ${u.enrollmentNumber}`.toLowerCase().includes(term))).sort((a, b) => a.trainingEnd.localeCompare(b.trainingEnd));
+  const pg = usePaged(shown);
   return <div className="portal-page cx ac">
     <TxHead title="Receivables" note={<>Balances still due after training ended · as of {fmtDate(today)}</>} />
     <div className="ac-rail">
@@ -264,8 +267,8 @@ export function AccountingReceivables({ data }: { data: PortalData }) {
       <section className="portal-panel cx-panel">
         <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search receivables" placeholder="Search trainee, course or enrollment" value={q} onChange={(e) => setQ(e.target.value)} />{bucket && <button type="button" className="portal-secondary" onClick={() => setBucket("")}>Show All</button>}</div>
         {shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Trainee</th><th>Training Ended</th><th className="r">Fee</th><th className="r">Paid</th><th className="r">Balance</th><th>Overdue</th></tr></thead><tbody>
-          {shown.map((u) => { const d = daysOf(u.trainingEnd); return <tr key={u.id}><td data-l="" className="lead"><span className="cx-name">{u.traineeName}</span><small>{u.course} · <span className="cx-mono">{u.enrollmentNumber}</span></small></td><td data-l="Training ended">{fmtDate(u.trainingEnd)}</td><td data-l="Fee" className="r cx-amt">{pesos2(u.dueCentavos)}</td><td data-l="Paid" className="r cx-amt">{pesos2(u.paidCentavos)}</td><td data-l="Balance" className="r"><strong className="cx-amt" style={{ color: "#c2410c" }}>{pesos2(u.balanceCentavos)}</strong></td><td data-l="Overdue">{u.endsToday ? <Badge tone="orange">Ends Today</Badge> : <Badge tone={d > 60 ? "red" : d > 30 ? "orange" : undefined}>{d} day{d === 1 ? "" : "s"}</Badge>}</td></tr>; })}
-        </tbody><tfoot><tr><td colSpan={4} data-l="">{shown.length} enrollment{shown.length === 1 ? "" : "s"}</td><td data-l="Total" className="r cx-amt">{pesos2(shown.reduce((s, u) => s + u.balanceCentavos, 0))}</td><td /></tr></tfoot></table></div> : <p className="portal-empty-copy">No unpaid balances after training.</p>}
+          {pg.shown.map((u) => { const d = daysOf(u.trainingEnd); return <tr key={u.id}><td data-l="" className="lead"><span className="cx-name">{u.traineeName}</span><small>{u.course} · <span className="cx-mono">{u.enrollmentNumber}</span></small></td><td data-l="Training ended">{fmtDate(u.trainingEnd)}</td><td data-l="Fee" className="r cx-amt">{pesos2(u.dueCentavos)}</td><td data-l="Paid" className="r cx-amt">{pesos2(u.paidCentavos)}</td><td data-l="Balance" className="r"><strong className="cx-amt" style={{ color: "#c2410c" }}>{pesos2(u.balanceCentavos)}</strong></td><td data-l="Overdue">{u.endsToday ? <Badge tone="orange">Ends Today</Badge> : <Badge tone={d > 60 ? "red" : d > 30 ? "orange" : undefined}>{d} day{d === 1 ? "" : "s"}</Badge>}</td></tr>; })}
+        </tbody><tfoot><tr><td colSpan={4} data-l="">{shown.length} enrollment{shown.length === 1 ? "" : "s"}</td><td data-l="Total" className="r cx-amt">{pesos2(shown.reduce((s, u) => s + u.balanceCentavos, 0))}</td><td /></tr></tfoot></table>{pg.pager}</div> : <p className="portal-empty-copy">No unpaid balances after training.</p>}
       </section>
     </div>
   </div>;
@@ -287,6 +290,7 @@ export function AccountingPayables({ data, reload }: { data: PortalData; reload:
   const stateOf = (i: Item) => (i.paid ? "Paid" : i.due && i.due < today ? "Overdue" : i.due && i.due <= weekEnd ? "Due this week" : "Open");
   const open = items.filter((i) => !i.paid);
   const shown = items.filter((i) => (tab === "Open" ? !i.paid : stateOf(i) === tab)).sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999"));
+  const pg = usePaged(shown);
   const kinds = ["Bills and fees", "Agency rebates"].map((k, n) => { const l = open.filter((i) => i.kind === k); return { name: k, color: n ? "#F25615" : "#0571D0", count: l.length, amount: l.reduce((s, i) => s + i.amount, 0) }; });
   const sum = (l: Item[]) => pesos2(l.reduce((s, i) => s + i.amount, 0));
   return <div className="portal-page cx ac">
@@ -301,8 +305,8 @@ export function AccountingPayables({ data, reload }: { data: PortalData; reload:
       <section className="portal-panel cx-panel">
         <div className="ac-chipbar">{PAYABLE_TABS.map((t) => <button key={t} type="button" className={`ac-chip${tab === t ? " on" : ""}`} onClick={() => setTab(t)}>{tcl(t)}<span>{t === "Open" ? open.length : items.filter((i) => stateOf(i) === t).length}</span></button>)}</div>
         {shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Payee</th><th>Type</th><th>Due</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
-          {shown.map((i) => { const s = stateOf(i); return <tr key={`${i.kind}-${i.id}`}><td data-l="" className="lead"><span className="cx-name">{i.payee}</span>{i.what && <small>{i.what}</small>}</td><td data-l="Type">{i.kind === "Agency rebates" ? "Agency rebate" : "Bill or fee"}</td><td data-l="Due">{i.due ? fmtDate(i.due) : "—"}</td><td data-l="Status"><Badge tone={s === "Paid" ? "green" : s === "Overdue" ? "red" : s === "Due this week" ? "orange" : undefined}>{tcl(s)}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(i.amount)}</strong></td><td data-l="">{!i.paid && <button type="button" className="portal-primary" disabled={busy} onClick={() => void i.settle().catch(() => undefined)}>Mark Paid</button>}</td></tr>; })}
-        </tbody></table></div> : <p className="portal-empty-copy">Nothing here.</p>}
+          {pg.shown.map((i) => { const s = stateOf(i); return <tr key={`${i.kind}-${i.id}`}><td data-l="" className="lead"><span className="cx-name">{i.payee}</span>{i.what && <small>{i.what}</small>}</td><td data-l="Type">{i.kind === "Agency rebates" ? "Agency rebate" : "Bill or fee"}</td><td data-l="Due">{i.due ? fmtDate(i.due) : "—"}</td><td data-l="Status"><Badge tone={s === "Paid" ? "green" : s === "Overdue" ? "red" : s === "Due this week" ? "orange" : undefined}>{tcl(s)}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(i.amount)}</strong></td><td data-l="">{!i.paid && <button type="button" className="portal-primary" disabled={busy} onClick={() => void i.settle().catch(() => undefined)}>Mark Paid</button>}</td></tr>; })}
+        </tbody></table>{pg.pager}</div> : <p className="portal-empty-copy">Nothing here.</p>}
       </section>
     </div>
   </div>;

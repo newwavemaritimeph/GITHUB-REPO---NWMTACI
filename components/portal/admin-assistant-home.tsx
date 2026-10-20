@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
 import { accreditationFor, isBlocking, planRows, rangesOverlap, requisitionState, requisitionTotal, type Accreditation, type PlanBatch, type PlanRow, type RequisitionLine, type RequisitionState } from "@/lib/admin-assistant";
-import { Badge, Message, fmtDate, usePost } from "./shared-ui";
+import { Badge, Message, fmtDate, usePost, usePaged } from "./shared-ui";
 import { EXPENSE_REASONS, RejectInline } from "./reject-inline";
 import { CHANNELS, type Channel, type DaySummary, type ReconStatus } from "@/lib/reconciliation";
 
@@ -52,9 +52,11 @@ export function AssistantDashboard({ data, go }: { data: PortalData; go: (m: str
   const released = reqs.filter((r) => stateOf(r) === "Released" && day(r.created_at).slice(0, 7) === month).reduce((s, r) => s + r.total_centavos, 0);
   const plan = upcoming(data).filter((p) => p.b.starts_on <= week);
   const gaps = plan.filter((p) => p.issues.length);
+  const gapsP = usePaged(gaps);
   const names = new Map((extra(data).instructors ?? []).map((i) => [i.id, i.complete_name]));
   const courses = new Map(data.courses.map((c) => [c.id, c.code]));
   const expiring = (extra(data).accreditations ?? []).filter((a) => a.valid_until && a.valid_until <= soon).sort((a, z) => (a.valid_until ?? "").localeCompare(z.valid_until ?? ""));
+  const expP = usePaged(expiring);
   return <div className="portal-page cx ac">
     <Head title="Dashboard"><button type="button" className="portal-primary" onClick={() => go("Requisitions")}>New Requisition</button></Head>
     <ReconcileBanner go={go} />
@@ -76,13 +78,13 @@ export function AssistantDashboard({ data, go }: { data: PortalData; go: (m: str
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Batches That Need Attention</h2></div>
           {gaps.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Batch</th><th>Course</th><th>Starts</th><th>Issue</th></tr></thead><tbody>
-            {gaps.map((p, i) => <tr key={p.b.id}><td className="cl-no">{i + 1}</td><td className="cl-mono">{p.b.batch_number}</td><td>{first(p.b.courses)?.code ?? "—"}</td><td>{fmtDate(p.b.starts_on)}</td><td className="aa-warn">{p.issues.join(" · ")}</td></tr>)}
-          </tbody></table></div> : <p className="portal-empty-copy">Every batch this week has a classroom and an accredited instructor.</p>}
+            {gapsP.shown.map((p, i) => <tr key={p.b.id}><td className="cl-no">{i + 1}</td><td className="cl-mono">{p.b.batch_number}</td><td>{first(p.b.courses)?.code ?? "—"}</td><td>{fmtDate(p.b.starts_on)}</td><td className="aa-warn">{p.issues.join(" · ")}</td></tr>)}
+          </tbody></table>{gapsP.pager}</div> : <p className="portal-empty-copy">Every batch this week has a classroom and an accredited instructor.</p>}
         </section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Accreditations Expiring or Expired</h2></div>
           {expiring.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Instructor</th><th>Course</th><th>Accreditation No.</th><th>Valid Until</th></tr></thead><tbody>
-            {expiring.map((a) => <tr key={a.id}><td>{names.get(a.instructor_id) ?? "—"}</td><td>{courses.get(a.course_id) ?? "—"}</td><td className="cl-mono">{a.accreditation_number || "—"}</td><td><Badge tone={(a.valid_until ?? "") < today ? "red" : "orange"}>{(a.valid_until ?? "") < today ? `Expired ${fmtDate(a.valid_until!)}` : fmtDate(a.valid_until!)}</Badge></td></tr>)}
-          </tbody></table></div> : <p className="portal-empty-copy">No accreditation expires in the next 30 days.</p>}
+            {expP.shown.map((a) => <tr key={a.id}><td>{names.get(a.instructor_id) ?? "—"}</td><td>{courses.get(a.course_id) ?? "—"}</td><td className="cl-mono">{a.accreditation_number || "—"}</td><td><Badge tone={(a.valid_until ?? "") < today ? "red" : "orange"}>{(a.valid_until ?? "") < today ? `Expired ${fmtDate(a.valid_until!)}` : fmtDate(a.valid_until!)}</Badge></td></tr>)}
+          </tbody></table>{expP.pager}</div> : <p className="portal-empty-copy">No accreditation expires in the next 30 days.</p>}
         </section>
       </div>
     </div>
@@ -361,6 +363,7 @@ export function ReconcileBanner({ go }: { go: (m: string) => void }) {
 export function GcashNotInHistory() {
   const { data } = useRecon(manilaToday(), "GCash");
   const list = data?.missing ?? [];
+  const missP = usePaged(list);
   const overdue = data?.overdue ?? [];
   const late = overdue.reduce((s, o) => s + o.count, 0);
   if (!list.length && !late) return null;
@@ -368,8 +371,8 @@ export function GcashNotInHistory() {
     {late > 0 && <div className="ms-banner red"><b>{late} payment{late === 1 ? "" : "s"} not reconciled</b><span>{overdue.map((o) => `${o.channel} ${o.count} (oldest ${fmtDate(o.days[0].day)})`).join(" · ")}</span><span className="rc-note">Also emailed daily at 4:00 PM</span></div>}
     {list.length > 0 && <details className="rc-alert"><summary><b>{list.length} payment{list.length === 1 ? "" : "s"} not in the transaction history</b><span>Checked by the Admin Assistant · tap to see</span></summary>
       <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Date</th><th>Channel</th><th>Receipt No.</th><th>Trainee</th><th>Ref. No.</th><th>Amount</th><th>Note</th></tr></thead><tbody>
-        {list.map((m) => <tr key={m.payment_id}><td>{m.received_at ? fmtDate(day(m.received_at)) : "—"}</td><td>{m.channel ?? "—"}</td><td className="cl-mono">{m.payment_number}</td><td>{m.trainee}</td><td className="cl-mono">{m.reference_number ?? "—"}</td><td className="cl-mono">{pesos2(m.amount_centavos)}</td><td className="rc-remark">{m.remarks}</td></tr>)}
-      </tbody></table></div>
+        {missP.shown.map((m) => <tr key={m.payment_id}><td>{m.received_at ? fmtDate(day(m.received_at)) : "—"}</td><td>{m.channel ?? "—"}</td><td className="cl-mono">{m.payment_number}</td><td>{m.trainee}</td><td className="cl-mono">{m.reference_number ?? "—"}</td><td className="cl-mono">{pesos2(m.amount_centavos)}</td><td className="rc-remark">{m.remarks}</td></tr>)}
+      </tbody></table>{missP.pager}</div>
     </details>}
   </div>;
 }
