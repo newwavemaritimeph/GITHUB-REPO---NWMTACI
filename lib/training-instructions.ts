@@ -22,12 +22,15 @@ const clock = (v?: string | null) => { if (!v) return ""; const [h, m] = v.split
 /** Everything the instructions PDF and email need for one enrollment, or null when it does not exist. */
 export async function loadInstructionDetails(db: Admin, enrollmentId: string): Promise<InstructionDetails | null> {
   const { data } = await db.from("enrollments")
-    .select("id,enrollment_number,enrollment_status,course_id,scheduled_on,trainees(id,legal_first_name,legal_middle_name,legal_last_name,suffix,email,srn,trainee_number),courses(name,code,google_classroom_link,duration_label),batches(batch_number,mode,starts_on,ends_on,daily_start,daily_end,venue,classrooms(name))")
+    .select("id,enrollment_number,enrollment_status,course_id,batch_id,scheduled_on,trainees(id,legal_first_name,legal_middle_name,legal_last_name,suffix,email,srn,trainee_number),courses(name,code,google_classroom_link,duration_label),batches(batch_number,mode,starts_on,ends_on,daily_start,daily_end,venue,classrooms(name))")
     .eq("id", enrollmentId).maybeSingle();
   if (!data) return null;
   const trainee = one(data.trainees), course = one(data.courses), batch = one(data.batches);
   // The class code column comes from migration 202610070012; tolerate its absence.
   const { data: codeRow } = await db.from("courses").select("google_classroom_code").eq("id", data.course_id).maybeSingle();
+  // A batch with its own class (CCMD0076 …, 202610200049) uses that link and code instead of the course's.
+  const batchId = (data as { batch_id?: string | null }).batch_id;
+  const batchClass = batchId ? (await db.from("batches").select("google_classroom_link,google_classroom_code").eq("id", batchId).maybeSingle()).data as { google_classroom_link?: string | null; google_classroom_code?: string | null } | null : null;
   const { data: tpl } = await db.from("training_instruction_templates").select("subject,body").eq("course_id", data.course_id).eq("active", true).order("version", { ascending: false }).limit(1).maybeSingle();
   // The NWMTACI application number (202610070002); tolerate its absence.
   const traineeId = (trainee as { id?: string } | null)?.id;
@@ -44,7 +47,7 @@ export async function loadInstructionDetails(db: Admin, enrollmentId: string): P
     dates: batch?.starts_on ? `${fmtDate(batch.starts_on)}${batch.ends_on && batch.ends_on !== batch.starts_on ? ` - ${fmtDate(batch.ends_on)}` : ""}` : data.scheduled_on ? fmtDate(data.scheduled_on) : "To be scheduled",
     time: batch?.daily_start ? `${clock(batch.daily_start)} - ${clock(batch.daily_end) || "5:00 PM"}` : "8:00 AM - 5:00 PM",
     classroom: one(batch?.classrooms)?.name ?? batch?.venue ?? "To be assigned",
-    join: classroomJoin(course?.google_classroom_link, (codeRow as { google_classroom_code?: string | null } | null)?.google_classroom_code),
+    join: batchClass?.google_classroom_link ? classroomJoin(batchClass.google_classroom_link, batchClass.google_classroom_code) : classroomJoin(course?.google_classroom_link, (codeRow as { google_classroom_code?: string | null } | null)?.google_classroom_code),
     subject: tpl?.subject ?? "Training Instructions",
     body,
     formalName: trainee ? `${trainee.legal_last_name}, ${[trainee.legal_first_name, trainee.legal_middle_name, t2?.suffix].filter(Boolean).join(" ")}`.toUpperCase() : "TRAINEE",

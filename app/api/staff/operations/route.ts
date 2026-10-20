@@ -138,6 +138,9 @@ const offerCreateInput = z.object({ action: z.literal("offer-create"), partnerCe
 const offerArchiveInput = z.object({ action: z.literal("offer-archive"), offerId: z.string().uuid(), active: z.boolean() });
 // The end-of-training email again (post-test and evaluation still to do), owner 20 Oct 2026.
 const trainingEndEmailInput = z.object({ action: z.literal("training-end-email"), enrollmentId: z.string().uuid() });
+// Admin one-time setup (owner, 20 Oct 2026): Classroom links per course or batch, and default rooms.
+const classroomLinksImportInput = z.object({ action: z.literal("classroom-links-import"), rows: z.array(z.object({ courseId: z.string().uuid().nullable().optional(), batchId: z.string().uuid().nullable().optional(), link: z.string().trim().url().max(500).refine((u) => /^https:\/\/classroom\.google\.com\//.test(u), "Use classroom.google.com links."), code: z.string().trim().max(40).optional().default("") })).min(1).max(500) });
+const defaultRoomSaveInput = z.object({ action: z.literal("default-room-save"), courseId: z.string().uuid(), classroomId: z.string().uuid().nullable() });
 // Release plan for a certificate: how it leaves the office, and courier details.
 const certificateReleasePlanInput = z.object({ action: z.literal("certificate-release-plan"), enrollmentId: z.string().uuid(), releaseMethod: z.enum(["Pickup", "Representative", "Courier"]).optional(), expectedPickupOn: z.string().date().nullable().optional(), claimantName: z.string().trim().max(160).optional(), claimantRelationship: z.string().trim().max(80).optional(), courierName: z.string().trim().max(80).optional(), trackingNumber: z.string().trim().max(80).optional(), shippingFeeStatus: z.string().trim().max(40).optional(), shippingAddress: z.string().trim().max(300).optional(), courierStatus: z.enum(["For Booking", "Booked", "Shipped", "Delivered"]).optional() });
 // Certificate correction workflow (wrong spelling, wrong date, reprint needed).
@@ -263,7 +266,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -288,6 +291,8 @@ async function autoSendInstructions(admin: ReturnType<typeof createSupabaseAdmin
       const course = Array.isArray(e.courses) ? e.courses[0] : e.courses;
       if (course?.delivery_type !== "In-House" || !e.batch_id || e.enrollment_status !== "Enrolled" || e.instructions_sent_at) continue;
       await admin.from("enrollments").update({ instructions_sent_at: new Date().toISOString() }).eq("id", eid);
+      // Paid and enrolled: the training details, Classroom link and instructions PDF by email (owner, 20 Oct 2026); sent once.
+      await queueInstructionEmail(admin, eid, 0, process.env.APP_BASE_URL ?? "https://newwavemaritimemtaci.com").catch(() => undefined);
       const trainee = Array.isArray(e.trainees) ? e.trainees[0] : e.trainees;
       if (trainee?.profile_id) {
         const link = course?.google_classroom_link ? ` Google Classroom: ${course.google_classroom_link}` : "";
@@ -1075,6 +1080,13 @@ export async function GET() {
     }
   }
 
+  // Default rooms per course (202610200049), for the Admin.
+  let defaultRooms: unknown[] = [];
+  if (staff.roleCodes.includes("admin")) {
+    const { data: dr, error: drError } = await createSupabaseAdminClient().from("course_default_rooms").select("course_id,classroom_id");
+    defaultRooms = drError ? [] : dr ?? [];
+  }
+
   // Post-test results per New Wave enrollment (202610200048), for the Releasing Officer and Admin.
   let postTestResults: Record<string, unknown> = {};
   if (canRelease(staff.roleCodes)) {
@@ -1092,7 +1104,7 @@ export async function GET() {
     allOffers = ao.data ?? []; archivedCourses = ac.data ?? [];
   }
 
-  return NextResponse.json({ postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
+  return NextResponse.json({ defaultRooms, postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
     paymentMethods: paymentMethodsWithKind, charges: (charges.data ?? []).map((c) => ({ ...c, kind: chargeKinds.get((c as { id: string }).id) ?? "fee" })), agencies: agencies.data ?? [],
@@ -2222,6 +2234,46 @@ export async function POST(request: Request) {
       if (input.stickerNo) await admin.from("certificates").update({ sticker_no: input.stickerNo }).eq("id", cert.id);
       const { error: relErr } = await admin.from("certificate_release_events").insert({ certificate_id: cert.id, event_type: "release", recipient_name: input.recipientName, recipient_id_type: input.recipientIdType ?? null, released_by: staff.user.id, reason: input.reason ?? null });
       if (relErr) throw relErr;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "classroom-links-import") {
+      if (!staff.roleCodes.includes("admin")) return NextResponse.json({ error: "Only the Admin imports Classroom links." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      let courses = 0, batches = 0;
+      for (const r of input.rows) {
+        if (r.batchId) {
+          const { error } = await admin.from("batches").update({ google_classroom_link: r.link, google_classroom_code: r.code || null }).eq("id", r.batchId);
+          if (error) return NextResponse.json({ error: /google_classroom/.test(error.message) ? "Apply database update 202610200049 first." : error.message }, { status: 400 });
+          batches++;
+        } else if (r.courseId) {
+          const { error } = await admin.from("courses").update({ google_classroom_link: r.link }).eq("id", r.courseId);
+          if (error) throw error;
+          await admin.from("courses").update({ google_classroom_code: r.code || null }).eq("id", r.courseId);
+          courses++;
+        }
+      }
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: "classroom_links.imported", record_type: "catalog", record_id: "classroom-links", new_values: { courses, batches } });
+      return NextResponse.json({ ok: true, courses, batches });
+    }
+    if (input.action === "default-room-save") {
+      if (!staff.roleCodes.includes("admin")) return NextResponse.json({ error: "Only the Admin sets default rooms." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+      const { data: prior } = await admin.from("course_default_rooms").select("classroom_id").eq("course_id", input.courseId).maybeSingle();
+      const { error } = input.classroomId
+        ? await admin.from("course_default_rooms").upsert({ course_id: input.courseId, classroom_id: input.classroomId, updated_by: staff.user.id, updated_at: new Date().toISOString() })
+        : await admin.from("course_default_rooms").delete().eq("course_id", input.courseId);
+      if (error) return NextResponse.json({ error: /course_default_rooms/.test(error.message) ? "Apply database update 202610200049 first." : error.message }, { status: 400 });
+      // Upcoming batches still on the old default (or with no room) move to the new one.
+      if (input.classroomId) {
+        const { data: upcoming } = await admin.from("batches").select("id,classroom_id").eq("course_id", input.courseId).neq("status", "Cancelled").gte("starts_on", today);
+        const move = (upcoming ?? []).filter((b) => !b.classroom_id || b.classroom_id === prior?.classroom_id).map((b) => b.id as string);
+        if (move.length) {
+          await admin.from("batches").update({ classroom_id: input.classroomId }).in("id", move);
+          await admin.from("batch_resources").upsert(move.map((id) => ({ batch_id: id, classroom_id: input.classroomId, updated_by: staff.user.id })), { onConflict: "batch_id" });
+        }
+      }
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: "course.default_room_set", record_type: "course", record_id: input.courseId, prior_values: prior ?? null, new_values: { classroom_id: input.classroomId } });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "training-end-email") {

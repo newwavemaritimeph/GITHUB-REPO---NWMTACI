@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { downloadCsv } from "@/lib/csv";
 import type { PortalData, Enrollment } from "../portal-live-app";
 import { addDays, first, manilaToday, dueCentavos, pesos2 } from "@/lib/portal-format";
 import { automaticEndDate } from "@/lib/scheduling";
@@ -394,26 +395,109 @@ function PostTestCell({ t }: { t: PostTestResult | null }) {
   return t.attempts ? <><Badge tone="orange">Not Passed</Badge><small className="cl-sub cl-block">{t.best ? `Best ${t.best.score}/${t.best.total}` : ""} · {tries}</small></> : <Badge>Not Taken</Badge>;
 }
 
-/** Released: printed certificates waiting to be claimed, and those already released. */
+/** Release events (newest 400) with the certificate's number, method and sticker, by Manila day. */
+type ReleaseEvent = { id: string; certificate_id: string; event_type: string; recipient_name: string | null; recipient_id_type: string | null; created_at: string; certificates?: unknown };
+function releaseRows(data: PortalData) {
+  const certs = new Map((data.certificates as unknown as (CertRow & { printed_at?: string | null })[]).map((c) => [c.id, c]));
+  return ((data as unknown as { certificateReleases?: ReleaseEvent[] }).certificateReleases ?? []).filter((r) => r.event_type === "release").map((r) => {
+    const c = first(r.certificates as { snapshot?: Record<string, unknown> | null; enrollments?: unknown } | null);
+    const e = first(c?.enrollments as { enrollment_number?: string; trainees?: unknown; courses?: unknown } | null);
+    const t = first(e?.trainees as { legal_first_name?: string; legal_last_name?: string } | null), co = first(e?.courses as { name?: string; code?: string } | null);
+    const cert = certs.get(r.certificate_id);
+    return { id: r.id, day: day(r.created_at) ?? "", at: r.created_at, name: t ? `${(t.legal_last_name ?? "").toUpperCase()}, ${t.legal_first_name ?? ""}` : e?.enrollment_number ?? "Trainee", course: co?.code ?? "", courseName: co?.name ?? "",
+      certNo: cert?.certificate_number ?? (c?.snapshot?.certificate_number as string | undefined) ?? "—", to: r.recipient_name ?? "", idType: r.recipient_id_type ?? "", method: cert?.release_method ?? "Pickup", sticker: cert?.sticker_no ?? "" };
+  });
+}
+const clock = (iso: string) => new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso));
+const longDay = (d: string) => new Intl.DateTimeFormat("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T12:00:00+08:00`));
+
+/** Released (owner, 20 Oct 2026): ready to claim on top; released certificates by date, newest day first. */
 export function ReleasedCertificates({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   const [releasing, setReleasing] = useState<CertificateLine | null>(null);
-  const lines = certificateLines(data).filter((l) => l.view.state === "Printed" || l.view.state === "Released");
-  const waiting = lines.filter((l) => l.view.state === "Printed");
+  const today = manilaToday();
+  const [from, setFrom] = useState(addDays(today, -6)), [to, setTo] = useState(today), [q, setQ] = useState("");
+  const waiting = certificateLines(data).filter((l) => l.view.state === "Printed");
+  const term = q.trim().toLowerCase();
+  const rows = releaseRows(data).filter((r) => r.day >= from && r.day <= to && (!term || `${r.name} ${r.course} ${r.courseName} ${r.certNo} ${r.sticker}`.toLowerCase().includes(term)));
+  const days = [...new Set(rows.map((r) => r.day))].sort().reverse();
+  const quick = (f: string) => { setTo(today); setFrom(f); };
+  const csv = () => downloadCsv(`released-${from}-to-${to}.csv`, [["Date", "Time", "Trainee", "Course", "Certificate No.", "Released To", "ID", "Method", "Sticker No."], ...rows.map((r) => [r.day, clock(r.at), r.name, r.course, r.certNo, r.to, r.idType, r.method, r.sticker])]);
   return <div className="portal-page cx ac">
     <Head title="Released" />
     <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Release</h2></div>
-          <dl className="ac-lines"><div><dt>Ready for release</dt><dd>{waiting.length}</dd></div><div><dt>Released</dt><dd>{lines.length - waiting.length}</dd></div><div><dt>By courier</dt><dd>{lines.filter((l) => l.cert?.release_method === "Courier").length}</dd></div></dl>
+          <dl className="ac-lines"><div><dt>Ready for release</dt><dd>{waiting.length}</dd></div><div><dt>Released in range</dt><dd>{rows.length}</dd></div><div><dt>By courier</dt><dd>{rows.filter((r) => r.method === "Courier").length}</dd></div><div><dt>Days</dt><dd>{days.length}</dd></div></dl>
         </section>
       </div>
-      <section className="portal-panel cx-panel">
-        {lines.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee · NWMTACI no.</th><th>Course</th><th>Certificate No.</th><th>Status</th><th>Action</th></tr></thead><tbody>
-          {lines.map((l, i) => <tr key={l.e.id}><td className="cl-no">{i + 1}</td><td><b>{l.name}</b> <span className="cl-mono cl-sub">{l.number.replace(/^NWMTACI-/, "")}</span></td><td title={l.course.name}>{l.course.code}</td><td className="cl-mono">{l.cert?.certificate_number ?? "—"}</td><td><Badge tone={l.view.state === "Released" ? undefined : "green"}>{l.view.state === "Released" ? "Released" : "Ready for Release"}</Badge>{l.cert?.claimant_name && <small className="cl-sub cl-block">{l.cert.claimant_name}</small>}</td><td>{l.view.state === "Printed" && <ReleaseButton primary l={l} onRelease={() => setReleasing(l)} />}</td></tr>)}
-        </tbody></table></div> : <p className="portal-empty-copy">No printed certificates yet.</p>}
-      </section>
+      <div className="ac-stack">
+        {waiting.length > 0 && <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Ready for Release</h2><span className="slot-count">{waiting.length}</span></div>
+          <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee · NWMTACI no.</th><th>Course</th><th>Certificate No.</th><th>Action</th></tr></thead><tbody>
+            {waiting.map((l, i) => <tr key={l.e.id}><td className="cl-no">{i + 1}</td><td><b>{l.name}</b> <span className="cl-mono cl-sub">{l.number.replace(/^NWMTACI-/, "")}</span></td><td title={l.course.name}>{l.course.code}</td><td className="cl-mono">{l.cert?.certificate_number ?? "—"}</td><td><ReleaseButton primary l={l} onRelease={() => setReleasing(l)} /></td></tr>)}
+          </tbody></table></div></section>}
+        <section className="portal-panel cx-panel">
+          <div className="cx-bar ac-bar rl-bar"><label>From <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label><label>To <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} /></label>
+            <span className="cx-seg"><button type="button" onClick={() => quick(today)}>Today</button><button type="button" onClick={() => quick(addDays(today, -6))}>Last 7 Days</button><button type="button" onClick={() => quick(`${today.slice(0, 8)}01`)}>This Month</button></span>
+            <input className="vx-search" aria-label="Search released" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, course, certificate or sticker no." /><button type="button" className="portal-secondary" disabled={!rows.length} onClick={csv}>Download Excel</button></div>
+          {rows.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Time</th><th>Trainee</th><th>Course</th><th>Certificate No.</th><th>Released To</th><th>Method</th><th>Sticker No.</th></tr></thead><tbody>
+            {days.map((d) => { const g = rows.filter((r) => r.day === d); return [<tr key={d} className="nb-group"><td colSpan={7}><b>{longDay(d)}</b> <span className="cl-sub">{g.length} released</span></td></tr>,
+              ...g.map((r) => <tr key={r.id}><td className="cl-mono">{clock(r.at)}</td><td><b>{r.name}</b></td><td title={r.courseName}>{r.course}</td><td className="cl-mono">{r.certNo}</td><td>{r.to}{r.idType && <small className="cl-sub cl-block">{r.idType}</small>}</td><td><Badge tone={r.method === "Courier" ? undefined : "green"}>{r.method === "Pickup" ? "Picked Up" : r.method}</Badge></td><td className="cl-mono">{r.sticker || "—"}</td></tr>)]; })}
+          </tbody></table></div> : <p className="portal-empty-copy">Nothing released in this range.</p>}
+        </section>
+      </div>
     </div>
     {releasing && <ReleaseConfirm target={{ enrollmentId: releasing.e.id, name: releasing.name, course: releasing.course.name, certNo: releasing.cert?.certificate_number ?? "" }} onClose={() => setReleasing(null)} onDone={async () => { setReleasing(null); await reload(); }} />}
+  </div>;
+}
+
+/** The days a Daily / Weekly (Monday–Sunday) / Monthly report covers, from a picked date. */
+export function reportRange(period: "Daily" | "Weekly" | "Monthly", date: string): { from: string; to: string; label: string } {
+  if (period === "Daily") return { from: date, to: date, label: longDay(date) };
+  if (period === "Monthly") { const [y, m] = date.split("-").map(Number); const last = new Date(Date.UTC(y, m, 0)).getUTCDate(); const from = `${y}-${String(m).padStart(2, "0")}-01`; return { from, to: `${from.slice(0, 8)}${last}`, label: new Intl.DateTimeFormat("en-PH", { month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(`${from}T00:00:00Z`)) }; }
+  const dow = (new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7; const from = addDays(date, -dow), to = addDays(from, 6);
+  return { from, to, label: `Week of ${fmtDate(from)} – ${fmtDate(to)}` };
+}
+
+/** Releasing Officer › Reports (owner, 20 Oct 2026): Daily, Weekly and Monthly certificate figures. */
+export function ReleasingReports({ data }: { data: PortalData }) {
+  const [period, setPeriod] = useState<"Daily" | "Weekly" | "Monthly">("Daily"), [date, setDate] = useState(manilaToday());
+  const r = reportRange(period, date);
+  const inRange = (iso?: string | null) => { const d = day(iso ?? null); return !!d && d >= r.from && d <= r.to; };
+  const certs = data.certificates as unknown as (CertRow & { printed_at?: string | null; course_id?: string })[];
+  const lines = certificateLines(data);
+  const lineByCert = new Map(lines.filter((l) => l.cert).map((l) => [l.cert!.id, l]));
+  const printedRows = certs.filter((c) => inRange(c.printed_at));
+  const firstPrints = printedRows.filter((c) => Number(c.print_count ?? 1) <= 1), reprints = printedRows.filter((c) => Number(c.print_count ?? 1) > 1);
+  const released = releaseRows(data).filter((x) => x.day >= r.from && x.day <= r.to);
+  const photos = ((data as CertData).certificatePhotos ?? []).filter((p) => inRange(p.uploaded_at));
+  const waiting = lines.filter((l) => l.view.state === "Printed"), overdue = lines.filter((l) => l.view.overdue);
+  const courseOf = (certId: string) => lineByCert.get(certId)?.course.code ?? "Other";
+  const codes = [...new Set([...printedRows.map((c) => courseOf(c.id)), ...released.map((x) => x.course || "Other")])].sort();
+  const perCourse = codes.map((code) => ({ code, printed: firstPrints.filter((c) => courseOf(c.id) === code).length, reprinted: reprints.filter((c) => courseOf(c.id) === code).length, released: released.filter((x) => (x.course || "Other") === code).length, waiting: waiting.filter((l) => l.course.code === code).length }));
+  // Releases per hour (Daily), per day (Weekly) or per week of the month (Monthly).
+  const buckets: { label: string; n: number }[] = period === "Daily" ? Array.from({ length: 10 }, (_, i) => ({ label: `${((i + 7) % 12) || 12}${i + 7 < 12 ? "AM" : "PM"}`, n: released.filter((x) => Number(new Intl.DateTimeFormat("en-GB", { hour: "2-digit", hourCycle: "h23", timeZone: "Asia/Manila" }).format(new Date(x.at))) === i + 7).length }))
+    : period === "Weekly" ? Array.from({ length: 7 }, (_, i) => { const d = addDays(r.from, i); return { label: new Intl.DateTimeFormat("en-PH", { weekday: "short", timeZone: "UTC" }).format(new Date(`${d}T00:00:00Z`)), n: released.filter((x) => x.day === d).length }; })
+    : Array.from({ length: 5 }, (_, i) => ({ label: `Wk ${i + 1}`, n: released.filter((x) => Math.floor((Number(x.day.slice(8, 10)) - 1) / 7) === i).length }));
+  const max = Math.max(1, ...buckets.map((b) => b.n));
+  const csv = () => downloadCsv(`certificate-report-${period.toLowerCase()}-${r.from}.csv`, [["Course", "Printed", "Reprinted", "Released", "Waiting for release"], ...perCourse.map((p) => [p.code, p.printed, p.reprinted, p.released, p.waiting]), ["Total", firstPrints.length, reprints.length, released.length, waiting.length], [], ["Released", "Time", "Trainee", "Course", "Certificate No.", "Released To", "Method", "Sticker No."], ...released.map((x) => [x.day, clock(x.at), x.name, x.course, x.certNo, x.to, x.method, x.sticker])]);
+  return <div className="portal-page cx ac rr-report">
+    <div className="cx-head"><div><span className="portal-eyebrow">Releasing Officer</span><h1>Certificate Report</h1></div>
+      <div className="rl-bar"><span className="cx-seg">{(["Daily", "Weekly", "Monthly"] as const).map((p) => <button key={p} type="button" className={period === p ? "on" : ""} onClick={() => setPeriod(p)}>{p}</button>)}</span>
+        <input type="date" value={date} onChange={(e) => e.target.value && setDate(e.target.value)} aria-label="Report date" />
+        <button type="button" className="portal-secondary" onClick={() => setDate(addDays(r.from, period === "Daily" ? -1 : period === "Weekly" ? -7 : -1))}>‹</button><button type="button" className="portal-secondary" onClick={() => setDate(addDays(r.to, 1))}>›</button>
+        <button type="button" className="portal-secondary" onClick={csv}>Download Excel</button><button type="button" className="portal-primary" onClick={() => window.print()}>Print / Save PDF</button></div></div>
+    <p className="ac-note"><b>{r.label}</b>. Waiting for release and overdue are as of now.</p>
+    <div className="cx-tiles ac-tiles">
+      {[["Printed", firstPrints.length, "first prints"], ["Reprinted", reprints.length, "paid or Admin-approved"], ["Released", released.length, `${released.filter((x) => x.method === "Courier").length} by courier`], ["Waiting for Release", waiting.length, "printed, not claimed"], ["Overdue to Print", overdue.length, "due before today"], ["Photos Uploaded", photos.length, "2x2 photos"]].map(([label, n, sub]) => <div key={label as string} className="cx-tile ac-count"><span>{label}</span><b>{n}</b><small className="cl-sub">{sub}</small></div>)}
+    </div>
+    <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Released {period === "Daily" ? "by Hour" : period === "Weekly" ? "by Day" : "by Week"}</h2></div>
+      <div className="rr-chart" aria-label="Certificates released">{buckets.map((b) => <div key={b.label} className="rr-col"><span className="rr-n">{b.n || ""}</span><div className="rr-bar" style={{ height: `${Math.max(3, (b.n / max) * 100)}%` }} /><span className="rr-x">{b.label}</span></div>)}</div>
+      <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th className="r">Printed</th><th className="r">Reprinted</th><th className="r">Released</th><th className="r">Waiting</th></tr></thead><tbody>
+        {perCourse.map((p) => <tr key={p.code}><td><b>{p.code}</b></td><td className="r cl-mono">{p.printed}</td><td className="r cl-mono">{p.reprinted}</td><td className="r cl-mono">{p.released}</td><td className="r cl-mono">{p.waiting}</td></tr>)}
+        <tr className="nb-group"><td><b>Total</b></td><td className="r cl-mono"><b>{firstPrints.length}</b></td><td className="r cl-mono"><b>{reprints.length}</b></td><td className="r cl-mono"><b>{released.length}</b></td><td className="r cl-mono"><b>{waiting.length}</b></td></tr>
+      </tbody></table></div>
+      {!perCourse.length && <p className="portal-empty-copy">No certificates printed or released in this period.</p>}
+    </section>
   </div>;
 }
 
