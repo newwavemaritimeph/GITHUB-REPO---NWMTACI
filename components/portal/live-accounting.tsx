@@ -816,7 +816,7 @@ function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canM
     <>
       {!canManage && <div className="portal-message error">Only Admin and Accounting can edit courses, centers, and pricing.</div>}
       <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Courses</h2><p>Pick a course from the list to edit, or add a new one</p></div>{canManage && <div style={{ display: "flex", gap: "8px", alignItems: "center" }}><select value="" onChange={(e) => { const c = data.courses.find((x) => x.id === e.target.value); if (c) { setError(""); setEdit({ kind: "course", id: c.id, code: c.code, name: c.name, categoryId: c.category_id ?? defaultCategory, deliveryType: c.delivery_type === "Partner or Endorsed" ? "Partner or Endorsed" : "In-House", durationLabel: c.duration_label ?? "", durationDays: String(c.duration_days ?? 1), mode: c.training_mode ?? "In-person", price: String(c.standard_price_centavos / 100) }); } }} style={{ maxWidth: 240 }}><option value="">Select a Course…</option>{data.courses.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select><button className="portal-primary" disabled={busy} onClick={() => { setError(""); setEdit({ kind: "course", code: "", name: "", categoryId: defaultCategory, deliveryType: "In-House", durationLabel: "1 day", durationDays: "1", mode: "In-person", price: "0" }); }}>+ Add Course</button></div>}</div>
+        <div className="panel-heading"><div><h2>Courses</h2><p>Pick a course from the list to edit, or add a new one</p></div>{canManage && <div style={{ display: "flex", gap: "8px", alignItems: "center" }}><select value="" onChange={(e) => { const c = data.courses.find((x) => x.id === e.target.value); if (c) { setError(""); setEdit({ kind: "course", id: c.id, code: c.code, name: c.name, categoryId: c.category_id ?? defaultCategory, deliveryType: c.delivery_type === "Partner or Endorsed" ? "Partner or Endorsed" : "In-House", durationLabel: c.duration_label ?? "", durationDays: String(c.duration_days ?? 1), mode: c.training_mode ?? "In-person", price: String(c.standard_price_centavos / 100) }); } }} style={{ maxWidth: 240 }}><option value="">Select a Course…</option>{data.courses.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select><button className="portal-primary" disabled={busy} onClick={() => { setError(""); setEdit({ kind: "course", code: "", name: "", categoryId: defaultCategory, deliveryType: "In-House", durationLabel: "1 Day", durationDays: "1", mode: "In-person", price: "0" }); }}>+ Add Course</button></div>}</div>
         <div className="portal-table"><table><thead><tr><th>Course</th><th>Type</th><th>Duration</th><th>Price</th><th>Edited</th><th></th></tr></thead><tbody>
           {data.courses.map((c) => (
             <tr key={c.id}>
@@ -1490,7 +1490,7 @@ function EndorsedPrograms({ data, busy, post }: { data: AccountingData; busy: bo
   const centers = data.partnerCenters.filter((c) => c.active);
   const [centerId, setCenterId] = useState(centers[0]?.id ?? "");
   const center = centers.find((c) => c.id === centerId) ?? centers[0];
-  const blank = { name: "", code: "", duration: "1 day", fee: "", rebate: "", share: "" };
+  const blank = { name: "", code: "", duration: "1 Day", fee: "", rebate: "", share: "" };
   const [editing, setEditing] = useState<{ id: string; fee: string; rebate: string; share: string } | null>(null);
   const shareOf = (o: unknown) => Number((o as { agency_share_centavos?: number }).agency_share_centavos ?? 0);
   const [form, setForm] = useState(blank), [problem, setProblem] = useState(""), [done, setDone] = useState("");
@@ -1511,7 +1511,7 @@ function EndorsedPrograms({ data, busy, post }: { data: AccountingData; busy: bo
   const edit = (patch: Partial<typeof blank>) => { setProblem(""); setDone(""); setForm({ ...form, ...patch }); };
   async function add() {
     if (!center) return;
-    const courseName = form.name.trim(), courseCode = form.code.trim(), durationLabel = form.duration.trim() || "1 day";
+    const courseName = form.name.trim(), courseCode = form.code.trim(), durationLabel = form.duration.trim() || "1 Day";
     if (courseName.length < 2) { setProblem("Enter the course name."); return; }
     if (courseCode.length < 2) { setProblem("Enter the course code."); return; }
     if (fee == null) { setProblem("Enter the training fee."); return; }
@@ -1705,7 +1705,7 @@ function CoursesModule({ data, busy, post, reload }: { data: AccountingData; bus
   const term = q.trim().toLowerCase();
   const shown = pool.filter((c) => !term || `${c.code} ${c.name}`.toLowerCase().includes(term));
   const count = (f: typeof filter) => (f === "Archived" ? archived.length : own.filter((c) => (f === "STCW") === stcw(c)).length);
-  const open = (c?: Row) => { setProblem(""); setDone(""); setForm(c ? { id: c.id, code: c.code, name: c.name, categoryId: c.category_id ?? "", durationLabel: c.duration_label ?? "", durationDays: String(c.duration_days ?? ""), mode: c.training_mode ?? "Face-to-Face", price: String(Number(c.standard_price_centavos) / 100), publicVisible: c.public_visible !== false } : { code: "", name: "", categoryId: data.courseCategories[0]?.id ?? "", durationLabel: "1 day", durationDays: "1", mode: "Face-to-Face", price: "", publicVisible: true }); };
+  const open = (c?: Row) => { setProblem(""); setDone(""); setForm(c ? { id: c.id, code: c.code, name: c.name, categoryId: c.category_id ?? "", durationLabel: c.duration_label ?? "", durationDays: String(c.duration_days ?? ""), mode: c.training_mode ?? "Face-to-Face", price: String(Number(c.standard_price_centavos) / 100), publicVisible: c.public_visible !== false } : { code: "", name: "", categoryId: data.courseCategories[0]?.id ?? "", durationLabel: "1 Day", durationDays: "1", mode: "Face-to-Face", price: "", publicVisible: true }); };
   async function save() {
     if (!form) return;
     const days = Number(form.durationDays), price = Number(form.price);
@@ -1753,7 +1753,7 @@ function CoursesModule({ data, busy, post, reload }: { data: AccountingData; bus
         <tbody>{shown.map((c) => <tr key={c.id} className={filter === "Archived" ? "pm-archived" : ""}>
           <td className="pm-name"><strong>{c.name}</strong><small className="cx-mono">{c.code}</small></td>
           <td>{cats.get(c.category_id ?? "") ?? "—"}</td>
-          <td>{c.duration_label ?? "—"}{c.duration_days ? <small>{Number(c.duration_days) * 8} hours</small> : null}</td>
+          <td>{c.duration_label ?? "—"}{c.duration_days ? <small>{Number(c.duration_days) * 8} Hours</small> : null}</td>
           <td className="r cx-mono">{pesos(Number(c.standard_price_centavos))}</td>
           <td><span className={`ac-chip ${c.public_visible === false ? "warn" : "ok"}`}>{c.public_visible === false ? "Hidden" : "Shown"}</span></td>
           <td>{templates.has(c.id) ? <span className="ac-chip ok">✓ On File</span> : <span className="ac-chip warn">None</span>}</td>
