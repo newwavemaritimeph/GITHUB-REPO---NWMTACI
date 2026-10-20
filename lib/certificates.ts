@@ -6,6 +6,7 @@ import { corrected, type CertificateCorrections } from "@/lib/certificate-photo"
 import { detectPhotoBox } from "@/lib/certificate-template";
 import { certificateLayout, isHazmatCfr } from "@/lib/certificate-layouts";
 import { drawTemplateFields, isFieldsV2 } from "@/lib/certificate-overlay";
+import { bundledLayout } from "@/lib/certificate-template-layouts";
 import { newVerifyCode, verifyUrl } from "@/lib/certificate-verify";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
@@ -152,15 +153,15 @@ async function templateBytes(db: Admin, courseId: string) {
   if (row.drive_file_id) {
     const cachePath = `drive/${row.drive_file_id}`;
     const cached = await db.storage.from("certificate-templates").download(cachePath);
-    if (!cached.error && cached.data) return { id: row.id, bytes: new Uint8Array(await cached.data.arrayBuffer()), fields: row.fields };
+    if (!cached.error && cached.data) return { id: row.id, bytes: new Uint8Array(await cached.data.arrayBuffer()), fields: row.fields, storagePath: null as string | null };
     const bytes = await downloadDriveFile(row.drive_file_id);
     await db.storage.from("certificate-templates").upload(cachePath, bytes, { contentType: isPdf(bytes) ? "application/pdf" : isPng(bytes) ? "image/png" : "image/jpeg", upsert: true });
-    return { id: row.id, bytes, fields: row.fields };
+    return { id: row.id, bytes, fields: row.fields, storagePath: null as string | null };
   }
   if (!row.storage_path) return null;
   const file = await db.storage.from("certificate-templates").download(row.storage_path);
   if (file.error || !file.data) throw new Error("The certificate template file could not be read.");
-  return { id: row.id, bytes: new Uint8Array(await file.data.arrayBuffer()), fields: row.fields };
+  return { id: row.id, bytes: new Uint8Array(await file.data.arrayBuffer()), fields: row.fields, storagePath: row.storage_path as string | null };
 }
 
 /** Downloads a Drive file shared as "Anyone with the link can view". */
@@ -211,9 +212,11 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold), reg = await pdf.embedFont(StandardFonts.Helvetica);
   // A course with its own layout (HAZMAT with CFR) is filled like New Wave's sample certificate.
   const layout = certificateLayout(ctx.course);
-  if (isFieldsV2(tpl.fields)) {
-    // Templates converted from New Wave's Word files (scripts/certificate-templates, 20 Oct 2026).
-    await drawTemplateFields(pdf, page, tpl.fields, { name: String(traineeName), startsOn: startsOn ?? null, endsOn: endsOn ?? null, issuedOn: String(issuedOn), certificateNumber: number, registrationNumber: regNo ?? "", verifyUrl: ctx.cert?.verify_code ? verifyUrl(ctx.cert.verify_code) : null, copyNo: mode === "print" ? Number(ctx.cert?.print_count ?? 0) + 1 : undefined });
+  // Templates converted from New Wave's Word files (scripts/certificate-templates, 20 Oct 2026):
+  // positions from the upload, else the bundled ones for that converted file.
+  const v2 = isFieldsV2(tpl.fields) ? tpl.fields : bundledLayout(tpl.storagePath);
+  if (v2) {
+    await drawTemplateFields(pdf, page, v2, { name: String(traineeName), startsOn: startsOn ?? null, endsOn: endsOn ?? null, issuedOn: String(issuedOn), certificateNumber: number, registrationNumber: regNo ?? "", verifyUrl: ctx.cert?.verify_code ? verifyUrl(ctx.cert.verify_code) : null, copyNo: mode === "print" ? Number(ctx.cert?.print_count ?? 0) + 1 : undefined });
   } else if (layout) {
     await layout(pdf, page, { name: String(traineeName), startsOn: startsOn ?? null, endsOn: endsOn ?? null, issuedOn: String(issuedOn), certificateNumber: number, registrationNumber: regNo ?? "" });
   } else {

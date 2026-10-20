@@ -72,3 +72,14 @@ describe("8:00 PM certificate report", () => {
     expect(s.spread).toEqual([{ certNo: "HPT-00131", devices: 3 }]);
   });
 });
+
+describe("bundled template positions", () => {
+  it("find the converted template's fields from its stored file name", async () => {
+    const { bundledLayout } = await import("../lib/certificate-template-layouts");
+    const f = bundledLayout("course-id/0b6f2a8e-1c2d-4e5f-8a9b-0c1d2e3f4a5b-ABC---Awareness-on-Basic-Computer.pdf");
+    expect(f?.version).toBe(2);
+    expect(f?.conducted?.text).toContain("Conducted on [DATE]");
+    expect(bundledLayout("course-id/0b6f2a8e-1c2d-4e5f-8a9b-0c1d2e3f4a5b-some-other-design.pdf")).toBeNull();
+    expect(bundledLayout(null)).toBeNull();
+  });
+});
