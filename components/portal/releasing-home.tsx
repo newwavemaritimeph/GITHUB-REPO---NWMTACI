@@ -370,7 +370,7 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
       </div>
       <section className="portal-panel cx-panel">
         <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search any course by name or code" /><span className="cx-seg">{(["All", "With Template", "No Template"] as const).map((f) => <button key={f} type="button" className={show === f ? "on" : ""} onClick={() => setShow(f)}>{f}</button>)}</span>
-          <label className="portal-primary tp-upload">Upload Many PDFs<input type="file" accept="application/pdf,application/json,.json" multiple hidden disabled={bulkBusy} onChange={(e) => { pickMany(e.target.files); e.target.value = ""; }} /></label></div>
+          <label className="portal-primary tp-upload">Upload<input type="file" accept="application/pdf,application/json,.json" multiple hidden disabled={bulkBusy} onChange={(e) => { pickMany(e.target.files); e.target.value = ""; }} /></label></div>
         {bulk && <div className="tp-bulk">
           <p className="tp-group"><b>Check the Matches</b><span>{bulk.filter((r) => r.courseId).length} of {bulk.length} matched</span></p>
           <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>File</th><th>Course</th><th>Status</th></tr></thead><tbody>
