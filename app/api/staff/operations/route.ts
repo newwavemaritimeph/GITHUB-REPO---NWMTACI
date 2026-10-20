@@ -669,8 +669,8 @@ export async function GET() {
       db.from("certificates").select("id,corrections").order("created_at", { ascending: false }).limit(300),
       createSupabaseAdminClient().from("certificate_photos").select("enrollment_id,file_name,background_white,uploaded_at,replaced_at,profiles:uploaded_by(complete_name)").limit(5000),
       db.from("certificate_series").select("course_id,reg_prefix,reg_next,reg_digits,reg_style"),
-      // Revocation, sticker and the evaluation PDF in Drive (migration 202610200047).
-      db.from("certificates").select("id,revoked_at,revoked_reason,sticker_no").order("created_at", { ascending: false }).limit(300),
+      // Revocation, sticker and the evaluation PDF in Drive (migration 202610200047); Registration No. (037) and who printed, for Reports.
+      db.from("certificates").select("id,revoked_at,revoked_reason,sticker_no,registration_number,printer:printed_by(complete_name)").order("created_at", { ascending: false }).limit(300),
       db.from("training_feedback").select("enrollment_id,drive_link,comments").order("submitted_at", { ascending: false }).limit(2000),
     ]);
     const regByCourse = new Map(((regSeries.error ? [] : regSeries.data ?? []) as { course_id: string }[]).map((r) => [r.course_id, r]));

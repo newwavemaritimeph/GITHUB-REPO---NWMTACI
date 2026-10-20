@@ -1,0 +1,83 @@
+<title>Waiting Layout Designs</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+:root{--blue:#0571D0;--orange:#F25615;--navy:#123F63;--bg:#f1f6f9;--surface:#fff;--line:#d8e4ec;--fg:#0f2638;--muted:#58707f;--soft:#eaf6fa;--th:#e3f6fb;--okbg:#e3f4ea;--ok:#0a7a3e;--badbg:#fde4dc;--bad:#c2410c;--waitbg:#eef1f5;--wait:#64748b;--infobg:#e2effc;--info:#0b5cad;--soon:#fff8e6;--sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--badbg:#3a2016;--bad:#ffad78;--waitbg:#1a2a38;--wait:#a3b4c4;--infobg:#132f4a;--info:#7cc0ff;--soon:#2b2614;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--badbg:#3a2016;--bad:#ffad78;--waitbg:#1a2a38;--wait:#a3b4c4;--infobg:#132f4a;--info:#7cc0ff;--soon:#2b2614;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}button{font:inherit;color:inherit;cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.bar{background:var(--navy);color:#fff;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}.bar b{letter-spacing:.04em}.bar span{display:block;font-size:13px;opacity:.85}
+.page{max-width:1180px;margin:0 auto;padding-block:18px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}.tabs button{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 13px;font-weight:600;font-size:13.5px}.tabs button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+h1{margin:0;font-size:22px}.lead{margin:0;color:var(--muted);font-size:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13.5px}th{background:var(--th);color:var(--muted);font:600 11px var(--sans);letter-spacing:.07em;text-transform:uppercase;text-align:left;padding:8px 10px;white-space:nowrap}td{padding:8px 10px;border-top:1px solid var(--line);vertical-align:middle}td small,.sub{display:block;color:var(--muted);font-size:12px}.c{text-align:center}
+tr.soon td{background:var(--soon)}
+.name b{font-weight:600}.name .mono{color:var(--muted);font-size:12px;margin-left:6px}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}.y{background:var(--okbg);color:var(--ok)}.n{background:var(--badbg);color:var(--bad)}.w{background:var(--waitbg);color:var(--wait)}.i{background:var(--infobg);color:var(--info)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--info);border-radius:8px;padding:5px 11px;font-weight:600;font-size:13px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}
+.ico{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:99px;font-size:12.5px;font-weight:700}
+/* 1 stepper */
+.steps{display:flex;align-items:center;gap:0;min-width:300px}.st{display:flex;flex-direction:column;align-items:center;gap:2px;flex:1;position:relative;font-size:11px;color:var(--muted);text-align:center}.st::before{content:"";position:absolute;top:11px;left:-50%;width:100%;height:2px;background:var(--line);z-index:0}.st:first-child::before{display:none}.st.y::before{background:var(--ok)}.st .ico{position:relative;z-index:1}.st.y,.st.n,.st.w{background:none}
+.st.y .ico{background:var(--ok);color:#fff}.st.n .ico{background:var(--surface);color:var(--bad);border:2px solid var(--bad)}.st.w .ico{background:var(--waitbg);color:var(--wait);border:2px dashed var(--wait)}.st.n span{color:var(--bad);font-weight:600}
+.nx b{display:block;font-size:13.5px}.nx{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+/* 3 cards */
+.groups{display:flex;flex-direction:column;gap:14px}.ghead{display:flex;align-items:center;gap:8px;margin:0 0 8px}.ghead h2{margin:0;font-size:15px}.ghead span{font:600 12px var(--mono);color:var(--muted)}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}.card{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--c,var(--line));border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;min-width:0}.card .top{display:flex;justify-content:space-between;gap:8px}.card .meta{font-size:13px;color:var(--muted)}.chips{display:flex;flex-wrap:wrap;gap:5px}
+/* 4 two-line */
+.list{display:flex;flex-direction:column}.row2{padding:10px 16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px}.row2:first-child{border-top:0}.row2.soon{background:var(--soon)}.l1{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:baseline}.l1 .when{margin-left:auto;font-size:13px;color:var(--muted)}.l2{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.l2 .go{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:13px;flex-wrap:wrap}
+/* 5 board */
+.board{display:grid;grid-template-columns:repeat(4,minmax(220px,1fr));gap:10px;overflow-x:auto;padding-bottom:4px}.col{background:var(--soft);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}.col h3{margin:0;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);display:flex;justify-content:space-between}.kc{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 11px;display:flex;flex-direction:column;gap:5px;font-size:13px}.kc b{font-size:14px}
+.legend{font-size:12.5px;color:var(--muted)}
+@media (max-width:640px){.l1 .when{margin-left:0;width:100%}.l2 .go{margin-left:0}}
+</style>
+
+<div class="bar"><b>NEW WAVE MARITIME · RELEASING OFFICER</b><span>Waiting · 5 layout designs · sample data · pick one</span></div>
+<main class="page">
+  <nav class="tabs" id="tabs"></nav>
+  <div><h1 id="title"></h1><p class="lead" id="lead"></p></div>
+  <div id="view"></div>
+  <p class="legend">Shaded rows can be ready by tomorrow. Every design keeps search, the Waiting For tiles and the Ready Soon panel as they are today.</p>
+</main>
+
+<script>
+// k: y done · n missing · w waiting (time)
+const P = [
+  {n:"RAMOS, HERWIN",w:"0000005",c:"APA",cn:"Anti Piracy Awareness Prevention and Response",d:"Oct 17",st:"Evaluation",soon:false,ck:{Training:"y",Paid:"y",Photo:"y","Post-Test":"y",Evaluation:"n"},next:"Trainee submits the evaluation",then:"From the Trainee Status page",act:"Email Post-Test and Evaluation"},
+  {n:"SANTOS, MARIA",w:"0000011",c:"ESEA",cn:"Enclosed Space Entry Awareness",d:"Oct 16 – 17",st:"Post-Test",soon:false,ck:{Training:"y",Paid:"y",Photo:"y","Post-Test":"n",Evaluation:"y"},next:"Trainee passes the post-test",then:"Best 6/10 · 2 attempts",act:"Email Post-Test and Evaluation"},
+  {n:"DELA CRUZ, JUAN",w:"0000014",c:"ABC",cn:"Awareness on Basic Computer",d:"Oct 19",st:"Photo Needed",soon:true,ck:{Training:"y",Paid:"y",Photo:"n","Post-Test":"y",Evaluation:"y"},next:"Upload the 2x2 photo",then:"White background",act:"Upload Photo",pri:true},
+  {n:"GARCIA, LEO",w:"0000020",c:"DWK",cn:"Deck Watchkeeping",d:"Oct 19 – 21",st:"In Training",soon:true,ck:{Training:"w",Paid:"y",Photo:"y","Post-Test":"w",Evaluation:"w"},next:"Training ends Oct 21",then:"Nothing else missing",act:""},
+  {n:"MENDOZA, ANA",w:"0000023",c:"HPT",cn:"Hazmat Packaging Training",d:"Oct 20 – 24",st:"In Training",soon:false,ck:{Training:"w",Paid:"y",Photo:"n","Post-Test":"w",Evaluation:"w"},next:"Training ends Oct 24",then:"Also needs: photo",act:"Upload Photo"},
+];
+const K = Object.keys(P[0].ck), mark = {y:"✓",n:"✗",w:"◷"};
+const tone = (s) => s==="In Training"?"w":s==="Evaluation"||s==="Post-Test"?"i":"n";
+const btn = (p) => p.act ? `<button class="btn ${p.pri?"pri":""}">${p.act}</button>` : `<span class="sub">No action yet</span>`;
+const name = (p) => `<span class="name"><b>${p.n}</b><span class="mono">${p.w}</span></span>`;
+const missingChips = (p) => K.filter((k)=>p.ck[k]!=="y").map((k)=>`<span class="pill ${p.ck[k]}">${mark[p.ck[k]]} ${k}</span>`).join(" ");
+const D = [
+  {t:"1 · Progress Steps",l:"One line per trainee. A five-dot stepper shows what is done; the red ring is what's missing. Next step and its button sit at the right.",
+   r:()=>`<div class="panel wrap"><table><thead><tr><th>#</th><th>Trainee · NWMTACI No.</th><th>Course · Training</th><th>Progress</th><th>Next Step</th></tr></thead><tbody>${P.map((p,i)=>`<tr class="${p.soon?"soon":""}"><td class="sub">${i+1}</td><td>${name(p)}</td><td title="${p.cn}"><b>${p.c}</b><small>${p.d}</small></td>
+     <td><div class="steps">${K.map((k)=>`<div class="st ${p.ck[k]}"><span class="ico">${mark[p.ck[k]]}</span><span>${k}</span></div>`).join("")}</div></td>
+     <td><div class="nx"><b>${p.next}</b><small>${p.then}</small>${btn(p)}</div></td></tr>`).join("")}</tbody></table></div>`},
+  {t:"2 · Compact Table",l:"Densest. Each check is its own narrow column with a ✓ / ✗ / ◷ icon, so you can scan down a column (e.g. every missing Photo).",
+   r:()=>`<div class="panel wrap"><table><thead><tr><th>#</th><th>Trainee · NWMTACI No.</th><th>Course</th><th>Training</th>${K.map((k)=>`<th class="c">${k}</th>`).join("")}<th>Next Step</th><th></th></tr></thead><tbody>${P.map((p,i)=>`<tr class="${p.soon?"soon":""}"><td class="sub">${i+1}</td><td>${name(p)}</td><td title="${p.cn}"><b>${p.c}</b></td><td>${p.d}</td>
+     ${K.map((k)=>`<td class="c"><span class="ico pill ${p.ck[k]}" title="${k}">${mark[p.ck[k]]}</span></td>`).join("")}<td><b style="font-size:13.5px">${p.next}</b><small>${p.then}</small></td><td>${btn(p)}</td></tr>`).join("")}</tbody></table></div>`},
+  {t:"3 · Cards by What's Missing",l:"Grouped by the one thing holding each certificate back, so you work one group at a time (all photos, then all evaluations).",
+   r:()=>{ const g=[["Photo Needed","var(--bad)"],["Post-Test","var(--blue)"],["Evaluation","var(--blue)"],["In Training","var(--wait)"]];
+     return `<div class="groups">${g.map(([s,c])=>{const l=P.filter((p)=>p.st===s); return l.length?`<section><div class="ghead"><h2>${s}</h2><span>${l.length}</span></div><div class="cards">${l.map((p)=>`<div class="card" style="--c:${c}">
+       <div class="top">${name(p)}${p.soon?`<span class="pill i">Ready Soon</span>`:""}</div><div class="meta"><b>${p.c}</b> · ${p.d}</div>
+       <div class="chips">${missingChips(p)}</div><div class="sub">${p.next} · ${p.then}</div><div>${btn(p)}</div></div>`).join("")}</div></section>`:""}).join("")}</div>`}},
+  {t:"4 · Two-Line Rows",l:"Line one is who and when; line two shows only what's still missing plus the button. Works well on a phone.",
+   r:()=>`<div class="panel list">${P.map((p,i)=>`<div class="row2 ${p.soon?"soon":""}"><div class="l1"><span class="sub" style="display:inline">${i+1}</span>${name(p)}<span title="${p.cn}"><b>${p.c}</b></span><span class="when">${p.d} · <span class="pill ${tone(p.st)}">${p.st}</span></span></div>
+     <div class="l2">${missingChips(p)}<span class="go"><span class="sub" style="display:inline">${p.next}</span>${btn(p)}</span></div></div>`).join("")}</div>`},
+  {t:"5 · Board",l:"Columns by stage; each certificate is a card that moves right on its own as checks turn green, until it leaves for Certificates › Due.",
+   r:()=>{ const cols=[["In Training",(p)=>p.st==="In Training"],["Post-Test / Evaluation",(p)=>p.st==="Post-Test"||p.st==="Evaluation"],["Photo Needed",(p)=>p.st==="Photo Needed"],["Ready Tomorrow",(p)=>p.soon&&p.st!=="In Training"]];
+     return `<div class="board">${cols.map(([h,f])=>{const l=P.filter(f);return `<div class="col"><h3>${h}<span class="mono">${l.length}</span></h3>${l.map((p)=>`<div class="kc">${name(p)}<span><b>${p.c}</b> · ${p.d}</span><div class="chips">${missingChips(p)}</div>${btn(p)}</div>`).join("")||`<span class="sub">None</span>`}</div>`}).join("")}</div>`}},
+];
+let cur=0;
+function render(){ document.getElementById("tabs").innerHTML=D.map((d,i)=>`<button class="${i===cur?"on":""}" data-i="${i}">${d.t}</button>`).join("");
+  document.getElementById("title").textContent=D[cur].t; document.getElementById("lead").textContent=D[cur].l; document.getElementById("view").innerHTML=D[cur].r(); }
+document.addEventListener("click",(e)=>{const b=e.target.closest("[data-i]"); if(b){cur=+b.dataset.i; render();}});
+render();
+</script>

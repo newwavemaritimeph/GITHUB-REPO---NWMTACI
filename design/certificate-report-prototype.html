@@ -1,0 +1,142 @@
+<title>Printed Certificates Report</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+:root{--blue:#0571D0;--cyan:#35CCFA;--orange:#F25615;--navy:#123F63;--bg:#f1f6f9;--surface:#fff;--line:#d8e4ec;--fg:#0f2638;--muted:#58707f;--soft:#eaf6fa;--th:#e3f6fb;--okbg:#e3f4ea;--ok:#0a7a3e;--warnbg:#fde9dd;--warn:#b4480f;--badbg:#fbe4dc;--bad:#b42318;--infobg:#e2effc;--info:#0b5cad;--paper:#fff;--ink:#111;--sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}button,input{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.bar{background:var(--navy);color:#fff;padding-block:12px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.brand{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}.brand b{letter-spacing:.04em}.brand span{font-size:13px;opacity:.85}
+.views{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap}.views span{color:#fff;padding:9px 13px;border-radius:10px 10px 0 0;font-weight:500;font-size:14px;opacity:.8}.views span.on{background:var(--bg);color:var(--fg);opacity:1;box-shadow:inset 0 3px 0 var(--orange)}
+.page{max-width:1240px;margin:0 auto;padding-block:18px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}h1{margin:2px 0 0;font-size:25px}h2{margin:0;font-size:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.tools input{border:1px solid var(--line);border-radius:8px;padding:6px 9px;background:var(--surface)}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}.seg button{border:0;background:none;padding:7px 13px;font-weight:600;font-size:13.5px}.seg button.on{background:var(--navy);color:#fff}.seg b{font:600 11.5px var(--mono);margin-left:5px;opacity:.75}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 12px;font-weight:500;font-size:13.5px}.pri{background:var(--orange);color:#fff;border:0;border-radius:8px;padding:7px 14px;font-weight:600;font-size:13.5px}
+.note{background:var(--infobg);color:var(--info);border-radius:10px;padding:10px 14px;font-size:13.5px}
+.alerts{display:flex;gap:8px;flex-wrap:wrap}.alert{border:0;background:var(--warnbg);color:var(--warn);border-radius:10px;padding:8px 12px;font-size:13.5px;font-weight:500;text-align:left}.alert.bad{background:var(--badbg);color:var(--bad)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px}.tile span{display:block;font-size:12.5px;color:var(--muted)}.tile b{font:600 22px var(--mono)}.tile small{display:block;color:var(--muted);font-size:12px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;flex-wrap:wrap}.ph small{color:var(--muted)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:0 16px 12px}.filters input{flex:1 1 240px;min-width:0;border:1px solid var(--line);border-radius:8px;padding:7px 10px;background:var(--surface)}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13.5px}th{background:var(--th);color:var(--muted);font:600 11px var(--sans);letter-spacing:.07em;text-transform:uppercase;text-align:left;padding:7px 10px;white-space:nowrap}td{padding:7px 10px;border-top:1px solid var(--line);vertical-align:top}td small{display:block;color:var(--muted);font-size:12px}.r{text-align:right}.no{color:var(--muted);font:500 12px var(--mono)}
+.daygrp td{background:var(--soft);font-weight:700;color:var(--navy)}.daygrp small{display:inline;font-weight:500;margin-left:8px}
+:root[data-theme="dark"] .daygrp td{color:var(--fg)}@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .daygrp td{color:var(--fg)}}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}.ok{background:var(--okbg);color:var(--ok)}.warn{background:var(--warnbg);color:var(--warn)}.bad{background:var(--badbg);color:var(--bad)}.info{background:var(--infobg);color:var(--info)}.mut{background:var(--soft);color:var(--muted)}
+.miss{color:var(--warn);font-size:12.5px;font-weight:600}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:13.5px;max-width:calc(100% - 32px)}
+/* Print view: what Print / Save PDF produces (A4 landscape). */
+.sheetwrap{overflow-x:auto;background:#cfd9e0;border-radius:14px;padding:18px}
+.sheet{width:1060px;margin:0 auto;background:var(--paper);color:var(--ink);padding:34px 38px;font-size:11.5px;box-shadow:0 4px 18px #0003}
+.sheet .lh{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2.5px solid #F25615;padding-bottom:10px}.sheet .lh b{font-size:16px;color:#123F63;display:block}.sheet .lh span{color:#444}
+.sheet h3{margin:14px 0 2px;font-size:15px;color:#123F63}.sheet .sub{color:#555;margin-bottom:10px}
+.sheet table{font-size:10.5px}.sheet th{background:#e3f6fb;color:#123F63;font-size:9px;padding:5px 6px}.sheet td{padding:4px 6px;border-top:1px solid #ccd;color:#111}.sheet td small{color:#555;font-size:9.5px}
+.sheet .tot{display:flex;gap:22px;margin:10px 0;color:#123F63;font-weight:600}.sheet .sign{display:flex;justify-content:space-between;gap:40px;margin-top:40px}.sheet .sign div{flex:1;border-top:1px solid #333;padding-top:4px;text-align:center;color:#333}
+</style>
+
+<div class="bar"><div class="brand"><b>NEW WAVE MARITIME · PORTAL</b><span>Prototype · Working as Releasing Officer · sample data</span></div>
+  <nav class="views"><span>Dashboard</span><span>Certificates</span><span>Released</span><span>Delivery</span><span class="on">Reports</span></nav></div>
+<main class="page" id="page"></main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const T = "2026-10-20";
+const R = [
+  // d: print date, t: time, by, n: trainee, w: NWMTACI no., c/cn: course, reg, cert, st: sticker (doc no.), cp: copy, bal: centavos, s: status, rd: released date, m: method
+  {d:"2026-10-20",t:"9:12 AM",by:"J. Ramos",n:"ESGUERRA, Kate",w:"2610-0412",c:"ABC",cn:"Awareness on Basic Computer",reg:"NWMTC00412-102026",cert:"ABC-00150",st:"HS-0045871",cp:1,bal:0,s:"Released",rd:"2026-10-20",m:"Picked Up"},
+  {d:"2026-10-20",t:"9:20 AM",by:"J. Ramos",n:"DELA CRUZ, Juan",w:"2610-0398",c:"UBT-PSSR",cn:"Updating Training on Basic Training – PSSR",reg:"NWMTC00413-102026",cert:"UBT-08812",st:"HS-0045872",cp:1,bal:0,s:"Waiting"},
+  {d:"2026-10-20",t:"10:05 AM",by:"J. Ramos",n:"SANTOS, Maria",w:"2610-0377",c:"PSCMT",cn:"Proficiency in Crowd Management Training",reg:"NWMTC00414-102026",cert:"PSCMT-02231",st:"",cp:1,bal:0,s:"Waiting"},
+  {d:"2026-10-20",t:"10:40 AM",by:"J. Ramos",n:"REYES, Paolo",w:"2610-0360",c:"STPPDSPPS",cn:"Safety Training for Personnel Providing Direct Service to Passengers",reg:"NWMTC00415-102026",cert:"STP-01977",st:"HS-0045874",cp:1,bal:50000,s:"Waiting"},
+  {d:"2026-10-20",t:"1:15 PM",by:"J. Ramos",n:"MENDOZA, Ana",w:"2609-0288",c:"HPT",cn:"Hazmat Packaging Training",reg:"NWMTC00321-092026",cert:"HPT-00149",st:"HS-0045875",cp:2,bal:0,s:"Released",rd:"2026-10-20",m:"Picked Up"},
+  {d:"2026-10-20",t:"2:30 PM",by:"J. Ramos",n:"GARCIA, Leo",w:"2610-0402",c:"PSCMHBT",cn:"Proficiency in Crisis Management and Human Behavior Training",reg:"NWMTC00416-102026",cert:"PSC-01102",st:"HS-0045876",cp:1,bal:0,s:"Void",note:"Misprint — with the Admin"},
+  {d:"2026-10-19",t:"9:02 AM",by:"J. Ramos",n:"VILLANUEVA, Rico",w:"2610-0351",c:"UBT-PSSR",cn:"Updating Training on Basic Training – PSSR",reg:"NWMTC00405-102026",cert:"UBT-08811",st:"HS-0045860",cp:1,bal:0,s:"Released",rd:"2026-10-19",m:"Picked Up"},
+  {d:"2026-10-19",t:"11:30 AM",by:"J. Ramos",n:"TORRES, Bea",w:"2610-0349",c:"CCMD",cn:"Crowd and Crisis Management Domestic",reg:"NWMTC00406-102026",cert:"CCMD-00412",st:"HS-0045861",cp:1,bal:0,s:"Released",rd:"2026-10-20",m:"Courier",tr:"LBC 1234 5678 90"},
+  {d:"2026-10-19",t:"3:45 PM",by:"J. Ramos",n:"FLORES, Mark",w:"2610-0333",c:"ESEA",cn:"Enclosed Space Entry Awareness",reg:"NWMTC00407-102026",cert:"ESEA-00078",st:"",cp:1,bal:0,s:"Waiting"},
+  {d:"2026-10-16",t:"10:10 AM",by:"J. Ramos",n:"CASTRO, Joy",w:"2610-0301",c:"PSCMT",cn:"Proficiency in Crowd Management Training",reg:"NWMTC00390-102026",cert:"PSCMT-02228",st:"HS-0045840",cp:1,bal:0,s:"Released",rd:"2026-10-17",m:"Picked Up"},
+  {d:"2026-10-14",t:"2:20 PM",by:"J. Ramos",n:"AQUINO, Ben",w:"2610-0280",c:"DWK",cn:"Deck Watchkeeping",reg:"NWMTC00381-102026",cert:"DWK-00012",st:"HS-0045831",cp:1,bal:0,s:"Waiting"},
+  {d:"2026-10-12",t:"9:40 AM",by:"J. Ramos",n:"RAMOS, Lito",w:"2610-0255",c:"UBT-PSSR",cn:"Updating Training on Basic Training – PSSR",reg:"NWMTC00370-102026",cert:"UBT-08790",st:"HS-0045820",cp:1,bal:0,s:"Revoked",note:"Revoked by the Admin · wrong trainee"},
+  {d:"2026-10-09",t:"4:05 PM",by:"J. Ramos",n:"LIM, Grace",w:"2610-0221",c:"ABC",cn:"Awareness on Basic Computer",reg:"NWMTC00352-102026",cert:"ABC-00148",st:"HS-0045801",cp:1,bal:0,s:"Released",rd:"2026-10-10",m:"Picked Up"},
+  {d:"2026-10-06",t:"1:30 PM",by:"J. Ramos",n:"NAVARRO, Ella",w:"2610-0190",c:"STPPDSPPS",cn:"Safety Training for Personnel Providing Direct Service to Passengers",reg:"NWMTC00330-102026",cert:"STP-01960",st:"HS-0045788",cp:1,bal:0,s:"Waiting"},
+];
+const S = { period:"Daily", date:T, f:"All", q:"", view:"screen" };
+const peso = (c) => "₱" + (c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
+const D = (s) => new Date(s+"T00:00:00Z"), iso = (d) => d.toISOString().slice(0,10), add = (s,n) => { const d = D(s); d.setUTCDate(d.getUTCDate()+n); return iso(d); };
+const fmt = (s,o) => new Intl.DateTimeFormat("en-PH",{timeZone:"UTC",...o}).format(D(s));
+const short = (s) => fmt(s,{month:"short",day:"numeric",year:"numeric"}), long = (s) => fmt(s,{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+function range(){ const d=S.date;
+  if(S.period==="Daily") return {from:d,to:d,label:long(d)};
+  if(S.period==="Monthly"){ const from=d.slice(0,8)+"01", to=add(add(from,32).slice(0,8)+"01",-1); return {from,to,label:fmt(from,{month:"long",year:"numeric"})}; }
+  const dow=(D(d).getUTCDay()+6)%7, from=add(d,-dow), to=add(from,6); return {from,to,label:`Week of ${short(from)} – ${short(to)}`}; }
+const age = (r) => Math.round((D(T)-D(r.d))/864e5);
+const FILTERS = {
+  "All": () => true,
+  "Waiting for Release": (r) => r.s==="Waiting",
+  "Released": (r) => r.s==="Released",
+  "Reprints": (r) => r.cp>1,
+  "No Document No.": (r) => !r.st && r.s!=="Revoked",
+  "With Balance": (r) => r.bal>0,
+};
+function statusCell(r){
+  if(r.s==="Released") return `<span class="pill ok">Released</span><small>${short(r.rd)} · ${r.m}${r.tr?` · ${r.tr}`:""}</small>`;
+  if(r.s==="Waiting") return `<span class="pill ${age(r)>7?"bad":"info"}">Waiting for Release</span><small>${age(r)===0?"Printed today":`${age(r)} day${age(r)===1?"":"s"} since print`}</small>`;
+  if(r.s==="Void") return `<span class="pill warn">Void Requested</span><small>${r.note}</small>`;
+  return `<span class="pill bad">Revoked</span><small>${r.note}</small>`;
+}
+const pay = (r) => r.bal ? `<span class="pill bad">Balance ${peso(r.bal)}</span>` : `<span class="pill ok">Paid</span>`;
+const doc = (r) => r.st ? `<span class="mono">${r.st}</span>` : `<span class="miss">Not Encoded</span>`;
+function rows(){ const g=range(); return R.filter((r)=>r.d>=g.from&&r.d<=g.to); }
+function shown(){ const q=S.q.trim().toLowerCase(); return rows().filter(FILTERS[S.f]).filter((r)=>!q||`${r.n} ${r.w} ${r.c} ${r.cn} ${r.reg} ${r.cert} ${r.st}`.toLowerCase().includes(q)); }
+function table(list, paper){
+  const days=[...new Set(list.map((r)=>r.d))];
+  let i=0;
+  return `<div class="wrap"><table><thead><tr><th>#</th><th>Trainee</th><th>Course</th><th>Registration No.</th><th>Certificate No.</th><th>Document No.</th><th>Printed</th><th>Payment</th><th>Status</th></tr></thead><tbody>${
+    days.map((d)=>{ const g=list.filter((r)=>r.d===d); return `<tr class="daygrp"><td colspan="9">${long(d)}<small>${g.length} printed</small></td></tr>`+g.map((r)=>`<tr>
+      <td class="no">${++i}</td><td><b>${r.n}</b><small class="mono">${r.w}</small></td><td title="${r.cn}"><b>${r.c}</b>${paper?`<small>${r.cn}</small>`:""}</td>
+      <td class="mono">${r.reg}</td><td class="mono">${r.cert}</td><td>${doc(r)}</td>
+      <td>${r.t}<small>${r.by}${r.cp>1?` · <span class="pill warn">Copy ${r.cp} · Reprint</span>`:""}</small></td><td>${pay(r)}</td><td>${statusCell(r)}</td></tr>`).join(""); }).join("")
+  }</tbody></table></div>`;
+}
+function render(){
+  const g=range(), all=rows(), list=shown();
+  const noDoc=all.filter(FILTERS["No Document No."]), bal=all.filter((r)=>r.bal>0), old=R.filter((r)=>r.s==="Waiting"&&age(r)>7);
+  const alerts=[noDoc.length&&[`${noDoc.length} printed without a Document No.`,"No Document No.",""],bal.length&&[`${bal.length} printed with a balance`,"With Balance","bad"],old.length&&[`${old.length} printed over 7 days ago and not yet released`,"Waiting for Release","bad"]].filter(Boolean);
+  const head=`<div class="head"><div><div class="eyebrow">Releasing Officer</div><h1>Certificate Report</h1></div>
+    <div class="tools"><span class="seg">${["Daily","Weekly","Monthly"].map((p)=>`<button data-p="${p}" class="${S.period===p?"on":""}">${p}</button>`).join("")}</span>
+    <input type="date" id="date" value="${S.date}" aria-label="Report date"><button class="btn" data-step="-1" aria-label="Previous">‹</button><button class="btn" data-step="1" aria-label="Next">›</button>
+    <button class="btn" id="xls">Download Excel</button><button class="pri" id="pv">${S.view==="print"?"Back to Report":"Print / Save PDF"}</button></div></div>
+    <p class="note"><b>${g.label}</b>. Payment and release status are as of now.</p>`;
+  if(S.view==="print"){
+    document.getElementById("page").innerHTML=head+`<div class="sheetwrap"><div class="sheet">
+      <div class="lh"><div><b>NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.</b><span>Ride the New Wave of Maritime Excellence</span></div><span>Printed ${long(T)}</span></div>
+      <h3>Printed Certificates Report</h3><div class="sub">${g.label}${S.f!=="All"?` · ${S.f}`:""}</div>
+      <div class="tot"><span>Printed: ${list.length}</span><span>Released: ${list.filter((r)=>r.s==="Released").length}</span><span>Waiting: ${list.filter((r)=>r.s==="Waiting").length}</span><span>Reprints: ${list.filter((r)=>r.cp>1).length}</span><span>With balance: ${list.filter((r)=>r.bal).length}</span></div>
+      ${table(list,true)}
+      <div class="sign"><div>Prepared by: Releasing Officer</div><div>Noted by: Admin</div></div></div></div>`;
+  } else {
+    document.getElementById("page").innerHTML=head+
+    (alerts.length?`<div class="alerts">${alerts.map(([t,f,c])=>`<button class="alert ${c}" data-f="${f}">⚠ ${t}</button>`).join("")}</div>`:"")+
+    `<div class="tiles">${[["Printed",all.filter((r)=>r.cp===1).length,"first prints"],["Reprinted",all.filter((r)=>r.cp>1).length,"paid or Admin-approved"],["Released",all.filter((r)=>r.s==="Released").length,`${all.filter((r)=>r.m==="Courier").length} by courier`],["Waiting for Release",all.filter((r)=>r.s==="Waiting").length,"printed, not claimed"],["Paid",all.filter((r)=>!r.bal).length,`of ${all.length} printed`]].map(([a,b,c])=>`<div class="tile"><span>${a}</span><b>${b}</b><small>${c}</small></div>`).join("")}</div>
+    <section class="panel"><div class="ph"><h2>Printed Certificates</h2><small>${list.length} of ${all.length}</small></div>
+      <div class="filters"><span class="seg">${Object.keys(FILTERS).map((f)=>`<button data-f="${f}" class="${S.f===f?"on":""}">${f}<b>${all.filter(FILTERS[f]).length}</b></button>`).join("")}</span>
+      <input id="q" value="${S.q}" placeholder="Search trainee, course, registration, certificate or document no." aria-label="Search printed certificates"></div>
+      ${list.length?table(list,false):`<p style="padding:0 16px 16px;color:var(--muted)">No printed certificates match.</p>`}
+    </section>
+    <section class="panel"><div class="ph"><h2>Per Course</h2><small>stays below, as today</small></div><div class="wrap"><table><thead><tr><th>Course</th><th class="r">Printed</th><th class="r">Reprinted</th><th class="r">Released</th><th class="r">Waiting</th><th class="r">With Balance</th></tr></thead><tbody>${
+      [...new Set(all.map((r)=>r.c))].sort().map((c)=>{const x=all.filter((r)=>r.c===c);return `<tr><td><b>${c}</b></td><td class="r mono">${x.filter((r)=>r.cp===1).length}</td><td class="r mono">${x.filter((r)=>r.cp>1).length}</td><td class="r mono">${x.filter((r)=>r.s==="Released").length}</td><td class="r mono">${x.filter((r)=>r.s==="Waiting").length}</td><td class="r mono">${x.filter((r)=>r.bal).length}</td></tr>`}).join("")
+    }</tbody></table></div></section>`;
+  }
+}
+function toast(t){ const el=document.getElementById("toast"); el.textContent=t; el.hidden=false; clearTimeout(toast.h); toast.h=setTimeout(()=>el.hidden=true,3200); }
+document.addEventListener("click",(e)=>{ const b=e.target.closest("button"); if(!b) return;
+  if(b.dataset.p){ S.period=b.dataset.p; render(); }
+  else if(b.dataset.f){ S.f=b.dataset.f; S.view="screen"; render(); }
+  else if(b.dataset.step){ const g=range(); S.date=+b.dataset.step<0?add(g.from,-1):add(g.to,1); render(); }
+  else if(b.id==="pv"){ S.view=S.view==="print"?"screen":"print"; render(); }
+  else if(b.id==="xls") toast(`In the portal this downloads ${shown().length} rows: Date, Time, Trainee, NWMTACI No., Course, Registration No., Certificate No., Document No., Copy, Printed By, Payment, Status, Released On, Method.`);
+});
+document.addEventListener("change",(e)=>{ if(e.target.id==="date"&&e.target.value){ S.date=e.target.value; render(); } });
+document.addEventListener("input",(e)=>{ if(e.target.id==="q"){ S.q=e.target.value; const pos=e.target.selectionStart; render(); const q=document.getElementById("q"); q.focus(); q.setSelectionRange(pos,pos); } });
+render();
+</script>
