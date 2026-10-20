@@ -36,7 +36,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const db = createSupabaseAdminClient();
   let ctx = await certificateContext(db, id);
   if (!ctx) return notice("Enrollment not found.", 404);
-  if (WHY[ctx.view.state] && !(preview && ctx.view.state === "Waiting for photo")) return notice(WHY[ctx.view.state], 409);
+  // Preview Draft at any stage (owner, 20 Oct 2026), for double-checking; only a cancelled or revoked certificate is refused.
+  if (WHY[ctx.view.state] && !(preview && !["Cancelled", "Revoked"].includes(ctx.view.state))) return notice(WHY[ctx.view.state], 409);
+  // Before it is printable, a draft creates nothing: no certificate row, Certificate No. or verify code is used up.
+  if (preview && WHY[ctx.view.state] && ctx.view.state !== "Waiting for photo") {
+    try {
+      const bytes = await buildCertificatePdf(db, ctx, "preview");
+      await db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "releasing_officer", action: "certificate.draft_previewed", record_type: "enrollment", record_id: id, new_values: { state: ctx.view.state } });
+      return new Response(Buffer.from(bytes), { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="certificate-${ctx.enrollment.enrollment_number}-draft.pdf"`, "cache-control": "no-store" } });
+    } catch (error) { return notice(error instanceof Error ? error.message : "The draft could not be prepared.", 409); }
+  }
   if (!preview && !canPrint(ctx.view)) return notice("This certificate was already printed. A reprint needs a paid Reprinting request or an Admin-approved void.", 409);
   if (!preview && !ctx.issuanceEnabled) return notice("Certificate printing is turned off. The Admin turns it on in Certificate numbering.", 409);
   try {

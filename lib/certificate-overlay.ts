@@ -18,6 +18,11 @@ export type TemplateFieldsV2 = {
   qr?: { x: number; y: number; w: number; h: number };
   /** A template whose hours line was left blank (CSF "[__] Hours"): covered and printed. */
   hours?: { cx: number; y: number; size: number; text: string; cover: { x: number; y: number; w: number; h: number } };
+  /** MARINA STCW templates (Safety, Crowd, Crisis; owner 20 Oct 2026): "Date of Issue:" value and the Trainee Photo box. */
+  issueDate?: { x: number; y: number; size: number };
+  photo?: { x: number; y: number; w: number; h: number };
+  /** The name and the Conducted paragraph in a sans font, as in the MARINA STCW Word files (Arial). */
+  sans?: boolean;
 };
 export type OverlayFill = { name: string; startsOn: string | null; endsOn: string | null; issuedOn: string; certificateNumber: string; registrationNumber: string; verifyUrl: string | null;
   /** Template view (owner, 20 Oct 2026): the description with blank dates, a "TRAINEE NAME" guide, no numbers or QR. */
@@ -29,10 +34,10 @@ const INK = rgb(0, 0, 0);
 const safe = (s: string) => s.replace(/[–—]/g, "-").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[^\x20-\x7E\xA0-\xFF]/g, "");
 const longDate = (d: string) => new Intl.DateTimeFormat("en-PH", { month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T00:00:00+08:00`));
 
-/** The Word paragraph with its date placeholders filled: [DATE], or [START DATE] / [END DATE]. */
+/** The Word paragraph with its date placeholders filled: [DATE], or [START DATE] / [END DATE]; [ASSESS DATE] is the last training day. */
 export function conductedText(text: string, startsOn: string | null, endsOn: string | null) {
   const start = startsOn ?? endsOn, end = endsOn ?? startsOn;
-  return text.replace("[START DATE]", start ? longDate(start) : "").replace("[END DATE]", end ? longDate(end) : "").replace("[DATE]", end ? longDate(end) : "");
+  return text.replace("[START DATE]", start ? longDate(start) : "").replace("[END DATE]", end ? longDate(end) : "").replace("[DATE]", end ? longDate(end) : "").replace("[ASSESS DATE]", end ? longDate(end) : "");
 }
 
 /** "Issued this ______ day of ________________ 20____ in ..." → "Issued this 15th day of October 2026 in ...". */
@@ -44,21 +49,22 @@ export function issuedText(text: string, issuedOn: string) {
 
 export async function drawTemplateFields(pdf: PDFDocument, page: PDFPage, f: TemplateFieldsV2, fill: OverlayFill) {
   const reg = await pdf.embedFont(StandardFonts.TimesRoman), bold = await pdf.embedFont(StandardFonts.TimesRomanBold);
+  const body = f.sans ? await pdf.embedFont(StandardFonts.Helvetica) : reg, bodyBold = f.sans ? await pdf.embedFont(StandardFonts.HelveticaBold) : bold;
   if (f.name) {
-    const font = f.name.bold === false ? reg : bold, name = fill.blank ? "TRAINEE NAME" : safe(fill.name.toUpperCase());
+    const font = f.name.bold === false ? body : bodyBold, name = fill.blank ? "TRAINEE NAME" : safe(fill.name.toUpperCase());
     let size = f.name.size;
     while (size > 10 && font.widthOfTextAtSize(name, size) > f.name.maxW) size -= 0.5;
     page.drawText(name, { x: f.name.cx - font.widthOfTextAtSize(name, size) / 2, y: f.name.y, size, font, color: fill.blank ? rgb(0.72, 0.76, 0.8) : INK });
   }
   if (f.conducted) {
-    const filled = fill.blank ? f.conducted.text.replace(/\[(START DATE|END DATE|DATE)\]/g, "________________") : conductedText(f.conducted.text, fill.startsOn, fill.endsOn);
+    const filled = fill.blank ? f.conducted.text.replace(/\[(START DATE|END DATE|DATE|ASSESS DATE)\]/g, "________________") : conductedText(f.conducted.text, fill.startsOn, fill.endsOn);
     const text = safe(filled).replace(/\s+/g, " ");
-    if (f.conducted.align === 3) justified(page, text, f.conducted.x, f.conducted.y, f.conducted.w, f.conducted.leading, f.conducted.size, reg);
+    if (f.conducted.align === 3) justified(page, text, f.conducted.x, f.conducted.y, f.conducted.w, f.conducted.leading, f.conducted.size, body);
     else {
       // Left or centred: wrap at the paragraph width.
       const words = text.split(" "), lines: string[] = [];
-      for (const w of words) { const last = lines[lines.length - 1]; if (last && reg.widthOfTextAtSize(`${last} ${w}`, f.conducted.size) <= f.conducted.w) lines[lines.length - 1] = `${last} ${w}`; else lines.push(w); }
-      lines.forEach((l, i) => { const lw = reg.widthOfTextAtSize(l, f.conducted!.size); page.drawText(l, { x: f.conducted!.align === 1 ? f.conducted!.x + (f.conducted!.w - lw) / 2 : f.conducted!.x, y: f.conducted!.y - i * f.conducted!.leading, size: f.conducted!.size, font: reg, color: INK }); });
+      for (const w of words) { const last = lines[lines.length - 1]; if (last && body.widthOfTextAtSize(`${last} ${w}`, f.conducted.size) <= f.conducted.w) lines[lines.length - 1] = `${last} ${w}`; else lines.push(w); }
+      lines.forEach((l, i) => { const lw = body.widthOfTextAtSize(l, f.conducted!.size); page.drawText(l, { x: f.conducted!.align === 1 ? f.conducted!.x + (f.conducted!.w - lw) / 2 : f.conducted!.x, y: f.conducted!.y - i * f.conducted!.leading, size: f.conducted!.size, font: body, color: INK }); });
     }
   }
   if (f.issued) {
@@ -69,6 +75,7 @@ export async function drawTemplateFields(pdf: PDFDocument, page: PDFPage, f: Tem
     page.drawRectangle({ ...f.hours.cover, width: f.hours.cover.w, height: f.hours.cover.h, color: rgb(1, 1, 1) });
     page.drawText(f.hours.text, { x: f.hours.cx - bold.widthOfTextAtSize(f.hours.text, f.hours.size) / 2, y: f.hours.y, size: f.hours.size, font: bold, color: INK });
   }
+  if (f.issueDate && fill.issuedOn && !fill.blank) page.drawText(longDate(fill.issuedOn), { x: f.issueDate.x, y: f.issueDate.y, size: f.issueDate.size, font: reg, color: INK });
   if (f.certNo && fill.certificateNumber && !fill.blank) page.drawText(safe(fill.certificateNumber), { x: f.certNo.x, y: f.certNo.y, size: f.certNo.size, font: reg, color: INK });
   if (f.regNo && fill.registrationNumber && !fill.blank) page.drawText(safe(fill.registrationNumber), { x: f.regNo.x, y: f.regNo.y, size: f.regNo.size, font: reg, color: INK });
   // Reprints are not marked on the certificate (owner, 20 Oct 2026): the copy number stays internal, in the print audit.

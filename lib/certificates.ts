@@ -248,7 +248,8 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
     const file = await db.storage.from("certificate-photos").download(ctx.photo.storage_path);
     if (!file.error && file.data) {
       const img = await pdf.embedJpg(new Uint8Array(await file.data.arrayBuffer()));
-      const found = f.photoX === undefined && isPdf(tpl.bytes) ? await detectPhotoBox(tpl.bytes) : null;
+      // Every converted template carries its photo box (owner, 20 Oct 2026); otherwise it is found on the PDF.
+      const found = v2?.photo ?? (f.photoX === undefined && isPdf(tpl.bytes) ? await detectPhotoBox(tpl.bytes) : null);
       if (found) {
         const inset = 1.5, size = Math.min(found.w, found.h) - inset * 2;
         page.drawImage(img, { x: found.x + (found.w - size) / 2, y: found.y + (found.h - size) / 2, width: size, height: size });
@@ -261,7 +262,7 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
     }
   }
   if (mode === "preview") {
-    const text = "PREVIEW - NOT FOR RELEASE", size = Math.round(W / 14);
+    const text = "DRAFT - NOT FOR RELEASE", size = Math.round(W / 14);
     page.drawText(text, { x: W * 0.12, y: H * 0.25, size, font: bold, color: rgb(0.71, 0.14, 0.09), opacity: 0.18, rotate: degrees(20) });
   }
   if (mode === "soft") page.drawText("Electronic copy", { x: 18, y: 14, size: 8, font: reg, color: rgb(0.45, 0.5, 0.55) });
