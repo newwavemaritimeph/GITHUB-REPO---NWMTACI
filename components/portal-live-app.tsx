@@ -24,7 +24,7 @@ import { RejectInline } from "./portal/reject-inline";
 import { MismoDashboard, MismoFinalList, MismoSubmissions } from "./portal/mismo-home";
 import { AssistantDashboard, AssistantRequisitions, ResourcePlanning, InstructorShortlist, GcashReconciliation, GcashNotInHistory } from "./portal/admin-assistant-home";
 import { RegistrationDeliveries, ReleasingDeliveries } from "./portal/delivery-home";
-import { ReleasingReports, ReleasingHome, CertificatesWorkspace, WaitingCertificates, CertificateTemplates, ReleasedCertificates, AdminCertificateControls, CertificateAlarm, ReleasingNumbering, AdminCertificateNumbers } from "./portal/releasing-home";
+import { ReleasingReports, ReleasingHome, CertificatesWorkspace, WaitingCertificates, CertificateTemplates, ReleasedCertificates, AdminCertificateControls, CertificateAlarm, ReleasingNumbering } from "./portal/releasing-home";
 import { AccountingHome, AccountingApprovals, AccountingReports, AccountingPayments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
@@ -33,7 +33,7 @@ import { tcl } from "@/lib/title-case";
 import { CompletionRecords } from "./portal/completion-records";
 import { OtherIncome } from "./portal/other-income";
 import { PostTestReview } from "./portal/post-test-review";
-import { CertificateNumberImport, ClassroomLinksImport, DefaultRoomsPanel } from "./portal/admin-setup";
+import { ClassroomLinksImport, DefaultRoomsPanel } from "./portal/admin-setup";
 import { AdminHome, AdminSearchTrainee, AdminEnrollments, AdminVouchers, AdminHolidays } from "./portal/admin-home";
 
 type Module = "Classroom links" | "Post-tests" | "Dashboard" | "Waiting" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Requisitions" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "MISMO dashboard" | "Completion records" | "Other income" | AccountingConfigSection;
@@ -157,7 +157,7 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Delivery requests",icon:"⇥",roles:["registration"],group:"Work"},
   {label:"Requisitions",icon:"✎",roles:["admin_assistant","admin"],group:"Work"},{label:"Resource planning",icon:"▢",roles:["admin_assistant","admin"],group:"Work"},{label:"Instructors",icon:"♙",roles:["admin_assistant","admin"],group:"Work"},{label:"Reconciliation",icon:"✓",roles:["admin_assistant","admin"],group:"Work"},
   {label:"Final list",icon:"▤",roles:["mismo_officer"],group:"Work"},{label:"Submissions",icon:"✓",roles:["mismo_officer"],group:"Work"},{label:"Completion records",icon:"▤",roles:["mismo_officer","admin"],group:"Work"},
-  {label:"Certificate controls",icon:"№",roles:["admin"],group:"Configuration"},{label:"Certificate numbers",icon:"№",roles:["admin"],group:"Configuration"},
+  {label:"Certificate controls",icon:"№",roles:["admin"],group:"Configuration"},
   {label:"Employee accounts",icon:"⚙",roles:["admin"],group:"Configuration"},{label:"Classrooms",icon:"▢",roles:["admin"],group:"Configuration"},{label:"Certifications",icon:"№",roles:["admin"],group:"Configuration"},{label:"Holidays",icon:"▦",roles:["admin"],group:"Configuration"},
   {label:"Daily summary report",icon:"∑",roles:["admin"],group:"Records"},{label:"MISMO dashboard",icon:"⌂",roles:["admin"],group:"Work"},
   {label:"Endorsed courses",icon:"◇",group:"Configuration"},{label:"Configuration",icon:"⚙",roles:["admin"],group:"Configuration"},
@@ -412,7 +412,6 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Reconciliation")return <GcashReconciliation canCheck={["admin_assistant","admin"].includes(gateRole)}/>;
   if(active==="Delivery requests")return <RegistrationDeliveries data={data} reload={reload}/>;
   if(active==="Certificate controls"&&gateRole==="admin")return <AdminCertificateControls data={data} reload={reload}/>;
-  if(active==="Certificate numbers"&&gateRole==="admin")return <AdminCertificateNumbers data={data} reload={reload}/>;
   if(active==="Training calendar")return <TrainingCalendar data={data}/>;
   if(active==="Trainee scheduling")return <TraineeScheduling data={data} reload={reload}/>;
   if(active==="Instructor assignment")return <InstructorAssignmentScreen data={data} role={gateRole} reload={reload}/>;
@@ -466,11 +465,11 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   return <ConnectedModule module={active} data={data}/>;
 }
 
-/** Admin › Configuration › Certifications: Certificate Numbers and Certificate Controls in one place. */
+/** Admin › Configuration › Certifications (owner, 20 Oct 2026): the Admin uploads templates, approves voids and revokes; numbering is the Releasing Officer's. */
 function AdminCertifications({data,reload}:{data:PortalData;reload:()=>Promise<void>}){
-  const [tab,setTab]=useState("Certificate numbers");
-  return <><div className="portal-page" style={{paddingBottom:0}}><div className="cx-status" role="tablist">{["Certificate numbers","Import numbers","Certificate controls","Certificate templates"].map(t=><button key={t} type="button" role="tab" aria-selected={tab===t} className={tab===t?"on":""} onClick={()=>setTab(t)}>{tcl(t)}</button>)}</div></div>
-    {tab==="Certificate numbers"?<AdminCertificateNumbers data={data} reload={reload}/>:tab==="Import numbers"?<div className="portal-page cx"><CertificateNumberImport data={data as unknown as Parameters<typeof CertificateNumberImport>[0]["data"]} reload={reload}/></div>:tab==="Certificate templates"?<CertificateTemplates data={data} reload={reload}/>:<AdminCertificateControls data={data} reload={reload}/>}</>;
+  const [tab,setTab]=useState("Certificate controls");
+  return <><div className="portal-page" style={{paddingBottom:0}}><div className="cx-status" role="tablist">{["Certificate controls","Certificate templates"].map(t=><button key={t} type="button" role="tab" aria-selected={tab===t} className={tab===t?"on":""} onClick={()=>setTab(t)}>{tcl(t)}</button>)}</div></div>
+    {tab==="Certificate templates"?<CertificateTemplates data={data} reload={reload}/>:<AdminCertificateControls data={data} reload={reload}/>}</>;
 }
 
 function InstructorAssignmentScreen({data,role,reload}:{data:PortalData;role:string;reload:()=>Promise<void>}){

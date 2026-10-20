@@ -616,9 +616,7 @@ export function AdminCertificateControls({ data, reload }: { data: PortalData; r
         </section>
       </div>
       <div className="ac-stack">
-      <CertificateCorrectionsPanel data={data} reload={reload} mode="number" />
       <RevokePanel data={data} reload={reload} />
-      <NumberingTable data={data} reload={reload} scope="stcw" />
       </div>
     </div>
   </div>;
