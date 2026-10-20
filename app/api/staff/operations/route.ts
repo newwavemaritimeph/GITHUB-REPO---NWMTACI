@@ -1082,7 +1082,7 @@ export async function GET() {
 
   // Default rooms per course (202610200049), for the Admin.
   let defaultRooms: unknown[] = [];
-  if (staff.roleCodes.includes("admin")) {
+  if (staff.roleCodes.some((r) => ["admin", "admin_assistant"].includes(r))) {
     const { data: dr, error: drError } = await createSupabaseAdminClient().from("course_default_rooms").select("course_id,classroom_id");
     defaultRooms = drError ? [] : dr ?? [];
   }

@@ -35,7 +35,11 @@ export function upcoming(data: PortalData): (PlanRow & { b: PortalData["batches"
   const today = manilaToday();
   const plans = new Map((extra(data).batchResources ?? []).map((p) => [p.batch_id, p]));
   const list = data.batches.filter((b) => b.status !== "Cancelled" && b.ends_on >= today).sort((a, z) => a.starts_on.localeCompare(z.starts_on));
-  const batches: PlanBatch[] = list.map((b) => { const c = first(b.courses); const plan = plans.get(b.id); return { id: b.id, batchNumber: b.batch_number, courseId: b.course_id, courseCode: c?.code ?? "—", courseName: c?.name ?? "", startsOn: b.starts_on, endsOn: b.ends_on, students: Number(b.confirmed_count ?? 0), capacity: Number(b.capacity ?? 24), classroomId: plan?.classroom_id ?? (b as { classroom_id?: string | null }).classroom_id ?? null, instructorId: plan?.instructor_id ?? null }; });
+  // Assigned rooms (owner, 20 Oct 2026): BT-PSSR in Room 103; Safety, Crowd and Crisis in Room 304 — from Admin › Rooms, else by room number.
+  const defaults = new Map(((data as { defaultRooms?: { course_id: string; classroom_id: string }[] }).defaultRooms ?? []).map((d) => [d.course_id, d.classroom_id]));
+  const roomNo = (n: string) => data.classrooms.find((r) => r.active && r.name.replace(/D/g, "") === n)?.id ?? null;
+  const defaultRoom = (courseId: string, code?: string) => defaults.get(courseId) ?? (code === "UBT-PSSR" ? roomNo("103") : code && ["STPPDSPPS", "PSCMT", "PSCMHBT"].includes(code) ? roomNo("304") : null);
+  const batches: PlanBatch[] = list.map((b) => { const c = first(b.courses); const plan = plans.get(b.id); return { id: b.id, batchNumber: b.batch_number, courseId: b.course_id, courseCode: c?.code ?? "—", courseName: c?.name ?? "", startsOn: b.starts_on, endsOn: b.ends_on, students: Number(b.confirmed_count ?? 0), capacity: Number(b.capacity ?? 24), classroomId: plan?.classroom_id ?? (b as { classroom_id?: string | null }).classroom_id ?? defaultRoom(b.course_id, c?.code), instructorId: plan?.instructor_id ?? null }; });
   const rooms = data.classrooms.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name, capacity: Number(c.capacity) }));
   const rows = planRows(batches, rooms, extra(data).instructors ?? [], extra(data).accreditations ?? []);
   return rows.map((r, i) => ({ ...r, b: list[i] }));
