@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { PortalData, Enrollment, Batch, Trainee } from "../portal-live-app";
 import { first, manilaToday, dueCentavos, balanceOf, pesos, pesos2, addDays } from "@/lib/portal-format";
 import { LATE_ENROLLMENT_CODES, PUBLIC_STCW_CODES, automaticEndDate, fitsInWeek } from "@/lib/scheduling";
 import { emailStatusText } from "@/lib/instruction-email-status";
-import { Badge, Message, Modal, PageHead, Pager, usePost, fullName, fmtDate, fmtClock } from "./shared-ui";
+import { Badge, Message, Modal, PageHead, Pager, usePost, submit, fullName, fmtDate, fmtClock } from "./shared-ui";
 import { RequestActionModal, type RequestType } from "./payment-actions";
 import { tcl } from "@/lib/title-case";
 
@@ -418,18 +418,38 @@ export function RegistrationRecords({ data, query, reload, view, setView, traine
  * training and payment first, then one requirements table (received, status,
  * remarks, who received it), signature lines and the hand-over button.
  */
-function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<Record<string, unknown>> }) {
+function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<Record<string, unknown>>; reload: () => Promise<void> }) {
   const [unticking, setUnticking] = useState<string | null>(null);
   const [remarks, setRemarks] = useState("");
   const [notes, setNotes] = useState<Record<string, string>>({});
+  // Ticks show at once and save in the background (owner, 20 Oct 2026: ticking was slow);
+  // one portal refresh follows the last save instead of one per tick.
+  const [opt, setOpt] = useState<Record<string, { status: "Verified" | "Rejected"; remarks?: string }>>({});
+  const [saving, setSaving] = useState<Record<string, true>>({});
+  const [tickError, setTickError] = useState("");
+  const inFlight = useRef(0), refresh = useRef<number | undefined>(undefined);
   const r = readinessOf(data, e);
   const s = stateOf(r);
-  const allTicked = r.missing.length === 0;
+  const statusOf = (code: string) => opt[code]?.status ?? r.latest.get(code)?.status;
+  const missingNow = REQUIREMENTS.filter((q) => statusOf(q.code) !== "Verified");
+  const allTicked = missingNow.length === 0, anySaving = Object.keys(saving).length > 0;
   const t = first(e.trainees), c = first(e.courses), b = first(e.batches);
   const appNo = appNoOf(data, e.trainee_id) ?? e.enrollment_number;
   const balance = balanceOf(e);
-  const check = (requirement: string, status: "Verified" | "Rejected", label: string, note?: string) =>
-    void post({ action: "requirement-check", enrollmentId: e.id, requirement, status, remarks: note ?? (status === "Rejected" ? remarks.trim() : undefined) }, `${label} ${status === "Verified" ? "marked received" : "marked not received"}.`).then(() => { setUnticking(null); setRemarks(""); setNotes((n) => ({ ...n, [requirement]: "" })); }).catch(() => undefined);
+  const check = (requirement: string, status: "Verified" | "Rejected", label: string, note?: string) => {
+    const text = note ?? (status === "Rejected" ? remarks.trim() : undefined);
+    setOpt((o) => ({ ...o, [requirement]: { status, remarks: text } })); setSaving((v) => ({ ...v, [requirement]: true })); setTickError("");
+    setUnticking(null); setRemarks(""); setNotes((n) => ({ ...n, [requirement]: "" }));
+    inFlight.current += 1;
+    void submit({ action: "requirement-check", enrollmentId: e.id, requirement, status, remarks: text })
+      .catch((err: unknown) => { setOpt((o) => { const n = { ...o }; delete n[requirement]; return n; }); setTickError(`${label}: ${err instanceof Error ? err.message : "not saved"}`); })
+      .finally(() => {
+        setSaving((v) => { const n = { ...v }; delete n[requirement]; return n; });
+        inFlight.current -= 1;
+        window.clearTimeout(refresh.current);
+        refresh.current = window.setTimeout(() => { if (inFlight.current === 0) void reload().then(() => { if (inFlight.current === 0) setOpt({}); }); }, 400);
+      });
+  };
   const rows = [...REQUIREMENTS.map((q) => ({ ...q, optional: false })), { ...OTHER_REQUIREMENT, label: "Other (optional)", optional: true }];
   const lastChecker = [...r.latest.values()].filter((x) => x.status === "Verified").sort((a, z) => z.checked_at.localeCompare(a.checked_at))[0];
   return <div className="sc full">
@@ -441,23 +461,24 @@ function ScreeningPanel({ data, enrollment: e, busy, post }: { data: PortalData;
       <div><span className="sc-cap">Payment</span><b className={r.paid ? "sc-good" : ""}>{r.paid ? `${pesos2(r.paidCentavos)} paid` : r.handed ? "With the Cashier" : "Not paid yet"}</b><p>Balance {pesos2(balance)}</p><p><Badge tone={s.tone}>{s.text}</Badge></p></div>
     </div>
     <div className="sc-table"><table><thead><tr><th>Requirement</th><th>Received</th><th>Remarks</th><th>Received by</th></tr></thead><tbody>
-      {rows.map((q) => { const ck = r.latest.get(q.code); const ticked = ck?.status === "Verified"; const note = notes[q.code] ?? ""; const needsNote = q.optional && !ticked && !note.trim();
+      {tickError && <tr><td colSpan={4}><Message kind="error" text={tickError} /></td></tr>}
+      {rows.map((q) => { const ck = r.latest.get(q.code); const ticked = statusOf(q.code) === "Verified"; const note = notes[q.code] ?? ""; const needsNote = q.optional && !ticked && !note.trim();
         return <tr key={q.code} className={ticked ? "ok" : ""}>
           <td><b>{q.label}</b>{!ticked && ck?.status === "Rejected" && <small className="sc-bad">Not accepted{ck.remarks ? `: ${ck.remarks}` : ""}</small>}</td>
-          <td><label className="sc-rec"><input type="checkbox" checked={ticked} disabled={busy || needsNote} onChange={() => { if (ticked) { if (q.optional) check(q.code, "Rejected", q.label, "Removed"); else { setUnticking(q.code); setRemarks(""); } } else check(q.code, "Verified", q.label, note.trim() || undefined); }} />{q.optional && !ticked ? "Optional" : "Received"}</label></td>
-          <td>{ticked ? <span className="sc-note">{ck?.remarks || "—"}</span>
+          <td><label className="sc-rec"><input type="checkbox" checked={ticked} disabled={!!saving[q.code] || needsNote} onChange={() => { if (ticked) { if (q.optional) check(q.code, "Rejected", q.label, "Removed"); else { setUnticking(q.code); setRemarks(""); } } else check(q.code, "Verified", q.label, note.trim() || undefined); }} />{q.optional && !ticked ? "Optional" : "Received"}</label></td>
+          <td>{ticked ? <span className="sc-note">{(opt[q.code] ? opt[q.code].remarks : ck?.remarks) || "—"}</span>
             : unticking === q.code ? null
             : <input className="sc-input" value={note} onChange={(ev) => setNotes((n) => ({ ...n, [q.code]: ev.target.value }))} placeholder={q.optional ? "What is it? e.g. COP for BT-PSSR" : q.code === "valid_id" ? "e.g. Passport, expires 2030" : q.code === "medical_peme" ? "Clinic and date" : "Optional"} aria-label={`Remarks for ${q.label}`} />}
-            {unticking === q.code && <span className="sc-untick"><input className="sc-input" value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="Reason, e.g. medical certificate expired" aria-label={`Reason for ${q.label}`} autoFocus /><button type="button" className="portal-primary" disabled={busy || !remarks.trim()} onClick={() => check(q.code, "Rejected", q.label)}>Mark Not Received</button><button type="button" className="ghost-button" onClick={() => setUnticking(null)}>Keep</button></span>}</td>
-          <td>{ck ? <><span>{ck.checked_by_name ?? "Staff"}</span><small>{fmtDate(day(ck.checked_at))}</small></> : <span className="muted-text">—</span>}</td>
+            {unticking === q.code && <span className="sc-untick"><input className="sc-input" value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="Reason, e.g. medical certificate expired" aria-label={`Reason for ${q.label}`} autoFocus /><button type="button" className="portal-primary" disabled={!!saving[q.code] || !remarks.trim()} onClick={() => check(q.code, "Rejected", q.label)}>Mark Not Received</button><button type="button" className="ghost-button" onClick={() => setUnticking(null)}>Keep</button></span>}</td>
+          <td>{saving[q.code] ? <span className="muted-text">Saving…</span> : opt[q.code] ? <span className="muted-text">Saved</span> : ck ? <><span>{ck.checked_by_name ?? "Staff"}</span><small>{fmtDate(day(ck.checked_at))}</small></> : <span className="muted-text">—</span>}</td>
         </tr>; })}
-      <tr className="sc-total"><td>Received</td><td colSpan={3}>{r.verified} of {REQUIREMENTS.length}</td></tr>
+      <tr className="sc-total"><td>Received</td><td colSpan={3}>{REQUIREMENTS.length - missingNow.length} of {REQUIREMENTS.length}</td></tr>
     </tbody></table></div>
     <div className="sc-sig"><div><b>{lastChecker?.checked_by_name ?? " "}</b><span>Checked by · Registration officer</span></div><div><b>{lastChecker ? fmtDate(day(lastChecker.checked_at)) : " "}</b><span>Date</span></div></div>
     <div className="sc-foot">
-      <small>{!allTicked ? `Still to tick: ${r.missing.join(", ")}` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
+      <small>{!allTicked ? `Still to tick: ${missingNow.map((q) => q.label).join(", ")}` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
       <span className="sc-acts">
-        {!r.handed && !r.paid && <button type="button" className="portal-primary" disabled={busy || !allTicked} onClick={() => void post({ action: "application-handover", enrollmentId: e.id }, "Handed to the Cashier for payment.").catch(() => undefined)}>Hand to Cashier</button>}
+        {!r.handed && !r.paid && <button type="button" className="portal-primary" disabled={busy || anySaving || !allTicked} onClick={() => void post({ action: "application-handover", enrollmentId: e.id }, "Handed to the Cashier for payment.").catch(() => undefined)}>Hand to Cashier</button>}
         {r.ready && <button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "application-enroll", enrollmentId: e.id }, "Trainee enrolled.").catch(() => undefined)}>Enroll Now</button>}
       </span>
     </div>
@@ -503,7 +524,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
   return <Modal title={isApplication ? `Application ${appNoOf(data, e.trainee_id) ?? e.enrollment_number}` : e.enrollment_number} onClose={onClose} wide>
     <div className="portal-form">
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
-      {isApplication && <ScreeningPanel data={data} enrollment={e} busy={busy} post={post} />}
+      {isApplication && <ScreeningPanel data={data} enrollment={e} busy={busy} post={post} reload={reload} />}
       {!isApplication && <div className="kv-grid kv-stack full">
         <div><span>{isApplication ? "Applicant" : "Trainee"}</span><strong>{t ? fullName(t) : "—"}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{t?.trainee_number} · <span className="lc">{t?.email}</span> · {t?.mobile}</small></div>
         <div><span>Course</span><strong>{c?.name ?? "—"}</strong><small>{c?.code}{center ? ` · endorsed: ${center}` : " · New Wave"}</small></div>

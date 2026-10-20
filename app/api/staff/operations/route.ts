@@ -1797,8 +1797,9 @@ export async function POST(request: Request) {
       const row = { enrollment_id: input.enrollmentId, requirement: input.requirement, status: input.status, remarks: input.remarks || null, checked_by: staff.user.id };
       const { data: check, error } = await admin.from("enrollment_requirement_checks").insert(row).select("id,checked_at").single();
       if (error) throw error;
-      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "registration", action: "application.requirement_checked", record_type: "enrollment", record_id: input.enrollmentId, new_values: { ...row, id: check.id, checked_at: check.checked_at } });
-      const enrolled = input.status === "Verified" ? await tryAutoEnroll(admin, [input.enrollmentId], staff.user.id) : [];
+      // The audit entry and the enrollment attempt run together (ticking was slow, owner 20 Oct 2026).
+      const audit = admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "registration", action: "application.requirement_checked", record_type: "enrollment", record_id: input.enrollmentId, new_values: { ...row, id: check.id, checked_at: check.checked_at } });
+      const [, enrolled] = await Promise.all([audit, input.status === "Verified" ? tryAutoEnroll(admin, [input.enrollmentId], staff.user.id) : Promise.resolve([] as string[])]);
       return NextResponse.json({ ok: true, enrolled });
     }
     if (input.action === "admission-record-issue") {
