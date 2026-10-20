@@ -71,7 +71,7 @@ export async function POST(request: Request) {
   const problem = evaluationProblem(parsed.data.answers);
   if (problem) return NextResponse.json({ error: problem }, { status: 400 });
   const raw = parsed.data.answers as EvaluationAnswers;
-  const answers: EvaluationAnswers = { ratings: raw.ratings, liked: raw.liked.trim(), suggestions: raw.suggestions.trim(), recommend: raw.recommend };
+  const answers: EvaluationAnswers = { attendance: true, ratings: raw.ratings, comments: raw.comments.trim() };
   if (!googleConfigured()) return NextResponse.json({ error: UNAVAILABLE }, { status: 503 });
 
   const submittedAt = new Date().toISOString();

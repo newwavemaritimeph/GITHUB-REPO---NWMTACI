@@ -2,26 +2,25 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { EVALUATION_QUESTIONS, EVALUATION_RATINGS, EVALUATION_TEXT_MAX, RATING_SCALE } from "@/lib/evaluation-form";
+import { ATTENDANCE_STATEMENT, COMMENTS_QUESTION, EVALUATION_INTRO, EVALUATION_RATINGS, EVALUATION_SECTIONS, EVALUATION_TEXT_MAX, RATING_SCALE } from "@/lib/evaluation-form";
 
 type Context = { traineeName: string; courseName: string; courseCode: string; startsOn: string | null; endsOn: string | null; inHouse: boolean; alreadySubmitted: boolean };
 
 const day = (d: string) => new Intl.DateTimeFormat("en-PH", { month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d.slice(0, 10)}T12:00:00+08:00`));
 const navy = "#123F63", muted = "#35607a", field: React.CSSProperties = { width: "100%", marginTop: 6, borderRadius: 8, border: "1px solid #9EE3F1", padding: 10, fontFamily: "inherit", fontSize: 16, boxSizing: "border-box" };
 
-/** One statement rated 1–5 as a radio group (keyboard and screen-reader friendly). */
+/** One item rated Poor to Excellent as a radio group (keyboard and screen-reader friendly), like the Google Form grid. */
 function Rating({ index, label, value, onChange }: { index: number; label: string; value: number; onChange: (v: number) => void }) {
   return (
     <fieldset style={{ border: 0, padding: 0, margin: "16px 0" }}>
       <legend style={{ fontSize: 15, fontWeight: 600, color: navy, marginBottom: 8 }}>{index + 1}. {label}</legend>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 }}>
-        {[1, 2, 3, 4, 5].map((n) => (
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+        {[4, 3, 2, 1].map((n) => (
           <label key={n} title={RATING_SCALE[n - 1]} style={{ position: "relative", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 48, borderRadius: 8, cursor: "pointer",
             border: `1px solid ${value === n ? "#F25615" : "#9EE3F1"}`, background: value === n ? "#F25615" : "#fff", color: value === n ? "#fff" : "#0571D0" }}>
-            <input type="radio" name={`rating-${index}`} value={n} checked={value === n} onChange={() => onChange(n)} aria-label={`${n} – ${RATING_SCALE[n - 1]}`}
+            <input type="radio" name={`rating-${index}`} value={n} checked={value === n} onChange={() => onChange(n)} aria-label={RATING_SCALE[n - 1]}
               style={{ position: "absolute", opacity: 0, inset: 0, margin: 0, cursor: "pointer" }} />
-            <span style={{ fontSize: 18, fontWeight: 700 }}>{n}</span>
-            <span style={{ fontSize: 10.5, lineHeight: 1.1, textAlign: "center" }}>{RATING_SCALE[n - 1]}</span>
+            <span style={{ fontSize: 14, fontWeight: 700 }}>{RATING_SCALE[n - 1]}</span>
           </label>
         ))}
       </div>
@@ -34,9 +33,8 @@ export function FeedbackForm({ token }: { token: string }) {
   const [ctx, setCtx] = useState<Context | null>(null);
   const [loadError, setLoadError] = useState("");
   const [ratings, setRatings] = useState<number[]>(() => EVALUATION_RATINGS.map(() => 0));
-  const [liked, setLiked] = useState("");
-  const [suggestions, setSuggestions] = useState("");
-  const [recommend, setRecommend] = useState("");
+  const [attendance, setAttendance] = useState(false);
+  const [comments, setComments] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<"" | "submitted" | "already">("");
   const [error, setError] = useState("");
@@ -50,14 +48,14 @@ export function FeedbackForm({ token }: { token: string }) {
     return () => { active = false; };
   }, [token]);
 
-  const complete = ratings.every((r) => r >= 1) && (recommend === "Yes" || recommend === "No");
+  const complete = attendance && ratings.every((r) => r >= 1) && comments.trim().length > 0;
 
   async function submit() {
-    if (!complete) { setError("Please rate every statement and answer whether you would recommend New Wave."); return; }
+    if (!complete) { setError("Please confirm your attendance, rate every item and write your comments."); return; }
     setBusy(true); setError("");
     try {
       const r = await fetch("/api/public/feedback", { method: "POST", headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token, answers: { ratings, liked: liked.trim(), suggestions: suggestions.trim(), recommend } }) });
+        body: JSON.stringify({ token, answers: { attendance, ratings, comments: comments.trim() } }) });
       const body = await r.json().catch(() => ({}));
       if (r.status === 409) { setDone("already"); return; }
       if (!r.ok) throw new Error(body.error ?? "Could not submit your evaluation.");
@@ -92,21 +90,18 @@ export function FeedbackForm({ token }: { token: string }) {
           </div>
         ) : (
           <form onSubmit={(e) => { e.preventDefault(); if (!busy) void submit(); }}>
-            <p style={{ color: muted, margin: "14px 0 0" }}>Rate each statement from 1 (Poor) to 5 (Excellent).</p>
-            {EVALUATION_RATINGS.map((q, i) => <Rating key={q} index={i} label={q} value={ratings[i]} onChange={(v) => setRatings((rs) => rs.map((r, j) => (j === i ? v : r)))} />)}
+            <p style={{ color: muted, margin: "14px 0 0" }}>{EVALUATION_INTRO}</p>
+            <fieldset style={{ border: "1px solid #9EE3F1", borderRadius: 10, padding: "10px 12px", margin: "16px 0" }}>
+              <legend style={{ fontSize: 15, fontWeight: 700, color: navy, padding: "0 4px" }}>Attendance <span style={{ color: "#F25615" }}>*</span></legend>
+              <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 15, color: muted, cursor: "pointer" }}><input type="checkbox" checked={attendance} onChange={(e) => setAttendance(e.target.checked)} style={{ width: 20, height: 20, marginTop: 2, flex: "none" }} /><span><b style={{ color: navy }}>Confirm.</b> {ATTENDANCE_STATEMENT}</span></label>
+            </fieldset>
+            {EVALUATION_SECTIONS.map((s, si) => { const start = EVALUATION_SECTIONS.slice(0, si).reduce((t, x) => t + x.items.length, 0); return <section key={s.title} style={{ marginTop: 18 }}>
+              <h2 style={{ fontSize: 17, color: "#0571D0", margin: "0 0 4px" }}>{s.title} <span style={{ color: "#F25615" }}>*</span></h2>
+              {s.items.map((q, k) => <Rating key={q} index={start + k} label={q} value={ratings[start + k]} onChange={(v) => setRatings((rs) => rs.map((r, j) => (j === start + k ? v : r)))} />)}
+            </section>; })}
             <label style={{ display: "block", margin: "16px 0" }}>
-              <span style={{ fontSize: 15, fontWeight: 600, color: navy }}>{EVALUATION_QUESTIONS.liked}</span>
-              <textarea value={liked} onChange={(e) => setLiked(e.target.value)} rows={3} maxLength={EVALUATION_TEXT_MAX} style={field} />
-            </label>
-            <label style={{ display: "block", margin: "16px 0" }}>
-              <span style={{ fontSize: 15, fontWeight: 600, color: navy }}>{EVALUATION_QUESTIONS.suggestions}</span>
-              <textarea value={suggestions} onChange={(e) => setSuggestions(e.target.value)} rows={3} maxLength={EVALUATION_TEXT_MAX} style={field} />
-            </label>
-            <label style={{ display: "block", margin: "16px 0" }}>
-              <span style={{ fontSize: 15, fontWeight: 600, color: navy }}>{EVALUATION_QUESTIONS.recommend} <span style={{ color: "#F25615" }}>*</span></span>
-              <select value={recommend} onChange={(e) => setRecommend(e.target.value)} required style={{ ...field, minHeight: 46, background: "#fff" }}>
-                <option value="">Select…</option><option value="Yes">Yes</option><option value="No">No</option>
-              </select>
+              <span style={{ fontSize: 15, fontWeight: 600, color: navy }}>{COMMENTS_QUESTION} <span style={{ color: "#F25615" }}>*</span></span>
+              <textarea value={comments} onChange={(e) => setComments(e.target.value)} rows={4} maxLength={EVALUATION_TEXT_MAX} required style={field} />
             </label>
             {error && <p role="alert" style={{ color: "#b3261e", margin: "6px 0" }}>{error}</p>}
             <button type="submit" disabled={busy || !complete}

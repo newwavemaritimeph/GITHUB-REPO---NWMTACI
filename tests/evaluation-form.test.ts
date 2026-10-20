@@ -5,7 +5,7 @@ import { EVALUATION_RATINGS, evaluationProblem, type EvaluationAnswers } from "@
 import { createEvaluationPdf } from "@/lib/print/evaluation";
 import { evaluationNaming } from "@/lib/evaluation-drive";
 
-const complete: EvaluationAnswers = { ratings: [5, 4, 5, 3, 4, 5, 2, 5], liked: "The hands-on drills.", suggestions: "", recommend: "Yes" };
+const complete: EvaluationAnswers = { attendance: true, ratings: [4, 3, 4, 2, 3, 4, 1, 4, 4], comments: "The hands-on drills." };
 // pdf-lib writes standard-font text as hex strings inside flate-compressed content streams.
 const hex = (s: string) => Buffer.from(s, "latin1").toString("hex").toUpperCase();
 function pageText(bytes: Uint8Array) {
@@ -17,20 +17,21 @@ function pageText(bytes: Uint8Array) {
 }
 
 describe("portal training evaluation", () => {
-  it("has the eight rated statements", () => expect(EVALUATION_RATINGS).toHaveLength(8));
+  it("has the nine rated items of the Google Form", () => expect(EVALUATION_RATINGS).toHaveLength(9));
 
   it("accepts complete answers", () => expect(evaluationProblem(complete)).toBeNull());
 
   it("rejects a missing, out-of-range or fractional rating", () => {
-    expect(evaluationProblem({ ...complete, ratings: complete.ratings.slice(0, 7) })).toMatch(/rate every/);
+    expect(evaluationProblem({ ...complete, ratings: complete.ratings.slice(0, 8) })).toMatch(/rate every/);
     expect(evaluationProblem({ ...complete, ratings: [0, ...complete.ratings.slice(1)] })).toMatch(/rate every/);
-    expect(evaluationProblem({ ...complete, ratings: [6, ...complete.ratings.slice(1)] })).toMatch(/rate every/);
-    expect(evaluationProblem({ ...complete, ratings: [4.5, ...complete.ratings.slice(1)] })).toMatch(/rate every/);
+    expect(evaluationProblem({ ...complete, ratings: [5, ...complete.ratings.slice(1)] })).toMatch(/rate every/);
+    expect(evaluationProblem({ ...complete, ratings: [3.5, ...complete.ratings.slice(1)] })).toMatch(/rate every/);
   });
 
-  it("rejects a missing recommendation, overlong text and junk", () => {
-    expect(evaluationProblem({ ...complete, recommend: "Maybe" })).toMatch(/recommend/);
-    expect(evaluationProblem({ ...complete, liked: "x".repeat(1001) })).toMatch(/1000/);
+  it("requires the attendance confirmation and comments", () => {
+    expect(evaluationProblem({ ...complete, attendance: false })).toMatch(/attendance/);
+    expect(evaluationProblem({ ...complete, comments: "  " })).toMatch(/comments/);
+    expect(evaluationProblem({ ...complete, comments: "x".repeat(1001) })).toMatch(/1000/);
     expect(evaluationProblem(null)).not.toBeNull();
   });
 
@@ -38,7 +39,7 @@ describe("portal training evaluation", () => {
     const bytes = await createEvaluationPdf({
       traineeName: "Juan Dela Cruz Ñoño", nwmtaciNo: "NWMTACI-2026-0001", courseName: "Basic Training", courseCode: "BT",
       startsOn: "2026-10-13", endsOn: "2026-10-17", submittedAt: "2026-10-20T02:00:00Z",
-      answers: { ...complete, liked: "Great 👍 训练 — thanks!\nSecond line", suggestions: "a".repeat(1000) },
+      answers: { ...complete, comments: "Great 👍 训练 — thanks!\nSecond line " + "a".repeat(900) },
     });
     expect(Buffer.from(bytes.slice(0, 4)).toString()).toBe("%PDF");
     expect((await PDFDocument.load(bytes)).getPageCount()).toBeGreaterThanOrEqual(1);

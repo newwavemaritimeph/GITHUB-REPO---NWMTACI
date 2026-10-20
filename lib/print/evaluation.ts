@@ -1,5 +1,5 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
-import { EVALUATION_QUESTIONS, EVALUATION_RATINGS, RATING_SCALE, type EvaluationAnswers } from "@/lib/evaluation-form";
+import { ATTENDANCE_STATEMENT, COMMENTS_QUESTION, EVALUATION_SECTIONS, RATING_SCALE, type EvaluationAnswers } from "@/lib/evaluation-form";
 
 /** One trainee's training evaluation, A4 portrait, filed in Google Drive (owner, 20 Oct 2026). */
 export type EvaluationPdfInput = { traineeName: string; nwmtaciNo: string; courseName: string; courseCode: string; startsOn: string | null; endsOn: string | null; submittedAt: string; answers: EvaluationAnswers; logo?: Uint8Array };
@@ -61,31 +61,35 @@ export async function createEvaluationPdf(input: EvaluationPdfInput) {
   for (const [k, v] of info) { text(k, M + 10, iy, 9, bold, muted); text(wrap(v, reg, 10, CW - 120)[0] ?? "", M + 110, iy, 10); iy -= 16; }
   y -= boxH + 24;
 
-  // Ratings table: statement | score (1-5) | meaning.
-  const scoreX = M + CW - 150, meaningX = M + CW - 100;
-  text("Statement", M + 6, y, 9, bold, muted); text("Score", scoreX, y, 9, bold, muted); text("Rating", meaningX, y, 9, bold, muted);
-  y -= 6; page.drawLine({ start: { x: M, y }, end: { x: M + CW, y }, thickness: 1, color: navy });
-  EVALUATION_RATINGS.forEach((q, i) => {
-    const lines = wrap(`${i + 1}. ${q}`, reg, 10, scoreX - M - 16);
-    const rowH = lines.length * 13 + 9;
-    ensure(rowH);
-    let ly = y - 14;
-    for (const l of lines) { text(l, M + 6, ly, 10); ly -= 13; }
-    const score = input.answers.ratings[i];
-    text(score ? `${score} / 5` : "-", scoreX, y - 14, 10, bold);
-    text(score ? RATING_SCALE[score - 1] ?? "" : "", meaningX, y - 14, 10, reg, muted);
-    y -= rowH;
-    page.drawLine({ start: { x: M, y }, end: { x: M + CW, y }, thickness: 0.6, color: line });
-  });
-  y -= 22;
+  // Attendance confirmation, as on the Google Form.
+  text("ATTENDANCE", M, y, 10, bold, navy); y -= 15;
+  for (const l of wrap(`${input.answers.attendance ? "[X] Confirmed" : "[ ] Not confirmed"}: ${ATTENDANCE_STATEMENT}`, reg, 10, CW)) { text(l, M, y, 10); y -= 14; }
+  y -= 12;
 
-  const open: [string, string][] = [[EVALUATION_QUESTIONS.liked, input.answers.liked], [EVALUATION_QUESTIONS.suggestions, input.answers.suggestions], [EVALUATION_QUESTIONS.recommend, input.answers.recommend]];
-  for (const [q, a] of open) {
+  // The three rating grids: item | rating (Poor, Fair, Good, Excellent).
+  const rateX = M + CW - 90;
+  let n = 0;
+  for (const section of EVALUATION_SECTIONS) {
     ensure(40);
-    text(q, M, y, 10, bold, navy); y -= 15;
-    for (const l of wrap(a.trim() || "-", reg, 10, CW)) { ensure(14); text(l, M, y, 10); y -= 14; }
-    y -= 10;
+    text(section.title.toUpperCase(), M, y, 10, bold, navy); text("Rating", rateX, y, 9, bold, muted);
+    y -= 6; page.drawLine({ start: { x: M, y }, end: { x: M + CW, y }, thickness: 1, color: navy });
+    for (const q of section.items) {
+      const lines = wrap(`${n + 1}. ${q}`, reg, 10, rateX - M - 16);
+      const rowH = lines.length * 13 + 9;
+      ensure(rowH);
+      let ly = y - 14;
+      for (const l of lines) { text(l, M + 6, ly, 10); ly -= 13; }
+      const score = input.answers.ratings[n];
+      text(score ? RATING_SCALE[score - 1] ?? "-" : "-", rateX, y - 14, 10, bold);
+      y -= rowH; n += 1;
+      page.drawLine({ start: { x: M, y }, end: { x: M + CW, y }, thickness: 0.6, color: line });
+    }
+    y -= 18;
   }
+
+  ensure(40);
+  text(COMMENTS_QUESTION, M, y, 10, bold, navy); y -= 15;
+  for (const l of wrap(input.answers.comments.trim() || "-", reg, 10, CW)) { ensure(14); text(l, M, y, 10); y -= 14; }
 
   const pages = pdf.getPages();
   pages.forEach((p, i) => p.drawText(`Page ${i + 1} of ${pages.length}`, { x: W - M - 60, y: 22, size: 8, font: reg, color: muted }));
