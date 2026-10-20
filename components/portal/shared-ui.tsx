@@ -59,6 +59,14 @@ export function Pager({ page, total, perPage, onPage }: { page: number; total: n
 export const fullName = (person: { legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; suffix?: string | null }) =>
   `${person.legal_first_name} ${person.legal_middle_name ?? ""} ${person.legal_last_name} ${person.suffix ?? ""}`.replace(/\s+/g, " ").trim();
 
+/** Ten rows per page on every list (owner, 20 Oct 2026); back to page 1 when the list changes. */
+export function usePaged<T>(rows: T[], perPage = 10) {
+  const [page, setPage] = useState(1), [seen, setSeen] = useState(rows.length);
+  if (seen !== rows.length) { setSeen(rows.length); setPage(1); }
+  const current = Math.min(page, Math.max(1, Math.ceil(rows.length / perPage)));
+  return { shown: rows.slice((current - 1) * perPage, current * perPage), offset: (current - 1) * perPage, pager: rows.length > perPage ? <Pager page={current} total={rows.length} perPage={perPage} onPage={setPage} /> : null };
+}
+
 /** Records by date (owner, 20 Oct 2026): Trainees and Enrollments start on today and list the newest first. */
 export type Period = "Daily" | "Weekly" | "Monthly" | "All Dates";
 export const manilaDay = (iso?: string | null) => (iso ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(iso)) : "");

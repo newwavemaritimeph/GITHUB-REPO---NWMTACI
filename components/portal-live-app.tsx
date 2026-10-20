@@ -16,7 +16,7 @@ import { AdminConfiguration } from "./admin-configuration";
 import { DateReports } from "./date-reports";
 import { downloadCsv } from "@/lib/csv";
 import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer } from "./portal/live-registration";
-import { Badge, Message, Modal, Page, PageHead, PeriodBar, manilaDay, submit, fullName, usePeriod } from "./portal/shared-ui";
+import { Badge, Message, Modal, Page, PageHead, PeriodBar, manilaDay, submit, fullName, usePaged, usePeriod } from "./portal/shared-ui";
 import { classroomJoin } from "@/lib/classroom";
 import { ClassroomPanel } from "./portal/classroom-panel";
 import { TraineeRequestModal, type RequestType } from "./portal/payment-actions";
@@ -533,6 +533,9 @@ function Trainees({data,query,embedded,reload,role}:{data:PortalData;query:strin
     const matchesTerm=!term||`${fullName(t)} ${t.trainee_number} ${data.applicationNumbers?.[t.id]??""} ${t.srn??""} ${t.email} ${t.mobile}`.toLowerCase().includes(term);
     return matchesTerm&&(term?true:p.inRange(t.registered_at));
   }).sort((a,b)=>(b.registered_at??"").localeCompare(a.registered_at??""));
+  const groupOf=(id:string)=>traineeEnrollmentStatus(data,id)??"None";
+  const ordered=TRAINEE_GROUPS.flatMap(([g])=>rows.filter(t=>groupOf(t.id)===g));
+  const paged=usePaged(ordered);
   // Re-read the trainee from the latest data so the profile reflects edits.
   const sel=selId?data.trainees.find(t=>t.id===selId)??null:null;
   const coursesOf=(id:string)=>data.enrollments.filter(e=>e.trainee_id===id&&e.enrollment_status!=="Cancelled");
@@ -549,14 +552,14 @@ function Trainees({data,query,embedded,reload,role}:{data:PortalData;query:strin
       </div>
       {term?<p className="pd-label pd-pad">Searching all dates · {rows.length} found</p>:<PeriodBar p={p} what="Registered" count={`${rows.length} trainee${rows.length===1?"":"s"}`}/>}
       <div className="portal-table tbl-compact"><table><thead><tr><th>Trainee · Contact</th><th>Courses</th><th className="num">Balance</th><th>Registered</th>{canRequest&&<th>Request</th>}</tr></thead><tbody>
-        {TRAINEE_GROUPS.flatMap(([g,label])=>{const list=rows.filter(t=>(traineeEnrollmentStatus(data,t.id)??"None")===g);if(!list.length)return [];const owed=list.reduce((sum,t)=>sum+coursesOf(t.id).reduce((x,e)=>x+balanceOf(e),0),0);return [<tr key={g} className="tl-group"><td colSpan={canRequest?5:4}><b>{label}</b> <span>{list.length} trainee{list.length===1?"":"s"}{owed>0?` · ${pesos(owed)} to collect`:""}</span></td></tr>,...list.map(t=>{const list=coursesOf(t.id);const bal=list.reduce((sum,e)=>sum+balanceOf(e),0);const no=data.applicationNumbers?.[t.id];return <tr key={t.id} className="row-clickable" onClick={()=>setSelId(t.id)}>
+        {TRAINEE_GROUPS.flatMap(([g,label])=>{const list=paged.shown.filter(t=>groupOf(t.id)===g);if(!list.length)return [];const owed=rows.filter(t=>groupOf(t.id)===g).reduce((sum,t)=>sum+coursesOf(t.id).reduce((x,e)=>x+balanceOf(e),0),0);return [<tr key={g} className="tl-group"><td colSpan={canRequest?5:4}><b>{label}</b> <span>{rows.filter(t=>groupOf(t.id)===g).length} trainee{rows.filter(t=>groupOf(t.id)===g).length===1?"":"s"}{owed>0?` · ${pesos(owed)} to collect`:""}</span></td></tr>,...list.map(t=>{const list=coursesOf(t.id);const bal=list.reduce((sum,e)=>sum+balanceOf(e),0);const no=data.applicationNumbers?.[t.id];return <tr key={t.id} className="row-clickable" onClick={()=>setSelId(t.id)}>
           <td><strong>{fullName(t)}</strong><small>{no&&<><span className="app-no">{no}</span> · </>}<span className="tc-mono">{t.trainee_number}</span></small><small className="lc">{t.email} · {t.mobile}</small>{(()=>{const aid=list.map(e=>data.referralByEnrollment?.[e.id]).find(Boolean);const ag=aid?data.agencies.find(a=>a.id===aid):null;return ag?<span className="ref-chip">Referred by {ag.name}</span>:null})()}</td>
           <td>{list.length?<span className="tl-chips">{list.slice(0,3).map(e=><span key={e.id} className="tl-chip">{first(e.courses)?.code??first(e.courses)?.name}</span>)}{list.length>3&&<small>+{list.length-3} more</small>}</span>:<span className="muted-text">None yet</span>}</td>
           <td className="num"><strong className={bal?"tl-due":"tl-zero"}>{pesos(bal)}</strong></td>
           <td className="tc-nowrap">{t.registered_at?date(manilaDay(t.registered_at)):"—"}</td>
           {canRequest&&<td onClick={e=>e.stopPropagation()}>{list.length?<div className="req-dd"><button type="button" className="portal-secondary req-dd-btn" aria-haspopup="menu" aria-expanded={menuFor===t.id} onClick={ev=>{const r=ev.currentTarget.getBoundingClientRect();setMenuPos({top:r.bottom+6,left:Math.max(8,Math.min(r.left,window.innerWidth-216))});setMenuFor(menuFor===t.id?null:t.id)}}>Request ▾</button>{openReqs(t.id)>0&&<small className="req-dd-open">{openReqs(t.id)} with the Cashier</small>}{menuFor===t.id&&<div className="req-dd-menu" role="menu" style={{top:menuPos.top,left:menuPos.left}}>{TRAINEE_REQUESTS.map(([type,lbl])=><button key={type} type="button" role="menuitem" onClick={()=>{setMenuFor(null);setReqFor({traineeId:t.id,type})}}>{lbl}</button>)}</div>}</div>:<span className="muted-text">—</span>}</td>}
         </tr>})];})}
-      </tbody></table>{!rows.length&&<p className="portal-empty-copy">{term?"No trainees match.":"No trainees registered in this period."}</p>}</div>
+      </tbody></table>{!rows.length&&<p className="portal-empty-copy">{term?"No trainees match.":"No trainees registered in this period."}</p>}{paged.pager}</div>
     </section>
     {reqMsg&&<Message kind="success" text={reqMsg}/>}
     {sel&&<TraineeDetailModal data={data} trainee={sel} reload={reload} role={role} onClose={()=>setSelId(null)}/>}

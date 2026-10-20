@@ -5,7 +5,7 @@ import type { PortalData, Enrollment, Batch, Trainee } from "../portal-live-app"
 import { first, manilaToday, dueCentavos, balanceOf, pesos, pesos2, addDays } from "@/lib/portal-format";
 import { LATE_ENROLLMENT_CODES, PUBLIC_STCW_CODES, automaticEndDate, fitsInWeek } from "@/lib/scheduling";
 import { emailStatusText } from "@/lib/instruction-email-status";
-import { Badge, Message, Modal, PageHead, Pager, PeriodBar, usePost, usePeriod, submit, fullName, fmtDate, fmtClock } from "./shared-ui";
+import { Badge, Message, Modal, PageHead, PeriodBar, usePaged, usePost, usePeriod, submit, fullName, fmtDate, fmtClock } from "./shared-ui";
 import { RequestActionModal, type RequestType } from "./payment-actions";
 import { TarButton } from "./live-cashier";
 import { tcl } from "@/lib/title-case";
@@ -311,7 +311,6 @@ function ChooseBatchModal({ data, enrollment, reload, onClose }: { data: PortalD
 function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; query: string; reload: () => Promise<void>; initial: RecordFilter }) {
   const [filter, setFilter] = useState<RecordFilter>(initial);
   const [q, setQ] = useState("");
-  const [page, setPage] = useState(1);
   const [open, setOpen] = useState<Enrollment | null>(null);
   const [assigning, setAssigning] = useState<Trainee | null>(null);
   const term = (q || query).trim().toLowerCase();
@@ -326,8 +325,7 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
     .filter((x) => inFilter(filter, x.r))
     .filter(({ e }) => !term || `${nameOf(e)} ${e.enrollment_number} ${appNoOf(data, e.trainee_id) ?? ""} ${first(e.courses)?.name ?? ""} ${first(e.trainees)?.trainee_number ?? ""}`.toLowerCase().includes(term))
     .sort((a, b) => rank(a) - rank(b) || b.e.created_at.localeCompare(a.e.created_at));
-  const PER = 25;
-  const pageRows = rows.slice((page - 1) * PER, page * PER);
+  const paged = usePaged(rows), pageRows = paged.shown;
   const current = open ? data.enrollments.find((e) => e.id === open.id) ?? open : null;
   const count = (f: RecordFilter) => all.filter((x) => inFilter(f, x.r)).length + (f === "For payment" ? 0 : awaiting.length);
   // Summary rail (owner, 8 Oct 2026): the filters, requirement counts and enrollment types on the left; the list on the right.
@@ -338,7 +336,7 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
     <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Queue</h2><span className="muted-text">tap to filter</span></div>
-          <div className="cx-tiles ac-tiles ac-tiles-in" role="tablist" aria-label="Enrollment filter">{RECORD_FILTERS.map((f) => <button key={f} type="button" role="tab" aria-selected={filter === f} className={`cx-tile ac-pick ac-count${filter === f ? " on" : ""}`} style={{ ["--c" as string]: FILTER_COLORS[f] }} onClick={() => { setFilter(f); setPage(1); }}><span>{tcl(f)}</span><b>{count(f)}</b></button>)}</div>
+          <div className="cx-tiles ac-tiles ac-tiles-in" role="tablist" aria-label="Enrollment filter">{RECORD_FILTERS.map((f) => <button key={f} type="button" role="tab" aria-selected={filter === f} className={`cx-tile ac-pick ac-count${filter === f ? " on" : ""}`} style={{ ["--c" as string]: FILTER_COLORS[f] }} onClick={() => setFilter(f)}><span>{tcl(f)}</span><b>{count(f)}</b></button>)}</div>
           {awaiting.length > 0 && <p className="ac-foot">{awaiting.length} applicant{awaiting.length === 1 ? "" : "s"} still need a course.</p>}
         </section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Requirements</h2><span className="muted-text">applications</span></div>
@@ -350,8 +348,8 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
         </section>
       </div>
       <div className="ac-stack">
-        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search enrollments" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Name, NWMTACI number, SRN, course" /></div>
-        <div className="portal-panel">{term ? <p className="pd-label pd-pad">Searching all dates · {rows.length} found</p> : <PeriodBar p={{ ...per, setPeriod: (v) => { per.setPeriod(v); setPage(1); }, setDate: (v) => { per.setDate(v); setPage(1); } }} what="Enrolled" count={`${rows.length} enrollment${rows.length === 1 ? "" : "s"}`} />}</div>
+        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search enrollments" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, NWMTACI number, SRN, course" /></div>
+        <div className="portal-panel">{term ? <p className="pd-label pd-pad">Searching all dates · {rows.length} found</p> : <PeriodBar p={per} what="Enrolled" count={`${rows.length} enrollment${rows.length === 1 ? "" : "s"}`} />}</div>
         {filter !== "For payment" && noCourse.length > 0 && <section className="portal-panel nc-panel">
           <div className="panel-heading"><div><h2>No Course Yet</h2><p>Assign a course and schedule, then screen the application</p></div><span className="slot-count">{noCourse.length}</span></div>
           {noCourse.map((t) => <div className="rd-row" key={t.id}>
@@ -370,7 +368,7 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
             <td><Badge tone={s.tone}>{s.text}</Badge></td>
           </tr>; })(x)])}
         </tbody></table>{!rows.length && <p className="portal-empty-copy">{filter === "For payment" ? "Nobody is waiting at the Cashier." : filter === "Screening" ? (noCourse.length ? "Applicants without a course are listed above." : "No applications to screen. New ones arrive from the website.") : term ? "No matching enrollments." : "No enrollments in this period."}</p>}</div>
-        <Pager page={page} total={rows.length} perPage={PER} onPage={setPage} />
+        {paged.pager}
       </div>
     </div>
     {current && <EnrollmentDrawer data={data} enrollment={current} reload={reload} onClose={() => setOpen(null)} />}

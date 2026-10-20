@@ -6,7 +6,7 @@ import type { PortalData, Enrollment } from "../portal-live-app";
 import { addDays, first, manilaToday, dueCentavos, pesos2 } from "@/lib/portal-format";
 import { automaticEndDate } from "@/lib/scheduling";
 import { canPrint, canSetSeries, certificateState, evaluationRequiredFor, formatCertificateNumber, nextOf, isStcwCategory, matchTemplateFiles, releaseProblem, type CertificateView } from "@/lib/certificate-rules";
-import { Badge, Message, fmtDate, usePost } from "./shared-ui";
+import { Badge, Message, fmtDate, usePaged, usePost } from "./shared-ui";
 import { ReleaseConfirm } from "./live-releasing";
 import { DeliveryAlert } from "./delivery-home";
 import { tcl } from "@/lib/title-case";
@@ -134,11 +134,12 @@ function CertificateLog({ data, lines, reload }: { data: PortalData; lines: Cert
   const pdf = (l: CertificateLine, preview: boolean) => `/api/documents/certificate/${l.e.id}${preview ? "?preview=1" : ""}`;
   // The print opens in a new tab; refresh so the counter (and the button) update.
   const afterPrint = () => window.setTimeout(() => void reload(), 2500);
+  const paged = usePaged(byCourseGroup(data, lines).flatMap((x) => x.lines));
   if (!lines.length) return <p className="portal-empty-copy">Nothing here.</p>;
   return <>
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <div className="cl-wrap"><table className="cl-log cl-cert"><thead><tr><th>#</th><th>Trainee · NWMTACI No.</th><th>Course · Ended</th><th>Certificate No.</th><th>Progress</th><th>Status</th><th>Action</th></tr></thead><tbody>
-      {byCourseGroup(data, lines).flatMap(({ group, lines: g }) => [<tr key={group} className="nb-group"><td colSpan={7}><b>{group}</b> <span className="cl-sub">{g.length}</span></td></tr>, ...g.map((l, i) => { const printable = canPrint(l.view) && l.view.state !== "Void requested"; const printed = l.view.printCount > 0; return [
+      {byCourseGroup(data, paged.shown).flatMap(({ group, lines: g }) => [<tr key={group} className="nb-group"><td colSpan={7}><b>{group}</b> <span className="cl-sub">{g.length}</span></td></tr>, ...g.map((l, i) => { const printable = canPrint(l.view) && l.view.state !== "Void requested"; const printed = l.view.printCount > 0; return [
         <tr key={l.e.id}>
           <td className="cl-no">{i + 1}</td>
           <td><b>{l.name}</b><small className="cl-mono cl-sub cl-block">{l.number.replace(/^NWMTACI-/, "")}</small></td>
@@ -164,6 +165,7 @@ function CertificateLog({ data, lines, reload }: { data: PortalData; lines: Cert
         </div></td></tr>,
       ]; })])}
     </tbody></table></div>
+    {paged.pager}
     <p className="cl-legend">Prints shows copies used out of copies allowed: one, plus one for each paid Reprinting request or Admin-approved void. Preview never counts.{tracked ? " A certificate prints only once the trainee's 2x2 photo is on file." : ""}</p>
     {uploading && <CertificatePhotoModal enrollmentId={uploading.e.id} traineeName={uploading.name} fileName={uploading.fileName} onClose={() => setUploading(null)} onDone={async () => { setUploading(null); await reload(); }} />}
     {releasing && <ReleaseConfirm target={{ enrollmentId: releasing.e.id, name: releasing.name, course: releasing.course.name, certNo: releasing.cert?.certificate_number ?? "" }} onClose={() => setReleasing(null)} onDone={async () => { setReleasing(null); await reload(); }} />}
@@ -241,6 +243,7 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
   const lines = certificateLines(data, { inTrainingDays: WAIT_DAYS }).filter((l) => l.balance === 0 && WAITING.some(([s]) => s === l.view.state)).sort((a, b) => (a.ended ?? "").localeCompare(b.ended ?? ""));
   const term = q.trim().toLowerCase();
   const shown = lines.filter((l) => (!pick || l.view.state === pick) && (!term || `${l.name} ${l.number} ${l.course.name} ${l.course.code}`.toLowerCase().includes(term)));
+  const waitPaged = usePaged(byCourseGroup(data, shown).flatMap((x) => x.lines));
   const range = (l: CertificateLine) => !l.starts || l.starts === l.ended ? short(l.ended) : `${short(l.starts)} – ${short(l.ended)}`;
   const missing = (l: CertificateLine) => [l.balance > 0 && "payment", l.evalNeeded && !l.evalDone && "evaluation", tracked && !l.photo && "photo"].filter(Boolean) as string[];
   const next = (l: CertificateLine): [string, string] => {
@@ -269,7 +272,7 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
       <section className="portal-panel cx-panel">
         <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search waiting certificates" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, NWMTACI number or course" />{pick && <button type="button" className="portal-secondary" onClick={() => setPick("")}>Show All</button>}</div>
         {!shown.length ? <p className="portal-empty-copy">Nothing waiting.</p> : <div className="cl-wrap"><table className="cl-log cl-cert wt-log"><thead><tr><th>#</th><th>Trainee · NWMTACI No.</th><th>Course · Training</th><th>Certificate No.</th><th>Progress</th><th>Status</th><th>Action</th></tr></thead><tbody>
-          {byCourseGroup(data, shown).flatMap(({ group, lines: g }) => [<tr key={group} className="nb-group"><td colSpan={7}><b>{group}</b> <span className="cl-sub">{g.length}</span></td></tr>, ...g.map((l, i) => { const [step, then] = next(l); const label = WAITING.find(([s]) => s === l.view.state)?.[1] ?? l.view.state; return <tr key={l.e.id} className={l.ended && l.ended <= tomorrow ? "wt-soon" : undefined}>
+          {byCourseGroup(data, waitPaged.shown).flatMap(({ group, lines: g }) => [<tr key={group} className="nb-group"><td colSpan={7}><b>{group}</b> <span className="cl-sub">{g.length}</span></td></tr>, ...g.map((l, i) => { const [step, then] = next(l); const label = WAITING.find(([s]) => s === l.view.state)?.[1] ?? l.view.state; return <tr key={l.e.id} className={l.ended && l.ended <= tomorrow ? "wt-soon" : undefined}>
             <td className="cl-no">{i + 1}</td>
             <td><b>{l.name}</b><small className="cl-mono cl-sub cl-block">{l.number.replace(/^NWMTACI-/, "")}</small></td>
             <td title={l.course.name}><b>{l.course.code}</b><small className="cl-sub cl-block">{range(l)}</small></td>
@@ -418,7 +421,8 @@ export function ReleasedCertificates({ data, reload }: { data: PortalData; reloa
   const waiting = certificateLines(data).filter((l) => l.view.state === "Printed");
   const term = q.trim().toLowerCase();
   const rows = releaseRows(data).filter((r) => r.day >= from && r.day <= to && (!term || `${r.name} ${r.course} ${r.courseName} ${r.certNo} ${r.sticker}`.toLowerCase().includes(term)));
-  const days = [...new Set(rows.map((r) => r.day))].sort().reverse();
+  const relPaged = usePaged(rows);
+  const days = [...new Set(relPaged.shown.map((r) => r.day))].sort().reverse();
   const quick = (f: string) => { setTo(today); setFrom(f); };
   const csv = () => downloadCsv(`released-${from}-to-${to}.csv`, [["Date", "Time", "Trainee", "Course", "Certificate No.", "Released To", "ID", "Method", "Sticker No."], ...rows.map((r) => [r.day, clock(r.at), r.name, r.course, r.certNo, r.to, r.idType, r.method, r.sticker])]);
   return <div className="portal-page cx ac">
@@ -439,9 +443,9 @@ export function ReleasedCertificates({ data, reload }: { data: PortalData; reloa
             <span className="cx-seg"><button type="button" onClick={() => quick(today)}>Today</button><button type="button" onClick={() => quick(addDays(today, -6))}>Last 7 Days</button><button type="button" onClick={() => quick(`${today.slice(0, 8)}01`)}>This Month</button></span>
             <input className="vx-search" aria-label="Search released" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, course, certificate or sticker no." /><button type="button" className="portal-secondary" disabled={!rows.length} onClick={csv}>Download Excel</button></div>
           {rows.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Time</th><th>Trainee</th><th>Course</th><th>Certificate No.</th><th>Released To</th><th>Method</th><th>Sticker No.</th></tr></thead><tbody>
-            {days.map((d) => { const g = rows.filter((r) => r.day === d); return [<tr key={d} className="nb-group"><td colSpan={7}><b>{longDay(d)}</b> <span className="cl-sub">{g.length} released</span></td></tr>,
+            {days.map((d) => { const g = relPaged.shown.filter((r) => r.day === d); return [<tr key={d} className="nb-group"><td colSpan={7}><b>{longDay(d)}</b> <span className="cl-sub">{g.length} released</span></td></tr>,
               ...g.map((r) => <tr key={r.id}><td className="cl-mono">{clock(r.at)}</td><td><b>{r.name}</b></td><td title={r.courseName}>{r.course}</td><td className="cl-mono">{r.certNo}</td><td>{r.to}{r.idType && <small className="cl-sub cl-block">{r.idType}</small>}</td><td><Badge tone={r.method === "Courier" ? undefined : "green"}>{r.method === "Pickup" ? "Picked Up" : r.method}</Badge></td><td className="cl-mono">{r.sticker || "—"}</td></tr>)]; })}
-          </tbody></table></div> : <p className="portal-empty-copy">Nothing released in this range.</p>}
+          </tbody></table>{relPaged.pager}</div> : <p className="portal-empty-copy">Nothing released in this range.</p>}
         </section>
       </div>
     </div>
@@ -517,7 +521,8 @@ function PrintedCertificates({ data, lines, from, to, label }: { data: PortalDat
   const stale = printedReportRows(certs, who, released, "0000-01-01", today, today).filter((r) => r.status === "Waiting" && r.ageDays > 7);
   const term = q.trim().toLowerCase();
   const rows = all.filter(PRINTED_FILTERS[f]).filter((r) => !term || `${r.name} ${r.number} ${r.course} ${r.courseName} ${r.regNo} ${r.certNo} ${r.docNo}`.toLowerCase().includes(term));
-  const days = [...new Set(rows.map((r) => r.printedOn))];
+  const prPaged = usePaged(rows);
+  const days = [...new Set(prPaged.shown.map((r) => r.printedOn))];
   const noDocReleased = all.filter((r) => r.status === "Released" && !r.docNo).length, withBalance = all.filter(PRINTED_FILTERS["With Balance"]).length;
   const alerts: [string, PrintedFilter][] = [];
   if (noDocReleased) alerts.push([`${noDocReleased} released without a Document No.`, "No Document No."]);
@@ -530,13 +535,13 @@ function PrintedCertificates({ data, lines, from, to, label }: { data: PortalDat
     <div className="cx-bar ac-bar rl-bar"><span className="cx-seg">{(Object.keys(PRINTED_FILTERS) as PrintedFilter[]).map((k) => <button key={k} type="button" className={f === k ? "on" : ""} onClick={() => setF(k)}>{k} <small className="cl-mono">{all.filter(PRINTED_FILTERS[k]).length}</small></button>)}</span>
       <input className="vx-search" aria-label="Search printed certificates" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, course, registration, certificate or document no." /><button type="button" className="portal-secondary" disabled={!rows.length} onClick={csv}>Download Excel</button></div>
     {rows.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee</th><th>Course</th><th>Registration No.</th><th>Certificate No.</th><th>Document No.</th><th>Printed</th><th>Payment</th><th>Status</th></tr></thead><tbody>
-      {days.map((d) => { const g = rows.filter((r) => r.printedOn === d); return [<tr key={d} className="nb-group"><td colSpan={9}><b>{longDay(d)}</b> <span className="cl-sub">{g.length} printed</span></td></tr>,
-        ...g.map((r) => <tr key={r.id}><td className="cl-no">{rows.indexOf(r) + 1}</td><td><b>{r.name}</b>{r.number && <small className="cl-mono cl-sub cl-block">{r.number}</small>}</td><td title={r.courseName}><b>{r.course || "—"}</b></td>
+      {days.map((d) => { const g = prPaged.shown.filter((r) => r.printedOn === d); return [<tr key={d} className="nb-group"><td colSpan={9}><b>{longDay(d)}</b> <span className="cl-sub">{g.length} printed</span></td></tr>,
+        ...g.map((r) => <tr key={r.id}><td className="cl-no">{prPaged.offset + prPaged.shown.indexOf(r) + 1}</td><td><b>{r.name}</b>{r.number && <small className="cl-mono cl-sub cl-block">{r.number}</small>}</td><td title={r.courseName}><b>{r.course || "—"}</b></td>
           <td className="cl-mono">{r.regNo || "—"}</td><td className="cl-mono">{r.certNo || "—"}</td><td>{r.docNo ? <span className="cl-mono">{r.docNo}</span> : <span className="pc-miss">Not Encoded</span>}</td>
           <td>{clock(r.printedAt)}<small className="cl-sub cl-block">{r.printedBy}{r.copy > 1 && <> · <Badge tone="orange">{`Copy ${r.copy} · Reprint`}</Badge></>}</small></td>
           <td>{r.balance == null ? "—" : <Badge tone={r.balance > 0 ? "red" : "green"}>{printedPay(r)}</Badge>}</td>
           <td><Badge tone={r.status === "Released" ? "green" : r.status === "Void" ? "orange" : r.status === "Revoked" || r.ageDays > 7 ? "red" : undefined}>{PRINTED_STATUS[r.status]}</Badge><small className="cl-sub cl-block">{printedNote(r)}</small></td></tr>)]; })}
-    </tbody></table></div> : <p className="portal-empty-copy">{all.length ? "No printed certificates match." : "No certificates printed in this period."}</p>}
+    </tbody></table>{prPaged.pager}</div> : <p className="portal-empty-copy">{all.length ? "No printed certificates match." : "No certificates printed in this period."}</p>}
     <p className="cl-legend pc-sign">Prepared by: Releasing Officer <span>Noted by: Admin</span></p>
   </section>;
 }
