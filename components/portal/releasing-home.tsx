@@ -561,12 +561,14 @@ function NumberingTable({ data, reload, scope }: { data: PortalData; reload: () 
   const term = q.trim().toLowerCase();
   // Admin (owner, 13 Oct 2026): the six STCW courses New Wave numbers itself first, then every In-House course.
   const featured = (c: { code: string }) => ADMIN_STCW_CODES.indexOf(c.code);
-  const courses = data.courses.filter((c, i, all) => c.delivery_type === "In-House" && all.findIndex((x) => x.id === c.id) === i && (scope === "all" ? (term ? true : featured(c) >= 0 || !stcwCourse(c)) : scope === "stcw" ? (term ? true : stcwCourse(c)) : !stcwCourse(c)) && (term ? `${c.code} ${c.name}`.toLowerCase().includes(term) : true))
-    .sort((a, b) => scope === "all" ? ((featured(a) < 0 ? 99 : featured(a)) - (featured(b) < 0 ? 99 : featured(b)) || a.name.localeCompare(b.name)) : a.name.localeCompare(b.name));
-  const groupOf = (c: { code: string }) => scope !== "all" ? "" : featured(c) >= 0 ? "STCW Courses" : "In-House Courses";
+  const stcwRow = (c: { code: string; course_categories?: unknown }) => featured(c) >= 0 || stcwCourse(c);
+  const courses = data.courses.filter((c, i, all) => c.delivery_type === "In-House" && all.findIndex((x) => x.id === c.id) === i && (scope === "all" ? (term ? true : featured(c) >= 0 || !stcwCourse(c)) : scope === "stcw" ? (term ? true : stcwCourse(c)) : true) && (term ? `${c.code} ${c.name}`.toLowerCase().includes(term) : true))
+    .sort((a, b) => scope === "all" ? ((featured(a) < 0 ? 99 : featured(a)) - (featured(b) < 0 ? 99 : featured(b)) || a.name.localeCompare(b.name)) : scope === "in-house" ? (Number(!stcwRow(a)) - Number(!stcwRow(b)) || a.name.localeCompare(b.name)) : a.name.localeCompare(b.name));
+  // Releasing Officer (owner, 20 Oct 2026): New Wave STCW courses first, then every In-House course.
+  const groupOf = (c: { code: string; course_categories?: unknown }) => scope === "all" ? (featured(c) >= 0 ? "STCW Courses" : "In-House Courses") : scope === "in-house" ? (stcwRow(c) ? "STCW Courses" : "In-House Courses") : "";
   const valueOf = (id: string) => { const s = series.get(id); return edit[id] ?? { prefix: s?.prefix ?? "", last: s && s.next_number > 1 ? String(s.next_number - 1) : "", pad: String(s?.pad ?? 5), batchPrefix: s?.batch_prefix ?? "", nextBatch: String(s?.next_batch ?? 1) }; };
   const set = (id: string, k: string, v: string) => setEdit({ ...edit, [id]: { ...valueOf(id), [k]: v } });
-  return <section className="portal-panel cx-panel"><div className="panel-heading"><h2>{scope === "all" ? "Certificate No. per Course" : scope === "stcw" ? "Certificate Numbering" : "In-House Certificate Numbering"}</h2></div>
+  return <section className="portal-panel cx-panel"><div className="panel-heading"><h2>{scope === "all" ? "Certificate No. per Course" : scope === "stcw" ? "Certificate Numbering" : "Certificate Numbering"}</h2></div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} placeholder={scope === "stcw" ? "STCW courses shown; search any course" : "Search any In-House course by name or code"} /></div>
     <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th>Prefix</th><th>Last No. Used</th><th>Digits</th><th>Next Certificate</th><th /></tr></thead><tbody>
@@ -588,7 +590,7 @@ function NumberingTable({ data, reload, scope }: { data: PortalData; reload: () 
 /** Releasing Officer › Numbering: the last Certificate No. used for every In-House course (owner, 20 Oct 2026: all courses, no batch numbers). */
 export function ReleasingNumbering({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   return <div className="portal-page cx ac">
-    <Head title="Numbering" note="Type the last Certificate No. used for each In-House course once; the portal continues from there. Registration No. is automatic. STCW numbering is set by the Admin." />
+    <Head title="Numbering" note="Type the last Certificate No. used for each New Wave course once, STCW and In-House; the portal continues from there. Registration No. is automatic." />
     <NumberingTable data={data} reload={reload} scope="in-house" />
   </div>;
 }

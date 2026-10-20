@@ -2175,7 +2175,7 @@ export async function POST(request: Request) {
       const { data: courseRow } = await admin.from("courses").select("course_categories(name)").eq("id", input.courseId).maybeSingle();
       const category = (courseRow as { course_categories?: { name?: string } | { name?: string }[] | null } | null)?.course_categories;
       const stcw = isStcwCategory(Array.isArray(category) ? category[0]?.name : category?.name);
-      if (!canSetSeries(staff.roleCodes, stcw)) return NextResponse.json({ error: stcw ? "Only the Admin sets numbering for STCW courses." : "Only the Releasing Officer or the Admin sets certificate numbering." }, { status: 403 });
+      if (!canSetSeries(staff.roleCodes, stcw)) return NextResponse.json({ error: "Only the Releasing Officer or the Admin sets certificate numbering." }, { status: 403 });
       // Registration No. per course (migration 202610130042): sent only when the screen has the fields.
       const reg: Record<string, string | number | null> = input.regNext === undefined ? {} : { reg_prefix: input.regPrefix || "NWMTC", reg_next: input.regNext, reg_digits: input.regDigits ?? 4, reg_style: input.regStyle ?? "month-number" };
       const row = { course_id: input.courseId, prefix: input.prefix, next_number: input.nextNumber, pad: input.pad, batch_prefix: input.batchPrefix, next_batch: input.nextBatch, ...reg, set_by: staff.user.id, set_at: new Date().toISOString() };

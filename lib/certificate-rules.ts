@@ -120,7 +120,9 @@ export const isStcwCategory = (categoryName: string | null | undefined) => (cate
  * Who sets a course's certificate numbering (owner, 9 Oct 2026): the Releasing
  * Officer for In-House courses, the Admin for any course (STCW only the Admin).
  */
-export const canSetSeries = (roles: string[], stcw: boolean) => roles.includes("admin") || (!stcw && roles.includes("releasing_officer"));
+// The Releasing Officer also numbers New Wave STCW courses (owner, 20 Oct 2026).
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- callers still pass whether the course is STCW
+export const canSetSeries = (roles: string[], _stcw: boolean) => roles.includes("admin") || roles.includes("releasing_officer");
 
 /**
  * Upload Many templates (owner, 20 Oct 2026): pairs each PDF file name with a course.

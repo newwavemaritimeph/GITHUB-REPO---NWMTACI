@@ -42,7 +42,7 @@ describe("certificate numbering", () => {
     expect(isStcwCategory("STCW Courses")).toBe(true);
     expect(isStcwCategory("In-House Training")).toBe(false);
     expect(canSetSeries(["releasing_officer"], false)).toBe(true);
-    expect(canSetSeries(["releasing_officer"], true)).toBe(false);
+    expect(canSetSeries(["releasing_officer"], true)).toBe(true);
     expect(canSetSeries(["admin"], true)).toBe(true);
     expect(canSetSeries(["cashier"], false)).toBe(false);
   });
