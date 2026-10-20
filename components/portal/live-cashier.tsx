@@ -63,7 +63,7 @@ export function ReceiptButton({ data, paymentId, reload, className = "portal-sec
   return <a className={className} href={`/portal/payment-receipt/${paymentId}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload?.(), 2500)}>Print Receipt</a>;
 }
 
-/** Print TAR (owner, 8 Oct 2026): prints twice; after the second print the button is gone. */
+/** Print TAR (owner, 8 Oct 2026): prints twice; after the second print the button is gone. Registration prints it (owner, 20 Oct 2026). */
 export function TarButton({ data, traineeId, reload, className = "portal-secondary" }: { data: PortalData; traineeId: string; reload?: () => Promise<void>; className?: string }) {
   const s = tarState(data, traineeId);
   const [error, setError] = useState("");
@@ -109,7 +109,6 @@ export function CashierPaymentQueue({ data, onPay, reload }: { data: PortalData;
       <div className="panel-heading"><div><h2>Paid · Training Admission Record</h2><p>Enrolled trainees paid in the last 7 days. The TAR prints twice; more needs the accounting manager&apos;s approval.</p></div><span className="slot-count">{toPrint.length}</span></div>
       {toPrint.map((t) => { const s = tarState(data, t.id); return <div className="live-row-item" key={t.id}>
         <div><strong>{fullName(t)}</strong><small>{data.applicationNumbers?.[t.id] ? <span className="app-no">{data.applicationNumbers[t.id]}</span> : null}{s.paid.map((e) => first(e.courses)?.code ?? first(e.courses)?.name).filter(Boolean).join(", ")}{s.record ? ` · ${s.record.ar_number} · printed ${s.printed} of ${s.allowed}` : " · not printed yet"}</small></div>
-        <div className="document-actions"><TarButton data={data} traineeId={t.id} reload={reload} className="portal-primary" /></div>
       </div>; })}
       {!toPrint.length && <p className="portal-empty-copy">No newly paid trainees.</p>}
     </section>
@@ -335,7 +334,6 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
       {posted.drive && <p className="portal-form-note full cx-drive">Saved to Google Drive · {posted.drive.path.split(" / ").slice(1).join(" / ")} {posted.drive.link && <a href={posted.drive.link} target="_blank" rel="noreferrer">Open</a>}</p>}
       <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
         {posted.id && <ReceiptButton data={data} paymentId={posted.id} reload={onSaved} />}
-        <TarButton data={data} traineeId={group.traineeId} className="portal-secondary" />
       </div>
       <div className="portal-form-actions full"><button type="button" className="portal-primary" onClick={onClose}>Done</button></div>
     </div>
@@ -452,9 +450,14 @@ export function CashierDashboard({ data, onPay, reload }: { data: PortalData; on
         {fresh.map((g) => <tr key={g.traineeId}><td data-l="" className="lead"><Who name={g.name} number={g.number} /></td><td data-l="Courses"><CourseList list={g.enrollments} /></td><td data-l="Endorsed">{fmtDate(day(g.since))}<small>{fmtClock(g.since)}</small></td><td data-l="Total due" className="r"><strong className="cx-amt">{pesos(g.due)}</strong><small>{g.enrollments.length} course{g.enrollments.length === 1 ? "" : "s"}</small></td><td data-l=""><div className="cx-acts"><button type="button" className="portal-primary" onClick={() => onPay(firstOpen(g))}>Record Payment</button></div></td></tr>)}
       </tbody></table></div> : <p className="portal-empty-copy">No new enrollments.</p>}
     </section>
+        {/* Paid and Enrolled (owner, 20 Oct 2026): one compact line per trainee; the TAR is printed by Registration. */}
         <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Paid and Enrolled</h2></div><span className="slot-count">{paid.length}</span></div>
-      {paid.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Courses</th><th className="r">Paid</th><th className="r">Balance</th><th>Status</th><th></th></tr></thead><tbody>
-        {paid.map((g) => { const latest = data.payments.filter((p) => p.trainee_id === g.traineeId).sort((a, b) => b.received_at.localeCompare(a.received_at))[0]; return <tr key={g.traineeId}><td data-l="" className="lead"><Who name={g.name} number={g.number} /></td><td data-l="Courses"><CourseList list={g.enrollments} /></td><td data-l="Paid" className="r cx-amt">{pesos(g.paid)}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(g.balance)}</strong></td><td data-l="Status"><Badge tone={g.balance === 0 ? "active" : "orange"}>{g.balance === 0 ? "Paid" : "Partially Paid"}</Badge></td><td data-l=""><div className="cx-acts">{g.balance > 0 && <button type="button" className="portal-secondary" onClick={() => onPay(firstOpen(g))}>Collect Balance</button>}{latest && <ReceiptButton data={data} paymentId={latest.id} reload={reload} />}<TarButton data={data} traineeId={g.traineeId} reload={reload} className="portal-primary" /></div></td></tr>; })}
+      {paid.length ? <div className="portal-table cx-cards pe-table"><table><thead><tr><th>Trainee · NWMTACI No.</th><th>Courses · Training</th><th className="r">Payment</th><th></th></tr></thead><tbody>
+        {paid.map((g) => { const latest = data.payments.filter((p) => p.trainee_id === g.traineeId).sort((a, b) => b.received_at.localeCompare(a.received_at))[0]; return <tr key={g.traineeId}>
+          <td data-l="" className="lead"><Who name={g.name} number={g.number} /></td>
+          <td data-l="Courses"><span className="pe-courses">{g.enrollments.map((e) => <span key={e.id} className="pe-course" title={first(e.courses)?.name ?? ""}><b>{courseCode(e)}</b>{scheduleText(e)}</span>)}</span></td>
+          <td data-l="Payment" className="r"><strong className="cx-amt">{pesos(g.paid)}</strong><small>{g.balance === 0 ? <Badge tone="active">Paid</Badge> : <Badge tone="orange">{`Balance ${pesos(g.balance)}`}</Badge>}</small></td>
+          <td data-l=""><div className="cx-acts">{g.balance > 0 && <button type="button" className="portal-secondary" onClick={() => onPay(firstOpen(g))}>Collect Balance</button>}{latest && <ReceiptButton data={data} paymentId={latest.id} reload={reload} />}</div></td></tr>; })}
       </tbody></table></div> : <p className="portal-empty-copy">No paid trainees in the last 7 days.</p>}
     </section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Unpaid Balances · 4:00 PM Summary</h2></div><span className="document-actions"><button type="button" className="portal-secondary" disabled={busy} onClick={() => void post({ action: "balance-summary-send" }, "Summary emailed.").catch(() => undefined)}>Email Summary Now</button></span></div>
@@ -552,7 +555,7 @@ export function CashierEnrollments({ data, onPay, reload }: { data: PortalData; 
       {(from || to) && <button type="button" className="ghost-button" onClick={() => { setFrom(""); setTo(""); }}>Clear Dates</button>}
     </div>
     <section className="portal-panel cx-panel">{rows.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Enrolled</th><th>Course</th><th className="r">Total Due</th><th className="r">Paid</th><th className="r">Balance</th><th>Status</th><th></th></tr></thead><tbody>
-      {rows.map((e) => { const st = payState(e); return <tr key={e.id}><td data-l="" className="lead"><Who name={traineeName(e)} number={data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number} /></td><td data-l="Enrolled">{fmtDate(dateOf(e))}</td><td data-l="Course"><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small></td><td data-l="Total due" className="r cx-amt">{pesos(dueCentavos(e))}</td><td data-l="Paid" className="r cx-amt">{pesos(paidOf(e))}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(e.enrollment_status === "Cancelled" ? 0 : balanceOf(e))}</strong></td><td data-l="Status"><Badge tone={PAY_TONE[st]}>{st}</Badge></td><td data-l=""><div className="cx-acts">{st !== "Paid" && st !== "Cancelled" && <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record Payment</button>}{st !== "Unpaid" && st !== "Cancelled" && <TarButton data={data} traineeId={e.trainee_id} reload={reload} />}</div></td></tr>; })}
+      {rows.map((e) => { const st = payState(e); return <tr key={e.id}><td data-l="" className="lead"><Who name={traineeName(e)} number={data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number} /></td><td data-l="Enrolled">{fmtDate(dateOf(e))}</td><td data-l="Course"><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small></td><td data-l="Total due" className="r cx-amt">{pesos(dueCentavos(e))}</td><td data-l="Paid" className="r cx-amt">{pesos(paidOf(e))}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(e.enrollment_status === "Cancelled" ? 0 : balanceOf(e))}</strong></td><td data-l="Status"><Badge tone={PAY_TONE[st]}>{st}</Badge></td><td data-l=""><div className="cx-acts">{st !== "Paid" && st !== "Cancelled" && <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record Payment</button>}</div></td></tr>; })}
     </tbody></table></div> : <p className="portal-empty-copy">No enrollments match these filters.</p>}</section>
   </div>;
 }

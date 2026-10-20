@@ -1,0 +1,82 @@
+<title>Releasing Officer Screens</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+:root{--blue:#0571D0;--orange:#F25615;--navy:#123F63;--bg:#f1f6f9;--surface:#fff;--line:#d8e4ec;--fg:#0f2638;--muted:#5f7180;--soft:#eef6fb;--th:#e3f6fb;--okbg:#e3f4ea;--ok:#15803d;--badbg:#fde7dc;--bad:#c2410c;--waitbg:#eef2f6;--wait:#5f7180;--redbg:#fbe4dc;--red:#b42318;--sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--badbg:#3a2016;--bad:#ffad78;--waitbg:#1a2a38;--wait:#a3b4c4;--redbg:#3c1d16;--red:#ff8a7a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--badbg:#3a2016;--bad:#ffad78;--waitbg:#1a2a38;--wait:#a3b4c4;--redbg:#3c1d16;--red:#ff8a7a;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}button,input{font:inherit;color:inherit}button{cursor:pointer}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.bar{background:var(--navy);color:#fff;padding-block:12px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}.bar b{letter-spacing:.04em}.bar small{display:block;opacity:.8}
+.views{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap}.views button{border:0;background:none;color:#fff;padding:9px 13px;border-radius:10px 10px 0 0;font-weight:500;font-size:14px;opacity:.85}.views button.on{background:var(--bg);color:var(--fg);opacity:1;box-shadow:inset 0 3px 0 var(--orange)}
+.page{max-width:1240px;margin:0 auto;padding-block:18px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}h1{margin:2px 0 0;font-size:25px}h2{margin:0;font-size:16px}
+.rail{display:grid;grid-template-columns:240px minmax(0,1fr);gap:14px;align-items:start}@media (max-width:900px){.rail{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;flex-wrap:wrap}.ph small{color:var(--muted)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 12px 12px}.tile{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 10px}.tile span{display:block;font-size:12.5px;color:var(--muted)}.tile b{font:600 20px var(--mono)}
+.search{padding:12px 16px}.search input{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--surface)}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13.5px}th{background:var(--th);color:var(--muted);font:600 11px var(--sans);letter-spacing:.07em;text-transform:uppercase;text-align:left;padding:8px 10px;white-space:nowrap}td{padding:8px 10px;border-top:1px solid var(--line);vertical-align:top}td small{display:block;color:var(--muted);font-size:12px}.no{color:var(--muted);font:500 12px var(--mono)}
+.grp td{background:var(--soft);font-weight:700}.grp small{display:inline;margin-left:6px;font-weight:500}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}.g{background:var(--okbg);color:var(--ok)}.o{background:var(--badbg);color:var(--bad)}.r{background:var(--redbg);color:var(--red)}.n{background:var(--waitbg);color:var(--wait)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:8px;padding:5px 11px;font-weight:600;font-size:13px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.split{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.split span{padding:5px 10px;font-size:13px;font-weight:600;color:var(--blue)}.split span.go{background:var(--orange);color:#fff}
+.acts{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.prog{display:flex;list-style:none;margin:0;padding:0;min-width:280px}.prog li{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative;font-size:11.5px;color:var(--muted);text-align:center}.prog li::before{content:"";position:absolute;top:12px;right:50%;width:100%;height:2px;background:var(--line)}.prog li:first-child::before{display:none}.prog li.y::before{background:var(--ok)}
+.dot{position:relative;z-index:1;display:grid;place-items:center;width:26px;height:26px;border-radius:99px;font-size:13px;font-weight:700;border:2px solid transparent}.y .dot{background:var(--ok);color:#fff}.n2 .dot{background:var(--surface);color:var(--bad);border-color:var(--bad)}.n2{color:var(--bad)!important;font-weight:600}.w .dot{background:var(--waitbg);color:var(--wait);border:2px dashed #94a3b8}
+.note{font-size:13px;color:var(--muted);padding:0 16px 14px;margin:0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}.seg button{border:0;background:none;padding:7px 12px;font-weight:600;font-size:13px}.seg button.on{background:var(--navy);color:#fff}.seg b{font:600 11px var(--mono);margin-left:4px;opacity:.75}
+.alerts{display:flex;gap:8px;flex-wrap:wrap;padding:0 16px 10px}.alert{background:#fde9dd;color:#b4480f;border-radius:10px;padding:7px 12px;font-size:13.5px;font-weight:500}
+.miss{color:var(--bad);font-size:12.5px;font-weight:600}
+.ktiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}.ktiles div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px}.ktiles span{display:block;font-size:12.5px;color:var(--muted)}.ktiles b{font:600 22px var(--mono)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+</style>
+
+<div class="bar"><b>NEW WAVE MARITIME · PORTAL</b><small>Preview with sample data · what is live now for the Releasing Officer</small>
+  <nav class="views" id="views"></nav></div>
+<main class="page" id="page"></main>
+
+<script>
+const dots = (d) => `<ol class="prog">${d.map(([l,k])=>`<li class="${k==="n"?"n2":k}"><span class="dot">${k==="y"?"✓":k==="w"?"◷":"✗"}</span><span>${l}</span></li>`).join("")}</ol>`;
+const C = [
+  {g:"STCW",n:"TABULAO, LEE JOEL",w:"0000008",c:"UBT-PSSR",e:"Oct 19",no:"UBT-08812",p:"0/1",d:[["Paid","y"],["Evaluation","y"],["Photo","y"]],s:["Due",""],a:`<span class="split"><span>Preview</span><span class="go">Print</span></span>`},
+  {g:"STCW",n:"DE BORJA, ALBRECHT",w:"0000006",c:"STPPDSPPS",e:"Oct 19",no:"STP-01977",p:"1/1",d:[["Paid","y"],["Evaluation","y"],["Photo","y"]],s:["Printed","g"],a:`<span class="split"><span>Preview</span></span> <span class="btn">▾</span>`},
+  {g:"STCW",n:"SALAZAR, CEZAR",w:"0000001",c:"UBT-PSSR",e:"Oct 19",no:"—",p:"0/1",d:[["Paid","y"],["Evaluation","y"],["Photo","n"]],s:["Waiting for Photo","o"],a:`<span class="btn pri">Upload Photo</span> <span class="split"><span>Preview</span></span>`},
+  {g:"In-House",n:"RAMOS, HERWIN",w:"0000005",c:"APA",e:"Oct 17",no:"APA-00021",p:"0/1",d:[["Paid","y"],["Post-Test","y"],["Evaluation","y"],["Photo","y"]],s:["Due",""],a:`<span class="split"><span>Preview</span><span class="go">Print</span></span>`},
+  {g:"In-House",n:"RAMOS, HERWIN",w:"0000005",c:"AI",e:"Oct 19",no:"AI-00007",p:"1/1",d:[["Paid","y"],["Post-Test","y"],["Evaluation","y"],["Photo","y"]],s:["Released","g"],a:`<span class="split"><span>Preview</span></span>`},
+];
+const W = [
+  {g:"STCW",n:"MORALES, RED",w:"0000012",c:"UBT-PSSR",t:"Oct 20",no:"UBT-08815",d:[["Paid","y"],["Evaluation","n"],["Photo","n"]],s:["Evaluation",""],step:"Trainee submits the evaluation",a:`<span class="btn">Email Post-Test and Evaluation</span> <span class="btn">Upload Photo</span>`},
+  {g:"STCW",n:"SORIANO, SIRIU WALLACE",w:"0000011",c:"PSCMHBT",t:"Oct 22 – 24",no:"—",d:[["Training","w"],["Paid","y"],["Evaluation","w"],["Photo","y"]],s:["In Training",""],step:"Training ends Oct 24",a:`<span style="color:var(--muted);font-size:13px">No action yet</span>`},
+  {g:"In-House",n:"SANTOS, MARIA",w:"0000014",c:"ESEA",t:"Oct 16 – 17",no:"ESEA-00078",d:[["Paid","y"],["Post-Test","n"],["Evaluation","y"],["Photo","y"]],s:["Evaluation",""],step:"Trainee passes the post-test",a:`<span class="btn">Email Post-Test and Evaluation</span>`},
+  {g:"In-House",n:"DELA CRUZ, JUAN",w:"0000015",c:"ABC",t:"Oct 19",no:"ABC-00151",d:[["Paid","y"],["Post-Test","y"],["Evaluation","y"],["Photo","n"]],s:["Photo Needed","o"],step:"Upload the 2x2 photo",a:`<span class="btn pri">Upload Photo</span>`},
+];
+const grouped = (rows, cols, row) => ["STCW","In-House"].map((g)=>{const l=rows.filter((r)=>r.g===g);return l.length?`<tr class="grp"><td colspan="${cols}">${g} Courses<small>${l.length}</small></td></tr>`+l.map((r,i)=>row(r,i)).join(""):""}).join("");
+const tiles = (t) => `<div class="tiles">${t.map(([a,b,c])=>`<div class="tile" style="--c:${c}"><span>${a}</span><b>${b}</b></div>`).join("")}</div>`;
+const V = {
+  Certificates: () => `<div><div class="eyebrow">Releasing Officer</div><h1>Certificates</h1></div><div class="rail">
+    <section class="panel"><div class="ph"><h2>Status</h2><small>tap to filter</small></div>${tiles([["Due","2","#0571D0"],["Printed","1","#15803d"],["Waiting for Photo","1","#c2410c"],["Released","1","#123F63"]])}</section>
+    <section class="panel"><div class="search"><input placeholder="Search trainee, NWMTACI number or certificate number"></div><div class="wrap"><table><thead><tr><th>#</th><th>Trainee · NWMTACI No.</th><th>Course · Ended</th><th>Certificate No.</th><th>Progress</th><th>Status</th><th>Action</th></tr></thead><tbody>
+    ${grouped(C,7,(r,i)=>`<tr><td class="no">${i+1}</td><td><b>${r.n}</b><small class="mono">${r.w}</small></td><td><b>${r.c}</b><small>Ended ${r.e}</small></td><td><span class="mono">${r.no}</span><small>Prints ${r.p}</small></td><td>${dots(r.d)}</td><td><span class="pill ${r.s[1]||"n"}">${r.s[0]}</span></td><td><div class="acts">${r.a}</div></td></tr>`)}
+    </tbody></table></div><p class="note" style="padding-top:10px">Prints shows copies used out of copies allowed. Preview never counts.</p></section></div>`,
+  Waiting: () => `<div><div class="eyebrow">Releasing Officer</div><h1>Waiting</h1></div><div class="rail">
+    <section class="panel"><div class="ph"><h2>Waiting For</h2><small>tap to filter</small></div>${tiles([["In Training","1","#64748b"],["Evaluation","2","#7a3fb8"],["Photo Needed","1","#c2410c"],["Waiting","4","#123F63"]])}</section>
+    <section class="panel"><div class="search"><input placeholder="Search trainee, NWMTACI number or course"></div><div class="wrap"><table><thead><tr><th>#</th><th>Trainee · NWMTACI No.</th><th>Course · Training</th><th>Certificate No.</th><th>Progress</th><th>Status</th><th>Action</th></tr></thead><tbody>
+    ${grouped(W,7,(r,i)=>`<tr><td class="no">${i+1}</td><td><b>${r.n}</b><small class="mono">${r.w}</small></td><td><b>${r.c}</b><small>${r.t}</small></td><td><span class="mono">${r.no}</span><small>Not printed yet</small></td><td>${dots(r.d)}</td><td><span class="pill ${r.s[1]||"n"}">${r.s[0]}</span><small>${r.step}</small></td><td><div class="acts">${r.a}</div></td></tr>`)}
+    </tbody></table></div></section></div>`,
+  Reports: () => `<div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-end"><div><div class="eyebrow">Releasing Officer</div><h1>Certificate Report</h1></div><div class="tools"><span class="seg"><button class="on">Daily</button><button>Weekly</button><button>Monthly</button></span><span class="btn">Download Excel</span><span class="btn pri">Print / Save PDF</span></div></div>
+    <div class="ktiles"><div><span>Printed</span><b>3</b></div><div><span>Reprinted</span><b>1</b></div><div><span>Released</span><b>2</b></div><div><span>Waiting for Release</span><b>2</b></div><div><span>Overdue to Print</span><b>0</b></div></div>
+    <section class="panel"><div class="ph"><h2>Printed Certificates</h2><small>4 of 4 · Tuesday, October 20, 2026</small></div>
+    <div class="alerts"><span class="alert">⚠ 1 printed with a balance</span><span class="alert">⚠ 1 released without a Document No.</span></div>
+    <div style="padding:0 16px 12px"><span class="seg"><button class="on">All<b>4</b></button><button>Waiting for Release<b>2</b></button><button>Released<b>2</b></button><button>Reprints<b>1</b></button><button>No Document No.<b>1</b></button><button>With Balance<b>1</b></button></span></div>
+    <div class="wrap"><table><thead><tr><th>#</th><th>Trainee</th><th>Course</th><th>Registration No.</th><th>Certificate No.</th><th>Document No.</th><th>Printed</th><th>Payment</th><th>Status</th></tr></thead><tbody>
+    <tr class="grp"><td colspan="9">Tuesday, October 20, 2026<small>4 printed</small></td></tr>
+    <tr><td class="no">1</td><td><b>ESGUERRA, Kate</b><small class="mono">0000412</small></td><td><b>ABC</b></td><td class="mono">NWMTC00412-102026</td><td class="mono">ABC-00150</td><td class="mono">HS-0045871</td><td>9:12 AM<small>J. Ramos</small></td><td><span class="pill g">Paid</span></td><td><span class="pill g">Released</span><small>Oct 20, 2026 · Picked Up</small></td></tr>
+    <tr><td class="no">2</td><td><b>DE BORJA, Albrecht</b><small class="mono">0000006</small></td><td><b>STPPDSPPS</b></td><td class="mono">NWMTC00415-102026</td><td class="mono">STP-01977</td><td><span class="miss">Not Encoded</span></td><td>10:40 AM<small>J. Ramos</small></td><td><span class="pill r">Balance ₱500.00</span></td><td><span class="pill n">Waiting for Release</span><small>Printed today</small></td></tr>
+    <tr><td class="no">3</td><td><b>MENDOZA, Ana</b><small class="mono">0000288</small></td><td><b>HPT</b></td><td class="mono">NWMTC00321-092026</td><td class="mono">HPT-00149</td><td><span class="miss">Not Encoded</span></td><td>1:15 PM<small>J. Ramos · <span class="pill o">Copy 2 · Reprint</span></small></td><td><span class="pill g">Paid</span></td><td><span class="pill g">Released</span><small>Oct 20, 2026 · Picked Up</small></td></tr>
+    <tr><td class="no">4</td><td><b>RAMOS, Herwin</b><small class="mono">0000005</small></td><td><b>AI</b></td><td class="mono">NWMTC00416-102026</td><td class="mono">AI-00007</td><td class="mono">HS-0045876</td><td>2:30 PM<small>J. Ramos</small></td><td><span class="pill g">Paid</span></td><td><span class="pill n">Waiting for Release</span><small>Printed today</small></td></tr>
+    </tbody></table></div></section>`,
+};
+let cur="Certificates";
+function render(){document.getElementById("views").innerHTML=["Dashboard","Certificates","Waiting","Released","Reports"].map((v)=>`<button class="${v===cur?"on":""}" data-v="${v}">${v}</button>`).join("");document.getElementById("page").innerHTML=(V[cur]||V.Certificates)();}
+document.addEventListener("click",(e)=>{const b=e.target.closest("[data-v]");if(b&&V[b.dataset.v]){cur=b.dataset.v;render();}});
+render();
+</script>

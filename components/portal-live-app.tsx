@@ -16,7 +16,7 @@ import { AdminConfiguration } from "./admin-configuration";
 import { DateReports } from "./date-reports";
 import { downloadCsv } from "@/lib/csv";
 import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer } from "./portal/live-registration";
-import { Badge, Message, Modal, Page, PageHead, submit, fullName } from "./portal/shared-ui";
+import { Badge, Message, Modal, Page, PageHead, PeriodBar, manilaDay, submit, fullName, usePeriod } from "./portal/shared-ui";
 import { classroomJoin } from "@/lib/classroom";
 import { ClassroomPanel } from "./portal/classroom-panel";
 import { TraineeRequestModal, type RequestType } from "./portal/payment-actions";
@@ -114,7 +114,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // in this order. Applications, enrollments and trainee records share the
   // Registration tab, and new
   // registrations come only from the website — there is no staff intake.
-  registration: ["Dashboard","Registration","Courses","Instructions","Delivery requests"],
+  registration: ["Dashboard","Registration","Courses","Delivery requests"],
   // Cleared on the owner's instruction (7 Oct 2026) ahead of the Registration,
   // Cashier and Accounting rebuilds. Their dashboards and modules stay on disk.
   // Scheduler (Training Operations), reopened 7 Oct 2026: open batches each month,
@@ -142,7 +142,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Dashboard",icon:"⌂",group:"Work"},{label:"Search trainee",icon:"⌕",roles:["admin"],group:"Work"},{label:"Trainee enrollments",icon:"◎",roles:["accounting"],group:"Work"},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting"],group:"Work"},
   {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting"],group:"Work"},{label:"Registration",icon:"✎",roles:["registration"],group:"Work"},{label:"Courses",icon:"◇",roles:["registration","admin"],group:"Work"},{label:"Post-tests",icon:"✓",roles:["admin"],group:"Configuration"},{label:"Classroom links",icon:"⇗",roles:["admin"],group:"Configuration"},
-  {label:"Schedules",icon:"□",roles:["admin","registration"],group:"Work"},{label:"Instructions",icon:"✉",roles:["admin","registration"],group:"Work"},{label:"Attendance",icon:"✓",roles:["admin"],group:"Work"},
+  {label:"Schedules",icon:"□",roles:["admin","registration"],group:"Work"},{label:"Instructions",icon:"✉",roles:["admin"],group:"Work"},{label:"Attendance",icon:"✓",roles:["admin"],group:"Work"},
   {label:"Rooms & facilities",icon:"▢",roles:["admin"],group:"Work"},{label:"Training calendar",icon:"▦",roles:["admin"],group:"Work"},{label:"Trainee scheduling",icon:"◎",roles:["admin"],group:"Work"},{label:"Instructor assignment",icon:"♙",roles:["admin"],group:"Work"},{label:"Schedule changes",icon:"↺",roles:["admin"],group:"Records"},{label:"Certificates",icon:"◈",roles:["admin","releasing_officer"],group:"Work"},{label:"Requests",icon:"↺",roles:["admin","accounting","cashier"],group:"Work"},
   {label:"Reports",icon:"↥",roles:["admin","accounting","releasing_officer","registration","cashier"],group:"Records"},
   {label:"Accounting",icon:"▥",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Expenses",icon:"◰",roles:["admin","accounting","cashier"],group:"Finance"},{label:"Inventory",icon:"▦",roles:["admin","accounting"],group:"Finance"},{label:"Employee charges",icon:"₱",roles:["admin","accounting"],group:"Finance"},
@@ -522,15 +522,17 @@ function TraineesEnrollments({data,query,open,canEnroll,role,reload}:{data:Porta
   return <><Trainees data={data} query={query}/><Enrollments data={data} query={query} open={open} canEnroll={canEnroll} role={role} reload={reload}/></>;
 }
 
+const TRAINEE_GROUPS:[string,string][]=[["Pending","Pending"],["Enrolled","Enrolled"],["Cancelled","Cancelled"],["None","No Course Yet"]];
 const TRAINEE_REQUESTS:[RequestType,string][]=[["Cancellation","Cancellation"],["Rescheduling","Reschedule"],["Change Course","Change course"],["Make-up Class","Make-up class"],["Reprinting","Reprinting"]];
 function Trainees({data,query,embedded,reload,role}:{data:PortalData;query:string;embedded?:boolean;reload?:()=>Promise<void>;role?:string}){
-  const [lookup,setLookup]=useState(""),[from,setFrom]=useState(""),[to,setTo]=useState(""),[selId,setSelId]=useState<string|null>(null);
+  const [lookup,setLookup]=useState(""),[selId,setSelId]=useState<string|null>(null);
+  const p=usePeriod();
   const term=(lookup||query).trim().toLowerCase();
+  // Date sensitive, newest first, grouped by status (owner, 20 Oct 2026: design 5). A search looks across all dates.
   const rows=data.trainees.filter(t=>{
-    const reg=(t.registered_at||"").slice(0,10);
     const matchesTerm=!term||`${fullName(t)} ${t.trainee_number} ${data.applicationNumbers?.[t.id]??""} ${t.srn??""} ${t.email} ${t.mobile}`.toLowerCase().includes(term);
-    return matchesTerm&&(!from||reg>=from)&&(!to||reg<=to);
-  });
+    return matchesTerm&&(term?true:p.inRange(t.registered_at));
+  }).sort((a,b)=>(b.registered_at??"").localeCompare(a.registered_at??""));
   // Re-read the trainee from the latest data so the profile reflects edits.
   const sel=selId?data.trainees.find(t=>t.id===selId)??null:null;
   const coursesOf=(id:string)=>data.enrollments.filter(e=>e.trainee_id===id&&e.enrollment_status!=="Cancelled");
@@ -544,22 +546,17 @@ function Trainees({data,query,embedded,reload,role}:{data:PortalData;query:strin
     <section className="portal-panel tl-panel">
       <div className="tl-toolbar">
         <label className="tl-search"><span aria-hidden="true">⌕</span><input value={lookup} onChange={e=>setLookup(e.target.value)} placeholder="Search name, NWMTACI number, SRN, email or mobile" aria-label="Search trainees"/></label>
-        <label className="tl-date">Registered From<input type="date" value={from} onChange={e=>setFrom(e.target.value)}/></label>
-        <label className="tl-date">To<input type="date" value={to} onChange={e=>setTo(e.target.value)}/></label>
-        {(from||to)&&<button type="button" className="ghost-button" onClick={()=>{setFrom("");setTo("")}}>Clear</button>}
-        <span className="tl-count">{rows.length} of {data.trainees.length}</span>
       </div>
-      <div className="portal-table tbl-compact"><table><thead><tr><th>Trainee</th><th>Contact</th><th>Courses</th><th>Status</th><th className="num">Balance</th>{canRequest&&<th>Request</th>}<th>Registered</th></tr></thead><tbody>
-        {rows.map(t=>{const s=traineeEnrollmentStatus(data,t.id);const list=coursesOf(t.id);const bal=list.reduce((sum,e)=>sum+balanceOf(e),0);const no=data.applicationNumbers?.[t.id];return <tr key={t.id} className="row-clickable" onClick={()=>setSelId(t.id)}>
-          <td><strong>{fullName(t)}</strong><small>{no&&<><span className="app-no">{no}</span> · </>}<span className="tc-mono">{t.trainee_number}</span></small>{(()=>{const aid=list.map(e=>data.referralByEnrollment?.[e.id]).find(Boolean);const ag=aid?data.agencies.find(a=>a.id===aid):null;return ag?<span className="ref-chip">Referred by {ag.name}</span>:null})()}</td>
-          <td><span className="lc">{t.email}</span><small>{t.mobile}</small></td>
-          <td>{list.length?<>{first(list[0].courses)?.code??first(list[0].courses)?.name}{list.length>1&&<small>+{list.length-1} more</small>}</>:<span className="muted-text">None yet</span>}</td>
-          <td><Badge tone={s==="Enrolled"?"green":s==="Cancelled"?"red":"orange"}>{tcl(s)}</Badge></td>
-          <td className="num"><strong>{pesos(bal)}</strong></td>
+      {term?<p className="pd-label pd-pad">Searching all dates · {rows.length} found</p>:<PeriodBar p={p} what="Registered" count={`${rows.length} trainee${rows.length===1?"":"s"}`}/>}
+      <div className="portal-table tbl-compact"><table><thead><tr><th>Trainee · Contact</th><th>Courses</th><th className="num">Balance</th><th>Registered</th>{canRequest&&<th>Request</th>}</tr></thead><tbody>
+        {TRAINEE_GROUPS.flatMap(([g,label])=>{const list=rows.filter(t=>(traineeEnrollmentStatus(data,t.id)??"None")===g);if(!list.length)return [];const owed=list.reduce((sum,t)=>sum+coursesOf(t.id).reduce((x,e)=>x+balanceOf(e),0),0);return [<tr key={g} className="tl-group"><td colSpan={canRequest?5:4}><b>{label}</b> <span>{list.length} trainee{list.length===1?"":"s"}{owed>0?` · ${pesos(owed)} to collect`:""}</span></td></tr>,...list.map(t=>{const list=coursesOf(t.id);const bal=list.reduce((sum,e)=>sum+balanceOf(e),0);const no=data.applicationNumbers?.[t.id];return <tr key={t.id} className="row-clickable" onClick={()=>setSelId(t.id)}>
+          <td><strong>{fullName(t)}</strong><small>{no&&<><span className="app-no">{no}</span> · </>}<span className="tc-mono">{t.trainee_number}</span></small><small className="lc">{t.email} · {t.mobile}</small>{(()=>{const aid=list.map(e=>data.referralByEnrollment?.[e.id]).find(Boolean);const ag=aid?data.agencies.find(a=>a.id===aid):null;return ag?<span className="ref-chip">Referred by {ag.name}</span>:null})()}</td>
+          <td>{list.length?<span className="tl-chips">{list.slice(0,3).map(e=><span key={e.id} className="tl-chip">{first(e.courses)?.code??first(e.courses)?.name}</span>)}{list.length>3&&<small>+{list.length-3} more</small>}</span>:<span className="muted-text">None yet</span>}</td>
+          <td className="num"><strong className={bal?"tl-due":"tl-zero"}>{pesos(bal)}</strong></td>
+          <td className="tc-nowrap">{t.registered_at?date(manilaDay(t.registered_at)):"—"}</td>
           {canRequest&&<td onClick={e=>e.stopPropagation()}>{list.length?<div className="req-dd"><button type="button" className="portal-secondary req-dd-btn" aria-haspopup="menu" aria-expanded={menuFor===t.id} onClick={ev=>{const r=ev.currentTarget.getBoundingClientRect();setMenuPos({top:r.bottom+6,left:Math.max(8,Math.min(r.left,window.innerWidth-216))});setMenuFor(menuFor===t.id?null:t.id)}}>Request ▾</button>{openReqs(t.id)>0&&<small className="req-dd-open">{openReqs(t.id)} with the Cashier</small>}{menuFor===t.id&&<div className="req-dd-menu" role="menu" style={{top:menuPos.top,left:menuPos.left}}>{TRAINEE_REQUESTS.map(([type,lbl])=><button key={type} type="button" role="menuitem" onClick={()=>{setMenuFor(null);setReqFor({traineeId:t.id,type})}}>{lbl}</button>)}</div>}</div>:<span className="muted-text">—</span>}</td>}
-          <td className="tc-nowrap">{t.registered_at?date(t.registered_at.slice(0,10)):"—"}</td>
-        </tr>})}
-      </tbody></table>{!rows.length&&<p className="portal-empty-copy">No trainees match.</p>}</div>
+        </tr>})];})}
+      </tbody></table>{!rows.length&&<p className="portal-empty-copy">{term?"No trainees match.":"No trainees registered in this period."}</p>}</div>
     </section>
     {reqMsg&&<Message kind="success" text={reqMsg}/>}
     {sel&&<TraineeDetailModal data={data} trainee={sel} reload={reload} role={role} onClose={()=>setSelId(null)}/>}
@@ -578,7 +575,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   const canEdit=!!reload&&["registration","admin"].includes(role??"");
   const [editing,setEditing]=useState(false),[addingCourse,setAddingCourse]=useState(false),[openEnrollment,setOpenEnrollment]=useState<string|null>(null);
   const [menu,setMenu]=useState(false),[reqType,setReqType]=useState<RequestType|null>(null),[note,setNote]=useState("");
-  const canPrint=["admin","cashier"].includes(role??"");
+  const canPrint=["admin","registration"].includes(role??"");
   const enrolls=data.enrollments.filter(e=>e.trainee_id===trainee.id).sort((a,b)=>a.created_at.localeCompare(b.created_at));
   const payments=data.payments.filter(p=>p.trainee_id===trainee.id).sort((a,b)=>a.received_at.localeCompare(b.received_at));
   const requests=data.requests.filter(r=>first(r.enrollments)?.trainee_id===trainee.id&&r.status==="Pending");

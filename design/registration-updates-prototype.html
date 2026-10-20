@@ -1,0 +1,107 @@
+<title>Registration Updates</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+:root{--blue:#0571D0;--orange:#F25615;--navy:#123F63;--bg:#f1f6f9;--surface:#fff;--line:#d8e4ec;--fg:#0f2638;--muted:#5f7180;--soft:#eef6fb;--th:#e3f6fb;--okbg:#e3f4ea;--ok:#15803d;--penbg:#fdf0dc;--pen:#a8570a;--red:#b42318;--info:#0b5cad;--infobg:#e2effc;--sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--penbg:#3a2a12;--pen:#f2b45c;--red:#ff8a7a;--info:#7cc0ff;--infobg:#132f4a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--penbg:#3a2a12;--pen:#f2b45c;--red:#ff8a7a;--info:#7cc0ff;--infobg:#132f4a;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}button,input{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.bar{background:var(--navy);color:#fff;padding-block:12px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}.brand{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}.brand b{letter-spacing:.04em}.brand span{font-size:13px;opacity:.85}
+.role{display:inline-flex;border:1px solid #ffffff55;border-radius:8px;overflow:hidden}.role button{border:0;background:none;color:#fff;padding:3px 10px;font-size:13px}.role button.on{background:#fff;color:var(--navy);font-weight:600}
+.views{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap}.views button{border:0;background:none;color:#fff;padding:9px 13px;border-radius:10px 10px 0 0;font-weight:500;font-size:14px;opacity:.85}.views button.on{background:var(--bg);color:var(--fg);opacity:1;box-shadow:inset 0 3px 0 var(--orange)}
+.gone{font-size:12px;opacity:.7;align-self:center;margin-left:6px;text-decoration:line-through}
+.page{max-width:1200px;margin:0 auto;padding-block:18px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}h1{margin:2px 0 0;font-size:25px}h2{margin:0;font-size:16px}
+.note{background:var(--infobg);color:var(--info);border-radius:10px;padding:10px 14px;font-size:13.5px;margin:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}
+.dates{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}.dates input{border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--surface)}.lbl{font-size:14px}.lbl b{font-weight:600}
+.search{padding:10px 16px}.search input{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:var(--surface)}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden}.seg button{border:0;background:var(--surface);padding:7px 12px;font-weight:600;font-size:13px}.seg button.on{background:var(--navy);color:#fff}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:8px;padding:5px 11px;font-weight:600;font-size:13px;white-space:nowrap;text-decoration:none;display:inline-block}.pri{background:var(--orange);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13.5px}th{background:var(--th);color:var(--muted);font:600 11px var(--sans);letter-spacing:.07em;text-transform:uppercase;text-align:left;padding:8px 12px;white-space:nowrap}td{padding:9px 12px;border-top:1px solid var(--line);vertical-align:top}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.grp td{background:var(--soft);font-weight:700}.grp small{display:inline;margin-left:8px;font-weight:500}
+.nm{font-weight:600}.ids{font:500 12px var(--mono);color:var(--muted)}.ids b{color:var(--orange);font-weight:600}
+.chip{display:inline-block;border:1px solid var(--line);border-radius:6px;padding:0 6px;font:600 11.5px var(--mono);margin:0 4px 3px 0}
+.bal{font:600 14px var(--mono)}.bal.due{color:var(--red)}.bal.zero{color:var(--muted);font-weight:500}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600}.Pending{background:var(--penbg);color:var(--pen)}.Enrolled{background:var(--okbg);color:var(--ok)}
+.more{border:1px solid var(--line);background:var(--surface);border-radius:8px;width:32px;height:30px;font-weight:700;color:var(--blue)}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--soft)}
+.drawer{position:fixed;inset:0;background:#0f263866;display:flex;justify-content:flex-end;z-index:5}.drawer[hidden]{display:none}.sheet{background:var(--surface);width:min(560px,100%);height:100%;overflow:auto;padding:18px max(18px,env(safe-area-inset-right,0px)) 18px 18px;display:flex;flex-direction:column;gap:14px}
+.sec{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}.sec h3{margin:0;font-size:14px}.acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.hint{font-size:13px;color:var(--muted);margin:0}
+.ok{color:var(--ok);font-weight:600}
+.ttl{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:13.5px;max-width:calc(100% - 32px);z-index:9}
+</style>
+
+<div class="bar"><div class="brand"><b>NEW WAVE MARITIME · PORTAL</b><span>Prototype · sample people · Working as <span class="role" id="role"></span></span></div><nav class="views" id="views"></nav></div>
+<main class="page" id="page"></main>
+<div class="drawer" id="drawer" hidden><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const ALL = [
+  {n:"JUAN MIGUEL REYES DELA CRUZ",a:"0000014",t:"NWM-2026-000012",e:"juan.delacruz@example.com",m:"+639170000014",c:["UBT-PSSR"],s:"Pending",b:130000,d:"2026-10-20"},
+  {n:"MARIA ISABEL SANTOS LIM",a:"0000013",t:"NWM-2026-000011",e:"maria.lim@example.com",m:"+639170000013",c:["MAEN"],s:"Enrolled",b:0,d:"2026-10-20",tar:0,mail:"Emailed to maria.lim@example.com · Oct 20, 9:41 AM"},
+  {n:"PAOLO ANDRES VILLANUEVA",a:"0000012",t:"NWM-2026-000010",e:"paolo.v@example.com",m:"+639170000012",c:["UBT-PSSR"],s:"Pending",b:130000,d:"2026-10-19"},
+  {n:"ANA PATRICIA GARCIA",a:"0000010",t:"NWM-2026-000008",e:"ana.garcia@example.com",m:"+639170000010",c:["MAEN","ABC","ESEA"],s:"Enrolled",b:0,d:"2026-10-19",tar:2,mail:"Emailed to ana.garcia@example.com · Oct 19, 3:12 PM"},
+  {n:"LEO MARCO TORRES",a:"0000007",t:"NWM-2026-000005",e:"leo.torres@example.com",m:"+639170000007",c:["PSCMHBT"],s:"Pending",b:160000,d:"2026-10-18"},
+  {n:"GRACE ELLEN FLORES",a:"0000005",t:"NWM-2026-000004",e:"grace.flores@example.com",m:"+639170000005",c:["AI","APA"],s:"Enrolled",b:0,d:"2026-10-16",tar:1,mail:"Email to grace.flores@example.com failed — check the address"},
+];
+const TODAY="2026-10-20";
+const S={role:"Registration",view:"Trainees",per:"Daily",date:TODAY,open:null};
+const peso=(c)=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
+const add=(s,n)=>{const d=new Date(s+"T00:00:00Z");d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
+const fmt=(s,o)=>new Intl.DateTimeFormat("en-PH",{timeZone:"UTC",...o}).format(new Date(s+"T00:00:00Z"));
+function range(){const d=S.date;if(S.per==="All Dates")return{from:"0",to:"9",label:"All dates"};if(S.per==="Daily")return{from:d,to:d,label:fmt(d,{weekday:"long",month:"long",day:"numeric",year:"numeric"})};
+  if(S.per==="Monthly"){const f=d.slice(0,8)+"01";return{from:f,to:add(add(f,32).slice(0,8)+"01",-1),label:fmt(f,{month:"long",year:"numeric"})}}
+  const w=(new Date(d+"T00:00:00Z").getUTCDay()+6)%7,f=add(d,-w),t=add(f,6);return{from:f,to:t,label:"Week of "+fmt(f,{month:"short",day:"numeric"})+" – "+fmt(t,{month:"short",day:"numeric",year:"numeric"})}}
+const dateBar=(what,n)=>{const g=range();return `<div class="dates"><span class="seg">${["Daily","Weekly","Monthly","All Dates"].map((p)=>`<button data-per="${p}" class="${S.per===p?"on":""}">${p}</button>`).join("")}</span><button class="btn" data-step="-1">‹</button><input type="date" id="pd" value="${S.date}" aria-label="Date"><button class="btn" data-step="1">›</button><button class="btn" data-today>Today</button><span class="lbl">${what} <b>${g.label}</b> · ${n} · newest first</span></div>`};
+const inRange=(x)=>{const g=range();return x.d>=g.from&&x.d<=g.to};
+const ids=(x)=>`<span class="ids"><b>NWMTACI-${x.a}</b> · ${x.t}</span>`;
+const bal=(x)=>`<span class="bal ${x.b?"due":"zero"}">${peso(x.b)}</span>`;
+const chips=(x)=>x.c.slice(0,3).map((c)=>`<span class="chip">${c}</span>`).join("")+(x.c.length>3?`<small style="display:inline">+${x.c.length-3} more</small>`:"");
+function trainees(){const L=ALL.filter(inRange);
+  return `<div><div class="eyebrow">Registration</div><h1>Trainees</h1></div><section class="panel">${dateBar("Registered",`${L.length} trainee${L.length===1?"":"s"}`)}
+  <div class="search"><input placeholder="Search name, NWMTACI No., SRN, email or mobile"></div>
+  ${L.length?`<div class="wrap"><table><thead><tr><th>Trainee · Contact</th><th>Courses</th><th class="r">Balance</th><th>Registered</th><th></th></tr></thead><tbody>${["Pending","Enrolled"].map((s)=>{const l=L.filter((x)=>x.s===s);return l.length?`<tr class="grp"><td colspan="5">${s}<small>${l.length} trainee${l.length===1?"":"s"}${s==="Pending"?` · ${peso(l.reduce((a,x)=>a+x.b,0))} to collect`:""}</small></td></tr>`+l.map((x)=>`<tr class="click" data-open="${x.a}"><td><div class="nm">${x.n}</div>${ids(x)}<small>${x.e} · ${x.m}</small></td><td>${chips(x)}</td><td class="r">${bal(x)}</td><td><small style="color:var(--fg)">${fmt(x.d,{month:"short",day:"numeric",year:"numeric"})}</small></td><td><button class="more" title="Request a change">▾</button></td></tr>`).join(""):""}).join("")}</tbody></table></div>`:`<p style="padding:16px;color:var(--muted);margin:0">No trainees registered on this date.</p>`}
+  </section><p class="note">Click a trainee to open the record. Paid trainees show <b>Print TAR</b> there.</p>`}
+function enrollments(){const rows=ALL.flatMap((x)=>x.c.map((c,i)=>({...x,course:c,no:`ENR-2026-${String(300+Number(x.a)*3+i).padStart(6,"0")}`}))).filter(inRange);
+  return `<div><div class="eyebrow">Registration</div><h1>Enrollments</h1></div><section class="panel">${dateBar("Enrolled",`${rows.length} enrollment${rows.length===1?"":"s"}`)}
+  <div class="search"><input placeholder="Search trainee, enrollment no. or course"></div>
+  ${rows.length?`<div class="wrap"><table><thead><tr><th>Trainee</th><th>Enrollment</th><th>Course</th><th class="r">Balance</th><th>Status</th></tr></thead><tbody>${["Pending","Enrolled"].map((s)=>{const l=rows.filter((x)=>x.s===s);return l.length?`<tr class="grp"><td colspan="5">${s}<small>${l.length}</small></td></tr>`+l.map((x)=>`<tr class="click" data-open="${x.a}"><td><div class="nm">${x.n}</div>${ids(x)}</td><td class="mono">${x.no}</td><td><span class="chip">${x.course}</span></td><td class="r">${bal(x)}</td><td><span class="pill ${x.s}">${x.s}</span></td></tr>`).join(""):""}).join("")}</tbody></table></div>`:`<p style="padding:16px;color:var(--muted);margin:0">No enrollments on this date.</p>`}</section>`}
+function cashier(){const paid=ALL.filter((x)=>x.s==="Enrolled");
+  return `<div><div class="eyebrow">Cashier</div><h1>Dashboard</h1></div><section class="panel"><div style="padding:12px 16px"><h2>Paid and Enrolled</h2></div><div class="wrap"><table><thead><tr><th>Trainee</th><th>Courses</th><th class="r">Paid</th><th>Action</th></tr></thead><tbody>${paid.map((x)=>`<tr><td><div class="nm">${x.n}</div>${ids(x)}</td><td>${chips(x)}</td><td class="r mono">₱1,300.00</td><td><div class="acts"><button class="btn">Print Receipt</button></div></td></tr>`).join("")}</tbody></table></div></section>
+  <p class="note"><b>Print TAR is gone from the Cashier.</b> Once the trainee is settled here, Registration prints the TAR.</p>`}
+function drawer(x){const settled=x.s==="Enrolled",left=2-(x.tar??0),failed=/failed/.test(x.mail??"");
+  return `<div class="ttl"><div><div class="eyebrow">Trainee</div><h2 style="font-size:19px">${x.n}</h2>${ids(x)}</div><button class="btn" data-close>Close</button></div>
+  <div class="acts"><span class="pill ${x.s}">${x.s}</span>${bal(x)}<span>${chips(x)}</span></div>
+  <div class="sec"><h3>Documents</h3>
+    <div class="acts">${settled?(left>0?`<button class="btn pri" data-tar="${x.a}">Print TAR</button><small style="color:var(--muted)">printed ${x.tar} of 2</small>`:`<span class="hint">TAR printed 2 of 2 — request a TAR reprint below.</span>`):`<button class="btn pri" disabled title="The TAR prints once the course is paid">Print TAR</button>`}
+    ${settled?`<a class="btn" href="#" onclick="return false">Instructions PDF</a>`:""}${settled&&failed?`<button class="btn" data-resend>Resend Email</button>`:""}</div>
+    <p class="hint">${settled?`Instructions are emailed automatically: <span class="${failed?"":"ok"}">${x.mail}</span>.`:`The TAR and instructions become available once the Cashier records the payment. Instructions are then emailed automatically to ${x.e}.`}</p></div>
+  <div class="sec"><h3>Request a Change</h3><div class="acts">${["Change batch / reschedule","Change course",...(settled?["Make-up class","Certificate reprint","TAR reprint"]:[]),settled?"Cancel enrollment":"Decline application"].map((r)=>`<button class="btn">${r}</button>`).join("")}</div><p class="hint">Goes to the Cashier for charges, then the Accounting Manager for approval.</p></div>`}
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>el.hidden=true,3000)}
+function render(){
+  document.getElementById("role").innerHTML=["Registration","Cashier"].map((r)=>`<button data-role="${r}" class="${S.role===r?"on":""}">${r}</button>`).join("");
+  const tabs=S.role==="Registration"?["Dashboard","Registration","Trainees","Enrollments","Courses","Delivery Requests"]:["Dashboard","Enrollments ▾","Accounting ▾"];
+  if(S.role==="Cashier")S.view="Cashier";
+  document.getElementById("views").innerHTML=tabs.map((v)=>`<button data-view="${v}" class="${v===S.view||(S.role==="Cashier"&&v==="Dashboard")?"on":""}">${v}</button>`).join("")+(S.role==="Registration"?`<span class="gone">Instructions</span>`:"");
+  document.getElementById("page").innerHTML=S.role==="Cashier"?cashier():S.view==="Enrollments"?enrollments():trainees();
+  const x=ALL.find((y)=>y.a===S.open);document.getElementById("drawer").hidden=!x;if(x)document.getElementById("sheet").innerHTML=drawer(x);
+}
+document.addEventListener("click",(e)=>{const t=e.target.closest("button,tr,[data-close]");if(!t)return;const d=t.dataset;
+  if(d.role){S.role=d.role;S.view=d.role==="Registration"?"Trainees":"Cashier";S.open=null}
+  else if(d.view&&S.role==="Registration"){if(d.view==="Trainees"||d.view==="Enrollments")S.view=d.view;else{toast(`${d.view} is unchanged`);return}}
+  else if(d.per)S.per=d.per;
+  else if(d.step){const g=range();S.date=+d.step<0?add(S.per==="Daily"?S.date:g.from,-1):add(S.per==="Daily"?S.date:g.to,1)}
+  else if("today" in d)S.date=TODAY;
+  else if(d.open){if(e.target.closest(".more")){toast("Request ▾ opens the same request menu as today");return}S.open=d.open}
+  else if("close" in d)S.open=null;
+  else if(d.tar){const x=ALL.find((y)=>y.a===d.tar);x.tar=(x.tar??0)+1;toast("The TAR opens in a new tab to print");}
+  else if("resend" in d){toast("Instructions emailed again");return}
+  else return;render()});
+document.addEventListener("change",(e)=>{if(e.target.id==="pd"&&e.target.value){S.date=e.target.value;render()}});
+document.getElementById("drawer").addEventListener("click",(e)=>{if(e.target.id==="drawer"){S.open=null;render()}});
+render();
+</script>

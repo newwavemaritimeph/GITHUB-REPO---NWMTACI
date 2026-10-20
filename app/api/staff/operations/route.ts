@@ -911,7 +911,7 @@ export async function GET() {
   const { data: instructionRows } = await db.from("enrollments").select("id,instructions_generated_count").gt("instructions_generated_count", 0).limit(5000);
   const instructionsCount = Object.fromEntries((instructionRows ?? []).map((row: { id: string; instructions_generated_count: number }) => [row.id, Number(row.instructions_generated_count)]));
   let admissionRecords: unknown[] = [];
-  if (canCashier(staff.roleCodes)) {
+  if (canCashier(staff.roleCodes) || canRegister(staff.roleCodes)) {
     const admin = createSupabaseAdminClient();
     const { data: recordRows } = await admin.from("admission_records").select("id,ar_number,trainee_id,enrollment_ids,print_count,reprints_approved,issued_at,last_printed_at").order("issued_at", { ascending: false }).limit(2000);
     admissionRecords = recordRows ?? [];
@@ -1678,7 +1678,7 @@ export async function POST(request: Request) {
       if (input.requestType === "Refund" && !input.amountCentavos) return NextResponse.json({ error: "Enter the refund amount." }, { status: 400 });
       if (input.requestType === "Change Course" && !input.courseId) return NextResponse.json({ error: "Choose the course to change to." }, { status: 400 });
       if (input.requestedOn && input.requestedOn > manilaDate()) return NextResponse.json({ error: "The request date cannot be in the future." }, { status: 400 });
-      if (input.requestType === "TAR reprint" && !canCashier(staff.roleCodes)) return NextResponse.json({ error: "Only the Cashier can request a TAR reprint." }, { status: 403 });
+      if (input.requestType === "TAR reprint" && !canCashier(staff.roleCodes) && !canRegister(staff.roleCodes)) return NextResponse.json({ error: "Only Registration or the Cashier can request a TAR reprint." }, { status: 403 });
       if (input.requestType === "TAR reprint") {
         const pendingReprint = await createSupabaseAdminClient().from("enrollment_requests").select("id").eq("enrollment_id", input.enrollmentId).eq("request_type", "TAR reprint").eq("status", "Pending").limit(1);
         if (pendingReprint.data?.length) return NextResponse.json({ error: "A TAR reprint request is already waiting for approval." }, { status: 400 });
@@ -1803,8 +1803,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, enrolled });
     }
     if (input.action === "admission-record-issue") {
-      // The Cashier prints the TAR (it is the acknowledgement receipt); Registration does not.
-      if (!staff.roleCodes.some((r) => ["admin", "cashier"].includes(r))) return NextResponse.json({ error: "Only the Cashier prints the Training Admission Record." }, { status: 403 });
+      // Registration prints the TAR once the trainee is settled with the Cashier (owner, 20 Oct 2026).
+      if (!staff.roleCodes.some((r) => ["admin", "registration"].includes(r))) return NextResponse.json({ error: "Only Registration prints the Training Admission Record." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       // The record covers the trainee's paid enrollments (Enrolled / Open
       // Schedule); printing the same set again keeps the same AR number, up to the

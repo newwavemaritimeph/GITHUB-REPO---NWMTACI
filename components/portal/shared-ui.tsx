@@ -59,6 +59,33 @@ export function Pager({ page, total, perPage, onPage }: { page: number; total: n
 export const fullName = (person: { legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; suffix?: string | null }) =>
   `${person.legal_first_name} ${person.legal_middle_name ?? ""} ${person.legal_last_name} ${person.suffix ?? ""}`.replace(/\s+/g, " ").trim();
 
+/** Records by date (owner, 20 Oct 2026): Trainees and Enrollments start on today and list the newest first. */
+export type Period = "Daily" | "Weekly" | "Monthly" | "All Dates";
+export const manilaDay = (iso?: string | null) => (iso ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(iso)) : "");
+const shiftDay = (d: string, n: number) => { const x = new Date(`${d}T00:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+const utcLabel = (d: string, o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-PH", { timeZone: "UTC", ...o }).format(new Date(`${d}T00:00:00Z`));
+export function periodRange(period: Period, date: string): { from: string; to: string; label: string } {
+  if (period === "All Dates") return { from: "0000-01-01", to: "9999-12-31", label: "All dates" };
+  if (period === "Daily") return { from: date, to: date, label: utcLabel(date, { weekday: "long", month: "long", day: "numeric", year: "numeric" }) };
+  if (period === "Monthly") { const from = `${date.slice(0, 8)}01`; return { from, to: shiftDay(`${shiftDay(from, 32).slice(0, 8)}01`, -1), label: utcLabel(from, { month: "long", year: "numeric" }) }; }
+  const from = shiftDay(date, -((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7)), to = shiftDay(from, 6);
+  return { from, to, label: `Week of ${utcLabel(from, { month: "short", day: "numeric" })} – ${utcLabel(to, { month: "short", day: "numeric", year: "numeric" })}` };
+}
+export function usePeriod() {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+  const [period, setPeriod] = useState<Period>("Daily"), [date, setDate] = useState(today);
+  const range = periodRange(period, date);
+  return { period, setPeriod, date, setDate, today, range, inRange: (iso?: string | null) => { const d = manilaDay(iso); return !!d && d >= range.from && d <= range.to; } };
+}
+export function PeriodBar({ p, what, count }: { p: ReturnType<typeof usePeriod>; what: string; count: string }) {
+  const step = (n: number) => p.setDate(p.period === "Daily" || p.period === "All Dates" ? shiftDay(p.date, n) : shiftDay(n < 0 ? p.range.from : p.range.to, n));
+  return <div className="pd-bar">
+    <span className="cx-seg">{(["Daily", "Weekly", "Monthly", "All Dates"] as Period[]).map((x) => <button key={x} type="button" className={p.period === x ? "on" : ""} onClick={() => p.setPeriod(x)}>{x}</button>)}</span>
+    {p.period !== "All Dates" && <><button type="button" className="portal-secondary" aria-label="Previous" onClick={() => step(-1)}>‹</button><input type="date" value={p.date} aria-label="Date" onChange={(e) => e.target.value && p.setDate(e.target.value)} /><button type="button" className="portal-secondary" aria-label="Next" onClick={() => step(1)}>›</button>{p.date !== p.today && <button type="button" className="portal-secondary" onClick={() => p.setDate(p.today)}>Today</button>}</>}
+    <span className="pd-label">{what} <b>{p.range.label}</b> · {count} · newest first</span>
+  </div>;
+}
+
 export const fmtDate = (value?: string | null) =>
   value ? new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${value.length === 10 ? `${value}T00:00:00+08:00` : value}`)) : "—";
 

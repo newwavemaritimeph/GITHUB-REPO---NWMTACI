@@ -5,8 +5,9 @@ import type { PortalData, Enrollment, Batch, Trainee } from "../portal-live-app"
 import { first, manilaToday, dueCentavos, balanceOf, pesos, pesos2, addDays } from "@/lib/portal-format";
 import { LATE_ENROLLMENT_CODES, PUBLIC_STCW_CODES, automaticEndDate, fitsInWeek } from "@/lib/scheduling";
 import { emailStatusText } from "@/lib/instruction-email-status";
-import { Badge, Message, Modal, PageHead, Pager, usePost, submit, fullName, fmtDate, fmtClock } from "./shared-ui";
+import { Badge, Message, Modal, PageHead, Pager, PeriodBar, usePost, usePeriod, submit, fullName, fmtDate, fmtClock } from "./shared-ui";
 import { RequestActionModal, type RequestType } from "./payment-actions";
+import { TarButton } from "./live-cashier";
 import { tcl } from "@/lib/title-case";
 
 /**
@@ -30,9 +31,9 @@ const fmtLong = (v: string) => new Intl.DateTimeFormat("en-PH", { weekday: "long
 const day = (v?: string | null) => (v ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(v)) : "");
 const nameOf = (e: Enrollment) => { const t = first(e.trainees); return t ? fullName(t) : e.enrollment_number; };
 /** Request types a Registration Officer may raise (addendum: rescheduling, change of course, cancellation). */
-const REG_REQUESTS: RequestType[] = ["Rescheduling", "Change Course", "Make-up Class", "Reprinting", "Cancellation"];
+const REG_REQUESTS: RequestType[] = ["Rescheduling", "Change Course", "Make-up Class", "Reprinting", "TAR reprint", "Cancellation"];
 /** Button label for each request type a Registration Officer can raise. */
-const requestLabel = (type: RequestType, isApplication: boolean) => (type === "Rescheduling" ? "Change batch / reschedule" : type === "Change Course" ? "Change course" : type === "Make-up Class" ? "Make-up class" : type === "Reprinting" ? "Certificate reprint" : isApplication ? "Decline application" : "Cancel enrollment");
+const requestLabel = (type: RequestType, isApplication: boolean) => (type === "Rescheduling" ? "Change batch / reschedule" : type === "Change Course" ? "Change course" : type === "Make-up Class" ? "Make-up class" : type === "Reprinting" ? "Certificate reprint" : type === "TAR reprint" ? "TAR reprint" : isApplication ? "Decline application" : "Cancel enrollment");
 /** Where a request is: with the Cashier for charges, with Accounting for approval, or decided. */
 const requestStage = (r: RequestRow) => (r.status !== "Pending" ? { text: r.status, tone: r.status === "Approved" ? "active" : "cancelled" } : r.stage === "With cashier" ? { text: "With the Cashier", tone: "orange" } : { text: "Awaiting approval", tone: "pending" });
 
@@ -314,15 +315,18 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
   const [open, setOpen] = useState<Enrollment | null>(null);
   const [assigning, setAssigning] = useState<Trainee | null>(null);
   const term = (q || query).trim().toLowerCase();
-  const all = data.enrollments.map((e) => ({ e, r: e.enrollment_status === "Pending" ? readinessOf(data, e) : null }));
-  const awaiting = awaitingCourseOf(data);
+  // Date sensitive (owner, 20 Oct 2026): today first, newest on top, grouped by status; a search looks across all dates.
+  const per = usePeriod();
+  const all = data.enrollments.filter((e) => term || per.inRange(e.created_at)).map((e) => ({ e, r: e.enrollment_status === "Pending" ? readinessOf(data, e) : null }));
+  const awaiting = awaitingCourseOf(data).filter((t) => term || per.inRange(t.registered_at));
   const noCourse = awaiting.filter((t) => !term || `${fullName(t)} ${t.trainee_number} ${appNoOf(data, t.id) ?? ""} ${t.email} ${t.mobile}`.toLowerCase().includes(term));
-  const rank = (x: (typeof all)[number]) => (x.r ? 0 : 1);
+  const rank = (x: (typeof all)[number]) => (x.r ? 0 : x.e.enrollment_status === "Cancelled" ? 2 : 1);
+  const GROUPS = ["Applications · Pending", "Enrolled", "Cancelled"];
   const rows = all
     .filter((x) => inFilter(filter, x.r))
     .filter(({ e }) => !term || `${nameOf(e)} ${e.enrollment_number} ${appNoOf(data, e.trainee_id) ?? ""} ${first(e.courses)?.name ?? ""} ${first(e.trainees)?.trainee_number ?? ""}`.toLowerCase().includes(term))
-    .sort((a, b) => rank(a) - rank(b) || (a.r ? (first(a.e.batches)?.starts_on ?? "9999").localeCompare(first(b.e.batches)?.starts_on ?? "9999") || a.e.created_at.localeCompare(b.e.created_at) : b.e.created_at.localeCompare(a.e.created_at)));
-  const PER = 12;
+    .sort((a, b) => rank(a) - rank(b) || b.e.created_at.localeCompare(a.e.created_at));
+  const PER = 25;
   const pageRows = rows.slice((page - 1) * PER, page * PER);
   const current = open ? data.enrollments.find((e) => e.id === open.id) ?? open : null;
   const count = (f: RecordFilter) => all.filter((x) => inFilter(f, x.r)).length + (f === "For payment" ? 0 : awaiting.length);
@@ -347,6 +351,7 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
       </div>
       <div className="ac-stack">
         <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search enrollments" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Name, NWMTACI number, SRN, course" /></div>
+        <div className="portal-panel">{term ? <p className="pd-label pd-pad">Searching all dates · {rows.length} found</p> : <PeriodBar p={{ ...per, setPeriod: (v) => { per.setPeriod(v); setPage(1); }, setDate: (v) => { per.setDate(v); setPage(1); } }} what="Enrolled" count={`${rows.length} enrollment${rows.length === 1 ? "" : "s"}`} />}</div>
         {filter !== "For payment" && noCourse.length > 0 && <section className="portal-panel nc-panel">
           <div className="panel-heading"><div><h2>No Course Yet</h2><p>Assign a course and schedule, then screen the application</p></div><span className="slot-count">{noCourse.length}</span></div>
           {noCourse.map((t) => <div className="rd-row" key={t.id}>
@@ -356,15 +361,15 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
           </div>)}
         </section>}
         <div className="portal-table portal-panel tbl-compact"><table><thead><tr><th>Trainee</th><th>Enrollment no.</th><th>Course and Schedule</th><th>Requirements</th><th>Payment</th><th>Status</th></tr></thead><tbody>
-          {pageRows.map(({ e, r }) => { const t = first(e.trainees), s = r ? stateOf(r) : { text: e.enrollment_status, tone: statusTone(e.enrollment_status) }, p = payState(e); return <tr key={e.id} className="row-clickable" onClick={() => setOpen(e)}>
+          {pageRows.map((x, i) => [(i === 0 || rank(pageRows[i - 1]) !== rank(x)) && <tr key={`g${rank(x)}`} className="tl-group"><td colSpan={6}><b>{GROUPS[rank(x)]}</b> <span>{rows.filter((y) => rank(y) === rank(x)).length}</span></td></tr>, (({ e, r }) => { const t = first(e.trainees), s = r ? stateOf(r) : { text: e.enrollment_status, tone: statusTone(e.enrollment_status) }, p = payState(e); return <tr key={e.id} className="row-clickable" onClick={() => setOpen(e)}>
             <td><strong>{t ? fullName(t) : "Unknown"}</strong>{enrollmentTypeOf(data, e) && <span className="et-chip">{enrollmentTypeOf(data, e)}</span>}<small className="tc-mono">{t?.trainee_number}</small></td>
             <td><strong className="app-no-cell">{appNoOf(data, e.trainee_id) ?? e.enrollment_number}</strong><small className="tc-mono">{appNoOf(data, e.trainee_id) ? e.enrollment_number : fmtDate(day(e.created_at))}</small></td>
             <td>{first(e.courses)?.name ?? "—"}<small>{scheduleOf(e)}</small></td>
             <td>{r ? <><span className={`req-count${r.missing.length ? "" : " ok"}`}>{r.verified} of {REQUIREMENTS.length}</span>{r.rejected.length > 0 && <small>Rejected: {r.rejected.join(", ")}</small>}</> : <span className="muted-text">{e.enrollment_status === "Cancelled" ? "—" : "Complete"}</span>}</td>
             <td>{r ? (r.paid ? <><strong>{pesos(r.paidCentavos)}</strong><small>Verified</small></> : <span className="muted-text">{r.handed ? "With cashier" : "Not yet"}</span>) : <><Badge tone={p.tone}>{p.text}</Badge><small>{pesos(balanceOf(e))} balance</small></>}</td>
             <td><Badge tone={s.tone}>{s.text}</Badge></td>
-          </tr>; })}
-        </tbody></table>{!rows.length && <p className="portal-empty-copy">{filter === "For payment" ? "Nobody is waiting at the Cashier." : filter === "Screening" ? (noCourse.length ? "Applicants without a course are listed above." : "No applications to screen. New ones arrive from the website.") : "No matching enrollments."}</p>}</div>
+          </tr>; })(x)])}
+        </tbody></table>{!rows.length && <p className="portal-empty-copy">{filter === "For payment" ? "Nobody is waiting at the Cashier." : filter === "Screening" ? (noCourse.length ? "Applicants without a course are listed above." : "No applications to screen. New ones arrive from the website.") : term ? "No matching enrollments." : "No enrollments in this period."}</p>}</div>
         <Pager page={page} total={rows.length} perPage={PER} onPage={setPage} />
       </div>
     </div>
@@ -507,6 +512,7 @@ function StartDateEditor({ data, enrollment: e, busy, post }: { data: PortalData
 export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void }) {
   const { busy, msg, post } = usePost(reload);
   const generated = instructionsCountOf(data, e), atLimit = generated >= INSTRUCTION_LIMIT;
+  const mail = data.instructionEmails?.[e.id], emailOk = !!mail && mail.state !== "Failed" && mail.state !== "Delivery Failed", emailFailed = !!mail && !emailOk;
   const [req, setReq] = useState<RequestType | null>(null);
   const [addingCourse, setAddingCourse] = useState(false);
   const [choosingBatch, setChoosingBatch] = useState(false);
@@ -543,20 +549,21 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
       </div>
       {payments.length > 0 && <div className="full"><small style={{ color: "var(--muted)", fontWeight: 700 }}>Trainee&apos;s payments</small>{payments.slice(0, 6).map((pm) => <div className="live-row-item" key={pm.id}><div><strong>{pm.payment_number}</strong><small>{pm.method}{pm.reference_number ? ` · ${pm.reference_number}` : ""} · {fmtDate(day(pm.received_at))} · {pm.verification_state}</small></div><span className="slot-count">{pesos(pm.amount_centavos)}</span></div>)}<p className="portal-form-note">Payments are recorded per trainee; which enrollment each one covers is on the receipt.</p></div>}
 
-      <div className="full"><strong>Documents &amp; instructions</strong></div>
+      <div className="full"><strong>Documents</strong></div>
       {hasDocuments ? <>
         <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
-          {!atLimit && <button type="button" disabled={busy} onClick={() => void post({ action: "send-instructions", enrollmentId: e.id }, generated ? "Instructions generated again and emailed to the trainee." : "Instructions generated and emailed to the trainee.").catch(() => undefined)}>Generate Instructions</button>}
-          {generated > 0 && <a href={`/api/documents/training-instructions/${e.id}`} target="_blank" rel="noreferrer">Instructions PDF</a>}
+          <TarButton data={data} traineeId={e.trainee_id} reload={reload} className="portal-primary" />
+          <a href={`/api/documents/training-instructions/${e.id}`} target="_blank" rel="noreferrer">Instructions PDF</a>
+          {!atLimit && (!emailOk || emailFailed) && <button type="button" disabled={busy} onClick={() => void post({ action: "send-instructions", enrollmentId: e.id }, "Instructions emailed to the trainee.").catch(() => undefined)}>Resend Email</button>}
         </div>
-        <p className="portal-form-note full">{emailStatusText(data.instructionEmails?.[e.id]) ? `${emailStatusText(data.instructionEmails?.[e.id])}. ` : t?.email ? `Generating emails the PDF and Google Classroom link to ${t.email}. ` : ""}{e.instructions_sent_at ? `Last generated ${fmtDate(day(e.instructions_sent_at))}. ` : ""}Instructions can be generated twice. The Training Admission Record is printed by the Cashier.</p>
+        <p className="portal-form-note full">Instructions are emailed automatically{emailStatusText(data.instructionEmails?.[e.id]) ? `: ${emailStatusText(data.instructionEmails?.[e.id])}.` : t?.email ? ` to ${t.email} once the trainee is paid.` : "."} Print the Training Admission Record here once the trainee is paid.</p>
       </> : <p className="portal-form-note full">{isApplication ? "Training instructions become available once the trainee is paid and enrolled." : "No documents for a cancelled enrollment."}</p>}
 
       {isApplication && <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>{!e.batch_id && !e.scheduled_on && <button type="button" className="portal-primary" onClick={() => setChoosingBatch(true)}>Choose Batch</button>}{traineeRecord && <button type="button" onClick={() => setAddingCourse(true)}>+ Add Another Course</button>}</div>}
 
       <div className="full"><strong>Request a change</strong> <small style={{ color: "var(--muted)" }}>goes to the Cashier for charges, then the Accounting Manager for approval</small></div>
       <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
-        {REG_REQUESTS.filter((type) => !(isApplication && (type === "Make-up Class" || type === "Reprinting"))).map((type) => <button key={type} type="button" disabled={!canRequest || pendingTypes.has(type)} title={pendingTypes.has(type) ? "A request of this type is already pending" : undefined} onClick={() => setReq(type)}>{requestLabel(type, isApplication)}</button>)}
+        {REG_REQUESTS.filter((type) => !(isApplication && (type === "Make-up Class" || type === "Reprinting" || type === "TAR reprint"))).map((type) => <button key={type} type="button" disabled={!canRequest || pendingTypes.has(type)} title={pendingTypes.has(type) ? "A request of this type is already pending" : undefined} onClick={() => setReq(type)}>{requestLabel(type, isApplication)}</button>)}
       </div>
       {history.length > 0 && <div className="full"><small style={{ color: "var(--muted)", fontWeight: 700 }}>Request history</small>{history.map((r: RequestRow) => { const st = requestStage(r); const charge = first(r.enrollment_charges); return <div className="live-row-item" key={r.id}><div><strong>{r.request_number} · {r.request_type === "Rescheduling" ? "Change batch / reschedule" : r.request_type}</strong><small>{r.reason} · filed {fmtDate(day(r.created_at))}{charge ? ` · charge ${pesos(charge.amount_centavos)}` : r.stage === "For approval" && r.status === "Pending" ? " · no charge" : ""}{r.decided_at ? ` · decided ${fmtDate(day(r.decided_at))}` : ""}{r.decision_remarks ? ` · ${r.decision_remarks}` : ""}</small></div><Badge tone={st.tone}>{st.text}</Badge></div>; })}</div>}
 
