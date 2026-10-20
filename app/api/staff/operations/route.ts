@@ -18,6 +18,8 @@ import { isStcwRebateCourse } from "@/lib/rebates";
 import { fitsInWeek } from "@/lib/scheduling";
 import { certificateContext, claimCertificateNumber, downloadDriveFile, ensureCertificate, trySendSoftCopy } from "@/lib/certificates";
 import { driveFileId, googleFormId, isStcwCategory, canSetSeries, releaseProblem, courseRemoveMode } from "@/lib/certificate-rules";
+import { postTestStatus } from "@/lib/post-test-server";
+import { sendTrainingEndEmail } from "@/lib/training-end-email";
 
 /** Tables whose course_id keeps a course from being deleted (Admin › Courses › Remove). */
 const COURSE_REFERENCES = ["enrollments", "batches", "partner_course_offers", "certificate_templates", "training_instruction_templates", "certificate_number_pool", "agency_rebates", "instructor_accreditations", "trainee_registration_numbers"];
@@ -134,6 +136,8 @@ const certificateReleaseInput = z.object({ action: z.literal("certificate-releas
 const certificateRevokeInput = z.object({ action: z.literal("certificate-revoke"), enrollmentId: z.string().uuid(), reason: z.string().trim().min(5, "Enter the reason (at least 5 characters).").max(300) });
 const offerCreateInput = z.object({ action: z.literal("offer-create"), partnerCenterId: z.string().uuid(), courseName: z.string().trim().min(3).max(200), courseCode: z.string().trim().min(1).max(40), durationLabel: z.string().trim().min(1).max(60), trainingFeeCentavos: z.number().int().positive(), rebateCentavos: z.number().int().nonnegative() });
 const offerArchiveInput = z.object({ action: z.literal("offer-archive"), offerId: z.string().uuid(), active: z.boolean() });
+// The end-of-training email again (post-test and evaluation still to do), owner 20 Oct 2026.
+const trainingEndEmailInput = z.object({ action: z.literal("training-end-email"), enrollmentId: z.string().uuid() });
 // Release plan for a certificate: how it leaves the office, and courier details.
 const certificateReleasePlanInput = z.object({ action: z.literal("certificate-release-plan"), enrollmentId: z.string().uuid(), releaseMethod: z.enum(["Pickup", "Representative", "Courier"]).optional(), expectedPickupOn: z.string().date().nullable().optional(), claimantName: z.string().trim().max(160).optional(), claimantRelationship: z.string().trim().max(80).optional(), courierName: z.string().trim().max(80).optional(), trackingNumber: z.string().trim().max(80).optional(), shippingFeeStatus: z.string().trim().max(40).optional(), shippingAddress: z.string().trim().max(300).optional(), courierStatus: z.enum(["For Booking", "Booked", "Shipped", "Delivered"]).optional() });
 // Certificate correction workflow (wrong spelling, wrong date, reprint needed).
@@ -259,7 +263,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -303,6 +307,12 @@ async function tryAutoEnroll(admin: ReturnType<typeof createSupabaseAdminClient>
   for (const row of pending ?? []) {
     const { error } = await admin.rpc("enroll_screened_application", { target_enrollment: row.id, actor });
     if (!error) enrolled.push(row.id);
+  }
+  // Once enrolled, the trainee gets the training details, Google Classroom link and the
+  // instructions PDF by email automatically (owner, 20 Oct 2026). Best-effort, sent once.
+  for (const id of enrolled) {
+    try { await queueInstructionEmail(admin, id, 0, process.env.APP_BASE_URL ?? "https://newwavemaritimemtaci.com"); }
+    catch (err) { console.error("enrollment email failed:", err instanceof Error ? err.message : err); }
   }
   return enrolled;
 }
@@ -1065,6 +1075,13 @@ export async function GET() {
     }
   }
 
+  // Post-test results per New Wave enrollment (202610200048), for the Releasing Officer and Admin.
+  let postTestResults: Record<string, unknown> = {};
+  if (canRelease(staff.roleCodes)) {
+    const own = (enrollments as { id: string; course_id: string; partner_offer_id?: string | null; enrollment_status: string }[]).filter((e) => !e.partner_offer_id && e.enrollment_status !== "Cancelled");
+    postTestResults = await postTestStatus(createSupabaseAdminClient(), own).catch(() => ({}));
+  }
+
   // Archived endorsed programs and courses, for Configuration › Partners and Courses (owner, 20 Oct 2026).
   let allOffers: unknown[] = [], archivedCourses: unknown[] = [];
   if (canManageAccounting(staff.roleCodes)) {
@@ -1075,7 +1092,7 @@ export async function GET() {
     allOffers = ao.data ?? []; archivedCourses = ac.data ?? [];
   }
 
-  return NextResponse.json({ allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
+  return NextResponse.json({ postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
     paymentMethods: paymentMethodsWithKind, charges: (charges.data ?? []).map((c) => ({ ...c, kind: chargeKinds.get((c as { id: string }).id) ?? "fee" })), agencies: agencies.data ?? [],
@@ -2196,7 +2213,7 @@ export async function POST(request: Request) {
       if (cert.status !== "Printed") return NextResponse.json({ error: "Print the certificate before releasing it." }, { status: 400 });
       // Released only when paid and evaluated (owner, 20 Oct 2026), checked again here.
       const ctx = await certificateContext(admin, input.enrollmentId);
-      const problem = ctx && releaseProblem({ balanceCentavos: ctx.balanceCentavos, evaluationRequired: ctx.evaluation.required, evaluationOn: ctx.evaluation.on, revoked: !!ctx.cert?.revoked_at });
+      const problem = ctx && releaseProblem({ balanceCentavos: ctx.balanceCentavos, evaluationRequired: ctx.evaluation.required, evaluationOn: ctx.evaluation.on, revoked: !!ctx.cert?.revoked_at, postTestRequired: ctx.postTest.required, postTestPassed: ctx.postTest.passed });
       if (problem) return NextResponse.json({ error: problem }, { status: 400 });
       await admin.from("certificates").update({ release_method: input.releaseMethod ?? null, claimant_name: input.recipientName, claimant_relationship: input.claimantRelationship ?? null, id_checked: Boolean(input.idChecked), authorization_checked: Boolean(input.authorizationChecked) }).eq("id", cert.id);
       const { error } = await db.rpc("set_certificate_status", { target_enrollment: input.enrollmentId, target_status: "Released" });
@@ -2206,6 +2223,13 @@ export async function POST(request: Request) {
       const { error: relErr } = await admin.from("certificate_release_events").insert({ certificate_id: cert.id, event_type: "release", recipient_name: input.recipientName, recipient_id_type: input.recipientIdType ?? null, released_by: staff.user.id, reason: input.reason ?? null });
       if (relErr) throw relErr;
       return NextResponse.json({ ok: true });
+    }
+    if (input.action === "training-end-email") {
+      if (!(canRelease(staff.roleCodes) || staff.roleCodes.includes("registration"))) return NextResponse.json({ error: "Your account cannot send this email." }, { status: 403 });
+      const res = await sendTrainingEndEmail(createSupabaseAdminClient(), input.enrollmentId, { origin: process.env.APP_BASE_URL ?? new URL(request.url).origin, manual: true });
+      if (res.state === "Sent" || res.state === "Already sent") return NextResponse.json({ ok: true, to: (res as { to?: string }).to });
+      const why: Record<string, string> = { "No email": "This trainee has no email address on file.", "Nothing to do": "The post-test is passed and the evaluation is in; nothing to send.", "Not configured": "Email is not set up yet.", Skipped: "This enrollment does not take a post-test or evaluation." };
+      return NextResponse.json({ error: why[res.state] ?? "The email could not be sent." }, { status: 400 });
     }
     if (input.action === "certificate-revoke") {
       if (!staff.roleCodes.includes("admin")) return NextResponse.json({ error: "Only the Admin can revoke a certificate." }, { status: 403 });

@@ -25,9 +25,10 @@ type Series = { course_id: string; prefix: string; next_number: number; pad: num
 type Template = { id: string; course_id: string; version: number; active: boolean; drive_link?: string | null; storage_path?: string | null; approved_at?: string | null };
 const stcwCourse = (c: { course_categories?: unknown }) => isStcwCategory((Array.isArray(c.course_categories) ? c.course_categories[0] : c.course_categories as { name?: string } | null)?.name);
 type Photo = { enrollment_id: string; file_name: string; background_white: boolean; uploaded_at: string; replaced_at?: string | null; profiles?: { complete_name: string } | { complete_name: string }[] | null };
-type CertData = PortalData & { certificateSeries?: Series[]; evaluationForms?: Record<string, string>; feedbackAt?: Record<string, string>; feedbackLinks?: Record<string, string>; certificatePhotos?: Photo[] | null };
+type CertData = PortalData & { certificateSeries?: Series[]; evaluationForms?: Record<string, string>; feedbackAt?: Record<string, string>; feedbackLinks?: Record<string, string>; certificatePhotos?: Photo[] | null; postTestResults?: Record<string, PostTestResult> };
+type PostTestResult = { required: boolean; passed: boolean; best: { score: number; total: number; percent: number } | null; attempts: number };
 
-export type CertificateLine = { e: Enrollment; cert: CertRow | null; view: CertificateView; name: string; number: string; course: { id: string; name: string; code: string }; starts: string | null; ended: string | null; evalNeeded: boolean; evalDone: boolean; evalLink: string | null; balance: number; photo: Photo | null; fileName: string };
+export type CertificateLine = { e: Enrollment; cert: CertRow | null; view: CertificateView; name: string; number: string; course: { id: string; name: string; code: string }; starts: string | null; ended: string | null; evalNeeded: boolean; evalDone: boolean; evalLink: string | null; postTest: PostTestResult | null; balance: number; photo: Photo | null; fileName: string };
 
 const day = (v?: string | null) => (v ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(v)) : null);
 const short = (d: string | null) => (d ? new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T00:00:00+08:00`)) : "—");
@@ -63,7 +64,7 @@ export function certificateLines(data: PortalData, opts: { inTrainingDays?: numb
     if (view.state === "Training not finished" && (opts.inTrainingDays === undefined || !ended || ended > addDays(today, opts.inTrainingDays))) continue;
     const t = first(e.trainees);
     const fileName = photoFileName({ lastName: t?.legal_last_name ?? "TRAINEE", firstName: t?.legal_first_name ?? "", middleName: (t as { legal_middle_name?: string | null } | null)?.legal_middle_name, courseCode: c.code, batchNumber: b?.batch_number ?? null, date: ended ?? today });
-    lines.push({ e, cert, view, photo: photos?.get(e.id) ?? null, fileName, name: t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : e.enrollment_number, number: data.applicationNumbers?.[e.trainee_id] ?? t?.trainee_number ?? e.enrollment_number, course: { id: c.id, name: c.name, code: c.code }, starts: b?.starts_on ?? e.scheduled_on ?? null, ended, evalNeeded, evalDone: !!fb, evalLink: d.feedbackLinks?.[e.id] ?? null, balance });
+    lines.push({ e, cert, view, photo: photos?.get(e.id) ?? null, fileName, name: t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : e.enrollment_number, number: data.applicationNumbers?.[e.trainee_id] ?? t?.trainee_number ?? e.enrollment_number, course: { id: c.id, name: c.name, code: c.code }, starts: b?.starts_on ?? e.scheduled_on ?? null, ended, evalNeeded, evalDone: !!fb, evalLink: d.feedbackLinks?.[e.id] ?? null, postTest: d.postTestResults?.[e.id] ?? null, balance });
   }
   const rank = (l: CertificateLine) => (l.view.overdue ? 0 : l.view.state === "Due" ? 1 : l.view.state === "Waiting for photo" ? 2 : l.view.state === "Void requested" ? 2 : l.view.state === "Waiting for payment" || l.view.state === "Waiting for evaluation" ? 3 : 4);
   return lines.sort((a, b) => rank(a) - rank(b) || (a.ended ?? "").localeCompare(b.ended ?? ""));
@@ -111,7 +112,7 @@ function CertificateLog({ data, lines, reload }: { data: PortalData; lines: Cert
   if (!lines.length) return <p className="portal-empty-copy">Nothing here.</p>;
   return <>
     {msg && <Message kind={msg.kind} text={msg.text} />}
-    <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee · NWMTACI no.</th><th>Course · Ended</th><th>Certificate No.</th><th>Paid</th><th>Eval.</th>{tracked && <th>Photo</th>}<th>Prints</th><th>Status</th><th>Action</th></tr></thead><tbody>
+    <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee · NWMTACI no.</th><th>Course · Ended</th><th>Certificate No.</th><th>Paid</th><th>Post-Test</th><th>Eval.</th>{tracked && <th>Photo</th>}<th>Prints</th><th>Status</th><th>Action</th></tr></thead><tbody>
       {lines.map((l, i) => { const printable = canPrint(l.view) && l.view.state !== "Void requested"; const printed = l.view.printCount > 0; return [
         <tr key={l.e.id}>
           <td className="cl-no">{i + 1}</td>
@@ -119,6 +120,7 @@ function CertificateLog({ data, lines, reload }: { data: PortalData; lines: Cert
           <td title={l.course.name}>{l.course.code} <span className="cl-sub">· {short(l.ended)}</span></td>
           <td className="cl-mono">{l.cert?.certificate_number ?? <span className="cl-sub">—</span>}</td>
           <td>{l.balance > 0 ? <span className="cl-x" title={`Balance ${pesos2(l.balance)}`}>✗</span> : <span className="cl-y">✓</span>}</td>
+          <td><PostTestCell t={l.postTest} /></td>
           <td>{!l.evalNeeded ? <span className="cl-sub">—</span> : l.evalLink ? <a className="cl-y" href={l.evalLink} target="_blank" rel="noreferrer" title="Open the evaluation PDF in Google Drive">✓ PDF</a> : l.evalDone ? <span className="cl-y">✓</span> : <span className="cl-x">✗</span>}</td>
           {tracked && <td>{l.photo ? <button type="button" className="cl-photo" title={l.photo.file_name} onClick={() => void openCertificatePhoto(l.e.id)}>✓ On File</button> : <button type="button" className="portal-secondary cl-upload" onClick={() => setUploading(l)}>Upload Photo</button>}</td>}
           <td className="cl-mono">{l.view.printCount}/{l.view.printsAllowed}</td>
@@ -133,7 +135,7 @@ function CertificateLog({ data, lines, reload }: { data: PortalData; lines: Cert
             {l.view.state === "Void requested" && <span className="cl-sub">With the Admin</span>}
           </span></td>
         </tr>,
-        voiding === l.e.id && <tr key={`${l.e.id}-void`} className="cl-voidrow"><td /><td colSpan={tracked ? 9 : 8}><div className="cl-void">
+        voiding === l.e.id && <tr key={`${l.e.id}-void`} className="cl-voidrow"><td /><td colSpan={tracked ? 10 : 9}><div className="cl-void">
           <label>Reason for Voiding<input value={reason} autoFocus onChange={(ev) => setReason(ev.target.value)} placeholder="e.g. Misprint — wrong spelling of the name" /></label>
           <button type="button" className="portal-secondary" onClick={() => setVoiding(null)}>Keep</button>
           <button type="button" className="cl-danger" disabled={busy || reason.trim().length < 3} onClick={() => void post({ action: "certificate-void-request", enrollmentId: l.e.id, reason: reason.trim() }, "Sent to the Admin for approval.").then(() => setVoiding(null)).catch(() => undefined)}>Send to the Admin</button>
@@ -230,6 +232,7 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
     l.view.state === "Training not finished" ? [`Ends ${short(l.ended)}`, "w"] : ["Training ended", "y"],
     [l.balance > 0 ? `Fee · ${pesos2(l.balance)} due` : "Fee paid", l.balance > 0 ? "n" : "y"],
     ...(tracked ? [["2x2 photo", l.photo ? "y" : "n"] as [string, "y" | "n"]] : []),
+    ...(l.postTest?.required ? [[l.postTest.passed ? "Post-test passed" : "Post-test", l.postTest.passed ? "y" : "n"] as [string, "y" | "n"]] : []),
     ...(l.evalNeeded ? [["Evaluation", l.evalDone ? "y" : "n"] as [string, "y" | "n"]] : []),
   ];
   return <div className="portal-page cx ac">
@@ -257,7 +260,7 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
             <td title={l.course.name}>{l.course.code}</td>
             <td>{range(l)}<small className="cl-block"><Badge tone={l.view.state === "Training not finished" || l.view.state === "Waiting for evaluation" ? undefined : "orange"}>{label}</Badge></small></td>
             <td><span className="wt-steps">{steps(l).map(([t, k]) => <span key={t} className={`wt-step ${k}`}>{k === "y" ? "✓" : k === "w" ? "◷" : "✗"} {t}</span>)}</span></td>
-            <td className="wt-next"><b>{step}</b><small className="cl-sub cl-block">{then}</small>{l.view.state === "Waiting for evaluation" && <button type="button" className="portal-secondary cl-upload" disabled={busy} onClick={() => void post({ action: "feedback-send-email", enrollmentId: l.e.id }, `Evaluation link emailed to ${l.name}.`).catch(() => undefined)}>Email Evaluation Link</button>}</td>
+            <td className="wt-next"><b>{step}</b><small className="cl-sub cl-block">{then}</small>{(l.view.state === "Waiting for evaluation" || (l.postTest?.required && !l.postTest.passed)) && l.view.state !== "Training not finished" && <button type="button" className="portal-secondary cl-upload" disabled={busy} onClick={() => void post({ action: "training-end-email", enrollmentId: l.e.id }, `Post-test and evaluation email sent to ${l.name}.`).catch(() => undefined)}>Email Post-Test and Evaluation</button>}</td>
             {tracked && <td>{l.photo ? <button type="button" className="cl-photo" title={l.photo.file_name} onClick={() => void openCertificatePhoto(l.e.id)}>✓ On File</button> : <button type="button" className="portal-secondary cl-upload" onClick={() => setUploading(l)}>Upload Photo</button>}</td>}
           </tr>; })}
         </tbody></table></div>}
@@ -379,8 +382,16 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
 
 /** Release needs the fee paid and the evaluation in (owner, 20 Oct 2026); the server checks again. */
 function ReleaseButton({ l, onRelease, primary }: { l: CertificateLine; onRelease: () => void; primary?: boolean }) {
-  const why = releaseProblem({ balanceCentavos: l.balance, evaluationRequired: l.evalNeeded, evaluationOn: l.evalDone ? "in" : null, revoked: !!l.cert?.revoked_at });
+  const why = releaseProblem({ balanceCentavos: l.balance, evaluationRequired: l.evalNeeded, evaluationOn: l.evalDone ? "in" : null, revoked: !!l.cert?.revoked_at, postTestRequired: l.postTest?.required, postTestPassed: l.postTest?.passed });
   return <button type="button" className={primary ? "portal-primary" : undefined} disabled={!!why} title={why ?? undefined} onClick={onRelease}>{why ? `Release · ${why.replace(/:.*$/, "")}` : "Release"}</button>;
+}
+
+/** Post-test result (20 Oct 2026): "—" when the course has no approved post-test. */
+function PostTestCell({ t }: { t: PostTestResult | null }) {
+  if (!t?.required) return <span className="cl-sub">—</span>;
+  const tries = t.attempts ? `${t.attempts} attempt${t.attempts === 1 ? "" : "s"}` : "";
+  if (t.passed) return <><Badge tone="green">Passed</Badge><small className="cl-sub cl-block">{t.best ? `${t.best.score}/${t.best.total}` : ""}{tries ? ` · ${tries}` : ""}</small></>;
+  return t.attempts ? <><Badge tone="orange">Not Passed</Badge><small className="cl-sub cl-block">{t.best ? `Best ${t.best.score}/${t.best.total}` : ""} · {tries}</small></> : <Badge>Not Taken</Badge>;
 }
 
 /** Released: printed certificates waiting to be claimed, and those already released. */

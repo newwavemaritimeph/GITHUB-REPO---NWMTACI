@@ -32,9 +32,10 @@ import { pesos, pesos2, first, dueCentavos, balanceOf, isUnpaid, manilaToday, ad
 import { tcl } from "@/lib/title-case";
 import { CompletionRecords } from "./portal/completion-records";
 import { OtherIncome } from "./portal/other-income";
+import { PostTestReview } from "./portal/post-test-review";
 import { AdminHome, AdminSearchTrainee, AdminEnrollments, AdminVouchers, AdminHolidays } from "./portal/admin-home";
 
-type Module = "Dashboard" | "Waiting" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Requisitions" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "MISMO dashboard" | "Completion records" | "Other income" | AccountingConfigSection;
+type Module = "Post-tests" | "Dashboard" | "Waiting" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Requisitions" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "MISMO dashboard" | "Completion records" | "Other income" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -128,7 +129,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   hr: [],
   // Admin (owner, 9 Oct 2026): Dashboard · Search Trainee · Enrollments · Resource Planning ·
   // Configuration ▾ · Requests · Reports ▾ · MISMO ▾ (ADMIN_TABS). Requisitions opens from the dashboard.
-  admin: ["Dashboard","Search trainee","Enrollments","Resource planning","Courses","Employee accounts","Instructors","Classrooms","Certifications","Partners","Schedule of fees","Holidays","Requests","Daily summary report","MISMO dashboard","Final list","Submissions","Completion records","Requisitions"],
+  admin: ["Dashboard","Search trainee","Enrollments","Resource planning","Courses","Post-tests","Employee accounts","Instructors","Classrooms","Certifications","Partners","Schedule of fees","Holidays","Requests","Daily summary report","MISMO dashboard","Final list","Submissions","Completion records","Requisitions"],
   // Cashier (Accounting Officer), owner's menu of 7 Oct 2026, shown as top tabs:
   // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses,
   // Report (with opening and closing), Requests (CASHIER_TABS).
@@ -139,7 +140,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Dashboard",icon:"⌂",group:"Work"},{label:"Search trainee",icon:"⌕",roles:["admin"],group:"Work"},{label:"Trainee enrollments",icon:"◎",roles:["accounting"],group:"Work"},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting"],group:"Work"},
-  {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting"],group:"Work"},{label:"Registration",icon:"✎",roles:["registration"],group:"Work"},{label:"Courses",icon:"◇",roles:["registration","admin"],group:"Work"},
+  {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting"],group:"Work"},{label:"Registration",icon:"✎",roles:["registration"],group:"Work"},{label:"Courses",icon:"◇",roles:["registration","admin"],group:"Work"},{label:"Post-tests",icon:"✓",roles:["admin"],group:"Configuration"},
   {label:"Schedules",icon:"□",roles:["admin","registration"],group:"Work"},{label:"Instructions",icon:"✉",roles:["admin","registration"],group:"Work"},{label:"Attendance",icon:"✓",roles:["admin"],group:"Work"},
   {label:"Rooms & facilities",icon:"▢",roles:["admin"],group:"Work"},{label:"Training calendar",icon:"▦",roles:["admin"],group:"Work"},{label:"Trainee scheduling",icon:"◎",roles:["admin"],group:"Work"},{label:"Instructor assignment",icon:"♙",roles:["admin"],group:"Work"},{label:"Schedule changes",icon:"↺",roles:["admin"],group:"Records"},{label:"Certificates",icon:"◈",roles:["admin","releasing_officer"],group:"Work"},{label:"Requests",icon:"↺",roles:["admin","accounting","cashier"],group:"Work"},
   {label:"Reports",icon:"↥",roles:["admin","accounting","releasing_officer","registration","cashier"],group:"Records"},
@@ -188,7 +189,7 @@ const ADMIN_TABS:TopTab[]=[
   {label:"Search trainee",items:["Search trainee"]},
   {label:"Enrollments",items:["Enrollments"]},
   {label:"Resource planning",items:["Resource planning"]},
-  {label:"Configuration",items:["Courses","Employee accounts","Instructors","Classrooms","Certifications","Partners","Schedule of fees","Holidays"]},
+  {label:"Configuration",items:["Courses","Post-tests","Employee accounts","Instructors","Classrooms","Certifications","Partners","Schedule of fees","Holidays"]},
   {label:"Requests",items:["Requests"]},
   {label:"Reports",items:["Daily summary report"]},
   {label:"MISMO",items:["MISMO dashboard","Final list","Submissions","Completion records"]},
@@ -365,6 +366,8 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Completion records"&&["mismo_officer","admin"].includes(gateRole))return <CompletionRecords/>;
   if(active==="Dashboard"&&gateRole==="registration")return <RegistrationDashboard data={data} go={m=>go(m as Module)}/>;
   // Admin › Configuration › Courses: add, edit and remove (owner, 20 Oct 2026); Registration keeps the read-only list.
+  // Admin › Configuration › Post-Tests (owner, 20 Oct 2026).
+  if(active==="Post-tests"&&gateRole==="admin")return <PostTestReview/>;
   if(active==="Courses"&&gateRole==="admin")return <AccountingConfiguration section="Courses" data={data as unknown as Parameters<typeof AccountingConfiguration>[0]["data"]} reload={reload}/>;
   if(active==="Courses")return <CoursesAndCenters data={data} query={query}/>;
   if(active==="For payment")return <CashierPaymentQueue data={data} onPay={onPay} reload={reload}/>;

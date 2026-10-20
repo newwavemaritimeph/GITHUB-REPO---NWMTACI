@@ -7,6 +7,7 @@ import { detectPhotoBox } from "@/lib/certificate-template";
 import { certificateLayout, isHazmatCfr } from "@/lib/certificate-layouts";
 import { drawTemplateFields, isFieldsV2 } from "@/lib/certificate-overlay";
 import { bundledLayout } from "@/lib/certificate-template-layouts";
+import { postTestStatus } from "@/lib/post-test-server";
 import { newVerifyCode, verifyUrl } from "@/lib/certificate-verify";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
@@ -25,6 +26,8 @@ export type CertificateContext = {
   balanceCentavos: number;
   /** The portal evaluation (20 Oct 2026): required for New Wave courses; `on` is the day it came in. */
   evaluation: { required: boolean; on: string | null };
+  /** The course post-test (20 Oct 2026): required once approved; passed when any attempt passed. */
+  postTest: { required: boolean; passed: boolean; best: { score: number; total: number; percent: number } | null; attempts: number };
   /** The 2x2 photo (migration 202610090034); undefined before it. */
   photo?: { storage_path: string; file_name: string } | null;
   corrections: CertificateCorrections;
@@ -82,6 +85,7 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
     cert = basic ? { id: basic.id, status: basic.status, snapshot: basic.snapshot as Record<string, unknown> | null, certificate_number: ((basic.snapshot as Record<string, unknown> | null)?.certificate_number as string) ?? null, batch_label: null, print_count: ["Printed", "Released"].includes(basic.status) ? 1 : 0, reprints_allowed: 0, void_status: null, soft_copy_sent_at: null } : null;
   }
   if (cert && !qrRes.error && qrRes.data) cert = { ...cert, ...(qrRes.data as { verify_code: string | null; sticker_no: string | null; revoked_at: string | null }) };
+  const postTest = (await postTestStatus(db, [{ id: e.id, course_id: e.course_id }]))[e.id] ?? { required: false, passed: false, best: null, attempts: 0 };
   const b = first(e.batches as unknown as { starts_on: string; ends_on: string; batch_number: string } | null);
   const c = first(e.courses as unknown as { id: string; name: string; code: string; duration_label: string; delivery_type?: string } | null);
   const t = first(e.trainees as unknown as { legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; email?: string | null } | null);
@@ -112,7 +116,7 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
     trainee: { name: t ? [t.legal_first_name, t.legal_middle_name, t.legal_last_name].filter(Boolean).join(" ") : "Trainee", email: t?.email ?? null, firstName: t?.legal_first_name ?? "", middleName: t?.legal_middle_name ?? null, lastName: t?.legal_last_name ?? "" },
     course: { id: c?.id ?? e.course_id, name: c?.name ?? "Course", code: c?.code ?? "", evaluationFormId },
     batch: { starts_on: b?.starts_on ?? scheduled, ends_on: trainingEnd, batch_number: b?.batch_number ?? null },
-    cert, view, photo, corrections, numbers, balanceCentavos: Math.max(0, due - paid), evaluation: { required: evaluationRequired, on: manilaDay((feedback as { submitted_at?: string } | null)?.submitted_at) }, issuanceEnabled: Boolean((settings as { certificate_issuance_enabled?: boolean } | null)?.certificate_issuance_enabled),
+    cert, view, photo, corrections, numbers, balanceCentavos: Math.max(0, due - paid), evaluation: { required: evaluationRequired, on: manilaDay((feedback as { submitted_at?: string } | null)?.submitted_at) }, postTest, issuanceEnabled: Boolean((settings as { certificate_issuance_enabled?: boolean } | null)?.certificate_issuance_enabled),
   };
 }
 
@@ -213,8 +217,8 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
   // A course with its own layout (HAZMAT with CFR) is filled like New Wave's sample certificate.
   const layout = certificateLayout(ctx.course);
   // Templates converted from New Wave's Word files (scripts/certificate-templates, 20 Oct 2026):
-  // positions from the upload, else the bundled ones for that converted file.
-  const v2 = isFieldsV2(tpl.fields) ? tpl.fields : bundledLayout(tpl.storagePath);
+  // the bundled positions for that converted file (they carry fixes, e.g. CSF hours), else the upload's.
+  const v2 = bundledLayout(tpl.storagePath) ?? (isFieldsV2(tpl.fields) ? tpl.fields : null);
   if (v2) {
     await drawTemplateFields(pdf, page, v2, { name: String(traineeName), startsOn: startsOn ?? null, endsOn: endsOn ?? null, issuedOn: String(issuedOn), certificateNumber: number, registrationNumber: regNo ?? "", verifyUrl: ctx.cert?.verify_code ? verifyUrl(ctx.cert.verify_code) : null, copyNo: mode === "print" ? Number(ctx.cert?.print_count ?? 0) + 1 : undefined });
   } else if (layout) {

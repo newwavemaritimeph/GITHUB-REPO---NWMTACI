@@ -12,6 +12,7 @@ type CourseStatus = {
   feeCentavos: number; paidCentavos: number; balanceCentavos: number;
   certificate: string | null; certificateNumber: string | null; releasedAt: string | null; ready: boolean; delivery: string | null;
   evaluation: { needed: boolean; submitted: boolean; url: string | null };
+  postTest?: { needed: boolean; passed: boolean; best: { score: number; total: number } | null; attempts: number; url: string | null };
 };
 type PaymentRow = { paymentNumber: string; receivedAt: string; method: string; referenceNumber: string | null; amountCentavos: number; valid: boolean };
 type StatusResult = { firstName: string; nwmtaciNo: string; awaitingCourse: boolean; courses: CourseStatus[]; payments: PaymentRow[] };
@@ -103,10 +104,12 @@ function StatusTab() {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
                   <Step done={c.trainingFinished}>Training Finished</Step>
                   <Step done={c.balanceCentavos <= 0}>Paid</Step>
+                  {c.postTest?.needed && <Step done={c.postTest.passed}>{c.postTest.passed && c.postTest.best ? `Post-Test ${c.postTest.best.score}/${c.postTest.best.total}` : "Post-Test"}</Step>}
                   {c.evaluation.needed && <Step done={c.evaluation.submitted}>Evaluation</Step>}
                   {c.certificate !== null && <Step done={!!c.certificateNumber}>Certificate{c.certificateNumber && <> <span style={mono}>{c.certificateNumber}</span> · {c.releasedAt ? `Released ${day(c.releasedAt)}` : "Ready for Release"}</>}</Step>}
                 </div>
               )}
+              {c.postTest?.url && <Link className="button button-primary" href={c.postTest.url} style={{ marginTop: 12, marginRight: 8, display: "inline-flex" }}>{c.postTest.attempts ? "Retake Post-Test" : "Take Post-Test"}</Link>}
               {c.evaluation.url && <Link className="button button-primary" href={c.evaluation.url} style={{ marginTop: 12, display: "inline-flex" }}>Evaluate Training</Link>}
               {c.ready && !c.delivery && <p className="ts-note">Can&apos;t come to the office? <Link href="/certificate-delivery">Request delivery by LBC</Link>.</p>}
             </div>

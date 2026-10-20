@@ -16,6 +16,8 @@ export type TemplateFieldsV2 = {
   certNo?: { x: number; y: number; size: number };
   regNo?: { x: number; y: number; size: number };
   qr?: { x: number; y: number; w: number; h: number };
+  /** A template whose hours line was left blank (CSF "[__] Hours"): covered and printed. */
+  hours?: { cx: number; y: number; size: number; text: string; cover: { x: number; y: number; w: number; h: number } };
 };
 export type OverlayFill = { name: string; startsOn: string | null; endsOn: string | null; issuedOn: string; certificateNumber: string; registrationNumber: string; verifyUrl: string | null; copyNo?: number };
 
@@ -59,6 +61,10 @@ export async function drawTemplateFields(pdf: PDFDocument, page: PDFPage, f: Tem
   if (f.issued) {
     const text = safe(issuedText(f.issued.text, fill.issuedOn));
     page.drawText(text, { x: f.issued.cx - reg.widthOfTextAtSize(text, f.issued.size) / 2, y: f.issued.y, size: f.issued.size, font: reg, color: INK });
+  }
+  if (f.hours) {
+    page.drawRectangle({ ...f.hours.cover, width: f.hours.cover.w, height: f.hours.cover.h, color: rgb(1, 1, 1) });
+    page.drawText(f.hours.text, { x: f.hours.cx - bold.widthOfTextAtSize(f.hours.text, f.hours.size) / 2, y: f.hours.y, size: f.hours.size, font: bold, color: INK });
   }
   if (f.certNo && fill.certificateNumber) page.drawText(safe(fill.certificateNumber), { x: f.certNo.x, y: f.certNo.y, size: f.certNo.size, font: reg, color: INK });
   if (f.regNo && fill.registrationNumber) page.drawText(safe(fill.registrationNumber), { x: f.regNo.x, y: f.regNo.y, size: f.regNo.size, font: reg, color: INK });

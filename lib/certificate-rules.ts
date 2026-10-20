@@ -57,9 +57,11 @@ export function certificateState(f: CertificateFacts, today: string): Certificat
 export const evaluationRequiredFor = (deliveryType: string | null | undefined, partnerOfferId: string | null | undefined) => deliveryType === "In-House" && !partnerOfferId;
 
 /** Why a printed certificate cannot be released yet (owner, 20 Oct 2026: paid and evaluated), or null. */
-export function releaseProblem(f: { balanceCentavos: number; evaluationRequired: boolean; evaluationOn: string | null; revoked?: boolean }) {
+export function releaseProblem(f: { balanceCentavos: number; evaluationRequired: boolean; evaluationOn: string | null; revoked?: boolean; postTestRequired?: boolean; postTestPassed?: boolean }) {
   if (f.revoked) return "This certificate is revoked.";
   if (f.balanceCentavos > 0) return "Not paid: the training fee still has a balance.";
+  // Course post-test (owner, 20 Oct 2026): live once the Admin approves the course's questions.
+  if (f.postTestRequired && !f.postTestPassed) return "Post-test not passed yet.";
   if (f.evaluationRequired && !f.evaluationOn) return "Evaluation not submitted yet.";
   return null;
 }
