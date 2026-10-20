@@ -31,10 +31,19 @@ export function trainingEndBody(d: TrainingEndInput) {
   const post = d.postTest ? box("Post-Test", `<p style="margin:0 0 12px">Answer ${d.postTest.total} questions about the course. You pass with <b>${d.postTest.passingPercent}% (${passMark(d.postTest.total, d.postTest.passingPercent)} correct)</b>. If you do not pass, you can take it again; there is no limit on retakes.</p><p style="margin:0 0 10px">${btn(d.postTest.url, "Take the Post-Test", "#F25615")}</p><p style="margin:0;font-size:12.5px;color:#5b7587">This link is for you only. Do not share it.</p>`, "#F25615") : "";
   const evaluation = d.evaluationUrl ? box("Training Evaluation", `<p style="margin:0 0 12px">Tell us how the training went. It takes about 3 minutes.</p><p style="margin:0">${btn(d.evaluationUrl, "Evaluate the Training", "#0571D0")}</p>`) : "";
   const steps = [d.postTest && "post-test", d.evaluationUrl && "training evaluation"].filter(Boolean).join(" and ");
-  const html = `<p style="margin:0 0 12px">Dear ${e(d.firstName || d.traineeName)},</p><p style="margin:0 0 12px">Your training has ended. Please complete your <b>${e(steps)}</b> so we can release your certificate.</p>${details}${post}${evaluation}<p style="margin:0">Your certificate is released once your fee is settled${d.postTest ? ", your post-test is passed" : ""}${d.evaluationUrl ? " and your evaluation is submitted" : ""}.</p>`;
+  // How to get to each one (owner, 20 Oct 2026), including the way back in without this email.
+  const howItems = [
+    ...(d.postTest ? [`<b>Post-test:</b> click <b>Take the Post-Test</b>. It opens on your phone or computer; no login is needed. Answer all ${d.postTest.total} questions, then click <b>Submit Answers</b>. Your score shows right away. If it is below ${d.postTest.passingPercent}%, click <b>Retake the Test</b> and try again.`] : []),
+    ...(d.evaluationUrl ? [`<b>Evaluation:</b> click <b>Evaluate the Training</b>. Tick <b>Confirm</b> for attendance, rate each item from Excellent to Poor, write your comments and suggestions, then click <b>Submit Evaluation</b>.`] : []),
+    `<b>Lost this email?</b> Go to <a href="https://newwavemaritimemtaci.com/registration-search" style="color:#0571D0">newwavemaritimemtaci.com/registration-search</a>, enter your <b>SRN</b> and <b>NWMTACI No.</b> (${e(d.nwmtaciNo)}), then click ${[d.postTest && "<b>Take Post-Test</b>", d.evaluationUrl && "<b>Evaluate Training</b>"].filter(Boolean).join(" or ")}.`,
+    `<b>Need help?</b> Call or text 0948 847 6530, or email newwavemaritime@gmail.com.`,
+  ];
+  const how = box(`How to Take the ${d.postTest && d.evaluationUrl ? "Post-Test and Evaluation" : d.postTest ? "Post-Test" : "Evaluation"}`, `<ol style="margin:0;padding-left:20px">${howItems.map((x) => `<li style="margin:0 0 8px">${x}</li>`).join("")}</ol>`, "#9EE3F1");
+  const html = `<p style="margin:0 0 12px">Dear ${e(d.firstName || d.traineeName)},</p><p style="margin:0 0 12px">Your training has ended. Please complete your <b>${e(steps)}</b> so we can release your certificate.</p>${details}${post}${evaluation}${how}<p style="margin:0">Your certificate is released once your fee is settled${d.postTest ? ", your post-test is passed" : ""}${d.evaluationUrl ? " and your evaluation is submitted" : ""}.</p>`;
   const text = [`Dear ${d.firstName || d.traineeName},`, "", `Your training has ended. Please complete your ${steps} so we can release your certificate.`, "",
     `Course: ${d.courseName}${d.courseCode ? ` (${d.courseCode})` : ""}`, `Training Dates: ${d.dates}`, `NWMTACI No.: ${d.nwmtaciNo}`, "",
     ...(d.postTest ? [`Post-Test (pass with ${d.postTest.passingPercent}%, unlimited retakes): ${d.postTest.url}`] : []), ...(d.evaluationUrl ? [`Training Evaluation: ${d.evaluationUrl}`] : []),
+    "", "How to take them: open each link on your phone or computer (no login needed), answer every item and submit. Lost this email? Go to newwavemaritimemtaci.com/registration-search and enter your SRN and NWMTACI No.",
     "", "New Wave Maritime Training and Assessment Center, Inc. · 0948 847 6530 · newwavemaritime@gmail.com"].join("\n");
   return { html, text, steps };
 }

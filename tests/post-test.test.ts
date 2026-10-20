@@ -53,6 +53,8 @@ describe("end-of-training email", () => {
     expect(b.html).toContain("Evaluate the Training");
     expect(b.html).toContain("70% (7 correct)");
     expect(b.steps).toBe("post-test and training evaluation");
+    expect(b.html).toContain("How to Take the Post-Test and Evaluation");
+    expect(b.html).toContain("registration-search");
   });
   it("leaves out what is already done", () => {
     const b = trainingEndBody({ ...base, postTest: null, evaluationUrl: "https://x/feedback/t" });
