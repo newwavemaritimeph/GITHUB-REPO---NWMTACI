@@ -1,0 +1,131 @@
+<title>Pay the Centers</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Same shell as the live portal: navy bar with dropdown tabs, summary rail on the left, light-cyan table headers. */
+:root{--orange:#F25615;--blue:#0571D0;--cyan:#35CCFA;--cyan-l:#9EE3F1;--navy:#123F63;--bg:#f2f6f8;--surface:#fff;--fg:#0f2638;--muted:#587184;--line:#dbe6ec;--soft:#eef4f8;--th:#e6f6fd;--thc:#0b4f8f;--zebra:#f7fafc;
+ --good:#0a7a3e;--good-bg:#e2f5e9;--warn:#a2470b;--warn-bg:#fdf0e5;--bad:#b42318;--bad-bg:#fcebea;--info:#0571D0;--info-bg:#e5f1fb;
+ --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding-block:16px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.w{max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.logo{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}.logo b{font-size:19px;font-weight:600}.logo b span{color:var(--orange)}.logo small{display:block;color:var(--cyan-l);font-size:14px}.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.who{font-size:14px;color:#cfe3ef;display:flex;align-items:center;gap:8px}.who select{background:#ffffff14;border:1px solid #ffffff30;color:#fff;border-radius:8px;padding:5px 8px}.who select option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:16px;flex-wrap:wrap}.tab>button{background:none;border:0;color:#c3dbea;font:500 16px var(--sans);padding:12px 18px;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:8px}.tab>button:hover{color:#fff;background:#ffffff12}.tab.on>button{background:var(--bg);color:var(--fg);font-weight:600}
+.caret{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.menu{position:absolute;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:15;display:flex;flex-direction:column;margin-top:2px}.tab{position:relative}.menu button{background:none;border:0;text-align:left;color:var(--fg);font:500 15.5px var(--sans);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;gap:12px}.menu button:hover{background:var(--soft)}.menu button.on{background:var(--info-bg);color:var(--info);font-weight:600}.menu small,.n{font:600 11.5px var(--mono);background:var(--orange);color:#fff;border-radius:10px;padding:1px 7px}
+.page{padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.cx-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}h1{font-size:25px;font-weight:600;margin:0}h2{font-size:19px;font-weight:600;margin:0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.seg button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.seg button.on{background:var(--navy);color:#fff}
+.rail{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}@media (max-width:900px){.rail{grid-template-columns:1fr}}.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.ph small{color:var(--muted);font-size:14px}
+.lines{display:flex;flex-direction:column;padding:0 20px 16px}.lines div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}.lines div:first-child{border-top:0}.lines dd,.lines span:last-child{font-family:var(--mono);font-weight:600}.lines .tot{font-weight:700}.lines .bad{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 16px}.tile{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 12px}.tile span{display:block;font-size:13px;color:var(--muted)}.tile b{font:600 19px var(--mono)}
+.cwrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--th);color:var(--thc);font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:10px 12px;border-right:1px solid var(--line);white-space:nowrap}td{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.35}tbody tr:nth-child(even) td{background:var(--zebra)}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}.due{background:var(--bad-bg);color:var(--bad)}.dueo{background:var(--warn-bg);color:var(--warn)}.appr{background:var(--info-bg);color:var(--info)}.paid{background:var(--good-bg);color:var(--good)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:9px;padding:7px 14px;font-weight:600;font-size:14.5px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.okb{background:var(--good);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:14px 20px;background:var(--soft);border-top:1px solid var(--line)}.form label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}.form select,.form input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line)}
+.alert{background:var(--bad-bg);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:15px;font-weight:500;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.note{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+</style>
+
+<header class="top"><div class="w">
+  <div class="brand"><div class="logo"><span class="mark">NW</span><div><b>New Wave <span>Maritime</span><span class="proto">PROTOTYPE</span></b><small>Staff Portal · sample trainees, real centers and fees</small></div></div>
+  <label class="who">Working as <select id="role"><option>Cashier</option><option>Accounting</option></select></label></div>
+  <nav class="tabs" id="tabs"></nav></div></header>
+<main class="page"><div class="w" id="page"></div></main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const TODAY="2026-10-20";
+const T=[
+ {id:1,n:"DELA CRUZ, JUAN",no:"0000014",c:"BT",cn:"Basic Training",ctr:"Nautical Options",fee:5500,enr:"2026-10-20",train:"2026-10-27",s:"due"},
+ {id:2,n:"LIM, MARIA",no:"0000013",c:"SCRB",cn:"Survival Craft and Rescue Boat",ctr:"Nautical Options",fee:3900,enr:"2026-10-20",train:"2026-10-28",s:"due"},
+ {id:3,n:"REYES, PAOLO",no:"0000012",c:"AFF",cn:"Advanced Fire Fighting",ctr:"Nautical Options",fee:4200,enr:"2026-10-17",train:"2026-10-22",s:"due"},
+ {id:4,n:"TORRES, LEO",no:"0000007",c:"ML-DECK",cn:"ML for Deck",ctr:"Mariana",fee:13000,enr:"2026-10-20",train:"2026-10-29",s:"due"},
+ {id:5,n:"GARCIA, ANA",no:"0000010",c:"BT",cn:"Basic Training",ctr:"Altitude Maritime",fee:6000,enr:"2026-10-19",train:"2026-10-26",s:"paid",cv:"CV-2026-000131",ch:"PSBank",on:"Oct 19, 2026"},
+];
+const RB={1:[1300,1000,"Qapla Maritime"],2:[900,800,""],3:[800,700,"Qapla Maritime"],4:[1500,1400,"Seaways Consultancy"],5:[1200,1100,""]};
+T.forEach((t)=>{t.rb=RB[t.id][0];t.share=RB[t.id][1];t.agency=RB[t.id][2];t.rs=t.s==="paid"?"due":"wait";});
+T[4].rs="received";T[4].inc="INC-2026-000006";
+const COL={"Nautical Options":"#0571D0","Altitude Maritime":"#123F63","Mariana":"#F25615"};
+const S={role:"Cashier",view:"Expenses",sub:"Pay the Centers",menu:null,picked:new Set(T.filter((t)=>t.s==="due"&&t.enr===TODAY).map((t)=>t.id)),form:null,release:null,er:41,cv:132};
+const reqs=[];
+const peso=(p)=>"₱"+Number(p).toLocaleString("en-PH",{minimumFractionDigits:2});
+const d=(s)=>new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",year:"numeric",timeZone:"UTC"}).format(new Date(s+"T00:00:00Z"));
+const reqOf=(t)=>reqs.find((r)=>r.ids.includes(t.id)&&r.status!=="Rejected");
+const open=(t)=>t.s!=="paid"&&!reqOf(t);
+const centers=[...new Set(T.map((t)=>t.ctr))];
+const owed=(c)=>T.filter((t)=>(!c||t.ctr===c)&&t.s!=="paid").reduce((a,t)=>a+t.fee,0);
+function status(t){if(t.s==="paid")return `<span class="pill paid">Paid · ${t.on}</span><small>${t.cv} · ${t.ch}</small>`;const r=reqOf(t);
+ if(r&&r.status==="For Approval")return `<span class="pill dueo">For Approval</span><small>${r.er}</small>`;if(r&&r.status==="Approved")return `<span class="pill appr">Approved · ${r.cv}</span><small>Ready to release</small>`;
+ return t.enr===TODAY?`<span class="pill due">Due Today</span>`:`<span class="pill dueo">Due since ${d(t.enr)}</span>`}
+const TABS={Cashier:[["Dashboard"],["Enrollments",["Search Trainee"]],["Accounting",["Payments","Expenses","Report","Requests","Other Income"]]],Accounting:[["Dashboard"],["Approvals"],["Transactions",["Payments","Expenses","Receivables","Payables","Rebates","Cash Position"]],["Reports"]]};
+function tabs(){return TABS[S.role].map(([lbl,items])=>{const on=items?items.includes(S.view):S.view===lbl;const nApr=reqs.filter((r)=>r.status==="For Approval").length;
+ return `<div class="tab ${on?"on":""}"><button data-tab="${lbl}">${lbl}${lbl==="Approvals"&&nApr?` <span class="n">${nApr}</span>`:""}${items?`<span class="caret"></span>`:""}</button>${S.menu===lbl&&items?`<div class="menu">${items.map((i)=>`<button data-go="${i}" class="${S.view===i?"on":""}">${i}${i==="Expenses"&&S.role==="Cashier"&&T.filter(open).length?`<small>${T.filter(open).length}</small>`:""}</button>`).join("")}</div>`:""}</div>`}).join("")}
+const head=(eb,title)=>`<div class="cx-head"><div><span class="eyebrow">${eb}</span><h1>${title}</h1></div></div>`;
+const dueRail=()=>`<section class="panel"><div class="ph"><h2>Due to Centers</h2><small>full fee</small></div><div class="tiles">${centers.map((c)=>`<div class="tile" style="--c:${COL[c]}"><span>${c}</span><b>${peso(owed(c))}</b></div>`).join("")}<div class="tile" style="--c:#b42318"><span>Due today</span><b>${peso(T.filter((t)=>open(t)&&t.enr===TODAY).reduce((a,t)=>a+t.fee,0))}</b></div></div>
+ <p class="note">A trainee is due to the center on the day they are enrolled. The center's rebate comes back later in Other Income.</p></section>`;
+function payCenters(){
+ return `${head("Accounting","Expenses")}<div class="seg">${["Expenses","Vouchers","Pay the Centers"].map((t)=>`<button data-sub="${t}" class="${S.sub===t?"on":""}">${t}${t==="Pay the Centers"&&T.filter(open).length?` <span class="n">${T.filter(open).length}</span>`:""}</button>`).join("")}</div>
+ ${S.sub!=="Pay the Centers"?`<section class="panel"><p class="note" style="padding:18px 20px">${S.sub} stays as it is today.</p></section>`:`<div class="rail"><div class="stack">${dueRail()}</div><div class="stack">
+ ${centers.map((ctr)=>{const l=T.filter((t)=>t.ctr===ctr);const sel=l.filter((t)=>S.picked.has(t.id)&&open(t));const tot=sel.reduce((a,t)=>a+t.fee,0);const appr=reqs.filter((r)=>r.ctr===ctr&&r.status==="Approved");
+  return `<section class="panel"><div class="ph"><h2>${ctr}</h2><small>Owed <b class="mono">${peso(owed(ctr))}</b></small></div>
+  <div class="cwrap"><table><thead><tr><th></th><th>Trainee · NWMTACI No.</th><th>Course</th><th>Enrolled</th><th>Training</th><th class="r">Pay Center</th><th>Status</th></tr></thead><tbody>
+  ${l.map((t)=>`<tr><td>${open(t)?`<input type="checkbox" data-pick="${t.id}" ${S.picked.has(t.id)?"checked":""} aria-label="Pick ${t.n}">`:""}</td><td><b>${t.n}</b><small class="mono">${t.no}</small></td><td><b>${t.c}</b><small>${t.cn}</small></td><td>${d(t.enr)}</td><td>${d(t.train)}</td><td class="r amt">${peso(t.fee)}</td><td>${status(t)}</td></tr>`).join("")}</tbody></table></div>
+  ${S.form===ctr?`<div class="form"><label>Total<input readonly value="${peso(tot)} · ${sel.length} trainee${sel.length===1?"":"s"}"></label><label>Channel<select id="ch"><option>Cash</option><option selected>PSBank</option><option>UnionBank</option><option>GCash</option></select></label><label>Billing Statement (optional)<input type="file"></label><label>Notes<input placeholder="e.g. Batch of Oct 27"></label></div>
+   <div class="foot"><span style="font-size:14px;color:var(--muted)">Goes to Accounting for approval, like any expense.</span><span style="display:flex;gap:8px"><button class="btn" data-cancel>Cancel</button><button class="btn pri" data-send="${ctr}" ${sel.length?"":"disabled"}>Send for Approval</button></span></div>`
+  :`<div class="foot"><span style="font-size:14.5px">${sel.length?`${sel.length} ticked · <b class="mono">${peso(tot)}</b>`:"Tick the trainees to pay"}</span><span style="display:flex;gap:8px;flex-wrap:wrap">${appr.map((r)=>`<button class="btn okb" data-rel="${r.er}">Release ${r.cv}</button>`).join("")}<button class="btn pri" data-raise="${ctr}" ${sel.length?"":"disabled"}>Raise Payment to ${ctr}</button></span></div>`}
+  ${S.release&&appr.some((r)=>r.er===S.release)?`<div class="form"><label>Channel<select><option>PSBank</option><option>Cash</option><option>UnionBank</option><option>GCash</option></select></label><label>Reference No.<input placeholder="Bank reference"></label><label>Deposit Slip Photo (required)<input type="file"></label></div><div class="foot"><span style="font-size:14px;color:var(--muted)">Print the voucher, have it signed, then release.</span><span style="display:flex;gap:8px"><button class="btn" data-t="Opens the voucher PDF">Print Voucher</button><button class="btn okb" data-done="${S.release}">Mark Released</button></span></div>`:""}
+  </section>`}).join("")}</div></div>`}`}
+function cashDash(){const due=T.filter(open);const amt=due.reduce((a,t)=>a+t.fee,0);
+ return `${head(d(TODAY),"Cashier Dashboard")}${amt?`<div class="alert"><span>⚠ ${peso(amt)} due to partnered centers · ${due.length} trainee${due.length===1?"":"s"}</span><button class="btn" data-go="Expenses">Pay the Centers</button></div>`:""}
+ <div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>Cash Drawer</h2><span class="pill dueo">Open</span></div><div class="lines"><div><span>Opening cash · 7:58 AM</span><span>₱5,000.00</span></div><div><span>+ Cash collected</span><span>₱18,500.00</span></div><div><span>− Cash expenses</span><span>₱4,200.00</span></div><div class="tot"><span>= Expected in drawer</span><span>₱19,300.00</span></div></div></section>${dueRail()}<section class="panel"><div class="ph"><h2>Rebates Due</h2><small>from centers</small></div><div class="lines"><div><span>Due now</span><span class="bad">${peso(T.filter((t)=>t.s==="paid"&&t.rs==="due").reduce((a,t)=>a+t.rb,0))}</span></div><div><span>Received this month</span><span>${peso(T.filter((t)=>t.rs==="received").reduce((a,t)=>a+t.rb,0))}</span></div></div><div class="foot"><span></span><button class="btn" data-go="Other Income">Open Rebates</button></div></section></div>
+ <div class="stack"><section class="panel"><div class="ph"><h2>Approvals and Requests</h2></div><div class="cwrap"><table><thead><tr><th>Request</th><th>Status</th><th>Sent</th></tr></thead><tbody>
+ ${reqs.length?reqs.map((r)=>`<tr><td><b>Payment to ${r.ctr}</b><small>${r.ids.length} trainee${r.ids.length===1?"":"s"} · ${peso(r.amt)}</small></td><td><span class="pill ${r.status==="For Approval"?"dueo":r.status==="Approved"?"appr":r.status==="Paid"?"paid":"due"}">${r.status==="Approved"?`Approved · ${r.cv}`:r.status==="Paid"?`Released · ${r.cv}`:r.status}</span>${r.why?`<small>${r.why}</small>`:""}</td><td>${d(TODAY)}</td></tr>`).join(""):`<tr><td colspan="3" style="color:var(--muted)">Raise a payment in Accounting › Expenses › Pay the Centers to see it here.</td></tr>`}
+ </tbody></table></div></section></div></div>`}
+function approvals(){const p=reqs.filter((r)=>r.status==="For Approval");
+ return `${head("Accounting","Approvals")}<div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>Waiting</h2></div><div class="lines"><div><span>Expenses</span><span>2</span></div><div><span>Payments to centers</span><span>${p.length}</span></div><div><span>Discounts</span><span>1</span></div></div></section></div>
+ <div class="stack"><section class="panel"><div class="ph"><h2>Payments to Partnered Centers</h2><small>${p.length} waiting</small></div><div class="cwrap"><table><thead><tr><th>Request</th><th>Trainees</th><th class="r">Amount</th><th></th></tr></thead><tbody>
+ ${p.length?p.map((r)=>`<tr><td><b>${r.er}</b><small>Payment to ${r.ctr} · ${r.ch}</small></td><td>${r.ids.map((i)=>{const t=T.find((x)=>x.id===i);return `${t.n} · ${t.c} · ${peso(t.fee)}`}).join("<br>")}</td><td class="r amt">${peso(r.amt)}</td><td><div style="display:flex;gap:6px;justify-content:flex-end"><button class="btn okb" data-ok="${r.er}">Approve</button><button class="btn" style="color:var(--bad)" data-no="${r.er}">Reject</button></div></td></tr>`).join(""):`<tr><td colspan="4" style="color:var(--muted)">Nothing waiting. Switch "Working as" to Cashier and raise a payment first.</td></tr>`}
+ </tbody></table></div></section></div></div>`}
+function payables(){return `${head("Accounting","Payables")}<div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>Open Payables</h2></div><div class="lines"><div><span>Bills and fees</span><span>₱9,650.00</span></div><div><span>Agency rebates</span><span>₱1,200.00</span></div><div class="tot"><span>Partnered centers</span><span class="bad">${peso(owed())}</span></div><div><span>Agency shares owed</span><span>${peso(T.filter((t)=>t.agency&&t.rs==="received").reduce((a,t)=>a+t.share,0))}</span></div></div></section></div>
+ <div class="stack"><section class="panel"><div class="ph"><h2>Partnered Centers</h2><small>still owed</small></div><div class="cwrap"><table><thead><tr><th>Center</th><th>Trainees</th><th class="r">Owed</th></tr></thead><tbody>${centers.map((c)=>`<tr><td><b>${c}</b></td><td>${T.filter((t)=>t.ctr===c&&t.s!=="paid").length}</td><td class="r amt">${peso(owed(c))}</td></tr>`).join("")}</tbody></table></div></section></div></div>`}
+function rebates(){
+ const stateOf=(t)=>t.s!=="paid"?"wait":t.rs;
+ const due=T.filter((t)=>stateOf(t)==="due"),got=T.filter((t)=>stateOf(t)==="received"),wait=T.filter((t)=>stateOf(t)==="wait");
+ const sum=(l,k)=>l.reduce((a,t)=>a+t[k],0);
+ const pill=(t)=>{const st=stateOf(t);return st==="wait"?`<span class="pill dueo">After the center is paid</span>`:st==="due"?`<span class="pill due">Rebate Due</span>`:`<span class="pill paid">Received</span><small>${t.inc}</small>`};
+ const sharePill=(t)=>!t.agency?`<small>No referring agency · New Wave keeps all</small>`:stateOf(t)==="received"?`<span class="pill appr">Owed to ${t.agency}</span>`:`<small>${t.agency} · after the rebate</small>`;
+ return `${head(S.role==="Cashier"?"Accounting › Other Income":"Accounting","Endorsement Rebates")}
+ <div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>Rebates</h2><small>from the centers</small></div><div class="lines">
+  <div><span>Waiting for the center payment</span><span>${peso(sum(wait,"rb"))}</span></div><div><span>Rebate due from centers</span><span class="bad">${peso(sum(due,"rb"))}</span></div><div><span>Received this month</span><span>${peso(sum(got,"rb"))}</span></div>
+  <div class="tot"><span>Agency shares owed</span><span>${peso(got.filter((t)=>t.agency).reduce((a,t)=>a+t.share,0))}</span></div></div>
+  <p class="note">The rebate becomes due once New Wave has paid the center. Recording it as received makes the agency share owed (Payables › Agency rebates).</p></section>
+  <section class="panel"><div class="ph"><h2>Per Center</h2></div><div class="lines">${centers.map((c)=>`<div><span>${c}</span><span>${peso(due.filter((t)=>t.ctr===c).reduce((a,t)=>a+t.rb,0))} due</span></div>`).join("")}</div></section></div>
+ <div class="stack">${centers.map((ctr)=>{const l=T.filter((t)=>t.ctr===ctr);const dueHere=l.filter((t)=>stateOf(t)==="due");return `<section class="panel"><div class="ph"><h2>${ctr}</h2><small>Due <b class="mono">${peso(dueHere.reduce((a,t)=>a+t.rb,0))}</b></small></div>
+  <div class="cwrap"><table><thead><tr><th>Trainee</th><th>Course</th><th class="r">Paid to Center</th><th class="r">Rebate</th><th>Status</th><th class="r">Agency Share</th><th>Agency</th></tr></thead><tbody>
+  ${l.map((t)=>`<tr><td><b>${t.n}</b><small class="mono">${t.no}</small></td><td><b>${t.c}</b></td><td class="r amt">${t.s==="paid"?peso(t.fee):"—"}</td><td class="r amt">${peso(t.rb)}</td><td>${pill(t)}</td><td class="r amt">${t.agency?peso(t.share):"—"}</td><td>${sharePill(t)}</td></tr>`).join("")}</tbody></table></div>
+  <div class="foot"><span style="font-size:14.5px">${dueHere.length?`${dueHere.length} rebate${dueHere.length===1?"":"s"} due · <b class="mono">${peso(dueHere.reduce((a,t)=>a+t.rb,0))}</b>`:"No rebate due right now"}</span><button class="btn pri" data-recv="${ctr}" ${dueHere.length?"":"disabled"}>Record Rebate Received</button></div></section>`}).join("")}</div></div>`}
+function page(){if(S.role==="Cashier")return S.view==="Dashboard"?cashDash():S.view==="Expenses"?payCenters():S.view==="Other Income"?rebates():`${head("Cashier",S.view)}<section class="panel"><p class="note" style="padding:18px 20px">${S.view} stays as it is today.</p></section>`;
+ return S.view==="Approvals"?approvals():S.view==="Payables"?payables():S.view==="Rebates"?rebates():`${head("Accounting",S.view)}<section class="panel"><p class="note" style="padding:18px 20px">${S.view} stays as it is today. Open Approvals or Transactions › Payables.</p></section>`}
+function render(){document.getElementById("tabs").innerHTML=tabs();document.getElementById("page").innerHTML=page()}
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>el.hidden=true,3000)}
+document.getElementById("role").addEventListener("change",(e)=>{S.role=e.target.value;S.view=S.role==="Cashier"?"Expenses":"Approvals";S.menu=null;render()});
+document.addEventListener("change",(e)=>{if(e.target.dataset.pick){const i=+e.target.dataset.pick;S.picked.has(i)?S.picked.delete(i):S.picked.add(i);render()}});
+document.addEventListener("click",(e)=>{const b=e.target.closest("button");if(!b){if(S.menu){S.menu=null;render()}return}const k=b.dataset;
+ if(k.tab){const it=TABS[S.role].find((x)=>x[0]===k.tab);if(it[1]){S.menu=S.menu===k.tab?null:k.tab}else{S.view=k.tab;S.menu=null}}
+ else if(k.go){S.view=k.go;S.menu=null;if(k.go==="Expenses")S.sub="Pay the Centers"}else if(k.sub)S.sub=k.sub;else if(k.raise)S.form=k.raise;else if("cancel" in k)S.form=null;
+ else if(k.send){const ids=T.filter((t)=>t.ctr===k.send&&S.picked.has(t.id)&&open(t)).map((t)=>t.id);const er=`ER-2026-${String(S.er++).padStart(6,"0")}`;reqs.push({er,ctr:k.send,ids,amt:ids.reduce((a,i)=>a+T.find((t)=>t.id===i).fee,0),ch:document.getElementById("ch")?.value??"PSBank",status:"For Approval"});S.form=null;toast(`${er} sent to Accounting. Switch "Working as" to Accounting to approve it.`)}
+ else if(k.ok){const r=reqs.find((x)=>x.er===k.ok);r.status="Approved";r.cv=`CV-2026-${String(S.cv++).padStart(6,"0")}`;toast(`Approved: ${r.cv}. Switch back to Cashier to release it.`)}
+ else if(k.no){const r=reqs.find((x)=>x.er===k.no);r.status="Rejected";r.why="Rejected: wrong amount";toast("Rejected. The trainees are due again.")}
+ else if(k.rel)S.release=k.rel;else if(k.done){const r=reqs.find((x)=>x.er===k.done);r.status="Paid";for(const i of r.ids)Object.assign(T.find((x)=>x.id===i),{s:"paid",cv:r.cv,ch:r.ch,on:d(TODAY),rs:"due"});S.release=null;toast(`Released. ${r.ids.length} trainee${r.ids.length===1?"":"s"} paid to ${r.ctr}.`)}
+ else if(k.recv){let n=0;for(const t of T.filter((x)=>x.ctr===k.recv&&x.s==="paid"&&x.rs==="due")){t.rs="received";t.inc="INC-2026-0000"+(10+n++);}toast(`Recorded with the deposit slip as Other Income. Agency shares are now owed.`)}
+ else if(k.t){toast(k.t);return}else return;render()});
+render();
+</script>

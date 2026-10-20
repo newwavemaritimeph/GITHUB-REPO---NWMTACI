@@ -9,6 +9,7 @@ import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balanc
 import { requestFee } from "@/lib/request-fees";
 import type { CashierReportSnapshot } from "@/lib/documents";
 import { tcl } from "@/lib/title-case";
+import { PayTheCenters, centerLines } from "./pay-centers";
 
 /**
  * Cashier pieces of the registration workflow (Oct 2026):
@@ -435,6 +436,7 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
   return <div className="portal-page cx">
     <div className="cx-head"><div><span className="portal-eyebrow">{fmtDate(today)}</span><h1>Cashier Dashboard</h1></div></div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
+    {(() => { const due = centerLines(data).filter((l) => l.state === "Due"); return due.length ? <p className="ac-note fr-warn">⚠ {pesos2(due.reduce((s, l) => s + l.amount, 0))} due to partnered centers · {due.length} trainee{due.length === 1 ? "" : "s"} <span className="muted-text">Accounting › Expenses › Pay the Centers</span></p> : null; })()}
     {/* Cash Rail (owner's choice, 20 Oct 2026): the drawer, channels and the two actions on the left; the work on the right. */}
     <div className="ac-rail">
       <div className="ac-stack">
@@ -453,6 +455,9 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
             <div className="total"><dt>Net today</dt><dd className="eq">{pesos(totalToday - releasedToday)}</dd></div>
           </dl>
         </section>
+        {(() => { const paid = centerLines(data).filter((l) => l.state === "Paid"); const got = (data as unknown as { rebatesReceived?: Record<string, string> }).rebatesReceived ?? {}; const toCollect = paid.filter((l) => !got[l.e.id] && Number(l.e.rebate_centavos) > 0); return paid.length ? <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Rebates to Collect</h2><span className="muted-text">from centers</span></div>
+          <dl className="ac-lines"><div><dt>To collect · {toCollect.length}</dt><dd className="minus">{pesos2(toCollect.reduce((s, l) => s + Number(l.e.rebate_centavos), 0))}</dd></div></dl>
+          {go && <div className="cr-act"><button type="button" className="portal-secondary" onClick={() => go("Other income")}>Open Rebates</button></div>}</section> : null; })()}
         <button type="button" className="cr-big cr-pay" onClick={() => onPay("")}><b>Record Payment</b><small>{fresh.length} waiting to pay</small></button>
         <button type="button" className="cr-big cr-exp" onClick={() => setRaising(true)}><b>Raise Expense</b><small>Sent to Accounting for approval</small></button>
       </div>
@@ -824,7 +829,8 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   const today = manilaToday();
   const canDecide = role === "accounting" || role === "admin";
   const isManager = role === "accounting";
-  const [view, setView] = useState<"Expenses" | "Vouchers">("Expenses");
+  const [view, setView] = useState<"Expenses" | "Vouchers" | "Pay the Centers">("Expenses");
+  const centersDue = centerLines(data).filter((l) => l.state === "Due").length;
   const [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today);
   const [tab, setTab] = useState<(typeof EXPENSE_STATUSES)[number]>(canDecide ? "For approval" : "All");
   const [recording, setRecording] = useState(false);
@@ -858,7 +864,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
 
   return <div className="portal-page cx">
     <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Expenses</h1></div><button type="button" className="portal-primary" onClick={() => setRecording(true)}>Record Expense</button></div>
-    <div className="cx-status cx-views" role="tablist">{(["Expenses", "Vouchers"] as const).map((v) => <button key={v} type="button" role="tab" aria-selected={view === v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{v}{v === "Vouchers" && pendingReprints.length ? <span>{pendingReprints.length}</span> : null}</button>)}</div>
+    <div className="cx-status cx-views" role="tablist">{(["Expenses", "Vouchers", "Pay the Centers"] as const).map((v) => <button key={v} type="button" role="tab" aria-selected={view === v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{v}{v === "Pay the Centers" && centersDue > 0 && <span className="cx-count"> {centersDue}</span>}{v === "Vouchers" && pendingReprints.length ? <span>{pendingReprints.length}</span> : null}</button>)}</div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
 
     {view === "Expenses" && <>
@@ -890,6 +896,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
       </tbody></table></div> : <p className="portal-empty-copy">No expenses in this view.</p>}</section>
     </>}
 
+    {view === "Pay the Centers" && <PayTheCenters data={data} reload={reload} onRelease={(id) => { const e = byId.get(id); if (e) setReleasing(e); }} />}
     {view === "Vouchers" && <>
       {pendingReprints.length > 0 && <section className="portal-panel cx-panel">
         <div className="panel-heading"><h2>Reprint Requests</h2></div>

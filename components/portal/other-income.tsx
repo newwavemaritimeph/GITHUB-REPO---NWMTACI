@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { PortalData } from "../portal-live-app";
 import { first, manilaToday, pesos2 } from "@/lib/portal-format";
 import { Badge, Message, fmtDate, usePost as useRawPost, usePaged } from "./shared-ui";
+import { centerPaymentsOf, paymentFor } from "./pay-centers";
 import { shrinkPhoto } from "./live-cashier";
 
 /**
@@ -47,7 +48,11 @@ export function OtherIncome({ data, reload, canRecord, canVoid }: { data: Portal
     return { e, partner: first(o?.partner_centers)?.name ?? "Partner center", trainee: t ? `${t.legal_last_name}, ${t.legal_first_name}` : "—", number: t?.trainee_number ?? "", course: c?.name ?? "—", date: b?.starts_on ?? e.scheduled_on ?? null, rebate: Number(e.rebate_centavos), income: received[e.id] ?? null };
   });
   const partners = [...new Set(endorsed.map((r) => r.partner))].sort();
-  const due = endorsed.filter((r) => !r.income);
+  // Rebates are collected after New Wave has paid the center (owner, 20 Oct 2026), once center payments are tracked (202610200051).
+  const tracked = centerPaymentsOf(data).length > 0, pays = paymentFor(data);
+  const centerPaid = (id: string) => !tracked || pays.get(id)?.status === "Paid";
+  const shareOf = (e: (typeof endorsed)[number]["e"]) => Number((e as { agency_share_centavos?: number }).agency_share_centavos ?? 0);
+  const due = endorsed.filter((r) => !r.income && centerPaid(r.e.id));
   const chosen = endorsed.filter((r) => picked.has(r.e.id));
   const chosenPartners = [...new Set(chosen.map((r) => r.partner))];
   const chosenTotal = chosen.reduce((s, r) => s + r.rebate, 0);
@@ -117,15 +122,16 @@ export function OtherIncome({ data, reload, canRecord, canVoid }: { data: Portal
 
     {tab === "Endorsement Rebates" ? <section className="portal-panel cx-panel">
       <div className="panel-heading"><h2>Endorsement Rebates</h2><small>{canRecord ? "Tick the trainees the partner paid for, then Record Received" : "View only"}</small></div>
-      {partners.length ? partners.map((p) => { const rows = endorsed.filter((r) => r.partner === p); const pd = rows.filter((r) => !r.income); return <div key={p} className="oi-partner">
+      {partners.length ? partners.map((p) => { const rows = endorsed.filter((r) => r.partner === p); const pd = rows.filter((r) => !r.income && centerPaid(r.e.id)); return <div key={p} className="oi-partner">
         <div className="oi-partner-head"><b>{p}</b><span className="cx-mono">{pd.length ? `${pesos2(pd.reduce((s, r) => s + r.rebate, 0))} due · ${pd.length}` : "All received"}</span></div>
-        <div className="portal-table"><table><thead><tr>{canRecord && <th />}<th>Trainee</th><th>Course</th><th>Training Date</th><th className="r">Rebate</th><th>Status</th></tr></thead><tbody>
+        <div className="portal-table"><table><thead><tr>{canRecord && <th />}<th>Trainee</th><th>Course</th><th>Training Date</th><th className="r">Rebate</th><th>Status</th><th className="r">Agency Share</th></tr></thead><tbody>
           {rows.map((r) => <tr key={r.e.id} className={picked.has(r.e.id) ? "oi-sel" : r.income ? "oi-done" : ""}>
-            {canRecord && <td>{!r.income && <input type="checkbox" aria-label={`Select ${r.trainee}`} checked={picked.has(r.e.id)} onChange={() => { const next = new Set(picked); if (next.has(r.e.id)) next.delete(r.e.id); else next.add(r.e.id); setPicked(next); setForm(null); }} />}</td>}
+            {canRecord && <td>{!r.income && centerPaid(r.e.id) && <input type="checkbox" aria-label={`Select ${r.trainee}`} checked={picked.has(r.e.id)} onChange={() => { const next = new Set(picked); if (next.has(r.e.id)) next.delete(r.e.id); else next.add(r.e.id); setPicked(next); setForm(null); }} />}</td>}
             <td><strong>{r.trainee}</strong><small className="tc-mono">{r.number} · {r.e.enrollment_number}</small></td>
             <td>{r.course}</td><td className="tc-nowrap">{r.date ? fmtDate(r.date) : "—"}</td>
             <td className="r cx-mono"><strong>{pesos2(r.rebate)}</strong></td>
-            <td>{r.income ? <><Badge tone="green">Received</Badge><small className="tc-mono">{r.income}</small></> : <Badge tone="orange">Due</Badge>}</td>
+            <td>{r.income ? <><Badge tone="green">Received</Badge><small className="tc-mono">{r.income}</small></> : centerPaid(r.e.id) ? <Badge tone="red">To Collect</Badge> : <><Badge tone="orange">Waiting</Badge><small>after New Wave pays the center</small></>}</td>
+            <td className="r cx-mono">{shareOf(r.e) ? <>{pesos2(shareOf(r.e))}<small>{r.income ? "owed to the agency" : "after the rebate"}</small></> : "—"}</td>
           </tr>)}
         </tbody></table></div>
       </div>; }) : <p className="portal-empty-copy">No endorsed trainee with a rebate yet. Rebates come from each endorsed course&apos;s rebate in Endorsed Rates.</p>}
