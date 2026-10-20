@@ -271,18 +271,16 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
   </div>;
 }
 
-/** Templates: the Google Drive link of each course's template and, for Google Classroom courses, the evaluation form. */
+/** Certificate Templates (owner, 20 Oct 2026): one compact list; View shows the template with its description and blank details. */
 export function CertificateTemplates({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   // Every New Wave course, with an uploaded PDF template (owner, 9 Oct 2026). The newest upload is the active one.
-  const d = data as CertData;
-  const { busy, msg, setMsg, post } = usePost(reload);
-  const [q, setQ] = useState(""), [missing, setMissing] = useState(false), [uploading, setUploading] = useState<string | null>(null);
-  const [forms, setForms] = useState<Record<string, string>>({});
+  const { msg, setMsg } = usePost(reload);
+  const [q, setQ] = useState(""), [show, setShow] = useState<"All" | "With Template" | "No Template">("All"), [uploading, setUploading] = useState<string | null>(null);
   const templates = data.certificateTemplates as unknown as Template[];
   const active = new Map(templates.filter((t) => t.active).map((t) => [t.course_id, t]));
   const all = data.courses.filter((c) => c.delivery_type === "In-House" && (c as { active?: boolean }).active !== false);
   const term = q.trim().toLowerCase();
-  const courses = all.filter((c) => (!term || `${c.code} ${c.name}`.toLowerCase().includes(term)) && (!missing || !active.has(c.id))).sort((a, b) => a.name.localeCompare(b.name));
+  const courses = all.filter((c) => (!term || `${c.code} ${c.name}`.toLowerCase().includes(term)) && (show === "All" || (show === "With Template") === active.has(c.id))).sort((a, b) => a.name.localeCompare(b.name));
   const withTemplate = all.filter((c) => active.has(c.id)).length;
   async function upload(courseId: string, file: File | undefined) {
     if (!file) return;
@@ -331,36 +329,27 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
     const done = rows.filter((r) => r.result === "Uploaded").length, failed = rows.filter((r) => r.courseId && r.result !== "Uploaded").length, skipped = rows.filter((r) => !r.courseId).length;
     setMsg({ kind: failed ? "error" : "success", text: `${done} template${done === 1 ? "" : "s"} uploaded and now in use.${failed ? ` ${failed} failed: see the list.` : ""}${skipped ? ` ${skipped} skipped (no course).` : ""}` });
   }
-  async function view(id: string) {
-    const win = window.open("", "_blank");
-    const r = await fetch(`/api/staff/certificate-templates/${id}`, { cache: "no-store" });
-    const body = await r.json().catch(() => ({}));
-    if (win) { if (body.url) win.location.href = body.url; else win.close(); }
-    if (!body.url) setMsg({ kind: "error", text: body.error ?? "The template could not be opened." });
-  }
+  // The template with its course description; name, dates, numbers and QR left blank.
+  const view = (id: string) => window.open(`/api/staff/certificate-templates/${id}?view=1`, "_blank", "noopener");
   const group = (label: string, rows: typeof courses) => rows.length ? <div key={label}>
-    <p className="tp-group"><b>{label} Courses</b><span>{rows.length}</span></p>
-    <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th>Template (PDF)</th><th>Evaluation Form in Classroom (For Matching)</th><th /></tr></thead><tbody>
-      {rows.map((c) => { const t = active.get(c.id); const uploaded = t && t.storage_path; const form = forms[c.id] ?? (d.evaluationForms?.[c.id] ? `https://docs.google.com/forms/d/${d.evaluationForms[c.id]}/edit` : ""); return <tr key={c.id}>
-        <td><b>{c.name}</b><small className="cl-sub cl-block cl-mono">{c.code}</small></td>
-        <td>{uploaded ? <Badge tone="green">{`Version ${t.version}${t.approved_at ? ` · ${fmtDate(day(t.approved_at) ?? "")}` : ""}`}</Badge> : t ? <Badge tone="orange">Drive link only · upload the PDF</Badge> : <Badge tone="orange">No template yet</Badge>}</td>
-        <td><span className="cl-field"><input aria-label={`Evaluation form for ${c.name}`} value={form} onChange={(e) => setForms({ ...forms, [c.id]: e.target.value })} placeholder="https://docs.google.com/forms/d/…/edit (optional)" /><button type="button" className="portal-secondary" disabled={busy || forms[c.id] === undefined} onClick={() => void post({ action: "course-evaluation-form-save", courseId: c.id, formLink: forms[c.id] ?? "" }, forms[c.id] ? "Evaluation form saved. Certificates for this course now need it." : "Evaluation form removed.").then(() => setForms((f) => { const n = { ...f }; delete n[c.id]; return n; })).catch(() => undefined)}>Save</button></span>
-          <small className="cl-sub cl-block">{d.evaluationForms?.[c.id] ? "Required before printing" : "Not required"}</small></td>
-        <td><span className="cl-acts">{uploaded && <button type="button" className="portal-secondary" onClick={() => void view(t.id)}>View Blank</button>}<label className={uploaded ? "portal-secondary tp-upload" : "portal-primary tp-upload"}>{uploading === c.id ? "Uploading…" : uploaded ? "Replace PDF" : "Upload PDF"}<input type="file" accept="application/pdf" hidden disabled={!!uploading} onChange={(e) => { void upload(c.id, e.target.files?.[0]); e.target.value = ""; }} /></label></span></td>
-      </tr>; })}
-    </tbody></table></div></div> : null;
+    <p className="tp-group"><b>{label} Courses</b><span>{rows.filter((c) => active.has(c.id)).length} of {rows.length} with template</span></p>
+    <div className="tpl-list">{rows.map((c) => { const t = active.get(c.id); const uploaded = !!t?.storage_path; return <div key={c.id} className="tpl-row">
+      <div className="tpl-name"><b>{c.name}</b><small className="cl-mono">{c.code}</small></div>
+      <div>{uploaded ? <Badge tone="green">{`Template · v${t!.version}${t!.approved_at ? ` · ${fmtDate(day(t!.approved_at) ?? "")}` : ""}`}</Badge> : <Badge tone="orange">No Template Yet</Badge>}</div>
+      <span className="cl-acts">{uploaded && <button type="button" className="portal-secondary" onClick={() => view(t!.id)}>View</button>}<label className={uploaded ? "portal-secondary tp-upload" : "portal-primary tp-upload"}>{uploading === c.id ? "Uploading…" : uploaded ? "Replace PDF" : "Upload PDF"}<input type="file" accept="application/pdf" hidden disabled={!!uploading} onChange={(e) => { void upload(c.id, e.target.files?.[0]); e.target.value = ""; }} /></label></span>
+    </div>; })}</div></div> : null;
   return <div className="portal-page cx ac">
-    <Head title="Templates" note="Upload each course's certificate template as a PDF, or pick many at once: each file is matched to its course by the course code in its name. A new upload replaces the one in use; earlier versions are kept. View shows the blank template: the course description, name, dates, numbers and QR are written on when a certificate is printed, so use Preview in Certificates to see a filled one." />
+    <Head title="Templates" note="View shows each template with its course description; the trainee's name, training dates, issue date, Certificate No., Registration No. and QR are filled in when a certificate is printed. A new upload replaces the one in use; earlier versions are kept." />
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Setup</h2></div>
-          <dl className="ac-lines"><div><dt>Courses with a template</dt><dd>{withTemplate} of {all.length}</dd></div><div><dt>Courses with an evaluation form</dt><dd>{Object.keys(d.evaluationForms ?? {}).length}</dd></div><div><dt>Printing</dt><dd className={data.certificateIssuanceEnabled ? "plus" : "warn"}>{data.certificateIssuanceEnabled ? "On" : "Off"}</dd></div></dl>
-          <p className="ac-foot">Trainees open the evaluation form from their Google Classroom classwork; nothing is sent from here. Paste the same form link so the portal knows which course a submission belongs to.</p>
+          <dl className="ac-lines"><div><dt>Courses with a template</dt><dd>{withTemplate} of {all.length}</dd></div><div><dt>Without a template</dt><dd className={all.length - withTemplate ? "warn" : undefined}>{all.length - withTemplate}</dd></div><div><dt>Printing</dt><dd className={data.certificateIssuanceEnabled ? "plus" : "warn"}>{data.certificateIssuanceEnabled ? "On" : "Off"}</dd></div></dl>
+          <p className="ac-foot">The training evaluation is sent to trainees by email, so no form link is needed here.</p>
         </section>
       </div>
       <section className="portal-panel cx-panel">
-        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search any course by name or code" /><label className="tp-filter"><input type="checkbox" checked={missing} onChange={(e) => setMissing(e.target.checked)} /> Without template</label>
+        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search any course by name or code" /><span className="cx-seg">{(["All", "With Template", "No Template"] as const).map((f) => <button key={f} type="button" className={show === f ? "on" : ""} onClick={() => setShow(f)}>{f}</button>)}</span>
           <label className="portal-primary tp-upload">Upload Many PDFs<input type="file" accept="application/pdf,application/json,.json" multiple hidden disabled={bulkBusy} onChange={(e) => { pickMany(e.target.files); e.target.value = ""; }} /></label></div>
         {bulk && <div className="tp-bulk">
           <p className="tp-group"><b>Check the Matches</b><span>{bulk.filter((r) => r.courseId).length} of {bulk.length} matched</span></p>

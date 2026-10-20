@@ -1,4 +1,7 @@
 import { NextResponse } from "next/server";
+import { PDFDocument } from "pdf-lib";
+import { drawTemplateFields, isFieldsV2 } from "@/lib/certificate-overlay";
+import { bundledLayout } from "@/lib/certificate-template-layouts";
 import { detectPhotoBox } from "@/lib/certificate-template";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -10,13 +13,32 @@ export const runtime = "nodejs";
 // Returns a short-lived signed URL + metadata for a certificate template, so the
 // browser can fetch the template file to render a certificate PDF client-side.
 // Training Operations / Admin only.
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const staff = await requireStaff(["admin", "releasing_officer"]);
   if (!staff) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   const { id } = await params;
   const db = createSupabaseAdminClient();
   const { data: template } = await db.from("certificate_templates").select("id,storage_path,fields").eq("id", id).maybeSingle();
   if (!template) return NextResponse.json({ error: "Template not found." }, { status: 404 });
+  // ?view=1 (owner, 20 Oct 2026): the template as a PDF with its course description, the dates,
+  // name, numbers and QR left blank, for checking a template before any certificate is printed.
+  if (new URL(request.url).searchParams.get("view") === "1") {
+    const { data: file } = await db.storage.from("certificate-templates").download(template.storage_path);
+    if (!file) return NextResponse.json({ error: "The template file could not be read." }, { status: 404 });
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const fields = bundledLayout(template.storage_path) ?? (isFieldsV2(template.fields) ? template.fields : null);
+    let out: Uint8Array = bytes;
+    if (template.storage_path.toLowerCase().endsWith(".pdf") && fields) {
+      const src = await PDFDocument.load(bytes), pdf = await PDFDocument.create();
+      const [copied] = await pdf.copyPages(src, [0]);
+      const page = pdf.addPage([copied.getWidth(), copied.getHeight()]);
+      page.drawPage(await pdf.embedPage(copied), { x: 0, y: 0, width: copied.getWidth(), height: copied.getHeight() });
+      await drawTemplateFields(pdf, page, fields, { name: "", startsOn: null, endsOn: null, issuedOn: "", certificateNumber: "", registrationNumber: "", verifyUrl: null, blank: true });
+      out = await pdf.save();
+    }
+    const pdfOut = template.storage_path.toLowerCase().endsWith(".pdf");
+    return new Response(Buffer.from(out), { headers: { "content-type": pdfOut ? "application/pdf" : "image/png", "content-disposition": "inline; filename=\"template-view.pdf\"", "cache-control": "no-store" } });
+  }
   const { data, error } = await db.storage.from("certificate-templates").createSignedUrl(template.storage_path, 3600);
   if (error || !data) return NextResponse.json({ error: error?.message ?? "Could not create a template link." }, { status: 400 });
   const isPdf = template.storage_path.toLowerCase().endsWith(".pdf");

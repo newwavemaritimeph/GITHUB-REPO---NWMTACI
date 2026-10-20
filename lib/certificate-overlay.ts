@@ -19,7 +19,9 @@ export type TemplateFieldsV2 = {
   /** A template whose hours line was left blank (CSF "[__] Hours"): covered and printed. */
   hours?: { cx: number; y: number; size: number; text: string; cover: { x: number; y: number; w: number; h: number } };
 };
-export type OverlayFill = { name: string; startsOn: string | null; endsOn: string | null; issuedOn: string; certificateNumber: string; registrationNumber: string; verifyUrl: string | null; copyNo?: number };
+export type OverlayFill = { name: string; startsOn: string | null; endsOn: string | null; issuedOn: string; certificateNumber: string; registrationNumber: string; verifyUrl: string | null; copyNo?: number;
+  /** Template view (owner, 20 Oct 2026): the description with blank dates, a "TRAINEE NAME" guide, no numbers or QR. */
+  blank?: boolean };
 
 export const isFieldsV2 = (f: unknown): f is TemplateFieldsV2 => !!f && typeof f === "object" && (f as { version?: unknown }).version === 2;
 
@@ -43,13 +45,14 @@ export function issuedText(text: string, issuedOn: string) {
 export async function drawTemplateFields(pdf: PDFDocument, page: PDFPage, f: TemplateFieldsV2, fill: OverlayFill) {
   const reg = await pdf.embedFont(StandardFonts.TimesRoman), bold = await pdf.embedFont(StandardFonts.TimesRomanBold);
   if (f.name) {
-    const font = f.name.bold === false ? reg : bold, name = safe(fill.name.toUpperCase());
+    const font = f.name.bold === false ? reg : bold, name = fill.blank ? "TRAINEE NAME" : safe(fill.name.toUpperCase());
     let size = f.name.size;
     while (size > 10 && font.widthOfTextAtSize(name, size) > f.name.maxW) size -= 0.5;
-    page.drawText(name, { x: f.name.cx - font.widthOfTextAtSize(name, size) / 2, y: f.name.y, size, font, color: INK });
+    page.drawText(name, { x: f.name.cx - font.widthOfTextAtSize(name, size) / 2, y: f.name.y, size, font, color: fill.blank ? rgb(0.72, 0.76, 0.8) : INK });
   }
   if (f.conducted) {
-    const text = safe(conductedText(f.conducted.text, fill.startsOn, fill.endsOn)).replace(/\s+/g, " ");
+    const filled = fill.blank ? f.conducted.text.replace(/\[(START DATE|END DATE|DATE)\]/g, "________________") : conductedText(f.conducted.text, fill.startsOn, fill.endsOn);
+    const text = safe(filled).replace(/\s+/g, " ");
     if (f.conducted.align === 3) justified(page, text, f.conducted.x, f.conducted.y, f.conducted.w, f.conducted.leading, f.conducted.size, reg);
     else {
       // Left or centred: wrap at the paragraph width.
@@ -59,21 +62,21 @@ export async function drawTemplateFields(pdf: PDFDocument, page: PDFPage, f: Tem
     }
   }
   if (f.issued) {
-    const text = safe(issuedText(f.issued.text, fill.issuedOn));
+    const text = safe(fill.blank ? f.issued.text : issuedText(f.issued.text, fill.issuedOn));
     page.drawText(text, { x: f.issued.cx - reg.widthOfTextAtSize(text, f.issued.size) / 2, y: f.issued.y, size: f.issued.size, font: reg, color: INK });
   }
   if (f.hours) {
     page.drawRectangle({ ...f.hours.cover, width: f.hours.cover.w, height: f.hours.cover.h, color: rgb(1, 1, 1) });
     page.drawText(f.hours.text, { x: f.hours.cx - bold.widthOfTextAtSize(f.hours.text, f.hours.size) / 2, y: f.hours.y, size: f.hours.size, font: bold, color: INK });
   }
-  if (f.certNo && fill.certificateNumber) page.drawText(safe(fill.certificateNumber), { x: f.certNo.x, y: f.certNo.y, size: f.certNo.size, font: reg, color: INK });
-  if (f.regNo && fill.registrationNumber) page.drawText(safe(fill.registrationNumber), { x: f.regNo.x, y: f.regNo.y, size: f.regNo.size, font: reg, color: INK });
+  if (f.certNo && fill.certificateNumber && !fill.blank) page.drawText(safe(fill.certificateNumber), { x: f.certNo.x, y: f.certNo.y, size: f.certNo.size, font: reg, color: INK });
+  if (f.regNo && fill.registrationNumber && !fill.blank) page.drawText(safe(fill.registrationNumber), { x: f.regNo.x, y: f.regNo.y, size: f.regNo.size, font: reg, color: INK });
   // A reprint says so under the numbers (owner's QR plan, 20 Oct 2026).
   if (fill.copyNo && fill.copyNo > 1) {
     const at = f.regNo ?? f.certNo;
     if (at) page.drawText(`REPRINT - COPY ${fill.copyNo}`, { x: at.x, y: at.y - at.size * 1.25, size: Math.max(6, at.size - 1.5), font: bold, color: rgb(0.45, 0.1, 0.05) });
   }
-  if (f.qr && fill.verifyUrl) {
+  if (f.qr && fill.verifyUrl && !fill.blank) {
     // Generated at print, never stored: error correction M, quiet zone 1, 600 px.
     const png = await QRCode.toBuffer(fill.verifyUrl, { errorCorrectionLevel: "M", margin: 1, width: 600, type: "png" });
     const img = await pdf.embedPng(new Uint8Array(png));
