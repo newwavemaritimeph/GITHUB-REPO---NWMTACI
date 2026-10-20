@@ -590,7 +590,8 @@ function Register() {
     <section className="inside-page registration-page ql-page">
       <div className="registration-intro">
         <span className="eyebrow">Online registration</span>
-        <h1>Apply for training in a few short sections.</h1>
+        <h1 className="reg-headline">Enroll with New Wave Maritime</h1>
+        <p className="reg-tagline">Ride the New Wave of Maritime Excellence today!</p>
         <p>
           Enter your details once and choose up to 5 courses with their schedules. Our Registration team checks your requirements
           and payment, then enrolls you. You will receive a summary of your trainings and a reference to track your application.

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Inter, Geist, Geist_Mono, Source_Serif_4, Outfit } from "next/font/google";
+import { Inter, Geist, Geist_Mono, Source_Serif_4, Outfit, Montserrat, Caveat } from "next/font/google";
 import "./globals.css";
 import "./catalog.css";
 import "./portal-legacy.css";
@@ -37,6 +37,9 @@ const portalSans = Geist({ variable: "--font-portal", subsets: ["latin"], displa
 const portalNumerals = Geist_Mono({ variable: "--font-num", subsets: ["latin"], display: "swap" });
 // Registration form headings ("Quiet Checklist" direction). Variable font.
 const formDisplay = Outfit({ variable: "--font-form", subsets: ["latin"], display: "swap" });
+// Registration page heading (owner, 20 Oct 2026: design 4): Montserrat headline, Caveat tagline. Both variable fonts.
+const headline = Montserrat({ variable: "--font-headline", subsets: ["latin"], display: "swap" });
+const handwritten = Caveat({ variable: "--font-hand", subsets: ["latin"], display: "swap" });
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -69,7 +72,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${interSans.variable} ${geistMono.variable} ${sourceSerif.variable} ${portalSans.variable} ${portalNumerals.variable} ${formDisplay.variable} antialiased`}>
+      <body className={`${interSans.variable} ${geistMono.variable} ${sourceSerif.variable} ${portalSans.variable} ${portalNumerals.variable} ${formDisplay.variable} ${headline.variable} ${handwritten.variable} antialiased`}>
         {children}
       </body>
     </html>

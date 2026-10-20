@@ -6756,3 +6756,7 @@ a[href^="mailto:"],
 .public-footer div > a{font-size:14px;line-height:1.45}
 @media (max-width:900px){.section{padding:72px 22px}.inside-page{padding:44px 20px 72px}.public-footer{grid-template-columns:1fr 1fr;gap:32px}}
 @media (max-width:560px){.section{padding:56px 16px}.inside-page{padding:32px 16px 60px}.inside-hero{margin-bottom:28px}.search-card,.contact-form,.login-card,.signin-card{padding:22px 18px}.status-result{padding:20px 18px}.dr-main{padding:20px 18px}.dr-side{padding:20px}.public-footer{grid-template-columns:1fr;gap:26px;padding:40px 18px}}
+
+/* Registration heading (owner, 20 Oct 2026, design 4): bold uppercase Montserrat with a handwritten orange Caveat tagline. */
+.registration-page.ql-page .registration-intro h1.reg-headline { font-family: var(--font-headline), var(--font-ui), sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: -0.01em; line-height: 1.04; font-size: clamp(30px, 5vw, 54px); color: var(--blue-dark); text-wrap: balance; margin-bottom: 0; }
+.registration-page.ql-page .registration-intro p.reg-tagline { font-family: var(--font-hand), cursive; font-weight: 700; font-size: clamp(28px, 4vw, 42px); line-height: 1.1; color: var(--orange); margin: 6px 0 14px; display: inline-block; transform: rotate(-1.5deg); }
