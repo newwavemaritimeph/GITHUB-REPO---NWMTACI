@@ -22,15 +22,17 @@ const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v)
  * batch dates and an Open/Full flag leave the server (seat counts stay internal) (no prices, rebates or partner data).
  */
 export async function GET() {
-  if (!isSupabaseConfigured()) return NextResponse.json({ stcw: [], inHouse: [] });
+  if (!isSupabaseConfigured()) return NextResponse.json({ stcw: [], inHouse: [], other: [] });
   const db = createSupabaseAdminClient();
   const now = new Date();
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(now);
-  const [courses, batches] = await Promise.all([
+  const [courses, batches, offers] = await Promise.all([
     db.from("courses").select("id,code,name,duration_label,duration_days,training_mode,course_categories(name)").eq("active", true).eq("delivery_type", "In-House").order("name"),
     db.from("batches").select("id,batch_number,course_id,starts_on,ends_on,capacity,confirmed_count,status,courses!inner(code,delivery_type)")
       .in("status", ["Open", "Full"]).not("published_at", "is", null).gte("ends_on", today).gt("enrollment_deadline", now.toISOString())
       .in("courses.code", [...PUBLIC_STCW_CODES]).order("starts_on"),
+    // Other STCW Courses (owner, 20 Oct 2026): courses a partnered center offers; never the center, fee or rebate.
+    db.from("partner_course_offers").select("courses!inner(code,name,active,public_visible)").eq("active", true).eq("courses.active", true).eq("courses.public_visible", true),
   ]);
   if (courses.error || batches.error) {
     console.error("Public catalog failed:", courses.error?.message ?? batches.error?.message);
@@ -53,5 +55,6 @@ export async function GET() {
   // Every New Wave in-house course runs online (owner, 7 Oct 2026).
   const inHouse = courses.data.filter((c) => !stcwCodes.has(c.code)).map((c) => ({ ...shape(c), modality: "Online" })).filter((c) => !STCW_CATEGORIES.has(c.category) && !/stcw|domestic/i.test(c.category))
     .filter((c) => { const keys = [`code:${c.code.trim().toUpperCase()}`, `name:${c.name.trim().toLowerCase().replace(/\s+/g, " ")}`]; if (keys.some((k) => seen.has(k))) return false; keys.forEach((k) => seen.add(k)); return true; });
-  return NextResponse.json({ stcw, inHouse }, { headers: { "Cache-Control": "no-store" } });
+  const other = [...new Map(((offers.error ? [] : offers.data) ?? []).map((o) => first(o.courses as { code: string; name: string } | { code: string; name: string }[] | null)).filter((c): c is { code: string; name: string } => !!c).map((c) => [c.code, { code: c.code, name: c.name }])).values()].sort((a, b) => a.name.localeCompare(b.name));
+  return NextResponse.json({ stcw, inHouse, other }, { headers: { "Cache-Control": "no-store" } });
 }

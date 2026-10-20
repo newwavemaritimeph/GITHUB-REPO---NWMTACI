@@ -43,7 +43,7 @@ export default async function AdmissionRecordPage({ params }: { params: Promise<
 
   const [traineeRes, enrollRes, chargeRes, allocRes, officerRes] = await Promise.all([
     db.from("trainees").select("trainee_number,legal_first_name,legal_middle_name,legal_last_name,suffix,srn,rank,mobile,company,application_number").eq("id", record.trainee_id).maybeSingle(),
-    db.from("enrollments").select("id,enrollment_number,enrollment_status,selling_price_centavos,created_at,batch_id,courses(code,name),batches(batch_number,starts_on,ends_on,daily_start,daily_end,venue)").in("id", ids),
+    db.from("enrollments").select("id,enrollment_number,enrollment_status,selling_price_centavos,created_at,batch_id,scheduled_on,courses(code,name),partner_course_offers(partner_centers(name)),batches(batch_number,starts_on,ends_on,daily_start,daily_end,venue)").in("id", ids),
     db.from("enrollment_charges").select("enrollment_id,description,amount_centavos,event_type,valid").in("enrollment_id", ids).eq("valid", true),
     db.from("payment_allocations").select("enrollment_id,amount_centavos,payments(id,payment_number,received_at,method,reference_number,valid,cashier_id)").in("enrollment_id", ids),
     record.issued_by ? db.from("profiles").select("complete_name").eq("id", record.issued_by).maybeSingle() : Promise.resolve({ data: null }),
@@ -73,7 +73,9 @@ export default async function AdmissionRecordPage({ params }: { params: Promise<
 
   const courses = (enrollRes.data ?? [])
     .map((e) => { const c = one(e.courses as { code: string; name: string } | { code: string; name: string }[] | null); const b = one(e.batches as unknown as BatchRow | BatchRow[] | null);
-      return { id: e.id, code: c?.code ?? "", name: c?.name ?? "Course", start: b?.starts_on ?? null, dates: trainingDates(b?.starts_on, b?.ends_on), time: b ? `${hhmm(b.daily_start) || "8:00"}–${hhmm(b.daily_end) || "17:00"}` : "—", room: (e.batch_id && roomByBatch.get(e.batch_id)) || b?.venue || "To be assigned", fee: Number(e.selling_price_centavos) }; })
+      const center = one(one(e.partner_course_offers as unknown as { partner_centers: unknown } | { partner_centers: unknown }[] | null)?.partner_centers as { name: string } | { name: string }[] | null)?.name;
+      const day = (e as { scheduled_on?: string | null }).scheduled_on ?? null;
+      return { id: e.id, code: c?.code ?? "", name: center ? `${c?.name ?? "Course"} · ${center}` : c?.name ?? "Course", start: b?.starts_on ?? day, dates: b ? trainingDates(b.starts_on, b.ends_on) : trainingDates(day ?? undefined, day ?? undefined), time: b ? `${hhmm(b.daily_start) || "8:00"}–${hhmm(b.daily_end) || "17:00"}` : "—", room: (e.batch_id && roomByBatch.get(e.batch_id)) || b?.venue || center || "To be assigned", fee: Number(e.selling_price_centavos) }; })
     .sort((a, b) => (a.start ?? "9999").localeCompare(b.start ?? "9999"));
 
   const misc = (chargeRes.data ?? []).filter((c) => c.event_type !== "discount").map((c) => ({ label: c.description as string, amount: Number(c.amount_centavos) }));

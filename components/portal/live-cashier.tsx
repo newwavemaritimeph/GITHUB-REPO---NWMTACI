@@ -162,7 +162,8 @@ const needsReference = (data: PortalData, method: string) => !!data.paymentMetho
 const traineeName = (e: Enrollment) => { const t = first(e.trainees); return t ? fullName(t) : e.enrollment_number; };
 const paidOf = (e: Enrollment) => Number(e.paid_centavos ?? 0);
 const scheduleText = (e: Enrollment) => { const b = first(e.batches); return b ? `${fmtDate(b.starts_on)}${b.ends_on !== b.starts_on ? ` – ${fmtDate(b.ends_on)}` : ""}` : e.scheduled_on ? fmtDate(e.scheduled_on) : "No schedule yet"; };
-const courseCode = (e: Enrollment) => first(e.courses)?.code ?? first(e.courses)?.name ?? "Course";
+const centerOf = (e: Enrollment) => first(first((e as { partner_course_offers?: unknown }).partner_course_offers as { partner_centers?: unknown } | null)?.partner_centers as { name?: string } | null)?.name ?? "";
+const courseCode = (e: Enrollment) => { const code = first(e.courses)?.code ?? first(e.courses)?.name ?? "Course"; const c = centerOf(e); return c ? `${code} · ${c}` : code; };
 const toCentavos = (v: string) => { const n = Math.round(Number(String(v).replace(/,/g, "")) * 100); return Number.isFinite(n) && n > 0 ? n : 0; };
 const MODE_COLORS: Record<string, string> = { Cash: "#0a7a3e", GCash: "#0571D0", PSBank: "#123F63", UnionBank: "#F25615", Cheque: "#5d6f7e" };
 

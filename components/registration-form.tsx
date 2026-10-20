@@ -38,9 +38,11 @@ const TERMS_SECTIONS: { heading: string; items: string[] }[] = [
 type CatalogBatch = { id: string; number: string; startsOn: string; endsOn: string; full: boolean };
 type StcwCourse = { code: string; name: string; duration: string; modality: string; category: string; batches: CatalogBatch[] };
 type InHouseCourse = { code: string; name: string; duration: string; modality: string; category: string };
-type Catalog = { stcw: StcwCourse[]; inHouse: InHouseCourse[] };
+type OtherCourse = { code: string; name: string };
+type Catalog = { stcw: StcwCourse[]; inHouse: InHouseCourse[]; other: OtherCourse[] };
 /** One course row on the form: an STCW batch, or an In-House start date. */
 type Row = { code: string; batchId: string; start: string };
+/** start/end are "" for an Other STCW course: the center and date are set by Registration. */
 type Training = { code: string; name: string; duration: string; modality: string; start: string; end: string };
 const EMPTY_ROW: Row = { code: "", batchId: "", start: "" };
 
@@ -106,14 +108,14 @@ function Wizard() {
     let live = true;
     fetch("/api/public/catalog").then((r) => r.json()).then((b: Catalog) => {
       if (!live) return;
-      const next = { stcw: b.stcw ?? [], inHouse: b.inHouse ?? [] };
+      const next = { stcw: b.stcw ?? [], inHouse: b.inHouse ?? [], other: b.other ?? [] };
       setCatalog(next);
       const params = new URLSearchParams(window.location.search);
       const batch = params.get("batch"), code = params.get("course"), start = params.get("start");
       const course = batch ? next.stcw.find((c) => c.batches.some((x) => x.id === batch && !x.full)) : null;
       if (course && batch) setRows([{ code: course.code, batchId: batch, start: "" }]);
       else if (code && start && /^\d{4}-\d{2}-\d{2}$/.test(start) && next.inHouse.some((c) => c.code === code)) setRows([{ code, batchId: "", start }]);
-    }).catch(() => { if (live) setCatalog({ stcw: [], inHouse: [] }); });
+    }).catch(() => { if (live) setCatalog({ stcw: [], inHouse: [], other: [] }); });
     return () => { live = false; };
   }, []);
 
@@ -145,6 +147,7 @@ function Wizard() {
 
   const stcwOf = (code: string) => catalog?.stcw.find((c) => c.code === code) ?? null;
   const inHouseOf = (code: string) => catalog?.inHouse.find((c) => c.code === code) ?? null;
+  const otherOf = (code: string) => (stcwOf(code) || inHouseOf(code) ? null : catalog?.other.find((c) => c.code === code) ?? null);
   const tomorrow = manilaTomorrow();
   /** The dates a row covers, once it has a batch or a valid start date. */
   function rangeOf(row: Row): PickRange | null {
@@ -157,7 +160,7 @@ function Wizard() {
   const othersOf = (index: number) => rows.map((r, i) => (i === index ? null : rangeOf(r))).filter((r): r is PickRange => !!r);
   /** Why a row is not complete yet ("" when it is). */
   function rowProblem(row: Row, index: number) {
-    if (!row.code) return "";
+    if (!row.code || otherOf(row.code)) return "";
     const range = rangeOf(row);
     const ih = inHouseOf(row.code);
     if (!range) return stcwOf(row.code) ? "Choose a schedule." : !row.start ? "Choose a start date." : row.start < tomorrow ? "Choose a date from tomorrow onwards." : `A ${ih ? ih.duration : ""} course runs on consecutive days within one week (no Sundays).`;
@@ -168,7 +171,8 @@ function Wizard() {
   function removeRow(index: number) { setRows((cur) => (cur.length > 1 ? cur.filter((_, i) => i !== index) : [EMPTY_ROW])); }
   /** The chosen trainings in date order, for the schedule table and the summary. */
   const trainings: Training[] = rows.map((r) => { const range = rangeOf(r); const c = stcwOf(r.code) ?? inHouseOf(r.code); return range && c ? { code: c.code, name: c.name, duration: c.duration, modality: c.modality, start: range.start, end: range.end } : null; })
-    .filter((t): t is Training => !!t).sort((a, b) => a.start.localeCompare(b.start));
+    .filter((t): t is Training => !!t).sort((a, b) => a.start.localeCompare(b.start))
+    .concat(rows.map((r) => otherOf(r.code)).filter((c): c is OtherCourse => !!c).map((c) => ({ code: c.code, name: c.name, duration: "Other STCW", modality: "Partnered center", start: "", end: "" })));
 
   // The same checks the server runs (lib/validation), so the form never sends
   // something the server will reject with a vague error.
@@ -183,7 +187,8 @@ function Wizard() {
   const contactValid = applicant.address.trim().length >= 8 && mobileValid && emailValid;
   const emergencyValid = applicant.emergencyContactName.trim().length >= 2 && emergencyMobileValid;
   // At least one course; every chosen course needs a valid schedule that respects the order.
-  const selectionsValid = trainings.length >= 1 && rows.every((r, i) => !r.code || (!!rangeOf(r) && !rowProblem(r, i)));
+  const selectionsValid = trainings.length >= 1 && rows.every((r, i) => !r.code || !!otherOf(r.code) || (!!rangeOf(r) && !rowProblem(r, i)));
+  const when = (t: Training) => (t.start ? pickedRange(t.start, t.end) : "To be confirmed");
 
   async function submit() {
     setError("");
@@ -196,6 +201,7 @@ function Wizard() {
       fd.set("placeOfBirth", applicant.placeOfBirth); fd.set("birthDate", applicant.birthDate); fd.set("rank", rank); fd.set("company", applicant.company); fd.set("enrollmentType", applicant.enrollmentType); if (applicant.enrollmentType === "Agency" && referral.state === "ok") fd.set("referralCode", applicant.referralCode);
       fd.set("emergencyContactName", applicant.emergencyContactName); fd.set("emergencyContactMobile", applicant.emergencyContactMobile);
       for (const r of rows) {
+        if (r.code && otherOf(r.code)) { fd.append("otherCourseCodes", r.code); continue; }
         if (!r.code || !rangeOf(r)) continue;
         if (stcwOf(r.code)) fd.append("scheduleIds", r.batchId);
         else { fd.append("courseCodes", r.code); fd.append("startDates", r.start); }
@@ -248,7 +254,7 @@ function Wizard() {
               </tbody></table>
               {submittedTrainings.length > 0 && <div className="op-trainings">
                 <div className="op-trainings-head"><span>TRAININGS APPLIED FOR</span><span>{submittedTrainings.length} COURSE{submittedTrainings.length === 1 ? "" : "S"}</span></div>
-                {submittedTrainings.map((t, i) => <div className="op-training" key={t.code}><i>{i + 1}</i><div><b>{t.name}</b><small>{t.code} · {t.duration} · {t.modality}</small></div><div className="op-training-date">{chipRange(t.start, t.end).replace(/^\w+, /, "")}<small>{t.start === t.end ? weekday(t.start) : `${weekday(t.start).slice(0, 3)} – ${weekday(t.end).slice(0, 3)}`}</small></div></div>)}
+                {submittedTrainings.map((t, i) => <div className="op-training" key={t.code}><i>{i + 1}</i><div><b>{t.name}</b><small>{t.code} · {t.duration} · {t.modality}</small></div><div className="op-training-date">{(t.start ? chipRange(t.start, t.end) : "To be confirmed").replace(/^\w+, /, "")}<small>{t.start === t.end ? weekday(t.start) : `${weekday(t.start).slice(0, 3)} – ${weekday(t.end).slice(0, 3)}`}</small></div></div>)}
               </div>}
               <div className="op-instructions">
                 <b>INSTRUCTIONS</b>
@@ -297,7 +303,7 @@ function Wizard() {
     { key: "personal", title: "Personal Details", hint: "As written on your seaman's book or passport.", done: personalValid, summary: [nameText, applicant.birthDate, applicant.placeOfBirth, rankText].filter(Boolean).join(" · ") },
     { key: "contact", title: "Contact", hint: "How New Wave will reach you about your application.", done: contactValid, summary: [applicant.mobile, applicant.email].filter(Boolean).join(" · ") },
     { key: "emergency", title: "Emergency Contact", hint: "Someone we can call if we cannot reach you.", done: emergencyValid, summary: [applicant.emergencyContactName, applicant.emergencyContactMobile].filter(Boolean).join(" · ") },
-    { key: "courses", title: "Courses", hint: `Choose up to ${MAX_COURSES} courses and a schedule for each. ${ORDER_RULE_TEXT}`, done: selectionsValid, summary: trainings.map((t) => `${t.code} ${pickedRange(t.start, t.end)}`).join(" · ") },
+    { key: "courses", title: "Courses", hint: `Choose up to ${MAX_COURSES} courses and a schedule for each. ${ORDER_RULE_TEXT}`, done: selectionsValid, summary: trainings.map((t) => `${t.code} ${when(t)}`).join(" · ") },
   ];
   const doneCount = sections.filter((x) => x.done).length;
   const allDone = doneCount === sections.length;
@@ -361,6 +367,7 @@ function Wizard() {
             <select className="ql-course-select" value={row.code} aria-label={`Course ${index + 1}`} onChange={(e) => setRow(index, { code: e.target.value, batchId: "", start: "" })}>
               <option value="">Select a Course</option>
               <optgroup label="STCW (Scheduled Batches)">{catalog.stcw.filter((c) => !taken.has(c.code)).map((c) => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}</optgroup>
+              {catalog.other.length > 0 && <optgroup label="Other STCW Courses">{catalog.other.filter((c) => !taken.has(c.code) && !stcwOf(c.code) && !inHouseOf(c.code)).map((c) => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}</optgroup>}
               {categories.map((cat) => <optgroup key={cat} label={`${cat} · online`}>{catalog.inHouse.filter((c) => c.category === cat && !taken.has(c.code)).map((c) => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}</optgroup>)}
             </select>
             {st && (st.batches.length ? <div className="ql-chips" role="radiogroup" aria-label="Schedule">{st.batches.map((b) => {
@@ -376,7 +383,7 @@ function Wizard() {
           </div>;
         })}
         {rows.length < MAX_COURSES && <button type="button" className="ql-link" onClick={addRow}>+ Add Another Course ({rows.length}/{MAX_COURSES})</button>}
-        {trainings.length > 0 && <div className="ql-schedule"><h4>Your Training Schedule</h4><table><thead><tr><th>#</th><th>Course</th><th>Dates</th></tr></thead><tbody>{trainings.map((t, i) => <tr key={t.code}><td>{i + 1}</td><td><b>{t.name}</b><small>{t.code} · {t.modality}</small></td><td>{pickedRange(t.start, t.end)}</td></tr>)}</tbody></table></div>}
+        {trainings.length > 0 && <div className="ql-schedule"><h4>Your Training Schedule</h4><table><thead><tr><th>#</th><th>Course</th><th>Dates</th></tr></thead><tbody>{trainings.map((t, i) => <tr key={t.code}><td>{i + 1}</td><td><b>{t.name}</b><small>{t.code} · {t.modality}</small></td><td>{when(t)}</td></tr>)}</tbody></table></div>}
       </>}
     </>,
   };
@@ -417,7 +424,7 @@ function Wizard() {
             <span className="ql-title"><h2>{sections.length + 1}. Review and submit</h2><span>{allDone ? "Accept the terms and send your application." : "Complete the sections above first."}</span></span>
           </button>
           {open === "review" && allDone && <div className="ql-body">
-            <div className="ql-schedule"><h4>Your Training Schedule</h4><table><thead><tr><th>#</th><th>Course</th><th>Dates</th></tr></thead><tbody>{trainings.map((t, i) => <tr key={t.code}><td>{i + 1}</td><td><b>{t.name}</b><small>{t.code} · {t.modality}</small></td><td>{pickedRange(t.start, t.end)}</td></tr>)}</tbody></table></div>
+            <div className="ql-schedule"><h4>Your Training Schedule</h4><table><thead><tr><th>#</th><th>Course</th><th>Dates</th></tr></thead><tbody>{trainings.map((t, i) => <tr key={t.code}><td>{i + 1}</td><td><b>{t.name}</b><small>{t.code} · {t.modality}</small></td><td>{when(t)}</td></tr>)}</tbody></table></div>
             <p className="ql-note">Your seats are held while our Registration team screens your application, confirms the fees, and collects your requirements and payment.</p>
             <h3 className="review-subhead">Terms and Conditions</h3>
             <div className="terms-box">

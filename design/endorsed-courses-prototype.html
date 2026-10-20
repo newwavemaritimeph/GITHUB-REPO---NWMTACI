@@ -1,0 +1,119 @@
+<title>Other STCW Courses</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+:root{--blue:#0571D0;--cyan:#35CCFA;--orange:#F25615;--navy:#123F63;--bg:#f1f6f9;--surface:#fff;--line:#d8e4ec;--fg:#0f2638;--muted:#5f7180;--soft:#eef6fb;--th:#e3f6fb;--okbg:#e3f4ea;--ok:#15803d;--penbg:#fdf0dc;--pen:#a8570a;--redbg:#fbe4dc;--red:#b42318;--infobg:#e2effc;--info:#0b5cad;--sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--penbg:#3a2a12;--pen:#f2b45c;--redbg:#3c1d16;--red:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--penbg:#3a2a12;--pen:#f2b45c;--redbg:#3c1d16;--red:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.bar{background:var(--navy);color:#fff;padding-block:12px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}.bar b{letter-spacing:.04em}.bar small{display:block;opacity:.8}
+.views{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap}.views button{border:0;background:none;color:#fff;padding:9px 13px;border-radius:10px 10px 0 0;font-weight:500;font-size:14px;opacity:.85}.views button.on{background:var(--bg);color:var(--fg);opacity:1;box-shadow:inset 0 3px 0 var(--orange)}
+.page{max-width:1200px;margin:0 auto;padding-block:18px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}h1{margin:2px 0 0;font-size:25px}h2{margin:0;font-size:16px}h3{margin:0;font-size:15px}
+.note{background:var(--infobg);color:var(--info);border-radius:10px;padding:10px 14px;font-size:13.5px;margin:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;flex-wrap:wrap}.ph small{color:var(--muted)}
+.ptabs{display:flex;gap:6px;flex-wrap:wrap}.ptabs button{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:8px 16px;font-weight:600}.ptabs button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.search{padding:0 16px 12px}.search input{width:100%;border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--surface)}
+.clist{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;padding:0 16px 16px}.ci{border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center;min-width:0}.ci b{display:block}.ci small{color:var(--muted);font:500 12px var(--mono)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:9px;padding:6px 12px;font-weight:600;font-size:13.5px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13.5px}th{background:var(--th);color:var(--muted);font:600 11px var(--sans);letter-spacing:.07em;text-transform:uppercase;text-align:left;padding:8px 12px;white-space:nowrap}td{padding:8px 12px;border-top:1px solid var(--line);vertical-align:middle}td small{display:block;color:var(--muted);font-size:12px}.r{text-align:right}
+.amt{font:600 14px var(--mono)}.in{color:var(--ok)}.out{color:var(--red)}.zero{color:var(--muted);font-weight:500}
+.cin{width:96px;border:1px solid var(--line);border-radius:8px;padding:4px 8px;text-align:right;font:500 13.5px var(--mono);background:var(--surface)}
+.grp td{background:var(--soft);font-weight:700}.grp small{display:inline;margin-left:8px;font-weight:500}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}.g{background:var(--okbg);color:var(--ok)}.o{background:var(--penbg);color:var(--pen)}.b{background:var(--infobg);color:var(--info)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;padding:0 16px 16px}.form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}.form select,.form input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg)}
+.sum{display:flex;gap:18px;flex-wrap:wrap;padding:0 16px 16px;font-size:14px}.sum div{display:flex;flex-direction:column}.sum span{color:var(--muted);font-size:12.5px}.sum b{font:600 16px var(--mono)}
+.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;padding:0 16px 16px}@media (max-width:760px){.flow{grid-template-columns:1fr 1fr}}.fs{border:1px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13.5px}.fs b{display:block;font:600 16px var(--mono)}.fs span{color:var(--muted);font-size:12.5px}
+.sel{background:var(--soft);border-radius:12px;padding:12px 14px;margin:0 16px 12px;font-size:14px}
+.site{background:#fff;color:#123f63;border:1px solid #dde8ee;border-radius:16px;padding:22px clamp(14px,3vw,28px)}.site h1{font-family:Georgia,"Times New Roman",serif;font-weight:600;font-size:30px;margin:0 0 4px;color:#123f63}.site .sub{color:#40606f;margin:0 0 16px}
+.catalog-tabs{display:flex;gap:7px;margin-bottom:12px;border-bottom:1px solid #dde8ee;overflow:auto}.catalog-tabs button{border:0;background:transparent;padding:12px 15px;color:#40606f;font-size:13.5px;white-space:nowrap}.catalog-tabs button.active{color:#123f63;font-weight:700;border-bottom:3px solid #F25615}.catalog-tabs button span{background:#eaf2f6;border-radius:10px;padding:2px 7px;font-size:10px;margin-left:5px;color:#123f63}
+.inhouse-picker{margin-top:16px;display:grid;gap:16px}.inhouse-fields{display:grid;grid-template-columns:1fr;gap:12px;background:#f4f8fa;border:1px solid #dde8ee;border-radius:14px;padding:14px}.inhouse-fields label{display:flex;flex-direction:column;gap:6px;color:#40606f;font-size:12px;font-weight:600}.inhouse-fields input{height:44px;border:1px solid #cadce5;border-radius:9px;padding:0 10px;background:#fff;font-size:15px;color:#0b1f33}
+.inhouse-note{margin:0;font-size:13px;color:#40606f}.inhouse-table{background:#fff;border:1px solid #dde8ee;border-radius:14px;overflow:auto;max-height:620px}.inhouse-table table{width:100%;border-collapse:collapse;min-width:420px}.inhouse-table th{text-align:left;background:#f3f8fa;color:#5b7587;font-size:12px;letter-spacing:.04em;padding:11px 14px;position:sticky;top:0;text-transform:none;font-family:inherit;font-weight:600}.inhouse-table td{border-top:1px solid #e7eff3;padding:11px 14px;font-size:14px;color:#123f63}
+.register-banner{margin-top:22px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;background:#123f63;color:#fff;border-radius:14px;padding:16px 20px}.register-banner b{display:block;font-size:17px}.register-banner span{font-size:14px;color:#bcd6e6}.button-primary{background:#F25615;color:#fff;border:0;border-radius:10px;padding:11px 18px;font-weight:700}
+.catalog-note{font-size:12.5px;color:#40606f;margin:14px 0 0}
+.ql-rule{margin:0 0 14px;padding:10px 12px;border-radius:10px;background:#fff7ed;border:1px solid #f8c9a6;color:#8a3b0b;font-size:13.5px}.ql-course{border:1px solid #dbe7ec;border-radius:12px;padding:14px;margin-bottom:12px;background:#fbfdfe}.ql-course-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}.ql-course-head b{color:#123f63;font-size:14px}.ql-course-select{width:100%;height:46px;border:1px solid #cadce5;border-radius:10px;padding:0 12px;background:#fff;font-size:15px;color:#0b1f33}.ql-link{border:0;background:none;padding:6px 0;font-size:14px;font-weight:600;color:#0571D0}.ql-partner{margin-top:10px;border:1px solid #cadce5;border-radius:10px;padding:10px 12px;background:#fff;font-size:13.5px;color:#123f63}.ql-partner b{display:block;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:#5b7587}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:13.5px;max-width:calc(100% - 32px);z-index:9}
+</style>
+
+<div class="bar"><b>NEW WAVE MARITIME</b><small>Prototype · Other STCW Courses from your sheet · trainee names are samples</small><nav class="views" id="views"></nav></div>
+<main class="page" id="page"></main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+// From the ENDORSED COURSES sheet: [code, name, days, fee, rebate, agency share]. Blank or -100 → 0 (to be edited).
+const C = {
+ "Nautical Options":[["BT","Basic Training",10,5500,1300,1000],["SCRB","Survival Craft and Rescue Boat",5,3900,900,800],["AFF","Advanced Fire Fighting",6,4200,800,700],["FRB","Fast Rescue Boat",5,3900,700,0],["BTR","Basic Training Refresher",2,2600,600,500],["SCRBR","Survival Craft and Rescue Boat Refresher",1,2400,600,500],["AFFR","Advanced Fire Fighting Refresher",1.5,2500,600,500],["FRBR","Fast Rescue Boat Refresher",1,2600,500,400],["BTOC","Basic Training Oil for Chemical Tanker",6,3200,700,600],["BTLGT","Basic Training for Liquefied Gas Tanker",6,3500,700,600],["ATOT","Advanced Training for Oil Tanker",8,4700,800,700],["ATCT","Advanced Training for Chemical Tanker",8,4700,800,700],["MEFA","Medical First Aid",5,2000,200,100],["SSO","Ship's Security Officer",4,2000,500,0]],
+ "Altitude Maritime":[["BT","Basic Training",10,6000,1200,1100],["SCRB","Survival Craft and Rescue Boat",5,3600,0,0],["AFF","Advanced Fire Fighting",6,4000,0,0],["BTR","Basic Training Refresher",3,2800,0,0],["SCRBR","Survival Craft and Rescue Boat Refresher",1.5,2400,0,0],["AFFR","Advanced Fire Fighting Refresher",1.5,2500,0,0],["BTOC","Basic Training Oil for Chemical Tanker",6,3000,0,0],["MECA","Medical Care",5.5,3000,500,400],["MEFA","Medical First Aid",4.5,1500,200,100],["RFPNW","Deck Watchkeeping",5.5,2500,600,500],["RFPEW","Engine Watchkeeping",6,2500,600,500],["SDSD","SATSDSD",1,600,250,150],["SSO","Ship's Security Officer",3,1000,300,200]],
+ "Mariana":[["II-4","II-4 (Ratings for Deck)",2,2200,800,700],["III-4","III-4 (Ratings for Engine)",2,2200,800,700],["II-5","II-5 (AB for Deck)",2,5200,500,400],["III-5","III-5 (AB for Engine)",2,5200,500,400],["OIC-DECK","OIC for Deck",2,5200,500,400],["OIC-ENGINE","OIC for Engine",2,5200,500,400],["ML-DECK","ML for Deck",2,13000,1500,1400],["ML-ENGINE","ML for Engine",2,13000,1500,1400],["RASD","Ratings As Able Seafarer Deck",5,5700,500,0],["RASE","Ratings As Able Seafarer Engine",5,5700,500,0]],
+};
+const peso=(p)=>"₱"+Number(p).toLocaleString("en-PH",{minimumFractionDigits:2});
+// Public list: the same course from several centers shows once.
+const merged=(()=>{const m=new Map();for(const [ctr,l] of Object.entries(C))for(const [code,name] of l){if(!m.has(code))m.set(code,{code,name,centers:[]});m.get(code).centers.push(ctr)}return [...m.values()].sort((a,b)=>a.name.localeCompare(b.name))})();
+const S={view:"Public Courses",ptab:"Other STCW Courses",q:"",picked:null,app:{center:"",date:"2026-10-27"},editing:null,flow:"Rebates Due"};
+const VIEWS=["Public Courses","Registration Form","Registration","Partnered Centers","Money Flow"];
+function pub(){
+  const list=merged.filter((c)=>!S.q||`${c.code} ${c.name}`.toLowerCase().includes(S.q.toLowerCase()));
+  return `<div class="site"><h1>Training Courses</h1><p class="sub">STCW schedules, Other STCW courses and In-House courses.</p>
+  <div class="catalog-tabs" role="tablist">${[["STCW schedules",4],["Other STCW Courses",merged.length],["In-House courses",141]].map(([t,n])=>`<button data-ptab="${t}" class="${S.ptab===t?"active":""}">${t}<span>${n}</span></button>`).join("")}</div>
+  ${S.ptab!=="Other STCW Courses"?`<p class="inhouse-note" style="padding:16px 0">${S.ptab} stays exactly as it is today.</p>`:`<section class="inhouse-picker">
+    <div class="inhouse-fields"><label>Search<input id="q" value="${S.q}" placeholder="Course name or code"></label></div>
+    <p class="inhouse-note">These STCW courses are held at our partnered training centers. Choose the course in the registration form; our Registration team confirms the training center, schedule and fee with you.</p>
+    <div class="inhouse-table"><table><thead><tr><th>Course</th><th>Code</th></tr></thead><tbody>${list.map((c)=>`<tr><td>${c.name}</td><td>${c.code}</td></tr>`).join("")}</tbody></table></div>
+  </section>`}
+  <div class="register-banner"><div><b>Ready to enroll?</b><span>Choose up to 5 courses and their schedules in one registration.</span></div><button class="button-primary" data-view="Registration Form">Register Now →</button></div>
+  <p class="catalog-note">Dates come from schedules published by New Wave. Enrollment for STCW courses closes at 7:00 AM on the training date. Course fees are confirmed by our Registration team during screening.</p></div>
+  <p class="note">Only the course name and code are shown. A course offered by more than one center appears once (Basic Training is offered by two centers; it is listed once).</p>`}
+function form(){
+  const pick=S.formPick||"";const other=merged.find((c)=>c.code===pick);
+  return `<div class="site"><h1>Register</h1><p class="sub">Courses section of the registration form.</p>
+  <p class="ql-rule"><b>Order Rule:</b> unchanged for STCW schedules.</p>
+  <div class="ql-course"><div class="ql-course-head"><b>Course 1</b></div>
+   <select class="ql-course-select" id="fp"><option value="">Select a Course</option><optgroup label="STCW (Scheduled Batches)"><option>Updating Training on Basic Training – PSSR (UBT-PSSR)</option><option>Safety (STPPDSPPS)</option></optgroup>
+   <optgroup label="Other STCW Courses · at a partnered center">${merged.map((c)=>`<option value="${c.code}" ${pick===c.code?"selected":""}>${c.name} (${c.code})</option>`).join("")}</optgroup><optgroup label="Safety and Security · online"><option>Anti Piracy Awareness (APA)</option></optgroup></select>
+   ${other?`<div class="ql-partner"><b>Training center and date</b>Our Registration team confirms the training center, schedule and fee with you after screening. No date to choose here.</div>`:""}
+  </div><button class="ql-link" data-t="Adds another course row">+ Add Another Course (1/5)</button></div>
+  <p class="note">Pick an Other STCW course in the list to see what the trainee is told.</p>`}
+function reg(){
+  const code="BT",offers=Object.entries(C).flatMap(([ctr,l])=>l.filter((x)=>x[0]===code).map((x)=>({ctr,fee:x[3],days:x[2]})));
+  const o=offers.find((x)=>x.ctr===S.app.center);
+  return `<div><div class="eyebrow">Staff Portal · Registration › Enrollments › Application</div><h1>DELA CRUZ, JUAN MIGUEL</h1></div>
+  <section class="panel"><div class="ph"><h2>Other STCW Course</h2><span class="pill o">Center and Date Needed</span></div>
+   <div class="sum"><div><span>Course chosen online</span><b style="font-family:var(--sans)">Basic Training (BT)</b></div><div><span>Applied</span><b style="font-family:var(--sans);font-size:14px">Oct 20, 2026 · 9:14 AM</b></div></div>
+   <div class="form"><label>Training Center<select id="ctr"><option value="">Choose the center</option>${offers.map((x)=>`<option ${S.app.center===x.ctr?"selected":""}>${x.ctr}</option>`).join("")}</select></label>
+   <label>Training Start Date<input type="date" id="dt" value="${S.app.date}"></label>
+   <label>Fee to Collect<input readonly value="${o?peso(o.fee)+" · "+o.days+" days":"—"}"></label></div>
+   <div style="padding:0 16px 16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" ${o?"":"disabled"} data-t="Saved. The Cashier collects ${o?peso(o.fee):""}; the requirements and hand-over work as today">Save Center and Date</button><small style="color:var(--muted);align-self:center">Only centers that offer this course are listed. Rebates are not shown to Registration.</small></div>
+  </section>
+  <p class="note">Officers can also add an Other STCW course for a walk-in in Assign Course: <b>Course → Training Center → Start Date</b>.</p>`}
+function centers(){
+  return `<div><div class="eyebrow">Accounting</div><h1>Partnered Centers</h1></div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-t="Paste the Google Sheet link → preview the three centers → Import">Import from Google Sheet</button><button class="btn" data-t="Add Center: name, email, mobile">Add Center</button></div>
+  ${Object.entries(C).map(([ctr,l])=>`<section class="panel"><div class="ph"><h2>${ctr}</h2><small>${l.length} programs · <button class="btn" data-t="Add Program: code, course, days, fee, rebate, agency share">Add Program</button></small></div>
+   <div class="wrap"><table><thead><tr><th>Code</th><th>Course</th><th class="r">Days</th><th class="r">Fee</th><th class="r">Rebate to New Wave</th><th class="r">Agency Share</th><th class="r">New Wave Keeps</th><th></th></tr></thead><tbody>
+   ${l.map((x,i)=>{const key=ctr+i,ed=S.editing===key;return `<tr><td class="mono">${x[0]}</td><td>${x[1]}${x[4]===0?`<small>Rebate not set yet</small>`:""}${x[3]<x[4]?`<small style="color:var(--red)">Check: rebate is more than the fee</small>`:""}</td><td class="r mono">${x[2]}</td>
+     <td class="r">${ed?`<input class="cin" id="e3" value="${x[3]}">`:`<span class="amt">${peso(x[3])}</span>`}</td>
+     <td class="r">${ed?`<input class="cin" id="e4" value="${x[4]}">`:`<span class="amt ${x[4]?"in":"zero"}">${peso(x[4])}</span>`}</td>
+     <td class="r">${ed?`<input class="cin" id="e5" value="${x[5]}">`:`<span class="amt ${x[5]?"out":"zero"}">${peso(x[5])}</span>`}</td>
+     <td class="r amt">${peso(Math.max(0,x[4]-x[5]))}</td>
+     <td class="r">${ed?`<button class="btn pri" data-save="${ctr}|${i}">Save</button>`:`<button class="btn" data-edit="${key}">Edit</button>`}</td></tr>`}).join("")}</tbody></table></div></section>`).join("")}
+  <p class="note">Accounting and the Admin edit the fee, the rebate the center releases to New Wave, and the agency share for the referring consultancy. New enrollments use the new amounts; earlier ones keep theirs.</p>`}
+function flow(){
+  return `<div><div class="eyebrow">Accounting</div><h1>Money Flow · Basic Training at Nautical Options</h1></div>
+  <section class="panel"><div class="flow"><div class="fs"><span>1 · Trainee pays New Wave</span><b class="in">${peso(5500)}</b><span>Cashier, as today</span></div><div class="fs"><span>2 · New Wave pays the center</span><b class="out">${peso(5500)}</b><span>Payables › Partnered Centers</span></div><div class="fs"><span>3 · Center releases the rebate</span><b class="in">${peso(1300)}</b><span>Other Income › Endorsement Rebates</span></div><div class="fs"><span>4 · Agency share to the referrer</span><b class="out">${peso(1000)}</b><span>Payables › Agency Shares</span></div></div>
+  <p class="note" style="margin:0 16px 16px">New Wave keeps ${peso(300)}. If nobody referred the trainee, there is no agency share and New Wave keeps the full ${peso(1300)}.</p></section>
+  <div class="ptabs">${["Rebates Due","Pay the Centers","Agency Shares"].map((t)=>`<button data-flow="${t}" class="${S.flow===t?"on":""}">${t}</button>`).join("")}</div>
+  <section class="panel"><div class="wrap"><table>${S.flow==="Rebates Due"?`<thead><tr><th>Trainee</th><th>Course</th><th>Center</th><th class="r">Rebate Due</th><th>Status</th></tr></thead><tbody><tr class="grp"><td colspan="5">Nautical Options<small>2 trainees · ${peso(2200)}</small></td></tr><tr><td><b>DELA CRUZ, JUAN</b></td><td>BT</td><td>Nautical Options</td><td class="r amt in">${peso(1300)}</td><td><span class="pill o">Due</span></td></tr><tr><td><b>LIM, MARIA</b></td><td>SCRB</td><td>Nautical Options</td><td class="r amt in">${peso(900)}</td><td><span class="pill o">Due</span></td></tr><tr class="grp"><td colspan="5">Mariana<small>1 trainee · ${peso(1500)}</small></td></tr><tr><td><b>TORRES, LEO</b></td><td>ML-DECK</td><td>Mariana</td><td class="r amt in">${peso(1500)}</td><td><span class="pill g">Received INC-2026-000004</span></td></tr></tbody>`
+   :S.flow==="Pay the Centers"?`<thead><tr><th>Center</th><th>Trainees</th><th class="r">To Pay</th><th></th></tr></thead><tbody><tr><td><b>Nautical Options</b></td><td>DELA CRUZ, JUAN (BT) · LIM, MARIA (SCRB)</td><td class="r amt out">${peso(9400)}</td><td><button class="btn" data-t="Mark Paid with channel and reference">Mark Paid</button></td></tr><tr><td><b>Mariana</b></td><td>TORRES, LEO (ML-DECK)</td><td class="r amt out">${peso(13000)}</td><td><span class="pill g">Paid</span></td></tr></tbody>`
+   :`<thead><tr><th>Agency</th><th>Trainee · Course</th><th class="r">Share</th><th>Status</th></tr></thead><tbody><tr><td><b>Qapla Maritime</b></td><td>TORRES, LEO · ML-DECK</td><td class="r amt out">${peso(1400)}</td><td><span class="pill o">Owed · rebate received</span></td></tr><tr><td><b>Qapla Maritime</b></td><td>DELA CRUZ, JUAN · BT</td><td class="r amt zero">${peso(1000)}</td><td><span class="pill b">Waits for the center's rebate</span></td></tr></tbody>`}</table></div></section>`}
+function render(){document.getElementById("views").innerHTML=VIEWS.map((v)=>`<button data-view="${v}" class="${S.view===v?"on":""}">${v}</button>`).join("");
+  document.getElementById("page").innerHTML=S.view==="Public Courses"?pub():S.view==="Registration Form"?form():S.view==="Registration"?reg():S.view==="Partnered Centers"?centers():flow();}
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>el.hidden=true,3000)}
+document.addEventListener("click",(e)=>{const b=e.target.closest("button");if(!b)return;const d=b.dataset;
+  if(d.view)S.view=d.view;else if(d.ptab)S.ptab=d.ptab;else if(d.pick)S.picked=merged.find((c)=>c.code===d.pick);else if("unpick" in d)S.picked=null;
+  else if(d.edit)S.editing=d.edit;else if(d.save){const [ctr,i]=d.save.split("|");const r=C[ctr][+i];r[3]=+document.getElementById("e3").value||0;r[4]=+document.getElementById("e4").value||0;r[5]=+document.getElementById("e5").value||0;S.editing=null;toast("Saved. New enrollments use these amounts.")}
+  else if(d.flow)S.flow=d.flow;else if(d.t){toast(d.t);return}else return;render()});
+document.addEventListener("change",(e)=>{if(e.target.id==="fp"){S.formPick=e.target.value;render()}else if(e.target.id==="ctr"){S.app.center=e.target.value;render()}else if(e.target.id==="dt")S.app.date=e.target.value});
+document.addEventListener("input",(e)=>{if(e.target.id==="q"){S.q=e.target.value;const p=e.target.selectionStart;render();const q=document.getElementById("q");q.focus();q.setSelectionRange(p,p)}});
+render();
+</script>

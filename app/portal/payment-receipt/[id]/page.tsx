@@ -55,7 +55,7 @@ export default async function PaymentReceiptPage({ params }: { params: Promise<{
 
   // Each enrollment this payment covers, with its balance after all valid payments.
   const [enrollRes, chargeRes, paidRes] = enrollmentIds.length ? await Promise.all([
-    db.from("enrollments").select("id,enrollment_number,selling_price_centavos,courses(code,name),batches(starts_on,ends_on)").in("id", enrollmentIds),
+    db.from("enrollments").select("id,enrollment_number,selling_price_centavos,scheduled_on,courses(code,name),partner_course_offers(partner_centers(name)),batches(starts_on,ends_on)").in("id", enrollmentIds),
     db.from("enrollment_charges").select("enrollment_id,description,amount_centavos,event_type,created_by,created_at").in("enrollment_id", enrollmentIds).eq("valid", true),
     db.from("payment_allocations").select("enrollment_id,amount_centavos,payments!inner(valid)").in("enrollment_id", enrollmentIds).eq("payments.valid", true),
   ]) : [{ data: [] }, { data: [] }, { data: [] }];
@@ -71,7 +71,9 @@ export default async function PaymentReceiptPage({ params }: { params: Promise<{
     const misc = charges.filter((x) => x.event_type === "charge" && x.created_by === payment.cashier_id && Date.parse(x.created_at as string) <= posted + 5000 && Date.parse(x.created_at as string) >= posted - 120000)
       .map((x) => ({ label: x.description as string, amount: Number(x.amount_centavos) }));
     const miscTotal = misc.reduce((s, m) => s + m.amount, 0);
-    return { id: e.id, number: e.enrollment_number as string, code: c?.code ?? "", name: c?.name ?? "Course", dates: trainingDates(b?.starts_on, b?.ends_on), due, paid, applied, misc: miscTotal <= applied ? misc : [], feeApplied: miscTotal <= applied ? applied - miscTotal : applied, balance: Math.max(0, due - paid) };
+    const center = one(one(e.partner_course_offers as unknown as { partner_centers: unknown } | { partner_centers: unknown }[] | null)?.partner_centers as { name: string } | { name: string }[] | null)?.name;
+    const day = (e as { scheduled_on?: string | null }).scheduled_on ?? undefined;
+    return { id: e.id, number: e.enrollment_number as string, code: c?.code ?? "", name: center ? `${c?.name ?? "Course"} · ${center}` : c?.name ?? "Course", dates: b ? trainingDates(b.starts_on, b.ends_on) : trainingDates(day, day), due, paid, applied, misc: miscTotal <= applied ? misc : [], feeApplied: miscTotal <= applied ? applied - miscTotal : applied, balance: Math.max(0, due - paid) };
   });
   const totalDue = appliedTo.reduce((s, r) => s + r.due, 0), totalPaid = appliedTo.reduce((s, r) => s + r.paid, 0), balance = Math.max(0, totalDue - totalPaid);
   const status = !payment.valid ? "VOID" : totalDue > 0 && totalPaid >= totalDue ? "FULLY PAID" : "PARTIALLY PAID";

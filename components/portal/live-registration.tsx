@@ -507,6 +507,23 @@ function StartDateEditor({ data, enrollment: e, busy, post }: { data: PortalData
   </div>;
 }
 
+/** Other STCW Courses (owner, 20 Oct 2026): Registration picks the partnered center (its fee) and the training date. */
+function OtherCenterEditor({ data, enrollment: e, busy, post }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, ok: string) => Promise<unknown> }) {
+  const course = data.courses.find((c) => c.id === e.course_id);
+  const [offerId, setOfferId] = useState(e.partner_offer_id ?? ""), [date, setDate] = useState(e.scheduled_on ?? "");
+  if (!course || course.delivery_type !== "Partner or Endorsed" || e.enrollment_status !== "Pending") return null;
+  const offers = data.offers.filter((o) => o.course_id === e.course_id);
+  const picked = offers.find((o) => o.id === offerId);
+  const centerName = (o: (typeof offers)[number]) => first(o.partner_centers)?.name ?? "Partnered center";
+  const changed = offerId !== (e.partner_offer_id ?? "") || date !== (e.scheduled_on ?? "");
+  return <div className="full sd-edit">
+    <label>Training Center<select value={offerId} onChange={(ev) => setOfferId(ev.target.value)}><option value="">Choose the center</option>{offers.map((o) => <option key={o.id} value={o.id}>{centerName(o)} · {pesos2(Number(o.training_fee_centavos))} · {o.duration_label}</option>)}</select></label>
+    <label>Training Date<input type="date" value={date} onChange={(ev) => setDate(ev.target.value)} /></label>
+    <button type="button" className="portal-primary" disabled={busy || !offerId || !date || !changed} onClick={() => void post({ action: "other-course-center", enrollmentId: e.id, offerId, scheduledOn: date }, `Training center set: ${picked ? centerName(picked) : ""}. The fee to collect is ${picked ? pesos2(Number(picked.training_fee_centavos)) : ""}.`).catch(() => undefined)}>Save Center and Date</button>
+    <small style={{ color: "var(--muted)" }}>{!offers.length ? "No partnered center offers this course right now." : !e.partner_offer_id ? "Other STCW course: set the center and date before handing to the Cashier." : `Fee ${pesos2(Number(e.selling_price_centavos))}.`}</small>
+  </div>;
+}
+
 export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void }) {
   const { busy, msg, post } = usePost(reload);
   const generated = instructionsCountOf(data, e), atLimit = generated >= INSTRUCTION_LIMIT;
@@ -536,6 +553,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
         <div><span>Status</span><strong><Badge tone={statusTone(e.enrollment_status)}>{e.enrollment_status}</Badge></strong><small>{isApplication ? "Submitted" : "Created"} {fmtDate(day(e.created_at))}{e.source ? ` · ${e.source}` : ""}</small></div>
       </div>}
       <StartDateEditor data={data} enrollment={e} busy={busy} post={post} />
+      <OtherCenterEditor data={data} enrollment={e} busy={busy} post={post} />
 
       <div className="full"><strong>Payment status</strong> <small style={{ color: "var(--muted)" }}>read-only — payments are recorded by the Cashier</small></div>
       <div className="pill-row full">

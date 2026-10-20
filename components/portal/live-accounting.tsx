@@ -1376,7 +1376,7 @@ export function CashPositionModule({ data }: { data: AccountingData }) {
 
 type ConfigTrainee = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; email?: string | null; mobile?: string | null; srn?: string | null; company?: string | null; registered_at?: string | null };
 // Schedule of fees is fixed by the owner's ruling (Reprinting ₱500, Uniform ₱150, LBC ₱500), so it is not edited here.
-export const ACCOUNTING_CONFIG_SECTIONS = ["Payment channels", "Expense categories", "Schedule of fees", "Requisition items", "Partners"] as const;
+export const ACCOUNTING_CONFIG_SECTIONS = ["Payment channels", "Expense categories", "Schedule of fees", "Requisition items", "Partnered Centers"] as const;
 export type AccountingConfigSection = (typeof ACCOUNTING_CONFIG_SECTIONS)[number];
 /**
  * Accounting › Configuration (owner, 7 Oct 2026): the referring agencies and
@@ -1490,13 +1490,24 @@ function EndorsedPrograms({ data, busy, post }: { data: AccountingData; busy: bo
   const centers = data.partnerCenters.filter((c) => c.active);
   const [centerId, setCenterId] = useState(centers[0]?.id ?? "");
   const center = centers.find((c) => c.id === centerId) ?? centers[0];
-  const blank = { name: "", code: "", duration: "1 day", fee: "", rebate: "" };
+  const blank = { name: "", code: "", duration: "1 day", fee: "", rebate: "", share: "" };
+  const [editing, setEditing] = useState<{ id: string; fee: string; rebate: string; share: string } | null>(null);
+  const shareOf = (o: unknown) => Number((o as { agency_share_centavos?: number }).agency_share_centavos ?? 0);
   const [form, setForm] = useState(blank), [problem, setProblem] = useState(""), [done, setDone] = useState("");
   // Archived programs come in allOffers (Admin/Accounting); data.offers holds active ones only.
   const programs = center ? (data.allOffers?.length ? data.allOffers : data.offers).filter((o) => o.partner_center_id ? o.partner_center_id === center.id : one(o.partner_centers)?.name === center.name) : [];
   const peso = (v: string) => { const n = Number(v); return v.trim() !== "" && Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null; };
-  const fee = peso(form.fee), rebate = form.rebate.trim() === "" ? 0 : peso(form.rebate);
-  const tooMuch = fee != null && rebate != null && rebate > fee;
+  const fee = peso(form.fee), rebate = form.rebate.trim() === "" ? 0 : peso(form.rebate), share = form.share.trim() === "" ? 0 : peso(form.share);
+  const tooMuch = (fee != null && rebate != null && rebate > fee) || (rebate != null && share != null && share > rebate);
+  async function saveRate() {
+    if (!editing) return;
+    const f = peso(editing.fee), r = editing.rebate.trim() === "" ? 0 : peso(editing.rebate), a = editing.share.trim() === "" ? 0 : peso(editing.share);
+    if (f == null || r == null || a == null) { setProblem("Enter valid amounts."); return; }
+    if (r > f) { setProblem("The rebate cannot be more than the training fee."); return; }
+    if (a > r) { setProblem("The agency share cannot be more than the rebate."); return; }
+    try { await post({ action: "offer-rate-save", offerId: editing.id, trainingFeeCentavos: f, rebateCentavos: r, agencyShareCentavos: a }); setEditing(null); setDone("Saved. New enrollments use these amounts."); }
+    catch { /* the page shows the error */ }
+  }
   const edit = (patch: Partial<typeof blank>) => { setProblem(""); setDone(""); setForm({ ...form, ...patch }); };
   async function add() {
     if (!center) return;
@@ -1506,7 +1517,7 @@ function EndorsedPrograms({ data, busy, post }: { data: AccountingData; busy: bo
     if (fee == null) { setProblem("Enter the training fee."); return; }
     if (rebate == null) { setProblem("Enter a valid rebate."); return; }
     if (tooMuch) return;
-    try { await post({ action: "offer-create", partnerCenterId: center.id, courseName, courseCode, durationLabel, trainingFeeCentavos: fee, rebateCentavos: rebate }); setForm(blank); setDone(`${courseName} added to ${center.name}.`); }
+    try { await post({ action: "offer-create", partnerCenterId: center.id, courseName, courseCode, durationLabel, trainingFeeCentavos: fee, rebateCentavos: rebate, agencyShareCentavos: share ?? 0 }); setForm(blank); setDone(`${courseName} added to ${center.name}.`); }
     catch { /* the page shows the error */ }
   }
   async function archive(offerId: string, name: string, active: boolean) {
@@ -1515,22 +1526,30 @@ function EndorsedPrograms({ data, busy, post }: { data: AccountingData; busy: bo
     catch { /* the page shows the error */ }
   }
   return <section className="portal-panel cx-panel rb3">
-    <div className="panel-heading"><h2>Endorsed Programs</h2>
+    <div className="panel-heading"><h2>Programs</h2>
       {centers.length > 0 && <div className="pm-tools"><select className="rb3-mode" aria-label="Partner center" value={center?.id ?? ""} onChange={(e) => { setCenterId(e.target.value); setProblem(""); setDone(""); }}>{centers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>}</div>
     {done && <div className="portal-message success">{done}</div>}
     {!center ? <p className="portal-empty-copy">No partner centers yet.</p> : <>
-      <div className="rb3-wrap"><table className="rb3-table"><thead><tr><th>Program</th><th>Duration</th><th className="r">Training Fee</th><th className="r">Rebate to New Wave</th><th className="r">Payable to Partner</th><th>Status</th><th /></tr></thead>
+      <div className="rb3-wrap"><table className="rb3-table"><thead><tr><th>Program</th><th>Duration</th><th className="r">Training Fee</th><th className="r">Rebate to New Wave</th><th className="r">Agency Share</th><th className="r">New Wave Keeps</th><th>Status</th><th /></tr></thead>
         <tbody>{programs.map((o) => { const c = data.courses.find((x) => x.id === o.course_id) ?? one(o.courses); const name = c?.name ?? "—"; const archived = o.active === false;
           return <tr key={o.id} className={archived ? "pm-archived" : ""}>
             <td><strong>{name}</strong>{c?.code && <small className="cx-mono">{c.code}</small>}</td>
             <td>{o.duration_label}</td>
-            <td className="r cx-mono">{pesos(o.training_fee_centavos)}</td>
-            <td className="r cx-mono">{pesos(o.rebate_centavos)}</td>
-            <td className="r cx-mono">{pesos(o.partner_payable_centavos)}</td>
+            {editing?.id === o.id ? <>
+              <td className="r"><input className="cl-in cl-num" aria-label="Training fee" inputMode="decimal" value={editing.fee} onChange={(e) => setEditing({ ...editing, fee: e.target.value })} /></td>
+              <td className="r"><input className="cl-in cl-num" aria-label="Rebate to New Wave" inputMode="decimal" value={editing.rebate} onChange={(e) => setEditing({ ...editing, rebate: e.target.value })} /></td>
+              <td className="r"><input className="cl-in cl-num" aria-label="Agency share" inputMode="decimal" value={editing.share} onChange={(e) => setEditing({ ...editing, share: e.target.value })} /></td>
+              <td className="r cx-mono">—</td>
+            </> : <>
+              <td className="r cx-mono">{pesos(o.training_fee_centavos)}</td>
+              <td className="r cx-mono">{pesos(o.rebate_centavos)}{!Number(o.rebate_centavos) && <small className="cl-sub cl-block">Not set yet</small>}</td>
+              <td className="r cx-mono">{pesos(shareOf(o))}</td>
+              <td className="r cx-mono">{pesos(Math.max(0, Number(o.rebate_centavos) - shareOf(o)))}</td>
+            </>}
             <td><span className={`ac-chip ${archived ? "warn" : "ok"}`}>{archived ? "Archived" : "Active"}</span></td>
-            <td className="cm-acts"><button type="button" className="pm-link" disabled={busy} onClick={() => void archive(o.id, name, archived)}>{archived ? "Restore" : "Archive"}</button></td>
+            <td className="cm-acts">{editing?.id === o.id ? <><button type="button" className="portal-primary" disabled={busy} onClick={() => void saveRate()}>Save</button> <button type="button" className="pm-link" onClick={() => setEditing(null)}>Cancel</button></> : <>{!archived && <button type="button" className="pm-link" disabled={busy} onClick={() => setEditing({ id: o.id, fee: String(Number(o.training_fee_centavos) / 100), rebate: String(Number(o.rebate_centavos) / 100), share: String(shareOf(o) / 100) })}>Edit</button>} <button type="button" className="pm-link" disabled={busy} onClick={() => void archive(o.id, name, archived)}>{archived ? "Restore" : "Archive"}</button></>}</td>
           </tr>; })}
-        {!programs.length && <tr><td colSpan={7}><span className="portal-empty-copy">No programs yet. Add the first one below.</span></td></tr>}</tbody></table></div>
+        {!programs.length && <tr><td colSpan={8}><span className="portal-empty-copy">No programs yet. Add the first one below.</span></td></tr>}</tbody></table></div>
       <div className="panel-heading"><h2>Add Program</h2></div>
       <div className="pm-form">
         <label>Course Name<input value={form.name} maxLength={160} onChange={(e) => edit({ name: e.target.value })} /></label>
@@ -1538,9 +1557,10 @@ function EndorsedPrograms({ data, busy, post }: { data: AccountingData; busy: bo
         <label>Duration<input value={form.duration} maxLength={40} onChange={(e) => edit({ duration: e.target.value })} /></label>
         <label>Training Fee (PHP)<input inputMode="decimal" placeholder="0.00" value={form.fee} onChange={(e) => edit({ fee: e.target.value })} /></label>
         <label>Rebate to New Wave (PHP)<input inputMode="decimal" placeholder="0.00" value={form.rebate} onChange={(e) => edit({ rebate: e.target.value })} /></label>
-        <label>Payable to Partner<input readOnly className="cx-mono" value={fee != null && rebate != null && !tooMuch ? pesos(fee - rebate) : "—"} /></label>
+        <label>Agency Share (PHP)<input inputMode="decimal" placeholder="0.00" value={form.share} onChange={(e) => edit({ share: e.target.value })} /></label>
       </div>
-      {tooMuch && <div className="portal-message error">The rebate cannot be more than the training fee.</div>}
+      {tooMuch && <div className="portal-message error">The rebate cannot be more than the training fee, and the agency share cannot be more than the rebate.</div>}
+      <p className="cl-legend">New Wave pays the center the full training fee; the center releases the rebate later (Other Income › Endorsement Rebates). The agency share goes to the consultancy or agency that referred the trainee.</p>
       {problem && <div className="portal-message error">{problem}</div>}
       <div className="pm-actions"><span /><span className="cx-acts"><button type="button" className="portal-primary" disabled={busy || tooMuch} onClick={() => void add()}>Add Program</button></span></div>
     </>}
@@ -1638,7 +1658,7 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
       onAdd={(v) => post({ action: "channel-save", name: v.name.trim(), requiresReference: v.ref === "yes", allowsProof: true, kind: "receivable" })}
       onRemove={(r) => post({ action: "config-remove", entity: "channel", id: r.id })}
       note="One list for training payments and expense payments. A channel that needs a reference number also needs a proof of payment when the Cashier records it." />}
-    {section === "Partners" && <PartnersModule data={data} busy={busy} post={post} />}
+    {section === "Partnered Centers" && <PartnersModule data={data} busy={busy} post={post} />}
     {section === "Courses" && <CoursesModule data={data} busy={busy} post={post} reload={reload} />}
     {section === "Expense categories" && <ConfigMatrix title="Expense Categories" entity="category" busy={busy}
       cols={[{ key: "name", label: "Category", kind: "text", placeholder: "e.g. Office Supplies" }]}

@@ -85,7 +85,9 @@ export async function POST(request: Request) {
     const codes = form.getAll("courseCodes").map(String), starts = form.getAll("startDates").map(String);
     if (form.get("courseCode") && form.get("startDate")) { codes.push(String(form.get("courseCode"))); starts.push(String(form.get("startDate"))); }
     const dated = codes.map((code, i) => datedCourseSchema.parse({ courseCode: code, startDate: starts[i] }));
-    if (batches.length + dated.length > MAX_COURSES) throw new Error(`You can choose up to ${MAX_COURSES} courses per application.`);
+    // Other STCW Courses: the course only; Registration sets the center and date (owner, 20 Oct 2026).
+    const otherCodes = [...new Set(form.getAll("otherCourseCodes").map((v) => String(v).trim().toUpperCase()).filter(Boolean))].slice(0, MAX_COURSES);
+    if (batches.length + dated.length + otherCodes.length > MAX_COURSES) throw new Error(`You can choose up to ${MAX_COURSES} courses per application.`);
     const db = createSupabaseAdminClient();
     await checkCourseOrder(db, batches, dated);
     const startedAt = new Date().toISOString();
@@ -102,6 +104,7 @@ export async function POST(request: Request) {
     if (error) throw error;
     const result = data as { application_number?:string;registration_reference:string;trainee_id:string;email:string;complete_name:string };
     for (const pick of dated) await attachDatedCourse(db, result.trainee_id, pick);
+    for (const code of otherCodes) await attachOtherCourse(db, result.trainee_id, code);
     if (referral) await tagReferral(db, result.trainee_id, referral.id, startedAt);
     // Record the enrollment type on this submission's enrollments (shown to Registration and the Cashier).
     await db.from("enrollments").update({ source: body.enrollmentType }).eq("trainee_id", result.trainee_id).gte("created_at", startedAt);
@@ -152,6 +155,16 @@ async function attachDatedCourse(db: ReturnType<typeof createSupabaseAdminClient
     const { error: dateError } = await db.from("enrollments").update({ scheduled_on: pick.startDate }).eq("id", (enrollment as { id: string }).id);
     if (dateError) console.error("Could not set the picked start date:", dateError.message);
   } catch (err) { console.error("Could not attach the picked course:", err instanceof Error ? err.message : err); }
+}
+
+/** An Other STCW course on the application (no center yet). Best-effort, like attachDatedCourse. */
+async function attachOtherCourse(db: ReturnType<typeof createSupabaseAdminClient>, traineeId: string, code: string) {
+  try {
+    const { data: course } = await db.from("courses").select("id").eq("code", code).eq("delivery_type", "Partner or Endorsed").eq("active", true).order("created_at").limit(1).maybeSingle();
+    if (!course) return;
+    const { error } = await db.rpc("assign_other_course", { target_trainee: traineeId, target_course: course.id, actor: null });
+    if (error) console.error("Could not attach the Other STCW course (apply database update 202610200050):", error.message);
+  } catch (err) { console.error("Could not attach the Other STCW course:", err instanceof Error ? err.message : err); }
 }
 
 /**

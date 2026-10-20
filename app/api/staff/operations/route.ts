@@ -134,7 +134,9 @@ const certificateVoidInput = z.object({ action: z.literal("certificate-void"), e
 const certificateReleaseInput = z.object({ action: z.literal("certificate-release"), enrollmentId: z.string().uuid(), recipientName: z.string().trim().min(1).max(160), recipientIdType: z.string().trim().max(80).optional(), reason: z.string().trim().max(300).optional(), releaseMethod: z.enum(["Pickup", "Representative", "Courier"]).optional(), claimantRelationship: z.string().trim().max(80).optional(), idChecked: z.boolean().optional(), authorizationChecked: z.boolean().optional(), stickerNo: z.string().trim().max(40).optional() });
 // Revoke (Admin only) and endorsed programs encoded in the portal (owner, 20 Oct 2026).
 const certificateRevokeInput = z.object({ action: z.literal("certificate-revoke"), enrollmentId: z.string().uuid(), reason: z.string().trim().min(5, "Enter the reason (at least 5 characters).").max(300) });
-const offerCreateInput = z.object({ action: z.literal("offer-create"), partnerCenterId: z.string().uuid(), courseName: z.string().trim().min(3).max(200), courseCode: z.string().trim().min(1).max(40), durationLabel: z.string().trim().min(1).max(60), trainingFeeCentavos: z.number().int().positive(), rebateCentavos: z.number().int().nonnegative() });
+const offerCreateInput = z.object({ action: z.literal("offer-create"), partnerCenterId: z.string().uuid(), courseName: z.string().trim().min(3).max(200), courseCode: z.string().trim().min(1).max(40), durationLabel: z.string().trim().min(1).max(60), trainingFeeCentavos: z.number().int().positive(), rebateCentavos: z.number().int().nonnegative(), agencyShareCentavos: z.number().int().nonnegative().optional().default(0) });
+// Other STCW Courses (owner, 20 Oct 2026): Registration sets the partnered center and the training date.
+const otherCenterInput = z.object({ action: z.literal("other-course-center"), enrollmentId: z.string().uuid(), offerId: z.string().uuid(), scheduledOn: z.string().date() });
 const offerArchiveInput = z.object({ action: z.literal("offer-archive"), offerId: z.string().uuid(), active: z.boolean() });
 // The end-of-training email again (post-test and evaluation still to do), owner 20 Oct 2026.
 const trainingEndEmailInput = z.object({ action: z.literal("training-end-email"), enrollmentId: z.string().uuid() });
@@ -220,7 +222,7 @@ const classroomSaveInput = z.object({ action: z.literal("classroom-save"), id: z
 const classroomSetActiveInput = z.object({ action: z.literal("classroom-set-active"), id: z.string().uuid(), active: z.boolean() });
 // Accounting-managed pricing: course pricelist + endorsed-offer rates/rebates.
 const coursePriceInput = z.object({ action: z.literal("course-price-save"), courseId: z.string().uuid(), priceCentavos: z.number().int().nonnegative() });
-const offerRateInput = z.object({ action: z.literal("offer-rate-save"), offerId: z.string().uuid(), trainingFeeCentavos: z.number().int().nonnegative(), rebateCentavos: z.number().int().nonnegative() });
+const offerRateInput = z.object({ action: z.literal("offer-rate-save"), offerId: z.string().uuid(), trainingFeeCentavos: z.number().int().nonnegative(), rebateCentavos: z.number().int().nonnegative(), agencyShareCentavos: z.number().int().nonnegative().optional() });
 const courseSaveInput = z.object({ action: z.literal("course-save"), id: z.string().uuid().nullable().optional(), code: z.string().trim().min(2).max(40), name: z.string().trim().min(2).max(240), categoryId: z.string().uuid(), deliveryType: z.enum(["In-House", "Partner or Endorsed"]), durationLabel: z.string().trim().min(1).max(60), durationDays: z.number().positive().max(365), mode: z.string().trim().min(2).max(80), priceCentavos: z.number().int().nonnegative(), publicVisible: z.boolean().optional() });
 // Admin › Courses (owner, 20 Oct 2026): remove deletes an unused course, otherwise archives it.
 const courseRemoveInput = z.object({ action: z.literal("course-remove"), id: z.string().uuid() });
@@ -266,7 +268,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -306,6 +308,18 @@ async function autoSendInstructions(admin: ReturnType<typeof createSupabaseAdmin
 // requirements are verified, a batch is set and a verified payment exists, the
 // database enrolls it. Called after every step that can complete those rules;
 // "not ready yet" errors are expected and ignored. Returns the enrolled ids.
+/** Other STCW Courses (owner, 20 Oct 2026): once a center's rebate is received, the referring agency's share is owed (Payables › Agency rebates). */
+async function owedAgencyShares(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentIds: string[], actor: string) {
+  try {
+    const { data } = await admin.from("enrollments").select("id,trainee_id,course_id,agency_share_centavos,referral_agency_id,trainees(marketing_agency_id)").in("id", enrollmentIds);
+    for (const e of (data ?? []) as { id: string; trainee_id: string; course_id: string; agency_share_centavos: number; referral_agency_id: string | null; trainees: unknown }[]) {
+      const agency = e.referral_agency_id ?? (Array.isArray(e.trainees) ? e.trainees[0] : e.trainees as { marketing_agency_id?: string | null } | null)?.marketing_agency_id ?? null;
+      if (!agency || !Number(e.agency_share_centavos)) continue;
+      await admin.from("agency_rebates").insert({ agency_id: agency, enrollment_id: e.id, trainee_id: e.trainee_id, course_id: e.course_id, rebate_centavos: Number(e.agency_share_centavos), status: "Pending", created_by: actor });
+    }
+  } catch (err) { console.error("Agency share not recorded (apply database update 202610200050):", err instanceof Error ? err.message : err); }
+}
+
 async function tryAutoEnroll(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentIds: string[], actor: string) {
   const enrolled: string[] = [];
   const { data: pending } = await admin.from("enrollments").select("id").in("id", enrollmentIds).eq("enrollment_status", "Pending");
@@ -1102,6 +1116,8 @@ export async function GET() {
       db.from("courses").select("id,code,name,delivery_type,duration_label,duration_days,training_mode,category_id,standard_price_centavos,public_visible,active,updated_at,course_categories(name)").eq("active", false).order("name"),
     ]);
     allOffers = ao.data ?? []; archivedCourses = ac.data ?? [];
+    const { data: shares, error: shareError } = await db.from("partner_course_offers").select("id,agency_share_centavos");
+    if (!shareError) { const byId = new Map((shares ?? []).map((x) => [x.id as string, Number(x.agency_share_centavos ?? 0)])); allOffers = (allOffers as { id: string }[]).map((o) => ({ ...o, agency_share_centavos: byId.get(o.id) ?? 0 })); }
   }
 
   return NextResponse.json({ defaultRooms, postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
@@ -1249,6 +1265,7 @@ export async function POST(request: Request) {
         if (linkError) { await admin.from("other_income").delete().eq("id", row.id); return NextResponse.json({ error: linkError.message }, { status: 400 }); }
       }
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("cashier") ? "cashier" : staff.roleCodes[0] ?? null, action: "income.recorded", record_type: "other_income", record_id: row.id, new_values: { income_number: number, source: rebate ? "Endorsement Rebate" : input.source, payer: input.payer, amount_centavos: input.amountCentavos, channel: input.channel, enrollments: input.enrollmentIds } });
+      if (input.enrollmentIds?.length) await owedAgencyShares(admin, input.enrollmentIds, staff.user.id);
       return NextResponse.json({ ok: true, incomeNumber: number });
     }
     if (input.action === "income-void") {
@@ -1835,6 +1852,12 @@ export async function POST(request: Request) {
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "registration", action: "trainee.updated", record_type: "trainee", record_id: input.traineeId, prior_values: prior, new_values: next });
       return NextResponse.json({ ok: true });
     }
+    if (input.action === "other-course-center") {
+      if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Only Registration sets the training center." }, { status: 403 });
+      const { error } = await createSupabaseAdminClient().rpc("set_other_course_center", { target_enrollment: input.enrollmentId, target_offer: input.offerId, target_date: input.scheduledOn, actor: staff.user.id });
+      if (error) return NextResponse.json({ error: /set_other_course_center/.test(error.message) ? "Apply database update 202610200050 first." : error.message }, { status: 400 });
+      return NextResponse.json({ ok: true });
+    }
     if (input.action === "application-handover") {
       if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot hand applications to the Cashier." }, { status: 403 });
       const admin = createSupabaseAdminClient();
@@ -1843,6 +1866,11 @@ export async function POST(request: Request) {
       if (!enrollment) return NextResponse.json({ error: "Application not found." }, { status: 404 });
       if (enrollment.enrollment_status !== "Pending") return NextResponse.json({ error: "Only a Pending application can be handed to the Cashier." }, { status: 400 });
       if (enrollment.handed_to_cashier_at) return NextResponse.json({ ok: true });
+      // An Other STCW course needs its center (and so its fee) before the Cashier can collect.
+      const { data: course } = await admin.from("enrollments").select("partner_offer_id,scheduled_on,courses(delivery_type)").eq("id", input.enrollmentId).maybeSingle();
+      const courseRow = course?.courses as unknown as { delivery_type?: string } | { delivery_type?: string }[] | null;
+      const partner = (Array.isArray(courseRow) ? courseRow[0] : courseRow)?.delivery_type === "Partner or Endorsed";
+      if (partner && (!course?.partner_offer_id || !course.scheduled_on)) return NextResponse.json({ error: "Set the training center and date first." }, { status: 400 });
       const { data: checks, error: checkError } = await admin.from("enrollment_requirement_checks").select("requirement,status,checked_at").eq("enrollment_id", input.enrollmentId).order("checked_at", { ascending: false });
       if (checkError) throw checkError;
       const latest = new Map<string, string>();
@@ -2311,7 +2339,7 @@ export async function POST(request: Request) {
       }
       const { data: same } = await admin.from("partner_course_offers").select("id").eq("partner_center_id", input.partnerCenterId).eq("course_id", course!.id).eq("active", true).maybeSingle();
       if (same) return NextResponse.json({ error: "This partner center already offers that course. Edit its rate instead." }, { status: 400 });
-      const { data: offer, error } = await admin.from("partner_course_offers").insert({ course_id: course!.id, partner_center_id: input.partnerCenterId, duration_label: input.durationLabel, training_fee_centavos: input.trainingFeeCentavos, rebate_centavos: input.rebateCentavos, source_document: "Portal", source_row: 0, source_label: `Encoded by ${staff.user.email ?? "staff"}`, effective_from: new Date().toISOString().slice(0, 10), active: true }).select("id").single();
+      const { data: offer, error } = await admin.from("partner_course_offers").insert({ course_id: course!.id, partner_center_id: input.partnerCenterId, duration_label: input.durationLabel, training_fee_centavos: input.trainingFeeCentavos, rebate_centavos: input.rebateCentavos, ...(input.agencyShareCentavos ? { agency_share_centavos: Math.min(input.agencyShareCentavos, input.rebateCentavos) } : {}), source_document: "Portal", source_row: 0, source_label: `Encoded by ${staff.user.email ?? "staff"}`, effective_from: new Date().toISOString().slice(0, 10), active: true }).select("id").single();
       if (error) return NextResponse.json({ error: /unique|duplicate/i.test(error.message) ? "This program was already added today. Restore it from the archived list." : error.message }, { status: 400 });
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("accounting") ? "accounting" : "admin", action: "catalog.offer_created", record_type: "partner_course_offer", record_id: offer.id, new_values: { course: code, name: input.courseName, fee: input.trainingFeeCentavos, rebate: input.rebateCentavos } });
       return NextResponse.json({ ok: true });
@@ -2622,9 +2650,13 @@ export async function POST(request: Request) {
     if (input.action === "offer-rate-save") {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot edit endorsement rates." }, { status: 403 });
       if (input.rebateCentavos > input.trainingFeeCentavos) throw new Error("Rebate cannot exceed the training fee.");
+      if ((input.agencyShareCentavos ?? 0) > input.rebateCentavos) throw new Error("The agency share cannot be more than the rebate.");
       const admin = createSupabaseAdminClient();
-      const { error } = await admin.from("partner_course_offers").update({ training_fee_centavos: input.trainingFeeCentavos, rebate_centavos: input.rebateCentavos }).eq("id", input.offerId);
-      if (error) throw error;
+      const patch: Record<string, number> = { training_fee_centavos: input.trainingFeeCentavos, rebate_centavos: input.rebateCentavos };
+      if (input.agencyShareCentavos != null) patch.agency_share_centavos = input.agencyShareCentavos;
+      const { error } = await admin.from("partner_course_offers").update(patch).eq("id", input.offerId);
+      if (error) throw new Error(/agency_share/.test(error.message) ? "Apply database update 202610200050 first." : error.message);
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("accounting") ? "accounting" : "admin", action: "catalog.offer_rate_changed", record_type: "partner_course_offer", record_id: input.offerId, new_values: patch });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "payment-split") {

@@ -15,7 +15,8 @@ type Batch = { id: string; number: string; startsOn: string; endsOn: string; ful
 type StcwCourse = { code: string; name: string; duration: string; modality: string; category: string; batches: Batch[] };
 type InHouseCourse = { code: string; name: string; duration: string; modality: string; category: string };
 
-const tabs = ["STCW schedules", "In-House courses"] as const;
+type OtherCourse = { code: string; name: string };
+const tabs = ["STCW schedules", "Other STCW Courses", "In-House courses"] as const;
 type Tab = (typeof tabs)[number];
 
 const fmt = (iso: string, opts: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-PH", { ...opts, timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
@@ -79,24 +80,38 @@ function InHouseList({ courses }: { courses: InHouseCourse[] }) {
   </section>;
 }
 
+/** Other STCW Courses (owner, 20 Oct 2026): held at partnered centers; the course only — Registration confirms the center, date and fee. */
+function OtherList({ courses }: { courses: OtherCourse[] }) {
+  const [query, setQuery] = useState("");
+  const term = query.trim().toLowerCase();
+  const rows = courses.filter((c) => !term || `${c.code} ${c.name}`.toLowerCase().includes(term));
+  return <section className="inhouse-picker">
+    <div className="inhouse-fields"><label>Search<input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Course name or code" /></label></div>
+    <p className="inhouse-note">These STCW courses are held at our partnered training centers. Choose the course in the registration form; our Registration team confirms the training center, schedule and fee with you.</p>
+    <div className="inhouse-table"><table><thead><tr><th>Course</th><th>Code</th></tr></thead><tbody>
+      {rows.map((c) => <tr key={c.code}><td>{c.name}</td><td>{c.code}</td></tr>)}
+    </tbody></table>{!rows.length && <p className="catalog-empty">No course matches.</p>}</div>
+  </section>;
+}
+
 export function PublicCourseCatalog() {
   const [tab, setTab] = useState<Tab>("STCW schedules");
-  const [data, setData] = useState<{ stcw: StcwCourse[]; inHouse: InHouseCourse[] } | null>(null);
+  const [data, setData] = useState<{ stcw: StcwCourse[]; inHouse: InHouseCourse[]; other: OtherCourse[] } | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let live = true;
-    fetch("/api/public/catalog").then((r) => r.json()).then((b) => { if (live) setData({ stcw: b.stcw ?? [], inHouse: b.inHouse ?? [] }); }).catch(() => { if (live) setFailed(true); });
+    fetch("/api/public/catalog").then((r) => r.json()).then((b) => { if (live) setData({ stcw: b.stcw ?? [], inHouse: b.inHouse ?? [], other: b.other ?? [] }); }).catch(() => { if (live) setFailed(true); });
     return () => { live = false; };
   }, []);
   return <div className="catalog-wrap">
     <div className="catalog-tabs" role="tablist" aria-label="Course categories">
-      {tabs.map((item) => <button key={item} role="tab" aria-selected={tab === item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}{data ? <span>{item === "STCW schedules" ? data.stcw.length : data.inHouse.length}</span> : null}</button>)}
+      {tabs.map((item) => <button key={item} role="tab" aria-selected={tab === item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item}{data ? <span>{item === "STCW schedules" ? data.stcw.length : item === "Other STCW Courses" ? data.other.length : data.inHouse.length}</span> : null}</button>)}
     </div>
     {!data ? <div className="catalog-empty">{failed ? "Courses could not be loaded. Please refresh the page." : "Loading courses…"}</div>
       : tab === "STCW schedules" ? <>
         <div className="course-grid">{data.stcw.map((c) => <StcwCard key={c.code} course={c} />)}</div>
         {!data.stcw.length && <div className="catalog-empty">No STCW schedules are open right now.</div>}
-      </> : data.inHouse.length ? <InHouseList courses={data.inHouse} /> : <div className="catalog-empty">No in-house courses are listed right now.</div>}
+      </> : tab === "Other STCW Courses" ? (data.other.length ? <OtherList courses={data.other} /> : <div className="catalog-empty">No other STCW courses are listed right now.</div>) : data.inHouse.length ? <InHouseList courses={data.inHouse} /> : <div className="catalog-empty">No in-house courses are listed right now.</div>}
     <div className="register-banner"><div><b>Ready to enroll?</b><span>Choose up to 5 courses and their schedules in one registration.</span></div><Link className="button button-primary" href="/register">Register Now →</Link></div>
     <p className="catalog-note">Dates come from schedules published by New Wave. Enrollment for STCW courses closes at 7:00 AM on the training date. Course fees are confirmed by our Registration team during screening.</p>
   </div>;
