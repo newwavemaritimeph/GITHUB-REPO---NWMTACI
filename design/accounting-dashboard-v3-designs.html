@@ -1,0 +1,91 @@
+<title>Accounting Dashboard Designs</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+:root{--blue:#0571D0;--orange:#F25615;--navy:#123F63;--bg:#f1f6f9;--surface:#fff;--line:#d8e4ec;--fg:#0f2638;--muted:#5f7180;--soft:#eef6fb;--th:#e3f6fb;--okbg:#e3f4ea;--ok:#15803d;--penbg:#fdf0dc;--pen:#a8570a;--redbg:#fbe4dc;--red:#b42318;--infobg:#e2effc;--info:#0b5cad;--sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--penbg:#3a2a12;--pen:#f2b45c;--redbg:#3c1d16;--red:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--penbg:#3a2a12;--pen:#f2b45c;--redbg:#3c1d16;--red:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}button{font:inherit;color:inherit;cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.bar{background:var(--navy);color:#fff;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}.bar b{letter-spacing:.04em}.bar small{display:block;opacity:.8}
+.page{max-width:1260px;margin:0 auto;padding-block:18px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap}.tabs button{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 13px;font-weight:600;font-size:13.5px}.tabs button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+h1{margin:0;font-size:24px}h2{margin:0;font-size:16px}.lead{margin:0;color:var(--muted);font-size:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;flex-wrap:wrap}.ph small{color:var(--muted)}
+.g2{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:14px;align-items:start}.g3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;align-items:start}.rail{display:grid;grid-template-columns:320px minmax(0,1fr);gap:14px;align-items:start}@media (max-width:960px){.g2,.g3,.rail{grid-template-columns:1fr}}
+.stack{display:flex;flex-direction:column;gap:14px;min-width:0}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13.5px}th{background:var(--th);color:var(--muted);font:600 11px var(--sans);letter-spacing:.07em;text-transform:uppercase;text-align:left;padding:8px 12px;white-space:nowrap}td{padding:8px 12px;border-top:1px solid var(--line);vertical-align:middle}td small{display:block;color:var(--muted);font-size:12px}.r{text-align:right}tfoot td{font-weight:700;background:var(--soft)}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}.o{background:var(--penbg);color:var(--pen)}.g{background:var(--okbg);color:var(--ok)}.rd{background:var(--redbg);color:var(--red)}.b{background:var(--infobg);color:var(--info)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:8px;padding:5px 11px;font-weight:600;font-size:13px;white-space:nowrap}.ap{background:var(--ok);color:#fff;border:0}.rj{color:var(--red)}
+.acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.amt{font:600 14px var(--mono)}.in{color:var(--ok)}.out{color:var(--red)}
+.lines{display:flex;flex-direction:column;gap:6px;padding:0 16px 14px}.lines div{display:flex;justify-content:space-between;gap:10px;font-size:14px}.lines .tot{border-top:1px solid var(--line);padding-top:6px;font-weight:700}.lines span:last-child{font-family:var(--mono);font-weight:600}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}.kpi{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--c);border-radius:12px;padding:10px 14px}.kpi span{display:block;font-size:12.5px;color:var(--muted)}.kpi b{font:600 21px var(--mono)}.kpi small{display:block;color:var(--muted);font-size:12px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden}.seg button{border:0;background:var(--surface);padding:7px 12px;font-weight:600;font-size:13px}.seg button.on{background:var(--navy);color:#fff}.seg b{font:600 11px var(--mono);margin-left:4px;opacity:.75}
+.alert{display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--redbg);color:var(--red);border-radius:10px;padding:9px 14px;font-size:13.5px;font-weight:500;flex-wrap:wrap}.alert.w{background:var(--penbg);color:var(--pen)}
+.inbox .grp{padding:8px 16px;background:var(--soft);font-weight:700;font-size:13.5px;display:flex;justify-content:space-between}.item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;padding:10px 16px;border-top:1px solid var(--line);align-items:center}.item small{color:var(--muted);display:block;font-size:12.5px}
+.stmt{padding:4px 18px 16px;font-size:14.5px}.stmt div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--line)}.stmt .h{font-weight:700;color:var(--navy);border:0;padding-top:12px}.stmt .t{font-weight:700;border-bottom:2px solid var(--fg)}.stmt span:last-child{font-family:var(--mono)}
+.legend{font-size:12.5px;color:var(--muted)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:13.5px;max-width:calc(100% - 32px)}
+</style>
+
+<div class="bar"><b>NEW WAVE MARITIME · ACCOUNTING</b><small>Dashboard · 5 designs · sample data, not real records · pick one</small></div>
+<main class="page">
+  <nav class="tabs" id="tabs"></nav>
+  <div><h1 id="title"></h1><p class="lead" id="lead"></p></div>
+  <div id="view"></div>
+  <p class="legend">Every design has: Requests and Approvals (with Approve / Reject), Collections per channel and per source, Positions (cash, banks and GCash, receivables, payables), and alerts (GCash not reconciled, cash short or over). Lists show 10 per page.</p>
+</main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const AP=[
+ {k:"Expense",w:"Office supplies · Shopee",a:125000,by:"Cashier · 10:30 AM",n:"2 receipt photos"},
+ {k:"Expense",w:"LBC courier",a:50000,by:"Cashier · 11:05 AM",n:"1 receipt photo"},
+ {k:"Requisition",w:"RQ-2026-0014 · Coffee beans, cups",a:180000,by:"Admin Assistant · 9:12 AM",n:"Needed Oct 22"},
+ {k:"Discount",w:"LIM, MARIA · UBT-PSSR · 10%",a:13000,by:"Cashier · 1:20 PM",n:"Agency letter attached"},
+ {k:"Refund",w:"TORRES, LEO · PSCMHBT",a:80000,by:"Registration · yesterday",n:"Cancelled 6 days before"},
+ {k:"Voucher Reprint",w:"CV-2026-000120",a:0,by:"Cashier · yesterday",n:"Paper jam"},
+ {k:"Rescheduling",w:"GARCIA, ANA · UBT-PSSR → Oct 27",a:30000,by:"Registration · 8:50 AM",n:"Fee paid"},
+];
+const CH=[["Cash","#15803d",1850000,420000],["GCash","#0571D0",1260000,0],["PSBank","#123F63",600000,150000],["UnionBank","#F25615",300000,0]];
+const SRC=[["Walk-in",2460000,14],["Agencies",1150000,4],["Consultancies",400000,1]];
+const POS={cash:1930000,banks:[["GCash",5640000],["PSBank",12850000],["UnionBank",3120000]],recv:2840000,recvN:9,pay:965000,payN:5,rebates:120000};
+const ALERTS=[["3 GCash payments not reconciled · oldest Oct 18","rd"],["Cashier closing Oct 19 · ₱20.00 short","w"]];
+const peso=(c)=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
+const tIn=CH.reduce((a,c)=>a+c[2],0),tOut=CH.reduce((a,c)=>a+c[3],0);
+const kinds=[...new Set(AP.map((x)=>x.k))];
+let f1="All";
+const apTable=(list=AP)=>`<div class="wrap"><table><thead><tr><th>Request</th><th class="r">Amount</th><th>From</th><th></th></tr></thead><tbody>${list.map((x)=>`<tr><td><b>${x.k}</b><small>${x.w} · ${x.n}</small></td><td class="r amt">${x.a?peso(x.a):"—"}</td><td><small style="color:var(--fg)">${x.by}</small></td><td><div class="acts"><button class="btn ap" data-t="Approved: ${x.k}">Approve</button><button class="btn rj" data-t="Reject asks for a reason">Reject</button></div></td></tr>`).join("")}</tbody></table></div>`;
+const kindSeg=()=>`<span class="seg">${["All",...kinds].map((k)=>`<button data-k="${k}" class="${f1===k?"on":""}">${k}<b>${k==="All"?AP.length:AP.filter((x)=>x.k===k).length}</b></button>`).join("")}</span>`;
+const chTable=()=>`<div class="wrap"><table><thead><tr><th>Channel</th><th class="r">Collected</th><th class="r">Released</th><th class="r">Net</th></tr></thead><tbody>${CH.map(([n,c,i,o])=>`<tr><td><b style="color:${c}">●</b> ${n}</td><td class="r amt in">${peso(i)}</td><td class="r amt out">${o?"− "+peso(o):"—"}</td><td class="r amt">${peso(i-o)}</td></tr>`).join("")}</tbody><tfoot><tr><td>Total</td><td class="r amt in">${peso(tIn)}</td><td class="r amt out">− ${peso(tOut)}</td><td class="r amt">${peso(tIn-tOut)}</td></tr></tfoot></table></div>`;
+const srcLines=()=>`<div class="lines">${SRC.map(([n,a,k])=>`<div><span>${n} · ${k}</span><span>${peso(a)}</span></div>`).join("")}<div class="tot"><span>Total collected</span><span>${peso(tIn)}</span></div></div>`;
+const posLines=()=>`<div class="lines"><div><span>Cash on hand</span><span>${peso(POS.cash)}</span></div>${POS.banks.map(([n,a])=>`<div><span>${n}</span><span>${peso(a)}</span></div>`).join("")}<div class="tot"><span>Cash and banks</span><span>${peso(POS.cash+POS.banks.reduce((a,b)=>a+b[1],0))}</span></div><div><span>Receivables · ${POS.recvN} trainees</span><span class="in">${peso(POS.recv)}</span></div><div><span>Payables · ${POS.payN} due</span><span class="out">${peso(POS.pay)}</span></div><div><span>Rebates owed to agencies</span><span class="out">${peso(POS.rebates)}</span></div></div>`;
+const alerts=()=>ALERTS.map(([t,c])=>`<div class="alert ${c==="w"?"w":""}"><span>⚠ ${t}</span><button class="btn" data-t="Opens the detail">Open</button></div>`).join("");
+const kpis=()=>`<div class="kpis">${[["Collections today",peso(tIn),"19 receipts","#15803d"],["Expenses released",peso(tOut),"3 vouchers","#b42318"],["Net today",peso(tIn-tOut),"collections − expenses","#123F63"],["For approval",String(AP.length),"oldest yesterday","#F25615"],["Receivables",peso(POS.recv),POS.recvN+" trainees","#0571D0"],["Payables due",peso(POS.pay),POS.payN+" bills","#a8570a"]].map(([a,b,c,col])=>`<div class="kpi" style="--c:${col}"><span>${a}</span><b>${b}</b><small>${c}</small></div>`).join("")}</div>`;
+let per="Daily";
+const D=[
+ {t:"1 · Approvals First",l:"The approval list is the first and biggest panel, filtered by type. Collections, Positions and Alerts sit in three columns underneath.",
+  r:()=>`${alerts()}<section class="panel"><div class="ph"><h2>Requests and Approvals</h2>${kindSeg()}</div>${apTable(AP.filter((x)=>f1==="All"||x.k===f1))}</section>
+   <div class="g3"><section class="panel"><div class="ph"><h2>Collections</h2><small>by source</small></div>${srcLines()}</section><section class="panel"><div class="ph"><h2>Per Channel</h2></div><div class="lines">${CH.map(([n,,i,o])=>`<div><span>${n}</span><span><span class="in">${peso(i)}</span>${o?` / <span class="out">−${peso(o)}</span>`:""}</span></div>`).join("")}</div></section><section class="panel"><div class="ph"><h2>Positions</h2></div>${posLines()}</section></div>`},
+ {t:"2 · Finance Rail",l:"Like the Cashier's Cash Rail: Positions and Collections down the left, the approvals and the channel table on the right.",
+  r:()=>`<div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>Positions</h2><small>as of now</small></div>${posLines()}</section><section class="panel"><div class="ph"><h2>Collections Today</h2></div>${srcLines()}</section>${alerts()}</div>
+   <div class="stack"><section class="panel"><div class="ph"><h2>Requests and Approvals</h2>${kindSeg()}</div>${apTable(AP.filter((x)=>f1==="All"||x.k===f1))}</section><section class="panel"><div class="ph"><h2>Payments and Expenses per Channel</h2></div>${chTable()}</section></div></div>`},
+ {t:"3 · KPI Strip",l:"Six figures across the top (collections, expenses, net, approvals waiting, receivables, payables), then approvals beside the channel table.",
+  r:()=>`${kpis()}${alerts()}<div class="g2"><section class="panel"><div class="ph"><h2>Requests and Approvals</h2><small>${AP.length} waiting</small></div>${apTable()}</section><div class="stack"><section class="panel"><div class="ph"><h2>Per Channel</h2></div>${chTable()}</section><section class="panel"><div class="ph"><h2>Positions</h2></div>${posLines()}</section></div></div>`},
+ {t:"4 · Approval Inbox",l:"Approvals as an inbox grouped by type with the amount and reason on each line; a narrow summary column on the right.",
+  r:()=>`<div class="g2"><section class="panel inbox"><div class="ph"><h2>Approval Inbox</h2><span class="pill o">${AP.length} waiting</span></div>${kinds.map((k)=>{const l=AP.filter((x)=>x.k===k);return `<div class="grp"><span>${k}</span><span class="mono">${l.length}</span></div>`+l.map((x)=>`<div class="item"><div><b>${x.w}</b><small>${x.by} · ${x.n}</small></div><div class="acts"><span class="amt">${x.a?peso(x.a):""}</span><button class="btn ap" data-t="Approved">Approve</button><button class="btn rj" data-t="Reject asks for a reason">Reject</button></div></div>`).join("")}).join("")}</section>
+   <div class="stack">${alerts()}<section class="panel"><div class="ph"><h2>Today</h2></div><div class="lines"><div><span>Collected</span><span class="in">${peso(tIn)}</span></div><div><span>Released</span><span class="out">− ${peso(tOut)}</span></div><div class="tot"><span>Net</span><span>${peso(tIn-tOut)}</span></div></div></section><section class="panel"><div class="ph"><h2>Positions</h2></div>${posLines()}</section></div></div>`},
+ {t:"5 · Statement View",l:"A Daily / Weekly / Monthly statement (Collections − Expenses = Net, then Positions) with the approval count as a banner that opens the list.",
+  r:()=>`<div class="alert w"><span>${AP.length} requests waiting for your approval · oldest yesterday</span><button class="btn" data-t="Opens the approval list">Review Now</button></div>
+   <div class="g2"><section class="panel"><div class="ph"><h2>Statement</h2><span class="seg">${["Daily","Weekly","Monthly"].map((p)=>`<button data-per="${p}" class="${per===p?"on":""}">${p}</button>`).join("")}</span></div>
+     <div class="stmt"><div class="h"><span>Collections</span><span></span></div>${SRC.map(([n,a])=>`<div><span>&nbsp;&nbsp;${n}</span><span>${peso(a)}</span></div>`).join("")}<div class="t"><span>Total collections</span><span>${peso(tIn)}</span></div>
+     <div class="h"><span>Less: Expenses released</span><span></span></div>${CH.filter((c)=>c[3]).map(([n,,,o])=>`<div><span>&nbsp;&nbsp;${n}</span><span>(${peso(o)})</span></div>`).join("")}<div class="t"><span>Net</span><span>${peso(tIn-tOut)}</span></div></div></section>
+   <div class="stack"><section class="panel"><div class="ph"><h2>Positions</h2></div>${posLines()}</section>${alerts()}</div></div>`},
+];
+let cur=0;
+function render(){document.getElementById("tabs").innerHTML=D.map((d,i)=>`<button class="${i===cur?"on":""}" data-i="${i}">${d.t}</button>`).join("");document.getElementById("title").textContent=D[cur].t;document.getElementById("lead").textContent=D[cur].l;document.getElementById("view").innerHTML=D[cur].r();}
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>el.hidden=true,2600)}
+document.addEventListener("click",(e)=>{const b=e.target.closest("[data-i],[data-k],[data-per],[data-t]");if(!b)return;const d=b.dataset;if(d.i){cur=+d.i;render()}else if(d.k){f1=d.k;render()}else if(d.per){per=d.per;render()}else toast(d.t)});
+render();
+</script>

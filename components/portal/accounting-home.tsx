@@ -370,59 +370,50 @@ export function AccountingHome({ data, reload, go }: { data: PortalData; reload:
   const total = CHANNELS.reduce((s, c) => s + colOf(c), 0), receipts = CHANNELS.reduce((s, c) => s + countOf(c), 0);
   const durations = new Map(data.courses.map((c) => [c.id, c.duration_label]));
   const unpaid = unpaidAfterTraining(data.enrollments as unknown as BalanceEnrollment[], (id) => durations.get(id), today);
-  const last7 = w ? w.series.slice(-7) : [];
   const p = r?.position;
+  // Finance Rail (owner's choice, 20 Oct 2026): positions and collections on the left; approvals and channels on the right.
+  const released = (ch: string) => r?.expenseTotals.find((t) => t.channel === ch)?.totalCentavos ?? 0;
+  const releasedTotal = r ? r.expenses.reduce((x, e) => x + e.amountCentavos, 0) : 0;
+  const bills = data.payables.filter((x) => x.status !== "Paid");
+  const billsTotal = bills.reduce((x, b) => x + Number(b.amount_centavos), 0);
+  const receivable = unpaid.reduce((x, u) => x + u.balanceCentavos, 0);
+  const shortOver = data.cashierClosings.filter((c) => c.closing_date >= addDays(today, -6) && c.status !== "Reviewed" && Number(c.variance_centavos ?? 0) !== 0);
   return <div className="portal-page cx ac">
     <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Dashboard</h1></div>
       <div className="ac-day"><button type="button" aria-label="Previous day" onClick={() => setDate(addDays(date, -1))}>‹</button><input type="date" aria-label="Date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} /><button type="button" aria-label="Next day" disabled={date >= today} onClick={() => setDate(addDays(date, 1))}>›</button></div></div>
     <p className="ac-note">{longDay(date)} · view only — the Cashier records payments and expenses.</p>
     {dayReport.error && <Message kind="error" text={dayReport.error} />}
-    {/* Summary rail (owner's choice, design 2, 8 Oct 2026): figures in one narrow column, approvals and charts on the right. */}
+    {shortOver.map((c) => <div key={c.id} className="cl-admin-alarm"><p className="ac-note fr-warn">⚠ Cashier closing {fmtDate(c.closing_date)} · {Number(c.variance_centavos) < 0 ? "short" : "over"} {pesos2(Math.abs(Number(c.variance_centavos)))} <button type="button" className="portal-secondary" onClick={() => go("Cash position")}>Review</button></p></div>)}
     <div className="ac-rail">
       <div className="ac-stack">
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Positions</h2><span className="muted-text">as of now</span></div>
+          <dl className="ac-lines">
+            <div><dt>Cash on hand</dt><dd>{p ? pesos2(p.onHandCentavos) : "…"}</dd></div>
+            {p && p.countedCentavos != null && <div><dt>Counted · over / short</dt><dd className={p.overShortCentavos ? (p.overShortCentavos < 0 ? "minus" : "plus") : ""}>{pesos2(p.countedCentavos)}{p.overShortCentavos ? ` · ${pesos2(p.overShortCentavos)}` : ""}</dd></div>}
+            <div><dt>Bank and e-wallet collected</dt><dd>{pesos2(total - colOf("Cash"))}</dd></div>
+            <div><dt>Receivables · {new Set(unpaid.map((u) => u.traineeId)).size} after training</dt><dd className="plus">{pesos2(receivable)}</dd></div>
+            <div><dt>Payables · {bills.length} open</dt><dd className="minus">{pesos2(billsTotal)}</dd></div>
+            <div><dt>Rebates owed to agencies</dt><dd className="minus">{pesos2(w?.current.rebatesOwed ?? 0)}</dd></div>
+          </dl>
+          <div className="ac-more"><button type="button" onClick={() => go("Receivables")}>Receivables</button> <button type="button" onClick={() => go("Payables")}>Payables</button> <button type="button" onClick={() => go("Cash position")}>Cash Position</button></div>
+        </section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections</h2><strong className="cx-mono">{pesos2(total)}</strong></div>
-          <div className="cx-tiles ac-tiles ac-tiles-in">
-            {CHANNELS.map((c) => <div className="cx-tile" key={c} style={{ ["--c" as string]: COLORS[c] }}><span>{c}</span><b>{pesos2(colOf(c))}</b><small>{countOf(c)} receipt{countOf(c) === 1 ? "" : "s"}</small></div>)}
-            <div className="cx-tile ac-total"><span>Total collected</span><b>{pesos2(total)}</b><small>{receipts} receipt{receipts === 1 ? "" : "s"}</small></div>
-          </div>
-          {r && <p className="ac-split">{r.matrix.map((m) => <span key={m.source}>{m.source} <b className="cx-mono">{pesos2(m.totalCentavos)}</b></span>)}</p>}
-        </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Cash Position</h2><span className="muted-text">cash only</span></div>
-          {p ? <dl className="ac-lines">
-            <div><dt>Previous cash</dt><dd>{pesos2(p.previousCentavos)}</dd></div>
-            <div><dt>+ Cash collected</dt><dd className="plus">{pesos2(p.cashCollectedCentavos)}</dd></div>
-            <div><dt>− Cash expenses</dt><dd className="minus">{pesos2(p.cashExpensesCentavos)}</dd></div>
-            <div className="total"><dt>= Cash on hand</dt><dd className="eq">{pesos2(p.onHandCentavos)}</dd></div>
-            <div><dt>Counted at closing</dt><dd>{p.countedCentavos == null ? "Not yet" : pesos2(p.countedCentavos)}</dd></div>
-            <div><dt>Over / short</dt><dd className={p.overShortCentavos ? (p.overShortCentavos < 0 ? "minus" : "plus") : ""}>{p.overShortCentavos == null ? "—" : pesos2(p.overShortCentavos)}</dd></div>
-          </dl> : <p className="portal-empty-copy">Loading…</p>}
-          {p?.previousNote && <p className="ac-foot">{p.previousNote}</p>}
-        </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Rebates</h2></div>
-          <dl className="ac-lines"><div><dt>Deducted from payments</dt><dd>{pesos2(w?.current.rebatesDeducted ?? 0)}</dd></div><div><dt>Owed to agencies</dt><dd className="warn">{pesos2(w?.current.rebatesOwed ?? 0)}</dd></div></dl>
-          {w && w.current.owedByAgency.length > 0 && <table className="ac-mini"><tbody>{w.current.owedByAgency.slice(0, 5).map((o) => <tr key={o.name}><td>{o.name}</td><td>{o.count} trainee{o.count === 1 ? "" : "s"}</td><td className="r cx-mono">{pesos2(o.total)}</td></tr>)}</tbody></table>}
-          <div className="ac-more"><button type="button" onClick={() => go("Payables")}>View Payables</button></div>
-        </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Unpaid After Training</h2></div>
-          <dl className="ac-lines"><div><dt>Balance</dt><dd className="minus">{pesos2(unpaid.reduce((s, u) => s + u.balanceCentavos, 0))}</dd></div><div><dt>Trainees</dt><dd>{new Set(unpaid.map((u) => u.traineeId)).size}</dd></div></dl>
-          <div className="ac-more"><button type="button" onClick={() => go("Receivables")}>View Receivables</button></div>
+          <dl className="ac-lines">
+            {(r?.matrix ?? []).map((m) => <div key={m.source}><dt>{m.source}</dt><dd>{pesos2(m.totalCentavos)}</dd></div>)}
+            <div className="total"><dt>Total · {receipts} receipt{receipts === 1 ? "" : "s"}</dt><dd className="eq">{pesos2(total)}</dd></div>
+            <div><dt>Rebates deducted</dt><dd>{pesos2(w?.current.rebatesDeducted ?? 0)}</dd></div>
+          </dl>
         </section>
       </div>
-
       <div className="ac-stack">
         <AccountingApprovals data={data} reload={reload} compact />
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Last 7 Days</h2><span className="muted-text">collections and expenses</span></div>
-          {last7.length ? <BarChart label="Collections and Expenses, Last 7 Days" labels={last7.map((b) => b.label)} series={[{ name: "Collections", color: "#0571D0", values: last7.map((b) => b.collections) }, { name: "Expenses released", color: "#F25615", values: last7.map((b) => b.expenses) }]} /> : <p className="portal-empty-copy">{week.error || "Loading…"}</p>}
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Payments and Expenses per Channel</h2><span className="muted-text">{fmtDate(date)}</span></div>
+          <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Channel</th><th className="r">Collected</th><th className="r">Released</th><th className="r">Net</th></tr></thead><tbody>
+            {CHANNELS.map((c) => <tr key={c}><td data-l="" className="lead"><span className="cr-dot" style={{ background: COLORS[c] }} />{c}<small>{countOf(c)} receipt{countOf(c) === 1 ? "" : "s"}</small></td><td data-l="Collected" className="r cx-amt">{pesos2(colOf(c))}</td><td data-l="Released" className="r cx-amt">{released(c) ? `− ${pesos2(released(c))}` : "—"}</td><td data-l="Net" className="r"><strong className="cx-amt">{pesos2(colOf(c) - released(c))}</strong></td></tr>)}
+            <tr className="nb-group"><td data-l="" className="lead"><b>Total</b></td><td data-l="Collected" className="r cx-amt"><b>{pesos2(total)}</b></td><td data-l="Released" className="r cx-amt"><b>− {pesos2(releasedTotal)}</b></td><td data-l="Net" className="r cx-amt"><b>{pesos2(total - releasedTotal)}</b></td></tr>
+          </tbody></table></div>
+          <div className="ac-more"><button type="button" onClick={() => go("Expenses")}>View Vouchers</button></div>
         </section>
-        <div className="ac-grid2">
-          <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By Channel</h2><span className="muted-text">{fmtDate(date)}</span></div>
-            <Donut label="Collections by Channel" parts={CHANNELS.map((c) => ({ name: c, color: COLORS[c], value: colOf(c) }))} />
-          </section>
-          <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Expenses Released</h2><strong className="cx-mono">{pesos2(r ? r.expenses.reduce((s, e) => s + e.amountCentavos, 0) : 0)}</strong></div>
-            {r && r.expenseTotals.length ? <HBars rows={r.expenseTotals.map((t) => ({ name: t.channel, value: t.totalCentavos, color: COLORS[t.channel] }))} /> : <p className="portal-empty-copy">No expenses released.</p>}
-            <div className="ac-more"><button type="button" onClick={() => go("Expenses")}>View Vouchers</button></div>
-          </section>
-        </div>
       </div>
     </div>
   </div>;
