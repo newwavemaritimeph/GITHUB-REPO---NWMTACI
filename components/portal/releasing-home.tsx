@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { PortalData, Enrollment } from "../portal-live-app";
 import { addDays, first, manilaToday, dueCentavos, pesos2 } from "@/lib/portal-format";
 import { automaticEndDate } from "@/lib/scheduling";
-import { canPrint, canSetSeries, certificateState, formatCertificateNumber, isStcwCategory, type CertificateView } from "@/lib/certificate-rules";
+import { canPrint, canSetSeries, certificateState, evaluationRequiredFor, formatCertificateNumber, nextOf, isStcwCategory, matchTemplateFiles, releaseProblem, type CertificateView } from "@/lib/certificate-rules";
 import { Badge, Message, fmtDate, usePost } from "./shared-ui";
 import { ReleaseConfirm } from "./live-releasing";
 import { DeliveryAlert } from "./delivery-home";
@@ -20,14 +20,14 @@ import { legacyRowsFromCsv, type ImportResult, type LegacyRow } from "@/lib/lega
  * The Admin sets the numbering and decides void requests (AdminCertificateControls).
  */
 
-type CertRow = { id: string; enrollment_id: string; status: string; certificate_number?: string | null; batch_label?: string | null; print_count?: number | null; reprints_allowed?: number | null; void_status?: string | null; void_reason?: string | null; void_requested_at?: string | null; soft_copy_sent_at?: string | null; snapshot?: Record<string, unknown> | null; claimant_name?: string | null; release_method?: string | null };
+type CertRow = { id: string; enrollment_id: string; status: string; certificate_number?: string | null; batch_label?: string | null; print_count?: number | null; reprints_allowed?: number | null; void_status?: string | null; void_reason?: string | null; void_requested_at?: string | null; soft_copy_sent_at?: string | null; snapshot?: Record<string, unknown> | null; claimant_name?: string | null; release_method?: string | null; revoked_at?: string | null; revoked_reason?: string | null; sticker_no?: string | null };
 type Series = { course_id: string; prefix: string; next_number: number; pad: number; batch_prefix: string; next_batch: number; set_at: string; reg_prefix?: string; reg_next?: number | null; reg_digits?: number; reg_style?: "month-number" | "number-month"; profiles?: { complete_name: string } | { complete_name: string }[] | null };
 type Template = { id: string; course_id: string; version: number; active: boolean; drive_link?: string | null; storage_path?: string | null; approved_at?: string | null };
 const stcwCourse = (c: { course_categories?: unknown }) => isStcwCategory((Array.isArray(c.course_categories) ? c.course_categories[0] : c.course_categories as { name?: string } | null)?.name);
 type Photo = { enrollment_id: string; file_name: string; background_white: boolean; uploaded_at: string; replaced_at?: string | null; profiles?: { complete_name: string } | { complete_name: string }[] | null };
-type CertData = PortalData & { certificateSeries?: Series[]; evaluationForms?: Record<string, string>; feedbackAt?: Record<string, string>; certificatePhotos?: Photo[] | null };
+type CertData = PortalData & { certificateSeries?: Series[]; evaluationForms?: Record<string, string>; feedbackAt?: Record<string, string>; feedbackLinks?: Record<string, string>; certificatePhotos?: Photo[] | null };
 
-export type CertificateLine = { e: Enrollment; cert: CertRow | null; view: CertificateView; name: string; number: string; course: { id: string; name: string; code: string }; starts: string | null; ended: string | null; evalNeeded: boolean; evalDone: boolean; balance: number; photo: Photo | null; fileName: string };
+export type CertificateLine = { e: Enrollment; cert: CertRow | null; view: CertificateView; name: string; number: string; course: { id: string; name: string; code: string }; starts: string | null; ended: string | null; evalNeeded: boolean; evalDone: boolean; evalLink: string | null; balance: number; photo: Photo | null; fileName: string };
 
 const day = (v?: string | null) => (v ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(v)) : null);
 const short = (d: string | null) => (d ? new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T00:00:00+08:00`)) : "—");
@@ -54,23 +54,23 @@ export function certificateLines(data: PortalData, opts: { inTrainingDays?: numb
     const b = first(e.batches);
     const ended = b?.ends_on ?? (e.scheduled_on ? automaticEndDate(e.scheduled_on, c.duration_label) : null);
     const cert = certs.get(e.id) ?? null;
-    // Google Classroom courses need the evaluation from their classwork; so does any course linked to a form.
-    const evalNeeded = !!d.evaluationForms?.[c.id] || !!c.google_classroom_link;
+    // The portal evaluation form (owner, 20 Oct 2026): every New Wave course needs it.
+    const evalNeeded = evaluationRequiredFor(c.delivery_type, e.partner_offer_id);
     const fb = d.feedbackAt?.[e.id] ?? null;
     const balance = Math.max(0, dueCentavos(e) - Number(e.paid_centavos));
-    const view = certificateState({ enrollmentStatus: e.enrollment_status, trainingEnd: ended, balanceCentavos: balance, evaluationRequired: evalNeeded, evaluationOn: day(fb), paidOn: lastPaid.get(e.trainee_id) ?? null, cert: cert ? { status: cert.status, printCount: Number(cert.print_count ?? (["Printed", "Released"].includes(cert.status) ? 1 : 0)), reprintsAllowed: Number(cert.reprints_allowed ?? 0), voidStatus: cert.void_status } : null, photoOnFile: photos ? photos.has(e.id) : undefined }, today);
+    const view = certificateState({ enrollmentStatus: e.enrollment_status, trainingEnd: ended, balanceCentavos: balance, evaluationRequired: evalNeeded, evaluationOn: day(fb), paidOn: lastPaid.get(e.trainee_id) ?? null, cert: cert ? { status: cert.status, printCount: Number(cert.print_count ?? (["Printed", "Released"].includes(cert.status) ? 1 : 0)), reprintsAllowed: Number(cert.reprints_allowed ?? 0), voidStatus: cert.void_status, revoked: !!cert.revoked_at } : null, photoOnFile: photos ? photos.has(e.id) : undefined }, today);
     if (view.state === "Cancelled") continue;
     if (view.state === "Training not finished" && (opts.inTrainingDays === undefined || !ended || ended > addDays(today, opts.inTrainingDays))) continue;
     const t = first(e.trainees);
     const fileName = photoFileName({ lastName: t?.legal_last_name ?? "TRAINEE", firstName: t?.legal_first_name ?? "", middleName: (t as { legal_middle_name?: string | null } | null)?.legal_middle_name, courseCode: c.code, batchNumber: b?.batch_number ?? null, date: ended ?? today });
-    lines.push({ e, cert, view, photo: photos?.get(e.id) ?? null, fileName, name: t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : e.enrollment_number, number: data.applicationNumbers?.[e.trainee_id] ?? t?.trainee_number ?? e.enrollment_number, course: { id: c.id, name: c.name, code: c.code }, starts: b?.starts_on ?? e.scheduled_on ?? null, ended, evalNeeded, evalDone: !!fb, balance });
+    lines.push({ e, cert, view, photo: photos?.get(e.id) ?? null, fileName, name: t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : e.enrollment_number, number: data.applicationNumbers?.[e.trainee_id] ?? t?.trainee_number ?? e.enrollment_number, course: { id: c.id, name: c.name, code: c.code }, starts: b?.starts_on ?? e.scheduled_on ?? null, ended, evalNeeded, evalDone: !!fb, evalLink: d.feedbackLinks?.[e.id] ?? null, balance });
   }
   const rank = (l: CertificateLine) => (l.view.overdue ? 0 : l.view.state === "Due" ? 1 : l.view.state === "Waiting for photo" ? 2 : l.view.state === "Void requested" ? 2 : l.view.state === "Waiting for payment" || l.view.state === "Waiting for evaluation" ? 3 : 4);
   return lines.sort((a, b) => rank(a) - rank(b) || (a.ended ?? "").localeCompare(b.ended ?? ""));
 }
 
-const STATES: [string, string][] = [["Due", "#0571D0"], ["Waiting for photo", "#c2410c"], ["Waiting for evaluation", "#7a3fb8"], ["Waiting for payment", "#F25615"], ["Printed", "#0a7a3e"], ["Released", "#5d6f7e"], ["Void requested", "#b42318"]];
-const tone = (l: CertificateLine) => (l.view.overdue ? "red" : l.view.state === "Due" ? "blue" : l.view.state === "Printed" ? "green" : l.view.state === "Void requested" ? "red" : l.view.state === "Waiting for payment" || l.view.state === "Waiting for photo" ? "orange" : undefined);
+const STATES: [string, string][] = [["Due", "#0571D0"], ["Waiting for photo", "#c2410c"], ["Waiting for evaluation", "#7a3fb8"], ["Waiting for payment", "#F25615"], ["Printed", "#0a7a3e"], ["Released", "#5d6f7e"], ["Void requested", "#b42318"], ["Revoked", "#8a1c12"]];
+const tone = (l: CertificateLine) => (l.view.overdue ? "red" : l.view.state === "Due" ? "blue" : l.view.state === "Printed" ? "green" : l.view.state === "Void requested" || l.view.state === "Revoked" ? "red" : l.view.state === "Waiting for payment" || l.view.state === "Waiting for photo" ? "orange" : undefined);
 const label = (l: CertificateLine) => (l.view.overdue ? "Overdue" : l.view.state === "Waiting for evaluation" ? "Evaluation" : l.view.state === "Waiting for photo" ? "Photo needed" : l.view.state === "Waiting for payment" ? "Payment" : l.view.state === "Printed" && l.view.printsLeft > 0 ? "Reprint ready" : l.view.state);
 
 /** Red alarm: due certificates not printed by the end of their due day. */
@@ -119,7 +119,7 @@ function CertificateLog({ data, lines, reload }: { data: PortalData; lines: Cert
           <td title={l.course.name}>{l.course.code} <span className="cl-sub">· {short(l.ended)}</span></td>
           <td className="cl-mono">{l.cert?.certificate_number ?? <span className="cl-sub">—</span>}</td>
           <td>{l.balance > 0 ? <span className="cl-x" title={`Balance ${pesos2(l.balance)}`}>✗</span> : <span className="cl-y">✓</span>}</td>
-          <td>{!l.evalNeeded ? <span className="cl-sub">—</span> : l.evalDone ? <span className="cl-y">✓</span> : <span className="cl-x">✗</span>}</td>
+          <td>{!l.evalNeeded ? <span className="cl-sub">—</span> : l.evalLink ? <a className="cl-y" href={l.evalLink} target="_blank" rel="noreferrer" title="Open the evaluation PDF in Google Drive">✓ PDF</a> : l.evalDone ? <span className="cl-y">✓</span> : <span className="cl-x">✗</span>}</td>
           {tracked && <td>{l.photo ? <button type="button" className="cl-photo" title={l.photo.file_name} onClick={() => void openCertificatePhoto(l.e.id)}>✓ On File</button> : <button type="button" className="portal-secondary cl-upload" onClick={() => setUploading(l)}>Upload Photo</button>}</td>}
           <td className="cl-mono">{l.view.printCount}/{l.view.printsAllowed}</td>
           <td><Badge tone={tone(l)}>{label(l)}</Badge>{l.view.state === "Waiting for payment" && <small className="cl-sub cl-block">{pesos2(l.balance)} due</small>}</td>
@@ -128,7 +128,7 @@ function CertificateLog({ data, lines, reload }: { data: PortalData; lines: Cert
             {printed && l.view.state !== "Void requested" && <details className="cl-more"><summary aria-label="More actions">▾</summary><div>
               <button type="button" disabled={busy} onClick={() => { setVoiding(l.e.id); setReason(""); }}>Request Void</button>
               <button type="button" disabled={busy} onClick={() => void post({ action: "certificate-soft-copy", enrollmentId: l.e.id }, "Soft copy emailed.").catch(() => undefined)}>Email Soft Copy</button>
-              {l.view.state === "Printed" && <button type="button" onClick={() => setReleasing(l)}>Release</button>}
+              {l.view.state === "Printed" && <ReleaseButton l={l} onRelease={() => setReleasing(l)} />}
             </div></details>}
             {l.view.state === "Void requested" && <span className="cl-sub">With the Admin</span>}
           </span></td>
@@ -165,7 +165,7 @@ export function ReleasingHome({ data, reload, go }: { data: PortalData; reload: 
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Certificates</h2></div><StateColumn lines={lines} /></section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Today</h2></div>
           <dl className="ac-lines"><div><dt>Printed today</dt><dd>{certs.filter((c) => day((c as { printed_at?: string | null }).printed_at) === today).length}</dd></div><div><dt>Reprints approved, not printed</dt><dd>{lines.filter((l) => l.view.printCount > 0 && l.view.printsLeft > 0).length}</dd></div><div><dt>Soft copies emailed</dt><dd>{certs.filter((c) => day(c.soft_copy_sent_at) === today).length}</dd></div></dl>
-          <p className="ac-foot">Due means the training ended, the fee is settled and, for courses with a Google Form, the evaluation is in.</p>
+          <p className="ac-foot">Due means the training ended and the fee is settled. {"Release also needs the trainee's evaluation, submitted on the Trainee Status page."}</p>
         </section>
       </div>
       <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Due to Print</h2><span className="slot-count">{due.length}</span></div><CertificateLog data={data} lines={due} reload={reload} /></section>
@@ -198,7 +198,8 @@ export function CertificatesWorkspace({ data, reload }: { data: PortalData; relo
 }
 
 /** What each waiting certificate is held up by, in the order the rules check them. */
-const WAITING: [CertificateView["state"], string, string][] = [["Training not finished", "In Training", "#64748b"], ["Waiting for payment", "Payment", "#F25615"], ["Waiting for evaluation", "Evaluation", "#7a3fb8"], ["Waiting for photo", "Photo Needed", "#c2410c"]];
+// Unpaid trainees are not listed (owner, 20 Oct 2026): they reach Waiting once paid.
+const WAITING: [CertificateView["state"], string, string][] = [["Training not finished", "In Training", "#64748b"], ["Waiting for evaluation", "Evaluation", "#7a3fb8"], ["Waiting for photo", "Photo Needed", "#c2410c"]];
 const WAIT_DAYS = 14;
 
 /**
@@ -212,7 +213,7 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
   const [uploading, setUploading] = useState<CertificateLine | null>(null);
   const today = manilaToday(), tomorrow = addDays(today, 1);
   const tracked = (data as CertData).certificatePhotos != null;
-  const lines = certificateLines(data, { inTrainingDays: WAIT_DAYS }).filter((l) => WAITING.some(([s]) => s === l.view.state)).sort((a, b) => (a.ended ?? "").localeCompare(b.ended ?? ""));
+  const lines = certificateLines(data, { inTrainingDays: WAIT_DAYS }).filter((l) => l.balance === 0 && WAITING.some(([s]) => s === l.view.state)).sort((a, b) => (a.ended ?? "").localeCompare(b.ended ?? ""));
   const term = q.trim().toLowerCase();
   const shown = lines.filter((l) => (!pick || l.view.state === pick) && (!term || `${l.name} ${l.number} ${l.course.name} ${l.course.code}`.toLowerCase().includes(term)));
   const range = (l: CertificateLine) => !l.starts || l.starts === l.ended ? short(l.ended) : `${short(l.starts)} – ${short(l.ended)}`;
@@ -221,7 +222,7 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
     const m = missing(l);
     if (l.view.state === "Training not finished") return [`Training ends ${short(l.ended)}`, m.length ? `Also needs: ${m.join(", ")}` : "Nothing else missing"];
     if (l.view.state === "Waiting for payment") return [`Cashier collects ${pesos2(l.balance)}`, m.length > 1 ? `Then: ${m.slice(1).join(", ")}` : "Then it is Due"];
-    if (l.view.state === "Waiting for evaluation") return ["Trainee submits the evaluation", m.includes("photo") ? "Then: photo" : "Google Form link was emailed"];
+    if (l.view.state === "Waiting for evaluation") return ["Trainee submits the evaluation", m.includes("photo") ? "Then: photo" : "From the Trainee Status page"];
     return ["Upload the 2x2 photo", "White background"];
   };
   const steps = (l: CertificateLine): [string, "y" | "n" | "w"][] => [
@@ -241,7 +242,7 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
           </div>
         </section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Ready Soon</h2></div>
-          <dl className="ac-lines"><div><dt>Training ends today</dt><dd>{lines.filter((l) => l.ended === today).length}</dd></div><div><dt>Ends tomorrow</dt><dd>{lines.filter((l) => l.ended === tomorrow).length}</dd></div><div><dt>Balances to collect</dt><dd>{lines.filter((l) => l.balance > 0).length}</dd></div>{tracked && <div><dt>Photos missing</dt><dd>{lines.filter((l) => !l.photo).length}</dd></div>}</dl>
+          <dl className="ac-lines"><div><dt>Training ends today</dt><dd>{lines.filter((l) => l.ended === today).length}</dd></div><div><dt>Ends tomorrow</dt><dd>{lines.filter((l) => l.ended === tomorrow).length}</dd></div>{tracked && <div><dt>Photos missing</dt><dd>{lines.filter((l) => !l.photo).length}</dd></div>}</dl>
           <p className="ac-foot">Trainings ending within {WAIT_DAYS} days are listed. A certificate moves to Certificates › Due by itself once every check is green.</p>
         </section>
       </div>
@@ -291,6 +292,39 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
       setMsg({ kind: "success", text: `Template version ${body.version} uploaded and now in use. ${box ? `2x2 photo box found (${(box.w / 72).toFixed(1)} × ${(box.h / 72).toFixed(1)} in): the photo prints inside it.` : "No 2x2 photo box was found on this PDF: the photo prints at the lower right. Preview a certificate to check."}` });
     } catch (e) { setMsg({ kind: "error", text: e instanceof Error ? e.message : "The template could not be uploaded." }); } finally { setUploading(null); }
   }
+  // Upload Many (owner, 20 Oct 2026): pick the PDFs downloaded from the Drive folder; each is matched to its course by the file name.
+  // Converted templates come with a "{CODE} - {Course}.json" of field positions, sent along as `layout`.
+  const [bulk, setBulk] = useState<{ file: File; layout?: File; courseId: string; result?: string }[] | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  function pickMany(list: FileList | null) {
+    const picked = [...(list ?? [])];
+    const files = picked.filter((f) => f.type === "application/pdf" || /\.pdf$/i.test(f.name));
+    const layouts = new Map(picked.filter((f) => /\.json$/i.test(f.name) && !/\.word\.json$/i.test(f.name)).map((f) => [f.name.replace(/\.json$/i, "").toLowerCase(), f]));
+    if (!files.length) { setMsg({ kind: "error", text: "Choose PDF files." }); return; }
+    const pdfs = files.filter((f) => !/\.measure\.pdf$/i.test(f.name));
+    const matched = matchTemplateFiles(pdfs.map((f) => f.name), all);
+    setBulk(pdfs.map((file, i) => ({ file, layout: layouts.get(file.name.replace(/\.pdf$/i, "").toLowerCase()), courseId: matched[i].courseId ?? "" }))); setMsg(null);
+  }
+  async function uploadAll() {
+    if (!bulk) return;
+    setBulkBusy(true); setMsg(null);
+    const rows = [...bulk];
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r.courseId || r.result === "Uploaded") continue;
+      try {
+        const form = new FormData(); form.set("courseId", r.courseId); form.set("template", r.file); if (r.layout) form.set("layout", await r.layout.text());
+        const res = await fetch("/api/staff/certificate-templates", { method: "POST", body: form });
+        const body = await res.json().catch(() => ({}));
+        rows[i] = { ...r, result: res.ok ? "Uploaded" : body.error ?? "Not uploaded." };
+      } catch { rows[i] = { ...r, result: "Not uploaded." }; }
+      setBulk([...rows]);
+    }
+    setBulkBusy(false);
+    await reload();
+    const done = rows.filter((r) => r.result === "Uploaded").length, failed = rows.filter((r) => r.courseId && r.result !== "Uploaded").length, skipped = rows.filter((r) => !r.courseId).length;
+    setMsg({ kind: failed ? "error" : "success", text: `${done} template${done === 1 ? "" : "s"} uploaded and now in use.${failed ? ` ${failed} failed: see the list.` : ""}${skipped ? ` ${skipped} skipped (no course).` : ""}` });
+  }
   async function view(id: string) {
     const win = window.open("", "_blank");
     const r = await fetch(`/api/staff/certificate-templates/${id}`, { cache: "no-store" });
@@ -310,7 +344,7 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
       </tr>; })}
     </tbody></table></div></div> : null;
   return <div className="portal-page cx ac">
-    <Head title="Templates" note="Upload each course's certificate template as a PDF. A new upload replaces the one in use; earlier versions are kept." />
+    <Head title="Templates" note="Upload each course's certificate template as a PDF, or pick many at once: each file is matched to its course by the course code in its name. A new upload replaces the one in use; earlier versions are kept." />
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <div className="ac-rail">
       <div className="ac-stack">
@@ -320,13 +354,31 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
         </section>
       </div>
       <section className="portal-panel cx-panel">
-        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search any course by name or code" /><label className="tp-filter"><input type="checkbox" checked={missing} onChange={(e) => setMissing(e.target.checked)} /> Without template</label></div>
+        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search any course by name or code" /><label className="tp-filter"><input type="checkbox" checked={missing} onChange={(e) => setMissing(e.target.checked)} /> Without template</label>
+          <label className="portal-primary tp-upload">Upload Many PDFs<input type="file" accept="application/pdf,application/json,.json" multiple hidden disabled={bulkBusy} onChange={(e) => { pickMany(e.target.files); e.target.value = ""; }} /></label></div>
+        {bulk && <div className="tp-bulk">
+          <p className="tp-group"><b>Check the Matches</b><span>{bulk.filter((r) => r.courseId).length} of {bulk.length} matched</span></p>
+          <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>File</th><th>Course</th><th>Status</th></tr></thead><tbody>
+            {bulk.map((r, i) => { const t = r.courseId ? active.get(r.courseId) : undefined; const twice = r.courseId && bulk.findIndex((x) => x.courseId === r.courseId) !== i; return <tr key={`${r.file.name}-${i}`}>
+              <td className="cl-mono">{r.file.name}</td>
+              <td><select className="cl-in" aria-label={`Course for ${r.file.name}`} disabled={bulkBusy || r.result === "Uploaded"} value={r.courseId} onChange={(e) => setBulk(bulk.map((x, j) => j === i ? { ...x, courseId: e.target.value, result: undefined } : x))}><option value="">Skip this file</option>{[...all].sort((a, b) => a.name.localeCompare(b.name)).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></td>
+              <td>{r.result === "Uploaded" ? <Badge tone="green">Uploaded</Badge> : r.result ? <Badge tone="orange">{r.result}</Badge> : !r.courseId ? <span className="cl-sub">No course found · pick one or skip</span> : twice ? <Badge tone="orange">Same course as another file</Badge> : t ? <span className="cl-sub">Replaces Version {t.version}</span> : <span className="cl-sub">New template</span>}</td>
+            </tr>; })}
+          </tbody></table></div>
+          <div className="cl-acts tp-bulk-acts"><button type="button" className="portal-secondary" disabled={bulkBusy} onClick={() => setBulk(null)}>Close</button><button type="button" className="portal-primary" disabled={bulkBusy || !bulk.some((r) => r.courseId && r.result !== "Uploaded")} onClick={() => void uploadAll()}>{bulkBusy ? "Uploading…" : `Upload All (${bulk.filter((r) => r.courseId && r.result !== "Uploaded").length})`}</button></div>
+        </div>}
         {group("STCW", courses.filter(stcwCourse))}
         {group("In-House", courses.filter((c) => !stcwCourse(c)))}
         {!courses.length && <p className="portal-empty-copy">No courses match.</p>}
       </section>
     </div>
   </div>;
+}
+
+/** Release needs the fee paid and the evaluation in (owner, 20 Oct 2026); the server checks again. */
+function ReleaseButton({ l, onRelease, primary }: { l: CertificateLine; onRelease: () => void; primary?: boolean }) {
+  const why = releaseProblem({ balanceCentavos: l.balance, evaluationRequired: l.evalNeeded, evaluationOn: l.evalDone ? "in" : null, revoked: !!l.cert?.revoked_at });
+  return <button type="button" className={primary ? "portal-primary" : undefined} disabled={!!why} title={why ?? undefined} onClick={onRelease}>{why ? `Release · ${why.replace(/:.*$/, "")}` : "Release"}</button>;
 }
 
 /** Released: printed certificates waiting to be claimed, and those already released. */
@@ -344,7 +396,7 @@ export function ReleasedCertificates({ data, reload }: { data: PortalData; reloa
       </div>
       <section className="portal-panel cx-panel">
         {lines.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee · NWMTACI no.</th><th>Course</th><th>Certificate No.</th><th>Status</th><th>Action</th></tr></thead><tbody>
-          {lines.map((l, i) => <tr key={l.e.id}><td className="cl-no">{i + 1}</td><td><b>{l.name}</b> <span className="cl-mono cl-sub">{l.number.replace(/^NWMTACI-/, "")}</span></td><td title={l.course.name}>{l.course.code}</td><td className="cl-mono">{l.cert?.certificate_number ?? "—"}</td><td><Badge tone={l.view.state === "Released" ? undefined : "green"}>{l.view.state === "Released" ? "Released" : "Ready for Release"}</Badge>{l.cert?.claimant_name && <small className="cl-sub cl-block">{l.cert.claimant_name}</small>}</td><td>{l.view.state === "Printed" && <button type="button" className="portal-primary" onClick={() => setReleasing(l)}>Release</button>}</td></tr>)}
+          {lines.map((l, i) => <tr key={l.e.id}><td className="cl-no">{i + 1}</td><td><b>{l.name}</b> <span className="cl-mono cl-sub">{l.number.replace(/^NWMTACI-/, "")}</span></td><td title={l.course.name}>{l.course.code}</td><td className="cl-mono">{l.cert?.certificate_number ?? "—"}</td><td><Badge tone={l.view.state === "Released" ? undefined : "green"}>{l.view.state === "Released" ? "Released" : "Ready for Release"}</Badge>{l.cert?.claimant_name && <small className="cl-sub cl-block">{l.cert.claimant_name}</small>}</td><td>{l.view.state === "Printed" && <ReleaseButton primary l={l} onRelease={() => setReleasing(l)} />}</td></tr>)}
         </tbody></table></div> : <p className="portal-empty-copy">No printed certificates yet.</p>}
       </section>
     </div>
@@ -360,9 +412,8 @@ function NumberingTable({ data, reload, scope }: { data: PortalData; reload: () 
   const d = data as CertData;
   const { busy, msg, post } = usePost(reload);
   const [q, setQ] = useState("");
-  const [edit, setEdit] = useState<Record<string, { prefix: string; next: string; pad: string; batchPrefix: string; nextBatch: string; regPrefix: string; regNext: string; regDigits: string; regStyle: string }>>({});
-  // The Registration No. fields appear once migration 202610130042 is in (the series rows then carry reg_prefix).
-  const regReady = (d.certificateSeries ?? []).length === 0 || (d.certificateSeries ?? []).some((s) => s.reg_prefix !== undefined);
+  // Certificate No. from the last number used (owner, 20 Oct 2026); the Registration No. is one automatic series (202610200046).
+  const [edit, setEdit] = useState<Record<string, { prefix: string; last: string; pad: string; batchPrefix: string; nextBatch: string }>>({});
   const roles = scope === "in-house" ? ["releasing_officer"] : ["admin"];
   const series = new Map((d.certificateSeries ?? []).map((s) => [s.course_id, s]));
   const used = new Set(data.enrollments.map((e) => e.course_id));
@@ -372,46 +423,33 @@ function NumberingTable({ data, reload, scope }: { data: PortalData; reload: () 
   const courses = data.courses.filter((c, i, all) => c.delivery_type === "In-House" && all.findIndex((x) => x.id === c.id) === i && (scope === "all" ? (term ? true : featured(c) >= 0 || !stcwCourse(c)) : scope === "stcw" ? (term ? true : stcwCourse(c)) : !stcwCourse(c)) && (term ? `${c.code} ${c.name}`.toLowerCase().includes(term) : scope === "all" || scope === "stcw" || used.has(c.id) || series.has(c.id)))
     .sort((a, b) => scope === "all" ? ((featured(a) < 0 ? 99 : featured(a)) - (featured(b) < 0 ? 99 : featured(b)) || a.name.localeCompare(b.name)) : a.name.localeCompare(b.name));
   const groupOf = (c: { code: string }) => scope !== "all" ? "" : featured(c) >= 0 ? "STCW Courses" : "In-House Courses";
-  const valueOf = (id: string) => { const s = series.get(id); return edit[id] ?? { prefix: s?.prefix ?? "", next: String(s?.next_number ?? 1), pad: String(s?.pad ?? 5), batchPrefix: s?.batch_prefix ?? "", nextBatch: String(s?.next_batch ?? 1), regPrefix: s?.reg_prefix ?? "NWMTC", regNext: s?.reg_next ? String(s.reg_next) : "", regDigits: String(s?.reg_digits ?? 4), regStyle: s?.reg_style ?? "month-number" }; };
+  const valueOf = (id: string) => { const s = series.get(id); return edit[id] ?? { prefix: s?.prefix ?? "", last: s && s.next_number > 1 ? String(s.next_number - 1) : "", pad: String(s?.pad ?? 5), batchPrefix: s?.batch_prefix ?? "", nextBatch: String(s?.next_batch ?? 1) }; };
   const set = (id: string, k: string, v: string) => setEdit({ ...edit, [id]: { ...valueOf(id), [k]: v } });
   return <section className="portal-panel cx-panel"><div className="panel-heading"><h2>{scope === "all" ? "Certificate No. per Course" : scope === "stcw" ? "Certificate Numbering" : "In-House Certificate Numbering"}</h2></div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} placeholder={scope === "stcw" ? "STCW courses shown; search any course" : "Search any In-House course by name or code"} /></div>
-    <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th>Prefix</th><th>Next No.</th><th>Digits</th><th>Batch Prefix</th><th>Next Batch</th><th>Next Certificate</th>{regReady && <><th>Reg. Prefix</th><th>Next Reg. No.</th><th>Digits</th><th>Reg. Style</th><th>Next Registration</th></>}<th /></tr></thead><tbody>
-      {courses.map((c, i) => { const v = valueOf(c.id), s = series.get(c.id); const changed = !!edit[c.id]; const can = canSetSeries(roles, stcwCourse(c)); const head = groupOf(c) && groupOf(c) !== groupOf(courses[i - 1] ?? { code: "" }) ? groupOf(c) : ""; return [head && <tr key={`${head}-head`} className="nb-group"><td colSpan={regReady ? 13 : 8}><b>{head}</b> <span className="cl-sub">{courses.filter((x) => groupOf(x) === head).length}</span></td></tr>, <tr key={c.id}>
+    <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th>Prefix</th><th>Last No. Used</th><th>Digits</th><th>Batch Prefix</th><th>Next Batch</th><th>Next Certificate</th><th /></tr></thead><tbody>
+      {courses.map((c, i) => { const v = valueOf(c.id), s = series.get(c.id); const changed = !!edit[c.id]; const can = canSetSeries(roles, stcwCourse(c)); const head = groupOf(c) && groupOf(c) !== groupOf(courses[i - 1] ?? { code: "" }) ? groupOf(c) : ""; return [head && <tr key={`${head}-head`} className="nb-group"><td colSpan={8}><b>{head}</b> <span className="cl-sub">{courses.filter((x) => groupOf(x) === head).length}</span></td></tr>, <tr key={c.id}>
         <td className="nb-course"><b>{c.name}</b><small className="cl-sub cl-block"><span className="cl-mono">{c.code}</span> · {s ? `Set ${fmtDate(day(s.set_at) ?? "")}${first(s.profiles)?.complete_name ? ` by ${first(s.profiles)?.complete_name}` : ""}` : "Not set yet"}</small></td>
         <td><input className="cl-in" aria-label="Prefix" disabled={!can} value={v.prefix} onChange={(e) => set(c.id, "prefix", e.target.value)} placeholder="NWM-HPT-" /></td>
-        <td><input className="cl-in cl-num" aria-label="Next certificate number" disabled={!can} type="number" min={1} value={v.next} onChange={(e) => set(c.id, "next", e.target.value)} /></td>
+        <td><input className="cl-in cl-num" aria-label="Last certificate number used" disabled={!can} type="number" min={0} value={v.last} onChange={(e) => set(c.id, "last", e.target.value)} placeholder="e.g. 149" /></td>
         <td><input className="cl-in cl-tiny" aria-label="Digits" disabled={!can} type="number" min={1} max={10} value={v.pad} onChange={(e) => set(c.id, "pad", e.target.value)} /></td>
         <td><input className="cl-in" aria-label="Batch prefix" disabled={!can} value={v.batchPrefix} onChange={(e) => set(c.id, "batchPrefix", e.target.value)} placeholder="HPT-" /></td>
         <td><input className="cl-in cl-num" aria-label="Next batch number" disabled={!can} type="number" min={1} value={v.nextBatch} onChange={(e) => set(c.id, "nextBatch", e.target.value)} /></td>
-        <td className="cl-mono cl-next">{formatCertificateNumber(v.prefix, Number(v.next) || 1, Number(v.pad) || 5)}</td>
-        {regReady && <>
-          <td><input className="cl-in" aria-label="Registration prefix" disabled={!can} value={v.regPrefix} onChange={(e) => set(c.id, "regPrefix", e.target.value)} placeholder="NWMTC" /></td>
-          <td><input className="cl-in cl-num" aria-label="Next registration number" disabled={!can} type="number" min={1} value={v.regNext} onChange={(e) => set(c.id, "regNext", e.target.value)} placeholder="e.g. 2291" /></td>
-          <td><input className="cl-in cl-tiny" aria-label="Registration digits" disabled={!can} type="number" min={1} max={12} value={v.regDigits} onChange={(e) => set(c.id, "regDigits", e.target.value)} /></td>
-          <td><select className="cl-in" aria-label="Registration style" disabled={!can} value={v.regStyle} onChange={(e) => set(c.id, "regStyle", e.target.value)}><option value="month-number">Month First</option><option value="number-month">Number First</option></select></td>
-          <td className="cl-mono cl-next">{v.regNext ? registrationPreview(v.regPrefix || "NWMTC", Number(v.regNext) || 1, Number(v.regDigits) || 4, v.regStyle) : <span className="cl-sub">Not set</span>}</td>
-        </>}
-        <td>{can ? <button type="button" className="portal-primary" disabled={busy || !changed} onClick={() => void post({ action: "certificate-series-save", courseId: c.id, prefix: v.prefix.trim(), nextNumber: Math.max(1, Number(v.next) || 1), pad: Math.min(10, Math.max(1, Number(v.pad) || 5)), batchPrefix: v.batchPrefix.trim(), nextBatch: Math.max(1, Number(v.nextBatch) || 1), ...(regReady ? { regPrefix: v.regPrefix.trim() || "NWMTC", regNext: v.regNext ? Math.max(1, Number(v.regNext) || 1) : null, regDigits: Math.min(12, Math.max(1, Number(v.regDigits) || 4)), regStyle: v.regStyle === "number-month" ? "number-month" : "month-number" } : {}) }, "Numbering saved. Enrolled trainees without numbers got theirs in enrollment order; new enrollments continue from here.").then(() => setEdit((e) => { const n = { ...e }; delete n[c.id]; return n; })).catch(() => undefined)}>Save</button> : <span className="cl-sub">Set by the Admin</span>}</td>
+        <td className="cl-mono cl-next">{formatCertificateNumber(v.prefix, nextOf(v.last), Number(v.pad) || 5)}</td>
+        <td>{can ? <button type="button" className="portal-primary" disabled={busy || !changed} onClick={() => void post({ action: "certificate-series-save", courseId: c.id, prefix: v.prefix.trim(), nextNumber: nextOf(v.last), pad: Math.min(10, Math.max(1, Number(v.pad) || 5)), batchPrefix: v.batchPrefix.trim(), nextBatch: Math.max(1, Number(v.nextBatch) || 1) }, `Numbering saved. The next certificate is ${formatCertificateNumber(v.prefix.trim(), nextOf(v.last), Number(v.pad) || 5)}; enrolled trainees without a number got theirs in enrollment order.`).then(() => setEdit((e) => { const n = { ...e }; delete n[c.id]; return n; })).catch(() => undefined)}>Save</button> : <span className="cl-sub">Set by the Admin</span>}</td>
       </tr>]; })}
     </tbody></table></div>
     {!courses.length && <p className="portal-empty-copy">{term ? "No courses match." : "No In-House course has trainees yet. Search a course to set its numbering."}</p>}
-    <p className="cl-legend">Numbers are given when a trainee is enrolled, in enrollment order. Certificate No.: one per enrollment. Registration No.: one per trainee per course, kept for retakes of the same course. Month First gives NWMTC102026-2291; Number First gives NWMTC2291-102026 (month and year of the day the number is given).</p>
+    <p className="cl-legend">Type the last Certificate No. already used for each course once; the portal continues from the next number, in enrollment order. Registration No. is given automatically from one New Wave series when a certificate is printed, and a trainee keeps it for re-prints and retakes of the same course.</p>
   </section>;
 }
 
-/** The Registration No. a course's next trainee gets, using this month. */
-function registrationPreview(prefix: string, next: number, digits: number, style: string) {
-  const [y, m] = manilaToday().split("-");
-  const n = String(next).padStart(digits, "0");
-  return style === "number-month" ? `${prefix}${n}-${m}${y}` : `${prefix}${Number(m)}${y}-${n}`;
-}
 
 /** Releasing Officer › Numbering (owner, 9 Oct 2026): starting Certificate No. and batch number for In-House courses. */
 export function ReleasingNumbering({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   return <div className="portal-page cx ac">
-    <Head title="Numbering" note="Set the starting Certificate No., Registration No. and batch number for each In-House course; the system continues from there. STCW numbering is set by the Admin." />
+    <Head title="Numbering" note="Type the last Certificate No. used for each In-House course once; the portal continues from there. Registration No. is automatic. STCW numbering is set by the Admin." />
     <NumberingTable data={data} reload={reload} scope="in-house" />
   </div>;
 }
@@ -438,6 +476,7 @@ export function AdminCertificateControls({ data, reload }: { data: PortalData; r
       </div>
       <div className="ac-stack">
       <CertificateCorrectionsPanel data={data} reload={reload} mode="number" />
+      <RevokePanel data={data} reload={reload} />
       <NumberingTable data={data} reload={reload} scope="stcw" />
       </div>
     </div>
@@ -531,11 +570,11 @@ export function AdminCertificateNumbers({ data, reload }: { data: PortalData; re
     {tab === "numbering" ? <>
       <p className="ac-note">Enter the <b>last Registration No. you already used</b> on paper. The portal continues from the next one at the moment a certificate is printed, and never reuses a number recorded under Issued Before the Portal. The Doc. No. is written on the certificate by hand.</p>
       <div className="cn-series">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Registration No.</h2><span className="muted-text">For courses without their own Reg. No. in the table below</span></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Registration No.</h2><span className="muted-text">One automatic series for every course</span></div>
           <div className="portal-form cx-formpad"><label>Prefix<input className="cl-mono" value={form.regPrefix} onChange={(e) => setForm({ ...form, regPrefix: e.target.value })} /></label><label>Last Number Used<input type="number" min={0} className="cl-mono" value={form.regLast} onChange={(e) => setForm({ ...form, regLast: e.target.value })} /></label><label>Digits<input type="number" min={1} max={12} value={form.regDigits} onChange={(e) => setForm({ ...form, regDigits: e.target.value })} /></label></div>
           <div className="cn-next"><span>Next certificate prints (issued this month)</span><b className="cl-mono">{nextReg}</b></div></section>
       </div>
-      <div className="cn-save"><span className="muted-text">{ns?.set_at ? `Last saved ${fmtDate(day(ns.set_at) ?? "")}` : "Not set yet — certificates cannot be printed until this is saved."}</span><button type="button" className="portal-primary" disabled={busy} onClick={saveSeries}>Save Registration No.</button></div>
+      <div className="cn-save"><span className="muted-text">{ns?.set_at ? `Last saved ${fmtDate(day(ns.set_at) ?? "")}` : "Not set yet — the series starts from 1 until this is saved."}</span><button type="button" className="portal-primary" disabled={busy} onClick={saveSeries}>Save Registration No.</button></div>
       <NumberingTable data={data} reload={reload} scope="all" />
     </> : <>
       <p className="ac-note">Record certificates you already printed, so their numbers are reserved and the trainees show as released. Upload your log as a CSV (save the Excel sheet as CSV), or add one at a time.</p>
@@ -563,4 +602,28 @@ export function AdminCertificateNumbers({ data, reload }: { data: PortalData; re
       </section>
     </>}
   </div>;
+}
+
+/** Admin › Certificate Controls › Revoke (owner, 20 Oct 2026): the QR page shows REVOKED at once and printing stops. */
+function RevokePanel({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
+  const { busy, msg, post } = usePost(reload);
+  const [q, setQ] = useState(""), [pickedId, setPickedId] = useState<string | null>(null), [reason, setReason] = useState(""), [asking, setAsking] = useState(false);
+  const lines = certificateLines(data).filter((l) => l.cert?.certificate_number);
+  const term = q.trim().toLowerCase();
+  const found = term.length >= 2 ? lines.filter((l) => `${l.name} ${l.number} ${l.cert?.certificate_number ?? ""}`.toLowerCase().includes(term)).slice(0, 8) : [];
+  const line = lines.find((l) => l.e.id === pickedId) ?? null;
+  const revoked = !!line?.cert?.revoked_at;
+  return <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Revoke a Certificate</h2></div>
+    {msg && <Message kind={msg.kind} text={msg.text} />}
+    <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search certificate to revoke" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search certificate number or trainee" /></div>
+    {found.length > 0 && <div className="cc-found">{found.map((l) => <button type="button" key={l.e.id} onClick={() => { setPickedId(l.e.id); setQ(""); setReason(""); setAsking(false); }}><b>{l.name}</b><span>{l.course.code} · {l.cert?.certificate_number}</span></button>)}</div>}
+    {line && <div className="cc-edit">
+      <p><b>{line.name}</b> · {line.course.name} · <span className="cl-mono">{line.cert?.certificate_number}</span> <Badge tone={revoked ? "red" : "green"}>{revoked ? "Revoked" : "Valid"}</Badge></p>
+      {revoked ? <p className="cl-sub">Revoked{line.cert?.revoked_reason ? `: ${line.cert.revoked_reason}` : ""}. {"The QR page shows: This certificate has been revoked."}</p> : <div className="cl-void">
+        <label>Reason<input value={reason} onChange={(e) => { setReason(e.target.value); setAsking(false); }} placeholder="e.g. Issued in error: trainee did not complete the course" /></label>
+        {asking ? <><span className="cl-sub">Revoke {line.cert?.certificate_number}? This shows on the QR page at once.</span><button type="button" className="portal-secondary" onClick={() => setAsking(false)}>Keep</button><button type="button" className="cl-danger" disabled={busy} onClick={() => void post({ action: "certificate-revoke", enrollmentId: line.e.id, reason: reason.trim() }, "Certificate revoked. Its QR page now shows REVOKED.").then(() => setAsking(false)).catch(() => undefined)}>Yes, Revoke</button></>
+          : <button type="button" className="cl-danger" disabled={reason.trim().length < 5} onClick={() => setAsking(true)}>Revoke</button>}
+      </div>}
+    </div>}
+  </section>;
 }

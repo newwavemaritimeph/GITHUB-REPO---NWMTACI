@@ -29,7 +29,7 @@ Implemented foundations include:
 
 - Branded responsive public pages and staff/trainee authentication surfaces.
 - Supabase schema, RLS, storage policies, roles, identifiers, audit data, organization settings, and catalog seeds.
-- 148 New Wave course records and exactly 96 endorsed partner offers.
+- 148 New Wave course records. Endorsed programs are no longer seeded; Accounting or the Admin encode them per partner center in the portal (owner, 20 Oct 2026). Partner centers stay seeded.
 - Public registration with complete trainee details, terms acceptance, duplicate protection, automatic trainee account invitation, and registration search.
 - Trainee, enrollment, course, schedule, batch, instructor/room, and 24-seat capacity workflows.
 - New Wave batch cadence rules, including the dedicated BT-PSSR, Safety, Crowd, and Crisis patterns.

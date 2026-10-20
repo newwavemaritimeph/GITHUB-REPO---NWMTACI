@@ -1,10 +1,12 @@
 import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { automaticEndDate } from "@/lib/scheduling";
-import { certificateState, type CertificateView } from "@/lib/certificate-rules";
+import { certificateState, evaluationRequiredFor, type CertificateView } from "@/lib/certificate-rules";
 import { corrected, type CertificateCorrections } from "@/lib/certificate-photo";
 import { detectPhotoBox } from "@/lib/certificate-template";
 import { certificateLayout, isHazmatCfr } from "@/lib/certificate-layouts";
+import { drawTemplateFields, isFieldsV2 } from "@/lib/certificate-overlay";
+import { newVerifyCode, verifyUrl } from "@/lib/certificate-verify";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -16,10 +18,12 @@ export type CertificateContext = {
   trainee: { name: string; email: string | null; firstName: string; middleName: string | null; lastName: string };
   course: { id: string; name: string; code: string; evaluationFormId: string | null };
   batch: { starts_on: string | null; ends_on: string | null; batch_number: string | null };
-  cert: { id: string; status: string; certificate_number: string | null; batch_label: string | null; print_count: number; reprints_allowed: number; void_status: string | null; soft_copy_sent_at: string | null; snapshot: Record<string, unknown> | null } | null;
+  cert: { id: string; status: string; certificate_number: string | null; batch_label: string | null; print_count: number; reprints_allowed: number; void_status: string | null; soft_copy_sent_at: string | null; snapshot: Record<string, unknown> | null; verify_code?: string | null; sticker_no?: string | null; revoked_at?: string | null } | null;
   view: CertificateView;
   issuanceEnabled: boolean;
   balanceCentavos: number;
+  /** The portal evaluation (20 Oct 2026): required for New Wave courses; `on` is the day it came in. */
+  evaluation: { required: boolean; on: string | null };
   /** The 2x2 photo (migration 202610090034); undefined before it. */
   photo?: { storage_path: string; file_name: string } | null;
   corrections: CertificateCorrections;
@@ -33,9 +37,9 @@ export type CertificateContext = {
  * 202610080030 columns (they read as zero / empty).
  */
 export async function certificateContext(db: Admin, enrollmentId: string): Promise<CertificateContext | null> {
-  const { data: e } = await db.from("enrollments").select("id,enrollment_number,course_id,trainee_id,enrollment_status,selling_price_centavos,batch_id,batches(starts_on,ends_on,batch_number),courses(id,name,code,duration_label),trainees(legal_first_name,legal_middle_name,legal_last_name,email)").eq("id", enrollmentId).maybeSingle();
+  const { data: e } = await db.from("enrollments").select("id,enrollment_number,course_id,trainee_id,enrollment_status,selling_price_centavos,batch_id,partner_offer_id,batches(starts_on,ends_on,batch_number),courses(id,name,code,duration_label,delivery_type),trainees(legal_first_name,legal_middle_name,legal_last_name,email)").eq("id", enrollmentId).maybeSingle();
   if (!e) return null;
-  const [{ data: extra }, { data: allocations }, { data: charges }, { data: feedback }, { data: settings }, certRes, formRes, photoRes, corrRes, numRes, seriesRes, styleRes, ownRegRes, courseRegRes] = await Promise.all([
+  const [{ data: extra }, { data: allocations }, { data: charges }, { data: feedback }, { data: settings }, certRes, formRes, photoRes, corrRes, numRes, seriesRes, styleRes, ownRegRes, courseRegRes, qrRes] = await Promise.all([
     db.from("enrollments").select("scheduled_on").eq("id", enrollmentId).maybeSingle(),
     db.from("payment_allocations").select("amount_centavos,payments(received_at,valid)").eq("enrollment_id", enrollmentId),
     db.from("enrollment_charges").select("amount_centavos,event_type").eq("enrollment_id", enrollmentId).eq("valid", true),
@@ -51,6 +55,8 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
     // Registration No. per trainee per course (migration 202610130042).
     db.from("trainee_registration_numbers").select("registration_number").eq("trainee_id", e.trainee_id).eq("course_id", e.course_id).maybeSingle(),
     db.from("certificate_series").select("reg_prefix,reg_next,reg_digits,reg_style").eq("course_id", e.course_id).maybeSingle(),
+    // QR code, hologram sticker and revocation (migration 202610200047).
+    db.from("certificates").select("verify_code,sticker_no,revoked_at").eq("enrollment_id", enrollmentId).maybeSingle(),
   ]);
   const own = (numRes.error ? null : numRes.data) as { registration_number?: string | null } | null;
   const ns = (seriesRes.error ? null : seriesRes.data) as { reg_prefix: string; reg_last: number; reg_digits: number; set_at: string | null } | null;
@@ -64,8 +70,8 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
   const courseNext = courseReg?.reg_next ? (courseReg.reg_style === "number-month" ? `${courseReg.reg_prefix}${String(courseReg.reg_next).padStart(courseReg.reg_digits, "0")}-${month[1]}${month[0]}` : `${courseReg.reg_prefix}${Number(month[1])}${month[0]}-${String(courseReg.reg_next).padStart(courseReg.reg_digits, "0")}`) : null;
   const numbers = {
     reg: own?.registration_number ?? null,
-    // The course's own series: the trainee's number for this course, else the course's next one.
-    nextReg: courseReg?.reg_next ? traineeReg ?? courseNext : !ns?.set_at ? null : style === "month-number" ? `${ns.reg_prefix}${Number(month[1])}${month[0]}-${nextNo}` : `${ns.reg_prefix}${String(nextNo).padStart(ns.reg_digits, "0")}-${month[1]}${month[0]}`,
+    // The trainee's number for this course if given before; else the next of the one New Wave series (202610200046).
+    nextReg: courseReg?.reg_next ? traineeReg ?? courseNext : traineeReg ?? (!ns ? null : style === "month-number" ? `${ns.reg_prefix}${Number(month[1])}${month[0]}-${nextNo}` : `${ns.reg_prefix}${String(nextNo).padStart(ns.reg_digits, "0")}-${month[1]}${month[0]}`),
   };
   const photo = photoRes.error ? undefined : (photoRes.data as { storage_path: string; file_name: string } | null);
   const corrections = (corrRes.error ? {} : ((corrRes.data as { corrections?: CertificateCorrections } | null)?.corrections ?? {})) as CertificateCorrections;
@@ -74,8 +80,9 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
     const { data: basic } = await db.from("certificates").select("id,status,snapshot,reprint_count").eq("enrollment_id", enrollmentId).maybeSingle();
     cert = basic ? { id: basic.id, status: basic.status, snapshot: basic.snapshot as Record<string, unknown> | null, certificate_number: ((basic.snapshot as Record<string, unknown> | null)?.certificate_number as string) ?? null, batch_label: null, print_count: ["Printed", "Released"].includes(basic.status) ? 1 : 0, reprints_allowed: 0, void_status: null, soft_copy_sent_at: null } : null;
   }
+  if (cert && !qrRes.error && qrRes.data) cert = { ...cert, ...(qrRes.data as { verify_code: string | null; sticker_no: string | null; revoked_at: string | null }) };
   const b = first(e.batches as unknown as { starts_on: string; ends_on: string; batch_number: string } | null);
-  const c = first(e.courses as unknown as { id: string; name: string; code: string; duration_label: string } | null);
+  const c = first(e.courses as unknown as { id: string; name: string; code: string; duration_label: string; delivery_type?: string } | null);
   const t = first(e.trainees as unknown as { legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; email?: string | null } | null);
   const scheduled = (extra as { scheduled_on?: string | null } | null)?.scheduled_on ?? null;
   const trainingEnd = b?.ends_on ?? (scheduled && c ? automaticEndDate(scheduled, c.duration_label) : null);
@@ -91,12 +98,12 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
   for (const ch of charges ?? []) due += ch.event_type === "discount" ? -Number(ch.amount_centavos) : Number(ch.amount_centavos);
   const formRow = formRes.error ? null : (formRes.data as { evaluation_form_id?: string | null; google_classroom_link?: string | null } | null);
   const evaluationFormId = formRow?.evaluation_form_id ?? null;
-  // Google Classroom courses need the evaluation (it sits in their classwork); so does any course linked to a form.
-  const evaluationRequired = !!evaluationFormId || !!formRow?.google_classroom_link;
+  // The portal's own evaluation form (owner, 20 Oct 2026): every New Wave course needs it.
+  const evaluationRequired = evaluationRequiredFor(c?.delivery_type ?? "In-House", (e as { partner_offer_id?: string | null }).partner_offer_id);
   const view = certificateState({
     enrollmentStatus: e.enrollment_status, trainingEnd, balanceCentavos: Math.max(0, due - paid), evaluationRequired,
     evaluationOn: manilaDay((feedback as { submitted_at?: string } | null)?.submitted_at), paidOn: lastPaid,
-    cert: cert ? { status: cert.status, printCount: Number(cert.print_count ?? 0), reprintsAllowed: Number(cert.reprints_allowed ?? 0), voidStatus: cert.void_status } : null,
+    cert: cert ? { status: cert.status, printCount: Number(cert.print_count ?? 0), reprintsAllowed: Number(cert.reprints_allowed ?? 0), voidStatus: cert.void_status, revoked: !!cert.revoked_at } : null,
     photoOnFile: photo === undefined ? undefined : !!photo,
   }, manilaToday());
   return {
@@ -104,7 +111,7 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
     trainee: { name: t ? [t.legal_first_name, t.legal_middle_name, t.legal_last_name].filter(Boolean).join(" ") : "Trainee", email: t?.email ?? null, firstName: t?.legal_first_name ?? "", middleName: t?.legal_middle_name ?? null, lastName: t?.legal_last_name ?? "" },
     course: { id: c?.id ?? e.course_id, name: c?.name ?? "Course", code: c?.code ?? "", evaluationFormId },
     batch: { starts_on: b?.starts_on ?? scheduled, ends_on: trainingEnd, batch_number: b?.batch_number ?? null },
-    cert, view, photo, corrections, numbers, balanceCentavos: Math.max(0, due - paid), issuanceEnabled: Boolean((settings as { certificate_issuance_enabled?: boolean } | null)?.certificate_issuance_enabled),
+    cert, view, photo, corrections, numbers, balanceCentavos: Math.max(0, due - paid), evaluation: { required: evaluationRequired, on: manilaDay((feedback as { submitted_at?: string } | null)?.submitted_at) }, issuanceEnabled: Boolean((settings as { certificate_issuance_enabled?: boolean } | null)?.certificate_issuance_enabled),
   };
 }
 
@@ -121,6 +128,20 @@ export async function claimCertificateNumber(db: Admin, certificateId: string, a
   const { data, error } = await db.rpc("claim_certificate_number", { target_certificate: certificateId, actor });
   if (error) throw new Error(error.message);
   return String(data);
+}
+
+/** Gives the certificate its QR verification code once (202610200047); null before the migration. */
+export async function ensureVerifyCode(db: Admin, certificateId: string) {
+  const { data, error } = await db.from("certificates").select("verify_code").eq("id", certificateId).maybeSingle();
+  if (error) return null;
+  if (data?.verify_code) return data.verify_code as string;
+  for (let i = 0; i < 5; i++) {
+    const code = newVerifyCode();
+    const { data: set, error: setError } = await db.from("certificates").update({ verify_code: code }).eq("id", certificateId).is("verify_code", null).select("verify_code").maybeSingle();
+    if (!setError) return (set?.verify_code as string | undefined) ?? (await db.from("certificates").select("verify_code").eq("id", certificateId).maybeSingle()).data?.verify_code ?? null;
+    if (setError.code !== "23505") return null;
+  }
+  return null;
 }
 
 /** The active template for a course: Drive link (cached in Storage by file ID) or an uploaded file. */
@@ -163,7 +184,7 @@ const range = (a: string | null, b: string | null) => (!a ? longDate(b) : !b || 
  */
 export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mode: "preview" | "print" | "soft") {
   const tpl = await templateBytes(db, ctx.course.id);
-  if (!tpl) throw new Error("No certificate template is linked for this course yet. Add the Google Drive link in Templates.");
+  if (!tpl) throw new Error("No certificate template is uploaded for this course yet. The Admin imports the templates from the NWMTACI CERTIFICATES folder.");
   const pdf = await PDFDocument.create();
   let page;
   if (isPdf(tpl.bytes)) {
@@ -190,7 +211,10 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold), reg = await pdf.embedFont(StandardFonts.Helvetica);
   // A course with its own layout (HAZMAT with CFR) is filled like New Wave's sample certificate.
   const layout = certificateLayout(ctx.course);
-  if (layout) {
+  if (isFieldsV2(tpl.fields)) {
+    // Templates converted from New Wave's Word files (scripts/certificate-templates, 20 Oct 2026).
+    await drawTemplateFields(pdf, page, tpl.fields, { name: String(traineeName), startsOn: startsOn ?? null, endsOn: endsOn ?? null, issuedOn: String(issuedOn), certificateNumber: number, registrationNumber: regNo ?? "", verifyUrl: ctx.cert?.verify_code ? verifyUrl(ctx.cert.verify_code) : null, copyNo: mode === "print" ? Number(ctx.cert?.print_count ?? 0) + 1 : undefined });
+  } else if (layout) {
     await layout(pdf, page, { name: String(traineeName), startsOn: startsOn ?? null, endsOn: endsOn ?? null, issuedOn: String(issuedOn), certificateNumber: number, registrationNumber: regNo ?? "" });
   } else {
     const centre = (text: string, y: number, size: number, font = reg, color = rgb(0.18, 0.25, 0.32)) => page.drawText(text, { x: (W - font.widthOfTextAtSize(text, size)) / 2, y, size, font, color });
@@ -254,6 +278,7 @@ export async function trySendSoftCopy(db: Admin, enrollmentId: string, options: 
     if (ctx.cert?.soft_copy_sent_at && !options.force) return { state: "Already sent" as const };
     const certId = await ensureCertificate(db, ctx);
     const number = ctx.cert?.certificate_number ?? await claimCertificateNumber(db, certId, options.actor ?? null);
+    await ensureVerifyCode(db, certId);
     const key = `certificate-softcopy:${certId}:${options.force ? Date.now() : "first"}`;
     const { data: job, error } = await db.from("email_jobs").insert({ template_code: "certificate.softcopy", recipient: ctx.trainee.email, idempotency_key: key, variables: { trainee_name: ctx.trainee.name, course_name: ctx.course.name, certificate_number: number, attach_certificate_for: enrollmentId } }).select("id").maybeSingle();
     if (error && error.code !== "23505") throw error;

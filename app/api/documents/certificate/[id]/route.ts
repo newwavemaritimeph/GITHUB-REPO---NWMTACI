@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { canPrint } from "@/lib/certificate-rules";
-import { buildCertificatePdf, certificateContext, claimCertificateNumber, ensureCertificate } from "@/lib/certificates";
+import { buildCertificatePdf, certificateContext, claimCertificateNumber, ensureCertificate, ensureVerifyCode } from "@/lib/certificates";
 
 export const runtime = "nodejs";
 
@@ -18,6 +18,7 @@ const WHY: Record<string, string> = {
   "Waiting for photo": "Upload the trainee's 2x2 photo first.",
   "Void requested": "A void request is waiting for the Admin.",
   Cancelled: "This certificate is cancelled.",
+  Revoked: "This certificate was revoked by the Admin and cannot be printed.",
 };
 
 /**
@@ -44,6 +45,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       await claimCertificateNumber(db, certId, staff.user.id);
       ctx = (await certificateContext(db, id))!;
     }
+    // The QR verification code, once per certificate (202610200047; skipped before it).
+    if (!ctx.cert?.verify_code && await ensureVerifyCode(db, certId)) ctx = (await certificateContext(db, id))!;
     // The Registration No. is taken at the print itself (migration 202610090037; skipped before it).
     if (!preview && !ctx.numbers.reg) {
       const { error: numError } = await db.rpc("claim_certificate_registration_number", { target_certificate: certId, actor: staff.user.id });

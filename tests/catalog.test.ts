@@ -1,13 +1,23 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { ENDORSEMENT_OFFERS, ENDORSEMENT_SUMMARY } from "../lib/endorsement-catalog";
 import { IN_HOUSE_COURSES } from "../lib/in-house-catalog";
 
 describe("course catalogs", () => {
-  it("imports all 96 endorsed offers by center", () => {
+  // The July 2026 matrix stays only as a reference file; endorsed programs are
+  // encoded in the portal by Accounting or the Admin (owner, 20 Oct 2026).
+  it("keeps the July 2026 reference matrix of 96 endorsed offers by center", () => {
     expect(ENDORSEMENT_OFFERS).toHaveLength(96);
     expect(Object.fromEntries(ENDORSEMENT_SUMMARY.map((item) => [item.center, item.offers]))).toEqual({
       "Nautical Options": 18, Fareast: 26, "Altitude Maritime": 18, "Great Seas": 24, "United International": 10,
     });
+  });
+
+  it("does not seed endorsed programs, so a re-seed cannot bring them back", () => {
+    const seed = readFileSync(new URL("../scripts/seed-catalog.ts", import.meta.url), "utf8");
+    expect(seed).not.toContain("partner_course_offers");
+    expect(seed).not.toContain("ENDORSEMENT_OFFERS");
+    expect(seed).toContain('from("partner_centers")');
   });
 
   it("calculates fees, rebates, and partner payables in centavos", () => {

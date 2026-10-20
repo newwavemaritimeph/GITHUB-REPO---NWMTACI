@@ -27,7 +27,7 @@ const monthYear = (d: string) => new Intl.DateTimeFormat("en-PH", { month: "long
 export const ordinal = (n: number) => (n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] ?? "th");
 
 /** Draws a justified paragraph from (x, y) downward; the last line stays left-aligned. */
-function justified(page: PDFPage, text: string, x: number, y: number, width: number, leading: number, size: number, font: PDFFont) {
+export function justified(page: PDFPage, text: string, x: number, y: number, width: number, leading: number, size: number, font: PDFFont) {
   const words = text.split(/\s+/).filter(Boolean), space = font.widthOfTextAtSize(" ", size);
   const lines: string[][] = [];
   let line: string[] = [], used = 0;

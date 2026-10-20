@@ -155,12 +155,14 @@ export function ReleaseConfirm({ target, onClose, onDone }: { target: { enrollme
   const [idOk, setIdOk] = useState(false), [spaOk, setSpaOk] = useState(false);
   const [courier, setCourier] = useState("LBC"), [tracking, setTracking] = useState(""), [fee, setFee] = useState("Paid"), [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false), [err, setErr] = useState("");
+  // Hologram sticker serial (owner, 20 Oct 2026), shown on the certificate's QR page.
+  const [sticker, setSticker] = useState("");
   const ready = method === "Pickup" ? name.trim().length > 1 && idOk : method === "Representative" ? name.trim().length > 1 && rel.trim().length > 1 && idOk && spaOk : address.trim().length > 4;
   async function confirm() {
     setBusy(true); setErr("");
     try {
       if (method === "Courier") await submit({ action: "certificate-release-plan", enrollmentId: target.enrollmentId, releaseMethod: "Courier", courierName: courier, trackingNumber: tracking, shippingFeeStatus: fee, shippingAddress: address, courierStatus: tracking ? "Shipped" : "Booked" });
-      await submit({ action: "certificate-release", enrollmentId: target.enrollmentId, recipientName: method === "Courier" ? `${courier}${tracking ? ` · ${tracking}` : ""}` : name.trim(), recipientIdType: idType || undefined, releaseMethod: method, claimantRelationship: rel || undefined, idChecked: idOk, authorizationChecked: spaOk });
+      await submit({ action: "certificate-release", enrollmentId: target.enrollmentId, stickerNo: sticker.trim() || undefined, recipientName: method === "Courier" ? `${courier}${tracking ? ` · ${tracking}` : ""}` : name.trim(), recipientIdType: idType || undefined, releaseMethod: method, claimantRelationship: rel || undefined, idChecked: idOk, authorizationChecked: spaOk });
       await onDone();
     } catch (e) { setErr(e instanceof Error ? e.message : "Could not release the certificate."); }
     finally { setBusy(false); }
@@ -185,6 +187,7 @@ export function ReleaseConfirm({ target, onClose, onDone }: { target: { enrollme
           <label>Shipping Fee<select value={fee} onChange={(e) => setFee(e.target.value)}><option>Paid</option><option>Pending</option></select></label>
           <label className="full">Shipping Address<input value={address} onChange={(e) => setAddress(e.target.value)} /></label>
         </>}
+        <label className="full">Hologram Sticker No.<input value={sticker} maxLength={40} onChange={(e) => setSticker(e.target.value)} placeholder="e.g. NW-H 004512" /></label>
         <p className="portal-form-note full">Released by, date and time are recorded automatically for the audit trail.</p>
         <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !ready} onClick={confirm}>{busy ? "Releasing…" : "Confirm Release"}</button></div>
       </div>

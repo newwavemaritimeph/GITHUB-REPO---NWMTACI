@@ -2,39 +2,43 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Pill } from "@/components/ui/kit";
-import { SystemProvider, formatDate, fullName, useSystem } from "@/lib/system/store";
 
 /* -------------------------------------------------------- trainee status --- */
 
-function maskName(name: string) {
-  return name
-    .split(" ")
-    .map((part) => (part.length <= 2 ? part : `${part[0]}${"•".repeat(Math.min(part.length - 1, 5))}`))
-    .join(" ");
+type CourseStatus = {
+  course: string; code: string; enrollmentNumber: string; schedule: string; status: string; trainingFinished: boolean;
+  feeCentavos: number; paidCentavos: number; balanceCentavos: number;
+  certificate: string | null; certificateNumber: string | null; releasedAt: string | null; ready: boolean; delivery: string | null;
+  evaluation: { needed: boolean; submitted: boolean; url: string | null };
+};
+type PaymentRow = { paymentNumber: string; receivedAt: string; method: string; referenceNumber: string | null; amountCentavos: number; valid: boolean };
+type StatusResult = { firstName: string; nwmtaciNo: string; awaitingCourse: boolean; courses: CourseStatus[]; payments: PaymentRow[] };
+const peso = (c: number) => `₱${(c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const day = (iso: string) => new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(iso));
+const mono: React.CSSProperties = { fontFamily: "var(--font-geist-mono, ui-monospace, monospace)" };
+
+function Step({ done, children }: { done: boolean; children: React.ReactNode }) {
+  return <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 99, fontSize: 13, fontWeight: 600, background: done ? "#e7f6ec" : "#f1f4f7", color: done ? "#15803d" : "#5f7180", border: `1px solid ${done ? "#b6e3c4" : "#dfe7ee"}` }}>{done ? "✓" : "○"} {children}</span>;
 }
 
-type CourseStatus = { course: string; code: string; schedule: string; status: string; balanceCentavos: number; certificate: string | null; ready: boolean; delivery: string | null };
-type StatusResult = { firstName: string; nwmtaciNo: string; awaitingCourse: boolean; courses: CourseStatus[] };
-const peso = (c: number) => `₱${(c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-
 /**
- * Trainee status (owner, 8 Oct 2026): with the NWMTACI number and birth date,
- * each course with its schedule, enrollment status, balance, and whether the
- * certificate is printed and ready for pick-up.
+ * Trainee status (owner, 8 Oct 2026; SRN and NWMTACI No., fees, payments,
+ * evaluation and certificate, owner, 20 Oct 2026).
  */
 function StatusTab() {
+  const [srn, setSrn] = useState("");
   const [no, setNo] = useState("");
-  const [birthdate, setBirthdate] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<StatusResult | null>(null);
   const [error, setError] = useState("");
-  const canSearch = no.trim().length >= 4 && !!birthdate;
+  const canSearch = srn.replace(/\D/g, "").length === 10 && no.trim().length >= 4;
 
   async function search() {
     setBusy(true); setResult(null); setError("");
     try {
-      const response = await fetch("/api/public/trainee-status", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ nwmtaciNo: no, birthdate }) });
+      const response = await fetch("/api/public/trainee-status", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ srn, nwmtaciNo: no }) });
       const body = await response.json();
       if (!response.ok) { setError(body.error ?? "We could not check your status. Please try again."); return; }
       setResult(body as StatusResult);
@@ -43,17 +47,19 @@ function StatusTab() {
   }
 
   const tone = (status: string) => (/enrolled/i.test(status) ? "green" : /cancel/i.test(status) ? "red" : "amber");
+  const active = result?.courses.filter((c) => !/cancel/i.test(c.status)) ?? [];
+  const total = (k: "feeCentavos" | "paidCentavos" | "balanceCentavos") => active.reduce((s, c) => s + c[k], 0);
 
   return (
     <>
       <form className="search-card" onSubmit={(event) => { event.preventDefault(); if (canSearch && !busy) void search(); }}>
         <label>
-          NWMTACI number
-          <input value={no} onChange={(event) => setNo(event.target.value)} placeholder="NWMTACI-2026-0000" autoComplete="off" />
+          SRN (Seafarer&apos;s Registration No.)
+          <input value={srn} onChange={(event) => setSrn(event.target.value)} placeholder="0000000000" inputMode="numeric" autoComplete="off" maxLength={14} />
         </label>
         <label>
-          Birth date
-          <input type="date" value={birthdate} onChange={(event) => setBirthdate(event.target.value)} />
+          NWMTACI No.
+          <input value={no} onChange={(event) => setNo(event.target.value)} placeholder="NWMTACI-2026-0000" autoComplete="off" />
         </label>
         <button className="button button-primary button-block" disabled={!canSearch || busy}>{busy ? "Checking…" : "Check My Status"}</button>
         <p className="muted-text" style={{ margin: "6px 0 0" }}>Your NWMTACI number is on your enrollment confirmation email.</p>
@@ -61,7 +67,7 @@ function StatusTab() {
 
       {error && (
         <div className="status-result status-warning">
-          <strong>No record matched</strong>
+          <strong>No Record Matched</strong>
           <p>{error}</p>
         </div>
       )}
@@ -71,18 +77,60 @@ function StatusTab() {
             <div><span className="eyebrow">{result.nwmtaciNo}</span><h2>Hello, {result.firstName}</h2></div>
           </div>
           {result.awaitingCourse && !result.courses.length && <p className="status-next">Your application is being screened. Our Registration team will confirm your course, schedule and fee.</p>}
+          {result.courses.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10, margin: "12px 0" }}>
+              {([["Total Fees", total("feeCentavos"), "#123F63"], ["Paid", total("paidCentavos"), "#15803d"], ["Balance", total("balanceCentavos"), total("balanceCentavos") > 0 ? "#b42318" : "#123F63"]] as const).map(([label, value, color]) => (
+                <div key={label} style={{ border: "1px solid #dfe7ee", borderRadius: 12, padding: "10px 14px", background: "#f7fafb" }}>
+                  <div style={{ fontSize: 13, color: "#5f7180", fontWeight: 600 }}>{label}</div>
+                  <div style={{ ...mono, fontSize: 20, fontWeight: 700, color }}>{peso(value)}</div>
+                </div>
+              ))}
+            </div>
+          )}
           {result.courses.map((c, i) => (
-            <div className="ts-course" key={`${c.code}-${i}`}>
+            <div className="ts-course" key={`${c.enrollmentNumber}-${i}`}>
               <div className="ts-head"><strong>{c.course}</strong><Pill tone={tone(c.status)}>{c.status}</Pill></div>
               <dl className="review-list">
+                {c.enrollmentNumber && <div><dt>Enrollment No.</dt><dd style={mono}>{c.enrollmentNumber}</dd></div>}
                 <div><dt>Schedule</dt><dd>{c.schedule}</dd></div>
-                <div><dt>Balance</dt><dd>{c.balanceCentavos > 0 ? <span className="ts-due">{peso(c.balanceCentavos)} to pay at the Cashier</span> : "Fully paid"}</dd></div>
+                <div><dt>Fee</dt><dd style={mono}>{peso(c.feeCentavos)}</dd></div>
+                <div><dt>Paid</dt><dd style={mono}>{peso(c.paidCentavos)}</dd></div>
+                <div><dt>Balance</dt><dd>{c.balanceCentavos > 0 ? <span className="ts-due"><span style={mono}>{peso(c.balanceCentavos)}</span> to pay at the Cashier</span> : "Fully paid"}</dd></div>
                 {c.certificate && <div><dt>Certificate</dt><dd className={c.ready ? "ts-ready" : undefined}>{c.certificate}</dd></div>}
-                {c.delivery && <div><dt>Delivery request</dt><dd>{c.delivery}</dd></div>}
+                {c.delivery && <div><dt>Delivery Request</dt><dd>{c.delivery}</dd></div>}
               </dl>
+              {!/cancel/i.test(c.status) && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+                  <Step done={c.trainingFinished}>Training Finished</Step>
+                  <Step done={c.balanceCentavos <= 0}>Paid</Step>
+                  {c.evaluation.needed && <Step done={c.evaluation.submitted}>Evaluation</Step>}
+                  {c.certificate !== null && <Step done={!!c.certificateNumber}>Certificate{c.certificateNumber && <> <span style={mono}>{c.certificateNumber}</span> · {c.releasedAt ? `Released ${day(c.releasedAt)}` : "Ready for Release"}</>}</Step>}
+                </div>
+              )}
+              {c.evaluation.url && <Link className="button button-primary" href={c.evaluation.url} style={{ marginTop: 12, display: "inline-flex" }}>Evaluate Training</Link>}
               {c.ready && !c.delivery && <p className="ts-note">Can&apos;t come to the office? <Link href="/certificate-delivery">Request delivery by LBC</Link>.</p>}
             </div>
           ))}
+          {result.payments.length > 0 && (
+            <div className="ts-course">
+              <strong>Payments</strong>
+              <div className="data-table" style={{ marginTop: 8 }}>
+                <table>
+                  <thead><tr><th>Receipt</th><th>Date</th><th>Paid By</th><th style={{ textAlign: "right" }}>Amount</th></tr></thead>
+                  <tbody>
+                    {result.payments.map((p) => (
+                      <tr key={p.paymentNumber} style={p.valid ? undefined : { color: "#8a9aa8" }}>
+                        <td style={mono}>{p.paymentNumber}{!p.valid && <> <Pill tone="red">Void</Pill></>}</td>
+                        <td>{day(p.receivedAt)}</td>
+                        <td>{p.method}{p.referenceNumber && <small style={{ display: "block", ...mono }}>Ref. {p.referenceNumber}</small>}</td>
+                        <td style={{ ...mono, textAlign: "right", textDecoration: p.valid ? undefined : "line-through" }}>{peso(p.amountCentavos)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </>
@@ -91,69 +139,21 @@ function StatusTab() {
 
 /* ------------------------------------------------ certificate verification --- */
 
+/** Verify a certificate by the code printed on it (owner, 20 Oct 2026); the QR code opens the same page. */
 function VerifyTab() {
-  const { state, view, ready } = useSystem();
-  const [number, setNumber] = useState("");
-  const [result, setResult] = useState<"idle" | "not-found" | string>("idle");
-
-  function verify() {
-    const target = number.trim().toLowerCase();
-    const certificate = state.certificates.find((item) => item.certificateNumber?.toLowerCase() === target);
-    setResult(certificate ? certificate.id : "not-found");
-  }
-
-  const certificate = typeof result === "string" && result !== "idle" && result !== "not-found"
-    ? state.certificates.find((item) => item.id === result)
-    : undefined;
-  const enrollmentView = certificate ? view(certificate.enrollmentId) : undefined;
-
+  const router = useRouter();
+  const [code, setCode] = useState("");
+  const normalized = code.toUpperCase().replace(/\s+/g, "");
   return (
-    <>
-      <form
-        className="search-card"
-        onSubmit={(event) => {
-          event.preventDefault();
-          verify();
-        }}
-      >
-        <label>
-          Certificate number
-          <input value={number} onChange={(event) => setNumber(event.target.value)} placeholder="NWM-CCMI-2026-000118" autoComplete="off" />
-        </label>
-        <button className="button button-primary button-block" disabled={!ready || number.trim().length < 6}>
-          Verify certificate
-        </button>
-        <p>No email or reference is needed. Verification confirms authenticity from the certificate number alone.</p>
-      </form>
-
-      {result === "not-found" && (
-        <div className="status-result status-warning">
-          <strong>Certificate not found</strong>
-          <p>No certificate matches that number. Check the number printed on the document.</p>
-        </div>
-      )}
-
-      {certificate && enrollmentView && (
-        <div className="status-result">
-          <div className="status-head">
-            <div>
-              <span className="eyebrow">{certificate.certificateNumber}</span>
-              <h2>Verified Certificate</h2>
-            </div>
-            <Pill tone={certificate.status === "Released" ? "green" : certificate.status === "Cancelled" ? "red" : "amber"}>{certificate.status}</Pill>
-          </div>
-          <dl className="review-list">
-            <div><dt>Trainee</dt><dd>{maskName(fullName(enrollmentView.trainee))}</dd></div>
-            <div><dt>Course</dt><dd>{enrollmentView.enrollment.courseName}</dd></div>
-            <div><dt>Course code</dt><dd>{enrollmentView.enrollment.courseCode}</dd></div>
-            <div><dt>Completion date</dt><dd>{formatDate(enrollmentView.enrollment.completedAt)}</dd></div>
-            <div><dt>Certificate number</dt><dd>{certificate.certificateNumber}</dd></div>
-            <div><dt>Issuing center</dt><dd>{state.settings.organizationName}</dd></div>
-            <div><dt>Status</dt><dd>{certificate.status}</dd></div>
-          </dl>
-        </div>
-      )}
-    </>
+    <form className="search-card" onSubmit={(event) => { event.preventDefault(); if (normalized.length >= 4) router.push(`/verify/${encodeURIComponent(normalized)}`); }}>
+      <h2 style={{ margin: "0 0 12px", color: "#123F63" }}>Verify a Certificate</h2>
+      <label>
+        Verification Code
+        <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="8KX4-Q2PM-7TZD" autoComplete="off" autoCapitalize="characters" />
+      </label>
+      <button className="button button-primary button-block" disabled={normalized.length < 4}>Verify Certificate</button>
+      <p>Or scan the QR code on the certificate.</p>
+    </form>
   );
 }
 
@@ -178,9 +178,5 @@ function Page() {
 }
 
 export function RegistrationStatus() {
-  return (
-    <SystemProvider>
-      <Page />
-    </SystemProvider>
-  );
+  return <Page />;
 }

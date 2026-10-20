@@ -17,7 +17,10 @@ import { applyReferralRebates, suggestReferralCode } from "@/lib/referral";
 import { isStcwRebateCourse } from "@/lib/rebates";
 import { fitsInWeek } from "@/lib/scheduling";
 import { certificateContext, claimCertificateNumber, downloadDriveFile, ensureCertificate, trySendSoftCopy } from "@/lib/certificates";
-import { driveFileId, googleFormId, isStcwCategory, canSetSeries } from "@/lib/certificate-rules";
+import { driveFileId, googleFormId, isStcwCategory, canSetSeries, releaseProblem, courseRemoveMode } from "@/lib/certificate-rules";
+
+/** Tables whose course_id keeps a course from being deleted (Admin › Courses › Remove). */
+const COURSE_REFERENCES = ["enrollments", "batches", "partner_course_offers", "certificate_templates", "training_instruction_templates", "certificate_number_pool", "agency_rebates", "instructor_accreditations", "trainee_registration_numbers"];
 
 const manilaDate = (d = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(d);
 
@@ -126,7 +129,11 @@ const certificateStatusInput = z.object({ action: z.literal("certificate-status"
 const certificateIssueInput = z.object({ action: z.literal("certificate-issue"), enrollmentId: z.string().uuid(), certificateNumber: z.string().trim().max(80).optional(), overrides: z.record(z.string(), z.string()).optional() });
 const certificatePrintInput = z.object({ action: z.literal("certificate-print"), enrollmentId: z.string().uuid(), reprint: z.boolean().optional() });
 const certificateVoidInput = z.object({ action: z.literal("certificate-void"), enrollmentId: z.string().uuid(), reason: z.string().trim().max(300).optional() });
-const certificateReleaseInput = z.object({ action: z.literal("certificate-release"), enrollmentId: z.string().uuid(), recipientName: z.string().trim().min(1).max(160), recipientIdType: z.string().trim().max(80).optional(), reason: z.string().trim().max(300).optional(), releaseMethod: z.enum(["Pickup", "Representative", "Courier"]).optional(), claimantRelationship: z.string().trim().max(80).optional(), idChecked: z.boolean().optional(), authorizationChecked: z.boolean().optional() });
+const certificateReleaseInput = z.object({ action: z.literal("certificate-release"), enrollmentId: z.string().uuid(), recipientName: z.string().trim().min(1).max(160), recipientIdType: z.string().trim().max(80).optional(), reason: z.string().trim().max(300).optional(), releaseMethod: z.enum(["Pickup", "Representative", "Courier"]).optional(), claimantRelationship: z.string().trim().max(80).optional(), idChecked: z.boolean().optional(), authorizationChecked: z.boolean().optional(), stickerNo: z.string().trim().max(40).optional() });
+// Revoke (Admin only) and endorsed programs encoded in the portal (owner, 20 Oct 2026).
+const certificateRevokeInput = z.object({ action: z.literal("certificate-revoke"), enrollmentId: z.string().uuid(), reason: z.string().trim().min(5, "Enter the reason (at least 5 characters).").max(300) });
+const offerCreateInput = z.object({ action: z.literal("offer-create"), partnerCenterId: z.string().uuid(), courseName: z.string().trim().min(3).max(200), courseCode: z.string().trim().min(1).max(40), durationLabel: z.string().trim().min(1).max(60), trainingFeeCentavos: z.number().int().positive(), rebateCentavos: z.number().int().nonnegative() });
+const offerArchiveInput = z.object({ action: z.literal("offer-archive"), offerId: z.string().uuid(), active: z.boolean() });
 // Release plan for a certificate: how it leaves the office, and courier details.
 const certificateReleasePlanInput = z.object({ action: z.literal("certificate-release-plan"), enrollmentId: z.string().uuid(), releaseMethod: z.enum(["Pickup", "Representative", "Courier"]).optional(), expectedPickupOn: z.string().date().nullable().optional(), claimantName: z.string().trim().max(160).optional(), claimantRelationship: z.string().trim().max(80).optional(), courierName: z.string().trim().max(80).optional(), trackingNumber: z.string().trim().max(80).optional(), shippingFeeStatus: z.string().trim().max(40).optional(), shippingAddress: z.string().trim().max(300).optional(), courierStatus: z.enum(["For Booking", "Booked", "Shipped", "Delivered"]).optional() });
 // Certificate correction workflow (wrong spelling, wrong date, reprint needed).
@@ -207,7 +214,10 @@ const classroomSetActiveInput = z.object({ action: z.literal("classroom-set-acti
 // Accounting-managed pricing: course pricelist + endorsed-offer rates/rebates.
 const coursePriceInput = z.object({ action: z.literal("course-price-save"), courseId: z.string().uuid(), priceCentavos: z.number().int().nonnegative() });
 const offerRateInput = z.object({ action: z.literal("offer-rate-save"), offerId: z.string().uuid(), trainingFeeCentavos: z.number().int().nonnegative(), rebateCentavos: z.number().int().nonnegative() });
-const courseSaveInput = z.object({ action: z.literal("course-save"), id: z.string().uuid().nullable().optional(), code: z.string().trim().min(2).max(40), name: z.string().trim().min(2).max(240), categoryId: z.string().uuid(), deliveryType: z.enum(["In-House", "Partner or Endorsed"]), durationLabel: z.string().trim().min(1).max(60), durationDays: z.number().positive().max(365), mode: z.string().trim().min(2).max(80), priceCentavos: z.number().int().nonnegative() });
+const courseSaveInput = z.object({ action: z.literal("course-save"), id: z.string().uuid().nullable().optional(), code: z.string().trim().min(2).max(40), name: z.string().trim().min(2).max(240), categoryId: z.string().uuid(), deliveryType: z.enum(["In-House", "Partner or Endorsed"]), durationLabel: z.string().trim().min(1).max(60), durationDays: z.number().positive().max(365), mode: z.string().trim().min(2).max(80), priceCentavos: z.number().int().nonnegative(), publicVisible: z.boolean().optional() });
+// Admin › Courses (owner, 20 Oct 2026): remove deletes an unused course, otherwise archives it.
+const courseRemoveInput = z.object({ action: z.literal("course-remove"), id: z.string().uuid() });
+const courseRestoreInput = z.object({ action: z.literal("course-restore"), id: z.string().uuid() });
 const centerSaveInput = z.object({ action: z.literal("center-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(2).max(160), email: z.string().email().optional().or(z.literal("")), mobile: z.string().trim().max(40).optional(), active: z.boolean().optional() });
 // Cashier actions relocated into the Payments module.
 // Miscellaneous items (Schedule of fees, kind "item") sold with a payment. Each becomes an
@@ -249,7 +259,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -618,7 +628,7 @@ export async function GET() {
   })();
 
   const certificateUnit = (async () => {
-    const empty = { certificates: [] as unknown[], templates: [] as unknown[], releases: [] as unknown[], issuanceEnabled: false, series: [] as unknown[], evaluationForms: {} as Record<string, string>, feedbackAt: {} as Record<string, string>, photos: null as unknown[] | null };
+    const empty = { certificates: [] as unknown[], templates: [] as unknown[], releases: [] as unknown[], issuanceEnabled: false, series: [] as unknown[], evaluationForms: {} as Record<string, string>, feedbackAt: {} as Record<string, string>, feedbackLinks: {} as Record<string, string>, photos: null as unknown[] | null };
     if (!seesCertificates) return empty;
     const [base, extra, tpls, rel, settings] = await Promise.all([
       db.from("certificates").select("id,enrollment_id,status,printed_at,printed_by,reprint_count,snapshot,number_pool_id,template_id,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name,code))").order("created_at", { ascending: false }).limit(300),
@@ -634,7 +644,7 @@ export async function GET() {
     ]);
     // Certificate controls (migration 202610080030): numbering, print counts, voids, Drive templates and
     // Google Forms evaluations. Each read is separate so a database without the update still loads.
-    const [controls, series, tplLinks, forms, fbDates, corr, photos, regSeries] = await Promise.all([
+    const [controls, series, tplLinks, forms, fbDates, corr, photos, regSeries, qr, fbLinks] = await Promise.all([
       db.from("certificates").select("id,certificate_number,batch_label,print_count,reprints_allowed,soft_copy_sent_at,void_status,void_reason,void_requested_at,void_remarks").order("created_at", { ascending: false }).limit(300),
       db.from("certificate_series").select("course_id,prefix,next_number,pad,batch_prefix,next_batch,set_at,profiles:set_by(complete_name)"),
       db.from("certificate_templates").select("id,drive_link").order("created_at", { ascending: false }).limit(200),
@@ -644,11 +654,14 @@ export async function GET() {
       db.from("certificates").select("id,corrections").order("created_at", { ascending: false }).limit(300),
       createSupabaseAdminClient().from("certificate_photos").select("enrollment_id,file_name,background_white,uploaded_at,replaced_at,profiles:uploaded_by(complete_name)").limit(5000),
       db.from("certificate_series").select("course_id,reg_prefix,reg_next,reg_digits,reg_style"),
+      // Revocation, sticker and the evaluation PDF in Drive (migration 202610200047).
+      db.from("certificates").select("id,revoked_at,revoked_reason,sticker_no").order("created_at", { ascending: false }).limit(300),
+      db.from("training_feedback").select("enrollment_id,drive_link,comments").order("submitted_at", { ascending: false }).limit(2000),
     ]);
     const regByCourse = new Map(((regSeries.error ? [] : regSeries.data ?? []) as { course_id: string }[]).map((r) => [r.course_id, r]));
     const seriesRows = ((series.data ?? []) as { course_id: string }[]).map((s) => ({ ...s, ...(regByCourse.get(s.course_id) ?? {}) }));
     let certificates = (base.data ?? []) as { id: string }[];
-    for (const merge of [extra.data, controls.data, corr.error ? null : corr.data]) {
+    for (const merge of [extra.data, controls.data, corr.error ? null : corr.data, qr.error ? null : qr.data]) {
       if (!merge?.length) continue;
       const byId = new Map((merge as { id: string }[]).map((r) => [r.id, r]));
       certificates = certificates.map((c) => ({ ...c, ...(byId.get(c.id) ?? {}) }));
@@ -657,7 +670,9 @@ export async function GET() {
     const templates = ((tpls.data ?? []) as { id: string }[]).map((t) => ({ ...t, drive_link: linkById.get(t.id) ?? null }));
     const evaluationForms = Object.fromEntries(((forms.data ?? []) as { id: string; evaluation_form_id: string }[]).map((r) => [r.id, r.evaluation_form_id]));
     const feedbackAt = Object.fromEntries(((fbDates.data ?? []) as { enrollment_id: string; submitted_at: string }[]).map((r) => [r.enrollment_id, r.submitted_at]));
-    return { certificates: certificates as unknown[], templates, releases: rel.data ?? [], issuanceEnabled: Boolean(settings.data?.certificate_issuance_enabled), series: seriesRows, evaluationForms, feedbackAt, photos: photos.error ? null : (photos.data ?? []) as unknown[] };
+    // The evaluation PDF link: drive_link, or "Evaluation PDF: <link>" in comments before 202610200047.
+    const feedbackLinks = Object.fromEntries(((fbLinks.error ? [] : fbLinks.data ?? []) as { enrollment_id: string; drive_link?: string | null; comments?: string | null }[]).map((r) => [r.enrollment_id, r.drive_link ?? r.comments?.match(/^Evaluation PDF: (https:\S+)/)?.[1] ?? null]).filter(([, l]) => l));
+    return { certificates: certificates as unknown[], templates, releases: rel.data ?? [], issuanceEnabled: Boolean(settings.data?.certificate_issuance_enabled), series: seriesRows, evaluationForms, feedbackAt, feedbackLinks, photos: photos.error ? null : (photos.data ?? []) as unknown[] };
   })();
 
   // Non-discount charges awaiting the Accounting Manager approval queue.
@@ -788,7 +803,7 @@ export async function GET() {
 
   const results = await Promise.all([
     db.from("profiles").select("complete_name,email").eq("id", staff.user.id).maybeSingle(),
-    db.from("courses").select("id,code,name,delivery_type,duration_label,duration_days,training_mode,category_id,standard_price_centavos,google_classroom_link,active,updated_at,course_categories(name)").eq("active", true).order("name"),
+    db.from("courses").select("id,code,name,delivery_type,duration_label,duration_days,training_mode,category_id,standard_price_centavos,google_classroom_link,public_visible,active,updated_at,course_categories(name)").eq("active", true).order("name"),
     db.from("partner_course_offers").select("id,course_id,duration_label,training_fee_centavos,rebate_centavos,partner_payable_centavos,updated_at,partner_centers(name,contact_details)").eq("active", true).order("training_fee_centavos"),
     db.from("trainees").select("id,trainee_number,legal_first_name,legal_middle_name,legal_last_name,suffix,birthdate,sex,nationality,address,place_of_birth,rank,company,emergency_contact,email,mobile,srn,account_state,registered_at").neq("account_state", "Deactivated").order("created_at", { ascending: false }).limit(250),
     db.from("batches").select("id,batch_number,course_id,partner_offer_id,starts_on,ends_on,daily_start,daily_end,mode,venue,capacity,confirmed_count,enrollment_deadline,status,published_at,courses(name,code),partner_course_offers(partner_centers(name))").eq("active", true).order("starts_on", { ascending: true }).limit(250),
@@ -1050,13 +1065,23 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
+  // Archived endorsed programs and courses, for Configuration › Partners and Courses (owner, 20 Oct 2026).
+  let allOffers: unknown[] = [], archivedCourses: unknown[] = [];
+  if (canManageAccounting(staff.roleCodes)) {
+    const [ao, ac] = await Promise.all([
+      db.from("partner_course_offers").select("id,course_id,partner_center_id,duration_label,training_fee_centavos,rebate_centavos,partner_payable_centavos,active,updated_at,partner_centers(name,contact_details)").order("training_fee_centavos"),
+      db.from("courses").select("id,code,name,delivery_type,duration_label,duration_days,training_mode,category_id,standard_price_centavos,public_visible,active,updated_at,course_categories(name)").eq("active", false).order("name"),
+    ]);
+    allOffers = ao.data ?? []; archivedCourses = ac.data ?? [];
+  }
+
+  return NextResponse.json({ allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
     paymentMethods: paymentMethodsWithKind, charges: (charges.data ?? []).map((c) => ({ ...c, kind: chargeKinds.get((c as { id: string }).id) ?? "fee" })), agencies: agencies.data ?? [],
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
-    classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, certificatePhotos: certs.photos, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
+    classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, feedbackLinks: certs.feedbackLinks, certificatePhotos: certs.photos, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
     agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, deliveryRequests, requisitions, requisitionItems, instructors, accreditations, batchResources, certificateNumberSettings, legacyCertificates, holidays, otherIncome, rebatesReceived }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -2169,11 +2194,57 @@ export async function POST(request: Request) {
       const { data: cert } = await admin.from("certificates").select("id,status").eq("enrollment_id", input.enrollmentId).maybeSingle();
       if (!cert) return NextResponse.json({ error: "No certificate to release." }, { status: 400 });
       if (cert.status !== "Printed") return NextResponse.json({ error: "Print the certificate before releasing it." }, { status: 400 });
+      // Released only when paid and evaluated (owner, 20 Oct 2026), checked again here.
+      const ctx = await certificateContext(admin, input.enrollmentId);
+      const problem = ctx && releaseProblem({ balanceCentavos: ctx.balanceCentavos, evaluationRequired: ctx.evaluation.required, evaluationOn: ctx.evaluation.on, revoked: !!ctx.cert?.revoked_at });
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
       await admin.from("certificates").update({ release_method: input.releaseMethod ?? null, claimant_name: input.recipientName, claimant_relationship: input.claimantRelationship ?? null, id_checked: Boolean(input.idChecked), authorization_checked: Boolean(input.authorizationChecked) }).eq("id", cert.id);
       const { error } = await db.rpc("set_certificate_status", { target_enrollment: input.enrollmentId, target_status: "Released" });
       if (error) throw error;
+      // Hologram sticker serial, shown on the QR page (202610200047; skipped before it).
+      if (input.stickerNo) await admin.from("certificates").update({ sticker_no: input.stickerNo }).eq("id", cert.id);
       const { error: relErr } = await admin.from("certificate_release_events").insert({ certificate_id: cert.id, event_type: "release", recipient_name: input.recipientName, recipient_id_type: input.recipientIdType ?? null, released_by: staff.user.id, reason: input.reason ?? null });
       if (relErr) throw relErr;
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "certificate-revoke") {
+      if (!staff.roleCodes.includes("admin")) return NextResponse.json({ error: "Only the Admin can revoke a certificate." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: cert, error: certError } = await admin.from("certificates").select("id,certificate_number,revoked_at").eq("enrollment_id", input.enrollmentId).maybeSingle();
+      if (certError) return NextResponse.json({ error: /revoked_at/.test(certError.message) ? "Apply database update 202610200047 first." : certError.message }, { status: 400 });
+      if (!cert?.certificate_number) return NextResponse.json({ error: "This trainee has no certificate number to revoke." }, { status: 400 });
+      if (cert.revoked_at) return NextResponse.json({ error: "This certificate is already revoked." }, { status: 400 });
+      const { error } = await admin.from("certificates").update({ revoked_at: new Date().toISOString(), revoked_by: staff.user.id, revoked_reason: input.reason }).eq("id", cert.id).is("revoked_at", null);
+      if (error) throw error;
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: "certificate.revoked", record_type: "certificate", record_id: cert.id, new_values: { certificate_number: cert.certificate_number }, reason: input.reason });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "offer-create") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or the Admin can add endorsed programs." }, { status: 403 });
+      if (input.rebateCentavos > input.trainingFeeCentavos) return NextResponse.json({ error: "The rebate cannot be more than the training fee." }, { status: 400 });
+      const admin = createSupabaseAdminClient();
+      const code = input.courseCode.toUpperCase();
+      // The partner course, found by code or created (endorsed courses are not New Wave In-House courses).
+      let { data: course } = await admin.from("courses").select("id").eq("code", code).eq("delivery_type", "Partner or Endorsed").maybeSingle();
+      if (course) await admin.from("courses").update({ name: input.courseName, duration_label: input.durationLabel, active: true, public_visible: true }).eq("id", course.id);
+      if (!course) {
+        const { data: made, error: courseError } = await admin.from("courses").insert({ code, name: input.courseName, delivery_type: "Partner or Endorsed", duration_label: input.durationLabel, standard_price_centavos: input.trainingFeeCentavos, active: true, public_visible: true, source_document: "Portal", source_label: "Encoded in the portal", created_by: staff.user.id }).select("id").single();
+        if (courseError) throw courseError;
+        course = made;
+      }
+      const { data: same } = await admin.from("partner_course_offers").select("id").eq("partner_center_id", input.partnerCenterId).eq("course_id", course!.id).eq("active", true).maybeSingle();
+      if (same) return NextResponse.json({ error: "This partner center already offers that course. Edit its rate instead." }, { status: 400 });
+      const { data: offer, error } = await admin.from("partner_course_offers").insert({ course_id: course!.id, partner_center_id: input.partnerCenterId, duration_label: input.durationLabel, training_fee_centavos: input.trainingFeeCentavos, rebate_centavos: input.rebateCentavos, source_document: "Portal", source_row: 0, source_label: `Encoded by ${staff.user.email ?? "staff"}`, effective_from: new Date().toISOString().slice(0, 10), active: true }).select("id").single();
+      if (error) return NextResponse.json({ error: /unique|duplicate/i.test(error.message) ? "This program was already added today. Restore it from the archived list." : error.message }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("accounting") ? "accounting" : "admin", action: "catalog.offer_created", record_type: "partner_course_offer", record_id: offer.id, new_values: { course: code, name: input.courseName, fee: input.trainingFeeCentavos, rebate: input.rebateCentavos } });
+      return NextResponse.json({ ok: true });
+    }
+    if (input.action === "offer-archive") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or the Admin can archive endorsed programs." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { error } = await admin.from("partner_course_offers").update({ active: input.active, effective_to: input.active ? null : new Date().toISOString().slice(0, 10) }).eq("id", input.offerId);
+      if (error) throw error;
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("accounting") ? "accounting" : "admin", action: input.active ? "catalog.offer_restored" : "catalog.offer_archived", record_type: "partner_course_offer", record_id: input.offerId });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "certificate-override") {
@@ -2475,7 +2546,7 @@ export async function POST(request: Request) {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot edit endorsement rates." }, { status: 403 });
       if (input.rebateCentavos > input.trainingFeeCentavos) throw new Error("Rebate cannot exceed the training fee.");
       const admin = createSupabaseAdminClient();
-      const { error } = await admin.from("partner_course_offers").update({ training_fee_centavos: input.trainingFeeCentavos, rebate_centavos: input.rebateCentavos, partner_payable_centavos: input.trainingFeeCentavos - input.rebateCentavos }).eq("id", input.offerId);
+      const { error } = await admin.from("partner_course_offers").update({ training_fee_centavos: input.trainingFeeCentavos, rebate_centavos: input.rebateCentavos }).eq("id", input.offerId);
       if (error) throw error;
       return NextResponse.json({ ok: true });
     }
@@ -2582,10 +2653,38 @@ export async function POST(request: Request) {
     if (input.action === "course-save") {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage courses." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      const payload = { code: input.code.toUpperCase(), name: input.name, category_id: input.categoryId, delivery_type: input.deliveryType, duration_label: input.durationLabel, duration_days: input.durationDays, training_mode: input.mode, standard_price_centavos: input.priceCentavos, public_visible: input.deliveryType === "In-House", active: true };
+      const payload = { code: input.code.toUpperCase(), name: input.name, category_id: input.categoryId, delivery_type: input.deliveryType, duration_label: input.durationLabel, duration_days: input.durationDays, training_mode: input.mode, standard_price_centavos: input.priceCentavos, public_visible: input.publicVisible ?? input.deliveryType === "In-House", active: true };
       const { error } = input.id ? await admin.from("courses").update(payload).eq("id", input.id) : await admin.from("courses").insert(payload);
-      if (error) throw error;
+      if (error) return NextResponse.json({ error: /unique|duplicate/i.test(error.message) ? "That course code is already used." : error.message }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("admin") ? "admin" : "accounting", action: input.id ? "catalog.course_updated" : "catalog.course_created", record_type: "course", record_id: input.id ?? payload.code, new_values: payload });
       return NextResponse.json({ ok: true });
+    }
+    if (input.action === "course-remove" || input.action === "course-restore") {
+      if (!staff.roleCodes.includes("admin")) return NextResponse.json({ error: "Only the Admin can remove courses." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: course } = await admin.from("courses").select("id,code,name").eq("id", input.id).maybeSingle();
+      if (!course) return NextResponse.json({ error: "Course not found." }, { status: 404 });
+      if (input.action === "course-restore") {
+        const { error } = await admin.from("courses").update({ active: true }).eq("id", input.id);
+        if (error) throw error;
+        await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: "catalog.course_restored", record_type: "course", record_id: input.id, new_values: { code: course.code } });
+        return NextResponse.json({ ok: true, mode: "restored" });
+      }
+      // Anything that still points at the course keeps it (archived) so old records read correctly.
+      const refs = await Promise.all(COURSE_REFERENCES.map(async (t) => { const { count, error } = await admin.from(t).select("course_id", { count: "exact", head: true }).eq("course_id", input.id); return error ? 0 : count ?? 0; }));
+      const used = refs.reduce((a, b) => a + b, 0);
+      const mode = courseRemoveMode(used);
+      const { error } = mode === "delete" ? await admin.from("courses").delete().eq("id", input.id) : await admin.from("courses").update({ active: false, public_visible: false }).eq("id", input.id);
+      if (error && mode === "delete") {
+        // A reference not in the list: archive instead.
+        const { error: archiveError } = await admin.from("courses").update({ active: false, public_visible: false }).eq("id", input.id);
+        if (archiveError) throw archiveError;
+        await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: "catalog.course_archived", record_type: "course", record_id: input.id, new_values: { code: course.code, name: course.name } });
+        return NextResponse.json({ ok: true, mode: "archive", used });
+      }
+      if (error) throw error;
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: mode === "delete" ? "catalog.course_removed" : "catalog.course_archived", record_type: "course", record_id: input.id, prior_values: { code: course.code, name: course.name }, new_values: { references: used } });
+      return NextResponse.json({ ok: true, mode, used });
     }
     if (input.action === "center-save") {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage training centers." }, { status: 403 });

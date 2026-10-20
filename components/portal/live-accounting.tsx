@@ -18,10 +18,10 @@ type Agency = { id: string; name: string; contact_name?: string | null; email?: 
 type Expense = { id: string; expense_number: string; payee: string; category: string; amount_centavos: number; status: string; created_at: string; payment_channel?: string | null; reference_number?: string | null; purpose?: string | null; requested_by_name?: string | null };
 const EXPENSE_CHANNELS = ["Cash", "GCash", "Unionbank", "Cheque", "PSBank", "Other"];
 type Payable = { id: string; description: string; amount_centavos: number; due_on?: string | null; status: string; partner_center_id?: string | null; created_at?: string };
-type Course = { id: string; code: string; name: string; delivery_type: string; duration_label?: string; duration_days?: number; training_mode?: string; category_id?: string; standard_price_centavos: number; updated_at?: string };
+type Course = { id: string; code: string; name: string; delivery_type: string; duration_label?: string; duration_days?: number; training_mode?: string; category_id?: string; standard_price_centavos: number; updated_at?: string; public_visible?: boolean; active?: boolean };
 type CenterRef = { name: string };
 type CourseRef = { name: string; code?: string };
-type Offer = { id: string; course_id?: string; duration_label: string; training_fee_centavos: number; rebate_centavos: number; partner_payable_centavos: number; updated_at?: string; partner_centers?: CenterRef | CenterRef[] | null; courses?: CourseRef | CourseRef[] | null };
+type Offer = { id: string; course_id?: string; active?: boolean; partner_center_id?: string; duration_label: string; training_fee_centavos: number; rebate_centavos: number; partner_payable_centavos: number; updated_at?: string; partner_centers?: CenterRef | CenterRef[] | null; courses?: CourseRef | CourseRef[] | null };
 type Category = { id: string; name: string };
 type Center = { id: string; name: string; active: boolean };
 type AgencyRebate = { id: string; agency_id: string; course_id: string; rebate_centavos: number; updated_at?: string };
@@ -34,7 +34,7 @@ export type AccountingData = {
   payments: Payment[]; enrollments: Enrollment[]; paymentMethods: Channel[];
   chargeCollected?: Record<string, { amount: number; collected: number; paid: boolean }>;
   charges: Charge[]; agencies: Agency[]; expenses: Expense[]; payables: Payable[];
-  courses: Course[]; offers: Offer[]; courseCategories: Category[]; partnerCenters: Center[];
+  courses: Course[]; offers: Offer[]; courseCategories: Category[]; partnerCenters: Center[]; allOffers?: Offer[]; archivedCourses?: Course[];
   agencyCourseRebates: AgencyRebate[]; agencyRebates: AgencyRebateEntry[];
   expenseCategories: { id: string; name: string; active: boolean }[];
   inventoryItems: InventoryItem[]; inventoryMovements: InventoryMovement[];
@@ -1477,7 +1477,74 @@ function PartnersModule({ data, busy, post }: { data: AccountingData; busy: bool
         <span className="cx-acts"><button type="button" className="portal-secondary" disabled={!dirty.length || busy} onClick={() => { setEdits({}); setProblem(""); }}>Discard</button><button type="button" className="portal-primary" disabled={!dirty.length || busy} onClick={() => void save()}>{busy ? "Saving…" : "Save Changes"}</button></span></div>
       <p className="ac-note">Trainees type the referral code on the website registration. Deducted: the trainee pays the fee less the rebate. Paid to the partner later: the trainee pays the full fee and the rebate goes to Payables › Agency Rebates. Every change is recorded in the audit log.</p>
     </section>
+    <EndorsedPrograms data={data} busy={busy} post={post} />
   </>;
+}
+
+/**
+ * Endorsed programs per partner center (owner, 20 Oct 2026): the July 2026 matrix
+ * was removed and Accounting or the Admin encode each program here. Programs are
+ * archived, never deleted, so enrollments keep their rate.
+ */
+function EndorsedPrograms({ data, busy, post }: { data: AccountingData; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
+  const centers = data.partnerCenters.filter((c) => c.active);
+  const [centerId, setCenterId] = useState(centers[0]?.id ?? "");
+  const center = centers.find((c) => c.id === centerId) ?? centers[0];
+  const blank = { name: "", code: "", duration: "1 day", fee: "", rebate: "" };
+  const [form, setForm] = useState(blank), [problem, setProblem] = useState(""), [done, setDone] = useState("");
+  // Archived programs come in allOffers (Admin/Accounting); data.offers holds active ones only.
+  const programs = center ? (data.allOffers?.length ? data.allOffers : data.offers).filter((o) => o.partner_center_id ? o.partner_center_id === center.id : one(o.partner_centers)?.name === center.name) : [];
+  const peso = (v: string) => { const n = Number(v); return v.trim() !== "" && Number.isFinite(n) && n >= 0 ? Math.round(n * 100) : null; };
+  const fee = peso(form.fee), rebate = form.rebate.trim() === "" ? 0 : peso(form.rebate);
+  const tooMuch = fee != null && rebate != null && rebate > fee;
+  const edit = (patch: Partial<typeof blank>) => { setProblem(""); setDone(""); setForm({ ...form, ...patch }); };
+  async function add() {
+    if (!center) return;
+    const courseName = form.name.trim(), courseCode = form.code.trim(), durationLabel = form.duration.trim() || "1 day";
+    if (courseName.length < 2) { setProblem("Enter the course name."); return; }
+    if (courseCode.length < 2) { setProblem("Enter the course code."); return; }
+    if (fee == null) { setProblem("Enter the training fee."); return; }
+    if (rebate == null) { setProblem("Enter a valid rebate."); return; }
+    if (tooMuch) return;
+    try { await post({ action: "offer-create", partnerCenterId: center.id, courseName, courseCode, durationLabel, trainingFeeCentavos: fee, rebateCentavos: rebate }); setForm(blank); setDone(`${courseName} added to ${center.name}.`); }
+    catch { /* the page shows the error */ }
+  }
+  async function archive(offerId: string, name: string, active: boolean) {
+    setProblem(""); setDone("");
+    try { await post({ action: "offer-archive", offerId, active }); setDone(`${name} ${active ? "restored" : "archived"}.`); }
+    catch { /* the page shows the error */ }
+  }
+  return <section className="portal-panel cx-panel rb3">
+    <div className="panel-heading"><h2>Endorsed Programs</h2>
+      {centers.length > 0 && <div className="pm-tools"><select className="rb3-mode" aria-label="Partner center" value={center?.id ?? ""} onChange={(e) => { setCenterId(e.target.value); setProblem(""); setDone(""); }}>{centers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>}</div>
+    {done && <div className="portal-message success">{done}</div>}
+    {!center ? <p className="portal-empty-copy">No partner centers yet.</p> : <>
+      <div className="rb3-wrap"><table className="rb3-table"><thead><tr><th>Program</th><th>Duration</th><th className="r">Training Fee</th><th className="r">Rebate to New Wave</th><th className="r">Payable to Partner</th><th>Status</th><th /></tr></thead>
+        <tbody>{programs.map((o) => { const c = data.courses.find((x) => x.id === o.course_id) ?? one(o.courses); const name = c?.name ?? "—"; const archived = o.active === false;
+          return <tr key={o.id} className={archived ? "pm-archived" : ""}>
+            <td><strong>{name}</strong>{c?.code && <small className="cx-mono">{c.code}</small>}</td>
+            <td>{o.duration_label}</td>
+            <td className="r cx-mono">{pesos(o.training_fee_centavos)}</td>
+            <td className="r cx-mono">{pesos(o.rebate_centavos)}</td>
+            <td className="r cx-mono">{pesos(o.partner_payable_centavos)}</td>
+            <td><span className={`ac-chip ${archived ? "warn" : "ok"}`}>{archived ? "Archived" : "Active"}</span></td>
+            <td className="cm-acts"><button type="button" className="pm-link" disabled={busy} onClick={() => void archive(o.id, name, archived)}>{archived ? "Restore" : "Archive"}</button></td>
+          </tr>; })}
+        {!programs.length && <tr><td colSpan={7}><span className="portal-empty-copy">No programs yet. Add the first one below.</span></td></tr>}</tbody></table></div>
+      <div className="panel-heading"><h2>Add Program</h2></div>
+      <div className="pm-form">
+        <label>Course Name<input value={form.name} maxLength={160} onChange={(e) => edit({ name: e.target.value })} /></label>
+        <label>Course Code<input value={form.code} maxLength={40} onChange={(e) => edit({ code: e.target.value })} /></label>
+        <label>Duration<input value={form.duration} maxLength={40} onChange={(e) => edit({ duration: e.target.value })} /></label>
+        <label>Training Fee (PHP)<input inputMode="decimal" placeholder="0.00" value={form.fee} onChange={(e) => edit({ fee: e.target.value })} /></label>
+        <label>Rebate to New Wave (PHP)<input inputMode="decimal" placeholder="0.00" value={form.rebate} onChange={(e) => edit({ rebate: e.target.value })} /></label>
+        <label>Payable to Partner<input readOnly className="cx-mono" value={fee != null && rebate != null && !tooMuch ? pesos(fee - rebate) : "—"} /></label>
+      </div>
+      {tooMuch && <div className="portal-message error">The rebate cannot be more than the training fee.</div>}
+      {problem && <div className="portal-message error">{problem}</div>}
+      <div className="pm-actions"><span /><span className="cx-acts"><button type="button" className="portal-primary" disabled={busy || tooMuch} onClick={() => void add()}>Add Program</button></span></div>
+    </>}
+  </section>;
 }
 
 /**
@@ -1548,7 +1615,7 @@ function ConfigMatrix({ title, entity, cols, rows, busy, onSave, onAdd, onRemove
   </>;
 }
 
-export function AccountingConfiguration({ section, data, reload }: { section: AccountingConfigSection; data: AccountingData; trainees?: ConfigTrainee[]; applicationNumbers?: Record<string, string>; reload: () => Promise<void> }) {
+export function AccountingConfiguration({ section, data, reload }: { section: AccountingConfigSection | "Courses"; data: AccountingData; trainees?: ConfigTrainee[]; applicationNumbers?: Record<string, string>; reload: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   async function post(body: Record<string, unknown>) {
@@ -1572,6 +1639,7 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
       onRemove={(r) => post({ action: "config-remove", entity: "channel", id: r.id })}
       note="One list for training payments and expense payments. A channel that needs a reference number also needs a proof of payment when the Cashier records it." />}
     {section === "Partners" && <PartnersModule data={data} busy={busy} post={post} />}
+    {section === "Courses" && <CoursesModule data={data} busy={busy} post={post} reload={reload} />}
     {section === "Expense categories" && <ConfigMatrix title="Expense Categories" entity="category" busy={busy}
       cols={[{ key: "name", label: "Category", kind: "text", placeholder: "e.g. Office Supplies" }]}
       rows={((data as unknown as { expenseCategories: { id: string; name: string; active: boolean }[] }).expenseCategories).map((c) => ({ id: c.id, active: c.active, values: { name: c.name } }))}
@@ -1596,4 +1664,86 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
       onRemove={(r) => post({ action: "requisition-item-save", id: r.id, name: "x", remove: true })}
       note="Items the Admin Assistant can request. The default cost fills in on a new requisition and can be changed there." />}
   </div>;
+}
+
+/**
+ * Admin › Configuration › Courses (owner, 20 Oct 2026): add, edit and remove
+ * New Wave courses. Remove deletes a course nothing uses; a course with
+ * enrollments, batches or templates is archived instead and can be restored.
+ */
+type CourseDraft = { id?: string; code: string; name: string; categoryId: string; durationLabel: string; durationDays: string; mode: string; price: string; publicVisible: boolean };
+function CoursesModule({ data, busy, post, reload }: { data: AccountingData; busy: boolean; post: (body: Record<string, unknown>) => Promise<void>; reload: () => Promise<void> }) {
+  const [q, setQ] = useState(""), [filter, setFilter] = useState<"In-House" | "STCW" | "Archived">("In-House");
+  const [form, setForm] = useState<CourseDraft | null>(null), [problem, setProblem] = useState(""), [done, setDone] = useState(""), [asking, setAsking] = useState<string | null>(null);
+  const templates = new Set(((data as unknown as { certificateTemplates?: { course_id: string; active?: boolean }[] }).certificateTemplates ?? []).filter((t) => t.active !== false).map((t) => t.course_id));
+  const cats = new Map(data.courseCategories.map((c) => [c.id, c.name]));
+  const stcw = (c: Course) => /STCW/i.test(cats.get(c.category_id ?? "") ?? "");
+  type Row = Course & { public_visible?: boolean; active?: boolean };
+  const own = (data.courses as Row[]).filter((c) => c.delivery_type === "In-House");
+  const archived = ((data.archivedCourses ?? []) as Row[]).filter((c) => c.delivery_type === "In-House");
+  const pool = filter === "Archived" ? archived : own.filter((c) => (filter === "STCW") === stcw(c));
+  const term = q.trim().toLowerCase();
+  const shown = pool.filter((c) => !term || `${c.code} ${c.name}`.toLowerCase().includes(term));
+  const count = (f: typeof filter) => (f === "Archived" ? archived.length : own.filter((c) => (f === "STCW") === stcw(c)).length);
+  const open = (c?: Row) => { setProblem(""); setDone(""); setForm(c ? { id: c.id, code: c.code, name: c.name, categoryId: c.category_id ?? "", durationLabel: c.duration_label ?? "", durationDays: String(c.duration_days ?? ""), mode: c.training_mode ?? "Face-to-Face", price: String(Number(c.standard_price_centavos) / 100), publicVisible: c.public_visible !== false } : { code: "", name: "", categoryId: data.courseCategories[0]?.id ?? "", durationLabel: "1 day", durationDays: "1", mode: "Face-to-Face", price: "", publicVisible: true }); };
+  async function save() {
+    if (!form) return;
+    const days = Number(form.durationDays), price = Number(form.price);
+    if (form.code.trim().length < 2 || form.name.trim().length < 2) { setProblem("Enter the course code and name."); return; }
+    if (!form.categoryId) { setProblem("Pick a category."); return; }
+    if (!Number.isFinite(days) || days <= 0) { setProblem("Enter the number of training days."); return; }
+    if (!Number.isFinite(price) || price < 0 || form.price.trim() === "") { setProblem("Enter the training fee."); return; }
+    try {
+      await post({ action: "course-save", id: form.id ?? null, code: form.code.trim(), name: form.name.trim(), categoryId: form.categoryId, deliveryType: "In-House", durationLabel: form.durationLabel.trim() || `${days} day${days === 1 ? "" : "s"}`, durationDays: days, mode: form.mode.trim() || "Face-to-Face", priceCentavos: Math.round(price * 100), publicVisible: form.publicVisible });
+      setDone(`${form.name.trim()} ${form.id ? "saved" : "added"}.`); setForm(null);
+    } catch { /* the page shows the error */ }
+  }
+  async function remove(c: Row) {
+    try {
+      const r = await fetch("/api/staff/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "course-remove", id: c.id }) });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) { setProblem(body.error ?? "The course could not be removed."); return; }
+      await reload();
+      setDone(body.mode === "delete" ? `${c.name} was deleted.` : `${c.name} is used by ${body.used ?? "some"} record${body.used === 1 ? "" : "s"}, so it was archived instead of deleted. Restore it from Archived.`);
+    } finally { setAsking(null); }
+  }
+  return <>
+    <div className="pm-top">{!form && <button type="button" className="portal-primary" onClick={() => open()}>Add Course</button>}</div>
+    {form && <section className="portal-panel cx-panel"><div className="panel-heading"><h2>{form.id ? `Edit ${form.code}` : "Add Course"}</h2></div>
+      <div className="pm-form">
+        <label>Course Code<input autoFocus className="cx-mono" value={form.code} maxLength={40} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} placeholder="e.g. HPT" /></label>
+        <label>Course Name<input value={form.name} maxLength={240} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="e.g. Hydraulic and Pneumatic Training" /></label>
+        <label>Category<select value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}>{data.courseCategories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+        <label>Duration<input value={form.durationLabel} maxLength={60} onChange={(e) => setForm({ ...form, durationLabel: e.target.value })} placeholder="e.g. 3 days" /></label>
+        <label>Training Days<input type="number" min="0.5" step="0.5" value={form.durationDays} onChange={(e) => setForm({ ...form, durationDays: e.target.value })} /></label>
+        <label>Training Mode<input value={form.mode} maxLength={80} onChange={(e) => setForm({ ...form, mode: e.target.value })} placeholder="Face-to-Face" /></label>
+        <label>Training Fee (PHP)<input className="cx-mono" type="number" min="0" step="0.01" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} placeholder="0.00" /></label>
+        <label className="pm-check"><input type="checkbox" checked={form.publicVisible} onChange={(e) => setForm({ ...form, publicVisible: e.target.checked })} /> Show on the Website</label>
+      </div>
+      {problem && <div className="portal-message error">{problem}</div>}
+      <div className="pm-actions"><span className="muted-text">Hours on the certificate come from the training days (8 hours a day).</span><span className="cx-acts"><button type="button" className="portal-secondary" onClick={() => setForm(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={() => void save()}>{busy ? "Saving…" : form.id ? "Save Course" : "Add Course"}</button></span></div>
+    </section>}
+    <section className="portal-panel cx-panel rb3">
+      <div className="panel-heading"><h2>New Wave Courses</h2>
+        <div className="pm-tools"><input className="pm-search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search course name or code" aria-label="Search courses" />
+          <div className="cx-seg">{(["In-House", "STCW", "Archived"] as const).map((f) => <button key={f} type="button" className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{f} <span className="cx-mono">{count(f)}</span></button>)}</div></div></div>
+      {done && <div className="portal-message success">{done}</div>}
+      {!form && problem && <div className="portal-message error">{problem}</div>}
+      <div className="rb3-wrap"><table className="rb3-table"><thead><tr><th>Course</th><th>Category</th><th>Duration</th><th className="r">Training Fee</th><th>Website</th><th>Template</th><th /></tr></thead>
+        <tbody>{shown.map((c) => <tr key={c.id} className={filter === "Archived" ? "pm-archived" : ""}>
+          <td className="pm-name"><strong>{c.name}</strong><small className="cx-mono">{c.code}</small></td>
+          <td>{cats.get(c.category_id ?? "") ?? "—"}</td>
+          <td>{c.duration_label ?? "—"}{c.duration_days ? <small>{Number(c.duration_days) * 8} hours</small> : null}</td>
+          <td className="r cx-mono">{pesos(Number(c.standard_price_centavos))}</td>
+          <td><span className={`ac-chip ${c.public_visible === false ? "warn" : "ok"}`}>{c.public_visible === false ? "Hidden" : "Shown"}</span></td>
+          <td>{templates.has(c.id) ? <span className="ac-chip ok">✓ On File</span> : <span className="ac-chip warn">None</span>}</td>
+          <td><span className="cx-acts">{filter === "Archived"
+            ? <button type="button" className="portal-secondary" disabled={busy} onClick={() => void post({ action: "course-restore", id: c.id }).then(() => setDone(`${c.name} restored.`)).catch(() => undefined)}>Restore</button>
+            : asking === c.id ? <><span className="muted-text">Remove {c.code}?</span><button type="button" className="portal-secondary" onClick={() => setAsking(null)}>Keep</button><button type="button" className="cl-danger" disabled={busy} onClick={() => void remove(c)}>Remove</button></>
+            : <><button type="button" className="portal-secondary" onClick={() => open(c)}>Edit</button><button type="button" className="portal-secondary" onClick={() => { setDone(""); setProblem(""); setAsking(c.id); }}>Remove</button></>}</span></td>
+        </tr>)}
+        {!shown.length && <tr><td colSpan={7}><span className="portal-empty-copy">{filter === "Archived" ? "No archived courses." : "No courses match."}</span></td></tr>}</tbody></table></div>
+      <p className="ac-note">Removing a course that trainees, batches or certificate templates already use archives it instead, so their records still read correctly. Endorsed partner courses are added under Partners.</p>
+    </section>
+  </>;
 }

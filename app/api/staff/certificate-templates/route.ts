@@ -20,13 +20,19 @@ export async function POST(request: Request) {
     if (!allowedTypes.has(file.type)) return NextResponse.json({ error: "Use a PDF, PNG, or JPEG file." }, { status: 400 });
     if (file.size <= 0 || file.size > 50 * 1024 * 1024) return NextResponse.json({ error: "The file must be smaller than 50 MB." }, { status: 400 });
     // Accept a JSON array of {key,label} or a comma-separated list of labels.
-    let fields: { key: string; label: string }[] = [];
+    let fields: { key: string; label: string }[] | Record<string, unknown> = [];
     const rawFields = form.get("fields");
     if (rawFields) {
       const s = String(rawFields).trim();
       const slug = (v: string) => v.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
       if (s.startsWith("[")) { try { const arr = JSON.parse(s) as { key?: unknown; label?: unknown }[]; fields = arr.filter((f) => typeof f?.label === "string").map((f) => ({ key: String(f.key ?? slug(String(f.label))), label: String(f.label) })); } catch { fields = []; } }
       else fields = s.split(",").map((x) => x.trim()).filter(Boolean).map((label) => ({ key: slug(label), label }));
+    }
+    // Field positions measured from New Wave's Word templates (scripts/certificate-templates, 20 Oct 2026).
+    const rawLayout = form.get("layout");
+    if (rawLayout) {
+      try { const layout = JSON.parse(String(rawLayout)) as { version?: unknown }; if (layout && layout.version === 2) fields = layout as Record<string, unknown>; else return NextResponse.json({ error: "The position file is not from the template converter." }, { status: 400 }); }
+      catch { return NextResponse.json({ error: "The position file could not be read." }, { status: 400 }); }
     }
 
     const db = createSupabaseAdminClient();

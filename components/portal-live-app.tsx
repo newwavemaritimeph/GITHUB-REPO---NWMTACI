@@ -120,7 +120,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // Attendance stays off until it is rebuilt.
   instructor: [],
   // Releasing Officer (owner, 8 Oct 2026): Dashboard · Certificates · Templates · Released (RELEASING_TABS).
-  releasing_officer: ["Dashboard","Certificates","Waiting","Templates","Numbering","Released","Delivery"],
+  releasing_officer: ["Dashboard","Certificates","Waiting","Numbering","Released","Delivery"],
   // MARINA MISMO Compliance Officer (owner, 8 Oct 2026): STCW trainees owing at 11:00 AM, the 4:00 PM final list, submissions.
   mismo_officer: ["Dashboard","Final list","Submissions","Completion records"],
   // Admin Assistant (owner, 9 Oct 2026): requisitions, resource planning, instructor shortlist.
@@ -128,7 +128,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   hr: [],
   // Admin (owner, 9 Oct 2026): Dashboard · Search Trainee · Enrollments · Resource Planning ·
   // Configuration ▾ · Requests · Reports ▾ · MISMO ▾ (ADMIN_TABS). Requisitions opens from the dashboard.
-  admin: ["Dashboard","Search trainee","Enrollments","Resource planning","Employee accounts","Instructors","Classrooms","Certifications","Partners","Schedule of fees","Holidays","Requests","Daily summary report","MISMO dashboard","Final list","Submissions","Completion records","Requisitions"],
+  admin: ["Dashboard","Search trainee","Enrollments","Resource planning","Courses","Employee accounts","Instructors","Classrooms","Certifications","Partners","Schedule of fees","Holidays","Requests","Daily summary report","MISMO dashboard","Final list","Submissions","Completion records","Requisitions"],
   // Cashier (Accounting Officer), owner's menu of 7 Oct 2026, shown as top tabs:
   // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses,
   // Report (with opening and closing), Requests (CASHIER_TABS).
@@ -139,7 +139,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Dashboard",icon:"⌂",group:"Work"},{label:"Search trainee",icon:"⌕",roles:["admin"],group:"Work"},{label:"Trainee enrollments",icon:"◎",roles:["accounting"],group:"Work"},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting"],group:"Work"},
-  {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting"],group:"Work"},{label:"Registration",icon:"✎",roles:["registration"],group:"Work"},{label:"Courses",icon:"◇",roles:["registration"],group:"Work"},
+  {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting"],group:"Work"},{label:"Registration",icon:"✎",roles:["registration"],group:"Work"},{label:"Courses",icon:"◇",roles:["registration","admin"],group:"Work"},
   {label:"Schedules",icon:"□",roles:["admin","registration"],group:"Work"},{label:"Instructions",icon:"✉",roles:["admin","registration"],group:"Work"},{label:"Attendance",icon:"✓",roles:["admin"],group:"Work"},
   {label:"Rooms & facilities",icon:"▢",roles:["admin"],group:"Work"},{label:"Training calendar",icon:"▦",roles:["admin"],group:"Work"},{label:"Trainee scheduling",icon:"◎",roles:["admin"],group:"Work"},{label:"Instructor assignment",icon:"♙",roles:["admin"],group:"Work"},{label:"Schedule changes",icon:"↺",roles:["admin"],group:"Records"},{label:"Certificates",icon:"◈",roles:["admin","releasing_officer"],group:"Work"},{label:"Requests",icon:"↺",roles:["admin","accounting","cashier"],group:"Work"},
   {label:"Reports",icon:"↥",roles:["admin","accounting","releasing_officer","registration","cashier"],group:"Records"},
@@ -182,13 +182,13 @@ const ACCOUNTING_TABS:TopTab[]=[
   {label:"Reports",items:["Reports"]},
   {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS]},
 ];
-const RELEASING_TABS:TopTab[]=[{label:"Dashboard",items:["Dashboard"]},{label:"Certificates",items:["Certificates"]},{label:"Waiting",items:["Waiting"]},{label:"Templates",items:["Templates"]},{label:"Numbering",items:["Numbering"]},{label:"Released",items:["Released"]},{label:"Delivery",items:["Delivery"]}];
+const RELEASING_TABS:TopTab[]=[{label:"Dashboard",items:["Dashboard"]},{label:"Certificates",items:["Certificates"]},{label:"Waiting",items:["Waiting"]},{label:"Numbering",items:["Numbering"]},{label:"Released",items:["Released"]},{label:"Delivery",items:["Delivery"]}];
 const ADMIN_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
   {label:"Search trainee",items:["Search trainee"]},
   {label:"Enrollments",items:["Enrollments"]},
   {label:"Resource planning",items:["Resource planning"]},
-  {label:"Configuration",items:["Employee accounts","Instructors","Classrooms","Certifications","Partners","Schedule of fees","Holidays"]},
+  {label:"Configuration",items:["Courses","Employee accounts","Instructors","Classrooms","Certifications","Partners","Schedule of fees","Holidays"]},
   {label:"Requests",items:["Requests"]},
   {label:"Reports",items:["Daily summary report"]},
   {label:"MISMO",items:["MISMO dashboard","Final list","Submissions","Completion records"]},
@@ -364,6 +364,8 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   // Training Completion and Record of Assessment Report (owner, 9 Oct 2026): MISMO Compliance Officer and Admin.
   if(active==="Completion records"&&["mismo_officer","admin"].includes(gateRole))return <CompletionRecords/>;
   if(active==="Dashboard"&&gateRole==="registration")return <RegistrationDashboard data={data} go={m=>go(m as Module)}/>;
+  // Admin › Configuration › Courses: add, edit and remove (owner, 20 Oct 2026); Registration keeps the read-only list.
+  if(active==="Courses"&&gateRole==="admin")return <AccountingConfiguration section="Courses" data={data as unknown as Parameters<typeof AccountingConfiguration>[0]["data"]} reload={reload}/>;
   if(active==="Courses")return <CoursesAndCenters data={data} query={query}/>;
   if(active==="For payment")return <CashierPaymentQueue data={data} onPay={onPay} reload={reload}/>;
   if(active==="Registration")return <RegistrationRecords data={data} query={query} reload={reload} view={recordsView} setView={setRecordsView} trainees={<Trainees data={data} query={query} embedded reload={reload} role={gateRole}/>}/>;
@@ -459,8 +461,8 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
 /** Admin › Configuration › Certifications: Certificate Numbers and Certificate Controls in one place. */
 function AdminCertifications({data,reload}:{data:PortalData;reload:()=>Promise<void>}){
   const [tab,setTab]=useState("Certificate numbers");
-  return <><div className="portal-page" style={{paddingBottom:0}}><div className="cx-status" role="tablist">{["Certificate numbers","Certificate controls"].map(t=><button key={t} type="button" role="tab" aria-selected={tab===t} className={tab===t?"on":""} onClick={()=>setTab(t)}>{tcl(t)}</button>)}</div></div>
-    {tab==="Certificate numbers"?<AdminCertificateNumbers data={data} reload={reload}/>:<AdminCertificateControls data={data} reload={reload}/>}</>;
+  return <><div className="portal-page" style={{paddingBottom:0}}><div className="cx-status" role="tablist">{["Certificate numbers","Certificate controls","Certificate templates"].map(t=><button key={t} type="button" role="tab" aria-selected={tab===t} className={tab===t?"on":""} onClick={()=>setTab(t)}>{tcl(t)}</button>)}</div></div>
+    {tab==="Certificate numbers"?<AdminCertificateNumbers data={data} reload={reload}/>:tab==="Certificate templates"?<CertificateTemplates data={data} reload={reload}/>:<AdminCertificateControls data={data} reload={reload}/>}</>;
 }
 
 function InstructorAssignmentScreen({data,role,reload}:{data:PortalData;role:string;reload:()=>Promise<void>}){

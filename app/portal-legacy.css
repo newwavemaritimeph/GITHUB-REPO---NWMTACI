@@ -2040,6 +2040,7 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .tp-group{display:flex;justify-content:space-between;align-items:baseline;margin:14px 20px 8px;font-size:15px}.nw-shell .tp-group span{color:#5f7180;font-size:13px}
 .nw-shell .tp-upload{cursor:pointer;white-space:nowrap}
 .nw-shell .tp-filter{display:inline-flex;align-items:center;gap:6px;font-size:14px;color:#5f7180;white-space:nowrap}
+.nw-shell .tp-bulk{border-bottom:1px solid #e3ecf0;padding-bottom:12px;margin-bottom:8px}.nw-shell .tp-bulk select{max-width:340px}.nw-shell .tp-bulk-acts{justify-content:flex-end;margin:10px 20px 0}
 
 /* GCash reconciliation (owner, 9 Oct 2026). */
 .nw-shell .rc-days{display:flex;flex-direction:column}
