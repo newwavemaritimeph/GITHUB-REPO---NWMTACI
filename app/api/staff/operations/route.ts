@@ -257,7 +257,7 @@ const requestChargeInput = z.object({ action: z.literal("request-charge"), id: z
 // Course now, batch later (202610070005): the batch is optional.
 // In-house courses that run on a picked start date (no batch) may be moved to any day, past included (owner, 13 Oct 2026).
 const enrollmentStartInput = z.object({ action: z.literal("enrollment-set-start"), enrollmentId: z.string().uuid(), scheduledOn: z.string().date() });
-const applicationAssignInput = z.object({ action: z.literal("application-assign"), traineeId: z.string().uuid(), courseId: z.string().uuid(), batchId: z.string().uuid().nullable().optional(), scheduledOn: z.string().date().nullable().optional() });
+const applicationAssignInput = z.object({ action: z.literal("application-assign"), traineeId: z.string().uuid(), courseId: z.string().uuid(), batchId: z.string().uuid().nullable().optional(), scheduledOn: z.string().date().nullable().optional(), offerId: z.string().uuid().nullable().optional() });
 const applicationPlaceBatchInput = z.object({ action: z.literal("application-place-batch"), enrollmentId: z.string().uuid(), batchId: z.string().uuid() });
 const sendInstructionsInput = z.object({ action: z.literal("send-instructions"), enrollmentId: z.string().uuid() });
 const instructionTemplateSaveInput = z.object({ action: z.literal("instruction-template-save"), courseId: z.string().uuid(), subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(8000) });
@@ -1909,6 +1909,20 @@ export async function POST(request: Request) {
     if (input.action === "application-assign") {
       if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot assign courses to applications." }, { status: 403 });
       const admin = createSupabaseAdminClient();
+      // Other STCW course for a walk-in (owner, 20 Oct 2026): the course, then (when chosen) its center and date.
+      const { data: picked } = await admin.from("courses").select("delivery_type").eq("id", input.courseId).maybeSingle();
+      if (picked?.delivery_type === "Partner or Endorsed") {
+        const { data: other, error: otherError } = await admin.rpc("assign_other_course", { target_trainee: input.traineeId, target_course: input.courseId, actor: staff.user.id });
+        if (otherError) return NextResponse.json({ error: /assign_other_course/.test(otherError.message) ? "Apply database update 202610200050 first." : otherError.message }, { status: 400 });
+        const enrollmentId = (other as { id: string }).id;
+        if (input.offerId && input.scheduledOn) {
+          const { error: centerError } = await admin.rpc("set_other_course_center", { target_enrollment: enrollmentId, target_offer: input.offerId, target_date: input.scheduledOn, actor: staff.user.id });
+          if (centerError) return NextResponse.json({ error: `Course added, but the center was not saved: ${centerError.message}` }, { status: 400 });
+        }
+        const { data: tr } = await admin.from("trainees").select("marketing_agency_id").eq("id", input.traineeId).maybeSingle();
+        if (tr?.marketing_agency_id) await admin.from("enrollments").update({ referral_agency_id: tr.marketing_agency_id }).eq("id", enrollmentId);
+        return NextResponse.json({ ok: true, enrollment: other });
+      }
       // The database checks the schedule is still bookable and holds the seat.
       const { data, error } = await admin.rpc("assign_application_course", { target_trainee: input.traineeId, target_course: input.courseId, target_batch: input.batchId ?? null, actor: staff.user.id });
       if (error) return NextResponse.json({ error: /function public.assign_application_course/i.test(error.message) ? "Apply database update 202610070005 to assign a course without a batch." : error.message }, { status: 400 });
