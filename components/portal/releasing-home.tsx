@@ -268,15 +268,18 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
       </div>
       <section className="portal-panel cx-panel">
         <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search waiting certificates" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, NWMTACI number or course" />{pick && <button type="button" className="portal-secondary" onClick={() => setPick("")}>Show All</button>}</div>
-        {!shown.length ? <p className="portal-empty-copy">Nothing waiting.</p> : <div className="cl-wrap"><table className="cl-log wt-log"><thead><tr><th>#</th><th>Trainee · NWMTACI No.</th><th>Course · Training</th><th>Progress</th><th>Next Step</th></tr></thead><tbody>
-          {byCourseGroup(data, shown).flatMap(({ group, lines: g }) => [<tr key={group} className="nb-group"><td colSpan={5}><b>{group}</b> <span className="cl-sub">{g.length}</span></td></tr>, ...g.map((l, i) => { const [step, then] = next(l); const label = WAITING.find(([s]) => s === l.view.state)?.[1] ?? l.view.state; return <tr key={l.e.id} className={l.ended && l.ended <= tomorrow ? "wt-soon" : undefined}>
+        {!shown.length ? <p className="portal-empty-copy">Nothing waiting.</p> : <div className="cl-wrap"><table className="cl-log cl-cert wt-log"><thead><tr><th>#</th><th>Trainee · NWMTACI No.</th><th>Course · Training</th><th>Certificate No.</th><th>Progress</th><th>Status</th><th>Action</th></tr></thead><tbody>
+          {byCourseGroup(data, shown).flatMap(({ group, lines: g }) => [<tr key={group} className="nb-group"><td colSpan={7}><b>{group}</b> <span className="cl-sub">{g.length}</span></td></tr>, ...g.map((l, i) => { const [step, then] = next(l); const label = WAITING.find(([s]) => s === l.view.state)?.[1] ?? l.view.state; return <tr key={l.e.id} className={l.ended && l.ended <= tomorrow ? "wt-soon" : undefined}>
             <td className="cl-no">{i + 1}</td>
-            <td><b>{l.name}</b> <span className="cl-mono cl-sub">{l.number.replace(/^NWMTACI-/, "")}</span></td>
-            <td title={l.course.name}><b>{l.course.code}</b><small className="cl-sub cl-block">{range(l)} · {label}</small></td>
+            <td><b>{l.name}</b><small className="cl-mono cl-sub cl-block">{l.number.replace(/^NWMTACI-/, "")}</small></td>
+            <td title={l.course.name}><b>{l.course.code}</b><small className="cl-sub cl-block">{range(l)}</small></td>
+            <td><span className="cl-mono">{l.cert?.certificate_number ?? "—"}</span><small className="cl-sub cl-block">Not printed yet</small></td>
             <td><ProgressDots dots={certificateDots(l, tracked, l.view.state === "Training not finished")} /></td>
-            <td className="wt-next"><b>{step}</b><small className="cl-sub cl-block">{then}</small>
+            <td><Badge tone={l.view.state === "Waiting for photo" ? "orange" : undefined}>{label}</Badge><small className="cl-sub cl-block" title={then}>{step}</small></td>
+            <td><span className="cl-acts">
               {(l.view.state === "Waiting for evaluation" || (l.postTest?.required && !l.postTest.passed)) && l.view.state !== "Training not finished" && <button type="button" className="portal-secondary cl-upload" disabled={busy} onClick={() => void post({ action: "training-end-email", enrollmentId: l.e.id }, `Post-test and evaluation email sent to ${l.name}.`).catch(() => undefined)}>Email Post-Test and Evaluation</button>}
-              {tracked && !l.photo && <button type="button" className={l.view.state === "Waiting for photo" ? "portal-primary cl-upload" : "portal-secondary cl-upload"} onClick={() => setUploading(l)}>Upload Photo</button>}</td>
+              {tracked && !l.photo && <button type="button" className={l.view.state === "Waiting for photo" ? "portal-primary cl-upload" : "portal-secondary cl-upload"} onClick={() => setUploading(l)}>Upload Photo</button>}
+              {l.view.state === "Training not finished" && !(tracked && !l.photo) && <span className="cl-sub">No action yet</span>}</span></td>
           </tr>; })])}
         </tbody></table></div>}
       </section>
