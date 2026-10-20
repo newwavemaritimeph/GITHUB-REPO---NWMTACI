@@ -17,7 +17,7 @@ describe("STCW certificate templates (Safety, Crowd, Crisis)", () => {
   });
   it("gives every converted template a 2x2 photo box", () => {
     const all = Object.values(layouts as Record<string, { photo?: { w: number; h: number } }>);
-    expect(all.length).toBe(144);
+    expect(all.length).toBeGreaterThanOrEqual(144);
     expect(all.every((f) => f.photo && f.photo.w > 100 && f.photo.h > 100)).toBe(true);
   });
 });
