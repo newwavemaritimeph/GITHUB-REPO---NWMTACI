@@ -428,7 +428,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Cash position")return <AccountingCashPosition data={data}/>;
   }
   if(gateRole==="cashier"){
-    if(active==="Dashboard")return <CashierDashboard data={data} onPay={onPay} reload={reload}/>;
+    if(active==="Dashboard")return <CashierDashboard data={data} onPay={onPay} reload={reload} go={(m)=>go(m as Module)}/>;
     if(active==="Search trainee")return <CashierEnrollments data={data} onPay={onPay} reload={reload}/>;
     if(active==="Payments")return <CashierPayments data={data} onPay={onPay}/>;
     if(active==="Report")return <SubTabs eyebrow="Accounting" title="Report" tabs={["Summary report","Opening and closing"]} render={t=>t==="Summary report"?<CashierSummaryReport data={data} embedded/>:<><CashierOpening data={data} reload={reload}/><LiveCashierClosing data={data} reload={reload} initialOpening={(data.cashierOpenings??[]).find(o=>o.opening_date===manilaToday())?.opening_cash_centavos}/></>}/>;
