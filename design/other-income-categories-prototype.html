@@ -1,0 +1,89 @@
+<title>Other Income Categories</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Same shell as the live portal: navy bar with dropdown tabs, summary rail on the left, light-cyan table headers. */
+:root{--orange:#F25615;--blue:#0571D0;--cyan:#35CCFA;--cyan-l:#9EE3F1;--navy:#123F63;--bg:#f2f6f8;--surface:#fff;--fg:#0f2638;--muted:#587184;--line:#dbe6ec;--soft:#eef4f8;--th:#e6f6fd;--thc:#0b4f8f;--zebra:#f7fafc;
+ --good:#0a7a3e;--good-bg:#e2f5e9;--warn:#a2470b;--warn-bg:#fdf0e5;--bad:#b42318;--bad-bg:#fcebea;--info:#0571D0;--info-bg:#e5f1fb;
+ --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding-block:16px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.w{max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.logo{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}.logo b{font-size:19px;font-weight:600}.logo b span{color:var(--orange)}.logo small{display:block;color:var(--cyan-l);font-size:14px}.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.who{font-size:14px;color:#cfe3ef;display:flex;align-items:center;gap:8px}.who select{background:#ffffff14;border:1px solid #ffffff30;color:#fff;border-radius:8px;padding:5px 8px}.who select option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:16px;flex-wrap:wrap}.tab>button{background:none;border:0;color:#c3dbea;font:500 16px var(--sans);padding:12px 18px;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:8px}.tab>button:hover{color:#fff;background:#ffffff12}.tab.on>button{background:var(--bg);color:var(--fg);font-weight:600}
+.caret{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.menu{position:absolute;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:15;display:flex;flex-direction:column;margin-top:2px}.tab{position:relative}.menu button{background:none;border:0;text-align:left;color:var(--fg);font:500 15.5px var(--sans);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;gap:12px}.menu button:hover{background:var(--soft)}.menu button.on{background:var(--info-bg);color:var(--info);font-weight:600}.menu small,.n{font:600 11.5px var(--mono);background:var(--orange);color:#fff;border-radius:10px;padding:1px 7px}
+.page{padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.cx-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}h1{font-size:25px;font-weight:600;margin:0}h2{font-size:19px;font-weight:600;margin:0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.seg button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.seg button.on{background:var(--navy);color:#fff}
+.rail{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}@media (max-width:900px){.rail{grid-template-columns:1fr}}.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.ph small{color:var(--muted);font-size:14px}
+.lines{display:flex;flex-direction:column;padding:0 20px 16px}.lines div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}.lines div:first-child{border-top:0}.lines dd,.lines span:last-child{font-family:var(--mono);font-weight:600}.lines .tot{font-weight:700}.lines .bad{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 16px}.tile{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 12px}.tile span{display:block;font-size:13px;color:var(--muted)}.tile b{font:600 19px var(--mono)}
+.cwrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--th);color:var(--thc);font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:10px 12px;border-right:1px solid var(--line);white-space:nowrap}td{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.35}tbody tr:nth-child(even) td{background:var(--zebra)}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}.due{background:var(--bad-bg);color:var(--bad)}.dueo{background:var(--warn-bg);color:var(--warn)}.appr{background:var(--info-bg);color:var(--info)}.paid{background:var(--good-bg);color:var(--good)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:9px;padding:7px 14px;font-weight:600;font-size:14.5px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.okb{background:var(--good);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:14px 20px;background:var(--soft);border-top:1px solid var(--line)}.form label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}.form select,.form input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line)}
+.alert{background:var(--bad-bg);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:15px;font-weight:500;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.note{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+</style>
+
+<style>
+.ovl{position:fixed;inset:0;background:#0a172299;display:grid;place-items:center;z-index:30;padding:16px}
+.dlg{background:var(--surface);color:var(--fg);border-radius:16px;max-width:560px;width:100%;max-height:calc(100vh - 32px);overflow:auto;box-shadow:0 20px 50px #0005}
+.dlg .ph{border-bottom:1px solid var(--line)}.body{padding:16px 20px;display:flex;flex-direction:column;gap:12px}
+.body label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}.body select,.body input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg);font-size:15px;min-width:0}
+.row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}.row label{flex:1 1 200px}
+.addcat{display:flex;gap:8px;flex-wrap:wrap;background:var(--soft);border-radius:10px;padding:10px}.addcat input{flex:1 1 180px}
+.acts{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.seg2{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.seg2 button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.seg2 button.on{background:var(--navy);color:#fff}
+.err{color:var(--bad);font-size:13px}.muted{color:var(--muted)}
+</style>
+<header class="top"><div class="w">
+  <div class="brand"><div class="logo"><span class="mark">NW</span><div><b>New Wave <span>Maritime</span><span class="proto">PROTOTYPE</span></b><small>Staff Portal · sample income</small></div></div><span class="who">Working as Accounting</span></div>
+  <nav class="tabs" id="tabs"></nav></div></header>
+<main class="page"><div class="w" id="page"></div></main>
+<div id="dlg"></div>
+<div class="toast" id="toast" hidden></div>
+<script>
+let CATS=[{n:"Rental",a:1,u:3},{n:"Sale of Items",a:1,u:5},{n:"Refund from Supplier",a:1,u:1},{n:"Interest",a:1,u:2},{n:"Others",a:1,u:0}];
+const LOG=[["INC-2026-000014","Oct 20","Rental","Cafe Uno (canteen space)","Cash",500000],["INC-2026-000013","Oct 18","Sale of Items","Walk-in trainees","Cash",45000],["INC-2026-000012","Oct 15","Interest","PSBank","PSBank",1288]];
+const S={view:"Other Income",dlg:false,adding:false,cat:"Rental",err:""};
+const peso=(c)=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
+function income(){return `<div class="cx-head"><div><span class="eyebrow">Accounting</span><h1>Other Income</h1></div><button class="btn pri" data-rec>Record Income</button></div>
+ <span class="seg2"><button data-t="Endorsement Rebates stays as it is today">Endorsement Rebates</button><button class="on">Other Income</button></span>
+ <section class="panel"><div class="ph"><h2>Income Log</h2><small>${LOG.length}</small></div><div class="cwrap"><table><thead><tr><th>Income No.</th><th>Date</th><th>Category</th><th>Received From</th><th>Channel</th><th class="r">Amount</th></tr></thead><tbody>
+ ${LOG.map((r)=>`<tr><td class="mono">${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td><td class="r amt">${peso(r[5])}</td></tr>`).join("")}</tbody></table></div></section>`}
+function config(){return `<div class="cx-head"><div><span class="eyebrow">Accounting · Configuration</span><h1>Other Income Categories</h1></div></div>
+ <section class="panel"><div class="ph"><h2>Categories</h2><small>${CATS.filter((c)=>c.a).length} active</small></div><div class="cwrap"><table><thead><tr><th>#</th><th>Category</th><th>Used</th><th>Status</th><th></th></tr></thead><tbody>
+ ${CATS.map((c,i)=>`<tr><td class="mono" style="color:var(--muted)">${i+1}</td><td><b>${c.n}</b></td><td class="mono">${c.u} record${c.u===1?"":"s"}</td><td><span class="pill ${c.a?"paid":"due"}">${c.a?"Active":"Archived"}</span></td><td><button class="btn" data-arch="${i}">${c.a?"Archive":"Restore"}</button></td></tr>`).join("")}</tbody></table></div>
+ <div class="form"><label>New Category<input id="cfgnew" placeholder="e.g. Seminar Hall Rental"></label><div style="display:flex;align-items:flex-end"><button class="btn pri" data-cfgadd>Add Category</button></div></div>
+ <p class="note" style="padding-top:12px">Categories Accounting picks when recording other income. Archive one to hide it from the form without changing past records.</p></section>`}
+function dlg(){if(!S.dlg)return "";const act=CATS.filter((c)=>c.a);return `<div class="ovl"><div class="dlg"><div class="ph"><h2>Record Income</h2><button class="btn" data-close>Close</button></div><div class="body">
+ <div class="row"><label>Category<select id="cat">${act.map((c)=>`<option ${S.cat===c.n?"selected":""}>${c.n}</option>`).join("")}</select></label>${S.adding?"":`<button class="btn" data-addcat>+ Add Category</button>`}</div>
+ ${S.adding?`<div class="addcat"><input id="newcat" placeholder="New category, e.g. Seminar Hall Rental" aria-label="New category"><button class="btn" data-addcancel>Cancel</button><button class="btn pri" data-addsave>Add</button></div>${S.err?`<span class="err">${S.err}</span>`:""}`:""}
+ <div class="row"><label>Received From<input placeholder="Payer name"></label><label>Amount (₱)<input type="number" placeholder="0.00"></label></div>
+ <div class="row"><label>Channel<select><option>Cash</option><option>GCash</option><option>PSBank</option><option>UnionBank</option><option>Check</option></select></label><label>Date Received<input type="date" value="2026-10-21"></label></div>
+ <label>Proof Photo<input type="file" disabled></label>
+ <div class="acts"><button class="btn" data-close>Cancel</button><button class="btn pri" data-t="Recorded (sample)">Record Income</button></div></div></div></div>`}
+function render(){document.getElementById("tabs").innerHTML=["Dashboard","Approvals","Transactions","Other Income","Configuration"].map((t)=>`<div class="tab ${S.view===t?"on":""}"><button data-view="${t}">${t}</button></div>`).join("");
+ document.getElementById("page").innerHTML=S.view==="Configuration"?config():income();document.getElementById("dlg").innerHTML=dlg()}
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>el.hidden=true,2800)}
+const add=(name)=>{name=name.trim();if(name.length<2)return "Type a category name.";if(CATS.some((c)=>c.n.toLowerCase()===name.toLowerCase()))return `${name} is already on the list.`;CATS.push({n:name,a:1,u:0});return ""};
+document.addEventListener("click",(e)=>{const b=e.target.closest("button");if(!b)return;const k=b.dataset;
+ if(k.view){if(["Other Income","Configuration"].includes(k.view))S.view=k.view;else{toast(k.view+" stays as it is today");return}}
+ else if("rec" in k){S.dlg=true;S.adding=false;S.err=""}else if("close" in k)S.dlg=false;
+ else if("addcat" in k){S.adding=true;S.err=""}else if("addcancel" in k){S.adding=false;S.err=""}
+ else if("addsave" in k){const v=document.getElementById("newcat").value;const er=add(v);if(er){S.err=er}else{S.cat=v.trim();S.adding=false;S.err="";toast(`${v.trim()} added and selected`)}}
+ else if(k.arch){const c=CATS[+k.arch];c.a=c.a?0:1;toast(`${c.n} ${c.a?"restored":"archived"}`)}
+ else if("cfgadd" in k){const v=document.getElementById("cfgnew").value;const er=add(v);toast(er||`${v.trim()} added`)}
+ else if(k.t){toast(k.t);return}else return;render()});
+document.addEventListener("change",(e)=>{if(e.target.id==="cat")S.cat=e.target.value});
+render();
+</script>

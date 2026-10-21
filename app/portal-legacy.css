@@ -2355,3 +2355,6 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .cs-danger{color:#b42318}.nw-shell .portal-primary.cs-danger-btn{background:#b42318;border-color:#b42318}
 .nw-shell .cs-ro{display:block;padding:9px 10px;border:1px dashed #cfdbe4;border-radius:10px;font-weight:400;color:#0f2638}
 .nw-shell .cs-meta{margin:0}.nw-shell .cs-mini td{padding:6px 8px}.nw-shell .cs-right{text-align:right}.nw-shell .cs-err{color:#b42318;font-size:13px;margin:0}
+/* Other Income categories (owner, 21 Oct 2026) */
+.nw-shell .oi-cat{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.nw-shell .oi-cat select{flex:1 1 180px;min-width:0}
+.nw-shell .oi-addcat{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;background:#eef4f8;border-radius:10px;padding:10px}.nw-shell .oi-addcat input{flex:1 1 200px;min-width:0}

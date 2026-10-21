@@ -271,6 +271,9 @@ export function PortalLiveApp(){
   const query="";
   const load=useCallback(async()=>{setLoading(true);setError("");try{const response=await fetch("/api/staff/operations",{cache:"no-store"});const body=await response.json();if(!response.ok)throw new Error(body.error??"Unable to load staff records.");setData(body);setRole((current:string)=>{const options=workingRolesFor(body.roles);return options.includes(current)?current:defaultWorkingRole(body.roles)})}catch(e){setError(e instanceof Error?e.message:"Unable to load staff records.")}finally{setLoading(false)}},[]);
   useEffect(()=>{void load()},[load]);
+  // Refresh every 10 seconds (owner, 21 Oct 2026), quietly. Skipped while the tab is hidden,
+  // a window is open or a field has focus, so nothing being typed is lost.
+  useEffect(()=>{let running=false;const id=window.setInterval(async()=>{const el=document.activeElement;if(running||document.hidden||document.querySelector("[role=dialog]")||(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;running=true;try{const r=await fetch("/api/staff/operations",{cache:"no-store"});if(r.ok)setData(await r.json())}catch{/* next tick retries */}finally{running=false}},10000);return()=>window.clearInterval(id)},[]);
   // Admin keeps an oversight-only workspace: Dashboard, Search trainee, Enrollments,
   // Accounting, Enrollment summary, Reports, MyHr and Setup. Everything else is the
   // day-to-day work of the specialised roles and is hidden here.
@@ -362,7 +365,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   // old workspace would still paint even though the sidebar is empty.
   if(modules&&!modules.includes(active))return <RebuildingWorkspace/>;
   // Other income (owner, 19 Oct 2026): endorsement rebates and other income; the Cashier records, Accounting views, the Admin voids.
-  if(active==="Other income")return <OtherIncome data={data} reload={reload} canRecord={["cashier","admin"].includes(gateRole)} canVoid={data.roles.includes("admin")}/>;
+  if(active==="Other income")return <OtherIncome data={data} reload={reload} canRecord={["cashier","accounting","admin"].includes(gateRole)} canVoid={data.roles.includes("admin")} canAddCategory={["accounting","admin"].includes(gateRole)}/>;
   // Training Completion and Record of Assessment Report (owner, 9 Oct 2026): MISMO Compliance Officer and Admin.
   if(active==="Completion records"&&["mismo_officer","admin"].includes(gateRole))return <CompletionRecords/>;
   if(active==="Dashboard"&&gateRole==="registration")return <RegistrationDashboard data={data} go={m=>go(m as Module)}/>;

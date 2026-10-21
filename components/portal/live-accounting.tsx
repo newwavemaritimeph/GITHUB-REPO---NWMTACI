@@ -1376,7 +1376,7 @@ export function CashPositionModule({ data }: { data: AccountingData }) {
 
 type ConfigTrainee = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; email?: string | null; mobile?: string | null; srn?: string | null; company?: string | null; registered_at?: string | null };
 // Schedule of fees is fixed by the owner's ruling (Reprinting ₱500, Uniform ₱150, LBC ₱500), so it is not edited here.
-export const ACCOUNTING_CONFIG_SECTIONS = ["Payment channels", "Expense categories", "Schedule of fees", "Requisition items", "Partnered Centers"] as const;
+export const ACCOUNTING_CONFIG_SECTIONS = ["Payment channels", "Expense categories", "Other income categories", "Schedule of fees", "Requisition items", "Partnered Centers"] as const;
 export type AccountingConfigSection = (typeof ACCOUNTING_CONFIG_SECTIONS)[number];
 /**
  * Accounting › Configuration (owner, 7 Oct 2026): the referring agencies and
@@ -1658,6 +1658,14 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
       onAdd={(v) => post({ action: "channel-save", name: v.name.trim(), requiresReference: v.ref === "yes", allowsProof: true, kind: "receivable" })}
       onRemove={(r) => post({ action: "config-remove", entity: "channel", id: r.id })}
       note="One list for training payments and expense payments. A channel that needs a reference number also needs a proof of payment when the Cashier records it." />}
+    {/* Other Income categories (owner, 21 Oct 2026). */}
+    {section === "Other income categories" && <ConfigMatrix title="Other Income Categories" entity="income category" busy={busy}
+      cols={[{ key: "name", label: "Category", kind: "text", placeholder: "e.g. Seminar Hall Rental" }]}
+      rows={(((data as unknown as { incomeCategories?: { id: string; name: string; active: boolean }[] }).incomeCategories) ?? []).map((c) => ({ id: c.id, active: c.active, values: { name: c.name } }))}
+      onSave={(r) => post({ action: "income-category-save", id: r.id, name: r.values.name.trim(), active: r.active })}
+      onAdd={(v) => post({ action: "income-category-save", name: v.name.trim() })}
+      onRemove={(r) => post({ action: "income-category-save", id: r.id, name: r.values.name, remove: true })}
+      note="Categories picked when recording other income. Archive one to hide it from the form without changing past records." />}
     {section === "Partnered Centers" && <PartnersModule data={data} busy={busy} post={post} />}
     {section === "Courses" && <CoursesModule data={data} busy={busy} post={post} reload={reload} />}
     {section === "Expense categories" && <ConfigMatrix title="Expense Categories" entity="category" busy={busy}

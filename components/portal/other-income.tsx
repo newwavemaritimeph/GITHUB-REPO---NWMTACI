@@ -16,7 +16,7 @@ import { shrinkPhoto } from "./live-cashier";
  */
 type Proof = { fileId: string; link: string; name: string; mime: string };
 type Income = { id: string; income_number: string; source: string; payer: string; amount_centavos: number; channel: string; reference?: string | null; received_on: string; notes?: string | null; proof_files?: Proof[] | null; void_reason?: string | null; voided_at?: string | null; partner_centers?: { name: string } | { name: string }[] | null };
-type Extra = { otherIncome?: Income[]; rebatesReceived?: Record<string, string> };
+type Extra = { otherIncome?: Income[]; rebatesReceived?: Record<string, string>; incomeCategories?: { id: string; name: string; active: boolean }[] };
 type Form = { source: string; payer: string; amount: string; channel: string; reference: string; date: string; notes: string };
 const SOURCES = ["Rental", "Sale of Items", "Refund from Supplier", "Interest", "Others"];
 const toCentavos = (v: string) => { const n = Math.round(Number(String(v).replace(/,/g, "")) * 100); return Number.isFinite(n) && n > 0 ? n : 0; };
@@ -26,9 +26,12 @@ function usePost(reload: () => Promise<void>) {
   return { busy: raw.busy, msg: raw.msg, post: async (body: Record<string, unknown>, text?: string) => { try { await raw.post(body, text); return true; } catch { return false; } } };
 }
 
-export function OtherIncome({ data, reload, canRecord, canVoid }: { data: PortalData; reload: () => Promise<void>; canRecord: boolean; canVoid: boolean }) {
+export function OtherIncome({ data, reload, canRecord, canVoid, canAddCategory = false }: { data: PortalData; reload: () => Promise<void>; canRecord: boolean; canVoid: boolean; canAddCategory?: boolean }) {
   const x = data as unknown as Extra;
   const incomes = x.otherIncome ?? [];
+  // Categories Accounting keeps (owner, 21 Oct 2026); the built-in list until migration 055 runs.
+  const categories = x.incomeCategories?.length ? x.incomeCategories.filter((c) => c.active).map((c) => c.name) : SOURCES;
+  const [newCat, setNewCat] = useState<string | null>(null);
   const incP = usePaged(incomes);
   const received = x.rebatesReceived ?? {};
   const [tab, setTab] = useState<"Endorsement Rebates" | "Other Income">("Endorsement Rebates");
@@ -61,8 +64,14 @@ export function OtherIncome({ data, reload, canRecord, canVoid }: { data: Portal
   const thisMonth = live.filter((i) => i.received_on.startsWith(month));
   const oldest = due.map((r) => r.date).filter(Boolean).sort()[0] as string | undefined;
 
-  const blank = (amount: number): Form => ({ source: SOURCES[0], payer: "", amount: amount ? (amount / 100).toFixed(2) : "", channel: channels.includes("Cash") ? (amount ? channels.find((c) => c !== "Cash") ?? "Cash" : "Cash") : channels[0] ?? "Cash", reference: "", date: today, notes: "" });
-  const open = (amount: number) => { setForm(blank(amount)); setProofs([]); setProofError(""); };
+  const blank = (amount: number): Form => ({ source: categories[0] ?? "Others", payer: "", amount: amount ? (amount / 100).toFixed(2) : "", channel: channels.includes("Cash") ? (amount ? channels.find((c) => c !== "Cash") ?? "Cash" : "Cash") : channels[0] ?? "Cash", reference: "", date: today, notes: "" });
+  const open = (amount: number) => { setForm(blank(amount)); setProofs([]); setProofError(""); setNewCat(null); };
+  async function addCategory() {
+    const name = (newCat ?? "").trim();
+    if (name.length < 2) { setProofError("Type a category name."); return; }
+    if (categories.some((c) => c.toLowerCase() === name.toLowerCase())) { setProofError(`${name} is already on the list.`); return; }
+    if (await post({ action: "income-category-save", name }, `${name} added.`)) { setNewCat(null); setProofError(""); setForm((f) => (f ? { ...f, source: name } : f)); }
+  }
   async function attach(files: FileList | null, payer: string) {
     for (const original of Array.from(files ?? []).slice(0, 10 - proofs.length)) {
       setUploading(original.name); setProofError("");
@@ -92,7 +101,8 @@ export function OtherIncome({ data, reload, canRecord, canVoid }: { data: Portal
   const formView = (rebate: boolean) => form && <div className="oi-form">
     <h3>{rebate ? `Record Rebate Received · ${chosenPartners[0] ?? ""}` : "Record Income"}</h3>
     <div className="pm-form">
-      {!rebate && <><label>Source<select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>{SOURCES.map((s) => <option key={s}>{s}</option>)}</select></label>
+      {!rebate && <><label>Category<span className="oi-cat"><select value={form.source} onChange={(e) => setForm({ ...form, source: e.target.value })}>{[...new Set([...categories, form.source])].map((s) => <option key={s}>{s}</option>)}</select>{canAddCategory && newCat === null && <button type="button" className="portal-secondary" onClick={() => setNewCat("")}>+ Add Category</button>}</span></label>
+        {newCat !== null && <span className="oi-addcat"><input aria-label="New category" value={newCat} maxLength={60} autoFocus placeholder="New category, e.g. Seminar Hall Rental" onChange={(e) => setNewCat(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); void addCategory(); } }} /><button type="button" className="portal-secondary" onClick={() => { setNewCat(null); setProofError(""); }}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={() => void addCategory()}>Add</button></span>}
         <label>Received From<input value={form.payer} maxLength={160} onChange={(e) => setForm({ ...form, payer: e.target.value })} placeholder="e.g. Harbor Review Center" /></label></>}
       <label>Amount Received (PHP)<input className="cx-mono" inputMode="decimal" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} /></label>
       <label>Channel<select value={form.channel} onChange={(e) => setForm({ ...form, channel: e.target.value })}>{channels.map((c) => <option key={c}>{c}</option>)}</select></label>
@@ -141,7 +151,7 @@ export function OtherIncome({ data, reload, canRecord, canVoid }: { data: Portal
     </section> : <section className="portal-panel cx-panel">
       <div className="panel-heading"><h2>Other Income</h2>{canRecord && !form ? <button type="button" className="portal-primary" onClick={() => open(0)}>Record Income</button> : <small>All income received outside trainee fees</small>}</div>
       {formView(false)}
-      {incomes.length ? <div className="portal-table"><table><thead><tr><th>Income No.</th><th>Date</th><th>Source</th><th>Received From</th><th>Channel</th><th className="r">Amount</th><th>Proof</th>{canVoid && <th />}</tr></thead><tbody>
+      {incomes.length ? <div className="portal-table"><table><thead><tr><th>Income No.</th><th>Date</th><th>Category</th><th>Received From</th><th>Channel</th><th className="r">Amount</th><th>Proof</th>{canVoid && <th />}</tr></thead><tbody>
         {incP.shown.map((i) => <tr key={i.id} className={i.voided_at ? "oi-done" : ""}>
           <td className="cx-mono"><strong>{i.income_number}</strong></td><td className="tc-nowrap">{fmtDate(i.received_on)}</td>
           <td><Badge tone={i.source === "Endorsement Rebate" ? "blue" : "green"}>{i.source}</Badge></td>
