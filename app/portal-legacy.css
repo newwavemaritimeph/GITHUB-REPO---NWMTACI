@@ -2365,3 +2365,6 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .cl-log .fs-n{text-align:right;font-family:var(--font-geist-mono,ui-monospace,monospace);font-variant-numeric:tabular-nums;white-space:nowrap}
 .nw-shell .cl-log tr.fs-sub td:first-child{padding-left:24px;color:#5f7180}.nw-shell .cl-log tr.fs-tot td{font-weight:700;border-top:2px solid #0f2638}
 .nw-shell .cl-log tr.fs-net td{font-weight:700;background:#e5f1fb;color:#0571D0}.nw-shell .fs-neg{color:#b42318}.nw-shell .fs-pos{color:#0a7a3e}
+/* Copy Trainee Details (owner, 21 Oct 2026) */
+.sa-copy{display:flex;gap:8px;flex-wrap:wrap;order:3;margin-left:auto}
+.sa-copybox{display:flex;gap:8px;align-items:flex-start;margin:8px 0}.sa-copybox textarea{flex:1;min-width:0;font:13px/1.5 var(--font-geist-mono,ui-monospace,monospace);border:1px solid #cfdbe4;border-radius:10px;padding:10px;resize:vertical}

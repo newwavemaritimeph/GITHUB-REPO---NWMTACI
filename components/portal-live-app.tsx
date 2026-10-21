@@ -1,4 +1,5 @@
 "use client";
+import { traineeCopy } from "@/lib/trainee-copy";
 
 import { FormEvent, Fragment, useCallback, useEffect, useState } from "react";
 import { NewWaveLogo } from "./new-wave-logo";
@@ -591,6 +592,21 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   const payments=data.payments.filter(p=>p.trainee_id===trainee.id).sort((a,b)=>a.received_at.localeCompare(b.received_at));
   const requests=data.requests.filter(r=>first(r.enrollments)?.trainee_id===trainee.id&&r.status==="Pending");
   const appNo=data.applicationNumbers?.[trainee.id];
+  // Copy Trainee Details (owner, 21 Oct 2026): for endorsing an enrollment to a partnered center.
+  const [copyFallback,setCopyFallback]=useState("");
+  const copyDetails=async(format:"text"|"row")=>{
+    const endorsed=enrolls.filter(e=>e.partner_offer_id&&e.enrollment_status!=="Cancelled");
+    const pick=endorsed.length?endorsed:enrolls.filter(e=>e.enrollment_status!=="Cancelled").slice(-1);
+    const centerOf=(e:Enrollment)=>first(first(data.offers.find(o=>o.id===e.partner_offer_id)?.partner_centers))?.name??(e.partner_offer_id?"":"New Wave");
+    const when=(e:Enrollment)=>{const b=first(e.batches);return b?(b.starts_on===b.ends_on?date(b.starts_on):`${date(b.starts_on)} – ${date(b.ends_on)}`):e.scheduled_on?date(e.scheduled_on):""};
+    const ec=trainee.emergency_contact;
+    const {text,rows}=traineeCopy({name:`${(trainee.legal_last_name??"").toUpperCase()}, ${trainee.legal_first_name??""}${trainee.legal_middle_name?` ${trainee.legal_middle_name}`:""}${trainee.suffix?` ${trainee.suffix}`:""}`,nwmtaciNo:appNo??trainee.trainee_number,birthDate:trainee.birthdate?date(trainee.birthdate):"",placeOfBirth:trainee.place_of_birth??"",srn:trainee.srn??"",rank:trainee.rank??"",company:trainee.company??"",address:trainee.address??"",mobile:trainee.mobile??"",email:trainee.email??"",emergency:[ec?.name,ec?.mobile].filter(Boolean).join(" · "),
+      courses:pick.map(e=>{const c=first(e.courses);return {course:c?`${c.code} ${c.name}`:"",center:centerOf(e),date:when(e)}})});
+    const value=format==="row"?rows:text;
+    void fetch("/api/staff/operations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"trainee-details-copied",traineeId:trainee.id,format})}).catch(()=>undefined);
+    try{await navigator.clipboard.writeText(value);setCopyFallback("");setNote(format==="row"?`Copied ${pick.length||1} row${pick.length===1?"":"s"} for the center's sheet.`:"Copied. Paste it in Messenger, Viber or email.")}
+    catch{setCopyFallback(value)}
+  };
   const em=trainee.emergency_contact;
   const live=enrolls.filter(e=>e.enrollment_status!=="Cancelled");
   const fees=live.reduce((s,e)=>s+Number(e.selling_price_centavos)+Number(e.charges_centavos??0),0);
@@ -620,10 +636,11 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
         <div className="sa-doc"><h2>Statement of Account</h2><small>As of {date(manilaToday())}</small></div>
       </div>
       {note&&<Message kind="success" text={note}/>}
+      {copyFallback&&<div className="sa-copybox"><textarea readOnly rows={Math.min(14,copyFallback.split("\n").length+1)} value={copyFallback} onFocus={e=>e.currentTarget.select()} aria-label="Trainee details to copy"/><button type="button" className="portal-secondary" onClick={()=>setCopyFallback("")}>Close</button></div>}
       <div className="sa-meta">
         {editing&&reload?<div className="sa-box"><TraineeEditForm trainee={trainee} reload={reload} onDone={()=>setEditing(false)}/></div>:<div className="sa-box">
           <span className="sa-cap">Trainee</span>
-          <div className="sa-who"><div className="sa-name">{`${(trainee.legal_last_name??"").toUpperCase()}, ${trainee.legal_first_name??""}${trainee.legal_middle_name?` ${trainee.legal_middle_name.charAt(0)}.`:""}`}</div>{trainee.rank&&<span className="sa-rank">{trainee.rank}</span>}</div>
+          <div className="sa-who">{canPrint&&<span className="sa-copy"><button type="button" className="portal-secondary" onClick={()=>void copyDetails("text")}>Copy as Text</button><button type="button" className="portal-secondary" onClick={()=>void copyDetails("row")}>Copy as Row</button></span>}<div className="sa-name">{`${(trainee.legal_last_name??"").toUpperCase()}, ${trainee.legal_first_name??""}${trainee.legal_middle_name?` ${trainee.legal_middle_name.charAt(0)}.`:""}`}</div>{trainee.rank&&<span className="sa-rank">{trainee.rank}</span>}</div>
           {/* One labelled field per detail; empty ones are left out. */}
           <dl className="sa-kv">
             {([["NWMTACI No.",appNo,"sa-mono"],["Trainee No.",trainee.trainee_number,"sa-mono"],["SRN",trainee.srn,"sa-mono"],
