@@ -105,7 +105,7 @@ export function AdminHome({ data, go, reload }: { data: PortalData; go: (m: stri
   const days: string[] = []; for (let d = from; d <= to && days.length < 62; d = addDays(d, 1)) days.push(d);
   const peak = Math.max(1, ...days.map((d) => dash?.enrollmentsPerDay[d] ?? 0));
   const stcw = (dash?.classes ?? []).filter((c) => c.stcw);
-  const [month, setMonth] = useState(addDays(today, 31).slice(0, 7));
+  const [month, setMonth] = useState(today.slice(0, 7));
   const quick: [string, string, string][] = [["Today", today, today], ["This Week", addDays(today, -6), today], ["This Month", `${today.slice(0, 7)}-01`, today]];
 
   return <div className="portal-page cx ac ad">
@@ -334,7 +334,7 @@ export function AdminEnrollments({ data, reload }: { data: PortalData; reload: (
 type Voucher = { id: string; number: string; payee: string; category: string; amount: number; status: string; channel: string | null; createdAt: string; paidAt: string | null; voidReason: string | null; voidedAt: string | null };
 export function AdminVouchers() {
   const today = manilaToday();
-  const [from, setFrom] = useState(`${today.slice(0, 7)}-01`), [to, setTo] = useState(today), [act, setAct] = useState<string | null>(null);
+  const [from, setFrom] = useState(today), [to, setTo] = useState(today), [act, setAct] = useState<string | null>(null);
   const { data, error, load } = useJson<{ vouchers: Voucher[] }>(`/api/staff/admin?view=vouchers&from=${from}&to=${to}`);
   const { busy, msg, post } = usePost(load);
   const list = data?.vouchers ?? [];

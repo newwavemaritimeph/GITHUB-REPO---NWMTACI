@@ -261,6 +261,9 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
   const group = traineeId ? groupByTrainee(data, mine)[0] : undefined;
   // Referral (8 Oct 2026): the agency's rebate is already deducted from these balances.
   const referralAgency = (() => { const id = mine.map((e) => data.referralByEnrollment?.[e.id]).find(Boolean); return id ? data.agencies.find((a) => a.id === id) ?? null : null; })();
+  // Rebates that come off once fully paid (21 Oct 2026): Pay All in Full collects the balance less them.
+  const pending = (e: { id: string }) => data.pendingRebates?.[e.id] ?? 0;
+  const pendingTotal = open.reduce((s, e) => s + Math.min(pending(e), balanceOf(e)), 0);
   const applied = open.reduce((s, e) => s + Math.min(toCentavos(amounts[e.id] ?? ""), balanceOf(e)), 0);
   const extraTotal = extras.reduce((s, x) => s + x.unit * x.quantity, 0);
   const total = applied + extraTotal;
@@ -273,7 +276,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
   function choose(id: string) { setTraineeId(id); setAmounts({}); setExtras([]); const firstOpen = data.enrollments.find((e) => e.trainee_id === id && e.enrollment_status !== "Cancelled"); setForEnrollment(firstOpen?.id ?? ""); if (!data.enrollments.some((e) => e.trainee_id === id && e.enrollment_status !== "Cancelled" && balanceOf(e) > 0)) setAddOpen(true); }
   function fill(how: "all" | "spread" | "clear") {
     if (how === "clear") { setAmounts({}); return; }
-    if (how === "all") { setAmounts(Object.fromEntries(open.map((e) => [e.id, (balanceOf(e) / 100).toFixed(2)]))); setReceived(((open.reduce((s, e) => s + balanceOf(e), 0) + extraTotal) / 100).toFixed(2)); return; }
+    if (how === "all") { setAmounts(Object.fromEntries(open.map((e) => [e.id, (Math.max(0, balanceOf(e) - pending(e)) / 100).toFixed(2)]))); setReceived(((open.reduce((s, e) => s + Math.max(0, balanceOf(e) - pending(e)), 0) + extraTotal) / 100).toFixed(2)); return; }
     let left = receivedCentavos - extraTotal;
     setAmounts(Object.fromEntries(open.map((e) => { const a = Math.max(0, Math.min(left, balanceOf(e))); left -= a; return [e.id, a > 0 ? (a / 100).toFixed(2) : ""]; })));
   }
@@ -349,7 +352,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
         <div className="cx-results">{candidates.map((g) => { const unpaid = g.enrollments.filter((e) => balanceOf(e) > 0); return <button type="button" key={g.traineeId} onClick={() => choose(g.traineeId)}><span><b>{g.name}</b><small>{unpaid.length ? unpaid.map(courseCode).join(" · ") : "All courses paid"}</small></span><strong className="cx-amt">{pesos(g.balance)}</strong></button>; })}
           {!candidates.length && <p className="portal-empty-copy">No trainee matches.</p>}</div>
       </div> : <>
-        <div className="cx-whocard full"><div><Who name={group.name} number={group.number} />{referralAgency && <span className="ref-chip">Referred by {referralAgency.name} · {referralAgency.rebate_mode === "No deduction" ? "rebate paid to the agency later" : "rebate deducted"}</span>}</div><div className="cx-right"><small>Balance</small><span className="cx-amt">{pesos(group.balance)}</span></div></div>
+        <div className="cx-whocard full"><div><Who name={group.name} number={group.number} />{referralAgency && <span className="ref-chip">Referred by {referralAgency.name} · {referralAgency.rebate_mode === "No deduction" ? "rebate paid to the agency later" : pendingTotal > 0 ? `rebate ${pesos(pendingTotal)} once ${pesos(group.balance - pendingTotal)} is paid` : "rebate deducted"}</span>}</div><div className="cx-right"><small>Balance</small><span className="cx-amt">{pesos(group.balance)}</span></div></div>
         <label>Amount Received (PHP)<input className="cx-mono" inputMode="decimal" value={received} onChange={(ev) => setReceived(ev.target.value)} placeholder="0.00" /></label>
         <div><span className="pay-label">Apply the amount</span><div className="cx-choice"><button type="button" onClick={() => fill("all")}>Pay All in Full</button><button type="button" onClick={() => fill("spread")}>Distribute in Order</button><button type="button" onClick={() => fill("clear")}>Clear</button></div></div>
         <div className="cx-lines full"><table><thead><tr><th>Course or Charge</th><th className="r">Balance</th><th className="r">Apply</th></tr></thead><tbody>
@@ -563,7 +566,7 @@ export function CashierEnrollments({ data, onPay, reload }: { data: PortalData; 
   const today = manilaToday();
   const [filter, setFilter] = useState<"All" | (typeof STATUS_ORDER)[number]>("All");
   const [q, setQ] = useState("");
-  const [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today);
+  const [from, setFrom] = useState(today), [to, setTo] = useState(today);
   const dateOf = (e: Enrollment) => day(e.enrolled_at ?? e.created_at);
   const term = q.trim().toLowerCase();
   const base = data.enrollments.filter((e) => { const d = dateOf(e); return (!from || d >= from) && (!to || d <= to) && (!term || `${traineeName(e)} ${e.enrollment_number} ${first(e.courses)?.name ?? ""} ${courseCode(e)} ${data.applicationNumbers?.[e.trainee_id] ?? ""}`.toLowerCase().includes(term)); });
@@ -831,7 +834,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   const isManager = role === "accounting";
   const [view, setView] = useState<"Expenses" | "Vouchers" | "Pay the Centers">("Expenses");
   const centersDue = centerLines(data).filter((l) => l.state === "Due").length;
-  const [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today);
+  const [from, setFrom] = useState(today), [to, setTo] = useState(today);
   const [tab, setTab] = useState<(typeof EXPENSE_STATUSES)[number]>(canDecide ? "For approval" : "All");
   const [recording, setRecording] = useState(false);
   const [releasing, setReleasing] = useState<ExpenseRow | null>(null);

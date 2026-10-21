@@ -101,7 +101,7 @@ export function ScheduleOfficerDashboard({ data, go, openBatch }: { data: Schedu
 export function TrainingCalendar({ data }: { data: SchedulingData }) {
   const today = manilaToday();
   const [month, setMonth] = useState(today.slice(0, 7));
-  const [view, setView] = useState<"Month" | "Week">("Month");
+  const [view, setView] = useState<"Month" | "Week">("Week");
   const [weekStart, setWeekStart] = useState(addDays(today, -((new Date(`${today}T00:00:00+08:00`).getDay() + 6) % 7)));
   const live = data.batches.filter((b) => b.status !== "Cancelled");
   const onDay = (day: string) => live.filter((b) => b.starts_on <= day && day <= b.ends_on);

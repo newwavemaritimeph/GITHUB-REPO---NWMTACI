@@ -203,7 +203,7 @@ export function LiveReleasing({ data, role, reload }: { data: ReleasingData; rol
   const [release, setRelease] = useState<Enrollment | null>(null);
   const [edit, setEdit] = useState<Enrollment | null>(null);
   const [pdf, setPdf] = useState<CertPdfTarget | null>(null);
-  const [span, setSpan] = useState<"Daily" | "Weekly" | "Monthly" | "All">("Weekly");
+  const [span, setSpan] = useState<"Daily" | "Weekly" | "Monthly" | "All">("Daily");
 
   async function act(body: Record<string, unknown>) {
     setBusy(true); setMessage("");

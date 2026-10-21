@@ -78,7 +78,7 @@ export async function createFinanceSummaryPdf(s: Summary, printed: string) {
   y -= 10;
 
   need(14 * (s.direct.courses.length + 12));
-  header("Direct Sales - New Wave courses by training date", ["Course", "Trainees", "", "Sales"]);
+  header("Direct Sales", ["Course", "Trainees", "", "Sales"]);
   for (const c of s.direct.courses) row([`${c.code}  ${c.name}`.slice(0, 70), String(c.trainees), "", money(c.sales)]);
   if (!s.direct.courses.length) row(["No New Wave training in this period", "", "", ""]);
   row(["Course Fees", String(s.direct.trainees), "", money(s.direct.fees)], { bold: true });
@@ -93,7 +93,7 @@ export async function createFinanceSummaryPdf(s: Summary, printed: string) {
 
   const ecols = [0.44, 0.55, 0.68, 0.79, 0.9, 1].map((f) => M + IW * f); // right edges of the number columns
   need(60);
-  text("Training Endorsement - Other STCW at partnered centers, by training date", M, 11.5, bold, navy); y -= 8;
+  text("Training Endorsement", M, 11.5, bold, navy); y -= 8;
   page.drawRectangle({ x: M, y: y - 12, width: IW, height: 15, color: band }); y -= 8;
   const eh = ["Center", "Trainees", "Fees Billed", "Paid to Center", "Rebate", "Agency Share", "NW Keeps"];
   text(eh[0], M + 4, 7.5, bold, navy); eh.slice(1).forEach((h, i) => right(h, ecols[i] - 4, 7.5, bold, navy)); y -= 14;
@@ -103,10 +103,6 @@ export async function createFinanceSummaryPdf(s: Summary, printed: string) {
   const e = s.endorsement;
   erow(["Total", String(e.trainees), money(e.fees), money(e.payable), money(e.rebate), money(-e.share), money(e.keeps)], true);
   erow([`Rebates received ${money(e.received)} - still due from centers ${money(e.rebateDue)}`, "", "", "", "", "", ""]);
-  y -= 6;
-  need(30);
-  text("New Wave collects the full fee and pays the same to the center; it keeps the rebate less the referring agency's share.", M, 7.5, reg, muted); y -= 11;
-  text("Agency shares are shown as owed per trainee; one payment can cover a course fee and its charges, so Direct cash shows them together.", M, 7.5, reg, muted);
 
   y = Math.max(y - 46, M + 20);
   if (y < M + 40) { page = pdf.addPage([W, H]); y = H - M - 40; }

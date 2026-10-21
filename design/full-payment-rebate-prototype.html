@@ -1,0 +1,88 @@
+<title>Full-Payment Rebates</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Same shell as the live portal: navy bar with dropdown tabs, summary rail on the left, light-cyan table headers. */
+:root{--orange:#F25615;--blue:#0571D0;--cyan:#35CCFA;--cyan-l:#9EE3F1;--navy:#123F63;--bg:#f2f6f8;--surface:#fff;--fg:#0f2638;--muted:#587184;--line:#dbe6ec;--soft:#eef4f8;--th:#e6f6fd;--thc:#0b4f8f;--zebra:#f7fafc;
+ --good:#0a7a3e;--good-bg:#e2f5e9;--warn:#a2470b;--warn-bg:#fdf0e5;--bad:#b42318;--bad-bg:#fcebea;--info:#0571D0;--info-bg:#e5f1fb;
+ --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding-block:16px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.w{max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.logo{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}.logo b{font-size:19px;font-weight:600}.logo b span{color:var(--orange)}.logo small{display:block;color:var(--cyan-l);font-size:14px}.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.who{font-size:14px;color:#cfe3ef;display:flex;align-items:center;gap:8px}.who select{background:#ffffff14;border:1px solid #ffffff30;color:#fff;border-radius:8px;padding:5px 8px}.who select option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:16px;flex-wrap:wrap}.tab>button{background:none;border:0;color:#c3dbea;font:500 16px var(--sans);padding:12px 18px;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:8px}.tab>button:hover{color:#fff;background:#ffffff12}.tab.on>button{background:var(--bg);color:var(--fg);font-weight:600}
+.caret{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.menu{position:absolute;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:15;display:flex;flex-direction:column;margin-top:2px}.tab{position:relative}.menu button{background:none;border:0;text-align:left;color:var(--fg);font:500 15.5px var(--sans);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;gap:12px}.menu button:hover{background:var(--soft)}.menu button.on{background:var(--info-bg);color:var(--info);font-weight:600}.menu small,.n{font:600 11.5px var(--mono);background:var(--orange);color:#fff;border-radius:10px;padding:1px 7px}
+.page{padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.cx-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}h1{font-size:25px;font-weight:600;margin:0}h2{font-size:19px;font-weight:600;margin:0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.seg button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.seg button.on{background:var(--navy);color:#fff}
+.rail{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}@media (max-width:900px){.rail{grid-template-columns:1fr}}.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.ph small{color:var(--muted);font-size:14px}
+.lines{display:flex;flex-direction:column;padding:0 20px 16px}.lines div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}.lines div:first-child{border-top:0}.lines dd,.lines span:last-child{font-family:var(--mono);font-weight:600}.lines .tot{font-weight:700}.lines .bad{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 16px}.tile{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 12px}.tile span{display:block;font-size:13px;color:var(--muted)}.tile b{font:600 19px var(--mono)}
+.cwrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--th);color:var(--thc);font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:10px 12px;border-right:1px solid var(--line);white-space:nowrap}td{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.35}tbody tr:nth-child(even) td{background:var(--zebra)}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}.due{background:var(--bad-bg);color:var(--bad)}.dueo{background:var(--warn-bg);color:var(--warn)}.appr{background:var(--info-bg);color:var(--info)}.paid{background:var(--good-bg);color:var(--good)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:9px;padding:7px 14px;font-weight:600;font-size:14.5px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.okb{background:var(--good);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:14px 20px;background:var(--soft);border-top:1px solid var(--line)}.form label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}.form select,.form input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line)}
+.alert{background:var(--bad-bg);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:15px;font-weight:500;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.note{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+</style>
+
+<style>
+.sub{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.sub button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.sub button.on{background:var(--navy);color:#fff}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;display:flex;flex-direction:column;gap:14px;max-width:720px}
+.who2{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:flex-start}.who2 b{font-size:17px}.who2 small{display:block;color:var(--muted)}
+.chip2{display:inline-block;margin-top:6px;border-radius:99px;padding:3px 10px;font-size:13px;font-weight:600}.chip2.wait{background:var(--warn-bg);color:var(--warn)}.chip2.done{background:var(--good-bg);color:var(--good)}
+.amt2{font:600 22px var(--mono);text-align:right}
+.hint{border-radius:10px;padding:10px 12px;font-size:14.5px}.hint.info{background:var(--info-bg);color:var(--info)}.hint.warn{background:var(--warn-bg);color:var(--warn)}.hint.ok{background:var(--good-bg);color:var(--good)}
+.row2{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}.row2 label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted);flex:1 1 180px}.row2 input,.row2 select{border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:var(--surface);color:var(--fg);font-size:15px}
+.mono2{font-family:var(--mono)}
+</style>
+<header class="top"><div class="w">
+  <div class="brand"><div class="logo"><span class="mark">NW</span><div><b>New Wave <span>Maritime</span><span class="proto">PROTOTYPE</span></b><small>Staff Portal · sample trainees</small></div></div><span class="who" id="who"></span></div>
+  <nav class="tabs" id="tabs"></nav></div></header>
+<main class="page"><div class="w" id="page"></div></main>
+<div class="toast" id="toast" hidden></div>
+<script>
+const T={other:{n:"SANTOS, Mark",no:"NWMTACI-2026-0412",course:"UBT-PSSR",fee:130000,reb:30000,ag:"Harbor Crew Agency",mode:"full"},qapla:{n:"DELA CRUZ, Juan",no:"NWMTACI-2026-0418",course:"UBT-PSSR",fee:130000,reb:30000,ag:"Qapla Maritime",mode:"any"}};
+const AG=[["Qapla Maritime","Consultancy","Deducted on Any Payment"],["Costa Maritime","Consultancy","Deducted on Any Payment"],["Tara Barko","Agency","Deducted on Any Payment"],["Harbor Crew Agency","Agency","Deducted Once Fully Paid"],["Blue Anchor Manning","Consultancy","Deducted Once Fully Paid"]];
+const S={view:"Cashier",who:"other",amt:"",paid:0,done:false};
+const peso=(c)=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
+function cashier(){const t=T[S.who];const full=t.mode==="full";const a=Math.round(Number(S.amt||0)*100);
+ const target=t.fee-t.reb, left=Math.max(0,target-S.paid), bal=S.done?0:full?t.fee-S.paid:t.fee-t.reb-S.paid;
+ const state=!full||!a?"":S.paid+a>=target?"ok":"warn";
+ return `<div class="cx-head"><div><span class="eyebrow">Cashier · Payments</span><h1>Record Payment</h1></div></div>
+ <span class="sub">${[["other","Referred by Harbor Crew Agency"],["qapla","Referred by Qapla / Costa / Tara Barko"]].map(([k,l])=>`<button class="${S.who===k?"on":""}" data-who="${k}">${l}</button>`).join("")}</span>
+ <div class="card">
+  <div class="who2"><div><b>${t.n}</b><small class="mono2">${t.no} · ${t.course}</small>
+   <span class="chip2 ${full&&!S.done?"wait":"done"}">Referred by ${t.ag} · ${full?(S.done?`rebate ${peso(t.reb)} deducted`:`rebate ${peso(t.reb)} once ${peso(t.fee-t.reb)} is paid · ${peso(Math.max(0,t.fee-t.reb-S.paid))} to go`):`rebate ${peso(t.reb)} deducted`}</span></div>
+   <div><small>Balance</small><div class="amt2">${peso(bal)}</div></div></div>
+  ${S.done?`<div class="hint ok">Fully paid · the ${peso(t.reb)} rebate was deducted · balance ₱0.00.</div>`:`<div class="row2"><label>Amount Received (₱)<input id="amt" inputmode="decimal" value="${S.amt}" placeholder="0.00"></label><label>Channel<select><option>Cash</option><option>GCash</option><option>PSBank</option><option>UnionBank</option></select></label><button class="btn" data-fill>Pay All in Full</button></div>
+  ${state==="ok"?`<div class="hint ok">This completes the payment · the ${peso(t.reb)} rebate will be deducted and the balance becomes ₱0.00.</div>`:state==="warn"?`<div class="hint warn">Partial payment · no rebate yet. Balance after this payment: ${peso(t.fee-S.paid-a)}.</div>`:""}
+  <div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" data-reset>Start Over</button><button class="btn pri" data-post>Record Payment</button></div>`}
+ </div>`}
+function config(){return `<div class="cx-head"><div><span class="eyebrow">Accounting · Configuration</span><h1>Agencies and Consultancies</h1></div></div>
+ <section class="panel"><div class="ph"><h2>Referral Partners</h2></div><div class="cwrap"><table><thead><tr><th>Name</th><th>Type</th><th>Rebate</th></tr></thead><tbody>
+ ${AG.map(([n,k,m],i)=>`<tr><td><b>${n}</b></td><td>${k}</td><td><select data-ag="${i}" style="border:1px solid var(--line);border-radius:9px;padding:7px 9px;background:var(--surface);color:var(--fg)">${["Deducted Once Fully Paid","Deducted on Any Payment","No Deduction (Pay the Agency)"].map((o)=>`<option ${o===m?"selected":""}>${o}</option>`).join("")}</select></td></tr>`).join("")}</tbody></table></div>
+function render(){document.getElementById("who").textContent=S.view==="Cashier"?"Working as Cashier":"Working as Accounting";
+ document.getElementById("tabs").innerHTML=[["Cashier","Cashier › Record Payment"],["Config","Accounting › Configuration"]].map(([k,l])=>`<div class="tab ${S.view===k?"on":""}"><button data-view="${k}">${l}</button></div>`).join("");
+ document.getElementById("page").innerHTML=S.view==="Cashier"?cashier():config()}
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>el.hidden=true,3000)}
+document.addEventListener("click",(e)=>{const b=e.target.closest("button");if(!b)return;const k=b.dataset;const t=T[S.who];
+ if(k.view)S.view=k.view;else if(k.who){S.who=k.who;S.amt="";S.paid=0;S.done=false}
+ else if("fill" in k)S.amt=(Math.max(0,(t.fee-t.reb)-S.paid)/100).toFixed(2);
+ else if("reset" in k){S.amt="";S.paid=0;S.done=false}
+ else if("post" in k){const a=Math.round(Number(S.amt||0)*100);if(!a){toast("Enter the amount received.");return}
+  const target=t.fee-t.reb;S.paid+=a;S.amt="";
+  if(S.paid>=target){S.done=true;toast(t.mode==="full"?`Recorded · fully paid · ${peso(t.reb)} rebate deducted · balance ₱0.00`:"Recorded · balance ₱0.00")}else toast(`Recorded · balance ${peso((t.mode==="full"?t.fee:target)-S.paid)}${t.mode==="full"?" · rebate comes off once fully paid":""}`)}
+ else return;render()});
+document.addEventListener("input",(e)=>{if(e.target.id==="amt"){S.amt=e.target.value;const pos=e.target.selectionStart;render();const el=document.getElementById("amt");if(el){el.focus();el.setSelectionRange(pos,pos)}}});
+document.addEventListener("change",(e)=>{if(e.target.dataset.ag){AG[+e.target.dataset.ag][2]=e.target.value;toast(`${AG[+e.target.dataset.ag][0]}: ${e.target.value}`)}});
+render();
+</script>

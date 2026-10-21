@@ -32,10 +32,10 @@ function Head({ title, children }: { title: string; children?: React.ReactNode }
 
 const PLAN_PERIODS = ["Weekly", "Every 2 Weeks", "Monthly"] as const;
 type PlanPeriod = (typeof PLAN_PERIODS)[number];
-/** Monday–Sunday week, two weeks from that Monday, or the calendar month around `date`. */
+/** From `date` (today by default): 7 or 14 days, or its calendar month (owner, 21 Oct 2026: tabs start on today). */
 export function planRange(mode: PlanPeriod, date: string) {
-  if (mode !== "Every 2 Weeks") return periodRange(mode, date);
-  const from = periodRange("Weekly", date).from, to = addDays(from, 13);
+  if (mode === "Monthly") return periodRange(mode, date);
+  const from = date, to = addDays(from, mode === "Weekly" ? 6 : 13);
   return { from, to, label: `${fmtDate(from)} – ${fmtDate(to)}` };
 }
 const isStcw = (c?: PortalData["courses"][number]) => (first(c?.course_categories)?.name ?? "").toUpperCase().includes("STCW");
@@ -226,7 +226,6 @@ export function ResourcePlanning({ data, reload }: { data: PortalData; reload: (
           <div><dt>No Assessor Yet</dt><dd className="cs-bad">{inPeriod.filter((r) => r.needsAssessor && !r.assessorId).length}</dd></div>
           <div><dt>Conflicts</dt><dd className={conflicts.length ? "cs-bad" : ""}>{conflicts.length}</dd></div>
         </dl>
-        <p className="ac-foot cs-note">Each batch gets a classroom, an <b>Instructor</b> and an <b>Assessor</b>. The lists only show people accredited for that course and role. CCMD is not planned here.</p>
       </section></div>
       <div className="ac-stack"><section className="portal-panel cx-panel"><div className="panel-heading"><h2>Upcoming Batches</h2><span className="slot-count">{rows.length}</span></div>
         <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search batches" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search course or batch number" /></div>
@@ -280,9 +279,8 @@ export function InstructorShortlist({ data, reload }: { data: PortalData; reload
         <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setForm(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy || form.completeName.trim().length < 2} onClick={saveInstructor}>Save</button></div>
       </div></section>}
     <div className="ac-rail">
-      <div className="ac-stack"><section className="portal-panel cx-panel"><div className="panel-heading"><h2>Per Course</h2><span className="muted-text">Can Teach · Can Assess</span></div>
+      <div className="ac-stack"><section className="portal-panel cx-panel"><div className="panel-heading"><h2>Per Course</h2></div>
         <dl className="ac-lines cs-lines">{stcwCourses.map((c) => <div key={c.id}><dt>{c.code}</dt><dd>{count(c.id, "Instructor")} · {count(c.id, "Assessor")}</dd></div>)}</dl>
-        <p className="ac-foot cs-note">STCW courses (BT-PSSR, Safety, Crowd, Crisis) need an accredited instructor and an accredited assessor for every batch.</p>
       </section></div>
       <div className="ac-stack"><section className="portal-panel cx-panel"><div className="panel-heading"><h2>Instructor Shortlist</h2><span className="slot-count">{shown.filter((i) => i.active).length}</span></div>
         <div className="cx-bar ac-bar"><label className="rp-who">Who Handles<select value={who} onChange={(e) => setWho(e.target.value)}><option value="">All courses</option>{courseOptions}</select></label></div>
@@ -349,7 +347,6 @@ export function ClassSchedules({ data, reload, onOpenBatches, onCreate }: { data
           {["Open", "Full", "Ongoing", "Cancelled"].map((s) => <div key={s}><dt>{s}</dt><dd>{count(s)}</dd></div>)}
           <div><dt>Trainees Booked</dt><dd>{inPeriod.filter((b) => b.status !== "Cancelled").reduce((s, b) => s + Number(b.confirmed_count ?? 0), 0)}</dd></div>
         </dl>
-        <p className="ac-foot cs-note">Dates follow each course&apos;s pattern (BT-PSSR Mon–Sat, Safety Monday, Crowd Tue–Wed, Crisis Thu–Sat). To change dates, cancel the batch and open a new one.</p>
       </section></div>
       <div className="ac-stack"><section className="portal-panel cx-panel"><div className="panel-heading"><h2>Batches</h2><span className="slot-count">{rows.length}</span></div>
         <div className="cx-bar ac-bar"><span className="cx-seg">{SCHEDULE_FILTERS.map((x) => <button key={x} type="button" className={filter === x ? "on" : ""} onClick={() => setFilter(x)}>{x}</button>)}</span></div>
@@ -389,7 +386,6 @@ function EditBatch({ batch, code, reload, onClose, onDone }: { batch: Batch; cod
     <label>Venue<input value={f.venue} placeholder="New Wave Training Center" onChange={(e) => setF({ ...f, venue: e.target.value })} /></label>
     <label>Enrollment Deadline<input type="datetime-local" value={f.deadline} onChange={(e) => setF({ ...f, deadline: e.target.value })} /></label>
     <label>Public Registration<select value={f.publish ? "1" : ""} onChange={(e) => setF({ ...f, publish: e.target.value === "1" })}><option value="1">Published</option><option value="">Hidden</option></select></label>
-    <p className="ac-foot full">Dates follow the course pattern and can&apos;t be changed here.</p>
     <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || f.batchNumber.trim().length < 3 || !f.deadline} onClick={save}>Save</button></div>
   </div></Modal>;
 }

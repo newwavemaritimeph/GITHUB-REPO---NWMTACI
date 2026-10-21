@@ -5,7 +5,9 @@ import { isStcwRebateCourse } from "@/lib/rebates";
  * Referral codes (owner, 8 Oct 2026). Each agency or consultancy has a secret
  * code, e.g. "QMCS050698". A trainee who registers with it is tagged as that
  * agency's referral, and the agency's rebate for the course is deducted from
- * what the trainee pays, whether the payment is partial or full.
+ * what the trainee pays. Since 21 Oct 2026 only Qapla Maritime, Costa Maritime and
+ * Tara Barko deduct on any payment; every other partner's rebate comes off once
+ * the trainee has paid the fee less the rebate ("Deducted on full payment").
  */
 
 /** Uppercase letters and digits only; 4–20 characters, else null. */
@@ -43,9 +45,17 @@ export function rebateFor(agencyId: string, courseId: string, matrix: { agency_i
  * "Deducted" → take it off the fee (any time, before payments too);
  * "No deduction" → owe it to the agency, recorded once the trainee has paid.
  */
-export function referralAction(mode: string | null | undefined, paid: boolean): "discount" | "payable" | "skip" {
+export const FULL_PAYMENT = "Deducted on full payment";
+export function referralAction(mode: string | null | undefined, paid: boolean, fullyPaid = false): "discount" | "payable" | "skip" {
   if (mode === "No deduction") return paid ? "payable" : "skip";
+  if (mode === FULL_PAYMENT) return fullyPaid ? "discount" : "skip";
   return "discount";
+}
+
+/** The rebate to take off once the total paid reaches the fee less the rebate (never more than what is still owed), else 0. */
+export function fullPaymentRebate(input: { due: number; rebate: number; paidTotal: number }) {
+  if (input.rebate <= 0 || input.paidTotal < input.due - input.rebate) return 0;
+  return Math.max(0, Math.min(input.rebate, input.due - input.paidTotal));
 }
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
@@ -85,19 +95,61 @@ export async function applyReferralRebates(db: Admin, enrollmentIds: string[], a
       if (rebate <= 0) continue;
       // Deducted or No deduction (202610080024); Deducted before it.
       const { data: modeRow } = await db.from("marketing_agencies").select("rebate_mode").eq("id", agencyId).maybeSingle();
-      const action = referralAction((modeRow as { rebate_mode?: string } | null)?.rebate_mode, !!options.paid);
+      const mode = (modeRow as { rebate_mode?: string } | null)?.rebate_mode;
+      let amount = rebate;
+      if (mode === FULL_PAYMENT) {
+        if (!options.paid) continue;
+        const [{ data: ch }, { data: al }] = await Promise.all([
+          db.from("enrollment_charges").select("amount_centavos,event_type").eq("enrollment_id", raw.id).eq("valid", true),
+          db.from("payment_allocations").select("amount_centavos,payments!inner(valid)").eq("enrollment_id", raw.id).eq("payments.valid", true),
+        ]);
+        const due = Number(raw.selling_price_centavos) + ((ch ?? []) as { amount_centavos: number; event_type: string }[]).reduce((t, c) => t + (c.event_type === "discount" ? -1 : 1) * Number(c.amount_centavos), 0);
+        const paidTotal = ((al ?? []) as { amount_centavos: number }[]).reduce((t, a) => t + Number(a.amount_centavos), 0);
+        amount = fullPaymentRebate({ due, rebate, paidTotal });
+      }
+      const action = referralAction(mode, !!options.paid, amount > 0);
       if (action === "skip") continue;
       // The agency_rebates row doubles as the "already applied" marker (one per enrollment).
-      const { error: recordError } = await db.from("agency_rebates").insert({ agency_id: agencyId, enrollment_id: raw.id, trainee_id: raw.trainee_id, course_id: raw.course_id, rebate_centavos: rebate, status: action === "discount" ? "Paid" : "Pending", created_by: actor });
+      const { error: recordError } = await db.from("agency_rebates").insert({ agency_id: agencyId, enrollment_id: raw.id, trainee_id: raw.trainee_id, course_id: raw.course_id, rebate_centavos: amount, status: action === "discount" ? "Paid" : "Pending", created_by: actor });
       if (recordError) continue; // another request got there first
       await db.from("agency_rebates").update({ settlement: action === "discount" ? "Deducted from the trainee's payment" : "Payable to the agency" }).eq("enrollment_id", raw.id); // 202610080023; ignored before it
       if (action === "payable") { applied.push(raw.id); continue; }
       const { data: agency } = await db.from("marketing_agencies").select("name").eq("id", agencyId).maybeSingle();
-      await db.from("enrollment_charges").insert({ enrollment_id: raw.id, description: `Referral rebate (${agency?.name ?? "agency"})`, amount_centavos: rebate, event_type: "discount", valid: true, approval_status: "Approved", agency_id: agencyId, created_by: actor, decided_by: actor, decided_at: new Date().toISOString() });
+      await db.from("enrollment_charges").insert({ enrollment_id: raw.id, description: `Referral rebate (${agency?.name ?? "agency"})`, amount_centavos: amount, event_type: "discount", valid: true, approval_status: "Approved", agency_id: agencyId, created_by: actor, decided_by: actor, decided_at: new Date().toISOString() });
       applied.push(raw.id);
     }
   } catch (e) {
     console.error("Referral rebate failed:", e instanceof Error ? e.message : e);
   }
   return applied;
+}
+
+/**
+ * Rebates waiting for full payment, per enrollment (for the Cashier's Record Payment):
+ * partner on "Deducted on full payment", not applied yet. Batched reads.
+ */
+export async function pendingFullPaymentRebates(db: Admin, enrollments: { id: string; course_id: string; agency_id: string | null; price: number; inHouse: boolean; code: string | null }[]) {
+  const out: Record<string, number> = {};
+  const withAgency = enrollments.filter((e) => e.agency_id);
+  if (!withAgency.length) return out;
+  try {
+    const agencyIds = [...new Set(withAgency.map((e) => e.agency_id as string))];
+    const { data: agencies, error } = await db.from("marketing_agencies").select("id,rebate_mode,rebate_percent").in("id", agencyIds);
+    if (error) return out;
+    const full = new Map(((agencies ?? []) as { id: string; rebate_mode?: string | null; rebate_percent?: number | null }[]).filter((a) => a.rebate_mode === FULL_PAYMENT).map((a) => [a.id, a]));
+    const mine = withAgency.filter((e) => full.has(e.agency_id as string));
+    if (!mine.length) return out;
+    const [{ data: matrix }, { data: done }] = await Promise.all([
+      db.from("agency_course_rebates").select("agency_id,course_id,rebate_centavos").in("agency_id", [...full.keys()]),
+      db.from("agency_rebates").select("enrollment_id").in("enrollment_id", mine.map((e) => e.id)),
+    ]);
+    const applied = new Set((done ?? []).map((r) => r.enrollment_id as string));
+    for (const e of mine) {
+      if (applied.has(e.id)) continue;
+      const a = full.get(e.agency_id as string)!;
+      const rebate = referralRebate({ percent: Number(a.rebate_percent ?? 0) || null, inHouse: e.inHouse, courseCode: e.code, feeCentavos: e.price, matrixCentavos: rebateFor(e.agency_id as string, e.course_id, (matrix ?? []) as { agency_id: string; course_id: string; rebate_centavos: number }[]) });
+      if (rebate > 0) out[e.id] = rebate;
+    }
+  } catch { /* the hint is optional */ }
+  return out;
 }

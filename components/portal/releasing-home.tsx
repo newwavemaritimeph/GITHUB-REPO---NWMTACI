@@ -417,7 +417,7 @@ const longDay = (d: string) => new Intl.DateTimeFormat("en-PH", { weekday: "long
 export function ReleasedCertificates({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   const [releasing, setReleasing] = useState<CertificateLine | null>(null);
   const today = manilaToday();
-  const [from, setFrom] = useState(addDays(today, -6)), [to, setTo] = useState(today), [q, setQ] = useState("");
+  const [from, setFrom] = useState(today), [to, setTo] = useState(today), [q, setQ] = useState("");
   const waiting = certificateLines(data).filter((l) => l.view.state === "Printed");
   const term = q.trim().toLowerCase();
   const rows = releaseRows(data).filter((r) => r.day >= from && r.day <= to && (!term || `${r.name} ${r.course} ${r.courseName} ${r.certNo} ${r.sticker}`.toLowerCase().includes(term)));

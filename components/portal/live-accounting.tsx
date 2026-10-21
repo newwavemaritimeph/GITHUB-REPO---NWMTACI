@@ -231,7 +231,7 @@ function AccountingOperations({ data, role, reload, profileName }: { data: Accou
 
 function AccountingSummaryReport({ data }: { data: AccountingData }) {
   const today = manilaDay(new Date().toISOString());
-  const [from, setFrom] = useState(today.slice(0, 8) + "01");
+  const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
   const pesos2 = (c: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format((Number(c) || 0) / 100);
   const inRange = (v?: string | null) => { if (!v) return false; const d = manilaDay(v); return d >= from && d <= to; };
@@ -582,7 +582,7 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
   const canDecide = role === "admin" || role === "accounting";
   const today = manilaDay(new Date().toISOString());
   const monthStart = today.slice(0, 8) + "01";
-  const [from, setFrom] = useState(monthStart), [to, setTo] = useState(today);
+  const [from, setFrom] = useState(today), [to, setTo] = useState(today);
   const [status, setStatus] = useState("All statuses"), [q, setQ] = useState("");
   const [page, setPage] = useState(1), [perPage, setPerPage] = useState(10);
   const [busy, setBusy] = useState(false), [msg, setMsg] = useState("");
@@ -1396,7 +1396,7 @@ function PartnersModule({ data, busy, post }: { data: AccountingData; busy: bool
   const agencies = data.agencies as PartnerRow[];
   const stcw = STCW_REBATE_COURSES.map(([code, label]) => ({ code, label, course: data.courses.find((c) => c.code.toUpperCase() === code) ?? null })).filter((x) => x.course);
   const base: PartnerDraft[] = agencies.map((a) => ({ id: a.id, name: a.name, kind: a.kind || "Agency", contact: a.contact_name ?? "", email: a.email ?? "", mobile: a.mobile ?? "", active: a.active, code: a.referral_code ?? "",
-    percent: a.rebate_percent == null ? null : Number(a.rebate_percent), mode: a.rebate_mode === "No deduction" ? "No deduction" : "Deducted",
+    percent: a.rebate_percent == null ? null : Number(a.rebate_percent), mode: a.rebate_mode === "No deduction" || a.rebate_mode === "Deducted on full payment" ? a.rebate_mode : "Deducted",
     stcw: Object.fromEntries(stcw.map((s) => { const v = data.agencyCourseRebates.find((r) => r.agency_id === a.id && r.course_id === s.course!.id)?.rebate_centavos ?? 0; return [s.course!.id, v ? (v / 100).toFixed(2) : ""]; })) }));
   const [edits, setEdits] = useState<Record<string, PartnerDraft>>({});
   const [filter, setFilter] = useState<"Active" | "Archived" | "All">("Active"), [query, setQuery] = useState("");
@@ -1459,7 +1459,7 @@ function PartnersModule({ data, busy, post }: { data: AccountingData; busy: bool
               <label className={`rb3-other${custom ? " on" : ""}`}><input type="number" min="1" max="100" step="0.5" placeholder="Other" aria-label={`Other percentage for ${r.name}`} value={custom ? String(r.percent) : ""} onChange={(e) => set(r.id, { percent: e.target.value === "" ? (custom ? null : r.percent) : Number(e.target.value) })} />%</label>
             </div>{r.percent == null && <small className="rb3-none">Not set</small>}</td>
             {stcw.map((s) => <td key={s.code} className="r"><input className="rb3-amt" type="number" min="0" step="0.01" placeholder="—" aria-label={`${r.name} ${s.label} rebate`} value={r.stcw[s.course!.id] ?? ""} onChange={(e) => set(r.id, { stcw: { ...r.stcw, [s.course!.id]: e.target.value } })} /></td>)}
-            <td><select className="rb3-mode" value={r.mode} onChange={(e) => set(r.id, { mode: e.target.value })}><option value="Deducted">Deducted From Payment</option><option value="No deduction">Paid to the Partner Later</option></select></td>
+            <td><select className="rb3-mode" value={r.mode} onChange={(e) => set(r.id, { mode: e.target.value })}><option value="Deducted on full payment">Deducted Once Fully Paid</option><option value="Deducted">Deducted on Any Payment</option><option value="No deduction">Paid to the Partner Later</option></select></td>
             <td><span className={`ac-chip ${r.active ? "ok" : "warn"}`}>{r.active ? "Active" : "Archived"}</span></td>
           </tr>
           {open === r.id && <tr className="pm-details"><td colSpan={span}><div className="pm-form">
@@ -1664,8 +1664,7 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
       rows={(((data as unknown as { incomeCategories?: { id: string; name: string; active: boolean }[] }).incomeCategories) ?? []).map((c) => ({ id: c.id, active: c.active, values: { name: c.name } }))}
       onSave={(r) => post({ action: "income-category-save", id: r.id, name: r.values.name.trim(), active: r.active })}
       onAdd={(v) => post({ action: "income-category-save", name: v.name.trim() })}
-      onRemove={(r) => post({ action: "income-category-save", id: r.id, name: r.values.name, remove: true })}
-      note="Categories picked when recording other income. Archive one to hide it from the form without changing past records." />}
+      onRemove={(r) => post({ action: "income-category-save", id: r.id, name: r.values.name, remove: true })} />}
     {section === "Partnered Centers" && <PartnersModule data={data} busy={busy} post={post} />}
     {section === "Courses" && <CoursesModule data={data} busy={busy} post={post} reload={reload} />}
     {section === "Expense categories" && <ConfigMatrix title="Expense Categories" entity="category" busy={busy}

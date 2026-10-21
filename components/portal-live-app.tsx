@@ -85,6 +85,7 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   classroomCourseIds?:Record<string,string>;
   classroomInvites?:Record<string,{state:string;email:string;error:string|null;created_at:string}>;
   referralByEnrollment?:Record<string,string>;
+  pendingRebates?:Record<string,number>;
   receiptPrints?:Record<string,number>;
   expenseReprints?:{id:string;expense_id:string;reason:string;status:string;requested_by_name:string|null;requested_at:string;decision_remarks:string|null}[];
   // Change Course / Rescheduling fee collection per pending request id (approval waits for payment).
@@ -273,7 +274,10 @@ export function PortalLiveApp(){
   useEffect(()=>{void load()},[load]);
   // Refresh every 10 seconds (owner, 21 Oct 2026), quietly. Skipped while the tab is hidden,
   // a window is open or a field has focus, so nothing being typed is lost.
-  useEffect(()=>{let running=false;const id=window.setInterval(async()=>{const el=document.activeElement;if(running||document.hidden||document.querySelector("[role=dialog]")||(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;running=true;try{const r=await fetch("/api/staff/operations",{cache:"no-store"});if(r.ok)setData(await r.json())}catch{/* next tick retries */}finally{running=false}},10000);return()=>window.clearInterval(id)},[]);
+  // A new Manila day re-opens the screens on today (owner, 21 Oct 2026: date tabs start on the current date).
+  const manilaNow=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date());
+  const [day,setDay]=useState(manilaNow);
+  useEffect(()=>{let running=false;const id=window.setInterval(async()=>{setDay(d=>{const now=manilaNow();return d===now?d:now});const el=document.activeElement;if(running||document.hidden||document.querySelector("[role=dialog]")||(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;running=true;try{const r=await fetch("/api/staff/operations",{cache:"no-store"});if(r.ok)setData(await r.json())}catch{/* next tick retries */}finally{running=false}},10000);return()=>window.clearInterval(id)},[]);
   // Admin keeps an oversight-only workspace: Dashboard, Search trainee, Enrollments,
   // Accounting, Enrollment summary, Reports, MyHr and Setup. Everything else is the
   // day-to-day work of the specialised roles and is hidden here.
@@ -325,7 +329,7 @@ export function PortalLiveApp(){
       </div>})}</nav>
       {notices&&<div className="notification-popover nw-notices"><div><h3>Notifications</h3><button onClick={()=>void markRead()}>Mark All as Read</button></div>{data.notifications.length?data.notifications.map(item=><button key={item.id} onClick={()=>{if(item.deep_link)setNotices(false)}}><i style={{opacity:item.read_at?.length?0:1}}/><span><strong>{item.title}</strong><small>{item.body}</small></span></button>):<p className="portal-empty-copy">No notifications yet.</p>}</div>}
     </header>
-    <section className="portal-workspace">{error&&<div className="portal-inline-error"><Message kind="error" text={error}/></div>}<PortalContent modules={rebuildModules} recordsView={recordsView} setRecordsView={setRecordsView} active={active} role={role} data={data} query={query} go={go} open={setModal} onPay={(id:string)=>{setPayTarget(id);setModal("payment")}} canEnroll={canEnroll} canSchedule={canSchedule} canPay={canPay} reload={load}/></section>
+    <section className="portal-workspace">{error&&<div className="portal-inline-error"><Message kind="error" text={error}/></div>}<PortalContent key={day} modules={rebuildModules} recordsView={recordsView} setRecordsView={setRecordsView} active={active} role={role} data={data} query={query} go={go} open={setModal} onPay={(id:string)=>{setPayTarget(id);setModal("payment")}} canEnroll={canEnroll} canSchedule={canSchedule} canPay={canPay} reload={load}/></section>
     {modal==="enrollment"&&<EnrollmentForm data={data} onClose={()=>setModal(null)} onSaved={load}/>} {modal==="batch"&&<BatchForm data={data} onClose={()=>setModal(null)} onSaved={load}/>} {modal==="payment"&&<RecordPaymentModal data={data} initialEnrollmentId={payTarget||undefined} onClose={()=>{setModal(null);setPayTarget("")}} onSaved={load}/>} {account&&<ChangePasswordModal email={data.profile.email} onClose={()=>setAccount(false)}/>}
   </main>;
 }
@@ -866,7 +870,7 @@ function financeCatalogSections(data:PortalData,reload:()=>Promise<void>):{key:s
 
 function ChargesReport({data}:{data:PortalData}){
   const todayISO=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date());
-  const [from,setFrom]=useState(todayISO.slice(0,8)+"01"),[to,setTo]=useState(todayISO),[type,setType]=useState<"All"|"Enrollment"|"Rescheduling"|"Reprinting">("All");
+  const [from,setFrom]=useState(todayISO),[to,setTo]=useState(todayISO),[type,setType]=useState<"All"|"Enrollment"|"Rescheduling"|"Reprinting">("All");
   const mday=(v:string)=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date(v));
   const inRange=(d:string)=>{const x=mday(d);return x>=from&&x<=to};
   const catName=(id?:string|null)=>id?(data.charges.find(c=>c.id===id)?.name??""):"";
@@ -884,7 +888,7 @@ function ChargesReport({data}:{data:PortalData}){
 
 function EmployeeCharges({data,reload}:{data:PortalData;reload:()=>Promise<void>}){
   const todayISO=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date());
-  const [from,setFrom]=useState(todayISO.slice(0,8)+"01"),[to,setTo]=useState(todayISO),[status,setStatus]=useState<"All"|"Pending"|"Active"|"Settled"|"Cancelled">("All");
+  const [from,setFrom]=useState(todayISO),[to,setTo]=useState(todayISO),[status,setStatus]=useState<"All"|"Pending"|"Active"|"Settled"|"Cancelled">("All");
   const [busy,setBusy]=useState(""),[msg,setMsg]=useState("");
   const [amounts,setAmounts]=useState<Record<string,string>>({});
   const [ne,setNe]=useState(""),[ncat,setNcat]=useState("Rescheduling"),[namt,setNamt]=useState(""),[nnote,setNnote]=useState("");
@@ -917,7 +921,7 @@ function DailyTar({data}:{data:PortalData}){
 
 function EnrollmentSummary({data}:{data:PortalData}){
   const todayISO=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date());
-  const [from,setFrom]=useState(todayISO.slice(0,8)+"01"),[to,setTo]=useState(todayISO);
+  const [from,setFrom]=useState(todayISO),[to,setTo]=useState(todayISO);
   const mday=(v:string)=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date(v));
   const inRange=data.enrollments.filter(e=>{const d=mday(e.created_at);return d>=from&&d<=to});
   const groups=new Map<string,{course:string;schedule:string;enrolled:number;pending:number;cancelled:number;total:number}>();

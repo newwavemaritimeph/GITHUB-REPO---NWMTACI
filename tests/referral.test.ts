@@ -60,3 +60,20 @@ describe("Rebates per Agency, Design 3", () => {
     expect(rebateRowsProblem([{ name: "A", percent: 10, stcw: [{ ...stcw[0], cents: 200000 }] }])).toMatch(/more than its training fee/);
   });
 });
+
+import { FULL_PAYMENT, fullPaymentRebate } from "@/lib/referral";
+describe("rebates deducted once fully paid (21 Oct 2026)", () => {
+  it("waits until the total paid reaches the fee less the rebate", () => {
+    expect(fullPaymentRebate({ due: 130000, rebate: 30000, paidTotal: 50000 })).toBe(0);
+    expect(fullPaymentRebate({ due: 130000, rebate: 30000, paidTotal: 100000 })).toBe(30000);
+    expect(fullPaymentRebate({ due: 130000, rebate: 30000, paidTotal: 120000 })).toBe(10000);
+    expect(fullPaymentRebate({ due: 130000, rebate: 30000, paidTotal: 130000 })).toBe(0);
+    expect(fullPaymentRebate({ due: 130000, rebate: 0, paidTotal: 130000 })).toBe(0);
+  });
+  it("skips before full payment and deducts after", () => {
+    expect(referralAction(FULL_PAYMENT, false)).toBe("skip");
+    expect(referralAction(FULL_PAYMENT, true, false)).toBe("skip");
+    expect(referralAction(FULL_PAYMENT, true, true)).toBe("discount");
+    expect(referralAction("Deducted", false)).toBe("discount");
+  });
+});
