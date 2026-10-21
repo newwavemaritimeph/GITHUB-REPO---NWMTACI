@@ -2372,3 +2372,4 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .bs-sheet{padding-bottom:16px}.nw-shell .bs-title{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:16px 20px 12px;padding-bottom:8px;border-bottom:2px solid #F25615}.nw-shell .bs-title h2{margin:0}
 .nw-shell .bs-info{border-collapse:collapse;margin:0 20px 14px;font-size:14.5px}.nw-shell .bs-info td{border:1px solid #c9d4dc;padding:5px 10px}.nw-shell .bs-info td:first-child{color:#5f7180;width:150px}
 .nw-shell .bs-items thead th{background:#F25615;color:#fff}.nw-shell .bs-items td.bs-st{text-transform:uppercase;font-size:13px}
+.nw-shell .bs-form{font-size:12.5px;color:#5f7180}

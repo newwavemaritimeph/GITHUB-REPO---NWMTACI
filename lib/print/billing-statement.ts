@@ -24,17 +24,23 @@ export async function createBillingStatementPdf(s: BillingStatement, logoBytes?:
   const letterhead = (cont: boolean) => {
     if (logo) page.drawImage(logo, { x: M, y: y - 42, width: 42, height: 42 });
     const lx = M + (logo ? 52 : 0);
-    text(page, "NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", lx, y - 13, 11.5, bold, navy);
+    text(page, "NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", lx, y - 13, 9.6, bold, navy);
     text(page, "Ride the New Wave of Maritime Excellence", lx, y - 25, 8.5, reg, blue);
-    text(page, "Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila - 0948 847 6530 - newwavemaritime@gmail.com", lx, y - 36, 7, reg, muted);
-    y -= 50;
+    text(page, "Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila", lx, y - 35, 7, reg, muted);
+    text(page, "0948 847 6530 - newwavemaritime@gmail.com", lx, y - 44, 7, reg, muted);
+    // Form block (owner, 22 Oct 2026): the form's own control details.
+    ([["Form No:", "NW-FMGR-04-24"], ["Revision No:", ""], ["Revision Date:", ""], ["Issued Date:", "12/03/2025"]] as [string, string][]).forEach(([k, v], i) => {
+      const yy = y - 10 - i * 9.5;
+      right(page, k, W - M - 62, yy, 6.6, bold, muted);
+      text(page, v, W - M - 59, yy, 6.6, reg, ink);
+    });
+    page.drawRectangle({ x: W - M - 112, y: y - 44, width: 112, height: 42, borderColor: rgb(0.75, 0.8, 0.84), borderWidth: 0.6 });
+    y -= 54;
     page.drawRectangle({ x: M, y, width: CW, height: 2.2, color: navy });
     page.drawRectangle({ x: M, y: y - 1.4, width: CW * 0.28, height: 1.4, color: orange });
     y -= 26;
     text(page, "Billing Statement", M, y, 18, bold, ink);
-    right(page, `BS No. ${s.bsNumber}`, W - M, y + 6, 9, bold, muted);
-    right(page, cont ? "continued" : s.date, W - M, y - 5, 8.5, reg, muted);
-    right(page, "Form No. NW-FMGR-04-24", W - M, y - 15, 6.5, reg, muted);
+    right(page, cont ? "continued" : `Date: ${s.date}`, W - M, y + 2, 9.5, reg, ink);
     y -= 26;
     if (!cont) {
       const lw = 110, rh = 18;

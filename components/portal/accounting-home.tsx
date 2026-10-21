@@ -588,7 +588,7 @@ export function BillingStatementReport({ switcher }: { switcher?: ReactNode }) {
   const groups = (["Agency", "Consultancy"] as const).map((k) => [k, list.filter((x) => (x.kind === "Consultancy" ? "Consultancy" : "Agency") === k)] as const).filter(([, xs]) => xs.length);
   return <div className="portal-page cx ac">
     <div className="cx-head"><div><span className="portal-eyebrow">Accounting · Reports</span><h1>Billing Statement</h1></div>
-      <div className="ac-controls">{st && <a className="portal-primary" href={`/api/documents/billing-statement?agency=${st.agencyId}&from=${from}&to=${to}`} target="_blank" rel="noreferrer">{st.bsNumber ? `Reprint BS No. ${st.bsNumber}` : "Print PDF"}</a>}</div></div>
+      <div className="ac-controls">{st && <a className="portal-primary" href={`/api/documents/billing-statement?agency=${st.agencyId}&from=${from}&to=${to}`} target="_blank" rel="noreferrer">{st.bsNumber ? "Reprint PDF" : "Print PDF"}</a>}</div></div>
     {switcher}
     <div className="pd-bar cs-bar">
       <label className="rp-who">Bill To<select value={st?.agencyId ?? ""} onChange={(e) => setAgency(e.target.value)} disabled={!list.length}>
@@ -601,7 +601,7 @@ export function BillingStatementReport({ switcher }: { switcher?: ReactNode }) {
     {error && <Message kind="error" text={error} />}
     {!data ? !error && <p className="portal-empty-copy">Loading…</p> : !st ? <p className="portal-empty-copy">No enrollments referred by an agency or consultancy in this coverage.</p> :
       <section className="portal-panel cx-panel bs-sheet">
-        <div className="bs-title"><h2>Billing Statement</h2><span className="cl-mono">{st.bsNumber ? `BS No. ${st.bsNumber}` : "BS No. given at printing"}</span></div>
+        <div className="bs-title"><h2>Billing Statement</h2><span className="bs-form">Form No: NW-FMGR-04-24 · Issued Date: 12/03/2025</span></div>
         <table className="bs-info"><tbody><tr><td>Bill to:</td><td><b>{st.billTo}</b></td></tr><tr><td>Billing Coverage:</td><td>{fmtDate(from)} – {fmtDate(to)} (as per date enrolled)</td></tr></tbody></table>
         <div className="cl-wrap"><table className="cl-log bs-items"><thead><tr><th>Date Enrolled</th><th>Name</th><th>Training</th><th>Status</th><th className="fs-n">Amount</th></tr></thead><tbody>
           {st.rows.map((r, i) => <tr key={i}><td>{r.enrolled}</td><td>{r.name}</td><td>{r.training}</td><td className="bs-st">{r.status}</td><td className="fs-n">{pesos2(r.amount)}</td></tr>)}
