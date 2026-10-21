@@ -261,7 +261,7 @@ function Wizard() {
               </tbody></table>
               {submittedTrainings.length > 0 && <div className="op-trainings">
                 <div className="op-trainings-head"><span>TRAININGS APPLIED FOR</span><span>{submittedTrainings.length} COURSE{submittedTrainings.length === 1 ? "" : "S"}</span></div>
-                {submittedTrainings.map((t, i) => <div className="op-training" key={t.code}><i>{i + 1}</i><div><b>{t.name}</b><small>{t.code} · {t.duration} · {t.modality}</small></div><div className="op-training-date">{(t.start ? chipRange(t.start, t.end) : "To be confirmed").replace(/^\w+, /, "")}<small>{t.start === t.end ? weekday(t.start) : `${weekday(t.start).slice(0, 3)} – ${weekday(t.end).slice(0, 3)}`}</small></div></div>)}
+                {submittedTrainings.map((t, i) => <div className="op-training" key={t.code}><i>{i + 1}</i><div><b>{t.name}</b><small>{t.code} · {t.duration} · {t.modality}</small></div><div className="op-training-date">{(t.start ? chipRange(t.start, t.end) : "To be confirmed").replace(/^\w+, /, "")}{t.start && <small>{t.start === t.end ? weekday(t.start) : `${weekday(t.start).slice(0, 3)} – ${weekday(t.end).slice(0, 3)}`}</small>}</div></div>)}
               </div>}
               <div className="op-instructions">
                 <b>INSTRUCTIONS</b>
