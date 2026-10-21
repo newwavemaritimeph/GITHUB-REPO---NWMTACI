@@ -85,3 +85,10 @@ export function planRows(batches: PlanBatch[], rooms: PlanRoom[], instructors: P
 
 /** Problems that block the class (shown red) versus things still to fill in (orange). */
 export const isBlocking = (issue: string) => /also booked|also teaching|exceed|not accredited|expired|same person/i.test(issue);
+
+/** Batches the trainees of `b` can all move to: same course, open, not started, enough seats. */
+export function moveTargets<T extends { id: string; course_id: string; status: string; starts_on: string; capacity: number; confirmed_count: number }>(b: { id: string; course_id: string }, trainees: number, batches: T[], today: string) {
+  return batches.filter((o) => o.id !== b.id && o.course_id === b.course_id && ["Open", "Full"].includes(o.status) && o.starts_on > today)
+    .map((o) => ({ batch: o, left: Math.max(0, Number(o.capacity) - Number(o.confirmed_count)) }))
+    .map((t) => ({ ...t, fits: t.left >= trainees }));
+}

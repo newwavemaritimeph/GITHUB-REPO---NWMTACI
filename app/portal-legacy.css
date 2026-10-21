@@ -2337,3 +2337,21 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .rb3-table th small { opacity: .8; }
 .nw-shell .tcr-all { border-color: #0b4f8f55; color: #0b4f8f; }
 .nw-shell .portal-secondary { border-color: #b9dcec; color: #0571D0; }
+/* Class Schedules, Resource Planning and Instructors (owner, 21 Oct 2026 prototypes) */
+.nw-shell .pd-bar.cs-bar{padding:0 0 16px;border:0}
+.nw-shell .cs-lines{padding:0 20px 8px}.nw-shell .cs-note{margin:4px 20px 18px;line-height:1.5}
+.nw-shell .ac-lines dd.cs-bad{color:#b42318}
+.nw-shell .rp-table td{vertical-align:top}.nw-shell .rp-table td>small{display:block}.nw-shell .rp-table .rp-pick select{min-width:190px;width:100%}
+.nw-shell .rp-pick small.rp-ok,.nw-shell small.rp-ok{color:#0a7a3e;font-weight:500}.nw-shell .rp-table small.rp-bad{color:#b42318;font-weight:600}
+.nw-shell .ia-chips{display:flex;flex-wrap:wrap;gap:6px;white-space:normal}
+.nw-shell .ia-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid #dfe7ee;border-radius:99px;padding:3px 6px 3px 10px;font-size:13px;background:#fff}
+.nw-shell .ia-chip b{font:600 12.5px var(--font-geist-mono,ui-monospace,monospace)}
+.nw-shell .ia-chip.exp{border-color:#b42318;color:#b42318}.nw-shell .ia-chip.soon{border-color:#c2410c}.nw-shell .ia-chip i{font-style:normal;font-size:12px}
+.nw-shell .ia-chip button{border:0;background:none;color:#5f7180;cursor:pointer;padding:0 3px;font-size:14px;line-height:1;border-radius:6px}.nw-shell .ia-chip button:hover{color:#b42318;background:#fbe4dc}
+.nw-shell .ia-role{font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:99px;white-space:nowrap}
+.nw-shell .ia-role.I{background:#e5f1fb;color:#0571D0}.nw-shell .ia-role.A{background:#fdf0e5;color:#a2470b}.nw-shell .ia-role.B{background:#e2f5e9;color:#0a7a3e}
+.nw-shell .ia-formrow td{background:#eef4f8}
+.nw-shell tr.cs-cancelled td{color:#5f7180}.nw-shell tr.cs-cancelled td b.cl-mono{text-decoration:line-through}
+.nw-shell .cs-danger{color:#b42318}.nw-shell .portal-primary.cs-danger-btn{background:#b42318;border-color:#b42318}
+.nw-shell .cs-ro{display:block;padding:9px 10px;border:1px dashed #cfdbe4;border-radius:10px;font-weight:400;color:#0f2638}
+.nw-shell .cs-meta{margin:0}.nw-shell .cs-mini td{padding:6px 8px}.nw-shell .cs-right{text-align:right}.nw-shell .cs-err{color:#b42318;font-size:13px;margin:0}

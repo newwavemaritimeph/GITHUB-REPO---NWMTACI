@@ -30,7 +30,7 @@ describe("resource planning", () => {
   });
 });
 
-import { planRows, rangesOverlap, isBlocking } from "@/lib/admin-assistant";
+import { moveTargets, planRows, rangesOverlap, isBlocking } from "@/lib/admin-assistant";
 describe("resource plan conflicts", () => {
   const base = { courseName: "", students: 10, capacity: 24 };
   const batches = [
@@ -74,5 +74,14 @@ describe("instructor and assessor roles", () => {
     expect(planIssues({ ...base, instructorId: "a", assessorId: "a", needsAssessor: true })).toEqual([]);
     const two = [...acc, { instructor_id: "b", course_id: "safety", role: "Instructor", valid_until: null }];
     expect(planIssues({ ...base, accreditations: [...two, { instructor_id: "d", course_id: "crowd", role: "Assessor", valid_until: null }], instructorId: "d", assessorId: "d" })).toContain("Same person as instructor and assessor");
+  });
+});
+
+describe("cancelling a batch", () => {
+  const b = (id: string, over: Partial<{ course_id: string; status: string; starts_on: string; confirmed_count: number }> = {}) => ({ id, course_id: "bt", status: "Open", starts_on: "2026-10-24", capacity: 24, confirmed_count: 10, ...over });
+  it("offers only open, not-started batches of the same course, flagging those without enough seats", () => {
+    const list = [b("src"), b("ok"), b("full", { confirmed_count: 20 }), b("other", { course_id: "crowd" }), b("past", { starts_on: "2026-10-21" }), b("gone", { status: "Cancelled" })];
+    const t = moveTargets(list[0], 5, list, "2026-10-21");
+    expect(t.map((x) => [x.batch.id, x.left, x.fits])).toEqual([["ok", 14, true], ["full", 4, false]]);
   });
 });

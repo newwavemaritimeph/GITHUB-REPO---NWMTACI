@@ -67,6 +67,7 @@ const batchUpdateInput = z.object({
   mode: z.string().trim().min(2).max(80), enrollmentDeadline: z.string().datetime({ offset: true }), publish: z.boolean(),
 });
 const batchDeleteInput = z.object({ action: z.literal("batch-delete"), batchId: z.string().uuid() });
+const batchCancelInput = z.object({ action: z.literal("batch-cancel"), batchId: z.string().uuid(), moveToBatchId: z.string().uuid().nullable().optional(), reason: z.string().trim().min(2).max(300) });
 
 // Accounting › Configuration remove (8 Oct 2026): a fee, payment channel, partner or rebate. Used records stay; archive those instead.
 const configRemoveInput = z.object({ action: z.literal("config-remove"), entity: z.enum(["charge", "channel", "partner", "rebate"]), id: z.string().uuid().optional(), agencyId: z.string().uuid().optional(), courseId: z.string().uuid().optional() });
@@ -272,12 +273,14 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
 const canAssist = (roles: string[]) => roles.some((role) => ["admin", "admin_assistant"].includes(role));
+// Class Schedules (owner, 21 Oct 2026): the Admin and the Admin Assistant open, edit, rename and cancel batches.
+const canSchedule = canAssist;
 const canManageHr = (roles: string[]) => roles.some((role) => ["admin"].includes(role));
 // Employee-charge management: the Accounting Manager owns it; admin + HR (who run payroll) included.
 const canManageEmployeeCharges = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
@@ -1004,7 +1007,7 @@ export async function GET() {
     deliveryRequests = rowsWithIds.map((r) => ({ ...r, certificate_status: certByEnrollment.get(r.enrollment_id)?.status ?? null, certificate_number: certByEnrollment.get(r.enrollment_id)?.certificate_number ?? null }));
   }
   // Admin Assistant data (migration 202610090033; empty without it).
-  let requisitions: unknown[] = [], requisitionItems: unknown[] = [], instructors: unknown[] = [], accreditations: unknown[] = [], batchResources: unknown[] = [];
+  let requisitions: unknown[] = [], requisitionItems: unknown[] = [], instructors: unknown[] = [], accreditations: unknown[] = [], batchResources: unknown[] = [], batchCancels: unknown[] = [];
   if (staff.roleCodes.some((r) => ["admin", "admin_assistant", "accounting", "cashier"].includes(r))) {
     const admin = createSupabaseAdminClient();
     const [rq, items] = await Promise.all([
@@ -1027,6 +1030,9 @@ export async function GET() {
     const res2 = res.error ? await admin.from("batch_resources").select("batch_id,classroom_id,instructor_id,updated_at") : res;
     accreditations = acc2.error ? [] : acc2.data ?? [];
     batchResources = res2.error ? [] : res2.data ?? [];
+    // Why and when a batch was cancelled (migration 202610210054); empty before it runs.
+    const cx = await admin.from("batches").select("id,cancel_reason,cancelled_at,canceller:profiles!batches_cancelled_by_fkey(complete_name)").eq("status", "Cancelled").order("cancelled_at", { ascending: false }).limit(200);
+    batchCancels = cx.error ? [] : cx.data ?? [];
   }
   // Certificate numbers (migration 202610090037; empty without it): Admin only.
   let certificateNumberSettings: unknown = null, legacyCertificates: unknown[] = [];
@@ -1136,7 +1142,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, feedbackLinks: certs.feedbackLinks, certificatePhotos: certs.photos, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, deliveryRequests, requisitions, requisitionItems, instructors, accreditations, batchResources, certificateNumberSettings, legacyCertificates, holidays, otherIncome, rebatesReceived }, { headers: { "Cache-Control": "no-store" } });
+    centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, deliveryRequests, requisitions, requisitionItems, instructors, accreditations, batchResources, batchCancels, certificateNumberSettings, legacyCertificates, holidays, otherIncome, rebatesReceived }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /**
@@ -2887,7 +2893,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "create-batch") {
-      if (!staff.roleCodes.some((role) => ["admin"].includes(role))) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
+      if (!canSchedule(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
       const { data, error } = await db.rpc("create_training_batch", { target_course: input.courseId, target_partner_offer: input.partnerOfferId ?? null,
         target_instructor_name: input.instructorName, target_instructor_email: input.instructorEmail, target_room_name: input.roomName,
         target_starts_on: input.startsOn, target_ends_on: input.endsOn, target_daily_start: input.dailyStart, target_daily_end: input.dailyEnd,
@@ -2896,13 +2902,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, batch: data });
     }
     if (input.action === "auto-open-batches") {
-      if (!staff.roleCodes.some((role) => ["admin"].includes(role))) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
+      if (!canSchedule(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
       const { data, error } = await db.rpc("auto_open_training_batches", { target_course: input.courseId, target_year: input.year, target_month: input.month });
       if (error) throw error;
       return NextResponse.json({ ok: true, created: data });
     }
     if (input.action === "auto-open-all-batches") {
-      if (!staff.roleCodes.some((role) => ["admin"].includes(role))) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
+      if (!canSchedule(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { data: courses } = await admin.from("courses").select("id,name").eq("active", true).eq("delivery_type", "In-House");
       const ids = (courses ?? []).map((c) => c.id as string);
@@ -2922,7 +2928,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, created, published, courses: (courses ?? []).length, failed });
     }
     if (input.action === "auto-open-week" || input.action === "auto-open-all-week") {
-      if (!staff.roleCodes.some((role) => ["admin"].includes(role))) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
+      if (!canSchedule(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
       // range_end = weekStart + 6 days (plain-date math, no timezone drift). The range RPC
       // publishes the batches it creates, so they are immediately publicly bookable.
       const [wy, wm, wd] = input.weekStart.split("-").map(Number);
@@ -2943,18 +2949,28 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, created, published: created, courses: (courses ?? []).length, failed });
     }
     if (input.action === "batch-update") {
-      if (!staff.roleCodes.some((role) => ["admin"].includes(role))) return NextResponse.json({ error: "Your account cannot edit schedules." }, { status: 403 });
+      if (!canSchedule(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot edit schedules." }, { status: 403 });
       const { data, error } = await db.rpc("update_training_batch", { target_batch: input.batchId,
         target_instructor_name: input.instructorName, target_instructor_email: input.instructorEmail, target_room_name: input.roomName, target_venue: input.venue,
         target_daily_start: input.dailyStart, target_daily_end: input.dailyEnd, target_mode: input.mode, target_enrollment_deadline: input.enrollmentDeadline, target_publish: input.publish });
       if (error) throw error;
-      // Renaming the batch number is Admin-only (it's a unique identifier). Applied separately from the RPC.
-      if (input.batchNumber && staff.roleCodes.includes("admin")) {
-        const admin = createSupabaseAdminClient();
+      const admin = createSupabaseAdminClient();
+      // The batch number is unique; renamed separately from the RPC and audited.
+      const old = (data as { batch_number?: string } | null)?.batch_number;
+      if (input.batchNumber && input.batchNumber !== old) {
         const { error: renameError } = await admin.from("batches").update({ batch_number: input.batchNumber }).eq("id", input.batchId);
         if (renameError) return NextResponse.json({ error: renameError.code === "23505" ? "That batch number is already used by another schedule." : renameError.message }, { status: 409 });
+        await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "batch.renamed", record_type: "batch", record_id: input.batchId, prior_values: { batch_number: old }, new_values: { batch_number: input.batchNumber } });
       }
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "batch.updated", record_type: "batch", record_id: input.batchId, new_values: { venue: input.venue, dailyStart: input.dailyStart, dailyEnd: input.dailyEnd, mode: input.mode, enrollmentDeadline: input.enrollmentDeadline, publish: input.publish } });
       return NextResponse.json({ ok: true, batch: data });
+    }
+    if (input.action === "batch-cancel") {
+      if (!canSchedule(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot cancel schedules." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data, error } = await admin.rpc("cancel_training_batch", { target_batch: input.batchId, move_to: input.moveToBatchId ?? null, actor: staff.user.id, reason: input.reason });
+      if (error) return NextResponse.json({ error: /cancel_training_batch/.test(error.message) ? "Apply database update 202610210054 first." : error.message }, { status: 400 });
+      return NextResponse.json({ ok: true, moved: Number(data ?? 0) });
     }
     if (input.action === "batch-delete") {
       if (!staff.roleCodes.some((role) => ["admin"].includes(role))) return NextResponse.json({ error: "Your account cannot remove schedules." }, { status: 403 });
