@@ -91,7 +91,8 @@ export function OtherIncome({ data, reload, canRecord, canVoid, canAddCategory =
     const amount = toCentavos(form.amount);
     const payer = rebate ? chosenPartners[0] ?? "" : form.payer.trim();
     const problem = !amount ? "Enter the amount received." : form.channel !== "Cash" && !form.reference.trim() ? "Enter the reference number." : !proofs.length ? "Attach the proof photo." : !rebate && payer.length < 2 ? "Enter who paid." : "";
-    if (problem) { setProofError(problem); return; }
+    setProofError(problem);
+    if (problem) return;
     const notes = rebate && amount !== chosenTotal ? [`Rebates due ${pesos2(chosenTotal)}; received ${pesos2(amount)}.`, form.notes.trim()].filter(Boolean).join(" ") : form.notes.trim();
     const ok = await post({ action: "income-record", source: rebate ? "Endorsement Rebate" : form.source, payer, amountCentavos: amount, channel: form.channel, reference: form.reference.trim(), receivedOn: form.date, notes, proofFiles: proofs, enrollmentIds: rebate ? chosen.map((r) => r.e.id) : [] },
       rebate ? `Recorded ${pesos2(amount)} from ${payer} for ${chosen.length} trainee${chosen.length === 1 ? "" : "s"}.` : `Recorded ${pesos2(amount)} ${form.source.toLowerCase()} from ${payer}.`);
@@ -117,6 +118,8 @@ export function OtherIncome({ data, reload, canRecord, canVoid, canAddCategory =
     </div>
     {rebate && toCentavos(form.amount) > 0 && toCentavos(form.amount) !== chosenTotal && <p className="oi-warn">The amount differs from the {pesos2(chosenTotal)} due; the difference is noted on the income record.</p>}
     {proofError && <p className="oi-err">{proofError}</p>}
+    {/* The server reason shows next to Save, not only at the top of the page. */}
+    {!proofError && msg?.kind === "error" && <p className="oi-err">{msg.text}</p>}
     <div className="pm-actions"><span /><span className="cx-acts"><button type="button" className="portal-secondary" onClick={() => setForm(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !!uploading} onClick={() => void save(rebate)}>{busy ? "Saving…" : "Save · Issue Income No."}</button></span></div>
   </div>;
 
