@@ -2368,3 +2368,8 @@ button.rd-row:hover { background: #f6fafc; }
 /* Copy Trainee Details (owner, 21 Oct 2026) */
 .sa-copy{display:flex;gap:8px;flex-wrap:wrap;order:3;margin-left:auto}
 .sa-copybox{display:flex;gap:8px;align-items:flex-start;margin:8px 0}.sa-copybox textarea{flex:1;min-width:0;font:13px/1.5 var(--font-geist-mono,ui-monospace,monospace);border:1px solid #cfdbe4;border-radius:10px;padding:10px;resize:vertical}
+/* Company Charge List (owner, 22 Oct 2026) */
+.nw-shell .ccl-soa{padding-bottom:16px}.nw-shell .ccl-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:16px 20px 10px;border-bottom:2px solid #F25615;margin:0 20px 14px;padding-left:0;padding-right:0}.nw-shell .ccl-top h2{margin:0}
+.nw-shell .ccl-boxes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0;margin:0 20px 16px;border:1px solid #dfe7ee;border-radius:10px;overflow:hidden}.nw-shell .ccl-boxes>div{padding:10px 14px;background:#f5f9fb;border-right:1px solid #dfe7ee}.nw-shell .ccl-boxes span{display:block;font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5f7180}.nw-shell .ccl-boxes b{display:block}.nw-shell .ccl-boxes small{color:#5f7180}
+.nw-shell .ccl-soa td small{display:block}
+.nw-shell .ccl-due{margin:16px 20px 0 auto;max-width:340px;border:2px solid #123F63;border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:4px}.nw-shell .ccl-due>div{display:flex;justify-content:space-between;gap:12px}.nw-shell .ccl-due b{font-family:var(--font-geist-mono,ui-monospace,monospace)}.nw-shell .ccl-total{border-top:1px solid #123F63;padding-top:6px;margin-top:2px;font-size:17px;color:#123F63}.nw-shell .ccl-due small{color:#5f7180}

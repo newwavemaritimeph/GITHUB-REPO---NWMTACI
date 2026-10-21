@@ -9,6 +9,7 @@ import { EXPENSE_REASONS, REQUEST_REASONS, RejectInline } from "./reject-inline"
 import { PERIODS, percentChange, periodStart, type Period } from "@/lib/accounting-periods";
 import { channelTotal, channelsUsed, sideTotal, type FinanceSummary, type Line } from "@/lib/finance-summary";
 import type { AccountingReport } from "@/lib/accounting-report";
+import { payStatus, type CompanyCharges } from "@/lib/company-charges";
 import type { CashierReportSnapshot } from "@/lib/documents";
 import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balances";
 import { downloadCsv } from "@/lib/csv";
@@ -481,12 +482,12 @@ export function AccountingReports({ switcher }: { switcher?: ReactNode } = {}) {
 
 /* ------------------------------------------------------------ cash and sales summary */
 
-const REPORT_VIEWS = ["Overview", "Cash and Sales Summary"] as const;
+const REPORT_VIEWS = ["Overview", "Cash and Sales Summary", "Company Charge List"] as const;
 /** Accounting › Reports (owner, 21 Oct 2026): Overview and the Cash and Sales Summary. */
 export function AccountingReportsHub() {
   const [view, setView] = useState<(typeof REPORT_VIEWS)[number]>("Overview");
   const switcher = <div className="cx-seg fs-views" role="tablist">{REPORT_VIEWS.map((v) => <button key={v} type="button" className={view === v ? "on" : ""} onClick={() => setView(v)}>{v}</button>)}</div>;
-  return view === "Overview" ? <AccountingReports switcher={switcher} /> : <FinanceSummaryReport switcher={switcher} />;
+  return view === "Overview" ? <AccountingReports switcher={switcher} /> : view === "Company Charge List" ? <CompanyChargeReport switcher={switcher} /> : <FinanceSummaryReport switcher={switcher} />;
 }
 
 /** End of the previous period, or the last day of the next one (never past today). */
@@ -567,5 +568,64 @@ export function FinanceSummaryReport({ switcher }: { switcher?: ReactNode }) {
         </tbody></table></div></section>
       </div>
     </>}
+  </div>;
+}
+
+/* ------------------------------------------------------------ company charge list */
+
+const CCL_TONE: Record<string, string> = { Paid: "green", "Partly Paid": "orange", Unpaid: "red" };
+/**
+ * Company Charge List (owner, 22 Oct 2026, design 2): a Statement of Account per agency or
+ * consultancy (dropdown), referred trainees at the full fee with the rebate and status apart.
+ */
+export function CompanyChargeReport({ switcher }: { switcher?: ReactNode }) {
+  const today = manilaToday();
+  const [period, setPeriod] = useState<Period>("Daily");
+  const [end, setEnd] = useState(today);
+  const [agency, setAgency] = useState("");
+  const q = `period=${period}&end=${end}`;
+  const { data, error } = useJson<CompanyCharges>(`/api/staff/company-charges?${q}`);
+  const list = data?.statements ?? [];
+  const st = list.find((x) => x.agencyId === agency) ?? list[0] ?? null;
+  const groups = (["Consultancy", "Agency"] as const).map((k) => [k, list.filter((x) => (x.kind === "Consultancy" ? "Consultancy" : "Agency") === k)] as const).filter(([, xs]) => xs.length);
+  const fee = st ? st.rows.reduce((t, r) => t + r.fee, 0) : 0, rebates = st ? st.rows.reduce((t, r) => t + r.rebate, 0) : 0;
+  const deducted = st ? st.rows.filter((r) => r.rebateStatus === "Deducted").reduce((t, r) => t + r.rebate, 0) : 0;
+  return <div className="portal-page cx ac">
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting · Reports</span><h1>Company Charge List</h1></div>
+      <div className="ac-controls">{st && <a className="portal-primary" href={`/api/documents/company-charges?${q}&agency=${st.agencyId}`} target="_blank" rel="noreferrer">Print PDF</a>}</div></div>
+    {switcher}
+    <div className="pd-bar cs-bar">
+      <label className="rp-who">Agency or Consultancy<select value={st?.agencyId ?? ""} onChange={(e) => setAgency(e.target.value)} disabled={!list.length}>
+        {!list.length && <option value="">No referred trainees</option>}
+        {groups.map(([k, xs]) => <optgroup key={k} label={k === "Consultancy" ? "Consultancies" : "Agencies"}>{xs.map((x) => <option key={x.agencyId} value={x.agencyId}>{x.company}</option>)}</optgroup>)}
+      </select></label>
+      <span className="cx-seg">{PERIODS.map((p) => <button key={p} type="button" className={period === p ? "on" : ""} onClick={() => setPeriod(p)}>{p}</button>)}</span>
+      <button type="button" className="portal-secondary" aria-label="Previous" onClick={() => setEnd(shiftPeriod(period, end, -1, today))}>‹</button>
+      <input type="date" value={end} max={today} aria-label="As of" onChange={(e) => e.target.value && setEnd(e.target.value)} />
+      <button type="button" className="portal-secondary" aria-label="Next" disabled={end >= today} onClick={() => setEnd(shiftPeriod(period, end, 1, today))}>›</button>
+      {data && <span className="pd-label"><b>{data.title}</b></span>}
+    </div>
+    {error && <Message kind="error" text={error} />}
+    {!data ? !error && <p className="portal-empty-copy">Loading the charge list…</p> : !st ? <p className="portal-empty-copy">No trainees referred by an agency or consultancy trained in this period.</p> :
+      <section className="portal-panel cx-panel ccl-soa">
+        <div className="ccl-top"><h2>Company Charge List</h2><span className="cl-mono">{st.statementNo}</span></div>
+        <div className="ccl-boxes">
+          <div><span>Charged To</span><b>{st.company}</b><small>{st.kind}</small></div>
+          <div><span>Period</span><b>{st.periodLabel}</b><small>by training date</small></div>
+          <div><span>Rebate Rule</span><b>{st.rule}</b></div>
+        </div>
+        <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee</th><th>Course</th><th>Training</th><th className="fs-n">Fee</th><th className="fs-n">Rebate</th><th>Status</th></tr></thead><tbody>
+          {st.rows.map((r, i) => { const status = payStatus(r); return <tr key={`${r.number}${r.course}${i}`}>
+            <td className="cl-no">{i + 1}</td><td><b>{r.name}</b><small className="cl-mono">{r.number}</small></td><td>{r.course}</td><td>{r.training}</td>
+            <td className="fs-n">{pesos2(r.fee)}</td><td className="fs-n">{r.rebate ? pesos2(r.rebate) : "—"}</td>
+            <td><Badge tone={CCL_TONE[status]}>{status}</Badge><small>{r.rebateStatus === "None" ? "No rebate" : `Rebate ${r.rebateStatus.toLowerCase()}`}</small></td></tr>; })}
+        </tbody></table></div>
+        <div className="ccl-due">
+          <div><span>Trainees</span><b>{st.rows.length}</b></div>
+          <div><span>Total Rebates</span><b>{pesos2(rebates)}</b></div>
+          <div className="ccl-total"><span>Total Fees</span><b>{pesos2(fee)}</b></div>
+          <small>Rebates deducted {pesos2(deducted)} · not deducted {pesos2(rebates - deducted)}</small>
+        </div>
+      </section>}
   </div>;
 }
