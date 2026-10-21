@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
-import { accreditationFor, isBlocking, planRows, rangesOverlap, requisitionState, requisitionTotal, type Accreditation, type PlanBatch, type PlanRow, type RequisitionLine, type RequisitionState } from "@/lib/admin-assistant";
-import { Badge, Message, fmtDate, usePost, usePaged } from "./shared-ui";
+import { ROLES, accreditationFor, handles, isBlocking, planRows, rangesOverlap, requisitionState, requisitionTotal, type Accreditation, type Duty, type PlanBatch, type PlanRow, type RequisitionLine, type RequisitionState } from "@/lib/admin-assistant";
+import { Badge, Message, fmtDate, periodRange, usePost, usePaged } from "./shared-ui";
 import { EXPENSE_REASONS, RejectInline } from "./reject-inline";
 import { CHANNELS, type Channel, type DaySummary, type ReconStatus } from "@/lib/reconciliation";
 
@@ -19,7 +19,7 @@ type Requisition = { id: string; requisition_number: string; purpose: string; ne
   requester?: { complete_name: string } | { complete_name: string }[] | null; expenses?: { status: string; voucher_number?: string | null; expense_number: string } | { status: string; voucher_number?: string | null; expense_number: string }[] | null };
 type Item = { id: string; name: string; unit: string; default_cost_centavos: number; active: boolean };
 type Instructor = { id: string; complete_name: string; mobile?: string | null; email?: string | null; notes?: string | null; active: boolean };
-type Plan = { batch_id: string; classroom_id?: string | null; instructor_id?: string | null };
+type Plan = { batch_id: string; classroom_id?: string | null; instructor_id?: string | null; assessor_id?: string | null };
 type AssistantData = { requisitions?: Requisition[]; requisitionItems?: Item[]; instructors?: Instructor[]; accreditations?: (Accreditation & { id: string })[]; batchResources?: Plan[] };
 const extra = (data: PortalData) => data as unknown as AssistantData;
 const TONE: Record<RequisitionState, string> = { "For Approval": "orange", Approved: "blue", Released: "green", Rejected: "red", Voided: "red" };
@@ -29,6 +29,16 @@ const itemsText = (r: Requisition) => (r.lines ?? []).map((l) => `${l.descriptio
 function Head({ title, children }: { title: string; children?: React.ReactNode }) {
   return <div className="cx-head"><div><span className="portal-eyebrow">Admin Assistant</span><h1>{title}</h1></div>{children}</div>;
 }
+
+const PLAN_PERIODS = ["Weekly", "Every 2 Weeks", "Monthly"] as const;
+type PlanPeriod = (typeof PLAN_PERIODS)[number];
+/** Monday–Sunday week, two weeks from that Monday, or the calendar month around `date`. */
+export function planRange(mode: PlanPeriod, date: string) {
+  if (mode !== "Every 2 Weeks") return periodRange(mode, date);
+  const from = periodRange("Weekly", date).from, to = addDays(from, 13);
+  return { from, to, label: `${fmtDate(from)} – ${fmtDate(to)}` };
+}
+const isStcw = (c?: PortalData["courses"][number]) => (first(c?.course_categories)?.name ?? "").toUpperCase().includes("STCW");
 
 /** Upcoming batches (not cancelled, not yet ended) with their planned room, instructor and problems (shared rules). */
 export function upcoming(data: PortalData): (PlanRow & { b: PortalData["batches"][number] })[] {
@@ -40,7 +50,9 @@ export function upcoming(data: PortalData): (PlanRow & { b: PortalData["batches"
   const defaults = new Map(((data as { defaultRooms?: { course_id: string; classroom_id: string }[] }).defaultRooms ?? []).map((d) => [d.course_id, d.classroom_id]));
   const roomNo = (n: string) => data.classrooms.find((r) => r.active && r.name.replace(/D/g, "") === n)?.id ?? null;
   const defaultRoom = (courseId: string, code?: string) => defaults.get(courseId) ?? (code === "UBT-PSSR" ? roomNo("103") : code && ["STPPDSPPS", "PSCMT", "PSCMHBT"].includes(code) ? roomNo("304") : null);
-  const batches: PlanBatch[] = list.map((b) => { const c = first(b.courses); const plan = plans.get(b.id); return { id: b.id, batchNumber: b.batch_number, courseId: b.course_id, courseCode: c?.code ?? "—", courseName: c?.name ?? "", startsOn: b.starts_on, endsOn: b.ends_on, students: Number(b.confirmed_count ?? 0), capacity: Number(b.capacity ?? 24), classroomId: plan?.classroom_id ?? (b as { classroom_id?: string | null }).classroom_id ?? defaultRoom(b.course_id, c?.code), instructorId: plan?.instructor_id ?? null }; });
+  // STCW batches need an assessor (owner, 21 Oct 2026).
+  const stcw = new Set(data.courses.filter(isStcw).map((c) => c.id));
+  const batches: PlanBatch[] = list.map((b) => { const c = first(b.courses); const plan = plans.get(b.id); return { assessorId: plan?.assessor_id ?? null, needsAssessor: stcw.has(b.course_id), id: b.id, batchNumber: b.batch_number, courseId: b.course_id, courseCode: c?.code ?? "—", courseName: c?.name ?? "", startsOn: b.starts_on, endsOn: b.ends_on, students: Number(b.confirmed_count ?? 0), capacity: Number(b.capacity ?? 24), classroomId: plan?.classroom_id ?? (b as { classroom_id?: string | null }).classroom_id ?? defaultRoom(b.course_id, c?.code), instructorId: plan?.instructor_id ?? null }; });
   const rooms = data.classrooms.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name, capacity: Number(c.capacity) }));
   const rows = planRows(batches, rooms, extra(data).instructors ?? [], extra(data).accreditations ?? []);
   return rows.map((r, i) => ({ ...r, b: list[i] }));
@@ -150,31 +162,64 @@ export function AssistantRequisitions({ data, reload, canRaise, canDecide }: { d
  */
 export function ResourcePlanning({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   const { busy, msg, post } = usePost(reload);
-  const rows = upcoming(data);
+  const all = upcoming(data);
   const [picked, setPicked] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const today = manilaToday();
+  // Weekly, every 2 weeks or monthly (owner, 21 Oct 2026); the PDF prints the same period.
+  const [mode, setMode] = useState<PlanPeriod>("Weekly");
+  const [anchor, setAnchor] = useState(today);
+  const range = planRange(mode, anchor);
+  const step = (n: number) => setAnchor(mode === "Monthly" ? (n < 0 ? addDays(range.from, -1) : addDays(range.to, 1)) : addDays(anchor, n * (mode === "Weekly" ? 7 : 14)));
+  const rows = all.filter((r) => rangesOverlap(r.startsOn, r.endsOn, range.from, range.to));
   const rooms = data.classrooms.filter((c) => c.active);
   const instructors = (extra(data).instructors ?? []).filter((i) => i.active);
   const acc = extra(data).accreditations ?? [];
-  const today = manilaToday();
   const term = q.trim().toLowerCase();
   const queue = [...rows].filter((r) => !term || `${r.courseCode} ${r.courseName} ${r.batchNumber}`.toLowerCase().includes(term))
     .sort((a, z) => Number(z.issues.some(isBlocking)) - Number(a.issues.some(isBlocking)) || Number(z.issues.length > 0) - Number(a.issues.length > 0) || a.startsOn.localeCompare(z.startsOn));
-  const sel = rows.find((r) => r.id === picked) ?? queue[0] ?? null;
-  const attention = rows.filter((r) => r.issues.length), conflicts = rows.filter((r) => r.roomClash || r.instructorClash || r.issues.some((x) => /exceed/i.test(x)));
-  const save = (classroomId: string | null, instructorId: string | null) => sel && void post({ action: "resource-plan-save", batchId: sel.id, classroomId, instructorId }, "Saved.").catch(() => undefined);
+  const sel = queue.find((r) => r.id === picked) ?? queue[0] ?? null;
+  const attention = rows.filter((r) => r.issues.length), conflicts = rows.filter((r) => r.roomClash || r.instructorClash || r.issues.some((x) => /exceed|also booked/i.test(x)));
+  const save = (patch: { classroomId?: string | null; instructorId?: string | null; assessorId?: string | null }) => sel && void post({ action: "resource-plan-save", batchId: sel.id, classroomId: sel.classroomId, instructorId: sel.instructorId, assessorId: sel.assessorId ?? null, ...patch }, "Saved.").catch(() => undefined);
   const dates = (r: PlanBatch) => (r.startsOn === r.endsOn ? fmtDate(r.startsOn) : `${fmtDate(r.startsOn)} – ${fmtDate(r.endsOn)}`);
-  const busyWith = (kind: "classroomId" | "instructorId", id: string) => sel ? rows.find((o) => o.id !== sel.id && o[kind] === id && rangesOverlap(o.startsOn, o.endsOn, sel.startsOn, sel.endsOn)) ?? null : null;
+  const overlapping = (o: PlanBatch) => !!sel && o.id !== sel.id && rangesOverlap(o.startsOn, o.endsOn, sel.startsOn, sel.endsOn);
+  const roomBusy = (id: string) => all.find((o) => overlapping(o) && o.classroomId === id) ?? null;
+  const personBusy = (id: string) => all.find((o) => overlapping(o) && (o.instructorId === id || o.assessorId === id)) ?? null;
   const tone = (r: PlanRow) => (r.issues.some(isBlocking) ? "red" : r.issues.length ? "orange" : "green");
-  const to = addDays(today, 13);
+  /** Instructor, then Assessor (owner, 21 Oct 2026): people whose course role covers that duty. */
+  const person = (duty: Duty) => {
+    if (!sel) return null;
+    const key = duty === "Instructor" ? "instructorId" : "assessorId", current = sel[key] ?? "";
+    const able = instructors.filter((i) => i.id === current || acc.some((a) => a.instructor_id === i.id && a.course_id === sel.courseId && handles(a.role, duty)));
+    const state = current ? accreditationFor(acc, current, sel.courseId, sel.startsOn, duty) : null;
+    const until = current ? acc.find((a) => a.instructor_id === current && a.course_id === sel.courseId)?.valid_until : null;
+    const clash = current ? personBusy(current) : null;
+    return <label className="rp-pick">{duty}
+      <select value={current} disabled={busy} onChange={(e) => save({ [key]: e.target.value || null })}>
+        <option value="">{duty === "Assessor" && !sel.needsAssessor ? "None needed" : `Choose ${duty.toLowerCase()}`}</option>
+        {able.map((i) => { const b = personBusy(i.id); return <option key={i.id} value={i.id}>{i.complete_name}{b ? ` · Busy: ${b.courseCode} ${dates(b)}` : ""}</option>; })}
+      </select>
+      {current ? <small className={state !== "ok" || clash ? "rp-bad" : ""}>{state === "none" ? `Not accredited as ${duty.toLowerCase()} for ${sel.courseCode}` : state === "expired" ? `Accreditation expired ${until ? fmtDate(until) : ""}` : clash ? `Also booked: ${clash.courseCode} ${dates(clash)}` : until ? `Accredited until ${fmtDate(until)}` : "Accredited"}</small>
+        : <small>{able.length ? `${able.length} can ${duty === "Instructor" ? "teach" : "assess"} ${sel.courseCode}` : `No one on the shortlist ${duty === "Instructor" ? "teaches" : "assesses"} ${sel.courseCode} yet. Add it in Instructors.`}</small>}
+    </label>;
+  };
   return <div className="portal-page cx ac">
-    <Head title="Resource Planning"><a className="portal-secondary" href={`/api/documents/resource-plan?from=${today}&to=${to}`} target="_blank" rel="noreferrer">Print PDF</a></Head>
+    <Head title="Resource Planning"><a className="portal-secondary" href={`/api/documents/resource-plan?from=${range.from}&to=${range.to}`} target="_blank" rel="noreferrer">Print PDF</a></Head>
     {msg && <Message kind={msg.kind} text={msg.text} />}
+    <div className="pd-bar">
+      <span className="cx-seg">{PLAN_PERIODS.map((x) => <button key={x} type="button" className={mode === x ? "on" : ""} onClick={() => setMode(x)}>{x}</button>)}</span>
+      <button type="button" className="portal-secondary" aria-label="Previous" onClick={() => step(-1)}>‹</button>
+      <input type="date" value={anchor} aria-label="Date" onChange={(e) => e.target.value && setAnchor(e.target.value)} />
+      <button type="button" className="portal-secondary" aria-label="Next" onClick={() => step(1)}>›</button>
+      {anchor !== today && <button type="button" className="portal-secondary" onClick={() => setAnchor(today)}>Today</button>}
+      <span className="pd-label"><b>{range.label}</b> · {rows.length} batch{rows.length === 1 ? "" : "es"}</span>
+    </div>
     <div className="rp-sum">
-      <div><b>{rows.length}</b><span>Upcoming batches</span></div>
+      <div><b>{rows.length}</b><span>Batches</span></div>
       <div className={attention.length ? "bad" : ""}><b>{attention.length}</b><span>Need attention</span></div>
       <div><b>{rows.filter((r) => !r.classroomId).length}</b><span>No classroom</span></div>
       <div><b>{rows.filter((r) => !r.instructorId).length}</b><span>No instructor</span></div>
+      <div><b>{rows.filter((r) => r.needsAssessor && !r.assessorId).length}</b><span>No assessor</span></div>
       <div className={conflicts.length ? "bad" : ""}><b>{conflicts.length}</b><span>Conflicts</span></div>
     </div>
     <div className="rp-split">
@@ -184,24 +229,20 @@ export function ResourcePlanning({ data, reload }: { data: PortalData; reload: (
           <span className="rp-qt"><b>{r.courseCode}</b><span className="cl-mono">{r.batchNumber}</span></span>
           <Badge tone={tone(r)}>{r.issues.length ? `${r.issues.length} to fix` : "Ready"}</Badge>
           <small>{dates(r)} · {r.students} student{r.students === 1 ? "" : "s"}</small>
-          <small className="rp-qr">{r.room?.name ?? "No room"} · {r.instructor?.complete_name ?? "No instructor"}</small>
-        </button>)}{!queue.length && <p className="portal-empty-copy">{rows.length ? "No batch matches." : "No upcoming batches."}</p>}</div>
+          <small className="rp-qr">{r.room?.name ?? "No room"} · {r.instructor?.complete_name ?? "No instructor"}{r.needsAssessor || r.assessor ? ` · ${r.assessor?.complete_name ?? "No assessor"}` : ""}</small>
+        </button>)}{!queue.length && <p className="portal-empty-copy">{rows.length ? "No batch matches." : "No upcoming batches in this period."}</p>}</div>
       </section>
       {sel ? <section className="portal-panel cx-panel rp-editor">
         <div className="panel-heading"><div><h2>{sel.courseCode} · <span className="cl-mono">{sel.batchNumber}</span></h2><span className="rp-sub">{sel.courseName} · {dates(sel)} · {sel.students} of {sel.capacity} seats booked</span></div><Badge tone={tone(sel)}>{sel.issues.length ? `${sel.issues.length} to fix` : "Ready"}</Badge></div>
         {sel.issues.length > 0 && <ul className="rp-issues">{sel.issues.map((x) => <li key={x} className={isBlocking(x) ? "bad" : ""}>{x}</li>)}</ul>}
         <h3 className="rp-h">Classroom</h3>
-        <div className="rp-cards">{rooms.map((r) => { const clash = busyWith("classroomId", r.id); const small = sel.students > Number(r.capacity); const on = sel.classroomId === r.id; return <button type="button" key={r.id} disabled={busy} className={`rp-card${on ? " on" : ""}${clash || small ? " warn" : ""}`} aria-pressed={on} onClick={() => save(on ? null : r.id, sel.instructorId)}>
+        <div className="rp-cards">{rooms.map((r) => { const clash = roomBusy(r.id); const small = sel.students > Number(r.capacity); const on = sel.classroomId === r.id; return <button type="button" key={r.id} disabled={busy} className={`rp-card${on ? " on" : ""}${clash || small ? " warn" : ""}`} aria-pressed={on} onClick={() => save({ classroomId: on ? null : r.id })}>
           <b>{r.name}</b><small>{r.capacity} seats{small ? ` · too small for ${sel.students}` : ""}</small>
           <small className={clash ? "rp-bad" : ""}>{clash ? `Booked: ${clash.courseCode} ${dates(clash)}` : "Free on these dates"}</small></button>; })}
           {!rooms.length && <p className="portal-empty-copy">No classrooms yet. The Admin adds them in Rooms and Facilities.</p>}</div>
-        <h3 className="rp-h">Instructor</h3>
-        <div className="rp-cards">{instructors.map((i) => { const state = accreditationFor(acc, i.id, sel.courseId, sel.startsOn); const until = acc.find((a) => a.instructor_id === i.id && a.course_id === sel.courseId)?.valid_until; const clash = busyWith("instructorId", i.id); const on = sel.instructorId === i.id; return <button type="button" key={i.id} disabled={busy} className={`rp-card${on ? " on" : ""}${state !== "ok" || clash ? " warn" : ""}`} aria-pressed={on} onClick={() => save(sel.classroomId, on ? null : i.id)}>
-          <b>{i.complete_name}</b>
-          <small className={state !== "ok" ? "rp-bad" : ""}>{state === "ok" ? (until ? `Accredited until ${fmtDate(until)}` : "Accredited") : state === "expired" ? `Accreditation expired ${until ? fmtDate(until) : ""}` : `Not accredited for ${sel.courseCode}`}</small>
-          <small className={clash ? "rp-bad" : ""}>{clash ? `Teaching ${clash.courseCode} ${dates(clash)}` : i.mobile ? i.mobile : "Free on these dates"}</small></button>; })}
-          {!instructors.length && <p className="portal-empty-copy">No instructors on the shortlist yet. Add them in Instructors.</p>}</div>
-        <p className="ac-foot">Click a card to assign it; click it again to clear. Changes save right away and show on the admission records and MISMO lists.</p>
+        <h3 className="rp-h">Instructor and Assessor</h3>
+        <div className="rp-people">{person("Instructor")}{person("Assessor")}</div>
+        <p className="ac-foot">Click a room to assign it; click it again to clear. Changes save right away and show on the admission records and MISMO lists.</p>
       </section> : <section className="portal-panel cx-panel"><p className="portal-empty-copy">No upcoming batches.</p></section>}
     </div>
   </div>;
@@ -212,13 +253,19 @@ export function InstructorShortlist({ data, reload }: { data: PortalData; reload
   const today = manilaToday(), soon = addDays(today, 30);
   const list = extra(data).instructors ?? [];
   const acc = extra(data).accreditations ?? [];
-  const courses = data.courses.filter((c) => (c as { active?: boolean }).active !== false).sort((a, z) => a.code.localeCompare(z.code));
+  // STCW courses first (BT-PSSR, Safety, Crowd, Crisis), then In-House (owner, 21 Oct 2026).
+  const courses = data.courses.filter((c) => (c as { active?: boolean }).active !== false && c.delivery_type === "In-House").sort((a, z) => Number(isStcw(z)) - Number(isStcw(a)) || a.code.localeCompare(z.code));
   const code = new Map(data.courses.map((c) => [c.id, c.code]));
   const [form, setForm] = useState<{ id?: string; completeName: string; mobile: string; email: string; notes: string } | null>(null);
   const [accFor, setAccFor] = useState<string | null>(null);
-  const [accForm, setAccForm] = useState({ courseId: "", accreditationNumber: "", validUntil: "" });
+  const blankAcc = { courseId: "", role: "Instructor", accreditationNumber: "", validUntil: "" };
+  const [accForm, setAccForm] = useState(blankAcc);
+  const [who, setWho] = useState("");
+  const shown = who ? list.filter((i) => acc.some((a) => a.instructor_id === i.id && a.course_id === who)) : list;
   const saveInstructor = () => form && void post({ action: "instructor-save", ...form }, form.id ? "Instructor updated." : "Instructor added.").then(() => setForm(null)).catch(() => undefined);
-  const saveAcc = (instructorId: string) => void post({ action: "instructor-accreditation-save", instructorId, courseId: accForm.courseId, accreditationNumber: accForm.accreditationNumber, validUntil: accForm.validUntil || null }, "Accreditation saved.").then(() => { setAccFor(null); setAccForm({ courseId: "", accreditationNumber: "", validUntil: "" }); }).catch(() => undefined);
+  const saveAcc = (instructorId: string) => void post({ action: "instructor-accreditation-save", instructorId, courseId: accForm.courseId, role: accForm.role, accreditationNumber: accForm.accreditationNumber, validUntil: accForm.validUntil || null }, "Course saved.").then(() => { setAccFor(null); setAccForm(blankAcc); }).catch(() => undefined);
+  const stcwCourses = courses.filter(isStcw), inHouse = courses.filter((c) => !isStcw(c));
+  const courseOptions = <><optgroup label="STCW">{stcwCourses.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</optgroup><optgroup label="In-House">{inHouse.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</optgroup></>;
   return <div className="portal-page cx ac">
     <Head title="Instructors">{!form && <button type="button" className="portal-primary" onClick={() => setForm({ completeName: "", mobile: "", email: "", notes: "" })}>Add Instructor</button>}</Head>
     {msg && <Message kind={msg.kind} text={msg.text} />}
@@ -230,19 +277,21 @@ export function InstructorShortlist({ data, reload }: { data: PortalData; reload
         <label>Notes<input value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
         <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setForm(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy || form.completeName.trim().length < 2} onClick={saveInstructor}>Save</button></div>
       </div></section>}
-    <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Instructor Shortlist</h2><span className="slot-count">{list.filter((i) => i.active).length}</span></div>
-      {list.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Instructor</th><th>Mobile</th><th>Email</th><th>Course Accreditations</th><th></th></tr></thead><tbody>
-        {list.map((i, n) => { const mine = acc.filter((a) => a.instructor_id === i.id); return [<tr key={i.id} className={i.active ? undefined : "ms-out"}>
+    <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Instructor Shortlist</h2><span className="slot-count">{shown.filter((i) => i.active).length}</span></div>
+      <div className="cx-bar ac-bar"><label className="rp-who">Who Handles<select value={who} onChange={(e) => setWho(e.target.value)}><option value="">All courses</option>{courseOptions}</select></label></div>
+      {shown.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Instructor</th><th>Mobile</th><th>Email</th><th>Courses Handled</th><th></th></tr></thead><tbody>
+        {shown.map((i, n) => { const mine = acc.filter((a) => a.instructor_id === i.id); return [<tr key={i.id} className={i.active ? undefined : "ms-out"}>
           <td className="cl-no">{n + 1}</td><td><b>{i.complete_name}</b>{i.notes ? <small>{i.notes}</small> : null}</td><td className="cl-mono">{i.mobile || "—"}</td><td>{i.email || "—"}</td>
-          <td><span className="aa-chips">{mine.map((a) => { const tone = a.valid_until && a.valid_until < today ? "red" : a.valid_until && a.valid_until <= soon ? "orange" : "green"; return <span key={a.id} className="aa-chip"><Badge tone={tone}>{code.get(a.course_id) ?? "Course"}{a.accreditation_number ? ` · ${a.accreditation_number}` : ""}{a.valid_until ? ` · Until ${fmtDate(a.valid_until)}` : ""}</Badge><button type="button" aria-label="Remove accreditation" disabled={busy} onClick={() => void post({ action: "instructor-accreditation-save", instructorId: i.id, courseId: a.course_id, remove: true }, "Accreditation removed.").catch(() => undefined)}>×</button></span>; })}{!mine.length && "—"}</span></td>
-          <td><span className="cl-acts"><button type="button" className="portal-secondary" onClick={() => { setAccFor(accFor === i.id ? null : i.id); setAccForm({ courseId: courses[0]?.id ?? "", accreditationNumber: "", validUntil: "" }); }}>Add Accreditation</button><button type="button" className="portal-secondary" onClick={() => setForm({ id: i.id, completeName: i.complete_name, mobile: i.mobile ?? "", email: i.email ?? "", notes: i.notes ?? "" })}>Edit</button><button type="button" className="portal-secondary" disabled={busy} onClick={() => void post({ action: "instructor-save", id: i.id, completeName: i.complete_name, mobile: i.mobile ?? "", email: i.email ?? "", notes: i.notes ?? "", active: !i.active }, i.active ? "Removed from the shortlist." : "Back on the shortlist.").catch(() => undefined)}>{i.active ? "Archive" : "Restore"}</button></span></td>
+          <td><span className="aa-chips">{mine.map((a) => { const tone = a.valid_until && a.valid_until < today ? "red" : a.valid_until && a.valid_until <= soon ? "orange" : "green"; return <span key={a.id} className="aa-chip"><Badge tone={tone}>{code.get(a.course_id) ?? "Course"} · {a.role ?? "Instructor"}{a.accreditation_number ? ` · ${a.accreditation_number}` : ""}{a.valid_until ? ` · Until ${fmtDate(a.valid_until)}` : ""}</Badge><button type="button" aria-label="Edit course" disabled={busy} onClick={() => { setAccFor(i.id); setAccForm({ courseId: a.course_id, role: a.role ?? "Instructor", accreditationNumber: a.accreditation_number ?? "", validUntil: a.valid_until ?? "" }); }}>✎</button><button type="button" aria-label="Remove course" disabled={busy} onClick={() => void post({ action: "instructor-accreditation-save", instructorId: i.id, courseId: a.course_id, remove: true }, "Course removed.").catch(() => undefined)}>×</button></span>; })}{!mine.length && "—"}</span></td>
+          <td><span className="cl-acts"><button type="button" className="portal-secondary" onClick={() => { setAccFor(accFor === i.id ? null : i.id); setAccForm({ ...blankAcc, courseId: who || courses[0]?.id || "" }); }}>Add Course</button><button type="button" className="portal-secondary" onClick={() => setForm({ id: i.id, completeName: i.complete_name, mobile: i.mobile ?? "", email: i.email ?? "", notes: i.notes ?? "" })}>Edit</button><button type="button" className="portal-secondary" disabled={busy} onClick={() => void post({ action: "instructor-save", id: i.id, completeName: i.complete_name, mobile: i.mobile ?? "", email: i.email ?? "", notes: i.notes ?? "", active: !i.active }, i.active ? "Removed from the shortlist." : "Back on the shortlist.").catch(() => undefined)}>{i.active ? "Archive" : "Restore"}</button></span></td>
         </tr>, accFor === i.id && <tr key={`${i.id}-acc`}><td colSpan={6}><div className="portal-form aa-accform">
-          <label>Course<select value={accForm.courseId} onChange={(e) => setAccForm({ ...accForm, courseId: e.target.value })}>{courses.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label>
+          <label>Course<select value={accForm.courseId} onChange={(e) => setAccForm({ ...accForm, courseId: e.target.value })}>{courseOptions}</select></label>
+          <label>Role<select value={accForm.role} onChange={(e) => setAccForm({ ...accForm, role: e.target.value })}>{ROLES.map((r) => <option key={r} value={r}>{r}</option>)}</select></label>
           <label>Accreditation No.<input value={accForm.accreditationNumber} onChange={(e) => setAccForm({ ...accForm, accreditationNumber: e.target.value })} /></label>
           <label>Valid Until<input type="date" value={accForm.validUntil} onChange={(e) => setAccForm({ ...accForm, validUntil: e.target.value })} /></label>
-          <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setAccFor(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !accForm.courseId} onClick={() => saveAcc(i.id)}>Save Accreditation</button></div>
+          <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setAccFor(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !accForm.courseId} onClick={() => saveAcc(i.id)}>Save Course</button></div>
         </div></td></tr>]; })}
-      </tbody></table></div> : <p className="portal-empty-copy">No instructors on the shortlist yet.</p>}
+      </tbody></table></div> : <p className="portal-empty-copy">{who ? `No one handles ${code.get(who) ?? "this course"} yet.` : "No instructors on the shortlist yet."}</p>}
     </section>
   </div>;
 }

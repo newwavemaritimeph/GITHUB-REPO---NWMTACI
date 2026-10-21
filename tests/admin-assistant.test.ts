@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accreditationFor, planIssues, requisitionState, requisitionTotal } from "@/lib/admin-assistant";
+import { accreditationFor, handles, planIssues, requisitionState, requisitionTotal } from "@/lib/admin-assistant";
 
 describe("requisitions", () => {
   it("adds up quantity × unit cost", () => {
@@ -47,5 +47,32 @@ describe("resource plan conflicts", () => {
     expect(rows[2].roomClash).toBeNull();
     expect(rows[0].issues.some(isBlocking)).toBe(true);
     expect(rows[2].issues).toEqual([]);
+  });
+});
+
+describe("instructor and assessor roles", () => {
+  const acc = [
+    { instructor_id: "a", course_id: "crowd", role: "Instructor and Assessor", valid_until: "2027-01-01" },
+    { instructor_id: "b", course_id: "crowd", role: "Assessor", valid_until: "2027-01-01" },
+    { instructor_id: "c", course_id: "crowd", valid_until: null },
+  ];
+  const base = { students: 10, startsOn: "2026-10-27", courseId: "crowd", classroom: { capacity: 24 }, accreditations: acc };
+  it("matches the duty to the course role (old rows count as Instructor)", () => {
+    expect(handles("Instructor and Assessor", "Assessor")).toBe(true);
+    expect(handles(null, "Instructor")).toBe(true);
+    expect(handles(null, "Assessor")).toBe(false);
+    expect(accreditationFor(acc, "b", "crowd", "2026-10-27", "Instructor")).toBe("none");
+    expect(accreditationFor(acc, "b", "crowd", "2026-10-27", "Assessor")).toBe("ok");
+  });
+  it("flags a missing or unaccredited assessor only where one is needed", () => {
+    expect(planIssues({ ...base, instructorId: "c", needsAssessor: true })).toEqual(["No assessor"]);
+    expect(planIssues({ ...base, instructorId: "c" })).toEqual([]);
+    expect(planIssues({ ...base, instructorId: "c", assessorId: "c" })).toContain("Assessor not accredited for this course");
+    expect(planIssues({ ...base, instructorId: "c", assessorId: "b", needsAssessor: true })).toEqual([]);
+  });
+  it("allows the same person for both only when the role is Instructor and Assessor", () => {
+    expect(planIssues({ ...base, instructorId: "a", assessorId: "a", needsAssessor: true })).toEqual([]);
+    const two = [...acc, { instructor_id: "b", course_id: "safety", role: "Instructor", valid_until: null }];
+    expect(planIssues({ ...base, accreditations: [...two, { instructor_id: "d", course_id: "crowd", role: "Assessor", valid_until: null }], instructorId: "d", assessorId: "d" })).toContain("Same person as instructor and assessor");
   });
 });

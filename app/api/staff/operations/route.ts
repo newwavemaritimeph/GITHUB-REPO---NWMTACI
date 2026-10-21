@@ -177,7 +177,7 @@ const requisitionCreateInput = z.object({ action: z.literal("requisition-create"
 const requisitionDecideInput = z.object({ action: z.literal("requisition-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(300).optional() });
 const requisitionItemInput = z.object({ action: z.literal("requisition-item-save"), id: z.string().uuid().optional(), name: z.string().trim().min(1).max(120), unit: z.string().trim().max(40).optional(), defaultCostCentavos: z.number().int().min(0).optional(), active: z.boolean().optional(), remove: z.boolean().optional() });
 const instructorSaveInput = z.object({ action: z.literal("instructor-save"), id: z.string().uuid().optional(), completeName: z.string().trim().min(2).max(160), mobile: z.string().trim().max(40).optional().default(""), email: z.string().trim().max(160).optional().default(""), notes: z.string().trim().max(300).optional().default(""), active: z.boolean().optional() });
-const accreditationInput = z.object({ action: z.literal("instructor-accreditation-save"), instructorId: z.string().uuid(), courseId: z.string().uuid(), accreditationNumber: z.string().trim().max(80).optional().default(""), validUntil: z.string().date().nullable().optional(), remove: z.boolean().optional() });
+const accreditationInput = z.object({ action: z.literal("instructor-accreditation-save"), instructorId: z.string().uuid(), courseId: z.string().uuid(), accreditationNumber: z.string().trim().max(80).optional().default(""), validUntil: z.string().date().nullable().optional(), remove: z.boolean().optional(), role: z.enum(["Instructor", "Assessor", "Instructor and Assessor"]).optional().default("Instructor") });
 const reconcileMarkInput = z.object({ action: z.literal("reconcile-mark"), paymentIds: z.array(z.string().uuid()).min(1).max(100), status: z.enum(["Reconciled", "Not in History"]), remarks: z.string().trim().max(300).optional() });
 // Admin voids and holidays (owner, 9 Oct 2026; migration 202610090038).
 const voidReason = z.string().trim().min(5, "Enter the reason (at least 5 characters).").max(500);
@@ -188,7 +188,7 @@ const holidaySaveInput = z.object({ action: z.literal("holiday-save"), date: z.s
 const holidayDeleteInput = z.object({ action: z.literal("holiday-delete"), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
 const holidayMarinaInput = z.object({ action: z.literal("holiday-marina"), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), status: z.enum(["Not Sent", "Sent", "Approved", "Classes Moved"]), note: z.string().trim().max(300).optional() });
 const reconcileUndoInput = z.object({ action: z.literal("reconcile-undo"), paymentId: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
-const resourcePlanInput = z.object({ action: z.literal("resource-plan-save"), batchId: z.string().uuid(), classroomId: z.string().uuid().nullable(), instructorId: z.string().uuid().nullable() });
+const resourcePlanInput = z.object({ action: z.literal("resource-plan-save"), batchId: z.string().uuid(), classroomId: z.string().uuid().nullable(), instructorId: z.string().uuid().nullable(), assessorId: z.string().uuid().nullable().optional() });
 const mismoSubmitInput = z.object({ action: z.literal("mismo-submit"), batchId: z.string().uuid(), listDate: z.string().date(), enrollmentIds: z.array(z.string().uuid()).max(200) });
 const certificateIssuanceToggleInput = z.object({ action: z.literal("certificate-issuance-toggle"), enabled: z.boolean() });
 const feedbackSendEmailInput = z.object({ action: z.literal("feedback-send-email"), enrollmentId: z.string().uuid() });
@@ -1018,12 +1018,15 @@ export async function GET() {
     const admin = createSupabaseAdminClient();
     const [ins, acc, res] = await Promise.all([
       admin.from("instructors").select("id,complete_name,mobile,email,notes,active").order("complete_name"),
-      admin.from("instructor_accreditations").select("id,instructor_id,course_id,accreditation_number,valid_until"),
-      admin.from("batch_resources").select("batch_id,classroom_id,instructor_id,updated_at"),
+      admin.from("instructor_accreditations").select("id,instructor_id,course_id,accreditation_number,valid_until,role"),
+      admin.from("batch_resources").select("batch_id,classroom_id,instructor_id,assessor_id,updated_at"),
     ]);
     instructors = ins.error ? [] : ins.data ?? [];
-    accreditations = acc.error ? [] : acc.data ?? [];
-    batchResources = res.error ? [] : res.data ?? [];
+    // Tolerant before migration 202610210053 (role, assessor_id).
+    const acc2 = acc.error ? await admin.from("instructor_accreditations").select("id,instructor_id,course_id,accreditation_number,valid_until") : acc;
+    const res2 = res.error ? await admin.from("batch_resources").select("batch_id,classroom_id,instructor_id,updated_at") : res;
+    accreditations = acc2.error ? [] : acc2.data ?? [];
+    batchResources = res2.error ? [] : res2.data ?? [];
   }
   // Certificate numbers (migration 202610090037; empty without it): Admin only.
   let certificateNumberSettings: unknown = null, legacyCertificates: unknown[] = [];
@@ -1516,7 +1519,10 @@ export async function POST(request: Request) {
       if (!canAssist(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin Assistant can edit accreditations." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       if (input.remove) { const { error } = await admin.from("instructor_accreditations").delete().eq("instructor_id", input.instructorId).eq("course_id", input.courseId); if (error) throw error; return NextResponse.json({ ok: true }); }
-      const { error } = await admin.from("instructor_accreditations").upsert({ instructor_id: input.instructorId, course_id: input.courseId, accreditation_number: input.accreditationNumber || null, valid_until: input.validUntil ?? null }, { onConflict: "instructor_id,course_id" });
+      const row = { instructor_id: input.instructorId, course_id: input.courseId, accreditation_number: input.accreditationNumber || null, valid_until: input.validUntil ?? null };
+      let { error } = await admin.from("instructor_accreditations").upsert({ ...row, role: input.role }, { onConflict: "instructor_id,course_id" });
+      // Before migration 202610210053 there is no role column.
+      if (error && /role/.test(error.message)) ({ error } = await admin.from("instructor_accreditations").upsert(row, { onConflict: "instructor_id,course_id" }));
       if (error) throw error;
       return NextResponse.json({ ok: true });
     }
@@ -1575,7 +1581,9 @@ export async function POST(request: Request) {
       const { data: batch } = await admin.from("batches").select("id,status").eq("id", input.batchId).maybeSingle();
       if (!batch) return NextResponse.json({ error: "That batch no longer exists." }, { status: 404 });
       if (batch.status === "Cancelled") return NextResponse.json({ error: "Cancelled batches cannot be planned." }, { status: 400 });
-      const { error } = await admin.from("batch_resources").upsert({ batch_id: input.batchId, classroom_id: input.classroomId, instructor_id: input.instructorId, updated_by: staff.user.id, updated_at: new Date().toISOString() });
+      const plan: Record<string, unknown> = { batch_id: input.batchId, classroom_id: input.classroomId, instructor_id: input.instructorId, updated_by: staff.user.id, updated_at: new Date().toISOString() };
+      let { error } = await admin.from("batch_resources").upsert(input.assessorId === undefined ? plan : { ...plan, assessor_id: input.assessorId });
+      if (error && /assessor_id/.test(error.message)) ({ error } = await admin.from("batch_resources").upsert(plan));
       if (error) return NextResponse.json({ error: /batch_resources/i.test(error.message) ? "Apply database update 202610090033 first." : error.message }, { status: 400 });
       if (input.classroomId) await admin.from("batches").update({ classroom_id: input.classroomId, updated_at: new Date().toISOString() }).eq("id", input.batchId);
       // Mirror into resource assignments so slips, the MISMO list and staffing show the instructor and room.

@@ -51,7 +51,7 @@ const peso=(p)=>"₱"+Number(p).toLocaleString("en-PH",{minimumFractionDigits:2}
 // Public list: the same course from several centers shows once.
 const merged=(()=>{const m=new Map();for(const [ctr,l] of Object.entries(C))for(const [code,name] of l){if(!m.has(code))m.set(code,{code,name,centers:[]});m.get(code).centers.push(ctr)}return [...m.values()].sort((a,b)=>a.name.localeCompare(b.name))})();
 const S={view:"Public Courses",ptab:"Other STCW Courses",q:"",picked:null,app:{center:"",date:"2026-10-27"},editing:null,flow:"Rebates Due"};
-const VIEWS=["Public Courses","Registration Form","Registration","Partnered Centers","Money Flow"];
+const VIEWS=["Public Courses","Registration Form","Registration","Assign Course (Walk-in)","Partnered Centers","Money Flow"];
 function pub(){
   const list=merged.filter((c)=>!S.q||`${c.code} ${c.name}`.toLowerCase().includes(S.q.toLowerCase()));
   return `<div class="site"><h1>Training Courses</h1><p class="sub">STCW schedules, Other STCW courses and In-House courses.</p>
@@ -86,6 +86,23 @@ function reg(){
    <div style="padding:0 16px 16px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn pri" ${o?"":"disabled"} data-t="Saved. The Cashier collects ${o?peso(o.fee):""}; the requirements and hand-over work as today">Save Center and Date</button><small style="color:var(--muted);align-self:center">Only centers that offer this course are listed. Rebates are not shown to Registration.</small></div>
   </section>
   <p class="note">Officers can also add an Other STCW course for a walk-in in Assign Course: <b>Course → Training Center → Start Date</b>.</p>`}
+function assign(){
+  const A=S.as||(S.as={code:"",center:"",date:""});
+  const offers=A.code?Object.entries(C).flatMap(([ctr,l])=>l.filter((x)=>x[0]===A.code).map((x)=>({ctr,fee:x[3],days:x[2]}))):[];
+  const o=offers.find((x)=>x.ctr===A.center);const half=!!A.center!==!!A.date;
+  return `<div><div class="eyebrow">Staff Portal · Registration › Walk-in Applicant</div><h1>Assign a Course · SANTOS, PEDRO</h1></div>
+  <section class="panel" style="max-width:720px"><div class="ph"><h2>Assign a Course</h2><small>Walk-in at the office</small></div>
+   <div class="form"><label style="grid-column:1/-1">Course<select id="ac"><option value="">Select a Course</option>
+    <optgroup label="STCW Courses"><option disabled>UBT-PSSR · Updating Training on Basic Training – PSSR · ₱1,300.00</option><option disabled>STPPDSPPS · Safety · ₱1,300.00</option></optgroup>
+    <optgroup label="Other STCW Courses">${merged.map((c)=>`<option value="${c.code}" ${A.code===c.code?"selected":""}>${c.code} · ${c.name}</option>`).join("")}</optgroup>
+    <optgroup label="Other Courses"><option disabled>APA · Anti Piracy Awareness · ₱1,650.00</option></optgroup></select></label>
+   ${A.code?`<label>Training Center<select id="acc"><option value="">Choose the center</option>${offers.map((x)=>`<option ${A.center===x.ctr?"selected":""}>${x.ctr} · ${peso(x.fee)} · ${x.days} days</option>`).join("")}</select></label>
+   <label>Training Date<input type="date" id="acd" value="${A.date}"></label>
+   <p style="grid-column:1/-1;margin:0;font-size:13px;color:var(--muted)">${o?`Fee to collect: <b>${peso(o.fee)}</b>.`:"You can also set the center and date later in the record."}</p>`:""}</div>
+   <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-top:1px solid var(--line)"><span style="font-size:13.5px">${A.code?`${A.code} · Other STCW${o?` · ${A.center} · fee ${peso(o.fee)}`:" · center not set yet"}`:"Choose a course first."}</span>
+   <span style="display:flex;gap:8px"><button class="btn" data-t="Closes without saving">Cancel</button><button class="btn pri" ${!A.code||half?"disabled":""} data-t="${o?"Assigned with the center and date. Tick the requirements, then Hand to Cashier.":"Assigned. Set the center and date in the record before Hand to Cashier."}">Assign Course</button></span></div>
+  </section>
+  <p class="note">Pick an Other STCW course to see the center and date fields. Filling only one of the two keeps Assign Course greyed out; leave both empty to set them later in the record.</p>`}
 function centers(){
   return `<div><div class="eyebrow">Accounting</div><h1>Partnered Centers</h1></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-t="Paste the Google Sheet link → preview the three centers → Import">Import from Google Sheet</button><button class="btn" data-t="Add Center: name, email, mobile">Add Center</button></div>
@@ -107,13 +124,13 @@ function flow(){
    :S.flow==="Pay the Centers"?`<thead><tr><th>Center</th><th>Trainees</th><th class="r">To Pay</th><th></th></tr></thead><tbody><tr><td><b>Nautical Options</b></td><td>DELA CRUZ, JUAN (BT) · LIM, MARIA (SCRB)</td><td class="r amt out">${peso(9400)}</td><td><button class="btn" data-t="Mark Paid with channel and reference">Mark Paid</button></td></tr><tr><td><b>Mariana</b></td><td>TORRES, LEO (ML-DECK)</td><td class="r amt out">${peso(13000)}</td><td><span class="pill g">Paid</span></td></tr></tbody>`
    :`<thead><tr><th>Agency</th><th>Trainee · Course</th><th class="r">Share</th><th>Status</th></tr></thead><tbody><tr><td><b>Qapla Maritime</b></td><td>TORRES, LEO · ML-DECK</td><td class="r amt out">${peso(1400)}</td><td><span class="pill o">Owed · rebate received</span></td></tr><tr><td><b>Qapla Maritime</b></td><td>DELA CRUZ, JUAN · BT</td><td class="r amt zero">${peso(1000)}</td><td><span class="pill b">Waits for the center's rebate</span></td></tr></tbody>`}</table></div></section>`}
 function render(){document.getElementById("views").innerHTML=VIEWS.map((v)=>`<button data-view="${v}" class="${S.view===v?"on":""}">${v}</button>`).join("");
-  document.getElementById("page").innerHTML=S.view==="Public Courses"?pub():S.view==="Registration Form"?form():S.view==="Registration"?reg():S.view==="Partnered Centers"?centers():flow();}
+  document.getElementById("page").innerHTML=S.view==="Public Courses"?pub():S.view==="Registration Form"?form():S.view==="Assign Course (Walk-in)"?assign():S.view==="Registration"?reg():S.view==="Partnered Centers"?centers():flow();}
 function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>el.hidden=true,3000)}
 document.addEventListener("click",(e)=>{const b=e.target.closest("button");if(!b)return;const d=b.dataset;
   if(d.view)S.view=d.view;else if(d.ptab)S.ptab=d.ptab;else if(d.pick)S.picked=merged.find((c)=>c.code===d.pick);else if("unpick" in d)S.picked=null;
   else if(d.edit)S.editing=d.edit;else if(d.save){const [ctr,i]=d.save.split("|");const r=C[ctr][+i];r[3]=+document.getElementById("e3").value||0;r[4]=+document.getElementById("e4").value||0;r[5]=+document.getElementById("e5").value||0;S.editing=null;toast("Saved. New enrollments use these amounts.")}
   else if(d.flow)S.flow=d.flow;else if(d.t){toast(d.t);return}else return;render()});
-document.addEventListener("change",(e)=>{if(e.target.id==="fp"){S.formPick=e.target.value;render()}else if(e.target.id==="ctr"){S.app.center=e.target.value;render()}else if(e.target.id==="dt")S.app.date=e.target.value});
+document.addEventListener("change",(e)=>{const A=S.as;if(e.target.id==="ac"){A.code=e.target.value;A.center="";render();return}if(e.target.id==="acc"){A.center=e.target.value.split(" · ")[0];render();return}if(e.target.id==="acd"){A.date=e.target.value;render();return}if(e.target.id==="fp"){S.formPick=e.target.value;render()}else if(e.target.id==="ctr"){S.app.center=e.target.value;render()}else if(e.target.id==="dt")S.app.date=e.target.value});
 document.addEventListener("input",(e)=>{if(e.target.id==="q"){S.q=e.target.value;const p=e.target.selectionStart;render();const q=document.getElementById("q");q.focus();q.setSelectionRange(p,p)}});
 render();
 </script>

@@ -1,0 +1,105 @@
+<title>Instructors and Assessors</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Same shell as the live portal: navy bar with dropdown tabs, summary rail on the left, light-cyan table headers. */
+:root{--orange:#F25615;--blue:#0571D0;--cyan:#35CCFA;--cyan-l:#9EE3F1;--navy:#123F63;--bg:#f2f6f8;--surface:#fff;--fg:#0f2638;--muted:#587184;--line:#dbe6ec;--soft:#eef4f8;--th:#e6f6fd;--thc:#0b4f8f;--zebra:#f7fafc;
+ --good:#0a7a3e;--good-bg:#e2f5e9;--warn:#a2470b;--warn-bg:#fdf0e5;--bad:#b42318;--bad-bg:#fcebea;--info:#0571D0;--info-bg:#e5f1fb;
+ --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding-block:16px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.w{max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.logo{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}.logo b{font-size:19px;font-weight:600}.logo b span{color:var(--orange)}.logo small{display:block;color:var(--cyan-l);font-size:14px}.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.who{font-size:14px;color:#cfe3ef;display:flex;align-items:center;gap:8px}.who select{background:#ffffff14;border:1px solid #ffffff30;color:#fff;border-radius:8px;padding:5px 8px}.who select option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:16px;flex-wrap:wrap}.tab>button{background:none;border:0;color:#c3dbea;font:500 16px var(--sans);padding:12px 18px;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:8px}.tab>button:hover{color:#fff;background:#ffffff12}.tab.on>button{background:var(--bg);color:var(--fg);font-weight:600}
+.caret{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.menu{position:absolute;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:15;display:flex;flex-direction:column;margin-top:2px}.tab{position:relative}.menu button{background:none;border:0;text-align:left;color:var(--fg);font:500 15.5px var(--sans);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;gap:12px}.menu button:hover{background:var(--soft)}.menu button.on{background:var(--info-bg);color:var(--info);font-weight:600}.menu small,.n{font:600 11.5px var(--mono);background:var(--orange);color:#fff;border-radius:10px;padding:1px 7px}
+.page{padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.cx-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}h1{font-size:25px;font-weight:600;margin:0}h2{font-size:19px;font-weight:600;margin:0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.seg button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.seg button.on{background:var(--navy);color:#fff}
+.rail{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}@media (max-width:900px){.rail{grid-template-columns:1fr}}.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.ph small{color:var(--muted);font-size:14px}
+.lines{display:flex;flex-direction:column;padding:0 20px 16px}.lines div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}.lines div:first-child{border-top:0}.lines dd,.lines span:last-child{font-family:var(--mono);font-weight:600}.lines .tot{font-weight:700}.lines .bad{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 16px}.tile{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 12px}.tile span{display:block;font-size:13px;color:var(--muted)}.tile b{font:600 19px var(--mono)}
+.cwrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--th);color:var(--thc);font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:10px 12px;border-right:1px solid var(--line);white-space:nowrap}td{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.35}tbody tr:nth-child(even) td{background:var(--zebra)}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}.due{background:var(--bad-bg);color:var(--bad)}.dueo{background:var(--warn-bg);color:var(--warn)}.appr{background:var(--info-bg);color:var(--info)}.paid{background:var(--good-bg);color:var(--good)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:9px;padding:7px 14px;font-weight:600;font-size:14.5px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.okb{background:var(--good);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:14px 20px;background:var(--soft);border-top:1px solid var(--line)}.form label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}.form select,.form input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line)}
+.alert{background:var(--bad-bg);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:15px;font-weight:500;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.note{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+</style>
+
+<style>
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:3px 10px;font-size:13px;background:var(--surface)}.chip b{font-family:var(--mono);font-size:12.5px}.chip.exp{border-color:var(--bad);color:var(--bad)}.chip i{font-style:normal;font-size:12px;color:var(--muted)}.chip button{border:0;background:none;color:var(--muted);padding:0 0 0 2px;font-size:14px}
+.ri{font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:99px}.ri.I{background:var(--info-bg);color:var(--info)}.ri.A{background:var(--warn-bg);color:var(--warn)}.ri.B{background:var(--good-bg);color:var(--good)}
+.pick select{border:1px solid var(--line);border-radius:9px;padding:7px 9px;background:var(--surface);color:var(--fg);min-width:200px;max-width:100%}
+.warn{display:block;color:var(--bad);font-size:12.5px;margin-top:3px}.ok{display:block;color:var(--good);font-size:12.5px;margin-top:3px}
+.filter{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:0 20px 14px}.filter select{border:1px solid var(--line);border-radius:9px;padding:7px 9px;background:var(--surface);color:var(--fg)}
+</style>
+
+<header class="top"><div class="w">
+  <div class="brand"><div class="logo"><span class="mark">NW</span><div><b>New Wave <span>Maritime</span><span class="proto">PROTOTYPE</span></b><small>Staff Portal · sample instructors</small></div></div><span class="who">Working as Admin Assistant</span></div>
+  <nav class="tabs" id="tabs"></nav></div></header>
+<main class="page"><div class="w" id="page"></div></main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const COURSES=[["UBT-PSSR","Updating Training on Basic Training – PSSR",1],["STPPDSPPS","Safety (Passenger Spaces)",1],["PSCMT","Crowd Management",1],["PSCMHBT","Crisis Management and Human Behaviour",1],["ABC","Awareness on Basic Computer",0],["APA","Anti Piracy Awareness",0],["ESEA","Enclosed Space Entry Awareness",0],["BRM-BTM","Bridge Resource Management with Bridge Team Management",0]];
+const ROLES=["Instructor","Assessor","Instructor and Assessor"];const RK={Instructor:"I",Assessor:"A","Instructor and Assessor":"B"};
+const P=[
+ {id:1,n:"Capt. Ramon Villanueva",m:"0917 000 0001",acc:[["UBT-PSSR","Instructor and Assessor","2027-06-30"],["PSCMT","Instructor","2027-03-31"],["PSCMHBT","Instructor","2027-03-31"]]},
+ {id:2,n:"C/E Maria Santos",m:"0917 000 0002",acc:[["STPPDSPPS","Assessor","2026-12-31"],["PSCMT","Assessor","2026-12-31"],["PSCMHBT","Assessor","2026-10-10"]]},
+ {id:3,n:"Engr. Paolo Reyes",m:"0917 000 0003",acc:[["STPPDSPPS","Instructor","2027-01-31"],["ABC","Instructor","2028-01-31"],["ESEA","Instructor and Assessor","2027-08-31"]]},
+ {id:4,n:"Capt. Leo Garcia",m:"0917 000 0004",acc:[["BRM-BTM","Instructor and Assessor","2027-05-31"],["UBT-PSSR","Assessor","2027-05-31"]]},
+];
+const B=[{id:"b1",c:"UBT-PSSR",d:"Oct 22, 2026",room:"Room 103",ins:1,asr:4,n:24},{id:"b2",c:"STPPDSPPS",d:"Oct 26, 2026",room:"Room 304",ins:3,asr:null,n:18},{id:"b3",c:"PSCMT",d:"Oct 27 – 28, 2026",room:"Room 304",ins:1,asr:2,n:20},{id:"b4",c:"PSCMHBT",d:"Oct 29 – 31, 2026",room:"Room 304",ins:1,asr:2,n:20},{id:"b5",c:"ESEA",d:"Oct 23, 2026",room:"Room 201",ins:3,asr:3,n:6}];
+const TODAY="2026-10-21";
+const S={view:"Instructors",adding:null,form:{c:"UBT-PSSR",r:"Instructor",no:"",until:""},filter:""};
+const can=(p,c,want)=>p.acc.some(([cc,r,u])=>cc===c&&(r===want||r==="Instructor and Assessor"));
+const accOf=(p,c)=>p.acc.find((a)=>a[0]===c);
+const expired=(u)=>u&&u<TODAY;
+const name=(id)=>P.find((p)=>p.id===id)?.n??"—";
+const cname=(c)=>COURSES.find((x)=>x[0]===c)?.[1]??c;
+const fmt=(u)=>new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",year:"numeric",timeZone:"UTC"}).format(new Date(u+"T00:00:00Z"));
+function instructors(){const list=P.filter((p)=>!S.filter||p.acc.some((a)=>a[0]===S.filter));
+ return `<div class="cx-head"><div><span class="eyebrow">Admin Assistant</span><h1>Instructors</h1></div><button class="btn pri" data-t="Add Instructor: name, mobile, email, notes">Add Instructor</button></div>
+ <div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>Per Course</h2><small>can teach · can assess</small></div><div class="lines">${COURSES.filter((c)=>c[2]).map(([c])=>`<div><span>${c}</span><span>${P.filter((p)=>can(p,c,"Instructor")).length} · ${P.filter((p)=>can(p,c,"Assessor")).length}</span></div>`).join("")}</div>
+  <p class="note">STCW courses (BT-PSSR, Safety, Crowd, Crisis) need an accredited instructor and an accredited assessor for every batch.</p></section></div>
+ <div class="stack"><section class="panel"><div class="ph"><h2>Instructor Shortlist</h2><small>${list.length}</small></div>
+  <div class="filter"><label>Who handles <select id="flt"><option value="">All courses</option>${COURSES.map(([c,n])=>`<option value="${c}" ${S.filter===c?"selected":""}>${c} · ${n}</option>`).join("")}</select></label></div>
+  <div class="cwrap"><table><thead><tr><th>#</th><th>Instructor</th><th>Courses · Role</th><th></th></tr></thead><tbody>
+  ${list.map((p,i)=>`<tr><td class="mono" style="color:var(--muted)">${i+1}</td><td><b>${p.n}</b><small class="mono">${p.m}</small></td>
+   <td><div class="chips">${p.acc.map(([c,r,u])=>`<span class="chip ${expired(u)?"exp":""}" title="${cname(c)} · valid until ${fmt(u)}"><b>${c}</b><span class="ri ${RK[r]}">${r}</span>${expired(u)?`<i>expired</i>`:""}<button data-del="${p.id}|${c}" aria-label="Remove ${c}">×</button></span>`).join("")}</div></td>
+   <td><button class="btn" data-add="${p.id}">Add Course</button></td></tr>
+   ${S.adding===p.id?`<tr><td colspan="4" style="background:var(--soft)"><div class="form" style="background:none;border:0;padding:4px 0"><label>Course<select id="fc">${["STCW","In-House"].map((g,gi)=>`<optgroup label="${g} Courses">${COURSES.filter((x)=>x[2]===(gi?0:1)).map(([c,n])=>`<option value="${c}" ${S.form.c===c?"selected":""}>${c} · ${n}</option>`).join("")}</optgroup>`).join("")}</select></label>
+    <label>Role<select id="fr">${ROLES.map((r)=>`<option ${S.form.r===r?"selected":""}>${r}</option>`).join("")}</select></label><label>Accreditation No.<input id="fn" placeholder="e.g. MARINA-INS-1234"></label><label>Valid Until<input type="date" id="fu"></label></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-cancel>Cancel</button><button class="btn pri" data-save="${p.id}">Save Course</button></div></td></tr>`:""}`).join("")}
+  </tbody></table></div></section></div></div>`}
+function planning(){
+ return `<div class="cx-head"><div><span class="eyebrow">Admin Assistant</span><h1>Resource Planning</h1></div></div>
+ <div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>This Week</h2></div><div class="lines"><div><span>Batches</span><span>${B.length}</span></div><div><span>No assessor yet</span><span style="color:var(--bad)">${B.filter((b)=>!b.asr).length}</span></div></div>
+  <p class="note">Each batch gets a classroom, an <b>Instructor</b> and an <b>Assessor</b>. The lists only show people accredited for that course and role. CCMD is not planned here.</p></section></div>
+ <div class="stack"><section class="panel"><div class="ph"><h2>Upcoming Batches</h2></div><div class="cwrap"><table><thead><tr><th>Course · Dates</th><th>Classroom</th><th>Instructor</th><th>Assessor</th></tr></thead><tbody>
+ ${B.map((b)=>{const ins=P.filter((p)=>can(p,b.c,"Instructor")),asr=P.filter((p)=>can(p,b.c,"Assessor"));const same=b.ins&&b.asr&&b.ins===b.asr;const sameOk=same&&accOf(P.find((p)=>p.id===b.ins),b.c)?.[1]==="Instructor and Assessor";const aExp=b.asr&&expired(accOf(P.find((p)=>p.id===b.asr),b.c)?.[2]);
+  return `<tr><td><b>${b.c}</b><small>${b.d} · ${b.n} trainees</small></td><td>${b.room}</td>
+  <td class="pick"><select data-ins="${b.id}"><option value="">Choose instructor</option>${ins.map((p)=>`<option value="${p.id}" ${b.ins===p.id?"selected":""}>${p.n}</option>`).join("")}</select>${!ins.length?`<span class="warn">Nobody is accredited to teach ${b.c}</span>`:""}</td>
+  <td class="pick"><select data-asr="${b.id}"><option value="">Choose assessor</option>${asr.map((p)=>`<option value="${p.id}" ${b.asr===p.id?"selected":""}>${p.n}${expired(accOf(p,b.c)?.[2])?" (expired)":""}</option>`).join("")}</select>
+   ${!b.asr?`<span class="warn">No assessor yet</span>`:aExp?`<span class="warn">Assessor accreditation expired</span>`:same&&!sameOk?`<span class="warn">Same person as the instructor</span>`:same?`<span class="ok">Instructor and Assessor (accredited for both)</span>`:`<span class="ok">✓ Accredited</span>`}</td></tr>`}).join("")}
+ </tbody></table></div></section></div></div>`}
+const V={Instructors:instructors,"Resource Planning":planning};
+function render(){document.getElementById("tabs").innerHTML=["Dashboard","Requisitions","Resource Planning","Instructors"].map((t)=>`<div class="tab ${S.view===t?"on":""}"><button data-view="${t}">${t}</button></div>`).join("");document.getElementById("page").innerHTML=(V[S.view]||instructors)()}
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.h);toast.h=setTimeout(()=>el.hidden=true,2800)}
+document.addEventListener("click",(e)=>{const b=e.target.closest("button");if(!b)return;const k=b.dataset;
+ if(k.view){if(V[k.view])S.view=k.view;else{toast(k.view+" stays as it is today");return}}
+ else if(k.add){S.adding=+k.add}else if("cancel" in k)S.adding=null;
+ else if(k.save){const p=P.find((x)=>x.id===+k.save);const c=document.getElementById("fc").value,r=document.getElementById("fr").value,u=document.getElementById("fu").value||"2027-12-31";p.acc=p.acc.filter((a)=>a[0]!==c).concat([[c,r,u]]);S.adding=null;toast(`${c} saved as ${r} for ${p.n}`)}
+ else if(k.del){const [id,c]=k.del.split("|");const p=P.find((x)=>x.id===+id);p.acc=p.acc.filter((a)=>a[0]!==c);toast(`${c} removed from ${p.n}`)}
+ else if(k.t){toast(k.t);return}else return;render()});
+document.addEventListener("change",(e)=>{const t=e.target;if(t.id==="flt"){S.filter=t.value;render()}else if(t.dataset.ins){B.find((b)=>b.id===t.dataset.ins).ins=+t.value||null;render()}else if(t.dataset.asr){B.find((b)=>b.id===t.dataset.asr).asr=+t.value||null;render()}});
+render();
+</script>

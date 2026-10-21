@@ -2085,6 +2085,11 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .rp-card{border:1px solid #dfe7ee;border-radius:12px;padding:10px 12px;text-align:left;background:#fff;display:flex;flex-direction:column;gap:3px;cursor:pointer;font:inherit;color:inherit}
 .nw-shell .rp-card:hover{border-color:#0571D0}.nw-shell .rp-card.on{border-color:#0571D0;box-shadow:inset 0 0 0 2px #0571D0;background:#f2f8fe}
 .nw-shell .rp-card.warn:not(.on){opacity:.72}.nw-shell .rp-card small{color:#5f7180;font-size:12.5px}.nw-shell .rp-card .rp-bad{color:#b42318;font-weight:600}
+.nw-shell .rp-people{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;padding:0 20px 14px}
+.nw-shell .rp-pick{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:#123F63}
+.nw-shell .rp-pick select,.nw-shell .rp-who select{font:inherit;font-weight:400;font-size:15px;padding:9px 10px;border:1px solid #cfdbe4;border-radius:10px;background:#fff;color:inherit;min-width:0;max-width:100%}
+.nw-shell .rp-pick small{font-weight:400;color:#5f7180;font-size:12.5px}.nw-shell .rp-pick small.rp-bad{color:#b42318;font-weight:600}
+.nw-shell .rp-who{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:#123F63;flex-wrap:wrap}
 @media (max-width:1000px){.nw-shell .rp-split{grid-template-columns:1fr}.nw-shell .rp-queue{max-height:none}}
 
 /* Admin › Certificate Numbers (owner, 9 Oct 2026). */

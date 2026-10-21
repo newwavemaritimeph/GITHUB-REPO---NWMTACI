@@ -16,17 +16,21 @@ export function requisitionState(r: { status: string; expense_status?: string | 
   return "For Approval";
 }
 
-export type Accreditation = { instructor_id: string; course_id: string; accreditation_number?: string | null; valid_until?: string | null };
+export type Accreditation = { instructor_id: string; course_id: string; accreditation_number?: string | null; valid_until?: string | null; role?: string | null };
+/** What a person does in a course (owner, 21 Oct 2026); rows saved before the roles count as Instructor. */
+export type Duty = "Instructor" | "Assessor";
+export const ROLES = ["Instructor", "Assessor", "Instructor and Assessor"] as const;
+export const handles = (role: string | null | undefined, duty: Duty) => role === "Instructor and Assessor" || (role ?? "Instructor") === duty;
 
-/** "ok" | "expired" | "none" for an instructor teaching a course on a day (YYYY-MM-DD). */
-export function accreditationFor(accreditations: Accreditation[], instructorId: string, courseId: string, onDay: string): "ok" | "expired" | "none" {
-  const a = accreditations.find((x) => x.instructor_id === instructorId && x.course_id === courseId);
+/** "ok" | "expired" | "none" for a person teaching (or assessing) a course on a day (YYYY-MM-DD). */
+export function accreditationFor(accreditations: Accreditation[], instructorId: string, courseId: string, onDay: string, duty: Duty = "Instructor"): "ok" | "expired" | "none" {
+  const a = accreditations.find((x) => x.instructor_id === instructorId && x.course_id === courseId && handles(x.role, duty));
   if (!a) return "none";
   return a.valid_until && a.valid_until < onDay ? "expired" : "ok";
 }
 
 /** Planning warnings for one batch. */
-export function planIssues(input: { students: number; startsOn: string; courseId: string; classroom?: { capacity: number } | null; instructorId?: string | null; accreditations: Accreditation[] }): string[] {
+export function planIssues(input: { students: number; startsOn: string; courseId: string; classroom?: { capacity: number } | null; instructorId?: string | null; assessorId?: string | null; needsAssessor?: boolean; accreditations: Accreditation[] }): string[] {
   const out: string[] = [];
   if (!input.classroom) out.push("No classroom");
   else if (input.students > input.classroom.capacity) out.push(`Students exceed room capacity (${input.classroom.capacity})`);
@@ -36,16 +40,24 @@ export function planIssues(input: { students: number; startsOn: string; courseId
     if (state === "none") out.push("Instructor not accredited for this course");
     if (state === "expired") out.push("Accreditation expired");
   }
+  if (!input.assessorId) { if (input.needsAssessor) out.push("No assessor"); }
+  else {
+    const state = accreditationFor(input.accreditations, input.assessorId, input.courseId, input.startsOn, "Assessor");
+    if (state === "none") out.push("Assessor not accredited for this course");
+    if (state === "expired") out.push("Assessor accreditation expired");
+    const both = input.accreditations.find((x) => x.instructor_id === input.assessorId && x.course_id === input.courseId)?.role === "Instructor and Assessor";
+    if (input.assessorId === input.instructorId && !both) out.push("Same person as instructor and assessor");
+  }
   return out;
 }
 
 /** Whether two inclusive date ranges (YYYY-MM-DD) share a day. */
 export const rangesOverlap = (aStart: string, aEnd: string, bStart: string, bEnd: string) => aStart <= bEnd && bStart <= aEnd;
 
-export type PlanBatch = { id: string; batchNumber: string; courseId: string; courseCode: string; courseName: string; startsOn: string; endsOn: string; students: number; capacity: number; classroomId: string | null; instructorId: string | null };
+export type PlanBatch = { id: string; batchNumber: string; courseId: string; courseCode: string; courseName: string; startsOn: string; endsOn: string; students: number; capacity: number; classroomId: string | null; instructorId: string | null; assessorId?: string | null; needsAssessor?: boolean };
 export type PlanRoom = { id: string; name: string; capacity: number };
 export type PlanInstructor = { id: string; complete_name: string };
-export type PlanRow = PlanBatch & { room: PlanRoom | null; instructor: PlanInstructor | null; issues: string[]; roomClash: PlanBatch | null; instructorClash: PlanBatch | null };
+export type PlanRow = PlanBatch & { room: PlanRoom | null; instructor: PlanInstructor | null; assessor: PlanInstructor | null; issues: string[]; roomClash: PlanBatch | null; instructorClash: PlanBatch | null };
 
 /**
  * Resource plan rows (owner, 9 Oct 2026, design 3): each batch with its room,
@@ -58,15 +70,18 @@ export function planRows(batches: PlanBatch[], rooms: PlanRoom[], instructors: P
   return batches.map((b) => {
     const room = b.classroomId ? roomById.get(b.classroomId) ?? null : null;
     const instructor = b.instructorId ? insById.get(b.instructorId) ?? null : null;
-    const issues = planIssues({ students: b.students, startsOn: b.startsOn, courseId: b.courseId, classroom: room, instructorId: b.instructorId, accreditations });
+    const assessor = b.assessorId ? insById.get(b.assessorId) ?? null : null;
+    const issues = planIssues({ students: b.students, startsOn: b.startsOn, courseId: b.courseId, classroom: room, instructorId: b.instructorId, assessorId: b.assessorId, needsAssessor: b.needsAssessor, accreditations });
     const others = batches.filter((o) => o.id !== b.id && rangesOverlap(o.startsOn, o.endsOn, b.startsOn, b.endsOn));
     const roomClash = b.classroomId ? others.find((o) => o.classroomId === b.classroomId) ?? null : null;
     const instructorClash = b.instructorId ? others.find((o) => o.instructorId === b.instructorId) ?? null : null;
     if (roomClash) issues.push(`${room?.name ?? "Room"} also booked for ${roomClash.courseCode} ${roomClash.batchNumber}`);
     if (instructorClash) issues.push(`${instructor?.complete_name ?? "Instructor"} also teaching ${instructorClash.courseCode} ${instructorClash.batchNumber}`);
-    return { ...b, room, instructor, issues, roomClash, instructorClash };
+    const assessorClash = b.assessorId ? others.find((o) => o.assessorId === b.assessorId || o.instructorId === b.assessorId) ?? null : null;
+    if (assessorClash) issues.push(`${assessor?.complete_name ?? "Assessor"} also booked for ${assessorClash.courseCode} ${assessorClash.batchNumber}`);
+    return { ...b, room, instructor, assessor, issues, roomClash, instructorClash };
   });
 }
 
 /** Problems that block the class (shown red) versus things still to fill in (orange). */
-export const isBlocking = (issue: string) => /also booked|also teaching|exceed|not accredited|expired/i.test(issue);
+export const isBlocking = (issue: string) => /also booked|also teaching|exceed|not accredited|expired|same person/i.test(issue);
