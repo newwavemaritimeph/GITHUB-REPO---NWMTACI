@@ -599,7 +599,7 @@ const stampManila = (date: string, hhmm: string) => `${date}T${hhmm}:00+08:00`;
 export const maxDuration = 60;
 
 /** Enrollment columns that arrive with later migrations; absent before they run. */
-type EnrollmentExtra = { id: string; scheduled_on?: string | null; instructions_sent_at?: string | null; feedback_token?: string | null };
+type EnrollmentExtra = { id: string; scheduled_on?: string | null; instructions_sent_at?: string | null; feedback_token?: string | null; agency_share_centavos?: number | null };
 
 const EMPTY_HR: Record<string, unknown[]> = { employees: [], employeeAttendance: [], leaveRequests: [], cashAdvances: [], payrollPeriods: [], payrollItems: [], benefitRecords: [], employmentContracts: [] };
 
@@ -628,12 +628,13 @@ export async function GET() {
   const enrollmentExtrasUnit = (async (): Promise<EnrollmentExtra[]> => {
     // Ordered the same way as the main enrollments query, so these 250 rows are
     // the same 250 rows; unordered, the extras could belong to a different set.
-    const merged = await db.from("enrollments").select("id,scheduled_on,instructions_sent_at,feedback_token").order("created_at", { ascending: false }).limit(250);
+    const merged = await db.from("enrollments").select("id,scheduled_on,instructions_sent_at,feedback_token,agency_share_centavos").order("created_at", { ascending: false }).limit(250);
     if (!merged.error) return (merged.data ?? []) as EnrollmentExtra[];
     const parts = await Promise.all([
       db.from("enrollments").select("id,scheduled_on").order("created_at", { ascending: false }).limit(250),
       db.from("enrollments").select("id,instructions_sent_at").order("created_at", { ascending: false }).limit(250),
       db.from("enrollments").select("id,feedback_token").order("created_at", { ascending: false }).limit(250),
+      db.from("enrollments").select("id,agency_share_centavos").order("created_at", { ascending: false }).limit(250),
     ]);
     const byId = new Map<string, EnrollmentExtra>();
     for (const part of parts) {
@@ -1074,6 +1075,7 @@ export async function GET() {
     return { ...row,
       scheduled_on: extra?.scheduled_on ?? null,
       instructions_sent_at: extra?.instructions_sent_at ?? null,
+      agency_share_centavos: Number(extra?.agency_share_centavos ?? 0),
       enrolled_at: enrolledAt.get(row.id) ?? null,
       paid_centavos: paidByEnrollment.get(row.id) ?? 0,
       verified_paid_centavos: verifiedPaidByEnrollment.get(row.id) ?? 0,

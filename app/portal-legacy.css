@@ -2358,3 +2358,10 @@ button.rd-row:hover { background: #f6fafc; }
 /* Other Income categories (owner, 21 Oct 2026) */
 .nw-shell .oi-cat{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.nw-shell .oi-cat select{flex:1 1 180px;min-width:0}
 .nw-shell .oi-addcat{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;background:#eef4f8;border-radius:10px;padding:10px}.nw-shell .oi-addcat input{flex:1 1 200px;min-width:0}
+/* Cash and Sales Summary (owner, 21 Oct 2026) */
+.nw-shell .fs-views{margin:0 0 14px}
+.nw-shell .fs-tiles{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}.nw-shell .fs-tile{border-left:4px solid var(--c)}.nw-shell .fs-tile small{display:block}
+.nw-shell .fs-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:16px;margin:16px 0}
+.nw-shell .cl-log .fs-n{text-align:right;font-family:var(--font-geist-mono,ui-monospace,monospace);font-variant-numeric:tabular-nums;white-space:nowrap}
+.nw-shell .cl-log tr.fs-sub td:first-child{padding-left:24px;color:#5f7180}.nw-shell .cl-log tr.fs-tot td{font-weight:700;border-top:2px solid #0f2638}
+.nw-shell .cl-log tr.fs-net td{font-weight:700;background:#e5f1fb;color:#0571D0}.nw-shell .fs-neg{color:#b42318}.nw-shell .fs-pos{color:#0a7a3e}
