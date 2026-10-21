@@ -34,7 +34,8 @@ function Head({ title, children }: { title: string; children?: React.ReactNode }
 export function upcoming(data: PortalData): (PlanRow & { b: PortalData["batches"][number] })[] {
   const today = manilaToday();
   const plans = new Map((extra(data).batchResources ?? []).map((p) => [p.batch_id, p]));
-  const list = data.batches.filter((b) => b.status !== "Cancelled" && b.ends_on >= today).sort((a, z) => a.starts_on.localeCompare(z.starts_on));
+  // CCMD is not planned here (owner, 21 Oct 2026).
+  const list = data.batches.filter((b) => b.status !== "Cancelled" && b.ends_on >= today && first(b.courses)?.code !== "CCMD").sort((a, z) => a.starts_on.localeCompare(z.starts_on));
   // Assigned rooms (owner, 20 Oct 2026): BT-PSSR in Room 103; Safety, Crowd and Crisis in Room 304 — from Admin › Rooms, else by room number.
   const defaults = new Map(((data as { defaultRooms?: { course_id: string; classroom_id: string }[] }).defaultRooms ?? []).map((d) => [d.course_id, d.classroom_id]));
   const roomNo = (n: string) => data.classrooms.find((r) => r.active && r.name.replace(/D/g, "") === n)?.id ?? null;

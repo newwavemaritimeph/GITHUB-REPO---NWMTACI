@@ -22,7 +22,7 @@ export async function GET(request: Request) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || to < from) return NextResponse.json({ error: "Invalid date range." }, { status: 400 });
   const db = createSupabaseAdminClient();
   const [batchRes, roomRes, insRes, accRes, planRes] = await Promise.all([
-    db.from("batches").select("id,batch_number,course_id,starts_on,ends_on,capacity,confirmed_count,status,classroom_id,courses(code,name)").neq("status", "Cancelled").lte("starts_on", to).gte("ends_on", from).order("starts_on").limit(1000),
+    db.from("batches").select("id,batch_number,course_id,starts_on,ends_on,capacity,confirmed_count,status,classroom_id,courses!inner(code,name)").neq("courses.code", "CCMD").neq("status", "Cancelled").lte("starts_on", to).gte("ends_on", from).order("starts_on").limit(1000),
     db.from("classrooms").select("id,name,capacity").eq("active", true),
     db.from("instructors").select("id,complete_name"),
     db.from("instructor_accreditations").select("instructor_id,course_id,valid_until"),
