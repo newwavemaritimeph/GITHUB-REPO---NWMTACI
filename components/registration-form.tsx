@@ -39,7 +39,8 @@ type CatalogBatch = { id: string; number: string; startsOn: string; endsOn: stri
 type StcwCourse = { code: string; name: string; duration: string; modality: string; category: string; batches: CatalogBatch[] };
 type InHouseCourse = { code: string; name: string; duration: string; modality: string; category: string };
 type OtherCourse = { code: string; name: string };
-type Catalog = { stcw: StcwCourse[]; inHouse: InHouseCourse[]; other: OtherCourse[] };
+type PackageCourse = { code: string; name: string; duration: string; modality: string; category: string; price: number; regular: number; weeks: { monday: string; ends: string; full: boolean }[] };
+type Catalog = { stcw: StcwCourse[]; inHouse: InHouseCourse[]; other: OtherCourse[]; packages?: PackageCourse[] };
 /** One course row on the form: an STCW batch, or an In-House start date. */
 type Row = { code: string; batchId: string; start: string };
 /** start/end are "" for an Other STCW course: the center and date are set by Registration. */
@@ -108,12 +109,14 @@ function Wizard() {
     let live = true;
     fetch("/api/public/catalog").then((r) => r.json()).then((b: Catalog) => {
       if (!live) return;
-      const next = { stcw: b.stcw ?? [], inHouse: b.inHouse ?? [], other: b.other ?? [] };
+      const next = { stcw: b.stcw ?? [], inHouse: b.inHouse ?? [], other: b.other ?? [], packages: b.packages ?? [] };
       setCatalog(next);
       const params = new URLSearchParams(window.location.search);
       const batch = params.get("batch"), code = params.get("course"), start = params.get("start");
       const course = batch ? next.stcw.find((c) => c.batches.some((x) => x.id === batch && !x.full)) : null;
-      if (course && batch) setRows([{ code: course.code, batchId: batch, start: "" }]);
+      const pkg = params.get("package"), week = params.get("week");
+      if (pkg && week && next.packages.some((p) => p.code === pkg && p.weeks.some((w) => w.monday === week && !w.full))) setRows([{ code: pkg, batchId: "", start: week }]);
+      else if (course && batch) setRows([{ code: course.code, batchId: batch, start: "" }]);
       else if (code && start && /^\d{4}-\d{2}-\d{2}$/.test(start) && next.inHouse.some((c) => c.code === code)) setRows([{ code, batchId: "", start }]);
     }).catch(() => { if (live) setCatalog({ stcw: [], inHouse: [], other: [] }); });
     return () => { live = false; };
@@ -147,10 +150,13 @@ function Wizard() {
 
   const stcwOf = (code: string) => catalog?.stcw.find((c) => c.code === code) ?? null;
   const inHouseOf = (code: string) => catalog?.inHouse.find((c) => c.code === code) ?? null;
-  const otherOf = (code: string) => (stcwOf(code) || inHouseOf(code) ? null : catalog?.other.find((c) => c.code === code) ?? null);
+  const pkgOf = (code: string) => catalog?.packages?.find((c) => c.code === code) ?? null;
+  const otherOf = (code: string) => (stcwOf(code) || inHouseOf(code) || pkgOf(code) ? null : catalog?.other.find((c) => c.code === code) ?? null);
   const tomorrow = manilaTomorrow();
   /** The dates a row covers, once it has a batch or a valid start date. */
   function rangeOf(row: Row): PickRange | null {
+    const pk = pkgOf(row.code);
+    if (pk) { const w = pk.weeks.find((x) => x.monday === row.start && !x.full); return w ? { code: row.code, start: w.monday, end: w.ends } : null; }
     const st = stcwOf(row.code);
     if (st) { const b = st.batches.find((x) => x.id === row.batchId); return b ? { code: row.code, start: b.startsOn, end: b.endsOn } : null; }
     const ih = inHouseOf(row.code);
@@ -163,14 +169,14 @@ function Wizard() {
     if (!row.code || otherOf(row.code)) return "";
     const range = rangeOf(row);
     const ih = inHouseOf(row.code);
-    if (!range) return stcwOf(row.code) ? "Choose a schedule." : !row.start ? "Choose a start date." : row.start < tomorrow ? "Choose a date from tomorrow onwards." : `A ${ih ? ih.duration : ""} course runs on consecutive days within one week (no Sundays).`;
+    if (!range) return stcwOf(row.code) || pkgOf(row.code) ? "Choose a schedule." : !row.start ? "Choose a start date." : row.start < tomorrow ? "Choose a date from tomorrow onwards." : `A ${ih ? ih.duration : ""} course runs on consecutive days within one week (no Sundays).`;
     return orderConflict(range, othersOf(index)) ?? "";
   }
   const setRow = (index: number, patch: Partial<Row>) => setRows((cur) => cur.map((r, i) => (i === index ? { ...r, ...patch } : r)));
   function addRow() { setRows((cur) => (cur.length < MAX_COURSES ? [...cur, EMPTY_ROW] : cur)); }
   function removeRow(index: number) { setRows((cur) => (cur.length > 1 ? cur.filter((_, i) => i !== index) : [EMPTY_ROW])); }
   /** The chosen trainings in date order, for the schedule table and the summary. */
-  const trainings: Training[] = rows.map((r) => { const range = rangeOf(r); const c = stcwOf(r.code) ?? inHouseOf(r.code); return range && c ? { code: c.code, name: c.name, duration: c.duration, modality: c.modality, start: range.start, end: range.end } : null; })
+  const trainings: Training[] = rows.map((r) => { const range = rangeOf(r); const c = stcwOf(r.code) ?? inHouseOf(r.code) ?? pkgOf(r.code); return range && c ? { code: c.code, name: c.name, duration: c.duration, modality: c.modality, start: range.start, end: range.end } : null; })
     .filter((t): t is Training => !!t).sort((a, b) => a.start.localeCompare(b.start))
     .concat(rows.map((r) => otherOf(r.code)).filter((c): c is OtherCourse => !!c).map((c) => ({ code: c.code, name: c.name, duration: "Other STCW", modality: "Partnered center", start: "", end: "" })));
 
@@ -203,7 +209,8 @@ function Wizard() {
       for (const r of rows) {
         if (r.code && otherOf(r.code)) { fd.append("otherCourseCodes", r.code); continue; }
         if (!r.code || !rangeOf(r)) continue;
-        if (stcwOf(r.code)) fd.append("scheduleIds", r.batchId);
+        if (pkgOf(r.code)) fd.append("packageWeeks", r.start);
+        else if (stcwOf(r.code)) fd.append("scheduleIds", r.batchId);
         else { fd.append("courseCodes", r.code); fd.append("startDates", r.start); }
       }
       fd.set("termsAccepted", "on");
@@ -366,6 +373,7 @@ function Wizard() {
             <div className="ql-course-head"><b>Course {index + 1}</b>{(rows.length > 1 || row.code) && <button type="button" className="ql-link" onClick={() => removeRow(index)}>Remove</button>}</div>
             <select className="ql-course-select" value={row.code} aria-label={`Course ${index + 1}`} onChange={(e) => setRow(index, { code: e.target.value, batchId: "", start: "" })}>
               <option value="">Select a Course</option>
+              {(catalog.packages ?? []).length > 0 && <optgroup label="STCW Package">{(catalog.packages ?? []).filter((c) => !taken.has(c.code)).map((c) => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}</optgroup>}
               <optgroup label="STCW (Scheduled Batches)">{catalog.stcw.filter((c) => !taken.has(c.code)).map((c) => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}</optgroup>
               {catalog.other.length > 0 && <optgroup label="Other STCW Courses">{catalog.other.filter((c) => !taken.has(c.code) && !stcwOf(c.code) && !inHouseOf(c.code)).map((c) => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}</optgroup>}
               {categories.map((cat) => <optgroup key={cat} label={`${cat} · online`}>{catalog.inHouse.filter((c) => c.category === cat && !taken.has(c.code)).map((c) => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}</optgroup>)}
@@ -375,6 +383,10 @@ function Wizard() {
               const disabled = b.full || !!conflict, on = row.batchId === b.id;
               return <button type="button" role="radio" aria-checked={on} key={b.id} disabled={disabled && !on} className={`ql-chip${on ? " on" : ""}${disabled ? " off" : ""}`} onClick={() => setRow(index, { batchId: b.id })}><b>{on ? "✓ " : ""}{chipRange(b.startsOn, b.endsOn)}</b><small>{b.full ? "Full" : conflict ?? "Open"}</small></button>;
             })}</div> : <p className="ql-error">No open schedule for this course yet. Please choose another course.</p>)}
+            {pkgOf(row.code) && (pkgOf(row.code)!.weeks.length ? <div className="ql-chips" role="radiogroup" aria-label="Week">{pkgOf(row.code)!.weeks.map((w) => {
+              const on = row.start === w.monday;
+              return <button type="button" role="radio" aria-checked={on} key={w.monday} disabled={w.full && !on} className={`ql-chip${on ? " on" : ""}${w.full ? " off" : ""}`} onClick={() => setRow(index, { start: w.monday })}><b>{on ? "✓ " : ""}{chipRange(w.monday, w.ends)}</b><small>{w.full ? "Full" : "Open"}</small></button>;
+            })}</div> : <p className="ql-error">No open week for this package yet. Please choose another course.</p>)}
             {ih && <div className="ql-dates">
               <label><span>Start date</span><input type="date" value={row.start} min={tomorrow} onChange={(e) => setRow(index, { start: e.target.value })} /></label>
               <div className="ql-ends"><span>Ends</span><b>{rangeOf(row) ? pickedDate(rangeOf(row)!.end) : "—"}</b><small>{ih.duration} · online · Monday to Saturday</small></div>

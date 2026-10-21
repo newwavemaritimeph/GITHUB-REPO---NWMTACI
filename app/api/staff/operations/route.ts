@@ -263,6 +263,7 @@ const requestChargeInput = z.object({ action: z.literal("request-charge"), id: z
 // Course now, batch later (202610070005): the batch is optional.
 // In-house courses that run on a picked start date (no batch) may be moved to any day, past included (owner, 13 Oct 2026).
 const enrollmentStartInput = z.object({ action: z.literal("enrollment-set-start"), enrollmentId: z.string().uuid(), scheduledOn: z.string().date() });
+const packageAssignInput = z.object({ action: z.literal("package-assign"), traineeId: z.string().uuid(), weekStart: z.string().date() });
 const applicationAssignInput = z.object({ action: z.literal("application-assign"), traineeId: z.string().uuid(), courseId: z.string().uuid(), batchId: z.string().uuid().nullable().optional(), scheduledOn: z.string().date().nullable().optional(), offerId: z.string().uuid().nullable().optional() });
 const applicationPlaceBatchInput = z.object({ action: z.literal("application-place-batch"), enrollmentId: z.string().uuid(), batchId: z.string().uuid() });
 const sendInstructionsInput = z.object({ action: z.literal("send-instructions"), enrollmentId: z.string().uuid() });
@@ -274,7 +275,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
@@ -1342,7 +1343,7 @@ export async function POST(request: Request) {
         if (!byId.has(r.agencyId)) return NextResponse.json({ error: "A partner in the list no longer exists. Reload and try again." }, { status: 400 });
         for (const x of r.stcw) {
           const c = courseById.get(x.courseId);
-          if (!c || !isStcwRebateCourse(c.code as string)) return NextResponse.json({ error: "Fixed amounts are only for BT-PSSR, Safety, Crowd, Crisis and CCM Domestic." }, { status: 400 });
+          if (!c || !isStcwRebateCourse(c.code as string)) return NextResponse.json({ error: "Fixed amounts are only for BT-PSSR, Safety, Crowd, Crisis, CCM Domestic and the CCI Package." }, { status: 400 });
           if (x.cents > Number(c.standard_price_centavos)) return NextResponse.json({ error: `The ${c.code} rebate for ${byId.get(r.agencyId)?.name} cannot be more than its training fee.` }, { status: 400 });
         }
       }
@@ -1989,6 +1990,18 @@ export async function POST(request: Request) {
       if (error) throw error;
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "registration", action: "enrollment.start_date_changed", record_type: "enrollment", record_id: e.id, prior_values: { scheduled_on: e.scheduled_on }, new_values: { scheduled_on: input.scheduledOn } });
       return NextResponse.json({ ok: true });
+    }
+    // CCI Package (owner, 21 Oct 2026): the week's Safety, Crowd and Crisis batches, all or nothing.
+    if (input.action === "package-assign") {
+      if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot assign courses to applications." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: pkg, error } = await admin.rpc("assign_cci_package", { target_trainee: input.traineeId, week_start: input.weekStart, actor: staff.user.id });
+      if (error) return NextResponse.json({ error: /assign_cci_package/.test(error.message) ? "Apply database update 202610210057 first." : error.message }, { status: 400 });
+      const { data: parts } = await admin.from("enrollments").select("id").eq("package_id", pkg as string);
+      const ids = (parts ?? []).map((e) => e.id as string);
+      const { data: tr } = await admin.from("trainees").select("marketing_agency_id").eq("id", input.traineeId).maybeSingle();
+      if (tr?.marketing_agency_id && ids.length) { await admin.from("enrollments").update({ referral_agency_id: tr.marketing_agency_id }).in("id", ids); await applyReferralRebates(admin, ids, staff.user.id); }
+      return NextResponse.json({ ok: true, packageId: pkg, enrollmentIds: ids });
     }
     if (input.action === "application-assign") {
       if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot assign courses to applications." }, { status: 403 });
@@ -2934,7 +2947,7 @@ export async function POST(request: Request) {
     if (input.action === "auto-open-all-batches") {
       if (!canSchedule(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      const { data: courses } = await admin.from("courses").select("id,name").eq("active", true).eq("delivery_type", "In-House");
+      const { data: courses } = await admin.from("courses").select("id,name").eq("active", true).eq("delivery_type", "In-House").neq("code", "CCI");
       const ids = (courses ?? []).map((c) => c.id as string);
       let created = 0; const failed: string[] = [];
       for (const c of courses ?? []) {
@@ -2964,7 +2977,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true, created: data });
       }
       const admin = createSupabaseAdminClient();
-      const { data: courses } = await admin.from("courses").select("id,name").eq("active", true).eq("delivery_type", "In-House");
+      const { data: courses } = await admin.from("courses").select("id,name").eq("active", true).eq("delivery_type", "In-House").neq("code", "CCI");
       let created = 0; const failed: string[] = [];
       for (const c of courses ?? []) {
         const { data, error } = await db.rpc("auto_open_training_batches_range", { target_course: c.id, range_start: input.weekStart, range_end: weekEnd });

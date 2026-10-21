@@ -16,6 +16,8 @@ type StcwCourse = { code: string; name: string; duration: string; modality: stri
 type InHouseCourse = { code: string; name: string; duration: string; modality: string; category: string };
 
 type OtherCourse = { code: string; name: string };
+type PackageCourse = { code: string; name: string; duration: string; price: number; regular: number; weeks: { monday: string; ends: string; full: boolean }[] };
+const peso = (c: number) => `₱${(c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
 const tabs = ["STCW schedules", "Other STCW Courses", "In-House courses"] as const;
 type Tab = (typeof tabs)[number];
 
@@ -62,6 +64,22 @@ function StcwCard({ course }: { course: StcwCourse }) {
   </article>;
 }
 
+/** CCI Package (owner, 21 Oct 2026): Safety, Crowd and Crisis in one week at the package price. */
+function PackageCard({ pkg }: { pkg: PackageCourse }) {
+  const open = pkg.weeks.filter((w) => !w.full);
+  const [week, setWeek] = useState(open[0]?.monday ?? "");
+  return <article className="course-card-public pkg-card">
+    <span className="course-badge pkg">Package</span>
+    <h3>{pkg.name}</h3>
+    <small className="course-code">{pkg.code}</small>
+    <p className="pkg-price"><b>{peso(pkg.price)}</b>{pkg.regular > pkg.price && <s>{peso(pkg.regular)}</s>}</p>
+    <dl className="course-facts"><div><dt>Duration</dt><dd>{pkg.duration} · Mon–Sat</dd></div></dl>
+    {pkg.weeks.length ? <ul className="slot-list pkg-weeks">{pkg.weeks.slice(0, SHOWN).map((w) => <li key={w.monday} className={`${w.full ? "full" : ""}${week === w.monday ? " on" : ""}`}><button type="button" disabled={w.full} onClick={() => setWeek(w.monday)}><b>{dayRange(w.monday, w.ends)}</b><i className={w.full ? "full" : ""}>{w.full ? "Full" : week === w.monday ? "Selected" : "Open"}</i></button></li>)}</ul>
+      : <span className="schedule-status soon">Schedule to be announced</span>}
+    {week && <Link className="pkg-enroll" href={`/register?package=${pkg.code}&week=${week}`}>Enroll Now</Link>}
+  </article>;
+}
+
 function InHouseList({ courses }: { courses: InHouseCourse[] }) {
   const categories = useMemo(() => [...new Set(courses.map((c) => c.category))], [courses]);
   const [category, setCategory] = useState(categories[0] ?? "");
@@ -96,11 +114,11 @@ function OtherList({ courses }: { courses: OtherCourse[] }) {
 
 export function PublicCourseCatalog() {
   const [tab, setTab] = useState<Tab>("STCW schedules");
-  const [data, setData] = useState<{ stcw: StcwCourse[]; inHouse: InHouseCourse[]; other: OtherCourse[] } | null>(null);
+  const [data, setData] = useState<{ stcw: StcwCourse[]; inHouse: InHouseCourse[]; other: OtherCourse[]; packages: PackageCourse[] } | null>(null);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     let live = true;
-    fetch("/api/public/catalog").then((r) => r.json()).then((b) => { if (live) setData({ stcw: b.stcw ?? [], inHouse: b.inHouse ?? [], other: b.other ?? [] }); }).catch(() => { if (live) setFailed(true); });
+    fetch("/api/public/catalog").then((r) => r.json()).then((b) => { if (live) setData({ stcw: b.stcw ?? [], inHouse: b.inHouse ?? [], other: b.other ?? [], packages: b.packages ?? [] }); }).catch(() => { if (live) setFailed(true); });
     return () => { live = false; };
   }, []);
   return <div className="catalog-wrap">
@@ -109,7 +127,7 @@ export function PublicCourseCatalog() {
     </div>
     {!data ? <div className="catalog-empty">{failed ? "Courses could not be loaded. Please refresh the page." : "Loading courses…"}</div>
       : tab === "STCW schedules" ? <>
-        <div className="course-grid">{data.stcw.map((c) => <StcwCard key={c.code} course={c} />)}</div>
+        <div className="course-grid">{data.packages.map((p) => <PackageCard key={p.code} pkg={p} />)}{data.stcw.map((c) => <StcwCard key={c.code} course={c} />)}</div>
         {!data.stcw.length && <div className="catalog-empty">No STCW schedules are open right now.</div>}
       </> : tab === "Other STCW Courses" ? (data.other.length ? <OtherList courses={data.other} /> : <div className="catalog-empty">No other STCW courses are listed right now.</div>) : data.inHouse.length ? <InHouseList courses={data.inHouse} /> : <div className="catalog-empty">No in-house courses are listed right now.</div>}
     <div className="register-banner"><div><b>Ready to enroll?</b><span>Choose up to 5 courses and their schedules in one registration.</span></div><Link className="button button-primary" href="/register">Register Now →</Link></div>

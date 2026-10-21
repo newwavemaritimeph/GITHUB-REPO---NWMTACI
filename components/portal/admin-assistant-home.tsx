@@ -253,7 +253,7 @@ export function InstructorShortlist({ data, reload }: { data: PortalData; reload
   const list = extra(data).instructors ?? [];
   const acc = extra(data).accreditations ?? [];
   // STCW courses first (BT-PSSR, Safety, Crowd, Crisis), then In-House.
-  const courses = data.courses.filter((c) => (c as { active?: boolean }).active !== false && c.delivery_type === "In-House").sort((a, z) => Number(isStcw(z)) - Number(isStcw(a)) || a.code.localeCompare(z.code));
+  const courses = data.courses.filter((c) => (c as { active?: boolean }).active !== false && c.delivery_type === "In-House" && c.code !== "CCI").sort((a, z) => Number(isStcw(z)) - Number(isStcw(a)) || a.code.localeCompare(z.code));
   const course = new Map(data.courses.map((c) => [c.id, c]));
   const [form, setForm] = useState<{ id?: string; completeName: string; mobile: string; email: string; notes: string } | null>(null);
   const [accFor, setAccFor] = useState<string | null>(null);

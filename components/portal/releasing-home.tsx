@@ -298,7 +298,7 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
   const [q, setQ] = useState(""), [show, setShow] = useState<"All" | "With Template" | "No Template">("All"), [uploading, setUploading] = useState<string | null>(null);
   const templates = data.certificateTemplates as unknown as Template[];
   const active = new Map(templates.filter((t) => t.active).map((t) => [t.course_id, t]));
-  const all = data.courses.filter((c) => c.delivery_type === "In-House" && (c as { active?: boolean }).active !== false);
+  const all = data.courses.filter((c) => c.delivery_type === "In-House" && c.code !== "CCI" && (c as { active?: boolean }).active !== false);
   const term = q.trim().toLowerCase();
   const courses = all.filter((c) => (!term || `${c.code} ${c.name}`.toLowerCase().includes(term)) && (show === "All" || (show === "With Template") === active.has(c.id))).sort((a, b) => a.name.localeCompare(b.name));
   const withTemplate = all.filter((c) => active.has(c.id)).length;
@@ -562,7 +562,7 @@ function NumberingTable({ data, reload, scope }: { data: PortalData; reload: () 
   // Admin (owner, 13 Oct 2026): the six STCW courses New Wave numbers itself first, then every In-House course.
   const featured = (c: { code: string }) => ADMIN_STCW_CODES.indexOf(c.code);
   const stcwRow = (c: { code: string; course_categories?: unknown }) => featured(c) >= 0 || stcwCourse(c);
-  const courses = data.courses.filter((c, i, all) => c.delivery_type === "In-House" && all.findIndex((x) => x.id === c.id) === i && (scope === "all" ? (term ? true : featured(c) >= 0 || !stcwCourse(c)) : scope === "stcw" ? (term ? true : stcwCourse(c)) : true) && (term ? `${c.code} ${c.name}`.toLowerCase().includes(term) : true))
+  const courses = data.courses.filter((c, i, all) => c.delivery_type === "In-House" && c.code !== "CCI" && all.findIndex((x) => x.id === c.id) === i && (scope === "all" ? (term ? true : featured(c) >= 0 || !stcwCourse(c)) : scope === "stcw" ? (term ? true : stcwCourse(c)) : true) && (term ? `${c.code} ${c.name}`.toLowerCase().includes(term) : true))
     .sort((a, b) => scope === "all" ? ((featured(a) < 0 ? 99 : featured(a)) - (featured(b) < 0 ? 99 : featured(b)) || a.name.localeCompare(b.name)) : scope === "in-house" ? (Number(!stcwRow(a)) - Number(!stcwRow(b)) || a.name.localeCompare(b.name)) : a.name.localeCompare(b.name));
   // Releasing Officer (owner, 20 Oct 2026): New Wave STCW courses first, then every In-House course.
   const groupOf = (c: { code: string; course_categories?: unknown }) => scope === "all" ? (featured(c) >= 0 ? "STCW Courses" : "In-House Courses") : scope === "in-house" ? (stcwRow(c) ? "STCW Courses" : "In-House Courses") : "";

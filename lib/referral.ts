@@ -78,20 +78,39 @@ export async function applyReferralRebates(db: Admin, enrollmentIds: string[], a
   const applied: string[] = [];
   if (!enrollmentIds.length) return applied;
   try {
-    const { data: rows, error } = await db.from("enrollments").select("id,course_id,trainee_id,referral_agency_id,enrollment_status,selling_price_centavos,courses(delivery_type,code),trainees(marketing_agency_id)").in("id", enrollmentIds);
-    if (error || !rows?.length) return applied;
+    const cols = "id,course_id,trainee_id,referral_agency_id,enrollment_status,selling_price_centavos,package_code,package_id,courses(delivery_type,code),trainees(marketing_agency_id)";
+    let res: { data: unknown[] | null; error: unknown } = await db.from("enrollments").select(cols).in("id", enrollmentIds);
+    if (res.error) res = await db.from("enrollments").select(cols.replace("package_code,package_id,", "")).in("id", enrollmentIds);
+    if (res.error || !res.data?.length) return applied;
+    let rows = res.data as unknown[];
+    // CCI Package (21 Oct 2026): one rebate per package, on its Crisis enrollment, using the CCI rate.
+    const pkgIds = [...new Set((rows as { package_id?: string | null }[]).map((r) => r.package_id).filter(Boolean) as string[])];
+    let cciCourse: string | null = null;
+    if (pkgIds.length) {
+      const { data: mates } = await db.from("enrollments").select(cols).in("package_id", pkgIds);
+      const seen = new Set((rows as { id: string }[]).map((r) => r.id));
+      rows = [...rows, ...((mates ?? []) as { id: string }[]).filter((m) => !seen.has(m.id))];
+      const { data: cci } = await db.from("courses").select("id").eq("code", "CCI").eq("delivery_type", "In-House").limit(1);
+      cciCourse = (cci?.[0]?.id as string | undefined) ?? null;
+    }
+    enrollmentIds = (rows as { id: string }[]).map((r) => r.id);
     const { data: done } = await db.from("agency_rebates").select("enrollment_id").in("enrollment_id", enrollmentIds);
     const already = new Set((done ?? []).map((r) => r.enrollment_id as string));
-    for (const raw of rows as unknown as { id: string; course_id: string; trainee_id: string; referral_agency_id: string | null; enrollment_status: string; selling_price_centavos: number; courses: { delivery_type?: string; code?: string } | { delivery_type?: string; code?: string }[] | null; trainees: { marketing_agency_id?: string | null } | { marketing_agency_id?: string | null }[] | null }[]) {
+    for (const raw of rows as unknown as { package_code?: string | null; package_id?: string | null; id: string; course_id: string; trainee_id: string; referral_agency_id: string | null; enrollment_status: string; selling_price_centavos: number; courses: { delivery_type?: string; code?: string } | { delivery_type?: string; code?: string }[] | null; trainees: { marketing_agency_id?: string | null } | { marketing_agency_id?: string | null }[] | null }[]) {
       if (already.has(raw.id) || raw.enrollment_status === "Cancelled") continue;
+      const part = Array.isArray(raw.courses) ? raw.courses[0] : raw.courses;
+      const inPackage = raw.package_code === "CCI" && !!raw.package_id;
+      if (inPackage && (part?.code !== "PSCMHBT" || !cciCourse)) continue;
+      const rateCourse = inPackage ? (cciCourse as string) : raw.course_id;
+      const packageRows = inPackage ? (rows as { id: string; package_id?: string | null; selling_price_centavos: number }[]).filter((r) => r.package_id === raw.package_id) : [raw];
       const trainee = Array.isArray(raw.trainees) ? raw.trainees[0] : raw.trainees;
       const agencyId = raw.referral_agency_id ?? trainee?.marketing_agency_id ?? null;
       if (!agencyId) continue;
-      const { data: matrix } = await db.from("agency_course_rebates").select("agency_id,course_id,rebate_centavos").eq("agency_id", agencyId).eq("course_id", raw.course_id);
+      const { data: matrix } = await db.from("agency_course_rebates").select("agency_id,course_id,rebate_centavos").eq("agency_id", agencyId).eq("course_id", rateCourse);
       // Percentage of the fee (202610080025); the peso table before it or when not set.
       const { data: pctRow } = await db.from("marketing_agencies").select("rebate_percent").eq("id", agencyId).maybeSingle();
       const course = Array.isArray(raw.courses) ? raw.courses[0] : raw.courses;
-      const rebate = referralRebate({ percent: Number((pctRow as { rebate_percent?: number | null } | null)?.rebate_percent ?? 0) || null, inHouse: course?.delivery_type === "In-House", courseCode: course?.code ?? null, feeCentavos: Number(raw.selling_price_centavos), matrixCentavos: rebateFor(agencyId, raw.course_id, (matrix ?? []) as { agency_id: string; course_id: string; rebate_centavos: number }[]) });
+      const rebate = referralRebate({ percent: Number((pctRow as { rebate_percent?: number | null } | null)?.rebate_percent ?? 0) || null, inHouse: course?.delivery_type === "In-House", courseCode: inPackage ? "CCI" : course?.code ?? null, feeCentavos: Number(raw.selling_price_centavos), matrixCentavos: rebateFor(agencyId, rateCourse, (matrix ?? []) as { agency_id: string; course_id: string; rebate_centavos: number }[]) });
       if (rebate <= 0) continue;
       // Deducted or No deduction (202610080024); Deducted before it.
       const { data: modeRow } = await db.from("marketing_agencies").select("rebate_mode").eq("id", agencyId).maybeSingle();
@@ -100,10 +119,10 @@ export async function applyReferralRebates(db: Admin, enrollmentIds: string[], a
       if (mode === FULL_PAYMENT) {
         if (!options.paid) continue;
         const [{ data: ch }, { data: al }] = await Promise.all([
-          db.from("enrollment_charges").select("amount_centavos,event_type").eq("enrollment_id", raw.id).eq("valid", true),
-          db.from("payment_allocations").select("amount_centavos,payments!inner(valid)").eq("enrollment_id", raw.id).eq("payments.valid", true),
+          db.from("enrollment_charges").select("amount_centavos,event_type").in("enrollment_id", packageRows.map((r) => r.id)).eq("valid", true),
+          db.from("payment_allocations").select("amount_centavos,payments!inner(valid)").in("enrollment_id", packageRows.map((r) => r.id)).eq("payments.valid", true),
         ]);
-        const due = Number(raw.selling_price_centavos) + ((ch ?? []) as { amount_centavos: number; event_type: string }[]).reduce((t, c) => t + (c.event_type === "discount" ? -1 : 1) * Number(c.amount_centavos), 0);
+        const due = packageRows.reduce((t, r) => t + Number(r.selling_price_centavos), 0) + ((ch ?? []) as { amount_centavos: number; event_type: string }[]).reduce((t, c) => t + (c.event_type === "discount" ? -1 : 1) * Number(c.amount_centavos), 0);
         const paidTotal = ((al ?? []) as { amount_centavos: number }[]).reduce((t, a) => t + Number(a.amount_centavos), 0);
         amount = fullPaymentRebate({ due, rebate, paidTotal });
       }

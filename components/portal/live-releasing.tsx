@@ -227,7 +227,7 @@ export function LiveReleasing({ data, role, reload }: { data: ReleasingData; rol
   }
 
   const rows = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && inHouse(data, e)).sort((a, z) => Number(isPaid(z)) - Number(isPaid(a)));
-  const ownCourses = data.courses.filter((c) => c.delivery_type === "In-House");
+  const ownCourses = data.courses.filter((c) => c.delivery_type === "In-House" && c.code !== "CCI");
 
   // Released report
   const today = manilaDay(new Date().toISOString());

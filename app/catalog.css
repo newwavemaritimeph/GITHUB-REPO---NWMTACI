@@ -48,3 +48,9 @@
 .register-banner b{display:block;font-size:17px}.register-banner span{font-size:14px;color:#bcd6e6}
 @media(max-width:680px){.inhouse-fields.two{grid-template-columns:1fr}.register-banner .button{width:100%;text-align:center}}
 .slot-batch{font-weight:500;color:var(--muted);font-size:11.5px;margin-left:4px}
+/* CCI Package card (owner, 21 Oct 2026) */
+.pkg-card{border:2px solid #F25615}
+.course-badge.pkg{background:#F25615;color:#fff}
+.pkg-price{display:flex;align-items:baseline;gap:8px;margin:4px 0}.pkg-price b{font-size:20px}.pkg-price s{color:#5f7180;font-size:14px}
+.pkg-weeks li{padding:0}.pkg-weeks li button{all:unset;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;padding:7px 10px;box-sizing:border-box}.pkg-weeks li button:disabled{cursor:not-allowed}.pkg-weeks li.on{border-color:#0571D0;box-shadow:inset 0 0 0 2px #0571D0}
+.pkg-enroll{display:block;text-align:center;margin-top:10px;background:#F25615;color:#fff;border-radius:10px;padding:10px 14px;font-weight:600;text-decoration:none}

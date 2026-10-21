@@ -86,8 +86,10 @@ export async function POST(request: Request) {
     if (form.get("courseCode") && form.get("startDate")) { codes.push(String(form.get("courseCode"))); starts.push(String(form.get("startDate"))); }
     const dated = codes.map((code, i) => datedCourseSchema.parse({ courseCode: code, startDate: starts[i] }));
     // Other STCW Courses: the course only; Registration sets the center and date (owner, 20 Oct 2026).
+    // CCI Package weeks (owner, 21 Oct 2026): a Monday each.
+    const packageWeeks = [...new Set(form.getAll("packageWeeks").map(String).filter((v) => /^\d{4}-\d{2}-\d{2}$/.test(v)))].slice(0, 2);
     const otherCodes = [...new Set(form.getAll("otherCourseCodes").map((v) => String(v).trim().toUpperCase()).filter(Boolean))].slice(0, MAX_COURSES);
-    if (batches.length + dated.length + otherCodes.length > MAX_COURSES) throw new Error(`You can choose up to ${MAX_COURSES} courses per application.`);
+    if (batches.length + dated.length + otherCodes.length + packageWeeks.length * 3 > MAX_COURSES) throw new Error(`You can choose up to ${MAX_COURSES} courses per application.`);
     const db = createSupabaseAdminClient();
     await checkCourseOrder(db, batches, dated);
     const startedAt = new Date().toISOString();
@@ -105,6 +107,7 @@ export async function POST(request: Request) {
     const result = data as { application_number?:string;registration_reference:string;trainee_id:string;email:string;complete_name:string };
     for (const pick of dated) await attachDatedCourse(db, result.trainee_id, pick);
     for (const code of otherCodes) await attachOtherCourse(db, result.trainee_id, code);
+    for (const week of packageWeeks) { const { error: pkgError } = await db.rpc("assign_cci_package", { target_trainee: result.trainee_id, week_start: week, actor: null }); if (pkgError) console.error("Could not attach the CCI Package:", pkgError.message); }
     if (referral) await tagReferral(db, result.trainee_id, referral.id, startedAt);
     // Record the enrollment type on this submission's enrollments (shown to Registration and the Cashier).
     await db.from("enrollments").update({ source: body.enrollmentType }).eq("trainee_id", result.trainee_id).gte("created_at", startedAt);

@@ -4,6 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import type { PortalData, Enrollment, Batch, Trainee } from "../portal-live-app";
 import { first, manilaToday, dueCentavos, balanceOf, pesos, pesos2, addDays } from "@/lib/portal-format";
 import { LATE_ENROLLMENT_CODES, PUBLIC_STCW_CODES, automaticEndDate, fitsInWeek } from "@/lib/scheduling";
+import { isPackageCourse, packageWeeks } from "@/lib/packages";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { Badge, Message, Modal, PageHead, PeriodBar, usePaged, usePost, usePeriod, submit, fullName, fmtDate, fmtClock } from "./shared-ui";
 import { RequestActionModal, type RequestType } from "./payment-actions";
@@ -275,7 +276,13 @@ export function AssignCourseModal({ data, trainee, reload, onClose }: { data: Po
   const dated = !!course && !isStcwCourse(course) && !batches.length;
   // Backdating is allowed (owner, 13 Oct 2026): a course already held can be recorded on its real dates.
   const dateOk = !startDate || fitsInWeek(startDate, course?.duration_label ?? "1");
-  const assign = () => otherCourse ? void post({ action: "application-assign", traineeId: trainee.id, courseId, batchId: null, offerId: offerId && otherDate ? offerId : null, scheduledOn: offerId && otherDate ? otherDate : null }, offerId && otherDate ? "Other STCW course, center and date assigned. Screening can start." : "Other STCW course assigned. Set the training center and date in the record.").then(onClose).catch(() => undefined) : void post({ action: "application-assign", traineeId: trainee.id, courseId, batchId: withBatch ? batchId : null, scheduledOn: dated && startDate ? startDate : null }, withBatch ? "Course and batch assigned. Screening can start." : dated && startDate ? "Course and start date assigned. Screening can start." : "Course assigned. Screening can start; place on a batch once one opens.").then(onClose).catch(() => undefined);
+  // CCI Package (owner, 21 Oct 2026): pick a week; the week's Safety, Crowd and Crisis batches are taken together.
+  const isPackage = !!course && isPackageCourse(course.code);
+  const codeOf = new Map(data.courses.map((c) => [c.id, c.code]));
+  const weeks = isPackage ? packageWeeks(data.batches.filter((x) => x.starts_on >= today).map((x) => ({ code: codeOf.get(x.course_id) ?? "", startsOn: x.starts_on, full: !isBookable(x, today, now) }))) : [];
+  const [week, setWeek] = useState("");
+  const assignPackage = () => void post({ action: "package-assign", traineeId: trainee.id, weekStart: week }, "CCI Package assigned: Safety, Crowd and Crisis seats held. Screening can start.").then(onClose).catch(() => undefined);
+  const assign = () => isPackage ? assignPackage() : otherCourse ? void post({ action: "application-assign", traineeId: trainee.id, courseId, batchId: null, offerId: offerId && otherDate ? offerId : null, scheduledOn: offerId && otherDate ? otherDate : null }, offerId && otherDate ? "Other STCW course, center and date assigned. Screening can start." : "Other STCW course assigned. Set the training center and date in the record.").then(onClose).catch(() => undefined) : void post({ action: "application-assign", traineeId: trainee.id, courseId, batchId: withBatch ? batchId : null, scheduledOn: dated && startDate ? startDate : null }, withBatch ? "Course and batch assigned. Screening can start." : dated && startDate ? "Course and start date assigned. Screening can start." : "Course assigned. Screening can start; place on a batch once one opens.").then(onClose).catch(() => undefined);
   return <Modal title={`Assign a course · ${fullName(trainee)}`} onClose={onClose}>
     <div className="portal-form">
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
@@ -290,9 +297,11 @@ export function AssignCourseModal({ data, trainee, reload, onClose }: { data: Po
         <label>Training Date<input type="date" value={otherDate} onChange={(e) => setOtherDate(e.target.value)} /></label>
         <p className="portal-form-note full">{offer ? `Fee to collect: ${pesos(Number(offer.training_fee_centavos))}.` : "You can also set the center and date later in the record."}</p>
       </>}
-      {course && !dated && <div className="full"><BatchCards data={data} batches={batches} selected={batchId} onSelect={setBatchId} allowNone /></div>}
+      {isPackage && <label className="full">Week<select value={week} onChange={(e) => setWeek(e.target.value)}><option value="">Choose a week</option>{weeks.map((w) => <option key={w.monday} value={w.monday} disabled={w.full}>{fmtDate(w.monday)} – {fmtDate(w.ends)}{w.full ? " · Full" : ""}</option>)}</select></label>}
+      {isPackage && !weeks.length && <p className="portal-form-note full">No week has open Safety, Crowd and Crisis batches yet.</p>}
+      {course && !dated && !isPackage && <div className="full"><BatchCards data={data} batches={batches} selected={batchId} onSelect={setBatchId} allowNone /></div>}
       {dated && course && <label className="full">Start Date (Optional)<input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /><small style={{ color: dateOk ? "var(--muted)" : "var(--red, #b42318)" }}>{!startDate ? `${course.duration_label} · Monday to Saturday, consecutive days in one week. Leave empty to set later.` : dateOk ? `${startDate < today ? "Backdated · ran" : "Runs"} ${fmtDate(startDate)} to ${fmtDate(automaticEndDate(startDate, course.duration_label))}` : "Pick a date that is not a Sunday and lets the course finish by Saturday of the same week."}</small></label>}
-      <div className="bc-foot full"><span>{otherCourse ? `${otherCourse.code} · Other STCW${offer ? ` · ${first(offer.partner_centers)?.name ?? ""} · fee ${pesos(Number(offer.training_fee_centavos))}` : " · center not set yet"}` : course ? (withBatch ? batchSummary(data, batches.find((x) => x.id === batchId)) : `${course.code} · fee ${pesos(course.standard_price_centavos)} · no batch yet`) : "Choose a course first."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!courseId || busy || (!otherCourse && !dateOk) || (!!offerId !== !!otherDate && !!otherCourse)} onClick={assign}>{busy ? "Assigning…" : withBatch ? "Assign Course and Batch" : "Assign Course"}</button></span></div>
+      <div className="bc-foot full"><span>{otherCourse ? `${otherCourse.code} · Other STCW${offer ? ` · ${first(offer.partner_centers)?.name ?? ""} · fee ${pesos(Number(offer.training_fee_centavos))}` : " · center not set yet"}` : course ? (withBatch ? batchSummary(data, batches.find((x) => x.id === batchId)) : `${course.code} · fee ${pesos(course.standard_price_centavos)} · no batch yet`) : "Choose a course first."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!courseId || busy || (isPackage && !week) || (!otherCourse && !dateOk) || (!!offerId !== !!otherDate && !!otherCourse)} onClick={assign}>{busy ? "Assigning…" : isPackage ? "Assign CCI Package" : withBatch ? "Assign Course and Batch" : "Assign Course"}</button></span></div>
     </div>
   </Modal>;
 }

@@ -10,7 +10,7 @@ export const REBATE_PRESETS = [10, 20, 30, 50] as const;
 
 /** The five STCW courses with a fixed rebate, with the short names staff use. */
 export const STCW_REBATE_COURSES: readonly (readonly [code: string, label: string])[] = [
-  ["UBT-PSSR", "BT-PSSR"], ["STPPDSPPS", "Safety"], ["PSCMT", "Crowd"], ["PSCMHBT", "Crisis"], ["CCMD", "CCM Domestic"],
+  ["UBT-PSSR", "BT-PSSR"], ["STPPDSPPS", "Safety"], ["PSCMT", "Crowd"], ["PSCMHBT", "Crisis"], ["CCMD", "CCM Domestic"], ["CCI", "CCI Package"],
 ];
 
 export const isStcwRebateCourse = (code: string | null | undefined) => STCW_REBATE_COURSES.some(([c]) => c === String(code ?? "").trim().toUpperCase());
