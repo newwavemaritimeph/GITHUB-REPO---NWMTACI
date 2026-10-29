@@ -22,6 +22,12 @@ describe("MARINA MISMO lists", () => {
     expect(balanceAt(b.trainees[2], "16")).toBe(45000);
     expect(owesAt(b.trainees[2], "now")).toBe(false);
   });
+  it("counts Company Charge trainees as settled (the partner pays on its Billing Statement)", () => {
+    const b = batch([t("billed", 130000, 0, 0, 0, { companyCharge: true }), t("unpaid", 130000, 0, 0, 0)]);
+    expect(unsettledAt11(b).map((x) => x.enrollmentId)).toEqual(["unpaid"]);
+    expect(finalList(b).map((x) => x.enrollmentId)).toEqual(["billed"]);
+    expect(balanceAt(b.trainees[0], "16")).toBe(0);
+  });
   it("writes the CSV for settled trainees only, quoting commas", () => {
     const csv = mismoCsv(batch([t("ok", 100, 100, 100, 100, { middleName: "Dela Cruz, Jr." }), t("no", 100, 0, 0, 0)])).split("\r\n");
     expect(csv[0]).toBe("Last name,First name,Middle name,Birth date,SRN,Rank,Course,Course code,Batch,Training start,Training end");

@@ -9,6 +9,8 @@ export const MISMO_COURSE_CODES = ["UBT-PSSR", "STPPDSPPS", "PSCMT", "PSCMHBT", 
 export type MismoTrainee = {
   enrollmentId: string; lastName: string; firstName: string; middleName: string | null; birthdate: string | null; srn: string | null; rank: string | null;
   dueCentavos: number; paidBy11: number; paidBy16: number; paidNow: number;
+  /** Company Charge (29 Oct 2026): the partner pays on its Billing Statement, so the trainee counts as settled. */
+  companyCharge?: boolean;
 };
 export type MismoBatch = { id: string; batchNumber: string; courseName: string; courseCode: string; startsOn: string; endsOn: string; room: string | null; instructor: string | null; trainees: MismoTrainee[]; submittedAt: string | null; submittedCount: number | null };
 export type MismoDay = { date: string; batches: MismoBatch[] };
@@ -16,8 +18,8 @@ export type MismoDay = { date: string; batches: MismoBatch[] };
 /** Manila wall-clock instant on a date, e.g. ("2026-10-08", 11) → 2026-10-08T03:00:00Z. */
 export const manilaInstant = (date: string, hour: number) => new Date(`${date}T${String(hour).padStart(2, "0")}:00:00+08:00`).toISOString();
 
-export const owesAt = (t: MismoTrainee, when: "11" | "16" | "now") => t.dueCentavos - (when === "11" ? t.paidBy11 : when === "16" ? t.paidBy16 : t.paidNow) > 0;
-export const balanceAt = (t: MismoTrainee, when: "11" | "16" | "now") => Math.max(0, t.dueCentavos - (when === "11" ? t.paidBy11 : when === "16" ? t.paidBy16 : t.paidNow));
+export const owesAt = (t: MismoTrainee, when: "11" | "16" | "now") => !t.companyCharge && t.dueCentavos - (when === "11" ? t.paidBy11 : when === "16" ? t.paidBy16 : t.paidNow) > 0;
+export const balanceAt = (t: MismoTrainee, when: "11" | "16" | "now") => t.companyCharge ? 0 : Math.max(0, t.dueCentavos - (when === "11" ? t.paidBy11 : when === "16" ? t.paidBy16 : t.paidNow));
 
 /** Trainees still owing at 11:00 AM (the instructor's list). */
 export const unsettledAt11 = (b: MismoBatch) => b.trainees.filter((t) => owesAt(t, "11"));

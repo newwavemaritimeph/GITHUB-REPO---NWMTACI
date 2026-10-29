@@ -14,6 +14,9 @@ export async function pruneUnpaidEnrollments(admin: AdminClient): Promise<number
   if (error) throw new Error(error.message);
   const { data: allocs } = await admin.from("payment_allocations").select("enrollment_id");
   const paid = new Set((allocs ?? []).map((a) => (a as { enrollment_id: string }).enrollment_id));
+  // Company Charge enrollments (29 Oct 2026) are unpaid on purpose: the partner pays on its Billing Statement.
+  const { data: billed } = await admin.from("enrollments").select("id").not("company_charge_agency_id", "is", null).limit(5000);
+  for (const b of billed ?? []) paid.add((b as { id: string }).id);
   const toDelete: string[] = [];
   for (const e of rows ?? []) {
     if (paid.has(e.id)) continue;

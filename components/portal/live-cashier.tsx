@@ -190,7 +190,7 @@ function CourseList({ list }: { list: Enrollment[] }) {
 }
 const Who = ({ name, number }: { name: string; number?: string }) => <><span className="cx-name">{name}</span>{number ? <span className="cx-id">{number}</span> : null}</>;
 const payState = (e: Enrollment) => (e.enrollment_status === "Cancelled" ? "Cancelled" : balanceOf(e) === 0 ? "Paid" : paidOf(e) > 0 ? "Partially paid" : "Unpaid");
-const PAY_TONE: Record<string, string> = { Paid: "active", "Partially paid": "orange", Unpaid: "red", Cancelled: "cancelled" };
+const PAY_TONE: Record<string, string> = { Paid: "active", "Partially paid": "orange", Unpaid: "red", Cancelled: "cancelled", "Company Charge": "pending" };
 
 /** Company Charge (owner, 29 Oct 2026): one payment for a partner's whole Billing Statement, one receipt to the company. */
 function CompanyPaymentModal({ data, reload, onClose }: { data: PortalData; reload: () => Promise<void>; onClose: () => void }) {
@@ -264,14 +264,15 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
   const [proof, setProof] = useState<{ id: string; link: string; path: string; duplicate: boolean } | null>(initialProof ? { id: initialProof.id, link: initialProof.drive_link ?? "", path: "", duplicate: false } : null);
   const [dupWarning, setDupWarning] = useState(false), [dupConfirmed, setDupConfirmed] = useState(false);
 
-  const mine = data.enrollments.filter((e) => e.trainee_id === traineeId && e.enrollment_status !== "Cancelled");
+  // Company Charge courses are paid by the partner on its Billing Statement (Record Company Payment), never here.
+  const mine = data.enrollments.filter((e) => e.trainee_id === traineeId && e.enrollment_status !== "Cancelled" && !data.companyCharge?.[e.id]);
   const open = mine.filter((e) => balanceOf(e) > 0);
   const catalog = data.charges.filter((c) => c.active);
   // Miscellaneous charges are only Uniform and Others (owner, 8 Oct 2026). Uniform's price comes from the schedule of fees, else ₱150.00.
   const uniform = catalog.find((c) => /uniform/i.test(c.name) && Number(c.default_amount_centavos) > 0);
   const uniformPrice = uniform ? Number(uniform.default_amount_centavos) : 15000;
   const term = search.trim().toLowerCase();
-  const candidates = groupByTrainee(data, data.enrollments.filter((e) => e.enrollment_status !== "Cancelled"))
+  const candidates = groupByTrainee(data, data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && !data.companyCharge?.[e.id]))
     .filter((g) => !term || `${g.name} ${g.number} ${g.enrollments.map((e) => `${courseCode(e)} ${e.enrollment_number}`).join(" ")}`.toLowerCase().includes(term))
     .sort((a, b) => b.balance - a.balance || a.name.localeCompare(b.name)).slice(0, 8);
   const group = traineeId ? groupByTrainee(data, mine)[0] : undefined;
@@ -420,12 +421,13 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
   // New enrollments: handed over by Registration, nothing paid yet, grouped by trainee.
   const awaiting = data.enrollments.filter((e) => e.enrollment_status === "Pending" && handed[e.id] && paidOf(e) === 0);
   const freshIds = new Set(awaiting.map((e) => e.trainee_id));
-  const fresh = groupByTrainee(data, data.enrollments.filter((e) => freshIds.has(e.trainee_id) && e.enrollment_status !== "Cancelled" && (handed[e.id] || PAID_STATUSES.includes(e.enrollment_status))), (e) => handed[e.id] ?? e.created_at)
+  const billed = (e: Enrollment) => !!data.companyCharge?.[e.id];
+  const fresh = groupByTrainee(data, data.enrollments.filter((e) => freshIds.has(e.trainee_id) && e.enrollment_status !== "Cancelled" && !billed(e) && (handed[e.id] || PAID_STATUSES.includes(e.enrollment_status))), (e) => handed[e.id] ?? e.created_at)
     .filter((g) => g.paid === 0).sort((a, b) => a.since.localeCompare(b.since));
   // Paid and enrolled: paid in the last 7 days.
   const since = addDays(today, -6);
   const paidRecently = new Set(data.payments.filter((p) => day(p.received_at) >= since).map((p) => p.trainee_id));
-  const paid = groupByTrainee(data, data.enrollments.filter((e) => paidRecently.has(e.trainee_id) && e.enrollment_status !== "Cancelled" && paidOf(e) > 0)).sort((a, b) => a.name.localeCompare(b.name));
+  const paid = groupByTrainee(data, data.enrollments.filter((e) => paidRecently.has(e.trainee_id) && e.enrollment_status !== "Cancelled" && !billed(e) && paidOf(e) > 0)).sort((a, b) => a.name.localeCompare(b.name));
   const durations = new Map(data.courses.map((c) => [c.id, c.duration_label]));
   const unpaid = unpaidAfterTraining(data.enrollments.filter((e) => !data.companyCharge?.[e.id]) as unknown as BalanceEnrollment[], (id) => durations.get(id), today);
   const proofs = data.traineeProofs ?? [];
@@ -596,19 +598,20 @@ export function DiscountRequests({ data, reload }: { data: PortalData; reload: (
   </div>;
 }
 
-const STATUS_ORDER = ["Unpaid", "Partially paid", "Paid", "Cancelled"] as const;
+const STATUS_ORDER = ["Unpaid", "Partially paid", "Company Charge", "Paid", "Cancelled"] as const;
 /** Every enrollment with its payment status, filtered by status and enrolled date. */
 export function CashierEnrollments({ data, onPay, reload }: { data: PortalData; onPay: (enrollmentId: string) => void; reload: () => Promise<void> }) {
   const today = manilaToday();
   const [filter, setFilter] = useState<"All" | (typeof STATUS_ORDER)[number]>("All");
+  const rowState = (e: Enrollment) => (e.enrollment_status !== "Cancelled" && data.companyCharge?.[e.id] && balanceOf(e) > 0 ? "Company Charge" : payState(e));
   const [q, setQ] = useState("");
   const [from, setFrom] = useState(today), [to, setTo] = useState(today);
   const dateOf = (e: Enrollment) => day(e.enrolled_at ?? e.created_at);
   const term = q.trim().toLowerCase();
   const base = data.enrollments.filter((e) => { const d = dateOf(e); return (!from || d >= from) && (!to || d <= to) && (!term || `${traineeName(e)} ${e.enrollment_number} ${first(e.courses)?.name ?? ""} ${courseCode(e)} ${data.applicationNumbers?.[e.trainee_id] ?? ""}`.toLowerCase().includes(term)); });
-  const rows = base.filter((e) => filter === "All" || payState(e) === filter)
-    .sort((a, b) => STATUS_ORDER.indexOf(payState(a) as (typeof STATUS_ORDER)[number]) - STATUS_ORDER.indexOf(payState(b) as (typeof STATUS_ORDER)[number]) || dateOf(b).localeCompare(dateOf(a))).slice(0, 300);
-  const count = (f: string) => base.filter((e) => f === "All" || payState(e) === f).length;
+  const rows = base.filter((e) => filter === "All" || rowState(e) === filter)
+    .sort((a, b) => STATUS_ORDER.indexOf(rowState(a) as (typeof STATUS_ORDER)[number]) - STATUS_ORDER.indexOf(rowState(b) as (typeof STATUS_ORDER)[number]) || dateOf(b).localeCompare(dateOf(a))).slice(0, 300);
+  const count = (f: string) => base.filter((e) => f === "All" || rowState(e) === f).length;
   return <div className="portal-page cx">
     <div className="cx-head"><div><span className="portal-eyebrow">Enrollments</span><h1>Search Trainee</h1></div></div>
     <div className="cx-status" role="tablist">{(["All", ...STATUS_ORDER] as const).map((f) => <button key={f} type="button" role="tab" aria-selected={filter === f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{tcl(f)}<span>{count(f)}</span></button>)}</div>
@@ -618,7 +621,7 @@ export function CashierEnrollments({ data, onPay, reload }: { data: PortalData; 
       {(from || to) && <button type="button" className="ghost-button" onClick={() => { setFrom(""); setTo(""); }}>Clear Dates</button>}
     </div>
     <section className="portal-panel cx-panel">{rows.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Enrolled</th><th>Course</th><th className="r">Total Due</th><th className="r">Paid</th><th className="r">Balance</th><th>Status</th><th></th></tr></thead><tbody>
-      {rows.map((e) => { const st = payState(e); return <tr key={e.id}><td data-l="" className="lead"><Who name={traineeName(e)} number={data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number} /></td><td data-l="Enrolled">{fmtDate(dateOf(e))}</td><td data-l="Course"><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small></td><td data-l="Total due" className="r cx-amt">{pesos(dueCentavos(e))}</td><td data-l="Paid" className="r cx-amt">{pesos(paidOf(e))}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(e.enrollment_status === "Cancelled" ? 0 : balanceOf(e))}</strong></td><td data-l="Status"><Badge tone={PAY_TONE[st]}>{st}</Badge></td><td data-l=""><div className="cx-acts">{st !== "Paid" && st !== "Cancelled" && <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record Payment</button>}</div></td></tr>; })}
+      {rows.map((e) => { const st = rowState(e); return <tr key={e.id}><td data-l="" className="lead"><Who name={traineeName(e)} number={data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number} /></td><td data-l="Enrolled">{fmtDate(dateOf(e))}</td><td data-l="Course"><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small></td><td data-l="Total due" className="r cx-amt">{pesos(dueCentavos(e))}</td><td data-l="Paid" className="r cx-amt">{pesos(paidOf(e))}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(e.enrollment_status === "Cancelled" ? 0 : balanceOf(e))}</strong></td><td data-l="Status"><Badge tone={PAY_TONE[st]}>{st}</Badge></td><td data-l=""><div className="cx-acts">{st === "Company Charge" ? <small className="muted-text">Billed on the Billing Statement</small> : st !== "Paid" && st !== "Cancelled" && <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record Payment</button>}</div></td></tr>; })}
     </tbody></table></div> : <p className="portal-empty-copy">No enrollments match these filters.</p>}</section>
   </div>;
 }

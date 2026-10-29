@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   const no = parsed.data.nwmtaciNo.toUpperCase().replace(/[^A-Z0-9-]/g, "");
   if (!no) return NextResponse.json({ error: NO_MATCH }, { status: 404 });
   const db = createSupabaseAdminClient();
-  const { data: trainees } = await db.from("trainees").select("id,legal_first_name,srn,application_number,trainee_number,awaiting_course").or(`application_number.eq.${no},trainee_number.eq.${no}`).limit(2);
+  const { data: trainees } = await db.from("trainees").select("id,legal_first_name,srn,application_number,trainee_number,awaiting_course,marketing_agency_id").or(`application_number.eq.${no},trainee_number.eq.${no}`).limit(2);
   const t = (trainees ?? []).find((r) => normalizeSrn(r.srn ?? "") === srn);
   if (!t) return NextResponse.json({ error: NO_MATCH }, { status: 404 });
   const { data: enrollments } = await db.from("enrollments").select("id,enrollment_number,enrollment_status,partner_offer_id,feedback_token,courses(name,code,delivery_type),batches(starts_on,ends_on)").eq("trainee_id", t.id).order("created_at", { ascending: false }).limit(20);
@@ -42,6 +42,17 @@ export async function POST(request: Request) {
     db.from("payments").select("payment_number,received_at,method,reference_number,amount_centavos,valid").eq("trainee_id", t.id).order("received_at", { ascending: false }).limit(100),
   ]);
   const handedSet = new Set(((handed ?? []) as { id: string; handed_to_cashier_at?: string | null }[]).filter((h) => h.handed_to_cashier_at).map((h) => h.id));
+  // Company Charge (29 Oct 2026): the partner pays on its Billing Statement, never the trainee at the Cashier.
+  const billedTo = new Map<string, string>();
+  {
+    const { data: links } = ids.length ? await db.from("enrollments").select("id,selling_price_centavos,referral_agency_id,company_charge_agency_id").in("id", ids) : { data: [] };
+    const rows = (links ?? []) as { id: string; selling_price_centavos: number; referral_agency_id: string | null; company_charge_agency_id?: string | null }[];
+    const agencyOf = (r: (typeof rows)[number]) => r.company_charge_agency_id ?? r.referral_agency_id ?? (t as { marketing_agency_id?: string | null }).marketing_agency_id ?? null;
+    const agencyIds = [...new Set(rows.map(agencyOf).filter(Boolean) as string[])];
+    const { data: ags } = agencyIds.length ? await db.from("marketing_agencies").select("id,name").in("id", agencyIds).eq("rebate_mode", "Company Charge") : { data: [] };
+    const ccName = new Map((ags ?? []).map((a) => [a.id as string, a.name as string]));
+    for (const r of rows) { const a = agencyOf(r); if (a && ccName.has(a)) billedTo.set(r.id, ccName.get(a)!); }
+  }
   const deliveryBy = new Map(((deliveries ?? []) as { enrollment_id: string; status: string; tracking_number: string | null }[]).map((d) => [d.enrollment_id, d]));
   const paidBy = new Map<string, number>();
   for (const a of allocations ?? []) {
@@ -78,7 +89,7 @@ export async function POST(request: Request) {
     courses.push({
       course: c?.name ?? "Course", code: c?.code ?? "", enrollmentNumber: e.enrollment_number ?? "",
       schedule: b ? `${longDate(b.starts_on)}${b.ends_on !== b.starts_on ? ` – ${longDate(b.ends_on)}` : ""}` : "Schedule to follow",
-      status, trainingFinished, feeCentavos: paid + balance, paidCentavos: paid, balanceCentavos: balance,
+      status, trainingFinished, feeCentavos: paid + balance, paidCentavos: paid, balanceCentavos: billedTo.has(e.id) ? 0 : balance, billedTo: billedTo.get(e.id) ?? null,
       certificate, certificateNumber: (state === "Printed" || state === "Released") ? ctx?.cert?.certificate_number ?? null : null, releasedAt,
       ready: state === "Printed", delivery: d ? d.status : null,
       evaluation: { needed, submitted, url: needed && !submitted && trainingFinished && e.feedback_token ? `/feedback/${e.feedback_token}` : null },

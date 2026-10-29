@@ -9,7 +9,7 @@ import { Pill } from "@/components/ui/kit";
 
 type CourseStatus = {
   course: string; code: string; enrollmentNumber: string; schedule: string; status: string; trainingFinished: boolean;
-  feeCentavos: number; paidCentavos: number; balanceCentavos: number;
+  feeCentavos: number; paidCentavos: number; balanceCentavos: number; billedTo?: string | null;
   certificate: string | null; certificateNumber: string | null; releasedAt: string | null; ready: boolean; delivery: string | null;
   evaluation: { needed: boolean; submitted: boolean; url: string | null };
   postTest?: { needed: boolean; passed: boolean; best: { score: number; total: number } | null; attempts: number; url: string | null };
@@ -95,9 +95,9 @@ function StatusTab() {
               <dl className="review-list">
                 {c.enrollmentNumber && <div><dt>Enrollment No.</dt><dd style={mono}>{c.enrollmentNumber}</dd></div>}
                 <div><dt>Schedule</dt><dd>{c.schedule}</dd></div>
-                <div><dt>Fee</dt><dd style={mono}>{peso(c.feeCentavos)}</dd></div>
-                <div><dt>Paid</dt><dd style={mono}>{peso(c.paidCentavos)}</dd></div>
-                <div><dt>Balance</dt><dd>{c.balanceCentavos > 0 ? <span className="ts-due"><span style={mono}>{peso(c.balanceCentavos)}</span> to pay at the Cashier</span> : "Fully paid"}</dd></div>
+                {!c.billedTo && <div><dt>Fee</dt><dd style={mono}>{peso(c.feeCentavos)}</dd></div>}
+                {!c.billedTo && <div><dt>Paid</dt><dd style={mono}>{peso(c.paidCentavos)}</dd></div>}
+                <div><dt>{c.billedTo ? "Payment" : "Balance"}</dt><dd>{c.billedTo ? `Company Charge · billed to ${c.billedTo}` : c.balanceCentavos > 0 ? <span className="ts-due"><span style={mono}>{peso(c.balanceCentavos)}</span> to pay at the Cashier</span> : "Fully paid"}</dd></div>
                 {c.certificate && <div><dt>Certificate</dt><dd className={c.ready ? "ts-ready" : undefined}>{c.certificate}</dd></div>}
                 {c.delivery && <div><dt>Delivery Request</dt><dd>{c.delivery}</dd></div>}
               </dl>

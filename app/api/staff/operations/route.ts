@@ -1189,6 +1189,11 @@ export async function GET() {
   // Referral agency per enrollment (202610080023); {} before it.
   const referralByEnrollment: Record<string, string> = {};
   { const { data: refs } = await db.from("enrollments").select("id,referral_agency_id").not("referral_agency_id", "is", null).order("created_at", { ascending: false }).limit(1000); for (const r of (refs ?? []) as { id: string; referral_agency_id: string }[]) referralByEnrollment[r.id] = r.referral_agency_id; }
+  // Open loaded enrollments with no partner of their own fall back to the trainee's partner (29 Oct 2026), so Company Charge is spotted.
+  { const ids = [...new Set((enrollmentsResult.data ?? []).filter((e) => !referralByEnrollment[(e as { id: string }).id] && (e as { enrollment_status: string }).enrollment_status !== "Cancelled").map((e) => (e as { trainee_id: string }).trainee_id))];
+    if (ids.length) { const { data: tas } = await db.from("trainees").select("id,marketing_agency_id").in("id", ids.slice(0, 300)).not("marketing_agency_id", "is", null);
+      const byTrainee = new Map((tas ?? []).map((x) => [x.id as string, x.marketing_agency_id as string]));
+      for (const e of (enrollmentsResult.data ?? []) as { id: string; trainee_id: string; enrollment_status: string }[]) { const a = byTrainee.get(e.trainee_id); if (a && !referralByEnrollment[e.id] && e.enrollment_status !== "Cancelled") referralByEnrollment[e.id] = a; } } }
   // Rebates that come off once fully paid (21 Oct 2026), for the Cashier's Record Payment.
   // Company Charge (migration 063): which enrollments are billed to a partner, and the issued statements the Cashier can collect.
   const companyCharge: Record<string, string> = {};
@@ -2035,6 +2040,10 @@ export async function POST(request: Request) {
       const courseRow = course?.courses as unknown as { delivery_type?: string } | { delivery_type?: string }[] | null;
       const partner = (Array.isArray(courseRow) ? courseRow[0] : courseRow)?.delivery_type === "Partner or Endorsed";
       if (partner && (!course?.partner_offer_id || !course.scheduled_on)) return NextResponse.json({ error: "Set the training center and date first." }, { status: 400 });
+      // Company Charge partners are billed on their Billing Statement, so the trainee never goes to the Cashier (29 Oct 2026).
+      const { data: ref } = await admin.from("enrollments").select("referral_agency_id,trainees(marketing_agency_id)").eq("id", input.enrollmentId).maybeSingle();
+      const refAgency = (ref?.referral_agency_id as string | null | undefined) ?? first(ref?.trainees as unknown as { marketing_agency_id: string | null } | null)?.marketing_agency_id ?? null;
+      if (refAgency) { const { data: ag } = await admin.from("marketing_agencies").select("name,rebate_mode").eq("id", refAgency).maybeSingle(); if (ag?.rebate_mode === "Company Charge") return NextResponse.json({ error: `${ag.name} is a Company Charge partner. Use Enroll · Company Charge instead of handing to the Cashier.` }, { status: 400 }); }
       const { data: checks, error: checkError } = await admin.from("enrollment_requirement_checks").select("requirement,status,checked_at").eq("enrollment_id", input.enrollmentId).order("checked_at", { ascending: false });
       if (checkError) throw checkError;
       const latest = new Map<string, string>();

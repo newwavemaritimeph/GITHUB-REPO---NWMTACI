@@ -24,6 +24,8 @@ export async function loadMismoDay(db: Admin, date: string): Promise<MismoDay> {
     db.from("enrollment_charges").select("enrollment_id,amount_centavos,event_type").in("enrollment_id", ids).eq("valid", true),
     db.from("payment_allocations").select("enrollment_id,amount_centavos,payments(received_at,valid)").in("enrollment_id", ids),
   ]) : [{ data: [] }, { data: [] }];
+  const billed = new Set<string>();
+  if (ids.length) { const { data: cc } = await db.from("enrollments").select("id").in("id", ids).not("company_charge_agency_id", "is", null); for (const x of cc ?? []) billed.add(x.id as string); }
   const due = new Map<string, number>(rows.map((e) => [e.id, Number(e.selling_price_centavos ?? 0)]));
   for (const c of charges ?? []) due.set(c.enrollment_id, (due.get(c.enrollment_id) ?? 0) + (c.event_type === "discount" ? -1 : 1) * Number(c.amount_centavos));
   const at11 = Date.parse(manilaInstant(date, 11)), at16 = Date.parse(manilaInstant(date, 16));
@@ -45,7 +47,7 @@ export async function loadMismoDay(db: Admin, date: string): Promise<MismoDay> {
     const st = staffing.get(b.id);
     const trainees = rows.filter((e) => e.batch_id === b.id).map((e) => {
       const t = first(e.trainees); const p = paid.get(e.id) ?? { b11: 0, b16: 0, now: 0 };
-      return { enrollmentId: e.id, lastName: t?.legal_last_name ?? "", firstName: t?.legal_first_name ?? "", middleName: t?.legal_middle_name ?? null, birthdate: t?.birthdate ?? null, srn: t?.srn ?? null, rank: t?.rank ?? null, dueCentavos: due.get(e.id) ?? 0, paidBy11: p.b11, paidBy16: p.b16, paidNow: p.now };
+      return { enrollmentId: e.id, lastName: t?.legal_last_name ?? "", firstName: t?.legal_first_name ?? "", middleName: t?.legal_middle_name ?? null, birthdate: t?.birthdate ?? null, srn: t?.srn ?? null, rank: t?.rank ?? null, dueCentavos: due.get(e.id) ?? 0, paidBy11: p.b11, paidBy16: p.b16, paidNow: p.now, companyCharge: billed.has(e.id) };
     }).sort((x, y) => x.lastName.localeCompare(y.lastName) || x.firstName.localeCompare(y.firstName));
     const s = sub.get(b.id);
     return { id: b.id, batchNumber: b.batch_number, courseName: c.name, courseCode: c.code, startsOn: b.starts_on, endsOn: b.ends_on, room: st?.room ?? b.venue ?? null, instructor: st?.instructor ?? null, trainees, submittedAt: s?.submitted_at ?? null, submittedCount: s?.trainee_count ?? null };

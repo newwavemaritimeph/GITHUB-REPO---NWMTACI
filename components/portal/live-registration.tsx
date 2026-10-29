@@ -364,7 +364,7 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
         </section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Requirements</h2><span className="muted-text">applications</span></div>
           <dl className="ac-lines">{REQUIREMENTS.map((req) => <div key={req.code}><dt>{req.label}</dt><dd>{pending.filter((x) => x.r!.latest.get(req.code)?.status === "Verified").length} of {pending.length}</dd></div>)}</dl>
-          <p className="ac-foot">Hand to the Cashier once all four are ticked.</p>
+          <p className="ac-foot">Hand to the Cashier once all four are ticked. Company Charge partners enroll directly.</p>
         </section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By Enrollment Type</h2></div>
           <dl className="ac-lines">{types.map(([k, n]) => <div key={k}><dt>{tcl(k)}</dt><dd>{n}</dd></div>)}</dl>
@@ -387,7 +387,7 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
             <td><strong className="app-no-cell">{appNoOf(data, e.trainee_id) ?? e.enrollment_number}</strong><small className="tc-mono">{appNoOf(data, e.trainee_id) ? e.enrollment_number : fmtDate(day(e.created_at))}</small></td>
             <td>{first(e.courses)?.name ?? "—"}<small>{scheduleOf(e)}</small></td>
             <td>{r ? <><span className={`req-count${r.missing.length ? "" : " ok"}`}>{r.verified} of {REQUIREMENTS.length}</span>{r.rejected.length > 0 && <small>Rejected: {r.rejected.join(", ")}</small>}</> : <span className="muted-text">{e.enrollment_status === "Cancelled" ? "—" : "Complete"}</span>}</td>
-            <td>{r ? (r.paid ? <><strong>{pesos(r.paidCentavos)}</strong><small>Verified</small></> : <span className="muted-text">{r.handed ? "With cashier" : "Not yet"}</span>) : <><Badge tone={p.tone}>{p.text}</Badge><small>{pesos(balanceOf(e))} balance</small></>}</td>
+            <td>{e.enrollment_status !== "Cancelled" && chargeTo(data, e) ? <><Badge tone="pending">Company Charge</Badge><small>Billed to {chargeTo(data, e)!.name}</small></> : r ? (r.paid ? <><strong>{pesos(r.paidCentavos)}</strong><small>Verified</small></> : <span className="muted-text">{r.handed ? "With cashier" : "Not yet"}</span>) : <><Badge tone={p.tone}>{p.text}</Badge><small>{pesos(balanceOf(e))} balance</small></>}</td>
             <td><Badge tone={s.tone}>{s.text}</Badge></td>
           </tr>; })(x)])}
         </tbody></table>{!rows.length && <p className="portal-empty-copy">{filter === "For payment" ? "Nobody is waiting at the Cashier." : filter === "Screening" ? (noCourse.length ? "Applicants without a course are listed above." : "No applications to screen. New ones arrive from the website.") : term ? "No matching enrollments." : "No enrollments in this period."}</p>}</div>
@@ -564,9 +564,9 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
       <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || handing || anySaving || !proofReady} onClick={() => void handOver()}>{handing ? "Saving…" : needsProof ? "Upload Proof & Hand to Cashier" : "Hand to Cashier"}</button>{needsProof && !proofReady && <small>Amount, reference and photo are required</small>}</div>
       {payError && <div className="sc-pay-err"><Message kind="error" text={payError} /></div>}
     </div>}
-    {r.handed && !r.paid && (() => { const pr = (data.traineeProofs ?? []).filter((x) => x.trainee_id === e.trainee_id).sort((a, z) => z.submitted_at.localeCompare(a.submitted_at))[0]; return <div className="sc-handed">With the Cashier · {pr ? `${pr.method} ${pesos2(pr.amount_centavos)} · Ref. ${pr.reference}` : "Cash"}</div>; })()}
+    {r.handed && !r.paid && !billTo && (() => { const pr = (data.traineeProofs ?? []).filter((x) => x.trainee_id === e.trainee_id).sort((a, z) => z.submitted_at.localeCompare(a.submitted_at))[0]; return <div className="sc-handed">With the Cashier · {pr ? `${pr.method} ${pesos2(pr.amount_centavos)} · Ref. ${pr.reference}` : "Cash"}</div>; })()}
     <div className="sc-foot">
-      <small>{!allTicked ? `Still to tick: ${missingNow.map((q) => q.label).join(", ")}` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
+      <small>{!allTicked ? `Still to tick: ${missingNow.map((q) => q.label).join(", ")}` : billTo && !r.paid ? `All requirements received. Enroll on Company Charge: ${billTo.name} is billed on its Billing Statement, so no payment at the Cashier.` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
       <span className="sc-acts">
         {r.ready && <button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "application-enroll", enrollmentId: e.id }, "Trainee enrolled.").catch(() => undefined)}>Enroll Now</button>}
       </span>
@@ -677,6 +677,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
   const isApplication = e.enrollment_status === "Pending";
   const hasDocuments = e.enrollment_status === "Enrolled" || e.enrollment_status === "Open Schedule";
   const p = payState(e);
+  const billTo = e.enrollment_status !== "Cancelled" ? chargeTo(data, e) : null;
   return <Modal title={isApplication ? `Application ${appNoOf(data, e.trainee_id) ?? e.enrollment_number}` : e.enrollment_number} onClose={onClose} wide>
     <div className="portal-form">
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
@@ -689,7 +690,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
       </div>}
       <StartDateEditor data={data} enrollment={e} busy={busy} post={post} />
       <OtherCenterEditor data={data} enrollment={e} busy={busy} post={post} />
-      {e.enrollment_status !== "Cancelled" && e.enrollment_status !== "Pending" && <ProofSection data={data} enrollment={e} reload={reload} />}
+      {e.enrollment_status !== "Cancelled" && e.enrollment_status !== "Pending" && !billTo && <ProofSection data={data} enrollment={e} reload={reload} />}
 
       <div className="full"><strong>Payment status</strong> <small style={{ color: "var(--muted)" }}>read-only — payments are recorded by the Cashier</small></div>
       <div className="pill-row full">
@@ -697,7 +698,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
         {charges > 0 && <div className="warn"><span>Charges</span><b>+{pesos(charges)}</b></div>}
         {discounts > 0 && <div className="ok"><span>Discounts</span><b>−{pesos(discounts)}</b></div>}
         <div><span>Total due</span><b>{pesos(due)}</b></div>
-        <div className={balance === 0 ? "ok" : paid > 0 ? "warn" : "bad"}><span>{p.text}</span><b>{pesos(paid)} paid · {pesos(balance)} balance</b></div>
+        {billTo ? <div className={balance === 0 ? "ok" : undefined}><span>Company Charge</span><b>{balance === 0 ? `Paid by ${billTo.name}` : `Billed to ${billTo.name} · ${pesos(balance)}`}</b></div> : <div className={balance === 0 ? "ok" : paid > 0 ? "warn" : "bad"}><span>{p.text}</span><b>{pesos(paid)} paid · {pesos(balance)} balance</b></div>}
       </div>
       {payments.length > 0 && <div className="full"><small style={{ color: "var(--muted)", fontWeight: 700 }}>Trainee&apos;s payments</small>{payments.slice(0, 6).map((pm) => <div className="live-row-item" key={pm.id}><div><strong>{pm.payment_number}</strong><small>{pm.method}{pm.reference_number ? ` · ${pm.reference_number}` : ""} · {fmtDate(day(pm.received_at))} · {pm.verification_state}</small></div><span className="slot-count">{pesos(pm.amount_centavos)}</span></div>)}<p className="portal-form-note">Payments are recorded per trainee; which enrollment each one covers is on the receipt.</p></div>}
 

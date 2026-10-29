@@ -100,7 +100,14 @@ export default async function AdmissionRecordPage({ params }: { params: Promise<
   // Company Charge (owner, 29 Oct 2026): the partner is billed on its Billing Statement, so the TAR says so instead of UNPAID.
   const live = (enrollRes.data ?? []).filter((e) => e.enrollment_status !== "Cancelled").map((e) => e.id as string);
   const { data: cc } = live.length ? await db.from("enrollments").select("company_charge_agency_id").in("id", live).not("company_charge_agency_id", "is", null).limit(1) : { data: null };
-  const ccAgency = (cc?.[0] as { company_charge_agency_id?: string } | undefined)?.company_charge_agency_id;
+  let ccAgency = (cc?.[0] as { company_charge_agency_id?: string } | undefined)?.company_charge_agency_id ?? null;
+  if (!ccAgency && live.length) {
+    // Not enrolled yet: the partner on the enrollment (or the trainee) is a Company Charge partner.
+    const { data: refs } = await db.from("enrollments").select("referral_agency_id").in("id", live).not("referral_agency_id", "is", null);
+    const { data: tr } = await db.from("trainees").select("marketing_agency_id").eq("id", record.trainee_id).maybeSingle();
+    const candidates = [...new Set([...(refs ?? []).map((r) => r.referral_agency_id as string), (tr?.marketing_agency_id as string | null) ?? ""].filter(Boolean))];
+    if (candidates.length) ccAgency = ((await db.from("marketing_agencies").select("id").in("id", candidates).eq("rebate_mode", "Company Charge").limit(1)).data?.[0]?.id as string | undefined) ?? null;
+  }
   const billedTo = ccAgency ? ((await db.from("marketing_agencies").select("name").eq("id", ccAgency).maybeSingle()).data?.name as string | undefined) ?? "the partner" : null;
   const status = billedTo ? "COMPANY CHARGE" : due > 0 && paid >= due ? "FULLY PAID" : paid > 0 ? "PARTIALLY PAID" : "UNPAID";
   const name = `${t.legal_last_name}, ${[t.legal_first_name, t.legal_middle_name, t.suffix].filter(Boolean).join(" ")}`.toUpperCase();
