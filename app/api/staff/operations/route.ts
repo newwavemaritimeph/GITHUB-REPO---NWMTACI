@@ -273,7 +273,7 @@ const traineeUpdateInput = z.object({ action: z.literal("trainee-update"), train
 const admissionRecordInput = z.object({ action: z.literal("admission-record-issue"), traineeId: z.string().uuid() });
 const applicationHandoverInput = z.object({ action: z.literal("application-handover"), enrollmentId: z.string().uuid() });
 // Company Charge (owner, 29 Oct 2026): enroll without payment; the partner is billed. One payment per Billing Statement.
-const enrollChargeInput = z.object({ action: z.literal("application-enroll-charge"), enrollmentId: z.string().uuid() });
+const enrollChargeInput = z.object({ action: z.literal("application-enroll-charge"), enrollmentId: z.string().uuid(), agencyId: z.string().uuid().nullable().optional() });
 const companyPaymentInput = z.object({ action: z.literal("company-payment"), billingStatementId: z.string().uuid(), amountCentavos: z.number().int().positive(), method: z.string().trim().min(1).max(80), referenceNumber: z.string().trim().max(80).optional().default(""), receivedAt: z.string().datetime({ offset: true }) });
 // Billing Statement amounts typed by Accounting, and void and reissue (owner, 29 Oct 2026).
 const statementIssueInput = z.object({ action: z.literal("billing-statement-issue"), agencyId: z.string().uuid(), from: z.string().date(), to: z.string().date(), amounts: z.record(z.string().uuid(), z.number().int().min(0).max(100_000_000)).default({}) });
@@ -952,33 +952,38 @@ export async function GET() {
     instructionTemplatesUnit, batchStaffingUnit, methodKindUnit, myHrUnit, expenseExtrasUnit, employeeChargeUnit, chargeKindUnit,
   ]);
 
+  const enrollmentRows = (enrollmentsResult.data ?? []) as { id: string }[];
+
+  // Speed (owner, 29 Oct 2026: "saving is so slow"): every save reloads this data, so the
+  // lookups below run together instead of one after another. Each task fills its own result.
+  const tasks: Promise<void>[] = [];
+  const task = (f: () => Promise<void>) => { tasks.push(f()); };
+
   // Collection status of pending Change Course / Rescheduling fees, shown to the
   // Cashier and the Accounting Manager (approval waits for payment).
   const chargeCollected: Record<string, { amount: number; collected: number; paid: boolean }> = {};
-  {
+  task(async () => {
     const admin = createSupabaseAdminClient();
     const pendingPayFirst = (requests as { id: string; status: string; request_type: string; charge_id?: string | null; enrollments?: { id: string } | { id: string }[] | null }[])
       .filter((r) => r.status === "Pending" && r.charge_id && PAY_FIRST_REQUESTS.includes(r.request_type));
     await Promise.all(pendingPayFirst.map(async (r) => { const e = first(r.enrollments); if (e?.id && r.charge_id) chargeCollected[r.id] = await chargeCollection(admin, e.id, r.charge_id); }));
-  }
-
-  const enrollmentRows = (enrollmentsResult.data ?? []) as { id: string }[];
+  });
 
   // Website applications still waiting for Registration to assign a course.
   // A missing column (migration 202610070002 not yet applied) yields none.
-  const { data: awaitingRows } = await db.from("trainees").select("id").eq("awaiting_course", true).limit(500);
-  const awaitingCourseIds = (awaitingRows ?? []).map((row: { id: string }) => row.id);
+  let awaitingCourseIds: string[] = [];
+  task(async () => { const { data: awaitingRows } = await db.from("trainees").select("id").eq("awaiting_course", true).limit(500); awaitingCourseIds = (awaitingRows ?? []).map((row: { id: string }) => row.id); });
   // Website enrollment numbers (NWMTACI-0000001), keyed by trainee: what the
   // applicant quotes on Facebook. A missing column (migration 202610070003 not
   // yet applied) yields none.
-  const { data: numberRows } = await db.from("trainees").select("id,application_number").not("application_number", "is", null).limit(5000);
+  let applicationNumbers: Record<string, string> = {};
+  task(async () => { const { data: numberRows } = await db.from("trainees").select("id,application_number").not("application_number", "is", null).limit(5000); applicationNumbers = Object.fromEntries((numberRows ?? []).map((row: { id: string; application_number: string }) => [row.id, row.application_number])); });
   // Applicants Registration has handed to the Cashier for payment (202610070004).
-  const { data: handedRows } = await db.from("enrollments").select("id,handed_to_cashier_at").not("handed_to_cashier_at", "is", null).eq("enrollment_status", "Pending").limit(1000);
-  const handedToCashier = Object.fromEntries((handedRows ?? []).map((row: { id: string; handed_to_cashier_at: string }) => [row.id, row.handed_to_cashier_at]));
-  const applicationNumbers = Object.fromEntries((numberRows ?? []).map((row: { id: string; application_number: string }) => [row.id, row.application_number]));
+  let handedToCashier: Record<string, string> = {};
+  task(async () => { const { data: handedRows } = await db.from("enrollments").select("id,handed_to_cashier_at").not("handed_to_cashier_at", "is", null).eq("enrollment_status", "Pending").limit(1000); handedToCashier = Object.fromEntries((handedRows ?? []).map((row: { id: string; handed_to_cashier_at: string }) => [row.id, row.handed_to_cashier_at])); });
   // Proofs the trainees sent from the website with no receipt yet (29 Oct 2026); none before migration 060.
   let traineeProofs: { id: string; trainee_id: string; name: string; number: string; method: string; amount_centavos: number; reference: string; drive_link: string | null; submitted_at: string }[] = [];
-  if (canCashier(staff.roleCodes) || canRegister(staff.roleCodes)) {
+  if (canCashier(staff.roleCodes) || canRegister(staff.roleCodes)) task(async () => {
     const { data: proofRows } = await db.from("payment_proofs").select("id,source,trainee_id,claimed_method,claimed_amount_centavos,extracted_reference,drive_link,submitted_at,dismissed_at,trainees(legal_first_name,legal_last_name,application_number,trainee_number)").eq("source", "Trainee").is("dismissed_at", null).order("submitted_at", { ascending: true }).limit(300);
     const ids = (proofRows ?? []).map((p) => p.id as string);
     const { data: usedRows } = ids.length ? await db.from("payments").select("proof_id").in("proof_id", ids).eq("valid", true) : { data: [] };
@@ -987,44 +992,44 @@ export async function GET() {
       const t = (Array.isArray(p.trainees) ? p.trainees[0] : p.trainees) as { legal_first_name?: string; legal_last_name?: string; application_number?: string | null; trainee_number?: string | null } | null;
       return { id: p.id, trainee_id: p.trainee_id, name: (t?.legal_last_name ?? "").toUpperCase() + ", " + (t?.legal_first_name ?? ""), number: t?.application_number ?? t?.trainee_number ?? "", method: p.claimed_method ?? "", amount_centavos: Number(p.claimed_amount_centavos ?? 0), reference: p.extracted_reference ?? "", drive_link: p.drive_link, submitted_at: p.submitted_at };
     });
-  }
-  // How many times instructions were generated per enrollment, and the printed
-  // admission records (202610070007). Missing columns yield none.
+  });
   // Google Classroom connection status (no tokens leave the server), linked
   // class per course, and the latest invite per enrollment (migration 202610070013).
   const classroom = { configured: googleConfigured(), connected: false, accountEmail: null as string | null, connectedAt: null as string | null, driveReady: false };
   const classroomCourseIds: Record<string, string> = {};
   const classroomInvites: Record<string, { state: string; email: string; error: string | null; created_at: string }> = {};
-  {
+  task(async () => {
     const admin = createSupabaseAdminClient();
-    const connection = await activeConnection(admin).catch(() => null);
+    const [connection, { data: linkRows }, { data: inviteRows }] = await Promise.all([
+      activeConnection(admin).catch(() => null),
+      db.from("courses").select("id,google_classroom_course_id").not("google_classroom_course_id", "is", null).limit(1000),
+      admin.from("classroom_invitations").select("enrollment_id,state,email,error,created_at").order("created_at", { ascending: false }).limit(1000),
+    ]);
     if (connection) Object.assign(classroom, { connected: true, accountEmail: connection.account_email, connectedAt: connection.connected_at, driveReady: hasDriveScope(connection.scopes) });
-    const { data: linkRows } = await db.from("courses").select("id,google_classroom_course_id").not("google_classroom_course_id", "is", null).limit(1000);
     for (const r of (linkRows ?? []) as { id: string; google_classroom_course_id: string }[]) classroomCourseIds[r.id] = r.google_classroom_course_id;
-    const { data: inviteRows } = await admin.from("classroom_invitations").select("enrollment_id,state,email,error,created_at").order("created_at", { ascending: false }).limit(1000);
     for (const r of (inviteRows ?? []) as { enrollment_id: string; state: string; email: string; error: string | null; created_at: string }[]) if (!classroomInvites[r.enrollment_id]) classroomInvites[r.enrollment_id] = r;
-  }
+  });
   // Google Classroom class codes per course (migration 202610070012; none without it).
-  const { data: codeRows } = await db.from("courses").select("id,google_classroom_code").not("google_classroom_code", "is", null).limit(1000);
-  const classroomCodes = Object.fromEntries(((codeRows ?? []) as { id: string; google_classroom_code: string }[]).map((r) => [r.id, r.google_classroom_code]));
+  let classroomCodes: Record<string, string> = {};
+  task(async () => { const { data: codeRows } = await db.from("courses").select("id,google_classroom_code").not("google_classroom_code", "is", null).limit(1000); classroomCodes = Object.fromEntries(((codeRows ?? []) as { id: string; google_classroom_code: string }[]).map((r) => [r.id, r.google_classroom_code])); });
   // Latest training-instructions email per enrollment (who it went to, and whether it was sent).
   const instructionEmails: Record<string, { state: string; to: string; sent_at: string | null; last_error: string | null; created_at: string }> = {};
-  {
-    const admin = createSupabaseAdminClient();
-    const { data: emailRows } = await admin.from("email_jobs").select("recipient,state,sent_at,last_error,created_at,variables").eq("template_code", "training.instructions").order("created_at", { ascending: false }).limit(1000);
+  task(async () => {
+    const { data: emailRows } = await createSupabaseAdminClient().from("email_jobs").select("recipient,state,sent_at,last_error,created_at,variables").eq("template_code", "training.instructions").order("created_at", { ascending: false }).limit(1000);
     for (const row of emailRows ?? []) {
       const id = String((row.variables as { enrollment_id?: string } | null)?.enrollment_id ?? "");
       if (id && !instructionEmails[id]) instructionEmails[id] = { state: row.state, to: row.recipient, sent_at: row.sent_at, last_error: row.last_error, created_at: row.created_at };
     }
-  }
-  const { data: instructionRows } = await db.from("enrollments").select("id,instructions_generated_count").gt("instructions_generated_count", 0).limit(5000);
-  const instructionsCount = Object.fromEntries((instructionRows ?? []).map((row: { id: string; instructions_generated_count: number }) => [row.id, Number(row.instructions_generated_count)]));
+  });
+  // How many times instructions were generated per enrollment, and the printed
+  // admission records (202610070007). Missing columns yield none.
+  let instructionsCount: Record<string, number> = {};
+  task(async () => { const { data: instructionRows } = await db.from("enrollments").select("id,instructions_generated_count").gt("instructions_generated_count", 0).limit(5000); instructionsCount = Object.fromEntries((instructionRows ?? []).map((row: { id: string; instructions_generated_count: number }) => [row.id, Number(row.instructions_generated_count)])); });
   let admissionRecords: unknown[] = [];
-  if (canCashier(staff.roleCodes) || canRegister(staff.roleCodes)) {
-    const admin = createSupabaseAdminClient();
-    const { data: recordRows } = await admin.from("admission_records").select("id,ar_number,trainee_id,enrollment_ids,print_count,reprints_approved,issued_at,last_printed_at").order("issued_at", { ascending: false }).limit(2000);
+  if (canCashier(staff.roleCodes) || canRegister(staff.roleCodes)) task(async () => {
+    const { data: recordRows } = await createSupabaseAdminClient().from("admission_records").select("id,ar_number,trainee_id,enrollment_ids,print_count,reprints_approved,issued_at,last_printed_at").order("issued_at", { ascending: false }).limit(2000);
     admissionRecords = recordRows ?? [];
-  }
+  });
 
   // Allocations drive paid_centavos, so they must cover every loaded enrollment
   // exactly. Scope them by id instead of capping with a limit: a cap would
@@ -1038,29 +1043,33 @@ export async function GET() {
   // rule for enrolling a website application.
   const verifiedPaidByEnrollment = new Map<string, number>();
   type AllocationPayment = { verification_state: string; valid: boolean };
-  const allocationChunks = await Promise.all(idChunks.map((ids) => db.from("payment_allocations").select("enrollment_id,amount_centavos,payments(verification_state,valid)").in("enrollment_id", ids)));
-  for (const chunk of allocationChunks) {
-    for (const allocation of chunk.data ?? []) {
-      if (first(allocation.payments as AllocationPayment | AllocationPayment[] | null)?.valid === false) continue;
-      paidByEnrollment.set(allocation.enrollment_id, (paidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
-      const payment = first(allocation.payments as AllocationPayment | AllocationPayment[] | null);
-      if (payment?.verification_state === "Verified" && payment.valid) verifiedPaidByEnrollment.set(allocation.enrollment_id, (verifiedPaidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
+  task(async () => {
+    const allocationChunks = await Promise.all(idChunks.map((ids) => db.from("payment_allocations").select("enrollment_id,amount_centavos,payments(verification_state,valid)").in("enrollment_id", ids)));
+    for (const chunk of allocationChunks) {
+      for (const allocation of chunk.data ?? []) {
+        if (first(allocation.payments as AllocationPayment | AllocationPayment[] | null)?.valid === false) continue;
+        paidByEnrollment.set(allocation.enrollment_id, (paidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
+        const payment = first(allocation.payments as AllocationPayment | AllocationPayment[] | null);
+        if (payment?.verification_state === "Verified" && payment.valid) verifiedPaidByEnrollment.set(allocation.enrollment_id, (verifiedPaidByEnrollment.get(allocation.enrollment_id) ?? 0) + Number(allocation.amount_centavos));
+      }
     }
-  }
+  });
 
   // Latest requirement check per (enrollment, requirement). A missing table
   // (migration 202610070001 not yet applied) just yields no checks.
   const requirementChecks: { enrollment_id: string; requirement: string; status: string; remarks: string | null; checked_at: string; checked_by_name: string | null }[] = [];
-  const checkChunks = await Promise.all(idChunks.map((ids) => db.from("enrollment_requirement_checks").select("enrollment_id,requirement,status,remarks,checked_at,profiles(complete_name)").in("enrollment_id", ids).order("checked_at", { ascending: false })));
-  const seenChecks = new Set<string>();
-  for (const chunk of checkChunks) {
-    for (const check of chunk.data ?? []) {
-      const key = `${check.enrollment_id}|${check.requirement}`;
-      if (seenChecks.has(key)) continue;
-      seenChecks.add(key);
-      requirementChecks.push({ enrollment_id: check.enrollment_id, requirement: check.requirement, status: check.status, remarks: check.remarks, checked_at: check.checked_at, checked_by_name: first(check.profiles as { complete_name: string } | { complete_name: string }[] | null)?.complete_name ?? null });
+  task(async () => {
+    const checkChunks = await Promise.all(idChunks.map((ids) => db.from("enrollment_requirement_checks").select("enrollment_id,requirement,status,remarks,checked_at,profiles(complete_name)").in("enrollment_id", ids).order("checked_at", { ascending: false })));
+    const seenChecks = new Set<string>();
+    for (const chunk of checkChunks) {
+      for (const check of chunk.data ?? []) {
+        const key = `${check.enrollment_id}|${check.requirement}`;
+        if (seenChecks.has(key)) continue;
+        seenChecks.add(key);
+        requirementChecks.push({ enrollment_id: check.enrollment_id, requirement: check.requirement, status: check.status, remarks: check.remarks, checked_at: check.checked_at, checked_by_name: first(check.profiles as { complete_name: string } | { complete_name: string }[] | null)?.complete_name ?? null });
+      }
     }
-  }
+  });
 
   const chargesByEnrollment = new Map<string, number>();
   const discountsByEnrollment = new Map<string, number>();
@@ -1071,17 +1080,17 @@ export async function GET() {
 
   // Cashier start-of-day openings (migration 202610070015; empty without it).
   let cashierOpenings: unknown[] = [];
-  if (canCashier(staff.roleCodes)) {
+  if (canCashier(staff.roleCodes)) task(async () => {
     const { data: openingRows } = await createSupabaseAdminClient().from("cashier_openings").select("id,opening_date,opening_cash_centavos,remarks,created_at").eq("cashier_id", staff.user.id).order("opening_date", { ascending: false }).limit(31);
     cashierOpenings = openingRows ?? [];
-  }
+  });
   // When each enrollment became Enrolled (migration 202610070014; empty without it).
-  const { data: enrolledRows } = await db.from("enrollments").select("id,enrolled_at").not("enrolled_at", "is", null).order("enrolled_at", { ascending: false }).limit(5000);
-  const enrolledAt = new Map(((enrolledRows ?? []) as { id: string; enrolled_at: string }[]).map((r) => [r.id, r.enrolled_at]));
+  let enrolledAt = new Map<string, string>();
+  task(async () => { const { data: enrolledRows } = await db.from("enrollments").select("id,enrolled_at").not("enrolled_at", "is", null).order("enrolled_at", { ascending: false }).limit(5000); enrolledAt = new Map(((enrolledRows ?? []) as { id: string; enrolled_at: string }[]).map((r) => [r.id, r.enrolled_at])); });
 
   // Certificate delivery requests (migration 202610080031; empty without it).
   let deliveryRequests: unknown[] = [];
-  if (staff.roleCodes.some((r) => ["admin", "registration", "releasing_officer", "cashier", "accounting"].includes(r))) {
+  if (staff.roleCodes.some((r) => ["admin", "registration", "releasing_officer", "cashier", "accounting"].includes(r))) task(async () => {
     const { data: deliveryRows } = await createSupabaseAdminClient().from("delivery_requests").select("id,request_number,status,recipient_name,mobile,address_line,city,province,zip,email,decline_reason,tracking_number,shipped_on,paid_at,created_at,enrollment_id,trainee_id,trainees(legal_first_name,legal_last_name,application_number,trainee_number),enrollments(enrollment_number,courses(name,code))").order("created_at", { ascending: false }).limit(300);
     const rowsWithIds = (deliveryRows ?? []) as { enrollment_id: string }[];
     const enrollmentIdsForCerts = [...new Set(rowsWithIds.map((r) => r.enrollment_id))];
@@ -1093,10 +1102,10 @@ export async function GET() {
       for (const c of (certRows.data ?? []) as { enrollment_id: string; status: string; certificate_number?: string | null }[]) certByEnrollment.set(c.enrollment_id, c);
     }
     deliveryRequests = rowsWithIds.map((r) => ({ ...r, certificate_status: certByEnrollment.get(r.enrollment_id)?.status ?? null, certificate_number: certByEnrollment.get(r.enrollment_id)?.certificate_number ?? null }));
-  }
+  });
   // Admin Assistant data (migration 202610090033; empty without it).
   let requisitions: unknown[] = [], requisitionItems: unknown[] = [], instructors: unknown[] = [], accreditations: unknown[] = [], batchResources: unknown[] = [], batchCancels: unknown[] = [];
-  if (staff.roleCodes.some((r) => ["admin", "admin_assistant", "accounting", "cashier"].includes(r))) {
+  if (staff.roleCodes.some((r) => ["admin", "admin_assistant", "accounting", "cashier"].includes(r))) task(async () => {
     const admin = createSupabaseAdminClient();
     const [rq, items] = await Promise.all([
       admin.from("requisitions").select("id,requisition_number,purpose,needed_by,lines,total_centavos,status,decision_remarks,decided_at,created_at,expense_id,requester:profiles!requisitions_requested_by_fkey(complete_name),expenses(status,voucher_number,expense_number)").order("created_at", { ascending: false }).limit(300),
@@ -1104,13 +1113,15 @@ export async function GET() {
     ]);
     requisitions = rq.error ? [] : rq.data ?? [];
     requisitionItems = items.error ? [] : items.data ?? [];
-  }
-  if (canAssist(staff.roleCodes)) {
+  });
+  if (canAssist(staff.roleCodes)) task(async () => {
     const admin = createSupabaseAdminClient();
-    const [ins, acc, res] = await Promise.all([
+    const [ins, acc, res, cx] = await Promise.all([
       admin.from("instructors").select("id,complete_name,mobile,email,notes,active").order("complete_name"),
       admin.from("instructor_accreditations").select("id,instructor_id,course_id,accreditation_number,valid_until,role"),
       admin.from("batch_resources").select("batch_id,classroom_id,instructor_id,assessor_id,alt_instructor_id,updated_at"),
+      // Why and when a batch was cancelled (migration 202610210054); empty before it runs.
+      admin.from("batches").select("id,cancel_reason,cancelled_at,canceller:profiles!batches_cancelled_by_fkey(complete_name)").eq("status", "Cancelled").order("cancelled_at", { ascending: false }).limit(200),
     ]);
     instructors = ins.error ? [] : ins.data ?? [];
     // Tolerant before migration 202610210053 (role, assessor_id).
@@ -1119,43 +1130,100 @@ export async function GET() {
     const res2 = res1.error ? await admin.from("batch_resources").select("batch_id,classroom_id,instructor_id,updated_at") : res1;
     accreditations = acc2.error ? [] : acc2.data ?? [];
     batchResources = res2.error ? [] : res2.data ?? [];
-    // Why and when a batch was cancelled (migration 202610210054); empty before it runs.
-    const cx = await admin.from("batches").select("id,cancel_reason,cancelled_at,canceller:profiles!batches_cancelled_by_fkey(complete_name)").eq("status", "Cancelled").order("cancelled_at", { ascending: false }).limit(200);
     batchCancels = cx.error ? [] : cx.data ?? [];
-  }
+  });
   // Certificate numbers (migration 202610090037; empty without it): Admin only.
   let certificateNumberSettings: unknown = null, legacyCertificates: unknown[] = [];
-  if (isAdminRole(staff.roleCodes)) {
+  // Holidays (migration 202610090038; empty without it): Admin dashboard reminders.
+  let holidays: unknown[] = [];
+  if (isAdminRole(staff.roleCodes)) task(async () => {
     const admin = createSupabaseAdminClient();
-    const [ns, lc] = await Promise.all([
+    const [ns, lc, h] = await Promise.all([
       admin.from("certificate_number_settings").select("reg_prefix,reg_last,reg_digits,set_at").maybeSingle(),
       admin.from("legacy_certificates").select("id,trainee_name,nwmtaci_number,course_code,enrollment_id,certificate_number,registration_number,issued_on,recorded_at").order("recorded_at", { ascending: false }).limit(500),
+      admin.from("holidays").select("holiday_date,name,kind,marina_status,marina_note,updated_at").order("holiday_date"),
     ]);
     certificateNumberSettings = ns.error ? null : ns.data;
     legacyCertificates = lc.error ? [] : lc.data ?? [];
-  }
-  // Holidays (migration 202610090038; empty without it): Admin dashboard reminders.
-  let holidays: unknown[] = [];
-  if (isAdminRole(staff.roleCodes)) {
-    const h = await createSupabaseAdminClient().from("holidays").select("holiday_date,name,kind,marina_status,marina_note,updated_at").order("holiday_date");
     holidays = h.error ? [] : h.data ?? [];
-  }
+  });
   // Other income (migration 202610190045; empty without it): Cashier, Accounting and Admin.
-  let otherIncome: unknown[] = [], rebatesReceived: Record<string, string> = {}, centerPayments: unknown[] = [], incomeCategories: unknown[] = [];
-  if (canCashier(staff.roleCodes)) {
+  let otherIncome: unknown[] = [], centerPayments: unknown[] = [], incomeCategories: unknown[] = [];
+  const rebatesReceived: Record<string, string> = {};
+  if (canCashier(staff.roleCodes)) task(async () => {
     const admin = createSupabaseAdminClient();
-    const [inc, links] = await Promise.all([
+    const [inc, links, ic, cp] = await Promise.all([
       admin.from("other_income").select("id,income_number,source,partner_center_id,payer,amount_centavos,channel,reference,received_on,notes,proof_files,created_at,void_reason,voided_at,partner_centers(name)").order("received_on", { ascending: false }).order("created_at", { ascending: false }).limit(300),
       admin.from("other_income_rebates").select("enrollment_id,other_income(income_number)").limit(5000),
+      // Empty before migration 202610210055; the form then falls back to the built-in list.
+      admin.from("income_categories").select("id,name,active").order("name"),
+      admin.from("center_payment_items").select("enrollment_id,amount_centavos,expense_id,expenses(expense_number,voucher_number,status,paid_at,payment_channel)").limit(5000),
     ]);
     otherIncome = inc.error ? [] : inc.data ?? [];
-    // Empty before migration 202610210055; the form then falls back to the built-in list.
-    const ic = await admin.from("income_categories").select("id,name,active").order("name");
     incomeCategories = ic.error ? [] : ic.data ?? [];
-    const cp = await admin.from("center_payment_items").select("enrollment_id,amount_centavos,expense_id,expenses(expense_number,voucher_number,status,paid_at,payment_channel)").limit(5000);
     if (!cp.error) centerPayments = cp.data ?? [];
     if (!links.error) for (const l of links.data ?? []) rebatesReceived[l.enrollment_id as string] = first(l.other_income as unknown as { income_number: string } | null)?.income_number ?? "Received";
-  }
+  });
+
+  // Receipt prints per payment (202610080026); {} before it.
+  const receiptPrints: Record<string, number> = {};
+  task(async () => { const { data: rp } = await db.from("receipts").select("payment_id,print_count").gt("print_count", 0).order("issued_at", { ascending: false }).limit(2000); for (const r of (rp ?? []) as { payment_id: string; print_count: number }[]) receiptPrints[r.payment_id] = r.print_count; });
+
+  // Referral agency per enrollment (202610080023); {} before it.
+  const referralByEnrollment: Record<string, string> = {};
+  task(async () => {
+    const { data: refs } = await db.from("enrollments").select("id,referral_agency_id").not("referral_agency_id", "is", null).order("created_at", { ascending: false }).limit(1000);
+    for (const r of (refs ?? []) as { id: string; referral_agency_id: string }[]) referralByEnrollment[r.id] = r.referral_agency_id;
+    // Open loaded enrollments with no partner of their own fall back to the trainee's partner (29 Oct 2026), so Company Charge is spotted.
+    const ids = [...new Set((enrollmentsResult.data ?? []).filter((e) => !referralByEnrollment[(e as { id: string }).id] && (e as { enrollment_status: string }).enrollment_status !== "Cancelled").map((e) => (e as { trainee_id: string }).trainee_id))];
+    if (!ids.length) return;
+    const { data: tas } = await db.from("trainees").select("id,marketing_agency_id").in("id", ids.slice(0, 300)).not("marketing_agency_id", "is", null);
+    const byTrainee = new Map((tas ?? []).map((x) => [x.id as string, x.marketing_agency_id as string]));
+    for (const e of (enrollmentsResult.data ?? []) as { id: string; trainee_id: string; enrollment_status: string }[]) { const a = byTrainee.get(e.trainee_id); if (a && !referralByEnrollment[e.id] && e.enrollment_status !== "Cancelled") referralByEnrollment[e.id] = a; }
+  });
+  // Company Charge (migration 063): which enrollments are billed to a partner, and the issued statements the Cashier can collect.
+  const companyCharge: Record<string, string> = {};
+  task(async () => { const r = await db.from("enrollments").select("id,company_charge_agency_id").not("company_charge_agency_id", "is", null).limit(2000); if (!r.error) for (const x of (r.data ?? []) as { id: string; company_charge_agency_id: string }[]) companyCharge[x.id] = x.company_charge_agency_id; });
+  let billingStatements: { id: string; bs_number: number; bill_to: string; coverage_from: string; coverage_to: string; total_centavos: number; paid_centavos: number }[] = [];
+  if (canCashier(staff.roleCodes)) task(async () => {
+    const [st, cps, vds] = await Promise.all([db.from("billing_statements").select("id,bs_number,bill_to,coverage_from,coverage_to,total_centavos").order("issued_at", { ascending: false }).limit(100), db.from("company_payments").select("billing_statement_id,amount_centavos"), db.from("billing_statement_voids").select("billing_statement_id")]);
+    const voided = new Set((vds.error ? [] : vds.data ?? []).map((v) => v.billing_statement_id as string));
+    const paidBy = new Map<string, number>(); for (const c of (cps.error ? [] : cps.data ?? []) as { billing_statement_id: string; amount_centavos: number }[]) paidBy.set(c.billing_statement_id, (paidBy.get(c.billing_statement_id) ?? 0) + Number(c.amount_centavos));
+    billingStatements = ((st.error ? [] : st.data ?? []) as Omit<(typeof billingStatements)[number], "paid_centavos">[]).filter((s) => !voided.has(s.id)).map((s) => ({ ...s, paid_centavos: paidBy.get(s.id) ?? 0 }));
+  });
+
+  // Voucher reprint requests (202610080020), newest first; [] before it.
+  let expenseReprints: { id: string; expense_id: string; reason: string; status: string; requested_by_name: string | null; requested_at: string; decision_remarks: string | null }[] = [];
+  if (staff.roleCodes.some((role) => ["admin", "cashier", "accounting"].includes(role))) task(async () => {
+    const { data: rr } = await db.from("expense_reprint_requests").select("id,expense_id,reason,status,requested_by,requested_at,decision_remarks").order("requested_at", { ascending: false }).limit(100);
+    if (!rr?.length) return;
+    const ids = [...new Set(rr.map((r) => r.requested_by).filter(Boolean))] as string[];
+    const { data: people } = ids.length ? await db.from("profiles").select("id,complete_name").in("id", ids) : { data: [] };
+    const names = new Map((people ?? []).map((p) => [p.id as string, p.complete_name as string]));
+    expenseReprints = rr.map((r) => ({ id: r.id, expense_id: r.expense_id, reason: r.reason, status: r.status, requested_by_name: names.get(r.requested_by ?? "") ?? null, requested_at: r.requested_at, decision_remarks: r.decision_remarks }));
+  });
+
+  // Default rooms per course (202610200049), for the Admin.
+  let defaultRooms: unknown[] = [];
+  if (staff.roleCodes.some((r) => ["admin", "admin_assistant"].includes(r))) task(async () => {
+    const { data: dr, error: drError } = await createSupabaseAdminClient().from("course_default_rooms").select("course_id,classroom_id");
+    defaultRooms = drError ? [] : dr ?? [];
+  });
+
+  // Archived endorsed programs and courses, for Configuration › Partners and Courses (owner, 20 Oct 2026).
+  let allOffers: unknown[] = [], archivedCourses: unknown[] = [];
+  if (canManageAccounting(staff.roleCodes)) task(async () => {
+    const [ao, ac, sh] = await Promise.all([
+      db.from("partner_course_offers").select("id,course_id,partner_center_id,duration_label,training_fee_centavos,rebate_centavos,partner_payable_centavos,active,updated_at,partner_centers(name,contact_details)").order("training_fee_centavos"),
+      db.from("courses").select("id,code,name,delivery_type,duration_label,duration_days,training_mode,category_id,standard_price_centavos,public_visible,active,updated_at,course_categories(name)").eq("active", false).order("name"),
+      db.from("partner_course_offers").select("id,agency_share_centavos"),
+    ]);
+    allOffers = ao.data ?? []; archivedCourses = ac.data ?? [];
+    if (!sh.error) { const byId = new Map((sh.data ?? []).map((x) => [x.id as string, Number(x.agency_share_centavos ?? 0)])); allOffers = (allOffers as { id: string }[]).map((o) => ({ ...o, agency_share_centavos: byId.get(o.id) ?? 0 })); }
+  });
+
+  await Promise.all(tasks);
+
   const extrasByEnrollment = new Map(enrollmentExtras.map((row) => [row.id, row]));
   const enrollments = (enrollmentsResult.data ?? []).map((row) => {
     const extra = extrasByEnrollment.get(row.id);
@@ -1182,68 +1250,13 @@ export async function GET() {
     return { ...merged, requested_by_name: expenseExtras.names.get(merged.requested_by ?? "") ?? null, approved_by_name: expenseExtras.names.get(m.approved_by ?? "") ?? null, released_by_name: expenseExtras.names.get(m.released_by ?? "") ?? null };
   });
 
-  // Receipt prints per payment (202610080026); {} before it.
-  const receiptPrints: Record<string, number> = {};
-  { const { data: rp } = await db.from("receipts").select("payment_id,print_count").gt("print_count", 0).order("issued_at", { ascending: false }).limit(2000); for (const r of (rp ?? []) as { payment_id: string; print_count: number }[]) receiptPrints[r.payment_id] = r.print_count; }
-
-  // Referral agency per enrollment (202610080023); {} before it.
-  const referralByEnrollment: Record<string, string> = {};
-  { const { data: refs } = await db.from("enrollments").select("id,referral_agency_id").not("referral_agency_id", "is", null).order("created_at", { ascending: false }).limit(1000); for (const r of (refs ?? []) as { id: string; referral_agency_id: string }[]) referralByEnrollment[r.id] = r.referral_agency_id; }
-  // Open loaded enrollments with no partner of their own fall back to the trainee's partner (29 Oct 2026), so Company Charge is spotted.
-  { const ids = [...new Set((enrollmentsResult.data ?? []).filter((e) => !referralByEnrollment[(e as { id: string }).id] && (e as { enrollment_status: string }).enrollment_status !== "Cancelled").map((e) => (e as { trainee_id: string }).trainee_id))];
-    if (ids.length) { const { data: tas } = await db.from("trainees").select("id,marketing_agency_id").in("id", ids.slice(0, 300)).not("marketing_agency_id", "is", null);
-      const byTrainee = new Map((tas ?? []).map((x) => [x.id as string, x.marketing_agency_id as string]));
-      for (const e of (enrollmentsResult.data ?? []) as { id: string; trainee_id: string; enrollment_status: string }[]) { const a = byTrainee.get(e.trainee_id); if (a && !referralByEnrollment[e.id] && e.enrollment_status !== "Cancelled") referralByEnrollment[e.id] = a; } } }
-  // Rebates that come off once fully paid (21 Oct 2026), for the Cashier's Record Payment.
-  // Company Charge (migration 063): which enrollments are billed to a partner, and the issued statements the Cashier can collect.
-  const companyCharge: Record<string, string> = {};
-  { const r = await db.from("enrollments").select("id,company_charge_agency_id").not("company_charge_agency_id", "is", null).limit(2000); if (!r.error) for (const x of (r.data ?? []) as { id: string; company_charge_agency_id: string }[]) companyCharge[x.id] = x.company_charge_agency_id; }
-  let billingStatements: { id: string; bs_number: number; bill_to: string; coverage_from: string; coverage_to: string; total_centavos: number; paid_centavos: number }[] = [];
-  if (canCashier(staff.roleCodes)) {
-    const [st, cps, vds] = await Promise.all([db.from("billing_statements").select("id,bs_number,bill_to,coverage_from,coverage_to,total_centavos").order("issued_at", { ascending: false }).limit(100), db.from("company_payments").select("billing_statement_id,amount_centavos"), db.from("billing_statement_voids").select("billing_statement_id")]);
-    const voided = new Set((vds.error ? [] : vds.data ?? []).map((v) => v.billing_statement_id as string));
-    const paidBy = new Map<string, number>(); for (const c of (cps.error ? [] : cps.data ?? []) as { billing_statement_id: string; amount_centavos: number }[]) paidBy.set(c.billing_statement_id, (paidBy.get(c.billing_statement_id) ?? 0) + Number(c.amount_centavos));
-    billingStatements = ((st.error ? [] : st.data ?? []) as Omit<(typeof billingStatements)[number], "paid_centavos">[]).filter((s) => !voided.has(s.id)).map((s) => ({ ...s, paid_centavos: paidBy.get(s.id) ?? 0 }));
-  }
-  const pendingRebates = canCashier(staff.roleCodes) ? await pendingFullPaymentRebates(createSupabaseAdminClient(), enrollments.filter((e) => referralByEnrollment[e.id] && e.enrollment_status !== "Cancelled").map((e) => { const c = Array.isArray(e.courses) ? e.courses[0] : e.courses; return { id: e.id, course_id: e.course_id, agency_id: referralByEnrollment[e.id], price: Number(e.selling_price_centavos ?? 0), inHouse: !e.partner_offer_id, code: (c as { code?: string } | null)?.code ?? null }; })) : {};
-
-  // Voucher reprint requests (202610080020), newest first; [] before it.
-  let expenseReprints: { id: string; expense_id: string; reason: string; status: string; requested_by_name: string | null; requested_at: string; decision_remarks: string | null }[] = [];
-  if (staff.roleCodes.some((role) => ["admin", "cashier", "accounting"].includes(role))) {
-    const { data: rr } = await db.from("expense_reprint_requests").select("id,expense_id,reason,status,requested_by,requested_at,decision_remarks").order("requested_at", { ascending: false }).limit(100);
-    if (rr?.length) {
-      const ids = [...new Set(rr.map((r) => r.requested_by).filter(Boolean))] as string[];
-      const { data: people } = ids.length ? await db.from("profiles").select("id,complete_name").in("id", ids) : { data: [] };
-      const names = new Map((people ?? []).map((p) => [p.id as string, p.complete_name as string]));
-      expenseReprints = rr.map((r) => ({ id: r.id, expense_id: r.expense_id, reason: r.reason, status: r.status, requested_by_name: names.get(r.requested_by ?? "") ?? null, requested_at: r.requested_at, decision_remarks: r.decision_remarks }));
-    }
-  }
-
-  // Default rooms per course (202610200049), for the Admin.
-  let defaultRooms: unknown[] = [];
-  if (staff.roleCodes.some((r) => ["admin", "admin_assistant"].includes(r))) {
-    const { data: dr, error: drError } = await createSupabaseAdminClient().from("course_default_rooms").select("course_id,classroom_id");
-    defaultRooms = drError ? [] : dr ?? [];
-  }
-
-  // Post-test results per New Wave enrollment (202610200048), for the Releasing Officer and Admin.
-  let postTestResults: Record<string, unknown> = {};
-  if (canRelease(staff.roleCodes)) {
-    const own = (enrollments as { id: string; course_id: string; partner_offer_id?: string | null; enrollment_status: string }[]).filter((e) => !e.partner_offer_id && e.enrollment_status !== "Cancelled");
-    postTestResults = await postTestStatus(createSupabaseAdminClient(), own).catch(() => ({}));
-  }
-
-  // Archived endorsed programs and courses, for Configuration › Partners and Courses (owner, 20 Oct 2026).
-  let allOffers: unknown[] = [], archivedCourses: unknown[] = [];
-  if (canManageAccounting(staff.roleCodes)) {
-    const [ao, ac] = await Promise.all([
-      db.from("partner_course_offers").select("id,course_id,partner_center_id,duration_label,training_fee_centavos,rebate_centavos,partner_payable_centavos,active,updated_at,partner_centers(name,contact_details)").order("training_fee_centavos"),
-      db.from("courses").select("id,code,name,delivery_type,duration_label,duration_days,training_mode,category_id,standard_price_centavos,public_visible,active,updated_at,course_categories(name)").eq("active", false).order("name"),
-    ]);
-    allOffers = ao.data ?? []; archivedCourses = ac.data ?? [];
-    const { data: shares, error: shareError } = await db.from("partner_course_offers").select("id,agency_share_centavos");
-    if (!shareError) { const byId = new Map((shares ?? []).map((x) => [x.id as string, Number(x.agency_share_centavos ?? 0)])); allOffers = (allOffers as { id: string }[]).map((o) => ({ ...o, agency_share_centavos: byId.get(o.id) ?? 0 })); }
-  }
+  // These two need the built enrollments, so they run together after the rest.
+  // Rebates that come off once fully paid (21 Oct 2026), for the Cashier's Record Payment; post-test
+  // results per New Wave enrollment (202610200048), for the Releasing Officer and Admin.
+  const [pendingRebates, postTestResults] = await Promise.all([
+    canCashier(staff.roleCodes) ? pendingFullPaymentRebates(createSupabaseAdminClient(), enrollments.filter((e) => referralByEnrollment[e.id] && e.enrollment_status !== "Cancelled").map((e) => { const c = Array.isArray(e.courses) ? e.courses[0] : e.courses; return { id: e.id, course_id: e.course_id, agency_id: referralByEnrollment[e.id], price: Number(e.selling_price_centavos ?? 0), inHouse: !e.partner_offer_id, code: (c as { code?: string } | null)?.code ?? null }; })) : Promise.resolve({}),
+    canRelease(staff.roleCodes) ? postTestStatus(createSupabaseAdminClient(), (enrollments as { id: string; course_id: string; partner_offer_id?: string | null; enrollment_status: string }[]).filter((e) => !e.partner_offer_id && e.enrollment_status !== "Cancelled")).catch(() => ({})) : Promise.resolve({}),
+  ]);
 
   return NextResponse.json({ defaultRooms, postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
@@ -2062,15 +2075,17 @@ export async function POST(request: Request) {
       if (!e) return NextResponse.json({ error: "Application not found." }, { status: 404 });
       if (e.enrollment_status !== "Pending") return NextResponse.json({ error: "Only a Pending application can be enrolled." }, { status: 400 });
       if (!e.batch_id && !e.scheduled_on) return NextResponse.json({ error: "Choose a batch or start date first." }, { status: 400 });
-      const agencyId = (e.referral_agency_id as string | null) ?? first(e.trainees as unknown as { marketing_agency_id: string | null } | null)?.marketing_agency_id ?? null;
-      const { data: agency } = agencyId ? await admin.from("marketing_agencies").select("id,name,rebate_mode").eq("id", agencyId).maybeSingle() : { data: null };
-      if (!agency || agency.rebate_mode !== "Company Charge") return NextResponse.json({ error: "This trainee's partner is not set to Company Charge." }, { status: 400 });
+      // Registration picks Company Charge in Mode of Payment with the company (owner, 29 Oct 2026); without one, the partner set to Company Charge applies.
+      const chosen = input.agencyId ?? null;
+      const agencyId = chosen ?? (e.referral_agency_id as string | null) ?? first(e.trainees as unknown as { marketing_agency_id: string | null } | null)?.marketing_agency_id ?? null;
+      const { data: agency } = agencyId ? await admin.from("marketing_agencies").select("id,name,rebate_mode,active").eq("id", agencyId).maybeSingle() : { data: null };
+      if (!agency || (chosen ? !agency.active : agency.rebate_mode !== "Company Charge")) return NextResponse.json({ error: chosen ? "Choose an active company." : "Choose the company to bill." }, { status: 400 });
       const { data: checks } = await admin.from("enrollment_requirement_checks").select("requirement,status,checked_at").eq("enrollment_id", input.enrollmentId).order("checked_at", { ascending: false });
       const latest = new Map<string, string>();
       for (const c of checks ?? []) { const code = c.requirement === "medical_certificate" ? "medical_peme" : c.requirement; if (!latest.has(code)) latest.set(code, c.status); }
       if (!REQUIREMENT_CODES.every((code) => latest.get(code) === "Verified")) return NextResponse.json({ error: "Tick all four requirements first." }, { status: 400 });
       const at = new Date().toISOString();
-      const { error } = await admin.from("enrollments").update({ enrollment_status: "Enrolled", enrolled_at: at, company_charge_agency_id: agency.id, updated_at: at }).eq("id", input.enrollmentId).eq("enrollment_status", "Pending");
+      const { error } = await admin.from("enrollments").update({ enrollment_status: "Enrolled", enrolled_at: at, company_charge_agency_id: agency.id, referral_agency_id: agency.id, source: "Agency", updated_at: at }).eq("id", input.enrollmentId).eq("enrollment_status", "Pending");
       if (error) return NextResponse.json({ error: /company_charge_agency_id/.test(error.message) ? "Apply database update 202610290063 first." : error.message }, { status: 400 });
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "registration", action: "application.company_charge", record_type: "enrollment", record_id: input.enrollmentId, new_values: { agency_id: agency.id, agency: agency.name } });
       await autoSendInstructions(admin, [input.enrollmentId]);

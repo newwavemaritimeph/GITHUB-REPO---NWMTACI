@@ -491,7 +491,11 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
   // Hand to Cashier with the mode of payment (owner, 29 Oct 2026): Cash goes in one click;
   // GCash and other channels needing a reference upload the proof first (Drive only).
   const payModes = data.paymentMethods.filter((m) => m.active && (m.kind ?? "receivable") === "receivable");
-  const [payMode, setPayMode] = useState(payModes.find((m) => m.name === "Cash")?.name ?? payModes[0]?.name ?? "Cash");
+  const [payMode, setPayMode] = useState(billTo ? COMPANY_CHARGE : payModes.find((m) => m.name === "Cash")?.name ?? payModes[0]?.name ?? "Cash");
+  // Company Charge (owner, 29 Oct 2026): Registration picks the company; no Cashier, no receipt, just the TAR.
+  const [ccAgency, setCcAgency] = useState(billTo?.id ?? partnerOf(data, e)?.id ?? "");
+  const isCC = payMode === COMPANY_CHARGE, ccName = data.agencies.find((a) => a.id === ccAgency)?.name ?? "";
+  const companies = data.agencies.filter((a) => a.active || a.id === ccAgency).sort((a, z) => a.name.localeCompare(z.name));
   const [payAmount, setPayAmount] = useState(""), [payRef, setPayRef] = useState(""), [payFile, setPayFile] = useState<File | null>(null);
   const [handing, setHanding] = useState(false), [payError, setPayError] = useState("");
   const needsProof = !!payModes.find((m) => m.name === payMode)?.requires_reference;
@@ -549,24 +553,23 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
         </tr>; })}
       <tr className="sc-total"><td>Received</td><td colSpan={3}>{REQUIREMENTS.length - missingNow.length} of {REQUIREMENTS.length}</td></tr>
     </tbody></table></div>
-    {/* Company Charge partner (29 Oct 2026): enrolled without payment; the partner is billed on its Billing Statement. */}
-    {!r.paid && allTicked && billTo && e.enrollment_status === "Pending" && <div className="sc-pay">
-      <span className="sc-pay-note">Billed to {billTo.name} — no payment at the Cashier.</span>
-      <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || anySaving} onClick={() => void post({ action: "application-enroll-charge", enrollmentId: e.id }, `Enrolled · Company Charge (${billTo.name}).`).catch(() => undefined)}>Enroll · Company Charge</button></div>
-    </div>}
-    {!r.handed && !r.paid && allTicked && !billTo && <div className="sc-pay">
-      <div className="sc-pay-mode"><span className="pay-label">Mode of Payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{payModes.map((m) => <button type="button" role="radio" aria-checked={payMode === m.name} key={m.id} className={payMode === m.name ? "on" : ""} onClick={() => setPayMode(m.name)}>{m.name}</button>)}</div></div>
-      {needsProof ? <>
+    {!r.handed && !r.paid && allTicked && e.enrollment_status === "Pending" && <div className="sc-pay">
+      <div className="sc-pay-mode"><span className="pay-label">Mode of Payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{payModes.map((m) => <button type="button" role="radio" aria-checked={payMode === m.name} key={m.id} className={payMode === m.name ? "on" : ""} onClick={() => setPayMode(m.name)}>{m.name}</button>)}<button type="button" role="radio" aria-checked={isCC} className={isCC ? "on" : ""} onClick={() => setPayMode(COMPANY_CHARGE)}>Company Charge</button></div></div>
+      {isCC ? <>
+        <label className="sc-pay-ref">Company<select value={ccAgency} onChange={(ev) => setCcAgency(ev.target.value)}><option value="">Choose the company…</option>{(["Agency", "Consultancy"] as const).map((k) => { const list = companies.filter((a) => (a.kind === "Consultancy" ? "Consultancy" : "Agency") === k); return list.length ? <optgroup key={k} label={k === "Agency" ? "Agencies" : "Consultancies"}>{list.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</optgroup> : null; })}</select></label>
+        <span className="sc-pay-note">No payment at the Cashier and no receipt: {ccName || "the company"} is billed on its Billing Statement.</span>
+        <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || anySaving || !ccAgency} onClick={() => void post({ action: "application-enroll-charge", enrollmentId: e.id, agencyId: ccAgency }, `Enrolled · Company Charge (${ccName}).`).catch(() => undefined)}>Enroll · Company Charge</button>{!ccAgency && <small>Choose the company first</small>}</div>
+      </> : needsProof ? <>
         <label className="sc-pay-amt">Amount (₱)<input inputMode="decimal" value={payAmount} onChange={(ev) => setPayAmount(ev.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" /></label>
         <label className="sc-pay-ref">Reference No.<input value={payRef} onChange={(ev) => setPayRef(ev.target.value.toUpperCase())} placeholder="From the screenshot" maxLength={80} /></label>
         <label className="sc-pay-file">Proof of Payment<input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(ev) => setPayFile(ev.target.files?.[0] ?? null)} /></label>
       </> : <span className="sc-pay-note">Trainee pays at the Cashier.</span>}
-      <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || handing || anySaving || !proofReady} onClick={() => void handOver()}>{handing ? "Saving…" : needsProof ? "Upload Proof & Hand to Cashier" : "Hand to Cashier"}</button>{needsProof && !proofReady && <small>Amount, reference and photo are required</small>}</div>
+      {!isCC && <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || handing || anySaving || !proofReady} onClick={() => void handOver()}>{handing ? "Saving…" : needsProof ? "Upload Proof & Hand to Cashier" : "Hand to Cashier"}</button>{needsProof && !proofReady && <small>Amount, reference and photo are required</small>}</div>}
       {payError && <div className="sc-pay-err"><Message kind="error" text={payError} /></div>}
     </div>}
     {r.handed && !r.paid && !billTo && (() => { const pr = (data.traineeProofs ?? []).filter((x) => x.trainee_id === e.trainee_id).sort((a, z) => z.submitted_at.localeCompare(a.submitted_at))[0]; return <div className="sc-handed">With the Cashier · {pr ? `${pr.method} ${pesos2(pr.amount_centavos)} · Ref. ${pr.reference}` : "Cash"}</div>; })()}
     <div className="sc-foot">
-      <small>{!allTicked ? `Still to tick: ${missingNow.map((q) => q.label).join(", ")}` : billTo && !r.paid ? `All requirements received. Enroll on Company Charge: ${billTo.name} is billed on its Billing Statement, so no payment at the Cashier.` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
+      <small>{!allTicked ? `Still to tick: ${missingNow.map((q) => q.label).join(", ")}` : isCC && !r.paid ? `All requirements received. Enroll on Company Charge: ${ccName || "the company"} is billed on its Billing Statement, so no payment at the Cashier.` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
       <span className="sc-acts">
         {r.ready && <button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "application-enroll", enrollmentId: e.id }, "Trainee enrolled.").catch(() => undefined)}>Enroll Now</button>}
       </span>
