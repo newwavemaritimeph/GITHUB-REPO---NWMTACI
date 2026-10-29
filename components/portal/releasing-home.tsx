@@ -61,7 +61,7 @@ export function certificateLines(data: PortalData, opts: { inTrainingDays?: numb
     // The portal evaluation form (owner, 20 Oct 2026): every New Wave course needs it.
     const evalNeeded = evaluationRequiredFor(c.delivery_type, e.partner_offer_id);
     const fb = d.feedbackAt?.[e.id] ?? null;
-    const balance = Math.max(0, dueCentavos(e) - Number(e.paid_centavos));
+    const balance = data.companyCharge?.[e.id] ? 0 : Math.max(0, dueCentavos(e) - Number(e.paid_centavos));
     const view = certificateState({ enrollmentStatus: e.enrollment_status, trainingEnd: ended, balanceCentavos: balance, evaluationRequired: evalNeeded, evaluationOn: day(fb), paidOn: lastPaid.get(e.trainee_id) ?? null, cert: cert ? { status: cert.status, printCount: Number(cert.print_count ?? (["Printed", "Released"].includes(cert.status) ? 1 : 0)), reprintsAllowed: Number(cert.reprints_allowed ?? 0), voidStatus: cert.void_status, revoked: !!cert.revoked_at } : null, photoOnFile: photos ? photos.has(e.id) : undefined }, today);
     if (view.state === "Cancelled") continue;
     if (view.state === "Training not finished" && (opts.inTrainingDays === undefined || !ended || ended > addDays(today, opts.inTrainingDays))) continue;

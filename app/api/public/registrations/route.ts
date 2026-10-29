@@ -30,7 +30,7 @@ const registrationSchema = z.object({
   // An agency or consultancy referral code (optional; 8 Oct 2026).
   referralCode: z.string().trim().max(40).optional().default(""),
   // How the applicant is enrolling (8 Oct 2026); Agency needs a valid referral code.
-  enrollmentType: z.enum(["Online enrollment", "Walk-in", "Agency"]).optional().default("Online enrollment"),
+  enrollmentType: z.enum(["Online enrollment", "Walk-in", "Agency", "Meta"]).optional().default("Online enrollment"),
 });
 // 1–5 chosen schedules (batch ids) per submission.
 // Schedules are optional: without one, Registration assigns the course and

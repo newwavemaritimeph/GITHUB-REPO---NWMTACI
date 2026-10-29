@@ -1,0 +1,108 @@
+<title>Company Charge</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Same shell as the live portal: navy bar with dropdown tabs, summary rail on the left, light-cyan table headers. */
+:root{--orange:#F25615;--blue:#0571D0;--cyan:#35CCFA;--cyan-l:#9EE3F1;--navy:#123F63;--bg:#f2f6f8;--surface:#fff;--fg:#0f2638;--muted:#587184;--line:#dbe6ec;--soft:#eef4f8;--th:#e6f6fd;--thc:#0b4f8f;--zebra:#f7fafc;
+ --good:#0a7a3e;--good-bg:#e2f5e9;--warn:#a2470b;--warn-bg:#fdf0e5;--bad:#b42318;--bad-bg:#fcebea;--info:#0571D0;--info-bg:#e5f1fb;
+ --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding-block:16px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.w{max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.logo{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}.logo b{font-size:19px;font-weight:600}.logo b span{color:var(--orange)}.logo small{display:block;color:var(--cyan-l);font-size:14px}.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.who{font-size:14px;color:#cfe3ef;display:flex;align-items:center;gap:8px}.who select{background:#ffffff14;border:1px solid #ffffff30;color:#fff;border-radius:8px;padding:5px 8px}.who select option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:16px;flex-wrap:wrap}.tab>button{background:none;border:0;color:#c3dbea;font:500 16px var(--sans);padding:12px 18px;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:8px}.tab>button:hover{color:#fff;background:#ffffff12}.tab.on>button{background:var(--bg);color:var(--fg);font-weight:600}
+.caret{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.menu{position:absolute;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:15;display:flex;flex-direction:column;margin-top:2px}.tab{position:relative}.menu button{background:none;border:0;text-align:left;color:var(--fg);font:500 15.5px var(--sans);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;gap:12px}.menu button:hover{background:var(--soft)}.menu button.on{background:var(--info-bg);color:var(--info);font-weight:600}.menu small,.n{font:600 11.5px var(--mono);background:var(--orange);color:#fff;border-radius:10px;padding:1px 7px}
+.page{padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.cx-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}h1{font-size:25px;font-weight:600;margin:0}h2{font-size:19px;font-weight:600;margin:0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.seg button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.seg button.on{background:var(--navy);color:#fff}
+.rail{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}@media (max-width:900px){.rail{grid-template-columns:1fr}}.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.ph small{color:var(--muted);font-size:14px}
+.lines{display:flex;flex-direction:column;padding:0 20px 16px}.lines div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}.lines div:first-child{border-top:0}.lines dd,.lines span:last-child{font-family:var(--mono);font-weight:600}.lines .tot{font-weight:700}.lines .bad{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 16px}.tile{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 12px}.tile span{display:block;font-size:13px;color:var(--muted)}.tile b{font:600 19px var(--mono)}
+.cwrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--th);color:var(--thc);font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:10px 12px;border-right:1px solid var(--line);white-space:nowrap}td{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.35}tbody tr:nth-child(even) td{background:var(--zebra)}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}.due{background:var(--bad-bg);color:var(--bad)}.dueo{background:var(--warn-bg);color:var(--warn)}.appr{background:var(--info-bg);color:var(--info)}.paid{background:var(--good-bg);color:var(--good)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:9px;padding:7px 14px;font-weight:600;font-size:14.5px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.okb{background:var(--good);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:14px 20px;background:var(--soft);border-top:1px solid var(--line)}.form label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}.form select,.form input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line)}
+.alert{background:var(--bad-bg);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:15px;font-weight:500;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.note{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+</style>
+<style>
+.views{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:18px}.views button{border:0;background:none;padding:9px 14px;font-weight:600;font-size:14px;color:var(--fg)}.views button.on{background:var(--orange);color:#fff}
+.chip{display:inline-block;font-size:12px;font-weight:600;border-radius:99px;padding:2px 9px;background:var(--soft);color:var(--fg);margin-left:6px;white-space:nowrap}
+.chip.cc{background:var(--warn-bg);color:var(--warn)}.chip.meta{background:#ece9fd;color:#4b3bb5}.chip.con{background:var(--info-bg);color:var(--info)}
+.f{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:14px 20px}@media (max-width:560px){.f{grid-template-columns:1fr}}
+.f label{display:flex;flex-direction:column;gap:6px;font-size:13.5px;font-weight:600}.f input,.f select{height:40px;border:1px solid var(--line);border-radius:9px;padding:0 10px;background:var(--surface);color:var(--fg);font:inherit;font-weight:400}.f .full{grid-column:1/-1}
+.bill{background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:10px 14px;font-weight:600;margin:0 20px 16px}
+.ok{background:var(--good-bg);color:var(--good);border-radius:10px;padding:10px 14px;font-weight:600;margin:0 20px 16px}
+.types{display:flex;gap:10px;flex-wrap:wrap;padding:14px 20px}.type{border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:170px;background:var(--surface);text-align:left}.type b{display:block}.type small{color:var(--muted)}.type.on{border-color:var(--orange);box-shadow:0 0 0 2px var(--warn-bg)}
+select.sel{height:34px;border:1px solid var(--line);border-radius:8px;padding:0 8px;background:var(--surface);color:var(--fg)}
+</style>
+<header class="top"><div class="w">
+ <div class="brand"><div class="logo"><div class="mark">NW</div><div><b>New <span>Wave</span> Portal<span class="proto">PROTOTYPE</span></b><small>Ride the New Wave of Maritime Excellence</small></div></div><div class="who" style="color:#cfe3ef">Company Charge · Trainee Source</div></div>
+ <nav class="tabs"><div class="tab on"><button>Flow</button></div></nav>
+</div></header>
+<main class="page"><div class="w">
+ <div class="views" id="views"><button data-v="1" class="on">1 · Accounting: Partners</button><button data-v="2">2 · Registration: Enroll</button><button data-v="3">3 · Billing Statement</button><button data-v="4">4 · Cashier: Company Payment</button><button data-v="5">5 · Trainee Source</button></div>
+
+ <section id="v1" class="panel"><div class="ph"><h2>Configuration · Partners</h2><small>Accounting</small></div>
+  <div class="cwrap"><table><thead><tr><th>Partner</th><th>Type</th><th>Referral Code</th><th>Billing</th><th>Rebate</th></tr></thead><tbody id="partners"></tbody></table></div>
+  <p class="note">Company Charge: trainees are enrolled without paying at the Cashier, the full fee goes on the partner's Billing Statement, and no rebate applies.</p></section>
+
+ <section id="v2" class="panel" hidden><div class="ph"><h2>Application · NWMTACI-0001502</h2><span class="pill dueo" id="st">Screening</span></div>
+  <div style="padding:0 20px 12px"><b style="font-size:18px">SANTOS, Ramon P.</b><span class="chip con">Consultancy · Marine Force</span><span class="chip cc">Company Charge</span></div>
+  <div class="cwrap"><table><tbody><tr><td>Valid ID / Passport</td><td style="color:var(--good);font-weight:700">✓ Received</td></tr><tr><td>Medical Certificate (PEME Format)</td><td style="color:var(--good);font-weight:700">✓ Received</td></tr><tr><td>2x2 Photo</td><td style="color:var(--good);font-weight:700">✓ Received</td></tr><tr><td>Seaman's Book / SRN</td><td style="color:var(--good);font-weight:700">✓ Received</td></tr></tbody></table></div>
+  <div id="enrollbox"><div class="foot"><span style="color:var(--muted)">Billed to Marine Force — no payment at the Cashier.</span><button class="btn pri" id="enroll">Enroll · Company Charge</button></div></div></section>
+
+ <section id="v3" class="panel" hidden><div class="ph"><h2>Billing Statement</h2><small>Accounting › Reports</small></div>
+  <div class="f"><label>Bill To<select><optgroup label="Consultancies"><option>Marine Force · Company Charge</option></optgroup></select></label><label>From – To<input value="Oct 1 – Oct 31, 2026"></label></div>
+  <div class="cwrap"><table><thead><tr><th>Date Enrolled</th><th>Name</th><th>Training</th><th>Status</th><th class="r">Amount</th></tr></thead><tbody id="bsrows"></tbody></table></div>
+  <div class="foot"><b id="bstotal"></b><button class="btn pri" id="bsprint">Print PDF</button></div></section>
+
+ <section id="v4" class="panel" hidden><div class="ph"><h2>Record Company Payment</h2><small>Cashier</small></div>
+  <div class="f"><label class="full">Billing Statement<select id="bssel"><option>BS No. 000029 · Marine Force · Oct 1–31, 2026 · ₱13,700.00</option></select></label>
+   <label>Amount Received (₱)<input id="camt" value="13700.00"></label><label>Mode of Payment<select><option>PSBank</option><option>UnionBank</option><option>GCash</option><option>Check</option></select></label>
+   <label>Reference No.<input value="PS20261105-0042"></label><label>Proof of Payment<input type="file" style="height:auto;padding:8px"></label></div>
+  <div class="cwrap"><table><thead><tr><th>Trainee</th><th>Training</th><th class="r">Billed</th><th class="r">Applied</th></tr></thead><tbody id="split"></tbody></table></div>
+  <div id="cpdone"></div>
+  <div class="foot"><span style="color:var(--muted)">One Acknowledgement Receipt to Marine Force lists every trainee.</span><button class="btn pri" id="cpost">Record and Issue Receipt</button></div></section>
+
+ <section id="v5" class="panel" hidden><div class="ph"><h2>Website Form · How Are You Enrolling?</h2></div>
+  <div class="types"><button class="type">‹b›</button></div>
+  <div class="ph" style="padding-top:4px"><h2>Registration · Trainees &amp; Enrollments</h2><select class="sel"><option>All Sources</option><option>Online</option><option>Walk-In</option><option>Meta</option><option>Agency</option><option>Consultancy</option></select></div>
+  <div class="cwrap"><table><thead><tr><th>Trainee</th><th>Course</th><th>Status</th></tr></thead><tbody>
+   <tr><td><b>REYES, Marco A.</b><span class="chip meta">Meta</span></td><td>Safety</td><td><span class="pill dueo">Screening</span></td></tr>
+   <tr><td><b>SANTOS, Ramon P.</b><span class="chip con">Consultancy · Marine Force</span><span class="chip cc">Company Charge</span></td><td>Crowd</td><td><span class="pill paid">Enrolled</span></td></tr>
+   <tr><td><b>DELA CRUZ, Juan P.</b><span class="chip">Agency · Qapla Maritime</span></td><td>BT-PSSR</td><td><span class="pill paid">Enrolled</span></td></tr>
+   <tr><td><b>GARCIA, Paolo R.</b><span class="chip">Walk-In</span></td><td>Crisis</td><td><span class="pill appr">With the Cashier</span></td></tr>
+   <tr><td><b>LOPEZ, Ana M.</b><span class="chip">Online</span></td><td>Safety</td><td><span class="pill dueo">Screening</span></td></tr>
+  </tbody></table></div></section>
+</div></main>
+<div class="toast" id="toast" hidden></div>
+<script>
+const $=id=>document.getElementById(id);
+const peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
+function toast(t){const e=$("toast");e.textContent=t;e.hidden=false;setTimeout(()=>{e.hidden=true},3200)}
+const P=[["Marine Force","Consultancy","MARIN482913",true,"Deducted on Full Payment"],["Qapla Maritime","Consultancy","QMCS050698",false,"Deducted on Any Payment"],["Costa Maritime","Agency","COSTA771204",false,"Deducted on Any Payment"]];
+const BS=[["Oct 6, 2026","SANTOS, RAMON P.","PSCMT","Scheduled",130000],["Oct 9, 2026","VILLAR, NOEL S.","STPPDSPPS","Completed",130000],["Oct 14, 2026","TAN, MARK L.","UBT-PSSR","Completed",90000],["Oct 20, 2026","CRUZ, LEO A.","CCI","Scheduled",410000],["Oct 27, 2026","AQUINO, JOEL B.","PSCMHBT","Scheduled",510000]];
+function partners(){$("partners").innerHTML=P.map((p,i)=>'<tr><td><b>'+p[0]+'</b></td><td>'+p[1]+'</td><td class="mono">'+p[2]+'</td><td><select class="sel" data-p="'+i+'"><option'+(p[3]?'':' selected')+'>Pay at Cashier</option><option'+(p[3]?' selected':'')+'>Company Charge</option></select></td><td>'+(p[3]?'<span style="color:var(--muted)">None (Company Charge)</span>':p[4])+'</td></tr>').join("")}
+function bs(){$("bsrows").innerHTML=BS.map(r=>'<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3].toUpperCase()+'</td><td class="r mono">'+peso(r[4])+'</td></tr>').join("");const t=BS.reduce((s,r)=>s+r[4],0);$("bstotal").textContent="Total · "+BS.length+" enrollments · "+peso(t);$("bssel").options[0].text="BS No. 000029 · Marine Force · Oct 1–31, 2026 · "+peso(t);$("camt").value=(t/100).toFixed(2);split()}
+function split(){let left=Math.round(parseFloat($("camt").value||"0")*100);$("split").innerHTML=BS.map(r=>{const a=Math.max(0,Math.min(left,r[4]));left-=a;return '<tr><td>'+r[1]+'</td><td>'+r[2]+'</td><td class="r mono">'+peso(r[4])+'</td><td class="r mono" style="color:'+(a===r[4]?'var(--good)':'var(--warn)')+'">'+peso(a)+'</td></tr>'}).join("")}
+document.addEventListener("change",e=>{if(e.target.dataset.p){const i=+e.target.dataset.p;P[i][3]=e.target.value==="Company Charge";partners();toast(P[i][0]+": "+e.target.value)}});
+document.addEventListener("input",e=>{if(e.target.id==="camt")split()});
+document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+ if(b.dataset.v){document.querySelectorAll("#views button").forEach(x=>x.classList.toggle("on",x===b));for(let k=1;k<=5;k++)$("v"+k).hidden=String(k)!==b.dataset.v}
+ if(b.id==="enroll"){$("st").textContent="Enrolled";$("st").className="pill paid";$("enrollbox").innerHTML='<div class="bill">Enrolled · Company Charge — billed to Marine Force on its Billing Statement. TAR prints with "Company Charge".</div>';toast("Enrolled on Company Charge.")}
+ if(b.id==="bsprint")toast("BS No. 000029 issued · PDF opens with the New Wave letterhead.");
+ if(b.id==="cpost"){$("cpdone").innerHTML='<div class="ok">Recorded · Receipt AR-2026-000331 to Marine Force · every trainee on BS No. 000029 is now paid.</div>';toast("Company payment recorded.")}
+ if(b.classList.contains("type")){document.querySelectorAll(".type").forEach(x=>x.classList.toggle("on",x===b))}
+});
+$("v5").querySelector(".types").innerHTML=[["Online","I'm registering on my own"],["Walk-In","I'm at the New Wave office"],["Agency or Consultancy","My agency or consultancy sent me (referral code)"],["Meta (Facebook / Instagram)","I saw New Wave on Facebook or Instagram"]].map(([t,s],i)=>'<button class="type'+(i===3?' on':'')+'"><b>'+t+'</b><small>'+s+'</small></button>').join("");
+partners();bs();
+</script>

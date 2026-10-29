@@ -47,6 +47,7 @@ export function rebateFor(agencyId: string, courseId: string, matrix: { agency_i
  */
 export const FULL_PAYMENT = "Deducted on full payment";
 export function referralAction(mode: string | null | undefined, paid: boolean, fullyPaid = false): "discount" | "payable" | "skip" {
+  if (mode === "Company Charge") return "skip"; // billed to the company at the full fee (29 Oct 2026)
   if (mode === "No deduction") return paid ? "payable" : "skip";
   if (mode === FULL_PAYMENT) return fullyPaid ? "discount" : "skip";
   return "discount";

@@ -79,6 +79,9 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   // Pending applications Registration handed to the Cashier: enrollment id → when (202610070004).
   handedToCashier?:Record<string,string>;
   traineeProofs?:TraineeProofRow[];
+  // Company Charge (29 Oct 2026): enrollment → partner billed; issued Billing Statements the Cashier can collect.
+  companyCharge?:Record<string,string>;
+  billingStatements?:{id:string;bs_number:number;bill_to:string;coverage_from:string;coverage_to:string;total_centavos:number;paid_centavos:number}[];
   // Times training instructions were generated per enrollment id (202610070007).
   instructionsCount?:Record<string,number>;
   // Latest training-instructions email per enrollment id (202610070012).
@@ -138,7 +141,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   hr: [],
   // Admin (owner, 9 Oct 2026): Dashboard · Search Trainee · Enrollments · Resource Planning ·
   // Configuration ▾ · Requests · Reports ▾ · MISMO ▾ (ADMIN_TABS). Requisitions opens from the dashboard.
-  admin: ["Dashboard","Search trainee","Enrollments","Resource planning","Courses","Post-tests","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Holidays","Requests","Daily summary report","Cash and sales summary","Billing statement","MISMO dashboard","Final list","Submissions","Completion records","Requisitions"],
+  admin: ["Dashboard","Search trainee","Enrollments","Resource planning","Courses","Post-tests","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Requisition items","Holidays","Requests","Daily summary report","Cash and sales summary","Billing statement","MISMO dashboard","Final list","Submissions","Completion records","Requisitions"],
   // Cashier (Accounting Officer), owner's menu of 7 Oct 2026, shown as top tabs:
   // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses,
   // Report (with opening and closing), Requests (CASHIER_TABS).
@@ -198,7 +201,7 @@ const ADMIN_TABS:TopTab[]=[
   {label:"Search trainee",items:["Search trainee"]},
   {label:"Enrollments",items:["Enrollments"]},
   {label:"Resource planning",items:["Resource planning"]},
-  {label:"Configuration",items:["Courses","Post-tests","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Holidays"]},
+  {label:"Configuration",items:["Courses","Post-tests","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Requisition items","Holidays"]},
   {label:"Requests",items:["Requests"]},
   {label:"Reports",items:["Daily summary report","Cash and sales summary","Billing statement"]},
   {label:"MISMO",items:["MISMO dashboard","Final list","Submissions","Completion records"]},

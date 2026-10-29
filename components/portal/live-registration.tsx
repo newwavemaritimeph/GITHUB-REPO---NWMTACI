@@ -11,6 +11,7 @@ import { RequestActionModal, type RequestType } from "./payment-actions";
 import { TarButton } from "./live-cashier";
 import { tcl } from "@/lib/title-case";
 import { shrinkProof } from "@/lib/proof-shrink";
+import { COMPANY_CHARGE, sourceLabel } from "@/lib/company-charge";
 
 /**
  * Registration Officer workspace (rebuilt Oct 2026 to MASTERPLAN §10 as
@@ -352,7 +353,7 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
   const count = (f: RecordFilter) => all.filter((x) => inFilter(f, x.r)).length + (f === "For payment" ? 0 : awaiting.length);
   // Summary rail (owner, 8 Oct 2026): the filters, requirement counts and enrollment types on the left; the list on the right.
   const pending = all.filter((x) => x.r);
-  const types = ["Online enrollment", "Walk-in", "Agency"].map((k) => [k, data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && (enrollmentTypeOf(data, e) || "").startsWith(k)).length] as const);
+  const types = ["Online", "Walk-In", "Meta", "Agency", "Consultancy"].map((k) => [k, data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && (enrollmentTypeOf(data, e) || "").startsWith(k)).length] as const);
   const FILTER_COLORS: Record<RecordFilter, string> = { "All enrollments": "#123F63", Screening: "#0571D0", "For payment": "#F25615" };
   return <>
     <div className="ac-rail">
@@ -401,11 +402,15 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
 /* -------------------------------------------------------------- Registration */
 
 /** Enrollment type (8 Oct 2026): Online enrollment, Walk-in, or Agency with the partner's name. */
+/** Where the trainee came from (owner, 29 Oct 2026): Online, Walk-In, Meta, or the agency or consultancy, plus Company Charge. */
+function partnerOf(data: PortalData, e: Enrollment) {
+  const agencyId = data.companyCharge?.[e.id] ?? data.referralByEnrollment?.[e.id];
+  return agencyId ? data.agencies.find((a) => a.id === agencyId) ?? null : null;
+}
+const chargeTo = (data: PortalData, e: Enrollment) => { const p = partnerOf(data, e); return p && (data.companyCharge?.[e.id] || p.rebate_mode === COMPANY_CHARGE) ? p : null; };
 function enrollmentTypeOf(data: PortalData, e: Enrollment) {
-  const agencyId = data.referralByEnrollment?.[e.id];
-  const agency = agencyId ? data.agencies.find((a) => a.id === agencyId)?.name : null;
-  if (agency) return `Agency · ${agency}`;
-  return e.source === "Online enrollment" || e.source === "Walk-in" || e.source === "Agency" ? e.source : e.source === "Public registration" ? "Online enrollment" : "";
+  const label = sourceLabel(e.source, partnerOf(data, e));
+  return chargeTo(data, e) ? `${label} · Company Charge` : label;
 }
 
 /** "applications" opens the list on Screening, "enrollments" on All enrollments. */
@@ -460,6 +465,7 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
   const allTicked = missingNow.length === 0, anySaving = Object.keys(saving).length > 0;
   const t = first(e.trainees), c = first(e.courses), b = first(e.batches);
   const appNo = appNoOf(data, e.trainee_id) ?? e.enrollment_number;
+  const billTo = chargeTo(data, e);
   // Hand to Cashier with the mode of payment (owner, 29 Oct 2026): Cash goes in one click;
   // GCash and other channels needing a reference upload the proof first (Drive only).
   const payModes = data.paymentMethods.filter((m) => m.active && (m.kind ?? "receivable") === "receivable");
@@ -497,7 +503,7 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
     <div className="sc-band"><div className="sc-seal" aria-hidden="true">NW</div><div><b>Application Screening</b><small>New Wave Maritime Training and Assessment Center, Inc.</small></div><div className="sc-no"><span>Application</span><b>{appNo}</b></div></div>
     <div className="sc-stripe" aria-hidden="true" />
     <div className="sc-ident">
-      <div><span className="sc-cap">Applicant{enrollmentTypeOf(data, e) ? ` · ${enrollmentTypeOf(data, e)}` : ""}</span><h3>{t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : "—"}</h3><p>{t?.trainee_number}{t?.mobile ? ` · ${t.mobile}` : ""}</p>{t?.email && <p className="lc">{t.email}</p>}</div>
+      <div><span className="sc-cap">Applicant{enrollmentTypeOf(data, e) ? ` · ${enrollmentTypeOf(data, e)}` : ""}</span>{!partnerOf(data, e) && e.enrollment_status === "Pending" && <select className="sc-source" aria-label="Where the trainee came from" value={e.source === "Walk-in" || e.source === "Meta" ? e.source : "Online enrollment"} disabled={busy} onChange={(ev) => void post({ action: "enrollment-source", traineeId: e.trainee_id, source: ev.target.value }, "Source saved.").catch(() => undefined)}><option value="Online enrollment">Online</option><option value="Walk-in">Walk-In</option><option value="Meta">Meta (Facebook / Instagram)</option></select>}<h3>{t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : "—"}</h3><p>{t?.trainee_number}{t?.mobile ? ` · ${t.mobile}` : ""}</p>{t?.email && <p className="lc">{t.email}</p>}</div>
       <div><span className="sc-cap">Training</span><b>{c?.name ?? "—"}</b><p>{scheduleOf(e)}{b ? ` · ${b.batch_number}` : ""}</p><p>{b?.mode ?? (c?.code ?? "")}</p></div>
       <div><span className="sc-cap">Payment</span><b className={r.paid ? "sc-good" : ""}>{r.paid ? `${pesos2(r.paidCentavos)} paid` : r.handed ? "With the Cashier" : "Not paid yet"}</b><p>Balance {pesos2(balance)}</p><p><Badge tone={s.tone}>{s.text}</Badge></p></div>
     </div>
@@ -515,7 +521,12 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
         </tr>; })}
       <tr className="sc-total"><td>Received</td><td colSpan={3}>{REQUIREMENTS.length - missingNow.length} of {REQUIREMENTS.length}</td></tr>
     </tbody></table></div>
-    {!r.handed && !r.paid && allTicked && <div className="sc-pay">
+    {/* Company Charge partner (29 Oct 2026): enrolled without payment; the partner is billed on its Billing Statement. */}
+    {!r.paid && allTicked && billTo && e.enrollment_status === "Pending" && <div className="sc-pay">
+      <span className="sc-pay-note">Billed to {billTo.name} — no payment at the Cashier.</span>
+      <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || anySaving} onClick={() => void post({ action: "application-enroll-charge", enrollmentId: e.id }, `Enrolled · Company Charge (${billTo.name}).`).catch(() => undefined)}>Enroll · Company Charge</button></div>
+    </div>}
+    {!r.handed && !r.paid && allTicked && !billTo && <div className="sc-pay">
       <div className="sc-pay-mode"><span className="pay-label">Mode of Payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{payModes.map((m) => <button type="button" role="radio" aria-checked={payMode === m.name} key={m.id} className={payMode === m.name ? "on" : ""} onClick={() => setPayMode(m.name)}>{m.name}</button>)}</div></div>
       {needsProof ? <>
         <label className="sc-pay-amt">Amount (₱)<input inputMode="decimal" value={payAmount} onChange={(ev) => setPayAmount(ev.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" /></label>

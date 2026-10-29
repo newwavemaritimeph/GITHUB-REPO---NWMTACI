@@ -105,6 +105,9 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
   const evaluationFormId = formRow?.evaluation_form_id ?? null;
   // The portal's own evaluation form (owner, 20 Oct 2026): every New Wave course needs it.
   const evaluationRequired = evaluationRequiredFor(c?.delivery_type ?? "In-House", (e as { partner_offer_id?: string | null }).partner_offer_id);
+  // Company Charge (29 Oct 2026): billed to the partner, so the certificate does not wait for payment. None before migration 063.
+  const billed = await db.from("enrollments").select("company_charge_agency_id").eq("id", e.id).maybeSingle();
+  if (!billed.error && (billed.data as { company_charge_agency_id?: string | null } | null)?.company_charge_agency_id) paid = Math.max(paid, due);
   const view = certificateState({
     enrollmentStatus: e.enrollment_status, trainingEnd, balanceCentavos: Math.max(0, due - paid), evaluationRequired,
     evaluationOn: manilaDay((feedback as { submitted_at?: string } | null)?.submitted_at), paidOn: lastPaid,

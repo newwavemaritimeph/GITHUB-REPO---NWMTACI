@@ -1397,7 +1397,7 @@ function PartnersModule({ data, busy, post }: { data: AccountingData; busy: bool
   const agencies = data.agencies as PartnerRow[];
   const stcw = STCW_REBATE_COURSES.map(([code, label]) => ({ code, label, course: data.courses.find((c) => c.code.toUpperCase() === code) ?? null })).filter((x) => x.course);
   const base: PartnerDraft[] = agencies.map((a) => ({ id: a.id, name: a.name, kind: a.kind || "Agency", contact: a.contact_name ?? "", email: a.email ?? "", mobile: a.mobile ?? "", active: a.active, code: a.referral_code ?? "",
-    percent: a.rebate_percent == null ? null : Number(a.rebate_percent), mode: a.rebate_mode === "No deduction" || a.rebate_mode === "Deducted on full payment" ? a.rebate_mode : "Deducted",
+    percent: a.rebate_percent == null ? null : Number(a.rebate_percent), mode: a.rebate_mode === "No deduction" || a.rebate_mode === "Deducted on full payment" || a.rebate_mode === "Company Charge" ? a.rebate_mode : "Deducted",
     stcw: Object.fromEntries(stcw.map((s) => { const v = data.agencyCourseRebates.find((r) => r.agency_id === a.id && r.course_id === s.course!.id)?.rebate_centavos ?? 0; return [s.course!.id, v ? (v / 100).toFixed(2) : ""]; })) }));
   const [edits, setEdits] = useState<Record<string, PartnerDraft>>({});
   const [filter, setFilter] = useState<"Active" | "Archived" | "All">("Active"), [query, setQuery] = useState("");
@@ -1460,7 +1460,7 @@ function PartnersModule({ data, busy, post }: { data: AccountingData; busy: bool
               <label className={`rb3-other${custom ? " on" : ""}`}><input type="number" min="1" max="100" step="0.5" placeholder="Other" aria-label={`Other percentage for ${r.name}`} value={custom ? String(r.percent) : ""} onChange={(e) => set(r.id, { percent: e.target.value === "" ? (custom ? null : r.percent) : Number(e.target.value) })} />%</label>
             </div>{r.percent == null && <small className="rb3-none">Not set</small>}</td>
             {stcw.map((s) => <td key={s.code} className="r"><input className="rb3-amt" type="number" min="0" step="0.01" placeholder="—" aria-label={`${r.name} ${s.label} rebate`} value={r.stcw[s.course!.id] ?? ""} onChange={(e) => set(r.id, { stcw: { ...r.stcw, [s.course!.id]: e.target.value } })} /></td>)}
-            <td><select className="rb3-mode" value={r.mode} onChange={(e) => set(r.id, { mode: e.target.value })}><option value="Deducted on full payment">Deducted Once Fully Paid</option><option value="Deducted">Deducted on Any Payment</option><option value="No deduction">Paid to the Partner Later</option></select></td>
+            <td><select className="rb3-mode" value={r.mode} onChange={(e) => set(r.id, { mode: e.target.value })}><option value="Deducted on full payment">Deducted Once Fully Paid</option><option value="Deducted">Deducted on Any Payment</option><option value="No deduction">Paid to the Partner Later</option><option value="Company Charge">Company Charge (Billed, No Rebate)</option></select></td>
             <td><span className={`ac-chip ${r.active ? "ok" : "warn"}`}>{r.active ? "Active" : "Archived"}</span></td>
           </tr>
           {open === r.id && <tr className="pm-details"><td colSpan={span}><div className="pm-form">
@@ -1476,7 +1476,7 @@ function PartnersModule({ data, busy, post }: { data: AccountingData; busy: bool
       {problem && <div className="portal-message error">{problem}</div>}
       <div className={`rb3-bar${dirty.length ? " on" : ""}`}><span>{dirty.length ? `${dirty.length} partner${dirty.length === 1 ? "" : "s"} changed` : "No changes"}</span>
         <span className="cx-acts"><button type="button" className="portal-secondary" disabled={!dirty.length || busy} onClick={() => { setEdits({}); setProblem(""); }}>Discard</button><button type="button" className="portal-primary" disabled={!dirty.length || busy} onClick={() => void save()}>{busy ? "Saving…" : "Save Changes"}</button></span></div>
-      <p className="ac-note">Trainees type the referral code on the website registration. Deducted: the trainee pays the fee less the rebate. Paid to the partner later: the trainee pays the full fee and the rebate goes to Payables › Agency Rebates. Every change is recorded in the audit log.</p>
+      <p className="ac-note">Trainees type the referral code on the website registration. Deducted: the trainee pays the fee less the rebate. Paid to the partner later: the trainee pays the full fee and the rebate goes to Payables › Agency Rebates. Company Charge: the trainee is enrolled without paying; the partner is billed the full fee on its Billing Statement, with no rebate. Every change is recorded in the audit log.</p>
     </section>
     <EndorsedPrograms data={data} busy={busy} post={post} />
   </>;

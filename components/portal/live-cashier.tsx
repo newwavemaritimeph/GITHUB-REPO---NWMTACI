@@ -192,6 +192,41 @@ const Who = ({ name, number }: { name: string; number?: string }) => <><span cla
 const payState = (e: Enrollment) => (e.enrollment_status === "Cancelled" ? "Cancelled" : balanceOf(e) === 0 ? "Paid" : paidOf(e) > 0 ? "Partially paid" : "Unpaid");
 const PAY_TONE: Record<string, string> = { Paid: "active", "Partially paid": "orange", Unpaid: "red", Cancelled: "cancelled" };
 
+/** Company Charge (owner, 29 Oct 2026): one payment for a partner's whole Billing Statement, one receipt to the company. */
+function CompanyPaymentModal({ data, reload, onClose }: { data: PortalData; reload: () => Promise<void>; onClose: () => void }) {
+  const open = (data.billingStatements ?? []).filter((b) => b.paid_centavos < b.total_centavos);
+  const [id, setId] = useState(open[0]?.id ?? "");
+  const st = open.find((b) => b.id === id);
+  const left = st ? st.total_centavos - st.paid_centavos : 0;
+  const [amount, setAmount] = useState(left ? (left / 100).toFixed(2) : "");
+  const modes = modeNames(data);
+  const [method, setMethod] = useState(modes.find((m) => m !== "Cash") ?? modes[0] ?? "Cash"), [reference, setReference] = useState("");
+  const [receivedAt, setReceivedAt] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
+  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [done, setDone] = useState<string | null>(null);
+  const cents = toCentavos(amount), needRef = needsReference(data, method);
+  const valid = !!st && cents > 0 && cents <= left && (!needRef || reference.trim().length > 0);
+  async function save() {
+    setBusy(true); setError("");
+    try { const r = await submit({ action: "company-payment", billingStatementId: id, amountCentavos: cents, method, referenceNumber: reference.trim(), receivedAt: new Date(receivedAt).toISOString() }) as { companyPaymentId?: string }; setDone(r.companyPaymentId ?? ""); await reload(); }
+    catch (e) { setError(e instanceof Error ? e.message : "Could not record the payment."); } finally { setBusy(false); }
+  }
+  const range = (b: NonNullable<typeof st>) => `${fmtDate(b.coverage_from)} – ${fmtDate(b.coverage_to)}`;
+  if (done !== null) return <Modal title="Company Payment Recorded" onClose={onClose}><div className="portal-form">
+    <div className="full"><Message kind="success" text={`${pesos(cents)} received from ${st?.bill_to ?? "the company"} · applied to its trainees.`} /></div>
+    <div className="portal-form-actions full">{done && <a className="portal-primary" href={`/portal/company-receipt/${done}`} target="_blank" rel="noreferrer">Print Company Receipt</a>}<button type="button" className="portal-secondary" onClick={onClose}>Done</button></div>
+  </div></Modal>;
+  return <Modal title="Record Company Payment" onClose={onClose}><div className="portal-form">
+    {error && <div className="full"><Message kind="error" text={error} /></div>}
+    <label className="full">Billing Statement<select value={id} onChange={(e) => { setId(e.target.value); const b = open.find((x) => x.id === e.target.value); setAmount(b ? ((b.total_centavos - b.paid_centavos) / 100).toFixed(2) : ""); }}>{open.map((b) => <option key={b.id} value={b.id}>BS No. {String(b.bs_number).padStart(6, "0")} · {b.bill_to} · {range(b)} · {pesos(b.total_centavos - b.paid_centavos)} left</option>)}</select></label>
+    <label>Amount Received (₱)<input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />{cents > left && <small className="field-error">More than the {pesos(left)} left on this statement.</small>}</label>
+    <label>Received At<input type="datetime-local" value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} /></label>
+    <div className="full"><span className="pay-label">Mode of Payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{modes.map((m) => <button type="button" role="radio" aria-checked={method === m} key={m} className={method === m ? "on" : ""} onClick={() => setMethod(m)}>{m}</button>)}</div></div>
+    {needRef && <label className="full">Reference No.<input value={reference} onChange={(e) => setReference(e.target.value.toUpperCase())} placeholder="Bank or e-wallet reference" /></label>}
+    <p className="portal-form-note full">The amount is applied to the statement&apos;s trainees in order. Each trainee gets a receipt, and one Acknowledgement Receipt goes to the company.</p>
+    <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !valid} onClick={() => void save()}>{busy ? "Recording…" : "Record and Issue Receipt"}</button></div>
+  </div></Modal>;
+}
+
 type ExtraLine = { key: string; chargeCatalogId: string | null; description: string; unit: number; quantity: number; enrollmentId: string; kind: "item" | "fee" };
 
 /**
@@ -375,6 +410,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
  * balances still due after training (emailed daily at 4:00 PM).
  */
 export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData; onPay: (enrollmentId: string) => void; reload: () => Promise<void>; go?: (module: string) => void }) {
+  const [companyPay, setCompanyPay] = useState(false);
   const [raising, setRaising] = useState(false), [reqFilter, setReqFilter] = useState<"All" | "For Approval" | "Approved" | "Rejected">("All");
   const today = manilaToday();
   const handed = data.handedToCashier ?? {};
@@ -391,7 +427,7 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
   const paidRecently = new Set(data.payments.filter((p) => day(p.received_at) >= since).map((p) => p.trainee_id));
   const paid = groupByTrainee(data, data.enrollments.filter((e) => paidRecently.has(e.trainee_id) && e.enrollment_status !== "Cancelled" && paidOf(e) > 0)).sort((a, b) => a.name.localeCompare(b.name));
   const durations = new Map(data.courses.map((c) => [c.id, c.duration_label]));
-  const unpaid = unpaidAfterTraining(data.enrollments as unknown as BalanceEnrollment[], (id) => durations.get(id), today);
+  const unpaid = unpaidAfterTraining(data.enrollments.filter((e) => !data.companyCharge?.[e.id]) as unknown as BalanceEnrollment[], (id) => durations.get(id), today);
   const proofs = data.traineeProofs ?? [];
   const [fromProof, setFromProof] = useState<TraineeProofRow | null>(null), [notValid, setNotValid] = useState<{ id: string; reason: string } | null>(null);
   const freshP = usePaged(fresh), paidP = usePaged(paid), unpaidP = usePaged(unpaid), proofP = usePaged(proofs);
@@ -445,6 +481,7 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
           <dl className="ac-lines"><div><dt>To collect · {toCollect.length}</dt><dd className="minus">{pesos2(toCollect.reduce((s, l) => s + Number(l.e.rebate_centavos), 0))}</dd></div></dl>
           {go && <div className="cr-act"><button type="button" className="portal-secondary" onClick={() => go("Other income")}>Open Rebates</button></div>}</section> : null; })()}
         <button type="button" className="cr-big cr-pay" onClick={() => onPay("")}><b>Record Payment</b><small>{fresh.length} waiting to pay</small></button>
+        {(data.billingStatements ?? []).some((b) => b.paid_centavos < b.total_centavos) && <button type="button" className="cr-big cr-pay" onClick={() => setCompanyPay(true)}><b>Record Company Payment</b><small>{(data.billingStatements ?? []).filter((b) => b.paid_centavos < b.total_centavos).length} Billing Statement(s) to collect</small></button>}
         <button type="button" className="cr-big cr-exp" onClick={() => setRaising(true)}><b>Raise Expense</b><small>Sent to Accounting for approval</small></button>
       </div>
       <div className="ac-stack">
@@ -491,6 +528,7 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
       </div>
     </div>
     {raising && <RecordExpenseModal data={data} onClose={() => setRaising(false)} post={post} />}
+    {companyPay && <CompanyPaymentModal data={data} reload={reload} onClose={() => setCompanyPay(false)} />}
     {fromProof && <RecordPaymentModal data={data} initialProof={fromProof} onClose={() => setFromProof(null)} onSaved={reload} />}
   </div>;
 }

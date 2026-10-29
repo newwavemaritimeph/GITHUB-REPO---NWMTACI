@@ -15,7 +15,10 @@ export async function loadUnpaidBalances(db: Admin, today: string) {
   const enrollments = (rows ?? []) as unknown as (BalanceEnrollment & { courses?: { duration_label?: string } | { duration_label?: string }[] | null })[];
   const durationOf = (courseId: string) => { const e = enrollments.find((x) => x.course_id === courseId); const c = (Array.isArray(e?.courses) ? e?.courses[0] : e?.courses) as { duration_label?: string } | null | undefined; return c?.duration_label ?? "1"; };
   // Only enrollments whose training has ended need their money loaded.
-  const candidates = enrollments.filter((e) => { const end = trainingEnd(e, durationOf); return !!end && end <= today; });
+  // Company Charge enrollments are billed to the partner (migration 063), not chased at the counter.
+  const billed = await db.from("enrollments").select("id").not("company_charge_agency_id", "is", null).limit(5000);
+  const billedIds = new Set(billed.error ? [] : (billed.data ?? []).map((r) => r.id as string));
+  const candidates = enrollments.filter((e) => { if (billedIds.has(e.id)) return false; const end = trainingEnd(e, durationOf); return !!end && end <= today; });
   const ids = candidates.map((e) => e.id);
   const paid = new Map<string, number>(), charges = new Map<string, number>(), discounts = new Map<string, number>();
   for (let i = 0; i < ids.length; i += 100) {

@@ -5,7 +5,7 @@ import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
  * consultancy, by date enrolled within the coverage, at the full training fee (the
  * referral rebate is not taken off), with the training status.
  */
-export type BillingRow = { enrolled: string; name: string; training: string; status: string; amount: number };
+export type BillingRow = { enrollmentId?: string; enrolled: string; name: string; training: string; status: string; amount: number };
 export type BillingStatement = { bsNumber: string; date: string; billTo: string; kind: string; coverage: string; rows: BillingRow[]; total: number };
 
 export const bsNumber = (n: number) => String(n).padStart(6, "0");
@@ -55,7 +55,7 @@ export async function buildBillingRows(db: Admin, from: string, to: string) {
   const byAgency = new Map<string, BillingRow[]>();
   for (const e of referred) {
     const t = one(e.trainees), b = one(e.batches);
-    const row: BillingRow = { enrolled: long(manilaDay(e.created_at)), name: `${(t?.legal_last_name ?? "").toUpperCase()}, ${(t?.legal_first_name ?? "").toUpperCase()}`, training: one(e.courses)?.code ?? "", status: trainingStatus(b?.starts_on ?? e.scheduled_on, b?.ends_on ?? e.scheduled_on, today), amount: Number(e.selling_price_centavos ?? 0) + (extra.get(e.id) ?? 0) };
+    const row: BillingRow = { enrollmentId: e.id, enrolled: long(manilaDay(e.created_at)), name: `${(t?.legal_last_name ?? "").toUpperCase()}, ${(t?.legal_first_name ?? "").toUpperCase()}`, training: one(e.courses)?.code ?? "", status: trainingStatus(b?.starts_on ?? e.scheduled_on, b?.ends_on ?? e.scheduled_on, today), amount: Number(e.selling_price_centavos ?? 0) + (extra.get(e.id) ?? 0) };
     const id = agencyOf(e) as string;
     byAgency.set(id, [...(byAgency.get(id) ?? []), row]);
   }

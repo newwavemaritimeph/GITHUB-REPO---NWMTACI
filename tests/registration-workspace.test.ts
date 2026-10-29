@@ -152,7 +152,7 @@ describe("Registration Officer workspace", () => {
     const source = readFileSync(new URL("../components/portal/live-registration.tsx", import.meta.url), "utf8");
     // Sent directly from the Registration screens.
     const direct = new Set([...source.matchAll(/action: ?"([a-z-]+)"/g)].map((m) => m[1]));
-    expect([...direct].sort()).toEqual(["application-assign", "application-enroll", "application-handover", "application-place-batch", "enrollment-set-start", "other-course-center", "package-assign", "requirement-check", "send-instructions"]);
+    expect([...direct].sort()).toEqual(["application-assign", "application-enroll", "application-enroll-charge", "application-handover", "application-place-batch", "enrollment-set-start", "enrollment-source", "other-course-center", "package-assign", "requirement-check", "send-instructions"]);
     // The Training Admission Record is printed by the Cashier, never from here.
     expect(source).not.toContain("admission-record-issue");
     expect(source).not.toContain("openAdmissionRecord");

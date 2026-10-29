@@ -2444,3 +2444,4 @@ button.rd-row:hover { background: #f6fafc; }
 /* Checkboxes in Configuration forms (owner, 29 Oct 2026: "Why the check so big"): normal size, label beside it. */
 .nw-shell .pm-form input[type=checkbox],.nw-shell .pm-form input[type=radio]{width:18px;height:18px;margin:0;flex:0 0 18px;accent-color:#123F63}
 .nw-shell .pm-form label:has(> input[type=checkbox]),.nw-shell .pm-form label:has(> input[type=radio]){flex-direction:row;align-items:center;gap:10px;align-self:end;min-height:42px;font-size:14px;color:#0f2638}
+.portal-shell .sc-source{margin-left:8px;height:30px;border:1px solid #cfdbe3;border-radius:8px;padding:0 8px;font-size:13px;background:#fff;color:#123F63}
