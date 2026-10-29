@@ -14,6 +14,7 @@ import type { CashierReportSnapshot } from "@/lib/documents";
 import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balances";
 import { downloadCsv } from "@/lib/csv";
 import { tcl } from "@/lib/title-case";
+import { askText } from "./dialogs";
 
 /**
  * Accounting Manager (owner, 8 Oct 2026): a view-first dashboard like the
@@ -573,7 +574,7 @@ export function FinanceSummaryReport({ switcher }: { switcher?: ReactNode }) {
 
 /* ------------------------------------------------------------ billing statement */
 
-type BillingPreview = { from: string; to: string; statements: { agencyId: string; billTo: string; kind: string; rows: BillingRow[]; total: number; bsNumber: string | null }[] };
+type BillingPreview = { from: string; to: string; statements: { agencyId: string; billTo: string; kind: string; rows: BillingRow[]; total: number; bsNumber: string | null; statementId?: string | null }[] };
 const firstOfMonth = (d: string) => `${d.slice(0, 8)}01`;
 /**
  * Billing Statement (owner, 22 Oct 2026): per agency or consultancy (dropdown), the trainees
@@ -582,13 +583,38 @@ const firstOfMonth = (d: string) => `${d.slice(0, 8)}01`;
 export function BillingStatementReport({ switcher }: { switcher?: ReactNode }) {
   const today = manilaToday();
   const [from, setFrom] = useState(firstOfMonth(today)), [to, setTo] = useState(today), [agency, setAgency] = useState("");
-  const { data, error } = useJson<BillingPreview>(`/api/staff/billing-statement?from=${from}&to=${to}`);
+  // Amounts Accounting types before issuing (owner, 29 Oct 2026: partners have their own pricelists); a void lets a corrected one be issued.
+  const [typed, setTyped] = useState<Record<string, string>>({}), [version, setVersion] = useState(0), [busy, setBusy] = useState(false), [problem, setProblem] = useState("");
+  const { data, error } = useJson<BillingPreview>(`/api/staff/billing-statement?from=${from}&to=${to}&v=${version}`);
   const list = data?.statements ?? [];
   const st = list.find((x) => x.agencyId === agency) ?? list[0] ?? null;
+  const issued = !!st?.bsNumber;
+  const amountOf = (r: BillingRow) => (!issued && r.enrollmentId && typed[r.enrollmentId] !== undefined ? Math.round((Number(typed[r.enrollmentId]) || 0) * 100) : r.amount);
+  const total = st ? st.rows.reduce((s, r) => s + amountOf(r), 0) : 0;
+  const pdfUrl = st ? `/api/documents/billing-statement?agency=${st.agencyId}&from=${from}&to=${to}` : "";
+  async function act(body: Record<string, unknown>) {
+    setBusy(true); setProblem("");
+    try { const r = await fetch("/api/staff/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }); const b = await r.json(); if (!r.ok) throw new Error(b.error ?? "Could not save."); return b; }
+    finally { setBusy(false); }
+  }
+  async function issue() {
+    if (!st) return;
+    const amounts = Object.fromEntries(st.rows.filter((r) => r.enrollmentId).map((r) => [r.enrollmentId!, amountOf(r)]));
+    const tab = window.open("", "_blank");
+    try { await act({ action: "billing-statement-issue", agencyId: st.agencyId, from, to, amounts }); setTyped({}); setVersion((v) => v + 1); if (tab) tab.location.href = pdfUrl; }
+    catch (e) { tab?.close(); setProblem(e instanceof Error ? e.message : "Could not issue the statement."); }
+  }
+  async function voidIt() {
+    if (!st?.statementId) return;
+    const reason = await askText(`Void BS No. ${st.bsNumber}? A corrected statement can then be issued with a new BS No. Reason:`, "", { title: "Void Billing Statement", okLabel: "Void", danger: true });
+    if (!reason || reason.trim().length < 3) return;
+    try { await act({ action: "billing-statement-void", billingStatementId: st.statementId, reason: reason.trim() }); setVersion((v) => v + 1); }
+    catch (e) { setProblem(e instanceof Error ? e.message : "Could not void the statement."); }
+  }
   const groups = (["Agency", "Consultancy"] as const).map((k) => [k, list.filter((x) => (x.kind === "Consultancy" ? "Consultancy" : "Agency") === k)] as const).filter(([, xs]) => xs.length);
   return <div className="portal-page cx ac">
     <div className="cx-head"><div><span className="portal-eyebrow">Accounting · Reports</span><h1>Billing Statement</h1></div>
-      <div className="ac-controls">{st && <a className="portal-primary" href={`/api/documents/billing-statement?agency=${st.agencyId}&from=${from}&to=${to}`} target="_blank" rel="noreferrer">{st.bsNumber ? "Reprint PDF" : "Print PDF"}</a>}</div></div>
+      <div className="ac-controls">{st && (issued ? <><a className="portal-primary" href={pdfUrl} target="_blank" rel="noreferrer">Reprint PDF</a><button type="button" className="portal-secondary" disabled={busy} onClick={() => void voidIt()}>Void Statement</button></> : <button type="button" className="portal-primary" disabled={busy || !st.rows.length} onClick={() => void issue()}>{busy ? "Issuing…" : "Issue and Print PDF"}</button>)}</div></div>
     {switcher}
     <div className="pd-bar cs-bar">
       <label className="rp-who">Bill To<select value={st?.agencyId ?? ""} onChange={(e) => setAgency(e.target.value)} disabled={!list.length}>
@@ -599,14 +625,16 @@ export function BillingStatementReport({ switcher }: { switcher?: ReactNode }) {
       <label className="rp-who">To<input type="date" value={to} min={from} max={today} onChange={(e) => e.target.value && setTo(e.target.value)} /></label>
     </div>
     {error && <Message kind="error" text={error} />}
+    {problem && <Message kind="error" text={problem} />}
     {!data ? !error && <p className="portal-empty-copy">Loading…</p> : !st ? <p className="portal-empty-copy">No enrollments referred by an agency or consultancy in this coverage.</p> :
       <section className="portal-panel cx-panel bs-sheet">
-        <div className="bs-title"><h2>Billing Statement</h2><span className="bs-form">Form No: NW-FMGR-04-24 · Issued Date: 12/03/2025</span></div>
+        <div className="bs-title"><h2>Billing Statement{issued ? ` · BS No. ${st.bsNumber}` : ""}</h2><span className="bs-form">Form No: NW-FMGR-04-24 · Issued Date: 12/03/2025</span></div>
         <table className="bs-info"><tbody><tr><td>Bill to:</td><td><b>{st.billTo}</b></td></tr><tr><td>Billing Coverage:</td><td>{fmtDate(from)} – {fmtDate(to)} (as per date enrolled)</td></tr></tbody></table>
         <div className="cl-wrap"><table className="cl-log bs-items"><thead><tr><th>Date Enrolled</th><th>Name</th><th>Training</th><th>Status</th><th className="fs-n">Amount</th></tr></thead><tbody>
-          {st.rows.map((r, i) => <tr key={i}><td>{r.enrolled}</td><td>{r.name}</td><td>{r.training}</td><td className="bs-st">{r.status}</td><td className="fs-n">{pesos2(r.amount)}</td></tr>)}
-          <tr className="fs-tot"><td colSpan={4}>Total · {st.rows.length} enrollment{st.rows.length === 1 ? "" : "s"}</td><td className="fs-n">{pesos2(st.total)}</td></tr>
+          {st.rows.map((r, i) => <tr key={i}><td>{r.enrolled}</td><td>{r.name}</td><td>{r.training}</td><td className="bs-st">{r.status}</td><td className="fs-n">{!issued && r.enrollmentId ? <input className="rb3-amt" type="number" min="0" step="0.01" aria-label={`Amount for ${r.name}`} value={typed[r.enrollmentId] ?? (r.amount / 100).toFixed(2)} onChange={(e) => setTyped({ ...typed, [r.enrollmentId!]: e.target.value })} /> : pesos2(r.amount)}</td></tr>)}
+          <tr className="fs-tot"><td colSpan={4}>Total · {st.rows.length} enrollment{st.rows.length === 1 ? "" : "s"}</td><td className="fs-n">{pesos2(issued ? st.total : total)}</td></tr>
         </tbody></table></div>
+        <p className="ac-note">{issued ? "Issued statements stay as printed. Void it to issue a corrected one with a new BS No." : "Type each amount from the partner's pricelist, then Issue and Print PDF. Company Charge trainees are billed at these amounts, and their balances follow."}</p>
       </section>}
   </div>;
 }

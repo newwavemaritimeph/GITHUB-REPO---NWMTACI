@@ -26,3 +26,12 @@ describe("Company Charge partners", () => {
     expect(sourceLabel("Public registration", null)).toBe("Online");
   });
 });
+
+import { pricelistAdjustment } from "@/lib/company-charge";
+describe("partner pricelist adjustment", () => {
+  it("brings the trainee's fee to the billed amount", () => {
+    expect(pricelistAdjustment(130000, 110000)).toEqual({ kind: "discount", amountCentavos: 20000 });
+    expect(pricelistAdjustment(110000, 120000)).toEqual({ kind: "charge", amountCentavos: 10000 });
+    expect(pricelistAdjustment(130000, 130000)).toBeNull();
+  });
+});

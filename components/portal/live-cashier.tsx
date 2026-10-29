@@ -213,7 +213,7 @@ function CompanyPaymentModal({ data, reload, onClose }: { data: PortalData; relo
   const range = (b: NonNullable<typeof st>) => `${fmtDate(b.coverage_from)} – ${fmtDate(b.coverage_to)}`;
   if (done !== null) return <Modal title="Company Payment Recorded" onClose={onClose}><div className="portal-form">
     <div className="full"><Message kind="success" text={`${pesos(cents)} received from ${st?.bill_to ?? "the company"} · applied to its trainees.`} /></div>
-    <div className="portal-form-actions full">{done && <a className="portal-primary" href={`/portal/company-receipt/${done}`} target="_blank" rel="noreferrer">Print Company Receipt</a>}<button type="button" className="portal-secondary" onClick={onClose}>Done</button></div>
+    <div className="portal-form-actions full">{done && <a className="portal-primary" href={`/api/documents/company-receipt/${done}`} target="_blank" rel="noreferrer">Print Company Receipt</a>}<button type="button" className="portal-secondary" onClick={onClose}>Done</button></div>
   </div></Modal>;
   return <Modal title="Record Company Payment" onClose={onClose}><div className="portal-form">
     {error && <div className="full"><Message kind="error" text={error} /></div>}

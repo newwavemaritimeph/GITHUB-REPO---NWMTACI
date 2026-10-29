@@ -31,3 +31,13 @@ export function sourceLabel(source: string | null | undefined, partner: { name: 
   if (source === "Online enrollment" || source === "Public registration") return "Online";
   return source === "Agency" ? "Agency" : "";
 }
+
+/**
+ * Partner pricelist (owner, 29 Oct 2026): the adjustment that makes a trainee's fee equal the
+ * amount Accounting billed the company. A discount when lower, a charge when higher, none when equal.
+ */
+export function pricelistAdjustment(dueCentavos: number, billedCentavos: number): { kind: "discount" | "charge"; amountCentavos: number } | null {
+  const diff = billedCentavos - dueCentavos;
+  if (!diff) return null;
+  return diff < 0 ? { kind: "discount", amountCentavos: -diff } : { kind: "charge", amountCentavos: diff };
+}

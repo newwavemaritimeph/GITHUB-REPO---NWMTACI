@@ -3,8 +3,8 @@ import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { pendingTraineeProofs } from "@/lib/trainee-proof";
 import { tarPrintable } from "@/lib/trainee-match";
-import { splitStatementPayment } from "@/lib/company-charge";
-import { bsNumber } from "@/lib/billing-statement";
+import { pricelistAdjustment, splitStatementPayment } from "@/lib/company-charge";
+import { bsNumber, buildBillingRows, statementTotal } from "@/lib/billing-statement";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hardDeleteEnrollment, pruneUnpaidEnrollments, deletePastEmptyBatches } from "@/lib/enrollments";
@@ -275,6 +275,9 @@ const applicationHandoverInput = z.object({ action: z.literal("application-hando
 // Company Charge (owner, 29 Oct 2026): enroll without payment; the partner is billed. One payment per Billing Statement.
 const enrollChargeInput = z.object({ action: z.literal("application-enroll-charge"), enrollmentId: z.string().uuid() });
 const companyPaymentInput = z.object({ action: z.literal("company-payment"), billingStatementId: z.string().uuid(), amountCentavos: z.number().int().positive(), method: z.string().trim().min(1).max(80), referenceNumber: z.string().trim().max(80).optional().default(""), receivedAt: z.string().datetime({ offset: true }) });
+// Billing Statement amounts typed by Accounting, and void and reissue (owner, 29 Oct 2026).
+const statementIssueInput = z.object({ action: z.literal("billing-statement-issue"), agencyId: z.string().uuid(), from: z.string().date(), to: z.string().date(), amounts: z.record(z.string().uuid(), z.number().int().min(0).max(100_000_000)).default({}) });
+const statementVoidInput = z.object({ action: z.literal("billing-statement-void"), billingStatementId: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
 const sourceSetInput = z.object({ action: z.literal("enrollment-source"), traineeId: z.string().uuid(), source: z.enum(["Online enrollment", "Walk-in", "Meta"]) });
 const requestChargeInput = z.object({ action: z.literal("request-charge"), id: z.string().uuid(), chargeCatalogId: z.string().uuid().nullable().optional(), description: z.string().trim().max(200).optional(), amountCentavos: z.number().int().min(0), remarks: z.string().trim().max(500).optional() });
 // Course now, batch later (202610070005): the batch is optional.
@@ -293,7 +296,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [statementIssueInput, statementVoidInput, enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 /** A proof the trainee sent (29 Oct 2026) backs one payment of that trainee, unless marked Not Valid. Staff-filed proofs return null. */
 async function traineeProofProblem(admin: ReturnType<typeof createSupabaseAdminClient>, proofId: string, traineeId: string) {
@@ -1192,9 +1195,10 @@ export async function GET() {
   { const r = await db.from("enrollments").select("id,company_charge_agency_id").not("company_charge_agency_id", "is", null).limit(2000); if (!r.error) for (const x of (r.data ?? []) as { id: string; company_charge_agency_id: string }[]) companyCharge[x.id] = x.company_charge_agency_id; }
   let billingStatements: { id: string; bs_number: number; bill_to: string; coverage_from: string; coverage_to: string; total_centavos: number; paid_centavos: number }[] = [];
   if (canCashier(staff.roleCodes)) {
-    const [st, cps] = await Promise.all([db.from("billing_statements").select("id,bs_number,bill_to,coverage_from,coverage_to,total_centavos").order("issued_at", { ascending: false }).limit(100), db.from("company_payments").select("billing_statement_id,amount_centavos")]);
+    const [st, cps, vds] = await Promise.all([db.from("billing_statements").select("id,bs_number,bill_to,coverage_from,coverage_to,total_centavos").order("issued_at", { ascending: false }).limit(100), db.from("company_payments").select("billing_statement_id,amount_centavos"), db.from("billing_statement_voids").select("billing_statement_id")]);
+    const voided = new Set((vds.error ? [] : vds.data ?? []).map((v) => v.billing_statement_id as string));
     const paidBy = new Map<string, number>(); for (const c of (cps.error ? [] : cps.data ?? []) as { billing_statement_id: string; amount_centavos: number }[]) paidBy.set(c.billing_statement_id, (paidBy.get(c.billing_statement_id) ?? 0) + Number(c.amount_centavos));
-    billingStatements = ((st.error ? [] : st.data ?? []) as Omit<(typeof billingStatements)[number], "paid_centavos">[]).map((s) => ({ ...s, paid_centavos: paidBy.get(s.id) ?? 0 }));
+    billingStatements = ((st.error ? [] : st.data ?? []) as Omit<(typeof billingStatements)[number], "paid_centavos">[]).filter((s) => !voided.has(s.id)).map((s) => ({ ...s, paid_centavos: paidBy.get(s.id) ?? 0 }));
   }
   const pendingRebates = canCashier(staff.roleCodes) ? await pendingFullPaymentRebates(createSupabaseAdminClient(), enrollments.filter((e) => referralByEnrollment[e.id] && e.enrollment_status !== "Cancelled").map((e) => { const c = Array.isArray(e.courses) ? e.courses[0] : e.courses; return { id: e.id, course_id: e.course_id, agency_id: referralByEnrollment[e.id], price: Number(e.selling_price_centavos ?? 0), inHouse: !e.partner_offer_id, code: (c as { code?: string } | null)?.code ?? null }; })) : {};
 
@@ -2071,6 +2075,45 @@ export async function POST(request: Request) {
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "trainee.source_set", record_type: "trainee", record_id: input.traineeId, new_values: { source: input.source } });
       return NextResponse.json({ ok: true });
     }
+    if (input.action === "billing-statement-issue") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or the Admin issues Billing Statements." }, { status: 403 });
+      if (input.to < input.from) return NextResponse.json({ error: "Choose the billing coverage." }, { status: 400 });
+      const admin = createSupabaseAdminClient();
+      const { data: same } = await admin.from("billing_statements").select("id").eq("agency_id", input.agencyId).eq("coverage_from", input.from).eq("coverage_to", input.to);
+      const { data: voids } = (same ?? []).length ? await admin.from("billing_statement_voids").select("billing_statement_id").in("billing_statement_id", (same ?? []).map((x) => x.id as string)) : { data: [] };
+      if ((same ?? []).length > (voids ?? []).length) return NextResponse.json({ error: "This statement is already issued. Void it first to issue a corrected one." }, { status: 400 });
+      const partner = (await buildBillingRows(admin, input.from, input.to)).find((p) => p.agencyId === input.agencyId);
+      if (!partner) return NextResponse.json({ error: "No enrollments from this partner in that coverage." }, { status: 404 });
+      const rows = partner.rows.map((r) => (r.enrollmentId && input.amounts[r.enrollmentId] !== undefined ? { ...r, amount: input.amounts[r.enrollmentId] } : r));
+      const { data: saved, error } = await admin.from("billing_statements").insert({ agency_id: input.agencyId, coverage_from: input.from, coverage_to: input.to, bill_to: partner.billTo, rows, total_centavos: statementTotal(rows), issued_by: staff.user.id }).select("id,bs_number").single();
+      if (error) return NextResponse.json({ error: /billing_statements/.test(error.message) ? "Apply database updates 202610220058 and 202610290064 first." : /duplicate|unique/i.test(error.message) ? "Apply database update 202610290064 first (void and reissue)." : error.message }, { status: 400 });
+      const bsNo = bsNumber(Number(saved.bs_number));
+      // Company Charge trainees owe what the company is billed: their fee follows the typed amount.
+      const ids = rows.map((r) => r.enrollmentId).filter((x): x is string => !!x);
+      const { data: billed } = ids.length ? await admin.from("enrollments").select("id,selling_price_centavos,company_charge_agency_id").in("id", ids).not("company_charge_agency_id", "is", null) : { data: [] };
+      let adjusted = 0;
+      for (const e of (billed ?? []) as { id: string; selling_price_centavos: number }[]) {
+        const { data: chg } = await admin.from("enrollment_charges").select("amount_centavos,event_type").eq("enrollment_id", e.id).eq("valid", true);
+        const due = Number(e.selling_price_centavos) + (chg ?? []).reduce((s, c) => s + (c.event_type === "discount" ? -1 : 1) * Number(c.amount_centavos), 0);
+        const adj = pricelistAdjustment(due, rows.find((r) => r.enrollmentId === e.id)?.amount ?? due);
+        if (!adj) continue;
+        const { error: adjError } = await admin.from("enrollment_charges").insert({ enrollment_id: e.id, charge_catalog_id: null, description: `Partner pricelist · BS No. ${bsNo}`, amount_centavos: adj.amountCentavos, event_type: adj.kind, valid: true, approval_status: "Approved", created_by: staff.user.id });
+        if (adjError) return NextResponse.json({ error: `BS No. ${bsNo} was issued, but a fee adjustment failed: ${adjError.message}` }, { status: 400 });
+        adjusted++;
+      }
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "billing_statement.issued", record_type: "billing_statement", record_id: saved.id, new_values: { bs_number: bsNo, agency: input.agencyId, from: input.from, to: input.to, total: statementTotal(rows), adjusted } });
+      return NextResponse.json({ ok: true, bsNumber: bsNo, adjusted });
+    }
+    if (input.action === "billing-statement-void") {
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or the Admin voids Billing Statements." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { count } = await admin.from("company_payments").select("id", { count: "exact", head: true }).eq("billing_statement_id", input.billingStatementId);
+      if ((count ?? 0) > 0) return NextResponse.json({ error: "The company already paid this statement, so it can't be voided." }, { status: 400 });
+      const { error } = await admin.from("billing_statement_voids").insert({ billing_statement_id: input.billingStatementId, reason: input.reason, voided_by: staff.user.id });
+      if (error) return NextResponse.json({ error: /billing_statement_voids/.test(error.message) ? "Apply database update 202610290064 first." : /duplicate/i.test(error.message) ? "Already voided." : error.message }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "billing_statement.voided", record_type: "billing_statement", record_id: input.billingStatementId, reason: input.reason });
+      return NextResponse.json({ ok: true });
+    }
     if (input.action === "company-payment") {
       if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot post payments." }, { status: 403 });
       const admin = createSupabaseAdminClient();
@@ -2078,6 +2121,8 @@ export async function POST(request: Request) {
       if (modeProblem) return NextResponse.json({ error: modeProblem }, { status: 400 });
       const { data: bs, error: bsError } = await admin.from("billing_statements").select("id,bs_number,agency_id,bill_to,rows").eq("id", input.billingStatementId).maybeSingle();
       if (bsError || !bs) return NextResponse.json({ error: "Billing Statement not found." }, { status: 404 });
+      const { data: isVoid } = await admin.from("billing_statement_voids").select("billing_statement_id").eq("billing_statement_id", bs.id).maybeSingle();
+      if (isVoid) return NextResponse.json({ error: "This Billing Statement was voided." }, { status: 400 });
       const ids = ((bs.rows ?? []) as { enrollmentId?: string }[]).map((r) => r.enrollmentId).filter((x): x is string => !!x);
       if (!ids.length) return NextResponse.json({ error: "This statement was issued before enrollments were linked. Print it again for a new BS No." }, { status: 400 });
       const [{ data: enrs }, { data: allocs }, { data: chgs }] = await Promise.all([
