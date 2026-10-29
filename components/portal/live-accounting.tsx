@@ -1572,7 +1572,7 @@ function EndorsedPrograms({ data, busy, post }: { data: AccountingData; busy: bo
  * Active / Archived / All, Add, every field edited in the table, Archive or
  * Restore per row, and one Save Changes bar for all edits.
  */
-type CfgCol = { key: string; label: string; kind: "text" | "money" | "select"; options?: [string, string][]; placeholder?: string };
+type CfgCol = { key: string; label: string; kind: "text" | "money" | "select"; options?: [string, string][]; placeholder?: string; optional?: boolean };
 type CfgRow = { id: string; active: boolean; values: Record<string, string>; used?: number };
 function ConfigMatrix({ title, entity, cols, rows, busy, onSave, onAdd, onRemove, note }: {
   title: string; entity: string; cols: CfgCol[]; rows: CfgRow[]; busy: boolean; note?: string;
@@ -1591,7 +1591,7 @@ function ConfigMatrix({ title, entity, cols, rows, busy, onSave, onAdd, onRemove
   const q = query.trim().toLowerCase();
   const shown = current.filter((r) => (filter === "All" || (filter === "Active" ? r.active : !r.active)) && (!q || Object.values(r.values).join(" ").toLowerCase().includes(q)));
   const count = (f: typeof filter) => current.filter((r) => f === "All" || (f === "Active" ? r.active : !r.active)).length;
-  const bad = (v: Record<string, string>) => cols.find((c) => (c.kind === "text" && !v[c.key]?.trim()) || (c.kind === "money" && v[c.key] !== "" && !(Number(v[c.key]) >= 0)));
+  const bad = (v: Record<string, string>) => cols.find((c) => (c.kind === "text" && !c.optional && !v[c.key]?.trim()) || (c.kind === "money" && v[c.key] !== "" && !(Number(v[c.key]) >= 0)));
   async function save() {
     const wrong = dirty.find((r) => bad(r.values));
     if (wrong) { setProblem(`Check ${bad(wrong.values)!.label.toLowerCase()} for ${wrong.values[cols[0].key] || `the ${entity}`}.`); return; }
@@ -1652,7 +1652,7 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
     {error && <div className="portal-message error">{error}</div>}
     {/* One list for both (owner, 8 Oct 2026): the Cashier and expenses use the same channels. */}
     {section === "Payment channels" && <ConfigMatrix title="Payment Channels" entity="channel" busy={busy}
-      cols={[{ key: "name", label: "Channel", kind: "text", placeholder: "e.g. GCash" }, { key: "ref", label: "Reference Number", kind: "select", options: [["yes", "Required"], ["no", "Not Needed"]] }, { key: "acct", label: "Account Details on Website", kind: "text", placeholder: "e.g. 0917 000 0000 · New Wave Maritime" }]}
+      cols={[{ key: "name", label: "Channel", kind: "text", placeholder: "e.g. GCash" }, { key: "ref", label: "Reference Number", kind: "select", options: [["yes", "Required"], ["no", "Not Needed"]] }, { key: "acct", label: "Account Details on Website", kind: "text", optional: true, placeholder: "e.g. 0917 000 0000 · New Wave Maritime" }]}
       rows={data.paymentMethods.map((c) => ({ id: c.id, active: c.active, values: { name: c.name, ref: c.requires_reference ? "yes" : "no", acct: c.account_details ?? "" } }))}
       onSave={(r) => post({ action: "channel-save", id: r.id, name: r.values.name.trim(), requiresReference: r.values.ref === "yes", allowsProof: true, active: r.active, accountDetails: (r.values.acct ?? "").trim() })}
       onAdd={(v) => post({ action: "channel-save", name: v.name.trim(), requiresReference: v.ref === "yes", allowsProof: true, kind: "receivable", accountDetails: (v.acct ?? "").trim() })}
