@@ -515,7 +515,6 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
         </tr>; })}
       <tr className="sc-total"><td>Received</td><td colSpan={3}>{REQUIREMENTS.length - missingNow.length} of {REQUIREMENTS.length}</td></tr>
     </tbody></table></div>
-    <div className="sc-sig"><div><b>{lastChecker?.checked_by_name ?? " "}</b><span>Checked by · Registration officer</span></div><div><b>{lastChecker ? fmtDate(day(lastChecker.checked_at)) : " "}</b><span>Date</span></div></div>
     {!r.handed && !r.paid && allTicked && <div className="sc-pay">
       <div className="sc-pay-mode"><span className="pay-label">Mode of Payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{payModes.map((m) => <button type="button" role="radio" aria-checked={payMode === m.name} key={m.id} className={payMode === m.name ? "on" : ""} onClick={() => setPayMode(m.name)}>{m.name}</button>)}</div></div>
       {needsProof ? <>
@@ -526,6 +525,8 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
       <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || handing || anySaving || !proofReady} onClick={() => void handOver()}>{handing ? "Saving…" : needsProof ? "Upload Proof & Hand to Cashier" : "Hand to Cashier"}</button>{needsProof && !proofReady && <small>Amount, reference and photo are required</small>}</div>
       {payError && <div className="sc-pay-err"><Message kind="error" text={payError} /></div>}
     </div>}
+    {r.handed && !r.paid && (() => { const pr = (data.traineeProofs ?? []).filter((x) => x.trainee_id === e.trainee_id).sort((a, z) => z.submitted_at.localeCompare(a.submitted_at))[0]; return <div className="sc-handed">With the Cashier · {pr ? `${pr.method} ${pesos2(pr.amount_centavos)} · Ref. ${pr.reference}` : "Cash"}</div>; })()}
+    <div className="sc-sig"><div><b>{lastChecker?.checked_by_name ?? " "}</b><span>Checked by · Registration officer</span></div><div><b>{lastChecker ? fmtDate(day(lastChecker.checked_at)) : " "}</b><span>Date</span></div></div>
     <div className="sc-foot">
       <small>{!allTicked ? `Still to tick: ${missingNow.map((q) => q.label).join(", ")}` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
       <span className="sc-acts">
