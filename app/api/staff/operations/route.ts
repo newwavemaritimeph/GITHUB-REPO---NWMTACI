@@ -17,7 +17,7 @@ import { sendBalanceSummary } from "@/lib/balance-summary";
 import { RULED_REQUESTS, requestFee } from "@/lib/request-fees";
 import { applyReferralRebates, pendingFullPaymentRebates, suggestReferralCode } from "@/lib/referral";
 import { isStcwRebateCourse } from "@/lib/rebates";
-import { fitsInWeek } from "@/lib/scheduling";
+import { automaticEndDate, fitsInWeek, moveProblem } from "@/lib/scheduling";
 import { certificateContext, claimCertificateNumber, downloadDriveFile, ensureCertificate, trySendSoftCopy } from "@/lib/certificates";
 import { driveFileId, googleFormId, isStcwCategory, canSetSeries, releaseProblem, courseRemoveMode } from "@/lib/certificate-rules";
 import { postTestStatus } from "@/lib/post-test-server";
@@ -65,6 +65,8 @@ const autoOpenAllWeekInput = z.object({ action: z.literal("auto-open-all-week"),
 const enrollmentDeleteInput = z.object({ action: z.literal("enrollment-delete"), enrollmentId: z.string().uuid() });
 const pruneNowInput = z.object({ action: z.literal("prune-enrollments-now") });
 
+// Move a batch to new dates (owner, 29 Oct 2026).
+const batchMoveInput = z.object({ action: z.literal("batch-move"), batchId: z.string().uuid(), startsOn: z.string().date(), reason: z.string().trim().min(3).max(200), notify: z.boolean().default(true) });
 const batchUpdateInput = z.object({
   action: z.literal("batch-update"), batchId: z.string().uuid(),
   batchNumber: z.string().trim().min(1).max(60).optional(),
@@ -285,7 +287,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 /** A proof the trainee sent (29 Oct 2026) backs one payment of that trainee, unless marked Not Valid. Staff-filed proofs return null. */
 async function traineeProofProblem(admin: ReturnType<typeof createSupabaseAdminClient>, proofId: string, traineeId: string) {
@@ -3076,6 +3078,49 @@ export async function POST(request: Request) {
       }
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "batch.updated", record_type: "batch", record_id: input.batchId, new_values: { venue: input.venue, dailyStart: input.dailyStart, dailyEnd: input.dailyEnd, mode: input.mode, enrollmentDeadline: input.enrollmentDeadline, publish: input.publish } });
       return NextResponse.json({ ok: true, batch: data });
+    }
+    if (input.action === "batch-move") {
+      if (!canSchedule(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot move schedules." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: b } = await admin.from("batches").select("id,batch_number,status,starts_on,ends_on,daily_start,daily_end,enrollment_deadline,venue,courses(name,duration_label)").eq("id", input.batchId).maybeSingle();
+      if (!b) return NextResponse.json({ error: "That batch no longer exists." }, { status: 404 });
+      const { data: dates } = await admin.from("batch_training_dates").select("id").eq("batch_id", b.id);
+      const dateIds = (dates ?? []).map((d) => d.id as string);
+      const { count: attended } = dateIds.length ? await admin.from("attendance_sessions").select("id", { count: "exact", head: true }).in("batch_training_date_id", dateIds) : { count: 0 };
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+      const problem = moveProblem({ status: b.status as string, startsOn: b.starts_on as string, newStart: input.startsOn, today, hasAttendance: (attended ?? 0) > 0 });
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+      const course = first(b.courses as unknown as { name: string; duration_label: string } | null);
+      const endsOn = automaticEndDate(input.startsOn, course?.duration_label ?? "1 day");
+      const newStartAt = new Date(`${input.startsOn}T08:00:00+08:00`).toISOString();
+      const deadline = b.enrollment_deadline && (b.enrollment_deadline as string) < newStartAt ? b.enrollment_deadline : newStartAt;
+      const { error: moveError } = await admin.from("batches").update({ starts_on: input.startsOn, ends_on: endsOn, enrollment_deadline: deadline, updated_at: new Date().toISOString() }).eq("id", b.id);
+      if (moveError) throw moveError;
+      // New training days (Sundays skipped); resource assignments go with the old days and are re-mirrored below.
+      if (dateIds.length) await admin.from("batch_training_dates").delete().in("id", dateIds);
+      const days: string[] = [];
+      for (let d = new Date(`${input.startsOn}T00:00:00Z`); d.toISOString().slice(0, 10) <= endsOn; d = new Date(d.getTime() + 86400000)) if (d.getUTCDay() !== 0) days.push(d.toISOString().slice(0, 10));
+      const ds = (b.daily_start as string | null)?.slice(0, 5) || "08:00", de = (b.daily_end as string | null)?.slice(0, 5) || "17:00";
+      const { error: daysError } = await admin.from("batch_training_dates").insert(days.map((day) => ({ batch_id: b.id, training_date: day, starts_at: new Date(`${day}T${ds}:00+08:00`).toISOString(), ends_at: new Date(`${day}T${de}:00+08:00`).toISOString() })));
+      if (daysError) throw daysError;
+      const { data: plan } = await admin.from("batch_resources").select("*").eq("batch_id", b.id).maybeSingle();
+      if (plan) await saveResourcePlan(admin, staff.user.id, { batchId: b.id, classroomId: (plan.classroom_id as string | null) ?? null, instructorId: (plan.instructor_id as string | null) ?? null, ...(plan.alt_instructor_id !== undefined ? { altInstructorId: plan.alt_instructor_id as string | null } : {}), ...(plan.assessor_id !== undefined ? { assessorId: plan.assessor_id as string | null } : {}) });
+      const fmt = (a: string, z: string) => { const f = (x: string) => new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${x}T00:00:00Z`)); return a === z ? f(a) : `${f(a)} – ${f(z)}`; };
+      const oldDates = fmt(b.starts_on as string, (b.ends_on as string) ?? (b.starts_on as string)), newDates = fmt(input.startsOn, endsOn);
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "batch.moved", record_type: "batch", record_id: b.id, prior_values: { starts_on: b.starts_on, ends_on: b.ends_on }, new_values: { starts_on: input.startsOn, ends_on: endsOn }, reason: input.reason });
+      let emailed = 0;
+      if (input.notify) {
+        const { data: enrs } = await admin.from("enrollments").select("id,trainees(legal_first_name,legal_last_name,email)").eq("batch_id", b.id).neq("enrollment_status", "Cancelled");
+        const jobs = (enrs ?? []).map((e) => ({ e, t: first(e.trainees as unknown as { legal_first_name: string; legal_last_name: string; email: string | null } | null) })).filter((x) => x.t?.email)
+          .map(({ e, t }) => ({ idempotency_key: `batch-moved:${b.id}:${input.startsOn}:${e.id}`, template_code: "batch.moved", recipient: t!.email, variables: { trainee_name: `${t!.legal_first_name} ${t!.legal_last_name}`, course_name: course?.name ?? "your training", batch_number: b.batch_number, old_dates: oldDates, new_dates: newDates, daily_time: `${ds}–${de}${b.venue ? ` · ${b.venue}` : ""}`, reason: input.reason } }));
+        if (jobs.length) {
+          const { data: queued } = await admin.from("email_jobs").upsert(jobs, { onConflict: "idempotency_key", ignoreDuplicates: true }).select("id");
+          const ids = (queued ?? []).map((q) => q.id as string);
+          emailed = ids.length;
+          if (ids.length) await processEmailJobs(admin, { ids, origin: process.env.APP_BASE_URL ?? new URL(request.url).origin }).catch(() => undefined);
+        }
+      }
+      return NextResponse.json({ ok: true, startsOn: input.startsOn, endsOn, emailed });
     }
     if (input.action === "batch-cancel") {
       if (!canSchedule(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot cancel schedules." }, { status: 403 });

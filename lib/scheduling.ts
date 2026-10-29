@@ -154,3 +154,17 @@ export function batchPatternLabel(code: string, durationLabel: string) {
     } as Record<number, string>
   )[duration] ?? "Starts Monday; Sundays are excluded.";
 }
+
+/**
+ * Moving a batch to new dates (owner, 29 Oct 2026): only before it starts and before any
+ * attendance; any start day except Sunday, from tomorrow (YYYY-MM-DD, Manila).
+ */
+export function moveProblem(input: { status: string; startsOn: string; newStart: string; today: string; hasAttendance: boolean }) {
+  if (input.status === "Cancelled") return "A cancelled batch cannot be moved.";
+  if (input.startsOn <= input.today) return "Started batches can't be moved.";
+  if (input.hasAttendance) return "Attendance was already taken for this batch.";
+  if (!input.newStart || input.newStart <= input.today) return "Pick a new start date from tomorrow.";
+  if (new Date(`${input.newStart}T00:00:00Z`).getUTCDay() === 0) return "Sunday is not a training day.";
+  if (input.newStart === input.startsOn) return "Pick a different start date.";
+  return null;
+}

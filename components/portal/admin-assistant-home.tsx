@@ -7,6 +7,7 @@ import { ROLES, accreditationFor, handles, moveTargets, planRows, rangesOverlap,
 import { Badge, Message, Modal, fmtDate, periodRange, usePost, usePaged } from "./shared-ui";
 import { EXPENSE_REASONS, RejectInline } from "./reject-inline";
 import { CHANNELS, type Channel, type DaySummary, type ReconStatus } from "@/lib/reconciliation";
+import { MoveBatch } from "./move-batch";
 
 /**
  * Admin Assistant (owner, 9 Oct 2026): requisitions of supplies (approved by the
@@ -366,13 +367,13 @@ export function ClassSchedules({ data, reload, onOpenBatches, onCreate }: { data
         </tbody></table>{paged.pager}</div> : <p className="portal-empty-copy">No batches in this period.</p>}
       </section></div>
     </div>
-    {editing && <EditBatch batch={editing} code={course.get(editing.course_id)?.code ?? ""} reload={reload} onClose={() => setEditing(null)} onDone={(t) => { setDone(t); setEditing(null); }} />}
+    {editing && <EditBatch batch={editing} code={course.get(editing.course_id)?.code ?? ""} durationLabel={course.get(editing.course_id)?.duration_label ?? "1 day"} reload={reload} onClose={() => setEditing(null)} onDone={(t) => { setDone(t); setEditing(null); }} />}
     {cancelling && <CancelBatch data={data} batch={cancelling} code={course.get(cancelling.course_id)?.code ?? ""} today={today} reload={reload} onClose={() => setCancelling(null)} onDone={(t) => { setDone(t); setCancelling(null); }} />}
   </div>;
 }
 
 const manilaLocal = (iso?: string | null) => (iso ? new Date(iso).toLocaleString("sv-SE", { timeZone: "Asia/Manila" }).slice(0, 16).replace(" ", "T") : "");
-function EditBatch({ batch, code, reload, onClose, onDone }: { batch: Batch; code: string; reload: () => Promise<void>; onClose: () => void; onDone: (text: string) => void }) {
+function EditBatch({ batch, code, durationLabel, reload, onClose, onDone }: { batch: Batch; code: string; durationLabel: string; reload: () => Promise<void>; onClose: () => void; onDone: (text: string) => void }) {
   const { busy, msg, post } = usePost(reload);
   const [f, setF] = useState({ batchNumber: batch.batch_number, dailyStart: batch.daily_start?.slice(0, 5) || "08:00", dailyEnd: batch.daily_end?.slice(0, 5) || "17:00", mode: batch.mode || "Face-to-Face", venue: batch.venue ?? "", deadline: manilaLocal(batch.enrollment_deadline) || `${addDays(batch.starts_on, -1)}T17:00`, publish: Boolean(batch.published_at) });
   const save = () => { const text = f.batchNumber.trim().toUpperCase() !== batch.batch_number ? `Renamed ${batch.batch_number} to ${f.batchNumber.trim().toUpperCase()}. Saved.` : "Saved."; void post({ action: "batch-update", batchId: batch.id, batchNumber: f.batchNumber.trim().toUpperCase(), venue: f.venue, dailyStart: f.dailyStart, dailyEnd: f.dailyEnd, mode: f.mode, enrollmentDeadline: new Date(`${f.deadline}:00+08:00`).toISOString(), publish: f.publish },
@@ -381,6 +382,7 @@ function EditBatch({ batch, code, reload, onClose, onDone }: { batch: Batch; cod
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <label>Batch No.<input className="cl-mono" value={f.batchNumber} onChange={(e) => setF({ ...f, batchNumber: e.target.value })} /></label>
     <label>Dates<span className="cs-ro">{spanOf({ startsOn: batch.starts_on, endsOn: batch.ends_on })}</span></label>
+    <MoveBatch batch={batch} durationLabel={durationLabel} trainees={Number(batch.confirmed_count ?? 0)} reload={reload} onMoved={onDone} />
     <label>Daily Start<input type="time" value={f.dailyStart} onChange={(e) => setF({ ...f, dailyStart: e.target.value })} /></label>
     <label>Daily End<input type="time" value={f.dailyEnd} onChange={(e) => setF({ ...f, dailyEnd: e.target.value })} /></label>
     <label>Mode<select value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="Face-to-Face">Face-to-Face</option><option>Online</option><option>Blended</option></select></label>
