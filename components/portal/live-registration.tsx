@@ -10,6 +10,7 @@ import { Badge, Message, Modal, PageHead, PeriodBar, usePaged, usePost, usePerio
 import { RequestActionModal, type RequestType } from "./payment-actions";
 import { TarButton } from "./live-cashier";
 import { tcl } from "@/lib/title-case";
+import { shrinkProof } from "@/lib/proof-shrink";
 
 /**
  * Registration Officer workspace (rebuilt Oct 2026 to MASTERPLAN §10 as
@@ -509,6 +510,49 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
   </div>;
 }
 
+/**
+ * Proof of payment uploaded by Registration (owner, 29 Oct 2026; moved from the website).
+ * Saved to Google Drive only and listed on the Cashier Dashboard until a receipt uses it.
+ */
+function ProofSection({ data, enrollment: e, reload }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void> }) {
+  const modes = data.paymentMethods.filter((m) => m.active && m.requires_reference && (m.kind ?? "receivable") === "receivable");
+  const mine = (data.traineeProofs ?? []).filter((p) => p.trainee_id === e.trainee_id);
+  const [mode, setMode] = useState(modes[0]?.name ?? ""), [amount, setAmount] = useState(""), [reference, setReference] = useState("");
+  const [file, setFile] = useState<File | null>(null), [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  if (!modes.length) return null;
+  async function upload() {
+    setMsg(null);
+    if (!mode || !(Number(amount) > 0) || reference.trim().length < 3 || !file) { setMsg({ kind: "error", text: "Add the amount, the reference no. and the photo." }); return; }
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.set("traineeId", e.trainee_id); fd.set("mode", mode); fd.set("amount", amount); fd.set("reference", reference.trim()); fd.set("proof", await shrinkProof(file));
+      const response = await fetch("/api/staff/payment-proofs/trainee", { method: "POST", body: fd });
+      const body = await response.json().catch(() => ({})) as { error?: string; drivePath?: string };
+      if (!response.ok) throw new Error(body.error ?? "Could not save the proof to Google Drive.");
+      setMsg({ kind: "success", text: `Saved to Google Drive · ${(body.drivePath ?? "").split(" / ").slice(1).join(" / ")}. The Cashier sees it on the dashboard.` });
+      setAmount(""); setReference(""); setFile(null); if (fileRef.current) fileRef.current.value = "";
+      await reload();
+    } catch (err) { setMsg({ kind: "error", text: err instanceof Error ? err.message : "Could not upload the proof." }); }
+    finally { setBusy(false); }
+  }
+  return <section className="full rg-proof">
+    <div className="rg-proof-head"><strong>Proof of Payment</strong><span className="muted-text">{mine.length ? `${mine.length} waiting for receipt` : "Optional · for the Cashier to view"}</span></div>
+    {mine.length > 0 && <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Uploaded</th><th>Mode</th><th className="fs-n">Amount</th><th>Reference</th><th>Status</th><th></th></tr></thead><tbody>
+      {mine.map((p) => <tr key={p.id}><td>{fmtDate(day(p.submitted_at))}<small>{fmtClock(p.submitted_at)}</small></td><td>{p.method}</td><td className="fs-n">{pesos2(p.amount_centavos)}</td><td className="cl-mono">{p.reference}</td><td><Badge tone="orange">Waiting for Receipt</Badge></td><td>{p.drive_link && <a href={p.drive_link} target="_blank" rel="noreferrer">View Proof</a>}</td></tr>)}
+    </tbody></table></div>}
+    {msg && <Message kind={msg.kind} text={msg.text} />}
+    <div className="rg-proof-form">
+      <div className="rg-proof-wide"><span className="pay-label">Mode of Payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{modes.map((m) => <button type="button" role="radio" aria-checked={mode === m.name} key={m.id} className={mode === m.name ? "on" : ""} onClick={() => setMode(m.name)}>{m.name}</button>)}</div></div>
+      <label>Amount (₱)<input inputMode="decimal" value={amount} onChange={(ev) => setAmount(ev.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" /></label>
+      <label>Reference No.<input value={reference} onChange={(ev) => setReference(ev.target.value.toUpperCase())} placeholder="From the trainee's screenshot" maxLength={80} /></label>
+      <label className="rg-proof-wide">Photo or PDF of the Proof<input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(ev) => setFile(ev.target.files?.[0] ?? null)} /></label>
+      <div className="rg-proof-wide rg-proof-act"><button type="button" className="portal-primary" disabled={busy} onClick={() => void upload()}>{busy ? "Uploading…" : "Upload Proof"}</button></div>
+    </div>
+  </section>;
+}
+
 /** Everything about one enrollment, read-only on money. Requests go to Accounting. */
 /**
  * Change the start date of an in-house course that runs on a picked date (no
@@ -575,6 +619,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
       </div>}
       <StartDateEditor data={data} enrollment={e} busy={busy} post={post} />
       <OtherCenterEditor data={data} enrollment={e} busy={busy} post={post} />
+      {e.enrollment_status !== "Cancelled" && <ProofSection data={data} enrollment={e} reload={reload} />}
 
       <div className="full"><strong>Payment status</strong> <small style={{ color: "var(--muted)" }}>read-only — payments are recorded by the Cashier</small></div>
       <div className="pill-row full">

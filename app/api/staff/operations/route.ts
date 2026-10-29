@@ -965,7 +965,7 @@ export async function GET() {
   const applicationNumbers = Object.fromEntries((numberRows ?? []).map((row: { id: string; application_number: string }) => [row.id, row.application_number]));
   // Proofs the trainees sent from the website with no receipt yet (29 Oct 2026); none before migration 060.
   let traineeProofs: { id: string; trainee_id: string; name: string; number: string; method: string; amount_centavos: number; reference: string; drive_link: string | null; submitted_at: string }[] = [];
-  if (canCashier(staff.roleCodes)) {
+  if (canCashier(staff.roleCodes) || canRegister(staff.roleCodes)) {
     const { data: proofRows } = await db.from("payment_proofs").select("id,source,trainee_id,claimed_method,claimed_amount_centavos,extracted_reference,drive_link,submitted_at,dismissed_at,trainees(legal_first_name,legal_last_name,application_number,trainee_number)").eq("source", "Trainee").is("dismissed_at", null).order("submitted_at", { ascending: true }).limit(300);
     const ids = (proofRows ?? []).map((p) => p.id as string);
     const { data: usedRows } = ids.length ? await db.from("payments").select("proof_id").in("proof_id", ids).eq("valid", true) : { data: [] };

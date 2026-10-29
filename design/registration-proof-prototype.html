@@ -1,0 +1,88 @@
+<title>Registration Proof Upload</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Same shell as the live portal: navy bar with dropdown tabs, summary rail on the left, light-cyan table headers. */
+:root{--orange:#F25615;--blue:#0571D0;--cyan:#35CCFA;--cyan-l:#9EE3F1;--navy:#123F63;--bg:#f2f6f8;--surface:#fff;--fg:#0f2638;--muted:#587184;--line:#dbe6ec;--soft:#eef4f8;--th:#e6f6fd;--thc:#0b4f8f;--zebra:#f7fafc;
+ --good:#0a7a3e;--good-bg:#e2f5e9;--warn:#a2470b;--warn-bg:#fdf0e5;--bad:#b42318;--bad-bg:#fcebea;--info:#0571D0;--info-bg:#e5f1fb;
+ --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding-block:16px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.w{max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.logo{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}.logo b{font-size:19px;font-weight:600}.logo b span{color:var(--orange)}.logo small{display:block;color:var(--cyan-l);font-size:14px}.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.who{font-size:14px;color:#cfe3ef;display:flex;align-items:center;gap:8px}.who select{background:#ffffff14;border:1px solid #ffffff30;color:#fff;border-radius:8px;padding:5px 8px}.who select option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:16px;flex-wrap:wrap}.tab>button{background:none;border:0;color:#c3dbea;font:500 16px var(--sans);padding:12px 18px;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:8px}.tab>button:hover{color:#fff;background:#ffffff12}.tab.on>button{background:var(--bg);color:var(--fg);font-weight:600}
+.caret{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.menu{position:absolute;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:15;display:flex;flex-direction:column;margin-top:2px}.tab{position:relative}.menu button{background:none;border:0;text-align:left;color:var(--fg);font:500 15.5px var(--sans);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;gap:12px}.menu button:hover{background:var(--soft)}.menu button.on{background:var(--info-bg);color:var(--info);font-weight:600}.menu small,.n{font:600 11.5px var(--mono);background:var(--orange);color:#fff;border-radius:10px;padding:1px 7px}
+.page{padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.cx-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}h1{font-size:25px;font-weight:600;margin:0}h2{font-size:19px;font-weight:600;margin:0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.seg button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.seg button.on{background:var(--navy);color:#fff}
+.rail{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}@media (max-width:900px){.rail{grid-template-columns:1fr}}.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.ph small{color:var(--muted);font-size:14px}
+.lines{display:flex;flex-direction:column;padding:0 20px 16px}.lines div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}.lines div:first-child{border-top:0}.lines dd,.lines span:last-child{font-family:var(--mono);font-weight:600}.lines .tot{font-weight:700}.lines .bad{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 16px}.tile{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 12px}.tile span{display:block;font-size:13px;color:var(--muted)}.tile b{font:600 19px var(--mono)}
+.cwrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--th);color:var(--thc);font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:10px 12px;border-right:1px solid var(--line);white-space:nowrap}td{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.35}tbody tr:nth-child(even) td{background:var(--zebra)}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}.due{background:var(--bad-bg);color:var(--bad)}.dueo{background:var(--warn-bg);color:var(--warn)}.appr{background:var(--info-bg);color:var(--info)}.paid{background:var(--good-bg);color:var(--good)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:9px;padding:7px 14px;font-weight:600;font-size:14.5px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.okb{background:var(--good);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:14px 20px;background:var(--soft);border-top:1px solid var(--line)}.form label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}.form select,.form input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line)}
+.alert{background:var(--bad-bg);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:15px;font-weight:500;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.note{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+</style>
+<style>
+.drawer{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.req td:first-child{width:40%}.ok{color:var(--good);font-weight:700}
+.chips{display:flex;gap:8px;flex-wrap:wrap}.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:7px 16px;font-weight:600;color:var(--fg)}.chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.pf{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;padding:4px 20px 18px}@media (max-width:560px){.pf{grid-template-columns:1fr}}
+.pf label,.pf .lab{display:flex;flex-direction:column;gap:6px;font-size:13.5px;font-weight:600;color:var(--fg)}.pf input{height:42px;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:var(--surface);color:var(--fg);font:inherit;font-weight:400}
+.pf .full{grid-column:1/-1}.acct{background:var(--soft);border-radius:8px;padding:8px 12px;font-weight:400;color:var(--muted);font-size:13.5px}
+.gone{opacity:.5;text-decoration:line-through}
+</style>
+<header class="top"><div class="w">
+ <div class="brand"><div class="logo"><div class="mark">NW</div><div><b>New <span>Wave</span> Portal<span class="proto">PROTOTYPE</span></b><small>Ride the New Wave of Maritime Excellence</small></div></div>
+ <div class="who">Working as <select><option>Registration</option></select></div></div>
+ <nav class="tabs"><div class="tab"><button>Dashboard</button></div><div class="tab"><button>Courses</button></div><div class="tab on"><button>Trainees &amp; Enrollments</button></div></nav>
+</div></header>
+<main class="page"><div class="w drawer">
+ <div class="alert" style="background:var(--info-bg);color:var(--info)"><span><b>Website:</b> the upload box after Submit and on Trainee Status is removed. Trainees send their proof on Facebook; Registration uploads it here.</span><button class="btn" id="web">Show Website Change</button></div>
+ <div class="cx-head"><div><span class="eyebrow">Enrollment · ENR-2026-01482</span><h1>REYES, Marco A.</h1></div><span class="pill dueo">Screening</span></div>
+
+ <section class="panel"><div class="ph"><h2>Requirements</h2><small>4 of 4 received</small></div>
+  <div class="cwrap"><table class="req"><tbody><tr><td>Valid ID / Passport</td><td class="ok">✓ Received</td></tr><tr><td>Medical Certificate (PEME Format)</td><td class="ok">✓ Received</td></tr><tr><td>2x2 Photo</td><td class="ok">✓ Received</td></tr><tr><td>Seaman's Book / SRN</td><td class="ok">✓ Received</td></tr></tbody></table></div></section>
+
+ <section class="panel"><div class="ph"><h2>Proof of Payment</h2><small id="pcount">Optional · for the Cashier to view</small></div>
+  <div class="cwrap" id="listwrap" hidden><table><thead><tr><th>Uploaded</th><th>Mode</th><th class="r">Amount</th><th>Reference</th><th>Status</th><th></th></tr></thead><tbody id="list"></tbody></table></div>
+  <div class="pf" id="form">
+   <div class="lab full">Mode of Payment<div class="chips" id="modes"><button class="chip on">GCash</button><button class="chip">PSBank</button><button class="chip">UnionBank</button></div></div>
+   <label>Amount (₱)<input id="amt" value="2600.00" inputmode="decimal"></label>
+   <label>Reference No.<input id="ref" placeholder="From the trainee's screenshot"></label>
+   <label class="full">Photo or PDF of the Proof<input type="file" id="file" style="height:auto;padding:9px 12px"></label>
+   <div class="full" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:13.5px;color:var(--muted)">Saved to Google Drive · GCash › 2026-10 October as "REYES - 2026-10-29"</span><button class="btn pri" id="up">Upload Proof</button></div>
+  </div></section>
+
+ <div class="foot panel"><span style="color:var(--muted)">All requirements received. Hand the trainee to the Cashier for payment.</span><button class="btn pri">Hand to Cashier</button></div>
+
+ <section class="panel"><div class="ph"><h2>Cashier Dashboard · Proofs of Payment · No Receipt Yet</h2><small>unchanged</small></div>
+  <div class="cwrap"><table><thead><tr><th>Uploaded</th><th>Trainee</th><th>Mode</th><th class="r">Amount</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="cash"><tr><td colspan="6" style="color:var(--muted)">Nothing waiting.</td></tr></tbody></table></div></section>
+</div></main>
+<div class="toast" id="toast" hidden></div>
+<script>
+const $=id=>document.getElementById(id),P=[];
+const peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
+function toast(t){const e=$("toast");e.textContent=t;e.hidden=false;setTimeout(()=>{e.hidden=true},3200)}
+function render(){$("listwrap").hidden=!P.length;$("pcount").textContent=P.length?P.length+" uploaded":"Optional · for the Cashier to view";
+ $("list").innerHTML=P.map(p=>'<tr><td>Oct 29 · now<small>by Registration</small></td><td>'+p.mode+'</td><td class="r mono">'+peso(p.amt)+'</td><td class="mono">'+p.ref+'</td><td><span class="pill appr">Waiting for Receipt</span></td><td><button class="btn">View Proof</button></td></tr>').join("");
+ $("cash").innerHTML=P.length?P.map(p=>'<tr><td>Oct 29 · now</td><td><b>REYES, Marco A.</b><small class="mono">NWM-2026-01482</small></td><td>'+p.mode+'</td><td class="r mono">'+peso(p.amt)+'</td><td class="mono">'+p.ref+'</td><td><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn">View Proof</button><button class="btn pri">Record Payment</button><button class="btn">Not Valid</button></div></td></tr>').join(""):'<tr><td colspan="6" style="color:var(--muted)">Nothing waiting.</td></tr>'}
+document.addEventListener("click",e=>{const t=e.target.closest("button");if(!t)return;
+ if(t.classList.contains("chip")){t.parentNode.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",c===t))}
+ if(t.id==="up"){const ref=$("ref").value.trim(),amt=Math.round(parseFloat($("amt").value)*100);if(!ref||!amt||!$("file").files.length&&!$("file").dataset.fake){toast("Add the amount, reference no. and the photo.");return}
+  P.push({mode:document.querySelector("#modes .chip.on").textContent,amt,ref});$("ref").value="";render();toast("Proof uploaded to Google Drive. The Cashier sees it on the dashboard.")}
+ if(t.id==="web"){toast("Website: the Upload Proof of Payment box is gone from the success page and Trainee Status.")}
+});
+$("file").addEventListener("click",ev=>{ev.preventDefault();$("file").dataset.fake="1";toast("Photo chosen: gcash-receipt.jpg")});
+render();
+</script>

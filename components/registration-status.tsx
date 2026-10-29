@@ -4,7 +4,6 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pill } from "@/components/ui/kit";
-import { ProofUpload } from "@/components/proof-upload";
 
 /* -------------------------------------------------------- trainee status --- */
 
@@ -138,7 +137,7 @@ function StatusTab() {
           )}
           {!!result.proofs?.length && (
             <div className="ts-course">
-              <strong>Proofs of Payment You Sent</strong>
+              <strong>Proofs of Payment</strong>
               <div className="data-table" style={{ marginTop: 8 }}>
                 <table>
                   <thead><tr><th>Sent</th><th>Paid By</th><th style={{ textAlign: "right" }}>Amount</th><th>Status</th></tr></thead>
@@ -156,7 +155,6 @@ function StatusTab() {
               </div>
             </div>
           )}
-          {total("balanceCentavos") > 0 && <ProofUpload srn={srn} nwmtaciNo={no} onSent={() => void search()} />}
         </div>
       )}
     </>

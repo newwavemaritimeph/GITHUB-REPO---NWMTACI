@@ -2397,3 +2397,12 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .aa-accform>label>input,.nw-shell .aa-accform>label>select{width:100%;min-width:0;height:42px;padding:0 12px;font-size:15px;border:1px solid #dbe5ec;border-radius:10px;background:#fff;color:#0f2638;box-sizing:border-box}
 .nw-shell .aa-accform>.portal-form-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:10px;margin:2px 0 0}
 @media (max-width:640px){.nw-shell .portal-form.aa-accform{grid-template-columns:1fr}}
+/* Registration › Proof of Payment (owner, 29 Oct 2026) */
+.nw-shell .rg-proof{border:1px solid #dbe5ec;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:12px;background:#fff}
+.nw-shell .rg-proof-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.nw-shell .rg-proof-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px}
+.nw-shell .rg-proof-form>label{display:flex;flex-direction:column;gap:6px;font-size:13.5px;font-weight:600;color:#123F63;min-width:0}
+.nw-shell .rg-proof-form>label>input:not([type=file]){height:42px;padding:0 12px;font-size:15px;border:1px solid #dbe5ec;border-radius:10px;width:100%;box-sizing:border-box}
+.nw-shell .rg-proof-wide{grid-column:1/-1;display:flex;flex-direction:column;gap:6px}
+.nw-shell .rg-proof-act{flex-direction:row;justify-content:flex-end}
+@media (max-width:640px){.nw-shell .rg-proof-form{grid-template-columns:1fr}}
