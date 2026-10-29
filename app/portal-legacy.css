@@ -2406,3 +2406,12 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .rg-proof-wide{grid-column:1/-1;display:flex;flex-direction:column;gap:6px}
 .nw-shell .rg-proof-act{flex-direction:row;justify-content:flex-end}
 @media (max-width:640px){.nw-shell .rg-proof-form{grid-template-columns:1fr}}
+/* Registration › Screening: mode of payment and Hand to Cashier on one row (owner, 29 Oct 2026) */
+.portal-shell .sc-pay{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 14px;padding:14px 18px;border-top:1px solid #cfdbe3;background:#fff}
+.portal-shell .sc-pay label,.portal-shell .sc-pay-mode{display:flex;flex-direction:column;gap:6px;font-size:13.5px;font-weight:600;color:#123F63;min-width:0}
+.portal-shell .sc-pay input:not([type=file]){height:42px;padding:0 12px;font-size:15px;border:1px solid #dbe5ec;border-radius:10px;box-sizing:border-box}
+.portal-shell .sc-pay-amt input{width:130px}.portal-shell .sc-pay-ref input{width:190px}.portal-shell .sc-pay-file input{max-width:240px}
+.portal-shell .sc-pay-note{color:#5f7180;font-size:14px;align-self:center}
+.portal-shell .sc-pay-go{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:4px}.portal-shell .sc-pay-go small{color:#5f7180;font-size:12.5px}
+.portal-shell .sc-pay-err{flex:1 1 100%}
+@media (max-width:640px){.portal-shell .sc-pay label{flex:1 1 100%}.portal-shell .sc-pay-amt input,.portal-shell .sc-pay-ref input,.portal-shell .sc-pay-file input{width:100%;max-width:none}.portal-shell .sc-pay-go{margin-left:0;width:100%;align-items:stretch}}

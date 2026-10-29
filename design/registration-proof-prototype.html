@@ -34,13 +34,18 @@
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
 </style>
 <style>
-.drawer{max-width:860px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.drawer{max-width:900px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
 .req td:first-child{width:40%}.ok{color:var(--good);font-weight:700}
-.chips{display:flex;gap:8px;flex-wrap:wrap}.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:7px 16px;font-weight:600;color:var(--fg)}.chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
-.pf{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;padding:4px 20px 18px}@media (max-width:560px){.pf{grid-template-columns:1fr}}
-.pf label,.pf .lab{display:flex;flex-direction:column;gap:6px;font-size:13.5px;font-weight:600;color:var(--fg)}.pf input{height:42px;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:var(--surface);color:var(--fg);font:inherit;font-weight:400}
-.pf .full{grid-column:1/-1}.acct{background:var(--soft);border-radius:8px;padding:8px 12px;font-weight:400;color:var(--muted);font-size:13.5px}
-.gone{opacity:.5;text-decoration:line-through}
+.chips{display:flex;gap:8px;flex-wrap:wrap}.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:8px 16px;font-weight:600;color:var(--fg)}.chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.payrow{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px 14px;padding:14px 20px 18px;border-top:1px solid var(--line)}
+.payrow label,.payrow .lab{display:flex;flex-direction:column;gap:6px;font-size:13.5px;font-weight:600;color:var(--fg);min-width:0}
+.payrow input{height:42px;border:1px solid var(--line);border-radius:10px;padding:0 12px;background:var(--surface);color:var(--fg);font:inherit;font-weight:400}
+.payrow .amt input{width:130px}.payrow .ref input{width:190px}.payrow .file input{width:230px;height:auto;padding:9px 10px}
+.payrow .go{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.payrow .note{padding:0;color:var(--muted);font-size:14px;align-self:center}
+@media (max-width:640px){.payrow .amt input,.payrow .ref input,.payrow .file input{width:100%}.payrow label{flex:1 1 100%}.payrow .go{margin-left:0;width:100%;align-items:stretch}}
+.handed{background:var(--info-bg);color:var(--info);border-radius:10px;padding:12px 16px;font-weight:600;margin:14px 20px 18px}
+.hint{font-size:12.5px;color:var(--muted)}
 </style>
 <header class="top"><div class="w">
  <div class="brand"><div class="logo"><div class="mark">NW</div><div><b>New <span>Wave</span> Portal<span class="proto">PROTOTYPE</span></b><small>Ride the New Wave of Maritime Excellence</small></div></div>
@@ -48,41 +53,35 @@
  <nav class="tabs"><div class="tab"><button>Dashboard</button></div><div class="tab"><button>Courses</button></div><div class="tab on"><button>Trainees &amp; Enrollments</button></div></nav>
 </div></header>
 <main class="page"><div class="w drawer">
- <div class="alert" style="background:var(--info-bg);color:var(--info)"><span><b>Website:</b> the upload box after Submit and on Trainee Status is removed. Trainees send their proof on Facebook; Registration uploads it here.</span><button class="btn" id="web">Show Website Change</button></div>
- <div class="cx-head"><div><span class="eyebrow">Enrollment · ENR-2026-01482</span><h1>REYES, Marco A.</h1></div><span class="pill dueo">Screening</span></div>
+ <div class="cx-head"><div><span class="eyebrow">Application · NWM-2026-01482</span><h1>REYES, Marco A.</h1></div><span class="pill dueo" id="state">Screening</span></div>
 
  <section class="panel"><div class="ph"><h2>Requirements</h2><small>4 of 4 received</small></div>
-  <div class="cwrap"><table class="req"><tbody><tr><td>Valid ID / Passport</td><td class="ok">✓ Received</td></tr><tr><td>Medical Certificate (PEME Format)</td><td class="ok">✓ Received</td></tr><tr><td>2x2 Photo</td><td class="ok">✓ Received</td></tr><tr><td>Seaman's Book / SRN</td><td class="ok">✓ Received</td></tr></tbody></table></div></section>
+  <div class="cwrap"><table class="req"><tbody><tr><td>Valid ID / Passport</td><td class="ok">✓ Received</td></tr><tr><td>Medical Certificate (PEME Format)</td><td class="ok">✓ Received</td></tr><tr><td>2x2 Photo</td><td class="ok">✓ Received</td></tr><tr><td>Seaman's Book / SRN</td><td class="ok">✓ Received</td></tr></tbody></table></div>
+  <div id="pay"></div>
+ </section>
 
- <section class="panel"><div class="ph"><h2>Proof of Payment</h2><small id="pcount">Optional · for the Cashier to view</small></div>
-  <div class="cwrap" id="listwrap" hidden><table><thead><tr><th>Uploaded</th><th>Mode</th><th class="r">Amount</th><th>Reference</th><th>Status</th><th></th></tr></thead><tbody id="list"></tbody></table></div>
-  <div class="pf" id="form">
-   <div class="lab full">Mode of Payment<div class="chips" id="modes"><button class="chip on">GCash</button><button class="chip">PSBank</button><button class="chip">UnionBank</button></div></div>
-   <label>Amount (₱)<input id="amt" value="2600.00" inputmode="decimal"></label>
-   <label>Reference No.<input id="ref" placeholder="From the trainee's screenshot"></label>
-   <label class="full">Photo or PDF of the Proof<input type="file" id="file" style="height:auto;padding:9px 12px"></label>
-   <div class="full" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:13.5px;color:var(--muted)">Saved to Google Drive · GCash › 2026-10 October as "REYES - 2026-10-29"</span><button class="btn pri" id="up">Upload Proof</button></div>
-  </div></section>
-
- <div class="foot panel"><span style="color:var(--muted)">All requirements received. Hand the trainee to the Cashier for payment.</span><button class="btn pri">Hand to Cashier</button></div>
-
- <section class="panel"><div class="ph"><h2>Cashier Dashboard · Proofs of Payment · No Receipt Yet</h2><small>unchanged</small></div>
-  <div class="cwrap"><table><thead><tr><th>Uploaded</th><th>Trainee</th><th>Mode</th><th class="r">Amount</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="cash"><tr><td colspan="6" style="color:var(--muted)">Nothing waiting.</td></tr></tbody></table></div></section>
+ <section class="panel"><div class="ph"><h2>Cashier Dashboard</h2><small>what the Cashier sees</small></div>
+  <div class="cwrap"><table><thead><tr><th>List</th><th>Trainee</th><th>Mode</th><th class="r">Amount</th><th>Reference</th></tr></thead><tbody id="cash"><tr><td colspan="5" style="color:var(--muted)">Nothing yet.</td></tr></tbody></table></div></section>
 </div></main>
 <div class="toast" id="toast" hidden></div>
 <script>
-const $=id=>document.getElementById(id),P=[];
+const $=id=>document.getElementById(id);let mode="Cash",done=null;
 const peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
 function toast(t){const e=$("toast");e.textContent=t;e.hidden=false;setTimeout(()=>{e.hidden=true},3200)}
-function render(){$("listwrap").hidden=!P.length;$("pcount").textContent=P.length?P.length+" uploaded":"Optional · for the Cashier to view";
- $("list").innerHTML=P.map(p=>'<tr><td>Oct 29 · now<small>by Registration</small></td><td>'+p.mode+'</td><td class="r mono">'+peso(p.amt)+'</td><td class="mono">'+p.ref+'</td><td><span class="pill appr">Waiting for Receipt</span></td><td><button class="btn">View Proof</button></td></tr>').join("");
- $("cash").innerHTML=P.length?P.map(p=>'<tr><td>Oct 29 · now</td><td><b>REYES, Marco A.</b><small class="mono">NWM-2026-01482</small></td><td>'+p.mode+'</td><td class="r mono">'+peso(p.amt)+'</td><td class="mono">'+p.ref+'</td><td><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn">View Proof</button><button class="btn pri">Record Payment</button><button class="btn">Not Valid</button></div></td></tr>').join(""):'<tr><td colspan="6" style="color:var(--muted)">Nothing waiting.</td></tr>'}
-document.addEventListener("click",e=>{const t=e.target.closest("button");if(!t)return;
- if(t.classList.contains("chip")){t.parentNode.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",c===t))}
- if(t.id==="up"){const ref=$("ref").value.trim(),amt=Math.round(parseFloat($("amt").value)*100);if(!ref||!amt||!$("file").files.length&&!$("file").dataset.fake){toast("Add the amount, reference no. and the photo.");return}
-  P.push({mode:document.querySelector("#modes .chip.on").textContent,amt,ref});$("ref").value="";render();toast("Proof uploaded to Google Drive. The Cashier sees it on the dashboard.")}
- if(t.id==="web"){toast("Website: the Upload Proof of Payment box is gone from the success page and Trainee Status.")}
+function render(){
+ if(done&&done.recorded){$("pay").innerHTML='<div class="handed" style="background:var(--good-bg);color:var(--good)">Paid · OR-2026-000318 issued. The screenshot is no longer shown in the portal; it stays in Google Drive › '+done.mode+' › 2026-10 October.</div>';$("state").textContent="Enrolled";$("state").className="pill paid";$("cash").innerHTML='<tr><td colspan="5" style="color:var(--muted)">Nothing waiting. The proof left the list once the receipt was issued.</td></tr>';return}
+ if(done){$("pay").innerHTML='<div class="handed">With the Cashier · '+done.mode+(done.amt?' '+peso(done.amt)+' · Ref. '+done.ref:'')+'</div>';$("state").textContent="With the Cashier";$("state").className="pill appr";
+  $("cash").innerHTML=done.amt?'<tr><td>Proofs of Payment · No Receipt Yet</td><td><b>REYES, Marco A.</b></td><td>'+done.mode+'</td><td class="r mono">'+peso(done.amt)+'</td><td class="mono">'+done.ref+' <button class="btn pri" id="rec" style="margin-left:8px">Record Payment</button></td></tr><tr><td>New Enrollments</td><td><b>REYES, Marco A.</b></td><td colspan="3">Waiting to pay</td></tr>':'<tr><td>New Enrollments</td><td><b>REYES, Marco A.</b></td><td>Cash</td><td colspan="2">Pays at the counter</td></tr>';return}
+ const e=mode!=="Cash";
+ $("pay").innerHTML='<div class="payrow"><div class="lab">Mode of Payment<div class="chips">'+["Cash","GCash","PSBank","UnionBank"].map(m=>'<button class="chip'+(m===mode?' on':'')+'" data-m="'+m+'">'+m+'</button>').join("")+'</div></div>'+
+  (e?'<label class="amt">Amount (₱)<input id="amt" inputmode="decimal" placeholder="0.00"></label><label class="ref">Reference No.<input id="ref" placeholder="From the screenshot"></label><label class="file">Proof of Payment<input type="file" id="file"></label>':'<span class="note">Trainee pays at the Cashier.</span>')+
+  '<div class="go"><button class="btn pri" id="go"'+(e?' disabled':'')+'>'+(e?'Upload Proof &amp; Hand to Cashier':'Hand to Cashier')+'</button>'+(e?'<span class="hint">Amount, reference and photo are required</span>':'')+'</div></div>';
+ if(e){const chk=()=>{$("go").disabled=!(parseFloat($("amt").value)>0&&$("ref").value.trim().length>=3&&$("file").dataset.fake)};["amt","ref"].forEach(id=>$(id).addEventListener("input",chk));$("file").addEventListener("click",ev=>{ev.preventDefault();$("file").dataset.fake="1";$("file").title="gcash-receipt.jpg";toast("Photo chosen: gcash-receipt.jpg");chk()})}
+}
+document.addEventListener("click",ev=>{const t=ev.target.closest("button");if(!t)return;
+ if(t.dataset.m){mode=t.dataset.m;render()}
+ if(t.id==="rec"){done.recorded=true;render();toast("Payment recorded · receipt issued.")}
+ if(t.id==="go"&&!t.disabled){done=mode==="Cash"?{mode:"Cash"}:{mode,amt:Math.round(parseFloat($("amt").value)*100),ref:$("ref").value.trim()};render();toast(mode==="Cash"?"Handed to the Cashier.":"Proof saved to Google Drive and handed to the Cashier.")}
 });
-$("file").addEventListener("click",ev=>{ev.preventDefault();$("file").dataset.fake="1";toast("Photo chosen: gcash-receipt.jpg")});
 render();
 </script>

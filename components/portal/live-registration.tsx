@@ -460,6 +460,22 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
   const allTicked = missingNow.length === 0, anySaving = Object.keys(saving).length > 0;
   const t = first(e.trainees), c = first(e.courses), b = first(e.batches);
   const appNo = appNoOf(data, e.trainee_id) ?? e.enrollment_number;
+  // Hand to Cashier with the mode of payment (owner, 29 Oct 2026): Cash goes in one click;
+  // GCash and other channels needing a reference upload the proof first (Drive only).
+  const payModes = data.paymentMethods.filter((m) => m.active && (m.kind ?? "receivable") === "receivable");
+  const [payMode, setPayMode] = useState(payModes.find((m) => m.name === "Cash")?.name ?? payModes[0]?.name ?? "Cash");
+  const [payAmount, setPayAmount] = useState(""), [payRef, setPayRef] = useState(""), [payFile, setPayFile] = useState<File | null>(null);
+  const [handing, setHanding] = useState(false), [payError, setPayError] = useState("");
+  const needsProof = !!payModes.find((m) => m.name === payMode)?.requires_reference;
+  const proofReady = !needsProof || (Number(payAmount) > 0 && payRef.trim().length >= 3 && !!payFile);
+  async function handOver() {
+    setPayError(""); setHanding(true);
+    try {
+      if (needsProof && payFile) await uploadTraineeProof(e.trainee_id, { mode: payMode, amount: payAmount, reference: payRef, file: payFile });
+      await post({ action: "application-handover", enrollmentId: e.id }, needsProof ? `Proof saved to Google Drive and handed to the Cashier (${payMode}).` : "Handed to the Cashier for payment (Cash).");
+    } catch (err) { setPayError(err instanceof Error ? err.message : "Could not hand to the Cashier."); }
+    finally { setHanding(false); }
+  }
   const balance = balanceOf(e);
   const check = (requirement: string, status: "Verified" | "Rejected", label: string, note?: string) => {
     const text = note ?? (status === "Rejected" ? remarks.trim() : undefined);
@@ -500,14 +516,33 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
       <tr className="sc-total"><td>Received</td><td colSpan={3}>{REQUIREMENTS.length - missingNow.length} of {REQUIREMENTS.length}</td></tr>
     </tbody></table></div>
     <div className="sc-sig"><div><b>{lastChecker?.checked_by_name ?? " "}</b><span>Checked by · Registration officer</span></div><div><b>{lastChecker ? fmtDate(day(lastChecker.checked_at)) : " "}</b><span>Date</span></div></div>
+    {!r.handed && !r.paid && allTicked && <div className="sc-pay">
+      <div className="sc-pay-mode"><span className="pay-label">Mode of Payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{payModes.map((m) => <button type="button" role="radio" aria-checked={payMode === m.name} key={m.id} className={payMode === m.name ? "on" : ""} onClick={() => setPayMode(m.name)}>{m.name}</button>)}</div></div>
+      {needsProof ? <>
+        <label className="sc-pay-amt">Amount (₱)<input inputMode="decimal" value={payAmount} onChange={(ev) => setPayAmount(ev.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" /></label>
+        <label className="sc-pay-ref">Reference No.<input value={payRef} onChange={(ev) => setPayRef(ev.target.value.toUpperCase())} placeholder="From the screenshot" maxLength={80} /></label>
+        <label className="sc-pay-file">Proof of Payment<input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(ev) => setPayFile(ev.target.files?.[0] ?? null)} /></label>
+      </> : <span className="sc-pay-note">Trainee pays at the Cashier.</span>}
+      <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || handing || anySaving || !proofReady} onClick={() => void handOver()}>{handing ? "Saving…" : needsProof ? "Upload Proof & Hand to Cashier" : "Hand to Cashier"}</button>{needsProof && !proofReady && <small>Amount, reference and photo are required</small>}</div>
+      {payError && <div className="sc-pay-err"><Message kind="error" text={payError} /></div>}
+    </div>}
     <div className="sc-foot">
       <small>{!allTicked ? `Still to tick: ${missingNow.map((q) => q.label).join(", ")}` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
       <span className="sc-acts">
-        {!r.handed && !r.paid && <button type="button" className="portal-primary" disabled={busy || anySaving || !allTicked} onClick={() => void post({ action: "application-handover", enrollmentId: e.id }, "Handed to the Cashier for payment.").catch(() => undefined)}>Hand to Cashier</button>}
         {r.ready && <button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "application-enroll", enrollmentId: e.id }, "Trainee enrolled.").catch(() => undefined)}>Enroll Now</button>}
       </span>
     </div>
   </div>;
+}
+
+/** Files a trainee's proof of payment in Google Drive (Mode › Month); returns the Drive path. */
+async function uploadTraineeProof(traineeId: string, p: { mode: string; amount: string; reference: string; file: File }) {
+  const fd = new FormData();
+  fd.set("traineeId", traineeId); fd.set("mode", p.mode); fd.set("amount", p.amount); fd.set("reference", p.reference.trim()); fd.set("proof", await shrinkProof(p.file));
+  const response = await fetch("/api/staff/payment-proofs/trainee", { method: "POST", body: fd });
+  const body = await response.json().catch(() => ({})) as { error?: string; drivePath?: string };
+  if (!response.ok) throw new Error(body.error ?? "Could not save the proof to Google Drive.");
+  return (body.drivePath ?? "").split(" / ").slice(1).join(" / ");
 }
 
 /**
@@ -526,12 +561,8 @@ function ProofSection({ data, enrollment: e, reload }: { data: PortalData; enrol
     if (!mode || !(Number(amount) > 0) || reference.trim().length < 3 || !file) { setMsg({ kind: "error", text: "Add the amount, the reference no. and the photo." }); return; }
     setBusy(true);
     try {
-      const fd = new FormData();
-      fd.set("traineeId", e.trainee_id); fd.set("mode", mode); fd.set("amount", amount); fd.set("reference", reference.trim()); fd.set("proof", await shrinkProof(file));
-      const response = await fetch("/api/staff/payment-proofs/trainee", { method: "POST", body: fd });
-      const body = await response.json().catch(() => ({})) as { error?: string; drivePath?: string };
-      if (!response.ok) throw new Error(body.error ?? "Could not save the proof to Google Drive.");
-      setMsg({ kind: "success", text: `Saved to Google Drive · ${(body.drivePath ?? "").split(" / ").slice(1).join(" / ")}. The Cashier sees it on the dashboard.` });
+      const path = await uploadTraineeProof(e.trainee_id, { mode, amount, reference, file });
+      setMsg({ kind: "success", text: `Saved to Google Drive · ${path}. The Cashier sees it on the dashboard.` });
       setAmount(""); setReference(""); setFile(null); if (fileRef.current) fileRef.current.value = "";
       await reload();
     } catch (err) { setMsg({ kind: "error", text: err instanceof Error ? err.message : "Could not upload the proof." }); }
@@ -619,7 +650,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
       </div>}
       <StartDateEditor data={data} enrollment={e} busy={busy} post={post} />
       <OtherCenterEditor data={data} enrollment={e} busy={busy} post={post} />
-      {e.enrollment_status !== "Cancelled" && <ProofSection data={data} enrollment={e} reload={reload} />}
+      {e.enrollment_status !== "Cancelled" && e.enrollment_status !== "Pending" && <ProofSection data={data} enrollment={e} reload={reload} />}
 
       <div className="full"><strong>Payment status</strong> <small style={{ color: "var(--muted)" }}>read-only — payments are recorded by the Cashier</small></div>
       <div className="pill-row full">

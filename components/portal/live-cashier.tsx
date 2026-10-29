@@ -313,7 +313,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
   if (posted && group) return <Modal title="Payment Recorded" onClose={onClose}>
     <div className="portal-form">
       <div className="full"><Message kind="success" text={`${pesos(posted.amount)} received from ${group.name}.`} /></div>
-      {posted.drive && <p className="portal-form-note full cx-drive">Saved to Google Drive · {posted.drive.path.split(" / ").slice(1).join(" / ")} {posted.drive.link && <a href={posted.drive.link} target="_blank" rel="noreferrer">Open</a>}</p>}
+      {posted.drive && <p className="portal-form-note full cx-drive">Proof kept in Google Drive{posted.drive.path ? ` · ${posted.drive.path.split(" / ").slice(1).join(" / ")}` : ""}.</p>}
       <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
         {posted.id && <ReceiptButton data={data} paymentId={posted.id} reload={onSaved} />}
       </div>
