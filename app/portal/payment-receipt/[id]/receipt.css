@@ -1,0 +1,6 @@
+/* Acknowledgement Receipt on one legal 8.5 × 13 in sheet (owner, 29 Oct 2026): the
+   original and duplicate copies, 6.5 in each. The TAR stays on 8.5 × 14. */
+@page { size: 8.5in 13in; margin: 0; }
+.tar-legal.ar-13 { height: 13in; }
+.ar-13 .tar-copy { height: 6.5in; }
+.ar-13 .tar-sheet { height: calc(6.5in / 1.12); }

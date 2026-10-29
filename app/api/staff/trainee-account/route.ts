@@ -19,7 +19,7 @@ export async function GET(request: Request) {
   const db = createSupabaseAdminClient();
   const { data: me } = await db.from("trainees").select("id,srn,legal_first_name,legal_last_name,birthdate").eq("id", traineeId).maybeSingle();
   if (!me) return NextResponse.json({ error: "Trainee not found." }, { status: 404 });
-  const { data: mine } = await db.from("enrollments").select("id,enrollment_status,batch_id,scheduled_on").eq("trainee_id", traineeId);
+  const { data: mine } = await db.from("enrollments").select("id,enrollment_status").eq("trainee_id", traineeId);
   // Candidates: same SRN, or same last name (then name + birth date is checked in code).
   const srn = normalizeSrn(me.srn ?? "");
   const [bySrn, byName] = await Promise.all([
@@ -30,7 +30,7 @@ export async function GET(request: Request) {
   for (const t of [...(bySrn.data ?? []), ...(byName.data ?? [])] as (Parameters<typeof sameTrainee>[0] & { application_number?: string | null; trainee_number?: string | null })[]) if (sameTrainee(me, t)) seen.set(t.id, t);
   const others = [];
   if (seen.size) {
-    const { data: theirs } = await db.from("enrollments").select("trainee_id,enrollment_status,batch_id,scheduled_on").in("trainee_id", [...seen.keys()]);
+    const { data: theirs } = await db.from("enrollments").select("trainee_id,enrollment_status").in("trainee_id", [...seen.keys()]);
     for (const [id, t] of seen) others.push({ id, number: t.application_number ?? t.trainee_number ?? "", tarCourses: (theirs ?? []).filter((e) => e.trainee_id === id && tarPrintable(e)).length });
   }
   return NextResponse.json({ tarEnrollmentIds: (mine ?? []).filter(tarPrintable).map((e) => e.id), others }, { headers: { "Cache-Control": "no-store" } });

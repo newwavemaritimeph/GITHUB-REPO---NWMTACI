@@ -3,6 +3,7 @@ import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { ReceiptSheets } from "./receipt-sheets";
 import "../../admission-record/[id]/admission-record.css";
+import "./receipt.css";
 
 /**
  * Acknowledgement receipt for one payment, in the Training Admission Record

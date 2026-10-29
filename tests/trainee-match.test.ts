@@ -2,12 +2,11 @@ import { describe, expect, it } from "vitest";
 import { sameTrainee, tarPrintable } from "@/lib/trainee-match";
 
 describe("TAR courses", () => {
-  it("prints scheduled courses, paid or with a balance, never cancelled or unscheduled ones", () => {
-    expect(tarPrintable({ enrollment_status: "Enrolled", batch_id: "b" })).toBe(true);
-    expect(tarPrintable({ enrollment_status: "Pending", batch_id: "b" })).toBe(true);
-    expect(tarPrintable({ enrollment_status: "Pending", scheduled_on: "2026-11-03" })).toBe(true);
-    expect(tarPrintable({ enrollment_status: "Pending" })).toBe(false);
-    expect(tarPrintable({ enrollment_status: "Cancelled", batch_id: "b" })).toBe(false);
+  it("prints every course that is not cancelled, paid or not", () => {
+    expect(tarPrintable({ enrollment_status: "Enrolled" })).toBe(true);
+    expect(tarPrintable({ enrollment_status: "Pending" })).toBe(true);
+    expect(tarPrintable({ enrollment_status: "Open Schedule" })).toBe(true);
+    expect(tarPrintable({ enrollment_status: "Cancelled" })).toBe(false);
   });
 });
 

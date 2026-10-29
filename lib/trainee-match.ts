@@ -1,12 +1,10 @@
 import { normalizeSrn } from "@/lib/validation";
 
 /**
- * TAR rule (owner, 29 Oct 2026: "If the trainee has balance, allow TAR"): any course
- * that is not cancelled and has a schedule (batch or start date) goes on the TAR,
- * paid or not; the TAR itself shows the balance.
+ * TAR rule (owner, 29 Oct 2026: "print TAR regardless of payment status"): every course
+ * that is not cancelled goes on the TAR, paid or not; the TAR itself shows the balance.
  */
-export const tarPrintable = (e: { enrollment_status: string; batch_id?: string | null; scheduled_on?: string | null }) =>
-  e.enrollment_status !== "Cancelled" && !!(e.batch_id || e.scheduled_on);
+export const tarPrintable = (e: { enrollment_status: string }) => e.enrollment_status !== "Cancelled";
 
 type Person = { id: string; srn?: string | null; legal_first_name?: string | null; legal_last_name?: string | null; birthdate?: string | null };
 const norm = (v?: string | null) => (v ?? "").trim().toUpperCase().replace(/\s+/g, " ");

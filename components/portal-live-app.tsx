@@ -676,7 +676,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
       </tbody></table></div>
       {requests.length>0&&<div className="sa-reqs"><span className="sa-cap">Open requests</span>{requests.map(r=><p key={r.id}><b>{r.request_type==="Rescheduling"?"Reschedule":r.request_type}</b> · {first(r.enrollments)?.enrollment_number} · {r.reason}</p>)}</div>}
       <div className="sa-sig"><div><b>{data.profile.complete_name}</b>Prepared by</div><div><b>&nbsp;</b>Received by · Trainee Signature over Printed Name · Date</div></div>
-      {account?.others.filter(o=>o.tarCourses>0).map(o=><p key={o.id} className="sa-dup">{(trainee.legal_last_name??"").toUpperCase()} also has record {o.number||"(no number)"} with {o.tarCourses} scheduled course{o.tarCourses===1?"":"s"}. Search {o.number||"the name"} in Trainees &amp; Enrollments and print the TAR from that record.</p>)}
+      {account?.others.filter(o=>o.tarCourses>0).map(o=><p key={o.id} className="sa-dup">{(trainee.legal_last_name??"").toUpperCase()} also has record {o.number||"(no number)"} with {o.tarCourses} course{o.tarCourses===1?"":"s"}. Search {o.number||"the name"} in Trainees &amp; Enrollments and print the TAR from that record.</p>)}
       <div className="sa-foot">
         <div className="sa-acts">
           {canEdit&&<button type="button" className="portal-primary" onClick={()=>setAddingCourse(true)}>Add Course</button>}

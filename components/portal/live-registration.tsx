@@ -671,7 +671,10 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
           {!atLimit && (!emailOk || emailFailed) && <button type="button" disabled={busy} onClick={() => void post({ action: "send-instructions", enrollmentId: e.id }, "Instructions emailed to the trainee.").catch(() => undefined)}>Resend Email</button>}
         </div>
         <p className="portal-form-note full">Instructions are emailed automatically{emailStatusText(data.instructionEmails?.[e.id]) ? `: ${emailStatusText(data.instructionEmails?.[e.id])}.` : t?.email ? ` to ${t.email} once the trainee is paid.` : "."} Print the Training Admission Record here once the trainee is paid.</p>
-      </> : <p className="portal-form-note full">{isApplication ? "Training instructions become available once the trainee is paid and enrolled." : "No documents for a cancelled enrollment."}</p>}
+      </> : isApplication ? <>
+        <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}><TarButton data={data} traineeId={e.trainee_id} reload={reload} className="portal-primary" /></div>
+        <p className="portal-form-note full">The TAR prints regardless of payment and shows the balance. Training instructions become available once the trainee is paid and enrolled.</p>
+      </> : <p className="portal-form-note full">No documents for a cancelled enrollment.</p>}
 
       {isApplication && <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>{!e.batch_id && !e.scheduled_on && <button type="button" className="portal-primary" onClick={() => setChoosingBatch(true)}>Choose Batch</button>}{traineeRecord && <button type="button" onClick={() => setAddingCourse(true)}>+ Add Another Course</button>}</div>}
 

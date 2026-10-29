@@ -48,7 +48,7 @@ const PAID_STATUSES = ["Enrolled", "Open Schedule"];
  * Print state of a trainee's TAR. A record covers the trainee's current set of
  * paid enrollments; adding a paid course starts a new record (new AR number).
  */
-// TAR courses (owner, 29 Oct 2026): scheduled and not cancelled, paid or with a balance.
+// TAR courses (owner, 29 Oct 2026): every course not cancelled, regardless of payment.
 // `knownIds` comes from the database when the loaded list does not hold all of them.
 export function tarState(data: PortalData, traineeId: string, knownIds?: string[]) {
   const paid = data.enrollments.filter((e) => e.trainee_id === traineeId && tarPrintable(e));
@@ -77,7 +77,7 @@ export function TarButton({ data, traineeId, reload, className = "portal-seconda
   if (printable && s.left <= 0) return null;
   return <>
     {!printable
-      ? <><button type="button" className={className} disabled>Print TAR</button><small className="muted-text">No scheduled course on this record yet</small></>
+      ? <><button type="button" className={className} disabled>Print TAR</button><small className="muted-text">No course on this record yet</small></>
       : <button type="button" className={className} onClick={print}>Print TAR</button>}
     {error && <Message kind="error" text={error} />}
   </>;

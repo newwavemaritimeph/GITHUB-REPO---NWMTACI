@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { PrintControls } from "../../admission-record/[id]/print-controls";
 
-/** The acknowledgement receipt sheets (TAR layout): original and duplicate on one legal page. */
+/** The acknowledgement receipt sheets (TAR layout): original and duplicate on one legal 8.5 × 13 page. */
 
 const peso = (c: number) => "₱" + (c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const ORG = "NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.";
@@ -61,11 +61,11 @@ export function ReceiptSheets({ receiptNo, name, received, cashier, status, paym
     </div>
     <div className="tar-terms"><div className="tar-terms-head"><b>NOTE</b><span>This acknowledges payment received by New Wave Maritime Training and Assessment Center, Inc. Keep this receipt with your Training Admission Record. Full payment is required before the end of training.</span></div></div>
   </>;
-  const copies = [["ORIGINAL COPY", "Trainee"], ["DUPLICATE COPY", "Office file"]];
+  const copies = [["ORIGINAL COPY", "Trainee"], ["DUPLICATE COPY", "Office File"]];
 
   return <main className="tar-screen">
     <PrintControls arNumber={receiptNo} title="Acknowledgement Receipt" />
-    <section className="tar-legal">
+    <section className="tar-legal ar-13">
       {copies.map(([label, holder]) => <div className="tar-copy" key={label}><div className="tar-sheet"><span className="tar-copy-tag"><b>{label}</b> · {holder}</span>{content}</div></div>)}
     </section>
   </main>;
