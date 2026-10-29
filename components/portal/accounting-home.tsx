@@ -44,8 +44,8 @@ function useJson<T>(url: string | null) {
 
 /* ------------------------------------------------------------ approvals */
 
-type Category = "Expense requests" | "Requisitions" | "Voucher reprints" | "Refunds" | "Discounts" | "Rebates owed to partners" | "Cashier closings";
-const CATEGORY_GROUPS: [string, Category[]][] = [["Money out", ["Expense requests", "Requisitions", "Voucher reprints", "Refunds"]], ["Fees", ["Discounts", "Rebates owed to partners"]], ["Cash control", ["Cashier closings"]]];
+type Category = "Expense requests" | "Requisitions" | "Voucher reprints" | "Refunds" | "Discounts" | "Rebates owed to partners" | "Payment voids" | "Cashier closings";
+const CATEGORY_GROUPS: [string, Category[]][] = [["Money out", ["Expense requests", "Requisitions", "Voucher reprints", "Refunds"]], ["Fees", ["Discounts", "Rebates owed to partners"]], ["Cash control", ["Payment voids", "Cashier closings"]]];
 /** Receipt photos the Cashier attached (owner, 19 Oct 2026), opened in Google Drive. */
 function ApprovalReceipts({ files }: { files: { fileId: string; link: string }[] }) {
   return files.length
@@ -92,7 +92,11 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
   type Req = { id: string; requisition_number: string; purpose: string; lines?: { description: string; quantity: number }[]; total_centavos: number; status: string; created_at: string; requester?: { complete_name: string } | { complete_name: string }[] | null };
   const requisitions = ((data as unknown as { requisitions?: Req[] }).requisitions ?? []).filter((r) => r.status === "For Approval").map((r): Row => ({ id: r.id, title: `Requisition · ${r.purpose}`, detail: (r.lines ?? []).map((l) => `${l.description} × ${l.quantity}`).join(", "), ref: r.requisition_number, who: first(r.requester)?.complete_name ?? "Admin Assistant", when: fmtDate(day(r.created_at)), amount: Number(r.total_centavos), okLabel: "Approve", canReject: true,
     act: (approve, remarks) => post({ action: "requisition-decide", id: r.id, approve, remarks }, approve ? "Approved. The voucher is with the Cashier." : "Rejected.") }));
-  const lists: Record<Category, Row[]> = { "Expense requests": expenses, Requisitions: requisitions, "Voucher reprints": reprints, Refunds: refunds, Discounts: discounts, "Rebates owed to partners": rebates, "Cashier closings": closings };
+  // Payment voids the Cashier asked for (owner, 29 Oct 2026): approving voids the payment and marks its receipt VOID.
+  const payById = new Map(data.payments.map((p) => [p.id, p]));
+  const voids = (data.paymentVoids ?? []).filter((r) => r.status === "Pending").map((r): Row => { const p = payById.get(r.payment_id); const t = p ? first(p.trainees) : null; return { id: r.id, title: `${p?.payment_number ?? "Payment"} · ${name(t ?? null)}`, detail: `${p ? `${p.method}${p.reference_number ? ` · Ref ${p.reference_number}` : ""} · ` : ""}Reason: ${r.reason}`, ref: "Void", who: r.requested_by_name ?? "Cashier", when: fmtDate(day(r.requested_at)), amount: Number(p?.amount_centavos ?? 0), okLabel: "Approve Void", canReject: true,
+    act: (approve, remarks) => post({ action: "payment-void-decide", requestId: r.id, approve, remarks }, approve ? "Payment voided. The receipt shows VOID and the amount is back on the balance." : "Void request rejected.") }; });
+  const lists: Record<Category, Row[]> = { "Expense requests": expenses, Requisitions: requisitions, "Voucher reprints": reprints, Refunds: refunds, Discounts: discounts, "Rebates owed to partners": rebates, "Payment voids": voids, "Cashier closings": closings };
   const waiting = Object.values(lists).reduce((s, l) => s + l.length, 0);
   const rowsOf = (list: Row[]) => list.map((r) => <div key={r.id} className={rejecting && rejecting !== r.id ? "ac-dim" : undefined}>
     <div className={`ac-req${rejecting === r.id ? " ac-rejecting" : ""}`}>

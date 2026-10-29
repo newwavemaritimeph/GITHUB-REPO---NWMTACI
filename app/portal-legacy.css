@@ -2500,3 +2500,11 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .sa.tp{display:flex;flex-direction:column;gap:12px}
 .tp .tp-table td:first-child{min-width:130px}
 .tp .tp-table th,.tp .tp-table td{padding-left:6px;padding-right:6px}
+/* Payment voids (owner, 29 Oct 2026): voided payments stay listed, struck through, with the reason. */
+.portal-shell .pv-cell{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.portal-shell .pv-cell small{flex-basis:100%;color:#587184;font-size:12px}
+.portal-shell .pv-cell .ghost-button{padding:3px 10px;font-size:12.5px}
+.portal-shell tr.pv-void td{color:#8a9aa6}
+.portal-shell tr.pv-void td.tp-mono,.portal-shell tr.pv-void td .cx-amt,.portal-shell tr.pv-void td.r{text-decoration:line-through}
+.portal-shell .pv-open{background:none;border:0;padding:0;text-align:left;cursor:pointer;color:inherit}
+.portal-shell .pv-open:hover .cx-name{color:#0571D0;text-decoration:underline}

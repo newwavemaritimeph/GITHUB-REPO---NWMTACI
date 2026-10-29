@@ -20,6 +20,7 @@ import { DateReports } from "./date-reports";
 import { downloadCsv } from "@/lib/csv";
 import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer, SourcePicker, partnerOf, chargeTo } from "./portal/live-registration";
 import { sourceLabel } from "@/lib/company-charge";
+import { PaymentVoidCell } from "./portal/payment-void";
 import { Badge, Message, Modal, Page, PageHead, PeriodBar, manilaDay, submit, fullName, usePaged, usePeriod } from "./portal/shared-ui";
 import { classroomJoin } from "@/lib/classroom";
 import { ClassroomPanel } from "./portal/classroom-panel";
@@ -83,6 +84,8 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   // Company Charge (29 Oct 2026): enrollment → partner billed; issued Billing Statements the Cashier can collect.
   companyCharge?:Record<string,string>;
   billingStatements?:{id:string;bs_number:number;bill_to:string;coverage_from:string;coverage_to:string;total_centavos:number;paid_centavos:number}[];
+  paymentVoids?:{id:string;payment_id:string;reason:string;status:string;requested_at:string;requested_by_name:string|null;decided_at:string|null;decision_remarks:string|null}[];
+  voidedPayments?:(Payment&{valid?:boolean;void_reason?:string|null;voided_at?:string|null})[];
   // Times training instructions were generated per enrollment id (202610070007).
   instructionsCount?:Record<string,number>;
   // Latest training-instructions email per enrollment id (202610070012).
@@ -449,8 +452,8 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   }
   if(gateRole==="cashier"){
     if(active==="Dashboard")return <CashierDashboard data={data} onPay={onPay} reload={reload} go={(m)=>go(m as Module)}/>;
-    if(active==="Search trainee")return <CashierEnrollments data={data} onPay={onPay} reload={reload}/>;
-    if(active==="Payments")return <CashierPayments data={data} onPay={onPay}/>;
+    if(active==="Search trainee")return <CashierSearchTrainee data={data} onPay={onPay} reload={reload} role={gateRole}/>;
+    if(active==="Payments")return <CashierPayments data={data} onPay={onPay} reload={reload}/>;
     if(active==="Report")return <SubTabs eyebrow="Accounting" title="Report" tabs={["Summary report","Opening and closing"]} render={t=>t==="Summary report"?<CashierSummaryReport data={data} embedded/>:<><CashierOpening data={data} reload={reload}/><LiveCashierClosing data={data} reload={reload} initialOpening={(data.cashierOpenings??[]).find(o=>o.opening_date===manilaToday())?.opening_cash_centavos}/></>}/>;
     if(active==="Requests")return <CashierRequests data={data} reload={reload}/>;
     if(active==="Expenses")return <ExpensesWorkspace data={data} role="cashier" reload={reload}/>;
@@ -638,6 +641,9 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   const billedTo=live.map(e=>chargeTo(data,e)).find(Boolean)??null;
   const enrolledN=live.filter(e=>e.enrollment_status==="Enrolled"||e.enrollment_status==="Open Schedule").length;
   const srcLabel=latest?sourceLabel(latest.source,partner):"";
+  // Payment voids (owner, 29 Oct 2026): voided payments stay listed; the Cashier requests, Accounting approves.
+  const canVoid=["cashier","accounting","admin"].includes(role??"");
+  const payRows=[...payments,...(data.voidedPayments??[]).filter(p=>p.trainee_id===trainee.id)].sort((a,b)=>a.received_at.localeCompare(b.received_at));
   const when=(e:Enrollment)=>{const b=first(e.batches);return b?(b.starts_on===b.ends_on?date(b.starts_on):`${date(b.starts_on)} – ${date(b.ends_on)}`):e.scheduled_on?date(e.scheduled_on):"No batch yet"};
   return <Modal title="Trainee Account" onClose={onClose} wide>
     <div className="sa tp">
@@ -667,9 +673,9 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
               {!enrolls.length&&<tr><td colSpan={6} className="sa-empty">No courses yet.</td></tr>}
             </tbody></table></div>
             <h4 className="tp-sub">Payments</h4>
-            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Receipt</th><th>Date</th><th>Mode</th><th className="r">Amount</th></tr></thead><tbody>
-              {payments.map(p=><tr key={p.id}><td className="tp-mono">{p.payment_number}</td><td>{day(p.received_at)}</td><td>{p.method}{p.reference_number?` · Ref ${p.reference_number}`:""}</td><td className="r tp-mono">{money(Number(p.amount_centavos))}</td></tr>)}
-              {!payments.length&&<tr><td colSpan={4} className="sa-empty">No payments yet.</td></tr>}
+            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Receipt</th><th>Date</th><th>Mode</th><th className="r">Amount</th><th>Status</th></tr></thead><tbody>
+              {payRows.map(p=><tr key={p.id} className={(p as {valid?:boolean}).valid===false?"pv-void":undefined}><td className="tp-mono">{p.payment_number}</td><td>{day(p.received_at)}</td><td>{p.method}{p.reference_number?` · Ref ${p.reference_number}`:""}</td><td className="r tp-mono">{money(Number(p.amount_centavos))}</td><td><PaymentVoidCell data={data} payment={p} canRequest={canVoid} busy={busy} post={post}/></td></tr>)}
+              {!payRows.length&&<tr><td colSpan={5} className="sa-empty">No payments yet.</td></tr>}
             </tbody></table></div>
           </section>
           {requests.length>0&&<section className="tp-panel"><h4>Open Requests</h4>{requests.map(r=><p key={r.id} className="tp-req"><b>{r.request_type==="Rescheduling"?"Reschedule":r.request_type}</b> · {first(r.enrollments)?.enrollment_number} · {r.reason}</p>)}</section>}
@@ -698,6 +704,13 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
     {addingCourse&&reload&&<AssignCourseModal data={data} trainee={trainee} reload={reload} onClose={()=>setAddingCourse(false)}/>}
     {openEnrollment&&reload&&(()=>{const e=data.enrollments.find(x=>x.id===openEnrollment);return e?<EnrollmentDrawer data={data} enrollment={e} reload={reload} onClose={()=>setOpenEnrollment(null)}/>:null})()}
   </Modal>;
+}
+
+/** Cashier › Search Trainee, with the Trainee Account a click away (payment voids, 29 Oct 2026). */
+function CashierSearchTrainee({data,onPay,reload,role}:{data:PortalData;onPay:(enrollmentId:string)=>void;reload:()=>Promise<void>;role:string}){
+  const [sel,setSel]=useState<string|null>(null);
+  const t=sel?data.trainees.find(x=>x.id===sel):undefined;
+  return <><CashierEnrollments data={data} onPay={onPay} reload={reload} onOpenTrainee={setSel}/>{t&&<TraineeDetailModal data={data} trainee={t} reload={reload} role={role} onClose={()=>setSel(null)}/>}</>;
 }
 
 /** Edit a trainee's contact and work details. Name, SRN and birth date stay as recorded. */
