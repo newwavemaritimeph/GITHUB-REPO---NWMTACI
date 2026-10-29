@@ -2430,3 +2430,14 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .mv-batch label.portal-check{flex-direction:row;align-items:center;font-weight:500}
 .nw-shell .mv-days{display:flex;gap:6px;flex-wrap:wrap}.nw-shell .mv-days span{border:1px solid #dbe5ec;border-radius:8px;padding:5px 10px;font-size:13px;font-weight:600}.nw-shell .mv-days span.off{opacity:.5;text-decoration:line-through}
 @media (max-width:560px){.nw-shell .mv-grid{grid-template-columns:1fr}}
+/* Staff portal at 85% (owner, 29 Oct 2026): text, boxes and tables scale together like browser
+   zoom. Viewport heights are divided by the zoom so the page and modals still fill the screen.
+   Phones keep full size. */
+.portal-shell.nw-shell { zoom: .85; min-height: calc(100vh / .85); }
+.portal-shell.nw-shell .portal-modal { max-height: calc((100vh - 40px) / .85); }
+.portal-shell.nw-shell .rp-queue { max-height: calc(70vh / .85); }
+@media (max-width: 640px) {
+  .portal-shell.nw-shell { zoom: 1; min-height: 100vh; }
+  .portal-shell.nw-shell .portal-modal { max-height: 94vh; }
+  .portal-shell.nw-shell .rp-queue { max-height: 70vh; }
+}
