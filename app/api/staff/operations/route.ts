@@ -44,7 +44,8 @@ const enrollmentInput = z.object({
 const batchInput = z.object({
   action: z.literal("create-batch"), courseId: z.string().uuid(), partnerOfferId: z.string().uuid().nullable().optional(),
   // Instructor / room / venue are optional for In-House batches (assigned later, or never).
-  instructorName: z.string().trim().max(160).optional().default(""), instructorEmail: z.string().trim().max(160).optional().default(""), roomName: z.string().trim().max(120).optional().default(""),
+  // A field the form does not show arrives as null (29 Oct 2026); treat it as blank.
+  instructorName: z.string().trim().max(160).nullish().transform((v) => v ?? ""), instructorEmail: z.string().trim().max(160).nullish().transform((v) => v ?? ""), roomName: z.string().trim().max(120).nullish().transform((v) => v ?? ""),
   startsOn: z.string().date(), endsOn: z.string().date(), dailyStart: z.string().regex(/^\d{2}:\d{2}$/), dailyEnd: z.string().regex(/^\d{2}:\d{2}$/),
   mode: z.string().trim().min(2).max(80), venue: z.string().trim().max(160).optional().default(""), capacity: z.literal(24),
   enrollmentDeadline: z.string().datetime({ offset: true }), publish: z.boolean().default(true),
