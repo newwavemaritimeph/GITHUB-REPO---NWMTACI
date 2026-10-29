@@ -2390,3 +2390,10 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .pm-form input,.nw-shell .pm-form select{height:42px;padding:0 12px;font-size:15px;border-radius:10px}
 .nw-shell .pm-actions{padding:4px 20px 18px}
 @media (max-width:640px){.nw-shell .pm-search{min-width:0;flex:1 1 100%}.nw-shell .rb3-table .cm-text{min-width:180px}}
+/* Instructors › Add Course form (owner, 29 Oct 2026): labels above their boxes, even columns. */
+.nw-shell .ia-formrow td{padding:16px 20px}
+.nw-shell .portal-form.aa-accform{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 18px;padding:4px 0;max-width:860px}
+.nw-shell .aa-accform>label{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:0;margin:0;font-size:13.5px;font-weight:600;color:#123F63}
+.nw-shell .aa-accform>label>input,.nw-shell .aa-accform>label>select{width:100%;min-width:0;height:42px;padding:0 12px;font-size:15px;border:1px solid #dbe5ec;border-radius:10px;background:#fff;color:#0f2638;box-sizing:border-box}
+.nw-shell .aa-accform>.portal-form-actions{grid-column:1/-1;display:flex;justify-content:flex-end;gap:10px;margin:2px 0 0}
+@media (max-width:640px){.nw-shell .portal-form.aa-accform{grid-template-columns:1fr}}
