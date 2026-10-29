@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { PortalData, Enrollment } from "../portal-live-app";
 import { first, manilaToday, pesos } from "@/lib/portal-format";
-import { requestFee } from "@/lib/request-fees";
+import { refundAfterDeduction, requestFee } from "@/lib/request-fees";
 import { Message, Modal, fmtDate } from "./shared-ui";
 
 /**
@@ -21,7 +21,6 @@ export type RequestType = "Cancellation" | "Refund" | "Make-up Class" | "Resched
  */
 export function RequestActionModal({ data, enrollment, reqType, onClose, post, embedded }: { data: PortalData; enrollment: Enrollment; reqType: RequestType; onClose: () => void; post: (body: Record<string, unknown>) => Promise<unknown>; embedded?: boolean }) {
   const [batchId, setBatchId] = useState("");
-  const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [courseId, setCourseId] = useState(enrollment.course_id);
   const [offerId, setOfferId] = useState("");
@@ -30,6 +29,9 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
   const today = manilaToday();
   const [requestedOn, setRequestedOn] = useState(today);
   const policyFee = requestFee({ type: reqType, trainingFeeCentavos: Number(enrollment.selling_price_centavos), startDate: first(enrollment.batches)?.starts_on ?? enrollment.scheduled_on ?? null, requestedOn: requestedOn || today });
+  // Refund Policy (owner, 29 Oct 2026): the refund is what was paid less the deduction; the server recomputes it.
+  const paidSoFar = Number(enrollment.paid_centavos ?? 0);
+  const refund = refundAfterDeduction(paidSoFar, policyFee?.amountCentavos ?? 0);
   const batches = data.batches.filter((b) => b.course_id === enrollment.course_id && b.id !== enrollment.batch_id && b.status === "Open" && b.confirmed_count < b.capacity);
   const newCourse = data.courses.find((c) => c.id === courseId);
   const offers = data.offers.filter((o) => o.course_id === courseId);
@@ -40,13 +42,11 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
       if (!courseId) { setErr("Pick the new course."); return; }
       if (newCourse?.delivery_type === "Partner or Endorsed" && !offerId) { setErr("Pick an endorsed program."); return; }
     }
-    const amt = Math.round(Number(amount) * 100);
-    if (reqType === "Refund" && (!Number.isFinite(amt) || amt <= 0)) { setErr("Enter a valid refund amount."); return; }
+    if (reqType === "Refund" && refund <= 0) { setErr("Nothing to refund after the policy deduction."); return; }
     setBusy(true); setErr("");
     try {
       await post({ action: "request-raise", enrollmentId: enrollment.id, requestType: reqType, reason: reason.trim(),
         batchId: reqType === "Rescheduling" ? (batchId || null) : null,
-        amountCentavos: reqType === "Refund" ? amt : undefined,
         courseId: reqType === "Change Course" ? courseId : undefined,
         partnerOfferId: reqType === "Change Course" ? (offerId || null) : undefined, requestedOn: requestedOn || today });
       onClose();
@@ -62,9 +62,9 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
       <label className="full">New Course<select value={courseId} onChange={(e) => { setCourseId(e.target.value); setOfferId(""); }}>{data.courses.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label>
       {newCourse?.delivery_type === "Partner or Endorsed" && <label className="full">Endorsed Program<select value={offerId} onChange={(e) => setOfferId(e.target.value)}><option value="">Select Rate</option>{offers.map((o) => <option key={o.id} value={o.id}>{first(o.partner_centers)?.name} · {o.duration_label} · {pesos(o.training_fee_centavos)}</option>)}</select></label>}
     </>}
-    {reqType === "Refund" && <label className="full">Refund Amount (PHP)<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>}
+    {reqType === "Refund" && policyFee && <div className="rate-preview full"><span>Refund to the trainee</span><strong>{pesos(refund)}</strong><small>Paid {pesos(paidSoFar)} less the policy deduction {pesos(policyFee.amountCentavos)}</small></div>}
     <label>Date Requested<input type="date" value={requestedOn} max={today} onChange={(e) => setRequestedOn(e.target.value)} /></label>
-    {policyFee && <div className="rate-preview"><span>Fee by policy</span><strong>{pesos(policyFee.amountCentavos)}</strong><small>{policyFee.rule}</small></div>}
+    {policyFee && <div className="rate-preview"><span>{reqType === "Refund" ? "Deduction by policy" : "Fee by policy"}</span><strong>{pesos(policyFee.amountCentavos)}</strong><small>{policyFee.rule}</small></div>}
     <label className="full">Reason<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why is this being requested?" /></label>
     <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={send}>{busy ? "Sending…" : "Send to Cashier"}</button></div>
   </div>;

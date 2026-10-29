@@ -98,8 +98,8 @@ const DEFAULT_REMINDERS = [
 ];
 const INSTRUCTION_POLICIES: [string, string, string][] = [
   ["P", "Payment", "Full payment for 1-day courses; 50% down payment otherwise."],
-  ["R", "Reschedule", "3+ days before: Php 300.00. 1-2 days before: 50% of the fee + Php 250.00."],
-  ["F", "Cancellation", "5+ days before: Php 300.00. Under 5 days: 50% of the fee + Php 250.00."],
+  ["R", "Reschedule", "5+ days before: Php 350.00. Under 5 days: 50% of the fee + Php 250.00."],
+  ["F", "Cancellation", "5+ days before: Php 350.00. Under 5 days: 50% of the fee + Php 250.00."],
   ["M", "Make-up", "3-day and longer courses; Php 350.00 per training day."],
   ["C", "Certificate", "Released after all requirements and balances are complete."],
 ];

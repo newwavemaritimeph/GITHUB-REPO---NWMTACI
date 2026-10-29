@@ -16,7 +16,7 @@ import { fileVoucherInDrive } from "@/lib/expense-voucher";
 import { channelOf } from "@/lib/reconciliation";
 import { activeConnection, googleConfigured, hasDriveScope, inviteStudent, listClasses, revokeConnection } from "@/lib/google-classroom";
 import { sendBalanceSummary } from "@/lib/balance-summary";
-import { RULED_REQUESTS, requestFee } from "@/lib/request-fees";
+import { RULED_REQUESTS, refundAfterDeduction, requestFee } from "@/lib/request-fees";
 import { applyReferralRebates, pendingFullPaymentRebates, suggestReferralCode } from "@/lib/referral";
 import { isStcwRebateCourse } from "@/lib/rebates";
 import { automaticEndDate, fitsInWeek, moveProblem } from "@/lib/scheduling";
@@ -1873,7 +1873,6 @@ export async function POST(request: Request) {
     if (input.action === "request-raise") {
       if (!staff.roleCodes.some((r) => ["admin", "cashier", "accounting", "registration"].includes(r))) return NextResponse.json({ error: "Your account cannot raise requests." }, { status: 403 });
       if (input.requestType === "Rescheduling" && !input.batchId) return NextResponse.json({ error: "Choose the new schedule for the reschedule request." }, { status: 400 });
-      if (input.requestType === "Refund" && !input.amountCentavos) return NextResponse.json({ error: "Enter the refund amount." }, { status: 400 });
       if (input.requestType === "Change Course" && !input.courseId) return NextResponse.json({ error: "Choose the course to change to." }, { status: 400 });
       if (input.requestedOn && input.requestedOn > manilaDate()) return NextResponse.json({ error: "The request date cannot be in the future." }, { status: 400 });
       if (input.requestType === "TAR reprint" && !canCashier(staff.roleCodes) && !canRegister(staff.roleCodes)) return NextResponse.json({ error: "Only Registration or the Cashier can request a TAR reprint." }, { status: 403 });
@@ -1890,6 +1889,21 @@ export async function POST(request: Request) {
       if (input.paymentId) requested.paymentId = input.paymentId;
       if (input.courseId) requested.courseId = input.courseId;
       if (input.partnerOfferId) requested.partnerOfferId = input.partnerOfferId;
+      // Refund Policy (owner, 29 Oct 2026): the refund is what was paid less the deduction; the typed amount is ignored.
+      let refund: { refund: number; deduction: number; rule: string } | null = null;
+      if (input.requestType === "Refund") {
+        const [{ data: en }, { data: allocs }] = await Promise.all([
+          admin.from("enrollments").select("selling_price_centavos,scheduled_on,batches(starts_on)").eq("id", input.enrollmentId).single(),
+          admin.from("payment_allocations").select("amount_centavos,payments!inner(valid)").eq("enrollment_id", input.enrollmentId).eq("payments.valid", true),
+        ]);
+        const paid = (allocs ?? []).reduce((s, a) => s + Number(a.amount_centavos), 0);
+        const e = en as { selling_price_centavos: number; scheduled_on?: string | null; batches?: { starts_on?: string | null } | { starts_on?: string | null }[] | null } | null;
+        const fee = requestFee({ type: "Refund", trainingFeeCentavos: Number(e?.selling_price_centavos ?? 0), startDate: first(e?.batches)?.starts_on ?? e?.scheduled_on ?? null, requestedOn: input.requestedOn ?? manilaDate() })!;
+        const amount = refundAfterDeduction(paid, fee.amountCentavos);
+        if (amount <= 0) return NextResponse.json({ error: `Nothing to refund: paid ${(paid / 100).toLocaleString("en-PH", { style: "currency", currency: "PHP" })}, deduction ${(fee.amountCentavos / 100).toLocaleString("en-PH", { style: "currency", currency: "PHP" })} (${fee.rule}).` }, { status: 400 });
+        refund = { refund: amount, deduction: fee.amountCentavos, rule: fee.rule };
+        Object.assign(requested, { amountCentavos: amount, deductionCentavos: fee.amountCentavos, feeRule: fee.rule });
+      }
       const { data: reference, error: refError } = await db.rpc("next_reference", { prefix: "REQ" });
       if (refError) throw refError;
       // Requests go to the Cashier for charges first, then to Accounting; a request
@@ -1908,7 +1922,7 @@ export async function POST(request: Request) {
         const charged = await chargeRequest(admin, { id: created.id, enrollment_id: input.enrollmentId, request_type: input.requestType, requested_values: requested }, staff.user.id, { amountCentavos: 0 });
         return NextResponse.json({ ok: true, feeCentavos: charged.amountCentavos, feeRule: charged.feeRule });
       }
-      return NextResponse.json({ ok: true });
+      return NextResponse.json({ ok: true, ...(refund ? { refundCentavos: refund.refund, deductionCentavos: refund.deduction, feeRule: refund.rule } : {}) });
     }
     if (input.action === "request-decide") {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or Admin can decide requests." }, { status: 403 });
