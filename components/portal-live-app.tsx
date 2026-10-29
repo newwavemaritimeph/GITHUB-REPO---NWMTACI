@@ -593,6 +593,9 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   const [editing,setEditing]=useState(false),[addingCourse,setAddingCourse]=useState(false),[openEnrollment,setOpenEnrollment]=useState<string|null>(null);
   const [menu,setMenu]=useState(false),[reqType,setReqType]=useState<RequestType|null>(null),[note,setNote]=useState("");
   const canPrint=["admin","registration"].includes(role??"");
+  // The loaded list holds only the newest rows; ask the database for this trainee's TAR courses and any other record for the same person (29 Oct 2026).
+  const [account,setAccount]=useState<{tarEnrollmentIds:string[];others:{id:string;number:string;tarCourses:number}[]}|null>(null);
+  useEffect(()=>{let live=true;fetch(`/api/staff/trainee-account?traineeId=${trainee.id}`,{cache:"no-store"}).then(r=>r.ok?r.json():null).then(b=>{if(live&&b)setAccount(b)}).catch(()=>undefined);return()=>{live=false}},[trainee.id]);
   const enrolls=data.enrollments.filter(e=>e.trainee_id===trainee.id).sort((a,b)=>a.created_at.localeCompare(b.created_at));
   const payments=data.payments.filter(p=>p.trainee_id===trainee.id).sort((a,b)=>a.received_at.localeCompare(b.received_at));
   const requests=data.requests.filter(r=>first(r.enrollments)?.trainee_id===trainee.id&&r.status==="Pending");
@@ -673,13 +676,14 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
       </tbody></table></div>
       {requests.length>0&&<div className="sa-reqs"><span className="sa-cap">Open requests</span>{requests.map(r=><p key={r.id}><b>{r.request_type==="Rescheduling"?"Reschedule":r.request_type}</b> · {first(r.enrollments)?.enrollment_number} · {r.reason}</p>)}</div>}
       <div className="sa-sig"><div><b>{data.profile.complete_name}</b>Prepared by</div><div><b>&nbsp;</b>Received by · Trainee Signature over Printed Name · Date</div></div>
+      {account?.others.filter(o=>o.tarCourses>0).map(o=><p key={o.id} className="sa-dup">{(trainee.legal_last_name??"").toUpperCase()} also has record {o.number||"(no number)"} with {o.tarCourses} scheduled course{o.tarCourses===1?"":"s"}. Search {o.number||"the name"} in Trainees &amp; Enrollments and print the TAR from that record.</p>)}
       <div className="sa-foot">
         <div className="sa-acts">
           {canEdit&&<button type="button" className="portal-primary" onClick={()=>setAddingCourse(true)}>Add Course</button>}
           {canEdit&&<button type="button" className="portal-secondary" onClick={()=>setEditing(v=>!v)}>{editing?"Done Editing":"Edit Details"}</button>}
           {canEdit&&live.length>0&&<div className="req-dd"><button type="button" className="portal-secondary" aria-haspopup="menu" aria-expanded={menu} onClick={()=>setMenu(v=>!v)}>Request ▾</button>{menu&&<div className="sa-menu" role="menu">{TRAINEE_REQUESTS.map(([t,lbl])=><button key={t} type="button" role="menuitem" onClick={()=>{setMenu(false);setReqType(t)}}>{lbl}</button>)}</div>}</div>}
         </div>
-        <div className="sa-acts">{canPrint&&<TarButton data={data} traineeId={trainee.id} reload={reload} className="portal-primary sa-navy"/>}<button type="button" className="portal-secondary" onClick={onClose}>Close</button></div>
+        <div className="sa-acts">{canPrint&&<TarButton data={data} traineeId={trainee.id} reload={reload} className="portal-primary sa-navy" knownIds={account?.tarEnrollmentIds}/>}<button type="button" className="portal-secondary" onClick={onClose}>Close</button></div>
       </div>
     </div>
     {reqType&&<TraineeRequestModal data={data} traineeId={trainee.id} reqType={reqType} onClose={()=>setReqType(null)} post={raise}/>}

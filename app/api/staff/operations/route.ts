@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { pendingTraineeProofs } from "@/lib/trainee-proof";
+import { tarPrintable } from "@/lib/trainee-match";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hardDeleteEnrollment, pruneUnpaidEnrollments, deletePastEmptyBatches } from "@/lib/enrollments";
@@ -1966,10 +1967,11 @@ export async function POST(request: Request) {
       // The record covers the trainee's paid enrollments (Enrolled / Open
       // Schedule); printing the same set again keeps the same AR number, up to the
       // print limit (migrations 202610070006 and 202610070007).
-      const { data: rows, error: findError } = await admin.from("enrollments").select("id").eq("trainee_id", input.traineeId).in("enrollment_status", ["Enrolled", "Open Schedule"]);
+      // Paid or with a balance (owner, 29 Oct 2026): every scheduled, not cancelled course.
+      const { data: rows, error: findError } = await admin.from("enrollments").select("id,enrollment_status,batch_id,scheduled_on").eq("trainee_id", input.traineeId);
       if (findError) throw findError;
-      const ids = (rows ?? []).map((row: { id: string }) => row.id);
-      if (!ids.length) return NextResponse.json({ error: "This trainee has no paid enrollment yet. The TAR prints once a course is paid." }, { status: 400 });
+      const ids = (rows ?? []).filter(tarPrintable).map((row) => row.id as string);
+      if (!ids.length) return NextResponse.json({ error: "This trainee has no scheduled course yet. Choose a batch or start date first." }, { status: 400 });
       const { data, error } = await admin.rpc("issue_admission_record", { target_trainee: input.traineeId, target_enrollments: ids, actor: staff.user.id });
       if (error) return NextResponse.json({ error: /function public.issue_admission_record/i.test(error.message) ? "Apply database update 202610070006 to print admission records." : error.message }, { status: 400 });
       const record = data as { id: string; ar_number: string; print_count: number; reprints_approved?: number };

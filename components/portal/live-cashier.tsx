@@ -11,6 +11,7 @@ import type { CashierReportSnapshot } from "@/lib/documents";
 import { tcl } from "@/lib/title-case";
 import { PayTheCenters, centerLines } from "./pay-centers";
 import { shrinkProof } from "@/lib/proof-shrink";
+import { tarPrintable } from "@/lib/trainee-match";
 
 /**
  * Cashier pieces of the registration workflow (Oct 2026):
@@ -47,9 +48,11 @@ const PAID_STATUSES = ["Enrolled", "Open Schedule"];
  * Print state of a trainee's TAR. A record covers the trainee's current set of
  * paid enrollments; adding a paid course starts a new record (new AR number).
  */
-export function tarState(data: PortalData, traineeId: string) {
-  const paid = data.enrollments.filter((e) => e.trainee_id === traineeId && PAID_STATUSES.includes(e.enrollment_status));
-  const ids = paid.map((e) => e.id).sort().join("|");
+// TAR courses (owner, 29 Oct 2026): scheduled and not cancelled, paid or with a balance.
+// `knownIds` comes from the database when the loaded list does not hold all of them.
+export function tarState(data: PortalData, traineeId: string, knownIds?: string[]) {
+  const paid = data.enrollments.filter((e) => e.trainee_id === traineeId && tarPrintable(e));
+  const ids = (knownIds && knownIds.length > paid.length ? [...knownIds] : paid.map((e) => e.id)).sort().join("|");
   const record = (data.admissionRecords ?? []).find((r) => r.trainee_id === traineeId && [...r.enrollment_ids].sort().join("|") === ids) ?? null;
   const allowed = TAR_FREE_PRINTS + Number(record?.reprints_approved ?? 0);
   const printed = Number(record?.print_count ?? 0);
@@ -66,14 +69,15 @@ export function ReceiptButton({ data, paymentId, reload, className = "portal-sec
 }
 
 /** Print TAR (owner, 8 Oct 2026): prints twice; after the second print the button is gone. Registration prints it (owner, 20 Oct 2026). */
-export function TarButton({ data, traineeId, reload, className = "portal-secondary" }: { data: PortalData; traineeId: string; reload?: () => Promise<void>; className?: string }) {
-  const s = tarState(data, traineeId);
+export function TarButton({ data, traineeId, reload, className = "portal-secondary", knownIds }: { data: PortalData; traineeId: string; reload?: () => Promise<void>; className?: string; knownIds?: string[] }) {
+  const s = tarState(data, traineeId, knownIds);
+  const printable = s.paid.length > 0 || !!knownIds?.length;
   const [error, setError] = useState("");
   const print = () => { setError(""); void openAdmissionRecord(traineeId).then(() => reload?.()).catch((e) => setError(e instanceof Error ? e.message : "Could not open the admission record.")); };
-  if (s.paid.length && s.left <= 0) return null;
+  if (printable && s.left <= 0) return null;
   return <>
-    {!s.paid.length
-      ? <button type="button" className={className} disabled title="The TAR Prints Once a Course Is Paid">Print TAR</button>
+    {!printable
+      ? <><button type="button" className={className} disabled>Print TAR</button><small className="muted-text">No scheduled course on this record yet</small></>
       : <button type="button" className={className} onClick={print}>Print TAR</button>}
     {error && <Message kind="error" text={error} />}
   </>;
