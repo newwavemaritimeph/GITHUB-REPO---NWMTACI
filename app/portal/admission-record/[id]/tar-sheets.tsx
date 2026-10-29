@@ -28,7 +28,7 @@ export type TarProps = {
   arNumber: string; issued: string; name: string;
   trainee: { appNo: string; srn: string | null; rank: string | null; mobile: string | null; company: string | null };
   courses: TarCourse[]; misc: { label: string; amount: number }[]; discounts: { label: string; amount: number }[]; payments: TarPayment[];
-  feesTotal: number; due: number; paid: number; balance: number; status: string; officer: string; cashier: string;
+  feesTotal: number; due: number; paid: number; balance: number; status: string; billedTo?: string | null; officer: string; cashier: string;
   /** Logo URL; the portal serves it from /brand, the sample script passes a file URL. */
   logoSrc?: string;
 };
@@ -58,12 +58,12 @@ export function TarSheets(p: TarProps) {
           {p.discounts.length ? p.discounts.map((d, i) => <tr key={`d${i}`}><td>Less · {d.label}</td><td className="r">−{peso(d.amount)}</td></tr>) : <tr><td>Discounts</td><td className="r">{peso(0)}</td></tr>}
           <tr className="b"><td>Total amount due</td><td className="r">{peso(p.due)}</td></tr>
           <tr className="b"><td>Total received</td><td className="r">{peso(p.paid)}</td></tr>
-          <tr className="b"><td>Balance</td><td className={`r${p.balance > 0 ? " due" : ""}`}>{peso(p.balance)}</td></tr>
+          <tr className="b"><td>Balance{p.billedTo && p.balance > 0 ? ` · billed to ${p.billedTo}` : ""}</td><td className={`r${p.balance > 0 ? " due" : ""}`}>{peso(p.balance)}</td></tr>
         </tbody></table></div>
-        <div><div className="tar-pay-head"><div className="tar-h">PAYMENTS RECEIVED ({p.payments.length})</div><span className={`tar-stamp ${p.status === "FULLY PAID" ? "ok" : p.status === "UNPAID" ? "none" : "part"}`}>{p.status}</span></div>
+        <div><div className="tar-pay-head"><div className="tar-h">PAYMENTS RECEIVED ({p.payments.length})</div>{p.billedTo && <span className="tar-billed">Billed to {p.billedTo}</span>}<span className={`tar-stamp ${p.billedTo ? "cc" : p.status === "FULLY PAID" ? "ok" : p.status === "UNPAID" ? "none" : "part"}`}>{p.status}</span></div>
           <table className="tar-table"><thead><tr><th>Payment</th><th>Date</th><th>Method</th><th>Reference</th><th className="r">Amount</th></tr></thead><tbody>
             {p.payments.map((x) => <tr key={x.id}><td className="mono">{x.number}</td><td className="nw">{x.dateLabel}</td><td>{x.method}</td><td className="mono">{x.ref}</td><td className="r b">{peso(x.amount)}</td></tr>)}
-            {!p.payments.length && <tr><td colSpan={5} className="dim">No payment recorded yet.</td></tr>}
+            {!p.payments.length && <tr><td colSpan={5} className="dim">{p.billedTo ? `Billed to ${p.billedTo} on the Billing Statement.` : "No payment recorded yet."}</td></tr>}
           </tbody></table>
           <div className="tar-sigs">{[["Registration officer", p.officer], ["Cashier", p.cashier], ["Trainee", ""]].map(([label, n]) => <div key={label}><span>{n}</span><small>{label}</small></div>)}</div>
         </div>

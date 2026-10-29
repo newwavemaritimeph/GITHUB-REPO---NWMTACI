@@ -54,6 +54,8 @@
 .tar-stamp.ok { border-color: #0a7d3b; color: #0a7d3b; }
 .tar-stamp.part { border-color: #c26a00; color: #a85500; }
 .tar-stamp.none { border-color: #b23d0c; color: #b23d0c; }
+.tar-stamp.cc { border-color: #0571D0; color: #0571D0; }
+.tar-billed { margin-left: auto; margin-right: 6px; font-size: 6.4pt; font-weight: 700; color: #0571D0; }
 .tar-sigs { display: flex; justify-content: space-between; margin-top: 7px; }
 .tar-sigs > div { width: .95in; text-align: center; }
 .tar-sigs span { display: flex; align-items: flex-end; justify-content: center; height: .2in; border-bottom: 1px solid #0b1f33; font-size: 6.6pt; }

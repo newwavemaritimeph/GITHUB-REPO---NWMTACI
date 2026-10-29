@@ -97,7 +97,12 @@ export default async function AdmissionRecordPage({ params }: { params: Promise<
 
   const feesTotal = courses.reduce((s, c) => s + c.fee, 0), miscTotal = misc.reduce((s, m) => s + m.amount, 0), discTotal = discounts.reduce((s, d) => s + d.amount, 0);
   const due = feesTotal + miscTotal - discTotal, paid = payments.reduce((s, p) => s + p.amount, 0), balance = Math.max(0, due - paid);
-  const status = due > 0 && paid >= due ? "FULLY PAID" : paid > 0 ? "PARTIALLY PAID" : "UNPAID";
+  // Company Charge (owner, 29 Oct 2026): the partner is billed on its Billing Statement, so the TAR says so instead of UNPAID.
+  const live = (enrollRes.data ?? []).filter((e) => e.enrollment_status !== "Cancelled").map((e) => e.id as string);
+  const { data: cc } = live.length ? await db.from("enrollments").select("company_charge_agency_id").in("id", live).not("company_charge_agency_id", "is", null).limit(1) : { data: null };
+  const ccAgency = (cc?.[0] as { company_charge_agency_id?: string } | undefined)?.company_charge_agency_id;
+  const billedTo = ccAgency ? ((await db.from("marketing_agencies").select("name").eq("id", ccAgency).maybeSingle()).data?.name as string | undefined) ?? "the partner" : null;
+  const status = billedTo ? "COMPANY CHARGE" : due > 0 && paid >= due ? "FULLY PAID" : paid > 0 ? "PARTIALLY PAID" : "UNPAID";
   const name = `${t.legal_last_name}, ${[t.legal_first_name, t.legal_middle_name, t.suffix].filter(Boolean).join(" ")}`.toUpperCase();
   const issued = manila({ dateStyle: "medium", timeStyle: "short" }).format(new Date(record.issued_at));
   const officer = (officerRes.data as { complete_name?: string } | null)?.complete_name ?? "";
@@ -106,5 +111,5 @@ export default async function AdmissionRecordPage({ params }: { params: Promise<
     trainee={{ appNo: t.application_number ?? t.trainee_number, srn: t.srn, rank: t.rank, mobile: t.mobile, company: t.company }}
     courses={courses} misc={misc} discounts={discounts}
     payments={payments.map((p) => ({ id: p.id, number: p.number, dateLabel: payDate.format(new Date(p.date)), method: p.method, ref: p.ref, amount: p.amount }))}
-    feesTotal={feesTotal} due={due} paid={paid} balance={balance} status={status} officer={officer} cashier={cashier} />;
+    feesTotal={feesTotal} due={due} paid={paid} balance={balance} status={status} billedTo={billedTo} officer={officer} cashier={cashier} />;
 }
