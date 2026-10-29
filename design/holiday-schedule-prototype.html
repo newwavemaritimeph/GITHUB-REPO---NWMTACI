@@ -99,6 +99,7 @@
   <label>Automatic End Date<input type="date" id="end" readonly></label>
   <div class="full"><div class="days" id="days"></div></div>
   <label>Daily Start<input type="time" value="08:00"></label><label>Daily End<input type="time" value="17:00"></label>
+  <label class="full">Classroom<select id="room"></select></label>
   <label>Lead Instructor<select id="lead"></select></label><label>Alternate Instructor<select id="alt"></select></label>
   <label>Assessor<select id="ass"></select></label><label>Mode<select><option>Face-to-Face</option><option>Online</option><option>Blended</option></select></label>
   <div class="full" id="warn"></div>
@@ -123,7 +124,8 @@ function render(){
 }
 const PEOPLE=[["Capt. R. Villanueva",{STPPDSPPS:"Instructor and Assessor",PSCMT:"Instructor",PSCMHBT:"Instructor"},"2027-03-31"],["C/E M. Dizon",{STPPDSPPS:"Instructor",PSCMT:"Instructor and Assessor","UBT-PSSR":"Instructor"},"2026-12-15"],["2/O A. Ramos",{PSCMT:"Assessor",PSCMHBT:"Assessor",STPPDSPPS:"Assessor"},"2027-06-30"],["C/M J. Castillo",{PSCMHBT:"Instructor","UBT-PSSR":"Instructor and Assessor"},"2026-10-15"],["3/E L. Navarro",{},""]];
 const does=(role,duty)=>role==="Instructor and Assessor"||role===duty;
-function fillPeople(){const k=$("course").value;const opts=duty=>{const ok=PEOPLE.filter(p=>does(p[1][k],duty)),rest=PEOPLE.filter(p=>!does(p[1][k],duty));return '<option value="">Not yet assigned</option><optgroup label="'+(duty==="Instructor"?"Teaches ":"Assesses ")+C[k].n+'">'+ok.map(p=>'<option>'+p[0]+(p[2]&&p[2]<"2026-10-30"?" · Expired":" · Valid until "+new Date(p[2]+"T00:00:00Z").toLocaleDateString("en-US",{month:"short",year:"numeric",timeZone:"UTC"}))+'</option>').join("")+'</optgroup><optgroup label="Others (Not Accredited)">'+rest.map(p=>'<option>'+p[0]+'</option>').join("")+'</optgroup>'};["lead","alt"].forEach(id=>$(id).innerHTML=opts("Instructor"));$("ass").innerHTML=opts("Assessor");warnings()}
+const ROOMS=[["Room 103",30],["Room 201",20],["Room 301",24],["Room 304",32]],DEF={"UBT-PSSR":"Room 103",STPPDSPPS:"Room 304",PSCMT:"Room 304",PSCMHBT:"Room 304"};
+function fillPeople(){const k=$("course").value;$("room").innerHTML='<option value="">Not yet assigned</option>'+ROOMS.map(([n,c])=>'<option value="'+n+'"'+(c<24?' disabled':'')+(DEF[k]===n?' selected':'')+'>'+n+' · '+c+' seats'+(c<24?' · too small for 24':DEF[k]===n?' · default for this course':'')+'</option>').join("");const opts=duty=>{const ok=PEOPLE.filter(p=>does(p[1][k],duty)),rest=PEOPLE.filter(p=>!does(p[1][k],duty));return '<option value="">Not yet assigned</option><optgroup label="'+(duty==="Instructor"?"Teaches ":"Assesses ")+C[k].n+'">'+ok.map(p=>'<option>'+p[0]+(p[2]&&p[2]<"2026-10-30"?" · Expired":" · Valid until "+new Date(p[2]+"T00:00:00Z").toLocaleDateString("en-US",{month:"short",year:"numeric",timeZone:"UTC"}))+'</option>').join("")+'</optgroup><optgroup label="Others (Not Accredited)">'+rest.map(p=>'<option>'+p[0]+'</option>').join("")+'</optgroup>'};["lead","alt"].forEach(id=>$(id).innerHTML=opts("Instructor"));$("ass").innerHTML=opts("Assessor");warnings()}
 function warnings(){const n=id=>$(id).value.split(" · ")[0],k=$("course").value,w=[];const L=n("lead"),A=n("alt"),S=n("ass");
  if(L&&L===A)w.push("The Lead and Alternate Instructor are the same person.");
  if(L&&L===S&&!(PEOPLE.find(p=>p[0]===L)||[,{}])[1][k]?.includes("and"))w.push(L+" can't be both Lead Instructor and Assessor for this course.");
