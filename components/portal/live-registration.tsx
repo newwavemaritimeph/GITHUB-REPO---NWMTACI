@@ -403,14 +403,36 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
 
 /** Enrollment type (8 Oct 2026): Online enrollment, Walk-in, or Agency with the partner's name. */
 /** Where the trainee came from (owner, 29 Oct 2026): Online, Walk-In, Meta, or the agency or consultancy, plus Company Charge. */
-function partnerOf(data: PortalData, e: Enrollment) {
+export function partnerOf(data: PortalData, e: Enrollment) {
   const agencyId = data.companyCharge?.[e.id] ?? data.referralByEnrollment?.[e.id];
   return agencyId ? data.agencies.find((a) => a.id === agencyId) ?? null : null;
 }
-const chargeTo = (data: PortalData, e: Enrollment) => { const p = partnerOf(data, e); return p && (data.companyCharge?.[e.id] || p.rebate_mode === COMPANY_CHARGE) ? p : null; };
+export const chargeTo = (data: PortalData, e: Enrollment) => { const p = partnerOf(data, e); return p && (data.companyCharge?.[e.id] || p.rebate_mode === COMPANY_CHARGE) ? p : null; };
 function enrollmentTypeOf(data: PortalData, e: Enrollment) {
   const label = sourceLabel(e.source, partnerOf(data, e));
   return chargeTo(data, e) ? `${label} · Company Charge` : label;
+}
+
+/**
+ * Where the trainee came from (owner, 29 Oct 2026): Registration picks it, the website no
+ * longer asks. Agency / Consultancy opens a partner dropdown; the server locks it once paid.
+ */
+export function SourcePicker({ data, enrollment: e, busy, post }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<unknown> }) {
+  const current = partnerOf(data, e);
+  const initial = current ? "Agency" : e.source === "Walk-in" || e.source === "Meta" ? e.source : "Online enrollment";
+  const [src, setSrc] = useState(initial);
+  const partners = data.agencies.filter((a) => a.active || a.id === current?.id).sort((a, z) => a.name.localeCompare(z.name));
+  const save = (source: string, agencyId: string | null = null) => void post({ action: "enrollment-source", traineeId: e.trainee_id, source, agencyId }, "Source saved.").catch(() => setSrc(initial));
+  return <div className="tp-source">
+    <span className="tp-cap">Where the Trainee Came From</span>
+    <label><span>Source</span><select value={src} disabled={busy} onChange={(ev) => { const v = ev.target.value; setSrc(v); if (v !== "Agency") save(v); }}>
+      <option value="Online enrollment">Online</option><option value="Walk-in">Walk-In</option><option value="Meta">Meta (Facebook / Instagram)</option><option value="Agency">Agency / Consultancy</option>
+    </select></label>
+    {src === "Agency" && <label><span>Partner</span><select value={current?.id ?? ""} disabled={busy} onChange={(ev) => { if (ev.target.value) save("Agency", ev.target.value); }}>
+      <option value="">Choose the partner…</option>
+      {(["Agency", "Consultancy"] as const).map((k) => { const list = partners.filter((a) => (a.kind === "Consultancy" ? "Consultancy" : "Agency") === k); return list.length ? <optgroup key={k} label={k === "Agency" ? "Agencies" : "Consultancies"}>{list.map((a) => <option key={a.id} value={a.id}>{a.name}{a.rebate_mode === COMPANY_CHARGE ? " · Company Charge" : ""}</option>)}</optgroup> : null; })}
+    </select></label>}
+  </div>;
 }
 
 /** "applications" opens the list on Screening, "enrollments" on All enrollments. */
@@ -498,14 +520,20 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
       });
   };
   const rows = [...REQUIREMENTS.map((q) => ({ ...q, optional: false })), { ...OTHER_REQUIREMENT, label: "Other (optional)", optional: true }];
-  const lastChecker = [...r.latest.values()].filter((x) => x.status === "Verified").sort((a, z) => z.checked_at.localeCompare(a.checked_at))[0];
-  return <div className="sc full">
-    <div className="sc-band"><div className="sc-seal" aria-hidden="true">NW</div><div><b>Application Screening</b><small>New Wave Maritime Training and Assessment Center, Inc.</small></div><div className="sc-no"><span>Application</span><b>{appNo}</b></div></div>
-    <div className="sc-stripe" aria-hidden="true" />
-    <div className="sc-ident">
-      <div><span className="sc-cap">Applicant{enrollmentTypeOf(data, e) ? ` · ${enrollmentTypeOf(data, e)}` : ""}</span>{!partnerOf(data, e) && e.enrollment_status === "Pending" && <select className="sc-source" aria-label="Where the trainee came from" value={e.source === "Walk-in" || e.source === "Meta" ? e.source : "Online enrollment"} disabled={busy} onChange={(ev) => void post({ action: "enrollment-source", traineeId: e.trainee_id, source: ev.target.value }, "Source saved.").catch(() => undefined)}><option value="Online enrollment">Online</option><option value="Walk-in">Walk-In</option><option value="Meta">Meta (Facebook / Instagram)</option></select>}<h3>{t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : "—"}</h3><p>{t?.trainee_number}{t?.mobile ? ` · ${t.mobile}` : ""}</p>{t?.email && <p className="lc">{t.email}</p>}</div>
-      <div><span className="sc-cap">Training</span><b>{c?.name ?? "—"}</b><p>{scheduleOf(e)}{b ? ` · ${b.batch_number}` : ""}</p><p>{b?.mode ?? (c?.code ?? "")}</p></div>
-      <div><span className="sc-cap">Payment</span><b className={r.paid ? "sc-good" : ""}>{r.paid ? `${pesos2(r.paidCentavos)} paid` : r.handed ? "With the Cashier" : "Not paid yet"}</b><p>Balance {pesos2(balance)}</p><p><Badge tone={s.tone}>{s.text}</Badge></p></div>
+  const partner = partnerOf(data, e); const srn = data.trainees.find((x) => x.id === e.trainee_id)?.srn;
+  // Design 01 · Card Header (owner, 29 Oct 2026): navy name card, the source, three tiles, then the requirements.
+  return <div className="sc full tp">
+    <div className="tp-hero">
+      <div className="tp-av" aria-hidden="true">{t ? `${t.legal_first_name.charAt(0)}${t.legal_last_name.charAt(0)}`.toUpperCase() : "NW"}</div>
+      <div className="tp-who"><h3>{t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : "—"}</h3>
+        <p><span className="tp-mono">{appNo}</span>{srn ? <> · SRN <span className="tp-mono">{srn}</span></> : null}{t?.mobile ? ` · ${t.mobile}` : ""}{t?.email ? <> · <span className="lc">{t.email}</span></> : null}</p>
+        <div className="tp-chips">{sourceLabel(e.source, partner) && <span className="tp-chip or">{sourceLabel(e.source, partner)}</span>}{billTo && <span className="tp-chip bl">Company Charge</span>}<Badge tone={s.tone}>{s.text}</Badge></div></div>
+    </div>
+    {e.enrollment_status === "Pending" && <SourcePicker key={`${e.id}:${partner?.id ?? e.source}`} data={data} enrollment={e} busy={busy} post={post} />}
+    <div className="tp-stats">
+      <div><span className="tp-cap">Training</span><b>{c ? `${c.code} · ${c.name}` : "—"}</b><small>{scheduleOf(e)}{b ? ` · ${b.batch_number}` : ""}</small></div>
+      <div><span className="tp-cap">Payment</span><b className={`tp-mono${r.paid ? " sc-good" : ""}`}>{r.paid ? pesos2(r.paidCentavos) : pesos2(balance)}</b><small>{billTo ? `Billed to ${billTo.name}` : r.paid ? `Paid · balance ${pesos2(balance)}` : r.handed ? "With the Cashier" : "Not paid yet"}</small></div>
+      <div><span className="tp-cap">Requirements</span><b>{REQUIREMENTS.length - missingNow.length} of {REQUIREMENTS.length}</b><small>{missingNow.length ? `Missing: ${missingNow.map((q) => q.label).join(", ")}` : "All received"}</small></div>
     </div>
     <div className="sc-table"><table><thead><tr><th>Requirement</th><th>Received</th><th>Remarks</th><th>Received by</th></tr></thead><tbody>
       {tickError && <tr><td colSpan={4}><Message kind="error" text={tickError} /></td></tr>}
@@ -537,7 +565,6 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
       {payError && <div className="sc-pay-err"><Message kind="error" text={payError} /></div>}
     </div>}
     {r.handed && !r.paid && (() => { const pr = (data.traineeProofs ?? []).filter((x) => x.trainee_id === e.trainee_id).sort((a, z) => z.submitted_at.localeCompare(a.submitted_at))[0]; return <div className="sc-handed">With the Cashier · {pr ? `${pr.method} ${pesos2(pr.amount_centavos)} · Ref. ${pr.reference}` : "Cash"}</div>; })()}
-    <div className="sc-sig"><div><b>{lastChecker?.checked_by_name ?? " "}</b><span>Checked by · Registration officer</span></div><div><b>{lastChecker ? fmtDate(day(lastChecker.checked_at)) : " "}</b><span>Date</span></div></div>
     <div className="sc-foot">
       <small>{!allTicked ? `Still to tick: ${missingNow.map((q) => q.label).join(", ")}` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
       <span className="sc-acts">

@@ -2445,3 +2445,58 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .pm-form input[type=checkbox],.nw-shell .pm-form input[type=radio]{width:18px;height:18px;margin:0;flex:0 0 18px;accent-color:#123F63}
 .nw-shell .pm-form label:has(> input[type=checkbox]),.nw-shell .pm-form label:has(> input[type=radio]){flex-direction:row;align-items:center;gap:10px;align-self:end;min-height:42px;font-size:14px;color:#0f2638}
 .portal-shell .sc-source{margin-left:8px;height:30px;border:1px solid #cfdbe3;border-radius:8px;padding:0 8px;font-size:13px;background:#fff;color:#123F63}
+
+/* Trainee profile · Design 01 Card Header (owner, 29 Oct 2026): Application window and Trainee Account */
+.tp{display:flex;flex-direction:column;gap:12px}
+.tp .tp-hero{display:flex;gap:14px;align-items:center;background:#123F63;color:#fff;border-radius:12px;padding:14px 16px;flex-wrap:wrap}
+.tp .tp-av{width:48px;height:48px;border-radius:12px;background:#35CCFA;color:#123F63;font-weight:700;font-size:17px;display:flex;align-items:center;justify-content:center;flex:none}
+.tp .tp-who{flex:1;min-width:220px}
+.tp .tp-who h3{margin:0;font-size:18px;color:#fff}
+.tp .tp-who p{margin:2px 0 0;color:#9EE3F1;font-size:13px}
+.tp .tp-who .lc{text-transform:none}
+.tp .tp-mono{font-family:"Geist Mono",ui-monospace,monospace}
+.tp .tp-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.tp .tp-chip{display:inline-flex;align-items:center;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:600;border:1px solid transparent}
+.tp .tp-chip.or{background:#fff1ea;border-color:#ffd2bd;color:#b33d0b}
+.tp .tp-chip.bl{background:#e8f3fd;border-color:#bcdcf7;color:#0457a3}
+.tp .tp-chip.gd{background:#e6f5ec;border-color:#b9e2c9;color:#0a7a3d}
+.tp .tp-hacts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tp .tp-hacts .portal-secondary{background:#fff}
+.tp .tp-cap{display:block;font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#5d6f7c}
+.tp .tp-source{display:grid;grid-template-columns:minmax(150px,auto) 1fr 1fr;gap:12px;align-items:end;border:1px dashed #0571D0;background:#f2f8fe;border-radius:10px;padding:10px 14px}
+.tp .tp-source .tp-cap{color:#0571D0;align-self:center}
+.tp .tp-source label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#5d6f7c;min-width:0}
+.tp .tp-source select{height:38px;border:1.5px solid #bcdcf7;border-radius:8px;padding:0 10px;font-size:14px;background:#fff;color:#123F63;text-transform:none;letter-spacing:0;font-weight:500;min-width:0}
+.tp .tp-side .tp-source{grid-template-columns:1fr;border:0;background:none;padding:0}
+.tp .tp-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.tp .tp-stats>div{border:1px solid #dbe5ec;border-radius:10px;padding:10px 14px;background:#f3f8fb;min-width:0}
+.tp .tp-stats b{display:block;font-size:16px;color:#14212b;margin-top:2px}
+.tp .tp-stats b.owe{color:#c62828}
+.tp .tp-stats b.settled{color:#0a7a3d}
+.tp .tp-stats small{color:#5d6f7c;font-size:12px}
+.tp .tp-cols{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(0,1fr);gap:12px}
+.tp .tp-main,.tp .tp-side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.tp .tp-panel{border:1px solid #dbe5ec;border-radius:10px;padding:12px 14px;background:#fff}
+.tp .tp-panel h4{margin:0 0 8px;font-size:14px;color:#123F63}
+.tp .tp-panel h4.tp-sub{margin-top:14px}
+.tp .tp-scroll{overflow-x:auto}
+.tp .tp-table{width:100%;border-collapse:collapse;font-size:13px}
+.tp .tp-table th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#5d6f7c;font-weight:600;padding:6px 8px;background:#e9f6fa;border-bottom:1px solid #dbe5ec}
+.tp .tp-table td{padding:7px 8px;border-bottom:1px solid #edf2f5;vertical-align:top}
+.tp .tp-table td small{display:block;color:#5d6f7c;font-size:11.5px}
+.tp .tp-table .r{text-align:right}
+.tp .tp-kv{display:grid;grid-template-columns:110px 1fr;gap:5px 10px;margin:0;font-size:13px}
+.tp .tp-kv dt{color:#5d6f7c}
+.tp .tp-kv dd{margin:0;font-weight:500;overflow-wrap:anywhere}
+.tp .tp-note{margin:6px 0 0;font-size:12px;color:#5d6f7c}
+.tp .tp-req{margin:4px 0;font-size:13px}
+.portal-shell .sc.tp .sc-rec input[type=checkbox]{appearance:none;-webkit-appearance:none;width:32px!important;height:18px!important;min-height:0!important;min-width:0;padding:0!important;border:0!important;box-shadow:none!important;flex:none;border-radius:999px;background:#cfdbe3;position:relative;cursor:pointer;margin:0 6px 0 0;vertical-align:middle;transition:background .15s}
+.portal-shell .sc.tp .sc-rec input[type=checkbox]::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .15s}
+.portal-shell .sc.tp .sc-rec input[type=checkbox]:checked{background:#0a7a3d}
+.portal-shell .sc.tp .sc-rec input[type=checkbox]:checked::after{left:16px}
+.portal-shell .sc.tp .sc-rec input[type=checkbox]:disabled{opacity:.5;cursor:default}
+@media (max-width:760px){.tp .tp-source,.tp .tp-stats,.tp .tp-cols{grid-template-columns:1fr}}
+.portal-shell .sc.tp{border:0;overflow:visible;background:none}
+.portal-shell .sa.tp{display:flex;flex-direction:column;gap:12px}
+.tp .tp-table td:first-child{min-width:130px}
+.tp .tp-table th,.tp .tp-table td{padding-left:6px;padding-right:6px}

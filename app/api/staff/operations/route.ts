@@ -278,7 +278,7 @@ const companyPaymentInput = z.object({ action: z.literal("company-payment"), bil
 // Billing Statement amounts typed by Accounting, and void and reissue (owner, 29 Oct 2026).
 const statementIssueInput = z.object({ action: z.literal("billing-statement-issue"), agencyId: z.string().uuid(), from: z.string().date(), to: z.string().date(), amounts: z.record(z.string().uuid(), z.number().int().min(0).max(100_000_000)).default({}) });
 const statementVoidInput = z.object({ action: z.literal("billing-statement-void"), billingStatementId: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
-const sourceSetInput = z.object({ action: z.literal("enrollment-source"), traineeId: z.string().uuid(), source: z.enum(["Online enrollment", "Walk-in", "Meta"]) });
+const sourceSetInput = z.object({ action: z.literal("enrollment-source"), traineeId: z.string().uuid(), source: z.enum(["Online enrollment", "Walk-in", "Meta", "Agency"]), agencyId: z.string().uuid().nullable().optional() });
 const requestChargeInput = z.object({ action: z.literal("request-charge"), id: z.string().uuid(), chargeCatalogId: z.string().uuid().nullable().optional(), description: z.string().trim().max(200).optional(), amountCentavos: z.number().int().min(0), remarks: z.string().trim().max(500).optional() });
 // Course now, batch later (202610070005): the batch is optional.
 // In-house courses that run on a picked start date (no batch) may be moved to any day, past included (owner, 13 Oct 2026).
@@ -2069,10 +2069,29 @@ export async function POST(request: Request) {
     }
     if (input.action === "enrollment-source") {
       if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Only Registration sets where a trainee came from." }, { status: 403 });
+      // Registration picks the agency or consultancy (owner, 29 Oct 2026; no longer asked on the website).
       const admin = createSupabaseAdminClient();
-      const { error } = await admin.from("enrollments").update({ source: input.source }).eq("trainee_id", input.traineeId).neq("enrollment_status", "Cancelled");
-      if (error) throw error;
-      await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "trainee.source_set", record_type: "trainee", record_id: input.traineeId, new_values: { source: input.source } });
+      const partnerId = input.source === "Agency" ? input.agencyId ?? null : null;
+      if (input.source === "Agency") {
+        if (!partnerId) return NextResponse.json({ error: "Choose the agency or consultancy." }, { status: 400 });
+        const { data: ag } = await admin.from("marketing_agencies").select("id,active").eq("id", partnerId).maybeSingle();
+        if (!ag?.active) return NextResponse.json({ error: "Choose an active agency or consultancy." }, { status: 400 });
+      }
+      const { data: open } = await admin.from("enrollments").select("id,referral_agency_id,company_charge_agency_id").eq("trainee_id", input.traineeId).neq("enrollment_status", "Cancelled");
+      const rows = (open ?? []) as { id: string; referral_agency_id: string | null; company_charge_agency_id?: string | null }[];
+      const ids = rows.map((r) => r.id);
+      const partnerChanges = rows.some((r) => (r.referral_agency_id ?? null) !== partnerId);
+      if (ids.length && partnerChanges) {
+        const { data: paid } = await admin.from("payment_allocations").select("enrollment_id,payments!inner(valid)").in("enrollment_id", ids).eq("payments.valid", true).limit(1);
+        if ((paid ?? []).length || rows.some((r) => r.company_charge_agency_id)) return NextResponse.json({ error: "The agency or consultancy is locked once a payment is recorded or the trainee is enrolled on Company Charge." }, { status: 400 });
+        const { data: rebates } = await admin.from("agency_rebates").select("id").in("enrollment_id", ids).limit(1);
+        if ((rebates ?? []).length) return NextResponse.json({ error: "A partner rebate is already recorded for this trainee. Ask Accounting to correct it first." }, { status: 400 });
+      }
+      if (ids.length) { const { error } = await admin.from("enrollments").update({ source: input.source, referral_agency_id: partnerId }).in("id", ids); if (error) throw error; }
+      const { error: tErr } = await admin.from("trainees").update({ marketing_agency_id: partnerId }).eq("id", input.traineeId);
+      if (tErr) throw tErr;
+      if (partnerId && ids.length) await applyReferralRebates(admin, ids, staff.user.id);
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "trainee.source_set", record_type: "trainee", record_id: input.traineeId, new_values: { source: input.source, agency_id: partnerId } });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "billing-statement-issue") {

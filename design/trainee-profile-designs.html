@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>Trainee Profile Designs</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;600&display=swap">
+<style>
+@page{size:A4 landscape;margin:0}
+:root{--or:#F25615;--bl:#0571D0;--cy:#35CCFA;--lc:#9EE3F1;--nv:#123F63;--ink:#14212b;--mut:#5d6f7c;--line:#dbe5ec;--soft:#f3f8fb;--good:#0a7a3d;--bad:#c62828}
+*{box-sizing:border-box}
+html,body{margin:0;background:#eef3f6;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font:12px/1.45 Geist,system-ui,sans-serif;color:var(--ink)}
+.mono{font-family:"Geist Mono",ui-monospace,monospace}
+.page{width:297mm;height:209.4mm;padding:12mm 14mm;page-break-after:always;position:relative;overflow:hidden;background:#eef3f6}
+.page:last-child{page-break-after:auto}
+.tag{position:absolute;top:5mm;left:14mm;font-size:10px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+.tag b{color:var(--or)}
+.win{background:#fff;border-radius:12px;border:1px solid #c9d8e2;height:100%;display:flex;flex-direction:column;overflow:hidden}
+.bar{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--line)}
+.bar h3{margin:0;font-size:14px}
+.x{color:var(--mut);font-size:16px}
+.body{flex:1;padding:14px 16px;display:flex;flex-direction:column;gap:12px;min-height:0}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:999px;font-size:10.5px;font-weight:600;border:1px solid var(--line);background:#fff;white-space:nowrap}
+.c-or{background:#fff1ea;border-color:#ffd2bd;color:#b33d0b}
+.c-bl{background:#e8f3fd;border-color:#bcdcf7;color:#0457a3}
+.c-gd{background:#e6f5ec;border-color:#b9e2c9;color:var(--good)}
+.c-nv{background:var(--nv);border-color:var(--nv);color:#fff}
+.c-mut{background:var(--soft);color:var(--mut)}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:7px 13px;border-radius:8px;font-weight:600;font-size:11.5px;border:1px solid var(--line);background:#fff;color:var(--nv);white-space:nowrap}
+.btn.p{background:var(--or);border-color:var(--or);color:#fff}
+.btn.b{background:var(--nv);border-color:var(--nv);color:#fff}
+.lbl{font-size:9.5px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--mut)}
+.sel{display:flex;align-items:center;justify-content:space-between;border:1.5px solid var(--line);border-radius:8px;padding:6px 10px;background:#fff;font-weight:500;min-width:0}
+.sel::after{content:"▾";color:var(--mut);margin-left:8px}
+.sel.on{border-color:var(--bl);box-shadow:0 0 0 3px rgba(5,113,208,.12)}
+.field{display:flex;flex-direction:column;gap:3px;min-width:0}
+.panel{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fff}
+.panel h4{margin:0 0 8px;font-size:11.5px;color:var(--nv);display:flex;justify-content:space-between;align-items:center}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{text-align:left;font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);font-weight:600;padding:5px 6px;background:#e9f6fa;border-bottom:1px solid var(--line)}
+td{padding:6px;border-bottom:1px solid #edf2f5;vertical-align:top}
+td.n,th.n{text-align:right;font-family:"Geist Mono",monospace}
+.kv{display:grid;grid-template-columns:108px 1fr;gap:4px 10px;font-size:11px}
+.kv dt{color:var(--mut)}
+.kv dd{margin:0;font-weight:500}
+.foot{display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid var(--line);background:#fbfdfe}
+.sp{flex:1}
+.check{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #edf2f5;font-size:11.5px}
+.box{width:15px;height:15px;border-radius:4px;border:1.5px solid #9fb3c0;display:inline-flex;align-items:center;justify-content:center;font-size:10px;color:#fff;flex:none}
+.box.ok{background:var(--good);border-color:var(--good)}
+.tg{width:30px;height:17px;border-radius:999px;background:#cfdbe3;position:relative;flex:none}
+.tg::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff}
+.tg.ok{background:var(--good)}
+.tg.ok::after{left:15px}
+.who{color:var(--mut);font-size:10px;margin-left:auto}
+.note{font-size:10.5px;color:var(--mut)}
+.callout{border:1px dashed var(--bl);background:#f2f8fe;border-radius:10px;padding:9px 12px}
+.av{width:46px;height:46px;border-radius:12px;background:var(--cy);color:var(--nv);font-weight:700;font-size:16px;display:flex;align-items:center;justify-content:center;flex:none}
+/* cover */
+.cover{background:var(--nv);color:#fff;display:flex;flex-direction:column;justify-content:center;padding:22mm}
+.cover h1{font-size:34px;margin:0 0 6px}
+.cover p{color:var(--lc);margin:0 0 22px;font-size:14px}
+.opts{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.opt{border:1px solid rgba(158,227,241,.35);border-radius:12px;padding:14px}
+.opt b{display:block;font-size:22px;color:var(--or)}
+.opt h2{margin:4px 0 6px;font-size:16px}
+.opt span{color:#cfe6ef;font-size:12px}
+.wave{height:4px;width:120px;background:var(--or);border-radius:2px;margin-bottom:18px}
+/* D1 */
+.hero{background:var(--nv);color:#fff;border-radius:12px;padding:12px 14px;display:flex;gap:12px;align-items:center}
+.hero h2{margin:0;font-size:17px}
+.hero .meta{color:var(--lc);font-size:11px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat{border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--soft)}
+.stat b{display:block;font-size:15px}
+/* D2 */
+.cols{display:grid;grid-template-columns:300px 1fr;gap:12px;flex:1;min-height:0}
+.prog{height:7px;border-radius:999px;background:#e3ecf0;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--good)}
+/* D3 */
+.tl{position:relative;padding-left:26px;display:flex;flex-direction:column;gap:9px}
+.tl::before{content:"";position:absolute;left:9px;top:6px;bottom:6px;width:2px;background:var(--line)}
+.st{position:relative;border:1px solid var(--line);border-radius:10px;padding:8px 12px;background:#fff}
+.st::before{content:"";position:absolute;left:-23px;top:10px;width:14px;height:14px;border-radius:50%;background:#fff;border:2.5px solid #9fb3c0}
+.st.done::before{background:var(--good);border-color:var(--good)}
+.st.now{border-color:var(--or);box-shadow:0 0 0 3px rgba(242,86,21,.10)}
+.st.now::before{border-color:var(--or);background:#fff}
+.st h5{margin:0 0 4px;font-size:12px;display:flex;gap:8px;align-items:center}
+.st .r{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.course{border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.course .hd{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--soft);border-bottom:1px solid var(--line)}
+.course .hd b{font-size:12.5px}
+</style></head><body>
+
+<!-- COVER -->
+<section class="page cover">
+  <div class="wave"></div>
+  <h1>Trainee Profile · 3 Designs</h1>
+  <p>Application window (Registration) and Trainee Account · sample trainee DELA CRUZ, Juan Paolo</p>
+  <div class="opts">
+    <div class="opt"><b>01</b><h2>Card Header</h2><span>Navy identity card, three stat tiles, requirements as switches. Pages 2–3.</span></div>
+    <div class="opt"><b>02</b><h2>Two-Column Sheet</h2><span>Identity and source on the left, training, payment and checklist on the right. Pages 4–5.</span></div>
+    <div class="opt"><b>03</b><h2>Timeline</h2><span>One vertical path from Registered to Certificate, with each step's actions inline. Pages 6–7.</span></div>
+  </div>
+  <p style="margin-top:22px;color:#cfe6ef;font-size:12px">All three add the new Source control: Online · Walk-In · Meta · Agency / Consultancy, then a Partner dropdown. The website form no longer asks for an agency.</p>
+</section>
+
+<!-- D1 · APPLICATION -->
+<section class="page">
+  <div class="tag"><b>Design 01 · Card Header</b> · Application Window</div>
+  <div class="win">
+    <div class="bar"><h3>Application</h3><span class="x">✕</span></div>
+    <div class="body">
+      <div class="hero">
+        <div class="av">JD</div>
+        <div style="flex:1;min-width:0">
+          <h2>DELA CRUZ, Juan Paolo</h2>
+          <div class="meta"><span class="mono">NWMTACI-2026-00412</span> · SRN <span class="mono">SRN-1234567</span> · 0917 555 0142 · juan.delacruz@gmail.com</div>
+          <div style="display:flex;gap:6px;margin-top:6px"><span class="chip c-or">Consultancy · Marine Force</span><span class="chip c-bl">Company Charge</span><span class="chip c-mut">Screening</span></div>
+        </div>
+        <span class="btn">Print TAR</span>
+      </div>
+      <div class="callout" style="display:grid;grid-template-columns:200px 1fr 1fr;gap:12px;align-items:end">
+        <div class="lbl" style="align-self:center;color:var(--bl)">Where the trainee came from</div>
+        <div class="field"><span class="lbl">Source</span><div class="sel on">Agency / Consultancy</div></div>
+        <div class="field"><span class="lbl">Partner</span><div class="sel on">Marine Force · Consultancy</div></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="lbl">Training</span><b>PSCMT · Crowd Management</b><span class="note">Nov 10–11, 2026 · BCH-2026-0451</span></div>
+        <div class="stat"><span class="lbl">Payment</span><b class="mono">₱1,300.00</b><span class="note">Billed to Marine Force</span></div>
+        <div class="stat"><span class="lbl">Requirements</span><b>3 of 4</b><span class="note">Medical certificate missing</span></div>
+      </div>
+      <div class="panel" style="flex:1">
+        <h4>Requirements <span class="note">Tick each document you checked</span></h4>
+        <div class="check"><span class="tg ok"></span>Valid ID / Passport<span class="who">Registration · Oct 29, 9:12 AM</span></div>
+        <div class="check"><span class="tg"></span>Medical Certificate (PEME Format)<span class="who">Not yet</span></div>
+        <div class="check"><span class="tg ok"></span>2x2 Photo<span class="who">Registration · Oct 29, 9:13 AM</span></div>
+        <div class="check"><span class="tg ok"></span>Seaman's Book / SRN<span class="who">Registration · Oct 29, 9:13 AM</span></div>
+        <div class="check" style="border:0"><span class="tg"></span>Other (Optional)<span class="who">—</span></div>
+      </div>
+    </div>
+    <div class="foot"><span class="note">Marine Force is a Company Charge partner: no payment at the Cashier.</span><span class="sp"></span><span class="btn">Request a Change</span><span class="btn p" style="opacity:.5">Enroll · Company Charge</span></div>
+  </div>
+</section>
+
+<!-- D1 · ACCOUNT -->
+<section class="page">
+  <div class="tag"><b>Design 01 · Card Header</b> · Trainee Account</div>
+  <div class="win">
+    <div class="bar"><h3>Trainee Account</h3><span class="x">✕</span></div>
+    <div class="body">
+      <div class="hero">
+        <div class="av">JD</div>
+        <div style="flex:1;min-width:0">
+          <h2>DELA CRUZ, Juan Paolo</h2>
+          <div class="meta"><span class="mono">NWMTACI-2026-00412</span> · Able Seaman · Registered Oct 28, 2026</div>
+          <div style="display:flex;gap:6px;margin-top:6px"><span class="chip c-or">Consultancy · Marine Force</span><span class="chip c-gd">2 Enrolled</span></div>
+        </div>
+        <div style="display:flex;gap:6px"><span class="btn">Copy as Text</span><span class="btn">Copy as Row</span><span class="btn b">Print TAR</span></div>
+      </div>
+      <div class="stats">
+        <div class="stat"><span class="lbl">Courses</span><b>3</b><span class="note">2 Enrolled · 1 Pending</span></div>
+        <div class="stat"><span class="lbl">Paid</span><b class="mono">₱2,600.00</b><span class="note">2 receipts</span></div>
+        <div class="stat"><span class="lbl">Balance</span><b class="mono" style="color:var(--bad)">₱1,300.00</b><span class="note">Billed to Marine Force</span></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1.6fr 1fr;gap:12px;flex:1;min-height:0">
+        <div class="panel">
+          <h4>Courses</h4>
+          <table><tr><th>Course</th><th>Schedule</th><th>Status</th><th class="n">Due</th><th class="n">Paid</th><th class="n">Balance</th></tr>
+          <tr><td><b>STPPDSPPS</b><br><span class="note">ENR-2026-01120</span></td><td>Nov 9</td><td><span class="chip c-gd">Enrolled</span></td><td class="n">1,300.00</td><td class="n">1,300.00</td><td class="n">0.00</td></tr>
+          <tr><td><b>PSCMT</b><br><span class="note">ENR-2026-01121</span></td><td>Nov 10–11</td><td><span class="chip c-gd">Enrolled</span></td><td class="n">1,300.00</td><td class="n">1,300.00</td><td class="n">0.00</td></tr>
+          <tr><td><b>PSCMHBT</b><br><span class="note">ENR-2026-01122</span></td><td>Nov 12–14</td><td><span class="chip c-bl">Company Charge</span></td><td class="n">1,300.00</td><td class="n">0.00</td><td class="n">1,300.00</td></tr></table>
+          <h4 style="margin-top:12px">Payments</h4>
+          <table><tr><th>Receipt</th><th>Date</th><th>Mode</th><th class="n">Amount</th></tr>
+          <tr><td class="mono">AR-2026-000318</td><td>Oct 28</td><td>GCash · Ref 1029384756</td><td class="n">1,300.00</td></tr>
+          <tr><td class="mono">AR-2026-000331</td><td>Oct 29</td><td>Cash</td><td class="n">1,300.00</td></tr></table>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="panel"><h4>Personal and Contact</h4>
+            <dl class="kv"><dt>Birth Date</dt><dd>Mar 14, 1994 · Iloilo City</dd><dt>SRN</dt><dd class="mono">SRN-1234567</dd><dt>Mobile</dt><dd>0917 555 0142</dd><dt>Email</dt><dd>juan.delacruz@gmail.com</dd><dt>Address</dt><dd>Blk 4 Lot 12, Molo, Iloilo City</dd><dt>Company</dt><dd>Marine Force</dd></dl></div>
+          <div class="panel"><h4>Emergency Contact</h4><dl class="kv"><dt>Name</dt><dd>Maria Dela Cruz (Mother)</dd><dt>Mobile</dt><dd>0918 222 0190</dd></dl></div>
+          <div class="panel"><h4>Source</h4>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div class="sel">Agency / Consultancy</div><div class="sel">Marine Force</div></div>
+            <p class="note" style="margin:6px 0 0">Locked once a payment is recorded.</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- D2 · APPLICATION -->
+<section class="page">
+  <div class="tag"><b>Design 02 · Two-Column Sheet</b> · Application Window</div>
+  <div class="win">
+    <div class="bar"><h3>Application · <span class="mono" style="font-weight:500">NWMTACI-2026-00412</span></h3><span class="x">✕</span></div>
+    <div class="body">
+      <div class="cols">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="panel" style="display:flex;gap:10px;align-items:center"><div class="av">JD</div><div><b style="font-size:14px">DELA CRUZ, Juan Paolo</b><br><span class="note">Able Seaman · Submitted Oct 29, 8:47 AM</span></div></div>
+          <div class="panel"><h4>Identity</h4><dl class="kv"><dt>SRN</dt><dd class="mono">SRN-1234567</dd><dt>Birth Date</dt><dd>Mar 14, 1994</dd><dt>Mobile</dt><dd>0917 555 0142</dd><dt>Email</dt><dd>juan.delacruz@gmail.com</dd><dt>Emergency</dt><dd>Maria Dela Cruz · 0918 222 0190</dd></dl></div>
+          <div class="panel" style="border-color:var(--bl);background:#f2f8fe">
+            <h4>Source</h4>
+            <div class="field"><span class="lbl">Came From</span><div class="sel on">Agency / Consultancy</div></div>
+            <div class="field" style="margin-top:8px"><span class="lbl">Partner</span><div class="sel on">Marine Force · Consultancy</div></div>
+            <div style="margin-top:8px;display:flex;gap:6px"><span class="chip c-bl">Company Charge</span><span class="chip c-mut">No Rebate</span></div>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+          <div class="panel"><h4>Training <span class="btn" style="padding:4px 10px">Add Course</span></h4>
+            <table><tr><th>Course</th><th>Batch</th><th>Schedule</th><th class="n">Fee</th></tr>
+            <tr><td><b>PSCMT</b> · Crowd Management</td><td class="mono">BCH-2026-0451</td><td>Nov 10–11 · 8:00 AM</td><td class="n">1,300.00</td></tr></table></div>
+          <div class="panel" style="flex:1">
+            <h4>Requirements <span class="note">3 of 4</span></h4>
+            <div class="prog"><i style="width:75%"></i></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 18px;margin-top:6px">
+              <div class="check"><span class="box ok">✓</span>Valid ID / Passport</div>
+              <div class="check"><span class="box">&nbsp;</span>Medical Certificate (PEME)</div>
+              <div class="check"><span class="box ok">✓</span>2x2 Photo</div>
+              <div class="check"><span class="box ok">✓</span>Seaman's Book / SRN</div>
+              <div class="check" style="border:0"><span class="box">&nbsp;</span>Other (Optional)</div>
+            </div>
+          </div>
+          <div class="panel"><h4>Payment</h4>
+            <div style="display:flex;gap:10px;align-items:center"><span class="note">Marine Force is billed on the Billing Statement.</span><span class="sp"></span><span class="btn p" style="opacity:.5">Enroll · Company Charge</span></div>
+            <p class="note" style="margin:6px 0 0">Other sources show the mode chips here: Cash · GCash · PSBank · UnionBank, then Hand to Cashier.</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="foot"><span class="btn">Print TAR</span><span class="btn">Request a Change</span><span class="sp"></span><span class="note">Tick the medical certificate to enroll.</span></div>
+  </div>
+</section>
+
+<!-- D2 · ACCOUNT -->
+<section class="page">
+  <div class="tag"><b>Design 02 · Two-Column Sheet</b> · Trainee Account</div>
+  <div class="win">
+    <div class="bar"><h3>Trainee Account · <span class="mono" style="font-weight:500">NWMTACI-2026-00412</span></h3><div style="display:flex;gap:6px"><span class="btn">Copy as Text</span><span class="btn">Copy as Row</span><span class="btn b">Print TAR</span></div></div>
+    <div class="body">
+      <div class="cols">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="panel" style="display:flex;gap:10px;align-items:center"><div class="av">JD</div><div><b style="font-size:14px">DELA CRUZ, Juan Paolo</b><br><span class="chip c-or" style="margin-top:4px">Consultancy · Marine Force</span></div></div>
+          <div class="panel"><h4>Personal</h4><dl class="kv"><dt>Birth</dt><dd>Mar 14, 1994 · Iloilo City</dd><dt>SRN</dt><dd class="mono">SRN-1234567</dd><dt>Rank</dt><dd>Able Seaman</dd><dt>Company</dt><dd>Marine Force</dd></dl></div>
+          <div class="panel"><h4>Contact</h4><dl class="kv"><dt>Mobile</dt><dd>0917 555 0142</dd><dt>Email</dt><dd>juan.delacruz@gmail.com</dd><dt>Address</dt><dd>Blk 4 Lot 12, Molo, Iloilo City</dd><dt>Emergency</dt><dd>Maria Dela Cruz · 0918 222 0190</dd></dl></div>
+          <div class="panel"><h4>Source</h4><div class="sel">Agency / Consultancy</div><div class="sel" style="margin-top:6px">Marine Force</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+          <div class="panel" style="flex:1">
+            <h4>Statement <span class="note">Running balance</span></h4>
+            <table><tr><th>Date</th><th>Entry</th><th>Reference</th><th class="n">Charge</th><th class="n">Payment</th><th class="n">Balance</th></tr>
+            <tr><td>Oct 28</td><td>STPPDSPPS · Safety · Nov 9</td><td class="mono">ENR-2026-01120</td><td class="n">1,300.00</td><td class="n"></td><td class="n">1,300.00</td></tr>
+            <tr><td>Oct 28</td><td>PSCMT · Crowd · Nov 10–11</td><td class="mono">ENR-2026-01121</td><td class="n">1,300.00</td><td class="n"></td><td class="n">2,600.00</td></tr>
+            <tr><td>Oct 28</td><td>Payment · GCash</td><td class="mono">AR-2026-000318</td><td class="n"></td><td class="n">1,300.00</td><td class="n">1,300.00</td></tr>
+            <tr><td>Oct 29</td><td>Payment · Cash</td><td class="mono">AR-2026-000331</td><td class="n"></td><td class="n">1,300.00</td><td class="n">0.00</td></tr>
+            <tr><td>Oct 29</td><td>PSCMHBT · Crisis · Nov 12–14 <span class="chip c-bl">Company Charge</span></td><td class="mono">ENR-2026-01122</td><td class="n">1,300.00</td><td class="n"></td><td class="n">1,300.00</td></tr>
+            <tr style="background:#fff7f2"><td colspan="3"><b>Balance</b> · billed to Marine Force</td><td class="n"><b>3,900.00</b></td><td class="n"><b>2,600.00</b></td><td class="n" style="color:var(--bad)"><b>1,300.00</b></td></tr></table>
+          </div>
+          <div class="panel"><h4>Requests</h4><table><tr><th>Type</th><th>Course</th><th>Stage</th><th class="n">Fee</th></tr><tr><td>Rescheduling</td><td>STPPDSPPS</td><td><span class="chip c-gd">Approved</span></td><td class="n">300.00</td></tr></table></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- D3 · APPLICATION -->
+<section class="page">
+  <div class="tag"><b>Design 03 · Timeline</b> · Application Window</div>
+  <div class="win">
+    <div class="bar">
+      <div style="display:flex;gap:10px;align-items:center"><div class="av" style="width:34px;height:34px;font-size:13px">JD</div><div><h3>DELA CRUZ, Juan Paolo</h3><span class="note"><span class="mono">NWMTACI-2026-00412</span> · SRN <span class="mono">SRN-1234567</span> · 0917 555 0142</span></div></div>
+      <div style="display:flex;gap:8px;align-items:center"><span class="sel" style="min-width:170px">Agency / Consultancy</span><span class="sel" style="min-width:170px">Marine Force</span><span class="x">✕</span></div>
+    </div>
+    <div class="body" style="flex-direction:row;gap:16px">
+      <div class="tl" style="flex:1">
+        <div class="st done"><h5>Registered <span class="note">Oct 29, 8:47 AM · Website</span></h5><div class="r"><span class="chip c-or">Consultancy · Marine Force</span><span class="note">Set by Registration</span></div></div>
+        <div class="st done"><h5>Course and Schedule</h5><div class="r"><b>PSCMT · Crowd Management</b><span class="note">Nov 10–11 · BCH-2026-0451</span><span class="sp"></span><span class="btn" style="padding:4px 10px">Add Course</span></div></div>
+        <div class="st now"><h5>Requirements <span class="chip c-or">3 of 4</span></h5>
+          <div class="r"><span class="check" style="border:0;padding:0"><span class="box ok">✓</span>Valid ID</span><span class="check" style="border:0;padding:0"><span class="box">&nbsp;</span>Medical (PEME)</span><span class="check" style="border:0;padding:0"><span class="box ok">✓</span>2x2 Photo</span><span class="check" style="border:0;padding:0"><span class="box ok">✓</span>Seaman's Book</span><span class="check" style="border:0;padding:0"><span class="box">&nbsp;</span>Other</span></div></div>
+        <div class="st"><h5>Enroll <span class="note">Company Charge · billed to Marine Force</span></h5><div class="r"><span class="btn p" style="opacity:.5">Enroll · Company Charge</span><span class="note">Opens once all four are ticked</span></div></div>
+        <div class="st"><h5>Training <span class="note">Nov 10–11</span></h5><div class="r"><span class="note">Instructions emailed automatically once enrolled</span></div></div>
+        <div class="st"><h5>Certificate</h5><div class="r"><span class="note">Released after the post-test and evaluation</span></div></div>
+      </div>
+      <div style="width:250px;display:flex;flex-direction:column;gap:12px">
+        <div class="panel"><h4>Source</h4>
+          <div class="field"><span class="lbl">Came From</span><div class="sel on">Agency / Consultancy</div></div>
+          <div class="field" style="margin-top:8px"><span class="lbl">Partner</span><div class="sel on">Marine Force</div></div>
+          <p class="note" style="margin:8px 0 0">Options: Online · Walk-In · Meta · Agency / Consultancy. Partner list shows active agencies and consultancies.</p></div>
+        <div class="panel"><h4>Fee</h4><b class="mono" style="font-size:16px">₱1,300.00</b><p class="note" style="margin:4px 0 0">Billed on the Billing Statement</p></div>
+        <div class="panel" style="display:flex;flex-direction:column;gap:6px"><span class="btn">Print TAR</span><span class="btn">Request a Change</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- D3 · ACCOUNT -->
+<section class="page">
+  <div class="tag"><b>Design 03 · Timeline</b> · Trainee Account</div>
+  <div class="win">
+    <div class="bar">
+      <div style="display:flex;gap:10px;align-items:center"><div class="av" style="width:34px;height:34px;font-size:13px">JD</div><div><h3>DELA CRUZ, Juan Paolo</h3><span class="note"><span class="mono">NWMTACI-2026-00412</span> · Able Seaman · Consultancy · Marine Force</span></div></div>
+      <div style="display:flex;gap:6px;align-items:center"><span class="chip c-gd">Paid ₱2,600.00</span><span class="chip c-or">Balance ₱1,300.00</span><span class="btn">Copy as Text</span><span class="btn">Copy as Row</span><span class="btn b">Print TAR</span><span class="x">✕</span></div>
+    </div>
+    <div class="body" style="flex-direction:row;gap:16px">
+      <div style="flex:1;display:flex;flex-direction:column;gap:10px;min-width:0">
+        <div class="course"><div class="hd"><b>STPPDSPPS · Safety</b><span class="note">Nov 9 · ENR-2026-01120</span><span class="sp"></span><span class="chip c-gd">Enrolled · Paid</span></div>
+          <table><tr><td style="width:120px" class="mono">AR-2026-000318</td><td>Oct 28 · GCash · Ref 1029384756</td><td class="n">1,300.00</td></tr><tr><td colspan="2" class="note">Rescheduling approved Oct 29 · fee ₱300.00 paid</td><td class="n">300.00</td></tr></table></div>
+        <div class="course"><div class="hd"><b>PSCMT · Crowd Management</b><span class="note">Nov 10–11 · ENR-2026-01121</span><span class="sp"></span><span class="chip c-gd">Enrolled · Paid</span></div>
+          <table><tr><td style="width:120px" class="mono">AR-2026-000331</td><td>Oct 29 · Cash</td><td class="n">1,300.00</td></tr></table></div>
+        <div class="course"><div class="hd"><b>PSCMHBT · Crisis Management</b><span class="note">Nov 12–14 · ENR-2026-01122</span><span class="sp"></span><span class="chip c-bl">Company Charge</span></div>
+          <table><tr><td class="note">No payment yet · billed to Marine Force on the next Billing Statement</td><td class="n" style="color:var(--bad)">1,300.00 due</td></tr></table></div>
+      </div>
+      <div style="width:250px;display:flex;flex-direction:column;gap:12px">
+        <div class="panel"><h4>Contact</h4><dl class="kv" style="grid-template-columns:70px 1fr"><dt>Mobile</dt><dd>0917 555 0142</dd><dt>Email</dt><dd>juan.delacruz@gmail.com</dd><dt>Address</dt><dd>Molo, Iloilo City</dd><dt>Birth</dt><dd>Mar 14, 1994</dd></dl></div>
+        <div class="panel"><h4>Emergency</h4><p style="margin:0">Maria Dela Cruz (Mother)<br><span class="note">0918 222 0190</span></p></div>
+        <div class="panel"><h4>Source</h4><div class="sel">Agency / Consultancy</div><div class="sel" style="margin-top:6px">Marine Force</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+</body></html>

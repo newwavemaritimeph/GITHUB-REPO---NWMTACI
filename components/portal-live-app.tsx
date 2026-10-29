@@ -18,7 +18,8 @@ import { MoveBatch } from "./portal/move-batch";
 import { AdminConfiguration } from "./admin-configuration";
 import { DateReports } from "./date-reports";
 import { downloadCsv } from "@/lib/csv";
-import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer } from "./portal/live-registration";
+import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer, SourcePicker, partnerOf, chargeTo } from "./portal/live-registration";
+import { sourceLabel } from "@/lib/company-charge";
 import { Badge, Message, Modal, Page, PageHead, PeriodBar, manilaDay, submit, fullName, usePaged, usePeriod } from "./portal/shared-ui";
 import { classroomJoin } from "@/lib/classroom";
 import { ClassroomPanel } from "./portal/classroom-panel";
@@ -627,60 +628,62 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   const paid=payments.reduce((s,p)=>s+Number(p.amount_centavos),0);
   const due=fees-discounts-paid;
   const day=(iso:string)=>new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",year:"numeric",timeZone:"Asia/Manila"}).format(new Date(iso));
-  const schedule=(e:Enrollment)=>{const b=first(e.batches);return b?`${date(b.starts_on)} batch`:e.scheduled_on?`starts ${date(e.scheduled_on)}`:"no batch yet"};
-  // One ledger: each course fee (with its extra charges and discounts), then each payment, by date.
-  type Line={key:string;at:string;text:string;ref:string;charge:number;payment:number;enrollmentId?:string;note?:string};
-  const lines:Line[]=[];
-  for(const e of enrolls){
-    const cancelled=e.enrollment_status==="Cancelled",c=first(e.courses)?.name??"Course";
-    lines.push({key:`f${e.id}`,at:e.created_at,text:`${c} · ${schedule(e)}`,ref:e.enrollment_number,charge:cancelled?0:Number(e.selling_price_centavos),payment:0,enrollmentId:e.id,note:cancelled?"Cancelled":undefined});
-    if(!cancelled&&Number(e.charges_centavos??0)>0)lines.push({key:`c${e.id}`,at:e.created_at,text:`Additional charges · ${c}`,ref:e.enrollment_number,charge:Number(e.charges_centavos),payment:0,enrollmentId:e.id});
-    if(!cancelled&&Number(e.discounts_centavos??0)>0)lines.push({key:`d${e.id}`,at:e.created_at,text:`Discount or rebate · ${c}`,ref:e.enrollment_number,charge:0,payment:Number(e.discounts_centavos),enrollmentId:e.id});
-  }
-  for(const p of payments)lines.push({key:`p${p.id}`,at:p.received_at,text:`Payment received · ${p.method}`,ref:p.payment_number,charge:0,payment:Number(p.amount_centavos)});
-  lines.sort((a,b)=>a.at.localeCompare(b.at));
-  let running=0;
   const money=(v:number)=>(v/100).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
   const raise=async(body:Record<string,unknown>)=>{const r=await submit(body) as {feeCentavos?:number};setNote(r.feeCentavos?`Sent to the Cashier. It is applied once the trainee pays ${pesos(r.feeCentavos)}.`:"Sent to the Cashier.");await reload?.();return r};
+  // Design 01 · Card Header (owner, 29 Oct 2026): navy name card, three tiles, courses and payments, then the details.
+  const [err,setErr]=useState(""),[busy,setBusy]=useState(false);
+  const post=async(body:Record<string,unknown>,text?:string)=>{setBusy(true);setErr("");try{const r=await submit(body);if(text)setNote(text);await reload?.();return r}catch(e){setErr(e instanceof Error?e.message:"Could not save.");throw e}finally{setBusy(false)}};
+  const latest=live[live.length-1];
+  const partner=[...live].reverse().map(e=>partnerOf(data,e)).find(Boolean)??null;
+  const billedTo=live.map(e=>chargeTo(data,e)).find(Boolean)??null;
+  const enrolledN=live.filter(e=>e.enrollment_status==="Enrolled"||e.enrollment_status==="Open Schedule").length;
+  const srcLabel=latest?sourceLabel(latest.source,partner):"";
+  const when=(e:Enrollment)=>{const b=first(e.batches);return b?(b.starts_on===b.ends_on?date(b.starts_on):`${date(b.starts_on)} – ${date(b.ends_on)}`):e.scheduled_on?date(e.scheduled_on):"No batch yet"};
   return <Modal title="Trainee Account" onClose={onClose} wide>
-    <div className="sa">
-      <div className="sa-head">
-        <div className="sa-org"><div className="sa-seal" aria-hidden="true">NW</div><div><b>New Wave Maritime Training and Assessment Center, Inc.</b><small>Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila</small></div></div>
-        <div className="sa-doc"><h2>Statement of Account</h2><small>As of {date(manilaToday())}</small></div>
+    <div className="sa tp">
+      <div className="tp-hero">
+        <div className="tp-av" aria-hidden="true">{`${(trainee.legal_first_name??"").charAt(0)}${(trainee.legal_last_name??"").charAt(0)}`.toUpperCase()}</div>
+        <div className="tp-who"><h3>{`${(trainee.legal_last_name??"").toUpperCase()}, ${trainee.legal_first_name??""}${trainee.legal_middle_name?` ${trainee.legal_middle_name.charAt(0)}.`:""}`}</h3>
+          <p><span className="tp-mono">{appNo??trainee.trainee_number}</span>{trainee.rank?` · ${trainee.rank}`:""}{trainee.registered_at?` · Registered ${day(trainee.registered_at)}`:""}</p>
+          <div className="tp-chips">{srcLabel&&<span className="tp-chip or">{srcLabel}</span>}{enrolledN>0&&<span className="tp-chip gd">{enrolledN} Enrolled</span>}{due<=0&&fees>0&&<span className="tp-chip gd">Paid in Full</span>}</div></div>
+        <div className="tp-hacts">{canPrint&&<><button type="button" className="portal-secondary" onClick={()=>void copyDetails("text")}>Copy as Text</button><button type="button" className="portal-secondary" onClick={()=>void copyDetails("row")}>Copy as Row</button><TarButton data={data} traineeId={trainee.id} reload={reload} className="portal-primary" knownIds={account?.tarEnrollmentIds}/></>}</div>
       </div>
       {note&&<Message kind="success" text={note}/>}
+      {err&&<Message kind="error" text={err}/>}
       {copyFallback&&<div className="sa-copybox"><textarea readOnly rows={Math.min(14,copyFallback.split("\n").length+1)} value={copyFallback} onFocus={e=>e.currentTarget.select()} aria-label="Trainee details to copy"/><button type="button" className="portal-secondary" onClick={()=>setCopyFallback("")}>Close</button></div>}
-      <div className="sa-meta">
-        {editing&&reload?<div className="sa-box"><TraineeEditForm trainee={trainee} reload={reload} onDone={()=>setEditing(false)}/></div>:<div className="sa-box">
-          <span className="sa-cap">Trainee</span>
-          <div className="sa-who">{canPrint&&<span className="sa-copy"><button type="button" className="portal-secondary" onClick={()=>void copyDetails("text")}>Copy as Text</button><button type="button" className="portal-secondary" onClick={()=>void copyDetails("row")}>Copy as Row</button></span>}<div className="sa-name">{`${(trainee.legal_last_name??"").toUpperCase()}, ${trainee.legal_first_name??""}${trainee.legal_middle_name?` ${trainee.legal_middle_name.charAt(0)}.`:""}`}</div>{trainee.rank&&<span className="sa-rank">{trainee.rank}</span>}</div>
-          {/* One labelled field per detail; empty ones are left out. */}
-          <dl className="sa-kv">
-            {([["NWMTACI No.",appNo,"sa-mono"],["Trainee No.",trainee.trainee_number,"sa-mono"],["SRN",trainee.srn,"sa-mono"],
-              ["Mobile",trainee.mobile,"sa-mono"],["Email",trainee.email,"sa-two"],
-              ["Birthday",trainee.birthdate?date(trainee.birthdate):"",""],["Place of Birth",trainee.place_of_birth,""],["Company",trainee.company,""]] as [string,string|null|undefined,string][])
-              .filter(([,v])=>v).map(([k,v,cls])=><div key={k} className={cls==="sa-two"?cls:undefined}><dt>{k}</dt><dd className={cls==="sa-mono"?cls:undefined}>{v}</dd></div>)}
-            {trainee.address&&<div className="sa-wide"><dt>Address</dt><dd>{trainee.address}</dd></div>}
-            {em?.name&&<div className="sa-wide sa-em"><dt>Emergency Contact</dt><dd>{em.name}{em.mobile&&<span className="sa-mono"> · {em.mobile}</span>}</dd></div>}
-          </dl>
-        </div>}
-        <div className="sa-box sa-sum"><span className="sa-cap">Account Summary</span>
-          <div><span>Training Fees</span><b>{pesos2(fees)}</b></div>
-          <div><span>Discounts and Rebates</span><b className="sa-less">({pesos2(discounts)})</b></div>
-          <div><span>Payments Received</span><b className="sa-less">({pesos2(paid)})</b></div>
-          <div className="sa-due"><span>Balance Due</span><b className={due>0?"owe":"settled"}>{pesos2(due)}</b></div>
-          {due<=0&&fees>0&&<span className="sa-paid">Paid in Full</span>}
+      <div className="tp-stats">
+        <div><span className="tp-cap">Courses</span><b>{live.length}</b><small>{enrolledN} Enrolled · {live.length-enrolledN} Pending</small></div>
+        <div><span className="tp-cap">Paid</span><b className="tp-mono">{pesos2(paid)}</b><small>{payments.length} receipt{payments.length===1?"":"s"}</small></div>
+        <div><span className="tp-cap">Balance</span><b className={`tp-mono ${due>0?"owe":"settled"}`}>{pesos2(due)}</b><small>{billedTo?`Billed to ${billedTo.name}`:discounts?`After ${pesos2(discounts)} discounts and rebates`:"Training fees less payments"}</small></div>
+      </div>
+      <div className="tp-cols">
+        <div className="tp-main">
+          <section className="tp-panel"><h4>Courses</h4>
+            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Course</th><th>Schedule</th><th>Status</th><th className="r">Due</th><th className="r">Paid</th><th className="r">Balance</th></tr></thead><tbody>
+              {enrolls.map(e=>{const c=first(e.courses),cancelled=e.enrollment_status==="Cancelled",d=cancelled?0:dueCentavos(e),bal=cancelled?0:balanceOf(e);return <tr key={e.id} className={canEdit?"sa-click":undefined} onClick={canEdit?()=>setOpenEnrollment(e.id):undefined} title={canEdit?"Open this enrollment":undefined}>
+                <td><b>{c?.code??"Course"}</b><small>{c?.name} · {e.enrollment_number}</small></td><td>{when(e)}</td>
+                <td>{!cancelled&&chargeTo(data,e)?<Badge tone="pending">Company Charge</Badge>:<Badge tone={e.enrollment_status==="Enrolled"?"active":e.enrollment_status==="Cancelled"?"cancelled":"pending"}>{e.enrollment_status}</Badge>}</td>
+                <td className="r tp-mono">{money(d)}</td><td className="r tp-mono">{money(Math.max(0,d-bal))}</td><td className="r tp-mono">{money(bal)}</td></tr>})}
+              {!enrolls.length&&<tr><td colSpan={6} className="sa-empty">No courses yet.</td></tr>}
+            </tbody></table></div>
+            <h4 className="tp-sub">Payments</h4>
+            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Receipt</th><th>Date</th><th>Mode</th><th className="r">Amount</th></tr></thead><tbody>
+              {payments.map(p=><tr key={p.id}><td className="tp-mono">{p.payment_number}</td><td>{day(p.received_at)}</td><td>{p.method}{p.reference_number?` · Ref ${p.reference_number}`:""}</td><td className="r tp-mono">{money(Number(p.amount_centavos))}</td></tr>)}
+              {!payments.length&&<tr><td colSpan={4} className="sa-empty">No payments yet.</td></tr>}
+            </tbody></table></div>
+          </section>
+          {requests.length>0&&<section className="tp-panel"><h4>Open Requests</h4>{requests.map(r=><p key={r.id} className="tp-req"><b>{r.request_type==="Rescheduling"?"Reschedule":r.request_type}</b> · {first(r.enrollments)?.enrollment_number} · {r.reason}</p>)}</section>}
+        </div>
+        <div className="tp-side">
+          {editing&&reload?<section className="tp-panel"><TraineeEditForm trainee={trainee} reload={reload} onDone={()=>setEditing(false)}/></section>:<section className="tp-panel"><h4>Personal and Contact</h4>
+            <dl className="tp-kv">
+              {([["Birth Date",trainee.birthdate?`${date(trainee.birthdate)}${trainee.place_of_birth?` · ${trainee.place_of_birth}`:""}`:""],["SRN",trainee.srn],["Trainee No.",trainee.trainee_number],["Mobile",trainee.mobile],["Email",trainee.email],["Address",trainee.address],["Company",trainee.company]] as [string,string|null|undefined][])
+                .filter(([,v])=>v).map(([k,v])=><Fragment key={k}><dt>{k}</dt><dd>{v}</dd></Fragment>)}
+            </dl></section>}
+          {em?.name&&<section className="tp-panel"><h4>Emergency Contact</h4><dl className="tp-kv"><dt>Name</dt><dd>{em.name}</dd>{em.mobile&&<><dt>Mobile</dt><dd>{em.mobile}</dd></>}</dl></section>}
+          {canEdit&&latest&&<section className="tp-panel"><SourcePicker key={`${latest.id}:${partner?.id??latest.source}`} data={data} enrollment={latest} busy={busy} post={post}/><p className="tp-note">Locked once a payment is recorded.</p></section>}
         </div>
       </div>
-      <div className="sa-led"><table><thead><tr><th>Date</th><th>Particulars</th><th>Reference</th><th className="r">Charges</th><th className="r">Credits</th><th className="r">Balance</th></tr></thead><tbody>
-        {lines.map(l=>{running+=l.charge-l.payment;const click=canEdit&&l.enrollmentId;return <tr key={l.key} className={click?"sa-click":undefined} onClick={click?()=>setOpenEnrollment(l.enrollmentId!):undefined} title={click?"Open this enrollment":undefined}>
-          <td className="sa-date">{day(l.at)}</td><td>{l.text}{l.note&&<> <Badge tone="red">{l.note}</Badge></>}</td><td className="sa-mono">{l.ref}</td>
-          <td className="r sa-mono">{l.charge?money(l.charge):""}</td><td className={`r sa-mono${l.payment?" sa-cr":""}`}>{l.payment?`(${money(l.payment)})`:""}</td><td className="r sa-mono">{money(running)}</td></tr>})}
-        {!lines.length&&<tr><td colSpan={6} className="sa-empty">No courses or payments yet.</td></tr>}
-        <tr className="sa-total"><td colSpan={5}>Balance Due</td><td className="r sa-mono">{pesos2(due)}</td></tr>
-      </tbody></table></div>
-      {requests.length>0&&<div className="sa-reqs"><span className="sa-cap">Open requests</span>{requests.map(r=><p key={r.id}><b>{r.request_type==="Rescheduling"?"Reschedule":r.request_type}</b> · {first(r.enrollments)?.enrollment_number} · {r.reason}</p>)}</div>}
-      <div className="sa-sig"><div><b>{data.profile.complete_name}</b>Prepared by</div><div><b>&nbsp;</b>Received by · Trainee Signature over Printed Name · Date</div></div>
       {account?.others.filter(o=>o.tarCourses>0).map(o=><p key={o.id} className="sa-dup">{(trainee.legal_last_name??"").toUpperCase()} also has record {o.number||"(no number)"} with {o.tarCourses} course{o.tarCourses===1?"":"s"}. Search {o.number||"the name"} in Trainees &amp; Enrollments and print the TAR from that record.</p>)}
       <div className="sa-foot">
         <div className="sa-acts">
@@ -688,7 +691,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
           {canEdit&&<button type="button" className="portal-secondary" onClick={()=>setEditing(v=>!v)}>{editing?"Done Editing":"Edit Details"}</button>}
           {canEdit&&live.length>0&&<div className="req-dd"><button type="button" className="portal-secondary" aria-haspopup="menu" aria-expanded={menu} onClick={()=>setMenu(v=>!v)}>Request ▾</button>{menu&&<div className="sa-menu" role="menu">{TRAINEE_REQUESTS.map(([t,lbl])=><button key={t} type="button" role="menuitem" onClick={()=>{setMenu(false);setReqType(t)}}>{lbl}</button>)}</div>}</div>}
         </div>
-        <div className="sa-acts">{canPrint&&<TarButton data={data} traineeId={trainee.id} reload={reload} className="portal-primary sa-navy" knownIds={account?.tarEnrollmentIds}/>}<button type="button" className="portal-secondary" onClick={onClose}>Close</button></div>
+        <div className="sa-acts"><button type="button" className="portal-secondary" onClick={onClose}>Close</button></div>
       </div>
     </div>
     {reqType&&<TraineeRequestModal data={data} traineeId={trainee.id} reqType={reqType} onClose={()=>setReqType(null)} post={raise}/>}

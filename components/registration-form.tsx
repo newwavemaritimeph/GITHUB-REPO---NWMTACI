@@ -60,7 +60,7 @@ const emptyApplicant = {
 // collapse to a one-line summary once complete, a progress rail, and quiet
 // underline fields. Applicants can reopen any finished section to edit it.
 /** Enrollment type (owner, 8 Oct 2026): the first question on the form. */
-const ENROLLMENT_TYPES: [string, string, string][] = [["Online enrollment", "Online Enrollment", "I'm registering on my own, online"], ["Walk-in", "Walk-In", "I'm at the New Wave office"], ["Agency", "Agency or Consultancy", "My agency or consultancy sent me"], ["Meta", "Meta (Facebook / Instagram)", "I saw New Wave on Facebook or Instagram"]];
+const ENROLLMENT_TYPES: [string, string, string][] = [["Online enrollment", "Online Enrollment", "I'm registering on my own, online"], ["Walk-in", "Walk-In", "I'm at the New Wave office"], ["Meta", "Meta (Facebook / Instagram)", "I saw New Wave on Facebook or Instagram"]];
 type SectionKey = "enrollment" | "identification" | "personal" | "contact" | "emergency" | "courses" | "review";
 const upper = (value: string) => value.toUpperCase();
 const pickedDate = (iso: string) => new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
@@ -89,19 +89,6 @@ function Wizard() {
   const locked = lookup?.kind === "found";
 
   const set = <K extends keyof typeof emptyApplicant>(key: K, value: string) => setApplicant((current) => ({ ...current, [key]: value }));
-  // Referral code from an agency or consultancy (8 Oct 2026): checked as the applicant types; only the agency name comes back.
-  const referralInput = applicant.referralCode.replace(/[^A-Za-z0-9]/g, "");
-  const [checked, setChecked] = useState<{ code: string; name: string | null } | null>(null);
-  useEffect(() => {
-    if (referralInput.length < 4) return;
-    const timer = window.setTimeout(() => {
-      void fetch("/api/public/referral-check", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ code: referralInput }) })
-        .then(async (r) => { const body = await r.json().catch(() => ({})) as { name?: string }; setChecked({ code: referralInput, name: r.ok && body.name ? body.name : null }); })
-        .catch(() => setChecked({ code: referralInput, name: null }));
-    }, 600);
-    return () => window.clearTimeout(timer);
-  }, [referralInput]);
-  const referral: { state: "idle" | "checking" | "ok" | "bad"; name?: string } = referralInput.length < 4 ? { state: "idle" } : checked?.code !== referralInput ? { state: "checking" } : checked.name ? { state: "ok", name: checked.name } : { state: "bad" };
 
   // Live catalog; a course chosen earlier arrives in the URL (?batch= or ?course=&start=)
   // and fills the first row.
@@ -204,7 +191,7 @@ function Wizard() {
       const fd = new FormData();
       fd.set("firstName", applicant.firstName); fd.set("middleName", applicant.middleName); fd.set("lastName", applicant.lastName); fd.set("suffix", applicant.suffix);
       fd.set("srn", applicant.srn); fd.set("email", applicant.email.toLowerCase()); fd.set("presentAddress", applicant.address); fd.set("mobile", applicant.mobile);
-      fd.set("placeOfBirth", applicant.placeOfBirth); fd.set("birthDate", applicant.birthDate); fd.set("rank", rank); fd.set("company", applicant.company); fd.set("enrollmentType", applicant.enrollmentType); if (applicant.enrollmentType === "Agency" && referral.state === "ok") fd.set("referralCode", applicant.referralCode);
+      fd.set("placeOfBirth", applicant.placeOfBirth); fd.set("birthDate", applicant.birthDate); fd.set("rank", rank); fd.set("company", applicant.company); fd.set("enrollmentType", applicant.enrollmentType);
       fd.set("emergencyContactName", applicant.emergencyContactName); fd.set("emergencyContactMobile", applicant.emergencyContactMobile);
       for (const r of rows) {
         if (r.code && otherOf(r.code)) { fd.append("otherCourseCodes", r.code); continue; }
@@ -303,9 +290,9 @@ function Wizard() {
 
   const rankText = applicant.rank === "OTHER" ? applicant.rankOther : applicant.rank;
   const nameText = [applicant.firstName, applicant.middleName, applicant.lastName, applicant.suffix].filter(Boolean).join(" ");
-  const enrollmentValid = applicant.enrollmentType === "Online enrollment" || applicant.enrollmentType === "Walk-in" || applicant.enrollmentType === "Meta" || (applicant.enrollmentType === "Agency" && referral.state === "ok");
+  const enrollmentValid = applicant.enrollmentType === "Online enrollment" || applicant.enrollmentType === "Walk-in" || applicant.enrollmentType === "Meta";
   const sections: { key: SectionKey; title: string; hint: string; done: boolean; summary: string }[] = [
-    { key: "enrollment", title: "Enrollment Type", hint: "How are you enrolling?", done: enrollmentValid, summary: applicant.enrollmentType === "Agency" && referral.name ? `Agency · ${referral.name}` : applicant.enrollmentType },
+    { key: "enrollment", title: "Enrollment Type", hint: "How are you enrolling?", done: enrollmentValid, summary: applicant.enrollmentType },
     { key: "identification", title: "Identification", hint: "Start with your SRN. If you have trained with us before, we fill in your details.", done: idValid, summary: `SRN ${applicant.srn}${locked ? " · record found" : ""}` },
     { key: "personal", title: "Personal Details", hint: "As written on your seaman's book or passport.", done: personalValid, summary: [nameText, applicant.birthDate, applicant.placeOfBirth, rankText].filter(Boolean).join(" · ") },
     { key: "contact", title: "Contact", hint: "How New Wave will reach you about your application.", done: contactValid, summary: [applicant.mobile, applicant.email].filter(Boolean).join(" · ") },
@@ -324,15 +311,8 @@ function Wizard() {
   const body: Record<Exclude<SectionKey, "review">, React.ReactNode> = {
     enrollment: <>
       <div className="ql-types" role="radiogroup" aria-label="Enrollment type">
-        {ENROLLMENT_TYPES.map(([value, title, text]) => <button key={value} type="button" role="radio" aria-checked={applicant.enrollmentType === value} className={applicant.enrollmentType === value ? "on" : ""} onClick={() => { set("enrollmentType", value); if (value !== "Agency") set("referralCode", ""); }}><b>{title}</b><small>{text}</small></button>)}
+        {ENROLLMENT_TYPES.map(([value, title, text]) => <button key={value} type="button" role="radio" aria-checked={applicant.enrollmentType === value} className={applicant.enrollmentType === value ? "on" : ""} onClick={() => set("enrollmentType", value)}><b>{title}</b><small>{text}</small></button>)}
       </div>
-      {applicant.enrollmentType === "Agency" && <div className="ql-grid caps-form" style={{ marginTop: 16 }}>
-        <Field label="Referral Code*" wide><input value={applicant.referralCode} onChange={(e) => set("referralCode", e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} placeholder="Type the code from your agency" autoComplete="off" maxLength={24} autoFocus />
-          {referral.state === "ok" && <small className="ref-ok">✓ Referred by {referral.name}</small>}
-          {referral.state === "bad" && <small className="ref-bad">Code not recognised. Check with your agency.</small>}
-          {referral.state === "checking" && <small className="ref-wait">Checking…</small>}</Field>
-        <p className="wizard-hint span-2">No code? Ask your agency, or choose Online enrollment.</p>
-      </div>}
     </>,
     identification: <>
       <div className="ql-grid caps-form">
