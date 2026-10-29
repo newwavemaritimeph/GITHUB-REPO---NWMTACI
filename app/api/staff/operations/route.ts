@@ -46,6 +46,8 @@ const batchInput = z.object({
   startsOn: z.string().date(), endsOn: z.string().date(), dailyStart: z.string().regex(/^\d{2}:\d{2}$/), dailyEnd: z.string().regex(/^\d{2}:\d{2}$/),
   mode: z.string().trim().min(2).max(80), venue: z.string().trim().max(160).optional().default(""), capacity: z.literal(24),
   enrollmentDeadline: z.string().datetime({ offset: true }), publish: z.boolean().default(true),
+  // Holiday Schedule (owner, 29 Oct 2026): any start day except Sunday.
+  holiday: z.boolean().optional().default(false),
 });
 
 const autoOpenBatchInput = z.object({
@@ -2937,11 +2939,15 @@ export async function POST(request: Request) {
     }
     if (input.action === "create-batch") {
       if (!canSchedule(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot create schedules." }, { status: 403 });
-      const { data, error } = await db.rpc("create_training_batch", { target_course: input.courseId, target_partner_offer: input.partnerOfferId ?? null,
+      const { data, error } = await db.rpc(input.holiday ? "create_holiday_batch" : "create_training_batch", { target_course: input.courseId, target_partner_offer: input.partnerOfferId ?? null,
         target_instructor_name: input.instructorName, target_instructor_email: input.instructorEmail, target_room_name: input.roomName,
         target_starts_on: input.startsOn, target_ends_on: input.endsOn, target_daily_start: input.dailyStart, target_daily_end: input.dailyEnd,
         target_mode: input.mode, target_venue: input.venue, target_capacity: input.capacity, target_enrollment_deadline: input.enrollmentDeadline, target_publish: input.publish });
-      if (error) throw error;
+      if (error) {
+        if (input.holiday && /create_holiday_batch/.test(error.message)) return NextResponse.json({ error: "Apply database update 202610290059 first." }, { status: 400 });
+        throw error;
+      }
+      if (input.holiday) await createSupabaseAdminClient().from("audit_logs").insert({ actor_id: staff.user.id, action: "batch.holiday_created", record_type: "batch", record_id: (data as { id?: string } | null)?.id ?? null, new_values: { courseId: input.courseId, startsOn: input.startsOn, endsOn: input.endsOn, publish: input.publish } });
       return NextResponse.json({ ok: true, batch: data });
     }
     if (input.action === "auto-open-batches") {
