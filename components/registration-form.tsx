@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn } from "@/lib/validation";
 import { automaticEndDate, fitsInWeek } from "@/lib/scheduling";
 import { MAX_COURSES, ORDER_RULE_TEXT, orderConflict, type PickRange } from "@/lib/course-selection";
+import { ProofUpload } from "@/components/proof-upload";
 
 // Official New Wave channels shown on the application summary.
 const FACEBOOK_URL = "https://www.facebook.com/newwavemtc";
@@ -279,6 +280,7 @@ function Wizard() {
             </div>
           </div>
           <div className="op-side">
+            {applicationNumber && <ProofUpload srn={applicant.srn} nwmtaciNo={applicationNumber} />}
             <section className="op-panel">
               <h3>Send to Our Facebook Page</h3>
               <p>Message <strong>facebook.com/newwavemtc</strong> with your screenshot and a photo of your valid ID. Copy this message:</p>

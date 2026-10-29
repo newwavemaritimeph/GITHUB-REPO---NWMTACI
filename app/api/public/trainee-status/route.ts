@@ -5,6 +5,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { enforceRateLimit } from "@/lib/security";
 import { normalizeSrn } from "@/lib/validation";
 import { certificateContext } from "@/lib/certificates";
+import { proofState } from "@/lib/trainee-proof";
 
 export const runtime = "nodejs";
 
@@ -85,8 +86,14 @@ export async function POST(request: Request) {
       postTest: { needed: !!ctx?.postTest.required && !cancelled, passed: !!ctx?.postTest.passed, best: ctx?.postTest.best ?? null, attempts: ctx?.postTest.attempts ?? 0, url: ctx?.postTest.required && !ctx.postTest.passed && trainingFinished && !cancelled && e.feedback_token ? `/post-test/${e.feedback_token}` : null },
     });
   }
+  // Proofs of payment the trainee sent (29 Oct 2026); empty before migration 060.
+  const { data: proofRows } = await db.from("payment_proofs").select("id,source,submitted_at,claimed_method,claimed_amount_centavos,extracted_reference,dismissed_at,dismiss_reason").eq("trainee_id", t.id).eq("source", "Trainee").order("submitted_at", { ascending: false }).limit(20);
+  const proofIds = (proofRows ?? []).map((p) => p.id as string);
+  const { data: usedRows } = proofIds.length ? await db.from("payments").select("proof_id").in("proof_id", proofIds).eq("valid", true) : { data: [] };
+  const used = new Set((usedRows ?? []).map((r) => r.proof_id as string));
+  const proofs = (proofRows ?? []).map((p) => ({ submittedAt: p.submitted_at as string, method: (p.claimed_method as string) ?? "", amountCentavos: Number(p.claimed_amount_centavos ?? 0), reference: (p.extracted_reference as string) ?? "", state: proofState(p as { id: string; dismissed_at: string | null }, used), reason: p.dismissed_at && !used.has(p.id as string) ? (p.dismiss_reason as string | null) : null }));
   return NextResponse.json({
-    firstName: t.legal_first_name, nwmtaciNo: t.application_number ?? t.trainee_number, awaitingCourse: !!t.awaiting_course, courses,
+    firstName: t.legal_first_name, proofs, nwmtaciNo: t.application_number ?? t.trainee_number, awaitingCourse: !!t.awaiting_course, courses,
     payments: (payments ?? []).map((p) => ({ paymentNumber: p.payment_number, receivedAt: p.received_at, method: p.method, referenceNumber: p.reference_number, amountCentavos: Number(p.amount_centavos), valid: p.valid !== false })),
   }, { headers: { "Cache-Control": "no-store" } });
 }

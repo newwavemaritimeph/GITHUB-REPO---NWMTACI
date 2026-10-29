@@ -1,0 +1,134 @@
+<title>Trainee Proof of Payment</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Same shell as the live portal: navy bar with dropdown tabs, summary rail on the left, light-cyan table headers. */
+:root{--orange:#F25615;--blue:#0571D0;--cyan:#35CCFA;--cyan-l:#9EE3F1;--navy:#123F63;--bg:#f2f6f8;--surface:#fff;--fg:#0f2638;--muted:#587184;--line:#dbe6ec;--soft:#eef4f8;--th:#e6f6fd;--thc:#0b4f8f;--zebra:#f7fafc;
+ --good:#0a7a3e;--good-bg:#e2f5e9;--warn:#a2470b;--warn-bg:#fdf0e5;--bad:#b42318;--bad-bg:#fcebea;--info:#0571D0;--info-bg:#e5f1fb;
+ --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding-block:16px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.w{max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.logo{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}.logo b{font-size:19px;font-weight:600}.logo b span{color:var(--orange)}.logo small{display:block;color:var(--cyan-l);font-size:14px}.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.who{font-size:14px;color:#cfe3ef;display:flex;align-items:center;gap:8px}.who select{background:#ffffff14;border:1px solid #ffffff30;color:#fff;border-radius:8px;padding:5px 8px}.who select option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:16px;flex-wrap:wrap}.tab>button{background:none;border:0;color:#c3dbea;font:500 16px var(--sans);padding:12px 18px;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:8px}.tab>button:hover{color:#fff;background:#ffffff12}.tab.on>button{background:var(--bg);color:var(--fg);font-weight:600}
+.caret{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.menu{position:absolute;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:15;display:flex;flex-direction:column;margin-top:2px}.tab{position:relative}.menu button{background:none;border:0;text-align:left;color:var(--fg);font:500 15.5px var(--sans);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;gap:12px}.menu button:hover{background:var(--soft)}.menu button.on{background:var(--info-bg);color:var(--info);font-weight:600}.menu small,.n{font:600 11.5px var(--mono);background:var(--orange);color:#fff;border-radius:10px;padding:1px 7px}
+.page{padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.cx-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}h1{font-size:25px;font-weight:600;margin:0}h2{font-size:19px;font-weight:600;margin:0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.seg button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.seg button.on{background:var(--navy);color:#fff}
+.rail{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}@media (max-width:900px){.rail{grid-template-columns:1fr}}.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.ph small{color:var(--muted);font-size:14px}
+.lines{display:flex;flex-direction:column;padding:0 20px 16px}.lines div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}.lines div:first-child{border-top:0}.lines dd,.lines span:last-child{font-family:var(--mono);font-weight:600}.lines .tot{font-weight:700}.lines .bad{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 16px}.tile{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 12px}.tile span{display:block;font-size:13px;color:var(--muted)}.tile b{font:600 19px var(--mono)}
+.cwrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--th);color:var(--thc);font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:10px 12px;border-right:1px solid var(--line);white-space:nowrap}td{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.35}tbody tr:nth-child(even) td{background:var(--zebra)}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}.due{background:var(--bad-bg);color:var(--bad)}.dueo{background:var(--warn-bg);color:var(--warn)}.appr{background:var(--info-bg);color:var(--info)}.paid{background:var(--good-bg);color:var(--good)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:9px;padding:7px 14px;font-weight:600;font-size:14.5px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.okb{background:var(--good);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:14px 20px;background:var(--soft);border-top:1px solid var(--line)}.form label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}.form select,.form input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line)}
+.alert{background:var(--bad-bg);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:15px;font-weight:500;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.note{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+</style>
+<style>
+.views{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:18px}.views button{border:0;background:none;padding:9px 16px;font-weight:600;font-size:14.5px}.views button.on{background:var(--orange);color:#fff}
+.pubwrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.ok{background:var(--good-bg);color:var(--good);border-radius:12px;padding:14px 18px;font-weight:600}
+.box{background:var(--surface);border:2px dashed var(--cyan);border-radius:16px;padding:18px 20px;display:flex;flex-direction:column;gap:14px}
+.box h2 small{display:inline-block;margin-left:8px;font:600 12px var(--sans);color:var(--muted);background:var(--soft);border-radius:99px;padding:2px 9px;vertical-align:middle}
+.acct{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}.acct div{border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:14px}.acct b{display:block}.acct span{color:var(--muted);font-family:var(--mono);font-size:13px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:7px 16px;font-weight:600}.chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media (max-width:560px){.f2{grid-template-columns:1fr}}
+.f2 label,.fl{display:flex;flex-direction:column;gap:5px;font-size:14px;font-weight:600}.f2 input,.fl input{border:1px solid var(--line);border-radius:9px;padding:9px 10px;background:var(--surface);color:var(--fg);font-weight:400}
+.file{border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--soft)}
+.done{background:var(--info-bg);color:var(--info);border-radius:12px;padding:12px 16px;font-weight:600}
+.sumtbl td:first-child{color:var(--muted);width:40%}
+.thumb{width:44px;height:56px;border-radius:6px;background:linear-gradient(160deg,#0a6fd8,#35CCFA);display:grid;place-items:center;color:#fff;font:700 10px var(--mono)}
+.inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px}.inline input{border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--surface);color:var(--fg);min-width:0;flex:1}
+.modal-bg{position:fixed;inset:0;background:#0009;display:grid;place-items:center;padding:16px;z-index:30}.modal{background:var(--surface);border-radius:16px;width:min(560px,100%);max-height:calc(100vh - 32px);overflow:auto}
+.modal .body{padding:16px 20px;display:flex;flex-direction:column;gap:12px}.prefill{background:var(--info-bg);color:var(--info);border-radius:10px;padding:10px 14px;font-size:14px}
+</style>
+<header class="top"><div class="w">
+ <div class="brand"><div class="logo"><div class="mark">NW</div><div><b>New <span>Wave</span> Portal<span class="proto">PROTOTYPE</span></b><small>Ride the New Wave of Maritime Excellence</small></div></div>
+ <div class="who">Proof of Payment Flow</div></div>
+ <nav class="tabs"><div class="tab on"><button>Trainee Uploads → Cashier Records</button></div></nav>
+</div></header>
+<main class="page"><div class="w">
+ <div class="views" id="views"><button data-v="reg" class="on">1 · Website: After Submit</button><button data-v="status">2 · Website: Trainee Status</button><button data-v="cash">3 · Cashier Dashboard</button></div>
+
+ <section id="v-reg" class="pubwrap">
+  <div class="ok">Application submitted · Enrollment No. <span class="mono">NWM-2026-01482</span></div>
+  <div class="panel"><div class="ph"><h2>Registration Summary</h2></div><div class="cwrap"><table class="sumtbl"><tbody><tr><td>Name</td><td><b>REYES, Marco A.</b></td></tr><tr><td>Training</td><td>STPPDSPPS · Safety · Tue Nov 3</td></tr><tr><td>Training</td><td>PSCMT · Crowd · Wed Nov 4 – Thu Nov 5</td></tr><tr><td>Total Fee</td><td class="mono">₱2,600.00</td></tr></tbody></table></div></div>
+  <div id="box-reg"></div>
+ </section>
+
+ <section id="v-status" class="pubwrap" hidden>
+  <div class="panel"><div class="ph"><h2>Trainee Status</h2><small>REYES, Marco A. · NWM-2026-01482</small></div>
+   <div class="cwrap"><table><thead><tr><th>Course</th><th>Dates</th><th class="r">Balance</th><th>Status</th></tr></thead><tbody><tr><td>Safety</td><td>Nov 3</td><td class="r mono">₱1,300.00</td><td><span class="pill dueo">For Payment</span></td></tr><tr><td>Crowd</td><td>Nov 4 – Nov 5</td><td class="r mono">₱1,300.00</td><td><span class="pill dueo">For Payment</span></td></tr></tbody></table></div></div>
+  <div class="panel"><div class="ph"><h2>Proofs of Payment</h2></div><div class="cwrap"><table><thead><tr><th>Sent</th><th>Mode</th><th class="r">Amount</th><th>Reference</th><th>Status</th></tr></thead><tbody id="mine"></tbody></table></div></div>
+  <div id="box-status"></div>
+ </section>
+
+ <section id="v-cash" hidden>
+  <div class="cx-head"><div><span class="eyebrow">Cashier</span><h1>Dashboard</h1></div></div>
+  <div class="rail">
+   <section class="panel"><div class="ph"><h2>Today</h2></div><div class="tiles"><div class="tile" style="--c:var(--orange)"><span>Proofs to Check</span><b id="cnt">0</b></div><div class="tile" style="--c:var(--blue)"><span>GCash Today</span><b>₱18,200</b></div><div class="tile" style="--c:var(--good)"><span>Receipts Issued</span><b id="rcpt">6</b></div><div class="tile" style="--c:var(--cyan)"><span>New Enrollments</span><b>9</b></div></div></section>
+   <div class="stack">
+    <section class="panel"><div class="ph"><h2>Proofs of Payment · No Receipt Yet</h2><small id="cnt2"></small></div>
+     <div class="cwrap"><table><thead><tr><th>Uploaded</th><th>Trainee</th><th>Courses</th><th>Mode</th><th class="r">Amount</th><th>Reference</th><th>Actions</th></tr></thead><tbody id="pend"></tbody></table></div>
+     <p class="note" id="empty" hidden>No proofs waiting. Every uploaded proof has a receipt.</p></section>
+    <section class="panel"><div class="ph"><h2>New Enrollments</h2><small>handed over by Registration</small></div><p class="note">… existing list stays below …</p></section>
+   </div>
+  </div>
+ </section>
+</div></main>
+
+<div class="modal-bg" id="mb" hidden><div class="modal" role="dialog" aria-modal="true">
+ <div class="ph" style="border-bottom:1px solid var(--line)"><h2>Record Payment</h2><button class="btn" id="mx">Close</button></div>
+ <div class="body" id="mbody"></div>
+</div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const P=[
+ {id:1,at:"Oct 29 · 9:12 AM",name:"DELA CRUZ, Juan P.",no:"NWM-2026-01471",courses:"BT-PSSR · Nov 2",bal:130000,mode:"GCash",amt:130000,ref:"5029 384 117",st:"Waiting for Receipt"},
+ {id:2,at:"Oct 29 · 10:40 AM",name:"SANTOS, Maria L.",no:"NWM-2026-01476",courses:"Crisis · Nov 6–9",bal:180000,mode:"UnionBank",amt:90000,ref:"UB88213409",st:"Waiting for Receipt"},
+ {id:3,at:"Oct 29 · 1:05 PM",name:"GARCIA, Paolo R.",no:"NWM-2026-01479",courses:"Safety · Nov 3, Crowd · Nov 4–5",bal:260000,mode:"PSBank",amt:260000,ref:"PS0012983",st:"Waiting for Receipt"}];
+const mine=[];
+const peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
+function toast(t){const e=$("toast");e.textContent=t;e.hidden=false;setTimeout(()=>{e.hidden=true},3200)}
+function box(where){return '<div class="box" id="bx-'+where+'"><h2>Upload Proof of Payment<small>Optional</small></h2>'+
+ '<div class="acct"><div><b>GCash</b><span>Account details set by Admin</span></div><div><b>PSBank</b><span>Account details set by Admin</span></div><div><b>UnionBank</b><span>Account details set by Admin</span></div></div>'+
+ '<div class="fl">Mode of Payment<div class="chips" id="mode-'+where+'"><button class="chip on">GCash</button><button class="chip">PSBank</button><button class="chip">UnionBank</button></div></div>'+
+ '<div class="f2"><label>Amount Sent (₱)<input id="amt-'+where+'" inputmode="decimal" value="2600.00"></label><label>Reference No.<input id="ref-'+where+'" placeholder="From your receipt or screenshot"></label></div>'+
+ '<div class="file"><div class="thumb">IMG</div><div style="flex:1;min-width:0"><b id="fn-'+where+'">No file yet</b><div style="font-size:13px;color:var(--muted)">Photo or PDF, up to 4 MB. Large phone photos are made smaller.</div></div><button class="btn" data-pick="'+where+'">Choose Photo</button></div>'+
+ '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><span style="font-size:13.5px;color:var(--muted)">Paying cash at the office? Skip this.</span><button class="btn pri" data-send="'+where+'">Send Proof</button></div></div>'}
+function render(){
+ $("box-reg").innerHTML=box("reg");$("box-status").innerHTML=box("status");
+ const pend=P.filter(p=>p.st==="Waiting for Receipt");
+ $("pend").innerHTML=pend.map(p=>'<tr><td>'+p.at+'</td><td><b>'+p.name+'</b><small class="mono">'+p.no+'</small></td><td>'+p.courses+'<small>Balance '+peso(p.bal)+'</small></td><td>'+p.mode+'</td><td class="r mono">'+peso(p.amt)+'</td><td class="mono">'+p.ref+'</td><td><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn" data-view="'+p.id+'">View Proof</button><button class="btn pri" data-rec="'+p.id+'">Record Payment</button><button class="btn" data-nv="'+p.id+'">Not Valid</button></div><div id="nv-'+p.id+'"></div></td></tr>').join("");
+ $("cnt").textContent=pend.length;$("cnt2").textContent=pend.length+" waiting";$("empty").hidden=pend.length>0;
+ $("mine").innerHTML=mine.length?mine.map(m=>'<tr><td>'+m.at+'</td><td>'+m.mode+'</td><td class="r mono">'+peso(m.amt)+'</td><td class="mono">'+m.ref+'</td><td><span class="pill appr">Waiting for Receipt</span></td></tr>').join(""):'<tr><td colspan="5" style="color:var(--muted)">No proof sent yet.</td></tr>';
+}
+document.addEventListener("click",e=>{const t=e.target.closest("button");if(!t)return;
+ if(t.dataset.v){document.querySelectorAll("#views button").forEach(b=>b.classList.toggle("on",b===t));["reg","status","cash"].forEach(v=>$("v-"+v).hidden=v!==t.dataset.v)}
+ if(t.classList.contains("chip")){t.parentNode.querySelectorAll(".chip").forEach(c=>c.classList.toggle("on",c===t))}
+ if(t.dataset.pick){$("fn-"+t.dataset.pick).textContent="gcash-receipt.jpg · 1.2 MB"}
+ if(t.dataset.send){const w=t.dataset.send,ref=$("ref-"+w).value.trim(),amt=Math.round(parseFloat($("amt-"+w).value)*100);
+  if($("fn-"+w).textContent==="No file yet"||!ref||!amt){toast("Add the amount, reference no. and the photo.");return}
+  const mode=document.querySelector("#mode-"+w+" .chip.on").textContent;
+  P.push({id:P.length+1,at:"Oct 29 · now",name:"REYES, Marco A.",no:"NWM-2026-01482",courses:"Safety · Nov 3, Crowd · Nov 4–5",bal:260000,mode,amt,ref,st:"Waiting for Receipt"});mine.push({at:"Oct 29",mode,amt,ref});render();
+  $("bx-"+w).outerHTML='<div class="done">Proof received and saved. The Cashier will check it and issue your official receipt. You can follow it on the Trainee Status page.</div>'}
+ if(t.dataset.view){toast("Opens the proof in Google Drive: "+P.find(p=>p.id==t.dataset.view).mode+" › 2026-10 October")}
+ if(t.dataset.nv){$("nv-"+t.dataset.nv).innerHTML='<div class="inline"><input placeholder="Reason, e.g. reference not found in GCash" id="nvr-'+t.dataset.nv+'"><button class="btn" data-nvok="'+t.dataset.nv+'">Confirm</button></div>'}
+ if(t.dataset.nvok){const r=$("nvr-"+t.dataset.nvok).value.trim();if(!r){toast("Type the reason.");return}P.find(p=>p.id==t.dataset.nvok).st="Not Valid";render();toast("Marked Not Valid. The trainee sees it on the status page.")}
+ if(t.dataset.rec){const p=P.find(x=>x.id==t.dataset.rec);$("mbody").innerHTML='<div class="prefill">Filled from the trainee\'s proof · <a href="#" onclick="return false">View Proof</a></div><div class="f2"><label>Trainee<input value="'+p.name+'" readonly></label><label>Mode<input value="'+p.mode+'" readonly></label><label>Amount Received (₱)<input value="'+(p.amt/100).toFixed(2)+'"></label><label>Reference No.<input value="'+p.ref+'"></label></div><div style="font-size:13.5px;color:var(--muted)">Check the amount against the '+p.mode+' history before recording. Applied to: '+p.courses+'.</div><div style="display:flex;justify-content:flex-end;gap:8px"><button class="btn" id="mc">Cancel</button><button class="btn pri" data-post="'+p.id+'">Record and Issue Receipt</button></div>';$("mb").hidden=false}
+ if(t.id==="mx"||t.id==="mc"){$("mb").hidden=true}
+ if(t.dataset.post){P.find(x=>x.id==t.dataset.post).st="Recorded";$("mb").hidden=true;$("rcpt").textContent=+$("rcpt").textContent+1;render();toast("Payment recorded · OR-2026-000318 issued. The row left the list.")}
+});
+render();
+</script>

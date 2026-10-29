@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pill } from "@/components/ui/kit";
+import { ProofUpload } from "@/components/proof-upload";
 
 /* -------------------------------------------------------- trainee status --- */
 
@@ -15,7 +16,8 @@ type CourseStatus = {
   postTest?: { needed: boolean; passed: boolean; best: { score: number; total: number } | null; attempts: number; url: string | null };
 };
 type PaymentRow = { paymentNumber: string; receivedAt: string; method: string; referenceNumber: string | null; amountCentavos: number; valid: boolean };
-type StatusResult = { firstName: string; nwmtaciNo: string; awaitingCourse: boolean; courses: CourseStatus[]; payments: PaymentRow[] };
+type ProofRow = { submittedAt: string; method: string; amountCentavos: number; reference: string; state: string; reason: string | null };
+type StatusResult = { firstName: string; nwmtaciNo: string; awaitingCourse: boolean; courses: CourseStatus[]; payments: PaymentRow[]; proofs?: ProofRow[] };
 const peso = (c: number) => `₱${(c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const day = (iso: string) => new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(iso));
 const mono: React.CSSProperties = { fontFamily: "var(--font-geist-mono, ui-monospace, monospace)" };
@@ -134,6 +136,27 @@ function StatusTab() {
               </div>
             </div>
           )}
+          {!!result.proofs?.length && (
+            <div className="ts-course">
+              <strong>Proofs of Payment You Sent</strong>
+              <div className="data-table" style={{ marginTop: 8 }}>
+                <table>
+                  <thead><tr><th>Sent</th><th>Paid By</th><th style={{ textAlign: "right" }}>Amount</th><th>Status</th></tr></thead>
+                  <tbody>
+                    {result.proofs.map((p, i) => (
+                      <tr key={i}>
+                        <td>{day(p.submittedAt)}</td>
+                        <td>{p.method}{p.reference && <small style={{ display: "block", ...mono }}>Ref. {p.reference}</small>}</td>
+                        <td style={{ ...mono, textAlign: "right" }}>{peso(p.amountCentavos)}</td>
+                        <td><Pill tone={p.state === "Receipt Issued" ? "green" : p.state === "Not Valid" ? "red" : "amber"}>{p.state}</Pill>{p.reason && <small style={{ display: "block" }}>{p.reason}</small>}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          {total("balanceCentavos") > 0 && <ProofUpload srn={srn} nwmtaciNo={no} onSent={() => void search()} />}
         </div>
       )}
     </>

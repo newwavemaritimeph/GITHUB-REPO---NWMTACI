@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { PortalData, Enrollment } from "../portal-live-app";
+import type { PortalData, Enrollment, TraineeProofRow } from "../portal-live-app";
 import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos, pesos2 } from "@/lib/portal-format";
 import { pesosInWords } from "@/lib/amount-words";
 import { Badge, Message, Modal, PageHead, fullName, fmtDate, fmtClock, usePaged, usePost, openAdmissionRecord, submit } from "./shared-ui";
@@ -10,6 +10,7 @@ import { requestFee } from "@/lib/request-fees";
 import type { CashierReportSnapshot } from "@/lib/documents";
 import { tcl } from "@/lib/title-case";
 import { PayTheCenters, centerLines } from "./pay-centers";
+import { shrinkProof } from "@/lib/proof-shrink";
 
 /**
  * Cashier pieces of the registration workflow (Oct 2026):
@@ -187,31 +188,6 @@ const Who = ({ name, number }: { name: string; number?: string }) => <><span cla
 const payState = (e: Enrollment) => (e.enrollment_status === "Cancelled" ? "Cancelled" : balanceOf(e) === 0 ? "Paid" : paidOf(e) > 0 ? "Partially paid" : "Unpaid");
 const PAY_TONE: Record<string, string> = { Paid: "active", "Partially paid": "orange", Unpaid: "red", Cancelled: "cancelled" };
 
-/**
- * Proofs go through the hosting platform, which refuses uploads over about
- * 4.5 MB. Photos and screenshots are scaled down to at most 2000 px and saved
- * as JPEG (stepping the quality down until under 3.5 MB); PDFs over the limit
- * are refused with a plain message.
- */
-const PROOF_LIMIT = 3.5 * 1024 * 1024;
-async function shrinkProof(file: File): Promise<File> {
-  if (file.size <= PROOF_LIMIT && file.type !== "image/heic") return file;
-  if (!file.type.startsWith("image/")) throw new Error("The PDF is too large. Use a PDF under 3.5 MB or a screenshot.");
-  const bitmap = await createImageBitmap(file).catch(() => { throw new Error("This image type can't be read here. Save it as JPEG or PNG and try again."); });
-  const scale = Math.min(1, 2000 / Math.max(bitmap.width, bitmap.height));
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale);
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return file;
-  ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  for (const quality of [0.85, 0.75, 0.6, 0.45]) {
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
-    if (blob && blob.size <= PROOF_LIMIT) return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
-  }
-  throw new Error("The image is still too large after shrinking. Crop it to the payment details and try again.");
-}
-
 type ExtraLine = { key: string; chargeCatalogId: string | null; description: string; unit: number; quantity: number; enrollmentId: string; kind: "item" | "fee" };
 
 /**
@@ -219,15 +195,16 @@ type ExtraLine = { key: string; chargeCatalogId: string | null; description: str
  * unpaid courses (split), plus any miscellaneous charges sold at the counter.
  * One payment, one receipt. A reference is required for every mode except Cash.
  */
-export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCentavos, onClose, onSaved }: { data: PortalData; initialEnrollmentId?: string; initialAmountCentavos?: number; onClose: () => void; onSaved: () => Promise<void> }) {
+export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCentavos, initialProof, onClose, onSaved }: { data: PortalData; initialEnrollmentId?: string; initialAmountCentavos?: number; initialProof?: TraineeProofRow; onClose: () => void; onSaved: () => Promise<void> }) {
   const initial = initialEnrollmentId ? data.enrollments.find((e) => e.id === initialEnrollmentId) : undefined;
-  const [traineeId, setTraineeId] = useState(initial?.trainee_id ?? "");
+  const [traineeId, setTraineeId] = useState(initialProof?.trainee_id ?? initial?.trainee_id ?? "");
   const [search, setSearch] = useState("");
   const modes = modeNames(data);
-  const [method, setMethod] = useState(modes[0] ?? "Cash");
-  const [reference, setReference] = useState("");
+  // A trainee's proof (29 Oct 2026) fills the mode, amount and reference, and is used instead of a new upload.
+  const [method, setMethod] = useState(initialProof && modes.includes(initialProof.method) ? initialProof.method : modes[0] ?? "Cash");
+  const [reference, setReference] = useState(initialProof?.reference ?? "");
   // "Collect fee" from Requests opens with the request fee filled in.
-  const preset = initialEnrollmentId && initialAmountCentavos ? (initialAmountCentavos / 100).toFixed(2) : "";
+  const preset = initialProof?.amount_centavos ? (initialProof.amount_centavos / 100).toFixed(2) : initialEnrollmentId && initialAmountCentavos ? (initialAmountCentavos / 100).toFixed(2) : "";
   const [received, setReceived] = useState(preset);
   const [amounts, setAmounts] = useState<Record<string, string>>(preset && initialEnrollmentId ? { [initialEnrollmentId]: preset } : {});
   const [extras, setExtras] = useState<ExtraLine[]>([]);
@@ -245,7 +222,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
   const [error, setError] = useState("");
   const [posted, setPosted] = useState<{ id: string; amount: number; drive: { link: string; path: string } | null } | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
-  const [proof, setProof] = useState<{ id: string; link: string; path: string; duplicate: boolean } | null>(null);
+  const [proof, setProof] = useState<{ id: string; link: string; path: string; duplicate: boolean } | null>(initialProof ? { id: initialProof.id, link: initialProof.drive_link ?? "", path: "", duplicate: false } : null);
   const [dupWarning, setDupWarning] = useState(false), [dupConfirmed, setDupConfirmed] = useState(false);
 
   const mine = data.enrollments.filter((e) => e.trainee_id === traineeId && e.enrollment_status !== "Cancelled");
@@ -375,9 +352,9 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
           </div>
         </details>
         <div className={`cx-tally full ${matches ? "ok" : "no"}`}><span>Applied {pesos(total)} of {pesos(receivedCentavos)}</span><span>{!receivedCentavos ? "Enter the amount received" : matches ? "Ready to record" : total < receivedCentavos ? `${pesos(receivedCentavos - total)} not applied` : `${pesos(total - receivedCentavos)} over the amount received`}</span></div>
-        <div className="full"><span className="pay-label">Mode of payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{modes.map((m) => <button type="button" role="radio" aria-checked={method === m} key={m} className={method === m ? "on" : ""} onClick={() => { setMethod(m); setProof(null); }}>{m}</button>)}</div></div>
+        <div className="full"><span className="pay-label">Mode of payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{modes.map((m) => <button type="button" role="radio" aria-checked={method === m} key={m} className={method === m ? "on" : ""} onClick={() => { setMethod(m); if (!initialProof || m !== initialProof.method) setProof(null); else setProof({ id: initialProof.id, link: initialProof.drive_link ?? "", path: "", duplicate: false }); }}>{m}</button>)}</div></div>
         <label>{refRequired ? "Reference number (required)" : "Reference number"}<input className="cx-mono" value={reference} onChange={(ev) => setReference(ev.target.value.toUpperCase())} placeholder={refRequired ? `${method} reference` : "Not needed for cash"} /></label>
-        {refRequired && <label>Proof of Payment (Required)<input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(ev) => { setProofFile(ev.target.files?.[0] ?? null); setProof(null); setDupWarning(false); setDupConfirmed(false); }} />{proof ? <small className="portal-form-note">Saved to Google Drive · {proof.path.split(" / ").slice(1).join(" / ")}</small> : <small className="portal-form-note">Filed in Google Drive under {method} › this month as the trainee&apos;s last name and date.</small>}</label>}
+        {refRequired && initialProof && proof?.id === initialProof.id ? <p className="portal-form-note full cx-drive">Proof sent by the trainee · {initialProof.method} · Ref. {initialProof.reference} {initialProof.drive_link && <a href={initialProof.drive_link} target="_blank" rel="noreferrer">View Proof</a>}</p> : refRequired && <label>Proof of Payment (Required)<input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(ev) => { setProofFile(ev.target.files?.[0] ?? null); setProof(null); setDupWarning(false); setDupConfirmed(false); }} />{proof ? <small className="portal-form-note">Saved to Google Drive · {proof.path.split(" / ").slice(1).join(" / ")}</small> : <small className="portal-form-note">Filed in Google Drive under {method} › this month as the trainee&apos;s last name and date.</small>}</label>}
         {dupWarning && <div className="full cx-dup"><Message kind="error" text={`Reference ${reference.trim()} was already used on another payment. Check the proof before recording it again.`} /><label className="portal-check"><input type="checkbox" checked={dupConfirmed} onChange={(ev) => setDupConfirmed(ev.target.checked)} /><span>I checked it; record this payment anyway</span></label></div>}
         <label>Received at<input type="datetime-local" value={receivedAt} onChange={(ev) => setReceivedAt(ev.target.value)} /></label>
         <label>Endorsing Agency<select value={agencyId} onChange={(ev) => setAgencyId(ev.target.value)}><option value="">None</option>{data.agencies.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
@@ -411,7 +388,9 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
   const paid = groupByTrainee(data, data.enrollments.filter((e) => paidRecently.has(e.trainee_id) && e.enrollment_status !== "Cancelled" && paidOf(e) > 0)).sort((a, b) => a.name.localeCompare(b.name));
   const durations = new Map(data.courses.map((c) => [c.id, c.duration_label]));
   const unpaid = unpaidAfterTraining(data.enrollments as unknown as BalanceEnrollment[], (id) => durations.get(id), today);
-  const freshP = usePaged(fresh), paidP = usePaged(paid), unpaidP = usePaged(unpaid);
+  const proofs = data.traineeProofs ?? [];
+  const [fromProof, setFromProof] = useState<TraineeProofRow | null>(null), [notValid, setNotValid] = useState<{ id: string; reason: string } | null>(null);
+  const freshP = usePaged(fresh), paidP = usePaged(paid), unpaidP = usePaged(unpaid), proofP = usePaged(proofs);
   const unpaidTotal = unpaid.reduce((s, r) => s + r.balanceCentavos, 0);
   const firstOpen = (g: TraineeGroup) => (g.enrollments.find((e) => balanceOf(e) > 0) ?? g.enrollments[0]).id;
   const { busy, msg, post } = usePost(reload);
@@ -465,6 +444,20 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
         <button type="button" className="cr-big cr-exp" onClick={() => setRaising(true)}><b>Raise Expense</b><small>Sent to Accounting for approval</small></button>
       </div>
       <div className="ac-stack">
+        {/* Proofs of payment sent by trainees from the website, still with no receipt (owner, 29 Oct 2026). */}
+        {proofs.length > 0 && <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Proofs of Payment · No Receipt Yet</h2></div><span className="slot-count">{proofs.length}</span></div>
+          <div className="portal-table cx-cards"><table><thead><tr><th>Uploaded</th><th>Trainee</th><th>Courses</th><th>Mode</th><th className="r">Amount</th><th>Reference</th><th></th></tr></thead><tbody>
+            {proofP.shown.map((p) => { const g = groupByTrainee(data, data.enrollments.filter((e) => e.trainee_id === p.trainee_id && e.enrollment_status !== "Cancelled"))[0]; return <tr key={p.id}>
+              <td data-l="Uploaded">{fmtDate(day(p.submitted_at))}<small>{fmtClock(p.submitted_at)}</small></td>
+              <td data-l="" className="lead"><Who name={p.name} number={p.number} /></td>
+              <td data-l="Courses">{g ? <><CourseList list={g.enrollments} /><small>Balance {pesos(g.balance)}</small></> : <small>No course yet</small>}</td>
+              <td data-l="Mode">{p.method}</td>
+              <td data-l="Amount" className="r"><strong className="cx-amt">{pesos(p.amount_centavos)}</strong></td>
+              <td data-l="Reference" className="cl-mono">{p.reference}</td>
+              <td data-l=""><div className="cx-acts">{p.drive_link && <a className="portal-secondary" href={p.drive_link} target="_blank" rel="noreferrer">View Proof</a>}<button type="button" className="portal-primary" disabled={!g} onClick={() => setFromProof(p)}>Record Payment</button><button type="button" className="portal-secondary" onClick={() => setNotValid({ id: p.id, reason: "" })}>Not Valid</button></div>
+                {notValid?.id === p.id && <div className="cx-acts" style={{ marginTop: 6 }}><input aria-label="Reason" placeholder="Reason, e.g. reference not found" value={notValid.reason} onChange={(ev) => setNotValid({ id: p.id, reason: ev.target.value })} /><button type="button" className="portal-primary" disabled={busy || notValid.reason.trim().length < 3} onClick={async () => { await post({ action: "proof-dismiss", proofId: p.id, reason: notValid.reason.trim() }, "Marked Not Valid."); setNotValid(null); }}>Confirm</button><button type="button" className="portal-secondary" onClick={() => setNotValid(null)}>Cancel</button></div>}</td>
+            </tr>; })}
+          </tbody></table>{proofP.pager}</div></section>}
         <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>New Enrollments</h2></div><span className="slot-count">{fresh.length}</span></div>
       {fresh.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Courses</th><th>Endorsed</th><th className="r">Total Due</th><th></th></tr></thead><tbody>
         {freshP.shown.map((g) => <tr key={g.traineeId}><td data-l="" className="lead"><Who name={g.name} number={g.number} /></td><td data-l="Courses"><CourseList list={g.enrollments} /></td><td data-l="Endorsed">{fmtDate(day(g.since))}<small>{fmtClock(g.since)}</small></td><td data-l="Total due" className="r"><strong className="cx-amt">{pesos(g.due)}</strong><small>{g.enrollments.length} course{g.enrollments.length === 1 ? "" : "s"}</small></td><td data-l=""><div className="cx-acts"><button type="button" className="portal-primary" onClick={() => onPay(firstOpen(g))}>Record Payment</button></div></td></tr>)}
@@ -494,6 +487,7 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
       </div>
     </div>
     {raising && <RecordExpenseModal data={data} onClose={() => setRaising(false)} post={post} />}
+    {fromProof && <RecordPaymentModal data={data} initialProof={fromProof} onClose={() => setFromProof(null)} onSaved={reload} />}
   </div>;
 }
 

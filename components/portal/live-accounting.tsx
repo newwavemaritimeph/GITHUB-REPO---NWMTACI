@@ -12,7 +12,7 @@ type Payment = { payment_number?: string; method: string; receiving_account?: st
 type Enrollment = { id: string; enrollment_number: string; trainee_id?: string; created_at?: string; selling_price_centavos: number; paid_centavos: number; charges_centavos?: number; discounts_centavos?: number; enrollment_status: string; partner_offer_id?: string | null; trainees?: unknown; courses?: unknown; scheduled_on?: string | null; batches?: { starts_on: string; ends_on: string } | { starts_on: string; ends_on: string }[] | null };
 type TraineeRow = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; srn?: string | null; email?: string | null; mobile?: string | null };
 /** Amount due = base price + other charges − rebates/discounts. */
-type Channel = { id: string; code: string; name: string; requires_reference: boolean; allows_proof: boolean; active: boolean; kind?: string };
+type Channel = { id: string; code: string; name: string; requires_reference: boolean; allows_proof: boolean; active: boolean; kind?: string; account_details?: string };
 type Charge = { id: string; name: string; default_amount_centavos: number; active: boolean; used_count: number; kind?: string | null };
 type Agency = { id: string; name: string; contact_name?: string | null; email?: string | null; mobile?: string | null; active: boolean };
 type Expense = { id: string; expense_number: string; payee: string; category: string; amount_centavos: number; status: string; created_at: string; payment_channel?: string | null; reference_number?: string | null; purpose?: string | null; requested_by_name?: string | null };
@@ -1652,10 +1652,10 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
     {error && <div className="portal-message error">{error}</div>}
     {/* One list for both (owner, 8 Oct 2026): the Cashier and expenses use the same channels. */}
     {section === "Payment channels" && <ConfigMatrix title="Payment Channels" entity="channel" busy={busy}
-      cols={[{ key: "name", label: "Channel", kind: "text", placeholder: "e.g. GCash" }, { key: "ref", label: "Reference Number", kind: "select", options: [["yes", "Required"], ["no", "Not Needed"]] }]}
-      rows={data.paymentMethods.map((c) => ({ id: c.id, active: c.active, values: { name: c.name, ref: c.requires_reference ? "yes" : "no" } }))}
-      onSave={(r) => post({ action: "channel-save", id: r.id, name: r.values.name.trim(), requiresReference: r.values.ref === "yes", allowsProof: true, active: r.active })}
-      onAdd={(v) => post({ action: "channel-save", name: v.name.trim(), requiresReference: v.ref === "yes", allowsProof: true, kind: "receivable" })}
+      cols={[{ key: "name", label: "Channel", kind: "text", placeholder: "e.g. GCash" }, { key: "ref", label: "Reference Number", kind: "select", options: [["yes", "Required"], ["no", "Not Needed"]] }, { key: "acct", label: "Account Details on Website", kind: "text", placeholder: "e.g. 0917 000 0000 · New Wave Maritime" }]}
+      rows={data.paymentMethods.map((c) => ({ id: c.id, active: c.active, values: { name: c.name, ref: c.requires_reference ? "yes" : "no", acct: c.account_details ?? "" } }))}
+      onSave={(r) => post({ action: "channel-save", id: r.id, name: r.values.name.trim(), requiresReference: r.values.ref === "yes", allowsProof: true, active: r.active, accountDetails: (r.values.acct ?? "").trim() })}
+      onAdd={(v) => post({ action: "channel-save", name: v.name.trim(), requiresReference: v.ref === "yes", allowsProof: true, kind: "receivable", accountDetails: (v.acct ?? "").trim() })}
       onRemove={(r) => post({ action: "config-remove", entity: "channel", id: r.id })}
       note="One list for training payments and expense payments. A channel that needs a reference number also needs a proof of payment when the Cashier records it." />}
     {/* Other Income categories (owner, 21 Oct 2026). */}
