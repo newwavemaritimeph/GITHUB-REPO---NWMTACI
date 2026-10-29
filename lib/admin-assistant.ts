@@ -51,13 +51,29 @@ export function planIssues(input: { students: number; startsOn: string; courseId
   return out;
 }
 
+/** Warnings while picking the Lead, Alternate and Assessor in Create Schedule (owner, 29 Oct 2026). */
+export function staffingWarnings(input: { instructorId?: string | null; altInstructorId?: string | null; assessorId?: string | null; courseId: string; onDay: string; accreditations: Accreditation[] }): string[] {
+  const out: string[] = [];
+  const { instructorId: lead, altInstructorId: alt, assessorId: assessor, courseId, onDay, accreditations } = input;
+  const both = (id: string) => accreditations.find((x) => x.instructor_id === id && x.course_id === courseId)?.role === "Instructor and Assessor";
+  if (lead && lead === alt) out.push("The Lead and Alternate Instructor are the same person.");
+  for (const [id, label] of [[lead, "Lead Instructor"], [alt, "Alternate Instructor"]] as const) if (id && assessor === id && !both(id)) out.push(`The ${label} can't also be the Assessor for this course.`);
+  for (const [id, label, duty] of [[lead, "Lead Instructor", "Instructor"], [alt, "Alternate Instructor", "Instructor"], [assessor, "Assessor", "Assessor"]] as const) {
+    if (!id) continue;
+    const state = accreditationFor(accreditations, id, courseId, onDay, duty);
+    if (state === "none") out.push(`The ${label} is not accredited for this course.`);
+    if (state === "expired") out.push(`The ${label}'s accreditation has expired.`);
+  }
+  return out;
+}
+
 /** Whether two inclusive date ranges (YYYY-MM-DD) share a day. */
 export const rangesOverlap = (aStart: string, aEnd: string, bStart: string, bEnd: string) => aStart <= bEnd && bStart <= aEnd;
 
-export type PlanBatch = { id: string; batchNumber: string; courseId: string; courseCode: string; courseName: string; startsOn: string; endsOn: string; students: number; capacity: number; classroomId: string | null; instructorId: string | null; assessorId?: string | null; needsAssessor?: boolean };
+export type PlanBatch = { id: string; batchNumber: string; courseId: string; courseCode: string; courseName: string; startsOn: string; endsOn: string; students: number; capacity: number; classroomId: string | null; instructorId: string | null; altInstructorId?: string | null; assessorId?: string | null; needsAssessor?: boolean };
 export type PlanRoom = { id: string; name: string; capacity: number };
 export type PlanInstructor = { id: string; complete_name: string };
-export type PlanRow = PlanBatch & { room: PlanRoom | null; instructor: PlanInstructor | null; assessor: PlanInstructor | null; issues: string[]; roomClash: PlanBatch | null; instructorClash: PlanBatch | null };
+export type PlanRow = PlanBatch & { room: PlanRoom | null; instructor: PlanInstructor | null; alternate: PlanInstructor | null; assessor: PlanInstructor | null; issues: string[]; roomClash: PlanBatch | null; instructorClash: PlanBatch | null };
 
 /**
  * Resource plan rows (owner, 9 Oct 2026, design 3): each batch with its room,
@@ -71,6 +87,7 @@ export function planRows(batches: PlanBatch[], rooms: PlanRoom[], instructors: P
     const room = b.classroomId ? roomById.get(b.classroomId) ?? null : null;
     const instructor = b.instructorId ? insById.get(b.instructorId) ?? null : null;
     const assessor = b.assessorId ? insById.get(b.assessorId) ?? null : null;
+    const alternate = b.altInstructorId ? insById.get(b.altInstructorId) ?? null : null;
     const issues = planIssues({ students: b.students, startsOn: b.startsOn, courseId: b.courseId, classroom: room, instructorId: b.instructorId, assessorId: b.assessorId, needsAssessor: b.needsAssessor, accreditations });
     const others = batches.filter((o) => o.id !== b.id && rangesOverlap(o.startsOn, o.endsOn, b.startsOn, b.endsOn));
     const roomClash = b.classroomId ? others.find((o) => o.classroomId === b.classroomId) ?? null : null;
@@ -79,7 +96,7 @@ export function planRows(batches: PlanBatch[], rooms: PlanRoom[], instructors: P
     if (instructorClash) issues.push(`${instructor?.complete_name ?? "Instructor"} also teaching ${instructorClash.courseCode} ${instructorClash.batchNumber}`);
     const assessorClash = b.assessorId ? others.find((o) => o.assessorId === b.assessorId || o.instructorId === b.assessorId) ?? null : null;
     if (assessorClash) issues.push(`${assessor?.complete_name ?? "Assessor"} also booked for ${assessorClash.courseCode} ${assessorClash.batchNumber}`);
-    return { ...b, room, instructor, assessor, issues, roomClash, instructorClash };
+    return { ...b, room, instructor, alternate, assessor, issues, roomClash, instructorClash };
   });
 }
 

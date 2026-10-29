@@ -2373,3 +2373,20 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .bs-info{border-collapse:collapse;margin:0 20px 14px;font-size:14.5px}.nw-shell .bs-info td{border:1px solid #c9d4dc;padding:5px 10px}.nw-shell .bs-info td:first-child{color:#5f7180;width:150px}
 .nw-shell .bs-items thead th{background:#F25615;color:#fff}.nw-shell .bs-items td.bs-st{text-transform:uppercase;font-size:13px}
 .nw-shell .bs-form{font-size:12.5px;color:#5f7180}
+/* Configuration spacing (owner, 29 Oct 2026): roomier rows, taller boxes and dropdowns. */
+.nw-shell .rb3-wrap{margin:0 20px 16px}
+.nw-shell .rb3-table th{padding:12px 14px}
+.nw-shell .rb3-table td{padding:12px 14px}
+.nw-shell .rb3-table .cm-text,.nw-shell .rb3-mode,.nw-shell .rb3-amt{height:42px;padding:0 12px;font-size:15px;border-radius:10px}
+.nw-shell .rb3-table .cm-text{min-width:240px}
+.nw-shell .rb3-mode{min-width:170px;appearance:none;-webkit-appearance:none;padding-right:34px;background-image:linear-gradient(45deg,transparent 50%,#5f7180 50%),linear-gradient(135deg,#5f7180 50%,transparent 50%);background-position:calc(100% - 18px) 18px,calc(100% - 13px) 18px;background-size:5px 5px;background-repeat:no-repeat}
+.nw-shell .rb3-amt{width:120px}
+.nw-shell .rb3-table .cm-acts .pm-link+.pm-link,.nw-shell .rb3-table .cm-acts .pm-ask{margin-left:16px}
+.nw-shell .rb3 .pm-tools{gap:12px}.nw-shell .pm-search{padding:10px 12px;min-width:260px}
+.nw-shell .rb3-bar{margin:4px 20px 18px;padding:12px 16px}
+.nw-shell .pm-top{margin:0 0 16px}
+.nw-shell .pm-form{gap:14px 16px;padding:4px 20px 16px}
+.nw-shell .pm-form label{gap:6px;font-size:13.5px}
+.nw-shell .pm-form input,.nw-shell .pm-form select{height:42px;padding:0 12px;font-size:15px;border-radius:10px}
+.nw-shell .pm-actions{padding:4px 20px 18px}
+@media (max-width:640px){.nw-shell .pm-search{min-width:0;flex:1 1 100%}.nw-shell .rb3-table .cm-text{min-width:180px}}

@@ -49,6 +49,8 @@ const batchInput = z.object({
   enrollmentDeadline: z.string().datetime({ offset: true }), publish: z.boolean().default(true),
   // Holiday Schedule (owner, 29 Oct 2026): any start day except Sunday.
   holiday: z.boolean().optional().default(false),
+  // Lead Instructor, Alternate Instructor and Assessor from the shortlist (owner, 29 Oct 2026).
+  instructorId: z.string().uuid().nullable().optional(), altInstructorId: z.string().uuid().nullable().optional(), assessorId: z.string().uuid().nullable().optional(),
 });
 
 const autoOpenBatchInput = z.object({
@@ -193,7 +195,7 @@ const holidaySaveInput = z.object({ action: z.literal("holiday-save"), date: z.s
 const holidayDeleteInput = z.object({ action: z.literal("holiday-delete"), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/) });
 const holidayMarinaInput = z.object({ action: z.literal("holiday-marina"), date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), status: z.enum(["Not Sent", "Sent", "Approved", "Classes Moved"]), note: z.string().trim().max(300).optional() });
 const reconcileUndoInput = z.object({ action: z.literal("reconcile-undo"), paymentId: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
-const resourcePlanInput = z.object({ action: z.literal("resource-plan-save"), batchId: z.string().uuid(), classroomId: z.string().uuid().nullable(), instructorId: z.string().uuid().nullable(), assessorId: z.string().uuid().nullable().optional() });
+const resourcePlanInput = z.object({ action: z.literal("resource-plan-save"), batchId: z.string().uuid(), classroomId: z.string().uuid().nullable(), instructorId: z.string().uuid().nullable(), altInstructorId: z.string().uuid().nullable().optional(), assessorId: z.string().uuid().nullable().optional() });
 const mismoSubmitInput = z.object({ action: z.literal("mismo-submit"), batchId: z.string().uuid(), listDate: z.string().date(), enrollmentIds: z.array(z.string().uuid()).max(200) });
 const certificateIssuanceToggleInput = z.object({ action: z.literal("certificate-issuance-toggle"), enabled: z.boolean() });
 const feedbackSendEmailInput = z.object({ action: z.literal("feedback-send-email"), enrollmentId: z.string().uuid() });
@@ -299,6 +301,45 @@ const stampTraineeProof = (admin: ReturnType<typeof createSupabaseAdminClient>, 
 const canRegister = (roles: string[]) => roles.some((role) => ["admin", "registration"].includes(role));
 const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
 const canAssist = (roles: string[]) => roles.some((role) => ["admin", "admin_assistant"].includes(role));
+/** Room and people for one batch (Resource Planning and Create Schedule, 29 Oct 2026); mirrored into resource assignments for slips and the MISMO list. */
+async function saveResourcePlan(admin: ReturnType<typeof createSupabaseAdminClient>, actorId: string, input: { batchId: string; classroomId: string | null; instructorId: string | null; altInstructorId?: string | null; assessorId?: string | null }): Promise<{ error?: string; status?: number }> {
+  const { data: batch } = await admin.from("batches").select("id,status").eq("id", input.batchId).maybeSingle();
+  if (!batch) return { error: "That batch no longer exists.", status: 404 };
+  if (batch.status === "Cancelled") return { error: "Cancelled batches cannot be planned.", status: 400 };
+  const plan: Record<string, unknown> = { batch_id: input.batchId, classroom_id: input.classroomId, instructor_id: input.instructorId, updated_by: actorId, updated_at: new Date().toISOString() };
+  const full = { ...plan, ...(input.assessorId === undefined ? {} : { assessor_id: input.assessorId }), ...(input.altInstructorId === undefined ? {} : { alt_instructor_id: input.altInstructorId }) };
+  let { error } = await admin.from("batch_resources").upsert(full);
+  // Tolerant before migrations 053 (assessor_id) and 061 (alt_instructor_id).
+  if (error && /alt_instructor_id/.test(error.message)) ({ error } = await admin.from("batch_resources").upsert({ ...full, alt_instructor_id: undefined }));
+  if (error && /assessor_id/.test(error.message)) ({ error } = await admin.from("batch_resources").upsert(plan));
+  if (error) return { error: /batch_resources/i.test(error.message) ? "Apply database update 202610090033 first." : error.message, status: 400 };
+  if (input.classroomId) await admin.from("batches").update({ classroom_id: input.classroomId, updated_at: new Date().toISOString() }).eq("id", input.batchId);
+  // Mirror into resource assignments so slips, the MISMO list and staffing show the instructor and room.
+  const { data: dates } = await admin.from("batch_training_dates").select("id").eq("batch_id", input.batchId);
+  const dateIds = (dates ?? []).map((d) => d.id as string);
+  if (dateIds.length) {
+    await admin.from("resource_assignments").delete().in("batch_training_date_id", dateIds);
+    if (input.instructorId) {
+      const { data: ins } = await admin.from("instructors").select("id,complete_name,email,employee_id").eq("id", input.instructorId).maybeSingle();
+      if (!ins) return { error: "That instructor is not on the shortlist.", status: 404 };
+      let employeeId = ins.employee_id as string | null;
+      if (!employeeId && ins.email) employeeId = ((await admin.from("employees").select("id").ilike("work_email", ins.email).limit(1).maybeSingle()).data?.id as string | undefined) ?? null;
+      if (!employeeId) {
+        const { data: empNo } = await admin.rpc("next_reference", { prefix: "EMP" });
+        const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+        const { data: emp, error: empError } = await admin.from("employees").insert({ employee_number: empNo, complete_name: ins.complete_name, position: "Instructor", employment_status: "Active", date_hired: today, pay_type: "Daily", base_rate_centavos: 0, work_email: ins.email || null }).select("id").single();
+        if (empError) return { error: empError.message, status: 400 };
+        employeeId = emp.id as string;
+      }
+      await admin.from("instructors").update({ employee_id: employeeId }).eq("id", ins.id);
+      const { error: assignError } = await admin.from("resource_assignments").insert(dateIds.map((id) => ({ batch_training_date_id: id, instructor_id: employeeId, classroom_id: input.classroomId })));
+      if (assignError) return { error: assignError.message, status: 400 };
+    }
+  }
+  await admin.from("audit_logs").insert({ actor_id: actorId, action: "batch.resources_planned", record_type: "batch", record_id: input.batchId, new_values: { classroom_id: input.classroomId, instructor_id: input.instructorId, alt_instructor_id: input.altInstructorId ?? null, assessor_id: input.assessorId ?? null } });
+  return {};
+}
+
 // Class Schedules (owner, 21 Oct 2026): the Admin and the Admin Assistant open, edit, rename and cancel batches.
 const canSchedule = canAssist;
 const canManageHr = (roles: string[]) => roles.some((role) => ["admin"].includes(role));
@@ -1056,12 +1097,13 @@ export async function GET() {
     const [ins, acc, res] = await Promise.all([
       admin.from("instructors").select("id,complete_name,mobile,email,notes,active").order("complete_name"),
       admin.from("instructor_accreditations").select("id,instructor_id,course_id,accreditation_number,valid_until,role"),
-      admin.from("batch_resources").select("batch_id,classroom_id,instructor_id,assessor_id,updated_at"),
+      admin.from("batch_resources").select("batch_id,classroom_id,instructor_id,assessor_id,alt_instructor_id,updated_at"),
     ]);
     instructors = ins.error ? [] : ins.data ?? [];
     // Tolerant before migration 202610210053 (role, assessor_id).
     const acc2 = acc.error ? await admin.from("instructor_accreditations").select("id,instructor_id,course_id,accreditation_number,valid_until") : acc;
-    const res2 = res.error ? await admin.from("batch_resources").select("batch_id,classroom_id,instructor_id,updated_at") : res;
+    const res1 = res.error ? await admin.from("batch_resources").select("batch_id,classroom_id,instructor_id,assessor_id,updated_at") : res;
+    const res2 = res1.error ? await admin.from("batch_resources").select("batch_id,classroom_id,instructor_id,updated_at") : res1;
     accreditations = acc2.error ? [] : acc2.data ?? [];
     batchResources = res2.error ? [] : res2.data ?? [];
     // Why and when a batch was cancelled (migration 202610210054); empty before it runs.
@@ -1652,38 +1694,8 @@ export async function POST(request: Request) {
     if (input.action === "resource-plan-save") {
       if (!canAssist(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin Assistant can plan resources." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      const { data: batch } = await admin.from("batches").select("id,status").eq("id", input.batchId).maybeSingle();
-      if (!batch) return NextResponse.json({ error: "That batch no longer exists." }, { status: 404 });
-      if (batch.status === "Cancelled") return NextResponse.json({ error: "Cancelled batches cannot be planned." }, { status: 400 });
-      const plan: Record<string, unknown> = { batch_id: input.batchId, classroom_id: input.classroomId, instructor_id: input.instructorId, updated_by: staff.user.id, updated_at: new Date().toISOString() };
-      let { error } = await admin.from("batch_resources").upsert(input.assessorId === undefined ? plan : { ...plan, assessor_id: input.assessorId });
-      if (error && /assessor_id/.test(error.message)) ({ error } = await admin.from("batch_resources").upsert(plan));
-      if (error) return NextResponse.json({ error: /batch_resources/i.test(error.message) ? "Apply database update 202610090033 first." : error.message }, { status: 400 });
-      if (input.classroomId) await admin.from("batches").update({ classroom_id: input.classroomId, updated_at: new Date().toISOString() }).eq("id", input.batchId);
-      // Mirror into resource assignments so slips, the MISMO list and staffing show the instructor and room.
-      const { data: dates } = await admin.from("batch_training_dates").select("id").eq("batch_id", input.batchId);
-      const dateIds = (dates ?? []).map((d) => d.id as string);
-      if (dateIds.length) {
-        await admin.from("resource_assignments").delete().in("batch_training_date_id", dateIds);
-        if (input.instructorId) {
-          const { data: ins } = await admin.from("instructors").select("id,complete_name,email,employee_id").eq("id", input.instructorId).maybeSingle();
-          if (!ins) return NextResponse.json({ error: "That instructor is not on the shortlist." }, { status: 404 });
-          let employeeId = ins.employee_id as string | null;
-          if (!employeeId && ins.email) employeeId = ((await admin.from("employees").select("id").ilike("work_email", ins.email).limit(1).maybeSingle()).data?.id as string | undefined) ?? null;
-          if (!employeeId) {
-            const { data: empNo } = await admin.rpc("next_reference", { prefix: "EMP" });
-            const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
-            const { data: emp, error: empError } = await admin.from("employees").insert({ employee_number: empNo, complete_name: ins.complete_name, position: "Instructor", employment_status: "Active", date_hired: today, pay_type: "Daily", base_rate_centavos: 0, work_email: ins.email || null }).select("id").single();
-            if (empError) return NextResponse.json({ error: empError.message }, { status: 400 });
-            employeeId = emp.id as string;
-          }
-          await admin.from("instructors").update({ employee_id: employeeId }).eq("id", ins.id);
-          const { error: assignError } = await admin.from("resource_assignments").insert(dateIds.map((id) => ({ batch_training_date_id: id, instructor_id: employeeId, classroom_id: input.classroomId })));
-          if (assignError) return NextResponse.json({ error: assignError.message }, { status: 400 });
-        }
-      }
-      await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "batch.resources_planned", record_type: "batch", record_id: input.batchId, new_values: { classroom_id: input.classroomId, instructor_id: input.instructorId } });
-      return NextResponse.json({ ok: true });
+      const result = await saveResourcePlan(admin, staff.user.id, input);
+      return result.error ? NextResponse.json({ error: result.error }, { status: result.status ?? 400 }) : NextResponse.json({ ok: true });
     }
     if (input.action === "expense-reprint-request") {
       if (!staff.roleCodes.some((role) => ["admin", "cashier", "accounting"].includes(role))) return NextResponse.json({ error: "Your account cannot request voucher reprints." }, { status: 403 });
@@ -2989,6 +3001,11 @@ export async function POST(request: Request) {
       if (error) {
         if (input.holiday && /create_holiday_batch/.test(error.message)) return NextResponse.json({ error: "Apply database update 202610290059 first." }, { status: 400 });
         throw error;
+      }
+      const created = data as { id?: string; classroom_id?: string | null } | null;
+      if (created?.id && (input.instructorId || input.altInstructorId || input.assessorId)) {
+        const plan = await saveResourcePlan(createSupabaseAdminClient(), staff.user.id, { batchId: created.id, classroomId: created.classroom_id ?? null, instructorId: input.instructorId ?? null, altInstructorId: input.altInstructorId ?? null, assessorId: input.assessorId ?? null });
+        if (plan.error) return NextResponse.json({ ok: true, batch: data, warning: `Batch created. Instructors not saved: ${plan.error}` });
       }
       if (input.holiday) await createSupabaseAdminClient().from("audit_logs").insert({ actor_id: staff.user.id, action: "batch.holiday_created", record_type: "batch", record_id: (data as { id?: string } | null)?.id ?? null, new_values: { courseId: input.courseId, startsOn: input.startsOn, endsOn: input.endsOn, publish: input.publish } });
       return NextResponse.json({ ok: true, batch: data });

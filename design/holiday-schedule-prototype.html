@@ -52,6 +52,17 @@
 .pub{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;padding:0 20px 18px}
 .card{border:1px solid var(--line);border-radius:12px;padding:12px 14px}.card h3{margin:0 0 2px;font-size:16px}.card small{color:var(--muted)}.slot{display:flex;justify-content:space-between;gap:8px;border-top:1px solid var(--line);padding:8px 0 0;margin-top:8px;font-size:14px}
 .newrow td{animation:hl 2.5s ease}@keyframes hl{from{background:var(--warn-bg)}}
+/* Configuration spacing: "Before" mimics today's tight table; "New Spacing" is the proposal. */
+.cfg .cfgt td{border-right:0}.cfg .cfgt th{border-right:0}
+.cfg input,.cfg select{border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg);font:inherit}
+.cfg-tools{display:flex;gap:12px;flex-wrap:wrap;align-items:center;padding:0 20px 16px}.cfg-tools input{flex:1 1 240px;min-width:0;padding:10px 12px}
+.cfg-bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin:4px 20px 18px;padding:12px 16px;border:1px solid var(--line);border-radius:12px;color:var(--muted)}
+.cfg .acts a{color:var(--blue);font-weight:600;font-size:14px;cursor:pointer}.cfg .acts a+a{margin-left:16px}.cfg .acts .rm{color:var(--bad)}
+.cfg.new .cfg-wrap{padding:0 20px 8px}.cfg.new .cfgt td{padding:12px 14px;border-bottom:1px solid var(--line)}.cfg.new .cfgt th{padding:12px 14px}
+.cfg.new .cfgt input,.cfg.new .cfgt select{height:42px;padding:0 12px;font-size:15px;width:100%}.cfg.new .cfgt td:nth-child(1){min-width:170px}.cfg.new .cfgt td:nth-child(2){min-width:170px}.cfg.new .cfgt td:nth-child(3){min-width:280px}
+.cfg.new .cfgt select{appearance:none;padding-right:34px;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:calc(100% - 18px) 18px,calc(100% - 13px) 18px;background-size:5px 5px;background-repeat:no-repeat}
+.cfg.new .cfgt td.acts{white-space:nowrap}
+.cfg.old .cfgt td{padding:4px 6px}.cfg.old .cfgt th{padding:6px}.cfg.old .cfgt input,.cfg.old .cfgt select{padding:4px 6px;font-size:13px}.cfg.old .cfg-tools{padding:0 20px 6px;gap:6px}.cfg.old .cfg-bar{margin:0 20px 8px;padding:6px 10px}
 </style>
 <header class="top"><div class="w">
  <div class="brand"><div class="logo"><div class="mark">NW</div><div><b>New <span>Wave</span> Portal<span class="proto">PROTOTYPE</span></b><small>Ride the New Wave of Maritime Excellence</small></div></div>
@@ -65,6 +76,16 @@
   <section class="panel"><div class="ph"><h2>STCW Batches · November 2026</h2><small id="cnt"></small></div>
    <div class="cwrap"><table><thead><tr><th>Batch No.</th><th>Course</th><th>Dates</th><th class="r">Seats</th><th>Schedule</th><th>Status</th></tr></thead><tbody id="rows"></tbody></table></div></section>
   <section class="panel"><div class="ph"><h2>Public Registration · What Trainees See</h2></div><div class="pub" id="pub"></div></section>
+  <section class="panel cfg" id="cfg"><div class="ph"><h2>Configuration · Payment Channels</h2><div class="seg" style="margin:0"><button id="sp-old">Before</button><button id="sp-new" class="on">New Spacing</button></div></div>
+   <div class="cfg-tools"><input placeholder="Search payment channels"><div class="seg" style="margin:0"><button class="on">Active 4</button><button>Archived 1</button><button>All 5</button></div></div>
+   <div class="cwrap cfg-wrap"><table class="cfgt"><thead><tr><th>Channel</th><th>Reference Number</th><th>Account Details on Website</th><th>Status</th><th></th></tr></thead><tbody>
+    <tr><td><input value="Cash"></td><td><select><option>Not Needed</option><option>Required</option></select></td><td><input placeholder="e.g. 0917 000 0000 · New Wave Maritime"></td><td><span class="pill paid">Active</span></td><td class="acts"><a>Archive</a><a class="rm">Remove</a></td></tr>
+    <tr><td><input value="GCash"></td><td><select><option>Required</option><option>Not Needed</option></select></td><td><input value="0917 000 0000 · New Wave Maritime"></td><td><span class="pill paid">Active</span></td><td class="acts"><a>Archive</a><a class="rm">Remove</a></td></tr>
+    <tr><td><input value="PSBank"></td><td><select><option>Required</option><option>Not Needed</option></select></td><td><input value="Acct. 000-0000-00 · New Wave Maritime"></td><td><span class="pill paid">Active</span></td><td class="acts"><a>Archive</a><a class="rm">Remove</a></td></tr>
+    <tr><td><input value="UnionBank"></td><td><select><option>Required</option><option>Not Needed</option></select></td><td><input value="Acct. 0000 0000 0000 · New Wave Maritime"></td><td><span class="pill paid">Active</span></td><td class="acts"><a>Archive</a><a class="rm">Remove</a></td></tr>
+   </tbody></table></div>
+   <div class="cfg-bar"><span>No changes</span><span style="display:flex;gap:8px"><button class="btn" disabled>Discard</button><button class="btn pri" disabled>Save Changes</button></span></div>
+  </section>
  </div>
 </div></main>
 
@@ -78,6 +99,9 @@
   <label>Automatic End Date<input type="date" id="end" readonly></label>
   <div class="full"><div class="days" id="days"></div></div>
   <label>Daily Start<input type="time" value="08:00"></label><label>Daily End<input type="time" value="17:00"></label>
+  <label>Lead Instructor<select id="lead"></select></label><label>Alternate Instructor<select id="alt"></select></label>
+  <label>Assessor<select id="ass"></select></label><label>Mode<select><option>Face-to-Face</option><option>Online</option><option>Blended</option></select></label>
+  <div class="full" id="warn"></div>
   <label>Enrollment Deadline<input type="datetime-local" id="dl"></label><label>Capacity<input value="24" readonly></label>
   <label class="full" style="flex-direction:row;align-items:center;gap:10px;font-weight:500"><input type="checkbox" id="pubbox" checked style="width:18px;height:18px">Publish for Public Registration</label>
   <div class="full" style="display:flex;justify-content:flex-end;gap:8px"><button type="button" class="btn" id="cancel">Cancel</button><button class="btn pri" id="save" disabled>Create 24-Person Batch</button></div>
@@ -97,6 +121,14 @@ function render(){
  $("cnt").textContent=rows.length+" batches";
  $("pub").innerHTML=["STPPDSPPS","PSCMT","PSCMHBT"].map(k=>'<div class="card"><h3>'+C[k].n+'</h3><small>'+k+' · '+C[k].days+' Day'+(C[k].days>1?"s":"")+'</small>'+rows.filter(r=>r[1]===k).map(r=>'<div class="slot"><span>'+label(r[2],r[3])+'</span><span class="mono">'+(24-r[4])+' left</span></div>').join("")+'</div>').join("");
 }
+const PEOPLE=[["Capt. R. Villanueva",{STPPDSPPS:"Instructor and Assessor",PSCMT:"Instructor",PSCMHBT:"Instructor"},"2027-03-31"],["C/E M. Dizon",{STPPDSPPS:"Instructor",PSCMT:"Instructor and Assessor","UBT-PSSR":"Instructor"},"2026-12-15"],["2/O A. Ramos",{PSCMT:"Assessor",PSCMHBT:"Assessor",STPPDSPPS:"Assessor"},"2027-06-30"],["C/M J. Castillo",{PSCMHBT:"Instructor","UBT-PSSR":"Instructor and Assessor"},"2026-10-15"],["3/E L. Navarro",{},""]];
+const does=(role,duty)=>role==="Instructor and Assessor"||role===duty;
+function fillPeople(){const k=$("course").value;const opts=duty=>{const ok=PEOPLE.filter(p=>does(p[1][k],duty)),rest=PEOPLE.filter(p=>!does(p[1][k],duty));return '<option value="">Not yet assigned</option><optgroup label="'+(duty==="Instructor"?"Teaches ":"Assesses ")+C[k].n+'">'+ok.map(p=>'<option>'+p[0]+(p[2]&&p[2]<"2026-10-30"?" · Expired":" · Valid until "+new Date(p[2]+"T00:00:00Z").toLocaleDateString("en-US",{month:"short",year:"numeric",timeZone:"UTC"}))+'</option>').join("")+'</optgroup><optgroup label="Others (Not Accredited)">'+rest.map(p=>'<option>'+p[0]+'</option>').join("")+'</optgroup>'};["lead","alt"].forEach(id=>$(id).innerHTML=opts("Instructor"));$("ass").innerHTML=opts("Assessor");warnings()}
+function warnings(){const n=id=>$(id).value.split(" · ")[0],k=$("course").value,w=[];const L=n("lead"),A=n("alt"),S=n("ass");
+ if(L&&L===A)w.push("The Lead and Alternate Instructor are the same person.");
+ if(L&&L===S&&!(PEOPLE.find(p=>p[0]===L)||[,{}])[1][k]?.includes("and"))w.push(L+" can't be both Lead Instructor and Assessor for this course.");
+ ["lead","alt","ass"].forEach(id=>{if($(id).value.includes("Expired"))w.push(n(id)+"'s accreditation has expired.")});
+ $("warn").innerHTML=w.map(x=>'<div class="err" style="background:var(--bad-bg);border-radius:8px;padding:6px 10px;margin-top:4px">⚠ '+x+'</div>').join("")}
 function update(){
  const c=C[$("course").value],hol=$("hol").checked,s=$("start").value;$("holbox").classList.toggle("on",hol);
  $("rule").innerHTML=hol?"<b>Holiday Schedule</b> · Start any day except Sunday. "+c.days+" training day"+(c.days>1?"s":"")+", Sundays skipped.":"<b>Regular Pattern</b> · "+c.n+" starts every "+c.dn+". Tick Holiday Schedule for another day.";
@@ -107,9 +139,11 @@ function update(){
 }
 $("course").innerHTML=Object.entries(C).map(([k,v])=>'<option value="'+k+'">'+k+' · '+v.n+' · '+v.days+' Day'+(v.days>1?"s":"")+'</option>').join("");
 ["course","hol","start"].forEach(id=>$(id).addEventListener("input",update));
+$("course").addEventListener("input",fillPeople);["lead","alt","ass"].forEach(id=>$(id).addEventListener("input",warnings));
 const preset=[["STPPDSPPS","2026-11-03"],["PSCMT","2026-11-04"],["PSCMHBT","2026-11-06"]];let pi=0;
-$("open").onclick=()=>{const p=preset[pi%3];$("course").value=p[0];$("start").value=p[1];$("hol").checked=false;update();$("mb").hidden=false};
+$("open").onclick=()=>{const p=preset[pi%3];$("course").value=p[0];$("start").value=p[1];$("hol").checked=false;update();fillPeople();$("mb").hidden=false};
 $("x").onclick=$("cancel").onclick=()=>{$("mb").hidden=true};
 $("f").onsubmit=e=>{e.preventDefault();if($("save").disabled)return;const k=$("course").value,s=$("start").value;rows.forEach(r=>r[6]=false);rows.push(["BCH-2026-06"+(14+pi),k,s,C[k].days,0,$("hol").checked,true]);rows.sort((a,b)=>a[2]<b[2]?-1:1);pi++;$("mb").hidden=true;render();const t=$("toast");t.textContent=C[k].n+" "+label(s,C[k].days)+" opened"+($("pubbox").checked?" and published to public registration.":".");t.hidden=false;setTimeout(()=>{t.hidden=true},3500)};
 render();
+const cfg=$("cfg");cfg.classList.add("new");$("sp-old").onclick=()=>{cfg.className="panel cfg old";$("sp-old").classList.add("on");$("sp-new").classList.remove("on")};$("sp-new").onclick=()=>{cfg.className="panel cfg new";$("sp-new").classList.add("on");$("sp-old").classList.remove("on")};
 </script>

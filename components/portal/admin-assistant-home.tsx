@@ -19,7 +19,7 @@ type Requisition = { id: string; requisition_number: string; purpose: string; ne
   requester?: { complete_name: string } | { complete_name: string }[] | null; expenses?: { status: string; voucher_number?: string | null; expense_number: string } | { status: string; voucher_number?: string | null; expense_number: string }[] | null };
 type Item = { id: string; name: string; unit: string; default_cost_centavos: number; active: boolean };
 type Instructor = { id: string; complete_name: string; mobile?: string | null; email?: string | null; notes?: string | null; active: boolean };
-type Plan = { batch_id: string; classroom_id?: string | null; instructor_id?: string | null; assessor_id?: string | null };
+type Plan = { batch_id: string; classroom_id?: string | null; instructor_id?: string | null; alt_instructor_id?: string | null; assessor_id?: string | null };
 type AssistantData = { requisitions?: Requisition[]; requisitionItems?: Item[]; instructors?: Instructor[]; accreditations?: (Accreditation & { id: string })[]; batchResources?: Plan[] };
 const extra = (data: PortalData) => data as unknown as AssistantData;
 const TONE: Record<RequisitionState, string> = { "For Approval": "orange", Approved: "blue", Released: "green", Rejected: "red", Voided: "red" };
@@ -52,7 +52,7 @@ export function upcoming(data: PortalData): (PlanRow & { b: PortalData["batches"
   const defaultRoom = (courseId: string, code?: string) => defaults.get(courseId) ?? (code === "UBT-PSSR" ? roomNo("103") : code && ["STPPDSPPS", "PSCMT", "PSCMHBT"].includes(code) ? roomNo("304") : null);
   // STCW batches need an assessor (owner, 21 Oct 2026).
   const stcw = new Set(data.courses.filter(isStcw).map((c) => c.id));
-  const batches: PlanBatch[] = list.map((b) => { const c = first(b.courses); const plan = plans.get(b.id); return { assessorId: plan?.assessor_id ?? null, needsAssessor: stcw.has(b.course_id), id: b.id, batchNumber: b.batch_number, courseId: b.course_id, courseCode: c?.code ?? "—", courseName: c?.name ?? "", startsOn: b.starts_on, endsOn: b.ends_on, students: Number(b.confirmed_count ?? 0), capacity: Number(b.capacity ?? 24), classroomId: plan?.classroom_id ?? (b as { classroom_id?: string | null }).classroom_id ?? defaultRoom(b.course_id, c?.code), instructorId: plan?.instructor_id ?? null }; });
+  const batches: PlanBatch[] = list.map((b) => { const c = first(b.courses); const plan = plans.get(b.id); return { assessorId: plan?.assessor_id ?? null, altInstructorId: plan?.alt_instructor_id ?? null, needsAssessor: stcw.has(b.course_id), id: b.id, batchNumber: b.batch_number, courseId: b.course_id, courseCode: c?.code ?? "—", courseName: c?.name ?? "", startsOn: b.starts_on, endsOn: b.ends_on, students: Number(b.confirmed_count ?? 0), capacity: Number(b.capacity ?? 24), classroomId: plan?.classroom_id ?? (b as { classroom_id?: string | null }).classroom_id ?? defaultRoom(b.course_id, c?.code), instructorId: plan?.instructor_id ?? null }; });
   const rooms = data.classrooms.filter((c) => c.active).map((c) => ({ id: c.id, name: c.name, capacity: Number(c.capacity) }));
   const rows = planRows(batches, rooms, extra(data).instructors ?? [], extra(data).accreditations ?? []);
   return rows.map((r, i) => ({ ...r, b: list[i] }));
@@ -192,23 +192,23 @@ export function ResourcePlanning({ data, reload }: { data: PortalData; reload: (
   const instructors = (extra(data).instructors ?? []).filter((i) => i.active);
   const acc = extra(data).accreditations ?? [];
   const attention = inPeriod.filter((r) => r.issues.length), conflicts = inPeriod.filter((r) => r.issues.some((x) => /exceed|also booked|also teaching/i.test(x)));
-  const save = (r: PlanRow, patch: { classroomId?: string | null; instructorId?: string | null; assessorId?: string | null }) => void post({ action: "resource-plan-save", batchId: r.id, classroomId: r.classroomId, instructorId: r.instructorId, assessorId: r.assessorId ?? null, ...patch }, "Saved.").catch(() => undefined);
+  const save = (r: PlanRow, patch: { classroomId?: string | null; instructorId?: string | null; altInstructorId?: string | null; assessorId?: string | null }) => void post({ action: "resource-plan-save", batchId: r.id, classroomId: r.classroomId, instructorId: r.instructorId, altInstructorId: r.altInstructorId ?? null, assessorId: r.assessorId ?? null, ...patch }, "Saved.").catch(() => undefined);
   const near = (r: PlanRow, o: PlanRow) => o.id !== r.id && rangesOverlap(o.startsOn, o.endsOn, r.startsOn, r.endsOn);
   const roomBusy = (r: PlanRow, id: string) => all.find((o) => near(r, o) && o.classroomId === id) ?? null;
   const personBusy = (r: PlanRow, id: string) => all.find((o) => near(r, o) && (o.instructorId === id || o.assessorId === id)) ?? null;
-  const person = (r: PlanRow, duty: Duty) => {
-    const key = duty === "Instructor" ? "instructorId" : "assessorId", current = r[key] ?? "";
+  const person = (r: PlanRow, duty: Duty, alternate = false) => {
+    const key = alternate ? "altInstructorId" : duty === "Instructor" ? "instructorId" : "assessorId", current = r[key] ?? "";
     const able = instructors.filter((i) => i.id === current || acc.some((a) => a.instructor_id === i.id && a.course_id === r.courseId && handles(a.role, duty)));
     const state = current ? accreditationFor(acc, current, r.courseId, r.startsOn, duty) : null;
     const mine = current ? acc.find((a) => a.instructor_id === current && a.course_id === r.courseId) : null;
     const clash = current ? personBusy(r, current) : null;
     const same = duty === "Assessor" && current && current === r.instructorId;
-    const msgFor = !current ? (duty === "Assessor" && !r.needsAssessor ? "" : able.length ? `No ${duty.toLowerCase()} yet` : `Nobody is accredited to ${duty === "Instructor" ? "teach" : "assess"} ${r.courseCode}`)
+    const msgFor = alternate && current && current === r.instructorId ? "Same person as the lead" : !current ? (alternate || (duty === "Assessor" && !r.needsAssessor) ? "" : able.length ? `No ${duty.toLowerCase()} yet` : `Nobody is accredited to ${duty === "Instructor" ? "teach" : "assess"} ${r.courseCode}`)
       : state === "none" ? `Not accredited as ${duty.toLowerCase()}` : state === "expired" ? `${duty} accreditation expired` : clash ? `Also booked: ${clash.courseCode} ${spanOf(clash)}`
       : same && mine?.role !== "Instructor and Assessor" ? "Same person as the instructor" : same ? "Instructor and Assessor (accredited for both)" : "✓ Accredited";
     const good = msgFor.startsWith("✓") || msgFor.startsWith("Instructor and Assessor");
     return <div className="rp-pick"><select aria-label={`${duty} for ${r.batchNumber}`} value={current} disabled={busy} onChange={(e) => save(r, { [key]: e.target.value || null })}>
-      <option value="">{duty === "Assessor" && !r.needsAssessor ? "None needed" : `Choose ${duty.toLowerCase()}`}</option>
+      <option value="">{alternate ? "No alternate" : duty === "Assessor" && !r.needsAssessor ? "None needed" : `Choose ${duty.toLowerCase()}`}</option>
       {able.map((i) => { const exp = accreditationFor(acc, i.id, r.courseId, r.startsOn, duty) === "expired"; return <option key={i.id} value={i.id}>{i.complete_name}{exp ? " (expired)" : ""}</option>; })}
     </select>{msgFor && <small className={good ? "rp-ok" : "rp-bad"}>{msgFor}</small>}</div>;
   };
@@ -229,7 +229,7 @@ export function ResourcePlanning({ data, reload }: { data: PortalData; reload: (
       </section></div>
       <div className="ac-stack"><section className="portal-panel cx-panel"><div className="panel-heading"><h2>Upcoming Batches</h2><span className="slot-count">{rows.length}</span></div>
         <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search batches" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search course or batch number" /></div>
-        {rows.length ? <div className="cl-wrap"><table className="cl-log rp-table"><thead><tr><th>Course · Dates</th><th>Classroom</th><th>Instructor</th><th>Assessor</th></tr></thead><tbody>
+        {rows.length ? <div className="cl-wrap"><table className="cl-log rp-table"><thead><tr><th>Course · Dates</th><th>Classroom</th><th>Lead Instructor</th><th>Alternate Instructor</th><th>Assessor</th></tr></thead><tbody>
           {paged.shown.map((r) => { const other = r.issues.filter((x) => /exceed|also booked|also teaching/i.test(x)); return <tr key={r.id}>
             <td><b>{r.courseCode}</b><small>{spanOf(r)} · {r.students} trainee{r.students === 1 ? "" : "s"}</small><small className="cl-mono">{r.batchNumber}</small>{other.map((x) => <small key={x} className="rp-bad">{x}</small>)}</td>
             <td><div className="rp-pick"><select aria-label={`Classroom for ${r.batchNumber}`} value={r.classroomId ?? ""} disabled={busy} onChange={(e) => save(r, { classroomId: e.target.value || null })}>
@@ -237,6 +237,7 @@ export function ResourcePlanning({ data, reload }: { data: PortalData; reload: (
               {rooms.map((c) => { const b = roomBusy(r, c.id); return <option key={c.id} value={c.id}>{c.name} · {c.capacity} seats{b ? ` · Booked: ${b.courseCode}` : ""}</option>; })}
             </select>{!r.classroomId && <small className="rp-bad">No classroom yet</small>}</div></td>
             <td>{person(r, "Instructor")}</td>
+            <td>{person(r, "Instructor", true)}</td>
             <td>{person(r, "Assessor")}</td>
           </tr>; })}
         </tbody></table>{paged.pager}</div> : <p className="portal-empty-copy">{inPeriod.length ? "No batch matches." : "No upcoming batches in this period."}</p>}
@@ -373,7 +374,7 @@ export function ClassSchedules({ data, reload, onOpenBatches, onCreate }: { data
 const manilaLocal = (iso?: string | null) => (iso ? new Date(iso).toLocaleString("sv-SE", { timeZone: "Asia/Manila" }).slice(0, 16).replace(" ", "T") : "");
 function EditBatch({ batch, code, reload, onClose, onDone }: { batch: Batch; code: string; reload: () => Promise<void>; onClose: () => void; onDone: (text: string) => void }) {
   const { busy, msg, post } = usePost(reload);
-  const [f, setF] = useState({ batchNumber: batch.batch_number, dailyStart: batch.daily_start?.slice(0, 5) || "08:00", dailyEnd: batch.daily_end?.slice(0, 5) || "17:00", mode: batch.mode || "In-person", venue: batch.venue ?? "", deadline: manilaLocal(batch.enrollment_deadline) || `${addDays(batch.starts_on, -1)}T17:00`, publish: Boolean(batch.published_at) });
+  const [f, setF] = useState({ batchNumber: batch.batch_number, dailyStart: batch.daily_start?.slice(0, 5) || "08:00", dailyEnd: batch.daily_end?.slice(0, 5) || "17:00", mode: batch.mode || "Face-to-Face", venue: batch.venue ?? "", deadline: manilaLocal(batch.enrollment_deadline) || `${addDays(batch.starts_on, -1)}T17:00`, publish: Boolean(batch.published_at) });
   const save = () => { const text = f.batchNumber.trim().toUpperCase() !== batch.batch_number ? `Renamed ${batch.batch_number} to ${f.batchNumber.trim().toUpperCase()}. Saved.` : "Saved."; void post({ action: "batch-update", batchId: batch.id, batchNumber: f.batchNumber.trim().toUpperCase(), venue: f.venue, dailyStart: f.dailyStart, dailyEnd: f.dailyEnd, mode: f.mode, enrollmentDeadline: new Date(`${f.deadline}:00+08:00`).toISOString(), publish: f.publish },
     text).then(() => onDone(text)).catch(() => undefined); };
   return <Modal title={`Edit ${code} · ${batch.batch_number}`} onClose={onClose}><div className="portal-form">
@@ -382,7 +383,7 @@ function EditBatch({ batch, code, reload, onClose, onDone }: { batch: Batch; cod
     <label>Dates<span className="cs-ro">{spanOf({ startsOn: batch.starts_on, endsOn: batch.ends_on })}</span></label>
     <label>Daily Start<input type="time" value={f.dailyStart} onChange={(e) => setF({ ...f, dailyStart: e.target.value })} /></label>
     <label>Daily End<input type="time" value={f.dailyEnd} onChange={(e) => setF({ ...f, dailyEnd: e.target.value })} /></label>
-    <label>Mode<select value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="In-person">Face-to-Face</option><option>Online</option><option>Blended</option></select></label>
+    <label>Mode<select value={f.mode} onChange={(e) => setF({ ...f, mode: e.target.value })}><option value="Face-to-Face">Face-to-Face</option><option>Online</option><option>Blended</option></select></label>
     <label>Venue<input value={f.venue} placeholder="New Wave Training Center" onChange={(e) => setF({ ...f, venue: e.target.value })} /></label>
     <label>Enrollment Deadline<input type="datetime-local" value={f.deadline} onChange={(e) => setF({ ...f, deadline: e.target.value })} /></label>
     <label>Public Registration<select value={f.publish ? "1" : ""} onChange={(e) => setF({ ...f, publish: e.target.value === "1" })}><option value="1">Published</option><option value="">Hidden</option></select></label>

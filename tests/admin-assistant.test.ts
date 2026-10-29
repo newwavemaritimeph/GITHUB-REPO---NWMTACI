@@ -85,3 +85,24 @@ describe("cancelling a batch", () => {
     expect(t.map((x) => [x.batch.id, x.left, x.fits])).toEqual([["ok", 14, true], ["full", 4, false]]);
   });
 });
+
+import { staffingWarnings } from "@/lib/admin-assistant";
+describe("Create Schedule staffing warnings", () => {
+  const acc = [
+    { instructor_id: "lead", course_id: "crowd", role: "Instructor", valid_until: "2027-01-01" },
+    { instructor_id: "both", course_id: "crowd", role: "Instructor and Assessor", valid_until: "2027-01-01" },
+    { instructor_id: "old", course_id: "crowd", role: "Instructor", valid_until: "2026-01-01" },
+  ];
+  const base = { courseId: "crowd", onDay: "2026-11-04", accreditations: acc };
+  it("flags the same person as Lead and Alternate", () => {
+    expect(staffingWarnings({ ...base, instructorId: "lead", altInstructorId: "lead" })).toContain("The Lead and Alternate Instructor are the same person.");
+  });
+  it("allows Instructor and Assessor to do both, not an Instructor only", () => {
+    expect(staffingWarnings({ ...base, instructorId: "both", assessorId: "both" })).toEqual([]);
+    expect(staffingWarnings({ ...base, instructorId: "lead", assessorId: "lead" })).toContain("The Lead Instructor can't also be the Assessor for this course.");
+  });
+  it("flags expired and missing accreditations", () => {
+    expect(staffingWarnings({ ...base, altInstructorId: "old" })).toEqual(["The Alternate Instructor's accreditation has expired."]);
+    expect(staffingWarnings({ ...base, instructorId: "stranger" })).toEqual(["The Lead Instructor is not accredited for this course."]);
+  });
+});

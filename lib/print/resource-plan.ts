@@ -37,7 +37,7 @@ export async function createResourcePlanPdf(from: string, to: string, today: str
       y -= 17;
       lastDay = day;
     }
-    const cells = [r.batchNumber, `${r.courseCode} ${r.courseName}`, r.startsOn === r.endsOn ? short(r.startsOn) : `${short(r.startsOn)}-${short(r.endsOn)}`, r.room?.name ?? "-", `${r.students}/${r.room?.capacity ?? r.capacity}`, r.instructor?.complete_name ?? "-", r.assessor?.complete_name ?? "-", r.issues.join("; ")];
+    const cells = [r.batchNumber, `${r.courseCode} ${r.courseName}`, r.startsOn === r.endsOn ? short(r.startsOn) : `${short(r.startsOn)}-${short(r.endsOn)}`, r.room?.name ?? "-", `${r.students}/${r.room?.capacity ?? r.capacity}`, (r.instructor?.complete_name ?? "-") + (r.alternate ? ` / Alt. ${r.alternate.complete_name}` : ""), r.assessor?.complete_name ?? "-", r.issues.join("; ")];
     let x = M;
     cells.forEach((c, i) => { const w = cols[i][1]; const font = i === 0 ? bold : reg; page.drawText(fit(c, w, font), { x: x + 4, y, size: 8.5, font, color: i === 7 ? red : ink }); x += w; });
     page.drawLine({ start: { x: M, y: y - 5 }, end: { x: W - M, y: y - 5 }, thickness: 0.5, color: rule });
