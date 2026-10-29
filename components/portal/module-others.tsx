@@ -30,6 +30,7 @@ import type { CashAdvance, Employee, EnrollmentView, Expense, HrAttendanceRecord
 import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn } from "@/lib/validation";
 import { PageHeader, Panel, StageBadge, simplifiedStage, type Module } from "./shared";
 import { tcl } from "@/lib/title-case";
+import { askText, askConfirm } from "./dialogs";
 
 /* ---------------------------------------------------------------- trainees */
 
@@ -1573,8 +1574,8 @@ export function AccountingModule({ role }: { role: Role }) {
                         </button>
                         <button
                           className="ghost-button"
-                          onClick={() => {
-                            if (!window.confirm(`Remove "${payable.name}" from monthly payables?`)) return;
+                          onClick={async () => {
+                            if (!await askConfirm(`Remove "${payable.name}" from monthly payables?`)) return;
                             removeMonthlyPayable(payable.id);
                             toast("warning", `${payable.name} removed.`);
                           }}
@@ -1605,8 +1606,8 @@ export function AccountingModule({ role }: { role: Role }) {
                     <td style={{ textAlign: "right" }}>{pesos(course.priceCentavos)}</td>
                     <td style={{ textAlign: "right" }}>
                       {canManage && (
-                        <button className="secondary-button" onClick={() => {
-                          const raw = window.prompt(`New price for ${course.course} (PHP)?`, String(course.priceCentavos / 100));
+                        <button className="secondary-button" onClick={async () => {
+                          const raw = await askText(`New price for ${course.course} (PHP)?`, String(course.priceCentavos / 100));
                           if (raw == null || raw.trim() === "") return;
                           const centavos = Math.round(Number(raw) * 100);
                           if (!Number.isFinite(centavos) || centavos < 0) { toast("danger", "Enter a valid price."); return; }
@@ -1635,11 +1636,11 @@ export function AccountingModule({ role }: { role: Role }) {
                     <td style={{ textAlign: "right" }}>{pesos(Math.max(0, offer.trainingFeeCentavos - offer.rebateCentavos))}</td>
                     <td style={{ textAlign: "right" }}>
                       {canManage && (
-                        <button className="secondary-button" onClick={() => {
-                          const feeRaw = window.prompt(`Training fee for ${offer.course} (PHP)?`, String(offer.trainingFeeCentavos / 100));
+                        <button className="secondary-button" onClick={async () => {
+                          const feeRaw = await askText(`Training fee for ${offer.course} (PHP)?`, String(offer.trainingFeeCentavos / 100));
                           if (feeRaw == null || feeRaw.trim() === "") return;
                           const fee = Math.round(Number(feeRaw) * 100);
-                          const rebateRaw = window.prompt("New Wave rebate (PHP)? Partner payable = fee − rebate.", String(offer.rebateCentavos / 100));
+                          const rebateRaw = await askText("New Wave rebate (PHP)? Partner payable = fee − rebate.", String(offer.rebateCentavos / 100));
                           if (rebateRaw == null || rebateRaw.trim() === "") return;
                           const rebate = Math.round(Number(rebateRaw) * 100);
                           if (!Number.isFinite(fee) || !Number.isFinite(rebate) || fee < 0 || rebate < 0) { toast("danger", "Enter valid amounts."); return; }
@@ -2395,8 +2396,8 @@ export function RequestsModule({ role }: { role: Role }) {
                       </button>
                       <button
                         className="ghost-button"
-                        onClick={() => {
-                          const remarks = window.prompt("What clarification do you need?");
+                        onClick={async () => {
+                          const remarks = await askText("What clarification do you need?");
                           if (!remarks) return;
                           decideRequest(request.id, "For clarification", remarks);
                           toast("info", "Returned to the requester.");
@@ -2406,8 +2407,8 @@ export function RequestsModule({ role }: { role: Role }) {
                       </button>
                       <button
                         className="ghost-button ghost-danger"
-                        onClick={() => {
-                          const remarks = window.prompt("Reason for rejecting this request?");
+                        onClick={async () => {
+                          const remarks = await askText("Reason for rejecting this request?");
                           if (!remarks) return;
                           decideRequest(request.id, "Rejected", remarks);
                           toast("warning", "Request rejected.");
@@ -3489,8 +3490,8 @@ export function SettingsModule() {
         </div>
         <button
           className="danger-button"
-          onClick={() => {
-            if (!window.confirm("Reset all demo records in this browser?")) return;
+          onClick={async () => {
+            if (!await askConfirm("Reset all demo records in this browser?")) return;
             resetSystem();
             toast("warning", "Workspace reset to the seeded demo data.");
           }}

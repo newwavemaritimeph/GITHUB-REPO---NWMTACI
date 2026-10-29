@@ -14,6 +14,7 @@ import { photoFileName, type CertificateCorrections } from "@/lib/certificate-ph
 import { CertificatePhotoModal, openCertificatePhoto } from "./certificate-photo-modal";
 import { legacyRowsFromCsv, type ImportResult, type LegacyRow } from "@/lib/legacy-certificates";
 import { PRINTED_FILTERS, printedReportRows, type PrintedCert, type PrintedFilter } from "@/lib/printed-certificates";
+import { askConfirm } from "./dialogs";
 
 /**
  * Releasing Officer (owner, 8 Oct 2026): certificates due to print, printed
@@ -643,7 +644,7 @@ function CertificateCorrectionsPanel({ data, reload, mode }: { data: PortalData;
   const t = line ? first(line.e.trainees) : null, b = line ? first(line.e.batches) : null;
   const portal: Record<string, string> = line ? { name: t ? [t.legal_first_name, (t as { legal_middle_name?: string | null }).legal_middle_name, t.legal_last_name].filter(Boolean).join(" ") : "", courseName: line.course.name, batchLabel: line.cert?.batch_label ?? b?.batch_number ?? "", startsOn: b?.starts_on ?? line.e.scheduled_on ?? "", endsOn: line.ended ?? "", issuedOn: "Print date" } : {};
   const FIELDS: [string, string, string][] = [["name", "Name", "text"], ["courseName", "Course", "text"], ["batchLabel", "Batch", "text"], ["startsOn", "Training Start", "date"], ["endsOn", "Training End", "date"], ["issuedOn", "Issue Date", "date"]];
-  const removePhoto = async () => { if (!line || !window.confirm("Remove this trainee's 2x2 photo? The certificate cannot print until a new photo is uploaded.")) return; const r = await fetch(`/api/staff/certificate-photo?enrollmentId=${line.e.id}`, { method: "DELETE" }); if (r.ok) await reload(); };
+  const removePhoto = async () => { if (!line || !await askConfirm("Remove this trainee's 2x2 photo? The certificate cannot print until a new photo is uploaded.")) return; const r = await fetch(`/api/staff/certificate-photo?enrollmentId=${line.e.id}`, { method: "DELETE" }); if (r.ok) await reload(); };
   if (mode === "number") return <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Change a Certificate Number</h2></div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search trainee" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, NWMTACI number or certificate number" /></div>

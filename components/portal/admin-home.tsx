@@ -8,6 +8,7 @@ import { requisitionState } from "@/lib/admin-assistant";
 import { Badge, Message, fmtDate, fullName, usePost as useRawPost } from "./shared-ui";
 import { certificateLines } from "./releasing-home";
 import { upcoming } from "./admin-assistant-home";
+import { askConfirm } from "./dialogs";
 
 /**
  * Admin workspace (owner, 9 Oct 2026): an up-to-date dashboard with a start and
@@ -233,7 +234,7 @@ export function AdminHolidays({ data, reload }: { data: PortalData; reload: () =
     <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Holidays</h2><small>{rows.length} listed</small></div>
       {rows.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Date</th><th>Holiday</th><th>Type</th><th>MARINA Request</th><th></th></tr></thead><tbody>
         {rows.map((h) => <tr key={h.holiday_date} className={h.holiday_date < today ? "ad-past" : ""}><td><b>{weekday(h.holiday_date)}</b></td><td>{h.name}</td><td>{h.kind}</td><td>{h.marina_status}</td>
-          <td><button type="button" className="portal-secondary" disabled={busy} onClick={() => { if (window.confirm(`Remove ${h.name} (${h.holiday_date}) from the list?`)) void post({ action: "holiday-delete", date: h.holiday_date }, "Removed."); }}>Remove</button></td></tr>)}
+          <td><button type="button" className="portal-secondary" disabled={busy} onClick={async () => { if (await askConfirm(`Remove ${h.name} (${h.holiday_date}) from the list?`)) void post({ action: "holiday-delete", date: h.holiday_date }, "Removed."); }}>Remove</button></td></tr>)}
       </tbody></table></div> : <p className="portal-empty-copy">No holidays yet. Run database update 202610090038, which adds the national holidays, or add them here.</p>}
     </section>
   </div>;

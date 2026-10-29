@@ -21,6 +21,7 @@ import { formatDate, formatDateRange, formatDateTime, formatTime, fullName, toda
 import type { EnrollmentView, RegistrationLifecycle, Role, RequestType } from "@/lib/system/types";
 import { PageHeader, Panel, StageBadge, StageTrack, type Module } from "./shared";
 import { tcl } from "@/lib/title-case";
+import { askText } from "./dialogs";
 
 const filters = ["All", "Unpaid", "Awaiting verification", "Ready for instructions", "In training", "Completed"] as const;
 const REGISTRATION_STATUSES: RegistrationLifecycle[] = ["Waiting for Payment", "Enrolled", "Reschedule", "Generated Voucher", "Cancelled"];
@@ -426,8 +427,8 @@ export function EnrollmentsModule({
               {active.enrollment.status !== "Cancelled" && (
                 <button
                   className="danger-button"
-                  onClick={() => {
-                    const reason = window.prompt("Reason for cancelling this enrollment?");
+                  onClick={async () => {
+                    const reason = await askText("Reason for cancelling this enrollment?");
                     if (!reason) return;
                     cancelEnrollment(active.enrollment.id, reason);
                     toast("warning", "Enrollment cancelled and the slot released.");
@@ -466,8 +467,8 @@ export function EnrollmentsModule({
             </div>
             <button
               className="ghost-button"
-              onClick={() => {
-                const amount = window.prompt("Discount amount in pesos");
+              onClick={async () => {
+                const amount = await askText("Discount amount in pesos");
                 const parsed = Number.parseFloat(amount ?? "");
                 if (!Number.isFinite(parsed) || parsed <= 0) return;
                 addLedgerEntry({

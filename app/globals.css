@@ -6760,3 +6760,18 @@ a[href^="mailto:"],
 /* Registration heading (owner, 20 Oct 2026, design 4): bold uppercase Montserrat with a handwritten orange Caveat tagline. */
 .registration-page.ql-page .registration-intro h1.reg-headline { font-family: var(--font-headline), var(--font-ui), sans-serif; font-weight: 900; text-transform: uppercase; letter-spacing: -0.01em; line-height: 1.04; font-size: clamp(30px, 5vw, 54px); color: var(--blue-dark); text-wrap: balance; margin-bottom: 0; }
 .registration-page.ql-page .registration-intro p.reg-tagline { font-family: var(--font-hand), cursive; font-weight: 700; font-size: clamp(28px, 4vw, 42px); line-height: 1.1; color: var(--orange); margin: 6px 0 14px; display: inline-block; transform: rotate(-1.5deg); }
+/* New Wave pop-ups (owner, 29 Oct 2026) — replace the browser's prompt, confirm and alert boxes. */
+.nw-dialog-backdrop{position:fixed;inset:0;z-index:1000;background:rgba(8,35,54,.55);display:grid;place-items:center;padding:16px;font-family:var(--font-ui),"Geist",system-ui,sans-serif}
+.nw-dialog{width:min(440px,100%);background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(5,35,54,.35);padding:20px 22px;display:flex;flex-direction:column;gap:14px;color:#0f2638}
+.nw-dialog-head{display:flex;align-items:center;gap:10px}
+.nw-dialog-mark{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#35CCFA,#0571D0);color:#fff;display:grid;place-items:center;font:700 12px var(--font-ui),system-ui,sans-serif;flex:0 0 32px}
+.nw-dialog-head h2{margin:0;font-size:18px;font-weight:600;color:#123F63}
+.nw-dialog-msg{margin:0;font-size:15px;line-height:1.5;white-space:pre-line;color:#33475a}
+.nw-dialog-input{height:44px;border:1px solid #cfdbe3;border-radius:10px;padding:0 12px;font:inherit;font-size:15px;color:#0f2638;width:100%;box-sizing:border-box}
+.nw-dialog-input:focus{outline:2px solid #F25615;outline-offset:1px;border-color:#F25615}
+.nw-dialog-acts{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.nw-dialog-acts button{height:42px;padding:0 20px;border-radius:10px;font:inherit;font-weight:600;font-size:15px;cursor:pointer}
+.nw-dialog-cancel{background:#fff;border:1px solid #cfdbe3;color:#123F63}
+.nw-dialog-ok{background:#F25615;border:0;color:#fff}.nw-dialog-ok.danger{background:#b42318}
+.nw-dialog-acts button:focus-visible{outline:2px solid #0571D0;outline-offset:2px}
+@media (max-width:480px){.nw-dialog-backdrop{align-items:end;padding:0}.nw-dialog{border-radius:16px 16px 0 0}.nw-dialog-acts button{flex:1}}

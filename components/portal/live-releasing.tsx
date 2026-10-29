@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { CertificatePdfModal, type CertPdfTarget } from "./certificate-pdf-modal";
 import { downloadCsv } from "@/lib/csv";
 import { tcl } from "@/lib/title-case";
+import { askText, askConfirm } from "./dialogs";
 
 // Loose shapes for the releasing-officer slices of the staff-operations payload.
 type NameRef = { legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string };
@@ -211,13 +212,13 @@ export function LiveReleasing({ data, role, reload }: { data: ReleasingData; rol
     catch (e) { setMessage(e instanceof Error ? e.message : "The action could not be completed."); }
     finally { setBusy(false); }
   }
-  function issue(e: Enrollment) {
-    const override = window.prompt(`Certificate number for ${traineeName(e)}?\nLeave blank to auto-generate.`, "");
+  async function issue(e: Enrollment) {
+    const override = await askText(`Certificate number for ${traineeName(e)}?\nLeave blank to auto-generate.`, "");
     if (override === null) return;
     void act({ action: "certificate-issue", enrollmentId: e.id, certificateNumber: override.trim() || undefined });
   }
   function activeTemplateFor(courseId: string) { return data.certificateTemplates.find((t) => t.course_id === courseId && t.active && t.approved_at) ?? null; }
-  function copyLink(token: string) { const url = `${window.location.origin}/feedback/${token}`; if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => setMessage("Feedback link copied to clipboard.")).catch(() => window.prompt("Share this feedback link with the trainee:", url)); else window.prompt("Share this feedback link with the trainee:", url); }
+  async function copyLink(token: string) { const url = `${window.location.origin}/feedback/${token}`; if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => setMessage("Feedback link copied to clipboard.")).catch(async () => await askText("Share this feedback link with the trainee:", url)); else await askText("Share this feedback link with the trainee:", url); }
   async function sendFeedback(e: Enrollment) { setBusy(true); setMessage(""); try { await submit({ action: "feedback-send-email", enrollmentId: e.id }); setMessage(`Feedback form emailed to ${traineeName(e)} (queued for delivery).`); } catch (err) { setMessage(err instanceof Error ? err.message : "Could not send the feedback form."); } finally { setBusy(false); } }
   function openPdf(e: Enrollment) {
     const c = certOf(data, e.id);
@@ -263,7 +264,7 @@ export function LiveReleasing({ data, role, reload }: { data: ReleasingData; rol
             <button type="button" disabled={busy || !c || !printed || c?.status === "Released"} onClick={() => setRelease(e)}>Release</button>
             <button type="button" disabled={busy || !c || !e.feedback_submitted} title={!e.feedback_submitted ? "The trainee must submit the feedback form before the certificate can be printed." : undefined} onClick={() => openPdf(e)}>PDF</button>
             {isAdmin && <button type="button" disabled={busy || !c} onClick={() => setEdit(e)}>Edit</button>}
-            {c && c.status !== "Released" && <button type="button" className="ghost-danger" disabled={busy} onClick={() => { const reason = window.prompt("Void this certificate? Reason:") ?? undefined; if (reason !== undefined) void act({ action: "certificate-void", enrollmentId: e.id, reason }); }}>Void</button>}
+            {c && c.status !== "Released" && <button type="button" className="ghost-danger" disabled={busy} onClick={async () => { const reason = await askText("Void this certificate? Reason:") ?? undefined; if (reason !== undefined) void act({ action: "certificate-void", enrollmentId: e.id, reason }); }}>Void</button>}
           </td></tr>; })}
         {!rows.length && <tr><td colSpan={6}><span className="portal-empty-copy">No in-house enrollments yet.</span></td></tr>}
       </tbody></table></div>}
@@ -359,7 +360,7 @@ function TemplateUpload({ data, ownCourses, onSaved }: { data: ReleasingData; ow
   }
   async function editFields(t: CertTemplate) {
     const current = (t.fields ?? []).map((f) => f.label).join(", ");
-    const next = window.prompt("Overlay fields to fill on the certificate (comma-separated labels):", current);
+    const next = await askText("Overlay fields to fill on the certificate (comma-separated labels):", current);
     if (next == null) return;
     setMessage(null);
     try { await tplRequest(t.id, "PATCH", { fields: next }); setMessage({ kind: "success", text: "Template fields updated." }); await onSaved(); }
@@ -371,7 +372,7 @@ function TemplateUpload({ data, ownCourses, onSaved }: { data: ReleasingData; ow
     catch (e) { setMessage({ kind: "error", text: e instanceof Error ? e.message : "Update failed." }); }
   }
   async function removeTemplate(t: CertTemplate) {
-    if (!window.confirm(`Remove the ${one(t.courses)?.name ?? "selected"} certificate template (v${t.version})? This cannot be undone.`)) return;
+    if (!await askConfirm(`Remove the ${one(t.courses)?.name ?? "selected"} certificate template (v${t.version})? This cannot be undone.`)) return;
     setMessage(null);
     try { await tplRequest(t.id, "DELETE"); setMessage({ kind: "success", text: "Template removed." }); await onSaved(); }
     catch (e) { setMessage({ kind: "error", text: e instanceof Error ? e.message : "Remove failed." }); }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { PortalData } from "../portal-live-app";
 import { Message, submit } from "./shared-ui";
+import { askConfirm } from "./dialogs";
 
 type ClassroomClass = { id: string; name: string; section?: string; alternateLink?: string; enrollmentCode?: string };
 
@@ -56,7 +57,7 @@ export function ClassroomPanel({ data, courseId, reload }: { data: PortalData; c
     if (r) await reload();
   }
   async function disconnect() {
-    if (!window.confirm("Disconnect Google Classroom? Trainees will no longer be invited automatically until it is connected again.")) return;
+    if (!await askConfirm("Disconnect Google Classroom? Trainees will no longer be invited automatically until it is connected again.")) return;
     if (await act({ action: "classroom-disconnect" }, "Google Classroom disconnected.")) { setClasses(null); await reload(); }
   }
 

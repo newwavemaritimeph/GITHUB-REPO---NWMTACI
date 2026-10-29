@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { CertificatePdfModal, type CertPdfTarget } from "./certificate-pdf-modal";
 import { tcl } from "@/lib/title-case";
+import { Modal } from "./shared-ui";
 
 type Classroom = { id: string; name: string; venue: string; capacity: number; active: boolean };
 type CertEnrollment = { enrollment_number?: string; trainees?: unknown; courses?: unknown };
@@ -58,14 +59,14 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
     } finally { setBusy(false); }
   }
 
+  // One form instead of three browser pop-ups (owner, 29 Oct 2026).
+  const [room, setRoom] = useState<{ id: string | null; name: string; venue: string; capacity: string } | null>(null);
   function saveClassroom(existing?: Classroom) {
-    const name = window.prompt("Classroom name?", existing?.name ?? ""); if (!name) return;
-    const venue = window.prompt("Venue / location?", existing?.venue ?? "New Wave training center"); if (!venue) return;
-    const capRaw = window.prompt("Seating capacity?", existing ? String(existing.capacity) : "24");
-    const capacity = capRaw == null ? NaN : Math.trunc(Number(capRaw));
-    if (!Number.isInteger(capacity) || capacity <= 0) { setMessage("Enter a valid capacity."); return; }
-    void post({ action: "classroom-save", id: existing?.id ?? null, name, venue, capacity });
+    setMessage("");
+    setRoom({ id: existing?.id ?? null, name: existing?.name ?? "", venue: existing?.venue ?? "New Wave Training Center", capacity: existing ? String(existing.capacity) : "24" });
   }
+  const roomCapacity = room ? Math.trunc(Number(room.capacity)) : 0;
+  const roomReady = !!room && room.name.trim().length > 0 && room.venue.trim().length > 0 && Number.isInteger(roomCapacity) && roomCapacity > 0;
 
   const upcoming = data.batches.filter((b) => b.ends_on >= today).sort((a, b) => a.starts_on.localeCompare(b.starts_on));
 
@@ -158,6 +159,15 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
         </>
       )}
       {pdfTarget && <CertificatePdfModal target={pdfTarget} onClose={() => setPdfTarget(null)} />}
+      {room && <Modal title={room.id ? "Edit Classroom" : "Add Classroom"} onClose={() => setRoom(null)}>
+        <form className="portal-form" onSubmit={(e) => { e.preventDefault(); if (!roomReady) return; void post({ action: "classroom-save", id: room.id, name: room.name.trim(), venue: room.venue.trim(), capacity: roomCapacity }).then(() => setRoom(null)); }}>
+          {message && <div className="portal-message error full" role="alert">{message}</div>}
+          <label className="full">Classroom Name<input autoFocus required value={room.name} placeholder="e.g. Room 304" onChange={(e) => setRoom({ ...room, name: e.target.value })} /></label>
+          <label>Venue / Location<input required value={room.venue} onChange={(e) => setRoom({ ...room, venue: e.target.value })} /></label>
+          <label>Seating Capacity<input required type="number" min={1} step={1} inputMode="numeric" value={room.capacity} onChange={(e) => setRoom({ ...room, capacity: e.target.value })} />{roomReady && roomCapacity < 24 && <small className="field-help">Under 24 seats: it can&apos;t hold a full New Wave batch.</small>}</label>
+          <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setRoom(null)}>Cancel</button><button className="portal-primary" disabled={busy || !roomReady}>{busy ? "Saving…" : room.id ? "Save Classroom" : "Add Classroom"}</button></div>
+        </form>
+      </Modal>}
     </div>
   );
 }

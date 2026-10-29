@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { tcl } from "@/lib/title-case";
+import { askText, askConfirm, showAlert } from "./dialogs";
 
 /** Loose shapes for the HR slices of the staff-operations payload. */
 type Employee = { id: string; employee_number: string; complete_name: string; position: string; employment_status: string; date_hired: string; pay_type: string; base_rate_centavos: number; instructor_daily_rate_centavos?: number | null; work_email?: string | null; active: boolean };
@@ -27,7 +28,7 @@ function currentCutoff() {
 
 const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 0 }).format((Number(centavos) || 0) / 100);
 const todayManila = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
-const num = (raw: string | null) => (raw == null || raw.trim() === "" ? null : Math.round(Number(raw) * 100));
+const num = async (raw: string | null) => (raw == null || raw.trim() === "" ? null : Math.round(Number(raw) * 100));
 
 export function LiveHr({ data, role, reload }: { data: HrData; role: string; reload: () => Promise<void> }) {
   const [tab, setTab] = useState<"Overview" | "Directory" | "Attendance" | "Requests" | "Benefits" | "Contracts" | "Payroll" | "13th month">("Overview");
@@ -48,15 +49,15 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
     } finally { setBusy(false); }
   }
 
-  function saveEmployee(existing?: Employee) {
-    const completeName = window.prompt("Full name?", existing?.complete_name ?? ""); if (!completeName) return;
-    const position = window.prompt("Position?", existing?.position ?? "Instructor"); if (!position) return;
-    const employmentStatus = window.prompt("Employment status? (Active, Probationary, Contractual, Trainee, Inactive)", existing?.employment_status ?? "Active"); if (!employmentStatus) return;
-    const dateHired = window.prompt("Date hired (YYYY-MM-DD)?", existing?.date_hired ?? todayManila()); if (!dateHired) return;
-    const payType = window.prompt("Pay type? (Monthly, Semi-Monthly, Weekly, Daily)", existing?.pay_type ?? "Monthly"); if (!payType) return;
-    const baseRate = num(window.prompt("Base rate (PHP)? For Monthly this is the monthly salary.", existing ? String(existing.base_rate_centavos / 100) : "0")) ?? 0;
-    const dailyRaw = payType === "Daily" ? window.prompt("Instructor daily rate (PHP)?", existing?.instructor_daily_rate_centavos ? String(existing.instructor_daily_rate_centavos / 100) : "0") : null;
-    const workEmail = window.prompt("Work email (optional)?", existing?.work_email ?? "") ?? "";
+  async function saveEmployee(existing?: Employee) {
+    const completeName = await askText("Full name?", existing?.complete_name ?? ""); if (!completeName) return;
+    const position = await askText("Position?", existing?.position ?? "Instructor"); if (!position) return;
+    const employmentStatus = await askText("Employment status? (Active, Probationary, Contractual, Trainee, Inactive)", existing?.employment_status ?? "Active"); if (!employmentStatus) return;
+    const dateHired = await askText("Date hired (YYYY-MM-DD)?", existing?.date_hired ?? todayManila()); if (!dateHired) return;
+    const payType = await askText("Pay type? (Monthly, Semi-Monthly, Weekly, Daily)", existing?.pay_type ?? "Monthly"); if (!payType) return;
+    const baseRate = num(await askText("Base rate (PHP)? For Monthly this is the monthly salary.", existing ? String(existing.base_rate_centavos / 100) : "0")) ?? 0;
+    const dailyRaw = payType === "Daily" ? await askText("Instructor daily rate (PHP)?", existing?.instructor_daily_rate_centavos ? String(existing.instructor_daily_rate_centavos / 100) : "0") : null;
+    const workEmail = await askText("Work email (optional)?", existing?.work_email ?? "") ?? "";
     void post({ action: "employee-save", id: existing?.id ?? null, completeName, position, employmentStatus, dateHired, payType, baseRateCentavos: baseRate, instructorDailyRateCentavos: dailyRaw == null ? null : (num(dailyRaw) ?? 0), workEmail });
   }
 
@@ -140,12 +141,12 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
           <section className="portal-panel">
             <div className="panel-heading">
               <div><h2>Leave Requests</h2><p>File and decide employee leave</p></div>
-              {canManage && <button className="portal-primary" disabled={busy} onClick={() => {
-                const employeeId = pickEmployee(data.employees); if (!employeeId) return;
-                const leaveType = window.prompt("Leave type? (e.g. Sick, Vacation, Emergency)", "Vacation"); if (!leaveType) return;
-                const startsOn = window.prompt("Start date (YYYY-MM-DD)?", todayManila()); if (!startsOn) return;
-                const endsOn = window.prompt("End date (YYYY-MM-DD)?", startsOn); if (!endsOn) return;
-                const reason = window.prompt("Reason?"); if (!reason) return;
+              {canManage && <button className="portal-primary" disabled={busy} onClick={async () => {
+                const employeeId = await pickEmployee(data.employees); if (!employeeId) return;
+                const leaveType = await askText("Leave type? (e.g. Sick, Vacation, Emergency)", "Vacation"); if (!leaveType) return;
+                const startsOn = await askText("Start date (YYYY-MM-DD)?", todayManila()); if (!startsOn) return;
+                const endsOn = await askText("End date (YYYY-MM-DD)?", startsOn); if (!endsOn) return;
+                const reason = await askText("Reason?"); if (!reason) return;
                 void post({ action: "leave-file", employeeId, leaveType, startsOn, endsOn, reason });
               }}>+ File Leave</button>}
             </div>
@@ -170,10 +171,10 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
           <section className="portal-panel">
             <div className="panel-heading">
               <div><h2>Cash Advances</h2><p>Salary advances against future payroll</p></div>
-              {canManage && <button className="portal-primary" disabled={busy} onClick={() => {
-                const employeeId = pickEmployee(data.employees); if (!employeeId) return;
-                const amt = num(window.prompt("Advance amount (PHP)?")); if (!amt) return;
-                const requestedOn = window.prompt("Requested on (YYYY-MM-DD)?", todayManila()); if (!requestedOn) return;
+              {canManage && <button className="portal-primary" disabled={busy} onClick={async () => {
+                const employeeId = await pickEmployee(data.employees); if (!employeeId) return;
+                const amt = num(await askText("Advance amount (PHP)?")); if (!amt) return;
+                const requestedOn = await askText("Requested on (YYYY-MM-DD)?", todayManila()); if (!requestedOn) return;
                 void post({ action: "advance-file", employeeId, amountCentavos: amt, requestedOn });
               }}>+ File Advance</button>}
             </div>
@@ -205,11 +206,11 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
   );
 }
 
-function pickEmployee(employees: Employee[]): string | null {
+async function pickEmployee(employees: Employee[]): Promise<string | null> {
   const active = employees.filter((e) => e.active);
-  if (!active.length) { window.alert("No active employees on file."); return null; }
+  if (!active.length) { await showAlert("No active employees on file."); return null; }
   const menu = active.map((e, i) => `${i + 1}. ${e.complete_name} (${e.position})`).join("\n");
-  const pick = window.prompt(`Which employee? Enter a number:\n${menu}`);
+  const pick = await askText(`Which employee? Enter a number:\n${menu}`);
   const idx = pick == null ? NaN : Number(pick) - 1;
   return Number.isInteger(idx) && idx >= 0 && idx < active.length ? active[idx].id : null;
 }
@@ -336,12 +337,12 @@ function AttendanceTab({ data, nameOf, canManage, busy, post }: { data: HrData; 
 }
 
 function BenefitsTab({ data, nameOf, canManage, busy, post }: { data: HrData; nameOf: Map<string, string>; canManage: boolean; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
-  function saveBenefit(existing?: Benefit) {
-    const employeeId = existing?.employee_id ?? pickEmployee(data.employees); if (!employeeId) return;
-    const benefitType = window.prompt("Benefit type? (SSS, PhilHealth, Pag-IBIG, TIN/BIR, Other)", existing?.benefit_type ?? "SSS"); if (!benefitType) return;
-    const reference = window.prompt("Reference / ID number? (optional)", existing?.reference ?? "") ?? "";
-    const amount = num(window.prompt("Monthly contribution (PHP)? (optional, 0 for none)", existing ? String((existing.amount_centavos || 0) / 100) : "0")) ?? 0;
-    const effectiveFrom = window.prompt("Effective from (YYYY-MM-DD)? (optional)", existing?.effective_from ?? "") || null;
+  async function saveBenefit(existing?: Benefit) {
+    const employeeId = existing?.employee_id ?? await pickEmployee(data.employees); if (!employeeId) return;
+    const benefitType = await askText("Benefit type? (SSS, PhilHealth, Pag-IBIG, TIN/BIR, Other)", existing?.benefit_type ?? "SSS"); if (!benefitType) return;
+    const reference = await askText("Reference / ID number? (optional)", existing?.reference ?? "") ?? "";
+    const amount = num(await askText("Monthly contribution (PHP)? (optional, 0 for none)", existing ? String((existing.amount_centavos || 0) / 100) : "0")) ?? 0;
+    const effectiveFrom = await askText("Effective from (YYYY-MM-DD)? (optional)", existing?.effective_from ?? "") || null;
     void post({ action: "benefit-save", id: existing?.id ?? null, employeeId, benefitType, reference, amountCentavos: amount, effectiveFrom });
   }
   return (
@@ -357,7 +358,7 @@ function BenefitsTab({ data, nameOf, canManage, busy, post }: { data: HrData; na
             <td>{b.effective_from ?? "—"}{b.effective_to ? ` → ${b.effective_to}` : ""}</td>
             <td className="document-actions">
               {canManage && <button disabled={busy} onClick={() => saveBenefit(b)}>Edit</button>}
-              {canManage && <button disabled={busy} onClick={() => { if (window.confirm("Remove this benefit record?")) void post({ action: "benefit-remove", id: b.id }); }}>Remove</button>}
+              {canManage && <button disabled={busy} onClick={async () => { if (await askConfirm("Remove this benefit record?")) void post({ action: "benefit-remove", id: b.id }); }}>Remove</button>}
             </td>
           </tr>
         ))}
@@ -368,15 +369,15 @@ function BenefitsTab({ data, nameOf, canManage, busy, post }: { data: HrData; na
 }
 
 function ContractsTab({ data, nameOf, canManage, busy, post }: { data: HrData; nameOf: Map<string, string>; canManage: boolean; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
-  function saveContract(existing?: Contract) {
-    const employeeId = existing?.employee_id ?? pickEmployee(data.employees); if (!employeeId) return;
-    const contractType = window.prompt("Contract type? (Probationary, Regular, Project, Consultancy)", existing?.contract_type ?? "Probationary"); if (!contractType) return;
-    const position = window.prompt("Position? (optional)", existing?.position ?? "") ?? "";
-    const rate = num(window.prompt("Rate (PHP)? (optional)", existing?.rate_centavos ? String(existing.rate_centavos / 100) : "0")) ?? 0;
-    const startsOn = window.prompt("Start date (YYYY-MM-DD)?", existing?.starts_on ?? todayManila()); if (!startsOn) return;
-    const endsOn = window.prompt("End date (YYYY-MM-DD)? (blank for open-ended)", existing?.ends_on ?? "") || null;
-    const status = window.prompt("Status? (Active, Ended, Terminated)", existing?.status ?? "Active") ?? "Active";
-    const notes = window.prompt("Notes? (optional)", existing?.notes ?? "") ?? "";
+  async function saveContract(existing?: Contract) {
+    const employeeId = existing?.employee_id ?? await pickEmployee(data.employees); if (!employeeId) return;
+    const contractType = await askText("Contract type? (Probationary, Regular, Project, Consultancy)", existing?.contract_type ?? "Probationary"); if (!contractType) return;
+    const position = await askText("Position? (optional)", existing?.position ?? "") ?? "";
+    const rate = num(await askText("Rate (PHP)? (optional)", existing?.rate_centavos ? String(existing.rate_centavos / 100) : "0")) ?? 0;
+    const startsOn = await askText("Start date (YYYY-MM-DD)?", existing?.starts_on ?? todayManila()); if (!startsOn) return;
+    const endsOn = await askText("End date (YYYY-MM-DD)? (blank for open-ended)", existing?.ends_on ?? "") || null;
+    const status = await askText("Status? (Active, Ended, Terminated)", existing?.status ?? "Active") ?? "Active";
+    const notes = await askText("Notes? (optional)", existing?.notes ?? "") ?? "";
     void post({ action: "contract-save", id: existing?.id ?? null, employeeId, contractType, position, rateCentavos: rate, startsOn, endsOn, status, notes });
   }
   return (
@@ -393,7 +394,7 @@ function ContractsTab({ data, nameOf, canManage, busy, post }: { data: HrData; n
             <td>{c.status}</td>
             <td className="document-actions">
               {canManage && <button disabled={busy} onClick={() => saveContract(c)}>Edit</button>}
-              {canManage && <button disabled={busy} onClick={() => { if (window.confirm("Remove this contract record?")) void post({ action: "contract-remove", id: c.id }); }}>Remove</button>}
+              {canManage && <button disabled={busy} onClick={async () => { if (await askConfirm("Remove this contract record?")) void post({ action: "contract-remove", id: c.id }); }}>Remove</button>}
             </td>
           </tr>
         ))}
