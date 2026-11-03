@@ -78,6 +78,7 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   awaitingCourseIds?:string[];
   // Website enrollment number (NWMTACI-0000001) per trainee id; empty until migration 202610070003.
   applicationNumbers?:Record<string,string>;
+  traineeFacebook?:Record<string,string>;
   // Pending applications Registration handed to the Cashier: enrollment id → when (202610070004).
   handedToCashier?:Record<string,string>;
   traineeProofs?:TraineeProofRow[];
@@ -610,6 +611,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   const payments=data.payments.filter(p=>p.trainee_id===trainee.id).sort((a,b)=>a.received_at.localeCompare(b.received_at));
   const requests=data.requests.filter(r=>first(r.enrollments)?.trainee_id===trainee.id&&r.status==="Pending");
   const appNo=data.applicationNumbers?.[trainee.id];
+  const fb=data.traineeFacebook?.[trainee.id]??"";
   // Copy Trainee Details (owner, 21 Oct 2026): for endorsing an enrollment to a partnered center.
   const [copyFallback,setCopyFallback]=useState("");
   const copyDetails=async(format:"text"|"row")=>{
@@ -618,7 +620,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
     const centerOf=(e:Enrollment)=>first(first(data.offers.find(o=>o.id===e.partner_offer_id)?.partner_centers))?.name??(e.partner_offer_id?"":"New Wave");
     const when=(e:Enrollment)=>{const b=first(e.batches);return b?(b.starts_on===b.ends_on?date(b.starts_on):`${date(b.starts_on)} – ${date(b.ends_on)}`):e.scheduled_on?date(e.scheduled_on):""};
     const ec=trainee.emergency_contact;
-    const {text,rows}=traineeCopy({name:`${(trainee.legal_last_name??"").toUpperCase()}, ${trainee.legal_first_name??""}${trainee.legal_middle_name?` ${trainee.legal_middle_name}`:""}${trainee.suffix?` ${trainee.suffix}`:""}`,nwmtaciNo:appNo??trainee.trainee_number,birthDate:trainee.birthdate?date(trainee.birthdate):"",placeOfBirth:trainee.place_of_birth??"",srn:trainee.srn??"",rank:trainee.rank??"",company:trainee.company??"",address:trainee.address??"",mobile:trainee.mobile??"",email:trainee.email??"",emergency:[ec?.name,ec?.mobile].filter(Boolean).join(" · "),
+    const {text,rows}=traineeCopy({name:`${(trainee.legal_last_name??"").toUpperCase()}, ${trainee.legal_first_name??""}${trainee.legal_middle_name?` ${trainee.legal_middle_name}`:""}${trainee.suffix?` ${trainee.suffix}`:""}`,nwmtaciNo:appNo??trainee.trainee_number,birthDate:trainee.birthdate?date(trainee.birthdate):"",placeOfBirth:trainee.place_of_birth??"",srn:trainee.srn??"",rank:trainee.rank??"",company:trainee.company??"",address:trainee.address??"",mobile:trainee.mobile??"",email:trainee.email??"",facebook:fb,emergency:[ec?.name,ec?.mobile].filter(Boolean).join(" · "),
       courses:pick.map(e=>{const c=first(e.courses);return {course:c?`${c.code} ${c.name}`:"",center:centerOf(e),date:when(e)}})});
     const value=format==="row"?rows:text;
     void fetch("/api/staff/operations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"trainee-details-copied",traineeId:trainee.id,format})}).catch(()=>undefined);
@@ -682,10 +684,11 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
           {requests.length>0&&<section className="tp-panel"><h4>Open Requests</h4>{requests.map(r=><p key={r.id} className="tp-req"><b>{r.request_type==="Rescheduling"?"Reschedule":r.request_type}</b> · {first(r.enrollments)?.enrollment_number} · {r.reason}</p>)}</section>}
         </div>
         <div className="tp-side">
-          {editing&&reload?<section className="tp-panel"><TraineeEditForm trainee={trainee} reload={reload} onDone={()=>setEditing(false)}/></section>:<section className="tp-panel"><h4>Personal and Contact</h4>
+          {editing&&reload?<section className="tp-panel"><TraineeEditForm trainee={trainee} facebook={fb} reload={reload} onDone={()=>setEditing(false)}/></section>:<section className="tp-panel"><h4>Personal and Contact</h4>
             <dl className="tp-kv">
               {([["Birth Date",trainee.birthdate?`${date(trainee.birthdate)}${trainee.place_of_birth?` · ${trainee.place_of_birth}`:""}`:""],["SRN",trainee.srn],["Trainee No.",trainee.trainee_number],["Mobile",trainee.mobile],["Email",trainee.email],["Address",trainee.address],["Company",trainee.company]] as [string,string|null|undefined][])
                 .filter(([,v])=>v).map(([k,v])=><Fragment key={k}><dt>{k}</dt><dd>{v}</dd></Fragment>)}
+              <dt>Facebook</dt><dd>{fb.startsWith("https://")?<a href={fb} target="_blank" rel="noreferrer">{fb.replace(/^https:\/\/(www\.)?/,"")}</a>:<span className="muted-text">Not yet recorded</span>}</dd>
             </dl></section>}
           {em?.name&&<section className="tp-panel"><h4>Emergency Contact</h4><dl className="tp-kv"><dt>Name</dt><dd>{em.name}</dd>{em.mobile&&<><dt>Mobile</dt><dd>{em.mobile}</dd></>}</dl></section>}
           {canEdit&&latest&&<section className="tp-panel"><SourcePicker key={`${latest.id}:${partner?.id??latest.source}`} data={data} enrollment={latest} busy={busy} post={post}/><p className="tp-note">Locked once a payment is recorded.</p></section>}
@@ -715,9 +718,9 @@ function CashierSearchTrainee({data,onPay,reload,role}:{data:PortalData;onPay:(e
 }
 
 /** Edit a trainee's contact and work details. Name, SRN and birth date stay as recorded. */
-function TraineeEditForm({trainee,reload,onDone}:{trainee:Trainee;reload:()=>Promise<void>;onDone:()=>void}){
+function TraineeEditForm({trainee,facebook,reload,onDone}:{trainee:Trainee;facebook:string;reload:()=>Promise<void>;onDone:()=>void}){
   const em=trainee.emergency_contact;
-  const [f,setF]=useState({mobile:trainee.mobile??"",email:trainee.email??"",address:trainee.address??"",placeOfBirth:trainee.place_of_birth??"",rank:trainee.rank??"",company:trainee.company??"",suffix:trainee.suffix??"",emergencyContactName:em?.name??"",emergencyContactMobile:em?.mobile??""});
+  const [f,setF]=useState({mobile:trainee.mobile??"",email:trainee.email??"",address:trainee.address??"",placeOfBirth:trainee.place_of_birth??"",rank:trainee.rank??"",company:trainee.company??"",suffix:trainee.suffix??"",emergencyContactName:em?.name??"",emergencyContactMobile:em?.mobile??"",facebookUrl:facebook});
   const [busy,setBusy]=useState(false),[err,setErr]=useState("");
   const set=(k:keyof typeof f)=>(ev:{target:{value:string}})=>setF(c=>({...c,[k]:ev.target.value}));
   async function save(){setBusy(true);setErr("");try{await submit({action:"trainee-update",traineeId:trainee.id,...f});await reload();onDone()}catch(e){setErr(e instanceof Error?e.message:"Could not save the changes.")}finally{setBusy(false)}}
@@ -734,6 +737,7 @@ function TraineeEditForm({trainee,reload,onDone}:{trainee:Trainee;reload:()=>Pro
       <label>Company / Manning Agency<input value={f.company} onChange={set("company")}/></label>
       <label>Emergency Contact Person<input value={f.emergencyContactName} onChange={set("emergencyContactName")}/></label>
       <label>Emergency Contact Number<input value={f.emergencyContactMobile} onChange={set("emergencyContactMobile")} inputMode="tel"/></label>
+      <label className="full">Facebook Link<input className="lc" value={f.facebookUrl} onChange={set("facebookUrl")} inputMode="url" placeholder="https://www.facebook.com/juan.delacruz"/></label>
       <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onDone}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={()=>void save()}>{busy?"Saving…":"Save Changes"}</button></div>
     </div>
   </section>;

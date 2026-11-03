@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   formatPhMobile,
   isEmail,
+  isFacebookUrl,
+  normalizeFacebookUrl,
   isPhContactNumber,
   isPhMobile,
   isSrn,
@@ -88,5 +90,24 @@ describe("email addresses", () => {
     expect(isEmail("missing@tld")).toBe(false);
     expect(isEmail("missing@.com")).toBe(false);
     expect(isEmail("")).toBe(false);
+  });
+});
+
+describe("facebook links", () => {
+  it("accepts facebook.com, fb.com and fb.me profile links", () => {
+    expect(isFacebookUrl("https://www.facebook.com/juan.delacruz")).toBe(true);
+    expect(isFacebookUrl("facebook.com/profile.php?id=100012345678")).toBe(true);
+    expect(isFacebookUrl("m.facebook.com/juan")).toBe(true);
+    expect(isFacebookUrl("fb.me/juan")).toBe(true);
+  });
+  it("rejects other sites and bare names", () => {
+    expect(isFacebookUrl("juan delacruz")).toBe(false);
+    expect(isFacebookUrl("https://facebook.com.example.net/juan")).toBe(false);
+    expect(isFacebookUrl("https://www.facebook.com/")).toBe(false);
+    expect(isFacebookUrl("javascript:alert(1)//facebook.com/x")).toBe(false);
+  });
+  it("always stores an https link", () => {
+    expect(normalizeFacebookUrl("facebook.com/juan")).toBe("https://facebook.com/juan");
+    expect(normalizeFacebookUrl("http://www.facebook.com/juan")).toBe("https://www.facebook.com/juan");
   });
 });

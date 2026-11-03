@@ -8,7 +8,7 @@ import { bsNumber, buildBillingRows, statementTotal } from "@/lib/billing-statem
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hardDeleteEnrollment, pruneUnpaidEnrollments, deletePastEmptyBatches } from "@/lib/enrollments";
-import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn, normalizeEmail, normalizePhContactNumber, normalizeSrn } from "@/lib/validation";
+import { VALIDATION_MESSAGES, isEmail, isFacebookUrl, isPhContactNumber, isSrn, normalizeEmail, normalizeFacebookUrl, normalizePhContactNumber, normalizeSrn } from "@/lib/validation";
 import { emailConfigured, processEmailJobs } from "@/lib/email-jobs";
 import { classroomEmailBlocks } from "@/lib/classroom";
 import { loadInstructionDetails } from "@/lib/training-instructions";
@@ -271,7 +271,10 @@ const traineeUpdateInput = z.object({ action: z.literal("trainee-update"), train
   mobile: z.string().trim().refine(isPhContactNumber, VALIDATION_MESSAGES.contact), email: z.string().trim().refine(isEmail, VALIDATION_MESSAGES.email),
   address: z.string().trim().min(8, "Enter the complete address.").max(500), placeOfBirth: z.string().trim().max(160).optional(),
   rank: z.string().trim().max(100).optional(), company: z.string().trim().max(160).optional(), suffix: z.string().trim().max(20).optional(),
-  emergencyContactName: z.string().trim().max(160).optional(), emergencyContactMobile: optionalContact });
+  emergencyContactName: z.string().trim().max(160).optional(), emergencyContactMobile: optionalContact,
+  facebookUrl: z.string().trim().max(300).optional().refine((v) => !v || isFacebookUrl(v), VALIDATION_MESSAGES.facebook) });
+// Registration records the trainee's Facebook link before the hand-over (owner, 3 Nov 2026).
+const traineeFacebookInput = z.object({ action: z.literal("trainee-facebook"), traineeId: z.string().uuid(), url: z.string().trim().max(300).refine(isFacebookUrl, VALIDATION_MESSAGES.facebook) });
 const admissionRecordInput = z.object({ action: z.literal("admission-record-issue"), traineeId: z.string().uuid() });
 const applicationHandoverInput = z.object({ action: z.literal("application-handover"), enrollmentId: z.string().uuid() });
 // Company Charge (owner, 29 Oct 2026): enroll without payment; the partner is billed. One payment per Billing Statement.
@@ -298,7 +301,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [paymentVoidRequestInput, paymentVoidDecideInput, statementIssueInput, statementVoidInput, enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [paymentVoidRequestInput, paymentVoidDecideInput, statementIssueInput, statementVoidInput, enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, traineeFacebookInput, admissionRecordInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 /** A proof the trainee sent (29 Oct 2026) backs one payment of that trainee, unless marked Not Valid. Staff-filed proofs return null. */
 async function traineeProofProblem(admin: ReturnType<typeof createSupabaseAdminClient>, proofId: string, traineeId: string) {
@@ -401,6 +404,26 @@ async function owedAgencyShares(admin: ReturnType<typeof createSupabaseAdminClie
       await admin.from("agency_rebates").insert({ agency_id: agency, enrollment_id: e.id, trainee_id: e.trainee_id, course_id: e.course_id, rebate_centavos: Number(e.agency_share_centavos), status: "Pending", created_by: actor });
     }
   } catch (err) { console.error("Agency share not recorded (apply database update 202610200050):", err instanceof Error ? err.message : err); }
+}
+
+// Trainee Facebook link (owner, 3 Nov 2026; migration 202610290070).
+async function saveFacebook(admin: ReturnType<typeof createSupabaseAdminClient>, traineeId: string, raw: string, actorId: string): Promise<{ url?: string; error?: string }> {
+  const url = normalizeFacebookUrl(raw);
+  const { data: prior, error: readError } = await admin.from("trainees").select("facebook_url").eq("id", traineeId).maybeSingle();
+  if (readError) return { error: /facebook_url/.test(readError.message) ? "Apply database update 202610290070 first." : readError.message };
+  if (!prior) return { error: "Trainee not found." };
+  if (prior.facebook_url === url) return { url };
+  const { error } = await admin.from("trainees").update({ facebook_url: url }).eq("id", traineeId);
+  if (error) return { error: error.message };
+  await admin.from("audit_logs").insert({ actor_id: actorId, action: "trainee.facebook_set", record_type: "trainee", record_id: traineeId, prior_values: { facebook_url: prior.facebook_url }, new_values: { facebook_url: url } });
+  return { url };
+}
+
+/** True when the application's trainee has no Facebook link yet; false before migration 070 so nothing is blocked. */
+async function facebookMissing(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentId: string) {
+  const { data, error } = await admin.from("enrollments").select("trainees(facebook_url)").eq("id", enrollmentId).maybeSingle();
+  if (error) return false;
+  return !first(data?.trainees as unknown as { facebook_url: string | null } | null)?.facebook_url;
 }
 
 async function tryAutoEnroll(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentIds: string[], actor: string) {
@@ -980,6 +1003,9 @@ export async function GET() {
   // yet applied) yields none.
   let applicationNumbers: Record<string, string> = {};
   task(async () => { const { data: numberRows } = await db.from("trainees").select("id,application_number").not("application_number", "is", null).limit(5000); applicationNumbers = Object.fromEntries((numberRows ?? []).map((row: { id: string; application_number: string }) => [row.id, row.application_number])); });
+  // Trainee Facebook links (migration 070); none before it is applied.
+  const traineeFacebook: Record<string, string> = {};
+  task(async () => { const r = await db.from("trainees").select("id,facebook_url").not("facebook_url", "is", null).limit(5000); if (!r.error) for (const x of (r.data ?? []) as { id: string; facebook_url: string }[]) traineeFacebook[x.id] = x.facebook_url; });
   // Applicants Registration has handed to the Cashier for payment (202610070004).
   let handedToCashier: Record<string, string> = {};
   task(async () => { const { data: handedRows } = await db.from("enrollments").select("id,handed_to_cashier_at").not("handed_to_cashier_at", "is", null).eq("enrollment_status", "Pending").limit(1000); handedToCashier = Object.fromEntries((handedRows ?? []).map((row: { id: string; handed_to_cashier_at: string }) => [row.id, row.handed_to_cashier_at])); });
@@ -1279,7 +1305,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, feedbackLinks: certs.feedbackLinks, certificatePhotos: certs.photos, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, pendingRebates, deliveryRequests, requisitions, requisitionItems, instructors, accreditations, batchResources, batchCancels, certificateNumberSettings, legacyCertificates, holidays, otherIncome, incomeCategories, rebatesReceived, traineeProofs, companyCharge, billingStatements, paymentVoids, voidedPayments }, { headers: { "Cache-Control": "no-store" } });
+    centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, traineeFacebook, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, pendingRebates, deliveryRequests, requisitions, requisitionItems, instructors, accreditations, batchResources, batchCancels, certificateNumberSettings, legacyCertificates, holidays, otherIncome, incomeCategories, rebatesReceived, traineeProofs, companyCharge, billingStatements, paymentVoids, voidedPayments }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /**
@@ -2087,7 +2113,15 @@ export async function POST(request: Request) {
       const { error } = await admin.from("trainees").update(next).eq("id", input.traineeId);
       if (error) throw error;
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "registration", action: "trainee.updated", record_type: "trainee", record_id: input.traineeId, prior_values: prior, new_values: next });
+      // A blank Facebook field keeps the link already recorded.
+      if (input.facebookUrl) { const fb = await saveFacebook(admin, input.traineeId, input.facebookUrl, staff.user.id); if (fb.error) return NextResponse.json({ error: fb.error }, { status: 400 }); }
       return NextResponse.json({ ok: true });
+    }
+    if (input.action === "trainee-facebook") {
+      if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Only Registration records the Facebook link." }, { status: 403 });
+      const fb = await saveFacebook(createSupabaseAdminClient(), input.traineeId, input.url, staff.user.id);
+      if (fb.error) return NextResponse.json({ error: fb.error }, { status: 400 });
+      return NextResponse.json({ ok: true, url: fb.url });
     }
     if (input.action === "other-course-center") {
       if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Only Registration sets the training center." }, { status: 403 });
@@ -2117,6 +2151,7 @@ export async function POST(request: Request) {
       const latest = new Map<string, string>();
       for (const c of checks ?? []) { const code = c.requirement === "medical_certificate" ? "medical_peme" : c.requirement; if (!latest.has(code)) latest.set(code, c.status); }
       if (!REQUIREMENT_CODES.every((code) => latest.get(code) === "Verified")) return NextResponse.json({ error: "Tick all four requirements (valid ID, PEME medical, 2x2 photo, seaman's book / SRN) before handing to the Cashier." }, { status: 400 });
+      if (await facebookMissing(admin, input.enrollmentId)) return NextResponse.json({ error: "Add the trainee's Facebook link first." }, { status: 400 });
       const at = new Date().toISOString();
       const { error } = await admin.from("enrollments").update({ handed_to_cashier_at: at, handed_to_cashier_by: staff.user.id }).eq("id", input.enrollmentId).is("handed_to_cashier_at", null);
       if (error) throw error;
@@ -2139,6 +2174,7 @@ export async function POST(request: Request) {
       const latest = new Map<string, string>();
       for (const c of checks ?? []) { const code = c.requirement === "medical_certificate" ? "medical_peme" : c.requirement; if (!latest.has(code)) latest.set(code, c.status); }
       if (!REQUIREMENT_CODES.every((code) => latest.get(code) === "Verified")) return NextResponse.json({ error: "Tick all four requirements first." }, { status: 400 });
+      if (await facebookMissing(admin, input.enrollmentId)) return NextResponse.json({ error: "Add the trainee's Facebook link first." }, { status: 400 });
       const at = new Date().toISOString();
       const { error } = await admin.from("enrollments").update({ enrollment_status: "Enrolled", enrolled_at: at, company_charge_agency_id: agency.id, referral_agency_id: agency.id, source: "Agency", updated_at: at }).eq("id", input.enrollmentId).eq("enrollment_status", "Pending");
       if (error) return NextResponse.json({ error: /company_charge_agency_id/.test(error.message) ? "Apply database update 202610290063 first." : error.message }, { status: 400 });

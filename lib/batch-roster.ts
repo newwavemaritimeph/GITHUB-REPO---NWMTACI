@@ -5,7 +5,7 @@ import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
  * database (the portal's own list holds only the newest enrollments), for the Batch window, Excel and PDF.
  */
 export type RosterRow = {
-  enrollmentId: string; name: string; nwmtaciNo: string; srn: string; rank: string; mobile: string; email: string;
+  enrollmentId: string; name: string; nwmtaciNo: string; srn: string; rank: string; mobile: string; email: string; facebook: string;
   source: string; status: string; payment: "Paid" | "Balance" | "Company Charge" | "Not Paid Yet"; balanceCentavos: number; requirements: number;
 };
 export type BatchRoster = {
@@ -36,8 +36,12 @@ export async function loadBatchRoster(db: ReturnType<typeof createSupabaseAdminC
     db.from("enrollments").select("id,enrollment_status,source,selling_price_centavos,referral_agency_id,trainee_id,trainees(legal_first_name,legal_middle_name,legal_last_name,suffix,application_number,trainee_number,srn,rank,mobile,email,marketing_agency_id)").eq("batch_id", batchId).neq("enrollment_status", "Cancelled"),
     db.from("batch_resources").select("classrooms(name),instructors!batch_resources_instructor_id_fkey(complete_name)").eq("batch_id", batchId).maybeSingle(),
   ]);
-  const list = (ens ?? []) as unknown as { id: string; enrollment_status: string; source: string | null; selling_price_centavos: number; referral_agency_id: string | null; trainees: unknown }[];
+  const list = (ens ?? []) as unknown as { id: string; enrollment_status: string; source: string | null; selling_price_centavos: number; referral_agency_id: string | null; trainee_id: string; trainees: unknown }[];
   const ids = list.map((e) => e.id);
+  // Facebook links (migration 070) are read on their own, so the list still loads before it is applied.
+  const traineeIds = [...new Set(list.map((e) => e.trainee_id))];
+  const fbRes = traineeIds.length ? await db.from("trainees").select("id,facebook_url").in("id", traineeIds) : null;
+  const facebook = new Map(((fbRes && !fbRes.error ? fbRes.data : []) ?? []).map((x) => [x.id as string, (x.facebook_url as string | null) ?? ""]));
   const [{ data: allocs }, { data: charges }, { data: checks }, cc] = ids.length ? await Promise.all([
     db.from("payment_allocations").select("enrollment_id,amount_centavos,payments!inner(valid)").in("enrollment_id", ids).eq("payments.valid", true),
     db.from("enrollment_charges").select("enrollment_id,amount_centavos,event_type").in("enrollment_id", ids).eq("valid", true),
@@ -59,7 +63,7 @@ export async function loadBatchRoster(db: ReturnType<typeof createSupabaseAdminC
     const partner = agency.get(e.referral_agency_id ?? t?.marketing_agency_id ?? "") ?? null;
     const p = paymentState(due.get(e.id) ?? 0, paid.get(e.id) ?? 0, billed.has(e.id));
     return { enrollmentId: e.id, name: t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}${t.legal_middle_name ? ` ${t.legal_middle_name.charAt(0)}.` : ""}${t.suffix ? ` ${t.suffix}` : ""}` : "—",
-      nwmtaciNo: t?.application_number ?? t?.trainee_number ?? "", srn: t?.srn ?? "", rank: t?.rank ?? "", mobile: t?.mobile ?? "", email: t?.email ?? "",
+      nwmtaciNo: t?.application_number ?? t?.trainee_number ?? "", srn: t?.srn ?? "", rank: t?.rank ?? "", mobile: t?.mobile ?? "", email: t?.email ?? "", facebook: facebook.get(e.trainee_id) ?? "",
       source: sourceLabel(e.source, partner), status: e.enrollment_status, ...p, requirements: REQUIRED.filter((r) => latest.get(`${e.id}|${r}`) === "Verified").length };
   });
   const course = one(b.courses as unknown as { code: string; name: string } | null);

@@ -12,6 +12,7 @@ import { TarButton } from "./live-cashier";
 import { tcl } from "@/lib/title-case";
 import { shrinkProof } from "@/lib/proof-shrink";
 import { COMPANY_CHARGE, sourceLabel } from "@/lib/company-charge";
+import { VALIDATION_MESSAGES, isFacebookUrl } from "@/lib/validation";
 
 /**
  * Registration Officer workspace (rebuilt Oct 2026 to MASTERPLAN §10 as
@@ -417,7 +418,25 @@ function enrollmentTypeOf(data: PortalData, e: Enrollment) {
  * Where the trainee came from (owner, 29 Oct 2026): Registration picks it, the website no
  * longer asks. Agency / Consultancy opens a partner dropdown; the server locks it once paid.
  */
-export function SourcePicker({ data, enrollment: e, busy, post }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<unknown> }) {
+/** Registration records the trainee's Facebook profile before the hand-over (owner, 3 Nov 2026); saves on blur or Enter. */
+function FacebookField({ traineeId, saved, onSaved }: { traineeId: string; saved: string; onSaved: (url: string) => void }) {
+  const [v, setV] = useState(saved), [saving, setSaving] = useState(false), [err, setErr] = useState("");
+  const value = v.trim(), good = isFacebookUrl(value), dirty = value !== saved;
+  const save = async () => {
+    if (!dirty || !good || saving) return;
+    setSaving(true); setErr("");
+    try { const r = await submit({ action: "trainee-facebook", traineeId, url: value }) as { url?: string }; const url = r.url ?? value; setV(url); onSaved(url); }
+    catch (x) { setErr(x instanceof Error ? x.message : "Not saved."); }
+    finally { setSaving(false); }
+  };
+  const hint = err || (!value ? "Paste the trainee's Facebook profile link." : !good ? VALIDATION_MESSAGES.facebook : saving ? "Saving…" : dirty ? "Press Enter or click outside the box to save." : "✓ Saved to the trainee record");
+  const tone = err || (value && !good) ? "bad" : value && !dirty ? "ok" : "";
+  return <label className="tp-fb"><span>Facebook Link (Required)</span>
+    <input className={tone} value={v} inputMode="url" placeholder="https://www.facebook.com/juan.delacruz" onChange={(ev) => { setV(ev.target.value); setErr(""); }} onBlur={() => void save()} onKeyDown={(ev) => { if (ev.key === "Enter") { ev.preventDefault(); void save(); } }} />
+    <small className={tone}>{hint}</small></label>;
+}
+
+export function SourcePicker({ data, enrollment: e, busy, post, children }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<unknown>; children?: ReactNode }) {
   const current = partnerOf(data, e);
   const initial = current ? "Agency" : e.source === "Walk-in" || e.source === "Meta" ? e.source : "Online enrollment";
   const [src, setSrc] = useState(initial);
@@ -432,6 +451,7 @@ export function SourcePicker({ data, enrollment: e, busy, post }: { data: Portal
       <option value="">Choose the partner…</option>
       {(["Agency", "Consultancy"] as const).map((k) => { const list = partners.filter((a) => (a.kind === "Consultancy" ? "Consultancy" : "Agency") === k); return list.length ? <optgroup key={k} label={k === "Agency" ? "Agencies" : "Consultancies"}>{list.map((a) => <option key={a.id} value={a.id}>{a.name}{a.rebate_mode === COMPANY_CHARGE ? " · Company Charge" : ""}</option>)}</optgroup> : null; })}
     </select></label>}
+    {children}
   </div>;
 }
 
@@ -500,6 +520,9 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
   const [handing, setHanding] = useState(false), [payError, setPayError] = useState("");
   const needsProof = !!payModes.find((m) => m.name === payMode)?.requires_reference;
   const proofReady = !needsProof || (Number(payAmount) > 0 && payRef.trim().length >= 3 && !!payFile);
+  // The Facebook link is required before the hand-over or Company Charge (owner, 3 Nov 2026).
+  const [fbLocal, setFbLocal] = useState<string | null>(null);
+  const fbSaved = fbLocal ?? data.traineeFacebook?.[e.trainee_id] ?? "";
   async function handOver() {
     setPayError(""); setHanding(true);
     try {
@@ -533,7 +556,7 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
         <p><span className="tp-mono">{appNo}</span>{srn ? <> · SRN <span className="tp-mono">{srn}</span></> : null}{t?.mobile ? ` · ${t.mobile}` : ""}{t?.email ? <> · <span className="lc">{t.email}</span></> : null}</p>
         <div className="tp-chips">{sourceLabel(e.source, partner) && <span className="tp-chip or">{sourceLabel(e.source, partner)}</span>}{billTo && <span className="tp-chip bl">Company Charge</span>}<Badge tone={s.tone}>{s.text}</Badge></div></div>
     </div>
-    {e.enrollment_status === "Pending" && <SourcePicker key={`${e.id}:${partner?.id ?? e.source}`} data={data} enrollment={e} busy={busy} post={post} />}
+    {e.enrollment_status === "Pending" && <SourcePicker key={`${e.id}:${partner?.id ?? e.source}`} data={data} enrollment={e} busy={busy} post={post}><FacebookField key={e.trainee_id} traineeId={e.trainee_id} saved={fbSaved} onSaved={setFbLocal} /></SourcePicker>}
     <div className="tp-stats">
       <div><span className="tp-cap">Training</span><b>{c ? `${c.code} · ${c.name}` : "—"}</b><small>{scheduleOf(e)}{b ? ` · ${b.batch_number}` : ""}</small></div>
       <div><span className="tp-cap">Payment</span><b className={`tp-mono${r.paid ? " sc-good" : ""}`}>{r.paid ? pesos2(r.paidCentavos) : pesos2(balance)}</b><small>{billTo ? `Billed to ${billTo.name}` : r.paid ? `Paid · balance ${pesos2(balance)}` : r.handed ? "With the Cashier" : "Not paid yet"}</small></div>
@@ -558,18 +581,18 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
       {isCC ? <>
         <label className="sc-pay-ref">Company<select value={ccAgency} onChange={(ev) => setCcAgency(ev.target.value)}><option value="">Choose the company…</option>{(["Agency", "Consultancy"] as const).map((k) => { const list = companies.filter((a) => (a.kind === "Consultancy" ? "Consultancy" : "Agency") === k); return list.length ? <optgroup key={k} label={k === "Agency" ? "Agencies" : "Consultancies"}>{list.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</optgroup> : null; })}</select></label>
         <span className="sc-pay-note">No payment at the Cashier and no receipt: {ccName || "the company"} is billed on its Billing Statement.</span>
-        <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || anySaving || !ccAgency} onClick={() => void post({ action: "application-enroll-charge", enrollmentId: e.id, agencyId: ccAgency }, `Enrolled · Company Charge (${ccName}).`).catch(() => undefined)}>Enroll · Company Charge</button>{!ccAgency && <small>Choose the company first</small>}</div>
+        <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || anySaving || !ccAgency || !fbSaved} onClick={() => void post({ action: "application-enroll-charge", enrollmentId: e.id, agencyId: ccAgency }, `Enrolled · Company Charge (${ccName}).`).catch(() => undefined)}>Enroll · Company Charge</button>{!fbSaved ? <small>Add the Facebook link first</small> : !ccAgency && <small>Choose the company first</small>}</div>
       </> : needsProof ? <>
         <label className="sc-pay-amt">Amount (₱)<input inputMode="decimal" value={payAmount} onChange={(ev) => setPayAmount(ev.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" /></label>
         <label className="sc-pay-ref">Reference No.<input value={payRef} onChange={(ev) => setPayRef(ev.target.value.toUpperCase())} placeholder="From the screenshot" maxLength={80} /></label>
         <label className="sc-pay-file">Proof of Payment<input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(ev) => setPayFile(ev.target.files?.[0] ?? null)} /></label>
       </> : <span className="sc-pay-note">Trainee pays at the Cashier.</span>}
-      {!isCC && <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || handing || anySaving || !proofReady} onClick={() => void handOver()}>{handing ? "Saving…" : needsProof ? "Upload Proof & Hand to Cashier" : "Hand to Cashier"}</button>{needsProof && !proofReady && <small>Amount, reference and photo are required</small>}</div>}
+      {!isCC && <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || handing || anySaving || !proofReady || !fbSaved} onClick={() => void handOver()}>{handing ? "Saving…" : needsProof ? "Upload Proof & Hand to Cashier" : "Hand to Cashier"}</button>{!fbSaved ? <small>Add the Facebook link first</small> : needsProof && !proofReady && <small>Amount, reference and photo are required</small>}</div>}
       {payError && <div className="sc-pay-err"><Message kind="error" text={payError} /></div>}
     </div>}
     {r.handed && !r.paid && !billTo && (() => { const pr = (data.traineeProofs ?? []).filter((x) => x.trainee_id === e.trainee_id).sort((a, z) => z.submitted_at.localeCompare(a.submitted_at))[0]; return <div className="sc-handed">With the Cashier · {pr ? `${pr.method} ${pesos2(pr.amount_centavos)} · Ref. ${pr.reference}` : "Cash"}</div>; })()}
     <div className="sc-foot">
-      <small>{!allTicked ? `Still to tick: ${missingNow.map((q) => q.label).join(", ")}` : isCC && !r.paid ? `All requirements received. Enroll on Company Charge: ${ccName || "the company"} is billed on its Billing Statement, so no payment at the Cashier.` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
+      <small>{!allTicked ? `Still to tick: ${missingNow.map((q) => q.label).join(", ")}` : !fbSaved && !r.handed && !r.paid ? "All requirements received. Add the trainee's Facebook link to continue." : isCC && !r.paid ? `All requirements received. Enroll on Company Charge: ${ccName || "the company"} is billed on its Billing Statement, so no payment at the Cashier.` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
       <span className="sc-acts">
         {r.ready && <button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "application-enroll", enrollmentId: e.id }, "Trainee enrolled.").catch(() => undefined)}>Enroll Now</button>}
       </span>

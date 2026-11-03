@@ -104,6 +104,23 @@ export function normalizeEmail(value: string) {
   return (value ?? "").trim().toLowerCase();
 }
 
+/* ------------------------------------------------------------- facebook ----- */
+
+// Registration records each trainee's Facebook profile (owner, 3 Nov 2026).
+// The domain must be followed by "/" so facebook.com.example.net is refused.
+const FACEBOOK = /^(https?:\/\/)?(www\.|m\.|web\.)?(facebook\.com|fb\.com|fb\.me)\/\S{2,}$/i;
+
+export function isFacebookUrl(value: string) {
+  const trimmed = (value ?? "").trim();
+  return trimmed.length <= 300 && FACEBOOK.test(trimmed);
+}
+
+/** Always an https:// link, so the stored value is safe to use as an href. */
+export function normalizeFacebookUrl(value: string) {
+  const trimmed = (value ?? "").trim();
+  return /^https?:\/\//i.test(trimmed) ? trimmed.replace(/^http:/i, "https:") : `https://${trimmed}`;
+}
+
 /* ------------------------------------------------------------- messages ----- */
 
 export const VALIDATION_MESSAGES = {
@@ -111,4 +128,5 @@ export const VALIDATION_MESSAGES = {
   contact: "Enter a Philippine mobile or landline number, for example 0917 123 4567 or (02) 8553 0310.",
   srn: "The SRN must be exactly 10 digits.",
   email: "Enter a valid email address, for example name@example.com.",
+  facebook: "Use a facebook.com link, for example https://www.facebook.com/juan.delacruz.",
 } as const;
