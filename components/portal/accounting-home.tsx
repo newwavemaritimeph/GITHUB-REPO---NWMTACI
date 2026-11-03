@@ -718,3 +718,44 @@ export function AccountingDocuments({ only, embedded }: { only?: "receipts" | "t
   </>;
   return embedded ? body : <div className="portal-page cx ac"><TxHead title="Receipts and TARs" />{body}</div>;
 }
+
+type HistoryRow = { id: string; category: string; decidedAt: string; title: string; detail: string; amountCentavos: number; decision: string; by: string; remarks: string };
+const HISTORY_CATEGORIES = ["Expense Requests", "Voucher Reprints", "Refunds", "Change Requests", "Discounts", "Payment Voids", "Rebates Paid to Partners", "Cashier Closings Reviewed"];
+const DECISION_TONE: Record<string, "active" | "cancelled" | "pending"> = { Approved: "active", Paid: "active", Reviewed: "active", Voided: "pending", Rejected: "cancelled", Cancelled: "cancelled" };
+
+/** Accounting › Approvals (owner, 3 Nov 2026): a date-sensitive history of every decision, by category. Waiting items are on the Dashboard. */
+export function ApprovalHistory({ data, go }: { data: PortalData; go: (module: string) => void }) {
+  const p = usePeriod();
+  const [custom, setCustom] = useState(false), [from, setFrom] = useState(p.today), [to, setTo] = useState(p.today);
+  const [cat, setCat] = useState("All"), [q, setQ] = useState("");
+  const range = custom ? { from, to, label: `${fmtDate(from)} – ${fmtDate(to)}` } : p.period === "All Dates" ? { from: addDays(p.today, -365), to: p.today, label: "the last 12 months" } : p.range;
+  const { data: res, error } = useJson<{ rows: HistoryRow[]; notes: string[] }>(range.from <= range.to ? `/api/staff/approval-history?from=${range.from}&to=${range.to}` : null);
+  const term = q.trim().toLowerCase();
+  const inView = (res?.rows ?? []).filter((r) => !term || `${r.title} ${r.detail} ${r.remarks} ${r.by}`.toLowerCase().includes(term));
+  const rows = inView.filter((r) => cat === "All" || r.category === cat);
+  const pg = usePaged(rows);
+  const okRows = rows.filter((r) => r.decision !== "Rejected" && r.decision !== "Cancelled"), noRows = rows.filter((r) => r.decision === "Rejected");
+  const sum = (l: HistoryRow[]) => l.reduce((s, r) => s + r.amountCentavos, 0);
+  // Still waiting: the same counts the Dashboard rail shows.
+  const waiting = data.expenses.filter((e) => e.status === "Pending").length + (data.expenseReprints ?? []).filter((r) => r.status === "Pending").length + data.requests.filter((r) => r.request_type === "Refund" && r.status === "Pending" && r.stage !== "With cashier").length + data.pendingDiscounts.length + (data.paymentVoids ?? []).filter((r) => r.status === "Pending").length + data.agencyRebates.filter((r) => r.status === "Pending").length + data.cashierClosings.filter((c) => c.status === "Submitted").length;
+  const when = (iso: string) => `${fmtDate(iso)} · ${new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso))}`;
+  return <>
+    {waiting > 0 && <div className="ah-wait"><span>{waiting} still waiting for your decision</span><button type="button" className="portal-secondary" onClick={() => go("Dashboard")}>Open on the Dashboard</button></div>}
+    {error && <Message kind="error" text={error} />}
+    {(res?.notes ?? []).length > 0 && <p className="ac-note">Not shown: {res!.notes.join(" · ")}</p>}
+    <section className="portal-panel cx-panel">
+      {custom ? <div className="pd-bar"><span className="cx-seg"><button type="button" onClick={() => setCustom(false)}>Daily · Weekly · Monthly</button><button type="button" className="on">Custom</button></span><label>From <input type="date" value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label><label>To <input type="date" value={to} onChange={(e) => e.target.value && setTo(e.target.value)} /></label></div>
+        : <div className="dc-bar"><PeriodBar p={p} what="Decided" count={`${rows.length}`} /><button type="button" className="portal-secondary" onClick={() => setCustom(true)}>Custom</button></div>}
+      <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search approvals" placeholder="Search number, payee, trainee or remarks" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+      <div className="chips ac-chipbar">{["All", ...HISTORY_CATEGORIES].map((c) => { const n = c === "All" ? inView.length : inView.filter((r) => r.category === c).length; return <button key={c} type="button" className={`ac-chip${cat === c ? " on" : ""}${n ? "" : " zero"}`} onClick={() => setCat(c)}>{c}<span className={n ? "has" : ""}>{n}</span></button>; })}</div>
+      <div className="ad-cash">
+        <div><span>Decided</span><b>{rows.length}</b><small>{range.label}</small></div>
+        <div><span>Approved · Paid · Reviewed</span><b>{pesos2(sum(okRows))}</b><small>{okRows.length} item{okRows.length === 1 ? "" : "s"}</small></div>
+        <div><span>Rejected</span><b>{pesos2(sum(noRows))}</b><small>{noRows.length} item{noRows.length === 1 ? "" : "s"}</small></div>
+      </div>
+      {!res ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : rows.length ? <div className="portal-table ac-table"><table><thead><tr><th>Decided</th><th>Category</th><th>What</th><th className="r">Amount</th><th>Decision</th><th>By</th><th>Remarks</th></tr></thead><tbody>
+        {pg.shown.map((r) => <tr key={r.id}><td>{when(r.decidedAt)}</td><td><span className="ah-cat">{r.category}</span></td><td><b>{r.title}</b>{r.detail && <small>{r.detail}</small>}</td><td className="r cx-amt">{r.amountCentavos ? pesos2(r.amountCentavos) : "—"}</td><td><Badge tone={DECISION_TONE[r.decision] ?? "pending"}>{r.decision}</Badge></td><td>{r.by}</td><td>{r.remarks || "—"}</td></tr>)}
+      </tbody></table>{pg.pager}</div> : <p className="portal-empty-copy">Nothing decided in this period.</p>}
+    </section>
+  </>;
+}

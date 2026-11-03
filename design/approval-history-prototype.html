@@ -1,0 +1,112 @@
+<title>Approvals History</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Same shell as the live portal: navy bar with dropdown tabs, summary rail on the left, light-cyan table headers. */
+:root{--orange:#F25615;--blue:#0571D0;--cyan:#35CCFA;--cyan-l:#9EE3F1;--navy:#123F63;--bg:#f2f6f8;--surface:#fff;--fg:#0f2638;--muted:#587184;--line:#dbe6ec;--soft:#eef4f8;--th:#e6f6fd;--thc:#0b4f8f;--zebra:#f7fafc;
+ --good:#0a7a3e;--good-bg:#e2f5e9;--warn:#a2470b;--warn-bg:#fdf0e5;--bad:#b42318;--bad-bg:#fcebea;--info:#0571D0;--info-bg:#e5f1fb;
+ --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding-block:16px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.w{max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.logo{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}.logo b{font-size:19px;font-weight:600}.logo b span{color:var(--orange)}.logo small{display:block;color:var(--cyan-l);font-size:14px}.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.who{font-size:14px;color:#cfe3ef;display:flex;align-items:center;gap:8px}.who select{background:#ffffff14;border:1px solid #ffffff30;color:#fff;border-radius:8px;padding:5px 8px}.who select option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:16px;flex-wrap:wrap}.tab>button{background:none;border:0;color:#c3dbea;font:500 16px var(--sans);padding:12px 18px;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:8px}.tab>button:hover{color:#fff;background:#ffffff12}.tab.on>button{background:var(--bg);color:var(--fg);font-weight:600}
+.caret{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.menu{position:absolute;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:15;display:flex;flex-direction:column;margin-top:2px}.tab{position:relative}.menu button{background:none;border:0;text-align:left;color:var(--fg);font:500 15.5px var(--sans);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;gap:12px}.menu button:hover{background:var(--soft)}.menu button.on{background:var(--info-bg);color:var(--info);font-weight:600}.menu small,.n{font:600 11.5px var(--mono);background:var(--orange);color:#fff;border-radius:10px;padding:1px 7px}
+.page{padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.cx-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}h1{font-size:25px;font-weight:600;margin:0}h2{font-size:19px;font-weight:600;margin:0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.seg button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.seg button.on{background:var(--navy);color:#fff}
+.rail{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}@media (max-width:900px){.rail{grid-template-columns:1fr}}.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.ph small{color:var(--muted);font-size:14px}
+.lines{display:flex;flex-direction:column;padding:0 20px 16px}.lines div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}.lines div:first-child{border-top:0}.lines dd,.lines span:last-child{font-family:var(--mono);font-weight:600}.lines .tot{font-weight:700}.lines .bad{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 16px}.tile{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 12px}.tile span{display:block;font-size:13px;color:var(--muted)}.tile b{font:600 19px var(--mono)}
+.cwrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--th);color:var(--thc);font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:10px 12px;border-right:1px solid var(--line);white-space:nowrap}td{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.35}tbody tr:nth-child(even) td{background:var(--zebra)}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}.due{background:var(--bad-bg);color:var(--bad)}.dueo{background:var(--warn-bg);color:var(--warn)}.appr{background:var(--info-bg);color:var(--info)}.paid{background:var(--good-bg);color:var(--good)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:9px;padding:7px 14px;font-weight:600;font-size:14.5px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.okb{background:var(--good);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:14px 20px;background:var(--soft);border-top:1px solid var(--line)}.form label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}.form select,.form input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line)}
+.alert{background:var(--bad-bg);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:15px;font-weight:500;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.note{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+</style>
+<style>
+[hidden]{display:none!important}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}.bar input{border:1px solid var(--line);border-radius:9px;padding:7px 10px;background:var(--surface);color:var(--fg)}
+.daypick{display:inline-flex;align-items:center;gap:6px}.daypick b{font-size:14.5px;white-space:nowrap}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px;border-bottom:1px solid var(--line)}.chips button{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 12px;font-weight:600;font-size:13.5px;color:var(--fg)}.chips button.on{background:var(--info-bg);border-color:var(--info);color:var(--info)}.chips small{font:600 11.5px var(--mono);margin-left:6px;color:var(--muted)}
+.dec{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12.5px;font-weight:600}.Approved,.Paid,.Reviewed{background:var(--good-bg);color:var(--good)}.Rejected{background:var(--bad-bg);color:var(--bad)}.Voided{background:#efe6fb;color:#7a3dbf}
+.cat{font-size:12px;font-weight:600;color:var(--blue)}
+.sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;padding:14px 16px}.sum div{border:1px solid var(--line);border-radius:10px;padding:8px 12px}.sum span{display:block;font-size:12.5px;color:var(--muted)}.sum b{font:600 16px var(--mono)}.sum small{color:var(--muted);font-size:12px}
+.wait{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;background:#fff1ea;color:#b33d0b;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-weight:600}
+</style>
+<header class="top"><div class="w">
+  <div class="brand"><div class="logo"><div class="mark">NW</div><div><b>New <span>Wave</span> Portal <span class="proto">PROTOTYPE</span></b><small>Approvals history</small></div></div></div>
+  <nav class="tabs"><div class="tab"><button type="button">Dashboard</button></div><div class="tab"><button type="button">Search Trainee</button></div><div class="tab on"><button type="button">Approvals</button></div><div class="tab"><button type="button">Transactions<span class="caret"></span></button></div><div class="tab"><button type="button">Reports</button></div><div class="tab"><button type="button">Configuration<span class="caret"></span></button></div></nav>
+</div></header>
+<main class="page"><div class="w">
+  <div class="cx-head"><div><span class="eyebrow">Accounting</span><h1>Approvals</h1></div></div>
+  <div class="wait"><span>8 still waiting for your decision</span><button class="btn">Open on the Dashboard</button></div>
+  <section class="panel">
+    <div class="bar"><div class="seg" id="seg"></div><span class="daypick" id="dp"></span><input id="q" placeholder="Search number, payee, trainee or remarks" style="flex:1;min-width:200px"></div>
+    <div class="chips" id="chips"></div>
+    <div class="sum" id="sum"></div>
+    <div class="cwrap"><table><thead><tr><th>Decided</th><th>Category</th><th>What</th><th class="r">Amount</th><th>Decision</th><th>By</th><th>Remarks</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div class="foot"><span id="count" style="font-size:14px;color:var(--muted)"></span><span id="pager"></span></div>
+  </section>
+</div></main>
+<script>
+const TODAY = "2026-11-03";
+const d = (s) => new Date(s + "T00:00:00Z"), iso = (x) => x.toISOString().slice(0, 10);
+const add = (s, n) => { const x = d(s); x.setUTCDate(x.getUTCDate() + n); return iso(x); };
+const fmt = (s) => d(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const peso = (c) => "₱" + (c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const CATS = ["Expense Requests", "Voucher Reprints", "Refunds", "Discounts", "Payment Voids", "Rebates Paid to Partners", "Cashier Closings Reviewed"];
+const R = [
+  ["2026-11-03", "4:10 PM", "Expense Requests", "ER-2026-000041 → CV-2026-000088 · Meralco", "Utilities", 845000, "Approved", "Accounting Manager", ""],
+  ["2026-11-03", "3:55 PM", "Payment Voids", "AR-2026-000117 · VILLANUEVA, Rico T.", "Training Fee · UBT-PSSR", 130000, "Voided", "Accounting Manager", "Duplicate entry"],
+  ["2026-11-03", "2:20 PM", "Refunds", "DELA CRUZ, Juan P. · SSO", "Cancellation 6 days before", 415000, "Approved", "Accounting Manager", ""],
+  ["2026-11-03", "11:05 AM", "Discounts", "REYES, Carlo M. · STPPDSPPS", "Returning trainee", 20000, "Rejected", "Accounting Manager", "No approved promo"],
+  ["2026-11-03", "9:30 AM", "Cashier Closings Reviewed", "Closing · Nov 2", "Counted ₱18,230.00 · short ₱20.00", 2000, "Reviewed", "Accounting Manager", "Shortage charged to the Cashier"],
+  ["2026-11-02", "5:40 PM", "Rebates Paid to Partners", "Qapla Maritime · 3 courses", "UBT-PSSR × 2, PSCMT", 90000, "Paid", "Accounting Manager", "GCash Ref 554120"],
+  ["2026-11-02", "3:15 PM", "Voucher Reprints", "CV-2026-000080 · PLDT", "Lost voucher", 0, "Approved", "Accounting Manager", ""],
+  ["2026-11-02", "10:45 AM", "Expense Requests", "ER-2026-000039 · Office Supplies", "Supplies", 128000, "Rejected", "Accounting Manager", "No receipt photo"],
+  ["2026-10-30", "4:00 PM", "Expense Requests", "ER-2026-000036 → CV-2026-000079 · Maynilad", "Utilities", 56000, "Approved", "Accounting Manager", ""],
+  ["2026-10-28", "1:10 PM", "Refunds", "SANTOS, Maria L. · PSCMT", "Cancellation 3 days before", 65000, "Approved", "Accounting Manager", ""],
+  ["2026-10-27", "2:00 PM", "Discounts", "MENDOZA, Ana R. · PSCMHBT", "Partner rebate", 30000, "Approved", "Accounting Manager", ""],
+];
+const S = { span: "Daily", day: TODAY, from: "2026-10-01", to: TODAY, cat: "All", q: "", page: 1 };
+function range() {
+  if (S.span === "Daily") return [S.day, S.day];
+  if (S.span === "Weekly") { const dow = (d(S.day).getUTCDay() + 6) % 7; const mon = add(S.day, -dow); return [mon, add(mon, 6)]; }
+  if (S.span === "Monthly") { const m = S.day.slice(0, 7); const e = d(m + "-01"); e.setUTCMonth(e.getUTCMonth() + 1); e.setUTCDate(0); return [m + "-01", iso(e)]; }
+  return [S.from, S.to];
+}
+function label() { const [a, b] = range(); return S.span === "Daily" ? fmt(a) : S.span === "Monthly" ? d(a).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" }) : `${fmt(a)} – ${fmt(b)}`; }
+function step(n) { if (S.span === "Daily") S.day = add(S.day, n); else if (S.span === "Weekly") S.day = add(S.day, 7 * n); else { const x = d(S.day.slice(0, 7) + "-01"); x.setUTCMonth(x.getUTCMonth() + n); S.day = iso(x); } }
+function render() {
+  const [a, b] = range(), q = S.q.toLowerCase();
+  const inR = R.filter((r) => r[0] >= a && r[0] <= b && (!q || r.join(" ").toLowerCase().includes(q)));
+  const list = inR.filter((r) => S.cat === "All" || r[2] === S.cat);
+  document.getElementById("seg").innerHTML = ["Daily", "Weekly", "Monthly", "Custom"].map((s) => `<button data-span="${s}" class="${S.span === s ? "on" : ""}">${s}</button>`).join("");
+  document.getElementById("dp").innerHTML = S.span === "Custom" ? `<label>From <input type="date" id="from" value="${S.from}"></label><label>To <input type="date" id="to" value="${S.to}"></label>` : `<button class="btn" data-step="-1">‹</button><b>${label()}</b><button class="btn" data-step="1">›</button><button class="btn" data-today>Today</button>`;
+  document.getElementById("chips").innerHTML = ["All", ...CATS].map((c) => `<button data-cat="${c}" class="${S.cat === c ? "on" : ""}">${c}<small>${c === "All" ? inR.length : inR.filter((r) => r[2] === c).length}</small></button>`).join("");
+  const ok = list.filter((r) => ["Approved", "Paid", "Reviewed", "Voided"].includes(r[6])), no = list.filter((r) => r[6] === "Rejected");
+  document.getElementById("sum").innerHTML = `<div><span>Decided</span><b>${list.length}</b><small>${label()}</small></div><div><span>Approved · Paid · Reviewed</span><b>${peso(ok.reduce((s, r) => s + r[5], 0))}</b><small>${ok.length} item${ok.length === 1 ? "" : "s"}</small></div><div><span>Rejected</span><b>${peso(no.reduce((s, r) => s + r[5], 0))}</b><small>${no.length} item${no.length === 1 ? "" : "s"}</small></div>`;
+  const pages = Math.max(1, Math.ceil(list.length / 10)); S.page = Math.min(S.page, pages);
+  document.getElementById("rows").innerHTML = list.slice((S.page - 1) * 10, S.page * 10).map((r) => `<tr><td>${fmt(r[0])}<small>${r[1]}</small></td><td><span class="cat">${r[2]}</span></td><td><b>${r[3]}</b><small>${r[4]}</small></td><td class="r amt">${r[5] ? peso(r[5]) : "—"}</td><td><span class="dec ${r[6]}">${r[6]}</span></td><td>${r[7]}</td><td>${r[8] || "—"}</td></tr>`).join("") || `<tr><td colspan="7" style="color:var(--muted)">Nothing decided in this period.</td></tr>`;
+  document.getElementById("count").textContent = `${list.length} decision${list.length === 1 ? "" : "s"} · ${label()} · newest first`;
+  document.getElementById("pager").innerHTML = pages > 1 ? `<button class="btn" data-pg="-1">Prev</button> ${S.page} of ${pages} <button class="btn" data-pg="1">Next</button>` : "";
+}
+document.addEventListener("click", (e) => {
+  const t = e.target.closest("button"); if (!t) return;
+  if (t.dataset.span) S.span = t.dataset.span; else if (t.dataset.step) step(Number(t.dataset.step)); else if ("today" in t.dataset) S.day = TODAY; else if (t.dataset.cat) S.cat = t.dataset.cat; else if (t.dataset.pg) S.page += Number(t.dataset.pg); else return;
+  render();
+});
+document.addEventListener("change", (e) => { if (e.target.id === "from") S.from = e.target.value; if (e.target.id === "to") S.to = e.target.value; render(); });
+document.addEventListener("input", (e) => { if (e.target.id === "q") { S.q = e.target.value; const pos = e.target.selectionStart; render(); const q = document.getElementById("q"); q.focus(); q.setSelectionRange(pos, pos); } });
+render();
+</script>

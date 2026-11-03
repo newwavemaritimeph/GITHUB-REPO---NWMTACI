@@ -3461,6 +3461,8 @@ export async function POST(request: Request) {
       if (!staff.roleCodes.some((role) => ["admin", "accounting"].includes(role))) return NextResponse.json({ error: "Only Accounting can settle rebates." }, { status: 403 });
       const { data, error } = await db.rpc("settle_agency_rebate", { target_entry: input.id, target_status: input.status });
       if (error) throw error;
+      // Dated for Accounting › Approvals history (owner, 3 Nov 2026).
+      await createSupabaseAdminClient().from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "accounting", action: "agency_rebate.settled", record_type: "agency_rebate", record_id: input.id, new_values: { status: input.status } });
       return NextResponse.json({ ok: true, rebate: data });
     }
     if (input.action === "create-enrollment") {

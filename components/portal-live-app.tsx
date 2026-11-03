@@ -30,7 +30,7 @@ import { MismoDashboard, MismoFinalList, MismoSubmissions } from "./portal/mismo
 import { AssistantDashboard, AssistantRequisitions, ClassSchedules, ResourcePlanning, InstructorShortlist, GcashReconciliation, GcashNotInHistory } from "./portal/admin-assistant-home";
 import { RegistrationDeliveries, ReleasingDeliveries } from "./portal/delivery-home";
 import { ReleasingReports, ReleasingHome, CertificatesWorkspace, WaitingCertificates, CertificateTemplates, ReleasedCertificates, AdminCertificateControls, CertificateAlarm, ReleasingNumbering } from "./portal/releasing-home";
-import { AccountingHome, AccountingApprovals, AccountingReportsHub, FinanceSummaryReport, BillingStatementReport, AccountingPayments, AccountingDocuments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
+import { AccountingHome, ApprovalHistory, AccountingReportsHub, FinanceSummaryReport, BillingStatementReport, AccountingPayments, AccountingDocuments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, pesos2, first, dueCentavos, balanceOf, isUnpaid, manilaToday, addDays } from "@/lib/portal-format";
@@ -449,7 +449,8 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Schedule changes")return <ScheduleChanges data={data}/>;
   if(gateRole==="accounting"){
     if(active==="Dashboard")return <><div className="cl-admin-alarm"><GcashNotInHistory/></div><AccountingHome data={data} reload={reload} go={m=>go(m as Module)}/></>;
-    if(active==="Approvals")return <div className="portal-page cx ac"><div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Approvals</h1></div></div><AccountingApprovals data={data} reload={reload}/><p className="ac-note">Change requests such as cancellations and reschedules are applied automatically once their fee is paid, so they do not wait here.</p></div>;
+    // Approvals is the history of decisions (owner, 3 Nov 2026); waiting items are on the Dashboard.
+    if(active==="Approvals")return <div className="portal-page cx ac"><div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Approvals</h1></div></div><ApprovalHistory data={data} go={m=>go(m as Module)}/></div>;
     if(active==="Reports")return <AccountingReportsHub/>;
     if(active==="Search trainee")return <Trainees data={data} query={query} reload={reload} role={gateRole}/>;
     if(active==="Payments")return <AccountingPayments/>;
