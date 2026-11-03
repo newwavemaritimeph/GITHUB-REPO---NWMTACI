@@ -31,13 +31,15 @@ const hhmm = (t?: string | null) => (t ? String(Number(t.slice(0, 2))) + t.slice
 type BatchRow = { batch_number: string; starts_on: string; ends_on: string; daily_start: string | null; daily_end: string | null; venue: string | null };
 type PaymentRow = { id: string; payment_number: string; received_at: string; method: string; reference_number: string | null; valid: boolean; cashier_id: string | null };
 
-export default async function AdmissionRecordPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function AdmissionRecordPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ reprint?: string }> }) {
   const staff = await requireStaff(["admin", "registration", "cashier", "accounting"]);
   if (!staff) redirect("/staff-login");
   const { id } = await params;
+  // Accounting's reprint from the Trainee Account (owner, 3 Nov 2026): the copy was counted by document-reprint.
+  const reprint = (await searchParams).reprint === "1" && staff.roleCodes.some((r) => ["admin", "accounting"].includes(r));
   const db = createSupabaseAdminClient();
 
-  const { data: record } = await db.from("admission_records").select("id,ar_number,trainee_id,enrollment_ids,issued_by,issued_at,last_printed_at").eq("id", id).maybeSingle();
+  const { data: record } = await db.from("admission_records").select("id,ar_number,trainee_id,enrollment_ids,issued_by,issued_at,last_printed_at,print_count").eq("id", id).maybeSingle();
   if (!record) notFound();
   const ids = record.enrollment_ids as string[];
 
@@ -114,7 +116,7 @@ export default async function AdmissionRecordPage({ params }: { params: Promise<
   const issued = manila({ dateStyle: "medium", timeStyle: "short" }).format(new Date(record.issued_at));
   const officer = (officerRes.data as { complete_name?: string } | null)?.complete_name ?? "";
   const payDate = manila({ day: "numeric", month: "short" });
-  return <TarSheets arNumber={record.ar_number} issued={issued} name={name}
+  return <TarSheets arNumber={record.ar_number} reprintCopy={reprint ? Number(record.print_count ?? 0) : null} issued={issued} name={name}
     trainee={{ appNo: t.application_number ?? t.trainee_number, srn: t.srn, rank: t.rank, mobile: t.mobile, company: t.company }}
     courses={courses} misc={misc} discounts={discounts}
     payments={payments.map((p) => ({ id: p.id, number: p.number, dateLabel: payDate.format(new Date(p.date)), method: p.method, ref: p.ref, amount: p.amount }))}

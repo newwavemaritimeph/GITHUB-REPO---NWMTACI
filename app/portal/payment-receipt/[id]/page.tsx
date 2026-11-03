@@ -30,36 +30,45 @@ function trainingDates(start?: string | null, end?: string | null) {
 
 type BatchRow = { starts_on: string; ends_on: string };
 
-export default async function PaymentReceiptPage({ params }: { params: Promise<{ id: string }> }) {
+// Miscellaneous items and service fees have their own receipt (owner, 3 Nov 2026); the payment's remarks name the fee.
+const FEE_RECEIPT = /^(Miscellaneous|Service Fee) · /;
+
+export default async function PaymentReceiptPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ reprint?: string }> }) {
   const staff = await requireStaff(["admin", "cashier", "accounting"]);
   if (!staff) redirect("/staff-login");
   const { id } = await params;
+  // Accounting's reprint from the Trainee Account (owner, 3 Nov 2026): the copy was counted by document-reprint.
+  const reprint = (await searchParams).reprint === "1" && staff.roleCodes.some((r) => ["admin", "accounting"].includes(r));
   const db = createSupabaseAdminClient();
 
   const { data: payment } = await db.from("payments").select("id,payment_number,trainee_id,amount_centavos,method,receiving_account,reference_number,received_at,verification_state,valid,cashier_id,remarks,created_at").eq("id", id).maybeSingle();
   if (!payment) notFound();
   const [traineeRes, receiptRes, allocRes, cashierRes] = await Promise.all([
     db.from("trainees").select("trainee_number,legal_first_name,legal_middle_name,legal_last_name,suffix,srn,rank,mobile,company,application_number").eq("id", payment.trainee_id).maybeSingle(),
-    db.from("receipts").select("receipt_number").eq("payment_id", id).maybeSingle(),
+    db.from("receipts").select("receipt_number,print_count").eq("payment_id", id).maybeSingle(),
     db.from("payment_allocations").select("enrollment_id,amount_centavos").eq("payment_id", id),
     payment.cashier_id ? db.from("profiles").select("complete_name").eq("id", payment.cashier_id).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const t = traineeRes.data;
   if (!t) notFound();
   // Two prints per receipt (202610080026); not limited before that update.
-  const { error: printError } = await db.rpc("record_receipt_print", { target_payment: id });
+  const { error: printError } = reprint ? { error: null } : await db.rpc("record_receipt_print", { target_payment: id });
   if (printError && !/record_receipt_print|does not exist|schema cache/i.test(printError.message)) {
     return <main style={{ font: "16px/1.5 system-ui, sans-serif", color: "#123F63", padding: 32, maxWidth: 560 }}><h1 style={{ fontSize: 22 }}>Acknowledgement Receipt</h1><p>{printError.message}</p><p style={{ color: "#5f7180" }}>Close this tab to go back to the portal.</p></main>;
   }
-  if (!printError) await db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("cashier") ? "cashier" : staff.roleCodes[0] ?? null, action: "receipt.printed", record_type: "payment", record_id: id, new_values: { receipt: receiptRes.data?.receipt_number ?? null } });
+  if (!printError && !reprint) await db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("cashier") ? "cashier" : staff.roleCodes[0] ?? null, action: "receipt.printed", record_type: "payment", record_id: id, new_values: { receipt: receiptRes.data?.receipt_number ?? null } });
   const enrollmentIds = (allocRes.data ?? []).map((a) => a.enrollment_id as string);
 
   // Each enrollment this payment covers, with its balance after all valid payments.
-  const [enrollRes, chargeRes, paidRes] = enrollmentIds.length ? await Promise.all([
+  const feeLabel = FEE_RECEIPT.test(payment.remarks ?? "") ? (payment.remarks as string) : null;
+  const [enrollRes, chargeRes, paidRes, feePayRes] = enrollmentIds.length ? await Promise.all([
     db.from("enrollments").select("id,enrollment_number,selling_price_centavos,scheduled_on,courses(code,name),partner_course_offers(partner_centers(name)),batches(starts_on,ends_on)").in("id", enrollmentIds),
     db.from("enrollment_charges").select("enrollment_id,description,amount_centavos,event_type,created_by,created_at").in("enrollment_id", enrollmentIds).eq("valid", true),
     db.from("payment_allocations").select("enrollment_id,amount_centavos,payments!inner(valid)").in("enrollment_id", enrollmentIds).eq("payments.valid", true),
-  ]) : [{ data: [] }, { data: [] }, { data: [] }];
+    db.from("payments").select("remarks").eq("trainee_id", payment.trainee_id).eq("valid", true).or("remarks.like.Miscellaneous · %,remarks.like.Service Fee · %"),
+  ]) : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
+  // Charges with a receipt of their own are not repeated on the training-fee receipt.
+  const ownReceipt = new Set(((feePayRes.data ?? []) as { remarks: string }[]).map((r) => r.remarks.replace(FEE_RECEIPT, "")));
   const appliedTo = (enrollRes.data ?? []).map((e) => {
     const c = one(e.courses as { code: string; name: string } | { code: string; name: string }[] | null), b = one(e.batches as unknown as BatchRow | BatchRow[] | null);
     const charges = (chargeRes.data ?? []).filter((x) => x.enrollment_id === e.id);
@@ -69,12 +78,12 @@ export default async function PaymentReceiptPage({ params }: { params: Promise<{
     // Miscellaneous items sold with this payment (owner, 19 Oct 2026): the Cashier adds them just before
     // posting it, so they are this enrollment's charges by the same Cashier in the two minutes before.
     const posted = Date.parse(payment.created_at as string);
-    const misc = charges.filter((x) => x.event_type === "charge" && x.created_by === payment.cashier_id && Date.parse(x.created_at as string) <= posted + 5000 && Date.parse(x.created_at as string) >= posted - 120000)
-      .map((x) => ({ label: x.description as string, amount: Number(x.amount_centavos) }));
+    const misc = feeLabel ? [{ label: feeLabel, amount: applied }] : charges.filter((x) => x.event_type === "charge" && !ownReceipt.has(x.description as string) && x.created_by === payment.cashier_id && Date.parse(x.created_at as string) <= posted + 5000 && Date.parse(x.created_at as string) >= posted - 120000)
+      .map((x) => ({ label: `Miscellaneous · ${x.description as string}`, amount: Number(x.amount_centavos) }));
     const miscTotal = misc.reduce((s, m) => s + m.amount, 0);
     const center = one(one(e.partner_course_offers as unknown as { partner_centers: unknown } | { partner_centers: unknown }[] | null)?.partner_centers as { name: string } | { name: string }[] | null)?.name;
     const day = (e as { scheduled_on?: string | null }).scheduled_on ?? undefined;
-    return { id: e.id, number: e.enrollment_number as string, code: c?.code ?? "", name: center ? `${c?.name ?? "Course"} · ${center}` : c?.name ?? "Course", dates: b ? trainingDates(b.starts_on, b.ends_on) : trainingDates(day, day), due, paid, applied, misc: miscTotal <= applied ? misc : [], feeApplied: miscTotal <= applied ? applied - miscTotal : applied, balance: Math.max(0, due - paid) };
+    return { id: e.id, number: e.enrollment_number as string, code: c?.code ?? "", name: center ? `${c?.name ?? "Course"} · ${center}` : c?.name ?? "Course", dates: b ? trainingDates(b.starts_on, b.ends_on) : trainingDates(day, day), due, paid, applied, misc: miscTotal <= applied ? misc : [], feeApplied: miscTotal <= applied ? applied - miscTotal : applied, feeOnly: !!feeLabel, balance: Math.max(0, due - paid) };
   });
   const totalDue = appliedTo.reduce((s, r) => s + r.due, 0), totalPaid = appliedTo.reduce((s, r) => s + r.paid, 0), balance = Math.max(0, totalDue - totalPaid);
   const status = !payment.valid ? "VOID" : totalDue > 0 && totalPaid >= totalDue ? "FULLY PAID" : "PARTIALLY PAID";
@@ -83,5 +92,6 @@ export default async function PaymentReceiptPage({ params }: { params: Promise<{
   const received = manila({ dateStyle: "medium", timeStyle: "short" }).format(new Date(payment.received_at));
   const cashier = (cashierRes.data as { complete_name?: string } | null)?.complete_name ?? "";
 
-  return <ReceiptSheets {...({ receiptNo, name, received, payment: { number: payment.payment_number, method: payment.method, reference: payment.reference_number, amount: Number(payment.amount_centavos), remarks: payment.remarks }, trainee: { appNo: t.application_number ?? t.trainee_number, srn: t.srn, rank: t.rank, mobile: t.mobile, company: t.company }, appliedTo, totalDue, totalPaid, balance, status, cashier })} />;
+  const reprintCopy = reprint ? Number((receiptRes.data as { print_count?: number } | null)?.print_count ?? 0) : null;
+  return <ReceiptSheets {...({ receiptNo, name, received, reprintCopy, payment: { number: payment.payment_number, method: payment.method, reference: payment.reference_number, amount: Number(payment.amount_centavos), remarks: feeLabel ? null : payment.remarks }, trainee: { appNo: t.application_number ?? t.trainee_number, srn: t.srn, rank: t.rank, mobile: t.mobile, company: t.company }, appliedTo, totalDue, totalPaid, balance, status, cashier })} />;
 }

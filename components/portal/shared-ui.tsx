@@ -137,10 +137,10 @@ export function usePost(reload: () => Promise<void>) {
  * new tab for printing. The tab is opened first so the browser does not block
  * it as a pop-up, then pointed at the record once its AR number is ready.
  */
-export async function openAdmissionRecord(traineeId: string) {
+export async function openAdmissionRecord(traineeId: string, enrollmentIds?: string[]) {
   const tab = window.open("", "_blank");
   try {
-    const result = await submit({ action: "admission-record-issue", traineeId }) as { id?: string };
+    const result = await submit({ action: "admission-record-issue", traineeId, ...(enrollmentIds?.length ? { enrollmentIds } : {}) }) as { id?: string };
     if (!result.id) throw new Error("The admission record could not be issued.");
     const url = `/portal/admission-record/${result.id}`;
     if (tab) tab.location.href = url; else window.location.href = url;

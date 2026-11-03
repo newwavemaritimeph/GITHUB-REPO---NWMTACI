@@ -152,7 +152,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // Report (with opening and closing), Requests (CASHIER_TABS).
   cashier: ["Dashboard","Search trainee","Batch schedules","Payments","Other income","Expenses","Report","Requests"],
   // Accounting Manager (owner, 8 Oct 2026): five tabs — Dashboard · Approvals · Transactions ▾ · Reports · Configuration ▾ (ACCOUNTING_TABS).
-  accounting: ["Dashboard","Approvals","Reports","Payments","Other income","Expenses","Receivables","Payables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
+  accounting: ["Dashboard","Search trainee","Approvals","Reports","Payments","Other income","Expenses","Receivables","Payables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
 };
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
@@ -195,6 +195,8 @@ const CASHIER_TABS:TopTab[]=[
 const GROUP_LABELS:Partial<Record<NavGroup,string>>={"Payables & cash":"Payables and cash"};
 const ACCOUNTING_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
+  // Reprints of receipts and TARs live in the Trainee Account (owner, 3 Nov 2026).
+  {label:"Search Trainee",items:["Search trainee"]},
   {label:"Approvals",items:["Approvals"]},
   {label:"Transactions",items:["Payments","Other income","Expenses","Receivables","Payables","Cash position"]},
   {label:"Reports",items:["Reports"]},
@@ -446,6 +448,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Dashboard")return <><div className="cl-admin-alarm"><GcashNotInHistory/></div><AccountingHome data={data} reload={reload} go={m=>go(m as Module)}/></>;
     if(active==="Approvals")return <div className="portal-page cx ac"><div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Approvals</h1></div></div><AccountingApprovals data={data} reload={reload}/><p className="ac-note">Change requests such as cancellations and reschedules are applied automatically once their fee is paid, so they do not wait here.</p></div>;
     if(active==="Reports")return <AccountingReportsHub/>;
+    if(active==="Search trainee")return <Trainees data={data} query={query} reload={reload} role={gateRole}/>;
     if(active==="Payments")return <AccountingPayments/>;
     if(active==="Expenses")return <AccountingExpenses data={data}/>;
     if(active==="Receivables")return <AccountingReceivables data={data}/>;
@@ -605,8 +608,11 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   const [menu,setMenu]=useState(false),[reqType,setReqType]=useState<RequestType|null>(null),[note,setNote]=useState("");
   const canPrint=["admin","registration"].includes(role??"");
   // The loaded list holds only the newest rows; ask the database for this trainee's TAR courses and any other record for the same person (29 Oct 2026).
-  const [account,setAccount]=useState<{tarEnrollmentIds:string[];others:{id:string;number:string;tarCourses:number}[]}|null>(null);
-  useEffect(()=>{let live=true;fetch(`/api/staff/trainee-account?traineeId=${trainee.id}`,{cache:"no-store"}).then(r=>r.ok?r.json():null).then(b=>{if(live&&b)setAccount(b)}).catch(()=>undefined);return()=>{live=false}},[trainee.id]);
+  type AccountPayment=Payment&{valid:boolean;remarks?:string|null;receipt_number?:string|null;print_count?:number};
+  type AccountTar={id:string;ar_number:string;enrollment_ids:string[];print_count:number;reprints_approved:number;issued_at:string};
+  const [account,setAccount]=useState<{tarEnrollmentIds:string[];tarGroups?:{date:string;ids:string[]}[];payments?:AccountPayment[];tars?:AccountTar[];others:{id:string;number:string;tarCourses:number}[]}|null>(null);
+  const [accountTick,setAccountTick]=useState(0);
+  useEffect(()=>{let live=true;fetch(`/api/staff/trainee-account?traineeId=${trainee.id}`,{cache:"no-store"}).then(r=>r.ok?r.json():null).then(b=>{if(live&&b)setAccount(b)}).catch(()=>undefined);return()=>{live=false}},[trainee.id,accountTick]);
   const enrolls=data.enrollments.filter(e=>e.trainee_id===trainee.id).sort((a,b)=>a.created_at.localeCompare(b.created_at));
   const payments=data.payments.filter(p=>p.trainee_id===trainee.id).sort((a,b)=>a.received_at.localeCompare(b.received_at));
   const requests=data.requests.filter(r=>first(r.enrollments)?.trainee_id===trainee.id&&r.status==="Pending");
@@ -646,7 +652,16 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   const srcLabel=latest?sourceLabel(latest.source,partner):"";
   // Payment voids (owner, 29 Oct 2026): voided payments stay listed; the Cashier requests, Accounting approves.
   const canVoid=["cashier","accounting","admin"].includes(role??"");
-  const payRows=[...payments,...(data.voidedPayments??[]).filter(p=>p.trainee_id===trainee.id)].sort((a,b)=>a.received_at.localeCompare(b.received_at));
+  const payRows:AccountPayment[]=account?.payments??[...payments,...(data.voidedPayments??[]).filter(p=>p.trainee_id===trainee.id)].sort((a,b)=>a.received_at.localeCompare(b.received_at)) as AccountPayment[];
+  // Accounting reprints a receipt or a TAR here, with a reason (owner, 3 Nov 2026: "just put in their Trainee Account").
+  const canReprint=["accounting","admin"].includes(role??"");
+  const [reprint,setReprint]=useState<{kind:"receipt"|"tar";id:string;no:string}|null>(null),[why,setWhy]=useState(""),[whyOther,setWhyOther]=useState("");
+  const feeLabel=(p:AccountPayment)=>p.remarks&&/^(Miscellaneous|Service Fee) · /.test(p.remarks)?p.remarks:"";
+  const doReprint=async()=>{if(!reprint)return;const reason=why==="Other"?whyOther.trim():why;if(reason.length<3){setErr("Choose the reason for the reprint.");return}
+    const tab=window.open("","_blank");setBusy(true);setErr("");
+    try{const r=await submit({action:"document-reprint",kind:reprint.kind,id:reprint.id,reason}) as {url:string;copy:number};if(tab)tab.location.href=r.url;else window.location.href=r.url;setNote(`${reprint.no} reprinted · Copy ${r.copy}.`);setReprint(null);setWhy("");setWhyOther("");setAccountTick(t=>t+1)}
+    catch(e){tab?.close();setErr(e instanceof Error?e.message:"Could not reprint.")}finally{setBusy(false)}};
+  const reprintForm=(cols:number)=>reprint&&<tr><td colSpan={cols}><div className="tp-reprint"><b>Reprint {reprint.no}</b><select value={why} onChange={e=>setWhy(e.target.value)} aria-label="Reason for the reprint"><option value="">Reason…</option><option>Misprint</option><option>Lost by the trainee</option><option>Damaged</option><option>Other</option></select>{why==="Other"&&<input value={whyOther} onChange={e=>setWhyOther(e.target.value)} placeholder="Reason" aria-label="Other reason"/>}<button type="button" className="portal-primary" disabled={busy} onClick={()=>void doReprint()}>Reprint</button><button type="button" className="portal-secondary" onClick={()=>setReprint(null)}>Cancel</button></div></td></tr>;
   const when=(e:Enrollment)=>{const b=first(e.batches);return b?(b.starts_on===b.ends_on?date(b.starts_on):`${date(b.starts_on)} – ${date(b.ends_on)}`):e.scheduled_on?date(e.scheduled_on):"No batch yet"};
   return <Modal title="Trainee Account" onClose={onClose} wide>
     <div className="sa tp">
@@ -655,7 +670,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
         <div className="tp-who"><h3>{`${(trainee.legal_last_name??"").toUpperCase()}, ${trainee.legal_first_name??""}${trainee.legal_middle_name?` ${trainee.legal_middle_name.charAt(0)}.`:""}`}</h3>
           <p><span className="tp-mono">{appNo??trainee.trainee_number}</span>{trainee.rank?` · ${trainee.rank}`:""}{trainee.registered_at?` · Registered ${day(trainee.registered_at)}`:""}</p>
           <div className="tp-chips">{srcLabel&&<span className="tp-chip or">{srcLabel}</span>}{enrolledN>0&&<span className="tp-chip gd">{enrolledN} Enrolled</span>}{due<=0&&fees>0&&<span className="tp-chip gd">Paid in Full</span>}</div></div>
-        <div className="tp-hacts">{canPrint&&<><button type="button" className="portal-secondary" onClick={()=>void copyDetails("text")}>Copy as Text</button><button type="button" className="portal-secondary" onClick={()=>void copyDetails("row")}>Copy as Row</button><TarButton data={data} traineeId={trainee.id} reload={reload} className="portal-primary" knownIds={account?.tarEnrollmentIds}/></>}</div>
+        <div className="tp-hacts">{canPrint&&<><button type="button" className="portal-secondary" onClick={()=>void copyDetails("text")}>Copy as Text</button><button type="button" className="portal-secondary" onClick={()=>void copyDetails("row")}>Copy as Row</button><TarButton data={data} traineeId={trainee.id} reload={reload} className="portal-primary" knownIds={account?.tarEnrollmentIds} knownGroups={account?.tarGroups}/></>}</div>
       </div>
       {note&&<Message kind="success" text={note}/>}
       {err&&<Message kind="error" text={err}/>}
@@ -676,10 +691,18 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
               {!enrolls.length&&<tr><td colSpan={6} className="sa-empty">No courses yet.</td></tr>}
             </tbody></table></div>
             <h4 className="tp-sub">Payments</h4>
-            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Receipt</th><th>Date</th><th>Mode</th><th className="r">Amount</th><th>Status</th></tr></thead><tbody>
-              {payRows.map(p=><tr key={p.id} className={(p as {valid?:boolean}).valid===false?"pv-void":undefined}><td className="tp-mono">{p.payment_number}</td><td>{day(p.received_at)}</td><td>{p.method}{p.reference_number?` · Ref ${p.reference_number}`:""}</td><td className="r tp-mono">{money(Number(p.amount_centavos))}</td><td><PaymentVoidCell data={data} payment={p} canRequest={canVoid} busy={busy} post={post}/></td></tr>)}
-              {!payRows.length&&<tr><td colSpan={5} className="sa-empty">No payments yet.</td></tr>}
+            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Receipt</th><th>Date</th><th>Mode</th><th className="r">Amount</th><th>Status</th>{canReprint&&<th></th>}</tr></thead><tbody>
+              {payRows.map(p=>{const no=p.receipt_number??p.payment_number;return <Fragment key={p.id}><tr className={p.valid===false?"pv-void":undefined}><td className="tp-mono">{no}{feeLabel(p)&&<small>{feeLabel(p)}</small>}</td><td>{day(p.received_at)}</td><td>{p.method}{p.reference_number?` · Ref ${p.reference_number}`:""}</td><td className="r tp-mono">{money(Number(p.amount_centavos))}</td><td><PaymentVoidCell data={data} payment={p} canRequest={canVoid} busy={busy} post={post}/></td>
+                {canReprint&&<td>{p.valid!==false&&p.receipt_number&&<button type="button" className="portal-secondary" onClick={()=>{setReprint({kind:"receipt",id:p.id,no});setWhy("");setWhyOther("")}}>Reprint{p.print_count?` · ${p.print_count} printed`:""}</button>}</td>}</tr>
+                {reprint?.kind==="receipt"&&reprint.id===p.id&&reprintForm(6)}</Fragment>})}
+              {!payRows.length&&<tr><td colSpan={canReprint?6:5} className="sa-empty">No payments yet.</td></tr>}
             </tbody></table></div>
+            {(account?.tars?.length??0)>0&&<><h4 className="tp-sub">Training Admission Records</h4>
+            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>TAR No.</th><th>Issued</th><th>Courses</th><th>Printed</th>{canReprint&&<th></th>}</tr></thead><tbody>
+              {account!.tars!.map(r=>{const codes=r.enrollment_ids.map(id=>first(data.enrollments.find(e=>e.id===id)?.courses)?.code).filter(Boolean);return <Fragment key={r.id}><tr><td className="tp-mono">{r.ar_number}</td><td>{day(r.issued_at)}</td><td>{codes.length?codes.join(", "):`${r.enrollment_ids.length} course${r.enrollment_ids.length===1?"":"s"}`}</td><td>{r.print_count}</td>
+                {canReprint&&<td><button type="button" className="portal-secondary" onClick={()=>{setReprint({kind:"tar",id:r.id,no:r.ar_number});setWhy("");setWhyOther("")}}>Reprint</button></td>}</tr>
+                {reprint?.kind==="tar"&&reprint.id===r.id&&reprintForm(5)}</Fragment>})}
+            </tbody></table></div></>}
           </section>
           {requests.length>0&&<section className="tp-panel"><h4>Open Requests</h4>{requests.map(r=><p key={r.id} className="tp-req"><b>{r.request_type==="Rescheduling"?"Reschedule":r.request_type}</b> · {first(r.enrollments)?.enrollment_number} · {r.reason}</p>)}</section>}
         </div>
@@ -997,7 +1020,7 @@ function LiveRequests({data,role,reload,embedded}:{data:PortalData;role:string;r
   type Req=PortalData["requests"][number];
   const canDecide=["admin","accounting"].includes(role);
   const canCharge=["admin","cashier","accounting"].includes(role);
-  const [busy,setBusy]=useState(""),[message,setMessage]=useState(""),[charging,setCharging]=useState<Req|null>(null),[showDecided,setShowDecided]=useState(false),[collecting,setCollecting]=useState<{enrollmentId:string;amount:number}|null>(null);
+  const [busy,setBusy]=useState(""),[message,setMessage]=useState(""),[charging,setCharging]=useState<Req|null>(null),[showDecided,setShowDecided]=useState(false),[collecting,setCollecting]=useState<{enrollmentId:string;amount:number;label:string}|null>(null);
   const pending=data.requests.filter(r=>r.status==="Pending");
   const withCashier=pending.filter(r=>r.stage==="With cashier");
   const charged=pending.filter(r=>r.stage!=="With cashier");
@@ -1018,7 +1041,7 @@ function LiveRequests({data,role,reload,embedded}:{data:PortalData;role:string;r
   const action=(r:Req)=>{
     if(r.status!=="Pending")return r.decision_remarks?<small>{r.decision_remarks}</small>:null;
     if(r.stage==="With cashier")return canCharge?<button type="button" className="portal-primary" onClick={()=>setCharging(r)}>Add Charge</button>:<small>With the Cashier</small>;
-    if(unpaid(r))return canCharge&&first(r.enrollments)?.id?<button type="button" className="portal-primary" onClick={()=>{const cc=data.chargeCollected?.[r.id];setCollecting({enrollmentId:first(r.enrollments)?.id??"",amount:cc?Math.max(0,cc.amount-cc.collected):0})}}>Collect Fee</button>:<small>Applied once the fee is paid</small>;
+    if(unpaid(r))return canCharge&&first(r.enrollments)?.id?<button type="button" className="portal-primary" onClick={()=>{const cc=data.chargeCollected?.[r.id];setCollecting({enrollmentId:first(r.enrollments)?.id??"",amount:cc?Math.max(0,cc.amount-cc.collected):0,label:`Service Fee · ${r.request_type}`})}}>Collect Fee</button>:<small>Applied once the fee is paid</small>;
     return canDecide?<div className="cx-acts"><button type="button" className="portal-primary" disabled={!!busy} onClick={()=>decide(r.id,true)}>{busy===r.id?"…":"Approve"}</button><button type="button" className="portal-secondary" disabled={!!busy||!!rejecting} onClick={()=>setRejecting(r.id)}>Reject</button></div>:<small>With the Accounting Manager</small>};
   const table=(list:Req[])=><div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Request</th><th>Course</th><th>Training Starts</th><th>Requested on</th><th className="r">Fee</th><th>Status</th><th></th></tr></thead><tbody>
     {list.map(r=>{const t=first(r.trainees),e=first(r.enrollments),c=e?first(e.courses):null,no=e?.trainee_id?data.applicationNumbers?.[e.trainee_id]:undefined,start=startOf(r);return <Fragment key={r.id}><tr className={rejecting&&rejecting!==r.id?"ac-dim":undefined}>
@@ -1040,7 +1063,7 @@ function LiveRequests({data,role,reload,embedded}:{data:PortalData;role:string;r
     {!pending.length&&<section className="portal-panel cx-panel"><p className="portal-empty-copy">No open requests.</p></section>}
     {decided.length>0&&<section className="portal-panel cx-panel"><button type="button" className="cx-month-head" aria-expanded={showDecided} onClick={()=>setShowDecided(v=>!v)}><span className="cx-month-name">Decided</span><span className="cx-month-meta">last 30 days · {decided.length}</span><span aria-hidden="true" className="cx-month-caret" style={{marginLeft:"auto"}}>{showDecided?"▾":"▸"}</span></button>{showDecided&&table(decided)}</section>}
     {charging&&<RequestChargeModal data={data} request={charging} reload={reload} onClose={()=>setCharging(null)}/>}
-    {collecting&&<RecordPaymentModal data={data} initialEnrollmentId={collecting.enrollmentId} initialAmountCentavos={collecting.amount} onClose={()=>setCollecting(null)} onSaved={reload}/>}
+    {collecting&&<RecordPaymentModal data={data} initialEnrollmentId={collecting.enrollmentId} initialAmountCentavos={collecting.amount} initialFeeLabel={collecting.label} onClose={()=>setCollecting(null)} onSaved={reload}/>}
   </div>;
 }
 

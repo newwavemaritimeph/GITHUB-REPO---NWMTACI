@@ -39,6 +39,7 @@
 .tar-title { display: flex; justify-content: space-between; align-items: flex-end; margin: 3px 0 2px; }
 .tar-title b { font-size: 9.6pt; font-weight: 800; color: #123f63; letter-spacing: .04em; }
 .tar-title span { font-size: 6pt; color: #40606f; }
+.tar-title .tar-reprint { border: 1.5px solid #b42318; color: #b42318; font-weight: 800; font-size: 7pt; padding: 1px 6px; border-radius: 3px; margin-right: 8px; letter-spacing: .06em; }
 .tar-title strong { font-family: var(--font-geist-mono), "IBM Plex Mono", ui-monospace, monospace; font-size: 9.4pt; color: #b23d0c; }
 
 .tar-grid th, .tar-grid td { border: 1px solid #c9c2b3; padding: 1.5px 4px; text-align: left; }

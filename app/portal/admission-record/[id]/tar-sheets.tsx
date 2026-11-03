@@ -25,7 +25,7 @@ export const COURSES_ON_FRONT = 6;
 export type TarCourse = { id: string; code: string; name: string; dates: string; time: string; room: string; fee: number };
 export type TarPayment = { id: string; number: string; dateLabel: string; method: string; ref: string; amount: number };
 export type TarProps = {
-  arNumber: string; issued: string; name: string;
+  arNumber: string; issued: string; name: string; reprintCopy?: number | null;
   trainee: { appNo: string; srn: string | null; rank: string | null; mobile: string | null; company: string | null };
   courses: TarCourse[]; misc: { label: string; amount: number }[]; discounts: { label: string; amount: number }[]; payments: TarPayment[];
   feesTotal: number; due: number; paid: number; balance: number; status: string; billedTo?: string | null; officer: string; cashier: string;
@@ -39,7 +39,7 @@ export function TarSheets(p: TarProps) {
   const courseRows = (list: TarCourse[], offset: number) => list.map((c, i) => <tr key={c.id}><td className="c">{offset + i + 1}</td><td><b>{c.name}</b> <span className="dim">({c.code})</span></td><td className="nw">{c.dates}</td><td className="nw">{c.time}</td><td className="nw">{c.room}</td><td className="r nw">{peso(c.fee)}</td></tr>);
   const header = (page: number) => <>
     <div className="tar-letter"><img src={p.logoSrc ?? "/brand/new-wave-emblem.png"} alt="" width={34} height={34} /><div><b>{ORG}</b><span>{ADDRESS}</span></div><i /></div>
-    <div className="tar-title"><div><b>TRAINING ADMISSION RECORD</b> <span>· admission slip and acknowledgement receipt · issued {p.issued}{pages > 1 ? ` · page ${page} of ${pages}` : ""}</span></div><div><span>AR NO. </span><strong>{p.arNumber}</strong></div></div>
+    <div className="tar-title"><div><b>TRAINING ADMISSION RECORD</b> <span>· admission slip and acknowledgement receipt · issued {p.issued}{pages > 1 ? ` · page ${page} of ${pages}` : ""}</span></div><div>{p.reprintCopy ? <span className="tar-reprint">REPRINT – COPY {p.reprintCopy}</span> : null}<span>{p.arNumber.startsWith("TAR-") ? "TAR NO. " : "AR NO. "}</span><strong>{p.arNumber}</strong></div></div>
   </>;
   // Page 1 (and page 2 when there are more than six courses). Each page is
   // printed twice on one legal sheet: an original for the trainee and a

@@ -12,7 +12,7 @@ import type { CashierReportSnapshot } from "@/lib/documents";
 import { tcl } from "@/lib/title-case";
 import { PayTheCenters, centerLines } from "./pay-centers";
 import { shrinkProof } from "@/lib/proof-shrink";
-import { tarPrintable } from "@/lib/trainee-match";
+import { tarGroups, tarPrintable, type TarGroup } from "@/lib/trainee-match";
 
 /**
  * Cashier pieces of the registration workflow (Oct 2026):
@@ -51,9 +51,10 @@ const PAID_STATUSES = ["Enrolled", "Open Schedule"];
  */
 // TAR courses (owner, 29 Oct 2026): every course not cancelled, regardless of payment.
 // `knownIds` comes from the database when the loaded list does not hold all of them.
-export function tarState(data: PortalData, traineeId: string, knownIds?: string[]) {
+// One TAR per enrollment date (owner, 3 Nov 2026): `groupIds` names the courses of one date.
+export function tarState(data: PortalData, traineeId: string, knownIds?: string[], groupIds?: string[]) {
   const paid = data.enrollments.filter((e) => e.trainee_id === traineeId && tarPrintable(e));
-  const ids = (knownIds && knownIds.length > paid.length ? [...knownIds] : paid.map((e) => e.id)).sort().join("|");
+  const ids = (groupIds ?? (knownIds && knownIds.length > paid.length ? [...knownIds] : paid.map((e) => e.id))).slice().sort().join("|");
   const record = (data.admissionRecords ?? []).find((r) => r.trainee_id === traineeId && [...r.enrollment_ids].sort().join("|") === ids) ?? null;
   const allowed = TAR_FREE_PRINTS + Number(record?.reprints_approved ?? 0);
   const printed = Number(record?.print_count ?? 0);
@@ -70,16 +71,23 @@ export function ReceiptButton({ data, paymentId, reload, className = "portal-sec
 }
 
 /** Print TAR (owner, 8 Oct 2026): prints twice; after the second print the button is gone. Registration prints it (owner, 20 Oct 2026). */
-export function TarButton({ data, traineeId, reload, className = "portal-secondary", knownIds }: { data: PortalData; traineeId: string; reload?: () => Promise<void>; className?: string; knownIds?: string[] }) {
+export function TarButton({ data, traineeId, reload, className = "portal-secondary", knownIds, knownGroups }: { data: PortalData; traineeId: string; reload?: () => Promise<void>; className?: string; knownIds?: string[]; knownGroups?: TarGroup[] }) {
+  const [error, setError] = useState("");
+  // One TAR per enrollment date (owner, 3 Nov 2026); the database's groups win when the loaded list is short.
+  const local = tarGroups(data.enrollments.filter((e) => e.trainee_id === traineeId));
+  const groups = knownGroups && knownGroups.reduce((n, g) => n + g.ids.length, 0) > local.reduce((n, g) => n + g.ids.length, 0) ? knownGroups : local;
+  const print = (ids?: string[]) => { setError(""); void openAdmissionRecord(traineeId, ids).then(() => reload?.()).catch((e) => setError(e instanceof Error ? e.message : "Could not open the admission record.")); };
+  if (groups.length > 1) return <>
+    {groups.map((g) => tarState(data, traineeId, undefined, g.ids).left > 0 && <button key={g.date} type="button" className={className} onClick={() => print(g.ids)}>Print TAR · {fmtDate(g.date)}</button>)}
+    {error && <Message kind="error" text={error} />}
+  </>;
   const s = tarState(data, traineeId, knownIds);
   const printable = s.paid.length > 0 || !!knownIds?.length;
-  const [error, setError] = useState("");
-  const print = () => { setError(""); void openAdmissionRecord(traineeId).then(() => reload?.()).catch((e) => setError(e instanceof Error ? e.message : "Could not open the admission record.")); };
   if (printable && s.left <= 0) return null;
   return <>
     {!printable
       ? <><button type="button" className={className} disabled>Print TAR</button><small className="muted-text">No course on this record yet</small></>
-      : <button type="button" className={className} onClick={print}>Print TAR</button>}
+      : <button type="button" className={className} onClick={() => print(groups[0]?.ids)}>Print TAR</button>}
     {error && <Message kind="error" text={error} />}
   </>;
 }
@@ -235,7 +243,7 @@ type ExtraLine = { key: string; chargeCatalogId: string | null; description: str
  * unpaid courses (split), plus any miscellaneous charges sold at the counter.
  * One payment, one receipt. A reference is required for every mode except Cash.
  */
-export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCentavos, initialProof, onClose, onSaved }: { data: PortalData; initialEnrollmentId?: string; initialAmountCentavos?: number; initialProof?: TraineeProofRow; onClose: () => void; onSaved: () => Promise<void> }) {
+export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCentavos, initialFeeLabel, initialProof, onClose, onSaved }: { data: PortalData; initialEnrollmentId?: string; initialAmountCentavos?: number; initialFeeLabel?: string; initialProof?: TraineeProofRow; onClose: () => void; onSaved: () => Promise<void> }) {
   const initial = initialEnrollmentId ? data.enrollments.find((e) => e.id === initialEnrollmentId) : undefined;
   const [traineeId, setTraineeId] = useState(initialProof?.trainee_id ?? initial?.trainee_id ?? "");
   const [search, setSearch] = useState("");
@@ -260,7 +268,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
   const [agencyId, setAgencyId] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [posted, setPosted] = useState<{ id: string; amount: number; drive: { link: string; path: string } | null } | null>(null);
+  const [posted, setPosted] = useState<{ receipts: { id: string; label: string; amount: number }[]; amount: number; drive: { link: string; path: string } | null } | null>(null);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proof, setProof] = useState<{ id: string; link: string; path: string; duplicate: boolean } | null>(initialProof ? { id: initialProof.id, link: initialProof.drive_link ?? "", path: "", duplicate: false } : null);
   const [dupWarning, setDupWarning] = useState(false), [dupConfirmed, setDupConfirmed] = useState(false);
@@ -342,11 +350,15 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
     try {
       const filed = await fileProof();
       if (filed?.duplicate && !dupConfirmed) { setDupWarning(true); return; }
-      const allocations = open.map((e) => ({ enrollmentId: e.id, amountCentavos: Math.min(toCentavos(amounts[e.id] ?? ""), balanceOf(e)) })).filter((a) => a.amountCentavos > 0);
-      const result = await submit({ action: "payment-split", allocations, items: extras.map((x) => ({ enrollmentId: x.enrollmentId, chargeCatalogId: x.chargeCatalogId, description: x.description, unitCentavos: x.unit, quantity: x.quantity })), method, receivingAccount: method === "Cash" ? "Main cashier" : method, referenceNumber: reference.trim(), receivedAt: new Date(receivedAt).toISOString(), remarks, proofId: filed?.id ?? null }) as { payment?: { id?: string } | string };
+      const lines = open.map((e) => ({ enrollmentId: e.id, amountCentavos: Math.min(toCentavos(amounts[e.id] ?? ""), balanceOf(e)) })).filter((a) => a.amountCentavos > 0);
+      // A request fee from Requests › Collect Fee gets its own receipt (owner, 3 Nov 2026); anything above it is a training-fee payment.
+      const feeLine = initialFeeLabel && initialEnrollmentId ? lines.find((a) => a.enrollmentId === initialEnrollmentId) : undefined;
+      const feeAmount = feeLine ? Math.min(feeLine.amountCentavos, initialAmountCentavos ?? feeLine.amountCentavos) : 0;
+      const fee = feeLine && feeAmount > 0 ? { enrollmentId: feeLine.enrollmentId, amountCentavos: feeAmount, label: initialFeeLabel } : null;
+      const allocations = lines.map((a) => (fee && a.enrollmentId === fee.enrollmentId ? { ...a, amountCentavos: a.amountCentavos - fee.amountCentavos } : a)).filter((a) => a.amountCentavos > 0);
+      const result = await submit({ action: "payment-split", allocations, fee, items: extras.map((x) => ({ enrollmentId: x.enrollmentId, chargeCatalogId: x.chargeCatalogId, description: x.description, unitCentavos: x.unit, quantity: x.quantity })), method, receivingAccount: method === "Cash" ? "Main cashier" : method, referenceNumber: reference.trim(), receivedAt: new Date(receivedAt).toISOString(), remarks, proofId: filed?.id ?? null }) as { payments?: { id: string; label: string; amount: number }[] };
       if (agencyId) for (const a of allocations) { try { await submit({ action: "record-agency-rebate", enrollmentId: a.enrollmentId, agencyId }); } catch { /* the rebate never blocks the payment */ } }
-      const paymentId = typeof result.payment === "string" ? result.payment : result.payment?.id ?? "";
-      setPosted({ id: paymentId, amount: total, drive: filed ? { link: filed.link, path: filed.path } : null });
+      setPosted({ receipts: result.payments ?? [], amount: total, drive: filed ? { link: filed.link, path: filed.path } : null });
       await onSaved();
     } catch (err) { setError(err instanceof Error ? err.message : "Could not record the payment."); } finally { setBusy(false); }
   }
@@ -355,9 +367,8 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
     <div className="portal-form">
       <div className="full"><Message kind="success" text={`${pesos(posted.amount)} received from ${group.name}.`} /></div>
       {posted.drive && <p className="portal-form-note full cx-drive">Proof kept in Google Drive{posted.drive.path ? ` · ${posted.drive.path.split(" / ").slice(1).join(" / ")}` : ""}.</p>}
-      <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
-        {posted.id && <ReceiptButton data={data} paymentId={posted.id} reload={onSaved} />}
-      </div>
+      {posted.receipts.length > 1 && <p className="portal-form-note full">{posted.receipts.length} separate receipts: the training fee, miscellaneous items and service fees each have their own.</p>}
+      <div className="cx-receipts full">{posted.receipts.map((r) => <div key={r.id}><span><b>{r.label}</b><small className="cx-amt">{pesos(r.amount)}</small></span><ReceiptButton data={data} paymentId={r.id} reload={onSaved} /></div>)}</div>
       <div className="portal-form-actions full"><button type="button" className="portal-primary" onClick={onClose}>Done</button></div>
     </div>
   </Modal>;

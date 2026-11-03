@@ -1,0 +1,194 @@
+<title>Receipts and TARs</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Same shell as the live portal: navy bar with dropdown tabs, summary rail on the left, light-cyan table headers. */
+:root{--orange:#F25615;--blue:#0571D0;--cyan:#35CCFA;--cyan-l:#9EE3F1;--navy:#123F63;--bg:#f2f6f8;--surface:#fff;--fg:#0f2638;--muted:#587184;--line:#dbe6ec;--soft:#eef4f8;--th:#e6f6fd;--thc:#0b4f8f;--zebra:#f7fafc;
+ --good:#0a7a3e;--good-bg:#e2f5e9;--warn:#a2470b;--warn-bg:#fdf0e5;--bad:#b42318;--bad-bg:#fcebea;--info:#0571D0;--info-bg:#e5f1fb;
+ --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding-block:16px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.w{max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.logo{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}.logo b{font-size:19px;font-weight:600}.logo b span{color:var(--orange)}.logo small{display:block;color:var(--cyan-l);font-size:14px}.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.who{font-size:14px;color:#cfe3ef;display:flex;align-items:center;gap:8px}.who select{background:#ffffff14;border:1px solid #ffffff30;color:#fff;border-radius:8px;padding:5px 8px}.who select option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:16px;flex-wrap:wrap}.tab>button{background:none;border:0;color:#c3dbea;font:500 16px var(--sans);padding:12px 18px;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:8px}.tab>button:hover{color:#fff;background:#ffffff12}.tab.on>button{background:var(--bg);color:var(--fg);font-weight:600}
+.caret{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.menu{position:absolute;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:15;display:flex;flex-direction:column;margin-top:2px}.tab{position:relative}.menu button{background:none;border:0;text-align:left;color:var(--fg);font:500 15.5px var(--sans);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;gap:12px}.menu button:hover{background:var(--soft)}.menu button.on{background:var(--info-bg);color:var(--info);font-weight:600}.menu small,.n{font:600 11.5px var(--mono);background:var(--orange);color:#fff;border-radius:10px;padding:1px 7px}
+.page{padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.cx-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}h1{font-size:25px;font-weight:600;margin:0}h2{font-size:19px;font-weight:600;margin:0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.seg button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.seg button.on{background:var(--navy);color:#fff}
+.rail{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}@media (max-width:900px){.rail{grid-template-columns:1fr}}.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.ph small{color:var(--muted);font-size:14px}
+.lines{display:flex;flex-direction:column;padding:0 20px 16px}.lines div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}.lines div:first-child{border-top:0}.lines dd,.lines span:last-child{font-family:var(--mono);font-weight:600}.lines .tot{font-weight:700}.lines .bad{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 16px}.tile{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 12px}.tile span{display:block;font-size:13px;color:var(--muted)}.tile b{font:600 19px var(--mono)}
+.cwrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--th);color:var(--thc);font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:10px 12px;border-right:1px solid var(--line);white-space:nowrap}td{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.35}tbody tr:nth-child(even) td{background:var(--zebra)}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}.due{background:var(--bad-bg);color:var(--bad)}.dueo{background:var(--warn-bg);color:var(--warn)}.appr{background:var(--info-bg);color:var(--info)}.paid{background:var(--good-bg);color:var(--good)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:9px;padding:7px 14px;font-weight:600;font-size:14.5px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.okb{background:var(--good);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:14px 20px;background:var(--soft);border-top:1px solid var(--line)}.form label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}.form select,.form input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line)}
+.alert{background:var(--bad-bg);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:15px;font-weight:500;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.note{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+</style>
+<style>
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px}.bar input,.bar select{border:1px solid var(--line);border-radius:9px;padding:7px 10px;background:var(--surface);color:var(--fg)}
+.daypick{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:3px}.daypick button{border:0;background:none;padding:5px 10px;border-radius:8px;font-weight:600;color:var(--blue)}.daypick b{font-weight:600;font-size:14.5px;padding:0 6px;white-space:nowrap}
+.seg{margin-bottom:0}.sub{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}.sub button{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:7px 16px;font-weight:600;color:var(--fg)}.sub button.on{background:var(--info-bg);border-color:var(--info);color:var(--info)}.sub small{font:600 12px var(--mono);margin-left:6px;color:var(--muted)}
+.chip{display:inline-block;font:600 11.5px var(--sans);padding:1px 8px;border-radius:99px;background:var(--warn-bg);color:var(--warn);margin-left:6px}
+.void td{color:var(--muted)}.void .amt{text-decoration:line-through}
+.rform td{background:var(--soft)!important}.rform .in{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.rform select,.rform input{border:1px solid var(--line);border-radius:9px;padding:7px 10px;background:var(--surface);color:var(--fg)}
+.tot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 20px;font-size:14.5px;border-top:1px solid var(--line)}.tot b{font-family:var(--mono)}
+.doc{border:1px solid var(--line);border-radius:12px;padding:14px 16px;background:var(--surface);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}.doc h3{margin:0;font-size:16px}.stamp{border:2px solid var(--bad);color:var(--bad);font:700 13px var(--mono);letter-spacing:.06em;padding:4px 10px;border-radius:6px;transform:rotate(-4deg)}
+.rlist{display:flex;flex-direction:column;gap:10px;padding:0 20px 18px}.rcard{border:1px solid var(--line);border-left:4px solid var(--c,var(--blue));border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}.rcard b{font-family:var(--mono)}.rcard small{display:block;color:var(--muted);font-size:13px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px}@media (max-width:860px){.cols{grid-template-columns:1fr}}
+.rules{margin:0;padding:0 20px 18px 38px;font-size:14.5px;display:flex;flex-direction:column;gap:6px}
+</style>
+<header class="top"><div class="w">
+  <div class="brand"><div class="logo"><div class="mark">NW</div><div><b>New <span>Wave</span> Portal <span class="proto">PROTOTYPE</span></b><small>Receipts and TARs</small></div></div>
+    <label class="who">Working as <select id="role"><option value="acc">Accounting</option><option value="cash">Cashier</option><option value="reg">Registration</option></select></label></div>
+  <nav class="tabs" id="tabs"></nav>
+</div></header>
+<main class="page"><div class="w" id="view"></div></main>
+<div id="toast" class="toast" hidden></div>
+<script>
+const TODAY = "2026-11-03";
+const d = (s) => new Date(s + "T00:00:00Z");
+const iso = (x) => x.toISOString().slice(0, 10);
+const add = (s, n) => { const x = d(s); x.setUTCDate(x.getUTCDate() + n); return iso(x); };
+const fmt = (s) => d(s).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+const peso = (c) => "₱" + (c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const $ = (id) => document.getElementById(id);
+function toast(t) { const el = $("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (el.hidden = true), 2800); }
+
+const RECEIPTS = [
+  { no: "AR-2026-000117", day: "2026-10-27", time: "2:05 PM", who: "VILLANUEVA, Rico T.", nw: "NWMTACI-0000398", what: "Training Fee · UBT-PSSR", mode: "Cash", amt: 130000, prints: 1, reprints: 0, valid: false },
+  { no: "AR-2026-000118", day: "2026-10-28", time: "10:20 AM", who: "DELA CRUZ, Juan P.", nw: "NWMTACI-0000412", what: "Training Fee · UBT-PSSR", mode: "GCash · Ref 7012345", amt: 130000, prints: 2, reprints: 0, valid: true },
+  { no: "AR-2026-000119", day: "2026-10-30", time: "9:02 AM", who: "SANTOS, Maria L.", nw: "NWMTACI-0000405", what: "Training Fee · PSCMT", mode: "Cash", amt: 180000, prints: 1, reprints: 0, valid: true },
+  { no: "AR-2026-000120", day: "2026-11-02", time: "3:41 PM", who: "REYES, Carlo M.", nw: "NWMTACI-0000420", what: "Training Fee · STPPDSPPS", mode: "PSBank · Ref 55102", amt: 130000, prints: 2, reprints: 0, valid: true },
+  { no: "AR-2026-000121", day: "2026-11-03", time: "9:12 AM", who: "DELA CRUZ, Juan P.", nw: "NWMTACI-0000412", what: "Training Fee · SSO, PSCMT", mode: "Cash", amt: 630000, prints: 1, reprints: 0, valid: true },
+  { no: "AR-2026-000122", day: "2026-11-03", time: "9:12 AM", who: "DELA CRUZ, Juan P.", nw: "NWMTACI-0000412", what: "Miscellaneous · T-Shirt × 1", mode: "Cash", amt: 15000, prints: 1, reprints: 0, valid: true },
+  { no: "AR-2026-000123", day: "2026-11-03", time: "9:12 AM", who: "DELA CRUZ, Juan P.", nw: "NWMTACI-0000412", what: "Service Fee · Rescheduling", mode: "Cash", amt: 35000, prints: 1, reprints: 0, valid: true },
+  { no: "AR-2026-000124", day: "2026-11-03", time: "11:40 AM", who: "MENDOZA, Ana R.", nw: "NWMTACI-0000431", what: "Training Fee · PSCMHBT", mode: "GCash · Ref 8820417", amt: 160000, prints: 2, reprints: 1, valid: true },
+];
+const TARS = [
+  { no: "AR-2026-000098", day: "2026-10-20", who: "SANTOS, Maria L.", nw: "NWMTACI-0000405", courses: "PSCMT", enrolled: "2026-10-20", pay: "Paid", prints: 2, reprints: 0, old: true },
+  { no: "TAR-2026-000001", day: "2026-11-02", who: "DELA CRUZ, Juan P.", nw: "NWMTACI-0000412", courses: "UBT-PSSR", enrolled: "2026-11-02", pay: "Paid", prints: 2, reprints: 0 },
+  { no: "TAR-2026-000002", day: "2026-11-03", who: "DELA CRUZ, Juan P.", nw: "NWMTACI-0000412", courses: "SSO, PSCMT", enrolled: "2026-11-03", pay: "Paid", prints: 1, reprints: 0 },
+  { no: "TAR-2026-000003", day: "2026-11-03", who: "MENDOZA, Ana R.", nw: "NWMTACI-0000431", courses: "PSCMHBT", enrolled: "2026-11-03", pay: "Balance ₱500.00", prints: 1, reprints: 0 },
+  { no: "TAR-2026-000004", day: "2026-11-03", who: "GARCIA, Leo B.", nw: "NWMTACI-0000433", courses: "STPPDSPPS", enrolled: "2026-11-03", pay: "Company Charge", prints: 0, reprints: 0 },
+];
+
+const S = { role: "acc", kind: "r", span: "Daily", day: TODAY, from: "2026-10-01", to: TODAY, q: "", open: null, preview: null };
+
+function range() {
+  if (S.span === "Daily") return [S.day, S.day];
+  if (S.span === "Weekly") { const dow = (d(S.day).getUTCDay() + 6) % 7; const mon = add(S.day, -dow); return [mon, add(mon, 6)]; }
+  if (S.span === "Monthly") { const m = S.day.slice(0, 7); const next = d(m + "-01"); next.setUTCMonth(next.getUTCMonth() + 1); next.setUTCDate(0); return [m + "-01", iso(next)]; }
+  return [S.from, S.to];
+}
+function label() {
+  const [a, b] = range();
+  if (S.span === "Daily") return fmt(a);
+  if (S.span === "Monthly") return d(a).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
+  return `${fmt(a)} – ${fmt(b)}`;
+}
+function step(n) {
+  if (S.span === "Daily") S.day = add(S.day, n);
+  else if (S.span === "Weekly") S.day = add(S.day, 7 * n);
+  else { const x = d(S.day.slice(0, 7) + "-01"); x.setUTCMonth(x.getUTCMonth() + n); S.day = iso(x); }
+}
+
+function tabs() {
+  const T = { acc: [["Dashboard"], ["Approvals"], ["Transactions", true], ["Reports"], ["Configuration"]], cash: [["Dashboard"], ["Search Trainee"], ["Accounting", true]], reg: [["Dashboard"], ["Trainees & Enrollments", true]] }[S.role];
+  $("tabs").innerHTML = T.map(([t, on]) => `<div class="tab${on ? " on" : ""}"><button type="button">${t}${t === "Transactions" || t === "Configuration" || t === "Accounting" ? '<span class="caret"></span>' : ""}</button></div>`).join("");
+}
+
+function accounting() {
+  const [a, b] = range(), q = S.q.trim().toLowerCase();
+  const list = (S.kind === "r" ? RECEIPTS : TARS).filter((x) => x.day >= a && x.day <= b && (!q || `${x.no} ${x.who} ${x.nw}`.toLowerCase().includes(q))).sort((x, y) => (y.day + y.no).localeCompare(x.day + x.no));
+  const inR = (arr) => arr.filter((x) => x.day >= a && x.day <= b).length;
+  const rows = list.slice(0, 10).map((x) => {
+    const printed = `${x.prints} of 2${x.reprints ? `<span class="chip">+${x.reprints} Reprint</span>` : ""}`;
+    const main = S.kind === "r"
+      ? `<tr class="${x.valid ? "" : "void"}"><td class="mono"><b>${x.no}</b></td><td>${fmt(x.day)}<small>${x.time}</small></td><td><b>${esc(x.who)}</b><small class="mono">${x.nw}</small></td><td>${esc(x.what)}</td><td>${esc(x.mode)}</td><td class="r amt">${peso(x.amt)}</td><td>${printed}</td><td>${x.valid ? '<span class="pill paid">Valid</span>' : '<span class="pill due">VOID</span>'}</td><td>${x.valid ? `<button class="btn" data-re="${x.no}">Reprint</button>` : ""}</td></tr>`
+      : `<tr><td class="mono"><b>${x.no}</b>${x.old ? "<small>Issued before the TAR series</small>" : ""}</td><td>${fmt(x.day)}</td><td><b>${esc(x.who)}</b><small class="mono">${x.nw}</small></td><td>${esc(x.courses)}<small>Enrolled ${fmt(x.enrolled)}</small></td><td><span class="pill ${x.pay === "Paid" ? "paid" : x.pay === "Company Charge" ? "appr" : "dueo"}">${esc(x.pay)}</span></td><td>${printed}</td><td><button class="btn" data-re="${x.no}">Reprint</button></td></tr>`;
+    const cols = S.kind === "r" ? 9 : 7;
+    const form = S.open === x.no ? `<tr class="rform"><td colspan="${cols}"><div class="in"><b>Reprint ${x.no}</b><select id="why"><option value="">Reason…</option><option>Misprint</option><option>Lost by the trainee</option><option>Damaged</option><option>Other</option></select><input id="whyx" placeholder="Details (for Other)" hidden><button class="btn pri" id="go">Reprint</button><button class="btn" data-cancel>Cancel</button></div></td></tr>` : "";
+    return main + form;
+  }).join("");
+  const total = S.kind === "r" ? list.filter((x) => x.valid).reduce((s, x) => s + x.amt, 0) : 0;
+  const head = S.kind === "r" ? "<th>AR No.</th><th>Issued</th><th>Trainee</th><th>For</th><th>Mode</th><th class='r'>Amount</th><th>Printed</th><th>Status</th><th></th>" : "<th>TAR No.</th><th>Issued</th><th>Trainee</th><th>Courses</th><th>Payment</th><th>Printed</th><th></th>";
+  return `<div class="cx-head"><div><span class="eyebrow">Transactions</span><h1>Receipts and TARs</h1></div></div>
+  <div class="sub"><button data-kind="r" class="${S.kind === "r" ? "on" : ""}">Acknowledgement Receipts<small>${inR(RECEIPTS)}</small></button><button data-kind="t" class="${S.kind === "t" ? "on" : ""}">Training Admission Records<small>${inR(TARS)}</small></button></div>
+  <div class="bar"><div class="seg">${["Daily", "Weekly", "Monthly", "Custom"].map((s) => `<button data-span="${s}" class="${S.span === s ? "on" : ""}">${s}</button>`).join("")}</div>
+    ${S.span === "Custom" ? `<label>From <input type="date" id="from" value="${S.from}"></label><label>To <input type="date" id="to" value="${S.to}"></label>` : `<div class="daypick"><button data-step="-1" aria-label="Previous">‹</button><b>${label()}</b><button data-step="1" aria-label="Next">›</button><button data-today>Today</button></div>`}
+    <input id="q" placeholder="Search number, trainee or NWMTACI No." value="${esc(S.q)}" style="flex:1;min-width:200px"></div>
+  <section class="panel"><div class="cwrap"><table><thead><tr>${head}</tr></thead><tbody>${rows || `<tr><td colspan="9" style="color:var(--muted)">No ${S.kind === "r" ? "receipts" : "TARs"} issued in this period.</td></tr>`}</tbody></table></div>
+  <div class="tot"><span>${list.length} ${S.kind === "r" ? "receipt" : "TAR"}${list.length === 1 ? "" : "s"} · ${label()}</span>${S.kind === "r" ? `<span>Total valid <b>${peso(total)}</b></span>` : ""}</div></section>
+  ${S.preview ? `<div class="doc" style="margin-top:16px"><div><span class="eyebrow">${S.kind === "r" ? "Acknowledgement Receipt" : "Training Admission Record"}</span><h3 class="mono">${S.preview.no}</h3><small style="color:var(--muted)">Reason: ${esc(S.preview.why)} · Reprinted by Accounting · ${fmt(TODAY)}</small></div><span class="stamp">REPRINT – COPY ${S.preview.copy}</span></div>` : ""}`;
+}
+
+function cashier() {
+  return `<div class="cx-head"><div><span class="eyebrow">Accounting</span><h1>Record Payment</h1></div></div>
+  <div class="cols"><section class="panel"><div class="ph"><h2>DELA CRUZ, Juan P.</h2><small class="mono">NWMTACI-0000412</small></div>
+    <div class="lines"><div><span>Training Fee · SSO</span><span>₱4,500.00</span></div><div><span>Training Fee · PSCMT</span><span>₱1,800.00</span></div><div><span>Miscellaneous · T-Shirt × 1</span><span>₱150.00</span></div><div><span>Service Fee · Rescheduling</span><span>₱350.00</span></div><div class="tot"><span>Amount Received · Cash</span><span>₱6,800.00</span></div></div></section>
+  <section class="panel"><div class="ph"><h2>Payment Recorded · 3 Receipts</h2></div>
+    <div class="rlist">
+      <div class="rcard" style="--c:var(--blue)"><div><b>AR-2026-000121</b><small>Training Fee · SSO, PSCMT</small></div><span class="amt">₱6,300.00</span><button class="btn" data-print="AR-2026-000121">Print Receipt</button></div>
+      <div class="rcard" style="--c:var(--orange)"><div><b>AR-2026-000122</b><small>Miscellaneous · T-Shirt × 1</small></div><span class="amt">₱150.00</span><button class="btn" data-print="AR-2026-000122">Print Receipt</button></div>
+      <div class="rcard" style="--c:var(--cyan)"><div><b>AR-2026-000123</b><small>Service Fee · Rescheduling</small></div><span class="amt">₱350.00</span><button class="btn" data-print="AR-2026-000123">Print Receipt</button></div>
+    </div></section></div>
+  <section class="panel" style="margin-top:20px"><div class="ph"><h2>Payment Records</h2></div><div class="cwrap"><table><thead><tr><th>AR No.</th><th>Time</th><th>Trainee</th><th>For</th><th>Mode</th><th class="r">Amount</th></tr></thead><tbody>
+    ${RECEIPTS.filter((x) => x.day === TODAY).map((x) => `<tr><td class="mono"><b>${x.no}</b></td><td>${x.time}</td><td>${esc(x.who)}</td><td>${esc(x.what)}</td><td>${esc(x.mode)}</td><td class="r amt">${peso(x.amt)}</td></tr>`).join("")}
+  </tbody></table></div></section>`;
+}
+
+function registration() {
+  return `<div class="cx-head"><div><span class="eyebrow">Trainee Account</span><h1>DELA CRUZ, Juan P.</h1></div></div>
+  <div class="cols"><section class="panel"><div class="ph"><h2>Courses</h2></div><div class="cwrap"><table><thead><tr><th>Course</th><th>Enrolled On</th><th>Status</th></tr></thead><tbody>
+    <tr><td><b>UBT-PSSR</b><small>Updating Training on Basic Training – PSSR</small></td><td>${fmt("2026-11-02")}</td><td><span class="pill paid">Enrolled</span></td></tr>
+    <tr><td><b>SSO</b><small>Ship Security Officers</small></td><td>${fmt("2026-11-03")}</td><td><span class="pill paid">Enrolled</span></td></tr>
+    <tr><td><b>PSCMT</b><small>Crowd Management</small></td><td>${fmt("2026-11-03")}</td><td><span class="pill paid">Enrolled</span></td></tr>
+  </tbody></table></div></section>
+  <section class="panel"><div class="ph"><h2>Training Admission Records</h2></div><div class="rlist">
+    <div class="rcard"><div><b>TAR-2026-000002</b><small>Enrolled ${fmt("2026-11-03")} · SSO, PSCMT</small></div><button class="btn pri" data-print="TAR-2026-000002">Print TAR · Nov 3</button></div>
+    <div class="rcard" style="--c:var(--muted)"><div><b>TAR-2026-000001</b><small>Enrolled ${fmt("2026-11-02")} · UBT-PSSR · Printed 2 of 2</small></div><button class="btn" data-print="TAR-2026-000001" disabled>Print TAR · Nov 2</button></div>
+  </div><ol class="rules"><li>One TAR per enrollment date.</li><li>Courses enrolled on the same date share one TAR.</li><li>TAR numbers have their own series, apart from receipts.</li></ol></section></div>`;
+}
+
+function render() {
+  tabs();
+  $("view").innerHTML = S.role === "acc" ? accounting() : S.role === "cash" ? cashier() : registration();
+}
+document.addEventListener("click", (ev) => {
+  const t = ev.target.closest("button"); if (!t) return;
+  if (t.dataset.kind) { S.kind = t.dataset.kind; S.open = null; S.preview = null; }
+  else if (t.dataset.span) S.span = t.dataset.span;
+  else if (t.dataset.step) step(Number(t.dataset.step));
+  else if ("today" in t.dataset) S.day = TODAY;
+  else if (t.dataset.re) S.open = S.open === t.dataset.re ? null : t.dataset.re;
+  else if ("cancel" in t.dataset) S.open = null;
+  else if (t.dataset.print) { toast(`${t.dataset.print} opened for printing`); return; }
+  else if (t.id === "go") {
+    const why = $("why").value, other = $("whyx").value.trim();
+    if (!why || (why === "Other" && !other)) { toast("Choose the reason for the reprint."); return; }
+    const row = (S.kind === "r" ? RECEIPTS : TARS).find((x) => x.no === S.open);
+    row.reprints += 1;
+    S.preview = { no: row.no, why: why === "Other" ? other : why, copy: row.prints + row.reprints };
+    toast(`${row.no} opened · REPRINT – COPY ${S.preview.copy}`); S.open = null;
+  } else return;
+  render();
+});
+document.addEventListener("change", (ev) => {
+  if (ev.target.id === "role") { S.role = ev.target.value; render(); }
+  if (ev.target.id === "why") $("whyx").hidden = ev.target.value !== "Other";
+  if (ev.target.id === "from") { S.from = ev.target.value; render(); }
+  if (ev.target.id === "to") { S.to = ev.target.value; render(); }
+});
+document.addEventListener("input", (ev) => { if (ev.target.id === "q") { S.q = ev.target.value; const pos = ev.target.selectionStart; render(); const q = $("q"); q.focus(); q.setSelectionRange(pos, pos); } });
+render();
+</script>
