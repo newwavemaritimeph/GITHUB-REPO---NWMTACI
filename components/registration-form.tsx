@@ -60,7 +60,7 @@ const emptyApplicant = {
 // collapse to a one-line summary once complete, a progress rail, and quiet
 // underline fields. Applicants can reopen any finished section to edit it.
 /** Enrollment type (owner, 8 Oct 2026): the first question on the form. */
-const ENROLLMENT_TYPES: [string, string, string][] = [["Online enrollment", "Online Enrollment", "I'm registering on my own, online"], ["Walk-in", "Walk-In", "I'm at the New Wave office"], ["Meta", "Meta (Facebook / Instagram)", "I saw New Wave on Facebook or Instagram"]];
+const ENROLLMENT_TYPES: [string, string, string][] = [["Online enrollment", "Online Enrollment", "I'm registering on my own, online"], ["Walk-in", "Walk-In", "I'm at the New Wave office"]];
 type SectionKey = "enrollment" | "identification" | "personal" | "contact" | "emergency" | "courses" | "review";
 const upper = (value: string) => value.toUpperCase();
 const pickedDate = (iso: string) => new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
@@ -290,7 +290,7 @@ function Wizard() {
 
   const rankText = applicant.rank === "OTHER" ? applicant.rankOther : applicant.rank;
   const nameText = [applicant.firstName, applicant.middleName, applicant.lastName, applicant.suffix].filter(Boolean).join(" ");
-  const enrollmentValid = applicant.enrollmentType === "Online enrollment" || applicant.enrollmentType === "Walk-in" || applicant.enrollmentType === "Meta";
+  const enrollmentValid = applicant.enrollmentType === "Online enrollment" || applicant.enrollmentType === "Walk-in";
   const sections: { key: SectionKey; title: string; hint: string; done: boolean; summary: string }[] = [
     { key: "enrollment", title: "Enrollment Type", hint: "How are you enrolling?", done: enrollmentValid, summary: applicant.enrollmentType },
     { key: "identification", title: "Identification", hint: "Start with your SRN. If you have trained with us before, we fill in your details.", done: idValid, summary: `SRN ${applicant.srn}${locked ? " · record found" : ""}` },
