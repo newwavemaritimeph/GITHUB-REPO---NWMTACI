@@ -1,0 +1,123 @@
+<title>Accounting Dashboard Designs</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Same shell as the live portal: navy bar with dropdown tabs, summary rail on the left, light-cyan table headers. */
+:root{--orange:#F25615;--blue:#0571D0;--cyan:#35CCFA;--cyan-l:#9EE3F1;--navy:#123F63;--bg:#f2f6f8;--surface:#fff;--fg:#0f2638;--muted:#587184;--line:#dbe6ec;--soft:#eef4f8;--th:#e6f6fd;--thc:#0b4f8f;--zebra:#f7fafc;
+ --good:#0a7a3e;--good-bg:#e2f5e9;--warn:#a2470b;--warn-bg:#fdf0e5;--bad:#b42318;--bad-bg:#fcebea;--info:#0571D0;--info-bg:#e5f1fb;
+ --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding-block:16px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.w{max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.logo{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}.logo b{font-size:19px;font-weight:600}.logo b span{color:var(--orange)}.logo small{display:block;color:var(--cyan-l);font-size:14px}.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.who{font-size:14px;color:#cfe3ef;display:flex;align-items:center;gap:8px}.who select{background:#ffffff14;border:1px solid #ffffff30;color:#fff;border-radius:8px;padding:5px 8px}.who select option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:16px;flex-wrap:wrap}.tab>button{background:none;border:0;color:#c3dbea;font:500 16px var(--sans);padding:12px 18px;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:8px}.tab>button:hover{color:#fff;background:#ffffff12}.tab.on>button{background:var(--bg);color:var(--fg);font-weight:600}
+.caret{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.menu{position:absolute;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:15;display:flex;flex-direction:column;margin-top:2px}.tab{position:relative}.menu button{background:none;border:0;text-align:left;color:var(--fg);font:500 15.5px var(--sans);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;gap:12px}.menu button:hover{background:var(--soft)}.menu button.on{background:var(--info-bg);color:var(--info);font-weight:600}.menu small,.n{font:600 11.5px var(--mono);background:var(--orange);color:#fff;border-radius:10px;padding:1px 7px}
+.page{padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.cx-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}h1{font-size:25px;font-weight:600;margin:0}h2{font-size:19px;font-weight:600;margin:0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.seg button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.seg button.on{background:var(--navy);color:#fff}
+.rail{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}@media (max-width:900px){.rail{grid-template-columns:1fr}}.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.ph small{color:var(--muted);font-size:14px}
+.lines{display:flex;flex-direction:column;padding:0 20px 16px}.lines div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}.lines div:first-child{border-top:0}.lines dd,.lines span:last-child{font-family:var(--mono);font-weight:600}.lines .tot{font-weight:700}.lines .bad{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 16px}.tile{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 12px}.tile span{display:block;font-size:13px;color:var(--muted)}.tile b{font:600 19px var(--mono)}
+.cwrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--th);color:var(--thc);font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:10px 12px;border-right:1px solid var(--line);white-space:nowrap}td{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.35}tbody tr:nth-child(even) td{background:var(--zebra)}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}.due{background:var(--bad-bg);color:var(--bad)}.dueo{background:var(--warn-bg);color:var(--warn)}.appr{background:var(--info-bg);color:var(--info)}.paid{background:var(--good-bg);color:var(--good)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:9px;padding:7px 14px;font-weight:600;font-size:14.5px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.okb{background:var(--good);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:14px 20px;background:var(--soft);border-top:1px solid var(--line)}.form label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}.form select,.form input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line)}
+.alert{background:var(--bad-bg);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:15px;font-weight:500;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.note{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+</style>
+<style>
+[hidden]{display:none!important}
+.pick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}.pick button{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:9px 14px;text-align:left;color:var(--fg)}.pick button b{display:block;font-size:14.5px}.pick button small{color:var(--muted);font-size:12.5px}.pick button.on{border-color:var(--orange);box-shadow:0 0 0 2px var(--orange) inset}
+.dayline{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px}.dayline .dp{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:4px 8px}.dayline .dp b{font-size:14.5px}
+.six{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px}.six button{border:1px solid var(--line);border-top:4px solid var(--c);background:var(--surface);border-radius:12px;padding:12px 14px;text-align:left;color:var(--fg);display:flex;flex-direction:column;gap:2px}.six button.on{box-shadow:0 0 0 2px var(--c) inset}.six b{font:600 26px var(--mono)}.six span{font-weight:600}.six small{color:var(--muted);font-size:12.5px}
+.q{display:flex;flex-direction:column}.q .it{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:10px 20px;border-top:1px solid var(--line)}.q .it:first-child{border-top:0}.q .it small{display:block;color:var(--muted);font-size:12.5px}.q .acts{display:flex;gap:6px;flex-wrap:wrap}
+.tag{display:inline-block;font:600 11.5px var(--sans);padding:1px 8px;border-radius:99px;background:color-mix(in srgb,var(--c) 15%,transparent);color:var(--c);margin-right:6px;white-space:nowrap}
+.kan{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(230px,1fr);gap:12px;overflow-x:auto;padding-bottom:6px}.kan .col{background:var(--soft);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}.kan .col h3{margin:0;font-size:14px;display:flex;justify-content:space-between;color:var(--c)}.kan .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-size:13.5px}.kan .card small{display:block;color:var(--muted)}.kan .card .acts{display:flex;gap:6px;margin-top:6px}
+.split{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}@media (max-width:860px){.split{grid-template-columns:1fr}}.cats{display:flex;flex-direction:column;gap:4px;padding:8px}.cats button{display:flex;justify-content:space-between;gap:8px;border:0;background:none;padding:9px 12px;border-radius:9px;text-align:left;color:var(--fg);font-weight:500}.cats button.on{background:var(--info-bg);color:var(--info);font-weight:600}.cats .n{background:var(--c)}
+.grp{padding:4px 8px 8px}.grp-h{display:block;font:600 12px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--blue);padding:6px 12px 2px}.grp .cats{padding:2px 0}.cats button small{display:block;font-weight:400;color:var(--muted);font-size:12px}
+.cash{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:0 20px 16px}.cash div{border:1px solid var(--line);border-radius:10px;padding:10px 12px}.cash span{display:block;font-size:12.5px;color:var(--muted)}.cash b{font:600 16px var(--mono)}
+.brief{display:flex;flex-direction:column;gap:18px}.brief h2{display:flex;gap:10px;align-items:baseline}.brief h2 small{font-weight:500;color:var(--muted);font-size:13.5px}
+.strip{display:flex;flex-wrap:wrap;gap:8px 22px;padding:12px 20px;font-size:14px;border-top:1px solid var(--line)}.strip b{font-family:var(--mono)}
+.btn.sm{padding:4px 10px;font-size:13px}.okb.sm{padding:4px 10px;font-size:13px}
+.two{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:18px;align-items:start}@media (max-width:860px){.two{grid-template-columns:1fr}}
+.gone{font-size:13px;color:var(--muted);margin:0 0 14px}
+</style>
+<header class="top"><div class="w">
+  <div class="brand"><div class="logo"><div class="mark">NW</div><div><b>New <span>Wave</span> Portal <span class="proto">PROTOTYPE</span></b><small>Accounting Dashboard · five designs</small></div></div></div>
+  <nav class="tabs"><div class="tab on"><button type="button">Dashboard</button></div><div class="tab"><button type="button">Search Trainee</button></div><div class="tab"><button type="button">Approvals</button></div><div class="tab"><button type="button">Transactions<span class="caret"></span></button></div><div class="tab"><button type="button">Reports</button></div><div class="tab"><button type="button">Configuration<span class="caret"></span></button></div></nav>
+</div></header>
+<main class="page"><div class="w">
+  <div class="pick" id="pick"></div>
+  <p class="gone">Requisitions are removed from Accounting (they stay with the Admin and the Admin Assistant).</p>
+  <div class="dayline"><div><span class="eyebrow">Accounting</span><h1>Dashboard</h1></div><span class="dp"><button class="btn sm">‹</button><b>Tuesday, Nov 3, 2026</b><button class="btn sm">›</button></span></div>
+  <div id="view"></div>
+</div></main>
+<div id="toast" class="toast" hidden></div>
+<script>
+const peso = (c) => "₱" + (c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const CATS = [
+  { key: "exp", name: "Expense Requests", c: "#0571D0", ok: "Approve", items: [["ER-2026-000041 · Meralco", "Utilities · requested by the Cashier · Nov 3, 9:40 AM", 845000], ["ER-2026-000042 · Office Supplies", "Supplies · 2 receipt photos · Nov 3, 10:15 AM", 128000], ["ER-2026-000043 · Maynilad", "Utilities · Nov 2, 4:05 PM", 56000]] },
+  { key: "ref", name: "Refunds", c: "#b42318", ok: "Approve", items: [["DELA CRUZ, Juan P. · SSO", "Cancellation 6 days before · paid ₱4,500 less ₱350", 415000], ["SANTOS, Maria L. · PSCMT", "Cancellation 3 days before · 50% + ₱250", 65000]] },
+  { key: "dis", name: "Discounts", c: "#a2470b", ok: "Approve", items: [["REYES, Carlo M. · STPPDSPPS", "Returning trainee · requested by the Cashier", 20000]] },
+  { key: "bill", name: "For Billing · Rebates Owed to Partners", c: "#F25615", ok: "Mark Paid", items: [["Qapla Maritime", "3 courses · UBT-PSSR × 2, PSCMT", 90000], ["Costa Maritime", "2 courses · STPPDSPPS, PSCMHBT", 60000]] },
+  { key: "void", name: "Payment Voids", c: "#7a3dbf", ok: "Approve Void", items: [["AR-2026-000117 · VILLANUEVA, Rico T.", "Duplicate entry · requested by the Cashier · Nov 3", 130000]] },
+  { key: "cash", name: "Cashier Opening and Closing", c: "#0a7a3e", ok: "Mark Reviewed", items: [["Closing · Nov 2", "Counted ₱18,230.00 · short ₱20.00 · not reviewed", 2000], ["Opening · Nov 3", "₱2,000.00 at 8:01 AM · closing not yet submitted", 0]] },
+];
+const DESIGNS = [["Six Tiles", "Big tiles in your order; tap one to see its list"], ["One Priority Queue", "Everything to decide in one list, oldest first"], ["Six Columns", "A column per category with buttons on each card"], ["Category Rail", "Categories on the left, the list on the right"], ["Morning Briefing", "Decide · Bill · Cash control, in three blocks"], ["Rail + Briefing (04 + 05)", "The rail grouped into the three blocks; the list beside it"]];
+let D = 6, sel = "exp";
+const done = new Set();
+const live = (cat) => cat.items.filter((_, i) => !done.has(`${cat.key}${i}`));
+const total = (cat) => live(cat).reduce((s, x) => s + x[2], 0);
+const act = (cat, i, label) => `<span class="acts"><button class="okb sm" data-do="${cat.key}${i}" data-t="${label}">${label}</button>${cat.key === "cash" || cat.key === "bill" ? "" : `<button class="btn sm" data-do="${cat.key}${i}" data-t="Rejected">Reject</button>`}</span>`;
+const list = (cat) => live(cat).length ? `<div class="q">${cat.items.map((x, i) => done.has(`${cat.key}${i}`) ? "" : `<div class="it"><div><b>${x[0]}</b><small>${x[1]}</small></div><span class="amt">${x[2] ? peso(x[2]) : ""}</span>${act(cat, i, cat.ok)}</div>`).join("")}</div>` : `<p class="note" style="padding:14px 20px">Nothing waiting.</p>`;
+const strip = `<div class="strip"><span>Collections today <b>₱24,600.00</b></span><span>Cash on hand <b>₱18,950.00</b></span><span>Released today <b>₱1,840.00</b></span><span>Receivables <b>₱12,300.00</b></span></div>`;
+function d1() {
+  const cat = CATS.find((c) => c.key === sel);
+  return `<div class="six">${CATS.map((c) => `<button data-sel="${c.key}" class="${sel === c.key ? "on" : ""}" style="--c:${c.c}"><b>${live(c).length}</b><span>${c.name}</span><small>${c.key === "cash" ? "1 short to review" : peso(total(c))}</small></button>`).join("")}</div><section class="panel"><div class="ph"><h2>${cat.name}</h2><small>${live(cat).length} waiting</small></div>${list(cat)}${strip}</section>`;
+}
+function d2() {
+  const all = CATS.flatMap((c) => c.items.map((x, i) => ({ c, x, i }))).filter(({ c, i }) => !done.has(`${c.key}${i}`));
+  return `<div class="two"><section class="panel"><div class="ph"><h2>To Decide Today</h2><small>${all.length} items · in your priority order</small></div><div class="q">${all.map(({ c, x, i }) => `<div class="it"><div><span class="tag" style="--c:${c.c}">${c.name.split(" · ")[0]}</span><b>${x[0]}</b><small>${x[1]}</small></div><span class="amt">${x[2] ? peso(x[2]) : ""}</span>${act(c, i, c.ok)}</div>`).join("") || `<p class="note" style="padding:14px 20px">Nothing waiting.</p>`}</div></section>
+  <section class="panel"><div class="ph"><h2>Today</h2></div><div class="lines"><div><span>Collections</span><span>₱24,600.00</span></div><div><span>Cash on hand</span><span>₱18,950.00</span></div><div><span>Released</span><span>₱1,840.00</span></div><div><span>Rebates owed</span><span>₱1,500.00</span></div><div><span>Receivables</span><span>₱12,300.00</span></div></div></section></div>`;
+}
+function d3() {
+  return `<div class="kan">${CATS.map((c) => `<div class="col" style="--c:${c.c}"><h3>${c.name.split(" · ")[0]}<span class="n" style="background:${c.c}">${live(c).length}</span></h3>${c.items.map((x, i) => done.has(`${c.key}${i}`) ? "" : `<div class="card"><b>${x[0]}</b><small>${x[1]}</small>${x[2] ? `<span class="amt">${peso(x[2])}</span>` : ""}<div class="acts">${act(c, i, c.ok)}</div></div>`).join("") || `<small style="color:var(--muted)">Nothing waiting.</small>`}</div>`).join("")}</div><section class="panel" style="margin-top:16px">${strip}</section>`;
+}
+function d4() {
+  const cat = CATS.find((c) => c.key === sel);
+  return `<div class="split"><section class="panel"><div class="cats">${CATS.map((c) => `<button data-sel="${c.key}" class="${sel === c.key ? "on" : ""}" style="--c:${c.c}"><span>${c.name}</span><span class="n">${live(c).length}</span></button>`).join("")}</div></section><div class="stack"><section class="panel"><div class="ph"><h2>Cashier Today</h2></div><div class="cash"><div><span>Opening</span><b>₱2,000.00</b><small>8:01 AM</small></div><div><span>Closing</span><b>Not yet</b><small>due at 5:00 PM</small></div><div><span>Yesterday</span><b style="color:var(--bad)">Short ₱20.00</b><small>needs review</small></div></div></section><section class="panel"><div class="ph"><h2>${cat.name}</h2><small>${peso(total(cat))}</small></div>${list(cat)}</section></div></div>`;
+}
+function d5() {
+  const sec = (title, sub, keys) => `<section class="panel"><div class="ph"><h2>${title}</h2><small>${sub}</small></div>${keys.map((k) => { const c = CATS.find((x) => x.key === k); return `<div style="padding:0 20px"><span class="tag" style="--c:${c.c}">${c.name} · ${live(c).length}</span></div>${list(c)}`; }).join("")}</section>`;
+  return `<div class="brief">${sec("1 · Needs Your Decision", "expense requests, refunds, discounts, payment voids", ["exp", "ref", "dis", "void"])}${sec("2 · For Billing", "rebates owed to partners, grouped by partner", ["bill"])}${sec("3 · Cash Control", "cashier opening and closing", ["cash"])}<section class="panel">${strip}</section></div>`;
+}
+function d6() {
+  const groups = [["1 · Needs Your Decision", ["exp", "ref", "dis", "void"]], ["2 · For Billing", ["bill"]], ["3 · Cash Control", ["cash"]]];
+  const cat = CATS.find((c) => c.key === sel);
+  const waiting = CATS.reduce((n, c) => n + live(c).length, 0);
+  return `<div class="split"><section class="panel"><div class="ph"><h2>To Do</h2><small>${waiting} waiting</small></div>${groups.map(([g, keys]) => `<div class="grp"><span class="grp-h">${g}</span><div class="cats">${keys.map((k) => { const c = CATS.find((x) => x.key === k); return `<button data-sel="${c.key}" class="${sel === c.key ? "on" : ""}" style="--c:${c.c}"><span>${c.name.replace("For Billing · ", "")}<small>${c.key === "cash" ? "1 short to review" : peso(total(c))}</small></span><span class="n">${live(c).length}</span></button>`; }).join("")}</div></div>`).join("")}</section>
+  <div class="stack"><section class="panel"><div class="ph"><h2>Cashier Today</h2><small>Tuesday, Nov 3</small></div><div class="cash"><div><span>Opening</span><b>₱2,000.00</b><small>8:01 AM</small></div><div><span>Closing</span><b>Not yet</b><small>due at 5:00 PM</small></div><div><span>Yesterday's Closing</span><b style="color:var(--bad)">Short ₱20.00</b><small>needs review</small></div></div></section>
+  <section class="panel"><div class="ph"><h2>${cat.name}</h2><small>${live(cat).length} waiting${cat.key === "cash" ? "" : ` · ${peso(total(cat))}`}</small></div>${list(cat)}${strip}</section></div></div>`;
+}
+function render() {
+  document.getElementById("pick").innerHTML = DESIGNS.map(([n, d], i) => `<button data-d="${i + 1}" class="${D === i + 1 ? "on" : ""}"><b>Design 0${i + 1} · ${n}</b><small>${d}</small></button>`).join("");
+  document.getElementById("view").innerHTML = [d1, d2, d3, d4, d5, d6][D - 1]();
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.d) { D = Number(b.dataset.d); }
+  else if (b.dataset.sel) sel = b.dataset.sel;
+  else if (b.dataset.do) { done.add(b.dataset.do); const t = document.getElementById("toast"); t.textContent = `${b.dataset.t}.`; t.hidden = false; setTimeout(() => (t.hidden = true), 1800); }
+  else return;
+  render();
+});
+render();
+</script>

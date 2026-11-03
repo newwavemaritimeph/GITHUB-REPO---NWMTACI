@@ -152,7 +152,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // Report (with opening and closing), Requests (CASHIER_TABS).
   cashier: ["Dashboard","Search trainee","Batch schedules","Payments","Other income","Expenses","Report","Requests"],
   // Accounting Manager (owner, 8 Oct 2026): five tabs — Dashboard · Approvals · Transactions ▾ · Reports · Configuration ▾ (ACCOUNTING_TABS).
-  accounting: ["Dashboard","Search trainee","Approvals","Reports","Payments","Receipts and TARs","Other income","Expenses","Receivables","Payables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
+  accounting: ["Dashboard","Search trainee","Approvals","Reports","Payments","Other income","Expenses","Receivables","Payables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
 };
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
@@ -198,7 +198,7 @@ const ACCOUNTING_TABS:TopTab[]=[
   // Reprints of receipts and TARs live in the Trainee Account (owner, 3 Nov 2026).
   {label:"Search Trainee",items:["Search trainee"]},
   {label:"Approvals",items:["Approvals"]},
-  {label:"Transactions",items:["Payments","Receipts and TARs","Other income","Expenses","Receivables","Payables","Cash position"]},
+  {label:"Transactions",items:["Payments","Other income","Expenses","Receivables","Payables","Cash position"]},
   {label:"Reports",items:["Reports"]},
   {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS]},
 ];

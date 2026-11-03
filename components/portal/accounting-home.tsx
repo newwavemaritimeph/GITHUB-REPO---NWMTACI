@@ -35,7 +35,7 @@ function useJson<T>(url: string | null) {
   useEffect(() => {
     if (!url) return;
     let live = true;
-    void fetch(url, { cache: "no-store" }).then(async (r) => { const body = await r.json(); if (!r.ok) throw new Error(body.error ?? "Could not load."); if (live) setState({ url, data: body as T, error: "" }); })
+    void fetch(url, { cache: "no-store" }).then(async (r) => { const text = await r.text(); let body: { error?: string } = {}; try { body = text ? JSON.parse(text) : {}; } catch { body = {}; } if (!r.ok || !text) throw new Error(body.error ?? `The server did not answer (status ${r.status}). Try again.`); if (live) setState({ url, data: body as T, error: "" }); })
       .catch((e) => { if (live) setState({ url, data: null, error: e instanceof Error ? e.message : "Could not load." }); });
     return () => { live = false; };
   }, [url]);
@@ -206,6 +206,14 @@ function useReprint(onDone?: () => void) {
 }
 
 export function AccountingPayments() {
+  // Receipts and TARs are consolidated here (owner, 3 Nov 2026: "Consolidate Receipt and TARs in Payment").
+  const [view, setView] = useState<"receipts" | "tars">("receipts");
+  const pills = <div className="sub-pills">{([["receipts", "Acknowledgement Receipts"], ["tars", "Training Admission Records"]] as const).map(([k, label]) => <button key={k} type="button" className={view === k ? "on" : ""} onClick={() => setView(k)}>{label}</button>)}</div>;
+  if (view === "tars") return <div className="portal-page cx ac"><TxHead title="Payments" />{pills}<AccountingDocuments only="tars" embedded /></div>;
+  return <PaymentReceipts pills={pills} />;
+}
+
+function PaymentReceipts({ pills }: { pills: ReactNode }) {
   const today = manilaToday();
   const [date, setDate] = useState(today), [channel, setChannel] = useState(""), [q, setQ] = useState("");
   const { data: r, error } = useJson<PayDay>(`/api/staff/cashier-report?date=${date}`);
@@ -218,7 +226,7 @@ export function AccountingPayments() {
   // Reprint here too (owner, 3 Nov 2026).
   const rp = useReprint();
   return <div className="portal-page cx ac">
-    <TxHead title="Payments" right={<DayPicker date={date} setDate={setDate} />} note={<>{longDay(date)} · <span className="ac-ro">View only — the Cashier records payments</span></>} />
+    <TxHead title="Payments" right={<DayPicker date={date} setDate={setDate} />} />{pills}<p className="ac-note">{longDay(date)} · <span className="ac-ro">View only — the Cashier records payments</span></p>
     {error && <Message kind="error" text={error} />}
     {rp.msg && <Message kind={rp.msg.kind} text={rp.msg.text} />}
     <div className="ac-rail">
@@ -669,9 +677,10 @@ export function BillingStatementReport({ switcher }: { switcher?: ReactNode }) {
 
 type DocRow = { id: string; number: string; issuedAt: string; trainee: string; nwmtaciNo: string; label?: string; courses?: string; method?: string; reference?: string; amount?: number; valid?: boolean; payment?: string; balanceCentavos?: number; printCount: number };
 /** Accounting › Receipts and TARs (owner, 3 Nov 2026): date-sensitive lists of every receipt and TAR issued; Accounting reprints them, with a reason and no limit. */
-export function AccountingDocuments() {
+export function AccountingDocuments({ only, embedded }: { only?: "receipts" | "tars"; embedded?: boolean } = {}) {
   const p = usePeriod();
-  const [kind, setKind] = useState<"receipts" | "tars">("receipts"), [q, setQ] = useState(""), [tick, setTick] = useState(0);
+  const [kindPick, setKind] = useState<"receipts" | "tars">(only ?? "receipts"), [q, setQ] = useState(""), [tick, setTick] = useState(0);
+  const kind = only ?? kindPick;
   const [custom, setCustom] = useState(false), [from, setFrom] = useState(p.today), [to, setTo] = useState(p.today);
   const range = custom ? { from, to, label: `${fmtDate(from)} – ${fmtDate(to)}` } : p.period === "All Dates" ? { from: addDays(p.today, -365), to: p.today, label: "the last 12 months" } : p.range;
   const { data, error } = useJson<{ rows: DocRow[] }>(range.from <= range.to ? `/api/staff/documents?kind=${kind}&from=${range.from}&to=${range.to}&n=${tick}` : null);
@@ -682,9 +691,8 @@ export function AccountingDocuments() {
   const total = rows.filter((r) => r.valid !== false).reduce((s, r) => s + Number(r.amount ?? 0), 0);
   const cols = kind === "receipts" ? 8 : 7;
   const when = (iso: string) => `${fmtDate(iso)} · ${new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso))}`;
-  return <div className="portal-page cx ac">
-    <TxHead title="Receipts and TARs" />
-    <div className="sub-pills">{([["receipts", "Acknowledgement Receipts"], ["tars", "Training Admission Records"]] as const).map(([k, label]) => <button key={k} type="button" className={kind === k ? "on" : ""} onClick={() => { setKind(k); rp.close(); }}>{label}</button>)}</div>
+  const body = <>
+    {!only && <div className="sub-pills">{([["receipts", "Acknowledgement Receipts"], ["tars", "Training Admission Records"]] as const).map(([k, label]) => <button key={k} type="button" className={kind === k ? "on" : ""} onClick={() => { setKind(k); rp.close(); }}>{label}</button>)}</div>}
     {rp.msg && <Message kind={rp.msg.kind} text={rp.msg.text} />}
     {error && <Message kind="error" text={error} />}
     <section className="portal-panel cx-panel">
@@ -705,5 +713,6 @@ export function AccountingDocuments() {
       </tbody>{kind === "receipts" && <tfoot><tr><td colSpan={5}>{rows.length} receipt{rows.length === 1 ? "" : "s"} · {range.label}</td><td className="r cx-amt">{pesos2(total)}</td><td colSpan={2} /></tr></tfoot>}</table>{pg.pager}</div>
         : <p className="portal-empty-copy">No {kind === "receipts" ? "receipts" : "TARs"} issued in this period.</p>}
     </section>
-  </div>;
+  </>;
+  return embedded ? body : <div className="portal-page cx ac"><TxHead title="Receipts and TARs" />{body}</div>;
 }
