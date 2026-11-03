@@ -18,7 +18,7 @@ import { MoveBatch } from "./portal/move-batch";
 import { AdminConfiguration } from "./admin-configuration";
 import { DateReports } from "./date-reports";
 import { downloadCsv } from "@/lib/csv";
-import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer, SourcePicker, partnerOf, chargeTo } from "./portal/live-registration";
+import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer, CourseSourceCell, partnerOf, chargeTo } from "./portal/live-registration";
 import { sourceLabel } from "@/lib/company-charge";
 import { PaymentVoidCell } from "./portal/payment-void";
 import { Badge, Message, Modal, Page, PageHead, PeriodBar, manilaDay, submit, fullName, usePaged, usePeriod } from "./portal/shared-ui";
@@ -648,7 +648,6 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   const [err,setErr]=useState(""),[busy,setBusy]=useState(false);
   const post=async(body:Record<string,unknown>,text?:string)=>{setBusy(true);setErr("");try{const r=await submit(body);if(text)setNote(text);await reload?.();return r}catch(e){setErr(e instanceof Error?e.message:"Could not save.");throw e}finally{setBusy(false)}};
   const latest=live[live.length-1];
-  const partner=[...live].reverse().map(e=>partnerOf(data,e)).find(Boolean)??null;
   const billedTo=live.map(e=>chargeTo(data,e)).find(Boolean)??null;
   const enrolledN=live.filter(e=>e.enrollment_status==="Enrolled"||e.enrollment_status==="Open Schedule").length;
   const srcLabel=latest?sourceLabel(latest.source,partnerOf(data,latest)):"";
@@ -665,6 +664,13 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
     catch(e){tab?.close();setErr(e instanceof Error?e.message:"Could not reprint.")}finally{setBusy(false)}};
   const reprintForm=(cols:number)=>reprint&&<tr><td colSpan={cols}><div className="tp-reprint"><b>Reprint {reprint.no}</b><select value={why} onChange={e=>setWhy(e.target.value)} aria-label="Reason for the reprint"><option value="">Reason…</option><option>Misprint</option><option>Lost by the trainee</option><option>Damaged</option><option>Other</option></select>{why==="Other"&&<input value={whyOther} onChange={e=>setWhyOther(e.target.value)} placeholder="Reason" aria-label="Other reason"/>}<button type="button" className="portal-primary" disabled={busy} onClick={()=>void doReprint()}>Reprint</button><button type="button" className="portal-secondary" onClick={()=>setReprint(null)}>Cancel</button></div></td></tr>;
   const when=(e:Enrollment)=>{const b=first(e.batches);return b?(b.starts_on===b.ends_on?date(b.starts_on):`${date(b.starts_on)} – ${date(b.ends_on)}`):e.scheduled_on?date(e.scheduled_on):"No batch yet"};
+  // Referral per course (Design 01, owner 3 Nov 2026): the rebate of each course's own partner.
+  const rebateOf=(e:Enrollment)=>{const ag=partnerOf(data,e);if(!ag||chargeTo(data,e))return <span className="muted-text">—</span>;
+    const rec=data.agencyRebates.find(r=>r.enrollment_id===e.id) as {rebate_centavos:number;status:string;settlement?:string|null}|undefined;
+    const rate=rec?Number(rec.rebate_centavos):Number(data.agencyCourseRebates.find(r=>r.agency_id===ag.id&&r.course_id===e.course_id)?.rebate_centavos??0);
+    if(!rate)return <span className="muted-text">No rate set</span>;
+    const state=rec?(rec.status==="Pending"?"payable to the partner":rec.status==="Paid"&&(rec.settlement??"").startsWith("Deducted")?"deducted":rec.status.toLowerCase()):data.pendingRebates?.[e.id]?"once paid in full":"when paid";
+    return <span>{pesos2(rate)}<small>{state}</small></span>};
   return <Modal title="Trainee Account" onClose={onClose} wide>
     <div className="sa tp">
       <div className="tp-hero">
@@ -685,12 +691,12 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
       <div className="tp-cols">
         <div className="tp-main">
           <section className="tp-panel"><h4>Courses</h4>
-            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Course</th><th>Schedule</th><th>Source</th><th>Status</th><th className="r">Due</th><th className="r">Paid</th><th className="r">Balance</th></tr></thead><tbody>
+            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Course</th><th>Schedule</th><th>Source</th><th>Rebate</th><th>Status</th><th className="r">Due</th><th className="r">Paid</th><th className="r">Balance</th></tr></thead><tbody>
               {enrolls.map(e=>{const c=first(e.courses),cancelled=e.enrollment_status==="Cancelled",d=cancelled?0:dueCentavos(e),bal=cancelled?0:balanceOf(e);return <tr key={e.id} className={canEdit?"sa-click":undefined} onClick={canEdit?()=>setOpenEnrollment(e.id):undefined} title={canEdit?"Open this enrollment":undefined}>
-                <td><b>{c?.code??"Course"}</b><small>{c?.name} · {e.enrollment_number}</small></td><td>{when(e)}</td><td>{sourceLabel(e.source,partnerOf(data,e))||"—"}</td>
+                <td><b>{c?.code??"Course"}</b><small>{c?.name} · {e.enrollment_number}</small></td><td>{when(e)}</td><td>{canEdit?<CourseSourceCell key={`${e.id}:${partnerOf(data,e)?.id??e.source}`} data={data} enrollment={e} busy={busy} post={post}/>:<span className={`cs-chip ${partnerOf(data,e)?"ag":"wk"}`}>{sourceLabel(e.source,partnerOf(data,e))||"Online"}</span>}</td><td>{rebateOf(e)}</td>
                 <td>{!cancelled&&chargeTo(data,e)?<Badge tone="pending">Company Charge</Badge>:<Badge tone={e.enrollment_status==="Enrolled"?"active":e.enrollment_status==="Cancelled"?"cancelled":"pending"}>{e.enrollment_status}</Badge>}</td>
                 <td className="r tp-mono">{money(d)}</td><td className="r tp-mono">{money(Math.max(0,d-bal))}</td><td className="r tp-mono">{money(bal)}</td></tr>})}
-              {!enrolls.length&&<tr><td colSpan={7} className="sa-empty">No courses yet.</td></tr>}
+              {!enrolls.length&&<tr><td colSpan={8} className="sa-empty">No courses yet.</td></tr>}
             </tbody></table></div>
             <h4 className="tp-sub">Payments</h4>
             <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Receipt</th><th>Date</th><th>Mode</th><th className="r">Amount</th><th>Status</th>{canReprint&&<th></th>}</tr></thead><tbody>
@@ -716,7 +722,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
               <dt>Facebook</dt><dd>{fb.startsWith("https://")?<a href={fb} target="_blank" rel="noreferrer">{fb.replace(/^https:\/\/(www\.)?/,"")}</a>:<span className="muted-text">Not yet recorded</span>}</dd>
             </dl></section>}
           {em?.name&&<section className="tp-panel"><h4>Emergency Contact</h4><dl className="tp-kv"><dt>Name</dt><dd>{em.name}</dd>{em.mobile&&<><dt>Mobile</dt><dd>{em.mobile}</dd></>}</dl></section>}
-          {canEdit&&latest&&<section className="tp-panel"><SourcePicker key={`${latest.id}:${partner?.id??latest.source}`} data={data} enrollment={latest} busy={busy} post={post}/><p className="tp-note">Locked once a payment is recorded.</p></section>}
+
         </div>
       </div>
       {account?.others.filter(o=>o.tarCourses>0).map(o=><p key={o.id} className="sa-dup">{(trainee.legal_last_name??"").toUpperCase()} also has record {o.number||"(no number)"} with {o.tarCourses} course{o.tarCourses===1?"":"s"}. Search {o.number||"the name"} in Trainees &amp; Enrollments and print the TAR from that record.</p>)}

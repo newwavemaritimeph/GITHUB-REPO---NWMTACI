@@ -1,0 +1,111 @@
+<title>Referral Designs</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Same shell as the live portal: navy bar with dropdown tabs, summary rail on the left, light-cyan table headers. */
+:root{--orange:#F25615;--blue:#0571D0;--cyan:#35CCFA;--cyan-l:#9EE3F1;--navy:#123F63;--bg:#f2f6f8;--surface:#fff;--fg:#0f2638;--muted:#587184;--line:#dbe6ec;--soft:#eef4f8;--th:#e6f6fd;--thc:#0b4f8f;--zebra:#f7fafc;
+ --good:#0a7a3e;--good-bg:#e2f5e9;--warn:#a2470b;--warn-bg:#fdf0e5;--bad:#b42318;--bad-bg:#fcebea;--info:#0571D0;--info-bg:#e5f1fb;
+ --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding-block:16px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.w{max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.logo{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}.logo b{font-size:19px;font-weight:600}.logo b span{color:var(--orange)}.logo small{display:block;color:var(--cyan-l);font-size:14px}.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.who{font-size:14px;color:#cfe3ef;display:flex;align-items:center;gap:8px}.who select{background:#ffffff14;border:1px solid #ffffff30;color:#fff;border-radius:8px;padding:5px 8px}.who select option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:16px;flex-wrap:wrap}.tab>button{background:none;border:0;color:#c3dbea;font:500 16px var(--sans);padding:12px 18px;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:8px}.tab>button:hover{color:#fff;background:#ffffff12}.tab.on>button{background:var(--bg);color:var(--fg);font-weight:600}
+.caret{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.menu{position:absolute;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:15;display:flex;flex-direction:column;margin-top:2px}.tab{position:relative}.menu button{background:none;border:0;text-align:left;color:var(--fg);font:500 15.5px var(--sans);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;gap:12px}.menu button:hover{background:var(--soft)}.menu button.on{background:var(--info-bg);color:var(--info);font-weight:600}.menu small,.n{font:600 11.5px var(--mono);background:var(--orange);color:#fff;border-radius:10px;padding:1px 7px}
+.page{padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.cx-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}h1{font-size:25px;font-weight:600;margin:0}h2{font-size:19px;font-weight:600;margin:0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.seg button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.seg button.on{background:var(--navy);color:#fff}
+.rail{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}@media (max-width:900px){.rail{grid-template-columns:1fr}}.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.ph small{color:var(--muted);font-size:14px}
+.lines{display:flex;flex-direction:column;padding:0 20px 16px}.lines div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}.lines div:first-child{border-top:0}.lines dd,.lines span:last-child{font-family:var(--mono);font-weight:600}.lines .tot{font-weight:700}.lines .bad{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 16px}.tile{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 12px}.tile span{display:block;font-size:13px;color:var(--muted)}.tile b{font:600 19px var(--mono)}
+.cwrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--th);color:var(--thc);font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:10px 12px;border-right:1px solid var(--line);white-space:nowrap}td{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.35}tbody tr:nth-child(even) td{background:var(--zebra)}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}.due{background:var(--bad-bg);color:var(--bad)}.dueo{background:var(--warn-bg);color:var(--warn)}.appr{background:var(--info-bg);color:var(--info)}.paid{background:var(--good-bg);color:var(--good)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:9px;padding:7px 14px;font-weight:600;font-size:14.5px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.okb{background:var(--good);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:14px 20px;background:var(--soft);border-top:1px solid var(--line)}.form label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}.form select,.form input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line)}
+.alert{background:var(--bad-bg);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:15px;font-weight:500;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.note{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+</style>
+<style>
+[hidden]{display:none!important}
+.pick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}.pick button{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 16px;text-align:left;color:var(--fg);min-width:200px}.pick button b{display:block;font-size:15px}.pick button small{color:var(--muted);font-size:13px}.pick button.on{border-color:var(--orange);box-shadow:0 0 0 2px var(--orange) inset}
+.chip{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12.5px;font-weight:600;white-space:nowrap}.ag{background:#fff1ea;color:#b33d0b}.wk{background:var(--good-bg);color:var(--good)}.on2{background:var(--info-bg);color:var(--info)}.lock{color:var(--muted);font-size:12px}
+.hero{background:var(--navy);color:#fff;border-radius:12px;padding:14px 16px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:0 20px 16px}.av{width:44px;height:44px;border-radius:12px;background:var(--cyan);color:var(--navy);font-weight:700;display:grid;place-items:center}.hero small{color:var(--cyan-l);display:block;font-size:13px}
+.inl{height:32px;border:1px solid var(--line);border-radius:8px;padding:0 8px;background:var(--surface);color:var(--fg);max-width:100%}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;padding:0 20px 18px}.card{border:1px solid var(--line);border-left:4px solid var(--c,var(--good));border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:6px}.card .row{display:flex;justify-content:space-between;gap:8px;font-size:14px}.card .row span:first-child{color:var(--muted)}
+.tile3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:0 20px 16px}@media (max-width:700px){.tile3{grid-template-columns:1fr}}.tile3 div{border:1px solid var(--line);border-radius:10px;padding:8px 12px}.tile3 span{display:block;font-size:12.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em}.tile3 b{font:600 17px var(--mono)}
+.pop{border:1px solid var(--blue);background:var(--info-bg);border-radius:10px;padding:10px 12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
+.cols{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:20px}@media (max-width:900px){.cols{grid-template-columns:1fr}}
+.note2{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
+</style>
+<header class="top"><div class="w">
+  <div class="brand"><div class="logo"><div class="mark">NW</div><div><b>New <span>Wave</span> Portal <span class="proto">PROTOTYPE</span></b><small>Referral · three designs</small></div></div></div>
+  <nav class="tabs"><div class="tab"><button type="button">Dashboard</button></div><div class="tab on"><button type="button">Trainees &amp; Enrollments</button></div></nav>
+</div></header>
+<main class="page"><div class="w">
+  <div class="pick" id="pick">
+    <button data-d="1" class="on"><b>Design 01 · Source in the Course Row</b><small>Edit the source right in the Courses table</small></button>
+    <button data-d="2"><b>Design 02 · Referral Cards</b><small>One card per course: source, partner, rebate</small></button>
+    <button data-d="3"><b>Design 03 · Rebate Summary + Chips</b><small>Totals on top, a chip per course opens the editor</small></button>
+  </div>
+  <div id="view"></div>
+</div></main>
+<div id="toast" class="toast" hidden></div>
+<script>
+const C = [
+  { code: "UBT-PSSR", name: "Basic Training – PSSR", enrolled: "Oct 28, 2026", src: "Agency", partner: "Qapla Maritime", rebate: 30000, state: "Deducted", paid: true, due: 100000 },
+  { code: "SSO", name: "Ship Security Officers", enrolled: "Nov 3, 2026", src: "Walk-In", partner: "", rebate: 0, state: "", paid: false, due: 450000 },
+  { code: "PSCMT", name: "Crowd Management", enrolled: "Nov 3, 2026", src: "Online", partner: "", rebate: 0, state: "", paid: false, due: 180000 },
+];
+const PARTNERS = ["Qapla Maritime", "Costa Maritime", "Marine Force"];
+let D = 1, editing = null;
+const $ = (id) => document.getElementById(id);
+const peso = (c) => "₱" + (c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2 });
+const label = (c) => (c.src === "Agency" ? `Agency · ${c.partner}` : c.src);
+const chip = (c) => `<span class="chip ${c.src === "Agency" ? "ag" : c.src === "Walk-In" ? "wk" : "on2"}">${label(c)}</span>`;
+const rebateText = (c) => (c.src === "Agency" ? `${peso(c.rebate)} · ${c.state}` : "No rebate");
+function toast(t) { const el = $("toast"); el.textContent = t; el.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(() => (el.hidden = true), 2400); }
+const hero = `<div class="hero"><div class="av">JD</div><div><b>DELA CRUZ, Juan P.</b><small>NWMTACI-0000412 · 3 courses</small></div></div>`;
+const editor = (i) => { const c = C[i]; return `<div class="pop"><select class="inl" data-src="${i}">${["Walk-In", "Online", "Meta", "Agency"].map((s) => `<option${c.src === s ? " selected" : ""}>${s}</option>`).join("")}</select>${c.src === "Agency" ? `<select class="inl" data-partner="${i}"><option value="">Partner…</option>${PARTNERS.map((p) => `<option${c.partner === p ? " selected" : ""}>${p}</option>`).join("")}</select>` : ""}<button class="btn pri" data-save="${i}">Save</button><button class="btn" data-close>Cancel</button></div>`; };
+const payPanel = `<section class="panel"><div class="ph"><h2>Record Payment</h2><small>Cashier</small></div><div class="cwrap"><table><thead><tr><th>Course</th><th class="r">Balance</th></tr></thead><tbody>${C.filter((c) => !c.paid).map((c) => `<tr><td><b>${c.code}</b> ${chip(c)}${c.src === "Agency" ? `<small style="color:#b33d0b;font-weight:600">rebate ${peso(c.rebate)}</small>` : ""}</td><td class="r amt">${peso(c.due)}</td></tr>`).join("")}</tbody></table></div></section>`;
+function d1() {
+  return `<div class="cols"><section class="panel"><div class="ph"><h2>Trainee Account</h2></div>${hero}<div class="cwrap"><table><thead><tr><th>Course</th><th>Enrolled</th><th>Source</th><th>Rebate</th></tr></thead><tbody>${C.map((c, i) => `<tr><td><b>${c.code}</b><small>${c.name}</small></td><td>${c.enrolled}</td><td>${c.paid ? `${chip(c)}<small class="lock">Locked · paid</small>` : editing === i ? editor(i) : `<select class="inl" data-quick="${i}">${["Walk-In", "Online", "Meta", "Agency"].map((s) => `<option${c.src === s ? " selected" : ""}>${s === "Agency" ? (c.src === "Agency" ? `Agency · ${c.partner}` : "Agency / Consultancy…") : s}</option>`).join("")}</select>`}</td><td>${rebateText(c)}</td></tr>`).join("")}</tbody></table></div><p class="note2" style="padding-top:12px">The side "Where the Trainee Came From" box is removed: each course row is the only place to set its source.</p></section>${payPanel}</div>`;
+}
+function d2() {
+  return `<div class="cols"><section class="panel"><div class="ph"><h2>Trainee Account · Referrals</h2></div>${hero}<div class="cards">${C.map((c, i) => `<div class="card" style="--c:${c.src === "Agency" ? "var(--orange)" : "var(--good)"}"><div class="row"><b>${c.code}</b>${chip(c)}</div><div class="row"><span>Enrolled</span><span>${c.enrolled}</span></div><div class="row"><span>Partner</span><span>${c.partner || "—"}</span></div><div class="row"><span>Rebate</span><span>${rebateText(c)}</span></div>${c.paid ? `<span class="lock">Locked · payment recorded</span>` : editing === i ? editor(i) : `<button class="btn" data-edit="${i}">Change Source</button>`}</div>`).join("")}</div></section>${payPanel}</div>`;
+}
+function d3() {
+  const ref = C.filter((c) => c.src === "Agency");
+  return `<div class="cols"><section class="panel"><div class="ph"><h2>Trainee Account</h2></div>${hero}<div class="tile3"><div><span>Referred Courses</span><b>${ref.length} of ${C.length}</b></div><div><span>Rebates</span><b>${peso(ref.reduce((s, c) => s + c.rebate, 0))}</b></div><div><span>Partners</span><b style="font-family:var(--sans);font-size:15px">${[...new Set(ref.map((c) => c.partner))].join(", ") || "None"}</b></div></div><div class="cwrap"><table><thead><tr><th>Course</th><th>Enrolled</th><th>Source</th></tr></thead><tbody>${C.map((c, i) => `<tr><td><b>${c.code}</b><small>${c.name}</small></td><td>${c.enrolled}</td><td>${c.paid ? chip(c) + ' <small class="lock">Locked</small>' : `<button class="btn" style="padding:2px 6px;border:0" data-edit="${i}">${chip(c)} ✎</button>`}${editing === i ? editor(i) : ""}</td></tr>`).join("")}</tbody></table></div></section>${payPanel}</div>`;
+}
+function acct() {
+  const pays = [["AR-2026-000118", "Nov 2 · 3:15 PM", "UBT-PSSR", C[0], "GCash", 100000], ["AR-2026-000121", "Nov 3 · 9:12 AM", "SSO", C[1], "Cash", 450000], ["AR-2026-000124", "Nov 3 · 9:14 AM", "PSCMT", C[2], "Cash", 180000]];
+  return `<h2 style="margin:26px 0 12px">Design 01 in Accounting</h2><div class="cols"><section class="panel"><div class="ph"><h2>Accounting › Payments</h2><small>Nov 2–3, 2026</small></div><div class="cwrap"><table><thead><tr><th>Receipt</th><th>Trainee · Course</th><th>Source</th><th>Rebate</th><th class="r">Amount</th><th></th></tr></thead><tbody>${pays.map(([no, t, code, c, mode, amt]) => `<tr><td class="mono"><b>${no}</b><small>${t}</small></td><td>DELA CRUZ, Juan P.<small>${code}</small></td><td>${chip(c)}</td><td>${c.src === "Agency" ? `${peso(c.rebate)}<small>${c.state}</small>` : "—"}</td><td class="r amt">${peso(amt)}<small>${mode}</small></td><td><button class="btn">Reprint</button></td></tr>`).join("")}</tbody></table></div><p class="note2" style="padding-top:12px">Source is each paid course's own, so the Walk-In course counts under Walk-ins in the report even though the trainee came through Qapla before.</p></section>
+  <section class="panel"><div class="ph"><h2>Payables › Agency Rebates</h2></div><div class="cwrap"><table><thead><tr><th>Partner</th><th>Course</th><th class="r">Rebate</th><th>Status</th></tr></thead><tbody>${C.filter((c) => c.src === "Agency").map((c) => `<tr><td><b>${c.partner}</b><small>DELA CRUZ, Juan P.</small></td><td>${c.code}<small>${c.enrolled}</small></td><td class="r amt">${peso(c.rebate)}</td><td><span class="chip ${c.state === "Deducted" ? "wk" : "ag"}">${c.state}</span></td></tr>`).join("")}</tbody></table></div><p class="note2" style="padding-top:12px">Only referred courses appear. SSO and PSCMT are not listed: no rebate is owed to Qapla for them.</p>
+  <div class="tile3" style="padding-top:4px"><div><span>Walk-ins</span><b>${peso(630000)}</b></div><div><span>Agencies</span><b>${peso(100000)}</b></div><div><span>Consultancies</span><b>${peso(0)}</b></div></div></section></div>`;
+}
+function render() { $("view").innerHTML = D === 1 ? d1() + acct() : D === 2 ? d2() : d3(); document.querySelectorAll("#pick button").forEach((b) => b.classList.toggle("on", Number(b.dataset.d) === D)); }
+document.addEventListener("click", (ev) => {
+  const b = ev.target.closest("button"); if (!b) return;
+  if (b.dataset.d) { D = Number(b.dataset.d); editing = null; }
+  else if (b.dataset.edit) editing = Number(b.dataset.edit);
+  else if ("close" in b.dataset) editing = null;
+  else if (b.dataset.save) { const c = C[Number(b.dataset.save)]; if (c.src === "Agency" && !c.partner) { toast("Choose the partner."); return; } c.rebate = c.src === "Agency" ? 30000 : 0; c.state = c.src === "Agency" ? "Deducted" : ""; editing = null; toast(`${c.code}: ${label(c)} · ${c.src === "Agency" ? "rebate on this course only" : "no rebate"}`); }
+  else return;
+  render();
+});
+document.addEventListener("change", (ev) => {
+  const t = ev.target;
+  if (t.dataset.quick) { const i = Number(t.dataset.quick), c = C[i]; if (t.value.startsWith("Agency")) { c.src = "Agency"; editing = i; } else { c.src = t.value; c.partner = ""; c.rebate = 0; c.state = ""; toast(`${c.code}: ${c.src} · no rebate`); } render(); }
+  if (t.dataset.src) { const c = C[Number(t.dataset.src)]; c.src = t.value; if (c.src !== "Agency") c.partner = ""; render(); }
+  if (t.dataset.partner) { C[Number(t.dataset.partner)].partner = t.value; }
+});
+render();
+</script>

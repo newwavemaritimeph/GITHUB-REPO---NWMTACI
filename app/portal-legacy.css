@@ -2564,3 +2564,10 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .sub-pills button.on{background:#e5f1fb;border-color:#0571D0;color:#0571D0}
 .portal-shell .dc-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border-bottom:1px solid #e3ecf0;padding-right:16px}
 .portal-shell .dc-bar .pd-bar{border-bottom:0;flex:1;min-width:0}
+/* Referral Design 01 (owner, 3 Nov 2026): the source per course row. */
+.portal-shell .cs-chip{display:inline-block;padding:1px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}
+.portal-shell .cs-chip.ag{background:#fff1ea;color:#b33d0b}.portal-shell .cs-chip.wk{background:#e2f5e9;color:#0a7a3e}
+.portal-shell .cs-chip-wrap{display:inline-flex;flex-direction:column;gap:2px}
+.portal-shell .cs-edit{display:inline-flex;flex-direction:column;gap:4px;min-width:0}
+.portal-shell .cs-edit select{height:30px;border:1px solid #bcdcf7;border-radius:7px;padding:0 6px;background:#fff;color:#123F63;font-size:13px;max-width:190px}
+.portal-shell .cx-lines small.ref-line.wk{color:#0a7a3e}

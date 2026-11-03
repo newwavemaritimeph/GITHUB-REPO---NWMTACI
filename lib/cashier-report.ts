@@ -14,7 +14,7 @@ import type { CashierReportSnapshot } from "@/lib/documents";
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 export const SOURCES = ["Direct walk-ins", "Agencies", "Consultancies"] as const;
 export type SourceKind = "Direct walk-in" | "Agency" | "Consultancy";
-export type CollectionRow = { paymentId?: string; receipt: string; time: string; trainee: string; course: string; channel: string; reference: string; amountCentavos: number; kind: SourceKind; agency: string; proof?: boolean };
+export type CollectionRow = { paymentId?: string; rebateCentavos?: number; rebateStatus?: string; receipt: string; time: string; trainee: string; course: string; channel: string; reference: string; amountCentavos: number; kind: SourceKind; agency: string; proof?: boolean };
 
 const sourceOf = (kind: SourceKind) => (kind === "Direct walk-in" ? "Direct walk-ins" : kind === "Agency" ? "Agencies" : "Consultancies");
 
@@ -77,8 +77,9 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
   const receiptOf = new Map((receipts ?? []).map((r) => [r.payment_id as string, r.receipt_number as string]));
   const allocList = (allocs ?? []) as unknown as { payment_id: string; enrollment_id: string; enrollments: unknown }[];
   const enrollmentIds = [...new Set(allocList.map((a) => a.enrollment_id))];
-  const { data: tagged } = enrollmentIds.length ? await db.from("agency_rebates").select("enrollment_id,agency_id").in("enrollment_id", enrollmentIds) : { data: [] };
+  const { data: tagged } = enrollmentIds.length ? await db.from("agency_rebates").select("enrollment_id,agency_id,rebate_centavos,status").in("enrollment_id", enrollmentIds) : { data: [] };
   const agencyOfEnrollment = new Map((tagged ?? []).map((t) => [t.enrollment_id as string, t.agency_id as string]));
+  const rebateOfEnrollment = new Map((tagged ?? []).map((t) => [t.enrollment_id as string, { amount: Number(t.rebate_centavos ?? 0), status: t.status === "Pending" ? "Payable" : "Deducted" }]));
   // Agency or consultancy (202610080021); every agency counts as "Agency" before it.
   let agencies = (await db.from("marketing_agencies").select("id,name,kind")).data as { id: string; name: string; kind?: string | null }[] | null;
   if (!agencies) agencies = (await db.from("marketing_agencies").select("id,name")).data as { id: string; name: string }[] | null;
@@ -92,7 +93,8 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
     const agency = agencyId ? agencyById.get(agencyId) : undefined;
     const kind: SourceKind = !agency ? "Direct walk-in" : agency.kind === "Consultancy" ? "Consultancy" : "Agency";
     const courses = [...new Set(mine.map((a) => { const c = one(one(a.enrollments as { courses?: unknown } | null)?.courses as { code?: string; name?: string } | null); return c?.name ? `${c.name}${c.code ? ` (${c.code})` : ""}` : ""; }).filter(Boolean))];
-    return { paymentId: p.id, receipt: receiptOf.get(p.id) ?? p.payment_number, time: manilaTime(p.received_at), trainee: nameOf(t), course: courses.join(", ") || "—", channel: p.method, reference: p.reference_number ?? "", amountCentavos: Number(p.amount_centavos), kind, agency: agency?.name ?? "", proof: !!p.proof_id };
+    const rebate = mine.map((a) => rebateOfEnrollment.get(a.enrollment_id)).find(Boolean);
+    return { paymentId: p.id, rebateCentavos: rebate?.amount, rebateStatus: rebate?.status, receipt: receiptOf.get(p.id) ?? p.payment_number, time: manilaTime(p.received_at), trainee: nameOf(t), course: courses.join(", ") || "—", channel: p.method, reference: p.reference_number ?? "", amountCentavos: Number(p.amount_centavos), kind, agency: agency?.name ?? "", proof: !!p.proof_id };
   });
   const { data: methods } = await db.from("payment_methods").select("name,active,sort_order").eq("active", true).order("sort_order");
   const receivable = (methods ?? []).map((m) => m.name as string).filter((n) => ["Cash", "GCash", "PSBank", "UnionBank", "Cheque"].includes(n));

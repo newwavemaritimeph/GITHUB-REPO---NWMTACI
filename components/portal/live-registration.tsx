@@ -444,6 +444,30 @@ function FacebookField({ traineeId, saved, onSaved }: { traineeId: string; saved
     <small className={tone}>{hint}</small></label>;
 }
 
+/**
+ * Referral Design 01 (owner, 3 Nov 2026): the source is set right in each course row of the Trainee Account.
+ * Paid or Company Charge courses are locked; picking Agency / Consultancy asks for the partner.
+ */
+export function CourseSourceCell({ data, enrollment: e, busy, post }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<unknown> }) {
+  const current = partnerOf(data, e);
+  const label = sourceLabel(e.source, current) || "Online";
+  const locked = Number(e.paid_centavos ?? 0) > 0 || !!data.companyCharge?.[e.id] || e.enrollment_status === "Cancelled";
+  const initial = current ? "Agency" : e.source === "Walk-in" || e.source === "Meta" ? e.source : "Online enrollment";
+  const [src, setSrc] = useState(initial);
+  if (locked) return <span className="cs-chip-wrap"><span className={`cs-chip ${current ? "ag" : "wk"}`}>{label}</span><small className="muted-text">Locked</small></span>;
+  const partners = data.agencies.filter((a) => a.active || a.id === current?.id).sort((a, z) => a.name.localeCompare(z.name));
+  const save = (source: string, agencyId: string | null = null) => void post({ action: "enrollment-source", traineeId: e.trainee_id, enrollmentId: e.id, source, agencyId }, `Source saved for ${first(e.courses)?.code ?? "this course"}.`).catch(() => setSrc(initial));
+  return <span className="cs-edit" onClick={(ev) => ev.stopPropagation()}>
+    <select value={src} disabled={busy} aria-label={`Source of ${first(e.courses)?.code ?? "this course"}`} onChange={(ev) => { const v = ev.target.value; setSrc(v); if (v !== "Agency") save(v); }}>
+      <option value="Walk-in">Walk-In</option><option value="Online enrollment">Online</option><option value="Meta">Meta</option><option value="Agency">Agency / Consultancy</option>
+    </select>
+    {src === "Agency" && <select value={current?.id ?? ""} disabled={busy} aria-label="Partner" onChange={(ev) => { if (ev.target.value) save("Agency", ev.target.value); }}>
+      <option value="">Choose the partner…</option>
+      {(["Agency", "Consultancy"] as const).map((k) => { const list = partners.filter((a) => (a.kind === "Consultancy" ? "Consultancy" : "Agency") === k); return list.length ? <optgroup key={k} label={k === "Agency" ? "Agencies" : "Consultancies"}>{list.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</optgroup> : null; })}
+    </select>}
+  </span>;
+}
+
 export function SourcePicker({ data, enrollment: e, busy, post, children }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<unknown>; children?: ReactNode }) {
   const current = partnerOf(data, e);
   const initial = current ? "Agency" : e.source === "Walk-in" || e.source === "Meta" ? e.source : "Online enrollment";
