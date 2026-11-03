@@ -14,7 +14,7 @@ import type { CashierReportSnapshot } from "@/lib/documents";
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 export const SOURCES = ["Direct walk-ins", "Agencies", "Consultancies"] as const;
 export type SourceKind = "Direct walk-in" | "Agency" | "Consultancy";
-export type CollectionRow = { receipt: string; time: string; trainee: string; course: string; channel: string; reference: string; amountCentavos: number; kind: SourceKind; agency: string; proof?: boolean };
+export type CollectionRow = { paymentId?: string; receipt: string; time: string; trainee: string; course: string; channel: string; reference: string; amountCentavos: number; kind: SourceKind; agency: string; proof?: boolean };
 
 const sourceOf = (kind: SourceKind) => (kind === "Direct walk-in" ? "Direct walk-ins" : kind === "Agency" ? "Agencies" : "Consultancies");
 
@@ -92,7 +92,7 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
     const agency = agencyId ? agencyById.get(agencyId) : undefined;
     const kind: SourceKind = !agency ? "Direct walk-in" : agency.kind === "Consultancy" ? "Consultancy" : "Agency";
     const courses = [...new Set(mine.map((a) => { const c = one(one(a.enrollments as { courses?: unknown } | null)?.courses as { code?: string; name?: string } | null); return c?.name ? `${c.name}${c.code ? ` (${c.code})` : ""}` : ""; }).filter(Boolean))];
-    return { receipt: receiptOf.get(p.id) ?? p.payment_number, time: manilaTime(p.received_at), trainee: nameOf(t), course: courses.join(", ") || "—", channel: p.method, reference: p.reference_number ?? "", amountCentavos: Number(p.amount_centavos), kind, agency: agency?.name ?? "", proof: !!p.proof_id };
+    return { paymentId: p.id, receipt: receiptOf.get(p.id) ?? p.payment_number, time: manilaTime(p.received_at), trainee: nameOf(t), course: courses.join(", ") || "—", channel: p.method, reference: p.reference_number ?? "", amountCentavos: Number(p.amount_centavos), kind, agency: agency?.name ?? "", proof: !!p.proof_id };
   });
   const { data: methods } = await db.from("payment_methods").select("name,active,sort_order").eq("active", true).order("sort_order");
   const receivable = (methods ?? []).map((m) => m.name as string).filter((n) => ["Cash", "GCash", "PSBank", "UnionBank", "Cheque"].includes(n));

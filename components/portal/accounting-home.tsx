@@ -185,6 +185,26 @@ function TxHead({ title, right, note }: { title: string; right?: ReactNode; note
   return <><div className="cx-head"><div><span className="portal-eyebrow">Accounting · Transactions</span><h1>{title}</h1></div>{right}</div>{note && <p className="ac-note">{note}</p>}</>;
 }
 
+const REPRINT_REASONS = ["Misprint", "Lost by the trainee", "Damaged", "Other"];
+
+/** Accounting's reprint with a reason, no limit (owner, 3 Nov 2026): the inline reason row and the call that opens the copy. */
+function useReprint(onDone?: () => void) {
+  const [open, setOpen] = useState<string | null>(null), [why, setWhy] = useState(""), [other, setOther] = useState(""), [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const toggle = (id: string) => { setOpen(open === id ? null : id); setWhy(""); setOther(""); };
+  const run = async (kind: "receipt" | "tar", id: string, number: string) => {
+    const reason = why === "Other" ? other.trim() : why;
+    if (reason.length < 3) { setMsg({ kind: "error", text: "Choose the reason for the reprint." }); return; }
+    const tab = window.open("", "_blank"); setBusy(true); setMsg(null);
+    try {
+      const res = await submit({ action: "document-reprint", kind, id, reason }) as { url: string; copy: number };
+      if (tab) tab.location.href = res.url; else window.location.assign(res.url);
+      setMsg({ kind: "success", text: `${number} reprinted · Copy ${res.copy}.` }); setOpen(null); setWhy(""); setOther(""); onDone?.();
+    } catch (e) { tab?.close(); setMsg({ kind: "error", text: e instanceof Error ? e.message : "Could not reprint." }); } finally { setBusy(false); }
+  };
+  const formRow = (kind: "receipt" | "tar", id: string, number: string, cols: number) => open === id ? <tr><td colSpan={cols}><div className="tp-reprint"><b>Reprint {number}</b><select value={why} onChange={(e) => setWhy(e.target.value)} aria-label="Reason for the reprint"><option value="">Reason…</option>{REPRINT_REASONS.map((x) => <option key={x}>{x}</option>)}</select>{why === "Other" && <input value={other} onChange={(e) => setOther(e.target.value)} placeholder="Reason" aria-label="Other reason" />}<button type="button" className="portal-primary" disabled={busy} onClick={() => void run(kind, id, number)}>Reprint</button><button type="button" className="portal-secondary" onClick={() => setOpen(null)}>Cancel</button></div></td></tr> : null;
+  return { toggle, formRow, msg, close: () => setOpen(null) };
+}
+
 export function AccountingPayments() {
   const today = manilaToday();
   const [date, setDate] = useState(today), [channel, setChannel] = useState(""), [q, setQ] = useState("");
@@ -195,9 +215,12 @@ export function AccountingPayments() {
   const pg = usePaged(shown);
   const byChannel = CHANNELS.map((c) => { const l = rows.filter((x) => x.channel === c); return { name: c, color: COLORS[c], count: l.length, amount: l.reduce((s, x) => s + x.amountCentavos, 0) }; });
   const proofOf = (x: (typeof rows)[number]) => (x.channel === "Cash" ? "Cash" : x.proof ? "Screenshot uploaded" : "Manual entry");
+  // Reprint here too (owner, 3 Nov 2026).
+  const rp = useReprint();
   return <div className="portal-page cx ac">
     <TxHead title="Payments" right={<DayPicker date={date} setDate={setDate} />} note={<>{longDay(date)} · <span className="ac-ro">View only — the Cashier records payments</span></>} />
     {error && <Message kind="error" text={error} />}
+    {rp.msg && <Message kind={rp.msg.kind} text={rp.msg.text} />}
     <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By Channel</h2><span className="muted-text">tap to filter</span></div><FigureColumn rows={byChannel} unit="receipt" totalLabel="Total collected" pick={channel} onPick={setChannel} /></section>
@@ -208,9 +231,9 @@ export function AccountingPayments() {
       </div>
       <section className="portal-panel cx-panel">
         <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search payments" placeholder="Search receipt, trainee, course or partner" value={q} onChange={(e) => setQ(e.target.value)} /><select aria-label="Channel" value={channel} onChange={(e) => setChannel(e.target.value)}><option value="">All Channels</option>{CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
-        {!r ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Receipt</th><th>Trainee</th><th>Source</th><th>Channel and Reference</th><th className="r">Amount</th></tr></thead><tbody>
-          {pg.shown.map((x, i) => <tr key={`${x.receipt}-${i}`}><td data-l="" className="lead"><span className="cx-name cx-mono">{x.receipt}</span><small>{x.time}</small></td><td data-l="Trainee">{x.trainee}<small>{x.course}</small></td><td data-l="Source">{x.source}</td><td data-l="Channel">{x.channel}<small className="cx-mono">{x.reference || "—"}</small><small className={x.proof ? "ac-up" : ""}>{proofOf(x)}</small></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(x.amountCentavos)}</strong></td></tr>)}
-        </tbody><tfoot><tr><td colSpan={4} data-l="">{shown.length} receipt{shown.length === 1 ? "" : "s"}{channel ? ` · ${channel}` : ""}</td><td data-l="Total" className="r cx-amt">{pesos2(shown.reduce((s, x) => s + x.amountCentavos, 0))}</td></tr></tfoot></table>{pg.pager}</div> : <p className="portal-empty-copy">No payments match.</p>}
+        {!r ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Receipt</th><th>Trainee</th><th>Source</th><th>Channel and Reference</th><th className="r">Amount</th><th></th></tr></thead><tbody>
+          {pg.shown.map((x, i) => <Fragment key={`${x.receipt}-${i}`}><tr><td data-l="" className="lead"><span className="cx-name cx-mono">{x.receipt}</span><small>{x.time}</small></td><td data-l="Trainee">{x.trainee}<small>{x.course}</small></td><td data-l="Source">{x.source}</td><td data-l="Channel">{x.channel}<small className="cx-mono">{x.reference || "—"}</small><small className={x.proof ? "ac-up" : ""}>{proofOf(x)}</small></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(x.amountCentavos)}</strong></td><td data-l="">{x.paymentId && <button type="button" className="portal-secondary" onClick={() => rp.toggle(x.paymentId!)}>Reprint</button>}</td></tr>{x.paymentId && rp.formRow("receipt", x.paymentId, x.receipt, 6)}</Fragment>)}
+        </tbody><tfoot><tr><td colSpan={4} data-l="">{shown.length} receipt{shown.length === 1 ? "" : "s"}{channel ? ` · ${channel}` : ""}</td><td data-l="Total" className="r cx-amt">{pesos2(shown.reduce((s, x) => s + x.amountCentavos, 0))}</td><td /></tr></tfoot></table>{pg.pager}</div> : <p className="portal-empty-copy">No payments match.</p>}
       </section>
     </div>
   </div>;
@@ -645,8 +668,6 @@ export function BillingStatementReport({ switcher }: { switcher?: ReactNode }) {
 }
 
 type DocRow = { id: string; number: string; issuedAt: string; trainee: string; nwmtaciNo: string; label?: string; courses?: string; method?: string; reference?: string; amount?: number; valid?: boolean; payment?: string; balanceCentavos?: number; printCount: number };
-const REPRINT_REASONS = ["Misprint", "Lost by the trainee", "Damaged", "Other"];
-
 /** Accounting › Receipts and TARs (owner, 3 Nov 2026): date-sensitive lists of every receipt and TAR issued; Accounting reprints them, with a reason and no limit. */
 export function AccountingDocuments() {
   const p = usePeriod();
@@ -657,24 +678,14 @@ export function AccountingDocuments() {
   const term = q.trim().toLowerCase();
   const rows = (data?.rows ?? []).filter((r) => !term || `${r.number} ${r.trainee} ${r.nwmtaciNo} ${r.label ?? ""} ${r.courses ?? ""}`.toLowerCase().includes(term));
   const pg = usePaged(rows);
-  const [open, setOpen] = useState<string | null>(null), [why, setWhy] = useState(""), [other, setOther] = useState(""), [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ kind: "success" | "error"; text: string } | null>(null);
-  const reprint = async (r: DocRow) => {
-    const reason = why === "Other" ? other.trim() : why;
-    if (reason.length < 3) { setMsg({ kind: "error", text: "Choose the reason for the reprint." }); return; }
-    const tab = window.open("", "_blank"); setBusy(true); setMsg(null);
-    try {
-      const res = await submit({ action: "document-reprint", kind: kind === "receipts" ? "receipt" : "tar", id: r.id, reason }) as { url: string; copy: number };
-      if (tab) tab.location.href = res.url; else window.location.assign(res.url);
-      setMsg({ kind: "success", text: `${r.number} reprinted · Copy ${res.copy}.` }); setOpen(null); setWhy(""); setOther(""); setTick((n) => n + 1);
-    } catch (e) { tab?.close(); setMsg({ kind: "error", text: e instanceof Error ? e.message : "Could not reprint." }); } finally { setBusy(false); }
-  };
+  const rp = useReprint(() => setTick((n) => n + 1));
   const total = rows.filter((r) => r.valid !== false).reduce((s, r) => s + Number(r.amount ?? 0), 0);
   const cols = kind === "receipts" ? 8 : 7;
   const when = (iso: string) => `${fmtDate(iso)} · ${new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso))}`;
   return <div className="portal-page cx ac">
     <TxHead title="Receipts and TARs" />
-    <div className="sub-pills">{([["receipts", "Acknowledgement Receipts"], ["tars", "Training Admission Records"]] as const).map(([k, label]) => <button key={k} type="button" className={kind === k ? "on" : ""} onClick={() => { setKind(k); setOpen(null); }}>{label}</button>)}</div>
-    {msg && <Message kind={msg.kind} text={msg.text} />}
+    <div className="sub-pills">{([["receipts", "Acknowledgement Receipts"], ["tars", "Training Admission Records"]] as const).map(([k, label]) => <button key={k} type="button" className={kind === k ? "on" : ""} onClick={() => { setKind(k); rp.close(); }}>{label}</button>)}</div>
+    {rp.msg && <Message kind={rp.msg.kind} text={rp.msg.text} />}
     {error && <Message kind="error" text={error} />}
     <section className="portal-panel cx-panel">
       {custom ? <div className="pd-bar"><span className="cx-seg"><button type="button" onClick={() => setCustom(false)}>Daily · Weekly · Monthly</button><button type="button" className="on">Custom</button></span><label>From <input type="date" value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label><label>To <input type="date" value={to} onChange={(e) => e.target.value && setTo(e.target.value)} /></label></div>
@@ -688,8 +699,8 @@ export function AccountingDocuments() {
           {kind === "receipts" ? <><td>{r.label}</td><td>{r.method}{r.reference ? <small>Ref. {r.reference}</small> : null}</td><td className="r cx-amt">{pesos2(Number(r.amount ?? 0))}</td></>
             : <><td>{r.courses || "—"}</td><td><Badge tone={r.payment === "Paid" ? "active" : r.payment === "Company Charge" ? "pending" : "cancelled"}>{r.payment === "Balance" ? `Balance ${pesos2(Number(r.balanceCentavos ?? 0))}` : r.payment ?? ""}</Badge></td></>}
           <td>{r.valid === false ? <Badge tone="cancelled">VOID</Badge> : r.printCount ? `Printed ${r.printCount} time${r.printCount === 1 ? "" : "s"}` : "Not printed yet"}</td>
-          <td>{r.valid !== false && <button type="button" className="portal-secondary" onClick={() => { setOpen(open === r.id ? null : r.id); setWhy(""); setOther(""); }}>Reprint</button>}</td></tr>
-          {open === r.id && <tr><td colSpan={cols}><div className="tp-reprint"><b>Reprint {r.number}</b><select value={why} onChange={(e) => setWhy(e.target.value)} aria-label="Reason for the reprint"><option value="">Reason…</option>{REPRINT_REASONS.map((x) => <option key={x}>{x}</option>)}</select>{why === "Other" && <input value={other} onChange={(e) => setOther(e.target.value)} placeholder="Reason" aria-label="Other reason" />}<button type="button" className="portal-primary" disabled={busy} onClick={() => void reprint(r)}>Reprint</button><button type="button" className="portal-secondary" onClick={() => setOpen(null)}>Cancel</button></div></td></tr>}
+          <td>{r.valid !== false && <button type="button" className="portal-secondary" onClick={() => rp.toggle(r.id)}>Reprint</button>}</td></tr>
+          {rp.formRow(kind === "receipts" ? "receipt" : "tar", r.id, r.number, cols)}
         </Fragment>)}
       </tbody>{kind === "receipts" && <tfoot><tr><td colSpan={5}>{rows.length} receipt{rows.length === 1 ? "" : "s"} · {range.label}</td><td className="r cx-amt">{pesos2(total)}</td><td colSpan={2} /></tr></tfoot>}</table>{pg.pager}</div>
         : <p className="portal-empty-copy">No {kind === "receipts" ? "receipts" : "TARs"} issued in this period.</p>}
