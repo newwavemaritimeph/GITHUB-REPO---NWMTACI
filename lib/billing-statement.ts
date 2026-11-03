@@ -41,7 +41,8 @@ export async function buildBillingRows(db: Admin, from: string, to: string) {
     rows.push(...((data ?? []) as unknown as Enr[]));
     if ((data ?? []).length < 1000) break;
   }
-  const agencyOf = (e: Enr) => e.referral_agency_id ?? one(e.trainees)?.marketing_agency_id ?? null;
+  // Each course has its own partner (owner, 3 Nov 2026); the trainee's earlier partner does not carry over.
+  const agencyOf = (e: Enr) => e.referral_agency_id ?? null;
   const referred = rows.filter((e) => agencyOf(e));
   // The full fee keeps charges and other discounts (e.g. the CCI Package discount); only the referral rebate is left out.
   const extra = new Map<string, number>();

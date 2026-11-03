@@ -71,7 +71,7 @@ export async function buildAccountingReport(db: Admin, period: Period, end: stri
   const byCourse: Record<string, number> = {};
   for (const p of inCurrent) {
     const mine = allocs.filter((a) => a.payment_id === p.id);
-    const agencyId = mine.map((a) => (one(a.enrollments as { referral_agency_id?: string | null } | null)?.referral_agency_id) ?? tagged.get(a.enrollment_id)).find(Boolean) ?? one(p.trainees)?.marketing_agency_id ?? null;
+    const agencyId = mine.map((a) => (one(a.enrollments as { referral_agency_id?: string | null } | null)?.referral_agency_id) ?? tagged.get(a.enrollment_id)).find(Boolean) ?? null;
     const source = agencyId ? kindOf.get(agencyId) ?? "Agencies" : "Walk-ins";
     bySource[source] += Number(p.amount_centavos);
     for (const a of mine) {

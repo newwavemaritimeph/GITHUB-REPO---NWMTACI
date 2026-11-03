@@ -79,7 +79,7 @@ export async function applyReferralRebates(db: Admin, enrollmentIds: string[], a
   const applied: string[] = [];
   if (!enrollmentIds.length) return applied;
   try {
-    const cols = "id,course_id,trainee_id,referral_agency_id,enrollment_status,selling_price_centavos,package_code,package_id,courses(delivery_type,code),trainees(marketing_agency_id)";
+    const cols = "id,course_id,trainee_id,referral_agency_id,enrollment_status,selling_price_centavos,package_code,package_id,courses(delivery_type,code)";
     let res: { data: unknown[] | null; error: unknown } = await db.from("enrollments").select(cols).in("id", enrollmentIds);
     if (res.error) res = await db.from("enrollments").select(cols.replace("package_code,package_id,", "")).in("id", enrollmentIds);
     if (res.error || !res.data?.length) return applied;
@@ -104,8 +104,8 @@ export async function applyReferralRebates(db: Admin, enrollmentIds: string[], a
       if (inPackage && (part?.code !== "PSCMHBT" || !cciCourse)) continue;
       const rateCourse = inPackage ? (cciCourse as string) : raw.course_id;
       const packageRows = inPackage ? (rows as { id: string; package_id?: string | null; selling_price_centavos: number }[]).filter((r) => r.package_id === raw.package_id) : [raw];
-      const trainee = Array.isArray(raw.trainees) ? raw.trainees[0] : raw.trainees;
-      const agencyId = raw.referral_agency_id ?? trainee?.marketing_agency_id ?? null;
+      // The course's own partner only (owner, 3 Nov 2026): a walk-in course of a referred trainee earns no rebate.
+      const agencyId = raw.referral_agency_id ?? null;
       if (!agencyId) continue;
       const { data: matrix } = await db.from("agency_course_rebates").select("agency_id,course_id,rebate_centavos").eq("agency_id", agencyId).eq("course_id", rateCourse);
       // Percentage of the fee (202610080025); the peso table before it or when not set.

@@ -49,7 +49,7 @@ export async function loadBatchRoster(db: ReturnType<typeof createSupabaseAdminC
     db.from("enrollments").select("id").in("id", ids).not("company_charge_agency_id", "is", null),
   ]) : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }];
   type T = { legal_first_name: string; legal_middle_name: string | null; legal_last_name: string; suffix: string | null; application_number: string | null; trainee_number: string; srn: string | null; rank: string | null; mobile: string | null; email: string | null; marketing_agency_id: string | null };
-  const agencyIds = [...new Set(list.map((e) => e.referral_agency_id ?? one(e.trainees as T | null)?.marketing_agency_id).filter(Boolean) as string[])];
+  const agencyIds = [...new Set(list.map((e) => e.referral_agency_id).filter(Boolean) as string[])];
   const { data: ags } = agencyIds.length ? await db.from("marketing_agencies").select("id,name,kind").in("id", agencyIds) : { data: [] };
   const agency = new Map((ags ?? []).map((a) => [a.id as string, a as { name: string; kind: string | null }]));
   const billed = new Set(((cc as { data: { id: string }[] | null }).data ?? []).map((x) => x.id));
@@ -60,7 +60,7 @@ export async function loadBatchRoster(db: ReturnType<typeof createSupabaseAdminC
   for (const c of (checks ?? []) as { enrollment_id: string; requirement: string; status: string }[]) { const k = `${c.enrollment_id}|${c.requirement === "medical_certificate" ? "medical_peme" : c.requirement}`; if (!latest.has(k)) latest.set(k, c.status); }
   const rows = list.map((e): RosterRow => {
     const t = one(e.trainees as T | null);
-    const partner = agency.get(e.referral_agency_id ?? t?.marketing_agency_id ?? "") ?? null;
+    const partner = agency.get(e.referral_agency_id ?? "") ?? null;
     const p = paymentState(due.get(e.id) ?? 0, paid.get(e.id) ?? 0, billed.has(e.id));
     return { enrollmentId: e.id, name: t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}${t.legal_middle_name ? ` ${t.legal_middle_name.charAt(0)}.` : ""}${t.suffix ? ` ${t.suffix}` : ""}` : "—",
       nwmtaciNo: t?.application_number ?? t?.trainee_number ?? "", srn: t?.srn ?? "", rank: t?.rank ?? "", mobile: t?.mobile ?? "", email: t?.email ?? "", facebook: facebook.get(e.trainee_id) ?? "",

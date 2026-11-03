@@ -104,10 +104,9 @@ export default async function AdmissionRecordPage({ params, searchParams }: { pa
   const { data: cc } = live.length ? await db.from("enrollments").select("company_charge_agency_id").in("id", live).not("company_charge_agency_id", "is", null).limit(1) : { data: null };
   let ccAgency = (cc?.[0] as { company_charge_agency_id?: string } | undefined)?.company_charge_agency_id ?? null;
   if (!ccAgency && live.length) {
-    // Not enrolled yet: the partner on the enrollment (or the trainee) is a Company Charge partner.
+    // Not enrolled yet: the partner on these courses is a Company Charge partner (each course has its own, 3 Nov 2026).
     const { data: refs } = await db.from("enrollments").select("referral_agency_id").in("id", live).not("referral_agency_id", "is", null);
-    const { data: tr } = await db.from("trainees").select("marketing_agency_id").eq("id", record.trainee_id).maybeSingle();
-    const candidates = [...new Set([...(refs ?? []).map((r) => r.referral_agency_id as string), (tr?.marketing_agency_id as string | null) ?? ""].filter(Boolean))];
+    const candidates = [...new Set((refs ?? []).map((r) => r.referral_agency_id as string).filter(Boolean))];
     if (candidates.length) ccAgency = ((await db.from("marketing_agencies").select("id").in("id", candidates).eq("rebate_mode", "Company Charge").limit(1)).data?.[0]?.id as string | undefined) ?? null;
   }
   const billedTo = ccAgency ? ((await db.from("marketing_agencies").select("name").eq("id", ccAgency).maybeSingle()).data?.name as string | undefined) ?? "the partner" : null;

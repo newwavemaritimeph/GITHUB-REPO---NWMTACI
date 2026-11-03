@@ -47,7 +47,7 @@ export async function POST(request: Request) {
   {
     const { data: links } = ids.length ? await db.from("enrollments").select("id,selling_price_centavos,referral_agency_id,company_charge_agency_id").in("id", ids) : { data: [] };
     const rows = (links ?? []) as { id: string; selling_price_centavos: number; referral_agency_id: string | null; company_charge_agency_id?: string | null }[];
-    const agencyOf = (r: (typeof rows)[number]) => r.company_charge_agency_id ?? r.referral_agency_id ?? (t as { marketing_agency_id?: string | null }).marketing_agency_id ?? null;
+    const agencyOf = (r: (typeof rows)[number]) => r.company_charge_agency_id ?? r.referral_agency_id ?? null;
     const agencyIds = [...new Set(rows.map(agencyOf).filter(Boolean) as string[])];
     const { data: ags } = agencyIds.length ? await db.from("marketing_agencies").select("id,name").in("id", agencyIds).eq("rebate_mode", "Company Charge") : { data: [] };
     const ccName = new Map((ags ?? []).map((a) => [a.id as string, a.name as string]));

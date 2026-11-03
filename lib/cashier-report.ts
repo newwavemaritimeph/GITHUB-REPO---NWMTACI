@@ -71,7 +71,7 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
   const [{ data: receipts }, { data: allocs }] = ids.length
     ? await Promise.all([
         db.from("receipts").select("payment_id,receipt_number").in("payment_id", ids),
-        db.from("payment_allocations").select("payment_id,enrollment_id,enrollments(courses(code,name))").in("payment_id", ids),
+        db.from("payment_allocations").select("payment_id,enrollment_id,enrollments(referral_agency_id,courses(code,name))").in("payment_id", ids),
       ])
     : [{ data: [] }, { data: [] }];
   const receiptOf = new Map((receipts ?? []).map((r) => [r.payment_id as string, r.receipt_number as string]));
@@ -87,7 +87,8 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
   const rows: CollectionRow[] = payments.map((p) => {
     const mine = allocList.filter((a) => a.payment_id === p.id);
     const t = one(p.trainees as { legal_first_name?: string; legal_middle_name?: string; legal_last_name?: string; marketing_agency_id?: string | null } | null);
-    const agencyId = mine.map((a) => agencyOfEnrollment.get(a.enrollment_id)).find(Boolean) ?? t?.marketing_agency_id ?? null;
+    // The paid course's own partner (owner, 3 Nov 2026), not the trainee's earlier one.
+    const agencyId = mine.map((a) => agencyOfEnrollment.get(a.enrollment_id) ?? one(a.enrollments as { referral_agency_id?: string | null } | null)?.referral_agency_id).find(Boolean) ?? null;
     const agency = agencyId ? agencyById.get(agencyId) : undefined;
     const kind: SourceKind = !agency ? "Direct walk-in" : agency.kind === "Consultancy" ? "Consultancy" : "Agency";
     const courses = [...new Set(mine.map((a) => { const c = one(one(a.enrollments as { courses?: unknown } | null)?.courses as { code?: string; name?: string } | null); return c?.name ? `${c.name}${c.code ? ` (${c.code})` : ""}` : ""; }).filter(Boolean))];

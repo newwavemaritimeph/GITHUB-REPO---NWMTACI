@@ -649,7 +649,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   const partner=[...live].reverse().map(e=>partnerOf(data,e)).find(Boolean)??null;
   const billedTo=live.map(e=>chargeTo(data,e)).find(Boolean)??null;
   const enrolledN=live.filter(e=>e.enrollment_status==="Enrolled"||e.enrollment_status==="Open Schedule").length;
-  const srcLabel=latest?sourceLabel(latest.source,partner):"";
+  const srcLabel=latest?sourceLabel(latest.source,partnerOf(data,latest)):"";
   // Payment voids (owner, 29 Oct 2026): voided payments stay listed; the Cashier requests, Accounting approves.
   const canVoid=["cashier","accounting","admin"].includes(role??"");
   const payRows:AccountPayment[]=account?.payments??[...payments,...(data.voidedPayments??[]).filter(p=>p.trainee_id===trainee.id)].sort((a,b)=>a.received_at.localeCompare(b.received_at)) as AccountPayment[];
@@ -683,12 +683,12 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
       <div className="tp-cols">
         <div className="tp-main">
           <section className="tp-panel"><h4>Courses</h4>
-            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Course</th><th>Schedule</th><th>Status</th><th className="r">Due</th><th className="r">Paid</th><th className="r">Balance</th></tr></thead><tbody>
+            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Course</th><th>Schedule</th><th>Source</th><th>Status</th><th className="r">Due</th><th className="r">Paid</th><th className="r">Balance</th></tr></thead><tbody>
               {enrolls.map(e=>{const c=first(e.courses),cancelled=e.enrollment_status==="Cancelled",d=cancelled?0:dueCentavos(e),bal=cancelled?0:balanceOf(e);return <tr key={e.id} className={canEdit?"sa-click":undefined} onClick={canEdit?()=>setOpenEnrollment(e.id):undefined} title={canEdit?"Open this enrollment":undefined}>
-                <td><b>{c?.code??"Course"}</b><small>{c?.name} · {e.enrollment_number}</small></td><td>{when(e)}</td>
+                <td><b>{c?.code??"Course"}</b><small>{c?.name} · {e.enrollment_number}</small></td><td>{when(e)}</td><td>{sourceLabel(e.source,partnerOf(data,e))||"—"}</td>
                 <td>{!cancelled&&chargeTo(data,e)?<Badge tone="pending">Company Charge</Badge>:<Badge tone={e.enrollment_status==="Enrolled"?"active":e.enrollment_status==="Cancelled"?"cancelled":"pending"}>{e.enrollment_status}</Badge>}</td>
                 <td className="r tp-mono">{money(d)}</td><td className="r tp-mono">{money(Math.max(0,d-bal))}</td><td className="r tp-mono">{money(bal)}</td></tr>})}
-              {!enrolls.length&&<tr><td colSpan={6} className="sa-empty">No courses yet.</td></tr>}
+              {!enrolls.length&&<tr><td colSpan={7} className="sa-empty">No courses yet.</td></tr>}
             </tbody></table></div>
             <h4 className="tp-sub">Payments</h4>
             <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Receipt</th><th>Date</th><th>Mode</th><th className="r">Amount</th><th>Status</th>{canReprint&&<th></th>}</tr></thead><tbody>

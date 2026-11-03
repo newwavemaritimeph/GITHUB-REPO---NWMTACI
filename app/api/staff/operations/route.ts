@@ -286,14 +286,16 @@ const companyPaymentInput = z.object({ action: z.literal("company-payment"), bil
 // Billing Statement amounts typed by Accounting, and void and reissue (owner, 29 Oct 2026).
 const statementIssueInput = z.object({ action: z.literal("billing-statement-issue"), agencyId: z.string().uuid(), from: z.string().date(), to: z.string().date(), amounts: z.record(z.string().uuid(), z.number().int().min(0).max(100_000_000)).default({}) });
 const statementVoidInput = z.object({ action: z.literal("billing-statement-void"), billingStatementId: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
-const sourceSetInput = z.object({ action: z.literal("enrollment-source"), traineeId: z.string().uuid(), source: z.enum(["Online enrollment", "Walk-in", "Meta", "Agency"]), agencyId: z.string().uuid().nullable().optional() });
+// Referral per course (owner, 3 Nov 2026): the source and partner belong to one enrollment, not to the trainee.
+const sourceSetInput = z.object({ action: z.literal("enrollment-source"), traineeId: z.string().uuid(), enrollmentId: z.string().uuid().optional(), source: z.enum(["Online enrollment", "Walk-in", "Meta", "Agency"]), agencyId: z.string().uuid().nullable().optional() });
+const courseSource = { source: z.enum(["Online enrollment", "Walk-in", "Meta", "Agency"]).optional(), agencyId: z.string().uuid().nullable().optional() };
 const requestChargeInput = z.object({ action: z.literal("request-charge"), id: z.string().uuid(), chargeCatalogId: z.string().uuid().nullable().optional(), description: z.string().trim().max(200).optional(), amountCentavos: z.number().int().min(0), remarks: z.string().trim().max(500).optional() });
 // Course now, batch later (202610070005): the batch is optional.
 // In-house courses that run on a picked start date (no batch) may be moved to any day, past included (owner, 13 Oct 2026).
 const enrollmentStartInput = z.object({ action: z.literal("enrollment-set-start"), enrollmentId: z.string().uuid(), scheduledOn: z.string().date() });
 const traineeCopyInput = z.object({ action: z.literal("trainee-details-copied"), traineeId: z.string().uuid(), format: z.enum(["text", "row"]) });
-const packageAssignInput = z.object({ action: z.literal("package-assign"), traineeId: z.string().uuid(), weekStart: z.string().date() });
-const applicationAssignInput = z.object({ action: z.literal("application-assign"), traineeId: z.string().uuid(), courseId: z.string().uuid(), batchId: z.string().uuid().nullable().optional(), scheduledOn: z.string().date().nullable().optional(), offerId: z.string().uuid().nullable().optional() });
+const packageAssignInput = z.object({ action: z.literal("package-assign"), traineeId: z.string().uuid(), weekStart: z.string().date(), ...courseSource });
+const applicationAssignInput = z.object({ action: z.literal("application-assign"), traineeId: z.string().uuid(), courseId: z.string().uuid(), batchId: z.string().uuid().nullable().optional(), scheduledOn: z.string().date().nullable().optional(), offerId: z.string().uuid().nullable().optional(), ...courseSource });
 const applicationPlaceBatchInput = z.object({ action: z.literal("application-place-batch"), enrollmentId: z.string().uuid(), batchId: z.string().uuid() });
 const sendInstructionsInput = z.object({ action: z.literal("send-instructions"), enrollmentId: z.string().uuid() });
 const instructionTemplateSaveInput = z.object({ action: z.literal("instruction-template-save"), courseId: z.string().uuid(), subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(8000) });
@@ -400,13 +402,28 @@ async function autoSendInstructions(admin: ReturnType<typeof createSupabaseAdmin
 /** Other STCW Courses (owner, 20 Oct 2026): once a center's rebate is received, the referring agency's share is owed (Payables › Agency rebates). */
 async function owedAgencyShares(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentIds: string[], actor: string) {
   try {
-    const { data } = await admin.from("enrollments").select("id,trainee_id,course_id,agency_share_centavos,referral_agency_id,trainees(marketing_agency_id)").in("id", enrollmentIds);
-    for (const e of (data ?? []) as { id: string; trainee_id: string; course_id: string; agency_share_centavos: number; referral_agency_id: string | null; trainees: unknown }[]) {
-      const agency = e.referral_agency_id ?? (Array.isArray(e.trainees) ? e.trainees[0] : e.trainees as { marketing_agency_id?: string | null } | null)?.marketing_agency_id ?? null;
+    const { data } = await admin.from("enrollments").select("id,trainee_id,course_id,agency_share_centavos,referral_agency_id").in("id", enrollmentIds);
+    for (const e of (data ?? []) as { id: string; trainee_id: string; course_id: string; agency_share_centavos: number; referral_agency_id: string | null }[]) {
+      const agency = e.referral_agency_id ?? null;
       if (!agency || !Number(e.agency_share_centavos)) continue;
       await admin.from("agency_rebates").insert({ agency_id: agency, enrollment_id: e.id, trainee_id: e.trainee_id, course_id: e.course_id, rebate_centavos: Number(e.agency_share_centavos), status: "Pending", created_by: actor });
     }
   } catch (err) { console.error("Agency share not recorded (apply database update 202610200050):", err instanceof Error ? err.message : err); }
+}
+
+/** Source and partner of newly added courses (owner, 3 Nov 2026): never copied from the trainee's earlier courses. */
+async function setCourseSource(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentIds: string[], source: string | undefined, agencyId: string | null | undefined, actor: string): Promise<string | null> {
+  if (!enrollmentIds.length || !source) return null;
+  const partnerId = source === "Agency" ? agencyId ?? null : null;
+  if (source === "Agency") {
+    if (!partnerId) return "Choose the agency or consultancy.";
+    const { data: ag } = await admin.from("marketing_agencies").select("id,active").eq("id", partnerId).maybeSingle();
+    if (!ag?.active) return "Choose an active agency or consultancy.";
+  }
+  const { error } = await admin.from("enrollments").update({ source, referral_agency_id: partnerId }).in("id", enrollmentIds);
+  if (error) return error.message;
+  if (partnerId) await applyReferralRebates(admin, enrollmentIds, actor);
+  return null;
 }
 
 // Trainee Facebook link (owner, 3 Nov 2026; migration 202610290070).
@@ -1217,12 +1234,7 @@ export async function GET() {
   task(async () => {
     const { data: refs } = await db.from("enrollments").select("id,referral_agency_id").not("referral_agency_id", "is", null).order("created_at", { ascending: false }).limit(1000);
     for (const r of (refs ?? []) as { id: string; referral_agency_id: string }[]) referralByEnrollment[r.id] = r.referral_agency_id;
-    // Open loaded enrollments with no partner of their own fall back to the trainee's partner (29 Oct 2026), so Company Charge is spotted.
-    const ids = [...new Set((enrollmentsResult.data ?? []).filter((e) => !referralByEnrollment[(e as { id: string }).id] && (e as { enrollment_status: string }).enrollment_status !== "Cancelled").map((e) => (e as { trainee_id: string }).trainee_id))];
-    if (!ids.length) return;
-    const { data: tas } = await db.from("trainees").select("id,marketing_agency_id").in("id", ids.slice(0, 300)).not("marketing_agency_id", "is", null);
-    const byTrainee = new Map((tas ?? []).map((x) => [x.id as string, x.marketing_agency_id as string]));
-    for (const e of (enrollmentsResult.data ?? []) as { id: string; trainee_id: string; enrollment_status: string }[]) { const a = byTrainee.get(e.trainee_id); if (a && !referralByEnrollment[e.id] && e.enrollment_status !== "Cancelled") referralByEnrollment[e.id] = a; }
+    // Each enrollment has its own partner (owner, 3 Nov 2026); there is no fallback to the trainee.
   });
   // Company Charge (migration 063): which enrollments are billed to a partner, and the issued statements the Cashier can collect.
   const companyCharge: Record<string, string> = {};
@@ -2159,8 +2171,8 @@ export async function POST(request: Request) {
       const partner = (Array.isArray(courseRow) ? courseRow[0] : courseRow)?.delivery_type === "Partner or Endorsed";
       if (partner && (!course?.partner_offer_id || !course.scheduled_on)) return NextResponse.json({ error: "Set the training center and date first." }, { status: 400 });
       // Company Charge partners are billed on their Billing Statement, so the trainee never goes to the Cashier (29 Oct 2026).
-      const { data: ref } = await admin.from("enrollments").select("referral_agency_id,trainees(marketing_agency_id)").eq("id", input.enrollmentId).maybeSingle();
-      const refAgency = (ref?.referral_agency_id as string | null | undefined) ?? first(ref?.trainees as unknown as { marketing_agency_id: string | null } | null)?.marketing_agency_id ?? null;
+      const { data: ref } = await admin.from("enrollments").select("referral_agency_id").eq("id", input.enrollmentId).maybeSingle();
+      const refAgency = (ref?.referral_agency_id as string | null | undefined) ?? null;
       if (refAgency) { const { data: ag } = await admin.from("marketing_agencies").select("name,rebate_mode").eq("id", refAgency).maybeSingle(); if (ag?.rebate_mode === "Company Charge") return NextResponse.json({ error: `${ag.name} is a Company Charge partner. Use Enroll · Company Charge instead of handing to the Cashier.` }, { status: 400 }); }
       const { data: checks, error: checkError } = await admin.from("enrollment_requirement_checks").select("requirement,status,checked_at").eq("enrollment_id", input.enrollmentId).order("checked_at", { ascending: false });
       if (checkError) throw checkError;
@@ -2177,13 +2189,13 @@ export async function POST(request: Request) {
     if (input.action === "application-enroll-charge") {
       if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Only Registration enrolls applications." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      const { data: e } = await admin.from("enrollments").select("id,enrollment_status,batch_id,scheduled_on,referral_agency_id,trainees(marketing_agency_id)").eq("id", input.enrollmentId).maybeSingle();
+      const { data: e } = await admin.from("enrollments").select("id,enrollment_status,batch_id,scheduled_on,referral_agency_id").eq("id", input.enrollmentId).maybeSingle();
       if (!e) return NextResponse.json({ error: "Application not found." }, { status: 404 });
       if (e.enrollment_status !== "Pending") return NextResponse.json({ error: "Only a Pending application can be enrolled." }, { status: 400 });
       if (!e.batch_id && !e.scheduled_on) return NextResponse.json({ error: "Choose a batch or start date first." }, { status: 400 });
       // Registration picks Company Charge in Mode of Payment with the company (owner, 29 Oct 2026); without one, the partner set to Company Charge applies.
       const chosen = input.agencyId ?? null;
-      const agencyId = chosen ?? (e.referral_agency_id as string | null) ?? first(e.trainees as unknown as { marketing_agency_id: string | null } | null)?.marketing_agency_id ?? null;
+      const agencyId = chosen ?? (e.referral_agency_id as string | null) ?? null;
       const { data: agency } = agencyId ? await admin.from("marketing_agencies").select("id,name,rebate_mode,active").eq("id", agencyId).maybeSingle() : { data: null };
       if (!agency || (chosen ? !agency.active : agency.rebate_mode !== "Company Charge")) return NextResponse.json({ error: chosen ? "Choose an active company." : "Choose the company to bill." }, { status: 400 });
       const { data: checks } = await admin.from("enrollment_requirement_checks").select("requirement,status,checked_at").eq("enrollment_id", input.enrollmentId).order("checked_at", { ascending: false });
@@ -2208,21 +2220,23 @@ export async function POST(request: Request) {
         const { data: ag } = await admin.from("marketing_agencies").select("id,active").eq("id", partnerId).maybeSingle();
         if (!ag?.active) return NextResponse.json({ error: "Choose an active agency or consultancy." }, { status: 400 });
       }
-      const { data: open } = await admin.from("enrollments").select("id,referral_agency_id,company_charge_agency_id").eq("trainee_id", input.traineeId).neq("enrollment_status", "Cancelled");
+      // One course when the window names it (owner, 3 Nov 2026); every open course only for older screens.
+      const scope = admin.from("enrollments").select("id,referral_agency_id,company_charge_agency_id").eq("trainee_id", input.traineeId).neq("enrollment_status", "Cancelled");
+      const { data: open } = input.enrollmentId ? await scope.eq("id", input.enrollmentId) : await scope;
       const rows = (open ?? []) as { id: string; referral_agency_id: string | null; company_charge_agency_id?: string | null }[];
       const ids = rows.map((r) => r.id);
       const partnerChanges = rows.some((r) => (r.referral_agency_id ?? null) !== partnerId);
       if (ids.length && partnerChanges) {
         const { data: paid } = await admin.from("payment_allocations").select("enrollment_id,payments!inner(valid)").in("enrollment_id", ids).eq("payments.valid", true).limit(1);
-        if ((paid ?? []).length || rows.some((r) => r.company_charge_agency_id)) return NextResponse.json({ error: "The agency or consultancy is locked once a payment is recorded or the trainee is enrolled on Company Charge." }, { status: 400 });
+        if ((paid ?? []).length || rows.some((r) => r.company_charge_agency_id)) return NextResponse.json({ error: "The agency or consultancy is locked once a payment is recorded on this course or it is enrolled on Company Charge." }, { status: 400 });
         const { data: rebates } = await admin.from("agency_rebates").select("id").in("enrollment_id", ids).limit(1);
-        if ((rebates ?? []).length) return NextResponse.json({ error: "A partner rebate is already recorded for this trainee. Ask Accounting to correct it first." }, { status: 400 });
+        if ((rebates ?? []).length) return NextResponse.json({ error: "A partner rebate is already recorded for this course. Ask Accounting to correct it first." }, { status: 400 });
       }
       if (ids.length) { const { error } = await admin.from("enrollments").update({ source: input.source, referral_agency_id: partnerId }).in("id", ids); if (error) throw error; }
-      const { error: tErr } = await admin.from("trainees").update({ marketing_agency_id: partnerId }).eq("id", input.traineeId);
-      if (tErr) throw tErr;
+      // The trainee keeps the last partner chosen, for display only; rebates follow each course.
+      if (partnerId) { const { error: tErr } = await admin.from("trainees").update({ marketing_agency_id: partnerId }).eq("id", input.traineeId); if (tErr) throw tErr; }
       if (partnerId && ids.length) await applyReferralRebates(admin, ids, staff.user.id);
-      await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "trainee.source_set", record_type: "trainee", record_id: input.traineeId, new_values: { source: input.source, agency_id: partnerId } });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "trainee.source_set", record_type: "trainee", record_id: input.traineeId, new_values: { source: input.source, agency_id: partnerId, enrollment_ids: ids } });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "billing-statement-issue") {
@@ -2337,8 +2351,8 @@ export async function POST(request: Request) {
       if (error) return NextResponse.json({ error: /assign_cci_package/.test(error.message) ? "Apply database update 202610210057 first." : error.message }, { status: 400 });
       const { data: parts } = await admin.from("enrollments").select("id").eq("package_id", pkg as string);
       const ids = (parts ?? []).map((e) => e.id as string);
-      const { data: tr } = await admin.from("trainees").select("marketing_agency_id").eq("id", input.traineeId).maybeSingle();
-      if (tr?.marketing_agency_id && ids.length) { await admin.from("enrollments").update({ referral_agency_id: tr.marketing_agency_id }).in("id", ids); await applyReferralRebates(admin, ids, staff.user.id); }
+      const srcError = await setCourseSource(admin, ids, input.source, input.agencyId, staff.user.id);
+      if (srcError) return NextResponse.json({ error: `Package added, but its source was not saved: ${srcError}` }, { status: 400 });
       return NextResponse.json({ ok: true, packageId: pkg, enrollmentIds: ids });
     }
     if (input.action === "application-assign") {
@@ -2354,19 +2368,18 @@ export async function POST(request: Request) {
           const { error: centerError } = await admin.rpc("set_other_course_center", { target_enrollment: enrollmentId, target_offer: input.offerId, target_date: input.scheduledOn, actor: staff.user.id });
           if (centerError) return NextResponse.json({ error: `Course added, but the center was not saved: ${centerError.message}` }, { status: 400 });
         }
-        const { data: tr } = await admin.from("trainees").select("marketing_agency_id").eq("id", input.traineeId).maybeSingle();
-        if (tr?.marketing_agency_id) await admin.from("enrollments").update({ referral_agency_id: tr.marketing_agency_id }).eq("id", enrollmentId);
+        const srcError = await setCourseSource(admin, [enrollmentId], input.source, input.agencyId, staff.user.id);
+        if (srcError) return NextResponse.json({ error: `Course added, but its source was not saved: ${srcError}` }, { status: 400 });
         return NextResponse.json({ ok: true, enrollment: other });
       }
       // The database checks the schedule is still bookable and holds the seat.
       const { data, error } = await admin.rpc("assign_application_course", { target_trainee: input.traineeId, target_course: input.courseId, target_batch: input.batchId ?? null, actor: staff.user.id });
       if (error) return NextResponse.json({ error: /function public.assign_application_course/i.test(error.message) ? "Apply database update 202610070005 to assign a course without a batch." : error.message }, { status: 400 });
       // A non-STCW in-house course may run on a picked start date instead of a batch.
-      // A referred trainee's new course carries the referral, and its rebate comes off the fee (202610080023).
+      // The new course has its own source (owner, 3 Nov 2026); a partner's rebate comes off only when this course is referred.
       if (data) {
-        const enrollmentId = (data as { id: string }).id;
-        const { data: tr } = await admin.from("trainees").select("marketing_agency_id").eq("id", input.traineeId).maybeSingle();
-        if (tr?.marketing_agency_id) { await admin.from("enrollments").update({ referral_agency_id: tr.marketing_agency_id }).eq("id", enrollmentId); await applyReferralRebates(admin, [enrollmentId], staff.user.id); }
+        const srcError = await setCourseSource(admin, [(data as { id: string }).id], input.source, input.agencyId, staff.user.id);
+        if (srcError) return NextResponse.json({ error: `Course added, but its source was not saved: ${srcError}` }, { status: 400 });
       }
       if (input.scheduledOn && !input.batchId && data) {
         const { error: dateError } = await admin.from("enrollments").update({ scheduled_on: input.scheduledOn }).eq("id", (data as { id: string }).id);

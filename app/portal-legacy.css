@@ -2556,3 +2556,5 @@ button.rd-row:hover { background: #f6fafc; }
 /* Accounting reprint in the Trainee Account (owner, 3 Nov 2026). */
 .portal-shell .tp-reprint{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#f2f8fe;border-radius:8px;padding:8px}
 .portal-shell .tp-reprint select,.portal-shell .tp-reprint input{height:34px;border:1px solid #bcdcf7;border-radius:8px;padding:0 8px;background:#fff;min-width:0}
+/* Referral per course (owner, 3 Nov 2026): the partner and rebate sit on the course line. */
+.portal-shell .cx-lines small.ref-line{display:block;color:#b33d0b;font-weight:600}
