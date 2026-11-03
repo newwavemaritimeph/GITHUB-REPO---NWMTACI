@@ -720,7 +720,8 @@ export function AccountingDocuments({ only, embedded }: { only?: "receipts" | "t
 }
 
 type HistoryRow = { id: string; category: string; decidedAt: string; title: string; detail: string; amountCentavos: number; decision: string; by: string; remarks: string };
-const HISTORY_CATEGORIES = ["Expense Requests", "Voucher Reprints", "Refunds", "Change Requests", "Discounts", "Payment Voids", "Rebates Paid to Partners", "Cashier Closings Reviewed"];
+// One line of short filters (owner, 3 Nov 2026); the table keeps each row's full category.
+const HISTORY_FILTERS: [string, string[]][] = [["Expenses", ["Expense Requests", "Voucher Reprints"]], ["Refunds", ["Refunds"]], ["Changes", ["Change Requests"]], ["Discounts", ["Discounts"]], ["Voids", ["Payment Voids"]], ["Rebates", ["Rebates Paid to Partners"]], ["Closings", ["Cashier Closings Reviewed"]]];
 const DECISION_TONE: Record<string, "active" | "cancelled" | "pending"> = { Approved: "active", Paid: "active", Reviewed: "active", Voided: "pending", Rejected: "cancelled", Cancelled: "cancelled" };
 
 /** Accounting › Approvals (owner, 3 Nov 2026): a date-sensitive history of every decision, by category. Waiting items are on the Dashboard. */
@@ -732,7 +733,8 @@ export function ApprovalHistory({ data, go }: { data: PortalData; go: (module: s
   const { data: res, error } = useJson<{ rows: HistoryRow[]; notes: string[] }>(range.from <= range.to ? `/api/staff/approval-history?from=${range.from}&to=${range.to}` : null);
   const term = q.trim().toLowerCase();
   const inView = (res?.rows ?? []).filter((r) => !term || `${r.title} ${r.detail} ${r.remarks} ${r.by}`.toLowerCase().includes(term));
-  const rows = inView.filter((r) => cat === "All" || r.category === cat);
+  const inFilter = (r: HistoryRow, f: string) => f === "All" || (HISTORY_FILTERS.find(([n]) => n === f)?.[1] ?? []).includes(r.category);
+  const rows = inView.filter((r) => inFilter(r, cat));
   const pg = usePaged(rows);
   const okRows = rows.filter((r) => r.decision !== "Rejected" && r.decision !== "Cancelled"), noRows = rows.filter((r) => r.decision === "Rejected");
   const sum = (l: HistoryRow[]) => l.reduce((s, r) => s + r.amountCentavos, 0);
@@ -747,7 +749,7 @@ export function ApprovalHistory({ data, go }: { data: PortalData; go: (module: s
       {custom ? <div className="pd-bar"><span className="cx-seg"><button type="button" onClick={() => setCustom(false)}>Daily · Weekly · Monthly</button><button type="button" className="on">Custom</button></span><label>From <input type="date" value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label><label>To <input type="date" value={to} onChange={(e) => e.target.value && setTo(e.target.value)} /></label></div>
         : <div className="dc-bar"><PeriodBar p={p} what="Decided" count={`${rows.length}`} /><button type="button" className="portal-secondary" onClick={() => setCustom(true)}>Custom</button></div>}
       <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search approvals" placeholder="Search number, payee, trainee or remarks" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-      <div className="chips ac-chipbar">{["All", ...HISTORY_CATEGORIES].map((c) => { const n = c === "All" ? inView.length : inView.filter((r) => r.category === c).length; return <button key={c} type="button" className={`ac-chip${cat === c ? " on" : ""}${n ? "" : " zero"}`} onClick={() => setCat(c)}>{c}<span className={n ? "has" : ""}>{n}</span></button>; })}</div>
+      <div className="chips ac-chipbar ah-chips">{["All", ...HISTORY_FILTERS.map(([n]) => n)].map((c) => { const n = inView.filter((r) => inFilter(r, c)).length; return <button key={c} type="button" className={`ac-chip${cat === c ? " on" : ""}${n ? "" : " zero"}`} onClick={() => setCat(c)}>{c}<span className={n ? "has" : ""}>{n}</span></button>; })}</div>
       <div className="ad-cash">
         <div><span>Decided</span><b>{rows.length}</b><small>{range.label}</small></div>
         <div><span>Approved · Paid · Reviewed</span><b>{pesos2(sum(okRows))}</b><small>{okRows.length} item{okRows.length === 1 ? "" : "s"}</small></div>
