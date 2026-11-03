@@ -27,8 +27,8 @@ const TONE: Record<RequisitionState, string> = { "For Approval": "orange", Appro
 const day = (v: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(v));
 const stateOf = (r: Requisition) => requisitionState({ status: r.status, expense_status: first(r.expenses)?.status });
 const itemsText = (r: Requisition) => (r.lines ?? []).map((l) => `${l.description} × ${l.quantity}`).join(", ");
-function Head({ title, children }: { title: string; children?: React.ReactNode }) {
-  return <div className="cx-head"><div><span className="portal-eyebrow">Admin Assistant</span><h1>{title}</h1></div>{children}</div>;
+function Head({ title, children, eyebrow = "Admin Assistant" }: { title: string; children?: React.ReactNode; eyebrow?: string }) {
+  return <div className="cx-head"><div><span className="portal-eyebrow">{eyebrow}</span><h1>{title}</h1></div>{children}</div>;
 }
 
 const PLAN_PERIODS = ["Weekly", "Every 2 Weeks", "Monthly"] as const;
@@ -323,7 +323,7 @@ const STATUS_TONE: Record<string, string> = { Open: "green", Full: "orange", Ong
  * edits, renames and cancels batches. Dates follow the course pattern; a
  * cancelled batch moves every trainee to another batch of the same course.
  */
-export function ClassSchedules({ data, reload, onOpenBatches, onCreate }: { data: PortalData; reload: () => Promise<void>; onOpenBatches: () => void; onCreate: () => void }) {
+export function ClassSchedules({ data, reload, onOpenBatches, onCreate, canManage = true }: { data: PortalData; reload: () => Promise<void>; onOpenBatches: () => void; onCreate: () => void; canManage?: boolean }) {
   const { today, range, bar } = usePlanPeriod();
   const [filter, setFilter] = useState<(typeof SCHEDULE_FILTERS)[number]>("All");
   const [editing, setEditing] = useState<Batch | null>(null);
@@ -335,34 +335,48 @@ export function ClassSchedules({ data, reload, onOpenBatches, onCreate }: { data
   const inPeriod = data.batches.filter((b) => !b.partner_offer_id && rangesOverlap(b.starts_on, b.ends_on, range.from, range.to)).sort((a, z) => a.starts_on.localeCompare(z.starts_on) || a.batch_number.localeCompare(z.batch_number));
   const count = (s: string) => inPeriod.filter((b) => scheduleStatus(b, today) === s).length;
   const rows = inPeriod.filter((b) => filter === "All" || scheduleStatus(b, today) === filter);
-  const grouped = [...rows.filter((b) => isStcw(course.get(b.course_id))), ...rows.filter((b) => !isStcw(course.get(b.course_id)))];
+  // Grouped STCW then In-House, and by course inside each group, so each course reads as one block.
+  const codeOf = (b: Batch) => course.get(b.course_id)?.code ?? first(b.courses)?.code ?? "";
+  const byCourse = (a: Batch, z: Batch) => codeOf(a).localeCompare(codeOf(z)) || a.starts_on.localeCompare(z.starts_on);
+  const grouped = [...rows.filter((b) => isStcw(course.get(b.course_id))).sort(byCourse), ...rows.filter((b) => !isStcw(course.get(b.course_id))).sort(byCourse)];
+  // Seats (owner, 3 Nov 2026): enrolled and pending per batch from the loaded enrollments; slots left from the held seats.
+  const seat = new Map<string, { enrolled: number; pending: number }>();
+  for (const e of data.enrollments) { if (!e.batch_id || e.enrollment_status === "Cancelled") continue; const x = seat.get(e.batch_id) ?? { enrolled: 0, pending: 0 }; if (e.enrollment_status === "Pending") x.pending += 1; else x.enrolled += 1; seat.set(e.batch_id, x); }
+  const left = (b: Batch) => Math.max(0, Number(b.capacity ?? 24) - Number(b.confirmed_count ?? 0));
+  const live = rows.filter((b) => b.status !== "Cancelled");
+  const courseLine = (code: string) => { const r = grouped.filter((b) => codeOf(b) === code && b.status !== "Cancelled"); return `${r.length} batch${r.length === 1 ? "" : "es"} · ${r.reduce((s, b) => s + (seat.get(b.id)?.enrolled ?? 0), 0)} enrolled · ${r.reduce((s, b) => s + left(b), 0)} slots left`; };
   const paged = usePaged(grouped);
   const groupOf = (b: Batch) => (isStcw(course.get(b.course_id)) ? "STCW" : "In-House");
   const groupCount = (g: string) => grouped.filter((b) => groupOf(b) === g).length;
   return <div className="portal-page cx ac">
-    <Head title="Class Schedules"><span className="cl-acts"><button type="button" className="portal-secondary" onClick={onCreate}>Create Schedule</button><button type="button" className="portal-primary" onClick={onOpenBatches}>Open Batches</button></span></Head>
+    <Head title="Batch Schedules" eyebrow="Schedules">{canManage && <span className="cl-acts"><button type="button" className="portal-secondary" onClick={onCreate}>Create Schedule</button><button type="button" className="portal-primary" onClick={onOpenBatches}>Open Batches</button></span>}</Head>
     {done && <Message kind="success" text={done} />}
     {bar(`${inPeriod.length} batch${inPeriod.length === 1 ? "" : "es"}`)}
     <div className="ac-rail">
       <div className="ac-stack"><section className="portal-panel cx-panel"><div className="panel-heading"><h2>This Period</h2></div>
         <dl className="ac-lines cs-lines">
           {["Open", "Full", "Ongoing", "Cancelled"].map((s) => <div key={s}><dt>{s}</dt><dd>{count(s)}</dd></div>)}
-          <div><dt>Trainees Booked</dt><dd>{inPeriod.filter((b) => b.status !== "Cancelled").reduce((s, b) => s + Number(b.confirmed_count ?? 0), 0)}</dd></div>
+          <div><dt>Enrolled</dt><dd>{live.reduce((s, b) => s + (seat.get(b.id)?.enrolled ?? 0), 0)}</dd></div>
+          <div><dt>Pending (Holding a Seat)</dt><dd>{live.reduce((s, b) => s + (seat.get(b.id)?.pending ?? 0), 0)}</dd></div>
+          <div><dt>Slots Left</dt><dd>{live.reduce((s, b) => s + left(b), 0)}</dd></div>
         </dl>
       </section></div>
       <div className="ac-stack"><section className="portal-panel cx-panel"><div className="panel-heading"><h2>Batches</h2><span className="slot-count">{rows.length}</span></div>
         <div className="cx-bar ac-bar"><span className="cx-seg">{SCHEDULE_FILTERS.map((x) => <button key={x} type="button" className={filter === x ? "on" : ""} onClick={() => setFilter(x)}>{x}</button>)}</span></div>
-        {rows.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Batch No.</th><th>Course</th><th>Dates</th><th>Seats</th><th>Room · Instructor</th><th>Status</th><th></th></tr></thead><tbody>
+        {rows.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Batch No.</th><th>Course</th><th>Dates</th><th>Room · Instructor</th><th className="r">Enrolled</th><th className="r">Pending</th><th>Slots Left</th><th>Status</th>{canManage && <th></th>}</tr></thead><tbody>
           {paged.shown.map((b, i) => { const s = scheduleStatus(b, today), c = course.get(b.course_id), p = plans.get(b.id), cx = cancels.get(b.id); const g = groupOf(b), prev = paged.shown[i - 1];
-            return [(!prev || groupOf(prev) !== g) && <tr key={`${b.id}-g`} className="nb-group"><td colSpan={7}>{g} · {groupCount(g)}</td></tr>,
+            const code = codeOf(b), cols = canManage ? 9 : 8, sl = left(b), st = seat.get(b.id) ?? { enrolled: 0, pending: 0 };
+            return [(!prev || groupOf(prev) !== g) && <tr key={`${b.id}-g`} className="nb-group"><td colSpan={cols}>{g} · {groupCount(g)}</td></tr>,
+              (!prev || codeOf(prev) !== code) && <tr key={`${b.id}-c`} className="bs-course"><td colSpan={cols}><b>{code}</b> {c?.name ?? first(b.courses)?.name} · {courseLine(code)}</td></tr>,
               <tr key={b.id} className={s === "Cancelled" ? "cs-cancelled" : undefined}>
                 <td><b className="cl-mono">{b.batch_number}</b></td>
                 <td><b>{c?.code ?? first(b.courses)?.code}</b><small>{c?.name ?? first(b.courses)?.name}</small></td>
                 <td>{spanOf({ startsOn: b.starts_on, endsOn: b.ends_on })}</td>
-                <td className="cl-mono">{b.confirmed_count}/{b.capacity}</td>
                 <td>{p?.room?.name ?? "No room"}<small>{p?.instructor?.complete_name ?? "No instructor"}</small></td>
-                <td><Badge tone={STATUS_TONE[s]}>{s}</Badge>{s === "Cancelled" && cx ? <small>{cx.cancel_reason}{first(cx.canceller)?.complete_name ? ` · ${first(cx.canceller)?.complete_name}` : ""}{cx.cancelled_at ? ` · ${fmtDate(day(cx.cancelled_at))}` : ""}</small> : null}{s !== "Cancelled" && !b.published_at ? <small>Not on the public form</small> : null}</td>
-                <td>{s !== "Cancelled" && s !== "Ended" && <span className="cl-acts"><button type="button" className="portal-secondary" onClick={() => setEditing(b)}>Edit</button>{s !== "Ongoing" && <button type="button" className="portal-secondary cs-danger" onClick={() => setCancelling(b)}>Cancel Batch</button>}</span>}</td>
+                <td className="r cl-mono">{st.enrolled}</td><td className="r cl-mono">{st.pending}</td>
+                <td><span className="bs-seat"><b className="cl-mono">{sl}</b> / {b.capacity}<span className={`bs-bar${sl === 0 ? " full" : sl <= 3 ? " low" : ""}`}><i style={{ width: `${Math.min(100, (Number(b.confirmed_count ?? 0) / Math.max(1, Number(b.capacity ?? 24))) * 100)}%` }} /></span></span></td>
+                <td><Badge tone={STATUS_TONE[s]}>{s === "Open" && sl > 0 && sl <= 3 ? "Almost Full" : s}</Badge>{s === "Cancelled" && cx ? <small>{cx.cancel_reason}{first(cx.canceller)?.complete_name ? ` · ${first(cx.canceller)?.complete_name}` : ""}{cx.cancelled_at ? ` · ${fmtDate(day(cx.cancelled_at))}` : ""}</small> : null}{s !== "Cancelled" && !b.published_at ? <small>Not on the public form</small> : null}</td>
+                {canManage && <td>{s !== "Cancelled" && s !== "Ended" && <span className="cl-acts"><button type="button" className="portal-secondary" onClick={() => setEditing(b)}>Edit</button>{s !== "Ongoing" && <button type="button" className="portal-secondary cs-danger" onClick={() => setCancelling(b)}>Cancel Batch</button>}</span>}</td>}
               </tr>]; })}
         </tbody></table>{paged.pager}</div> : <p className="portal-empty-copy">No batches in this period.</p>}
       </section></div>

@@ -72,8 +72,9 @@ export const courseRemoveMode = (references: number) => (references > 0 ? "archi
 /** Whether a print (first print or an allowed reprint) may happen now. */
 export const canPrint = (v: CertificateView) => (v.state === "Due" || v.state === "Printed" || v.state === "Released") && v.printsLeft > 0;
 
-/** "NWM-BT-" + 1245 padded to 5 → "NWM-BT-01245". */
-export const formatCertificateNumber = (prefix: string, next: number, pad: number) => `${prefix}${String(Math.max(1, Math.trunc(next))).padStart(Math.max(1, Math.min(10, pad)), "0")}`;
+/** "NWM-BT-" + 1245 padded to 5 → "NWM-BT-01245". "{YYYY}" in a prefix is the Manila year (In-House, 3 Nov 2026). */
+export const formatCertificateNumber = (prefix: string, next: number, pad: number, year = new Date(Date.now() + 8 * 3600_000).getUTCFullYear()) =>
+  `${prefix.replace(/\{YYYY\}/g, String(year))}${String(Math.max(1, Math.trunc(next))).padStart(Math.max(1, Math.min(10, pad)), "0")}`;
 
 /** The Google Form ID from a pasted Forms link (or the ID itself). */
 export function googleFormId(input: string | null | undefined) {

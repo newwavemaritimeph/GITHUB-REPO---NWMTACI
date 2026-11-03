@@ -38,6 +38,9 @@ describe("certificate rules", () => {
   it("formats numbers and reads links", () => {
     expect(formatCertificateNumber("NWM-BT-", 1245, 5)).toBe("NWM-BT-01245");
     expect(formatCertificateNumber("", 7, 3)).toBe("007");
+    // In-House (owner, 3 Nov 2026): NWMTACI-<year>-<code>-000001, the year filled in.
+    expect(formatCertificateNumber("NWMTACI-{YYYY}-HPT-", 1, 6, 2026)).toBe("NWMTACI-2026-HPT-000001");
+    expect(formatCertificateNumber("NWMTACI-{YYYY}-HPT-", 1, 6, 2027)).toBe("NWMTACI-2027-HPT-000001");
     expect(googleFormId("https://docs.google.com/forms/d/1FAIpQLSabcdEFGH12345/edit")).toBe("1FAIpQLSabcdEFGH12345");
     expect(googleFormId("nope")).toBeNull();
     expect(driveFileId("https://drive.google.com/file/d/1aBcDeFgHiJkLmNoPqRsTu/view?usp=sharing")).toBe("1aBcDeFgHiJkLmNoPqRsTu");

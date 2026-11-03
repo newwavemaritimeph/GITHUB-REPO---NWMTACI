@@ -2508,3 +2508,11 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell tr.pv-void td.tp-mono,.portal-shell tr.pv-void td .cx-amt,.portal-shell tr.pv-void td.r{text-decoration:line-through}
 .portal-shell .pv-open{background:none;border:0;padding:0;text-align:left;cursor:pointer;color:inherit}
 .portal-shell .pv-open:hover .cx-name{color:#0571D0;text-decoration:underline}
+/* Batch Schedules (owner, 3 Nov 2026): one line per course, then each batch with its seats. */
+.portal-shell .cl-log tr.bs-course td{background:#f3f8fb;font-size:13px;color:#123F63;padding-top:6px;padding-bottom:6px}
+.portal-shell .cl-log tr.bs-course b{font-family:"Geist Mono",ui-monospace,monospace;margin-right:6px}
+.portal-shell .bs-seat{display:flex;align-items:center;gap:8px;white-space:nowrap}
+.portal-shell .bs-bar{display:inline-block;width:80px;height:7px;border-radius:99px;background:#e3ecf0;overflow:hidden}
+.portal-shell .bs-bar i{display:block;height:100%;background:#0571D0}
+.portal-shell .bs-bar.low i{background:#F25615}
+.portal-shell .bs-bar.full i{background:#b42318}
