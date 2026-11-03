@@ -1,0 +1,102 @@
+<title>Monthly Lists</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Same shell as the live portal: navy bar with dropdown tabs, summary rail on the left, light-cyan table headers. */
+:root{--orange:#F25615;--blue:#0571D0;--cyan:#35CCFA;--cyan-l:#9EE3F1;--navy:#123F63;--bg:#f2f6f8;--surface:#fff;--fg:#0f2638;--muted:#587184;--line:#dbe6ec;--soft:#eef4f8;--th:#e6f6fd;--thc:#0b4f8f;--zebra:#f7fafc;
+ --good:#0a7a3e;--good-bg:#e2f5e9;--warn:#a2470b;--warn-bg:#fdf0e5;--bad:#b42318;--bad-bg:#fcebea;--info:#0571D0;--info-bg:#e5f1fb;
+ --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding-block:16px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.w{max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.logo{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}.logo b{font-size:19px;font-weight:600}.logo b span{color:var(--orange)}.logo small{display:block;color:var(--cyan-l);font-size:14px}.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.who{font-size:14px;color:#cfe3ef;display:flex;align-items:center;gap:8px}.who select{background:#ffffff14;border:1px solid #ffffff30;color:#fff;border-radius:8px;padding:5px 8px}.who select option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:16px;flex-wrap:wrap}.tab>button{background:none;border:0;color:#c3dbea;font:500 16px var(--sans);padding:12px 18px;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:8px}.tab>button:hover{color:#fff;background:#ffffff12}.tab.on>button{background:var(--bg);color:var(--fg);font-weight:600}
+.caret{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.menu{position:absolute;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:15;display:flex;flex-direction:column;margin-top:2px}.tab{position:relative}.menu button{background:none;border:0;text-align:left;color:var(--fg);font:500 15.5px var(--sans);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;gap:12px}.menu button:hover{background:var(--soft)}.menu button.on{background:var(--info-bg);color:var(--info);font-weight:600}.menu small,.n{font:600 11.5px var(--mono);background:var(--orange);color:#fff;border-radius:10px;padding:1px 7px}
+.page{padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.cx-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}h1{font-size:25px;font-weight:600;margin:0}h2{font-size:19px;font-weight:600;margin:0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.seg button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.seg button.on{background:var(--navy);color:#fff}
+.rail{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}@media (max-width:900px){.rail{grid-template-columns:1fr}}.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.ph small{color:var(--muted);font-size:14px}
+.lines{display:flex;flex-direction:column;padding:0 20px 16px}.lines div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}.lines div:first-child{border-top:0}.lines dd,.lines span:last-child{font-family:var(--mono);font-weight:600}.lines .tot{font-weight:700}.lines .bad{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 16px}.tile{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 12px}.tile span{display:block;font-size:13px;color:var(--muted)}.tile b{font:600 19px var(--mono)}
+.cwrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--th);color:var(--thc);font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:10px 12px;border-right:1px solid var(--line);white-space:nowrap}td{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.35}tbody tr:nth-child(even) td{background:var(--zebra)}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}.due{background:var(--bad-bg);color:var(--bad)}.dueo{background:var(--warn-bg);color:var(--warn)}.appr{background:var(--info-bg);color:var(--info)}.paid{background:var(--good-bg);color:var(--good)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:9px;padding:7px 14px;font-weight:600;font-size:14.5px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.okb{background:var(--good);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:14px 20px;background:var(--soft);border-top:1px solid var(--line)}.form label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}.form select,.form input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line)}
+.alert{background:var(--bad-bg);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:15px;font-weight:500;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.note{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+</style>
+<style>
+.top{background:linear-gradient(100deg,#0571D0 0%,#2aa6ec 60%,#35CCFA 100%);box-shadow:0 2px 0 #9EE3F1}
+.tab>button{color:#eaf7fd}.tab>button:hover{background:#ffffff26;color:#fff}.tab.on>button{background:var(--bg);color:#0571D0;box-shadow:inset 0 3px 0 #F25615}
+.pbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:0 20px 14px}
+.pbar .nav{border:1px solid var(--line);background:var(--surface);border-radius:9px;width:36px;height:36px;font-size:18px;color:var(--blue)}
+.pbar .mon{font:600 17px var(--sans);min-width:150px;text-align:center}
+.pbar .tod{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:6px 12px;font-weight:600;color:var(--blue)}
+.pbar .cnt{color:var(--muted);font-size:14px;margin-left:auto}
+.srch{border:1px solid var(--line);border-radius:9px;padding:8px 12px;min-width:240px;background:var(--surface);color:var(--fg)}
+.chipm{display:inline-block;font:600 11.5px var(--mono);background:var(--warn-bg);color:var(--warn);border-radius:6px;padding:1px 6px;margin-left:6px}
+.banner{margin:0 20px 12px;background:var(--info-bg);color:var(--info);border-radius:10px;padding:8px 12px;font-size:14px}
+.cal{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:0 20px 16px}.cal button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px;font-size:13.5px}.cal button.on{background:var(--navy);color:#fff}
+</style>
+<header class="top"><div class="w">
+  <div class="brand"><div class="logo"><div class="mark">NW</div><div><b>New Wave <span>Portal</span><span class="proto">PROTOTYPE</span></b><small>Ride the New Wave of Maritime Excellence</small></div></div><div class="who">Working as <select><option>Admin</option></select></div></div>
+  <nav class="tabs" id="tabs"></nav>
+</div></header>
+<main class="page"><div class="w">
+  <div class="cx-head"><div><span class="eyebrow" id="eb"></span><h1 id="h1"></h1></div><input class="srch" id="q" placeholder="Search all dates: name, NWMTACI No., batch"></div>
+  <section class="panel">
+    <div class="ph"><h2 id="h2"></h2><small>Opens on this month · ‹ › for other months</small></div>
+    <div class="pbar"><button class="nav" id="prev" aria-label="Previous month">‹</button><span class="mon" id="mon"></span><button class="nav" id="next" aria-label="Next month">›</button><button class="tod" id="tod" hidden>This Month</button><span class="cnt" id="cnt"></span></div>
+    <div id="ban"></div>
+    <div class="cwrap"><table><thead id="th"></thead><tbody id="tb"></tbody></table></div>
+    <div class="foot"><small style="color:var(--muted)" id="ft"></small><span><button class="btn" disabled>‹ Prev</button> <button class="btn">Next ›</button></span></div>
+  </section>
+  <p class="note" style="padding:12px 0 0">On December 1 every list switches to December by itself. Setup lists (courses, fees, channels, partners) stay undated.</p>
+</div></main>
+<script>
+const TODAY="2026-11-03";
+const MONTHS=["2026-08","2026-09","2026-10","2026-11"];
+const NAMES=["DELA CRUZ, Juan","REYES, Maria","SANTOS, Paolo","GARCIA, Liza","MENDOZA, Carlo","AQUINO, Rhea","BAUTISTA, Leo","TORRES, Ana","RAMOS, Jun","FLORES, Mae","CASTRO, Neil","VILLA, Joy"];
+const COURSES=["UBT-PSSR","STPPDSPPS","PSCMT","PSCMHBT","HPT","ISM"];
+const seed=(m,i)=>((m.charCodeAt(6)*31+i*17)%28)+1;
+const rows={
+  Enrollments:MONTHS.flatMap((m,k)=>Array.from({length:[6,8,11,7][k]},(_,i)=>({d:`${m}-${String(seed(m,i)).padStart(2,"0")}`,a:NAMES[(i+k*3)%12],b:`ENR-2026-${String(300-k*40-i).padStart(6,"0")}`,c:COURSES[(i+k)%6],e:["Enrolled","Pending","Enrolled","Cancelled"][i%4]}))),
+  Trainees:MONTHS.flatMap((m,k)=>Array.from({length:[5,7,9,4][k]},(_,i)=>({d:`${m}-${String(seed(m,i+3)).padStart(2,"0")}`,a:NAMES[(i*5+k)%12],b:`NWMTACI-${String(40-k*9-i).padStart(7,"0")}`,c:["Online","Walk-In","Agency · Qapla"][i%3],e:["Seaman","Cadet","Engineer"][i%3]}))),
+  Schedules:MONTHS.flatMap((m,k)=>Array.from({length:[4,5,6,6][k]},(_,i)=>({d:`${m}-${String(seed(m,i+5)).padStart(2,"0")}`,a:`26-${["609","506","507","508"][i%4]}-${String(120+k*6+i).padStart(3,"0")}`,b:COURSES[i%4],c:`${[18,24,12,20,9,24][i%6]}/24`,e:["Open","Full","Ongoing","Ended"][i%4]}))),
+  Payments:MONTHS.flatMap((m,k)=>Array.from({length:[7,9,12,8][k]},(_,i)=>({d:`${m}-${String(seed(m,i+7)).padStart(2,"0")}`,a:NAMES[(i*7+k)%12],b:`AR-2026-${String(200-k*30-i).padStart(6,"0")}`,c:["Cash","GCash","PSBank","UnionBank"][i%4],e:"₱"+[900,1300,650,4800,1050][i%5].toLocaleString("en-PH")}))),
+};
+const COLS={Enrollments:["Enrolled","Trainee","Enrollment No.","Course","Status"],Trainees:["Registered","Trainee","NWMTACI No.","Source","Rank"],Schedules:["Starts","Batch No.","Course","Seats","Status"],Payments:["Received","Trainee","Receipt No.","Channel","Amount"]};
+let mod="Enrollments",mi=3,q="";
+const lab=m=>new Intl.DateTimeFormat("en-PH",{month:"long",year:"numeric",timeZone:"UTC"}).format(new Date(m+"-15T00:00:00Z"));
+const fd=d=>new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",timeZone:"UTC"}).format(new Date(d+"T00:00:00Z"));
+const $=s=>document.getElementById(s);
+function render(){
+  $("tabs").innerHTML=["Dashboard","Enrollments","Schedules","Reports","MISMO","Configuration"].map(t=>`<div class="tab ${((mod==="Enrollments"||mod==="Trainees"||mod==="Payments")&&t==="Enrollments")||(mod==="Schedules"&&t==="Schedules")?"on":""}"><button data-t="${t}">${t}${["Dashboard"].includes(t)?"":' <span class="caret"></span>'}</button></div>`).join("");
+  $("eb").textContent=mod==="Schedules"?"Schedules":mod==="Payments"?"Accounting":"Enrollments";
+  $("h1").innerHTML=`${mod} <span class="seg" style="margin:0 0 0 12px;vertical-align:middle">${Object.keys(rows).map(k=>`<button data-m="${k}" class="${k===mod?"on":""}">${k}</button>`).join("")}</span>`;
+  $("h2").textContent=mod;
+  const m=MONTHS[mi],all=rows[mod].slice().sort((a,b)=>b.d.localeCompare(a.d));
+  const t=q.trim().toLowerCase();
+  const list=t?all.filter(r=>Object.values(r).join(" ").toLowerCase().includes(t)):all.filter(r=>r.d.startsWith(m));
+  $("mon").textContent=lab(m);$("prev").disabled=mi===0;$("next").disabled=mi===MONTHS.length-1;$("tod").hidden=mi===3||!!t;
+  $("cnt").textContent=t?`${list.length} found in all dates`:`${list.length} ${mod.toLowerCase()} · newest first`;
+  $("ban").innerHTML=t?`<div class="banner">Searching all dates for “${q}”. Clear the search to return to ${lab(m)}.</div>`:"";
+  $("th").innerHTML=`<tr>${COLS[mod].map((c,i)=>`<th class="${mod==="Payments"&&i===4?"r":""}">${c}</th>`).join("")}</tr>`;
+  $("tb").innerHTML=list.slice(0,10).map(r=>`<tr><td>${fd(r.d)}${t&&!r.d.startsWith(MONTHS[3])?`<span class="chipm">${lab(r.d.slice(0,7)).split(" ")[0].slice(0,3)}</span>`:""}</td><td>${r.a}</td><td class="mono">${r.b}</td><td>${r.c}</td><td class="${mod==="Payments"?"r mono":""}">${mod==="Payments"?r.e:`<span class="pill ${/Enrolled|Open|Ongoing/.test(r.e)?"paid":/Pending|Full/.test(r.e)?"dueo":/Cancelled/.test(r.e)?"due":"appr"}">${r.e}</span>`}</td></tr>`).join("")||`<tr><td colspan="5" style="color:var(--muted)">Nothing in ${lab(m)}.</td></tr>`;
+  $("ft").textContent=`Showing ${Math.min(10,list.length)} of ${list.length}`;
+}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-m]");if(b){mod=b.dataset.m;render();return}
+  if(e.target.id==="prev"&&mi>0){mi--;render()}if(e.target.id==="next"&&mi<3){mi++;render()}if(e.target.id==="tod"){mi=3;render()}
+});
+$("q").addEventListener("input",e=>{q=e.target.value;render()});
+render();
+</script>

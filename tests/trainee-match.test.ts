@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { sameTrainee, tarGroups, tarPrintable } from "@/lib/trainee-match";
+import { rankMatches, sameTrainee, tarGroups, tarPrintable } from "@/lib/trainee-match";
+
+describe("rankMatches", () => {
+  const people = [{ n: "JESTER RUAZOL NATIVIDAD", o: "NWMTACI-0000019 UBT-PSSR" }, { n: "JAYSON JAYSON CABRERO", o: "NWMTACI-0000022 APA" }, { n: "KING STEPHEN PACQUING", o: "NWMTACI-0000002 UBT-PSSR" }];
+  const rank = (t: string) => rankMatches(people, t, (p) => p.n, (p) => p.o).map((p) => p.n.split(" ")[0]);
+  it("lists nothing until a letter is typed", () => expect(rank("  ")).toEqual([]));
+  it("puts names with a word starting with the letters first", () => expect(rank("ja")).toEqual(["JAYSON"]));
+  it("then anything containing the letters, number or course", () => { expect(rank("az")).toEqual(["JESTER"]); expect(rank("0000002")).toEqual(["KING"]); expect(rank("ubt")).toEqual(["JESTER", "KING"]); });
+  it("keeps at most the limit", () => expect(rankMatches(people, "n", (p) => p.n, (p) => p.o, 2)).toHaveLength(2));
+});
 
 describe("TAR courses", () => {
   it("prints every course that is not cancelled, paid or not", () => {

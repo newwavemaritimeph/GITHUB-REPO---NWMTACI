@@ -21,6 +21,22 @@ type Person = { id: string; srn?: string | null; legal_first_name?: string | nul
 const norm = (v?: string | null) => (v ?? "").trim().toUpperCase().replace(/\s+/g, " ");
 
 /** Two trainee records for the same person: same SRN, or same last name, first name and birth date. */
+/**
+ * Type-ahead ranking (owner, 3 Nov 2026): nothing until a letter is typed; names with a word
+ * starting with the letters come first, then anything else containing them (number, course).
+ */
+export function rankMatches<T>(items: T[], term: string, name: (x: T) => string, other: (x: T) => string, limit = 6): T[] {
+  const t = term.trim().toLowerCase();
+  if (!t) return [];
+  const starts: T[] = [], rest: T[] = [];
+  for (const x of items) {
+    const n = name(x).toLowerCase();
+    if (n.split(/\s+/).some((w) => w.startsWith(t))) starts.push(x);
+    else if (`${n} ${other(x).toLowerCase()}`.includes(t)) rest.push(x);
+  }
+  return [...starts, ...rest].slice(0, limit);
+}
+
 export function sameTrainee(a: Person, b: Person) {
   if (a.id === b.id) return false;
   const sa = normalizeSrn(a.srn ?? ""), sb = normalizeSrn(b.srn ?? "");

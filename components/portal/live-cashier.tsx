@@ -12,7 +12,7 @@ import type { CashierReportSnapshot } from "@/lib/documents";
 import { tcl } from "@/lib/title-case";
 import { PayTheCenters, centerLines } from "./pay-centers";
 import { shrinkProof } from "@/lib/proof-shrink";
-import { tarGroups, tarPrintable, type TarGroup } from "@/lib/trainee-match";
+import { rankMatches, tarGroups, tarPrintable, type TarGroup } from "@/lib/trainee-match";
 import { sourceLabel } from "@/lib/company-charge";
 
 /**
@@ -244,6 +244,12 @@ type ExtraLine = { key: string; chargeCatalogId: string | null; description: str
  * unpaid courses (split), plus any miscellaneous charges sold at the counter.
  * One payment, one receipt. A reference is required for every mode except Cash.
  */
+/** The typed letters in bold at the start of each matching word. */
+function markWords(name: string, term: string) {
+  const t = term.trim().toLowerCase();
+  return name.split(" ").map((w, i) => <span key={i}>{i ? " " : ""}{t && w.toLowerCase().startsWith(t) ? <><mark className="cx-mark">{w.slice(0, t.length)}</mark>{w.slice(t.length)}</> : w}</span>);
+}
+
 export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCentavos, initialFeeLabel, initialProof, onClose, onSaved }: { data: PortalData; initialEnrollmentId?: string; initialAmountCentavos?: number; initialFeeLabel?: string; initialProof?: TraineeProofRow; onClose: () => void; onSaved: () => Promise<void> }) {
   const initial = initialEnrollmentId ? data.enrollments.find((e) => e.id === initialEnrollmentId) : undefined;
   const [traineeId, setTraineeId] = useState(initialProof?.trainee_id ?? initial?.trainee_id ?? "");
@@ -258,6 +264,14 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
   const [amounts, setAmounts] = useState<Record<string, string>>(preset && initialEnrollmentId ? { [initialEnrollmentId]: preset } : {});
   const [extras, setExtras] = useState<ExtraLine[]>([]);
   const [addOpen, setAddOpen] = useState(false);
+  // Design 03 · Split Primary (owner, 3 Nov 2026): the highlighted suggestion and the ▾ menu beside Record.
+  const [hi, setHi] = useState(0), [menu, setMenu] = useState(false);
+  useEffect(() => {
+    if (!menu) return;
+    const close = (ev: MouseEvent | KeyboardEvent) => { if (ev instanceof KeyboardEvent ? ev.key === "Escape" : !(ev.target as HTMLElement).closest(".cx-split")) setMenu(false); };
+    document.addEventListener("mousedown", close); document.addEventListener("keydown", close);
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", close); };
+  }, [menu]);
   const extraSeq = useRef(0);
   const [pick, setPick] = useState("");
   const [otherName, setOtherName] = useState("");
@@ -282,9 +296,9 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
   const uniform = catalog.find((c) => /uniform/i.test(c.name) && Number(c.default_amount_centavos) > 0);
   const uniformPrice = uniform ? Number(uniform.default_amount_centavos) : 15000;
   const term = search.trim().toLowerCase();
-  const candidates = groupByTrainee(data, data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && !data.companyCharge?.[e.id]))
-    .filter((g) => !term || `${g.name} ${g.number} ${g.enrollments.map((e) => `${courseCode(e)} ${e.enrollment_number}`).join(" ")}`.toLowerCase().includes(term))
-    .sort((a, b) => b.balance - a.balance || a.name.localeCompare(b.name)).slice(0, 8);
+  // No list until a letter is typed (owner, 3 Nov 2026); suggestions follow each letter.
+  const candidates = term ? rankMatches(groupByTrainee(data, data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && !data.companyCharge?.[e.id]))
+    .sort((a, b) => b.balance - a.balance || a.name.localeCompare(b.name)), term, (g) => g.name, (g) => `${g.number} ${g.enrollments.map((e) => `${courseCode(e)} ${e.enrollment_number}`).join(" ")}`) : [];
   const group = traineeId ? groupByTrainee(data, mine)[0] : undefined;
   // Referral (8 Oct 2026): the agency's rebate is already deducted from these balances.
   // Each course has its own partner (owner, 3 Nov 2026); its line in the table says so, with the rebate.
@@ -300,7 +314,8 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
   const matches = receivedCentavos > 0 && receivedCentavos === total;
   const valid = total > 0 && !over && matches && (!refRequired || (reference.trim().length > 0 && (!!proofFile || !!proof)));
 
-  function choose(id: string) { setTraineeId(id); setAmounts({}); setExtras([]); const firstOpen = data.enrollments.find((e) => e.trainee_id === id && e.enrollment_status !== "Cancelled"); setForEnrollment(firstOpen?.id ?? ""); if (!data.enrollments.some((e) => e.trainee_id === id && e.enrollment_status !== "Cancelled" && balanceOf(e) > 0)) setAddOpen(true); }
+  // Choosing a trainee fills every unpaid course in full; ▾ › Distribute in Order handles a partial payment.
+  function choose(id: string) { setTraineeId(id); const opens = data.enrollments.filter((e) => e.trainee_id === id && e.enrollment_status !== "Cancelled" && !data.companyCharge?.[e.id] && balanceOf(e) > 0); setAmounts(Object.fromEntries(opens.map((e) => [e.id, (Math.max(0, balanceOf(e) - pending(e)) / 100).toFixed(2)]))); setReceived((opens.reduce((s, e) => s + Math.max(0, balanceOf(e) - pending(e)), 0) / 100).toFixed(2)); setExtras([]); const firstOpen = data.enrollments.find((e) => e.trainee_id === id && e.enrollment_status !== "Cancelled"); setForEnrollment(firstOpen?.id ?? ""); if (!data.enrollments.some((e) => e.trainee_id === id && e.enrollment_status !== "Cancelled" && balanceOf(e) > 0)) setAddOpen(true); }
   function fill(how: "all" | "spread" | "clear") {
     if (how === "clear") { setAmounts({}); return; }
     if (how === "all") { setAmounts(Object.fromEntries(open.map((e) => [e.id, (Math.max(0, balanceOf(e) - pending(e)) / 100).toFixed(2)]))); setReceived(((open.reduce((s, e) => s + Math.max(0, balanceOf(e) - pending(e)), 0) + extraTotal) / 100).toFixed(2)); return; }
@@ -378,20 +393,21 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
     <div className="portal-form cx-pay">
       {error && <div className="full"><Message kind="error" text={error} /></div>}
       {!group ? <div className="full cx-pick">
-        <label>Find Trainee<input autoFocus value={search} onChange={(ev) => setSearch(ev.target.value)} placeholder="Name, NWMTACI number or course" /></label>
-        <div className="cx-results">{candidates.map((g) => { const unpaid = g.enrollments.filter((e) => balanceOf(e) > 0); return <button type="button" key={g.traineeId} onClick={() => choose(g.traineeId)}><span><b>{g.name}</b><small>{unpaid.length ? unpaid.map(courseCode).join(" · ") : "All courses paid"}</small></span><strong className="cx-amt">{pesos(g.balance)}</strong></button>; })}
-          {!candidates.length && <p className="portal-empty-copy">No trainee matches.</p>}</div>
+        <label>Find Trainee<input autoFocus role="combobox" aria-expanded={!!term} aria-controls="cx-sug" autoComplete="off" value={search} placeholder="Type a name, NWMTACI No. or course"
+          onChange={(ev) => { setSearch(ev.target.value); setHi(0); }}
+          onKeyDown={(ev) => { const n = candidates.length; if (!n) return; if (ev.key === "ArrowDown") { ev.preventDefault(); setHi((hi + 1) % n); } else if (ev.key === "ArrowUp") { ev.preventDefault(); setHi((hi - 1 + n) % n); } else if (ev.key === "Enter") { ev.preventDefault(); choose(candidates[Math.min(hi, n - 1)].traineeId); } }} /></label>
+        {term ? <div className="cx-results cx-sug" id="cx-sug" role="listbox">{candidates.map((g, i) => { const unpaid = g.enrollments.filter((e) => balanceOf(e) > 0); return <button type="button" role="option" aria-selected={i === hi} className={i === hi ? "hi" : ""} key={g.traineeId} onMouseEnter={() => setHi(i)} onClick={() => choose(g.traineeId)}><span><b>{markWords(g.name, term)}</b><small>{g.number} · {unpaid.length ? unpaid.map(courseCode).join(" · ") : "All courses paid"}</small></span><strong className="cx-amt">{pesos(g.balance)}</strong></button>; })}
+          {!candidates.length && <p className="portal-empty-copy">No trainee matches “{search.trim()}”.</p>}</div> : <p className="portal-form-note">Start typing; suggestions appear with each letter.</p>}
       </div> : <>
         <div className="cx-whocard full"><div><Who name={group.name} number={group.number} /></div><div className="cx-right"><small>Balance</small><span className="cx-amt">{pesos(group.balance)}</span></div></div>
         <label>Amount Received (PHP)<input className="cx-mono" inputMode="decimal" value={received} onChange={(ev) => setReceived(ev.target.value)} placeholder="0.00" /></label>
-        <div><span className="pay-label">Apply the amount</span><div className="cx-choice"><button type="button" onClick={() => fill("all")}>Pay All in Full</button><button type="button" onClick={() => fill("spread")}>Distribute in Order</button><button type="button" onClick={() => fill("clear")}>Clear</button></div></div>
         <div className="cx-lines full"><table><thead><tr><th>Course or Charge</th><th className="r">Balance</th><th className="r">Apply</th></tr></thead><tbody>
           {open.map((e) => { const v = amounts[e.id] ?? ""; const bad = toCentavos(v) > balanceOf(e); return <tr key={e.id} className={toCentavos(v) > 0 ? "sel" : ""}><td><span className="cx-code">{courseCode(e)}</span> <small>{first(e.courses)?.name} · {scheduleText(e)}</small>{(() => { const ag = partnerOn(e); return ag ? <small className="ref-line">{ag.name} · {ag.rebate_mode === "No deduction" ? "rebate paid to the agency later" : pending(e) > 0 ? `rebate ${pesos(pending(e))} once ${pesos(balanceOf(e) - pending(e))} is paid` : "rebate deducted"}</small> : <small className="ref-line wk">{sourceLabel(e.source, null) || "Online"} · no rebate</small>; })()}</td><td className="r cx-amt">{pesos(balanceOf(e))}</td><td className="r"><input className="cx-apply" inputMode="decimal" value={v} placeholder="0.00" aria-label={`Amount for ${courseCode(e)}`} onChange={(ev) => setAmounts((cur) => ({ ...cur, [e.id]: ev.target.value }))} />{bad && <small className="cx-bad">More than the balance</small>}</td></tr>; })}
           {extras.map((x) => { const e = mine.find((m) => m.id === x.enrollmentId); return <tr key={x.key} className="misc"><td><span className="cx-code misc">{x.kind === "item" ? "Item" : "Fee"}</span> <strong>{x.description}</strong>{x.quantity > 1 ? ` x ${x.quantity}` : ""} <small>For {e ? courseCode(e) : "course"}</small></td><td className="r cx-amt">{pesos(x.unit * x.quantity)}</td><td className="r"><button type="button" className="ghost-button" onClick={() => removeExtra(x.key)}>Remove</button></td></tr>; })}
           {!open.length && !extras.length && <tr><td colSpan={3}><small>All courses are fully paid.</small></td></tr>}
         </tbody></table></div>
-        <details className="cx-addbox full" open={addOpen} onToggle={(ev) => setAddOpen((ev.target as HTMLDetailsElement).open)}>
-          <summary>Add Miscellaneous Charges</summary>
+        {addOpen && <div className="cx-addbox full">
+          <div className="cx-addhead"><b>Add Miscellaneous Charge</b><button type="button" className="cx-textbtn" onClick={() => setAddOpen(false)}>Close</button></div>
           <div className="portal-form">
             <label>Charge<select value={pick} onChange={(ev) => setPick(ev.target.value)}><option value="">Select a Charge</option>
               <option value="uniform">Uniform · {pesos(uniformPrice)}</option>
@@ -403,7 +419,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
             <label>Quantity<input className="cx-mono" inputMode="numeric" value={quantity} onChange={(ev) => setQuantity(ev.target.value)} /></label>
             <div className="cx-addbtn"><button type="button" className="portal-secondary" disabled={!pick} onClick={addExtra}>Add to Payment</button></div>
           </div>
-        </details>
+        </div>}
         <div className={`cx-tally full ${matches ? "ok" : "no"}`}><span>Applied {pesos(total)} of {pesos(receivedCentavos)}</span><span>{!receivedCentavos ? "Enter the amount received" : matches ? "Ready to record" : total < receivedCentavos ? `${pesos(receivedCentavos - total)} not applied` : `${pesos(total - receivedCentavos)} over the amount received`}</span></div>
         <div className="full"><span className="pay-label">Mode of payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{modes.map((m) => <button type="button" role="radio" aria-checked={method === m} key={m} className={method === m ? "on" : ""} onClick={() => { setMethod(m); if (!initialProof || m !== initialProof.method) setProof(null); else setProof({ id: initialProof.id, link: initialProof.drive_link ?? "", path: "", duplicate: false }); }}>{m}</button>)}</div></div>
         <label>{refRequired ? "Reference number (required)" : "Reference number"}<input className="cx-mono" value={reference} onChange={(ev) => setReference(ev.target.value.toUpperCase())} placeholder={refRequired ? `${method} reference` : "Not needed for cash"} /></label>
@@ -413,7 +429,16 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
         <label>Endorsing Agency<select value={agencyId} onChange={(ev) => setAgencyId(ev.target.value)}><option value="">None</option>{data.agencies.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
         <label>Remarks<input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} /></label>
       </>}
-      <div className="portal-form-actions full">{group && !initial && <button type="button" className="portal-secondary cx-left" onClick={() => { setTraineeId(""); setAmounts({}); setExtras([]); }}>Change Trainee</button>}<button type="button" className="portal-secondary" onClick={onClose}>Cancel</button>{group && <button type="button" className="portal-primary" disabled={!valid || busy} onClick={() => void post()}>{busy ? "Recording…" : `Record ${receivedCentavos > 0 ? pesos(receivedCentavos) : "payment"}`}</button>}</div>
+      <div className="portal-form-actions full cx-foot">{group && !initial && <button type="button" className="cx-textbtn cx-left" onClick={() => { setTraineeId(""); setAmounts({}); setExtras([]); setReceived(""); }}>Change Trainee</button>}<button type="button" className="cx-textbtn" onClick={onClose}>Cancel</button>{group && <span className="cx-split">
+        {menu && <div className="cx-splitmenu" role="menu">
+          <button type="button" role="menuitem" onClick={() => { fill("all"); setMenu(false); }}>Pay All in Full</button>
+          <button type="button" role="menuitem" onClick={() => { fill("spread"); setMenu(false); }}>Distribute in Order</button>
+          <button type="button" role="menuitem" onClick={() => { fill("clear"); setMenu(false); }}>Clear Amounts</button>
+          <hr /><button type="button" role="menuitem" onClick={() => { setAddOpen(true); setMenu(false); }}>+ Add Miscellaneous Charge</button>
+        </div>}
+        <button type="button" className="portal-primary" disabled={!valid || busy} onClick={() => void post()}>{busy ? "Recording…" : `Record ${receivedCentavos > 0 ? pesos(receivedCentavos) : "Payment"}`}</button>
+        <button type="button" className="portal-primary cx-splitdd" aria-label="More payment options" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(!menu)}>▾</button>
+      </span>}</div>
     </div>
   </Modal>;
 }
@@ -439,6 +464,8 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
     .filter((g) => g.paid === 0).sort((a, b) => a.since.localeCompare(b.since));
   // Paid and enrolled: paid in the last 7 days.
   const since = addDays(today, -6);
+  // Decided requests stay on the dashboard for 5 days only (owner, 3 Nov 2026); open ones always show.
+  const decidedSince = addDays(today, -4);
   const paidRecently = new Set(data.payments.filter((p) => day(p.received_at) >= since).map((p) => p.trainee_id));
   const paid = groupByTrainee(data, data.enrollments.filter((e) => paidRecently.has(e.trainee_id) && e.enrollment_status !== "Cancelled" && !billed(e) && paidOf(e) > 0)).sort((a, b) => a.name.localeCompare(b.name));
   const durations = new Map(data.courses.map((c) => [c.id, c.duration_label]));
@@ -459,14 +486,14 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
   const channels = [...new Set([...tileModes, ...released.map((e) => e.payment_channel ?? "Cash")])].map((m) => ({ m, in: todays.filter((p) => p.method === m).reduce((x, p) => x + Number(p.amount_centavos), 0), receipts: todays.filter((p) => p.method === m).length, out: released.filter((e) => (e.payment_channel ?? "Cash") === m).reduce((x, e) => x + Number(e.amount_centavos), 0) })).filter((c) => c.in || c.out || ["Cash", "GCash", "PSBank", "UnionBank"].includes(c.m));
   const expected = (opening?.opening_cash_centavos ?? 0) + cashIn - cashOut;
   // Approvals and requests the Cashier is waiting on: expenses, change requests and voucher reprints, newest first.
-  type Ask = { id: string; kind: string; what: string; status: "For Approval" | "Approved" | "Rejected" | "To Do"; label: string; at: string; note: string };
-  const exps = data.expenses as (PortalData["expenses"][number] & { payee?: string; voucher_number?: string | null; created_at?: string; decision_remarks?: string | null })[];
+  type Ask = { id: string; kind: string; what: string; status: "For Approval" | "Approved" | "Rejected" | "To Do"; label: string; at: string; done?: string | null; note: string };
+  const exps = data.expenses as (PortalData["expenses"][number] & { payee?: string; voucher_number?: string | null; created_at?: string; decision_remarks?: string | null; approved_at?: string | null; paid_at?: string | null })[];
   const asks: Ask[] = [
-    ...exps.map((e) => ({ id: `x${e.id}`, kind: "Expense", what: `${e.payee ?? "Expense"} · ${pesos2(Number(e.amount_centavos))}`, status: (e.status === "Pending" ? "For Approval" : e.status === "Rejected" ? "Rejected" : "Approved") as Ask["status"], label: e.status === "Pending" ? "For Approval" : e.status === "Rejected" ? "Rejected" : e.status === "Paid" ? "Released" : `Approved${e.voucher_number ? ` · ${e.voucher_number}` : ""}`, at: e.created_at ?? "", note: e.status === "Rejected" ? e.decision_remarks ?? "" : e.status === "Approved" ? "Print the voucher and release" : "" })),
+    ...exps.map((e) => ({ id: `x${e.id}`, kind: "Expense", what: `${e.payee ?? "Expense"} · ${pesos2(Number(e.amount_centavos))}`, status: (e.status === "Pending" ? "For Approval" : e.status === "Rejected" ? "Rejected" : "Approved") as Ask["status"], label: e.status === "Pending" ? "For Approval" : e.status === "Rejected" ? "Rejected" : e.status === "Paid" ? "Released" : `Approved${e.voucher_number ? ` · ${e.voucher_number}` : ""}`, at: e.created_at ?? "", done: e.paid_at ?? e.approved_at, note: e.status === "Rejected" ? e.decision_remarks ?? "" : e.status === "Approved" ? "Print the voucher and release" : "" })),
     ...data.requests.map((r) => { const en = first((r as unknown as { enrollments?: unknown }).enrollments as { trainees?: unknown; courses?: unknown } | null); const t = first(en?.trainees as { legal_first_name?: string; legal_last_name?: string } | null), c = first(en?.courses as { code?: string } | null); const stage = (r as { stage?: string }).stage;
-      return { id: `r${r.id}`, kind: r.request_type, what: `${t ? `${(t.legal_last_name ?? "").toUpperCase()}, ${t.legal_first_name ?? ""}` : r.request_number}${c?.code ? ` · ${c.code}` : ""}`, status: (r.status === "Pending" ? (stage === "With cashier" ? "To Do" : "For Approval") : r.status === "Rejected" ? "Rejected" : "Approved") as Ask["status"], label: r.status === "Pending" ? (stage === "With cashier" ? "Add Charge" : "For Approval") : r.status, at: r.created_at, note: r.status === "Rejected" ? r.decision_remarks ?? "" : "" }; }),
+      return { id: `r${r.id}`, kind: r.request_type, what: `${t ? `${(t.legal_last_name ?? "").toUpperCase()}, ${t.legal_first_name ?? ""}` : r.request_number}${c?.code ? ` · ${c.code}` : ""}`, status: (r.status === "Pending" ? (stage === "With cashier" ? "To Do" : "For Approval") : r.status === "Rejected" ? "Rejected" : "Approved") as Ask["status"], label: r.status === "Pending" ? (stage === "With cashier" ? "Add Charge" : "For Approval") : r.status, at: r.created_at, done: r.decided_at, note: r.status === "Rejected" ? r.decision_remarks ?? "" : "" }; }),
     ...(data.expenseReprints ?? []).map((v) => ({ id: `v${v.id}`, kind: "Voucher Reprint", what: v.reason, status: (v.status === "Pending" ? "For Approval" : v.status === "Rejected" ? "Rejected" : "Approved") as Ask["status"], label: v.status === "Pending" ? "For Approval" : v.status, at: v.requested_at, note: v.decision_remarks ?? "" })),
-  ].filter((x) => x.status === "For Approval" || x.status === "To Do" || day(x.at) >= since).sort((x, y) => y.at.localeCompare(x.at));
+  ].filter((x: Ask) => x.status === "For Approval" || x.status === "To Do" || day(x.done || x.at) >= decidedSince).sort((x, y) => y.at.localeCompare(x.at));
   const askShown = asks.filter((x) => reqFilter === "All" || x.status === reqFilter || (reqFilter === "For Approval" && x.status === "To Do"));
   const askP = usePaged(askShown);
   const ASK_TONE: Record<Ask["status"], string> = { "For Approval": "orange", "To Do": "pending", Approved: "active", Rejected: "cancelled" };
@@ -523,7 +550,7 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
           <span className="cx-seg">{(["All", "For Approval", "Approved", "Rejected"] as const).map((k) => <button key={k} type="button" className={reqFilter === k ? "on" : ""} onClick={() => setReqFilter(k)}>{k} <small className="cl-mono">{asks.filter((x) => k === "All" || x.status === k || (k === "For Approval" && x.status === "To Do")).length}</small></button>)}</span></div>
           {askShown.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Request</th><th>Status</th><th>Sent</th></tr></thead><tbody>
             {askP.shown.map((x) => <tr key={x.id}><td data-l="" className="lead"><b>{x.kind}</b><small>{x.what}</small></td><td data-l="Status"><Badge tone={ASK_TONE[x.status]}>{x.label}</Badge>{x.note && <small>{x.note}</small>}</td><td data-l="Sent">{fmtDate(day(x.at))}<small>{x.at ? fmtClock(x.at) : ""}</small></td></tr>)}
-          </tbody></table>{askP.pager}</div> : <p className="portal-empty-copy">No approvals or requests in the last 7 days.</p>}
+          </tbody></table>{askP.pager}</div> : <p className="portal-empty-copy">No open requests; decided ones show for 5 days.</p>}
         </section>
         {/* Paid and Enrolled (owner, 20 Oct 2026): one compact line per trainee; the TAR is printed by Registration. */}
         <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Paid and Enrolled</h2></div><span className="slot-count">{paid.length}</span></div>

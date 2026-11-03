@@ -2600,3 +2600,19 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-menu { max-height: 75vh; overflow-y: auto; }
 .nw-menu-head { margin: 10px 14px 4px; font: 600 12px var(--font-portal), sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #587184; }
 .nw-menu-head:first-child { margin-top: 4px; }
+
+/* Record Payment Design 03 · Split Primary (owner, 3 Nov 2026): type-ahead suggestions, one Record button with a ▾ menu. */
+.cx-sug button.hi { background: var(--nw-info-bg); }
+.cx-sug small { display: block; }
+.cx-mark { background: none; color: var(--nw-blue); font-weight: 800; padding: 0; }
+.cx-addhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; color: var(--nw-blue); }
+.cx-textbtn { background: none; border: 0; color: #587184; font: 600 15px var(--font-portal), sans-serif; padding: 8px 10px; cursor: pointer; border-radius: 8px; }
+.cx-textbtn:hover { background: var(--nw-soft); color: var(--nw-fg); }
+.cx-foot { align-items: center; }
+.cx-split { position: relative; display: inline-flex; }
+.nw-shell .cx-split .portal-primary:not(.cx-splitdd) { border-radius: 10px 0 0 10px; }
+.nw-shell .cx-split .cx-splitdd { border-radius: 0 10px 10px 0; border-left: 1px solid #ffffff66; padding: 8px 12px; }
+.cx-splitmenu { position: absolute; right: 0; bottom: calc(100% + 6px); min-width: 230px; background: var(--nw-surface); border: 1px solid var(--nw-line); border-radius: 12px; box-shadow: 0 14px 34px #0f263833; padding: 6px; display: flex; flex-direction: column; z-index: 5; }
+.cx-splitmenu button { background: none; border: 0; text-align: left; padding: 10px 12px; border-radius: 8px; font: 500 15px var(--font-portal), sans-serif; color: var(--nw-fg); cursor: pointer; }
+.cx-splitmenu button:hover { background: var(--nw-soft); }
+.cx-splitmenu hr { border: 0; border-top: 1px solid var(--nw-line); margin: 4px 6px; }
