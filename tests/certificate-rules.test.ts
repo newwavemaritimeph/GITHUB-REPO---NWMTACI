@@ -41,6 +41,7 @@ describe("certificate rules", () => {
     // In-House (owner, 3 Nov 2026): NWMTACI-<year>-<code>-000001, the year filled in.
     expect(formatCertificateNumber("NWMTACI-{YYYY}-HPT-", 1, 6, 2026)).toBe("NWMTACI-2026-HPT-000001");
     expect(formatCertificateNumber("NWMTACI-{YYYY}-HPT-", 1, 6, 2027)).toBe("NWMTACI-2027-HPT-000001");
+    expect(formatCertificateNumber("NWMTACI-HPT{YYYY}", 1, 6, 2026)).toBe("NWMTACI-HPT2026000001");
     expect(googleFormId("https://docs.google.com/forms/d/1FAIpQLSabcdEFGH12345/edit")).toBe("1FAIpQLSabcdEFGH12345");
     expect(googleFormId("nope")).toBeNull();
     expect(driveFileId("https://drive.google.com/file/d/1aBcDeFgHiJkLmNoPqRsTu/view?usp=sharing")).toBe("1aBcDeFgHiJkLmNoPqRsTu");
