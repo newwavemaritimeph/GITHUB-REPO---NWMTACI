@@ -8,6 +8,8 @@ import { Badge, Message, Modal, fmtDate, periodRange, usePost, usePaged } from "
 import { EXPENSE_REASONS, RejectInline } from "./reject-inline";
 import { CHANNELS, type Channel, type DaySummary, type ReconStatus } from "@/lib/reconciliation";
 import { MoveBatch } from "./move-batch";
+import { downloadCsv } from "@/lib/csv";
+import type { BatchRoster } from "@/lib/batch-roster";
 
 /**
  * Admin Assistant (owner, 9 Oct 2026): requisitions of supplies (approved by the
@@ -329,16 +331,24 @@ export function ClassSchedules({ data, reload, onOpenBatches, onCreate, canManag
   const [editing, setEditing] = useState<Batch | null>(null);
   const [cancelling, setCancelling] = useState<Batch | null>(null);
   const [done, setDone] = useState("");
+  // Course finder, search and sort (owner, 3 Nov 2026); the Batch window lists every trainee on a batch.
+  const [courseId, setCourseId] = useState(""), [q, setQ] = useState(""), [sort, setSort] = useState<"date" | "course" | "fewest" | "most">("date");
+  const [rosterOf, setRosterOf] = useState<Batch | null>(null);
   const cancels = new Map(((data as { batchCancels?: CancelInfo[] }).batchCancels ?? []).map((c) => [c.id, c]));
   const plans = new Map(upcoming(data).map((r) => [r.id, r]));
   const course = new Map(data.courses.map((c) => [c.id, c]));
-  const inPeriod = data.batches.filter((b) => !b.partner_offer_id && rangesOverlap(b.starts_on, b.ends_on, range.from, range.to)).sort((a, z) => a.starts_on.localeCompare(z.starts_on) || a.batch_number.localeCompare(z.batch_number));
+  const periodBatches = data.batches.filter((b) => !b.partner_offer_id && rangesOverlap(b.starts_on, b.ends_on, range.from, range.to)).sort((a, z) => a.starts_on.localeCompare(z.starts_on) || a.batch_number.localeCompare(z.batch_number));
+  const term = q.trim().toLowerCase();
+  const inPeriod = periodBatches.filter((b) => { if (courseId && b.course_id !== courseId) return false; if (!term) return true; const c = course.get(b.course_id), p = plans.get(b.id); return `${b.batch_number} ${c?.code ?? ""} ${c?.name ?? ""} ${p?.room?.name ?? b.venue ?? ""} ${p?.instructor?.complete_name ?? ""}`.toLowerCase().includes(term); });
+  const courseOptions = [...new Map(periodBatches.map((b) => [b.course_id, course.get(b.course_id)])).entries()].filter((x): x is [string, NonNullable<ReturnType<typeof course.get>>] => !!x[1]).sort((a, z) => a[1].code.localeCompare(z[1].code));
   const count = (s: string) => inPeriod.filter((b) => scheduleStatus(b, today) === s).length;
   const rows = inPeriod.filter((b) => filter === "All" || scheduleStatus(b, today) === filter);
   // Grouped STCW then In-House, and by course inside each group, so each course reads as one block.
   const codeOf = (b: Batch) => course.get(b.course_id)?.code ?? first(b.courses)?.code ?? "";
   const byCourse = (a: Batch, z: Batch) => codeOf(a).localeCompare(codeOf(z)) || a.starts_on.localeCompare(z.starts_on);
-  const grouped = [...rows.filter((b) => isStcw(course.get(b.course_id))).sort(byCourse), ...rows.filter((b) => !isStcw(course.get(b.course_id))).sort(byCourse)];
+  const leftOf = (b: Batch) => Math.max(0, Number(b.capacity ?? 24) - Number(b.confirmed_count ?? 0));
+  const order = sort === "course" ? byCourse : sort === "fewest" ? (a: Batch, z: Batch) => leftOf(a) - leftOf(z) || a.starts_on.localeCompare(z.starts_on) : sort === "most" ? (a: Batch, z: Batch) => leftOf(z) - leftOf(a) || a.starts_on.localeCompare(z.starts_on) : (a: Batch, z: Batch) => a.starts_on.localeCompare(z.starts_on) || codeOf(a).localeCompare(codeOf(z));
+  const grouped = [...rows.filter((b) => isStcw(course.get(b.course_id))).sort(order), ...rows.filter((b) => !isStcw(course.get(b.course_id))).sort(order)];
   // Seats (owner, 3 Nov 2026): enrolled and pending per batch from the loaded enrollments; slots left from the held seats.
   const seat = new Map<string, { enrolled: number; pending: number }>();
   for (const e of data.enrollments) { if (!e.batch_id || e.enrollment_status === "Cancelled") continue; const x = seat.get(e.batch_id) ?? { enrolled: 0, pending: 0 }; if (e.enrollment_status === "Pending") x.pending += 1; else x.enrolled += 1; seat.set(e.batch_id, x); }
@@ -348,7 +358,7 @@ export function ClassSchedules({ data, reload, onOpenBatches, onCreate, canManag
   const paged = usePaged(grouped);
   const groupOf = (b: Batch) => (isStcw(course.get(b.course_id)) ? "STCW" : "In-House");
   const groupCount = (g: string) => grouped.filter((b) => groupOf(b) === g).length;
-  return <div className="portal-page cx ac">
+  return <div className="portal-page cx ac bs-page">
     <Head title="Batch Schedules" eyebrow="Schedules">{canManage && <span className="cl-acts"><button type="button" className="portal-secondary" onClick={onCreate}>Create Schedule</button><button type="button" className="portal-primary" onClick={onOpenBatches}>Open Batches</button></span>}</Head>
     {done && <Message kind="success" text={done} />}
     {bar(`${inPeriod.length} batch${inPeriod.length === 1 ? "" : "es"}`)}
@@ -362,28 +372,69 @@ export function ClassSchedules({ data, reload, onOpenBatches, onCreate, canManag
         </dl>
       </section></div>
       <div className="ac-stack"><section className="portal-panel cx-panel"><div className="panel-heading"><h2>Batches</h2><span className="slot-count">{rows.length}</span></div>
-        <div className="cx-bar ac-bar"><span className="cx-seg">{SCHEDULE_FILTERS.map((x) => <button key={x} type="button" className={filter === x ? "on" : ""} onClick={() => setFilter(x)}>{x}</button>)}</span></div>
-        {rows.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Batch No.</th><th>Course</th><th>Dates</th><th>Room · Instructor</th><th className="r">Enrolled</th><th className="r">Pending</th><th>Slots Left</th><th>Status</th>{canManage && <th></th>}</tr></thead><tbody>
+        <div className="cx-bar ac-bar bs-tools"><span className="cx-seg">{SCHEDULE_FILTERS.map((x) => <button key={x} type="button" className={filter === x ? "on" : ""} onClick={() => setFilter(x)}>{x}</button>)}</span>
+          <label>Course<select value={courseId} onChange={(e) => setCourseId(e.target.value)}><option value="">All Courses ({periodBatches.length})</option>{(["STCW", "In-House"] as const).map((g) => { const list = courseOptions.filter(([, c]) => (isStcw(c) ? "STCW" : "In-House") === g); return list.length ? <optgroup key={g} label={`${g} Courses`}>{list.map(([id, c]) => <option key={id} value={id}>{c.code} · {c.name.length > 40 ? `${c.name.slice(0, 38)}…` : c.name} ({periodBatches.filter((b) => b.course_id === id).length})</option>)}</optgroup> : null; })}</select></label>
+          <label>Find<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Batch no., course, room, instructor" /></label>
+          <label>Sort<select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}><option value="date">Date</option><option value="course">Course</option><option value="fewest">Slots Left · Fewest First</option><option value="most">Slots Left · Most First</option></select></label></div>
+        {rows.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Batch No.</th><th>Course</th><th>Dates</th><th>Room · Instructor</th><th className="r">Enrolled</th><th className="r">Pending</th><th>Slots Left</th><th>Status</th><th></th></tr></thead><tbody>
           {paged.shown.map((b, i) => { const s = scheduleStatus(b, today), c = course.get(b.course_id), p = plans.get(b.id), cx = cancels.get(b.id); const g = groupOf(b), prev = paged.shown[i - 1];
-            const code = codeOf(b), cols = canManage ? 9 : 8, sl = left(b), st = seat.get(b.id) ?? { enrolled: 0, pending: 0 };
+            const code = codeOf(b), cols = 9, sl = left(b), st = seat.get(b.id) ?? { enrolled: 0, pending: 0 };
             return [(!prev || groupOf(prev) !== g) && <tr key={`${b.id}-g`} className="nb-group"><td colSpan={cols}>{g} · {groupCount(g)}</td></tr>,
-              (!prev || codeOf(prev) !== code) && <tr key={`${b.id}-c`} className="bs-course"><td colSpan={cols}><b>{code}</b> {c?.name ?? first(b.courses)?.name} · {courseLine(code)}</td></tr>,
+              sort === "course" && (!prev || codeOf(prev) !== code) && <tr key={`${b.id}-c`} className="bs-course"><td colSpan={cols}><b>{code}</b> {c?.name ?? first(b.courses)?.name} · {courseLine(code)}</td></tr>,
               <tr key={b.id} className={s === "Cancelled" ? "cs-cancelled" : undefined}>
-                <td><b className="cl-mono">{b.batch_number}</b></td>
-                <td><b>{c?.code ?? first(b.courses)?.code}</b><small>{c?.name ?? first(b.courses)?.name}</small></td>
+                <td><button type="button" className="bs-open cl-mono" onClick={() => setRosterOf(b)} title="View the trainees on this batch">{b.batch_number}</button></td>
+                <td className="bs-name"><b>{c?.code ?? first(b.courses)?.code}</b><small title={c?.name ?? first(b.courses)?.name}>{c?.name ?? first(b.courses)?.name}</small></td>
                 <td>{spanOf({ startsOn: b.starts_on, endsOn: b.ends_on })}</td>
                 <td>{p?.room?.name ?? "No room"}<small>{p?.instructor?.complete_name ?? "No instructor"}</small></td>
                 <td className="r cl-mono">{st.enrolled}</td><td className="r cl-mono">{st.pending}</td>
                 <td><span className="bs-seat"><b className="cl-mono">{sl}</b> / {b.capacity}<span className={`bs-bar${sl === 0 ? " full" : sl <= 3 ? " low" : ""}`}><i style={{ width: `${Math.min(100, (Number(b.confirmed_count ?? 0) / Math.max(1, Number(b.capacity ?? 24))) * 100)}%` }} /></span></span></td>
                 <td><Badge tone={STATUS_TONE[s]}>{s === "Open" && sl > 0 && sl <= 3 ? "Almost Full" : s}</Badge>{s === "Cancelled" && cx ? <small>{cx.cancel_reason}{first(cx.canceller)?.complete_name ? ` · ${first(cx.canceller)?.complete_name}` : ""}{cx.cancelled_at ? ` · ${fmtDate(day(cx.cancelled_at))}` : ""}</small> : null}{s !== "Cancelled" && !b.published_at ? <small>Not on the public form</small> : null}</td>
-                {canManage && <td>{s !== "Cancelled" && s !== "Ended" && <span className="cl-acts"><button type="button" className="portal-secondary" onClick={() => setEditing(b)}>Edit</button>{s !== "Ongoing" && <button type="button" className="portal-secondary cs-danger" onClick={() => setCancelling(b)}>Cancel Batch</button>}</span>}</td>}
+                <td><span className="cl-acts"><button type="button" className="portal-secondary" onClick={() => setRosterOf(b)}>View</button>{canManage && s !== "Cancelled" && s !== "Ended" && <><button type="button" className="portal-secondary" onClick={() => setEditing(b)}>Edit Batch</button>{s !== "Ongoing" && <button type="button" className="portal-secondary cs-danger" onClick={() => setCancelling(b)}>Cancel Batch</button>}</>}</span></td>
               </tr>]; })}
         </tbody></table>{paged.pager}</div> : <p className="portal-empty-copy">No batches in this period.</p>}
       </section></div>
     </div>
+    {rosterOf && <BatchRosterModal batch={rosterOf} onClose={() => setRosterOf(null)} />}
     {editing && <EditBatch batch={editing} code={course.get(editing.course_id)?.code ?? ""} durationLabel={course.get(editing.course_id)?.duration_label ?? "1 day"} reload={reload} onClose={() => setEditing(null)} onDone={(t) => { setDone(t); setEditing(null); }} />}
     {cancelling && <CancelBatch data={data} batch={cancelling} code={course.get(cancelling.course_id)?.code ?? ""} today={today} reload={reload} onClose={() => setCancelling(null)} onDone={(t) => { setDone(t); setCancelling(null); }} />}
   </div>;
+}
+
+/** Every trainee on one batch, from the database (owner, 3 Nov 2026): Copy List, Excel and PDF. */
+function BatchRosterModal({ batch, onClose }: { batch: Batch; onClose: () => void }) {
+  const [roster, setRoster] = useState<BatchRoster | null>(null), [error, setError] = useState(""), [find, setFind] = useState(""), [note, setNote] = useState(""), [copyBox, setCopyBox] = useState("");
+  useEffect(() => { let live = true; fetch(`/api/staff/batch-roster?batchId=${batch.id}`, { cache: "no-store" }).then(async (r) => { const b = await r.json(); if (!r.ok) throw new Error(b.error ?? "Could not load the trainees."); if (live) setRoster(b as BatchRoster); }).catch((e: unknown) => { if (live) setError(e instanceof Error ? e.message : "Could not load the trainees."); }); return () => { live = false; }; }, [batch.id]);
+  const t = find.trim().toLowerCase();
+  const rows = (roster?.rows ?? []).filter((r) => !t || `${r.name} ${r.nwmtaciNo} ${r.srn} ${r.mobile}`.toLowerCase().includes(t));
+  const payText = (r: BatchRoster["rows"][number]) => (r.payment === "Balance" ? `Balance ${pesos2(r.balanceCentavos)}` : r.payment);
+  const b = roster?.batch, enrolled = (roster?.rows ?? []).filter((r) => r.status !== "Pending").length, pending = (roster?.rows.length ?? 0) - enrolled;
+  async function copy() {
+    const text = (roster?.rows ?? []).map((r, i) => `${i + 1}. ${r.name} · ${r.nwmtaciNo}`).join("\n");
+    try { await navigator.clipboard.writeText(text); setCopyBox(""); setNote(`Copied ${roster?.rows.length ?? 0} names. Paste them in Messenger or Viber.`); } catch { setCopyBox(text); }
+  }
+  const csv = () => roster && downloadCsv(`batch-${roster.batch.batchNumber}.csv`, [["#", "Trainee", "NWMTACI No.", "SRN", "Rank", "Mobile", "Email", "Source", "Status", "Payment", "Requirements"], ...roster.rows.map((r, i) => [i + 1, r.name, r.nwmtaciNo, r.srn, r.rank, r.mobile, r.email, r.source, r.status, payText(r), `${r.requirements} of 4`])]);
+  return <Modal title={`Batch ${batch.batch_number}`} onClose={onClose} wide><div className="portal-form br">
+    {error && <Message kind="error" text={error} />}
+    {note && <Message kind="success" text={note} />}
+    {!roster && !error && <p className="portal-empty-copy">Loading the trainees…</p>}
+    {b && <>
+      <div className="br-head full">
+        <div><span>Course</span><b>{b.code}</b><small>{b.course}</small></div>
+        <div><span>Dates</span><b>{spanOf({ startsOn: b.startsOn, endsOn: b.endsOn })}</b><small>{[b.dailyStart?.slice(0, 5), b.dailyEnd?.slice(0, 5)].filter(Boolean).join(" – ") || "8:00 – 17:00"}</small></div>
+        <div><span>Room · Instructor</span><b>{b.room ?? "To be assigned"}</b><small>{b.instructor ?? "No instructor yet"}</small></div>
+        <div><span>Trainees</span><b>{enrolled} enrolled · {pending} pending</b><small>{Math.max(0, b.capacity - b.held)} slots left of {b.capacity}</small></div>
+      </div>
+      <div className="br-tools full"><label>Find<input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Name, NWMTACI No., SRN, mobile" /></label><span className="br-acts"><button type="button" className="portal-secondary" disabled={!roster.rows.length} onClick={() => void copy()}>Copy List</button><button type="button" className="portal-secondary" disabled={!roster.rows.length} onClick={csv}>Download Excel</button><a className="portal-primary" href={`/api/documents/batch-roster?batchId=${batch.id}`} target="_blank" rel="noreferrer">Print / Save PDF</a></span></div>
+      {copyBox && <div className="sa-copybox full"><textarea readOnly rows={Math.min(14, copyBox.split("\n").length + 1)} value={copyBox} onFocus={(e) => e.currentTarget.select()} aria-label="Trainee list to copy" /><button type="button" className="portal-secondary" onClick={() => setCopyBox("")}>Close</button></div>}
+      <div className="cl-wrap full"><table className="cl-log"><thead><tr><th>#</th><th>Trainee</th><th>NWMTACI No.</th><th>SRN</th><th>Rank</th><th>Mobile</th><th>Source</th><th>Status</th><th>Payment</th><th>Requirements</th></tr></thead><tbody>
+        {rows.map((r, i) => <tr key={r.enrollmentId}><td>{i + 1}</td><td><b>{r.name}</b></td><td className="cl-mono">{r.nwmtaciNo}</td><td className="cl-mono">{r.srn || "—"}</td><td>{r.rank || "—"}</td><td className="cl-mono">{r.mobile || "—"}</td><td>{r.source}</td>
+          <td><Badge tone={r.status === "Pending" ? "orange" : "active"}>{r.status}</Badge></td>
+          <td><Badge tone={r.payment === "Paid" ? "active" : r.payment === "Company Charge" ? "blue" : r.payment === "Balance" ? "orange" : "red"}>{payText(r)}</Badge></td><td>{r.requirements} of 4</td></tr>)}
+        {!rows.length && <tr><td colSpan={10} className="portal-empty-copy">{roster.rows.length ? "No trainee matches." : "No trainees on this batch yet."}</td></tr>}
+      </tbody></table></div>
+      <p className="portal-form-note full">Cancelled enrollments are left out.</p>
+    </>}
+  </div></Modal>;
 }
 
 const manilaLocal = (iso?: string | null) => (iso ? new Date(iso).toLocaleString("sv-SE", { timeZone: "Asia/Manila" }).slice(0, 16).replace(" ", "T") : "");

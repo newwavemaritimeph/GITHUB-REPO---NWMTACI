@@ -33,6 +33,7 @@
 .note{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
 </style>
+<style>.toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:end;padding:0 20px 14px}.toolbar label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}.toolbar select,.toolbar input{border:1px solid var(--line);border-radius:9px;padding:7px 10px;background:var(--surface);color:var(--fg);min-width:180px}td.cname{max-width:240px}td.cname small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted);font-size:12.5px}.linkb{background:none;border:0;padding:0;color:var(--blue);font-weight:600;text-decoration:underline;cursor:pointer}.rmodal-bg{position:fixed;inset:0;background:#0007;display:flex;align-items:flex-start;justify-content:center;z-index:30;overflow:auto;padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}.rmodal{background:var(--surface);border:1px solid var(--line);border-radius:14px;max-width:1100px;width:100%;padding:18px 20px}.rhead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.rhead small{color:var(--muted)}</style>
 <style>
 .bar{height:8px;border-radius:99px;background:var(--soft);overflow:hidden;min-width:90px}.bar i{display:block;height:100%;background:var(--blue)}.bar.full i{background:var(--bad)}.bar.low i{background:var(--orange)}
 .cert{border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:18px 22px;display:grid;gap:6px;max-width:640px}
@@ -46,7 +47,7 @@
 .ro{color:var(--muted)}
 </style>
 <header class="top"><div class="w">
-  <div class="brand"><div class="logo"><div class="mark">NW</div><div><b>New <span>Wave</span> Portal <span class="proto">PROTOTYPE</span></b><small>Batch Schedules with seats · automatic certificate numbers</small></div></div></div>
+  <div class="brand"><div class="logo"><div class="mark">NW</div><div><b>New <span>Wave</span> Portal <span class="proto">PROTOTYPE</span></b><small>Batch Schedules · course finder · batch trainee list</small></div></div></div>
   <nav class="tabs" id="tabs"></nav>
 </div></header>
 <main class="page"><div class="w" id="view"></div></main>
@@ -74,27 +75,40 @@ for (let d = TODAY; d <= "2026-11-30"; d = add(d, 1)) {
 const IH = [["HPT", "Hydraulic Pressure Testing", 2, [4, 18]], ["ABC", "Awareness on Basic Computer", 1, [6, 13, 20, 27]], ["ESEA", "Enclosed Space Entry Awareness", 1, [7, 21]]];
 for (const [code, , days, dates] of IH) for (const day of dates) { const d = `2026-11-${String(day).padStart(2, "0")}`; const held = seats[k++ % seats.length]; const pending = Math.min(held, k % 3); BATCHES.push({ code, no: `BCH-2026-${String(nB++).padStart(4, "0")}`, start: d, end: add(d, days - 1), held, enrolled: held - pending, pending, ih: true }); }
 const ROOMS = ["Room 101 · Capt. Reyes", "Room 102 · Engr. Santos", "Room 304 · Capt. Lim", "Not yet assigned"];
-const S = { tab: "Batch Schedules", period: "Weekly", filter: "All" };
+BATCHES.forEach((x, i) => (x.room = ROOMS[i % ROOMS.length]));
+const S = { tab: "Batch Schedules", period: "Monthly", filter: "All", course: "", q: "", sort: "Date" };
 const TABS = ["Batch Schedules", "Registration Dashboard"];
 const range = () => S.period === "Weekly" ? [TODAY, "2026-11-08"] : S.period === "Every 2 Weeks" ? [TODAY, "2026-11-15"] : [TODAY, "2026-11-30"];
 const barCls = (left) => (left === 0 ? "full" : left <= 3 ? "low" : "");
 const statusOf = (x) => (24 - x.held === 0 ? "Full" : "Open");
 function batches() {
   const [a, b] = range();
+  const allCourses = [...STCW.map(([c, n]) => [c, n, "STCW"]), ...IH.map(([c, n]) => [c, n, "In-House"])];
+  const nameOf = (c) => (allCourses.find((x) => x[0] === c) ?? [c, c])[1];
   const inRange = BATCHES.filter((x) => x.start >= a && x.start <= b);
-  const list = inRange.filter((x) => S.filter === "All" || statusOf(x) === S.filter);
+  // Course finder and search (owner, 3 Nov 2026): narrow before the status chips, so every count follows.
+  const term = S.q.trim().toLowerCase();
+  const base = inRange.filter((x) => (!S.course || x.code === S.course) && (!term || `${x.no} ${x.code} ${nameOf(x.code)} ${x.room}`.toLowerCase().includes(term)));
+  const list = base.filter((x) => S.filter === "All" || statusOf(x) === S.filter);
   const tot = (r) => ({ batches: r.length, enrolled: r.reduce((s, x) => s + x.enrolled, 0), pending: r.reduce((s, x) => s + x.pending, 0), left: r.reduce((s, x) => s + 24 - x.held, 0) });
   const all = tot(list);
   const groups = [["STCW", STCW], ["In-House", IH.map(([c, n]) => [c, n])]];
-  return `<div class="cx-head"><div><span class="eyebrow">Registration · Cashier · Admin · Admin Assistant</span><h1>Batch Schedules</h1></div><div style="display:flex;gap:8px"><button class="btn">Open Batches</button><button class="btn pri">Create Schedule</button></div></div>
-  <div style="display:flex;gap:10px;flex-wrap:wrap"><div class="seg">${["Weekly", "Every 2 Weeks", "Monthly"].map((p) => `<button class="${S.period === p ? "on" : ""}" data-p="${p}">${p}</button>`).join("")}</div>
-  <div class="seg">${["All", "Open", "Full"].map((f) => `<button class="${S.filter === f ? "on" : ""}" data-f="${f}">${f} <small>${inRange.filter((x) => f === "All" || statusOf(x) === f).length}</small></button>`).join("")}</div></div>
+  const sorter = S.sort === "Slots least" ? (p, q) => (24 - p.held) - (24 - q.held) || p.start.localeCompare(q.start) : S.sort === "Slots most" ? (p, q) => (24 - q.held) - (24 - p.held) || p.start.localeCompare(q.start) : S.sort === "Course" ? (p, q) => p.code.localeCompare(q.code) || p.start.localeCompare(q.start) : (p, q) => p.start.localeCompare(q.start) || p.code.localeCompare(q.code);
+  const row = (x) => { const left = 24 - x.held; return `<tr><td><button class="linkb mono" data-open="${BATCHES.indexOf(x)}">${x.no}</button></td><td class="cname"><b>${x.code}</b><small title="${nameOf(x.code)}">${nameOf(x.code)}</small></td><td>${fmt(x.start)}${x.end !== x.start ? " – " + fmt(x.end) : ""}</td><td>${x.room}</td><td class="r amt">${x.enrolled}</td><td class="r amt">${x.pending}</td><td class="r amt"><b>${left}</b> / 24</td><td><div class="bar ${barCls(left)}"><i style="width:${(x.held / 24) * 100}%"></i></div></td><td>${left === 0 ? '<span class="pill due">Full</span>' : left <= 3 ? '<span class="pill dueo">Almost Full</span>' : '<span class="pill paid">Open</span>'}</td><td><div style="display:flex;gap:6px"><button class="btn" data-open="${BATCHES.indexOf(x)}">Trainees</button><button class="btn">Edit</button><button class="btn">Cancel</button></div></td></tr>`; };
+  const opt = (g) => allCourses.filter((x) => x[2] === g).map(([c, n]) => { const cnt = inRange.filter((x) => x.code === c).length; return `<option value="${c}" ${S.course === c ? "selected" : ""}>${c} · ${n.length > 34 ? n.slice(0, 32) + "…" : n} (${cnt})</option>`; }).join("");
+  return `<div class="cx-head"><div><span class="eyebrow">Schedules</span><h1>Batch Schedules</h1></div><div style="display:flex;gap:8px"><button class="btn">Open Batches</button><button class="btn pri">Create Schedule</button></div></div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap"><div class="seg">${["Weekly", "Every 2 Weeks", "Monthly"].map((p) => `<button class="${S.period === p ? "on" : ""}" data-p="${p}">${p}</button>`).join("")}</div></div>
   <div class="sum" style="padding:0 0 16px"><div class="cbox"><span>Batches</span><b>${all.batches}</b></div><div class="cbox"><span>Enrolled</span><b>${all.enrolled}</b></div><div class="cbox"><span>Pending (holding a seat)</span><b>${all.pending}</b></div><div class="cbox"><span>Slots Left</span><b>${all.left}</b></div></div>
-  <section class="panel"><div class="cwrap"><table><thead><tr><th>Batch No.</th><th>Dates</th><th>Room · Instructor</th><th class="r">Enrolled</th><th class="r">Pending</th><th class="r">Slots Left</th><th>Seats</th><th>Status</th><th></th></tr></thead><tbody>
-  ${groups.map(([g, courses]) => { const rowsG = list.filter((x) => courses.some(([c]) => c === x.code)); if (!rowsG.length) return ""; return `<tr class="grp"><td colspan="9" style="background:var(--th)!important;color:var(--thc)">${g} Courses</td></tr>` + courses.map(([c, name]) => { const r = rowsG.filter((x) => x.code === c); if (!r.length) return ""; const t = tot(r);
-    return `<tr class="grp"><td colspan="9"><span class="code">${c}</span> ${name.length > 60 ? name.slice(0, 58) + "…" : name} · ${t.batches} batch${t.batches === 1 ? "" : "es"} · ${t.enrolled} enrolled · ${t.left} slots left</td></tr>` +
-      r.map((x, i) => { const left = 24 - x.held; return `<tr><td class="mono">${x.no}</td><td>${fmt(x.start)}${x.end !== x.start ? " – " + fmt(x.end) : ""}</td><td>${ROOMS[(i + x.held) % ROOMS.length]}</td><td class="r amt">${x.enrolled}</td><td class="r amt">${x.pending}</td><td class="r amt"><b>${left}</b> / 24</td><td><div class="bar ${barCls(left)}"><i style="width:${(x.held / 24) * 100}%"></i></div></td><td>${left === 0 ? '<span class="pill due">Full</span>' : left <= 3 ? '<span class="pill dueo">Almost Full</span>' : '<span class="pill paid">Open</span>'}</td><td><div style="display:flex;gap:6px"><button class="btn">Edit</button><button class="btn">Cancel Batch</button></div></td></tr>`; }).join(""); }).join(""); }).join("")}
-  </tbody></table></div><p class="note" style="padding-top:12px">Edit and Cancel Batch show for the Admin and Admin Assistant; Registration and the Cashier see the same list without them.</p></section>`;
+  <section class="panel"><div class="ph"><h2>Batches</h2><small>${list.length}</small></div>
+  <div class="toolbar"><div class="seg" style="margin:0">${["All", "Open", "Full"].map((f) => `<button class="${S.filter === f ? "on" : ""}" data-f="${f}">${f} <small>${base.filter((x) => f === "All" || statusOf(x) === f).length}</small></button>`).join("")}</div>
+    <label>Course<select id="course"><option value="">All Courses (${inRange.length})</option><optgroup label="STCW Courses">${opt("STCW")}</optgroup><optgroup label="In-House Courses">${opt("In-House")}</optgroup></select></label>
+    <label>Find<input id="q" value="${S.q}" placeholder="Batch no., course, room, instructor"></label>
+    <label>Sort<select id="sort">${[["Date", "Date"], ["Course", "Course"], ["Slots least", "Slots Left · Fewest First"], ["Slots most", "Slots Left · Most First"]].map(([v, t]) => `<option value="${v}" ${S.sort === v ? "selected" : ""}>${t}</option>`).join("")}</select></label></div>
+  <div class="cwrap"><table><thead><tr><th>Batch No.</th><th>Course</th><th>Dates</th><th>Room · Instructor</th><th class="r">Enrolled</th><th class="r">Pending</th><th class="r">Slots Left</th><th>Seats</th><th>Status</th><th></th></tr></thead><tbody>
+  ${groups.map(([g, courses]) => { const rowsG = list.filter((x) => courses.some(([c]) => c === x.code)).sort(sorter); if (!rowsG.length) return ""; const head = `<tr class="grp"><td colspan="10" style="background:var(--th)!important;color:var(--thc)">${g} Courses</td></tr>`;
+    if (S.sort !== "Course") return head + rowsG.map(row).join("");
+    return head + courses.map(([c, name]) => { const r = rowsG.filter((x) => x.code === c); if (!r.length) return ""; const t = tot(r); return `<tr class="grp"><td colspan="10"><span class="code">${c}</span> ${name.length > 60 ? name.slice(0, 58) + "…" : name} · ${t.batches} batch${t.batches === 1 ? "" : "es"} · ${t.enrolled} enrolled · ${t.left} slots left</td></tr>` + r.map(row).join(""); }).join(""); }).join("") || `<tr><td colspan="10" class="ro">No batches match.</td></tr>`}
+  </tbody></table></div><p class="note" style="padding-top:12px">Edit and Cancel show for the Admin and Admin Assistant only.</p></section>`;
 }
 function dash() {
   const next = STCW.map(([c, name]) => ({ c, name, b: BATCHES.find((x) => x.code === c && x.held < 24) }));
@@ -113,5 +127,44 @@ function render() {
   document.getElementById("view").innerHTML = S.tab === "Batch Schedules" ? batches() : dash();
 }
 document.addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; if (b.dataset.tab) S.tab = b.dataset.tab; if (b.dataset.p) S.period = b.dataset.p; if (b.dataset.f) S.filter = b.dataset.f; if (b.dataset.go) S.tab = b.dataset.go; render(); });
+document.addEventListener("change", (e) => { if (e.target.id === "course") S.course = e.target.value; if (e.target.id === "sort") S.sort = e.target.value; render(); });
+document.addEventListener("input", (e) => { if (e.target.id !== "q") return; S.q = e.target.value; render(); const el = document.getElementById("q"); el.focus(); el.setSelectionRange(S.q.length, S.q.length); });
+// Batch window (owner, 3 Nov 2026): open a batch and see every trainee on it. Sample names only.
+document.body.insertAdjacentHTML("beforeend", '<div id="modal"></div><div id="toast" class="toast" hidden></div>');
+const NAMES = ["DELA CRUZ, Juan P.", "SANTOS, Maria L.", "REYES, Paolo M.", "GARCIA, Ana B.", "TAN, Mark L.", "VILLAR, Noel S.", "LIM, Grace C.", "CRUZ, Ramon A.", "BAUTISTA, Jose R.", "MENDOZA, Carlo D.", "AQUINO, Rey T.", "FLORES, Ken G.", "NAVARRO, Liza P.", "TORRES, Ben S.", "RAMOS, Joy V.", "CASTRO, Leo M.", "PASCUAL, Ivy N.", "OCAMPO, Dan R.", "SALAZAR, Mia K.", "DOMINGO, Raul F.", "MERCADO, Tess A.", "ROXAS, Gino B.", "VALDEZ, Rica D.", "LUNA, Paul E."];
+const SOURCES = ["Online", "Walk-In", "Consultancy · Marine Force", "Agency · Costa Maritime"];
+const RANKS = ["Able Seaman", "Oiler", "Messman", "Ordinary Seaman", "Cook"];
+function rosterOf(x) {
+  const seed = BATCHES.indexOf(x) * 5;
+  return Array.from({ length: x.held }, (_, i) => {
+    const enrolled = i < x.enrolled, src = SOURCES[(i + seed) % SOURCES.length], cc = src.includes("Marine Force");
+    return { name: NAMES[(i + seed) % NAMES.length], no: `NWMTACI-${String(412 + seed + i).padStart(7, "0")}`, srn: `SRN-${String(1234500 + seed * 7 + i * 13).slice(-7)}`, rank: RANKS[(i + seed) % RANKS.length], mobile: `0917 55${String(10 + i).padStart(2, "0")} ${String(140 + seed + i).slice(-3)}`,
+      src, status: enrolled ? "Enrolled" : "Pending", pay: cc ? "Company Charge" : !enrolled ? "Not paid yet" : (i + seed) % 3 === 0 ? "Balance ₱650.00" : "Paid", req: enrolled ? "4 of 4" : `${(i % 3) + 1} of 4` };
+  }).sort((p, q) => (p.status === q.status ? 0 : p.status === "Enrolled" ? -1 : 1));
+}
+const toastMsg = (t) => { const el = document.getElementById("toast"); el.textContent = t; el.hidden = false; clearTimeout(toastMsg.t); toastMsg.t = setTimeout(() => (el.hidden = true), 2800); };
+let openBatch = null, rq = "";
+function renderRoster() {
+  const m = document.getElementById("modal"); if (!openBatch) { m.innerHTML = ""; return; }
+  const x = openBatch, all = rosterOf(x), term = rq.trim().toLowerCase();
+  const rows = all.filter((r) => !term || `${r.name} ${r.no} ${r.srn} ${r.mobile}`.toLowerCase().includes(term));
+  const name = ([...STCW, ...IH].find((c) => c[0] === x.code) ?? [x.code, x.code])[1];
+  const payPill = (p) => p === "Paid" ? '<span class="pill paid">Paid</span>' : p === "Company Charge" ? '<span class="pill appr">Company Charge</span>' : p.startsWith("Balance") ? `<span class="pill dueo">${p}</span>` : `<span class="pill due">${p}</span>`;
+  m.innerHTML = `<div class="rmodal-bg"><div class="rmodal"><div class="rhead"><div><span class="eyebrow">Batch</span><h2>${x.no} · ${x.code}</h2><small>${name}</small></div><button class="btn" data-close="1">Close</button></div>
+    <div class="sum" style="padding:12px 0"><div class="cbox"><span>Dates</span><b style="font-size:15px">${fmt(x.start)}${x.end !== x.start ? " – " + fmt(x.end) : ""}</b><small>8:00 AM – 5:00 PM</small></div><div class="cbox"><span>Room · Instructor</span><b style="font-size:15px">${x.room}</b></div><div class="cbox"><span>Enrolled · Pending</span><b>${x.enrolled} · ${x.pending}</b></div><div class="cbox"><span>Slots Left</span><b>${24 - x.held} / 24</b></div></div>
+    <div class="toolbar" style="padding:0 0 12px"><label>Find<input id="rq" value="${rq}" placeholder="Name, NWMTACI No., SRN, mobile"></label><span style="flex:1"></span><button class="btn" data-copy="1">Copy List</button><button class="btn" data-csv="1">Download Excel</button><button class="btn pri" data-pdf="1">Print / Save PDF</button></div>
+    <div class="cwrap"><table><thead><tr><th>#</th><th>Trainee</th><th>NWMTACI No.</th><th>SRN</th><th>Rank</th><th>Mobile</th><th>Source</th><th>Status</th><th>Payment</th><th>Requirements</th></tr></thead><tbody>
+    ${rows.map((r, i) => `<tr><td>${i + 1}</td><td><b>${r.name}</b></td><td class="mono">${r.no}</td><td class="mono">${r.srn}</td><td>${r.rank}</td><td class="mono">${r.mobile}</td><td>${r.src}</td><td>${r.status === "Enrolled" ? '<span class="pill paid">Enrolled</span>' : '<span class="pill dueo">Pending</span>'}</td><td>${payPill(r.pay)}</td><td>${r.req}</td></tr>`).join("") || `<tr><td colspan="10" class="ro">${all.length ? "No trainee matches." : "No trainees on this batch yet."}</td></tr>`}
+    </tbody></table></div><p class="note" style="padding:10px 0 0">Cancelled enrollments are left out. The list comes straight from the database, so every trainee on the batch is shown.</p></div></div>`;
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  if (b.dataset.open !== undefined) { openBatch = BATCHES[+b.dataset.open]; rq = ""; renderRoster(); }
+  if (b.dataset.close) { openBatch = null; renderRoster(); }
+  if (b.dataset.copy && openBatch) { const text = rosterOf(openBatch).map((r, i) => `${i + 1}. ${r.name} · ${r.no}`).join("\n"); (navigator.clipboard ? navigator.clipboard.writeText(text) : Promise.reject()).then(() => toastMsg(`Copied ${rosterOf(openBatch).length} names. Paste them in Messenger or Viber.`)).catch(() => toastMsg("Copy is blocked here; in the portal the list is copied.")); }
+  if (b.dataset.csv) toastMsg("In the portal this downloads the batch list as an Excel (CSV) file.");
+  if (b.dataset.pdf) toastMsg("In the portal this opens the A4 roster PDF: letterhead, batch details, numbered list, Prepared by / Noted by.");
+});
+document.addEventListener("input", (e) => { if (e.target.id !== "rq") return; rq = e.target.value; renderRoster(); const el = document.getElementById("rq"); el.focus(); el.setSelectionRange(rq.length, rq.length); });
 render();
 </script>

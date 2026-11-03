@@ -2516,3 +2516,30 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .bs-bar i{display:block;height:100%;background:#0571D0}
 .portal-shell .bs-bar.low i{background:#F25615}
 .portal-shell .bs-bar.full i{background:#b42318}
+/* Batch Schedules finder and Batch window (owner, 3 Nov 2026). */
+.portal-shell .bs-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.portal-shell .bs-tools label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:#587184}
+.portal-shell .bs-tools select,.portal-shell .bs-tools input{height:36px;border:1px solid #cfdbe3;border-radius:8px;padding:0 10px;background:#fff;color:#0f2638;font-size:14px;min-width:180px}
+.portal-shell .bs-open{background:none;border:0;padding:0;font-weight:700;color:#0571D0;text-decoration:underline;cursor:pointer}
+.portal-shell .cl-log td.bs-name{max-width:220px}
+.portal-shell .cl-log td.bs-name small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.portal-shell .br .br-head{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.portal-shell .br .br-head>div{border:1px solid #dbe5ec;border-radius:10px;padding:8px 12px;background:#f3f8fb;min-width:0}
+.portal-shell .br .br-head span{display:block;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#587184}
+.portal-shell .br .br-head b{display:block;font-size:14px}
+.portal-shell .br .br-head small{color:#587184;font-size:12px}
+.portal-shell .br .br-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;justify-content:space-between}
+.portal-shell .br .br-tools label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:#587184;min-width:240px}
+.portal-shell .br .br-acts{display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:760px){.portal-shell .br .br-head{grid-template-columns:1fr 1fr}}
+/* Batch Schedules table: compact, so every column fits on a laptop (owner, 3 Nov 2026). */
+.portal-shell .bs-tools + .cl-wrap .cl-log th,.portal-shell .bs-tools + .cl-wrap .cl-log td{padding:7px 8px}
+.portal-shell .bs-tools + .cl-wrap .cl-log th{letter-spacing:.03em}
+.portal-shell .bs-tools + .cl-wrap .cl-acts{flex-wrap:wrap;gap:4px}
+.portal-shell .bs-tools + .cl-wrap .cl-acts .portal-secondary{padding:3px 9px;font-size:12.5px;min-height:0;height:auto}
+.portal-shell .bs-tools + .cl-wrap .bs-bar{width:52px}
+.portal-shell .bs-tools + .cl-wrap td.bs-name{max-width:170px}
+/* Batch Schedules: the period summary sits above the table as one line, so the table gets the full width. */
+.portal-shell .bs-page .ac-rail{grid-template-columns:1fr}
+.portal-shell .bs-page .cs-lines{display:flex;flex-wrap:wrap;gap:4px 28px}
+.portal-shell .bs-page .cs-lines>div{border:0;padding:2px 0;gap:8px;justify-content:flex-start}
