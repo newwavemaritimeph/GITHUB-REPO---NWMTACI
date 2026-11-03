@@ -2571,3 +2571,23 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .cs-edit{display:inline-flex;flex-direction:column;gap:4px;min-width:0}
 .portal-shell .cs-edit select{height:30px;border:1px solid #bcdcf7;border-radius:7px;padding:0 6px;background:#fff;color:#123F63;font-size:13px;max-width:190px}
 .portal-shell .cx-lines small.ref-line.wk{color:#0a7a3e}
+/* Accounting Dashboard Design 06 · Rail + Briefing (owner, 3 Nov 2026). */
+.portal-shell .ad-split{display:grid;grid-template-columns:290px minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:900px){.portal-shell .ad-split{grid-template-columns:1fr}}
+.portal-shell .ad-rail{padding-bottom:8px}
+.portal-shell .ad-grp{padding:2px 10px 8px}
+.portal-shell .ad-grp-h{display:block;font-size:12px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:#0571D0;padding:8px 10px 4px}
+.portal-shell .ad-grp button{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;border:0;background:none;padding:9px 10px;border-radius:9px;text-align:left;color:#0f2638;font-weight:500;font-size:15px}
+.portal-shell .ad-grp button:hover{background:#f2f7fa}
+.portal-shell .ad-grp button.on{background:#e5f1fb;color:#0571D0;font-weight:600}
+.portal-shell .ad-grp button small{display:block;font-weight:400;color:#5f7180;font-size:12.5px}
+.portal-shell .ad-grp button b{min-width:26px;text-align:center;font:600 12.5px var(--font-geist-mono,monospace);background:#F25615;color:#fff;border-radius:99px;padding:1px 8px}
+.portal-shell .ad-grp button b.zero{background:#e6edf2;color:#5f7180}
+.portal-shell .ad-cash{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;padding:0 16px 14px}
+.portal-shell .ad-cash>div{border:1px solid #dbe6ec;border-radius:10px;padding:9px 12px;display:flex;flex-direction:column;gap:2px}
+.portal-shell .ad-cash span{font-size:12.5px;color:#5f7180}.portal-shell .ad-cash b{font:600 16px var(--font-geist-mono,monospace);color:#0f2638}.portal-shell .ad-cash b.minus{color:#b42318}.portal-shell .ad-cash small{color:#5f7180;font-size:12.5px}
+.portal-shell .ad-strip{display:flex;flex-wrap:wrap;gap:10px 22px;padding:12px 16px;border-top:1px solid #e3ecf0;margin-top:8px}
+.portal-shell .ad-strip>div{display:flex;flex-direction:column;gap:1px;min-width:120px}
+.portal-shell .ad-strip span,.portal-shell .ad-strip button{font-size:12.5px;color:#5f7180;background:none;border:0;padding:0;text-align:left}
+.portal-shell .ad-strip button{color:#0571D0;text-decoration:underline;cursor:pointer}
+.portal-shell .ad-strip b{font:600 15px var(--font-geist-mono,monospace);color:#0f2638}.portal-shell .ad-strip small{color:#5f7180;font-size:12px}

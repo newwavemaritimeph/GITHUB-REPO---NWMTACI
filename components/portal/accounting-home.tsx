@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
-import { Badge, Message, PeriodBar, fmtDate, submit, usePeriod, usePost, usePaged } from "./shared-ui";
+import { Badge, Message, PeriodBar, fmtClock, fmtDate, submit, usePeriod, usePost, usePaged } from "./shared-ui";
 import { BarChart, Donut, HBars } from "./charts";
 import { EXPENSE_REASONS, REQUEST_REASONS, RejectInline } from "./reject-inline";
 import { PERIODS, percentChange, periodStart, type Period } from "@/lib/accounting-periods";
@@ -44,8 +44,9 @@ function useJson<T>(url: string | null) {
 
 /* ------------------------------------------------------------ approvals */
 
-type Category = "Expense requests" | "Requisitions" | "Voucher reprints" | "Refunds" | "Discounts" | "Rebates owed to partners" | "Payment voids" | "Cashier closings";
-const CATEGORY_GROUPS: [string, Category[]][] = [["Money out", ["Expense requests", "Requisitions", "Voucher reprints", "Refunds"]], ["Fees", ["Discounts", "Rebates owed to partners"]], ["Cash control", ["Payment voids", "Cashier closings"]]];
+// Accounting Dashboard Design 06 (owner, 3 Nov 2026): Requisitions are not Accounting's; voucher reprints sit with expense requests.
+type Category = "Expense requests" | "Refunds" | "Discounts" | "Payment voids" | "Rebates owed to partners" | "Cashier opening and closing";
+const CATEGORY_GROUPS: [string, Category[]][] = [["Needs your decision", ["Expense requests", "Refunds", "Discounts", "Payment voids"]], ["For billing", ["Rebates owed to partners"]], ["Cash control", ["Cashier opening and closing"]]];
 /** Receipt photos the Cashier attached (owner, 19 Oct 2026), opened in Google Drive. */
 function ApprovalReceipts({ files }: { files: { fileId: string; link: string }[] }) {
   return files.length
@@ -60,7 +61,7 @@ type Row = { id: string; title: string; detail: string; receipts?: { fileId: str
  * cash control (cashier closings). Full page with a category list; on the
  * dashboard the same lists sit under category tabs.
  */
-export function AccountingApprovals({ data, reload, compact }: { data: PortalData; reload: () => Promise<void>; compact?: boolean }) {
+export function AccountingApprovals({ data, reload, compact, rail }: { data: PortalData; reload: () => Promise<void>; compact?: boolean; rail?: { top?: ReactNode; bottom?: ReactNode } }) {
   const { busy, msg, post } = usePost(reload);
   const [cat, setCat] = useState<Category | "All">(compact ? "Expense requests" : "All");
   // Rejecting opens a reason row in place (design 2); the reason is required.
@@ -88,15 +89,11 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
     act: () => post({ action: "agency-rebate-settle", id: r.id, status: "Paid" }, "Rebate marked paid to the partner.") }));
   const closings = data.cashierClosings.filter((c) => c.status === "Submitted").map((c): Row => ({ id: c.id, title: `Cashier closing · ${fmtDate(c.closing_date)}`, detail: `Expected ${pesos2(c.expected_cash_centavos)} · counted ${pesos2(Number(c.actual_cash_centavos ?? 0))}`, ref: Number(c.variance_centavos ?? 0) === 0 ? "Balanced" : Number(c.variance_centavos) < 0 ? `Short ${pesos2(-Number(c.variance_centavos))}` : `Over ${pesos2(Number(c.variance_centavos))}`, who: "Cashier", when: fmtDate(c.closing_date), amount: Number(c.variance_centavos ?? 0), okLabel: "Mark reviewed", canReject: false,
     act: () => post({ action: "cashier-closing-review", id: c.id }, "Closing marked reviewed.") }));
-  // Admin Assistant requisitions (owner, 9 Oct 2026): approval issues a voucher for the Cashier.
-  type Req = { id: string; requisition_number: string; purpose: string; lines?: { description: string; quantity: number }[]; total_centavos: number; status: string; created_at: string; requester?: { complete_name: string } | { complete_name: string }[] | null };
-  const requisitions = ((data as unknown as { requisitions?: Req[] }).requisitions ?? []).filter((r) => r.status === "For Approval").map((r): Row => ({ id: r.id, title: `Requisition · ${r.purpose}`, detail: (r.lines ?? []).map((l) => `${l.description} × ${l.quantity}`).join(", "), ref: r.requisition_number, who: first(r.requester)?.complete_name ?? "Admin Assistant", when: fmtDate(day(r.created_at)), amount: Number(r.total_centavos), okLabel: "Approve", canReject: true,
-    act: (approve, remarks) => post({ action: "requisition-decide", id: r.id, approve, remarks }, approve ? "Approved. The voucher is with the Cashier." : "Rejected.") }));
   // Payment voids the Cashier asked for (owner, 29 Oct 2026): approving voids the payment and marks its receipt VOID.
   const payById = new Map(data.payments.map((p) => [p.id, p]));
   const voids = (data.paymentVoids ?? []).filter((r) => r.status === "Pending").map((r): Row => { const p = payById.get(r.payment_id); const t = p ? first(p.trainees) : null; return { id: r.id, title: `${p?.payment_number ?? "Payment"} · ${name(t ?? null)}`, detail: `${p ? `${p.method}${p.reference_number ? ` · Ref ${p.reference_number}` : ""} · ` : ""}Reason: ${r.reason}`, ref: "Void", who: r.requested_by_name ?? "Cashier", when: fmtDate(day(r.requested_at)), amount: Number(p?.amount_centavos ?? 0), okLabel: "Approve Void", canReject: true,
     act: (approve, remarks) => post({ action: "payment-void-decide", requestId: r.id, approve, remarks }, approve ? "Payment voided. The receipt shows VOID and the amount is back on the balance." : "Void request rejected.") }; });
-  const lists: Record<Category, Row[]> = { "Expense requests": expenses, Requisitions: requisitions, "Voucher reprints": reprints, Refunds: refunds, Discounts: discounts, "Rebates owed to partners": rebates, "Payment voids": voids, "Cashier closings": closings };
+  const lists: Record<Category, Row[]> = { "Expense requests": [...expenses, ...reprints], Refunds: refunds, Discounts: discounts, "Payment voids": voids, "Rebates owed to partners": rebates, "Cashier opening and closing": closings };
   const waiting = Object.values(lists).reduce((s, l) => s + l.length, 0);
   const rowsOf = (list: Row[]) => list.map((r) => <div key={r.id} className={rejecting && rejecting !== r.id ? "ac-dim" : undefined}>
     <div className={`ac-req${rejecting === r.id ? " ac-rejecting" : ""}`}>
@@ -104,9 +101,28 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
       <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{pesos2(r.amount)}</strong>
       {rejecting === r.id ? <span className="ac-rejlabel">Rejecting</span> : <div className="cx-acts"><button type="button" className="portal-primary" disabled={busy || !!rejecting} onClick={() => void r.act(true).catch(() => undefined)}>{r.okLabel}</button>{r.canReject && <button type="button" className="portal-secondary" disabled={busy || !!rejecting} onClick={() => setRejecting(r.id)}>Reject</button>}</div>}
     </div>
-    {rejecting === r.id && <RejectInline reasons={expenses.some((x) => x.id === r.id) || requisitions.some((x) => x.id === r.id) ? EXPENSE_REASONS : REQUEST_REASONS} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
+    {rejecting === r.id && <RejectInline reasons={expenses.some((x) => x.id === r.id) ? EXPENSE_REASONS : REQUEST_REASONS} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
   </div>);
   const groupOf = (c: Category) => CATEGORY_GROUPS.find(([, cs]) => cs.includes(c))?.[0] ?? "";
+  if (rail) {
+    const order = CATEGORY_GROUPS.flatMap(([, cs]) => cs);
+    const current: Category = cat === "All" ? order.find((k) => lists[k].length) ?? "Expense requests" : cat;
+    return <div className="ad-split">
+      <section className="portal-panel cx-panel ad-rail"><div className="panel-heading"><h2>To Do</h2><Badge tone={waiting ? "orange" : undefined}>{waiting} waiting</Badge></div>
+        {CATEGORY_GROUPS.map(([g, cs], i) => <div key={g} className="ad-grp"><span className="ad-grp-h">{i + 1} · {tcl(g)}</span>
+          {cs.map((k) => <button key={k} type="button" className={current === k ? "on" : ""} onClick={() => { setCat(k); setRejecting(null); }}><span>{tcl(k)}<small>{k === "Cashier opening and closing" ? `${lists[k].length} to review` : pesos2(lists[k].reduce((x, r) => x + r.amount, 0))}</small></span><b className={lists[k].length ? "" : "zero"}>{lists[k].length}</b></button>)}
+        </div>)}
+      </section>
+      <div className="ac-stack">
+        {rail.top}
+        <section className="portal-panel cx-panel ac-approvals"><div className="panel-heading"><h2>{tcl(current)}</h2><span className="muted-text">{lists[current].length} waiting</span></div>
+          {msg && <Message kind={msg.kind} text={msg.text} />}
+          {lists[current].length ? rowsOf(lists[current]) : <p className="portal-empty-copy">Nothing waiting.</p>}
+          {rail.bottom}
+        </section>
+      </div>
+    </div>;
+  }
   if (compact) {
     const current = cat === "All" ? "Expense requests" : cat;
     return <section className="portal-panel cx-panel ac-approvals">
@@ -156,7 +172,7 @@ export function AccountingApprovals({ data, reload, compact }: { data: PortalDat
             <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{pesos2(r.amount)}</strong>
             {rejecting === r.id ? <span className="ac-rejlabel">Rejecting</span> : <div className="cx-acts">{r.canReject && <button type="button" className="portal-secondary" disabled={busy || !!rejecting || !!bulk} onClick={() => setRejecting(r.id)}>Reject</button>}<button type="button" className="portal-primary" disabled={busy || !!rejecting || !!bulk} onClick={() => void r.act(true).then(() => setPicked((p) => { const n = new Set(p); n.delete(r.id); return n; })).catch(() => undefined)}>{r.okLabel}</button></div>}
           </div>
-          {rejecting === r.id && <RejectInline reasons={expenses.some((x) => x.id === r.id) || requisitions.some((x) => x.id === r.id) ? EXPENSE_REASONS : REQUEST_REASONS} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
+          {rejecting === r.id && <RejectInline reasons={expenses.some((x) => x.id === r.id) ? EXPENSE_REASONS : REQUEST_REASONS} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
         </div>)}
       </div>) : <p className="portal-empty-copy">{cat === "All" ? "Nothing waiting for your approval." : `No ${cat.toLowerCase()} waiting.`}</p>}
       {empty.length > 0 && <p className="ac-clear"><b>✓ Nothing Waiting:</b> {empty.join(", ")}.</p>}
@@ -414,50 +430,36 @@ export function AccountingHome({ data, reload, go }: { data: PortalData; reload:
   const unpaid = unpaidAfterTraining(data.enrollments as unknown as BalanceEnrollment[], (id) => durations.get(id), today);
   const p = r?.position;
   // Finance Rail (owner's choice, 20 Oct 2026): positions and collections on the left; approvals and channels on the right.
-  const released = (ch: string) => r?.expenseTotals.find((t) => t.channel === ch)?.totalCentavos ?? 0;
   const releasedTotal = r ? r.expenses.reduce((x, e) => x + e.amountCentavos, 0) : 0;
   const bills = data.payables.filter((x) => x.status !== "Paid");
   const billsTotal = bills.reduce((x, b) => x + Number(b.amount_centavos), 0);
   const receivable = unpaid.reduce((x, u) => x + u.balanceCentavos, 0);
   const shortOver = data.cashierClosings.filter((c) => c.closing_date >= addDays(today, -6) && c.status !== "Reviewed" && Number(c.variance_centavos ?? 0) !== 0);
+  // Cash control for the day (Design 06): the Cashier's opening and closing, and the last closing before it.
+  const opening = (data.cashierOpenings ?? []).find((o) => o.opening_date === date);
+  const closing = data.cashierClosings.find((c) => c.closing_date === date);
+  const last = data.cashierClosings.filter((c) => c.closing_date < date).sort((x, y) => y.closing_date.localeCompare(x.closing_date))[0];
+  const varianceText = (c: { variance_centavos?: number | null }) => { const v = Number(c.variance_centavos ?? 0); return v === 0 ? "Balanced" : `${v < 0 ? "Short" : "Over"} ${pesos2(Math.abs(v))}`; };
+  const cashierToday = <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Cashier Today</h2><span className="muted-text">{fmtDate(date)}</span></div>
+    <div className="ad-cash">
+      <div><span>Opening</span><b>{opening ? pesos2(Number(opening.opening_cash_centavos)) : "Not yet"}</b><small>{opening ? fmtClock(opening.created_at) : "No opening recorded"}</small></div>
+      <div><span>Closing</span><b>{closing ? varianceText(closing) : "Not yet"}</b><small>{closing ? `${closing.status} · counted ${pesos2(Number(closing.actual_cash_centavos ?? 0))}` : "Not submitted"}</small></div>
+      <div><span>Last Closing</span><b className={last && Number(last.variance_centavos ?? 0) < 0 ? "minus" : ""}>{last ? varianceText(last) : "—"}</b><small>{last ? `${fmtDate(last.closing_date)} · ${last.status === "Reviewed" ? "reviewed" : "needs review"}` : "None yet"}</small></div>
+    </div></section>;
   return <div className="portal-page cx ac">
     <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Dashboard</h1></div>
       <div className="ac-day"><button type="button" aria-label="Previous day" onClick={() => setDate(addDays(date, -1))}>‹</button><input type="date" aria-label="Date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} /><button type="button" aria-label="Next day" disabled={date >= today} onClick={() => setDate(addDays(date, 1))}>›</button></div></div>
     <p className="ac-note">{longDay(date)} · view only — the Cashier records payments and expenses.</p>
     {dayReport.error && <Message kind="error" text={dayReport.error} />}
     {shortOver.map((c) => <div key={c.id} className="cl-admin-alarm"><p className="ac-note fr-warn">⚠ Cashier closing {fmtDate(c.closing_date)} · {Number(c.variance_centavos) < 0 ? "short" : "over"} {pesos2(Math.abs(Number(c.variance_centavos)))} <button type="button" className="portal-secondary" onClick={() => go("Cash position")}>Review</button></p></div>)}
-    <div className="ac-rail">
-      <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Positions</h2><span className="muted-text">as of now</span></div>
-          <dl className="ac-lines">
-            <div><dt>Cash on hand</dt><dd>{p ? pesos2(p.onHandCentavos) : "…"}</dd></div>
-            {p && p.countedCentavos != null && <div><dt>Counted · over / short</dt><dd className={p.overShortCentavos ? (p.overShortCentavos < 0 ? "minus" : "plus") : ""}>{pesos2(p.countedCentavos)}{p.overShortCentavos ? ` · ${pesos2(p.overShortCentavos)}` : ""}</dd></div>}
-            <div><dt>Bank and e-wallet collected</dt><dd>{pesos2(total - colOf("Cash"))}</dd></div>
-            <div><dt>Receivables · {new Set(unpaid.map((u) => u.traineeId)).size} after training</dt><dd className="plus">{pesos2(receivable)}</dd></div>
-            <div><dt>Payables · {bills.length} open</dt><dd className="minus">{pesos2(billsTotal)}</dd></div>
-            <div><dt>Rebates owed to agencies</dt><dd className="minus">{pesos2(w?.current.rebatesOwed ?? 0)}</dd></div>
-          </dl>
-          <div className="ac-more"><button type="button" onClick={() => go("Receivables")}>Receivables</button> <button type="button" onClick={() => go("Payables")}>Payables</button> <button type="button" onClick={() => go("Cash position")}>Cash Position</button></div>
-        </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collections</h2><strong className="cx-mono">{pesos2(total)}</strong></div>
-          <dl className="ac-lines">
-            {(r?.matrix ?? []).map((m) => <div key={m.source}><dt>{m.source}</dt><dd>{pesos2(m.totalCentavos)}</dd></div>)}
-            <div className="total"><dt>Total · {receipts} receipt{receipts === 1 ? "" : "s"}</dt><dd className="eq">{pesos2(total)}</dd></div>
-            <div><dt>Rebates deducted</dt><dd>{pesos2(w?.current.rebatesDeducted ?? 0)}</dd></div>
-          </dl>
-        </section>
-      </div>
-      <div className="ac-stack">
-        <AccountingApprovals data={data} reload={reload} compact />
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Payments and Expenses per Channel</h2><span className="muted-text">{fmtDate(date)}</span></div>
-          <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Channel</th><th className="r">Collected</th><th className="r">Released</th><th className="r">Net</th></tr></thead><tbody>
-            {CHANNELS.map((c) => <tr key={c}><td data-l="" className="lead"><span className="cr-dot" style={{ background: COLORS[c] }} />{c}<small>{countOf(c)} receipt{countOf(c) === 1 ? "" : "s"}</small></td><td data-l="Collected" className="r cx-amt">{pesos2(colOf(c))}</td><td data-l="Released" className="r cx-amt">{released(c) ? `− ${pesos2(released(c))}` : "—"}</td><td data-l="Net" className="r"><strong className="cx-amt">{pesos2(colOf(c) - released(c))}</strong></td></tr>)}
-            <tr className="nb-group"><td data-l="" className="lead"><b>Total</b></td><td data-l="Collected" className="r cx-amt"><b>{pesos2(total)}</b></td><td data-l="Released" className="r cx-amt"><b>− {pesos2(releasedTotal)}</b></td><td data-l="Net" className="r cx-amt"><b>{pesos2(total - releasedTotal)}</b></td></tr>
-          </tbody></table></div>
-          <div className="ac-more"><button type="button" onClick={() => go("Expenses")}>View Vouchers</button></div>
-        </section>
-      </div>
-    </div>
+    <AccountingApprovals data={data} reload={reload} rail={{ top: cashierToday, bottom: <div className="ad-strip">
+      <div><span>Collections</span><b>{pesos2(total)}</b><small>{receipts} receipt{receipts === 1 ? "" : "s"}</small></div>
+      <div><span>Cash on hand</span><b>{p ? pesos2(p.onHandCentavos) : "…"}</b></div>
+      <div><span>Released</span><b>{pesos2(releasedTotal)}</b></div>
+      <div><button type="button" onClick={() => go("Receivables")}>Receivables</button><b>{pesos2(receivable)}</b></div>
+      <div><button type="button" onClick={() => go("Payables")}>Payables · {bills.length}</button><b>{pesos2(billsTotal)}</b></div>
+      <div><span>Rebates owed</span><b>{pesos2(w?.current.rebatesOwed ?? 0)}</b></div>
+    </div> }} />
   </div>;
 }
 

@@ -359,7 +359,7 @@ export function ClassSchedules({ data, reload, onOpenBatches, onCreate, canManag
   const groupOf = (b: Batch) => (isStcw(course.get(b.course_id)) ? "STCW" : "In-House");
   const groupCount = (g: string) => grouped.filter((b) => groupOf(b) === g).length;
   return <div className="portal-page cx ac bs-page">
-    <Head title="Batch Schedules" eyebrow="Schedules">{canManage && <span className="cl-acts"><button type="button" className="portal-secondary" onClick={onCreate}>Create Schedule</button><button type="button" className="portal-primary" onClick={onOpenBatches}>Open Batches</button></span>}</Head>
+    <Head title="Schedules" eyebrow="Batches">{canManage && <span className="cl-acts"><button type="button" className="portal-secondary" onClick={onCreate}>Create Schedule</button><button type="button" className="portal-primary" onClick={onOpenBatches}>Open Batches</button></span>}</Head>
     {done && <Message kind="success" text={done} />}
     {bar(`${inPeriod.length} batch${inPeriod.length === 1 ? "" : "es"}`)}
     <div className="ac-rail">

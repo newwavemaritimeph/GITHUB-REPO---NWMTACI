@@ -116,7 +116,7 @@ export function RegistrationDashboard({ data, go }: { data: PortalData; go: (mod
           <div className="cx-tiles ac-tiles ac-tiles-in">{queue.map(([label, color, n]) => <button type="button" key={label} className="cx-tile ac-pick ac-count" style={{ ["--c" as string]: color }} onClick={() => go("Applications")}><span>{tcl(label)}</span><b>{n}</b></button>)}
             <div className="cx-tile ac-total ac-count"><span>New today</span><b>{newToday}</b></div></div>
         </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>STCW Seats Open</h2><button type="button" className="portal-secondary" onClick={() => go("Batch schedules")}>View Batch Schedules</button></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>STCW Seats Open</h2><button type="button" className="portal-secondary" onClick={() => go("Batch schedules")}>View Schedules</button></div>
           {stcw.length ? <div className="cx-tiles ac-tiles ac-tiles-in">{stcw.map(({ course, next }) => { const left = seatsLeft(next!); return <div key={course.id} className="cx-tile ac-count ac-seat" style={{ ["--c" as string]: left <= 3 ? "#F25615" : "#0571D0" }}><span>{course.name}<small>{dateRange(next!.starts_on, next!.ends_on)} · {next!.batch_number}</small><i className="ac-meter"><i style={{ width: `${Math.round((next!.confirmed_count / Math.max(1, next!.capacity)) * 100)}%` }} /></i></span><b>{left}</b></div>; })}
             <div className="cx-tile ac-total ac-count"><span>Seats left</span><b>{stcw.reduce((sum, x) => sum + seatsLeft(x.next!), 0)}</b></div></div> : <p className="portal-empty-copy">No STCW batches open.</p>}
         </section>
