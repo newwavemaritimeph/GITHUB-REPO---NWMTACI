@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type ReactNode } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
-import { Badge, Message, fmtDate, usePost, usePaged } from "./shared-ui";
+import { Badge, Message, PeriodBar, fmtDate, submit, usePeriod, usePost, usePaged } from "./shared-ui";
 import { BarChart, Donut, HBars } from "./charts";
 import { EXPENSE_REASONS, REQUEST_REASONS, RejectInline } from "./reject-inline";
 import { PERIODS, percentChange, periodStart, type Period } from "@/lib/accounting-periods";
@@ -570,7 +570,8 @@ export function FinanceSummaryReport({ switcher }: { switcher?: ReactNode }) {
           {!s.endorsement.centers.length && <tr><td colSpan={7} className="muted-text">No endorsed training in this period.</td></tr>}
           <tr className="fs-tot"><td>Total</td><td className="fs-n">{s.endorsement.trainees}</td><td className="fs-n">{pesos2(s.endorsement.fees)}</td><td className="fs-n">{pesos2(s.endorsement.payable)}</td><td className="fs-n">{pesos2(s.endorsement.rebate)}</td>{neg(s.endorsement.share)}<td className="fs-n">{pesos2(s.endorsement.keeps)}</td></tr>
           <tr className="fs-sub"><td colSpan={6}>Rebates still due from centers</td><td className="fs-n fs-neg">{pesos2(s.endorsement.rebateDue)}</td></tr>
-        </tbody></table></div></section>
+        </tbody></table></div>
+</section>
       </div>
     </>}
   </div>;
@@ -640,5 +641,58 @@ export function BillingStatementReport({ switcher }: { switcher?: ReactNode }) {
         </tbody></table></div>
         <p className="ac-note">{issued ? "Issued statements stay as printed. Void it to issue a corrected one with a new BS No." : "Type each amount from the partner's pricelist, then Issue and Print PDF. Company Charge trainees are billed at these amounts, and their balances follow."}</p>
       </section>}
+  </div>;
+}
+
+type DocRow = { id: string; number: string; issuedAt: string; trainee: string; nwmtaciNo: string; label?: string; courses?: string; method?: string; reference?: string; amount?: number; valid?: boolean; payment?: string; balanceCentavos?: number; printCount: number };
+const REPRINT_REASONS = ["Misprint", "Lost by the trainee", "Damaged", "Other"];
+
+/** Accounting › Receipts and TARs (owner, 3 Nov 2026): date-sensitive lists of every receipt and TAR issued; Accounting reprints them, with a reason and no limit. */
+export function AccountingDocuments() {
+  const p = usePeriod();
+  const [kind, setKind] = useState<"receipts" | "tars">("receipts"), [q, setQ] = useState(""), [tick, setTick] = useState(0);
+  const [custom, setCustom] = useState(false), [from, setFrom] = useState(p.today), [to, setTo] = useState(p.today);
+  const range = custom ? { from, to, label: `${fmtDate(from)} – ${fmtDate(to)}` } : p.period === "All Dates" ? { from: addDays(p.today, -365), to: p.today, label: "the last 12 months" } : p.range;
+  const { data, error } = useJson<{ rows: DocRow[] }>(range.from <= range.to ? `/api/staff/documents?kind=${kind}&from=${range.from}&to=${range.to}&n=${tick}` : null);
+  const term = q.trim().toLowerCase();
+  const rows = (data?.rows ?? []).filter((r) => !term || `${r.number} ${r.trainee} ${r.nwmtaciNo} ${r.label ?? ""} ${r.courses ?? ""}`.toLowerCase().includes(term));
+  const pg = usePaged(rows);
+  const [open, setOpen] = useState<string | null>(null), [why, setWhy] = useState(""), [other, setOther] = useState(""), [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  const reprint = async (r: DocRow) => {
+    const reason = why === "Other" ? other.trim() : why;
+    if (reason.length < 3) { setMsg({ kind: "error", text: "Choose the reason for the reprint." }); return; }
+    const tab = window.open("", "_blank"); setBusy(true); setMsg(null);
+    try {
+      const res = await submit({ action: "document-reprint", kind: kind === "receipts" ? "receipt" : "tar", id: r.id, reason }) as { url: string; copy: number };
+      if (tab) tab.location.href = res.url; else window.location.assign(res.url);
+      setMsg({ kind: "success", text: `${r.number} reprinted · Copy ${res.copy}.` }); setOpen(null); setWhy(""); setOther(""); setTick((n) => n + 1);
+    } catch (e) { tab?.close(); setMsg({ kind: "error", text: e instanceof Error ? e.message : "Could not reprint." }); } finally { setBusy(false); }
+  };
+  const total = rows.filter((r) => r.valid !== false).reduce((s, r) => s + Number(r.amount ?? 0), 0);
+  const cols = kind === "receipts" ? 8 : 7;
+  const when = (iso: string) => `${fmtDate(iso)} · ${new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso))}`;
+  return <div className="portal-page cx ac">
+    <TxHead title="Receipts and TARs" />
+    <div className="sub-pills">{([["receipts", "Acknowledgement Receipts"], ["tars", "Training Admission Records"]] as const).map(([k, label]) => <button key={k} type="button" className={kind === k ? "on" : ""} onClick={() => { setKind(k); setOpen(null); }}>{label}</button>)}</div>
+    {msg && <Message kind={msg.kind} text={msg.text} />}
+    {error && <Message kind="error" text={error} />}
+    <section className="portal-panel cx-panel">
+      {custom ? <div className="pd-bar"><span className="cx-seg"><button type="button" onClick={() => setCustom(false)}>Daily · Weekly · Monthly</button><button type="button" className="on">Custom</button></span><label>From <input type="date" value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label><label>To <input type="date" value={to} onChange={(e) => e.target.value && setTo(e.target.value)} /></label></div>
+        : <div className="dc-bar"><PeriodBar p={p} what={kind === "receipts" ? "Receipts issued" : "TARs issued"} count={`${rows.length}`} /><button type="button" className="portal-secondary" onClick={() => setCustom(true)}>Custom</button></div>}
+      <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search receipts and TARs" placeholder="Search number, trainee or NWMTACI No." value={q} onChange={(e) => setQ(e.target.value)} /></div>
+      {!data ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : rows.length ? <div className="portal-table ac-table"><table><thead><tr>
+        {kind === "receipts" ? <><th>AR No.</th><th>Issued</th><th>Trainee</th><th>For</th><th>Mode</th><th className="r">Amount</th><th>Printed</th><th></th></> : <><th>TAR No.</th><th>Issued</th><th>Trainee</th><th>Courses</th><th>Payment</th><th>Printed</th><th></th></>}
+      </tr></thead><tbody>
+        {pg.shown.map((r) => <Fragment key={r.id}><tr className={r.valid === false ? "pv-void" : undefined}>
+          <td className="cx-mono"><b>{r.number}</b></td><td>{when(r.issuedAt)}</td><td>{r.trainee}<small className="cx-mono">{r.nwmtaciNo}</small></td>
+          {kind === "receipts" ? <><td>{r.label}</td><td>{r.method}{r.reference ? <small>Ref. {r.reference}</small> : null}</td><td className="r cx-amt">{pesos2(Number(r.amount ?? 0))}</td></>
+            : <><td>{r.courses || "—"}</td><td><Badge tone={r.payment === "Paid" ? "active" : r.payment === "Company Charge" ? "pending" : "cancelled"}>{r.payment === "Balance" ? `Balance ${pesos2(Number(r.balanceCentavos ?? 0))}` : r.payment ?? ""}</Badge></td></>}
+          <td>{r.valid === false ? <Badge tone="cancelled">VOID</Badge> : r.printCount ? `Printed ${r.printCount} time${r.printCount === 1 ? "" : "s"}` : "Not printed yet"}</td>
+          <td>{r.valid !== false && <button type="button" className="portal-secondary" onClick={() => { setOpen(open === r.id ? null : r.id); setWhy(""); setOther(""); }}>Reprint</button>}</td></tr>
+          {open === r.id && <tr><td colSpan={cols}><div className="tp-reprint"><b>Reprint {r.number}</b><select value={why} onChange={(e) => setWhy(e.target.value)} aria-label="Reason for the reprint"><option value="">Reason…</option>{REPRINT_REASONS.map((x) => <option key={x}>{x}</option>)}</select>{why === "Other" && <input value={other} onChange={(e) => setOther(e.target.value)} placeholder="Reason" aria-label="Other reason" />}<button type="button" className="portal-primary" disabled={busy} onClick={() => void reprint(r)}>Reprint</button><button type="button" className="portal-secondary" onClick={() => setOpen(null)}>Cancel</button></div></td></tr>}
+        </Fragment>)}
+      </tbody>{kind === "receipts" && <tfoot><tr><td colSpan={5}>{rows.length} receipt{rows.length === 1 ? "" : "s"} · {range.label}</td><td className="r cx-amt">{pesos2(total)}</td><td colSpan={2} /></tr></tfoot>}</table>{pg.pager}</div>
+        : <p className="portal-empty-copy">No {kind === "receipts" ? "receipts" : "TARs"} issued in this period.</p>}
+    </section>
   </div>;
 }

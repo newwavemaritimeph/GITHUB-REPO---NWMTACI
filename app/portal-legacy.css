@@ -2558,3 +2558,9 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .tp-reprint select,.portal-shell .tp-reprint input{height:34px;border:1px solid #bcdcf7;border-radius:8px;padding:0 8px;background:#fff;min-width:0}
 /* Referral per course (owner, 3 Nov 2026): the partner and rebate sit on the course line. */
 .portal-shell .cx-lines small.ref-line{display:block;color:#b33d0b;font-weight:600}
+/* Accounting › Receipts and TARs (owner, 3 Nov 2026). */
+.portal-shell .sub-pills{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.portal-shell .sub-pills button{border:1px solid #dbe6ec;background:#fff;border-radius:99px;padding:7px 16px;font-weight:600;color:#0f2638}
+.portal-shell .sub-pills button.on{background:#e5f1fb;border-color:#0571D0;color:#0571D0}
+.portal-shell .dc-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;border-bottom:1px solid #e3ecf0;padding-right:16px}
+.portal-shell .dc-bar .pd-bar{border-bottom:0;flex:1;min-width:0}

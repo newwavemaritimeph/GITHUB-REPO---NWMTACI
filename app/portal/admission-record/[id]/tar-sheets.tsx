@@ -23,7 +23,7 @@ const ADDRESS = "Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Mani
 export const COURSES_ON_FRONT = 6;
 
 export type TarCourse = { id: string; code: string; name: string; dates: string; time: string; room: string; fee: number };
-export type TarPayment = { id: string; number: string; dateLabel: string; method: string; ref: string; amount: number };
+export type TarPayment = { id: string; number: string; dateLabel: string; method: string; ref: string; label?: string; amount: number };
 export type TarProps = {
   arNumber: string; issued: string; name: string; reprintCopy?: number | null;
   trainee: { appNo: string; srn: string | null; rank: string | null; mobile: string | null; company: string | null };
@@ -39,7 +39,7 @@ export function TarSheets(p: TarProps) {
   const courseRows = (list: TarCourse[], offset: number) => list.map((c, i) => <tr key={c.id}><td className="c">{offset + i + 1}</td><td><b>{c.name}</b> <span className="dim">({c.code})</span></td><td className="nw">{c.dates}</td><td className="nw">{c.time}</td><td className="nw">{c.room}</td><td className="r nw">{peso(c.fee)}</td></tr>);
   const header = (page: number) => <>
     <div className="tar-letter"><img src={p.logoSrc ?? "/brand/new-wave-emblem.png"} alt="" width={34} height={34} /><div><b>{ORG}</b><span>{ADDRESS}</span></div><i /></div>
-    <div className="tar-title"><div><b>TRAINING ADMISSION RECORD</b> <span>· admission slip and acknowledgement receipt · issued {p.issued}{pages > 1 ? ` · page ${page} of ${pages}` : ""}</span></div><div>{p.reprintCopy ? <span className="tar-reprint">REPRINT – COPY {p.reprintCopy}</span> : null}<span>{p.arNumber.startsWith("TAR-") ? "TAR NO. " : "AR NO. "}</span><strong>{p.arNumber}</strong></div></div>
+    <div className="tar-title"><div><b>TRAINING ADMISSION RECORD</b> <span>· admission slip · issued {p.issued}{pages > 1 ? ` · page ${page} of ${pages}` : ""}</span></div><div>{p.reprintCopy ? <span className="tar-reprint">REPRINT – COPY {p.reprintCopy}</span> : null}<span>{p.arNumber.startsWith("TAR-") ? "TAR NO. " : "AR NO. "}</span><strong>{p.arNumber}</strong></div></div>
   </>;
   // Page 1 (and page 2 when there are more than six courses). Each page is
   // printed twice on one legal sheet: an original for the trainee and a
@@ -60,12 +60,12 @@ export function TarSheets(p: TarProps) {
           <tr className="b"><td>Total received</td><td className="r">{peso(p.paid)}</td></tr>
           <tr className="b"><td>Balance{p.billedTo && p.balance > 0 ? ` · billed to ${p.billedTo}` : ""}</td><td className={`r${p.balance > 0 ? " due" : ""}`}>{peso(p.balance)}</td></tr>
         </tbody></table></div>
-        <div><div className="tar-pay-head"><div className="tar-h">PAYMENTS RECEIVED ({p.payments.length})</div>{p.billedTo && <span className="tar-billed">Billed to {p.billedTo}</span>}<span className={`tar-stamp ${p.billedTo ? "cc" : p.status === "FULLY PAID" ? "ok" : p.status === "UNPAID" ? "none" : "part"}`}>{p.status}</span></div>
-          <table className="tar-table"><thead><tr><th>Payment</th><th>Date</th><th>Method</th><th>Reference</th><th className="r">Amount</th></tr></thead><tbody>
-            {p.payments.map((x) => <tr key={x.id}><td className="mono">{x.number}</td><td className="nw">{x.dateLabel}</td><td>{x.method}</td><td className="mono">{x.ref}</td><td className="r b">{peso(x.amount)}</td></tr>)}
-            {!p.payments.length && <tr><td colSpan={5} className="dim">{p.billedTo ? `Billed to ${p.billedTo} on the Billing Statement.` : "No payment recorded yet."}</td></tr>}
+        <div><div className="tar-pay-head"><div className="tar-h">RECEIPTS ISSUED ({p.payments.length})</div>{p.billedTo && <span className="tar-billed">Billed to {p.billedTo}</span>}<span className={`tar-stamp ${p.billedTo ? "cc" : p.status === "FULLY PAID" ? "ok" : p.status === "UNPAID" ? "none" : "part"}`}>{p.status}</span></div>
+          <table className="tar-table"><thead><tr><th>Receipt No.</th><th>Date</th><th>For</th><th className="r">Amount</th></tr></thead><tbody>
+            {p.payments.map((x) => <tr key={x.id}><td className="mono">{x.number}</td><td className="nw">{x.dateLabel}</td><td>{x.label ?? "Training Fee"}</td><td className="r b">{peso(x.amount)}</td></tr>)}
+            {!p.payments.length && <tr><td colSpan={4} className="dim">{p.billedTo ? `Billed to ${p.billedTo} on the Billing Statement.` : "No receipt issued yet."}</td></tr>}
           </tbody></table>
-          <div className="tar-sigs">{[["Registration officer", p.officer], ["Cashier", p.cashier], ["Trainee", ""]].map(([label, n]) => <div key={label}><span>{n}</span><small>{label}</small></div>)}</div>
+          <div className="tar-sigs">{[["Registration officer", p.officer], ["Trainee", ""]].map(([label, n]) => <div key={label}><span>{n}</span><small>{label}</small></div>)}</div>
         </div>
       </div>
       <div className="tar-terms"><div className="tar-terms-head"><b>TERMS AND CONDITIONS (SUMMARY)</b><span>Full terms accepted at registration. Present this record with a valid ID on the first training day; report by 7:30 AM.</span></div>

@@ -37,6 +37,7 @@
 .src{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;border:1px dashed var(--blue);background:var(--info-bg);border-radius:10px;padding:12px 14px;margin:0 20px 16px}
 .src .cap{grid-column:1/-1;font:600 12.5px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--blue)}
 .src label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}.src select{height:38px;border:1.5px solid var(--line);border-radius:8px;padding:0 10px;background:var(--surface);color:var(--fg)}
+[hidden]{display:none!important}
 .chip{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12.5px;font-weight:600}.ag{background:#fff1ea;color:#b33d0b}.wk{background:var(--good-bg);color:var(--good)}
 .cols{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:20px}@media (max-width:860px){.cols{grid-template-columns:1fr}}
 .refchip{display:inline-block;margin:0 20px 14px;background:#fff1ea;color:#b33d0b;border-radius:99px;padding:4px 12px;font-size:13.5px;font-weight:600}
@@ -52,8 +53,11 @@
     <div class="stack">
       <section class="panel"><div class="ph"><h2>Courses</h2></div><div class="cwrap"><table><thead><tr><th>Course</th><th>Enrolled</th><th>Source</th><th class="r">Rebate</th></tr></thead><tbody id="rows"></tbody></table></div></section>
       <section class="panel"><div class="ph"><h2>Record Payment</h2><small>Cashier</small></div>
-        
-        <div class="lines"><div><span><b>BT-PSSR</b><small style="display:block;color:#b33d0b;font-weight:600">Qapla Maritime · rebate ₱300.00 deducted</small></span><span>₱1,000.00</span></div><div><span><b>SSO</b><small style="display:block;color:var(--muted)">Walk-In</small></span><span>₱4,500.00</span></div><div class="tot"><span>Total</span><span>₱5,500.00</span></div></div></section>
+        <div class="cwrap"><table><thead><tr><th>Course or Charge</th><th class="r">Balance</th><th class="r">Apply</th></tr></thead><tbody>
+          <tr><td><b>UBT-PSSR</b> <small>Basic Training – PSSR · Nov 4, 2026</small><small style="color:#b33d0b;font-weight:600">Qapla Maritime · rebate deducted</small></td><td class="r amt">₱1,000.00</td><td class="r amt">1,000.00</td></tr>
+          <tr><td><b>SSO</b> <small>Ship Security Officers · Nov 8–10, 2026</small></td><td class="r amt">₱4,500.00</td><td class="r amt">4,500.00</td></tr>
+        </tbody></table></div>
+        <div class="lines"><div class="tot"><span>Amount Received · Cash</span><span>₱5,500.00</span></div></div></section>
     </div>
     <section class="panel"><div class="ph"><h2>Add Course</h2></div>
       <div class="form" style="border-top:0;background:none;padding-top:0"><label>Course<select id="course"><option>PSCMT · Crowd Management</option><option>PSCMHBT · Crisis Management</option></select></label><label>Batch<select><option>26-507-024 · Nov 10–11</option></select></label></div>

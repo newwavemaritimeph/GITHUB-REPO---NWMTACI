@@ -29,7 +29,7 @@ function trainingDates(start?: string | null, end?: string | null) {
 const hhmm = (t?: string | null) => (t ? String(Number(t.slice(0, 2))) + t.slice(2, 5) : "");
 
 type BatchRow = { batch_number: string; starts_on: string; ends_on: string; daily_start: string | null; daily_end: string | null; venue: string | null };
-type PaymentRow = { id: string; payment_number: string; received_at: string; method: string; reference_number: string | null; valid: boolean; cashier_id: string | null };
+type PaymentRow = { id: string; payment_number: string; received_at: string; method: string; reference_number: string | null; valid: boolean; cashier_id: string | null; remarks: string | null; receipts: { receipt_number: string } | { receipt_number: string }[] | null };
 
 export default async function AdmissionRecordPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ reprint?: string }> }) {
   const staff = await requireStaff(["admin", "registration", "cashier", "accounting"]);
@@ -47,7 +47,7 @@ export default async function AdmissionRecordPage({ params, searchParams }: { pa
     db.from("trainees").select("trainee_number,legal_first_name,legal_middle_name,legal_last_name,suffix,srn,rank,mobile,company,application_number").eq("id", record.trainee_id).maybeSingle(),
     db.from("enrollments").select("id,enrollment_number,enrollment_status,selling_price_centavos,created_at,batch_id,scheduled_on,courses(code,name),partner_course_offers(partner_centers(name)),batches(batch_number,starts_on,ends_on,daily_start,daily_end,venue)").in("id", ids),
     db.from("enrollment_charges").select("enrollment_id,description,amount_centavos,event_type,valid").in("enrollment_id", ids).eq("valid", true),
-    db.from("payment_allocations").select("enrollment_id,amount_centavos,payments(id,payment_number,received_at,method,reference_number,valid,cashier_id)").in("enrollment_id", ids),
+    db.from("payment_allocations").select("enrollment_id,amount_centavos,payments(id,payment_number,received_at,method,reference_number,valid,cashier_id,remarks,receipts(receipt_number))").in("enrollment_id", ids),
     record.issued_by ? db.from("profiles").select("complete_name").eq("id", record.issued_by).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const t = traineeRes.data;
@@ -83,19 +83,18 @@ export default async function AdmissionRecordPage({ params, searchParams }: { pa
   const misc = (chargeRes.data ?? []).filter((c) => c.event_type !== "discount").map((c) => ({ label: c.description as string, amount: Number(c.amount_centavos) }));
   const discounts = (chargeRes.data ?? []).filter((c) => c.event_type === "discount").map((c) => ({ label: c.description as string, amount: Number(c.amount_centavos) }));
 
-  // One line per payment, summing its allocations across the covered enrollments.
-  type PayRow = { id: string; number: string; date: string; method: string; ref: string; amount: number; cashierId: string | null };
+  // The TAR is the admission slip only (owner, 3 Nov 2026): it lists the Acknowledgement Receipts issued, one line
+  // per receipt, summing its allocations across the covered enrollments. Payment details stay on the receipt.
+  type PayRow = { id: string; number: string; date: string; method: string; ref: string; label: string; amount: number };
   const payMap = new Map<string, PayRow>();
   for (const a of allocRes.data ?? []) {
     const p = one(a.payments as unknown as PaymentRow | PaymentRow[] | null);
     if (!p || p.valid === false) continue;
-    const row = payMap.get(p.id) ?? { id: p.id, number: p.payment_number, date: p.received_at, method: p.method, ref: p.reference_number || "—", amount: 0, cashierId: p.cashier_id };
+    const row = payMap.get(p.id) ?? { id: p.id, number: one(p.receipts)?.receipt_number ?? p.payment_number, date: p.received_at, method: p.method, ref: p.reference_number || "—", label: p.remarks && /^(Miscellaneous|Service Fee) · /.test(p.remarks) ? p.remarks : "Training Fee", amount: 0 };
     row.amount += Number(a.amount_centavos);
     payMap.set(p.id, row);
   }
   const payments = [...payMap.values()].sort((a, b) => a.date.localeCompare(b.date));
-  const lastCashierId = payments.at(-1)?.cashierId ?? null;
-  const cashier = lastCashierId ? (await db.from("profiles").select("complete_name").eq("id", lastCashierId).maybeSingle()).data?.complete_name ?? "" : "";
 
   const feesTotal = courses.reduce((s, c) => s + c.fee, 0), miscTotal = misc.reduce((s, m) => s + m.amount, 0), discTotal = discounts.reduce((s, d) => s + d.amount, 0);
   const due = feesTotal + miscTotal - discTotal, paid = payments.reduce((s, p) => s + p.amount, 0), balance = Math.max(0, due - paid);
@@ -118,6 +117,6 @@ export default async function AdmissionRecordPage({ params, searchParams }: { pa
   return <TarSheets arNumber={record.ar_number} reprintCopy={reprint ? Number(record.print_count ?? 0) : null} issued={issued} name={name}
     trainee={{ appNo: t.application_number ?? t.trainee_number, srn: t.srn, rank: t.rank, mobile: t.mobile, company: t.company }}
     courses={courses} misc={misc} discounts={discounts}
-    payments={payments.map((p) => ({ id: p.id, number: p.number, dateLabel: payDate.format(new Date(p.date)), method: p.method, ref: p.ref, amount: p.amount }))}
-    feesTotal={feesTotal} due={due} paid={paid} balance={balance} status={status} billedTo={billedTo} officer={officer} cashier={cashier} />;
+    payments={payments.map((p) => ({ id: p.id, number: p.number, dateLabel: payDate.format(new Date(p.date)), method: p.method, ref: p.ref, label: p.label, amount: p.amount }))}
+    feesTotal={feesTotal} due={due} paid={paid} balance={balance} status={status} billedTo={billedTo} officer={officer} cashier="" />;
 }
