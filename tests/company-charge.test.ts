@@ -21,7 +21,7 @@ describe("Company Charge partners", () => {
   it("show the source chip", () => {
     expect(sourceLabel("Agency", { name: "Marine Force", kind: "Consultancy" })).toBe("Consultancy · Marine Force");
     expect(sourceLabel("Agency", { name: "Costa Maritime", kind: "Agency" })).toBe("Agency · Costa Maritime");
-    expect(sourceLabel("Meta", null)).toBe("Meta");
+    expect(sourceLabel("Meta", null)).toBe("Online");
     expect(sourceLabel("Walk-in", null)).toBe("Walk-In");
     expect(sourceLabel("Public registration", null)).toBe("Online");
   });

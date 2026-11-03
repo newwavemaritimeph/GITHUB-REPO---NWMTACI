@@ -1,0 +1,108 @@
+<title>Admin Tabs</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Same shell as the live portal: navy bar with dropdown tabs, summary rail on the left, light-cyan table headers. */
+:root{--orange:#F25615;--blue:#0571D0;--cyan:#35CCFA;--cyan-l:#9EE3F1;--navy:#123F63;--bg:#f2f6f8;--surface:#fff;--fg:#0f2638;--muted:#587184;--line:#dbe6ec;--soft:#eef4f8;--th:#e6f6fd;--thc:#0b4f8f;--zebra:#f7fafc;
+ --good:#0a7a3e;--good-bg:#e2f5e9;--warn:#a2470b;--warn-bg:#fdf0e5;--bad:#b42318;--bad-bg:#fcebea;--info:#0571D0;--info-bg:#e5f1fb;
+ --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding-block:16px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.w{max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.logo{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}.logo b{font-size:19px;font-weight:600}.logo b span{color:var(--orange)}.logo small{display:block;color:var(--cyan-l);font-size:14px}.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.who{font-size:14px;color:#cfe3ef;display:flex;align-items:center;gap:8px}.who select{background:#ffffff14;border:1px solid #ffffff30;color:#fff;border-radius:8px;padding:5px 8px}.who select option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:16px;flex-wrap:wrap}.tab>button{background:none;border:0;color:#c3dbea;font:500 16px var(--sans);padding:12px 18px;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:8px}.tab>button:hover{color:#fff;background:#ffffff12}.tab.on>button{background:var(--bg);color:var(--fg);font-weight:600}
+.caret{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.menu{position:absolute;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:15;display:flex;flex-direction:column;margin-top:2px}.tab{position:relative}.menu button{background:none;border:0;text-align:left;color:var(--fg);font:500 15.5px var(--sans);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;gap:12px}.menu button:hover{background:var(--soft)}.menu button.on{background:var(--info-bg);color:var(--info);font-weight:600}.menu small,.n{font:600 11.5px var(--mono);background:var(--orange);color:#fff;border-radius:10px;padding:1px 7px}
+.page{padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.cx-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}h1{font-size:25px;font-weight:600;margin:0}h2{font-size:19px;font-weight:600;margin:0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.seg button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.seg button.on{background:var(--navy);color:#fff}
+.rail{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}@media (max-width:900px){.rail{grid-template-columns:1fr}}.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.ph small{color:var(--muted);font-size:14px}
+.lines{display:flex;flex-direction:column;padding:0 20px 16px}.lines div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}.lines div:first-child{border-top:0}.lines dd,.lines span:last-child{font-family:var(--mono);font-weight:600}.lines .tot{font-weight:700}.lines .bad{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 16px}.tile{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 12px}.tile span{display:block;font-size:13px;color:var(--muted)}.tile b{font:600 19px var(--mono)}
+.cwrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--th);color:var(--thc);font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:10px 12px;border-right:1px solid var(--line);white-space:nowrap}td{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.35}tbody tr:nth-child(even) td{background:var(--zebra)}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}.due{background:var(--bad-bg);color:var(--bad)}.dueo{background:var(--warn-bg);color:var(--warn)}.appr{background:var(--info-bg);color:var(--info)}.paid{background:var(--good-bg);color:var(--good)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:9px;padding:7px 14px;font-weight:600;font-size:14.5px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.okb{background:var(--good);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:14px 20px;background:var(--soft);border-top:1px solid var(--line)}.form label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}.form select,.form input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line)}
+.alert{background:var(--bad-bg);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:15px;font-weight:500;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.note{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+</style>
+<style>
+/* Live portal colours (Design 2 · Ocean Wave): blue-to-cyan bar, active tab marked in orange. */
+.top{background:linear-gradient(100deg,#0571D0 0%,#2aa6ec 60%,#35CCFA 100%);box-shadow:0 2px 0 #9EE3F1}
+.tab>button{color:#eaf7fd}.tab>button:hover{background:#ffffff26;color:#fff}.tab.on>button{background:var(--bg);color:#0571D0;box-shadow:inset 0 3px 0 #F25615}
+.tabs{overflow-x:auto;scrollbar-width:none;flex-wrap:nowrap}.tabs::-webkit-scrollbar{display:none}
+.menu{position:fixed;min-width:250px}.menu h6{margin:8px 14px 4px;font:600 11.5px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}.menu h6:first-child{margin-top:4px}.menu hr{border:0;border-top:1px solid var(--line);margin:6px 8px}
+.cmp{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.cmp b{font-size:14px;color:var(--muted);font-weight:500}
+.count{font:600 13px var(--mono);color:var(--muted)}
+.map{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;padding:0 20px 20px}.map div{border:1px solid var(--line);border-radius:12px;padding:12px 14px;min-width:0}.map h3{margin:0 0 6px;font-size:16px;font-weight:600;display:flex;gap:8px;align-items:center}.map ul{margin:0;padding-left:18px;color:var(--muted);font-size:14.5px;line-height:1.7}.map li.new{color:var(--fg);font-weight:600}.map h4{margin:8px 0 2px;font:600 11.5px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--blue)}
+.tag{font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;background:var(--info-bg);color:var(--info)}
+.where{font-size:14px;color:var(--muted);margin:0 0 4px}
+.ph-body{padding:0 20px 20px;color:var(--muted);font-size:15px}
+</style>
+<header class="top"><div class="w">
+  <div class="brand"><div class="logo"><div class="mark">NW</div><div><b>New Wave <span>Portal</span><span class="proto">PROTOTYPE</span></b><small>Ride the New Wave of Maritime Excellence</small></div></div>
+  <div class="who">Working as <select><option>Admin</option></select></div></div>
+  <nav class="tabs" id="tabs"></nav>
+</div></header>
+<main class="page"><div class="w">
+  <div class="cmp"><b>Compare</b><div class="seg" style="margin:0" id="mode"><button data-m="after" class="on">Consolidated · 6 Tabs</button><button data-m="before">Today · 9 Tabs</button></div></div>
+  <div id="page"></div>
+</div></main>
+<div id="menu" class="menu" hidden></div>
+<script>
+const BEFORE=[
+  {l:"Dashboard",i:["Dashboard"]},{l:"Search Trainee",i:["Search Trainee"]},{l:"Enrollments",i:["Enrollments"]},{l:"Schedules",i:["Schedules"]},{l:"Resource Planning",i:["Resource Planning"]},
+  {l:"Configuration",i:["Courses","Post-Tests","Classroom Links","Employee Accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of Fees","Payment Channels","Expense Categories","Other Income Categories","Requisition Items","Holidays"]},
+  {l:"Requests",i:["Requests"]},{l:"Reports",i:["Daily Summary Report","Receipts and TARs","Cash and Sales Summary","Billing Statement"]},{l:"MISMO",i:["MISMO Dashboard","Final List","Submissions","Completion Records"]}];
+// Consolidated: trainee work in one dropdown, schedules in one, Configuration grouped by kind and placed last.
+const AFTER=[
+  {l:"Dashboard",i:["Dashboard"]},
+  {l:"Enrollments",i:["Search Trainee","Enrollments","Requests"]},
+  {l:"Schedules",i:["Schedules","Resource Planning"]},
+  {l:"Reports",i:["Daily Summary Report","Receipts and TARs","Cash and Sales Summary","Billing Statement"]},
+  {l:"MISMO",i:["MISMO Dashboard","Final List","Submissions","Completion Records"]},
+  {l:"Configuration",g:[["Training",["Courses","Post-Tests","Classroom Links","Instructors","Classrooms","Certifications","Holidays"]],["Fees and Accounts",["Schedule of Fees","Payment Channels","Expense Categories","Other Income Categories","Requisition Items"]],["People and Partners",["Employee Accounts","Partnered Centers"]]]}];
+const MOVED=new Set(["Search Trainee","Requests","Resource Planning"]);
+let mode="after",cur="Dashboard",openTab=null;
+const tabs=()=>mode==="after"?AFTER:BEFORE;
+const itemsOf=t=>t.i||t.g.flatMap(g=>g[1]);
+const tabOf=item=>tabs().find(t=>itemsOf(t).includes(item));
+const $=s=>document.querySelector(s);
+function render(){
+  $("#tabs").innerHTML=tabs().map((t,k)=>{const items=itemsOf(t),single=items.length===1&&items[0]===t.l;return `<div class="tab ${tabOf(cur)===t?"on":""}"><button data-k="${k}">${t.l}${single?"":'<span class="caret"></span>'}</button></div>`}).join("");
+  const t=tabOf(cur);
+  $("#page").innerHTML=`<div class="cx-head"><div><span class="eyebrow">${t.l===cur?"Admin":t.l}</span><h1>${cur}</h1></div><span class="count">${tabs().length} tabs in the bar</span></div>`+(cur==="Dashboard"?mapPanel():`<section class="panel"><div class="ph"><h2>${cur}</h2><small>Same screen as today</small></div><p class="ph-body">${MOVED.has(cur)&&mode==="after"?`Moved: now under <b>${t.l} ▾</b>.`:"Unchanged."}</p></section>`);
+}
+function mapPanel(){
+  if(mode!=="after")return `<section class="panel"><div class="ph"><h2>Today</h2><small>9 tabs · Configuration holds 14 items in one long list</small></div><div class="map">${BEFORE.map(t=>`<div><h3>${t.l}</h3><ul>${t.i.map(x=>`<li>${x}</li>`).join("")}</ul></div>`).join("")}</div></section>`;
+  return `<section class="panel"><div class="ph"><h2>What Moves</h2><small>Bold items moved in</small></div><div class="map">${AFTER.map(t=>`<div><h3>${t.l}${itemsOf(t).length>1?' <span class="tag">Dropdown</span>':""}</h3>${t.g?t.g.map(([h,xs])=>`<h4>${h}</h4><ul>${xs.map(x=>`<li>${x}</li>`).join("")}</ul>`).join(""):`<ul>${t.i.map(x=>`<li class="${MOVED.has(x)?"new":""}">${x}</li>`).join("")}</ul>`}</div>`).join("")}</div><p class="note">Requisitions still opens from the Dashboard. Nothing is removed; only where the buttons sit changes.</p></section>`;
+}
+function showMenu(k,btn){
+  const t=tabs()[k],m=$("#menu");
+  if(itemsOf(t).length===1&&itemsOf(t)[0]===t.l){cur=t.l;closeMenu();render();return}
+  if(openTab===k){closeMenu();return}
+  openTab=k;
+  const b=x=>`<button data-i="${x}" class="${cur===x?"on":""}">${x}</button>`;
+  m.innerHTML=t.g?t.g.map(([h,xs],n)=>`${n?"<hr>":""}<h6>${h}</h6>${xs.map(b).join("")}`).join(""):t.i.map(b).join("");
+  m.hidden=false;
+  const r=btn.getBoundingClientRect(),w=Math.max(250,m.offsetWidth);
+  m.style.top=`${r.bottom+2}px`;m.style.left=`${Math.max(8,Math.min(r.left,innerWidth-w-8))}px`;
+  m.style.maxHeight=`${innerHeight-r.bottom-16}px`;m.style.overflowY="auto";
+}
+function closeMenu(){openTab=null;$("#menu").hidden=true}
+document.addEventListener("click",e=>{
+  const tb=e.target.closest("#tabs button");if(tb){showMenu(+tb.dataset.k,tb);return}
+  const it=e.target.closest("#menu button");if(it){cur=it.dataset.i;closeMenu();render();return}
+  const md=e.target.closest("#mode button");if(md){mode=md.dataset.m;document.querySelectorAll("#mode button").forEach(x=>x.classList.toggle("on",x===md));closeMenu();render();return}
+  if(!e.target.closest("#menu"))closeMenu();
+});
+addEventListener("resize",closeMenu);addEventListener("keydown",e=>{if(e.key==="Escape")closeMenu()});
+render();
+</script>

@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
 import { groupNotices, holidayReminders, holidaysInMonth, totalsByChannel, voidReasonProblem, type HolidayDay, type MarinaStatus, type Notice } from "@/lib/admin-dashboard";
-import { requisitionState } from "@/lib/admin-assistant";
 import { Badge, Message, fmtDate, fullName, usePost as useRawPost } from "./shared-ui";
 import { certificateLines } from "./releasing-home";
 import { upcoming } from "./admin-assistant-home";
@@ -26,8 +25,7 @@ type Dash = {
   unreconciled: { channel: string; count: number; total: number; oldest: string | null }[];
   holidays: HolidayDay[];
 };
-type Requisition = { id: string; requisition_number: string; status: string; total_centavos: number; created_at: string; lines?: { description: string; quantity: number }[]; expenses?: { status: string; voucher_number?: string | null } | { status: string; voucher_number?: string | null }[] | null };
-type Extra = { requisitions?: Requisition[]; holidays?: { holiday_date: string; name: string; kind: string; marina_status: string }[] };
+type Extra = { holidays?: { holiday_date: string; name: string; kind: string; marina_status: string }[] };
 const extra = (d: PortalData) => d as unknown as Extra;
 const weekday = (d: string) => new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T12:00:00+08:00`));
 const when = (v: string) => new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(v));
@@ -102,7 +100,6 @@ export function AdminHome({ data, go, reload }: { data: PortalData; go: (m: stri
   const channels = [...CHANNELS, ...(coll.Other || rel.Other ? ["Other"] : [])];
   const totalColl = Object.values(coll).reduce((s, v) => s + v, 0), totalRel = Object.values(rel).reduce((s, v) => s + v, 0);
   const approvals = useApprovals(data);
-  const reqs = (extra(data).requisitions ?? []).slice(0, 8);
   const days: string[] = []; for (let d = from; d <= to && days.length < 62; d = addDays(d, 1)) days.push(d);
   const peak = Math.max(1, ...days.map((d) => dash?.enrollmentsPerDay[d] ?? 0));
   const stcw = (dash?.classes ?? []).filter((c) => c.stcw);
@@ -134,7 +131,6 @@ export function AdminHome({ data, go, reload }: { data: PortalData; go: (m: stri
       <div className="cx-tile"><span>Collections</span><b>{pesos2(totalColl)}</b></div>
       <div className="cx-tile"><span>Releases (Expenses Paid)</span><b>{pesos2(totalRel)}</b></div>
       <div className={`cx-tile${approvals.length ? " cl-overdue" : ""}`}><span>Requests and Approvals Waiting</span><b>{approvals.length}</b></div>
-      <div className="cx-tile"><span>Requisitions for Approval</span><b>{(extra(data).requisitions ?? []).filter((r) => r.status === "For Approval").length}</b></div>
     </div>
 
     <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Ongoing Classes · STCW Courses</h2><small>In class today, {fmtDate(today)}</small></div>
@@ -162,12 +158,6 @@ export function AdminHome({ data, go, reload }: { data: PortalData; go: (m: stri
       </tbody></table></div>
     </section>
 
-    <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Requisition Requests</h2><button type="button" className="portal-secondary" onClick={() => go("Requisitions")}>Open Requisitions</button></div>
-      {reqs.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>RQ No.</th><th>Date</th><th>Items</th><th>Total</th><th>Status</th></tr></thead><tbody>
-        {reqs.map((r) => { const s = requisitionState({ status: r.status, expense_status: first(r.expenses)?.status }); return <tr key={r.id}><td className="cl-mono">{r.requisition_number}</td><td>{fmtDate(r.created_at.slice(0, 10))}</td><td>{(r.lines ?? []).map((l) => `${l.description} × ${l.quantity}`).join(", ")}</td><td className="cl-mono">{pesos2(r.total_centavos)}</td><td><Badge tone={s === "For Approval" ? "orange" : s === "Released" ? "green" : s === "Rejected" || s === "Voided" ? "red" : "blue"}>{s}</Badge></td></tr>; })}
-      </tbody></table></div> : <p className="portal-empty-copy">No requisitions yet.</p>}
-    </section>
-
     <HolidayPanel holidays={dash?.holidays ?? []} month={month} setMonth={setMonth} reload={reload} onChanged={() => setFrom((f) => f)} today={today} go={go} />
   </div>;
 }
@@ -183,7 +173,6 @@ function useApprovals(data: PortalData): Approval[] {
     const reqs = (data as unknown as { requests: { id: string; enrollment_id: string; request_type: string; status: string; stage?: string | null }[] }).requests ?? [];
     for (const r of reqs.filter((r) => r.status === "Pending")) out.push({ key: `r${r.id}`, type: r.request_type, item: who(r.enrollment_id), ref: enr.get(r.enrollment_id)?.enrollment_number ?? "—", amount: null, with: r.stage === "With cashier" ? "Cashier (fee)" : "Accounting Manager" });
     for (const c of (data.certificates as unknown as { id: string; enrollment_id: string; void_status?: string | null; certificate_number?: string | null }[]).filter((c) => c.void_status === "Requested")) out.push({ key: `c${c.id}`, type: "Certificate Void", item: who(c.enrollment_id), ref: c.certificate_number ?? "—", amount: null, with: "Admin" });
-    for (const q of (extra(data).requisitions ?? []).filter((q) => q.status === "For Approval")) out.push({ key: `q${q.id}`, type: "Requisition", item: (q.lines ?? []).map((l) => `${l.description} × ${l.quantity}`).join(", "), ref: q.requisition_number, amount: Number(q.total_centavos), with: "Admin or Accounting Manager" });
     return out;
   }, [data]);
 }
@@ -350,7 +339,7 @@ export function AdminVouchers() {
       {data && !list.length && <tr><td colSpan={8}><span className="portal-empty-copy">No vouchers in these dates.</span></td></tr>}
     </tbody></table></div>
     {act && (() => { const v = list.find((x) => x.id === act); return v ? <VoidBox title="Void Voucher" busy={busy} onCancel={() => setAct(null)}
-      detail={`${pesos2(v.amount)} to ${v.payee} leaves the expense totals and the cash position. The voucher prints VOID; ${v.number} is kept and never reused.${v.payee.startsWith("Requisition") ? " The requisition shows Voided." : ""}${v.status === "Paid" && (v.channel ?? "Cash") === "Cash" ? " If the cash was handed out, return it to the drawer." : ""}`}
+      detail={`${pesos2(v.amount)} to ${v.payee} leaves the expense totals and the cash position. The voucher prints VOID; ${v.number} is kept and never reused.${v.status === "Paid" && (v.channel ?? "Cash") === "Cash" ? " If the cash was handed out, return it to the drawer." : ""}`}
       onConfirm={async (reason) => { if (await post({ action: "expense-void", id: v.id, reason }, `${v.number} voided.`)) setAct(null); }} /> : null; })()}
   </section>;
 }

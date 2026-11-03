@@ -3,32 +3,23 @@
 import { useEffect, useState } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, balanceOf, first, manilaToday, pesos2 } from "@/lib/portal-format";
-import { ROLES, accreditationFor, handles, moveTargets, planRows, rangesOverlap, requisitionState, requisitionTotal, type Accreditation, type Duty, type PlanBatch, type PlanRow, type RequisitionLine, type RequisitionState } from "@/lib/admin-assistant";
+import { ROLES, accreditationFor, handles, moveTargets, planRows, rangesOverlap, type Accreditation, type Duty, type PlanBatch, type PlanRow } from "@/lib/admin-assistant";
 import { Badge, Message, Modal, fmtDate, periodRange, usePost, usePaged } from "./shared-ui";
-import { EXPENSE_REASONS, RejectInline } from "./reject-inline";
 import { CHANNELS, type Channel, type DaySummary, type ReconStatus } from "@/lib/reconciliation";
 import { MoveBatch } from "./move-batch";
 import { downloadCsv } from "@/lib/csv";
 import type { BatchRoster } from "@/lib/batch-roster";
 
 /**
- * Admin Assistant (owner, 9 Oct 2026): requisitions of supplies (approved by the
- * Admin or the Accounting Manager, released by the Cashier as an expense voucher),
- * resource planning (course › batch › classroom › students › instructor) and the
+ * Admin Assistant (owner, 9 Oct 2026): resource planning (course › batch › classroom › students › instructor) and the
  * instructor shortlist with course accreditations.
  */
 
-type Requisition = { id: string; requisition_number: string; purpose: string; needed_by?: string | null; lines: RequisitionLine[]; total_centavos: number; status: string; decision_remarks?: string | null; created_at: string;
-  requester?: { complete_name: string } | { complete_name: string }[] | null; expenses?: { status: string; voucher_number?: string | null; expense_number: string } | { status: string; voucher_number?: string | null; expense_number: string }[] | null };
-type Item = { id: string; name: string; unit: string; default_cost_centavos: number; active: boolean };
 type Instructor = { id: string; complete_name: string; mobile?: string | null; email?: string | null; notes?: string | null; active: boolean };
 type Plan = { batch_id: string; classroom_id?: string | null; instructor_id?: string | null; alt_instructor_id?: string | null; assessor_id?: string | null };
-type AssistantData = { requisitions?: Requisition[]; requisitionItems?: Item[]; instructors?: Instructor[]; accreditations?: (Accreditation & { id: string })[]; batchResources?: Plan[] };
+type AssistantData = { instructors?: Instructor[]; accreditations?: (Accreditation & { id: string })[]; batchResources?: Plan[] };
 const extra = (data: PortalData) => data as unknown as AssistantData;
-const TONE: Record<RequisitionState, string> = { "For Approval": "orange", Approved: "blue", Released: "green", Rejected: "red", Voided: "red" };
 const day = (v: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(v));
-const stateOf = (r: Requisition) => requisitionState({ status: r.status, expense_status: first(r.expenses)?.status });
-const itemsText = (r: Requisition) => (r.lines ?? []).map((l) => `${l.description} × ${l.quantity}`).join(", ");
 function Head({ title, children, eyebrow = "Admin Assistant" }: { title: string; children?: React.ReactNode; eyebrow?: string }) {
   return <div className="cx-head"><div><span className="portal-eyebrow">{eyebrow}</span><h1>{title}</h1></div>{children}</div>;
 }
@@ -62,10 +53,7 @@ export function upcoming(data: PortalData): (PlanRow & { b: PortalData["batches"
 }
 
 export function AssistantDashboard({ data, go }: { data: PortalData; go: (m: string) => void }) {
-  const today = manilaToday(), month = today.slice(0, 7), soon = addDays(today, 30), week = addDays(today, 7);
-  const reqs = extra(data).requisitions ?? [];
-  const count = (s: RequisitionState) => reqs.filter((r) => stateOf(r) === s).length;
-  const released = reqs.filter((r) => stateOf(r) === "Released" && day(r.created_at).slice(0, 7) === month).reduce((s, r) => s + r.total_centavos, 0);
+  const today = manilaToday(), soon = addDays(today, 30), week = addDays(today, 7);
   const plan = upcoming(data).filter((p) => p.b.starts_on <= week);
   const gaps = plan.filter((p) => p.issues.length);
   const gapsP = usePaged(gaps);
@@ -74,19 +62,11 @@ export function AssistantDashboard({ data, go }: { data: PortalData; go: (m: str
   const expiring = (extra(data).accreditations ?? []).filter((a) => a.valid_until && a.valid_until <= soon).sort((a, z) => (a.valid_until ?? "").localeCompare(z.valid_until ?? ""));
   const expP = usePaged(expiring);
   return <div className="portal-page cx ac">
-    <Head title="Dashboard"><button type="button" className="portal-primary" onClick={() => go("Requisitions")}>New Requisition</button></Head>
+    <Head title="Dashboard" />
     <ReconcileBanner go={go} />
     {gaps.length > 0 && <div className="ms-banner red"><b>{gaps.length} batch{gaps.length === 1 ? "" : "es"} this week need a classroom, an instructor or a check</b><button type="button" className="ms-bbtn" onClick={() => go("Resource planning")}>Open Resource Planning</button></div>}
     <div className="ac-rail">
       <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Requisitions</h2></div>
-          <div className="cx-tiles ac-tiles ac-tiles-in">
-            <div className="cx-tile ac-count" style={{ ["--c" as string]: "#F25615" }}><span>For Approval</span><b>{count("For Approval")}</b></div>
-            <div className="cx-tile ac-count" style={{ ["--c" as string]: "#0571D0" }}><span>Approved · With the Cashier</span><b>{count("Approved")}</b></div>
-            <div className="cx-tile ac-count" style={{ ["--c" as string]: "#0a7a3e" }}><span>Released</span><b>{count("Released")}</b></div>
-            <div className="cx-tile ac-total ac-count"><span>Released This Month</span><b>{pesos2(released)}</b></div>
-          </div>
-        </section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Resources This Week</h2></div>
           <dl className="ac-lines"><div><dt>Batches</dt><dd>{plan.length}</dd></div><div><dt>Students</dt><dd>{plan.reduce((s, p) => s + Number(p.b.confirmed_count ?? 0), 0)}</dd></div><div><dt>Need Attention</dt><dd>{gaps.length}</dd></div><div><dt>Instructors on Shortlist</dt><dd>{(extra(data).instructors ?? []).filter((i) => i.active).length}</dd></div></dl>
         </section>
@@ -104,57 +84,6 @@ export function AssistantDashboard({ data, go }: { data: PortalData; go: (m: str
         </section>
       </div>
     </div>
-  </div>;
-}
-
-type Draft = { itemId: string; description: string; quantity: number; unit: string };
-export function AssistantRequisitions({ data, reload, canRaise, canDecide }: { data: PortalData; reload: () => Promise<void>; canRaise: boolean; canDecide: boolean }) {
-  const { busy, msg, post } = usePost(reload);
-  const items = (extra(data).requisitionItems ?? []).filter((i) => i.active);
-  const reqs = extra(data).requisitions ?? [];
-  const blank = (): Draft => ({ itemId: items[0]?.id ?? "", description: items[0]?.name ?? "", quantity: 1, unit: items[0] ? (items[0].default_cost_centavos / 100).toFixed(2) : "" });
-  const [adding, setAdding] = useState(false);
-  const [purpose, setPurpose] = useState("");
-  const [neededBy, setNeededBy] = useState("");
-  const [lines, setLines] = useState<Draft[]>([]);
-  const [rejecting, setRejecting] = useState<string | null>(null);
-  const toLines = (): RequisitionLine[] => lines.map((l) => ({ description: l.description.trim(), quantity: l.quantity, unitCentavos: Math.round(Number(l.unit || 0) * 100) }));
-  const total = requisitionTotal(toLines());
-  const valid = purpose.trim().length >= 2 && lines.length > 0 && toLines().every((l) => l.description && l.quantity > 0 && l.unitCentavos > 0);
-  const setLine = (i: number, patch: Partial<Draft>) => setLines(lines.map((l, k) => (k === i ? { ...l, ...patch } : l)));
-  const pickItem = (i: number, id: string) => { const it = items.find((x) => x.id === id); setLine(i, it ? { itemId: id, description: it.name, unit: (it.default_cost_centavos / 100).toFixed(2) } : { itemId: "", description: "" }); };
-  const send = () => void post({ action: "requisition-create", purpose: purpose.trim(), neededBy: neededBy || null, lines: toLines() }, "Sent for approval.").then(() => { setAdding(false); setPurpose(""); setNeededBy(""); setLines([]); }).catch(() => undefined);
-  return <div className="portal-page cx ac">
-    <div className="cx-head"><div><span className="portal-eyebrow">{canRaise ? "Admin Assistant" : "Approvals"}</span><h1>Requisitions</h1></div>{canRaise && !adding && <button type="button" className="portal-primary" onClick={() => { setAdding(true); setLines([blank()]); }}>New Requisition</button>}</div>
-    {msg && <Message kind={msg.kind} text={msg.text} />}
-    {adding && <section className="portal-panel cx-panel"><div className="panel-heading"><h2>New Requisition</h2></div>
-      <div className="portal-form cx-formpad">
-        <label>Purpose<input value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="Pantry restock" /></label>
-        <label>Needed By<input type="date" value={neededBy} min={manilaToday()} onChange={(e) => setNeededBy(e.target.value)} /></label>
-      </div>
-      <div className="cl-wrap"><table className="cl-log aa-lines"><thead><tr><th>Item</th><th>Quantity</th><th>Unit Cost (₱)</th><th>Amount</th><th></th></tr></thead><tbody>
-        {lines.map((l, i) => <tr key={i}>
-          <td><select aria-label="Item" value={l.itemId} onChange={(e) => pickItem(i, e.target.value)}>{items.map((it) => <option key={it.id} value={it.id}>{it.name} ({it.unit})</option>)}<option value="">Other</option></select>
-            {!l.itemId && <input aria-label="Item name" value={l.description} placeholder="Item name" onChange={(e) => setLine(i, { description: e.target.value })} />}</td>
-          <td><input type="number" min={1} aria-label="Quantity" value={l.quantity} onChange={(e) => setLine(i, { quantity: Math.max(1, Math.floor(Number(e.target.value) || 1)) })} /></td>
-          <td><input type="number" min={0} step="0.01" aria-label="Unit cost" value={l.unit} onChange={(e) => setLine(i, { unit: e.target.value })} /></td>
-          <td className="cl-mono">{pesos2(l.quantity * Math.round(Number(l.unit || 0) * 100))}</td>
-          <td><button type="button" className="portal-secondary" onClick={() => setLines(lines.filter((_, k) => k !== i))}>Remove</button></td></tr>)}
-      </tbody></table></div>
-      <div className="aa-total"><button type="button" className="portal-secondary" disabled={lines.length >= 10} onClick={() => setLines([...lines, blank()])}>Add Item</button><span>Total <b className="cl-mono">{pesos2(total)}</b></span><button type="button" className="portal-secondary" onClick={() => setAdding(false)}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !valid} onClick={send}>Send for Approval</button></div>
-      {!items.length && <p className="ac-foot">No items on the list yet. Accounting adds them in Configuration › Requisition Items; you can still type an item under Other.</p>}
-    </section>}
-    <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Requisition Log</h2><span className="slot-count">{reqs.length}</span></div>
-      {reqs.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>RQ No.</th><th>Date</th><th>Requested By</th><th>Items</th><th>Purpose</th><th>Total</th><th>Status</th>{canDecide && <th></th>}</tr></thead><tbody>
-        {reqs.map((r, i) => { const s = stateOf(r), ex = first(r.expenses); return [<tr key={r.id}>
-          <td className="cl-no">{i + 1}</td><td className="cl-mono">{r.requisition_number}</td><td>{fmtDate(day(r.created_at))}</td><td>{first(r.requester)?.complete_name ?? "—"}</td><td>{itemsText(r)}</td><td>{r.purpose}{r.needed_by ? <small> · needed by {fmtDate(r.needed_by)}</small> : null}</td>
-          <td className="cl-mono">{pesos2(r.total_centavos)}</td>
-          <td><Badge tone={TONE[s]}>{s}{ex?.voucher_number && s !== "Rejected" ? ` · ${ex.voucher_number}` : ""}</Badge>{s === "Rejected" && r.decision_remarks ? <small> {r.decision_remarks}</small> : null}</td>
-          {canDecide && <td>{s === "For Approval" && rejecting !== r.id && <span className="cl-acts"><button type="button" className="portal-secondary" disabled={busy} onClick={() => setRejecting(r.id)}>Reject</button><button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "requisition-decide", id: r.id, approve: true }, "Approved. The voucher is with the Cashier.").catch(() => undefined)}>Approve</button></span>}</td>}
-        </tr>, rejecting === r.id && <tr key={`${r.id}-rej`}><td colSpan={9}><RejectInline reasons={EXPENSE_REASONS} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void post({ action: "requisition-decide", id: r.id, approve: false, remarks: why }, "Rejected.").then(() => setRejecting(null)).catch(() => undefined)} /></td></tr>]; })}
-      </tbody></table></div> : <p className="portal-empty-copy">No requisitions yet.</p>}
-      <p className="ac-foot">Approved by the Admin or the Accounting Manager; the approval issues a voucher (CV) in Expenses and the Cashier releases the funds.</p>
-    </section>
   </div>;
 }
 

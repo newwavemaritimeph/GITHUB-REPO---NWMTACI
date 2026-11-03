@@ -184,11 +184,7 @@ const deliveryCheckInput = z.object({ action: z.literal("delivery-check"), id: z
 const deliveryDeclineInput = z.object({ action: z.literal("delivery-decline"), id: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
 const deliveryShipInput = z.object({ action: z.literal("delivery-ship"), id: z.string().uuid(), trackingNumber: z.string().trim().min(4).max(60), shippedOn: z.string().date() });
 const deliveryDeliveredInput = z.object({ action: z.literal("delivery-delivered"), id: z.string().uuid() });
-// Admin Assistant (owner, 9 Oct 2026): requisitions, instructor shortlist, resource planning.
-const requisitionLine = z.object({ description: z.string().trim().min(1).max(160), quantity: z.number().int().min(1).max(9999), unitCentavos: z.number().int().positive() });
-const requisitionCreateInput = z.object({ action: z.literal("requisition-create"), purpose: z.string().trim().min(2).max(300), neededBy: z.string().date().nullable().optional(), lines: z.array(requisitionLine).min(1).max(10) });
-const requisitionDecideInput = z.object({ action: z.literal("requisition-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(300).optional() });
-const requisitionItemInput = z.object({ action: z.literal("requisition-item-save"), id: z.string().uuid().optional(), name: z.string().trim().min(1).max(120), unit: z.string().trim().max(40).optional(), defaultCostCentavos: z.number().int().min(0).optional(), active: z.boolean().optional(), remove: z.boolean().optional() });
+// Admin Assistant (owner, 9 Oct 2026): instructor shortlist, resource planning.
 const instructorSaveInput = z.object({ action: z.literal("instructor-save"), id: z.string().uuid().optional(), completeName: z.string().trim().min(2).max(160), mobile: z.string().trim().max(40).optional().default(""), email: z.string().trim().max(160).optional().default(""), notes: z.string().trim().max(300).optional().default(""), active: z.boolean().optional() });
 const accreditationInput = z.object({ action: z.literal("instructor-accreditation-save"), instructorId: z.string().uuid(), courseId: z.string().uuid(), accreditationNumber: z.string().trim().max(80).optional().default(""), validUntil: z.string().date().nullable().optional(), remove: z.boolean().optional(), role: z.enum(["Instructor", "Assessor", "Instructor and Assessor"]).optional().default("Instructor") });
 const reconcileMarkInput = z.object({ action: z.literal("reconcile-mark"), paymentIds: z.array(z.string().uuid()).min(1).max(100), status: z.enum(["Reconciled", "Not in History"]), remarks: z.string().trim().max(300).optional() });
@@ -306,7 +302,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [paymentVoidRequestInput, paymentVoidDecideInput, statementIssueInput, statementVoidInput, enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, traineeFacebookInput, admissionRecordInput, documentReprintInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, requisitionCreateInput, requisitionDecideInput, requisitionItemInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [paymentVoidRequestInput, paymentVoidDecideInput, statementIssueInput, statementVoidInput, enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, traineeFacebookInput, admissionRecordInput, documentReprintInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 /** A proof the trainee sent (29 Oct 2026) backs one payment of that trainee, unless marked Not Valid. Staff-filed proofs return null. */
 async function traineeProofProblem(admin: ReturnType<typeof createSupabaseAdminClient>, proofId: string, traineeId: string) {
@@ -1152,16 +1148,7 @@ export async function GET() {
     deliveryRequests = rowsWithIds.map((r) => ({ ...r, certificate_status: certByEnrollment.get(r.enrollment_id)?.status ?? null, certificate_number: certByEnrollment.get(r.enrollment_id)?.certificate_number ?? null }));
   });
   // Admin Assistant data (migration 202610090033; empty without it).
-  let requisitions: unknown[] = [], requisitionItems: unknown[] = [], instructors: unknown[] = [], accreditations: unknown[] = [], batchResources: unknown[] = [], batchCancels: unknown[] = [];
-  if (staff.roleCodes.some((r) => ["admin", "admin_assistant", "accounting", "cashier"].includes(r))) task(async () => {
-    const admin = createSupabaseAdminClient();
-    const [rq, items] = await Promise.all([
-      admin.from("requisitions").select("id,requisition_number,purpose,needed_by,lines,total_centavos,status,decision_remarks,decided_at,created_at,expense_id,requester:profiles!requisitions_requested_by_fkey(complete_name),expenses(status,voucher_number,expense_number)").order("created_at", { ascending: false }).limit(300),
-      admin.from("requisition_items").select("id,name,unit,default_cost_centavos,active").order("name"),
-    ]);
-    requisitions = rq.error ? [] : rq.data ?? [];
-    requisitionItems = items.error ? [] : items.data ?? [];
-  });
+  let instructors: unknown[] = [], accreditations: unknown[] = [], batchResources: unknown[] = [], batchCancels: unknown[] = [];
   if (canAssist(staff.roleCodes)) task(async () => {
     const admin = createSupabaseAdminClient();
     const [ins, acc, res, cx] = await Promise.all([
@@ -1320,7 +1307,7 @@ export async function GET() {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, feedbackLinks: certs.feedbackLinks, certificatePhotos: certs.photos, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, traineeFacebook, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, pendingRebates, deliveryRequests, requisitions, requisitionItems, instructors, accreditations, batchResources, batchCancels, certificateNumberSettings, legacyCertificates, holidays, otherIncome, incomeCategories, rebatesReceived, traineeProofs, companyCharge, billingStatements, paymentVoids, voidedPayments }, { headers: { "Cache-Control": "no-store" } });
+    centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, traineeFacebook, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, pendingRebates, deliveryRequests, instructors, accreditations, batchResources, batchCancels, certificateNumberSettings, legacyCertificates, holidays, otherIncome, incomeCategories, rebatesReceived, traineeProofs, companyCharge, billingStatements, paymentVoids, voidedPayments }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /**
@@ -1663,60 +1650,6 @@ export async function POST(request: Request) {
       }
       const { error } = await admin.rpc("reject_expense", { target: input.id, actor: staff.user.id, remarks: input.remarks ?? null });
       if (error) return NextResponse.json({ error: /reject_expense/i.test(error.message) ? "Apply database update 202610070018 first." : error.message }, { status: 400 });
-      return NextResponse.json({ ok: true });
-    }
-    if (input.action === "requisition-create") {
-      if (!canAssist(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin Assistant can raise requisitions." }, { status: 403 });
-      const admin = createSupabaseAdminClient();
-      const total = input.lines.reduce((sum, l) => sum + l.quantity * l.unitCentavos, 0);
-      const year = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric" }).format(new Date()));
-      const { data: number, error: numberError } = await admin.rpc("next_reference", { prefix: "RQ", requested_year: year });
-      if (numberError || !number) return NextResponse.json({ error: numberError?.message ?? "Could not number the requisition." }, { status: 400 });
-      const { error } = await admin.from("requisitions").insert({ requisition_number: number, requested_by: staff.user.id, purpose: input.purpose, needed_by: input.neededBy ?? null, lines: input.lines, total_centavos: total });
-      if (error) return NextResponse.json({ error: /requisitions/i.test(error.message) ? "Apply database update 202610090033 first." : error.message }, { status: 400 });
-      await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "requisition.created", record_type: "requisition", record_id: String(number), new_values: { total_centavos: total, lines: input.lines } });
-      return NextResponse.json({ ok: true, number });
-    }
-    if (input.action === "requisition-decide") {
-      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin or the Accounting Manager can decide requisitions." }, { status: 403 });
-      const admin = createSupabaseAdminClient();
-      // Claim it first so two approvers can't both act on it.
-      const { data: claimed, error: claimError } = await admin.from("requisitions").update({ status: input.approve ? "Approved" : "Rejected", decided_by: staff.user.id, decided_at: new Date().toISOString(), decision_remarks: input.remarks ?? null })
-        .eq("id", input.id).eq("status", "For Approval").select("id,requisition_number,purpose,lines,total_centavos,requested_by").maybeSingle();
-      if (claimError) throw claimError;
-      if (!claimed) return NextResponse.json({ error: "This requisition was already decided." }, { status: 409 });
-      if (!input.approve) {
-        await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "requisition.rejected", record_type: "requisition", record_id: claimed.requisition_number, reason: input.remarks ?? null });
-        return NextResponse.json({ ok: true });
-      }
-      // Approval becomes an expense voucher the Cashier releases (owner's choice).
-      const lines = (claimed.lines ?? []) as { description: string; quantity: number; unitCentavos: number }[];
-      const year = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric" }).format(new Date()));
-      const undo = async (message: string) => { await admin.from("requisitions").update({ status: "For Approval", decided_by: null, decided_at: null, decision_remarks: null }).eq("id", claimed.id); return NextResponse.json({ error: message }, { status: 400 }); };
-      const { data: expenseNumber, error: numberError } = await admin.rpc("next_reference", { prefix: "ER", requested_year: year });
-      if (numberError || !expenseNumber) return undo(numberError?.message ?? "Could not number the expense.");
-      const purpose = `${claimed.purpose} (Requisition ${claimed.requisition_number}: ${lines.map((l) => `${l.description} × ${l.quantity}`).join(", ")})`.slice(0, 300);
-      const { data: expense, error: expenseError } = await admin.from("expenses").insert({ expense_number: expenseNumber, payee: `Requisition ${claimed.requisition_number}`, category: "Supplies", amount_centavos: claimed.total_centavos, purpose, status: "Pending", requested_by: claimed.requested_by ?? staff.user.id }).select("id").single();
-      if (expenseError) return undo(expenseError.message);
-      await admin.from("expenses").update({ request_number: expenseNumber }).eq("id", expense.id);
-      await admin.from("expenses").update({ line_items: lines }).eq("id", expense.id);
-      const { data: voucherNumber, error: approveError } = await admin.rpc("approve_expense", { target: expense.id, actor: staff.user.id, remarks: `Requisition ${claimed.requisition_number}` });
-      if (approveError) {
-        await admin.rpc("reject_expense", { target: expense.id, actor: staff.user.id, remarks: "Requisition approval did not complete" });
-        return undo(approveError.message);
-      }
-      await admin.from("requisitions").update({ expense_id: expense.id }).eq("id", claimed.id);
-      await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "requisition.approved", record_type: "requisition", record_id: claimed.requisition_number, new_values: { expense_id: expense.id, voucher_number: voucherNumber } });
-      const drive = await fileVoucherInDrive(admin, expense.id);
-      return NextResponse.json({ ok: true, voucherNumber, drive });
-    }
-    if (input.action === "requisition-item-save") {
-      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or the Admin can edit requisition items." }, { status: 403 });
-      const admin = createSupabaseAdminClient();
-      if (input.remove && input.id) { const { error } = await admin.from("requisition_items").delete().eq("id", input.id); if (error) throw error; return NextResponse.json({ ok: true }); }
-      const row = { name: input.name, ...(input.unit === undefined ? {} : { unit: input.unit || "pc" }), ...(input.defaultCostCentavos === undefined ? {} : { default_cost_centavos: input.defaultCostCentavos }), ...(input.active === undefined ? {} : { active: input.active }) };
-      const { error } = input.id ? await admin.from("requisition_items").update(row).eq("id", input.id) : await admin.from("requisition_items").insert(row);
-      if (error) return NextResponse.json({ error: error.code === "23505" ? "That item is already on the list." : /requisition_items/i.test(error.message) ? "Apply database update 202610090033 first." : error.message }, { status: 400 });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "instructor-save") {

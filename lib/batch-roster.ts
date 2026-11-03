@@ -27,7 +27,7 @@ export const sortRoster = (rows: RosterRow[]) => [...rows].sort((a, z) => (a.sta
 const REQUIRED = ["valid_id", "medical_peme", "photo_2x2", "seamans_book"];
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
 const sourceLabel = (source: string | null, partner: { name: string; kind?: string | null } | null) =>
-  partner ? `${partner.kind === "Consultancy" ? "Consultancy" : "Agency"} · ${partner.name}` : source === "Walk-in" ? "Walk-In" : source === "Meta" ? "Meta" : "Online";
+  partner ? `${partner.kind === "Consultancy" ? "Consultancy" : "Agency"} · ${partner.name}` : source === "Walk-in" ? "Walk-In" : "Online";
 
 export async function loadBatchRoster(db: ReturnType<typeof createSupabaseAdminClient>, batchId: string): Promise<BatchRoster | null> {
   const { data: b } = await db.from("batches").select("id,batch_number,starts_on,ends_on,daily_start,daily_end,venue,capacity,confirmed_count,courses(code,name)").eq("id", batchId).maybeSingle();

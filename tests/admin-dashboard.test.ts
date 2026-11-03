@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { groupNotices, holidayReminders, holidaysInMonth, totalsByChannel, voidReasonProblem, type HolidayDay, type Notice } from "@/lib/admin-dashboard";
-import { requisitionState } from "@/lib/admin-assistant";
 
 const n = (category: Notice["category"], severity: Notice["severity"], title: string): Notice => ({ category, severity, title, detail: "" });
 
@@ -38,10 +37,6 @@ describe("Admin voids", () => {
   it("needs a reason of at least 5 characters", () => {
     expect(voidReasonProblem("  ok ")).toMatch(/reason/);
     expect(voidReasonProblem("Duplicate receipt")).toBeNull();
-  });
-  it("shows a requisition whose voucher was voided as Voided", () => {
-    expect(requisitionState({ status: "Approved", expense_status: "Void" })).toBe("Voided");
-    expect(requisitionState({ status: "Approved", expense_status: "Paid" })).toBe("Released");
   });
   it("totals collections per channel", () => {
     expect(totalsByChannel([{ channel: "GCash", amount: 100 }, { channel: "gcash", amount: 50 }, { channel: "Union Bank", amount: 20 }, { channel: "Check", amount: 5 }], ["Cash", "GCash", "PSBank", "UnionBank"]))

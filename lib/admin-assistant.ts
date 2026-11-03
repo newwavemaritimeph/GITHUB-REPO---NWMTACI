@@ -2,20 +2,6 @@
  * Admin Assistant rules (owner, 9 Oct 2026), shared by the portal screens and tests.
  */
 
-export type RequisitionLine = { description: string; quantity: number; unitCentavos: number };
-export type RequisitionState = "For Approval" | "Approved" | "Released" | "Rejected" | "Voided";
-
-export const requisitionTotal = (lines: RequisitionLine[]) => lines.reduce((sum, l) => sum + Math.max(0, l.quantity) * Math.max(0, l.unitCentavos), 0);
-
-/** Approved requisitions become expense vouchers; once the Cashier releases it (Paid), the requisition reads Released. */
-export function requisitionState(r: { status: string; expense_status?: string | null }): RequisitionState {
-  if (r.status === "Rejected") return "Rejected";
-  // Its voucher voided by the Admin (202610090038).
-  if (r.status === "Approved" && r.expense_status === "Void") return "Voided";
-  if (r.status === "Approved") return r.expense_status === "Paid" ? "Released" : "Approved";
-  return "For Approval";
-}
-
 export type Accreditation = { instructor_id: string; course_id: string; accreditation_number?: string | null; valid_until?: string | null; role?: string | null };
 /** What a person does in a course (owner, 21 Oct 2026); rows saved before the roles count as Instructor. */
 export type Duty = "Instructor" | "Assessor";

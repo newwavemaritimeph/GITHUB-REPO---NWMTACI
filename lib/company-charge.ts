@@ -26,9 +26,9 @@ export function splitStatementPayment(amountCentavos: number, rows: { enrollment
 /** Where a trainee came from, as Registration sees it (owner, 29 Oct 2026). */
 export function sourceLabel(source: string | null | undefined, partner: { name: string; kind?: string | null } | null) {
   if (partner) return `${partner.kind === "Consultancy" ? "Consultancy" : "Agency"} · ${partner.name}`;
-  if (source === "Meta") return "Meta";
   if (source === "Walk-in") return "Walk-In";
-  if (source === "Online enrollment" || source === "Public registration") return "Online";
+  // Meta is the same as Online (owner, 3 Nov 2026).
+  if (source === "Online enrollment" || source === "Public registration" || source === "Meta") return "Online";
   return source === "Agency" ? "Agency" : "";
 }
 

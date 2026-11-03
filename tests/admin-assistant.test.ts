@@ -1,18 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accreditationFor, handles, planIssues, requisitionState, requisitionTotal } from "@/lib/admin-assistant";
-
-describe("requisitions", () => {
-  it("adds up quantity × unit cost", () => {
-    expect(requisitionTotal([{ description: "Coffee Cups", quantity: 4, unitCentavos: 18000 }, { description: "Coffee Beans", quantity: 2, unitCentavos: 65000 }])).toBe(202000);
-    expect(requisitionTotal([])).toBe(0);
-  });
-  it("reads Released once the Cashier pays the voucher", () => {
-    expect(requisitionState({ status: "For Approval" })).toBe("For Approval");
-    expect(requisitionState({ status: "Approved", expense_status: "Approved" })).toBe("Approved");
-    expect(requisitionState({ status: "Approved", expense_status: "Paid" })).toBe("Released");
-    expect(requisitionState({ status: "Rejected", expense_status: "Paid" })).toBe("Rejected");
-  });
-});
+import { accreditationFor, handles, planIssues } from "@/lib/admin-assistant";
 
 describe("resource planning", () => {
   const acc = [{ instructor_id: "i1", course_id: "c1", valid_until: "2026-12-31" }, { instructor_id: "i1", course_id: "c2", valid_until: "2026-09-30" }, { instructor_id: "i2", course_id: "c1", valid_until: null }];

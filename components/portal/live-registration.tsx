@@ -309,7 +309,7 @@ export function AssignCourseModal({ data, trainee, reload, onClose }: { data: Po
       {course && !dated && !isPackage && <div className="full"><BatchCards data={data} batches={batches} selected={batchId} onSelect={setBatchId} allowNone /></div>}
       {dated && course && <label className="full">Start Date (Optional)<input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /><small style={{ color: dateOk ? "var(--muted)" : "var(--red, #b42318)" }}>{!startDate ? `${course.duration_label} · Monday to Saturday, consecutive days in one week. Leave empty to set later.` : dateOk ? `${startDate < today ? "Backdated · ran" : "Runs"} ${fmtDate(startDate)} to ${fmtDate(automaticEndDate(startDate, course.duration_label))}` : "Pick a date that is not a Sunday and lets the course finish by Saturday of the same week."}</small></label>}
       {courseId && <div className="full tp"><div className="tp-source"><span className="tp-cap">Where the Trainee Came From · This Course</span>
-        <label><span>Source</span><select value={src} onChange={(ev) => setSrc(ev.target.value)}><option value="Walk-in">Walk-In</option><option value="Online enrollment">Online</option><option value="Meta">Meta (Facebook / Instagram)</option><option value="Agency">Agency / Consultancy</option></select></label>
+        <label><span>Source</span><select value={src} onChange={(ev) => setSrc(ev.target.value)}><option value="Walk-in">Walk-In</option><option value="Online enrollment">Online</option><option value="Agency">Agency / Consultancy</option></select></label>
         {src === "Agency" && <label><span>Partner</span><select value={srcPartner} onChange={(ev) => setSrcPartner(ev.target.value)}><option value="">Choose the partner…</option>{(["Agency", "Consultancy"] as const).map((k) => { const list = srcPartners.filter((a) => (a.kind === "Consultancy" ? "Consultancy" : "Agency") === k); return list.length ? <optgroup key={k} label={k === "Agency" ? "Agencies" : "Consultancies"}>{list.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</optgroup> : null; })}</select></label>}
       </div></div>}
       <div className="bc-foot full"><span>{otherCourse ? `${otherCourse.code} · Other STCW${offer ? ` · ${first(offer.partner_centers)?.name ?? ""} · fee ${pesos(Number(offer.training_fee_centavos))}` : " · center not set yet"}` : course ? (withBatch ? batchSummary(data, batches.find((x) => x.id === batchId)) : `${course.code} · fee ${pesos(course.standard_price_centavos)} · no batch yet`) : "Choose a course first."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!courseId || busy || (isPackage && !week) || (!otherCourse && !dateOk) || (!!offerId !== !!otherDate && !!otherCourse) || (src === "Agency" && !srcPartner)} onClick={assign}>{busy ? "Assigning…" : isPackage ? "Assign CCI Package" : withBatch ? "Assign Course and Batch" : "Assign Course"}</button></span></div>
@@ -362,7 +362,7 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
   const count = (f: RecordFilter) => all.filter((x) => inFilter(f, x.r)).length + (f === "For payment" ? 0 : awaiting.length);
   // Summary rail (owner, 8 Oct 2026): the filters, requirement counts and enrollment types on the left; the list on the right.
   const pending = all.filter((x) => x.r);
-  const types = ["Online", "Walk-In", "Meta", "Agency", "Consultancy"].map((k) => [k, data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && (enrollmentTypeOf(data, e) || "").startsWith(k)).length] as const);
+  const types = ["Online", "Walk-In", "Agency", "Consultancy"].map((k) => [k, data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && (enrollmentTypeOf(data, e) || "").startsWith(k)).length] as const);
   const FILTER_COLORS: Record<RecordFilter, string> = { "All enrollments": "#123F63", Screening: "#0571D0", "For payment": "#F25615" };
   return <>
     <div className="ac-rail">
@@ -411,7 +411,7 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
 /* -------------------------------------------------------------- Registration */
 
 /** Enrollment type (8 Oct 2026): Online enrollment, Walk-in, or Agency with the partner's name. */
-/** Where the trainee came from (owner, 29 Oct 2026): Online, Walk-In, Meta, or the agency or consultancy, plus Company Charge. */
+/** Where the trainee came from (owner, 29 Oct 2026): Online (Meta included), Walk-In, or the agency or consultancy, plus Company Charge. */
 export function partnerOf(data: PortalData, e: Enrollment) {
   const agencyId = data.companyCharge?.[e.id] ?? data.referralByEnrollment?.[e.id];
   return agencyId ? data.agencies.find((a) => a.id === agencyId) ?? null : null;
@@ -452,14 +452,14 @@ export function CourseSourceCell({ data, enrollment: e, busy, post }: { data: Po
   const current = partnerOf(data, e);
   const label = sourceLabel(e.source, current) || "Online";
   const locked = Number(e.paid_centavos ?? 0) > 0 || !!data.companyCharge?.[e.id] || e.enrollment_status === "Cancelled";
-  const initial = current ? "Agency" : e.source === "Walk-in" || e.source === "Meta" ? e.source : "Online enrollment";
+  const initial = current ? "Agency" : e.source === "Walk-in" ? e.source : "Online enrollment";
   const [src, setSrc] = useState(initial);
   if (locked) return <span className="cs-chip-wrap"><span className={`cs-chip ${current ? "ag" : "wk"}`}>{label}</span><small className="muted-text">Locked</small></span>;
   const partners = data.agencies.filter((a) => a.active || a.id === current?.id).sort((a, z) => a.name.localeCompare(z.name));
   const save = (source: string, agencyId: string | null = null) => void post({ action: "enrollment-source", traineeId: e.trainee_id, enrollmentId: e.id, source, agencyId }, `Source saved for ${first(e.courses)?.code ?? "this course"}.`).catch(() => setSrc(initial));
   return <span className="cs-edit" onClick={(ev) => ev.stopPropagation()}>
     <select value={src} disabled={busy} aria-label={`Source of ${first(e.courses)?.code ?? "this course"}`} onChange={(ev) => { const v = ev.target.value; setSrc(v); if (v !== "Agency") save(v); }}>
-      <option value="Walk-in">Walk-In</option><option value="Online enrollment">Online</option><option value="Meta">Meta</option><option value="Agency">Agency / Consultancy</option>
+      <option value="Walk-in">Walk-In</option><option value="Online enrollment">Online</option><option value="Agency">Agency / Consultancy</option>
     </select>
     {src === "Agency" && <select value={current?.id ?? ""} disabled={busy} aria-label="Partner" onChange={(ev) => { if (ev.target.value) save("Agency", ev.target.value); }}>
       <option value="">Choose the partner…</option>
@@ -470,14 +470,14 @@ export function CourseSourceCell({ data, enrollment: e, busy, post }: { data: Po
 
 export function SourcePicker({ data, enrollment: e, busy, post, children }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<unknown>; children?: ReactNode }) {
   const current = partnerOf(data, e);
-  const initial = current ? "Agency" : e.source === "Walk-in" || e.source === "Meta" ? e.source : "Online enrollment";
+  const initial = current ? "Agency" : e.source === "Walk-in" ? e.source : "Online enrollment";
   const [src, setSrc] = useState(initial);
   const partners = data.agencies.filter((a) => a.active || a.id === current?.id).sort((a, z) => a.name.localeCompare(z.name));
   const save = (source: string, agencyId: string | null = null) => void post({ action: "enrollment-source", traineeId: e.trainee_id, enrollmentId: e.id, source, agencyId }, "Source saved for this course.").catch(() => setSrc(initial));
   return <div className="tp-source">
     <span className="tp-cap">Where the Trainee Came From · {first(e.courses)?.code ?? "This Course"}</span>
     <label><span>Source</span><select value={src} disabled={busy} onChange={(ev) => { const v = ev.target.value; setSrc(v); if (v !== "Agency") save(v); }}>
-      <option value="Online enrollment">Online</option><option value="Walk-in">Walk-In</option><option value="Meta">Meta (Facebook / Instagram)</option><option value="Agency">Agency / Consultancy</option>
+      <option value="Online enrollment">Online</option><option value="Walk-in">Walk-In</option><option value="Agency">Agency / Consultancy</option>
     </select></label>
     {src === "Agency" && <label><span>Partner</span><select value={current?.id ?? ""} disabled={busy} onChange={(ev) => { if (ev.target.value) save("Agency", ev.target.value); }}>
       <option value="">Choose the partner…</option>

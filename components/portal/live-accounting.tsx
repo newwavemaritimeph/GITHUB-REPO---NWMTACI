@@ -1377,7 +1377,7 @@ export function CashPositionModule({ data }: { data: AccountingData }) {
 
 type ConfigTrainee = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; email?: string | null; mobile?: string | null; srn?: string | null; company?: string | null; registered_at?: string | null };
 // Schedule of fees is fixed by the owner's ruling (Reprinting ₱500, Uniform ₱150, LBC ₱500), so it is not edited here.
-export const ACCOUNTING_CONFIG_SECTIONS = ["Payment channels", "Expense categories", "Other income categories", "Schedule of fees", "Requisition items", "Partnered Centers"] as const;
+export const ACCOUNTING_CONFIG_SECTIONS = ["Payment channels", "Expense categories", "Other income categories", "Schedule of fees", "Partnered Centers"] as const;
 export type AccountingConfigSection = (typeof ACCOUNTING_CONFIG_SECTIONS)[number];
 /**
  * Accounting › Configuration (owner, 7 Oct 2026): the referring agencies and
@@ -1684,13 +1684,6 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
       onRemove={(r) => post({ action: "config-remove", entity: "charge", id: r.id })}
       note="Miscellaneous items (e.g. Uniform, ID Lace) are added to a payment in Record Payment and print on the receipt and TAR. Service fees (e.g. Reprinting, Cancellation, Rescheduling, Make-up Class) are charged through Requests. A blank price is typed when charging." />}
     {/* Items the Admin Assistant can request (owner, 9 Oct 2026). */}
-    {section === "Requisition items" && <ConfigMatrix title="Requisition Items" entity="item" busy={busy}
-      cols={[{ key: "name", label: "Item", kind: "text", placeholder: "e.g. Coffee Cups" }, { key: "unit", label: "Unit", kind: "text", placeholder: "pc, box, pack of 50" }, { key: "cost", label: "Default Cost (PHP)", kind: "money" }]}
-      rows={((data as unknown as { requisitionItems?: { id: string; name: string; unit: string; default_cost_centavos: number; active: boolean }[] }).requisitionItems ?? []).map((i) => ({ id: i.id, active: i.active, values: { name: i.name, unit: i.unit || "pc", cost: Number(i.default_cost_centavos) ? (Number(i.default_cost_centavos) / 100).toFixed(2) : "" } }))}
-      onSave={(r) => post({ action: "requisition-item-save", id: r.id, name: r.values.name.trim(), unit: r.values.unit.trim() || "pc", defaultCostCentavos: Math.round((Number(r.values.cost) || 0) * 100), active: r.active })}
-      onAdd={(v) => post({ action: "requisition-item-save", name: v.name.trim(), unit: v.unit.trim() || "pc", defaultCostCentavos: Math.round((Number(v.cost) || 0) * 100) })}
-      onRemove={(r) => post({ action: "requisition-item-save", id: r.id, name: "x", remove: true })}
-      note="Items the Admin Assistant can request. The default cost fills in on a new requisition and can be changed there." />}
   </div>;
 }
 

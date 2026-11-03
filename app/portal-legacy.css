@@ -2596,3 +2596,7 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .ah-cat{font-size:12.5px;font-weight:600;color:#0571D0}
 .portal-shell .ah-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}
 .portal-shell .ah-chips .ac-chip{flex:0 0 auto;white-space:nowrap}
+/* Admin tabs consolidated (owner, 3 Nov 2026): headings inside a long dropdown, and the menu scrolls on short screens. */
+.nw-menu { max-height: 75vh; overflow-y: auto; }
+.nw-menu-head { margin: 10px 14px 4px; font: 600 12px var(--font-portal), sans-serif; letter-spacing: .08em; text-transform: uppercase; color: #587184; }
+.nw-menu-head:first-child { margin-top: 4px; }
