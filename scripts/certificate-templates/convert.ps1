@@ -51,6 +51,10 @@ try {
       $script:toHide = @()
       $info = [ordered]@{ code = $code; file = $file.Name; course = $parts[2].Trim(); conducted = $null; issued = $null; name = $null; qr = $null }
       $body = $doc.Content
+      # The signer's title (owner, 4 Nov 2026): the Word files in Drive still read "Operational Manager".
+      $title = Find-All $body "Operational Manager"
+      if (-not $title -and -not (Find-All $body "Operations Manager")) { throw "No Operations Manager line." }
+      foreach ($h in $title) { $h.Text = "Operations Manager" }
       # The training-dates paragraph, recorded with its placeholders, then hidden.
       foreach ($ph in @("[START DATE]", "[DATE]")) {
         $hit = Find-All $body $ph | Select-Object -First 1
