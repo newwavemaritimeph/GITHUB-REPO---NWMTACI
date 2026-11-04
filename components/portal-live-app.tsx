@@ -18,10 +18,10 @@ import { MoveBatch } from "./portal/move-batch";
 import { AdminConfiguration } from "./admin-configuration";
 import { DateReports } from "./date-reports";
 import { downloadCsv } from "@/lib/csv";
-import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer, CourseSourceCell, partnerOf, chargeTo } from "./portal/live-registration";
+import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer, CourseSourceCell, MetaThreadField, partnerOf, chargeTo } from "./portal/live-registration";
 import { sourceLabel } from "@/lib/company-charge";
 import { PaymentVoidCell } from "./portal/payment-void";
-import { ALL_DATES, Badge, DataSince, Message, Modal, Page, PageHead, PeriodBar, manilaDay, submit, fullName, useMonthRows, useNeedSince, usePaged, usePeriod } from "./portal/shared-ui";
+import { ALL_DATES, Badge, DataSince, Message, Modal, Page, PageHead, PeriodBar, manilaDay, submit, fullName, txWhen, useMonthRows, useNeedSince, usePaged, usePeriod } from "./portal/shared-ui";
 import { classroomJoin } from "@/lib/classroom";
 import { ClassroomPanel } from "./portal/classroom-panel";
 import { TraineeRequestModal, type RequestType } from "./portal/payment-actions";
@@ -404,7 +404,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Courses"&&gateRole==="admin")return <AccountingConfiguration section="Courses" data={data as unknown as Parameters<typeof AccountingConfiguration>[0]["data"]} reload={reload}/>;
   if(active==="Courses")return <CoursesAndCenters data={data} query={query}/>;
   if(active==="For payment")return <CashierPaymentQueue data={data} onPay={onPay} reload={reload}/>;
-  if(active==="Registration")return <RegistrationRecords data={data} query={query} reload={reload} view={recordsView} setView={setRecordsView} trainees={<Trainees data={data} query={query} embedded reload={reload} role={gateRole}/>}/>;
+  if(active==="Registration")return <RegistrationRecords data={data} query={query} reload={reload} view={recordsView} setView={setRecordsView} trainees={<Trainees data={data} query={query} embedded reload={reload} role={gateRole}/>} account={(id,close)=>{const t=data.trainees.find(x=>x.id===id);return t?<TraineeDetailModal data={data} trainee={t} reload={reload} role={gateRole} onClose={close}/>:null}}/>;
   if(gateRole==="admin"){
     // The Admin workspace (owner, 9 Oct 2026); voids and cancellations are Admin-only.
     if(active==="Dashboard")return <AdminHome data={data} reload={reload} go={m=>go(m as Module)}/>;
@@ -618,9 +618,10 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   // The loaded list holds only the newest rows; ask the database for this trainee's TAR courses and any other record for the same person (29 Oct 2026).
   type AccountPayment=Payment&{valid:boolean;remarks?:string|null;receipt_number?:string|null;print_count?:number};
   type AccountTar={id:string;ar_number:string;enrollment_ids:string[];print_count:number;reprints_approved:number;issued_at:string};
-  const [account,setAccount]=useState<{tarEnrollmentIds:string[];tarGroups?:{date:string;ids:string[]}[];payments?:AccountPayment[];tars?:AccountTar[];others:{id:string;number:string;tarCourses:number}[]}|null>(null);
+  const [account,setAccount]=useState<{tarGroups?:{at:string;ids:string[];tar:string|null;receipts:string[]}[];payments?:AccountPayment[];tars?:AccountTar[];others:{id:string;number:string;tarCourses:number}[]}|null>(null);
   const [accountTick,setAccountTick]=useState(0);
-  useEffect(()=>{let live=true;fetch(`/api/staff/trainee-account?traineeId=${trainee.id}`,{cache:"no-store"}).then(r=>r.ok?r.json():null).then(b=>{if(live&&b)setAccount(b)}).catch(()=>undefined);return()=>{live=false}},[trainee.id,accountTick]);
+  const accountStamp=[data.enrollments.filter(e=>e.trainee_id===trainee.id).length,data.payments.filter(p=>p.trainee_id===trainee.id).length,(data.admissionRecords??[]).filter(r=>r.trainee_id===trainee.id).length].join("|");
+  useEffect(()=>{let live=true;fetch(`/api/staff/trainee-account?traineeId=${trainee.id}`,{cache:"no-store"}).then(r=>r.ok?r.json():null).then(b=>{if(live&&b)setAccount(b)}).catch(()=>undefined);return()=>{live=false}},[trainee.id,accountTick,accountStamp]);
   const enrolls=data.enrollments.filter(e=>e.trainee_id===trainee.id).sort((a,b)=>a.created_at.localeCompare(b.created_at));
   const payments=data.payments.filter(p=>p.trainee_id===trainee.id).sort((a,b)=>a.received_at.localeCompare(b.received_at));
   const requests=data.requests.filter(r=>first(r.enrollments)?.trainee_id===trainee.id&&r.status==="Pending");
@@ -684,7 +685,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
         <div className="tp-who"><h3>{`${(trainee.legal_last_name??"").toUpperCase()}, ${trainee.legal_first_name??""}${trainee.legal_middle_name?` ${trainee.legal_middle_name.charAt(0)}.`:""}`}</h3>
           <p><span className="tp-mono">{appNo??trainee.trainee_number}</span>{trainee.rank?` · ${trainee.rank}`:""}{trainee.registered_at?` · Registered ${day(trainee.registered_at)}`:""}</p>
           <div className="tp-chips">{srcLabel&&<span className="tp-chip or">{srcLabel}</span>}{enrolledN>0&&<span className="tp-chip gd">{enrolledN} Enrolled</span>}{due<=0&&fees>0&&<span className="tp-chip gd">Paid in Full</span>}</div></div>
-        <div className="tp-hacts">{canPrint&&<><button type="button" className="portal-secondary" onClick={()=>void copyDetails("text")}>Copy as Text</button><button type="button" className="portal-secondary" onClick={()=>void copyDetails("row")}>Copy as Row</button><TarButton data={data} traineeId={trainee.id} reload={reload} className="portal-primary" knownIds={account?.tarEnrollmentIds} knownGroups={account?.tarGroups}/></>}</div>
+        <div className="tp-hacts">{canPrint&&<><button type="button" className="portal-secondary" onClick={()=>void copyDetails("text")}>Copy as Text</button><button type="button" className="portal-secondary" onClick={()=>void copyDetails("row")}>Copy as Row</button><TarButton data={data} traineeId={trainee.id} reload={reload} className="portal-primary"/></>}</div>
       </div>
       {note&&<Message kind="success" text={note}/>}
       {err&&<Message kind="error" text={err}/>}
@@ -704,6 +705,10 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
                 <td className="r tp-mono">{money(d)}</td><td className="r tp-mono">{money(Math.max(0,d-bal))}</td><td className="r tp-mono">{money(bal)}</td></tr>})}
               {!enrolls.length&&<tr><td colSpan={8} className="sa-empty">No courses yet.</td></tr>}
             </tbody></table></div>
+            {(account?.tarGroups?.length??0)>0&&<><h4 className="tp-sub">Transactions</h4>
+            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Transaction</th><th>Courses</th><th>TAR No.</th><th>Receipts</th></tr></thead><tbody>
+              {[...account!.tarGroups!].reverse().map((g,n)=><tr key={g.ids.join("|")}><td><b>Transaction {n+1}</b><small>{txWhen(g.at)}</small></td><td>{g.ids.map(id=>first(data.enrollments.find(e=>e.id===id)?.courses)?.code).filter(Boolean).join(", ")||`${g.ids.length} course${g.ids.length===1?"":"s"}`}</td><td className="tp-mono">{g.tar??<span className="muted-text">Not Yet Printed</span>}</td><td className="tp-mono">{g.receipts.length?g.receipts.join(", "):<span className="muted-text">Not Yet Paid</span>}</td></tr>)}
+            </tbody></table></div></>}
             <h4 className="tp-sub">Payments</h4>
             <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Receipt</th><th>Date</th><th>Mode</th><th className="r">Amount</th><th>Status</th>{canReprint&&<th></th>}</tr></thead><tbody>
               {payRows.map(p=>{const no=p.receipt_number??p.payment_number;return <Fragment key={p.id}><tr className={p.valid===false?"pv-void":undefined}><td className="tp-mono">{no}{feeLabel(p)&&<small>{feeLabel(p)}</small>}</td><td>{day(p.received_at)}</td><td>{p.method}{p.reference_number?` · Ref ${p.reference_number}`:""}</td><td className="r tp-mono">{money(Number(p.amount_centavos))}</td><td><PaymentVoidCell data={data} payment={p} canRequest={canVoid} busy={busy} post={post}/></td>
@@ -726,7 +731,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
               {([["Birth Date",trainee.birthdate?`${date(trainee.birthdate)}${trainee.place_of_birth?` · ${trainee.place_of_birth}`:""}`:""],["SRN",trainee.srn],["Trainee No.",trainee.trainee_number],["Mobile",trainee.mobile],["Email",trainee.email],["Address",trainee.address],["Company",trainee.company]] as [string,string|null|undefined][])
                 .filter(([,v])=>v).map(([k,v])=><Fragment key={k}><dt>{k}</dt><dd>{v}</dd></Fragment>)}
               <dt>Meta Thread</dt><dd>{fb.startsWith("https://")?<a href={fb} target="_blank" rel="noreferrer">Open Conversation</a>:<span className="muted-text">Not yet recorded</span>}</dd>
-            </dl></section>}
+            </dl>{canEdit&&!fb&&<MetaThreadField key={trainee.id} traineeId={trainee.id} saved="" onSaved={()=>void reload?.()}/>}</section>}
           {em?.name&&<section className="tp-panel"><h4>Emergency Contact</h4><dl className="tp-kv"><dt>Name</dt><dd>{em.name}</dd>{em.mobile&&<><dt>Mobile</dt><dd>{em.mobile}</dd></>}</dl></section>}
 
         </div>

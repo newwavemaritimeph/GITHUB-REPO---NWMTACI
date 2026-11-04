@@ -16,7 +16,7 @@ const TERMS: [string, string][] = [
   ["4. Refund", "Five or more days before training: Php 350.00 processing fee. Within five days: 50% of the course fee plus Php 250.00."],
   ["5. Make-up class", "For courses of three days or more, subject to schedule and approval. Php 350.00 per training day."],
   ["6. Certificate", "Issued only when all course requirements are completed and all balances are settled."],
-  ["7. Miscellaneous", "Miscellaneous fees are part of the total due. This record is your admission slip and acknowledgement receipt. Terms may be updated without prior notice."],
+  ["7. Miscellaneous", "Miscellaneous fees are part of the total due. This record is your admission slip. Terms may be updated without prior notice."],
 ];
 const ORG = "NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.";
 const ADDRESS = "Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000 · +63 948 847 6530 · (02) 8553 0310 · newwavemaritime@gmail.com · facebook.com/newwavemtc";

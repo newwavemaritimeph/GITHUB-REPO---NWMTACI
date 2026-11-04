@@ -123,6 +123,9 @@ export const fmtDate = (value?: string | null) =>
 export const fmtClock = (value?: string | null) =>
   value ? new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(value)) : "—";
 
+/** When a transaction was made: Nov 4, 9:12 AM. */
+export const txWhen = (iso: string) => new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso));
+
 /** POST one action to the staff operations endpoint. Throws with the server's message. */
 export async function submit(body: unknown) {
   const response = await fetch("/api/staff/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });

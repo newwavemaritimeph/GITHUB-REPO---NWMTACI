@@ -340,7 +340,10 @@ function ChooseBatchModal({ data, enrollment, reload, onClose }: { data: PortalD
  * still need a batch) and For payment (handed to the Cashier, not yet paid).
  * Applicants without a course sit above the table under All and Screening.
  */
-function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; query: string; reload: () => Promise<void>; initial: RecordFilter }) {
+/** Opens the Trainee Account from an application window; the portal shell renders it. */
+type TraineeAccount = (traineeId: string, onClose: () => void) => ReactNode;
+function EnrollmentQueue({ data, query, reload, initial, account }: { data: PortalData; query: string; reload: () => Promise<void>; initial: RecordFilter; account?: TraineeAccount }) {
+  const [accountOf, setAccountOf] = useState<string | null>(null);
   const [filter, setFilter] = useState<RecordFilter>(initial);
   const [q, setQ] = useState("");
   const [open, setOpen] = useState<Enrollment | null>(null);
@@ -404,7 +407,8 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
         {paged.pager}
       </div>
     </div>
-    {current && <EnrollmentDrawer data={data} enrollment={current} reload={reload} onClose={() => setOpen(null)} />}
+    {current && <EnrollmentDrawer data={data} enrollment={current} reload={reload} onClose={() => setOpen(null)} onOpenAccount={account ? () => setAccountOf(current.trainee_id) : undefined} />}
+    {accountOf && account?.(accountOf, () => setAccountOf(null))}
     {assigning && <AssignCourseModal data={data} trainee={assigning} reload={reload} onClose={() => setAssigning(null)} />}
   </>;
 }
@@ -427,8 +431,8 @@ function enrollmentTypeOf(data: PortalData, e: Enrollment) {
  * Where the trainee came from (owner, 29 Oct 2026): Registration picks it, the website no
  * longer asks. Agency / Consultancy opens a partner dropdown; the server locks it once paid.
  */
-/** Registration records the Meta conversation with the trainee before the hand-over (owner, 4 Nov 2026); saves on blur or Enter. */
-function MetaThreadField({ traineeId, saved, onSaved }: { traineeId: string; saved: string; onSaved: (url: string) => void }) {
+/** Registration records the Meta conversation in the Trainee Account (owner, 4 Nov 2026), before the hand-over; saves on blur or Enter. */
+export function MetaThreadField({ traineeId, saved, onSaved }: { traineeId: string; saved: string; onSaved: (url: string) => void }) {
   const [v, setV] = useState(saved), [saving, setSaving] = useState(false), [err, setErr] = useState("");
   const value = v.trim(), good = isMetaThreadUrl(value), dirty = value !== saved;
   const save = async () => {
@@ -469,7 +473,7 @@ export function CourseSourceCell({ data, enrollment: e, busy, post }: { data: Po
   </span>;
 }
 
-export function SourcePicker({ data, enrollment: e, busy, post, children }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<unknown>; children?: ReactNode }) {
+export function SourcePicker({ data, enrollment: e, busy, post }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<unknown> }) {
   const current = partnerOf(data, e);
   const initial = current ? "Agency" : e.source === "Walk-in" ? e.source : "Online enrollment";
   const [src, setSrc] = useState(initial);
@@ -484,7 +488,6 @@ export function SourcePicker({ data, enrollment: e, busy, post, children }: { da
       <option value="">Choose the partner…</option>
       {(["Agency", "Consultancy"] as const).map((k) => { const list = partners.filter((a) => (a.kind === "Consultancy" ? "Consultancy" : "Agency") === k); return list.length ? <optgroup key={k} label={k === "Agency" ? "Agencies" : "Consultancies"}>{list.map((a) => <option key={a.id} value={a.id}>{a.name}{a.rebate_mode === COMPANY_CHARGE ? " · Company Charge" : ""}</option>)}</optgroup> : null; })}
     </select></label>}
-    {children}
   </div>;
 }
 
@@ -496,7 +499,7 @@ export type RecordsView = "applications" | "enrollments" | "trainees";
  * (All enrollments · Screening · For payment) and the trainee master records,
  * which live in the parent with their detail modal and so arrive as an element.
  */
-export function RegistrationRecords({ data, query, reload, view, setView, trainees }: { data: PortalData; query: string; reload: () => Promise<void>; view: RecordsView; setView: (v: RecordsView) => void; trainees: ReactNode }) {
+export function RegistrationRecords({ data, query, reload, view, setView, trainees, account }: { data: PortalData; query: string; reload: () => Promise<void>; view: RecordsView; setView: (v: RecordsView) => void; trainees: ReactNode; account?: TraineeAccount }) {
   const onList = view !== "trainees";
   const tabs: [RecordsView, string, number, boolean][] = [["enrollments", "Enrollments", data.enrollments.length + awaitingCourseOf(data).length, onList], ["trainees", "Trainees", data.trainees.length, !onList]];
   const weekAgo = addDays(manilaToday(), -6);
@@ -505,7 +508,7 @@ export function RegistrationRecords({ data, query, reload, view, setView, traine
     <div className="rr-switch" role="tablist" aria-label="Records">
       {tabs.map(([v, label, n, on]) => <button key={v} type="button" role="tab" aria-selected={on} className={on ? "active" : ""} onClick={() => setView(v)}>{tcl(label)}<small>{n}</small></button>)}
     </div>
-    {onList && <EnrollmentQueue key={view} data={data} query={query} reload={reload} initial={view === "applications" ? "Screening" : "All enrollments"} />}
+    {onList && <EnrollmentQueue key={view} data={data} query={query} reload={reload} initial={view === "applications" ? "Screening" : "All enrollments"} account={account} />}
     {view === "trainees" && <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Trainee Records</h2></div>
@@ -523,7 +526,7 @@ export function RegistrationRecords({ data, query, reload, view, setView, traine
  * training and payment first, then one requirements table (received, status,
  * remarks, who received it), signature lines and the hand-over button.
  */
-function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<Record<string, unknown>>; reload: () => Promise<void> }) {
+function ScreeningPanel({ data, enrollment: e, busy, post, reload, onOpenAccount }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<Record<string, unknown>>; reload: () => Promise<void>; onOpenAccount?: () => void }) {
   const [unticking, setUnticking] = useState<string | null>(null);
   const [remarks, setRemarks] = useState("");
   const [notes, setNotes] = useState<Record<string, string>>({});
@@ -554,8 +557,8 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
   const needsProof = !!payModes.find((m) => m.name === payMode)?.requires_reference;
   const proofReady = !needsProof || (Number(payAmount) > 0 && payRef.trim().length >= 3 && !!payFile);
   // The Meta thread link is required before the hand-over or Company Charge (owner, 4 Nov 2026).
-  const [fbLocal, setFbLocal] = useState<string | null>(null);
-  const fbSaved = fbLocal ?? data.traineeFacebook?.[e.trainee_id] ?? "";
+  const fbSaved = data.traineeFacebook?.[e.trainee_id] ?? "";
+  const threadNote = <small>Add the Meta thread link in the Trainee Account{onOpenAccount && <> · <button type="button" className="cx-textbtn" onClick={onOpenAccount}>Open Trainee Account</button></>}</small>;
   async function handOver() {
     setPayError(""); setHanding(true);
     try {
@@ -589,7 +592,7 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
         <p><span className="tp-mono">{appNo}</span>{srn ? <> · SRN <span className="tp-mono">{srn}</span></> : null}{t?.mobile ? ` · ${t.mobile}` : ""}{t?.email ? <> · <span className="lc">{t.email}</span></> : null}</p>
         <div className="tp-chips">{sourceLabel(e.source, partner) && <span className="tp-chip or">{sourceLabel(e.source, partner)}</span>}{billTo && <span className="tp-chip bl">Company Charge</span>}<Badge tone={s.tone}>{s.text}</Badge></div></div>
     </div>
-    {e.enrollment_status === "Pending" && <SourcePicker key={`${e.id}:${partner?.id ?? e.source}`} data={data} enrollment={e} busy={busy} post={post}><MetaThreadField key={e.trainee_id} traineeId={e.trainee_id} saved={fbSaved} onSaved={setFbLocal} /></SourcePicker>}
+    {e.enrollment_status === "Pending" && <SourcePicker key={`${e.id}:${partner?.id ?? e.source}`} data={data} enrollment={e} busy={busy} post={post} />}
     <div className="tp-stats">
       <div><span className="tp-cap">Training</span><b>{c ? `${c.code} · ${c.name}` : "—"}</b><small>{scheduleOf(e)}{b ? ` · ${b.batch_number}` : ""}</small></div>
       <div><span className="tp-cap">Payment</span><b className={`tp-mono${r.paid ? " sc-good" : ""}`}>{r.paid ? pesos2(r.paidCentavos) : pesos2(balance)}</b><small>{billTo ? `Billed to ${billTo.name}` : r.paid ? `Paid · balance ${pesos2(balance)}` : r.handed ? "With the Cashier" : "Not paid yet"}</small></div>
@@ -614,18 +617,18 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload }: { data: Por
       {isCC ? <>
         <label className="sc-pay-ref">Company<select value={ccAgency} onChange={(ev) => setCcAgency(ev.target.value)}><option value="">Choose the company…</option>{(["Agency", "Consultancy"] as const).map((k) => { const list = companies.filter((a) => (a.kind === "Consultancy" ? "Consultancy" : "Agency") === k); return list.length ? <optgroup key={k} label={k === "Agency" ? "Agencies" : "Consultancies"}>{list.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</optgroup> : null; })}</select></label>
         <span className="sc-pay-note">No payment at the Cashier and no receipt: {ccName || "the company"} is billed on its Billing Statement.</span>
-        <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || anySaving || !ccAgency || !fbSaved} onClick={() => void post({ action: "application-enroll-charge", enrollmentId: e.id, agencyId: ccAgency }, `Enrolled · Company Charge (${ccName}).`).catch(() => undefined)}>Enroll · Company Charge</button>{!fbSaved ? <small>Add the Meta thread link first</small> : !ccAgency && <small>Choose the company first</small>}</div>
+        <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || anySaving || !ccAgency || !fbSaved} onClick={() => void post({ action: "application-enroll-charge", enrollmentId: e.id, agencyId: ccAgency }, `Enrolled · Company Charge (${ccName}).`).catch(() => undefined)}>Enroll · Company Charge</button>{!fbSaved ? threadNote : !ccAgency && <small>Choose the company first</small>}</div>
       </> : needsProof ? <>
         <label className="sc-pay-amt">Amount (₱)<input inputMode="decimal" value={payAmount} onChange={(ev) => setPayAmount(ev.target.value.replace(/[^0-9.]/g, ""))} placeholder="0.00" /></label>
         <label className="sc-pay-ref">Reference No.<input value={payRef} onChange={(ev) => setPayRef(ev.target.value.toUpperCase())} placeholder="From the screenshot" maxLength={80} /></label>
         <label className="sc-pay-file">Proof of Payment<input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(ev) => setPayFile(ev.target.files?.[0] ?? null)} /></label>
       </> : <span className="sc-pay-note">Trainee pays at the Cashier.</span>}
-      {!isCC && <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || handing || anySaving || !proofReady || !fbSaved} onClick={() => void handOver()}>{handing ? "Saving…" : needsProof ? "Upload Proof & Hand to Cashier" : "Hand to Cashier"}</button>{!fbSaved ? <small>Add the Meta thread link first</small> : needsProof && !proofReady && <small>Amount, reference and photo are required</small>}</div>}
+      {!isCC && <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || handing || anySaving || !proofReady || !fbSaved} onClick={() => void handOver()}>{handing ? "Saving…" : needsProof ? "Upload Proof & Hand to Cashier" : "Hand to Cashier"}</button>{!fbSaved ? threadNote : needsProof && !proofReady && <small>Amount, reference and photo are required</small>}</div>}
       {payError && <div className="sc-pay-err"><Message kind="error" text={payError} /></div>}
     </div>}
     {r.handed && !r.paid && !billTo && (() => { const pr = (data.traineeProofs ?? []).filter((x) => x.trainee_id === e.trainee_id).sort((a, z) => z.submitted_at.localeCompare(a.submitted_at))[0]; return <div className="sc-handed">With the Cashier · {pr ? `${pr.method} ${pesos2(pr.amount_centavos)} · Ref. ${pr.reference}` : "Cash"}</div>; })()}
     <div className="sc-foot">
-      <small>{!allTicked ? `Still to tick: ${missingNow.map((q) => q.label).join(", ")}` : !fbSaved && !r.handed && !r.paid ? "All requirements received. Add the Meta thread link to continue." : isCC && !r.paid ? `All requirements received. Enroll on Company Charge: ${ccName || "the company"} is billed on its Billing Statement, so no payment at the Cashier.` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
+      <small>{!allTicked ? `Still to tick: ${missingNow.map((q) => q.label).join(", ")}` : !fbSaved && !r.handed && !r.paid ? "All requirements received. Add the Meta thread link in the Trainee Account to continue." : isCC && !r.paid ? `All requirements received. Enroll on Company Charge: ${ccName || "the company"} is billed on its Billing Statement, so no payment at the Cashier.` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
       <span className="sc-acts">
         {r.ready && <button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "application-enroll", enrollmentId: e.id }, "Trainee enrolled.").catch(() => undefined)}>Enroll Now</button>}
       </span>
@@ -718,7 +721,7 @@ function OtherCenterEditor({ data, enrollment: e, busy, post }: { data: PortalDa
   </div>;
 }
 
-export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void }) {
+export function EnrollmentDrawer({ data, enrollment: e, reload, onClose, onOpenAccount }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void; onOpenAccount?: () => void }) {
   const { busy, msg, post } = usePost(reload);
   const generated = instructionsCountOf(data, e), atLimit = generated >= INSTRUCTION_LIMIT;
   const mail = data.instructionEmails?.[e.id], emailOk = !!mail && mail.state !== "Failed" && mail.state !== "Delivery Failed", emailFailed = !!mail && !emailOk;
@@ -740,7 +743,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose }: { dat
   return <Modal title={isApplication ? `Application ${appNoOf(data, e.trainee_id) ?? e.enrollment_number}` : e.enrollment_number} onClose={onClose} wide>
     <div className="portal-form">
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
-      {isApplication && <ScreeningPanel data={data} enrollment={e} busy={busy} post={post} reload={reload} />}
+      {isApplication && <ScreeningPanel data={data} enrollment={e} busy={busy} post={post} reload={reload} onOpenAccount={onOpenAccount} />}
       {!isApplication && <div className="kv-grid kv-stack full">
         <div><span>{isApplication ? "Applicant" : "Trainee"}</span><strong>{t ? fullName(t) : "—"}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{t?.trainee_number} · <span className="lc">{t?.email}</span> · {t?.mobile}</small></div>
         <div><span>Course</span><strong>{c?.name ?? "—"}</strong><small>{c?.code}{center ? ` · endorsed: ${center}` : " · New Wave"}</small></div>

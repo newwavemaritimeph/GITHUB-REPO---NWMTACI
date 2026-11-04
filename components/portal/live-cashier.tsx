@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PortalData, Enrollment, TraineeProofRow } from "../portal-live-app";
 import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos, pesos2 } from "@/lib/portal-format";
 import { pesosInWords } from "@/lib/amount-words";
-import { ALL_DATES, Badge, Message, Modal, PageHead, fullName, fmtDate, fmtClock, useNeedSince, usePaged, usePost, openAdmissionRecord, submit } from "./shared-ui";
+import { ALL_DATES, Badge, Message, Modal, PageHead, fullName, fmtDate, fmtClock, txWhen, useNeedSince, usePaged, usePost, openAdmissionRecord, submit } from "./shared-ui";
 import { PaymentVoidCell } from "./payment-void";
 import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balances";
 import { requestFee } from "@/lib/request-fees";
@@ -12,7 +12,7 @@ import type { CashierReportSnapshot } from "@/lib/documents";
 import { tcl } from "@/lib/title-case";
 import { PayTheCenters, centerLines } from "./pay-centers";
 import { shrinkProof } from "@/lib/proof-shrink";
-import { rankMatches, tarGroups, tarPrintable, type TarGroup } from "@/lib/trainee-match";
+import { rankMatches, tarPrintable, type TarGroup } from "@/lib/trainee-match";
 import { sourceLabel } from "@/lib/company-charge";
 
 /**
@@ -51,11 +51,10 @@ const PAID_STATUSES = ["Enrolled", "Open Schedule"];
  * paid enrollments; adding a paid course starts a new record (new AR number).
  */
 // TAR courses (owner, 29 Oct 2026): every course not cancelled, regardless of payment.
-// `knownIds` comes from the database when the loaded list does not hold all of them.
-// One TAR per enrollment date (owner, 3 Nov 2026): `groupIds` names the courses of one date.
-export function tarState(data: PortalData, traineeId: string, knownIds?: string[], groupIds?: string[]) {
+// One TAR per transaction (owner, 4 Nov 2026): `groupIds` names the courses of one transaction.
+export function tarState(data: PortalData, traineeId: string, groupIds?: string[]) {
   const paid = data.enrollments.filter((e) => e.trainee_id === traineeId && tarPrintable(e));
-  const ids = (groupIds ?? (knownIds && knownIds.length > paid.length ? [...knownIds] : paid.map((e) => e.id))).slice().sort().join("|");
+  const ids = (groupIds ?? paid.map((e) => e.id)).slice().sort().join("|");
   const record = (data.admissionRecords ?? []).find((r) => r.trainee_id === traineeId && [...r.enrollment_ids].sort().join("|") === ids) ?? null;
   const allowed = TAR_FREE_PRINTS + Number(record?.reprints_approved ?? 0);
   const printed = Number(record?.print_count ?? 0);
@@ -72,23 +71,21 @@ export function ReceiptButton({ data, paymentId, reload, className = "portal-sec
 }
 
 /** Print TAR (owner, 8 Oct 2026): prints twice; after the second print the button is gone. Registration prints it (owner, 20 Oct 2026). */
-export function TarButton({ data, traineeId, reload, className = "portal-secondary", knownIds, knownGroups }: { data: PortalData; traineeId: string; reload?: () => Promise<void>; className?: string; knownIds?: string[]; knownGroups?: TarGroup[] }) {
+export function TarButton({ data, traineeId, reload, className = "portal-secondary" }: { data: PortalData; traineeId: string; reload?: () => Promise<void>; className?: string }) {
   const [error, setError] = useState("");
-  // One TAR per enrollment date (owner, 3 Nov 2026); the database's groups win when the loaded list is short.
-  const local = tarGroups(data.enrollments.filter((e) => e.trainee_id === traineeId));
-  const groups = knownGroups && knownGroups.reduce((n, g) => n + g.ids.length, 0) > local.reduce((n, g) => n + g.ids.length, 0) ? knownGroups : local;
-  const print = (ids?: string[]) => { setError(""); void openAdmissionRecord(traineeId, ids).then(() => reload?.()).catch((e) => setError(e instanceof Error ? e.message : "Could not open the admission record.")); };
-  if (groups.length > 1) return <>
-    {groups.map((g) => tarState(data, traineeId, undefined, g.ids).left > 0 && <button key={g.date} type="button" className={className} onClick={() => print(g.ids)}>Print TAR · {fmtDate(g.date)}</button>)}
-    {error && <Message kind="error" text={error} />}
-  </>;
-  const s = tarState(data, traineeId, knownIds);
-  const printable = s.paid.length > 0 || !!knownIds?.length;
-  if (printable && s.left <= 0) return null;
+  // One TAR per transaction (owner, 4 Nov 2026). The server alone knows which payment first covered each
+  // course; read again when a course, receipt or TAR of the trainee changes.
+  const [groups, setGroups] = useState<TarGroup[] | null>(null);
+  const stamp = [data.enrollments.filter((e) => e.trainee_id === traineeId).map((e) => e.id).join(), data.payments.filter((p) => p.trainee_id === traineeId).length, (data.admissionRecords ?? []).filter((r) => r.trainee_id === traineeId).length].join("|");
+  useEffect(() => {
+    let live = true;
+    void fetch(`/api/staff/trainee-account?traineeId=${traineeId}`, { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).then((b) => { if (live && b?.tarGroups) setGroups(b.tarGroups); }).catch(() => undefined);
+    return () => { live = false; };
+  }, [traineeId, stamp]);
+  const print = (ids: string[]) => { setError(""); void openAdmissionRecord(traineeId, ids).then(() => reload?.()).catch((e) => setError(e instanceof Error ? e.message : "Could not open the admission record.")); };
+  if (!groups?.length) return <><button type="button" className={className} disabled>Print TAR</button>{groups && <small className="muted-text">No course on this record yet</small>}</>;
   return <>
-    {!printable
-      ? <><button type="button" className={className} disabled>Print TAR</button><small className="muted-text">No course on this record yet</small></>
-      : <button type="button" className={className} onClick={() => print(groups[0]?.ids)}>Print TAR</button>}
+    {groups.map((g) => tarState(data, traineeId, g.ids).left > 0 && <button key={g.ids.join("|")} type="button" className={className} onClick={() => print(g.ids)}>Print TAR{groups.length > 1 ? ` · ${txWhen(g.at)}` : ""}</button>)}
     {error && <Message kind="error" text={error} />}
   </>;
 }

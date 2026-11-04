@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { pendingTraineeProofs } from "@/lib/trainee-proof";
-import { tarGroups } from "@/lib/trainee-match";
+import { loadTarGroups } from "@/lib/trainee-match-server";
 import { pricelistAdjustment, splitStatementPayment } from "@/lib/company-charge";
 import { bsNumber, buildBillingRows, statementTotal } from "@/lib/billing-statement";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -2060,17 +2060,13 @@ export async function POST(request: Request) {
       // Registration prints the TAR once the trainee is settled with the Cashier (owner, 20 Oct 2026).
       if (!staff.roleCodes.some((r) => ["admin", "registration"].includes(r))) return NextResponse.json({ error: "Only Registration prints the Training Admission Record." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      // The record covers the trainee's paid enrollments (Enrolled / Open
-      // Schedule); printing the same set again keeps the same AR number, up to the
-      // print limit (migrations 202610070006 and 202610070007).
-      // Regardless of payment (owner, 29 Oct 2026): every course that is not cancelled.
-      const { data: rows, error: findError } = await admin.from("enrollments").select("id,enrollment_status,enrolled_at,created_at").eq("trainee_id", input.traineeId);
-      if (findError) throw findError;
-      const groups = tarGroups((rows ?? []) as { id: string; enrollment_status: string; enrolled_at: string | null; created_at: string }[]);
+      // The record covers one transaction (owner, 4 Nov 2026), regardless of payment; printing the
+      // same set again keeps the same number, up to the print limit (migrations 202610070006 and 202610070007).
+      const groups = await loadTarGroups(admin, input.traineeId);
       if (!groups.length) return NextResponse.json({ error: "This trainee has no course yet. Assign a course first." }, { status: 400 });
       const wanted = input.enrollmentIds ? [...input.enrollmentIds].sort().join("|") : null;
       const group = wanted ? groups.find((g) => g.ids.join("|") === wanted) : groups[0];
-      if (!group) return NextResponse.json({ error: "Choose the courses of one enrollment date." }, { status: 400 });
+      if (!group) return NextResponse.json({ error: "This transaction changed. Reopen the trainee and print again." }, { status: 400 });
       const ids = group.ids;
       const { data, error } = await admin.rpc("issue_admission_record", { target_trainee: input.traineeId, target_enrollments: ids, actor: staff.user.id });
       if (error) return NextResponse.json({ error: /function public.issue_admission_record/i.test(error.message) ? "Apply database update 202610070006 to print admission records." : error.message }, { status: 400 });
@@ -3118,6 +3114,7 @@ export async function POST(request: Request) {
       const kindOf = new Map(((kinds ?? []) as { id: string; kind: string | null }[]).map((k) => [k.id, k.kind]));
       type Part = { label: string; remarks: string | null; allocations: { enrollment_id: string; amount_centavos: number }[]; chargeId?: string };
       const parts: Part[] = [];
+      // Courses paid together share one receipt and so one TAR (owner, 4 Nov 2026).
       const course = new Map<string, number>();
       for (const a of input.allocations) course.set(a.enrollmentId, (course.get(a.enrollmentId) ?? 0) + a.amountCentavos);
       if (course.size) parts.push({ label: "Training Fee", remarks: input.remarks || null, allocations: [...course].map(([enrollment_id, amount_centavos]) => ({ enrollment_id, amount_centavos })) });

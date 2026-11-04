@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { normalizeSrn } from "@/lib/validation";
-import { sameTrainee, tarGroups, tarPrintable } from "@/lib/trainee-match";
+import { sameTrainee, tarPrintable } from "@/lib/trainee-match";
+import { loadTarGroups } from "@/lib/trainee-match-server";
 
 export const runtime = "nodejs";
 
@@ -19,7 +20,6 @@ export async function GET(request: Request) {
   const db = createSupabaseAdminClient();
   const { data: me } = await db.from("trainees").select("id,srn,legal_first_name,legal_last_name,birthdate").eq("id", traineeId).maybeSingle();
   if (!me) return NextResponse.json({ error: "Trainee not found." }, { status: 404 });
-  const { data: mine } = await db.from("enrollments").select("id,enrollment_status,enrolled_at,created_at").eq("trainee_id", traineeId);
   // Every receipt and TAR of this trainee (owner, 3 Nov 2026: Accounting reprints from the Trainee Account).
   const [payRes, tarRes] = await Promise.all([
     db.from("payments").select("id,payment_number,trainee_id,amount_centavos,method,reference_number,received_at,valid,remarks,receipts(receipt_number,print_count)").eq("trainee_id", traineeId).order("received_at", { ascending: true }).limit(500),
@@ -39,5 +39,5 @@ export async function GET(request: Request) {
     const { data: theirs } = await db.from("enrollments").select("trainee_id,enrollment_status").in("trainee_id", [...seen.keys()]);
     for (const [id, t] of seen) others.push({ id, number: t.application_number ?? t.trainee_number ?? "", tarCourses: (theirs ?? []).filter((e) => e.trainee_id === id && tarPrintable(e)).length });
   }
-  return NextResponse.json({ tarEnrollmentIds: (mine ?? []).filter(tarPrintable).map((e) => e.id), tarGroups: tarGroups((mine ?? []) as { id: string; enrollment_status: string; enrolled_at: string | null; created_at: string }[]), payments, tars: tarRes.data ?? [], others }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ tarGroups: await loadTarGroups(db, traineeId), payments, tars: tarRes.data ?? [], others }, { headers: { "Cache-Control": "no-store" } });
 }

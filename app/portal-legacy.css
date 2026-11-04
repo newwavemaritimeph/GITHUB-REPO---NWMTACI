@@ -2468,11 +2468,11 @@ button.rd-row:hover { background: #f6fafc; }
 .tp .tp-source label{display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:#5d6f7c;min-width:0}
 .tp .tp-source select{height:38px;border:1.5px solid #bcdcf7;border-radius:8px;padding:0 10px;font-size:14px;background:#fff;color:#123F63;text-transform:none;letter-spacing:0;font-weight:500;min-width:0}
 .tp .tp-side .tp-source{grid-template-columns:1fr;border:0;background:none;padding:0}
-.tp .tp-source .tp-fb{grid-column:1/-1}
-.tp .tp-source .tp-fb input{height:38px;border:1.5px solid #bcdcf7;border-radius:8px;padding:0 10px;font-size:14px;background:#fff;color:#123F63;text-transform:none;letter-spacing:0;font-weight:500;min-width:0}
-.tp .tp-source .tp-fb input.bad{border-color:#c0392b}.tp .tp-source .tp-fb input.ok{border-color:#1e8a4c}
-.tp .tp-source .tp-fb small{text-transform:none;letter-spacing:0;font-weight:500;font-size:12.5px;color:#5d6f7c}
-.tp .tp-source .tp-fb small.bad{color:#c0392b}.tp .tp-source .tp-fb small.ok{color:#1e8a4c}
+.tp .tp-fb{grid-column:1/-1;display:flex;flex-direction:column;gap:4px;margin-top:10px;font-size:13px;font-weight:600}
+.tp .tp-fb input{height:38px;border:1.5px solid #bcdcf7;border-radius:8px;padding:0 10px;font-size:14px;background:#fff;color:#123F63;text-transform:none;letter-spacing:0;font-weight:500;min-width:0}
+.tp .tp-fb input.bad{border-color:#c0392b}.tp .tp-fb input.ok{border-color:#1e8a4c}
+.tp .tp-fb small{text-transform:none;letter-spacing:0;font-weight:500;font-size:12.5px;color:#5d6f7c}
+.tp .tp-fb small.bad{color:#c0392b}.tp .tp-fb small.ok{color:#1e8a4c}
 .tp .tp-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .tp .tp-stats>div{border:1px solid #dbe5ec;border-radius:10px;padding:10px 14px;background:#f3f8fb;min-width:0}
 .tp .tp-stats b{display:block;font-size:16px;color:#14212b;margin-top:2px}

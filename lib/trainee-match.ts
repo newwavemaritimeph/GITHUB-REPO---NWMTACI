@@ -6,15 +6,45 @@ import { normalizeSrn } from "@/lib/validation";
  */
 export const tarPrintable = (e: { enrollment_status: string }) => e.enrollment_status !== "Cancelled";
 
-export type TarGroup = { date: string; ids: string[] };
-type TarRow = { id: string; enrollment_status: string; enrolled_at?: string | null; created_at: string };
+export type TarGroup = { date: string; at: string; ids: string[] };
+type TarRow = { id: string; enrollment_status: string; created_at: string; receipt_at?: string | null; paid_by?: string | null };
 const manilaDay = (v: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(v));
+/** Courses added this close together, before any TAR or receipt exists, are one visit. */
+export const TAR_VISIT_MINUTES = 30;
 
-/** One TAR per enrollment date (owner, 3 Nov 2026): courses enrolled on the same Manila day share a TAR. Newest date first. */
-export function tarGroups(rows: TarRow[]): TarGroup[] {
-  const byDay = new Map<string, string[]>();
-  for (const r of rows.filter(tarPrintable)) { const d = manilaDay(r.enrolled_at ?? r.created_at); byDay.set(d, [...(byDay.get(d) ?? []), r.id]); }
-  return [...byDay].sort((a, z) => z[0].localeCompare(a[0])).map(([date, ids]) => ({ date, ids: ids.sort() }));
+/**
+ * One TAR per transaction, newest first (owner, 4 Nov 2026). Courses on an issued TAR stay together,
+ * so it keeps its number ("if the TAR and AR is already generated, do not combine"). The rest go by
+ * when they were added: a gap over the visit, or a course added after the group's first receipt,
+ * starts a new transaction. Courses whose first receipt is one payment are one transaction, whenever
+ * they were added ("paid together, one TAR and Acknowledgement Receipt"). `issued` is newest record first.
+ */
+export function tarGroups(rows: TarRow[], issued: string[][] = []): TarGroup[] {
+  const live = new Map(rows.filter(tarPrintable).map((r) => [r.id, r]));
+  const time = (v: string) => new Date(v).getTime();
+  const groups: TarRow[][] = [];
+  for (const ids of issued) {
+    const group = ids.flatMap((id) => live.get(id) ?? []);
+    if (!group.length) continue;
+    group.forEach((r) => live.delete(r.id));
+    groups.push(group);
+  }
+  const open: TarRow[][] = [];
+  let current: TarRow[] = [], last = 0, closedAt = Infinity;
+  for (const r of [...live.values()].sort((x, y) => time(x.created_at) - time(y.created_at))) {
+    const at = time(r.created_at);
+    if (!current.length || at - last > TAR_VISIT_MINUTES * 60000 || at > closedAt) {
+      current = []; closedAt = Infinity;
+      const before = r.paid_by ? open.find((g) => g.some((x) => x.paid_by === r.paid_by)) : undefined;
+      if (before) { current = before; closedAt = Math.min(...before.flatMap((x) => (x.receipt_at ? [time(x.receipt_at)] : []))); } else open.push(current);
+    }
+    current.push(r);
+    last = at;
+    if (r.receipt_at) closedAt = Math.min(closedAt, time(r.receipt_at));
+  }
+  return [...groups, ...open]
+    .map((g) => { const at = g.map((r) => r.created_at).sort((x, y) => time(x) - time(y))[0]; return { date: manilaDay(at), at, ids: g.map((r) => r.id).sort() }; })
+    .sort((x, y) => time(y.at) - time(x.at));
 }
 
 type Person = { id: string; srn?: string | null; legal_first_name?: string | null; legal_last_name?: string | null; birthdate?: string | null };
