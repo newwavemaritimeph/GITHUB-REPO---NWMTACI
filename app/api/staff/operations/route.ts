@@ -1779,7 +1779,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "expense-reprint-decide") {
-      if (!staff.roleCodes.includes("accounting")) return NextResponse.json({ error: "Only Accounting can approve voucher reprints." }, { status: 403 });
+      // Admin may act as Accounting, as on every other Accounting approval (owner, 4 Nov 2026).
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or Admin can approve voucher reprints." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { data: req } = await admin.from("expense_reprint_requests").select("id,expense_id,status").eq("id", input.requestId).maybeSingle();
       if (!req) return NextResponse.json({ error: "Request not found." }, { status: 404 });
