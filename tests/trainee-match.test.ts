@@ -46,8 +46,11 @@ describe("one TAR per transaction", () => {
   it("does not combine with a receipt, even minutes later", () => {
     expect(ids(tarGroups([row("a", "2026-11-04T01:00:00Z", { receipt_at: "2026-11-04T01:03:00Z" }), row("b", "2026-11-04T01:05:00Z")]))).toEqual([["b"], ["a"]]);
   });
-  it("keeps a course paid first with one added before that payment", () => {
-    expect(ids(tarGroups([row("a", "2026-11-04T01:00:00Z", { receipt_at: "2026-11-04T01:10:00Z" }), row("b", "2026-11-04T01:05:00Z")]))).toEqual([["a", "b"]]);
+  it("separates a course settled alone from one added with it and still unpaid", () => {
+    expect(ids(tarGroups([row("a", "2026-11-04T01:00:00Z", { receipt_at: "2026-11-04T01:10:00Z", paid_by: "p1" }), row("b", "2026-11-04T01:05:00Z")]))).toEqual([["b"], ["a"]]);
+  });
+  it("keeps one TAR with both receipts when it was printed before the courses were paid separately", () => {
+    expect(ids(tarGroups([row("a", "2026-11-04T01:00:00Z", { paid_by: "p1" }), row("b", "2026-11-04T01:05:00Z", { paid_by: "p2" })], [["a", "b"]]))).toEqual([["a", "b"]]);
   });
   it("keeps an issued TAR whole, whatever the times, and the newest record wins", () => {
     expect(ids(tarGroups([row("a", "2026-11-04T01:00:00Z"), row("b", "2026-11-04T07:00:00Z")], [["a", "b"]]))).toEqual([["a", "b"]]);

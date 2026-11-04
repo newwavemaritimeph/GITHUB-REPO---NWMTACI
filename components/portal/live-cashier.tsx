@@ -12,6 +12,7 @@ import type { CashierReportSnapshot } from "@/lib/documents";
 import { tcl } from "@/lib/title-case";
 import { PayTheCenters, centerLines } from "./pay-centers";
 import { shrinkProof } from "@/lib/proof-shrink";
+import { NO_REASON, REASONS, REJECT_REASONS, ReasonField, reasonReady, reasonText, type ReasonValue } from "./reject-inline";
 import { rankMatches, tarPrintable, type TarGroup } from "@/lib/trainee-match";
 import { sourceLabel } from "@/lib/company-charge";
 
@@ -85,7 +86,7 @@ export function TarButton({ data, traineeId, reload, className = "portal-seconda
   const print = (ids: string[]) => { setError(""); void openAdmissionRecord(traineeId, ids).then(() => reload?.()).catch((e) => setError(e instanceof Error ? e.message : "Could not open the admission record.")); };
   if (!groups?.length) return <><button type="button" className={className} disabled>Print TAR</button>{groups && <small className="muted-text">No course on this record yet</small>}</>;
   return <>
-    {groups.map((g) => tarState(data, traineeId, g.ids).left > 0 && <button key={g.ids.join("|")} type="button" className={className} onClick={() => print(g.ids)}>Print TAR{groups.length > 1 ? ` · ${txWhen(g.at)}` : ""}</button>)}
+    {groups.map((g) => tarState(data, traineeId, g.ids).left > 0 && <button key={g.ids.join("|")} type="button" className={className} onClick={() => print(g.ids)}>Print TAR{groups.length > 1 ? ` · ${g.ids.map((id) => { const e = data.enrollments.find((x) => x.id === id); return e ? courseCode(e) : ""; }).filter(Boolean).join(", ") || txWhen(g.at)}` : ""}</button>)}
     {error && <Message kind="error" text={error} />}
   </>;
 }
@@ -195,6 +196,21 @@ function groupByTrainee(data: PortalData, list: Enrollment[], sinceOf: (e: Enrol
 function CourseList({ list }: { list: Enrollment[] }) {
   return <div className="cx-courses">{list.map((e) => <div key={e.id}><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small></div>)}</div>;
 }
+/**
+ * Tick boxes for separate payments (owner, 4 Nov 2026): each course with a balance has a tick; the button records the
+ * ticked ones. Ticked courses paid together share one receipt and one TAR; paid separately, each has its own.
+ */
+type Unticked = Record<string, boolean>;
+export function TickCourses({ list, off, setOff }: { list: Enrollment[]; off: Unticked; setOff: (update: (cur: Unticked) => Unticked) => void }) {
+  return <div className="cx-courses cx-ticks">{list.map((e) => balanceOf(e) > 0
+    ? <label key={e.id} className="cx-tick"><input type="checkbox" checked={!off[e.id]} onChange={(ev) => { const on = ev.target.checked; setOff((cur) => ({ ...cur, [e.id]: !on })); }} aria-label={`Pay ${courseCode(e)} now`} /><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small><b className="cx-amt">{pesos(balanceOf(e))}</b></label>
+    : <div key={e.id} className="cx-tick"><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small><b className="cx-amt"><Badge tone="active">Paid</Badge></b></div>)}</div>;
+}
+export function RecordTicked({ data, list, off, onPay }: { data: PortalData; list: Enrollment[]; off: Unticked; onPay: (enrollmentId: string, courses: string[]) => void }) {
+  const ticked = list.filter((e) => balanceOf(e) > 0 && !off[e.id]);
+  const amount = ticked.reduce((s, e) => s + Math.max(0, balanceOf(e) - (data.pendingRebates?.[e.id] ?? 0)), 0);
+  return <button type="button" className="portal-primary" disabled={!ticked.length} onClick={() => onPay(ticked[0].id, ticked.map((e) => e.id))}>{ticked.length ? `Record ${pesos(amount)}` : "Tick a Course"}</button>;
+}
 const Who = ({ name, number }: { name: string; number?: string }) => <><span className="cx-name">{name}</span>{number ? <span className="cx-id">{number}</span> : null}</>;
 const payState = (e: Enrollment) => (e.enrollment_status === "Cancelled" ? "Cancelled" : balanceOf(e) === 0 ? "Paid" : paidOf(e) > 0 ? "Partially paid" : "Unpaid");
 const PAY_TONE: Record<string, string> = { Paid: "active", "Partially paid": "orange", Unpaid: "red", Cancelled: "cancelled", "Company Charge": "pending" };
@@ -247,7 +263,7 @@ function markWords(name: string, term: string) {
   return name.split(" ").map((w, i) => <span key={i}>{i ? " " : ""}{t && w.toLowerCase().startsWith(t) ? <><mark className="cx-mark">{w.slice(0, t.length)}</mark>{w.slice(t.length)}</> : w}</span>);
 }
 
-export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCentavos, initialFeeLabel, initialProof, onClose, onSaved }: { data: PortalData; initialEnrollmentId?: string; initialAmountCentavos?: number; initialFeeLabel?: string; initialProof?: TraineeProofRow; onClose: () => void; onSaved: () => Promise<void> }) {
+export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, initialAmountCentavos, initialFeeLabel, initialProof, onClose, onSaved }: { data: PortalData; initialEnrollmentId?: string; initialCourses?: string[]; initialAmountCentavos?: number; initialFeeLabel?: string; initialProof?: TraineeProofRow; onClose: () => void; onSaved: () => Promise<void> }) {
   const initial = initialEnrollmentId ? data.enrollments.find((e) => e.id === initialEnrollmentId) : undefined;
   const [traineeId, setTraineeId] = useState(initialProof?.trainee_id ?? initial?.trainee_id ?? "");
   const [search, setSearch] = useState("");
@@ -256,9 +272,13 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
   const [method, setMethod] = useState(initialProof && modes.includes(initialProof.method) ? initialProof.method : modes[0] ?? "Cash");
   const [reference, setReference] = useState(initialProof?.reference ?? "");
   // "Collect fee" from Requests opens with the request fee filled in.
-  const preset = initialProof?.amount_centavos ? (initialProof.amount_centavos / 100).toFixed(2) : initialEnrollmentId && initialAmountCentavos ? (initialAmountCentavos / 100).toFixed(2) : "";
+  // Courses ticked on the row open filled in, each at its balance less any rebate due on full payment (owner, 4 Nov 2026).
+  const payable = (e: Enrollment) => Math.max(0, balanceOf(e) - (data.pendingRebates?.[e.id] ?? 0));
+  const money = (centavos: number) => (centavos / 100).toFixed(2);
+  const ticked = initialCourses ? data.enrollments.filter((e) => initialCourses.includes(e.id) && balanceOf(e) > 0) : [];
+  const preset = ticked.length ? money(ticked.reduce((s, e) => s + payable(e), 0)) : initialProof?.amount_centavos ? money(initialProof.amount_centavos) : initialEnrollmentId && initialAmountCentavos ? money(initialAmountCentavos) : "";
   const [received, setReceived] = useState(preset);
-  const [amounts, setAmounts] = useState<Record<string, string>>(preset && initialEnrollmentId ? { [initialEnrollmentId]: preset } : {});
+  const [amounts, setAmounts] = useState<Record<string, string>>(ticked.length ? Object.fromEntries(ticked.map((e) => [e.id, money(payable(e))])) : preset && initialEnrollmentId ? { [initialEnrollmentId]: preset } : {});
   const [extras, setExtras] = useState<ExtraLine[]>([]);
   const [addOpen, setAddOpen] = useState(false);
   // Design 03 · Split Primary (owner, 3 Nov 2026): the highlighted suggestion and the ▾ menu beside Record.
@@ -320,6 +340,12 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
     if (how === "all") { setAmounts(Object.fromEntries(open.map((e) => [e.id, (Math.max(0, balanceOf(e) - pending(e)) / 100).toFixed(2)]))); setReceived(((open.reduce((s, e) => s + Math.max(0, balanceOf(e) - pending(e)), 0) + extraTotal) / 100).toFixed(2)); return; }
     let left = receivedCentavos - extraTotal;
     setAmounts(Object.fromEntries(open.map((e) => { const a = Math.max(0, Math.min(left, balanceOf(e))); left -= a; return [e.id, a > 0 ? (a / 100).toFixed(2) : ""]; })));
+  }
+  // The tick on a course line: on fills its balance, off clears it; Amount Received follows.
+  function tick(e: Enrollment, on: boolean) {
+    const next = { ...amounts, [e.id]: on ? money(payable(e)) : "" };
+    setAmounts(next);
+    setReceived(money(open.reduce((s, x) => s + Math.min(toCentavos(next[x.id] ?? ""), balanceOf(x)), 0) + extraTotal));
   }
   function addExtra() {
     const qty = Math.max(1, parseInt(quantity, 10) || 1);
@@ -400,9 +426,9 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
       </div> : <>
         <div className="cx-whocard full"><div><Who name={group.name} number={group.number} /></div><div className="cx-right"><small>Balance</small><span className="cx-amt">{pesos(group.balance)}</span></div></div>
         <label>Amount Received (PHP)<input className="cx-mono" inputMode="decimal" value={received} onChange={(ev) => setReceived(ev.target.value)} placeholder="0.00" /></label>
-        <div className="cx-lines full"><table><thead><tr><th>Course or Charge</th><th className="r">Balance</th><th className="r">Apply</th></tr></thead><tbody>
-          {open.map((e) => { const v = amounts[e.id] ?? ""; const bad = toCentavos(v) > balanceOf(e); return <tr key={e.id} className={toCentavos(v) > 0 ? "sel" : ""}><td><span className="cx-code">{courseCode(e)}</span> <small>{first(e.courses)?.name} · {scheduleText(e)}</small>{(() => { const ag = partnerOn(e); return ag ? <small className="ref-line">{ag.name} · {ag.rebate_mode === "No deduction" ? "rebate paid to the agency later" : pending(e) > 0 ? `rebate ${pesos(pending(e))} once ${pesos(balanceOf(e) - pending(e))} is paid` : "rebate deducted"}</small> : <small className="ref-line wk">{sourceLabel(e.source, null) || "Online"} · no rebate</small>; })()}</td><td className="r cx-amt">{pesos(balanceOf(e))}</td><td className="r"><input className="cx-apply" inputMode="decimal" value={v} placeholder="0.00" aria-label={`Amount for ${courseCode(e)}`} onChange={(ev) => setAmounts((cur) => ({ ...cur, [e.id]: ev.target.value }))} />{bad && <small className="cx-bad">More than the balance</small>}</td></tr>; })}
-          {extras.map((x) => { const e = mine.find((m) => m.id === x.enrollmentId); return <tr key={x.key} className="misc"><td><span className="cx-code misc">{x.kind === "item" ? "Item" : "Fee"}</span> <strong>{x.description}</strong>{x.quantity > 1 ? ` x ${x.quantity}` : ""} <small>For {e ? courseCode(e) : "course"}</small></td><td className="r cx-amt">{pesos(x.unit * x.quantity)}</td><td className="r"><button type="button" className="ghost-button" onClick={() => removeExtra(x.key)}>Remove</button></td></tr>; })}
+        <div className="cx-lines full"><table><thead><tr>{open.length > 1 && <th aria-label="Pay now"></th>}<th>Course or Charge</th><th className="r">Balance</th><th className="r">Apply</th></tr></thead><tbody>
+          {open.map((e) => { const v = amounts[e.id] ?? ""; const bad = toCentavos(v) > balanceOf(e); return <tr key={e.id} className={toCentavos(v) > 0 ? "sel" : ""}>{open.length > 1 && <td><input type="checkbox" className="cx-tickbox" checked={toCentavos(v) > 0} aria-label={`Pay ${courseCode(e)} now`} onChange={(ev) => tick(e, ev.target.checked)} /></td>}<td><span className="cx-code">{courseCode(e)}</span> <small>{first(e.courses)?.name} · {scheduleText(e)}</small>{(() => { const ag = partnerOn(e); return ag ? <small className="ref-line">{ag.name} · {ag.rebate_mode === "No deduction" ? "rebate paid to the agency later" : pending(e) > 0 ? `rebate ${pesos(pending(e))} once ${pesos(balanceOf(e) - pending(e))} is paid` : "rebate deducted"}</small> : <small className="ref-line wk">{sourceLabel(e.source, null) || "Online"} · no rebate</small>; })()}</td><td className="r cx-amt">{pesos(balanceOf(e))}</td><td className="r"><input className="cx-apply" inputMode="decimal" value={v} placeholder="0.00" aria-label={`Amount for ${courseCode(e)}`} onChange={(ev) => setAmounts((cur) => ({ ...cur, [e.id]: ev.target.value }))} />{bad && <small className="cx-bad">More than the balance</small>}</td></tr>; })}
+          {extras.map((x) => { const e = mine.find((m) => m.id === x.enrollmentId); return <tr key={x.key} className="misc">{open.length > 1 && <td></td>}<td><span className="cx-code misc">{x.kind === "item" ? "Item" : "Fee"}</span> <strong>{x.description}</strong>{x.quantity > 1 ? ` x ${x.quantity}` : ""} <small>For {e ? courseCode(e) : "course"}</small></td><td className="r cx-amt">{pesos(x.unit * x.quantity)}</td><td className="r"><button type="button" className="ghost-button" onClick={() => removeExtra(x.key)}>Remove</button></td></tr>; })}
           {!open.length && !extras.length && <tr><td colSpan={3}><small>All courses are fully paid.</small></td></tr>}
         </tbody></table></div>
         {addOpen && <div className="cx-addbox full">
@@ -447,7 +473,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
  * Registration (waiting for payment), trainees already paid and enrolled, and
  * balances still due after training (emailed daily at 4:00 PM).
  */
-export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData; onPay: (enrollmentId: string) => void; reload: () => Promise<void>; go?: (module: string) => void }) {
+export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData; onPay: (enrollmentId: string, courses?: string[]) => void; reload: () => Promise<void>; go?: (module: string) => void }) {
   const [companyPay, setCompanyPay] = useState(false);
   const [raising, setRaising] = useState(false), [reqFilter, setReqFilter] = useState<"All" | "For Approval" | "Approved" | "Rejected">("All");
   const today = manilaToday();
@@ -457,10 +483,10 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
   const tileModes = [...new Set(["Cash", "GCash", "PSBank", "UnionBank", ...modeNames(data)])];
   // New enrollments: handed over by Registration, nothing paid yet, grouped by trainee.
   const awaiting = data.enrollments.filter((e) => e.enrollment_status === "Pending" && handed[e.id] && paidOf(e) === 0);
-  const freshIds = new Set(awaiting.map((e) => e.trainee_id));
   const billed = (e: Enrollment) => !!data.companyCharge?.[e.id];
-  const fresh = groupByTrainee(data, data.enrollments.filter((e) => freshIds.has(e.trainee_id) && e.enrollment_status !== "Cancelled" && !billed(e) && (handed[e.id] || PAID_STATUSES.includes(e.enrollment_status))), (e) => handed[e.id] ?? e.created_at)
-    .filter((g) => g.paid === 0).sort((a, b) => a.since.localeCompare(b.since));
+  // Per course (owner, 4 Nov 2026): a course still unpaid stays here after another course of the trainee is paid.
+  const fresh = groupByTrainee(data, awaiting.filter((e) => !billed(e)), (e) => handed[e.id] ?? e.created_at).sort((a, b) => a.since.localeCompare(b.since));
+  const [off, setOff] = useState<Unticked>({});
   // Paid and enrolled: paid in the last 7 days.
   const since = addDays(today, -6);
   // Decided requests stay on the dashboard for 5 days only (owner, 3 Nov 2026); open ones always show.
@@ -470,10 +496,9 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
   const durations = new Map(data.courses.map((c) => [c.id, c.duration_label]));
   const unpaid = unpaidAfterTraining(data.enrollments.filter((e) => !data.companyCharge?.[e.id]) as unknown as BalanceEnrollment[], (id) => durations.get(id), today);
   const proofs = data.traineeProofs ?? [];
-  const [fromProof, setFromProof] = useState<TraineeProofRow | null>(null), [notValid, setNotValid] = useState<{ id: string; reason: string } | null>(null);
+  const [fromProof, setFromProof] = useState<TraineeProofRow | null>(null), [notValid, setNotValid] = useState<{ id: string; why: ReasonValue } | null>(null);
   const freshP = usePaged(fresh), paidP = usePaged(paid), unpaidP = usePaged(unpaid), proofP = usePaged(proofs);
   const unpaidTotal = unpaid.reduce((s, r) => s + r.balanceCentavos, 0);
-  const firstOpen = (g: TraineeGroup) => (g.enrollments.find((e) => balanceOf(e) > 0) ?? g.enrollments[0]).id;
   const { busy, msg, post } = usePost(reload);
   const opening = (data.cashierOpenings ?? []).find((o) => o.opening_date === today);
   const closedToday = data.cashierClosings.some((c) => c.closing_date === today);
@@ -536,13 +561,13 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
               <td data-l="Mode">{p.method}</td>
               <td data-l="Amount" className="r"><strong className="cx-amt">{pesos(p.amount_centavos)}</strong></td>
               <td data-l="Reference" className="cl-mono">{p.reference}</td>
-              <td data-l=""><div className="cx-acts">{p.drive_link && <ViewIcon label="View Proof" href={p.drive_link} />}<button type="button" className="portal-primary" disabled={!g} onClick={() => setFromProof(p)}>Record Payment</button><button type="button" className="portal-secondary" onClick={() => setNotValid({ id: p.id, reason: "" })}>Not Valid</button></div>
-                {notValid?.id === p.id && <div className="cx-acts" style={{ marginTop: 6 }}><input aria-label="Reason" placeholder="Reason, e.g. reference not found" value={notValid.reason} onChange={(ev) => setNotValid({ id: p.id, reason: ev.target.value })} /><button type="button" className="portal-primary" disabled={busy || notValid.reason.trim().length < 3} onClick={async () => { await post({ action: "proof-dismiss", proofId: p.id, reason: notValid.reason.trim() }, "Marked Not Valid."); setNotValid(null); }}>Confirm</button><button type="button" className="portal-secondary" onClick={() => setNotValid(null)}>Cancel</button></div>}</td>
+              <td data-l=""><div className="cx-acts">{p.drive_link && <ViewIcon label="View Proof" href={p.drive_link} />}<button type="button" className="portal-primary" disabled={!g} onClick={() => setFromProof(p)}>Record Payment</button><button type="button" className="portal-secondary" onClick={() => setNotValid({ id: p.id, why: NO_REASON })}>Not Valid</button></div>
+                {notValid?.id === p.id && <div className="cx-acts" style={{ marginTop: 6 }}><span className="cx-reasons"><ReasonField reasons={REASONS.proofNotValid} value={notValid.why} onChange={(why) => setNotValid({ id: p.id, why })} autoFocus /></span><button type="button" className="portal-primary" disabled={busy || !reasonReady(notValid.why)} onClick={async () => { await post({ action: "proof-dismiss", proofId: p.id, reason: reasonText(notValid.why) }, "Marked Not Valid."); setNotValid(null); }}>Confirm</button><button type="button" className="portal-secondary" onClick={() => setNotValid(null)}>Cancel</button></div>}</td>
             </tr>; })}
           </tbody></table>{proofP.pager}</div></section>}
         <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>New Enrollments</h2></div><span className="slot-count">{fresh.length}</span></div>
       {fresh.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Courses</th><th>Endorsed</th><th className="r">Total Due</th><th></th></tr></thead><tbody>
-        {freshP.shown.map((g) => <tr key={g.traineeId}><td data-l="" className="lead"><Who name={g.name} number={g.number} /></td><td data-l="Courses"><CourseList list={g.enrollments} /></td><td data-l="Endorsed">{fmtDate(day(g.since))}<small>{fmtClock(g.since)}</small></td><td data-l="Total due" className="r"><strong className="cx-amt">{pesos(g.due)}</strong><small>{g.enrollments.length} course{g.enrollments.length === 1 ? "" : "s"}</small></td><td data-l=""><div className="cx-acts"><button type="button" className="portal-primary" onClick={() => onPay(firstOpen(g))}>Record Payment</button></div></td></tr>)}
+        {freshP.shown.map((g) => <tr key={g.traineeId}><td data-l="" className="lead"><Who name={g.name} number={g.number} /></td><td data-l="Courses"><TickCourses list={g.enrollments} off={off} setOff={setOff} /></td><td data-l="Endorsed">{fmtDate(day(g.since))}<small>{fmtClock(g.since)}</small></td><td data-l="Total due" className="r"><strong className="cx-amt">{pesos(g.due)}</strong><small>{g.enrollments.length} course{g.enrollments.length === 1 ? "" : "s"}</small></td><td data-l=""><div className="cx-acts"><RecordTicked data={data} list={g.enrollments} off={off} onPay={onPay} /></div></td></tr>)}
       </tbody></table>{freshP.pager}</div> : <p className="portal-empty-copy">No new enrollments.</p>}
     </section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Approvals and Requests</h2></div>
@@ -556,14 +581,14 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
       {paid.length ? <div className="portal-table cx-cards pe-table"><table><thead><tr><th>Trainee · NWMTACI No.</th><th>Courses · Training</th><th className="r">Payment</th><th></th></tr></thead><tbody>
         {paidP.shown.map((g) => { const latest = data.payments.filter((p) => p.trainee_id === g.traineeId).sort((a, b) => b.received_at.localeCompare(a.received_at))[0]; return <tr key={g.traineeId}>
           <td data-l="" className="lead"><Who name={g.name} number={g.number} /></td>
-          <td data-l="Courses"><span className="pe-courses">{g.enrollments.map((e) => <span key={e.id} className="pe-course" title={first(e.courses)?.name ?? ""}><b>{courseCode(e)}</b>{scheduleText(e)}</span>)}</span></td>
+          <td data-l="Courses">{g.balance > 0 ? <TickCourses list={g.enrollments} off={off} setOff={setOff} /> : <span className="pe-courses">{g.enrollments.map((e) => <span key={e.id} className="pe-course" title={first(e.courses)?.name ?? ""}><b>{courseCode(e)}</b>{scheduleText(e)}</span>)}</span>}</td>
           <td data-l="Payment" className="r"><strong className="cx-amt">{pesos(g.paid)}</strong><small>{g.balance === 0 ? <Badge tone="active">Paid</Badge> : <Badge tone="orange">{`Balance ${pesos(g.balance)}`}</Badge>}</small></td>
-          <td data-l=""><div className="cx-acts">{g.balance > 0 && <button type="button" className="portal-secondary" onClick={() => onPay(firstOpen(g))}>Collect Balance</button>}{latest && <ReceiptButton data={data} paymentId={latest.id} reload={reload} />}</div></td></tr>; })}
+          <td data-l=""><div className="cx-acts">{g.balance > 0 && <RecordTicked data={data} list={g.enrollments} off={off} onPay={onPay} />}{latest && <ReceiptButton data={data} paymentId={latest.id} reload={reload} />}</div></td></tr>; })}
       </tbody></table>{paidP.pager}</div> : <p className="portal-empty-copy">No paid trainees in the last 7 days.</p>}
     </section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Unpaid Balances · 4:00 PM Summary</h2></div><span className="document-actions"><button type="button" className="portal-secondary" disabled={busy} onClick={() => void post({ action: "balance-summary-send" }, "Summary emailed.").catch(() => undefined)}>Email Summary Now</button></span></div>
       {unpaid.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Training</th><th>Status</th><th className="r">Balance</th><th></th></tr></thead><tbody>
-        {unpaidP.shown.map((r) => <tr key={r.id}><td data-l="" className="lead"><span className="cx-name">{r.traineeName}</span><span className="cx-id">{r.enrollmentNumber}</span></td><td data-l="Training">{r.course}<small>{r.endsToday ? "Ends today" : `Ended ${fmtDate(r.trainingEnd)}`}</small></td><td data-l="Status">{r.endsToday ? <Badge tone="orange">Ends Today</Badge> : <Badge tone="cancelled">Past Due</Badge>}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(r.balanceCentavos)}</strong><small>of {pesos(r.dueCentavos)}</small></td><td data-l=""><div className="cx-acts"><button type="button" className="portal-primary" onClick={() => onPay(r.id)}>Record Payment</button></div></td></tr>)}
+        {unpaidP.shown.map((r) => <tr key={r.id}><td data-l="" className="lead"><span className="cx-name">{r.traineeName}</span><span className="cx-id">{r.enrollmentNumber}</span></td><td data-l="Training">{r.course}<small>{r.endsToday ? "Ends today" : `Ended ${fmtDate(r.trainingEnd)}`}</small></td><td data-l="Status">{r.endsToday ? <Badge tone="orange">Ends Today</Badge> : <Badge tone="cancelled">Past Due</Badge>}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(r.balanceCentavos)}</strong><small>of {pesos(r.dueCentavos)}</small></td><td data-l=""><div className="cx-acts"><button type="button" className="portal-primary" onClick={() => onPay(r.id, [r.id])}>Settle Balance</button></div></td></tr>)}
       </tbody></table>{unpaidP.pager}</div> : <p className="portal-empty-copy">No unpaid balances after training.</p>}
     </section>
       </div>
@@ -616,13 +641,13 @@ export function DiscountRequests({ data, reload }: { data: PortalData; reload: (
   const { busy, msg, post } = usePost(reload);
   const [enrollmentId, setEnrollmentId] = useState("");
   const [amount, setAmount] = useState("");
-  const [reason, setReason] = useState("");
+  const [why, setWhy] = useState<ReasonValue>(NO_REASON);
   const [agencyId, setAgencyId] = useState("");
   const open = data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && balanceOf(e) > 0).sort((a, b) => traineeName(a).localeCompare(traineeName(b)));
   const e = open.find((x) => x.id === enrollmentId);
   const rebate = e && agencyId ? data.agencyCourseRebates.find((r) => r.agency_id === agencyId && r.course_id === e.course_id)?.rebate_centavos ?? null : null;
   const centavos = rebate ?? Math.round(Number(amount || 0) * 100);
-  const file = () => void post({ action: "discount-request", enrollmentId, amountCentavos: centavos, description: reason.trim() || undefined, agencyId: agencyId || null }, "Discount request sent for approval.").then(() => { setEnrollmentId(""); setAmount(""); setReason(""); setAgencyId(""); }).catch(() => undefined);
+  const file = () => void post({ action: "discount-request", enrollmentId, amountCentavos: centavos, description: reasonText(why), agencyId: agencyId || null }, "Discount request sent for approval.").then(() => { setEnrollmentId(""); setAmount(""); setWhy(NO_REASON); setAgencyId(""); }).catch(() => undefined);
   const enrollmentOf = (id: string) => data.enrollments.find((x) => x.id === id);
   return <div className="cx-stack">
     <section className="portal-panel cx-panel">
@@ -632,8 +657,8 @@ export function DiscountRequests({ data, reload }: { data: PortalData; reload: (
         <label className="full">Enrollment<select value={enrollmentId} onChange={(ev) => setEnrollmentId(ev.target.value)}><option value="">Select a Trainee with a Balance</option>{open.map((x) => <option key={x.id} value={x.id}>{traineeName(x)} · {x.enrollment_number} · {courseCode(x)} · {pesos(balanceOf(x))}</option>)}</select></label>
         <label>Endorsing Agency<select value={agencyId} onChange={(ev) => setAgencyId(ev.target.value)}><option value="">None</option>{data.agencies.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
         <label>Discount Amount (PHP){rebate != null ? <input value={(rebate / 100).toFixed(2)} readOnly /> : <input type="number" min="0.01" step="0.01" value={amount} onChange={(ev) => setAmount(ev.target.value)} />}</label>
-        <label className="full">Reason<input value={reason} onChange={(ev) => setReason(ev.target.value)} /></label>
-        <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || !e || centavos <= 0 || (e && centavos > balanceOf(e))} onClick={file}>{busy ? "Sending…" : "Request Discount"}</button></div>
+        <ReasonField reasons={REASONS.discount} value={why} onChange={setWhy} />
+        <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || !e || !reasonReady(why) || centavos <= 0 || (e && centavos > balanceOf(e))} onClick={file}>{busy ? "Sending…" : "Request Discount"}</button></div>
       </div>
     </section>
     <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>For Approval</h2></div><span className="slot-count">{data.pendingDiscounts.length}</span></div>
@@ -646,7 +671,7 @@ export function DiscountRequests({ data, reload }: { data: PortalData; reload: (
 
 const STATUS_ORDER = ["Unpaid", "Partially paid", "Company Charge", "Paid", "Cancelled"] as const;
 /** Every enrollment with its payment status, filtered by status and enrolled date. */
-export function CashierEnrollments({ data, onPay, reload, onOpenTrainee }: { data: PortalData; onPay: (enrollmentId: string) => void; reload: () => Promise<void>; onOpenTrainee?: (traineeId: string) => void }) {
+export function CashierEnrollments({ data, onPay, reload, onOpenTrainee }: { data: PortalData; onPay: (enrollmentId: string, courses?: string[]) => void; reload: () => Promise<void>; onOpenTrainee?: (traineeId: string) => void }) {
   const today = manilaToday();
   const [filter, setFilter] = useState<"All" | (typeof STATUS_ORDER)[number]>("All");
   const rowState = (e: Enrollment) => (e.enrollment_status !== "Cancelled" && data.companyCharge?.[e.id] && balanceOf(e) > 0 ? "Company Charge" : payState(e));
@@ -669,7 +694,7 @@ export function CashierEnrollments({ data, onPay, reload, onOpenTrainee }: { dat
       {(from || to) && <button type="button" className="ghost-button" onClick={() => { setFrom(""); setTo(""); }}>Clear Dates</button>}
     </div>
     <section className="portal-panel cx-panel">{rows.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Enrolled</th><th>Course</th><th className="r">Total Due</th><th className="r">Paid</th><th className="r">Balance</th><th>Status</th><th></th></tr></thead><tbody>
-      {rows.map((e) => { const st = rowState(e); return <tr key={e.id}><td data-l="" className="lead">{onOpenTrainee ? <button type="button" className="pv-open" onClick={() => onOpenTrainee(e.trainee_id)} title="Open the Trainee Account"><Who name={traineeName(e)} number={data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number} /></button> : <Who name={traineeName(e)} number={data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number} />}</td><td data-l="Enrolled">{fmtDate(dateOf(e))}</td><td data-l="Course"><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small></td><td data-l="Total due" className="r cx-amt">{pesos(dueCentavos(e))}</td><td data-l="Paid" className="r cx-amt">{pesos(paidOf(e))}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(e.enrollment_status === "Cancelled" ? 0 : balanceOf(e))}</strong></td><td data-l="Status"><Badge tone={PAY_TONE[st]}>{st}</Badge></td><td data-l=""><div className="cx-acts">{st === "Company Charge" ? <small className="muted-text">Billed on the Billing Statement</small> : st !== "Paid" && st !== "Cancelled" && <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record Payment</button>}</div></td></tr>; })}
+      {rows.map((e) => { const st = rowState(e); return <tr key={e.id}><td data-l="" className="lead">{onOpenTrainee ? <button type="button" className="pv-open" onClick={() => onOpenTrainee(e.trainee_id)} title="Open the Trainee Account"><Who name={traineeName(e)} number={data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number} /></button> : <Who name={traineeName(e)} number={data.applicationNumbers?.[e.trainee_id] ?? first(e.trainees)?.trainee_number} />}</td><td data-l="Enrolled">{fmtDate(dateOf(e))}</td><td data-l="Course"><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small></td><td data-l="Total due" className="r cx-amt">{pesos(dueCentavos(e))}</td><td data-l="Paid" className="r cx-amt">{pesos(paidOf(e))}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(e.enrollment_status === "Cancelled" ? 0 : balanceOf(e))}</strong></td><td data-l="Status"><Badge tone={PAY_TONE[st]}>{st}</Badge></td><td data-l=""><div className="cx-acts">{st === "Company Charge" ? <small className="muted-text">Billed on the Billing Statement</small> : st !== "Paid" && st !== "Cancelled" && <button type="button" className="portal-primary" onClick={() => onPay(e.id, [e.id])}>Settle Balance</button>}</div></td></tr>; })}
     </tbody></table></div> : <p className="portal-empty-copy">No enrollments match these filters.</p>}</section>
   </div>;
 }
@@ -929,7 +954,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   const [rejecting, setRejecting] = useState<ExpenseRow | null>(null);
   const [reprinting, setReprinting] = useState<ExpenseRow | null>(null);
   const [deciding, setDeciding] = useState<ReprintRow | null>(null);
-  const [reason, setReason] = useState("");
+  const [why, setWhy] = useState<ReasonValue>(NO_REASON);
   const [month, setMonth] = useState("");
   const [vFilter, setVFilter] = useState<(typeof VOUCHER_FILTERS)[number]>("All"), [vChannel, setVChannel] = useState(""), [vSearch, setVSearch] = useState("");
   const [selected, setSelected] = useState<ExpenseRow | null>(null);
@@ -948,10 +973,10 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   const monthsShown = month ? months.filter((m) => m.month === month) : months;
   const pendingReprints = reprints.filter((r) => r.status === "Pending");
   const approve = (e: ExpenseRow) => void post({ action: "expense-decide", id: e.id, decision: "Approved" }, "Approved. The voucher number is issued and the voucher is filed in Google Drive.").catch(() => undefined);
-  const reject = () => { if (!rejecting) return; void post({ action: "expense-decide", id: rejecting.id, decision: "Rejected", remarks: reason.trim() || undefined }, "Rejected.").then(() => { setRejecting(null); setReason(""); }).catch(() => undefined); };
-  const requestReprint = () => { if (!reprinting) return; void post({ action: "expense-reprint-request", id: reprinting.id, reason: reason.trim() }, "Reprint request sent to Accounting.").then(() => { setReprinting(null); setReason(""); }).catch(() => undefined); };
-  const decideReprint = (r: ReprintRow, decision: "Approved" | "Rejected", remarks?: string) => void post({ action: "expense-reprint-decide", requestId: r.id, decision, remarks }, decision === "Approved" ? "Reprint approved. The voucher can be printed once more." : "Reprint request rejected.").then(() => { setDeciding(null); setReason(""); }).catch(() => undefined);
-  const printCell = (e: ExpenseRow) => <VoucherPrint e={e} reprints={reprints} onRequest={(x) => { setReprinting(x); setReason(""); }} reload={reload} />;
+  const reject = () => { if (!rejecting) return; void post({ action: "expense-decide", id: rejecting.id, decision: "Rejected", remarks: reasonText(why) }, "Rejected.").then(() => { setRejecting(null); setWhy(NO_REASON); }).catch(() => undefined); };
+  const requestReprint = () => { if (!reprinting) return; void post({ action: "expense-reprint-request", id: reprinting.id, reason: reasonText(why) }, "Reprint request sent to Accounting.").then(() => { setReprinting(null); setWhy(NO_REASON); }).catch(() => undefined); };
+  const decideReprint = (r: ReprintRow, decision: "Approved" | "Rejected", remarks?: string) => void post({ action: "expense-reprint-decide", requestId: r.id, decision, remarks }, decision === "Approved" ? "Reprint approved. The voucher can be printed once more." : "Reprint request rejected.").then(() => { setDeciding(null); setWhy(NO_REASON); }).catch(() => undefined);
+  const printCell = (e: ExpenseRow) => <VoucherPrint e={e} reprints={reprints} onRequest={(x) => { setReprinting(x); setWhy(NO_REASON); }} reload={reload} />;
 
   return <div className="portal-page cx">
     <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Expenses</h1></div><button type="button" className="portal-primary" onClick={() => setRecording(true)}>Record Expense</button></div>
@@ -978,7 +1003,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
           <td data-l="Amount" className="r"><strong className="cx-amt">{pesos(e.amount_centavos)}</strong></td>
           <td data-l="Status"><Badge tone={EXPENSE_TONE[st]}>{st}</Badge>{st === "Rejected" && e.decision_remarks ? <small>{e.decision_remarks}</small> : null}{st === "Released" && e.released_at ? <small>{fmtDate(day(e.released_at))}</small> : null}</td>
           <td data-l=""><div className="cx-acts">
-            {st === "For approval" && canDecide && <><button type="button" className="portal-primary" disabled={busy} onClick={() => approve(e)}>Approve</button><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setRejecting(e); setReason(""); }}>Reject</button></>}
+            {st === "For approval" && canDecide && <><button type="button" className="portal-primary" disabled={busy} onClick={() => approve(e)}>Approve</button><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setRejecting(e); setWhy(NO_REASON); }}>Reject</button></>}
             {(st === "Approved" || st === "Released") && printCell(e)}
             {st === "Approved" && <button type="button" className="portal-primary" onClick={() => setReleasing(e)}>Mark Released</button>}
             {e.drive_link && <a className="ghost-button" href={e.drive_link} target="_blank" rel="noreferrer">Drive</a>}
@@ -997,7 +1022,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
             <td data-l="Reason">{r.reason}</td>
             <td data-l="Requested by">{r.requested_by_name ?? "—"}<small>{fmtDate(day(r.requested_at))}</small></td>
             <td data-l=""><div className="cx-acts">{isManager
-              ? <><button type="button" className="portal-primary" disabled={busy} onClick={() => decideReprint(r, "Approved")}>Approve Reprint</button><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setDeciding(r); setReason(""); }}>Reject</button></>
+              ? <><button type="button" className="portal-primary" disabled={busy} onClick={() => decideReprint(r, "Approved")}>Approve Reprint</button><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setDeciding(r); setWhy(NO_REASON); }}>Reject</button></>
               : <span className="cx-chip">Waiting for Accounting</span>}</div></td>
           </tr>; })}
         </tbody></table></div>
@@ -1047,25 +1072,25 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
       })()}
     </>}
 
-    {selected && <VoucherDrawer e={(data.expenses as ExpenseRow[]).find((x) => x.id === selected.id) ?? selected} reprints={reprints} isManager={isManager} reload={reload} onClose={() => setSelected(null)} onRelease={(x) => { setSelected(null); setReleasing(x); }} onRequestReprint={(x) => { setReprinting(x); setReason(""); }} />}
+    {selected && <VoucherDrawer e={(data.expenses as ExpenseRow[]).find((x) => x.id === selected.id) ?? selected} reprints={reprints} isManager={isManager} reload={reload} onClose={() => setSelected(null)} onRelease={(x) => { setSelected(null); setReleasing(x); }} onRequestReprint={(x) => { setReprinting(x); setWhy(NO_REASON); }} />}
     {recording && <RecordExpenseModal data={data} onClose={() => setRecording(false)} post={post} />}
     {releasing && <ReleaseExpenseModal data={data} expense={releasing} onClose={() => setReleasing(null)} post={post} />}
     {rejecting && <Modal title={`Reject ${rejecting.expense_number}`} onClose={() => setRejecting(null)}>
       <div className="portal-form">
-        <label className="full">Reason<input autoFocus value={reason} onChange={(ev) => setReason(ev.target.value)} /></label>
-        <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setRejecting(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={reject}>Reject Expense</button></div>
+        <ReasonField reasons={REJECT_REASONS.expense} value={why} onChange={setWhy} autoFocus />
+        <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setRejecting(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !reasonReady(why)} onClick={reject}>Reject Expense</button></div>
       </div>
     </Modal>}
     {reprinting && <Modal title={`Request reprint of ${reprinting.voucher_number ?? reprinting.expense_number}`} onClose={() => setReprinting(null)}>
       <div className="portal-form">
-        <label className="full">Reason for Reprinting<input autoFocus placeholder="e.g. Original was damaged" value={reason} onChange={(ev) => setReason(ev.target.value)} /></label>
-        <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setReprinting(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy || reason.trim().length < 3} onClick={requestReprint}>Send to Accounting</button></div>
+        <ReasonField reasons={REASONS.voucherReprint} label="Reason for Reprinting" value={why} onChange={setWhy} autoFocus />
+        <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setReprinting(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !reasonReady(why)} onClick={requestReprint}>Send to Accounting</button></div>
       </div>
     </Modal>}
     {deciding && <Modal title="Reject Reprint Request" onClose={() => setDeciding(null)}>
       <div className="portal-form">
-        <label className="full">Reason<input autoFocus value={reason} onChange={(ev) => setReason(ev.target.value)} /></label>
-        <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setDeciding(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={() => decideReprint(deciding, "Rejected", reason.trim() || undefined)}>Reject Request</button></div>
+        <ReasonField reasons={REJECT_REASONS.voucherReprint} value={why} onChange={setWhy} autoFocus />
+        <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={() => setDeciding(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !reasonReady(why)} onClick={() => decideReprint(deciding, "Rejected", reasonText(why))}>Reject Request</button></div>
       </div>
     </Modal>}
   </div>;

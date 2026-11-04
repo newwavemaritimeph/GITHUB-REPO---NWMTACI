@@ -5,6 +5,7 @@ import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
 import { groupNotices, holidayReminders, holidaysInMonth, totalsByChannel, voidReasonProblem, type HolidayDay, type MarinaStatus, type Notice } from "@/lib/admin-dashboard";
 import { ALL_DATES, Badge, Message, MonthBar, fmtDate, fullName, useMonthRows, useNeedSince, usePost as useRawPost } from "./shared-ui";
+import { NO_REASON, REASONS, ReasonField, reasonReady, reasonText, type ReasonValue } from "./reject-inline";
 import { certificateLines } from "./releasing-home";
 import { upcoming } from "./admin-assistant-home";
 import { askConfirm } from "./dialogs";
@@ -59,13 +60,14 @@ function useJson<T>(url: string) {
 
 /** The reason box shared by every void and cancellation. */
 function VoidBox({ title, detail, busy, onCancel, onConfirm }: { title: string; detail: string; busy: boolean; onCancel: () => void; onConfirm: (reason: string) => void }) {
-  const [reason, setReason] = useState(""), [problem, setProblem] = useState("");
+  const [why, setWhy] = useState<ReasonValue>(NO_REASON), [problem, setProblem] = useState("");
+  const reasons = title === "Void Payment" ? REASONS.paymentVoid : title === "Void Voucher" ? REASONS.voucherVoid : REASONS.cancelEnrollment;
   return <div className="ad-void" role="group" aria-label={title}>
     <b>{title}</b><p>{detail}</p>
-    <label>Reason<input value={reason} onChange={(e) => { setReason(e.target.value); setProblem(""); }} placeholder="e.g. Wrong trainee, duplicate receipt, wrong amount" maxLength={500} /></label>
+    <ReasonField reasons={reasons} value={why} onChange={(v) => { setWhy(v); setProblem(""); }} />
     {problem && <p className="ad-err">{problem}</p>}
     <div className="ad-void-actions"><button type="button" className="portal-secondary" onClick={onCancel} disabled={busy}>Keep It</button>
-      <button type="button" className="ad-danger" disabled={busy} onClick={() => { const p = voidReasonProblem(reason); if (p) { setProblem(p); return; } onConfirm(reason.trim()); }}>{busy ? "Saving…" : title}</button></div>
+      <button type="button" className="ad-danger" disabled={busy} onClick={() => { const text = reasonText(why), p = !reasonReady(why) ? "Choose a reason. Other needs a note." : voidReasonProblem(text); if (p) { setProblem(p); return; } onConfirm(text); }}>{busy ? "Saving…" : title}</button></div>
   </div>;
 }
 

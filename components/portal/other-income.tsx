@@ -5,6 +5,7 @@ import type { PortalData } from "../portal-live-app";
 import { first, manilaToday, pesos2 } from "@/lib/portal-format";
 import { Badge, Message, MonthBar, fmtDate, usePost as useRawPost, usePaged, usePeriod } from "./shared-ui";
 import { centerPaymentsOf, paymentFor } from "./pay-centers";
+import { NO_REASON, REASONS, ReasonField, reasonReady, reasonText, type ReasonValue } from "./reject-inline";
 import { shrinkPhoto } from "./live-cashier";
 
 /**
@@ -41,7 +42,7 @@ export function OtherIncome({ data, reload, canRecord, canVoid, canAddCategory =
   const [picked, setPicked] = useState<Set<string>>(new Set());
   const [form, setForm] = useState<Form | null>(null);
   const [proofs, setProofs] = useState<Proof[]>([]), [uploading, setUploading] = useState(""), [proofError, setProofError] = useState("");
-  const [voiding, setVoiding] = useState<string | null>(null), [reason, setReason] = useState("");
+  const [voiding, setVoiding] = useState<string | null>(null), [why, setWhy] = useState<ReasonValue>(NO_REASON);
   const { busy, msg, post } = usePost(reload);
   const channels = [...new Set([...data.paymentMethods.filter((m) => m.active).map((m) => m.name), "Check"])];
   const today = manilaToday();
@@ -168,8 +169,8 @@ export function OtherIncome({ data, reload, canRecord, canVoid, canAddCategory =
           <td className="r cx-mono">{i.voided_at ? <s>{pesos2(Number(i.amount_centavos))}</s> : <strong>{pesos2(Number(i.amount_centavos))}</strong>}{i.voided_at && <small>VOID · {i.void_reason}</small>}</td>
           <td>{(i.proof_files ?? []).map((p, k) => <a key={p.fileId} className="oi-proof" href={p.link} target="_blank" rel="noreferrer">Proof {k + 1}</a>)}</td>
           {canVoid && <td>{!i.voided_at && (voiding === i.id
-            ? <span className="oi-void"><input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason" aria-label="Reason for the void" /><button type="button" className="portal-secondary" disabled={busy || reason.trim().length < 5} onClick={() => void post({ action: "income-void", id: i.id, reason: reason.trim() }, `${i.income_number} voided.`).then((ok) => { if (ok) { setVoiding(null); setReason(""); } })}>Void</button><button type="button" className="pm-link" onClick={() => setVoiding(null)}>Keep</button></span>
-            : <button type="button" className="pm-link cm-remove" onClick={() => { setVoiding(i.id); setReason(""); }}>Void</button>)}</td>}
+            ? <span className="oi-void"><ReasonField reasons={REASONS.incomeVoid} value={why} onChange={setWhy} autoFocus /><button type="button" className="portal-secondary" disabled={busy || !reasonReady(why)} onClick={() => void post({ action: "income-void", id: i.id, reason: reasonText(why) }, `${i.income_number} voided.`).then((ok) => { if (ok) { setVoiding(null); setWhy(NO_REASON); } })}>Void</button><button type="button" className="pm-link" onClick={() => setVoiding(null)}>Keep</button></span>
+            : <button type="button" className="pm-link cm-remove" onClick={() => { setVoiding(i.id); setWhy(NO_REASON); }}>Void</button>)}</td>}
         </tr>)}
       </tbody></table>{incP.pager}</div> : <p className="portal-empty-copy">No other income in this period.</p>}
     </section>}

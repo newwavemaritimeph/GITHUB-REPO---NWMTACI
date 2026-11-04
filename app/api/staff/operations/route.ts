@@ -136,7 +136,7 @@ const closingInput = z.object({ action: z.literal("cashier-close"), closingDate:
 const enrollmentChargeInput = z.object({ action: z.literal("enrollment-charge"), enrollmentId: z.string().uuid(), chargeCatalogId: z.string().uuid().nullable().optional(), description: z.string().trim().min(1).max(200), amountCentavos: z.number().int().positive(), kind: z.enum(["charge", "discount"]).default("charge") });
 const enrollmentChargeVoidInput = z.object({ action: z.literal("enrollment-charge-void"), id: z.string().uuid() });
 const discountRequestInput = z.object({ action: z.literal("discount-request"), enrollmentId: z.string().uuid(), amountCentavos: z.number().int().positive(), description: z.string().trim().max(200).optional(), agencyId: z.string().uuid().nullable().optional() });
-const discountDecideInput = z.object({ action: z.literal("discount-decide"), id: z.string().uuid(), approve: z.boolean() });
+const discountDecideInput = z.object({ action: z.literal("discount-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 const chargeDecideInput = z.object({ action: z.literal("charge-decide"), id: z.string().uuid(), approve: z.boolean() });
 const announcementPostInput = z.object({ action: z.literal("announcement-post"), title: z.string().trim().min(1).max(160), body: z.string().trim().min(1).max(2000), audienceRoles: z.array(z.string()).optional(), expiresAt: z.string().datetime({ offset: true }).nullable().optional() });
 const announcementDeleteInput = z.object({ action: z.literal("announcement-delete"), id: z.string().uuid() });
@@ -1887,6 +1887,8 @@ export async function POST(request: Request) {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or Admin can decide discounts." }, { status: 403 });
       const { data, error } = await db.rpc("decide_enrollment_discount", { target_charge: input.id, target_approve: input.approve });
       if (error) throw error;
+      // The reason Accounting picks (owner, 4 Nov 2026) was lost before: the charge has no field for it, so the audit log keeps it.
+      if (!input.approve && input.remarks) await createSupabaseAdminClient().from("audit_logs").insert({ actor_id: staff.user.id, action: "discount.rejected", record_type: "enrollment_charge", record_id: input.id, new_values: { remarks: input.remarks } });
       return NextResponse.json({ ok: true, charge: data });
     }
     if (input.action === "charge-decide") {

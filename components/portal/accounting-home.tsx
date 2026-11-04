@@ -5,7 +5,7 @@ import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
 import { Badge, Message, MonthBar, PeriodBar, ViewIcon, fmtClock, fmtDate, submit, useMonthRows, usePeriod, usePost, usePaged } from "./shared-ui";
 import { BarChart, Donut, HBars } from "./charts";
-import { EXPENSE_REASONS, REQUEST_REASONS, RejectInline } from "./reject-inline";
+import { REASONS, REJECT_REASONS, RejectInline } from "./reject-inline";
 import { PERIODS, percentChange, periodStart, type Period } from "@/lib/accounting-periods";
 import { channelTotal, channelsUsed, sideTotal, type FinanceSummary, type Line } from "@/lib/finance-summary";
 import type { AccountingReport } from "@/lib/accounting-report";
@@ -14,7 +14,7 @@ import type { CashierReportSnapshot } from "@/lib/documents";
 import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balances";
 import { downloadCsv } from "@/lib/csv";
 import { tcl } from "@/lib/title-case";
-import { askText } from "./dialogs";
+import { askReason } from "./dialogs";
 
 /**
  * Accounting (owner, 8 Oct 2026): a view-first dashboard like the
@@ -53,7 +53,7 @@ function ApprovalReceipts({ files }: { files: { fileId: string; link: string }[]
     ? <small className="ap-receipts">{files.map((f, i) => <a key={f.fileId} href={f.link} target="_blank" rel="noreferrer" onClick={(ev) => ev.stopPropagation()}>Receipt {i + 1}</a>)}</small>
     : <small className="ap-receipts none">No receipt photo</small>;
 }
-type Row = { id: string; title: string; detail: string; receipts?: { fileId: string; link: string }[]; ref: string; who: string; when: string; amount: number; act: (approve: boolean, remarks?: string) => Promise<unknown>; okLabel: string; canReject: boolean };
+type Row = { id: string; reasons?: string[]; title: string; detail: string; receipts?: { fileId: string; link: string }[]; ref: string; who: string; when: string; amount: number; act: (approve: boolean, remarks?: string) => Promise<unknown>; okLabel: string; canReject: boolean };
 
 /**
  * Approvals by category (owner, 8 Oct 2026): money out (expense requests,
@@ -72,18 +72,18 @@ export function AccountingApprovals({ data, reload, compact, rail }: { data: Por
   const [doneNote, setDoneNote] = useState("");
   const name = (t: { legal_first_name: string; legal_last_name: string } | null) => (t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : "Trainee");
   const expenses = (data.expenses as (PortalData["expenses"][number] & { purpose?: string; payment_channel?: string | null; request_number?: string | null; requested_by_name?: string | null; line_items?: unknown[] | null; receipt_files?: { fileId: string; link: string }[] | null })[])
-    .filter((e) => e.status === "Pending").map((e): Row => ({ id: e.id, receipts: e.receipt_files ?? [], title: `${e.payee} · ${e.category}`, detail: [e.purpose, Array.isArray(e.line_items) && e.line_items.length ? `${e.line_items.length} line${e.line_items.length === 1 ? "" : "s"}` : "", e.payment_channel].filter(Boolean).join(" · "), ref: e.request_number ?? e.expense_number, who: e.requested_by_name ?? "Cashier", when: fmtDate(day(e.created_at)), amount: Number(e.amount_centavos), okLabel: "Approve", canReject: true,
+    .filter((e) => e.status === "Pending").map((e): Row => ({ id: e.id, reasons: REJECT_REASONS.expense, receipts: e.receipt_files ?? [], title: `${e.payee} · ${e.category}`, detail: [e.purpose, Array.isArray(e.line_items) && e.line_items.length ? `${e.line_items.length} line${e.line_items.length === 1 ? "" : "s"}` : "", e.payment_channel].filter(Boolean).join(" · "), ref: e.request_number ?? e.expense_number, who: e.requested_by_name ?? "Cashier", when: fmtDate(day(e.created_at)), amount: Number(e.amount_centavos), okLabel: "Approve", canReject: true,
       act: (approve, remarks) => post({ action: "expense-decide", id: e.id, decision: approve ? "Approved" : "Rejected", remarks }, approve ? "Approved. The voucher number is issued." : "Rejected.") }));
   const byExpense = new Map((data.expenses as { id: string; payee: string; amount_centavos: number; voucher_number?: string | null; expense_number: string }[]).map((e) => [e.id, e]));
-  const reprints = (data.expenseReprints ?? []).filter((r) => r.status === "Pending").map((r): Row => { const e = byExpense.get(r.expense_id); return { id: r.id, title: `${e?.voucher_number ?? e?.expense_number ?? "Voucher"} · ${e?.payee ?? ""}`, detail: `Reason: ${r.reason}`, ref: "Reprint", who: r.requested_by_name ?? "Cashier", when: fmtDate(day(r.requested_at)), amount: Number(e?.amount_centavos ?? 0), okLabel: "Approve", canReject: true,
+  const reprints = (data.expenseReprints ?? []).filter((r) => r.status === "Pending").map((r): Row => { const e = byExpense.get(r.expense_id); return { id: r.id, reasons: REJECT_REASONS.voucherReprint, title: `${e?.voucher_number ?? e?.expense_number ?? "Voucher"} · ${e?.payee ?? ""}`, detail: `Reason: ${r.reason}`, ref: "Reprint", who: r.requested_by_name ?? "Cashier", when: fmtDate(day(r.requested_at)), amount: Number(e?.amount_centavos ?? 0), okLabel: "Approve", canReject: true,
     act: (approve, remarks) => post({ action: "expense-reprint-decide", requestId: r.id, decision: approve ? "Approved" : "Rejected", remarks }, approve ? "Reprint approved." : "Reprint request rejected.") }; });
-  const refunds = data.requests.filter((r) => r.request_type === "Refund" && r.status === "Pending" && r.stage !== "With cashier").map((r): Row => ({ id: r.id, title: `${name(first(r.trainees))} · Refund`, detail: r.reason, ref: first(r.enrollments)?.enrollment_number ?? r.request_number, who: "Cashier", when: fmtDate(day(r.created_at)), amount: Number(r.requested_values?.amountCentavos ?? 0), okLabel: "Approve", canReject: true,
+  const refunds = data.requests.filter((r) => r.request_type === "Refund" && r.status === "Pending" && r.stage !== "With cashier").map((r): Row => ({ id: r.id, reasons: REJECT_REASONS.refund, title: `${name(first(r.trainees))} · Refund`, detail: r.reason, ref: first(r.enrollments)?.enrollment_number ?? r.request_number, who: "Cashier", when: fmtDate(day(r.created_at)), amount: Number(r.requested_values?.amountCentavos ?? 0), okLabel: "Approve", canReject: true,
     act: (approve, remarks) => post({ action: "request-decide", id: r.id, approve, remarks }, approve ? "Refund approved." : "Refund rejected.") }));
   const discounts = (data.pendingDiscounts as (PortalData["pendingDiscounts"][number] & { enrollments?: unknown })[]).map((d): Row => {
     const en = first(d.enrollments as { enrollment_number?: string; trainees?: unknown; courses?: unknown } | { enrollment_number?: string }[] | null) as { enrollment_number?: string; trainees?: unknown; courses?: unknown } | null;
     const c = first(en?.courses as { name: string } | null);
-    return { id: d.id, title: `${name(first(en?.trainees as { legal_first_name: string; legal_last_name: string } | null))}${c ? ` · ${c.name}` : ""}`, detail: d.description, ref: en?.enrollment_number ?? "", who: "Cashier", when: fmtDate(day(d.created_at)), amount: Number(d.amount_centavos), okLabel: "Approve", canReject: true,
-      act: (approve) => post({ action: "discount-decide", id: d.id, approve }, approve ? "Discount approved." : "Discount rejected.") };
+    return { id: d.id, reasons: REJECT_REASONS.discount, title: `${name(first(en?.trainees as { legal_first_name: string; legal_last_name: string } | null))}${c ? ` · ${c.name}` : ""}`, detail: d.description, ref: en?.enrollment_number ?? "", who: "Cashier", when: fmtDate(day(d.created_at)), amount: Number(d.amount_centavos), okLabel: "Approve", canReject: true,
+      act: (approve, remarks) => post({ action: "discount-decide", id: d.id, approve, remarks }, approve ? "Discount approved." : "Discount rejected.") };
   });
   const rebates = (data.agencyRebates as (PortalData["agencyRebates"][number] & { marketing_agencies?: unknown; courses?: unknown; trainees?: unknown })[]).filter((r) => r.status === "Pending").map((r): Row => ({ id: r.id, title: `${first(r.marketing_agencies as { name: string } | null)?.name ?? "Partner"} · ${name(first(r.trainees as { legal_first_name: string; legal_last_name: string } | null))}`, detail: `${first(r.courses as { name: string } | null)?.name ?? "Course"} · rebate owed (no-deduction partner)`, ref: "Payable", who: "Recorded automatically", when: fmtDate(day(r.created_at)), amount: Number(r.rebate_centavos), okLabel: "Mark paid", canReject: false,
     act: () => post({ action: "agency-rebate-settle", id: r.id, status: "Paid" }, "Rebate marked paid to the partner.") }));
@@ -91,7 +91,7 @@ export function AccountingApprovals({ data, reload, compact, rail }: { data: Por
     act: () => post({ action: "cashier-closing-review", id: c.id }, "Closing marked reviewed.") }));
   // Payment voids the Cashier asked for (owner, 29 Oct 2026): approving voids the payment and marks its receipt VOID.
   const payById = new Map(data.payments.map((p) => [p.id, p]));
-  const voids = (data.paymentVoids ?? []).filter((r) => r.status === "Pending").map((r): Row => { const p = payById.get(r.payment_id); const t = p ? first(p.trainees) : null; return { id: r.id, title: `${p?.payment_number ?? "Payment"} · ${name(t ?? null)}`, detail: `${p ? `${p.method}${p.reference_number ? ` · Ref ${p.reference_number}` : ""} · ` : ""}Reason: ${r.reason}`, ref: "Void", who: r.requested_by_name ?? "Cashier", when: fmtDate(day(r.requested_at)), amount: Number(p?.amount_centavos ?? 0), okLabel: "Approve Void", canReject: true,
+  const voids = (data.paymentVoids ?? []).filter((r) => r.status === "Pending").map((r): Row => { const p = payById.get(r.payment_id); const t = p ? first(p.trainees) : null; return { id: r.id, reasons: REJECT_REASONS.paymentVoid, title: `${p?.payment_number ?? "Payment"} · ${name(t ?? null)}`, detail: `${p ? `${p.method}${p.reference_number ? ` · Ref ${p.reference_number}` : ""} · ` : ""}Reason: ${r.reason}`, ref: "Void", who: r.requested_by_name ?? "Cashier", when: fmtDate(day(r.requested_at)), amount: Number(p?.amount_centavos ?? 0), okLabel: "Approve Void", canReject: true,
     act: (approve, remarks) => post({ action: "payment-void-decide", requestId: r.id, approve, remarks }, approve ? "Payment voided. The receipt shows VOID and the amount is back on the balance." : "Void request rejected.") }; });
   const lists: Record<Category, Row[]> = { "Expense requests": [...expenses, ...reprints], Refunds: refunds, Discounts: discounts, "Payment voids": voids, "Rebates owed to partners": rebates, "Cashier opening and closing": closings };
   const waiting = Object.values(lists).reduce((s, l) => s + l.length, 0);
@@ -101,7 +101,7 @@ export function AccountingApprovals({ data, reload, compact, rail }: { data: Por
       <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{pesos2(r.amount)}</strong>
       {rejecting === r.id ? <span className="ac-rejlabel">Rejecting</span> : <div className="cx-acts"><button type="button" className="portal-primary" disabled={busy || !!rejecting} onClick={() => void r.act(true).catch(() => undefined)}>{r.okLabel}</button>{r.canReject && <button type="button" className="portal-secondary" disabled={busy || !!rejecting} onClick={() => setRejecting(r.id)}>Reject</button>}</div>}
     </div>
-    {rejecting === r.id && <RejectInline reasons={expenses.some((x) => x.id === r.id) ? EXPENSE_REASONS : REQUEST_REASONS} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
+    {rejecting === r.id && <RejectInline reasons={r.reasons ?? REJECT_REASONS.request} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
   </div>);
   const groupOf = (c: Category) => CATEGORY_GROUPS.find(([, cs]) => cs.includes(c))?.[0] ?? "";
   if (rail) {
@@ -172,7 +172,7 @@ export function AccountingApprovals({ data, reload, compact, rail }: { data: Por
             <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{pesos2(r.amount)}</strong>
             {rejecting === r.id ? <span className="ac-rejlabel">Rejecting</span> : <div className="cx-acts">{r.canReject && <button type="button" className="portal-secondary" disabled={busy || !!rejecting || !!bulk} onClick={() => setRejecting(r.id)}>Reject</button>}<button type="button" className="portal-primary" disabled={busy || !!rejecting || !!bulk} onClick={() => void r.act(true).then(() => setPicked((p) => { const n = new Set(p); n.delete(r.id); return n; })).catch(() => undefined)}>{r.okLabel}</button></div>}
           </div>
-          {rejecting === r.id && <RejectInline reasons={expenses.some((x) => x.id === r.id) ? EXPENSE_REASONS : REQUEST_REASONS} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
+          {rejecting === r.id && <RejectInline reasons={r.reasons ?? REJECT_REASONS.request} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
         </div>)}
       </div>) : <p className="portal-empty-copy">{cat === "All" ? "Nothing waiting for your approval." : `No ${cat.toLowerCase()} waiting.`}</p>}
       {empty.length > 0 && <p className="ac-clear"><b>✓ Nothing Waiting:</b> {empty.join(", ")}.</p>}
@@ -649,7 +649,7 @@ export function BillingStatementReport({ switcher }: { switcher?: ReactNode }) {
   }
   async function voidIt() {
     if (!st?.statementId) return;
-    const reason = await askText(`Void BS No. ${st.bsNumber}? A corrected statement can then be issued with a new BS No. Reason:`, "", { title: "Void Billing Statement", okLabel: "Void", danger: true });
+    const reason = await askReason(`Void BS No. ${st.bsNumber}? A corrected statement can then be issued with a new BS No.`, REASONS.billingVoid, { title: "Void Billing Statement", okLabel: "Void", danger: true });
     if (!reason || reason.trim().length < 3) return;
     try { await act({ action: "billing-statement-void", billingStatementId: st.statementId, reason: reason.trim() }); setVersion((v) => v + 1); }
     catch (e) { setProblem(e instanceof Error ? e.message : "Could not void the statement."); }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { expenseState, expenseTotalsByChannel } from "@/components/portal/live-cashier";
 import { voucherNaming } from "@/lib/google-drive";
 import { fitVoucherLines } from "@/lib/documents";
+import { NO_REASON, REASONS, REJECT_REASONS, reasonReady, reasonText } from "@/components/portal/reject-inline";
 
 describe("expense vouchers", () => {
   const rows = [
@@ -74,3 +75,20 @@ describe("fitVoucherLines", () => {
   it("never goes below 6 pt", () => expect(fitVoucherLines(rows("x".repeat(160), 40), space, linesAt)).toBe(6));
 });
 
+// Reason dropdowns (owner, 4 Nov 2026).
+describe("reason dropdowns", () => {
+  it("stores the reason and the note as text", () => {
+    expect(reasonText({ reason: "Misprint", note: "" })).toBe("Misprint");
+    expect(reasonText({ reason: "Misprint", note: " Wrong date " })).toBe("Misprint — Wrong date");
+    expect(reasonText({ reason: "Other", note: "Bank reversed it" })).toBe("Bank reversed it");
+  });
+  it("needs a reason, and a note for Other", () => {
+    expect(reasonReady(NO_REASON)).toBe(false);
+    expect(reasonReady({ reason: "Other", note: " " })).toBe(false);
+    expect(reasonReady({ reason: "Other", note: "x" })).toBe(true);
+    expect(reasonReady({ reason: "Misprint", note: "" })).toBe(true);
+  });
+  it("offers Other on every list", () => {
+    for (const list of [...Object.values(REASONS), ...Object.values(REJECT_REASONS)]) expect(list.at(-1)).toBe("Other");
+  });
+});

@@ -12,6 +12,7 @@ import { DeliveryAlert } from "./delivery-home";
 import { tcl } from "@/lib/title-case";
 import { photoFileName, type CertificateCorrections } from "@/lib/certificate-photo";
 import { CertificatePhotoModal, openCertificatePhoto } from "./certificate-photo-modal";
+import { NO_REASON, REASONS, REJECT_REASONS, ReasonField, reasonReady, reasonText, type ReasonValue } from "./reject-inline";
 import { legacyRowsFromCsv, type ImportResult, type LegacyRow } from "@/lib/legacy-certificates";
 import { PRINTED_FILTERS, printedReportRows, type PrintedCert, type PrintedFilter } from "@/lib/printed-certificates";
 import { askConfirm } from "./dialogs";
@@ -128,7 +129,7 @@ function certificateDots(l: CertificateLine, tracked: boolean, training = false)
 function CertificateLog({ data, lines, reload }: { data: PortalData; lines: CertificateLine[]; reload: () => Promise<void> }) {
   const { busy, msg, post } = usePost(reload);
   const [voiding, setVoiding] = useState<string | null>(null);
-  const [reason, setReason] = useState("");
+  const [why, setWhy] = useState<ReasonValue>(NO_REASON);
   const [releasing, setReleasing] = useState<CertificateLine | null>(null);
   const [uploading, setUploading] = useState<CertificateLine | null>(null);
   const tracked = (data as CertData).certificatePhotos != null;
@@ -152,7 +153,7 @@ function CertificateLog({ data, lines, reload }: { data: PortalData; lines: Cert
             {tracked && !l.photo && <button type="button" className={l.view.state === "Waiting for photo" ? "portal-primary cl-upload" : "portal-secondary cl-upload"} onClick={() => setUploading(l)}>Upload Photo</button>}
             {l.view.state !== "Cancelled" && <span className="cl-split"><a href={pdf(l, true)} target="_blank" rel="noreferrer" onClick={afterPrint} title="Draft for checking; never counts as a print">Preview Draft</a>{printable && <a className="go" href={pdf(l, false)} target="_blank" rel="noreferrer" onClick={afterPrint}>{printed ? "Reprint" : "Print"}</a>}</span>}
             {printed && l.view.state !== "Void requested" && <details className="cl-more"><summary aria-label="More actions">▾</summary><div>
-              <button type="button" disabled={busy} onClick={() => { setVoiding(l.e.id); setReason(""); }}>Request Void</button>
+              <button type="button" disabled={busy} onClick={() => { setVoiding(l.e.id); setWhy(NO_REASON); }}>Request Void</button>
               <button type="button" disabled={busy} onClick={() => void post({ action: "certificate-soft-copy", enrollmentId: l.e.id }, "Soft copy emailed.").catch(() => undefined)}>Email Soft Copy</button>
               {l.view.state === "Printed" && <ReleaseButton l={l} onRelease={() => setReleasing(l)} />}
             </div></details>}
@@ -160,9 +161,9 @@ function CertificateLog({ data, lines, reload }: { data: PortalData; lines: Cert
           </span></td>
         </tr>,
         voiding === l.e.id && <tr key={`${l.e.id}-void`} className="cl-voidrow"><td /><td colSpan={6}><div className="cl-void">
-          <label>Reason for Voiding<input value={reason} autoFocus onChange={(ev) => setReason(ev.target.value)} placeholder="e.g. Misprint — wrong spelling of the name" /></label>
+          <ReasonField reasons={REASONS.certificateVoid} label="Reason for Voiding" value={why} onChange={setWhy} autoFocus />
           <button type="button" className="portal-secondary" onClick={() => setVoiding(null)}>Keep</button>
-          <button type="button" className="cl-danger" disabled={busy || reason.trim().length < 3} onClick={() => void post({ action: "certificate-void-request", enrollmentId: l.e.id, reason: reason.trim() }, "Sent to the Admin for approval.").then(() => setVoiding(null)).catch(() => undefined)}>Send to the Admin</button>
+          <button type="button" className="cl-danger" disabled={busy || !reasonReady(why)} onClick={() => void post({ action: "certificate-void-request", enrollmentId: l.e.id, reason: reasonText(why) }, "Sent to the Admin for approval.").then(() => setVoiding(null)).catch(() => undefined)}>Send to the Admin</button>
         </div></td></tr>,
       ]; })])}
     </tbody></table></div>
@@ -605,7 +606,7 @@ export function ReleasingNumbering({ data, reload }: { data: PortalData; reload:
 
 export function AdminCertificateControls({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   const { busy, msg, post } = usePost(reload);
-  const [rejecting, setRejecting] = useState<string | null>(null), [remarks, setRemarks] = useState("");
+  const [rejecting, setRejecting] = useState<string | null>(null), [remarks, setRemarks] = useState<ReasonValue>(NO_REASON);
   const voids = certificateLines(data).filter((l) => l.view.state === "Void requested");
   return <div className="portal-page cx ac">
     <div className="cx-head"><div><span className="portal-eyebrow">Admin</span><h1>Certificate Controls</h1></div>
@@ -617,8 +618,8 @@ export function AdminCertificateControls({ data, reload }: { data: PortalData; r
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Void Requests</h2><span className="slot-count">{voids.length}</span></div>
           {voids.length ? voids.map((l) => <div key={l.e.id} className="cl-vreq">
             <div><b>{l.name}</b> · <span className="cl-mono">{l.cert?.certificate_number}</span><small className="cl-sub cl-block">{l.course.code} · {l.cert?.void_reason}{l.cert?.void_requested_at ? ` · ${fmtDate(day(l.cert.void_requested_at) ?? "")}` : ""}</small></div>
-            {rejecting === l.e.id ? <div className="cl-void"><label>Reason for Rejecting<input value={remarks} autoFocus onChange={(e) => setRemarks(e.target.value)} /></label><button type="button" className="portal-secondary" onClick={() => setRejecting(null)}>Keep</button><button type="button" className="cl-danger" disabled={busy || remarks.trim().length < 3} onClick={() => void post({ action: "certificate-void-decide", enrollmentId: l.e.id, approve: false, remarks: remarks.trim() }, "Void request rejected.").then(() => setRejecting(null)).catch(() => undefined)}>Reject</button></div>
-              : <span className="cl-acts"><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setRejecting(l.e.id); setRemarks(""); }}>Reject</button><button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "certificate-void-decide", enrollmentId: l.e.id, approve: true }, "Void approved. One more print allowed with the same number.").catch(() => undefined)}>Approve Void</button></span>}
+            {rejecting === l.e.id ? <div className="cl-void"><ReasonField reasons={REJECT_REASONS.certificateVoid} label="Reason for Rejecting" value={remarks} onChange={setRemarks} autoFocus /><button type="button" className="portal-secondary" onClick={() => setRejecting(null)}>Keep</button><button type="button" className="cl-danger" disabled={busy || !reasonReady(remarks)} onClick={() => void post({ action: "certificate-void-decide", enrollmentId: l.e.id, approve: false, remarks: reasonText(remarks) }, "Void request rejected.").then(() => setRejecting(null)).catch(() => undefined)}>Reject</button></div>
+              : <span className="cl-acts"><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setRejecting(l.e.id); setRemarks(NO_REASON); }}>Reject</button><button type="button" className="portal-primary" disabled={busy} onClick={() => void post({ action: "certificate-void-decide", enrollmentId: l.e.id, approve: true }, "Void approved. One more print allowed with the same number.").catch(() => undefined)}>Approve Void</button></span>}
           </div>) : <p className="portal-empty-copy">No void requests.</p>}
           <p className="ac-foot">Approving voids the printed copy and allows one more print with the same certificate number.</p>
         </section>

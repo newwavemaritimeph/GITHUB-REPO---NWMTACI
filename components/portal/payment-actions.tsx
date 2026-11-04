@@ -5,6 +5,7 @@ import type { PortalData, Enrollment } from "../portal-live-app";
 import { first, manilaToday, pesos } from "@/lib/portal-format";
 import { refundAfterDeduction, requestFee } from "@/lib/request-fees";
 import { Message, Modal, fmtDate } from "./shared-ui";
+import { NO_REASON, REASONS, ReasonField, reasonReady, reasonText, type ReasonValue } from "./reject-inline";
 
 /**
  * Actions that sit next to a payment or an enrollment: raising a request for
@@ -21,7 +22,7 @@ export type RequestType = "Cancellation" | "Refund" | "Make-up Class" | "Resched
  */
 export function RequestActionModal({ data, enrollment, reqType, onClose, post, embedded }: { data: PortalData; enrollment: Enrollment; reqType: RequestType; onClose: () => void; post: (body: Record<string, unknown>) => Promise<unknown>; embedded?: boolean }) {
   const [batchId, setBatchId] = useState("");
-  const [reason, setReason] = useState("");
+  const [why, setWhy] = useState<ReasonValue>(NO_REASON);
   const [courseId, setCourseId] = useState(enrollment.course_id);
   const [offerId, setOfferId] = useState("");
   const [busy, setBusy] = useState(false), [err, setErr] = useState("");
@@ -36,7 +37,7 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
   const newCourse = data.courses.find((c) => c.id === courseId);
   const offers = data.offers.filter((o) => o.course_id === courseId);
   async function send() {
-    if (!reason.trim()) { setErr("Enter a reason for the request."); return; }
+    if (!reasonReady(why)) { setErr(why.reason ? "Add a note for Other." : "Choose a reason for the request."); return; }
     if (reqType === "Rescheduling" && !batchId) { setErr("Choose the new schedule."); return; }
     if (reqType === "Change Course") {
       if (!courseId) { setErr("Pick the new course."); return; }
@@ -45,7 +46,7 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
     if (reqType === "Refund" && refund <= 0) { setErr("Nothing to refund after the policy deduction."); return; }
     setBusy(true); setErr("");
     try {
-      await post({ action: "request-raise", enrollmentId: enrollment.id, requestType: reqType, reason: reason.trim(),
+      await post({ action: "request-raise", enrollmentId: enrollment.id, requestType: reqType, reason: reasonText(why),
         batchId: reqType === "Rescheduling" ? (batchId || null) : null,
         courseId: reqType === "Change Course" ? courseId : undefined,
         partnerOfferId: reqType === "Change Course" ? (offerId || null) : undefined, requestedOn: requestedOn || today });
@@ -65,7 +66,7 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
     {reqType === "Refund" && policyFee && <div className="rate-preview full"><span>Refund to the trainee</span><strong>{pesos(refund)}</strong><small>Paid {pesos(paidSoFar)} less the policy deduction {pesos(policyFee.amountCentavos)}</small></div>}
     <label>Date Requested<input type="date" value={requestedOn} max={today} onChange={(e) => setRequestedOn(e.target.value)} /></label>
     {policyFee && <div className="rate-preview"><span>{reqType === "Refund" ? "Deduction by policy" : "Fee by policy"}</span><strong>{pesos(policyFee.amountCentavos)}</strong><small>{policyFee.rule}</small></div>}
-    <label className="full">Reason<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Why is this being requested?" /></label>
+    <ReasonField reasons={REASONS[reqType]} value={why} onChange={setWhy} />
     <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={send}>{busy ? "Sending…" : "Send to Cashier"}</button></div>
   </div>;
   const title = reqType === "Rescheduling" ? "Change batch / reschedule" : reqType === "Make-up Class" ? "Make-up class" : reqType === "TAR reprint" ? "TAR reprint" : reqType;

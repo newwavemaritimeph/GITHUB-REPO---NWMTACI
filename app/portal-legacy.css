@@ -2661,3 +2661,22 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .portal-workspace.nw-syncing .portal-modal-backdrop, .nw-shell .portal-workspace.nw-syncing .vx-panel, .nw-shell .portal-workspace.nw-syncing .nw-dialog { pointer-events: auto; }
 @keyframes nw-sync { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .nw-shell .portal-workspace.nw-syncing::before { animation: none; } }
+
+/* Tick boxes for separate payments (owner, 4 Nov 2026) */
+.nw-shell .cx-tick { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 14.5px; font-weight: 400; color: inherit; }
+.nw-shell label.cx-tick { cursor: pointer; }
+.nw-shell .cx-tick input, .nw-shell .cx-tickbox, .nw-shell .portal-form .cx-tickbox { width: 18px; height: 18px; min-height: 0; padding: 0; margin: 0; flex: none; accent-color: #F25615; cursor: pointer; }
+.nw-shell .cx-tick .cx-amt { margin-left: auto; }
+.nw-shell .cx-ticks { align-items: stretch; gap: 6px; min-width: 240px; }
+.nw-shell .tp-table th.tp-tick, .nw-shell .tp-table td.tp-tick { width: 30px; min-width: 30px; max-width: 30px; padding-right: 0; }
+.nw-shell .tp-table td.tp-tick + td { min-width: 130px; }
+.nw-shell .tp-settle { display: flex; justify-content: flex-end; padding-top: 10px; }
+
+/* Reason dropdowns (owner, 4 Nov 2026) */
+.nw-shell .cx-reasons, .nw-shell .oi-void { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.nw-shell .cx-reasons label, .nw-shell .oi-void label, .nw-shell .ad-void label { display: grid; gap: 4px; font-size: 13px; color: var(--nw-muted); min-width: 150px; flex: 1; }
+.nw-shell .cx-reasons select, .nw-shell .cx-reasons input, .nw-shell .oi-void select, .nw-shell .oi-void input, .nw-shell .cl-void select, .nw-shell .ad-void select { font: inherit; font-size: 14.5px; padding: 8px 10px; border: 1px solid var(--nw-line); border-radius: 9px; background: var(--nw-surface); color: var(--nw-fg); width: 100%; min-width: 0; }
+.nw-dialog-reason { display: grid; gap: 10px; margin-bottom: 14px; }
+.nw-dialog-reason label { display: grid; gap: 4px; font-size: 14px; color: #587184; }
+.nw-dialog-reason select, .nw-dialog-reason input { height: 44px; border: 1px solid #cfdbe3; border-radius: 10px; padding: 0 12px; font: inherit; font-size: 15px; color: #0f2638; background: #fff; width: 100%; box-sizing: border-box; }
+.nw-dialog-ok:disabled { opacity: .5; cursor: not-allowed; }

@@ -13,11 +13,10 @@ const manilaDay = (v: string) => new Intl.DateTimeFormat("en-CA", { timeZone: "A
 export const TAR_VISIT_MINUTES = 30;
 
 /**
- * One TAR per transaction, newest first (owner, 4 Nov 2026). Courses on an issued TAR stay together,
- * so it keeps its number ("if the TAR and AR is already generated, do not combine"). The rest go by
- * when they were added: a gap over the visit, or a course added after the group's first receipt,
- * starts a new transaction. Courses whose first receipt is one payment are one transaction, whenever
- * they were added ("paid together, one TAR and Acknowledgement Receipt"). `issued` is newest record first.
+ * One TAR per transaction, newest first (owner, 4 Nov 2026). Courses on an issued TAR stay together, so it
+ * keeps its number ("if the TAR and AR is already generated, do not combine"). Paid courses go by their first
+ * payment: paid together, one TAR and Acknowledgement Receipt; paid separately, one each. Unpaid courses go by
+ * when they were added. `issued` is newest record first.
  */
 export function tarGroups(rows: TarRow[], issued: string[][] = []): TarGroup[] {
   const live = new Map(rows.filter(tarPrintable).map((r) => [r.id, r]));
@@ -29,20 +28,16 @@ export function tarGroups(rows: TarRow[], issued: string[][] = []): TarGroup[] {
     group.forEach((r) => live.delete(r.id));
     groups.push(group);
   }
-  const open: TarRow[][] = [];
-  let current: TarRow[] = [], last = 0, closedAt = Infinity;
+  const paid = new Map<string, TarRow[]>();
+  let unpaid: TarRow[] = [], last = 0;
   for (const r of [...live.values()].sort((x, y) => time(x.created_at) - time(y.created_at))) {
-    const at = time(r.created_at);
-    if (!current.length || at - last > TAR_VISIT_MINUTES * 60000 || at > closedAt) {
-      current = []; closedAt = Infinity;
-      const before = r.paid_by ? open.find((g) => g.some((x) => x.paid_by === r.paid_by)) : undefined;
-      if (before) { current = before; closedAt = Math.min(...before.flatMap((x) => (x.receipt_at ? [time(x.receipt_at)] : []))); } else open.push(current);
-    }
-    current.push(r);
-    last = at;
-    if (r.receipt_at) closedAt = Math.min(closedAt, time(r.receipt_at));
+    const by = r.paid_by ?? r.receipt_at;
+    if (by) { paid.set(by, [...(paid.get(by) ?? []), r]); continue; }
+    if (!unpaid.length || time(r.created_at) - last > TAR_VISIT_MINUTES * 60000) groups.push(unpaid = []);
+    unpaid.push(r);
+    last = time(r.created_at);
   }
-  return [...groups, ...open]
+  return [...groups, ...paid.values()]
     .map((g) => { const at = g.map((r) => r.created_at).sort((x, y) => time(x) - time(y))[0]; return { date: manilaDay(at), at, ids: g.map((r) => r.id).sort() }; })
     .sort((x, y) => time(y.at) - time(x.at));
 }

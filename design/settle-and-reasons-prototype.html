@@ -1,0 +1,369 @@
+<title>Settle and Reason Dropdowns</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Same shell as the live portal: navy bar with dropdown tabs, summary rail on the left, light-cyan table headers. */
+:root{--orange:#F25615;--blue:#0571D0;--cyan:#35CCFA;--cyan-l:#9EE3F1;--navy:#123F63;--bg:#f2f6f8;--surface:#fff;--fg:#0f2638;--muted:#587184;--line:#dbe6ec;--soft:#eef4f8;--th:#e6f6fd;--thc:#0b4f8f;--zebra:#f7fafc;
+ --good:#0a7a3e;--good-bg:#e2f5e9;--warn:#a2470b;--warn-bg:#fdf0e5;--bad:#b42318;--bad-bg:#fcebea;--info:#0571D0;--info-bg:#e5f1fb;
+ --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--th:#15344b;--thc:#9fd3f7;--zebra:#12283a;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--sans);-webkit-font-smoothing:antialiased}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding-block:16px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.w{max-width:1200px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.logo{display:flex;align-items:center;gap:12px}.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}.logo b{font-size:19px;font-weight:600}.logo b span{color:var(--orange)}.logo small{display:block;color:var(--cyan-l);font-size:14px}.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.who{font-size:14px;color:#cfe3ef;display:flex;align-items:center;gap:8px}.who select{background:#ffffff14;border:1px solid #ffffff30;color:#fff;border-radius:8px;padding:5px 8px}.who select option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:16px;flex-wrap:wrap}.tab>button{background:none;border:0;color:#c3dbea;font:500 16px var(--sans);padding:12px 18px;border-radius:10px 10px 0 0;white-space:nowrap;display:flex;align-items:center;gap:8px}.tab>button:hover{color:#fff;background:#ffffff12}.tab.on>button{background:var(--bg);color:var(--fg);font-weight:600}
+.caret{width:8px;height:8px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg)}
+.menu{position:absolute;min-width:220px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:15;display:flex;flex-direction:column;margin-top:2px}.tab{position:relative}.menu button{background:none;border:0;text-align:left;color:var(--fg);font:500 15.5px var(--sans);padding:10px 14px;border-radius:8px;display:flex;justify-content:space-between;gap:12px}.menu button:hover{background:var(--soft)}.menu button.on{background:var(--info-bg);color:var(--info);font-weight:600}.menu small,.n{font:600 11.5px var(--mono);background:var(--orange);color:#fff;border-radius:10px;padding:1px 7px}
+.page{padding-block:24px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.cx-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:16px}.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}h1{font-size:25px;font-weight:600;margin:0}h2{font-size:19px;font-weight:600;margin:0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);margin-bottom:16px}.seg button{border:0;background:none;padding:8px 14px;font-weight:600;font-size:14.5px}.seg button.on{background:var(--navy);color:#fff}
+.rail{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start}@media (max-width:900px){.rail{grid-template-columns:1fr}}.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.ph small{color:var(--muted);font-size:14px}
+.lines{display:flex;flex-direction:column;padding:0 20px 16px}.lines div{display:flex;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}.lines div:first-child{border-top:0}.lines dd,.lines span:last-child{font-family:var(--mono);font-weight:600}.lines .tot{font-weight:700}.lines .bad{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 20px 16px}.tile{border:1px solid var(--line);border-left:4px solid var(--c);border-radius:10px;padding:8px 12px}.tile span{display:block;font-size:13px;color:var(--muted)}.tile b{font:600 19px var(--mono)}
+.cwrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--th);color:var(--thc);font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:10px 12px;border-right:1px solid var(--line);white-space:nowrap}td{padding:9px 12px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:middle;line-height:1.35}tbody tr:nth-child(even) td{background:var(--zebra)}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}.due{background:var(--bad-bg);color:var(--bad)}.dueo{background:var(--warn-bg);color:var(--warn)}.appr{background:var(--info-bg);color:var(--info)}.paid{background:var(--good-bg);color:var(--good)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--blue);border-radius:9px;padding:7px 14px;font-weight:600;font-size:14.5px;white-space:nowrap}.pri{background:var(--orange);color:#fff;border:0}.okb{background:var(--good);color:#fff;border:0}.btn:disabled{opacity:.5;cursor:not-allowed}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;padding:14px 20px;background:var(--soft);border-top:1px solid var(--line)}.form label{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted)}.form select,.form input{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 20px;border-top:1px solid var(--line)}
+.alert{background:var(--bad-bg);color:var(--bad);border-radius:12px;padding:12px 16px;font-size:15px;font-weight:500;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.note{font-size:13.5px;color:var(--muted);padding:0 20px 16px;margin:0}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:calc(100% - 32px);z-index:20}
+</style>
+<style>
+.proto{margin-left:8px}
+.top .sub{display:block;color:var(--cyan-l);font-size:14px}
+.panel+.panel{margin-top:0}
+.tname{display:block;font-weight:600}.tno{display:block;font:500 12.5px var(--mono);color:var(--muted)}
+.cl{display:grid;gap:6px;min-width:0}
+.cl>div{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px}
+.cl .code{font:600 13.5px var(--mono);color:var(--navy);min-width:82px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .cl .code{color:var(--cyan-l)}}
+:root[data-theme="dark"] .cl .code{color:var(--cyan-l)}
+.cl small{color:var(--muted);font-size:13px}
+.cl .bal{font:600 13.5px var(--mono);margin-left:auto}
+.btn.sm{padding:3px 10px;font-size:13px}
+.acts{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.rule{margin:0;padding:12px 16px;background:var(--info-bg);color:var(--info);border-radius:12px;font-size:14.5px;font-weight:500}
+.sub2{font-size:15px;font-weight:600;margin:0;padding:14px 20px 8px}
+.empty{padding:0 20px 16px;margin:0;color:var(--muted);font-size:14.5px}
+.back{position:fixed;inset:0;background:#0b1a2699;display:grid;place-items:start center;overflow:auto;z-index:18;padding-block:max(24px,env(safe-area-inset-top,0px)) 24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.dlg{background:var(--surface);border-radius:14px;width:100%;max-width:760px;min-width:0}
+.dlg-h{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid var(--line)}
+.dlg-b{padding:14px 20px;display:grid;gap:12px;min-width:0}
+.dlg-f{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;padding:12px 20px;border-top:1px solid var(--line)}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:13.5px;color:var(--muted);min-width:0}
+.fld input,.fld select{border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);color:var(--fg);width:100%;min-width:0}
+.apply{width:104px;border:1px solid var(--line);border-radius:8px;padding:5px 8px;background:var(--surface);color:var(--fg);text-align:right;font-family:var(--mono)}
+tr.sel td{background:var(--info-bg)!important}
+.tally{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;padding:9px 12px;border-radius:9px;font-size:14px;font-weight:500}
+.tally.ok{background:var(--good-bg);color:var(--good)}.tally.no{background:var(--warn-bg);color:var(--warn)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chips button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 12px;font-weight:500}.chips button[aria-checked="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:grid;gap:10px;align-content:start;min-width:0}
+.card h3{margin:0;font-size:16px;font-weight:600}
+.card .tag{font-size:13px;color:var(--muted)}
+.saved{font-size:13px;color:var(--muted);min-height:18px;overflow-wrap:anywhere}
+.saved b{color:var(--fg);font-weight:600}
+.hint-bad{color:var(--bad);font-size:13px}
+.rj{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:10px;align-items:end;padding:10px 12px;background:var(--bad-bg);border-radius:10px}
+.sec{margin:24px 0 10px;font-size:19px;font-weight:600}
+.design{display:flex;flex-wrap:wrap;gap:6px}
+.design button{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:9px;padding:7px 12px;font-weight:500;font-size:14.5px}
+.design button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:#fff}
+.dnote{margin:0;color:var(--muted);font-size:14.5px}
+.split{display:inline-flex;white-space:nowrap}
+.split .main{border-radius:9px 0 0 9px}
+.split .dd{border-radius:0 9px 9px 0;border-left:1px solid #ffffff66;padding:7px 10px}
+.ddmenu{position:fixed;z-index:17;width:280px;max-width:calc(100vw - 32px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;display:grid;gap:2px}
+.ddmenu button{display:flex;justify-content:space-between;gap:12px;background:none;border:0;border-radius:8px;padding:8px 10px;text-align:left;color:var(--fg);font-size:14.5px}
+.ddmenu button:hover,.ddmenu button:focus-visible{background:var(--soft)}
+.ddmenu hr{border:0;border-top:1px solid var(--line);margin:4px 0}
+.ddmenu .amt{font-weight:600}
+.ddmenu small{display:block;color:var(--muted);font-size:12.5px}
+.pickrow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pickrow select{border:1px solid var(--line);border-radius:9px;padding:7px 8px;background:var(--surface);color:var(--fg);max-width:230px;min-width:0}
+.chipset{display:flex;flex-wrap:wrap;gap:4px}
+.chipset span{font:600 13px var(--mono);background:var(--soft);border-radius:6px;padding:2px 8px}
+.tick{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;cursor:pointer}
+.tick input{width:17px;height:17px;accent-color:var(--orange);margin:0}
+.exp td{background:var(--info-bg)!important}
+.subhead{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:14px 20px 8px}
+.subhead .sub2{padding:0}
+.sec:first-child{margin-top:0}
+</style>
+
+<header class="top"><div class="w">
+  <div class="brand"><div class="logo"><span class="mark">NW</span><div><b>New Wave Portal<span class="proto">PROTOTYPE</span></b><span class="sub">Sample Data Only</span></div></div></div>
+  <div class="tabs" id="tabs" role="tablist">
+    <div class="tab on"><button type="button" role="tab" data-view="settle">Settle per Course</button></div>
+    <div class="tab"><button type="button" role="tab" data-view="reasons">Reason Dropdowns</button></div>
+  </div>
+</div></header>
+<main class="page"><div class="w" id="app"></div></main>
+<div id="ddroot"></div>
+<div id="modal"></div>
+<div id="toast" class="toast" role="status" hidden></div>
+
+<script>
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const P=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+const cents=v=>{const n=Math.round(parseFloat(String(v).replace(/,/g,""))*100);return Number.isFinite(n)&&n>0?n:0};
+let toastT;function toast(m){const t=document.getElementById("toast");t.textContent=m;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3200)}
+
+/* ---------- Settle per Course ---------- */
+const newCourse=(id,code,name,sched,due)=>({id,code,name,sched,due,paid:0,firstAr:null});
+const TRAINEES=[
+  {id:"t1",name:"SANTOS, Juan P.",no:"NWMTACI-2026-0412",courses:[newCourse("a","UBT-PSSR","Updating Training on Basic Training","Nov 9",180000),newCourse("b","PSCMT","Crowd Management Training","Nov 10–11",130000),newCourse("c","PSCMHBT","Crisis Management and Human Behavior","Nov 12–14",210000)]},
+  {id:"t2",name:"REYES, Maria L.",no:"NWMTACI-2026-0413",courses:[newCourse("d","SFA","Standard First Aid","Nov 16–17",150000),newCourse("e","HPT","Hydraulic and Pneumatic Training","Nov 18",120000)]},
+];
+let arSeq=124,tarSeq=11,view="settle",pay=null,account="t1";
+const payments=[],issued=[];
+const bal=c=>c.due-c.paid;
+const byId=id=>TRAINEES.find(t=>t.id===id);
+const ar=()=>`AR-2026-000${arSeq++}`;
+
+/* The TAR rule in the plan: an issued TAR stays whole; paid courses group by first receipt; unpaid courses stay together. */
+function groups(t){
+  const out=[],left=new Map(t.courses.map(c=>[c.id,c]));
+  for(const r of issued.filter(i=>i.t===t.id)){out.push({ids:r.ids,tar:r.no,list:r.ids.map(i=>left.get(i)).filter(Boolean)});r.ids.forEach(i=>left.delete(i))}
+  const paid=new Map();const unpaid=[];
+  for(const c of left.values()){if(c.firstAr){if(!paid.has(c.firstAr))paid.set(c.firstAr,[]);paid.get(c.firstAr).push(c)}else unpaid.push(c)}
+  for(const l of paid.values())out.push({ids:l.map(c=>c.id),tar:null,list:l});
+  if(unpaid.length)out.push({ids:unpaid.map(c=>c.id),tar:null,list:unpaid});
+  return out;
+}
+const receiptsOf=g=>payments.filter(p=>p.ids.some(i=>g.ids.includes(i))).map(p=>p.ar);
+
+const DESIGNS=[
+  ["split","Design 1 · Split Button","One button per trainee. The arrow lists each course. Same style as the Record button you chose in Record Payment."],
+  ["pick","Design 2 · Pay For Dropdown","A dropdown beside the button picks all courses or one course. The button shows the amount."],
+  ["expand","Design 3 · Expand Row","The row stays short. The Courses button opens each course with its balance and Settle."],
+  ["tick","Design 4 · Tick Courses","Tick the courses paid now, one or several. Ticked courses paid together share one receipt."],
+  ["window","Design 5 · In the Window","No choice on the row. Record Payment opens and its Pay For dropdown picks the course."],
+];
+let design="split",menuFor=null;const picked={},ticks={},expanded={};
+const openOf=t=>t.courses.filter(c=>bal(c)>0);
+const sumBal=l=>l.reduce((n,c)=>n+bal(c),0);
+const tickedOf=t=>(ticks[t.id]??openOf(t).map(c=>c.id)).filter(id=>openOf(t).some(c=>c.id===id));
+const line=c=>`<div><span class="code">${esc(c.code)}</span><small>${esc(c.sched)}</small><span class="bal">${bal(c)>0?P(bal(c)):'<span class="pill paid">Paid</span>'}</span></div>`;
+function coursesCell(t,list){
+  if(design==="expand")return `<div class="chipset">${list.map(c=>`<span>${esc(c.code)}</span>`).join("")}</div>`;
+  if(design==="tick"){const on=tickedOf(t);return `<div class="cl">${list.map(c=>bal(c)>0?`<label class="tick"><input type="checkbox" data-tick="${t.id}:${c.id}" ${on.includes(c.id)?"checked":""} aria-label="Pay ${esc(c.code)} now"><span class="code">${esc(c.code)}</span><small>${esc(c.sched)}</small><span class="bal">${P(bal(c))}</span></label>`:line(c)).join("")}</div>`}
+  return `<div class="cl">${list.map(line).join("")}</div>`;
+}
+const chosenAmount=t=>{const o=openOf(t);if(design==="tick")return sumBal(o.filter(c=>tickedOf(t).includes(c.id)));if(design==="pick"&&picked[t.id]&&picked[t.id]!=="all"){const c=o.find(x=>x.id===picked[t.id]);if(c)return bal(c)}return sumBal(o)};
+function actionCell(t){
+  const o=openOf(t);
+  if(!o.length)return '<span class="pill paid">Paid</span>';
+  const amt=chosenAmount(t),many=o.length>1;
+  if(design==="split"&&many)return `<span class="split"><button type="button" class="btn pri main" data-payall="${t.id}">Record ${P(amt)}</button><button type="button" class="btn pri dd" data-menu="${t.id}" aria-haspopup="menu" aria-expanded="${menuFor===t.id}" aria-label="Choose a course to settle for ${esc(t.name)}">&#9662;</button></span>`;
+  if(design==="pick"&&many)return `<div class="pickrow"><select data-pick="${t.id}" id="pick-${t.id}" aria-label="Pay for"><option value="all">All Courses</option>${o.map(c=>`<option value="${c.id}" ${picked[t.id]===c.id?"selected":""}>${esc(c.code)} · ${P(bal(c))}</option>`).join("")}</select><button type="button" class="btn pri" data-paypick="${t.id}">Record ${P(amt)}</button></div>`;
+  if(design==="expand"&&many)return `<div class="acts"><button type="button" class="btn pri" data-payall="${t.id}">Record ${P(amt)}</button><button type="button" class="btn" data-expand="${t.id}" aria-expanded="${!!expanded[t.id]}">${o.length} Courses ${expanded[t.id]?"&#9652;":"&#9662;"}</button></div>`;
+  if(design==="tick")return `<button type="button" class="btn pri" data-paytick="${t.id}" ${amt?"":"disabled"}>Record ${P(amt)}</button>`;
+  if(design==="window")return `<button type="button" class="btn pri" data-payall="${t.id}">Record Payment</button>`;
+  return `<button type="button" class="btn pri" data-payall="${t.id}">Record ${P(amt)}</button>`;
+}
+const expandRow=(t,cols)=>design==="expand"&&expanded[t.id]&&openOf(t).length>1?`<tr class="exp"><td colspan="${cols}"><div class="cl">${openOf(t).map(c=>`<div><span class="code">${esc(c.code)}</span><small>${esc(c.sched)}</small><span class="bal">${P(bal(c))}</span><button type="button" class="btn sm" data-settle="${t.id}:${c.id}" aria-label="Settle ${esc(c.code)}">Settle</button></div>`).join("")}</div></td></tr>`:"";
+const who=x=>`<span class="tname">${esc(x.name)}</span><span class="tno">${esc(x.no)}</span>`;
+
+function settleView(){
+  const fresh=TRAINEES.filter(t=>t.courses.some(c=>c.paid===0));
+  const paid=TRAINEES.filter(t=>t.courses.some(c=>c.paid>0));
+  const t=byId(account),note=DESIGNS.find(d=>d[0]===design)[2];
+  return `<div class="cx-head"><div><span class="eyebrow">Cashier</span><h1>Dashboard</h1></div></div>
+  <div class="stack">
+  <div class="design" role="group" aria-label="Design">${DESIGNS.map(d=>`<button type="button" data-design="${d[0]}" aria-pressed="${design===d[0]}">${d[1]}</button>`).join("")}</div>
+  <p class="dnote">${esc(note)}</p>
+  <section class="panel"><div class="ph"><h2>New Enrollments</h2><span class="n">${fresh.length}</span></div>
+    ${fresh.length?`<div class="cwrap"><table><thead><tr><th>Trainee</th><th>Courses · Balance</th><th></th></tr></thead><tbody>
+    ${fresh.map(x=>`<tr><td>${who(x)}</td><td>${coursesCell(x,x.courses.filter(c=>c.paid===0))}</td><td>${actionCell(x)}</td></tr>${expandRow(x,3)}`).join("")}
+    </tbody></table></div>`:`<p class="empty">No new enrollments.</p>`}
+  </section>
+  <section class="panel"><div class="ph"><h2>Paid and Enrolled</h2><span class="n">${paid.length}</span></div>
+    ${paid.length?`<div class="cwrap"><table><thead><tr><th>Trainee</th><th>Paid Courses</th><th class="r">Paid</th></tr></thead><tbody>
+    ${paid.map(x=>{const l=x.courses.filter(c=>c.paid>0);return `<tr><td>${who(x)}</td><td><div class="cl">${l.map(line).join("")}</div></td><td class="r amt">${P(l.reduce((n,c)=>n+c.paid,0))}</td></tr>`}).join("")}
+    </tbody></table></div>`:`<p class="empty">Settle one course above and it moves here. Its other courses stay in New Enrollments.</p>`}
+  </section>
+  <section class="panel"><div class="ph"><h2>Trainee Account · ${esc(t.name)}</h2><div class="acts">${TRAINEES.map(x=>`<button type="button" class="btn sm" data-account="${x.id}" aria-pressed="${x.id===account}">${esc(x.name.split(",")[0])}</button>`).join("")}</div></div>
+    <div class="subhead"><h3 class="sub2">Courses</h3>${actionCell(t)}</div>
+    <div class="cwrap"><table><thead><tr><th>Course</th><th>Schedule</th><th class="r">Due</th><th class="r">Paid</th><th class="r">Balance</th></tr></thead><tbody>
+    ${t.courses.map(c=>`<tr><td><b>${esc(c.code)}</b><small>${esc(c.name)}</small></td><td>${esc(c.sched)}</td><td class="r amt">${P(c.due)}</td><td class="r amt">${P(c.paid)}</td><td class="r amt">${P(bal(c))}</td></tr>`).join("")}
+    ${expandRow(t,5)}</tbody></table></div>
+    <h3 class="sub2">Transactions</h3>
+    <div class="cwrap"><table><thead><tr><th>Transaction</th><th>Courses</th><th>TAR No.</th><th>Receipts</th><th></th></tr></thead><tbody>
+    ${groups(t).map((g,i)=>{const r=receiptsOf(g);return `<tr><td><b>Transaction ${i+1}</b></td><td>${esc(g.list.map(c=>c.code).join(", "))}</td><td class="mono">${g.tar??'<small>Not Yet Printed</small>'}</td><td class="mono">${r.length?esc(r.join(", ")):'<small>Not Yet Paid</small>'}</td><td>${g.tar?"":`<button type="button" class="btn sm" data-tar="${t.id}:${g.ids.join(",")}">Print TAR</button>`}</td></tr>`}).join("")}
+    </tbody></table></div>
+  </section>
+  <p class="rule">Paid separately means a separate receipt and a separate TAR. Paid together stays one receipt and one TAR. A TAR already printed stays as printed.</p></div>`;
+}
+function closeMenu(){if(menuFor===null)return;menuFor=null;document.getElementById("ddroot").innerHTML="";document.querySelectorAll("[data-menu]").forEach(b=>b.setAttribute("aria-expanded","false"))}
+function openMenu(tid,btn){
+  const t=byId(tid),o=openOf(t);menuFor=tid;btn.setAttribute("aria-expanded","true");
+  const root=document.getElementById("ddroot");
+  root.innerHTML=`<div class="ddmenu" role="menu" aria-label="Pay for"><button type="button" role="menuitem" data-payall="${t.id}"><span>Pay All Courses</span><span class="amt">${P(sumBal(o))}</span></button><hr>${o.map(c=>`<button type="button" role="menuitem" data-settle="${t.id}:${c.id}"><span>Settle ${esc(c.code)}<small>${esc(c.sched)}</small></span><span class="amt">${P(bal(c))}</span></button>`).join("")}</div>`;
+  const m=root.firstElementChild,r=btn.getBoundingClientRect();
+  m.style.left=Math.max(16,Math.min(r.right-m.offsetWidth,innerWidth-m.offsetWidth-16))+"px";
+  const below=r.bottom+4;m.style.top=(below+m.offsetHeight>innerHeight-8?Math.max(8,r.top-m.offsetHeight-4):below)+"px";
+  m.querySelector("button").focus();
+}
+
+const fmt=c=>(c/100).toFixed(2);
+function fillPay(ids){const t=byId(pay.tid),list=openOf(t).filter(c=>ids.includes(c.id));pay.amounts=Object.fromEntries(list.map(c=>[c.id,fmt(bal(c))]));pay.received=fmt(sumBal(list))}
+function openPay(tid,only){
+  closeMenu();
+  const o=openOf(byId(tid)),ids=only?[].concat(only):o.map(c=>c.id);
+  pay={tid,mode:"Cash",ref:"",done:null,forId:ids.length===o.length?"all":ids.length===1?ids[0]:"some"};
+  fillPay(ids);renderPay();
+}
+function totals(){const t=byId(pay.tid);const open=t.courses.filter(c=>bal(c)>0);const applied=open.reduce((s,c)=>s+Math.min(cents(pay.amounts[c.id]??""),bal(c)),0);const over=open.some(c=>cents(pay.amounts[c.id]??"")>bal(c));const rec=cents(pay.received);return{applied,over,rec,ok:applied>0&&!over&&applied===rec&&(pay.mode==="Cash"||pay.ref.trim().length>0)}}
+function tallyHtml(){const x=totals();const ok=x.applied>0&&x.applied===x.rec&&!x.over;return `<div class="tally ${ok?"ok":"no"}" id="tally"><span>Applied ${P(x.applied)} of ${P(x.rec)}</span><span>${x.over?"More than a balance":!x.rec?"Enter the amount received":ok?"Ready to record":x.applied<x.rec?`${P(x.rec-x.applied)} not applied`:`${P(x.applied-x.rec)} over the amount received`}</span></div>`}
+function renderPay(){
+  const box=document.getElementById("modal");
+  if(!pay){box.innerHTML="";return}
+  const t=byId(pay.tid);
+  if(pay.done){const d=pay.done;const left=t.courses.filter(c=>bal(c)>0);box.innerHTML=`<div class="back"><div class="dlg" role="dialog" aria-modal="true" aria-label="Payment Recorded"><div class="dlg-h"><h2>Payment Recorded</h2></div><div class="dlg-b">
+    <div class="tally ok"><span>${P(d.amount)} received from ${esc(t.name)}</span></div>
+    <div class="cwrap"><table><thead><tr><th>Receipt</th><th>Courses</th><th class="r">Amount</th><th></th></tr></thead><tbody><tr><td class="mono">${d.ar}</td><td>${esc(d.codes.join(", "))}</td><td class="r amt">${P(d.amount)}</td><td><button type="button" class="btn sm" data-toast="Receipt ${d.ar} opens for printing.">Print Receipt</button></td></tr></tbody></table></div>
+    ${left.length?`<p style="margin:0;font-size:14.5px">Still open: ${left.map(c=>`<b>${esc(c.code)}</b> ${P(bal(c))}`).join(" · ")}</p>`:'<p style="margin:0;font-size:14.5px">All courses are fully paid.</p>'}
+  </div><div class="dlg-f"><button type="button" class="btn pri" data-close>Done</button></div></div></div>`;return}
+  const open=t.courses.filter(c=>bal(c)>0);
+  box.innerHTML=`<div class="back"><div class="dlg" role="dialog" aria-modal="true" aria-label="Record Payment"><div class="dlg-h"><div><h2>Record Payment</h2><small style="color:var(--muted)">${esc(t.name)} · ${esc(t.no)}</small></div><button type="button" class="btn sm" data-close>Cancel</button></div>
+  <div class="dlg-b">
+    <div class="two">${open.length>1?`<label class="fld">Pay For<select id="payFor"><option value="all" ${pay.forId==="all"?"selected":""}>All Courses · ${P(sumBal(open))}</option>${pay.forId==="some"?'<option value="some" selected>Selected Courses</option>':""}${open.map(c=>`<option value="${c.id}" ${pay.forId===c.id?"selected":""}>${esc(c.code)} · ${P(bal(c))}</option>`).join("")}</select></label>`:""}<label class="fld">Amount Received (PHP)<input class="mono" id="rec" inputmode="decimal" value="${esc(pay.received)}"></label></div>
+    <div class="cwrap"><table><thead><tr><th>Course</th><th class="r">Balance</th><th class="r">Apply</th></tr></thead><tbody>
+    ${open.map(c=>`<tr class="${cents(pay.amounts[c.id]??"")>0?"sel":""}" data-row="${c.id}"><td><b class="mono">${esc(c.code)}</b><small>${esc(c.name)} · ${esc(c.sched)}</small></td><td class="r amt">${P(bal(c))}</td><td class="r"><input class="apply" data-apply="${c.id}" inputmode="decimal" aria-label="Amount for ${esc(c.code)}" placeholder="0.00" value="${esc(pay.amounts[c.id]??"")}"></td></tr>`).join("")}
+    </tbody></table></div>
+    ${tallyHtml()}
+    <div><span class="fld">Mode of Payment</span><div class="chips" role="radiogroup" aria-label="Mode of Payment" style="margin-top:4px">${["Cash","GCash","PSBank","UnionBank"].map(m=>`<button type="button" role="radio" aria-checked="${pay.mode===m}" data-mode="${m}">${m}</button>`).join("")}</div></div>
+    ${pay.mode==="Cash"?"":`<label class="fld">Reference Number (Required)<input class="mono" id="ref" value="${esc(pay.ref)}" placeholder="${pay.mode} reference"></label>`}
+  </div>
+  <div class="dlg-f"><button type="button" class="btn pri" id="doRecord" ${totals().ok?"":"disabled"}>Record ${cents(pay.received)?P(cents(pay.received)):"Payment"}</button></div></div></div>`;
+}
+function record(){
+  const t=byId(pay.tid),x=totals();if(!x.ok)return;
+  const no=ar(),ids=[];
+  for(const c of t.courses){const a=Math.min(cents(pay.amounts[c.id]??""),bal(c));if(a>0&&bal(c)>0){c.paid+=a;c.firstAr=c.firstAr??no;ids.push(c.id)}}
+  payments.push({ar:no,ids,amount:x.applied});
+  pay.done={ar:no,amount:x.applied,codes:t.courses.filter(c=>ids.includes(c.id)).map(c=>c.code)};
+  renderPay();draw();
+}
+
+/* ---------- Reason Dropdowns ---------- */
+const OTHER="Other";
+const LISTS={
+  "Rescheduling":["Trainee's Request","Joining a Vessel","Medical Reason","Family Emergency","Batch Moved or Cancelled",OTHER],
+  "Change Course":["Wrong Course Selected","Company or Agency Requirement","Trainee's Request","Course Not Available",OTHER],
+  "Make-up Class":["Missed Class · Medical","Missed Class · Family Emergency","Missed Class · Joining a Vessel","Late Arrival",OTHER],
+  "Cancellation":["Trainee's Request","Joining a Vessel","Medical Reason","Family Emergency","Requirements Not Met",OTHER],
+  "Refund":["Trainee Cancelled","Course Cancelled by New Wave","Overpayment","Duplicate Payment",OTHER],
+  "Reprinting":["Misprint","Wrong Name or Details","Lost by the Trainee","Damaged",OTHER],
+  "TAR Reprint":["Misprint","Lost by the Trainee","Damaged",OTHER],
+  "Voucher Reprint":["Misprint","Lost","Damaged",OTHER],
+  "Payment Void":["Wrong Amount Entered","Wrong Trainee","Wrong Mode or Reference","Duplicate Entry","Payment Did Not Push Through",OTHER],
+  "Discount":["Agency Rebate","Company Arrangement","Promo","Approved by Management",OTHER],
+};
+const REJECT={
+  "Expense":["Missing or Unclear Receipt","Amount Does Not Match the Receipt","Wrong Category","Not an Approved Expense","Duplicate Request",OTHER],
+  "Voucher Reprint":["Reason Not Valid","Already Reprinted","Original Still Available","Duplicate Request",OTHER],
+  "Refund":["Not Covered by the Policy","Amount Is Incorrect","Missing Documents","Duplicate Request",OTHER],
+  "Discount":["Not Covered by the Policy","Amount Is Incorrect","No Approval on File","Duplicate Request",OTHER],
+  "Payment Void":["Payment Is Correct","Reason Not Valid","Missing Proof","Duplicate Request",OTHER],
+};
+const rows=[
+  {id:"r1",type:"Expense",title:"Meralco · Utilities",ref:"ER-2026-000031",amt:1845050,who:"Karen Mallari"},
+  {id:"r2",type:"Voucher Reprint",title:"CV-2026-000124 · Meralco",ref:"Reason: Misprint",amt:0,who:"Karen Mallari"},
+  {id:"r3",type:"Refund",title:"SANTOS, Juan P. · Crowd Management",ref:"Reason: Joining a Vessel",amt:95000,who:"Karen Mallari"},
+  {id:"r4",type:"Discount",title:"REYES, Maria L. · Standard First Aid",ref:"Reason: Agency Rebate",amt:30000,who:"Karen Mallari"},
+  {id:"r5",type:"Payment Void",title:"AR-2026-000118 · CRUZ, Ana B.",ref:"Reason: Wrong Amount Entered",amt:130000,who:"Karen Mallari"},
+];
+const OTHERS=[
+  ["Proof Not Valid","Cashier",["Reference Not Found","Amount Does Not Match","Unclear Proof","Duplicate Proof",OTHER]],
+  ["Billing Statement Void","Accounting",["Wrong Amounts","Wrong Coverage Dates","Wrong Partner",OTHER]],
+  ["Other Income Void","Accounting and Admin",["Wrong Amount","Wrong Source","Duplicate Entry",OTHER]],
+  ["Certificate Void Request","Releasing Officer",["Misprint","Wrong Name or Details","Damaged While Printing",OTHER]],
+  ["Certificate Void Reject","Admin",["Certificate Is Correct","Reason Not Valid","Duplicate Request",OTHER]],
+  ["Cancel Enrollment","Admin",["Trainee's Request","Duplicate Enrollment","Requirements Not Met",OTHER]],
+];
+let reqType="Rescheduling",rejecting=null;const decided=[];const forms={};
+const reasonField=(key,list,noteLabel)=>{const f=forms[key]??(forms[key]={r:"",n:""});return `<label class="fld">Reason<select id="sel-${key}" data-rf="${key}"><option value="">Choose a Reason</option>${list.map(o=>`<option ${f.r===o?"selected":""}>${esc(o)}</option>`).join("")}</select></label><label class="fld">${esc(noteLabel)}<input id="note-${key}" data-rn="${key}" value="${esc(f.n)}" placeholder="${f.r===OTHER?"Required for Other":"Optional"}"></label>`};
+const reasonText=f=>[f.r===OTHER?"":f.r,f.n.trim()].filter(Boolean).join(" — ");
+const ready=f=>!!f.r&&(f.r!==OTHER||!!f.n.trim());
+const savedLine=key=>{const f=forms[key]??{r:"",n:""};return ready(f)?`Saved as: <b>${esc(reasonText(f))}</b>`:f.r===OTHER?'<span class="hint-bad">Add a note for Other.</span>':""};
+const card=(key,title,tag,list,btn)=>`<div class="card"><h3>${esc(title)}</h3><span class="tag">${esc(tag)}</span>${reasonField(key,list,"Note")}<div class="saved" id="saved-${key}">${savedLine(key)}</div><button type="button" class="btn pri" data-send="${key}" data-msg="${esc(btn)}" ${ready(forms[key]??{r:""})?"":"disabled"}>${esc(btn)}</button></div>`;
+
+function reasonsView(){
+  const pending=rows.filter(r=>!decided.some(d=>d.id===r.id));
+  return `<div class="cx-head"><div><span class="eyebrow">Accounting</span><h1>Approvals</h1></div></div>
+  <section class="panel"><div class="ph"><h2>Waiting for Accounting</h2><span class="n">${pending.length}</span></div>
+    ${pending.length?`<div class="cwrap"><table><thead><tr><th>Type</th><th>Request</th><th>Sent by</th><th class="r">Amount</th><th></th></tr></thead><tbody>
+    ${pending.map(r=>`<tr><td><b>${esc(r.type)}</b></td><td>${esc(r.title)}<small>${esc(r.ref)}</small></td><td>${esc(r.who)}</td><td class="r amt">${r.amt?P(r.amt):"—"}</td><td><div class="acts">${rejecting===r.id?"<small>Rejecting</small>":`<button type="button" class="btn sm okb" data-approve="${r.id}">Approve</button><button type="button" class="btn sm" data-reject="${r.id}">Reject</button>`}</div></td></tr>${rejecting===r.id?`<tr><td colspan="5"><div class="rj">${reasonField("rej-"+r.id,REJECT[r.type],"Note for the Cashier")}<div class="acts"><button type="button" class="btn sm" data-keep>Keep</button><button type="button" class="btn sm pri" id="rejBtn" data-doreject="${r.id}" ${ready(forms["rej-"+r.id]??{r:""})?"":"disabled"}>Reject Request</button></div></div></td></tr>`:""}`).join("")}
+    </tbody></table></div>`:'<p class="empty">Nothing is waiting.</p>'}
+  </section>
+  <section class="panel" style="margin-top:16px"><div class="ph"><h2>Approvals History</h2></div>
+    ${decided.length?`<div class="cwrap"><table><thead><tr><th>Type</th><th>Request</th><th>Decision</th><th>Reason</th><th>By</th></tr></thead><tbody>${decided.map(d=>`<tr><td><b>${esc(d.type)}</b></td><td>${esc(d.title)}</td><td><span class="pill ${d.ok?"paid":"due"}">${d.ok?"Approved":"Rejected"}</span></td><td>${esc(d.why||"—")}</td><td>Accounting</td></tr>`).join("")}</tbody></table></div>`:'<p class="empty">Reject a request above: the reason you pick is saved here. Discount rejections now keep their reason too.</p>'}
+  </section>
+  <h2 class="sec">Sent to Accounting</h2>
+  <div class="cards">
+    <div class="card"><h3>Request a Change</h3><span class="tag">Registration and Cashier</span><label class="fld">Request<select id="reqType">${Object.keys(LISTS).slice(0,7).map(k=>`<option ${k===reqType?"selected":""}>${esc(k)}</option>`).join("")}</select></label>${reasonField("change",LISTS[reqType],"Note")}<div class="saved" id="saved-change">${savedLine("change")}</div><button type="button" class="btn pri" data-send="change" data-msg="Sent to the Cashier" ${ready(forms.change??{r:""})?"":"disabled"}>Send to Cashier</button></div>
+    ${card("reprint","Voucher Reprint","Cashier",LISTS["Voucher Reprint"],"Send to Accounting")}
+    ${card("void","Payment Void","Cashier",LISTS["Payment Void"],"Send to Accounting")}
+    ${card("discount","Discount","Cashier",LISTS["Discount"],"Send to Accounting")}
+  </div>
+  <h2 class="sec">Other Reason Boxes</h2>
+  <section class="panel"><div class="cwrap"><table><thead><tr><th>Form</th><th>Used by</th><th>Reasons in the Dropdown</th></tr></thead><tbody>${OTHERS.map(([a,b,c])=>`<tr><td><b>${esc(a)}</b></td><td>${esc(b)}</td><td>${esc(c.join(" · "))}</td></tr>`).join("")}</tbody></table></div></section>`;
+}
+
+/* ---------- Page ---------- */
+function draw(){
+  document.querySelectorAll("#tabs .tab").forEach(t=>{const on=t.firstElementChild.dataset.view===view;t.classList.toggle("on",on);t.firstElementChild.setAttribute("aria-selected",String(on))});
+  document.getElementById("app").innerHTML=view==="settle"?settleView():reasonsView();
+}
+document.addEventListener("click",e=>{
+  if(menuFor!==null&&!e.target.closest("#ddroot,[data-menu]"))closeMenu();
+  const b=e.target.closest("button");if(!b)return;const d=b.dataset;
+  if(d.view){view=d.view;rejecting=null;closeMenu();draw();window.scrollTo(0,0);return}
+  if(d.design){design=d.design;closeMenu();draw();return}
+  if(d.menu){const same=menuFor===d.menu;closeMenu();if(!same)openMenu(d.menu,b);return}
+  if(d.expand){expanded[d.expand]=!expanded[d.expand];draw();document.querySelector(`[data-expand="${d.expand}"]`)?.focus();return}
+  if(d.paypick){const v=picked[d.paypick];openPay(d.paypick,v&&v!=="all"?v:null);return}
+  if(d.paytick){openPay(d.paytick,tickedOf(byId(d.paytick)));return}
+  if(d.settle){const[t,c]=d.settle.split(":");openPay(t,c);return}
+  if(d.payall){openPay(d.payall);return}
+  if(d.account){account=d.account;draw();return}
+  if(d.mode){pay.mode=d.mode;renderPay();return}
+  if("close" in d){pay=null;renderPay();return}
+  if(b.id==="doRecord"){record();return}
+  if(d.toast){toast(d.toast);return}
+  if(d.tar){const[t,ids]=d.tar.split(":");const no=`TAR-2026-0000${tarSeq++}`;issued.push({t,ids:ids.split(","),no});toast(`${no} opens for printing.`);draw();return}
+  if(d.approve){const r=rows.find(x=>x.id===d.approve);decided.unshift({...r,ok:true,why:""});toast("Approved.");draw();return}
+  if(d.reject){rejecting=d.reject;draw();return}
+  if("keep" in d){rejecting=null;draw();return}
+  if(d.doreject){const r=rows.find(x=>x.id===d.doreject);decided.unshift({...r,ok:false,why:reasonText(forms["rej-"+r.id])});rejecting=null;toast("Rejected. The reason is saved.");draw();return}
+  if(d.send){toast(d.msg==="Sent to the Cashier"?"Sent to the Cashier.":"Sent to Accounting.");delete forms[d.send];draw();return}
+});
+document.addEventListener("input",e=>{
+  const el=e.target,d=el.dataset;
+  if(el.id==="rec"){pay.received=el.value;syncPay();return}
+  if(el.id==="ref"){pay.ref=el.value;syncPay();return}
+  if(d.apply){pay.amounts[d.apply]=el.value;const row=el.closest("tr");row.classList.toggle("sel",cents(el.value)>0);syncPay();return}
+  if(d.rn){(forms[d.rn]??(forms[d.rn]={r:"",n:""})).n=el.value;syncReason(d.rn);return}
+});
+document.addEventListener("change",e=>{
+  const el=e.target,d=el.dataset;
+  if(d.rf){(forms[d.rf]??(forms[d.rf]={r:"",n:""})).r=el.value;const n=document.getElementById("note-"+d.rf);if(n)n.placeholder=el.value===OTHER?"Required for Other":"Optional";syncReason(d.rf);return}
+  if(el.id==="payFor"){pay.forId=el.value;fillPay(el.value==="all"?openOf(byId(pay.tid)).map(c=>c.id):[el.value]);renderPay();document.getElementById("payFor")?.focus();return}
+  if(d.pick){picked[d.pick]=el.value;draw();document.getElementById("pick-"+d.pick)?.focus();return}
+  if(d.tick){const[t,c]=d.tick.split(":");const now=new Set(tickedOf(byId(t)));el.checked?now.add(c):now.delete(c);ticks[t]=[...now];draw();document.querySelector(`[data-tick="${d.tick}"]`)?.focus();return}
+  if(el.id==="reqType"){reqType=el.value;delete forms.change;draw();document.getElementById("reqType")?.focus();return}
+});
+function syncPay(){const t=document.getElementById("tally");if(t)t.outerHTML=tallyHtml();const b=document.getElementById("doRecord");if(b){b.disabled=!totals().ok;b.textContent=`Record ${cents(pay.received)?P(cents(pay.received)):"Payment"}`}}
+function syncReason(key){const f=forms[key],s=document.getElementById("saved-"+key);if(s)s.innerHTML=savedLine(key);const b=document.querySelector(`[data-send="${key}"]`)??(key.startsWith("rej-")?document.getElementById("rejBtn"):null);if(b)b.disabled=!ready(f)}
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(menuFor!==null){const f=menuFor;closeMenu();document.querySelector(`[data-menu="${f}"]`)?.focus()}else if(pay){pay=null;renderPay()}}});
+addEventListener("scroll",closeMenu,{passive:true});addEventListener("resize",closeMenu);
+draw();
+</script>

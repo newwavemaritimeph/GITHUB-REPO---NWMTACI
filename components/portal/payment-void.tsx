@@ -1,7 +1,8 @@
 "use client";
 
 import type { PortalData } from "../portal-live-app";
-import { askText } from "./dialogs";
+import { askReason } from "./dialogs";
+import { REASONS } from "./reject-inline";
 import { Badge } from "./shared-ui";
 
 /**
@@ -23,7 +24,7 @@ export function voidStateOf(data: PortalData, p: VoidablePayment) {
 export function PaymentVoidCell({ data, payment, canRequest, busy, post }: { data: PortalData; payment: VoidablePayment; canRequest: boolean; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<unknown> }) {
   const s = voidStateOf(data, payment);
   async function request() {
-    const reason = await askText(`Void ${payment.payment_number} (${payment.method}, ₱${(Number(payment.amount_centavos) / 100).toLocaleString("en-PH", { minimumFractionDigits: 2 })})? Accounting approves it. Reason:`, "", { title: "Request Void", okLabel: "Send to Accounting" });
+    const reason = await askReason(`Void ${payment.payment_number} (${payment.method}, ₱${(Number(payment.amount_centavos) / 100).toLocaleString("en-PH", { minimumFractionDigits: 2 })})? Accounting approves it.`, REASONS.paymentVoid, { title: "Request Void", okLabel: "Send to Accounting" });
     if (!reason || reason.trim().length < 5) return;
     await post({ action: "payment-void-request", paymentId: payment.id, reason: reason.trim() }, "Void request sent to Accounting.").catch(() => undefined);
   }

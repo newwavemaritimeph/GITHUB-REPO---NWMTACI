@@ -6,7 +6,8 @@ import { pesos, first as one, dueCentavos as dueOf } from "@/lib/portal-format";
 import { LiveCashierClosing, type ClosingData } from "./live-cashier-closing";
 import { tcl } from "@/lib/title-case";
 import { REBATE_PRESETS, STCW_REBATE_COURSES, rebateRowsProblem } from "@/lib/rebates";
-import { askText, askConfirm } from "./dialogs";
+import { askReason, askConfirm } from "./dialogs";
+import { REJECT_REASONS } from "./reject-inline";
 import { useNeedSince } from "./shared-ui";
 
 /** Loose shapes for the accounting slices of the staff-operations payload. */
@@ -1332,7 +1333,7 @@ export function ApprovalsModule({ data, role, reload }: { data: AccountingData; 
       {!data.pendingDiscounts.length && <p className="portal-empty-copy">No waivers pending.</p>}
     </section>
     <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Change Requests</h2><p>Batch, course, make-up, cancellation and refund — priced by the Cashier</p></div><span className="slot-count">{refunds.length}</span></div>
-      {refunds.map((r) => { const t = one(r.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null | undefined); const amt = r.requested_values?.amountCentavos; const ch = one(r.enrollment_charges ?? null); const enr = one(r.enrollments ?? null); return <div className="live-row-item" key={r.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : r.request_number}</strong><small>{r.request_type === "Rescheduling" ? "Change batch / reschedule" : r.request_type}{enr ? ` · ${enr.enrollment_number}` : ""}{amt ? ` · refund ${peso2(amt)}` : ""}{ch ? ` · charge ${peso2(ch.amount_centavos)}` : r.stage === "For approval" ? " · no charge" : ""}{data.chargeCollected?.[r.id] ? (data.chargeCollected[r.id].paid ? " · fee paid ✓" : ` · fee not paid yet (${peso2(data.chargeCollected[r.id].collected)} of ${peso2(data.chargeCollected[r.id].amount)}) — approve after payment`) : ""} · {r.reason}</small></div><Actions onYes={() => void post({ action: "request-decide", id: r.id, approve: true })} onNo={async () => { const remarks = await askText("Reason for rejecting? (optional)") ?? undefined; void post({ action: "request-decide", id: r.id, approve: false, remarks }); }} /></div>; })}
+      {refunds.map((r) => { const t = one(r.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null | undefined); const amt = r.requested_values?.amountCentavos; const ch = one(r.enrollment_charges ?? null); const enr = one(r.enrollments ?? null); return <div className="live-row-item" key={r.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : r.request_number}</strong><small>{r.request_type === "Rescheduling" ? "Change batch / reschedule" : r.request_type}{enr ? ` · ${enr.enrollment_number}` : ""}{amt ? ` · refund ${peso2(amt)}` : ""}{ch ? ` · charge ${peso2(ch.amount_centavos)}` : r.stage === "For approval" ? " · no charge" : ""}{data.chargeCollected?.[r.id] ? (data.chargeCollected[r.id].paid ? " · fee paid ✓" : ` · fee not paid yet (${peso2(data.chargeCollected[r.id].collected)} of ${peso2(data.chargeCollected[r.id].amount)}) — approve after payment`) : ""} · {r.reason}</small></div><Actions onYes={() => void post({ action: "request-decide", id: r.id, approve: true })} onNo={async () => { const remarks = await askReason("Why is this rejected?", REJECT_REASONS.request, { title: "Reject Request", okLabel: "Reject", danger: true }) ?? undefined; void post({ action: "request-decide", id: r.id, approve: false, remarks }); }} /></div>; })}
       {!refunds.length && <p className="portal-empty-copy">No requests pending.</p>}
     </section>
   </div>;
