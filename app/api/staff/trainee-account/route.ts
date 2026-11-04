@@ -21,11 +21,18 @@ export async function GET(request: Request) {
   const { data: me } = await db.from("trainees").select("id,srn,legal_first_name,legal_last_name,birthdate").eq("id", traineeId).maybeSingle();
   if (!me) return NextResponse.json({ error: "Trainee not found." }, { status: 404 });
   // Every receipt and TAR of this trainee (owner, 3 Nov 2026: Accounting reprints from the Trainee Account).
-  const [payRes, tarRes] = await Promise.all([
-    db.from("payments").select("id,payment_number,trainee_id,amount_centavos,method,reference_number,received_at,valid,remarks,receipts(receipt_number,print_count)").eq("trainee_id", traineeId).order("received_at", { ascending: true }).limit(500),
+  type PayRow = { id: string; payment_number: string; trainee_id: string; amount_centavos: number; method: string; reference_number: string | null; received_at: string; valid: boolean; remarks: string | null; receipts: { receipt_number?: string; print_count?: number } | { receipt_number?: string; print_count?: number }[] | null };
+  const paySelect = (receipts: string) => db.from("payments").select(`id,payment_number,trainee_id,amount_centavos,method,reference_number,received_at,valid,remarks,receipts(${receipts})`).eq("trainee_id", traineeId).order("received_at", { ascending: true }).limit(500);
+  const [firstPay, tarRes] = await Promise.all([
+    paySelect("receipt_number,print_count"),
     db.from("admission_records").select("id,ar_number,enrollment_ids,print_count,reprints_approved,issued_at").eq("trainee_id", traineeId).order("issued_at", { ascending: true }).limit(200),
   ]);
-  const payments = (payRes.data ?? []).map((p) => { const r = (Array.isArray(p.receipts) ? p.receipts[0] : p.receipts) as { receipt_number?: string; print_count?: number } | null; return { id: p.id, payment_number: p.payment_number, trainee_id: p.trainee_id, amount_centavos: p.amount_centavos, method: p.method, reference_number: p.reference_number, received_at: p.received_at, valid: p.valid, remarks: p.remarks, receipt_number: r?.receipt_number ?? null, print_count: Number(r?.print_count ?? 0) }; });
+  // A failed read must never look like "No payments yet" (owner, 4 Nov 2026: receipts showed under Transactions but not here).
+  // Retry without the print count; if that fails too, send nothing and the page falls back on its own list.
+  let payRes = firstPay;
+  if (payRes.error) { console.error("Trainee Account payments:", payRes.error.message); payRes = await paySelect("receipt_number"); }
+  if (payRes.error) console.error("Trainee Account payments, retry:", payRes.error.message);
+  const payments = payRes.error ? undefined : ((payRes.data ?? []) as unknown as PayRow[]).map((p) => { const r = Array.isArray(p.receipts) ? p.receipts[0] : p.receipts; return { id: p.id, payment_number: p.payment_number, trainee_id: p.trainee_id, amount_centavos: p.amount_centavos, method: p.method, reference_number: p.reference_number, received_at: p.received_at, valid: p.valid, remarks: p.remarks, receipt_number: r?.receipt_number ?? null, print_count: Number(r?.print_count ?? 0) }; });
   // Candidates: same SRN, or same last name (then name + birth date is checked in code).
   const srn = normalizeSrn(me.srn ?? "");
   const [bySrn, byName] = await Promise.all([

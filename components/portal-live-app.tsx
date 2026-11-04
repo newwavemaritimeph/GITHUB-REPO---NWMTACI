@@ -672,7 +672,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   const srcLabel=latest?sourceLabel(latest.source,partnerOf(data,latest)):"";
   // Payment voids (owner, 29 Oct 2026): voided payments stay listed; the Cashier requests, Accounting approves.
   const canVoid=["cashier","accounting","admin"].includes(role??"");
-  const payRows:AccountPayment[]=account?.payments??[...payments,...(data.voidedPayments??[]).filter(p=>p.trainee_id===trainee.id)].sort((a,b)=>a.received_at.localeCompare(b.received_at)) as AccountPayment[];
+  const payRows:AccountPayment[]=account?.payments?.length?account.payments:[...payments,...(data.voidedPayments??[]).filter(p=>p.trainee_id===trainee.id)].sort((a,b)=>a.received_at.localeCompare(b.received_at)) as AccountPayment[];
   // Accounting reprints a receipt or a TAR here, with a reason (owner, 3 Nov 2026: "just put in their Trainee Account").
   const canReprint=["accounting","admin"].includes(role??"");
   const [reprint,setReprint]=useState<{kind:"receipt"|"tar";id:string;no:string}|null>(null),[why,setWhy]=useState(""),[whyOther,setWhyOther]=useState("");
