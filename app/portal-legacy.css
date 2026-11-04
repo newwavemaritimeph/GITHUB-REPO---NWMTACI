@@ -2616,3 +2616,6 @@ button.rd-row:hover { background: #f6fafc; }
 .cx-splitmenu button { background: none; border: 0; text-align: left; padding: 10px 12px; border-radius: 8px; font: 500 15px var(--font-portal), sans-serif; color: var(--nw-fg); cursor: pointer; }
 .cx-splitmenu button:hover { background: var(--nw-soft); }
 .cx-splitmenu hr { border: 0; border-top: 1px solid var(--nw-line); margin: 4px 6px; }
+
+/* Month bar (owner, 3 Nov 2026): ‹ November 2026 › */
+.nw-shell .pd-month { font: 600 17px var(--font-portal), sans-serif; min-width: 150px; text-align: center; color: #123F63; }

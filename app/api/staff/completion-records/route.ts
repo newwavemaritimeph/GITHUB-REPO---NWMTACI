@@ -41,7 +41,8 @@ export async function GET(request: Request) {
       const payload = await loadCompletion(db, batch);
       return payload ? NextResponse.json(payload, { headers: { "cache-control": "no-store" } }) : NextResponse.json({ error: "Batch not found." }, { status: 404 });
     }
-    return NextResponse.json(await listCompletionBatches(db, manilaDay(new Date().toISOString())), { headers: { "cache-control": "no-store" } });
+    const from = new URL(request.url).searchParams.get("from") ?? "";
+    return NextResponse.json(await listCompletionBatches(db, manilaDay(new Date().toISOString()), /^\d{4}-\d{2}-\d{2}$/.test(from) ? from : undefined), { headers: { "cache-control": "no-store" } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Could not load the records." }, { status: 400 });
   }

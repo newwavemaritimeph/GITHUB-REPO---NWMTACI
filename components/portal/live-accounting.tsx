@@ -7,6 +7,7 @@ import { LiveCashierClosing, type ClosingData } from "./live-cashier-closing";
 import { tcl } from "@/lib/title-case";
 import { REBATE_PRESETS, STCW_REBATE_COURSES, rebateRowsProblem } from "@/lib/rebates";
 import { askText, askConfirm } from "./dialogs";
+import { useNeedSince } from "./shared-ui";
 
 /** Loose shapes for the accounting slices of the staff-operations payload. */
 type Payment = { payment_number?: string; method: string; receiving_account?: string | null; amount_centavos: number; reference_number?: string | null; received_at?: string; verification_state: string; trainee_id?: string };
@@ -583,7 +584,8 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
   const canDecide = role === "admin" || role === "accounting";
   const today = manilaDay(new Date().toISOString());
   const monthStart = today.slice(0, 8) + "01";
-  const [from, setFrom] = useState(today), [to, setTo] = useState(today);
+  const [from, setFrom] = useState(monthStart), [to, setTo] = useState(today);
+  useNeedSince(from);
   const [status, setStatus] = useState("All statuses"), [q, setQ] = useState("");
   const [page, setPage] = useState(1), [perPage, setPerPage] = useState(10);
   const [busy, setBusy] = useState(false), [msg, setMsg] = useState("");

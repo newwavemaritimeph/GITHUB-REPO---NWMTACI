@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PortalData, Enrollment, TraineeProofRow } from "../portal-live-app";
 import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos, pesos2 } from "@/lib/portal-format";
 import { pesosInWords } from "@/lib/amount-words";
-import { Badge, Message, Modal, PageHead, fullName, fmtDate, fmtClock, usePaged, usePost, openAdmissionRecord, submit } from "./shared-ui";
+import { ALL_DATES, Badge, Message, Modal, PageHead, fullName, fmtDate, fmtClock, useNeedSince, usePaged, usePost, openAdmissionRecord, submit } from "./shared-ui";
 import { PaymentVoidCell } from "./payment-void";
 import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balances";
 import { requestFee } from "@/lib/request-fees";
@@ -296,6 +296,8 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialAmountCen
   const uniform = catalog.find((c) => /uniform/i.test(c.name) && Number(c.default_amount_centavos) > 0);
   const uniformPrice = uniform ? Number(uniform.default_amount_centavos) : 15000;
   const term = search.trim().toLowerCase();
+  // A trainee from an older month can still pay (owner, 3 Nov 2026): typing looks across all dates.
+  useNeedSince(term ? ALL_DATES : "");
   // No list until a letter is typed (owner, 3 Nov 2026); suggestions follow each letter.
   const candidates = term ? rankMatches(groupByTrainee(data, data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && !data.companyCharge?.[e.id]))
     .sort((a, b) => b.balance - a.balance || a.name.localeCompare(b.name)), term, (g) => g.name, (g) => `${g.number} ${g.enrollments.map((e) => `${courseCode(e)} ${e.enrollment_number}`).join(" ")}`) : [];
@@ -580,12 +582,15 @@ const RANGES = ["Today", "This week", "This month", "Custom"] as const;
 export function CashierPayments({ data, onPay, reload }: { data: PortalData; onPay: (enrollmentId: string) => void; reload?: () => Promise<void> }) {
   const { busy, msg, post } = usePost(reload ?? (async () => undefined));
   const today = manilaToday();
-  const [range, setRange] = useState<(typeof RANGES)[number]>("Today");
-  const [from, setFrom] = useState(today), [to, setTo] = useState(today);
+  // Opens on this month (owner, 3 Nov 2026).
+  const [range, setRange] = useState<(typeof RANGES)[number]>("This month");
+  const [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today);
+  useNeedSince(from);
   const [mode, setMode] = useState("");
   const [q, setQ] = useState("");
   const start = range === "Today" ? today : range === "This week" ? addDays(today, -6) : range === "This month" ? `${today.slice(0, 8)}01` : from;
   const end = range === "Custom" ? to : today;
+  useNeedSince(start);
   const term = q.trim().toLowerCase();
   // Voided payments stay listed, marked VOID (owner, 29 Oct 2026); totals count valid payments only.
   const rows = [...data.payments, ...(data.voidedPayments ?? [])].filter((p) => { const d = day(p.received_at); const t = first(p.trainees); return d >= start && d <= end && (!mode || p.method === mode) && (!term || `${p.payment_number} ${p.reference_number ?? ""} ${t ? `${t.legal_first_name} ${t.legal_last_name}` : ""}`.toLowerCase().includes(term)); })
@@ -649,10 +654,12 @@ export function CashierEnrollments({ data, onPay, reload, onOpenTrainee }: { dat
   const [filter, setFilter] = useState<"All" | (typeof STATUS_ORDER)[number]>("All");
   const rowState = (e: Enrollment) => (e.enrollment_status !== "Cancelled" && data.companyCharge?.[e.id] && balanceOf(e) > 0 ? "Company Charge" : payState(e));
   const [q, setQ] = useState("");
-  const [from, setFrom] = useState(today), [to, setTo] = useState(today);
+  const [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today);
+  useNeedSince(from);
   const dateOf = (e: Enrollment) => day(e.enrolled_at ?? e.created_at);
   const term = q.trim().toLowerCase();
-  const base = data.enrollments.filter((e) => { const d = dateOf(e); return (!from || d >= from) && (!to || d <= to) && (!term || `${traineeName(e)} ${e.enrollment_number} ${first(e.courses)?.name ?? ""} ${courseCode(e)} ${data.applicationNumbers?.[e.trainee_id] ?? ""}`.toLowerCase().includes(term)); });
+  useNeedSince(term ? ALL_DATES : "");
+  const base = data.enrollments.filter((e) => { const d = dateOf(e); return (!!term || ((!from || d >= from) && (!to || d <= to))) && (!term || `${traineeName(e)} ${e.enrollment_number} ${first(e.courses)?.name ?? ""} ${courseCode(e)} ${data.applicationNumbers?.[e.trainee_id] ?? ""}`.toLowerCase().includes(term)); });
   const rows = base.filter((e) => filter === "All" || rowState(e) === filter)
     .sort((a, b) => STATUS_ORDER.indexOf(rowState(a) as (typeof STATUS_ORDER)[number]) - STATUS_ORDER.indexOf(rowState(b) as (typeof STATUS_ORDER)[number]) || dateOf(b).localeCompare(dateOf(a))).slice(0, 300);
   const count = (f: string) => base.filter((e) => f === "All" || rowState(e) === f).length;
@@ -917,7 +924,8 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   const isManager = role === "accounting";
   const [view, setView] = useState<"Expenses" | "Vouchers" | "Pay the Centers">("Expenses");
   const centersDue = centerLines(data).filter((l) => l.state === "Due").length;
-  const [from, setFrom] = useState(today), [to, setTo] = useState(today);
+  const [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today);
+  useNeedSince(from);
   const [tab, setTab] = useState<(typeof EXPENSE_STATUSES)[number]>(canDecide ? "For approval" : "All");
   const [recording, setRecording] = useState(false);
   const [releasing, setReleasing] = useState<ExpenseRow | null>(null);

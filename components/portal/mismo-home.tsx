@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { addDays, manilaToday, pesos2 } from "@/lib/portal-format";
 import { balanceAt, finalList, leftOff, mismoCsv, owesAt, unsettledAt11, type MismoDay } from "@/lib/mismo";
-import { Badge, Message, usePost } from "./shared-ui";
+import { Badge, Message, MonthBar, useMonthRows, usePost } from "./shared-ui";
 
 /**
  * MARINA MISMO Compliance Officer (owner, 8 Oct 2026). For the five STCW
@@ -125,14 +125,16 @@ export function MismoFinalList() {
 
 export function MismoSubmissions() {
   const { data, error } = useMismo(manilaToday());
-  const rows = data?.history ?? [];
+  // By month (owner, 3 Nov 2026).
+  const { p, rows } = useMonthRows(data?.history ?? [], (h) => h.list_date, false);
   return <div className="portal-page cx ac ms-page">
     <Head title="Submissions" />
     {error && <Message kind="error" text={error} />}
+    <MonthBar p={p} what="List date" count={`${rows.length} batch${rows.length === 1 ? "" : "es"}`} />
     <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Submitted to the MARINA MISMO Portal</h2><span className="slot-count">{rows.length}</span></div>
       {rows.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>List Date</th><th>Batch</th><th>Course</th><th>Trainees</th><th>Submitted</th><th>By</th></tr></thead><tbody>
         {rows.map((h) => { const b = one(h.batches as { batch_number: string; courses: unknown } | null); const c = one(b?.courses as { name: string; code: string } | null); return <tr key={h.batch_id}><td>{h.list_date}</td><td className="cl-mono">{b?.batch_number ?? "—"}</td><td>{c?.code ?? "—"}</td><td className="cl-mono">{h.trainee_count}</td><td>{fmt(h.submitted_at)}</td><td>{one(h.profiles)?.complete_name ?? "—"}</td></tr>; })}
-      </tbody></table></div> : <p className="portal-empty-copy">{data ? "Nothing submitted yet." : error ? "" : "Loading…"}</p>}
+      </tbody></table></div> : <p className="portal-empty-copy">{data ? "Nothing submitted in this period." : error ? "" : "Loading…"}</p>}
     </section>
   </div>;
 }

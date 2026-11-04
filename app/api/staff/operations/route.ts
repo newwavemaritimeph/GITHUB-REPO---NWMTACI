@@ -717,11 +717,40 @@ type EnrollmentExtra = { id: string; scheduled_on?: string | null; instructions_
 
 const EMPTY_HR: Record<string, unknown[]> = { employees: [], employeeAttendance: [], leaveRequests: [], cashAdvances: [], payrollPeriods: [], payrollItems: [], benefitRecords: [], employmentContracts: [] };
 
-export async function GET() {
+export async function GET(request: Request) {
   const staff = await requireStaff();
   if (!staff) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   // One service-role client for the whole handler.
   const db = createSupabaseAdminClient();
+
+  // This Month (owner, 3 Nov 2026): every list opens on the current month and steps back month
+  // by month, so records load from `since` (the 1st of this month unless the portal asks for an
+  // older month). The newest rows still load as before, so open work older than the month stays
+  // in the queues: reachBack gives whichever start date holds more.
+  const todayManila = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+  const sinceParam = new URL(request.url).searchParams.get("since") ?? "";
+  const since = /^\d{4}-\d{2}-\d{2}$/.test(sinceParam) && sinceParam < todayManila ? sinceParam : `${todayManila.slice(0, 8)}01`;
+  const sinceAt = `${since}T00:00:00+08:00`;
+  const reachBack = async (table: string, column: string, keep: number) => {
+    const { data } = await db.from(table).select(column).order(column, { ascending: false }).range(keep - 1, keep - 1);
+    const edge = (data?.[0] as unknown as Record<string, string> | undefined)?.[column];
+    return !edge ? "1970-01-01T00:00:00Z" : new Date(edge) < new Date(sinceAt) ? edge : sinceAt;
+  };
+  // Pages past the 1000-row limit of each request. shortcut: stops at 5000 rows a list, newest first; move search to the server if a list outgrows it.
+  const allRows = async <T, E>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: E | null }>) => {
+    const rows: T[] = [];
+    for (let at = 0; at < 5000; at += 1000) {
+      const { data, error } = await page(at, at + 999);
+      if (error) return { data: at ? rows : null, error };
+      rows.push(...(data ?? []));
+      if ((data?.length ?? 0) < 1000) break;
+    }
+    return { data: rows, error: null as E | null };
+  };
+  const shiftIso = (d: string, n: number) => { const x = new Date(`${d}T00:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  const [traineesFrom, enrollmentsFrom, paymentsFrom, expensesFrom] = await Promise.all([reachBack("trainees", "created_at", 250), reachBack("enrollments", "created_at", 250), reachBack("payments", "received_at", 250), reachBack("expenses", "created_at", 250)]);
+  // Batches: four months back (for training end dates) or the month asked for, plus every later batch.
+  const batchesFrom = since < shiftIso(todayManila, -120) ? since : shiftIso(todayManila, -120);
 
   // HR datasets are sensitive (salaries, government IDs) — only HR and Admin receive them.
   const isHr = canManageHr(staff.roleCodes);
@@ -740,20 +769,16 @@ export async function GET() {
   // three migrations. Read them in one query; if any column is missing the whole
   // select errors, so fall back to reading each on its own and omit what is absent.
   const enrollmentExtrasUnit = (async (): Promise<EnrollmentExtra[]> => {
-    // Ordered the same way as the main enrollments query, so these 250 rows are
-    // the same 250 rows; unordered, the extras could belong to a different set.
-    const merged = await db.from("enrollments").select("id,scheduled_on,instructions_sent_at,feedback_token,agency_share_centavos").order("created_at", { ascending: false }).limit(250);
-    if (!merged.error) return (merged.data ?? []) as EnrollmentExtra[];
-    const parts = await Promise.all([
-      db.from("enrollments").select("id,scheduled_on").order("created_at", { ascending: false }).limit(250),
-      db.from("enrollments").select("id,instructions_sent_at").order("created_at", { ascending: false }).limit(250),
-      db.from("enrollments").select("id,feedback_token").order("created_at", { ascending: false }).limit(250),
-      db.from("enrollments").select("id,agency_share_centavos").order("created_at", { ascending: false }).limit(250),
-    ]);
+    // The same rows as the main enrollments query; a different start or order
+    // would give the extras a different set.
+    const same = (columns: string) => allRows((from, to) => db.from("enrollments").select(columns).gte("created_at", enrollmentsFrom).order("created_at", { ascending: false }).order("id").range(from, to));
+    const merged = await same("id,scheduled_on,instructions_sent_at,feedback_token,agency_share_centavos");
+    if (!merged.error) return (merged.data ?? []) as unknown as EnrollmentExtra[];
+    const parts = await Promise.all([same("id,scheduled_on"), same("id,instructions_sent_at"), same("id,feedback_token"), same("id,agency_share_centavos")]);
     const byId = new Map<string, EnrollmentExtra>();
     for (const part of parts) {
       if (part.error) continue;
-      for (const row of (part.data ?? []) as EnrollmentExtra[]) byId.set(row.id, { ...(byId.get(row.id) ?? { id: row.id }), ...row });
+      for (const row of (part.data ?? []) as unknown as EnrollmentExtra[]) byId.set(row.id, { ...(byId.get(row.id) ?? { id: row.id }), ...row });
     }
     return [...byId.values()];
   })();
@@ -782,12 +807,13 @@ export async function GET() {
   const certificateUnit = (async () => {
     const empty = { certificates: [] as unknown[], templates: [] as unknown[], releases: [] as unknown[], issuanceEnabled: false, series: [] as unknown[], evaluationForms: {} as Record<string, string>, feedbackAt: {} as Record<string, string>, feedbackLinks: {} as Record<string, string>, photos: null as unknown[] | null };
     if (!seesCertificates) return empty;
+    const certificatesFrom = await reachBack("certificates", "created_at", 300);
     const [base, extra, tpls, rel, settings] = await Promise.all([
-      db.from("certificates").select("id,enrollment_id,status,printed_at,printed_by,reprint_count,snapshot,number_pool_id,template_id,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name,code))").order("created_at", { ascending: false }).limit(300),
+      allRows((from, to) => db.from("certificates").select("id,enrollment_id,status,printed_at,printed_by,reprint_count,snapshot,number_pool_id,template_id,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name,code))").gte("created_at", certificatesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
       // Release/courier/correction fields ship in a later migration — merge tolerantly
       // so a pre-migration database returns the base certificate rows instead of 500ing.
       // The limit matches the base query so the merge cannot miss a loaded row.
-      db.from("certificates").select("id,release_method,expected_pickup_on,claimant_name,claimant_relationship,id_checked,authorization_checked,courier_name,tracking_number,shipping_fee_status,shipping_address,courier_status,issue_status,issue_note,issue_reported_on").order("created_at", { ascending: false }).limit(300),
+      allRows((from, to) => db.from("certificates").select("id,release_method,expected_pickup_on,claimant_name,claimant_relationship,id_checked,authorization_checked,courier_name,tracking_number,shipping_fee_status,shipping_address,courier_status,issue_status,issue_note,issue_reported_on").gte("created_at", certificatesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
       db.from("certificate_templates").select("id,course_id,version,storage_path,active,fields,approved_at,courses(name,code)").order("created_at", { ascending: false }).limit(200),
       // Released-list report source (tolerant: table exists but may be empty).
       db.from("certificate_release_events").select("id,certificate_id,event_type,recipient_name,recipient_id_type,reason,created_at,certificates(enrollment_id,snapshot,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name,code)))").order("created_at", { ascending: false }).limit(400),
@@ -797,17 +823,17 @@ export async function GET() {
     // Certificate controls (migration 202610080030): numbering, print counts, voids, Drive templates and
     // Google Forms evaluations. Each read is separate so a database without the update still loads.
     const [controls, series, tplLinks, forms, fbDates, corr, photos, regSeries, qr, fbLinks] = await Promise.all([
-      db.from("certificates").select("id,certificate_number,batch_label,print_count,reprints_allowed,soft_copy_sent_at,void_status,void_reason,void_requested_at,void_remarks").order("created_at", { ascending: false }).limit(300),
+      allRows((from, to) => db.from("certificates").select("id,certificate_number,batch_label,print_count,reprints_allowed,soft_copy_sent_at,void_status,void_reason,void_requested_at,void_remarks").gte("created_at", certificatesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
       db.from("certificate_series").select("course_id,prefix,next_number,pad,batch_prefix,next_batch,set_at,profiles:set_by(complete_name)"),
       db.from("certificate_templates").select("id,drive_link").order("created_at", { ascending: false }).limit(200),
       db.from("courses").select("id,evaluation_form_id").not("evaluation_form_id", "is", null),
       db.from("training_feedback").select("enrollment_id,submitted_at").order("submitted_at", { ascending: false }).limit(2000),
       // 2x2 photos and Admin corrections (migration 202610090034).
-      db.from("certificates").select("id,corrections").order("created_at", { ascending: false }).limit(300),
+      allRows((from, to) => db.from("certificates").select("id,corrections").gte("created_at", certificatesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
       createSupabaseAdminClient().from("certificate_photos").select("enrollment_id,file_name,background_white,uploaded_at,replaced_at,profiles:uploaded_by(complete_name)").limit(5000),
       db.from("certificate_series").select("course_id,reg_prefix,reg_next,reg_digits,reg_style"),
       // Revocation, sticker and the evaluation PDF in Drive (migration 202610200047); Registration No. (037) and who printed, for Reports.
-      db.from("certificates").select("id,revoked_at,revoked_reason,sticker_no,registration_number,printer:printed_by(complete_name)").order("created_at", { ascending: false }).limit(300),
+      allRows((from, to) => db.from("certificates").select("id,revoked_at,revoked_reason,sticker_no,registration_number,printer:printed_by(complete_name)").gte("created_at", certificatesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
       db.from("training_feedback").select("enrollment_id,drive_link,comments").order("submitted_at", { ascending: false }).limit(2000),
     ]);
     const regByCourse = new Map(((regSeries.error ? [] : regSeries.data ?? []) as { course_id: string }[]).map((r) => [r.course_id, r]));
@@ -842,15 +868,16 @@ export async function GET() {
     const base = "id,request_number,request_type,requested_values,reason,status,decision_remarks,created_at,decided_at,trainees(legal_first_name,legal_last_name),enrollments(id,enrollment_number,trainee_id,courses(name))";
     const types = ["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course", "TAR reprint"];
     // stage / charge_id come from migration 202610070004; without it, fall back.
-    const routed = await db.from("enrollment_requests").select(`${base},stage,charge_id,enrollment_charges!enrollment_requests_charge_id_fkey(amount_centavos,description,approval_status)`).in("request_type", types).order("created_at", { ascending: false }).limit(200);
+    const requestsFrom = await reachBack("enrollment_requests", "created_at", 200);
+    const routed = await allRows((from, to) => db.from("enrollment_requests").select(`${base},stage,charge_id,enrollment_charges!enrollment_requests_charge_id_fkey(amount_centavos,description,approval_status)`).in("request_type", types).gte("created_at", requestsFrom).order("created_at", { ascending: false }).order("id").range(from, to));
     if (!routed.error) {
       const list = (routed.data ?? []) as { id: string }[];
       // Request date and fee rule (202610080022); ignored before it.
-      const { data: dated } = list.length ? await db.from("enrollment_requests").select("id,requested_on,fee_rule").in("id", list.map((r) => r.id)) : { data: [] };
+      const { data: dated } = list.length ? await allRows((from, to) => db.from("enrollment_requests").select("id,requested_on,fee_rule").gte("created_at", requestsFrom).order("created_at", { ascending: false }).order("id").range(from, to)) : { data: [] };
       const byId = new Map((dated ?? []).map((r) => [(r as { id: string }).id, r]));
       return list.map((r) => ({ ...r, ...(byId.get(r.id) ?? {}) }));
     }
-    const { data } = await db.from("enrollment_requests").select(base).in("request_type", types).order("created_at", { ascending: false }).limit(200);
+    const { data } = await allRows((from, to) => db.from("enrollment_requests").select(base).in("request_type", types).gte("created_at", requestsFrom).order("created_at", { ascending: false }).order("id").range(from, to));
     return data ?? [];
   })();
 
@@ -919,21 +946,21 @@ export async function GET() {
   // Tolerant merge of expense payment channel + reference (migration 202608100001).
   // Kept out of the main select so a pre-migration schema does not empty the expenses list.
   const expenseExtrasUnit = (async () => {
-    const { data: ex } = await db.from("expenses").select("id,payment_channel,reference_number,purpose,requested_by").order("created_at", { ascending: false }).limit(250);
+    const { data: ex } = await allRows((from, to) => db.from("expenses").select("id,payment_channel,reference_number,purpose,requested_by").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to));
     if (!ex) return { rows: [] as { id: string }[], names: new Map<string, string>() };
     // Voucher flow fields (202610070018).
-    const { data: flow } = await db.from("expenses").select("id,request_number,voucher_number,approved_at,decision_remarks,released_at,drive_link,paid_at").in("id", ex.map((r) => (r as { id: string }).id));
+    const { data: flow } = await allRows((from, to) => db.from("expenses").select("id,request_number,voucher_number,approved_at,decision_remarks,released_at,drive_link,paid_at").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to));
     const flowById = new Map((flow ?? []).map((r) => [(r as { id: string }).id, r]));
     // Print counts (202610080020); ignored before it.
-    const { data: prints } = await db.from("expenses").select("id,print_count,reprints_approved").in("id", ex.map((r) => (r as { id: string }).id));
+    const { data: prints } = await allRows((from, to) => db.from("expenses").select("id,print_count,reprints_approved").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to));
     const printsById = new Map((prints ?? []).map((r) => [(r as { id: string }).id, r]));
     // Voucher lines and supporting document (202610080019); who approved and released (202610070018). Ignored before them.
-    const { data: lines } = await db.from("expenses").select("id,line_items,supporting_document").in("id", ex.map((r) => (r as { id: string }).id));
+    const { data: lines } = await allRows((from, to) => db.from("expenses").select("id,line_items,supporting_document").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to));
     const linesById = new Map((lines ?? []).map((r) => [(r as { id: string }).id, r]));
     // Receipt photos (202610190044); ignored before it.
-    const { data: receipts } = await db.from("expenses").select("id,receipt_files").in("id", ex.map((r) => (r as { id: string }).id));
+    const { data: receipts } = await allRows((from, to) => db.from("expenses").select("id,receipt_files").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to));
     const receiptsById = new Map((receipts ?? []).map((r) => [(r as { id: string }).id, r]));
-    const { data: people2 } = await db.from("expenses").select("id,approved_by,released_by").in("id", ex.map((r) => (r as { id: string }).id));
+    const { data: people2 } = await allRows((from, to) => db.from("expenses").select("id,approved_by,released_by").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to));
     const peopleById = new Map((people2 ?? []).map((r) => [(r as { id: string }).id, r]));
     const rows = ex.map((r) => ({ ...r, ...(flowById.get((r as { id: string }).id) ?? {}), ...(printsById.get((r as { id: string }).id) ?? {}), ...(linesById.get((r as { id: string }).id) ?? {}), ...(receiptsById.get((r as { id: string }).id) ?? {}), ...(peopleById.get((r as { id: string }).id) ?? {}) })) as { id: string }[];
     // Display names for who raised, approved and released each voucher.
@@ -958,18 +985,18 @@ export async function GET() {
     db.from("profiles").select("complete_name,email").eq("id", staff.user.id).maybeSingle(),
     db.from("courses").select("id,code,name,delivery_type,duration_label,duration_days,training_mode,category_id,standard_price_centavos,google_classroom_link,public_visible,active,updated_at,course_categories(name)").eq("active", true).order("name"),
     db.from("partner_course_offers").select("id,course_id,partner_center_id,duration_label,training_fee_centavos,rebate_centavos,partner_payable_centavos,updated_at,partner_centers(name,contact_details)").eq("active", true).order("training_fee_centavos"),
-    db.from("trainees").select("id,trainee_number,legal_first_name,legal_middle_name,legal_last_name,suffix,birthdate,sex,nationality,address,place_of_birth,rank,company,emergency_contact,email,mobile,srn,account_state,registered_at").neq("account_state", "Deactivated").order("created_at", { ascending: false }).limit(250),
-    db.from("batches").select("id,batch_number,course_id,partner_offer_id,starts_on,ends_on,daily_start,daily_end,mode,venue,capacity,confirmed_count,enrollment_deadline,status,published_at,courses(name,code),partner_course_offers(partner_centers(name))").eq("active", true).order("starts_on", { ascending: true }).limit(250),
-    db.from("enrollments").select("id,enrollment_number,trainee_id,course_id,partner_offer_id,batch_id,enrollment_status,instructions_status,source,selling_price_centavos,rebate_centavos,partner_payable_centavos,created_at,trainees(trainee_number,legal_first_name,legal_middle_name,legal_last_name,email,mobile),courses(name,code),batches(batch_number,starts_on,ends_on,mode,venue),partner_course_offers(partner_centers(name))").order("created_at", { ascending: false }).limit(250),
-    db.from("payments").select("id,payment_number,trainee_id,amount_centavos,method,receiving_account,reference_number,proof_id,received_at,verification_state,remarks,valid,trainees(legal_first_name,legal_last_name)").eq("valid", true).order("received_at", { ascending: false }).limit(250),
+    allRows((from, to) => db.from("trainees").select("id,trainee_number,legal_first_name,legal_middle_name,legal_last_name,suffix,birthdate,sex,nationality,address,place_of_birth,rank,company,emergency_contact,email,mobile,srn,account_state,registered_at").neq("account_state", "Deactivated").gte("created_at", traineesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
+    db.from("batches").select("id,batch_number,course_id,partner_offer_id,starts_on,ends_on,daily_start,daily_end,mode,venue,capacity,confirmed_count,enrollment_deadline,status,published_at,courses(name,code),partner_course_offers(partner_centers(name))").eq("active", true).gte("starts_on", batchesFrom).order("starts_on", { ascending: true }).limit(2000),
+    allRows((from, to) => db.from("enrollments").select("id,enrollment_number,trainee_id,course_id,partner_offer_id,batch_id,enrollment_status,instructions_status,source,selling_price_centavos,rebate_centavos,partner_payable_centavos,created_at,trainees(trainee_number,legal_first_name,legal_middle_name,legal_last_name,email,mobile),courses(name,code),batches(batch_number,starts_on,ends_on,mode,venue),partner_course_offers(partner_centers(name))").gte("created_at", enrollmentsFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
+    allRows((from, to) => db.from("payments").select("id,payment_number,trainee_id,amount_centavos,method,receiving_account,reference_number,proof_id,received_at,verification_state,remarks,valid,trainees(legal_first_name,legal_last_name)").eq("valid", true).gte("received_at", paymentsFrom).order("received_at", { ascending: false }).order("id").range(from, to)),
     db.from("notifications").select("id,title,body,deep_link,read_at,created_at").eq("recipient_id", staff.user.id).order("created_at", { ascending: false }).limit(20),
     // Accounting datasets (Slice 1): channels, charges, agencies, expenses, payables.
     db.from("payment_methods").select("id,code,name,requires_reference,allows_proof,active,sort_order").order("sort_order"),
     db.from("charge_catalog").select("id,name,default_amount_centavos,active,used_count").order("name"),
     db.from("marketing_agencies").select("*").order("name"),
-    db.from("expenses").select("id,expense_number,payee,category,amount_centavos,purpose,status,created_at").order("created_at", { ascending: false }).limit(250),
+    allRows((from, to) => db.from("expenses").select("id,expense_number,payee,category,amount_centavos,purpose,status,created_at").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
     db.from("payables").select("id,description,amount_centavos,due_on,status,paid_at,partner_center_id,enrollment_id,created_at").order("created_at", { ascending: false }).limit(250),
-    db.from("cashier_closings").select("id,closing_date,opening_cash_centavos,cash_collections_centavos,online_collections_centavos,refunds_centavos,expenses_centavos,expected_cash_centavos,actual_cash_centavos,variance_centavos,status,submitted_at").order("closing_date", { ascending: false }).limit(60),
+    db.from("cashier_closings").select("id,closing_date,opening_cash_centavos,cash_collections_centavos,online_collections_centavos,refunds_centavos,expenses_centavos,expected_cash_centavos,actual_cash_centavos,variance_centavos,status,submitted_at").gte("closing_date", batchesFrom).order("closing_date", { ascending: false }).limit(1000),
     db.from("enrollment_charges").select("id,enrollment_id,charge_catalog_id,description,amount_centavos,event_type,created_at").eq("valid", true).order("created_at", { ascending: false }).limit(500),
     db.from("classrooms").select("id,name,venue,capacity,active").order("name"),
     db.from("course_categories").select("id,name").eq("active", true).order("sort_order"),

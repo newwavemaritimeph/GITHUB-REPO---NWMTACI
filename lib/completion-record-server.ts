@@ -28,11 +28,12 @@ const EMPTY: CompletionFields = { classNo: "", resitClassNo: "", resitDuration: 
 const isStcw = (code: string, category: string | null | undefined) => isStcwCategory(category) || MISMO_COURSE_CODES.includes(code.toUpperCase());
 export const cleanTasks = (v: unknown): AssessmentTask[] => (Array.isArray(v) ? v : []).map((t) => ({ title: String((t as AssessmentTask)?.title ?? "").trim(), criteria: String((t as AssessmentTask)?.criteria ?? "").trim() })).filter((t) => t.title).slice(0, 8);
 
-/** STCW batches whose training has ended (last 120 days), newest first, with their record status. */
-export async function listCompletionBatches(db: Admin, today: string): Promise<{ ready: boolean; batches: CompletionBatch[] }> {
+/** STCW batches whose training has ended (last 120 days, or back to `from`), newest first, with their record status. */
+export async function listCompletionBatches(db: Admin, today: string, from?: string): Promise<{ ready: boolean; batches: CompletionBatch[] }> {
   const since = new Date(`${today}T12:00:00+08:00`); since.setUTCDate(since.getUTCDate() - 120);
+  const earliest = from && from < since.toISOString().slice(0, 10) ? from : since.toISOString().slice(0, 10);
   const { data, error } = await db.from("batches").select("id,batch_number,starts_on,ends_on,course_id,confirmed_count,status,courses(code,name,course_categories(name))")
-    .lte("ends_on", today).gte("ends_on", since.toISOString().slice(0, 10)).neq("status", "Cancelled").order("ends_on", { ascending: false }).limit(400);
+    .lte("ends_on", today).gte("ends_on", earliest).neq("status", "Cancelled").order("ends_on", { ascending: false }).limit(400);
   if (error) throw error;
   const rows = (data ?? []).map((b) => { const c = one(b.courses as unknown as { code: string; name: string; course_categories?: { name: string } | { name: string }[] | null } | null); return { b, c }; })
     .filter(({ c }) => c && isStcw(c.code, one(c.course_categories)?.name));

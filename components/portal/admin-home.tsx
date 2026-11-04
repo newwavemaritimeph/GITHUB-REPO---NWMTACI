@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
 import { groupNotices, holidayReminders, holidaysInMonth, totalsByChannel, voidReasonProblem, type HolidayDay, type MarinaStatus, type Notice } from "@/lib/admin-dashboard";
-import { Badge, Message, fmtDate, fullName, usePost as useRawPost } from "./shared-ui";
+import { ALL_DATES, Badge, Message, MonthBar, fmtDate, fullName, useMonthRows, useNeedSince, usePost as useRawPost } from "./shared-ui";
 import { certificateLines } from "./releasing-home";
 import { upcoming } from "./admin-assistant-home";
 import { askConfirm } from "./dialogs";
@@ -238,6 +238,7 @@ type Ledger = {
 
 export function AdminSearchTrainee({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   const [q, setQ] = useState(""), [pick, setPick] = useState<string | null>(null);
+  useNeedSince(q.trim().length >= 2 ? ALL_DATES : "");
   const matches = useMemo(() => {
     const s = q.trim().toLowerCase(); if (s.length < 2) return [];
     const nos = (data as unknown as { applicationNumbers?: Record<string, string> }).applicationNumbers ?? {};
@@ -295,12 +296,15 @@ export function AdminEnrollments({ data, reload }: { data: PortalData; reload: (
   const [q, setQ] = useState(""), [status, setStatus] = useState("All"), [act, setAct] = useState<string | null>(null), [limit, setLimit] = useState(60);
   const { busy, msg, post } = usePost(reload);
   const statuses = ["All", "Pending", "Enrolled", "Open Schedule", "Cancelled"];
-  const rows = data.enrollments.filter((e) => (status === "All" || e.enrollment_status === status) && (() => { const s = q.trim().toLowerCase(); if (!s) return true; const t = first(e.trainees); const c = first(e.courses); return `${e.enrollment_number} ${t?.legal_last_name ?? ""} ${t?.legal_first_name ?? ""} ${t?.trainee_number ?? ""} ${c?.code ?? ""} ${first(e.batches)?.batch_number ?? ""}`.toLowerCase().includes(s); })());
+  // This month first; a search looks across all dates (owner, 3 Nov 2026).
+  const { p, rows: inPeriod } = useMonthRows(data.enrollments, (e) => e.created_at, !!q.trim());
+  const rows = inPeriod.filter((e) => (status === "All" || e.enrollment_status === status) && (() => { const s = q.trim().toLowerCase(); if (!s) return true; const t = first(e.trainees); const c = first(e.courses); return `${e.enrollment_number} ${t?.legal_last_name ?? ""} ${t?.legal_first_name ?? ""} ${t?.trainee_number ?? ""} ${c?.code ?? ""} ${first(e.batches)?.batch_number ?? ""}`.toLowerCase().includes(s); })());
   const due = (e: PortalData["enrollments"][number]) => Number(e.selling_price_centavos) + Number(e.charges_centavos ?? 0) - Number(e.discounts_centavos ?? 0);
   return <div className="portal-page cx ac ad">
     <Head title="Enrollments" />
     {msg && <Message kind={msg.kind} text={msg.text} />}
-    <div className="cx-status" role="tablist">{statuses.map((s) => { const n = s === "All" ? data.enrollments.length : data.enrollments.filter((e) => e.enrollment_status === s).length; return <button key={s} type="button" role="tab" aria-selected={status === s} className={status === s ? "on" : ""} onClick={() => setStatus(s)}>{s}{n > 0 && <span>{n}</span>}</button>; })}</div>
+    <MonthBar p={p} what="Enrolled" count={`${rows.length} enrollment${rows.length === 1 ? "" : "s"}`} searching={!!q.trim()} />
+    <div className="cx-status" role="tablist">{statuses.map((s) => { const n = s === "All" ? inPeriod.length : inPeriod.filter((e) => e.enrollment_status === s).length; return <button key={s} type="button" role="tab" aria-selected={status === s} className={status === s ? "on" : ""} onClick={() => setStatus(s)}>{s}{n > 0 && <span>{n}</span>}</button>; })}</div>
     <section className="portal-panel cx-panel"><div className="ad-search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, enrollment, course or batch" aria-label="Search enrollments" /></div>
       <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Enrollment</th><th>Trainee</th><th>Course</th><th>Batch · Schedule</th><th>Status</th><th>Paid</th><th>Balance</th><th></th></tr></thead><tbody>
         {rows.slice(0, limit).map((e) => { const t = first(e.trainees), c = first(e.courses), b = first(e.batches); return <tr key={e.id}>
@@ -324,7 +328,7 @@ export function AdminEnrollments({ data, reload }: { data: PortalData; reload: (
 type Voucher = { id: string; number: string; payee: string; category: string; amount: number; status: string; channel: string | null; createdAt: string; paidAt: string | null; voidReason: string | null; voidedAt: string | null };
 export function AdminVouchers() {
   const today = manilaToday();
-  const [from, setFrom] = useState(today), [to, setTo] = useState(today), [act, setAct] = useState<string | null>(null);
+  const [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today), [act, setAct] = useState<string | null>(null);
   const { data, error, load } = useJson<{ vouchers: Voucher[] }>(`/api/staff/admin?view=vouchers&from=${from}&to=${to}`);
   const { busy, msg, post } = usePost(load);
   const list = data?.vouchers ?? [];

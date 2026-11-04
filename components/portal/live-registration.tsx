@@ -6,7 +6,7 @@ import { first, manilaToday, dueCentavos, balanceOf, pesos, pesos2, addDays } fr
 import { LATE_ENROLLMENT_CODES, PUBLIC_STCW_CODES, automaticEndDate, fitsInWeek } from "@/lib/scheduling";
 import { isPackageCourse, packageWeeks } from "@/lib/packages";
 import { emailStatusText } from "@/lib/instruction-email-status";
-import { Badge, Message, Modal, PageHead, PeriodBar, usePaged, usePost, usePeriod, submit, fullName, fmtDate, fmtClock } from "./shared-ui";
+import { ALL_DATES, Badge, Message, Modal, PageHead, PeriodBar, useNeedSince, usePaged, usePost, usePeriod, submit, fullName, fmtDate, fmtClock } from "./shared-ui";
 import { RequestActionModal, type RequestType } from "./payment-actions";
 import { TarButton } from "./live-cashier";
 import { tcl } from "@/lib/title-case";
@@ -346,8 +346,9 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
   const [open, setOpen] = useState<Enrollment | null>(null);
   const [assigning, setAssigning] = useState<Trainee | null>(null);
   const term = (q || query).trim().toLowerCase();
-  // Date sensitive (owner, 20 Oct 2026): today first, newest on top, grouped by status; a search looks across all dates.
+  // Date sensitive (owner, 3 Nov 2026): this month first, newest on top, grouped by status; a search looks across all dates.
   const per = usePeriod();
+  useNeedSince(term ? ALL_DATES : "");
   const all = data.enrollments.filter((e) => term || per.inRange(e.created_at)).map((e) => ({ e, r: e.enrollment_status === "Pending" ? readinessOf(data, e) : null }));
   const awaiting = awaitingCourseOf(data).filter((t) => term || per.inRange(t.registered_at));
   const noCourse = awaiting.filter((t) => !term || `${fullName(t)} ${t.trainee_number} ${appNoOf(data, t.id) ?? ""} ${t.email} ${t.mobile}`.toLowerCase().includes(term));
@@ -393,7 +394,7 @@ function EnrollmentQueue({ data, query, reload, initial }: { data: PortalData; q
         <div className="portal-table portal-panel tbl-compact"><table><thead><tr><th>Trainee</th><th>Enrollment no.</th><th>Course and Schedule</th><th>Requirements</th><th>Payment</th><th>Status</th></tr></thead><tbody>
           {pageRows.map((x, i) => [(i === 0 || rank(pageRows[i - 1]) !== rank(x)) && <tr key={`g${rank(x)}`} className="tl-group"><td colSpan={6}><b>{GROUPS[rank(x)]}</b> <span>{rows.filter((y) => rank(y) === rank(x)).length}</span></td></tr>, (({ e, r }) => { const t = first(e.trainees), s = r ? stateOf(r) : { text: e.enrollment_status, tone: statusTone(e.enrollment_status) }, p = payState(e); return <tr key={e.id} className="row-clickable" onClick={() => setOpen(e)}>
             <td><strong>{t ? fullName(t) : "Unknown"}</strong>{enrollmentTypeOf(data, e) && <span className="et-chip">{enrollmentTypeOf(data, e)}</span>}<small className="tc-mono">{t?.trainee_number}</small></td>
-            <td><strong className="app-no-cell">{appNoOf(data, e.trainee_id) ?? e.enrollment_number}</strong><small className="tc-mono">{appNoOf(data, e.trainee_id) ? e.enrollment_number : fmtDate(day(e.created_at))}</small></td>
+            <td><strong className="app-no-cell">{appNoOf(data, e.trainee_id) ?? e.enrollment_number}</strong><small className="tc-mono">{appNoOf(data, e.trainee_id) ? `${e.enrollment_number}${term ? ` · ${fmtDate(day(e.created_at))}` : ""}` : fmtDate(day(e.created_at))}</small></td>
             <td>{first(e.courses)?.name ?? "—"}<small>{scheduleOf(e)}</small></td>
             <td>{r ? <><span className={`req-count${r.missing.length ? "" : " ok"}`}>{r.verified} of {REQUIREMENTS.length}</span>{r.rejected.length > 0 && <small>Rejected: {r.rejected.join(", ")}</small>}</> : <span className="muted-text">{e.enrollment_status === "Cancelled" ? "—" : "Complete"}</span>}</td>
             <td>{e.enrollment_status !== "Cancelled" && chargeTo(data, e) ? <><Badge tone="pending">Company Charge</Badge><small>Billed to {chargeTo(data, e)!.name}</small></> : r ? (r.paid ? <><strong>{pesos(r.paidCentavos)}</strong><small>Verified</small></> : <span className="muted-text">{r.handed ? "With cashier" : "Not yet"}</span>) : <><Badge tone={p.tone}>{p.text}</Badge><small>{pesos(balanceOf(e))} balance</small></>}</td>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { PeriodBar, usePeriod } from "./shared-ui";
 
 type Payment = { amount_centavos: number; method: string; received_at: string };
 type Closing = { id: string; closing_date: string; opening_cash_centavos: number; cash_collections_centavos: number; online_collections_centavos: number; expenses_centavos: number; expected_cash_centavos: number; actual_cash_centavos?: number | null; variance_centavos?: number | null; status: string };
@@ -10,6 +11,9 @@ const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "cur
 const todayManila = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date()); // YYYY-MM-DD
 
 export function LiveCashierClosing({ data, reload, initialOpening }: { data: ClosingData; reload: () => Promise<void>; initialOpening?: number }) {
+  // Closings by month (owner, 3 Nov 2026).
+  const period = usePeriod();
+  const closings = data.cashierClosings.filter((c) => period.inRange(c.closing_date));
   // Starts from today's recorded opening cash, when there is one.
   const [opening, setOpening] = useState(initialOpening != null ? (initialOpening / 100).toFixed(2) : "");
   const [actual, setActual] = useState("");
@@ -72,9 +76,10 @@ export function LiveCashierClosing({ data, reload, initialOpening }: { data: Clo
       </section>
 
       <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Recent Closings</h2><p>Submitted drawer counts</p></div></div>
+        <div className="panel-heading"><div><h2>Closings</h2><p>Submitted drawer counts</p></div></div>
+        <PeriodBar p={period} what="Closed" count={`${closings.length} closing${closings.length === 1 ? "" : "s"}`} />
         <div className="portal-table"><table><thead><tr><th>Date</th><th>Opening</th><th>Cash</th><th>Online</th><th>Expenses</th><th>Expected</th><th>Actual</th><th>Variance</th><th>Status</th></tr></thead><tbody>
-          {data.cashierClosings.map((c) => (
+          {closings.map((c) => (
             <tr key={c.id}>
               <td><strong>{c.closing_date}</strong></td>
               <td>{pesos(c.opening_cash_centavos)}</td>
@@ -87,7 +92,7 @@ export function LiveCashierClosing({ data, reload, initialOpening }: { data: Clo
               <td>{c.status}</td>
             </tr>
           ))}
-          {!data.cashierClosings.length && <tr><td colSpan={9}><span className="portal-empty-copy">No closings submitted yet.</span></td></tr>}
+          {!closings.length && <tr><td colSpan={9}><span className="portal-empty-copy">No closings in this period.</span></td></tr>}
         </tbody></table></div>
       </section>
     </div>

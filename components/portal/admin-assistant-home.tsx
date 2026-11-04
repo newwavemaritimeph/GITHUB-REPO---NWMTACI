@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, balanceOf, first, manilaToday, pesos2 } from "@/lib/portal-format";
 import { ROLES, accreditationFor, handles, moveTargets, planRows, rangesOverlap, type Accreditation, type Duty, type PlanBatch, type PlanRow } from "@/lib/admin-assistant";
-import { Badge, Message, Modal, fmtDate, periodRange, usePost, usePaged } from "./shared-ui";
+import { Badge, Message, Modal, fmtDate, periodRange, useNeedSince, usePost, usePaged } from "./shared-ui";
 import { CHANNELS, type Channel, type DaySummary, type ReconStatus } from "@/lib/reconciliation";
 import { MoveBatch } from "./move-batch";
 import { downloadCsv } from "@/lib/csv";
@@ -90,9 +90,11 @@ export function AssistantDashboard({ data, go }: { data: PortalData; go: (m: str
 /** Week, two weeks or month with ‹ › (owner, 21 Oct 2026); shared by Class Schedules and Resource Planning. */
 function usePlanPeriod() {
   const today = manilaToday();
-  const [mode, setMode] = useState<PlanPeriod>("Weekly");
+  // Opens on this month (owner, 3 Nov 2026).
+  const [mode, setMode] = useState<PlanPeriod>("Monthly");
   const [anchor, setAnchor] = useState(today);
   const range = planRange(mode, anchor);
+  useNeedSince(range.from);
   const step = (n: number) => setAnchor(mode === "Monthly" ? (n < 0 ? addDays(range.from, -1) : addDays(range.to, 1)) : addDays(anchor, n * (mode === "Weekly" ? 7 : 14)));
   const bar = (count: string) => <div className="pd-bar cs-bar">
     <span className="cx-seg">{PLAN_PERIODS.map((x) => <button key={x} type="button" className={mode === x ? "on" : ""} onClick={() => setMode(x)}>{x}</button>)}</span>

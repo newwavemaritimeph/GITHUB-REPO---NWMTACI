@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { completionProblems, durationText, emptyResult, formDate, numberSeries, practicalDone, practicalOk, remarkOf, resultOf, type AssessmentTask, type CompletionFields, type TraineeResult } from "@/lib/completion-record";
 import type { CompletionBatch, CompletionPayload } from "@/lib/completion-record-server";
-import { Badge, Message } from "./shared-ui";
+import { ALL_DATES, Badge, Message, MonthBar, usePeriod } from "./shared-ui";
 
 /**
  * MISMO › Completion Records (owner, 9 Oct 2026): the Training Completion and
@@ -32,18 +32,21 @@ function useLoad<T>(url: string | null, tick: number) {
 
 export function CompletionRecords({ eyebrow = "MISMO" }: { eyebrow?: string }) {
   const [tick, setTick] = useState(0), [pick, setPick] = useState<string | null>(null), [filter, setFilter] = useState("All");
-  const list = useLoad<{ ready: boolean; batches: CompletionBatch[] }>(API, tick);
-  const batches = list.data?.batches ?? [];
+  // By the month training ended (owner, 3 Nov 2026).
+  const p = usePeriod();
+  const list = useLoad<{ ready: boolean; batches: CompletionBatch[] }>(`${API}?from=${p.range.from < ALL_DATES ? ALL_DATES : p.range.from}`, tick);
+  const batches = (list.data?.batches ?? []).filter((b) => p.inRange(b.endsOn));
   const shown = filter === "All" ? batches : batches.filter((b) => (filter === "To Do" ? b.status === "Not Started" || b.status === "Draft" : b.status === filter));
   return <div className="portal-page cx ac tcr-ui">
     <div className="cx-head"><div><span className="portal-eyebrow">{eyebrow}</span><h1>Completion Records</h1></div></div>
     {list.error && <Message kind="error" text={list.error} />}
     {list.data && !list.data.ready && <Message kind="error" text="The Completion Records tables are not in the database yet. Run database updates 202610090039 and 202610090040 (Supabase SQL Editor), then reload this page." />}
+    <MonthBar p={p} what="Ended" count={`${batches.length} batch${batches.length === 1 ? "" : "es"}`} />
     <section className="portal-panel cx-panel"><div className="panel-heading"><h2>STCW Batches</h2>
       <div className="cx-seg">{["All", "To Do", "Ready", "Printed"].map((f) => <button key={f} type="button" className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{f === "Ready" ? "Ready to Print" : f}</button>)}</div></div>
       {shown.length ? <div className="tcr-batches">{shown.map((b) => <button key={b.id} type="button" className={`tcr-bt${pick === b.id ? " on" : ""}`} onClick={() => setPick(b.id)}>
         <b>{b.batchNumber} · {b.courseCode}</b><small>{durationText(b.startsOn, b.endsOn)} · {b.trainees} trainee{b.trainees === 1 ? "" : "s"}</small><Badge tone={TONE[b.status]}>{LABEL[b.status]}</Badge></button>)}</div>
-        : <p className="portal-empty-copy">{list.loading ? "Loading…" : "No STCW batch has ended in the last 120 days."}</p>}
+        : <p className="portal-empty-copy">{list.loading ? "Loading…" : "No STCW batch ended in this period."}</p>}
     </section>
     {pick && <RecordEditor key={pick} batchId={pick} onSaved={() => setTick((t) => t + 1)} />}
   </div>;

@@ -1,7 +1,7 @@
 "use client";
 import { traineeCopy } from "@/lib/trainee-copy";
 
-import { FormEvent, Fragment, useCallback, useEffect, useState } from "react";
+import { FormEvent, Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { NewWaveLogo } from "./new-wave-logo";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { LiveAttendance } from "./portal/live-attendance";
@@ -21,7 +21,7 @@ import { downloadCsv } from "@/lib/csv";
 import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer, CourseSourceCell, partnerOf, chargeTo } from "./portal/live-registration";
 import { sourceLabel } from "@/lib/company-charge";
 import { PaymentVoidCell } from "./portal/payment-void";
-import { Badge, Message, Modal, Page, PageHead, PeriodBar, manilaDay, submit, fullName, usePaged, usePeriod } from "./portal/shared-ui";
+import { ALL_DATES, Badge, DataSince, Message, Modal, Page, PageHead, PeriodBar, manilaDay, submit, fullName, useMonthRows, useNeedSince, usePaged, usePeriod } from "./portal/shared-ui";
 import { classroomJoin } from "@/lib/classroom";
 import { ClassroomPanel } from "./portal/classroom-panel";
 import { TraineeRequestModal, type RequestType } from "./portal/payment-actions";
@@ -285,18 +285,22 @@ function ChangePasswordModal({email,onClose}:{email:string;onClose:()=>void}){
   </form></Modal>;
 }
 
+const recordsUrl=(since:string)=>since?`/api/staff/operations?since=${since}`:"/api/staff/operations";
 export function PortalLiveApp(){
   const [data,setData]=useState<PortalData|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[active,setActive]=useState<Module>("Dashboard"),[recordsView,setRecordsView]=useState<RecordsView>("applications"),[role,setRole]=useState(""),[openTab,setOpenTab]=useState(""),[menuAt,setMenuAt]=useState({left:16,top:120}),[notices,setNotices]=useState(false),[modal,setModal]=useState<"enrollment"|"batch"|"payment"|null>(null),[payTarget,setPayTarget]=useState(""),[account,setAccount]=useState(false);
   // The top-bar "Search this page" box was removed (owner, 8 Oct 2026); screens keep their own search.
   const query="";
-  const load=useCallback(async()=>{setLoading(true);setError("");try{const response=await fetch("/api/staff/operations",{cache:"no-store"});const body=await response.json();if(!response.ok)throw new Error(body.error??"Unable to load staff records.");setData(body);setRole((current:string)=>{const options=workingRolesFor(body.roles);return options.includes(current)?current:defaultWorkingRole(body.roles)})}catch(e){setError(e instanceof Error?e.message:"Unable to load staff records.")}finally{setLoading(false)}},[]);
-  useEffect(()=>{void load()},[load]);
+  // This Month (owner, 3 Nov 2026): the server sends the current month; `since` reaches back when a list steps to an older month.
+  const sinceRef=useRef(""),[since,setSince]=useState("");
+  const needSince=useCallback((from:string)=>{const loaded=sinceRef.current||`${new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date()).slice(0,8)}01`;if(from<loaded){sinceRef.current=from;setSince(from)}},[]);
+  const load=useCallback(async()=>{setLoading(true);setError("");try{const response=await fetch(recordsUrl(sinceRef.current),{cache:"no-store"});const body=await response.json();if(!response.ok)throw new Error(body.error??"Unable to load staff records.");setData(body);setRole((current:string)=>{const options=workingRolesFor(body.roles);return options.includes(current)?current:defaultWorkingRole(body.roles)})}catch(e){setError(e instanceof Error?e.message:"Unable to load staff records.")}finally{setLoading(false)}},[]);
+  useEffect(()=>{void load()},[load,since]);
   // Refresh every 10 seconds (owner, 21 Oct 2026), quietly. Skipped while the tab is hidden,
   // a window is open or a field has focus, so nothing being typed is lost.
   // A new Manila day re-opens the screens on today (owner, 21 Oct 2026: date tabs start on the current date).
   const manilaNow=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date());
   const [day,setDay]=useState(manilaNow);
-  useEffect(()=>{let running=false;const id=window.setInterval(async()=>{setDay(d=>{const now=manilaNow();return d===now?d:now});const el=document.activeElement;if(running||document.hidden||document.querySelector("[role=dialog]")||(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;running=true;try{const r=await fetch("/api/staff/operations",{cache:"no-store"});if(r.ok)setData(await r.json())}catch{/* next tick retries */}finally{running=false}},10000);return()=>window.clearInterval(id)},[]);
+  useEffect(()=>{let running=false;const id=window.setInterval(async()=>{setDay(d=>{const now=manilaNow();return d===now?d:now});const el=document.activeElement;if(running||document.hidden||document.querySelector("[role=dialog]")||(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;running=true;try{const r=await fetch(recordsUrl(sinceRef.current),{cache:"no-store"});if(r.ok)setData(await r.json())}catch{/* next tick retries */}finally{running=false}},10000);return()=>window.clearInterval(id)},[]);
   // Admin keeps an oversight-only workspace: Dashboard, Search trainee, Enrollments,
   // Accounting, Enrollment summary, Reports, MyHr and Setup. Everything else is the
   // day-to-day work of the specialised roles and is hidden here.
@@ -330,7 +334,7 @@ export function PortalLiveApp(){
   const tabs=topTabsFor(role,allowedNav.map(item=>item.label));
   const openRequests=data.requests.filter(r=>r.status==="Pending"&&(r.stage==="With cashier"||(r.charge_id&&data.chargeCollected?.[r.id]&&!data.chargeCollected[r.id].paid))).length;
   const initials=data.profile.complete_name.split(" ").map(v=>v[0]).slice(0,2).join("").toUpperCase();
-  return <main className="portal-shell nw-shell">
+  return <DataSince.Provider value={needSince}><main className="portal-shell nw-shell">
     <header className="nw-bar">
       <div className="nw-bar-row">
         <div className="nw-brand"><NewWaveLogo inverted/></div>
@@ -350,7 +354,7 @@ export function PortalLiveApp(){
     </header>
     <section className="portal-workspace">{error&&<div className="portal-inline-error"><Message kind="error" text={error}/></div>}<PortalContent key={day} modules={rebuildModules} recordsView={recordsView} setRecordsView={setRecordsView} active={active} role={role} data={data} query={query} go={go} open={setModal} onPay={(id:string)=>{setPayTarget(id);setModal("payment")}} canEnroll={canEnroll} canSchedule={canSchedule} canPay={canPay} reload={load}/></section>
     {modal==="enrollment"&&<EnrollmentForm data={data} onClose={()=>setModal(null)} onSaved={load}/>} {modal==="batch"&&<BatchForm data={data} onClose={()=>setModal(null)} onSaved={load}/>} {modal==="payment"&&<RecordPaymentModal data={data} initialEnrollmentId={payTarget||undefined} onClose={()=>{setModal(null);setPayTarget("")}} onSaved={load}/>} {account&&<ChangePasswordModal email={data.profile.email} onClose={()=>setAccount(false)}/>}
-  </main>;
+  </main></DataSince.Provider>;
 }
 
 function RebuildingWorkspace(){
@@ -559,6 +563,7 @@ function Trainees({data,query,embedded,reload,role}:{data:PortalData;query:strin
   const [lookup,setLookup]=useState(""),[selId,setSelId]=useState<string|null>(null);
   const p=usePeriod();
   const term=(lookup||query).trim().toLowerCase();
+  useNeedSince(term?ALL_DATES:"");
   // Date sensitive, newest first, grouped by status (owner, 20 Oct 2026: design 5). A search looks across all dates.
   const rows=data.trainees.filter(t=>{
     const matchesTerm=!term||`${fullName(t)} ${t.trainee_number} ${data.applicationNumbers?.[t.id]??""} ${t.srn??""} ${t.email} ${t.mobile}`.toLowerCase().includes(term);
@@ -954,7 +959,8 @@ function financeCatalogSections(data:PortalData,reload:()=>Promise<void>):{key:s
 
 function ChargesReport({data}:{data:PortalData}){
   const todayISO=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date());
-  const [from,setFrom]=useState(todayISO),[to,setTo]=useState(todayISO),[type,setType]=useState<"All"|"Enrollment"|"Rescheduling"|"Reprinting">("All");
+  const [from,setFrom]=useState(`${todayISO.slice(0,8)}01`),[to,setTo]=useState(todayISO),[type,setType]=useState<"All"|"Enrollment"|"Rescheduling"|"Reprinting">("All");
+  useNeedSince(from);
   const mday=(v:string)=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date(v));
   const inRange=(d:string)=>{const x=mday(d);return x>=from&&x<=to};
   const catName=(id?:string|null)=>id?(data.charges.find(c=>c.id===id)?.name??""):"";
@@ -972,7 +978,8 @@ function ChargesReport({data}:{data:PortalData}){
 
 function EmployeeCharges({data,reload}:{data:PortalData;reload:()=>Promise<void>}){
   const todayISO=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date());
-  const [from,setFrom]=useState(todayISO),[to,setTo]=useState(todayISO),[status,setStatus]=useState<"All"|"Pending"|"Active"|"Settled"|"Cancelled">("All");
+  const [from,setFrom]=useState(`${todayISO.slice(0,8)}01`),[to,setTo]=useState(todayISO),[status,setStatus]=useState<"All"|"Pending"|"Active"|"Settled"|"Cancelled">("All");
+  useNeedSince(from);
   const [busy,setBusy]=useState(""),[msg,setMsg]=useState("");
   const [amounts,setAmounts]=useState<Record<string,string>>({});
   const [ne,setNe]=useState(""),[ncat,setNcat]=useState("Rescheduling"),[namt,setNamt]=useState(""),[nnote,setNnote]=useState("");
@@ -1005,7 +1012,8 @@ function DailyTar({data}:{data:PortalData}){
 
 function EnrollmentSummary({data}:{data:PortalData}){
   const todayISO=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date());
-  const [from,setFrom]=useState(todayISO),[to,setTo]=useState(todayISO);
+  const [from,setFrom]=useState(`${todayISO.slice(0,8)}01`),[to,setTo]=useState(todayISO);
+  useNeedSince(from);
   const mday=(v:string)=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date(v));
   const inRange=data.enrollments.filter(e=>{const d=mday(e.created_at);return d>=from&&d<=to});
   const groups=new Map<string,{course:string;schedule:string;enrolled:number;pending:number;cancelled:number;total:number}>();
@@ -1036,8 +1044,8 @@ function LiveRequests({data,role,reload,embedded}:{data:PortalData;role:string;r
   const unpaid=(r:Req)=>{const cc=data.chargeCollected?.[r.id];return !!cc&&!cc.paid};
   const waitingPayment=charged.filter(unpaid);
   const forApproval=charged.filter(r=>!unpaid(r));
-  const since=addDays(manilaToday(),-30);
-  const decided=data.requests.filter(r=>r.status!=="Pending"&&(r.decided_at??r.created_at).slice(0,10)>=since);
+  const decidedAll=data.requests.filter(r=>r.status!=="Pending");
+  const {p:decidedPeriod,rows:decided}=useMonthRows(decidedAll,r=>r.decided_at??r.created_at,false);
   const [rejecting,setRejecting]=useState<string|null>(null);
   async function decide(id:string,approve:boolean,remarks?:string){setBusy(id);setMessage("");try{await submit({action:"request-decide",id,approve,remarks});setRejecting(null);await reload()}catch(e){setMessage(e instanceof Error?e.message:"Could not update the request.")}finally{setBusy("")}}
   const typeOf=(r:Req)=>r.request_type==="Rescheduling"?"Reschedule":r.request_type;
@@ -1070,7 +1078,7 @@ function LiveRequests({data,role,reload,embedded}:{data:PortalData;role:string;r
     {section("Waiting for payment",waitingPayment)}
     {section("For approval",forApproval)}
     {!pending.length&&<section className="portal-panel cx-panel"><p className="portal-empty-copy">No open requests.</p></section>}
-    {decided.length>0&&<section className="portal-panel cx-panel"><button type="button" className="cx-month-head" aria-expanded={showDecided} onClick={()=>setShowDecided(v=>!v)}><span className="cx-month-name">Decided</span><span className="cx-month-meta">last 30 days · {decided.length}</span><span aria-hidden="true" className="cx-month-caret" style={{marginLeft:"auto"}}>{showDecided?"▾":"▸"}</span></button>{showDecided&&table(decided)}</section>}
+    {decidedAll.length>0&&<section className="portal-panel cx-panel"><button type="button" className="cx-month-head" aria-expanded={showDecided} onClick={()=>setShowDecided(v=>!v)}><span className="cx-month-name">Decided</span><span className="cx-month-meta">{decidedPeriod.range.label} · {decided.length}</span><span aria-hidden="true" className="cx-month-caret" style={{marginLeft:"auto"}}>{showDecided?"▾":"▸"}</span></button>{showDecided&&<><PeriodBar p={decidedPeriod} what="Decided" count={`${decided.length} request${decided.length===1?"":"s"}`}/>{decided.length?table(decided):<p className="portal-empty-copy">Nothing decided in this period.</p>}</>}</section>}
     {charging&&<RequestChargeModal data={data} request={charging} reload={reload} onClose={()=>setCharging(null)}/>}
     {collecting&&<RecordPaymentModal data={data} initialEnrollmentId={collecting.enrollmentId} initialAmountCentavos={collecting.amount} initialFeeLabel={collecting.label} onClose={()=>setCollecting(null)} onSaved={reload}/>}
   </div>;

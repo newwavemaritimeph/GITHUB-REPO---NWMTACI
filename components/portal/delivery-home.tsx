@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { PortalData } from "../portal-live-app";
 import { manilaToday } from "@/lib/portal-format";
-import { Badge, Message, usePost } from "./shared-ui";
+import { Badge, Message, MonthBar, useMonthRows, usePost } from "./shared-ui";
 
 /**
  * Certificate delivery (owner, 8 Oct 2026). The trainee requests it on the
@@ -29,18 +29,21 @@ function Counts({ rows }: { rows: DeliveryRow[] }) {
 
 /** Registration › Delivery requests: check the certificate, then send to the Cashier or decline. */
 export function RegistrationDeliveries({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
-  const rows = deliveriesOf(data);
+  const all = deliveriesOf(data);
+  // New requests always show; the rest by month (owner, 3 Nov 2026).
+  const { p, rows } = useMonthRows(all, (r) => r.created_at, false);
   const { busy, msg, post } = usePost(reload);
   const [declining, setDeclining] = useState<string | null>(null), [reason, setReason] = useState(""), [note, setNote] = useState("");
   const [show, setShow] = useState<"Open" | "All">("Open");
   const printed = (r: DeliveryRow) => ["Printed", "Released"].includes(r.certificate_status ?? "");
-  const shown = rows.filter((r) => show === "All" || r.status === "Requested");
-  const fresh = rows.filter((r) => r.status === "Requested").length;
+  const shown = show === "All" ? rows : all.filter((r) => r.status === "Requested");
+  const fresh = all.filter((r) => r.status === "Requested").length;
   return <div className="portal-page cx ac">
     <div className="cx-head"><div><span className="portal-eyebrow">Registration</span><h1>Delivery Requests</h1></div></div>
     <p className="ac-note">From the website. Check that the certificate is printed, then send to the Cashier for the ₱500.00 LBC fee.</p>
     {msg && <Message kind={msg.kind} text={msg.text} />}
     {fresh > 0 && <div className="ms-banner blue"><b>{fresh} new delivery request{fresh === 1 ? "" : "s"}</b><span>waiting for your check</span></div>}
+    <MonthBar p={p} what="Requested" count={`${rows.length} request${rows.length === 1 ? "" : "s"}`} />
     <div className="ac-rail">
       <div className="ac-stack"><section className="portal-panel cx-panel"><div className="panel-heading"><h2>Requests</h2></div><Counts rows={rows} /></section></div>
       <section className="portal-panel cx-panel">
@@ -61,7 +64,7 @@ export function RegistrationDeliveries({ data, reload }: { data: PortalData; rel
               <button type="button" className="cl-danger" disabled={busy || !reason || (reason === "Other" && note.trim().length < 3)} onClick={() => void post({ action: "delivery-decline", id: r.id, reason: reason === "Other" ? note.trim() : reason }, "Declined. The trainee was emailed the reason.").then(() => setDeclining(null)).catch(() => undefined)}>Decline</button>
             </div></td></tr>,
           ]; })}
-        </tbody></table></div> : <p className="portal-empty-copy">{show === "Open" ? "No new delivery requests." : "No delivery requests yet."}</p>}
+        </tbody></table></div> : <p className="portal-empty-copy">{show === "Open" ? "No new delivery requests." : "No delivery requests in this period."}</p>}
       </section>
     </div>
   </div>;
@@ -76,7 +79,10 @@ export function DeliveryAlert({ data, onOpen }: { data: PortalData; onOpen: () =
 
 /** Releasing Officer › Delivery: paid requests to ship (tracking number required), shipped and delivered. */
 export function ReleasingDeliveries({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
-  const rows = deliveriesOf(data).filter((r) => ["Paid", "Shipped", "Delivered"].includes(r.status));
+  const paidRows = deliveriesOf(data).filter((r) => r.status === "Paid");
+  // Paid requests to ship always show; shipped and delivered by month (owner, 3 Nov 2026).
+  const { p, rows: sent } = useMonthRows(deliveriesOf(data).filter((r) => ["Shipped", "Delivered"].includes(r.status)), (r) => r.shipped_on ?? r.created_at, false);
+  const rows = [...paidRows, ...sent];
   const { busy, msg, post } = usePost(reload);
   const [shipping, setShipping] = useState<string | null>(null), [tracking, setTracking] = useState(""), [shippedOn, setShippedOn] = useState(manilaToday());
   const toShip = rows.filter((r) => r.status === "Paid").length;
@@ -84,6 +90,7 @@ export function ReleasingDeliveries({ data, reload }: { data: PortalData; reload
     <div className="cx-head"><div><span className="portal-eyebrow">Releasing Officer</span><h1>Delivery</h1></div></div>
     <p className="ac-note">Only paid requests appear here. Enter the LBC tracking number when you ship; the trainee sees it on the website and by email.</p>
     {msg && <Message kind={msg.kind} text={msg.text} />}
+    <MonthBar p={p} what="Shipped" count={`${sent.length} request${sent.length === 1 ? "" : "s"}`} />
     <div className="ac-rail">
       <div className="ac-stack"><section className="portal-panel cx-panel"><div className="panel-heading"><h2>Delivery</h2></div>
         <dl className="ac-lines"><div><dt>To ship</dt><dd className={toShip ? "warn" : ""}>{toShip}</dd></div><div><dt>Shipped</dt><dd>{rows.filter((r) => r.status === "Shipped").length}</dd></div><div><dt>Delivered</dt><dd>{rows.filter((r) => r.status === "Delivered").length}</dd></div></dl></section></div>

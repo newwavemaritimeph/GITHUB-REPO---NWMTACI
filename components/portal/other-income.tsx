@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { PortalData } from "../portal-live-app";
 import { first, manilaToday, pesos2 } from "@/lib/portal-format";
-import { Badge, Message, fmtDate, usePost as useRawPost, usePaged } from "./shared-ui";
+import { Badge, Message, MonthBar, fmtDate, usePost as useRawPost, usePaged, usePeriod } from "./shared-ui";
 import { centerPaymentsOf, paymentFor } from "./pay-centers";
 import { shrinkPhoto } from "./live-cashier";
 
@@ -28,7 +28,10 @@ function usePost(reload: () => Promise<void>) {
 
 export function OtherIncome({ data, reload, canRecord, canVoid, canAddCategory = false }: { data: PortalData; reload: () => Promise<void>; canRecord: boolean; canVoid: boolean; canAddCategory?: boolean }) {
   const x = data as unknown as Extra;
-  const incomes = x.otherIncome ?? [];
+  const allIncomes = x.otherIncome ?? [];
+  // By month; rebates still to collect always show (owner, 3 Nov 2026).
+  const per = usePeriod();
+  const incomes = allIncomes.filter((i) => per.inRange(i.received_on));
   // Categories Accounting keeps (owner, 21 Oct 2026); the built-in list until migration 055 runs.
   const categories = x.incomeCategories?.length ? x.incomeCategories.filter((c) => c.active).map((c) => c.name) : SOURCES;
   const [newCat, setNewCat] = useState<string | null>(null);
@@ -50,7 +53,8 @@ export function OtherIncome({ data, reload, canRecord, canVoid, canAddCategory =
     const t = first(e.trainees), c = first(e.courses), b = first(e.batches);
     return { e, partner: first(o?.partner_centers)?.name ?? "Partner center", trainee: t ? `${t.legal_last_name}, ${t.legal_first_name}` : "—", number: t?.trainee_number ?? "", course: c?.name ?? "—", date: b?.starts_on ?? e.scheduled_on ?? null, rebate: Number(e.rebate_centavos), income: received[e.id] ?? null };
   });
-  const partners = [...new Set(endorsed.map((r) => r.partner))].sort();
+  const inView = endorsed.filter((r) => !r.income || per.inRange(r.date ?? r.e.created_at));
+  const partners = [...new Set(inView.map((r) => r.partner))].sort();
   // Rebates are collected after New Wave has paid the center (owner, 20 Oct 2026), once center payments are tracked (202610200051).
   const tracked = centerPaymentsOf(data).length > 0, pays = paymentFor(data);
   const centerPaid = (id: string) => !tracked || pays.get(id)?.status === "Paid";
@@ -60,7 +64,7 @@ export function OtherIncome({ data, reload, canRecord, canVoid, canAddCategory =
   const chosenPartners = [...new Set(chosen.map((r) => r.partner))];
   const chosenTotal = chosen.reduce((s, r) => s + r.rebate, 0);
   const month = today.slice(0, 7);
-  const live = incomes.filter((i) => !i.voided_at);
+  const live = allIncomes.filter((i) => !i.voided_at);
   const thisMonth = live.filter((i) => i.received_on.startsWith(month));
   const oldest = due.map((r) => r.date).filter(Boolean).sort()[0] as string | undefined;
 
@@ -133,9 +137,10 @@ export function OtherIncome({ data, reload, canRecord, canVoid, canAddCategory =
       <div className="cx-tile"><span>Oldest Rebate Due</span><b>{oldest ? fmtDate(oldest) : "—"}</b><small>{oldest ? "training date" : "nothing due"}</small></div>
     </div>
 
+    <MonthBar p={per} what={tab === "Other Income" ? "Received" : "Rebates received"} count={tab === "Other Income" ? `${incomes.length} receipt${incomes.length === 1 ? "" : "s"}` : `${inView.filter((r) => r.income).length} received`} />
     {tab === "Endorsement Rebates" ? <section className="portal-panel cx-panel">
       <div className="panel-heading"><h2>Endorsement Rebates</h2><small>{canRecord ? "Tick the trainees the partner paid for, then Record Received" : "View only"}</small></div>
-      {partners.length ? partners.map((p) => { const rows = endorsed.filter((r) => r.partner === p); const pd = rows.filter((r) => !r.income && centerPaid(r.e.id)); return <div key={p} className="oi-partner">
+      {partners.length ? partners.map((p) => { const rows = inView.filter((r) => r.partner === p); const pd = rows.filter((r) => !r.income && centerPaid(r.e.id)); return <div key={p} className="oi-partner">
         <div className="oi-partner-head"><b>{p}</b><span className="cx-mono">{pd.length ? `${pesos2(pd.reduce((s, r) => s + r.rebate, 0))} due · ${pd.length}` : "All received"}</span></div>
         <div className="portal-table"><table><thead><tr>{canRecord && <th />}<th>Trainee</th><th>Course</th><th>Training Date</th><th className="r">Rebate</th><th>Status</th><th className="r">Agency Share</th></tr></thead><tbody>
           {rows.map((r) => <tr key={r.e.id} className={picked.has(r.e.id) ? "oi-sel" : r.income ? "oi-done" : ""}>
@@ -166,7 +171,7 @@ export function OtherIncome({ data, reload, canRecord, canVoid, canAddCategory =
             ? <span className="oi-void"><input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Reason" aria-label="Reason for the void" /><button type="button" className="portal-secondary" disabled={busy || reason.trim().length < 5} onClick={() => void post({ action: "income-void", id: i.id, reason: reason.trim() }, `${i.income_number} voided.`).then((ok) => { if (ok) { setVoiding(null); setReason(""); } })}>Void</button><button type="button" className="pm-link" onClick={() => setVoiding(null)}>Keep</button></span>
             : <button type="button" className="pm-link cm-remove" onClick={() => { setVoiding(i.id); setReason(""); }}>Void</button>)}</td>}
         </tr>)}
-      </tbody></table>{incP.pager}</div> : <p className="portal-empty-copy">No other income recorded yet.</p>}
+      </tbody></table>{incP.pager}</div> : <p className="portal-empty-copy">No other income in this period.</p>}
     </section>}
     <p className="ac-note">Endorsement rebates are what partner centers pay New Wave for trainees endorsed to them. Every receipt gets an income number and a proof photo in Google Drive, and appears in the Daily Summary Report under Other Income. Cash received counts in the cash drawer at closing.</p>
   </div>;

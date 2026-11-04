@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
-import { Badge, Message, PeriodBar, fmtClock, fmtDate, submit, usePeriod, usePost, usePaged } from "./shared-ui";
+import { Badge, Message, MonthBar, PeriodBar, fmtClock, fmtDate, submit, useMonthRows, usePeriod, usePost, usePaged } from "./shared-ui";
 import { BarChart, Donut, HBars } from "./charts";
 import { EXPENSE_REASONS, REQUEST_REASONS, RejectInline } from "./reject-inline";
 import { PERIODS, percentChange, periodStart, type Period } from "@/lib/accounting-periods";
@@ -265,19 +265,21 @@ function PaymentReceipts({ pills }: { pills: ReactNode }) {
 
 const EXPENSE_STATES = ["All", "For approval", "Awaiting release", "Released", "Rejected"] as const;
 export function AccountingExpenses({ data }: { data: PortalData }) {
-  const today = manilaToday();
-  const [date, setDate] = useState(today), [st, setSt] = useState<(typeof EXPENSE_STATES)[number]>("All");
+  // Opens on this month (owner, 3 Nov 2026).
+  const p = usePeriod();
+  const [st, setSt] = useState<(typeof EXPENSE_STATES)[number]>("All");
   type Ex = PortalData["expenses"][number] & { payment_channel?: string | null; reference_number?: string | null; voucher_number?: string | null; paid_at?: string | null; approved_at?: string | null };
   const label = (e: Ex) => (e.status === "Paid" ? "Released" : e.status === "Approved" ? "Awaiting release" : e.status === "Pending" ? "For approval" : e.status);
-  const list = (data.expenses as Ex[]).filter((e) => day(e.created_at) === date || day(e.paid_at) === date || day(e.approved_at) === date).sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const released = list.filter((e) => e.status === "Paid" && day(e.paid_at) === date);
+  const list = (data.expenses as Ex[]).filter((e) => p.inRange(e.created_at) || p.inRange(e.paid_at) || p.inRange(e.approved_at)).sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const released = list.filter((e) => e.status === "Paid" && p.inRange(e.paid_at));
   const byChannel = CHANNELS.map((c) => { const l = released.filter((e) => e.payment_channel === c); return { name: c, color: COLORS[c], count: l.length, amount: l.reduce((s, e) => s + Number(e.amount_centavos), 0) }; });
   const cats = [...new Set(list.filter((e) => e.status !== "Rejected").map((e) => e.category))];
   const shown = list.filter((e) => st === "All" || label(e) === st);
   const pg = usePaged(shown);
   const tone = (s: string) => (s === "Released" ? "green" : s === "Rejected" ? "red" : s === "For approval" ? "orange" : "blue");
   return <div className="portal-page cx ac">
-    <TxHead title="Expenses" right={<DayPicker date={date} setDate={setDate} />} note={<>{longDay(date)} · <span className="ac-ro">View only — the Cashier records and releases expenses</span></>} />
+    <TxHead title="Expenses" note={<span className="ac-ro">View only — the Cashier records and releases expenses</span>} />
+    <MonthBar p={p} what="Expenses" count={`${list.length} voucher${list.length === 1 ? "" : "s"}`} />
     <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Released by Channel</h2></div><FigureColumn rows={byChannel} unit="voucher" totalLabel="Total released" /></section>
@@ -285,13 +287,13 @@ export function AccountingExpenses({ data }: { data: PortalData }) {
           <dl className="ac-lines">{EXPENSE_STATES.slice(1).map((s) => { const l = list.filter((e) => label(e) === s); return <div key={s}><dt>{tcl(s)}</dt><dd>{l.length} · {pesos2(l.reduce((a, e) => a + Number(e.amount_centavos), 0))}</dd></div>; })}</dl>
           <p className="ac-foot">Requests for your decision are in Approvals.</p></section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By Category</h2></div>
-          {cats.length ? <dl className="ac-lines">{cats.map((c) => <div key={c}><dt>{c}</dt><dd>{pesos2(list.filter((e) => e.category === c && e.status !== "Rejected").reduce((a, e) => a + Number(e.amount_centavos), 0))}</dd></div>)}</dl> : <p className="portal-empty-copy">No expenses on this day.</p>}</section>
+          {cats.length ? <dl className="ac-lines">{cats.map((c) => <div key={c}><dt>{c}</dt><dd>{pesos2(list.filter((e) => e.category === c && e.status !== "Rejected").reduce((a, e) => a + Number(e.amount_centavos), 0))}</dd></div>)}</dl> : <p className="portal-empty-copy">No expenses in this period.</p>}</section>
       </div>
       <section className="portal-panel cx-panel">
         <div className="ac-chipbar">{EXPENSE_STATES.map((s) => <button key={s} type="button" className={`ac-chip${st === s ? " on" : ""}`} onClick={() => setSt(s)}>{tcl(s)}<span>{s === "All" ? list.length : list.filter((e) => label(e) === s).length}</span></button>)}</div>
         {shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Channel</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
           {pg.shown.map((e) => <tr key={e.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher_number ?? e.expense_number}</span><small>{fmtDate(day(e.created_at))}</small></td><td data-l="Payee"><strong>{e.payee}</strong><small>{e.category}</small></td><td data-l="Channel">{e.payment_channel || "—"}{e.reference_number ? <small className="cx-mono">{e.reference_number}</small> : null}</td><td data-l="Status"><Badge tone={tone(label(e))}>{label(e)}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(e.amount_centavos)}</strong></td><td data-l="">{e.voucher_number && <a className="portal-secondary" href={`/api/documents/expense/${e.id}?copy=1`} target="_blank" rel="noreferrer">View</a>}</td></tr>)}
-        </tbody></table>{pg.pager}</div> : <p className="portal-empty-copy">{list.length ? "Nothing with this status." : "No expenses on this day."}</p>}
+        </tbody></table>{pg.pager}</div> : <p className="portal-empty-copy">{list.length ? "Nothing with this status." : "No expenses in this period."}</p>}
       </section>
     </div>
   </div>;
@@ -343,7 +345,9 @@ export function AccountingPayables({ data, reload }: { data: PortalData; reload:
   const items = [...bills, ...rebates];
   const stateOf = (i: Item) => (i.paid ? "Paid" : i.due && i.due < today ? "Overdue" : i.due && i.due <= weekEnd ? "Due this week" : "Open");
   const open = items.filter((i) => !i.paid);
-  const shown = items.filter((i) => (tab === "Open" ? !i.paid : stateOf(i) === tab)).sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999"));
+  // Paid by month; what is still owed always shows (owner, 3 Nov 2026).
+  const { p: paidPeriod, rows: paidRows } = useMonthRows(items.filter((i) => i.paid), (i) => i.paidOn, false);
+  const shown = (tab === "Paid" ? paidRows : items.filter((i) => (tab === "Open" ? !i.paid : stateOf(i) === tab))).sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999"));
   const pg = usePaged(shown);
   const kinds = ["Bills and fees", "Agency rebates"].map((k, n) => { const l = open.filter((i) => i.kind === k); return { name: k, color: n ? "#F25615" : "#0571D0", count: l.length, amount: l.reduce((s, i) => s + i.amount, 0) }; });
   const sum = (l: Item[]) => pesos2(l.reduce((s, i) => s + i.amount, 0));
@@ -357,7 +361,8 @@ export function AccountingPayables({ data, reload }: { data: PortalData; reload:
           <dl className="ac-lines"><div><dt>Overdue</dt><dd className="minus">{sum(open.filter((i) => stateOf(i) === "Overdue"))}</dd></div><div><dt>Due this week</dt><dd className="warn">{sum(open.filter((i) => stateOf(i) === "Due this week"))}</dd></div><div><dt>Paid this month</dt><dd className="plus">{sum(items.filter((i) => i.paid && (i.paidOn ?? "") >= monthStart))}</dd></div></dl></section>
       </div>
       <section className="portal-panel cx-panel">
-        <div className="ac-chipbar">{PAYABLE_TABS.map((t) => <button key={t} type="button" className={`ac-chip${tab === t ? " on" : ""}`} onClick={() => setTab(t)}>{tcl(t)}<span>{t === "Open" ? open.length : items.filter((i) => stateOf(i) === t).length}</span></button>)}</div>
+        <div className="ac-chipbar">{PAYABLE_TABS.map((t) => <button key={t} type="button" className={`ac-chip${tab === t ? " on" : ""}`} onClick={() => setTab(t)}>{tcl(t)}<span>{t === "Open" ? open.length : t === "Paid" ? paidRows.length : items.filter((i) => stateOf(i) === t).length}</span></button>)}</div>
+        {tab === "Paid" && <PeriodBar p={paidPeriod} what="Paid" count={`${paidRows.length} item${paidRows.length === 1 ? "" : "s"}`} />}
         {shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Payee</th><th>Type</th><th>Due</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
           {pg.shown.map((i) => { const s = stateOf(i); return <tr key={`${i.kind}-${i.id}`}><td data-l="" className="lead"><span className="cx-name">{i.payee}</span>{i.what && <small>{i.what}</small>}</td><td data-l="Type">{i.kind === "Agency rebates" ? "Agency rebate" : "Bill or fee"}</td><td data-l="Due">{i.due ? fmtDate(i.due) : "—"}</td><td data-l="Status"><Badge tone={s === "Paid" ? "green" : s === "Overdue" ? "red" : s === "Due this week" ? "orange" : undefined}>{tcl(s)}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(i.amount)}</strong></td><td data-l="">{!i.paid && <button type="button" className="portal-primary" disabled={busy} onClick={() => void i.settle().catch(() => undefined)}>Mark Paid</button>}</td></tr>; })}
         </tbody></table>{pg.pager}</div> : <p className="portal-empty-copy">Nothing here.</p>}

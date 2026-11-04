@@ -16,6 +16,6 @@ export async function GET(request: Request) {
   const db = createSupabaseAdminClient();
   const day = await loadMismoDay(db, date);
   // Recent submissions for the history list.
-  const { data: history } = await db.from("mismo_submissions").select("batch_id,list_date,trainee_count,submitted_at,profiles:submitted_by(complete_name),batches(batch_number,courses(name,code))").order("submitted_at", { ascending: false }).limit(100);
+  const { data: history } = await db.from("mismo_submissions").select("batch_id,list_date,trainee_count,submitted_at,profiles:submitted_by(complete_name),batches(batch_number,courses(name,code))").order("submitted_at", { ascending: false }).limit(1000);
   return NextResponse.json({ ...day, now: new Date().toISOString(), history: history ?? [] }, { headers: { "Cache-Control": "no-store" } });
 }

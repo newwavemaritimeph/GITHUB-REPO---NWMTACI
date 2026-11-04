@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { PortalData, Enrollment } from "../portal-live-app";
 import { first, manilaToday, pesos2 } from "@/lib/portal-format";
-import { Badge, Message, fmtDate, usePost } from "./shared-ui";
+import { Badge, Message, MonthBar, fmtDate, useMonthRows, usePost } from "./shared-ui";
 
 /**
  * Paying the partnered centers (owner, 20 Oct 2026; design/pay-the-centers-prototype.html):
@@ -40,7 +40,11 @@ export function PayTheCenters({ data, reload, onRelease }: { data: PortalData; r
   const [picked, setPicked] = useState<Set<string>>(() => new Set(lines.filter((l) => l.state === "Due" && l.dueToday).map((l) => l.e.id)));
   const [raising, setRaising] = useState<string | null>(null), [channel, setChannel] = useState(""), [notes, setNotes] = useState("");
   const { busy, msg, post } = usePost(reload);
-  const centers = [...new Set(lines.map((l) => l.center))].sort();
+  // Trainees still to pay always show; paid ones by month (owner, 3 Nov 2026).
+  const { p: period, rows: paidRows } = useMonthRows(lines.filter((l) => l.state === "Paid"), (l) => l.p?.paid_at ?? l.enrolledOn, false);
+  const keptPaid = new Set(paidRows);
+  const inView = lines.filter((l) => l.state !== "Paid" || keptPaid.has(l));
+  const centers = [...new Set(inView.map((l) => l.center))].sort();
   const channels = data.paymentMethods.filter((m) => m.active).map((m) => m.name);
   const owed = (c?: string) => lines.filter((l) => (!c || l.center === c) && l.state !== "Paid").reduce((s, l) => s + l.amount, 0);
   const dueToday = lines.filter((l) => l.state === "Due" && l.dueToday).reduce((s, l) => s + l.amount, 0);
@@ -52,6 +56,7 @@ export function PayTheCenters({ data, reload, onRelease }: { data: PortalData; r
   };
   return <>
     {msg && <Message kind={msg.kind} text={msg.text} />}
+    {lines.length > 0 && <MonthBar p={period} what="Paid" count={`${paidRows.length} trainee${paidRows.length === 1 ? "" : "s"}`} />}
     {!lines.length ? <section className="portal-panel cx-panel"><p className="portal-empty-copy">No enrolled Other STCW trainees yet. They appear here on the day they are enrolled.</p></section> : <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Due to Centers</h2><span className="muted-text">full fee</span></div>
@@ -60,7 +65,7 @@ export function PayTheCenters({ data, reload, onRelease }: { data: PortalData; r
         </section>
       </div>
       <div className="ac-stack">
-        {centers.map((center) => { const l = lines.filter((x) => x.center === center); const sel = l.filter((x) => x.state === "Due" && picked.has(x.e.id)); const total = sel.reduce((s, x) => s + x.amount, 0);
+        {centers.map((center) => { const l = inView.filter((x) => x.center === center); const sel = l.filter((x) => x.state === "Due" && picked.has(x.e.id)); const total = sel.reduce((s, x) => s + x.amount, 0);
           const approved = [...new Map(l.filter((x) => x.state === "Approved" && x.p).map((x) => [x.p!.expense_id, x.p!])).values()];
           return <section key={center} className="portal-panel cx-panel">
             <div className="panel-heading"><h2>{center}</h2><span className="muted-text">Owed {pesos2(owed(center))}</span></div>

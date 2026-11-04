@@ -6,7 +6,7 @@ import type { PortalData, Enrollment } from "../portal-live-app";
 import { addDays, first, manilaToday, dueCentavos, pesos2 } from "@/lib/portal-format";
 import { automaticEndDate } from "@/lib/scheduling";
 import { canPrint, canSetSeries, certificateState, evaluationRequiredFor, formatCertificateNumber, nextOf, isStcwCategory, matchTemplateFiles, releaseProblem, type CertificateView } from "@/lib/certificate-rules";
-import { Badge, Message, fmtDate, usePaged, usePost } from "./shared-ui";
+import { Badge, Message, MonthBar, fmtDate, useMonthRows, useNeedSince, usePaged, usePost } from "./shared-ui";
 import { ReleaseConfirm } from "./live-releasing";
 import { DeliveryAlert } from "./delivery-home";
 import { tcl } from "@/lib/title-case";
@@ -202,12 +202,18 @@ export function ReleasingHome({ data, reload, go }: { data: PortalData; reload: 
 
 export function CertificatesWorkspace({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   const [pick, setPick] = useState(""), [q, setQ] = useState("");
-  const lines = certificateLines(data);
+  const allLines = certificateLines(data);
   const term = q.trim().toLowerCase();
+  // Not yet printed always shows; printed certificates by month, or every date while searching (owner, 3 Nov 2026).
+  const printedOn = (l: CertificateLine) => (l.cert as { printed_at?: string | null } | null | undefined)?.printed_at;
+  const { p, rows: printed } = useMonthRows(allLines.filter((l) => printedOn(l)), printedOn, !!term);
+  const kept = new Set(printed);
+  const lines = allLines.filter((l) => !printedOn(l) || kept.has(l));
   const shown = lines.filter((l) => (!pick || l.view.state === pick) && (!term || `${l.name} ${l.number} ${l.cert?.certificate_number ?? ""} ${l.course.name} ${l.course.code}`.toLowerCase().includes(term)));
   return <div className="portal-page cx ac">
     <Head title="Certificates" />
     <CertificateAlarm data={data} />
+    <MonthBar p={p} what="Printed" count={`${printed.length} certificate${printed.length === 1 ? "" : "s"}`} searching={!!term} />
     <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Status</h2><span className="muted-text">tap to filter</span></div><StateColumn lines={lines} pick={pick} onPick={setPick} /></section>
@@ -418,7 +424,8 @@ const longDay = (d: string) => new Intl.DateTimeFormat("en-PH", { weekday: "long
 export function ReleasedCertificates({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   const [releasing, setReleasing] = useState<CertificateLine | null>(null);
   const today = manilaToday();
-  const [from, setFrom] = useState(today), [to, setTo] = useState(today), [q, setQ] = useState("");
+  const [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today), [q, setQ] = useState("");
+  useNeedSince(from);
   const waiting = certificateLines(data).filter((l) => l.view.state === "Printed");
   const term = q.trim().toLowerCase();
   const rows = releaseRows(data).filter((r) => r.day >= from && r.day <= to && (!term || `${r.name} ${r.course} ${r.courseName} ${r.certNo} ${r.sticker}`.toLowerCase().includes(term)));
@@ -464,7 +471,7 @@ export function reportRange(period: "Daily" | "Weekly" | "Monthly", date: string
 
 /** Releasing Officer › Reports (owner, 20 Oct 2026): Daily, Weekly and Monthly certificate figures. */
 export function ReleasingReports({ data }: { data: PortalData }) {
-  const [period, setPeriod] = useState<"Daily" | "Weekly" | "Monthly">("Daily"), [date, setDate] = useState(manilaToday());
+  const [period, setPeriod] = useState<"Daily" | "Weekly" | "Monthly">("Monthly"), [date, setDate] = useState(manilaToday());
   const r = reportRange(period, date);
   const inRange = (iso?: string | null) => { const d = day(iso ?? null); return !!d && d >= r.from && d <= r.to; };
   const certs = data.certificates as unknown as (CertRow & { printed_at?: string | null; course_id?: string })[];
