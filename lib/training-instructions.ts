@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createTrainingInstructionsPdf } from "@/lib/documents";
 import { classroomJoin, type ClassroomJoin } from "@/lib/classroom";
+import { DEFAULT_CATEGORY_TEMPLATES, fillPlaceholders, instructionCategoryOf, isOnlineMode, linesOf, policyPairs, sheetSteps, type InstructionCategory } from "@/lib/instruction-templates";
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
@@ -15,6 +16,8 @@ export type InstructionDetails = {
   join: ClassroomJoin; subject: string; body: string;
   // Grid form (Design 3, 7 Oct 2026) fields.
   formalName: string; nwmtaciNumber: string; srn: string; batchNumber: string; mode: string; duration: string;
+  // Design 11 (3 Nov 2026): the category's template, filled for this trainee.
+  category: InstructionCategory; firstName: string; online: boolean; bring: string[]; reminders: string[]; policies: [string, string][];
 };
 /** "08:00" → "8:00 AM". */
 const clock = (v?: string | null) => { if (!v) return ""; const [h, m] = v.split(":").map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
@@ -22,7 +25,7 @@ const clock = (v?: string | null) => { if (!v) return ""; const [h, m] = v.split
 /** Everything the instructions PDF and email need for one enrollment, or null when it does not exist. */
 export async function loadInstructionDetails(db: Admin, enrollmentId: string): Promise<InstructionDetails | null> {
   const { data } = await db.from("enrollments")
-    .select("id,enrollment_number,enrollment_status,course_id,batch_id,scheduled_on,trainees(id,legal_first_name,legal_middle_name,legal_last_name,suffix,email,srn,trainee_number),courses(name,code,google_classroom_link,duration_label),batches(batch_number,mode,starts_on,ends_on,daily_start,daily_end,venue,classrooms(name))")
+    .select("id,enrollment_number,enrollment_status,course_id,batch_id,scheduled_on,trainees(id,legal_first_name,legal_middle_name,legal_last_name,suffix,email,srn,trainee_number),courses(name,code,google_classroom_link,duration_label,course_categories(name)),batches(batch_number,mode,starts_on,ends_on,daily_start,daily_end,venue,classrooms(name))")
     .eq("id", enrollmentId).maybeSingle();
   if (!data) return null;
   const trainee = one(data.trainees), course = one(data.courses), batch = one(data.batches);
@@ -38,7 +41,13 @@ export async function loadInstructionDetails(db: Admin, enrollmentId: string): P
   const t2 = trainee as { suffix?: string | null; srn?: string | null; trainee_number?: string | null } | null;
   const b2 = batch as { batch_number?: string | null; mode?: string | null } | null;
   const body = tpl?.body && typeof tpl.body === "object" && "text" in (tpl.body as Record<string, unknown>) ? String((tpl.body as { text?: unknown }).text ?? "") : "";
-  return {
+  // The category's template (202610290073), or the same text built in until that is run.
+  const category = instructionCategoryOf(course?.code, one((course as { course_categories?: { name: string } | { name: string }[] | null } | null)?.course_categories)?.name);
+  const { data: categoryRow } = await db.from("instruction_category_templates").select("subject,bring,reminders,policies").eq("category", category).maybeSingle();
+  const template = categoryRow ?? DEFAULT_CATEGORY_TEMPLATES[category];
+  // A course's own template still wins for its subject and its "- " reminder lines.
+  const ownReminders = body.split("\n").map((l) => l.trim()).filter((l) => /^[-•]\s/.test(l)).map((l) => l.replace(/^[-•]\s*/, ""));
+  const details: InstructionDetails = {
     enrollmentId: data.id, enrollmentNumber: data.enrollment_number, enrollmentStatus: data.enrollment_status,
     traineeName: trainee ? `${trainee.legal_first_name} ${trainee.legal_middle_name ?? ""} ${trainee.legal_last_name}`.replace(/\s+/g, " ").trim() : "Trainee",
     traineeEmail: trainee?.email ?? null,
@@ -48,8 +57,14 @@ export async function loadInstructionDetails(db: Admin, enrollmentId: string): P
     time: batch?.daily_start ? `${clock(batch.daily_start)} - ${clock(batch.daily_end) || "5:00 PM"}` : "8:00 AM - 5:00 PM",
     classroom: one(batch?.classrooms)?.name ?? batch?.venue ?? "To be assigned",
     join: batchClass?.google_classroom_link ? classroomJoin(batchClass.google_classroom_link, batchClass.google_classroom_code) : classroomJoin(course?.google_classroom_link, (codeRow as { google_classroom_code?: string | null } | null)?.google_classroom_code),
-    subject: tpl?.subject ?? "Training Instructions",
+    subject: tpl?.subject ?? template.subject,
     body,
+    category,
+    firstName: trainee?.legal_first_name ?? "",
+    online: isOnlineMode(b2?.mode),
+    bring: linesOf(template.bring),
+    reminders: ownReminders.length ? ownReminders : linesOf(template.reminders),
+    policies: policyPairs(template.policies),
     formalName: trainee ? `${trainee.legal_last_name}, ${[trainee.legal_first_name, trainee.legal_middle_name, t2?.suffix].filter(Boolean).join(" ")}`.toUpperCase() : "TRAINEE",
     nwmtaciNumber: (appRow as { application_number?: string | null } | null)?.application_number ?? t2?.trainee_number ?? "",
     srn: t2?.srn ?? "",
@@ -57,6 +72,9 @@ export async function loadInstructionDetails(db: Admin, enrollmentId: string): P
     mode: b2?.mode ?? "Face-to-face",
     duration: course?.duration_label ?? "",
   };
+  const values = { trainee: details.traineeName, course: details.courseName, dates: details.dates, time: details.time, room: details.classroom, classroom_link: details.join.url ?? "", class_code: details.join.code ?? "" };
+  const fill = (text: string) => fillPlaceholders(text, values);
+  return { ...details, subject: fill(details.subject), bring: details.bring.map(fill), reminders: details.reminders.map(fill), policies: details.policies.map(([k, v]): [string, string] => [k, fill(v)]) };
 }
 
 async function logoBytes(origin?: string) {
@@ -66,26 +84,29 @@ async function logoBytes(origin?: string) {
   try { return new Uint8Array(await (await fetch(new URL("/new-wave-emblem.png", base))).arrayBuffer()); } catch { return undefined; }
 }
 
-/** The half-A4 training instructions PDF; the same bytes are shown in the portal and attached to the email. */
+/** The half-Legal training instructions PDF; the same bytes are shown in the portal and attached to the email. */
 export async function buildTrainingInstructionsPdf(details: InstructionDetails, origin?: string) {
   return createTrainingInstructionsPdf({
     traineeName: details.traineeName,
-    courseName: details.courseName,
-    dateOfTraining: details.dates,
-    time: details.time,
-    classroom: details.classroom,
-    googleClassroomLink: details.join.url,
-    classCode: details.join.code,
     formalName: details.formalName,
     nwmtaciNumber: details.nwmtaciNumber,
     srn: details.srn,
+    courseName: details.courseName,
     batchNumber: details.batchNumber,
+    dateOfTraining: details.dates,
+    time: details.time,
+    classroom: details.classroom,
     mode: details.mode,
-    duration: details.duration,
-    subject: details.subject,
-    body: details.body,
+    online: details.online,
+    googleClassroomLink: details.join.url,
+    classCode: details.join.code,
     reference: details.enrollmentNumber,
     issuedAt: new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date()),
+    categoryLabel: `${details.category} Courses`,
+    bring: details.bring,
+    reminders: details.reminders,
+    policies: details.policies,
+    steps: sheetSteps(details.online, !!(details.join.url || details.join.code)),
     logoBytes: await logoBytes(origin),
   });
 }

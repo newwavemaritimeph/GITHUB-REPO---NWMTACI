@@ -7,6 +7,7 @@
  *
  *   npx tsx scripts/render-print-samples.tsx
  */
+import { DEFAULT_CATEGORY_TEMPLATES, linesOf, policyPairs, sheetSteps } from "../lib/instruction-templates";
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -146,8 +147,9 @@ await save("08-enrollment-record.pdf", "Enrollment Record (Invoice and Admission
 // ---- Training instructions -------------------------------------------------------
 await save("09-training-instructions.pdf", "Training Instructions", await createTrainingInstructionsPdf({
   traineeName: "Juan Perez Dela Cruz", formalName: "DELA CRUZ, JUAN PEREZ", nwmtaciNumber: "NWMTACI-0000411", srn: "SRN-2210441",
-  courseName: "Updating Training on Basic Training – PSSR (UBT-PSSR)", batchNumber: "BCH-2026-0412", dateOfTraining: "Monday, October 12, 2026", time: "8:00 AM – 5:00 PM", classroom: "ROOM 101",
-  mode: "Face-to-face", duration: "1 day", googleClassroomLink: "https://classroom.google.com/c/NzAxMjM0?cjc=abc1234", classCode: "abc1234", reference: "ENR-2026-000871", issuedAt: "October 9, 2026", logoBytes,
+  courseName: "UBT-PSSR - Updating Training on Basic Training", batchNumber: "26-609-139", dateOfTraining: "Oct 12, 2026", time: "8:00 AM - 5:00 PM", classroom: "ROOM 101",
+  mode: "Face-to-face", online: false, reference: "ENR-2026-000871", issuedAt: "Oct 9, 2026", categoryLabel: "STCW Courses",
+  bring: linesOf(DEFAULT_CATEGORY_TEMPLATES.STCW.bring), reminders: linesOf(DEFAULT_CATEGORY_TEMPLATES.STCW.reminders), policies: policyPairs(DEFAULT_CATEGORY_TEMPLATES.STCW.policies), steps: sheetSteps(false, false),
 }));
 
 // ---- Payment reconciliation day sheet ----------------------------------------------

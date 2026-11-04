@@ -294,6 +294,7 @@ const packageAssignInput = z.object({ action: z.literal("package-assign"), train
 const applicationAssignInput = z.object({ action: z.literal("application-assign"), traineeId: z.string().uuid(), courseId: z.string().uuid(), batchId: z.string().uuid().nullable().optional(), scheduledOn: z.string().date().nullable().optional(), offerId: z.string().uuid().nullable().optional(), ...courseSource });
 const applicationPlaceBatchInput = z.object({ action: z.literal("application-place-batch"), enrollmentId: z.string().uuid(), batchId: z.string().uuid() });
 const sendInstructionsInput = z.object({ action: z.literal("send-instructions"), enrollmentId: z.string().uuid() });
+const instructionCategorySaveInput = z.object({ action: z.literal("instruction-category-save"), category: z.enum(["STCW", "In-House"]), subject: z.string().trim().min(1).max(200), bring: z.string().max(2000), reminders: z.string().max(2000), policies: z.string().max(2000) });
 const instructionTemplateSaveInput = z.object({ action: z.literal("instruction-template-save"), courseId: z.string().uuid(), subject: z.string().trim().min(1).max(200), body: z.string().trim().min(1).max(8000) });
 const classroomLinkSaveInput = z.object({ action: z.literal("course-classroom-link-save"), courseId: z.string().uuid(), link: z.string().trim().max(500), code: z.string().trim().max(40).optional() });
 const requestRaiseInput = z.object({ action: z.literal("request-raise"), enrollmentId: z.string().uuid(), requestType: z.enum(["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course", "TAR reprint"]), reason: z.string().trim().min(1).max(500), batchId: z.string().uuid().nullable().optional(), amountCentavos: z.number().int().positive().optional(), paymentId: z.string().uuid().nullable().optional(), courseId: z.string().uuid().nullable().optional(), partnerOfferId: z.string().uuid().nullable().optional(), requestedOn: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional() });
@@ -302,7 +303,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [paymentVoidRequestInput, paymentVoidDecideInput, statementIssueInput, statementVoidInput, enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, traineeFacebookInput, admissionRecordInput, documentReprintInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [instructionCategorySaveInput, paymentVoidRequestInput, paymentVoidDecideInput, statementIssueInput, statementVoidInput, enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, traineeFacebookInput, admissionRecordInput, documentReprintInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 /** A proof the trainee sent (29 Oct 2026) backs one payment of that trainee, unless marked Not Valid. Staff-filed proofs return null. */
 async function traineeProofProblem(admin: ReturnType<typeof createSupabaseAdminClient>, proofId: string, traineeId: string) {
@@ -370,27 +371,6 @@ const isAdminRole = (roles: string[]) => roles.some((role) => ["admin"].includes
 const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? (v[0] ?? null) : (v ?? null));
 const minutesOfDay = (hhmm: string) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
-// After a payment posts, auto-send training instructions for in-house, scheduled, enrolled
-// enrollments that have not yet been sent. Best-effort — never blocks the payment.
-async function autoSendInstructions(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentIds: string[]) {
-  for (const eid of enrollmentIds) {
-    try {
-      const { data: e } = await admin.from("enrollments").select("id,enrollment_number,batch_id,enrollment_status,instructions_sent_at,trainees(profile_id),courses(name,delivery_type,google_classroom_link)").eq("id", eid).maybeSingle();
-      if (!e) continue;
-      const course = Array.isArray(e.courses) ? e.courses[0] : e.courses;
-      if (course?.delivery_type !== "In-House" || !e.batch_id || e.enrollment_status !== "Enrolled" || e.instructions_sent_at) continue;
-      await admin.from("enrollments").update({ instructions_sent_at: new Date().toISOString() }).eq("id", eid);
-      // Paid and enrolled: the training details, Classroom link and instructions PDF by email (owner, 20 Oct 2026); sent once.
-      await queueInstructionEmail(admin, eid, 0, process.env.APP_BASE_URL ?? "https://newwavemaritimemtaci.com").catch(() => undefined);
-      const trainee = Array.isArray(e.trainees) ? e.trainees[0] : e.trainees;
-      if (trainee?.profile_id) {
-        const link = course?.google_classroom_link ? ` Google Classroom: ${course.google_classroom_link}` : "";
-        await admin.from("notifications").insert({ recipient_id: trainee.profile_id, notification_type: "training_instructions", title: "Your training instructions are ready", body: `Reporting instructions for ${course?.name ?? "your training"} (${e.enrollment_number}) have been sent. Please review your portal for reporting details.${link}`, related_record_type: "enrollment", related_record_id: eid });
-      }
-    } catch (err) { console.error("auto-send instructions failed:", err instanceof Error ? err.message : err); }
-  }
-}
-
 // A paid application counts as enrolled (owner rule, 7 Oct 2026): once the
 // requirements are verified, a batch is set and a verified payment exists, the
 // database enrolls it. Called after every step that can complete those rules;
@@ -449,12 +429,7 @@ async function tryAutoEnroll(admin: ReturnType<typeof createSupabaseAdminClient>
     const { error } = await admin.rpc("enroll_screened_application", { target_enrollment: row.id, actor });
     if (!error) enrolled.push(row.id);
   }
-  // Once enrolled, the trainee gets the training details, Google Classroom link and the
-  // instructions PDF by email automatically (owner, 20 Oct 2026). Best-effort, sent once.
-  for (const id of enrolled) {
-    try { await queueInstructionEmail(admin, id, 0, process.env.APP_BASE_URL ?? "https://newwavemaritimemtaci.com"); }
-    catch (err) { console.error("enrollment email failed:", err instanceof Error ? err.message : err); }
-  }
+  // Registration sends the instructions with Generate Training Instructions (owner, 3 Nov 2026).
   return enrolled;
 }
 
@@ -1047,6 +1022,9 @@ export async function GET(request: Request) {
   let applicationNumbers: Record<string, string> = {};
   task(async () => { const { data: numberRows } = await db.from("trainees").select("id,application_number").not("application_number", "is", null).limit(5000); applicationNumbers = Object.fromEntries((numberRows ?? []).map((row: { id: string; application_number: string }) => [row.id, row.application_number])); });
   // Meta thread links (migration 070); none before it is applied.
+  // The Admin's Training Instructions templates (202610290073); none before it is run, and the screen shows the defaults.
+  let instructionCategories: unknown[] = [];
+  if (isAdminRole(staff.roleCodes)) task(async () => { const r = await db.from("instruction_category_templates").select("category,subject,bring,reminders,policies"); if (!r.error) instructionCategories = r.data ?? []; });
   const traineeFacebook: Record<string, string> = {};
   task(async () => { const r = await db.from("trainees").select("id,facebook_url").not("facebook_url", "is", null).limit(5000); if (!r.error) for (const x of (r.data ?? []) as { id: string; facebook_url: string }[]) traineeFacebook[x.id] = x.facebook_url; });
   // Applicants Registration has handed to the Cashier for payment (202610070004).
@@ -1334,7 +1312,7 @@ export async function GET(request: Request) {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, feedbackLinks: certs.feedbackLinks, certificatePhotos: certs.photos, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, traineeFacebook, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, pendingRebates, deliveryRequests, instructors, accreditations, batchResources, batchCancels, certificateNumberSettings, legacyCertificates, holidays, otherIncome, incomeCategories, rebatesReceived, traineeProofs, companyCharge, billingStatements, paymentVoids, voidedPayments }, { headers: { "Cache-Control": "no-store" } });
+    centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, traineeFacebook, instructionCategories, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, pendingRebates, deliveryRequests, instructors, accreditations, batchResources, batchCancels, certificateNumberSettings, legacyCertificates, holidays, otherIncome, incomeCategories, rebatesReceived, traineeProofs, companyCharge, billingStatements, paymentVoids, voidedPayments }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /**
@@ -1992,6 +1970,14 @@ export async function POST(request: Request) {
       await admin.from("request_events").insert({ request_id: req.id, actor_id: staff.user.id, event_type: input.approve ? "approved" : "rejected", remarks: input.remarks ?? null });
       return NextResponse.json({ ok: true });
     }
+    if (input.action === "instruction-category-save") {
+      if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin edits the training instructions." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { error } = await admin.from("instruction_category_templates").upsert({ category: input.category, subject: input.subject, bring: input.bring, reminders: input.reminders, policies: input.policies, updated_by: staff.user.id, updated_at: new Date().toISOString() }, { onConflict: "category" });
+      if (error) return NextResponse.json({ error: /instruction_category_templates/.test(error.message) ? "Apply database update 202610290073 first." : error.message }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, action: "training_instructions.category_saved", record_type: "instruction_category_template", record_id: input.category, new_values: { subject: input.subject, bring: input.bring, reminders: input.reminders, policies: input.policies } });
+      return NextResponse.json({ ok: true });
+    }
     if (input.action === "instruction-template-save") {
       if (!staff.roleCodes.some((r) => ["admin", "registration"].includes(r))) return NextResponse.json({ error: "Your account cannot edit instruction templates." }, { status: 403 });
       const admin = createSupabaseAdminClient();
@@ -2163,7 +2149,6 @@ export async function POST(request: Request) {
       const { error } = await admin.from("enrollments").update({ enrollment_status: "Enrolled", enrolled_at: at, company_charge_agency_id: agency.id, referral_agency_id: agency.id, source: "Agency", updated_at: at }).eq("id", input.enrollmentId).eq("enrollment_status", "Pending");
       if (error) return NextResponse.json({ error: /company_charge_agency_id/.test(error.message) ? "Apply database update 202610290063 first." : error.message }, { status: 400 });
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "registration", action: "application.company_charge", record_type: "enrollment", record_id: input.enrollmentId, new_values: { agency_id: agency.id, agency: agency.name } });
-      await autoSendInstructions(admin, [input.enrollmentId]);
       return NextResponse.json({ ok: true });
     }
     if (input.action === "enrollment-source") {
@@ -3142,7 +3127,6 @@ export async function POST(request: Request) {
         posted.push({ id: (pay as { id: string }).id, label: part.label, amount });
       }
       if (input.proofId) await stampTraineeProof(admin, input.proofId, staff.user.id, input.referenceNumber);
-      await autoSendInstructions(admin, ids);
       const enrolled = await tryAutoEnroll(admin, ids, staff.user.id);
       const implemented = await autoImplementPaidRequests(admin, ids, staff.user.id);
       await applyReferralRebates(admin, ids, staff.user.id, { paid: true }); // "No deduction" agencies: rebate owed once paid
@@ -3483,7 +3467,6 @@ export async function POST(request: Request) {
       target_method: input.method, target_receiving_account: input.receivingAccount, target_reference: input.referenceNumber || null,
       target_received_at: input.receivedAt, target_proof: input.proofId ?? null, target_allocations: [{ enrollment_id: input.enrollmentId, amount_centavos: input.amountCentavos }], target_remarks: input.remarks || null });
     if (error) throw error;
-    await autoSendInstructions(admin, [input.enrollmentId]);
     const enrolled = await tryAutoEnroll(admin, [input.enrollmentId], staff.user.id);
     const implemented = await autoImplementPaidRequests(admin, [input.enrollmentId], staff.user.id);
     await applyReferralRebates(admin, [input.enrollmentId], staff.user.id, { paid: true }); // "No deduction" agencies: rebate owed once paid

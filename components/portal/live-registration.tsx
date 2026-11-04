@@ -721,10 +721,26 @@ function OtherCenterEditor({ data, enrollment: e, busy, post }: { data: PortalDa
   </div>;
 }
 
+/**
+ * Registration generates the Training Instructions (owner, 3 Nov 2026), enrolled trainees only:
+ * opens the half-Legal sheet to print and emails it to the trainee, at most twice.
+ */
+export function GenerateInstructions({ data, enrollment: e, reload, label = "Generate" }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; label?: string }) {
+  const { busy, msg, post } = usePost(reload);
+  const pdf = `/api/documents/training-instructions/${e.id}`;
+  const count = instructionsCountOf(data, e), enrolled = ["Enrolled", "Open Schedule"].includes(e.enrollment_status), atLimit = count >= INSTRUCTION_LIMIT;
+  const emailed = emailStatusText(data.instructionEmails?.[e.id]);
+  const generate = () => { window.open(pdf, "_blank"); void post({ action: "send-instructions", enrollmentId: e.id }).catch(() => undefined); };
+  if (e.enrollment_status === "Cancelled") return null;
+  return <span className="gi" onClick={(ev) => ev.stopPropagation()}>
+    <button type="button" className={enrolled && !atLimit ? "portal-primary" : "portal-secondary"} disabled={busy || !enrolled || atLimit} onClick={generate}>{busy ? "Generating…" : label}</button>
+    <small>{!enrolled ? "Enrolled trainees only" : count ? `Generated ${count} of ${INSTRUCTION_LIMIT}${emailed ? ` · ${emailed}` : ""}` : "Not yet generated"}{enrolled && count > 0 && <> · <a href={pdf} target="_blank" rel="noreferrer">View PDF</a></>}</small>
+    {msg?.kind === "error" && <small className="cx-bad">{msg.text}</small>}
+  </span>;
+}
+
 export function EnrollmentDrawer({ data, enrollment: e, reload, onClose, onOpenAccount }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void; onOpenAccount?: () => void }) {
   const { busy, msg, post } = usePost(reload);
-  const generated = instructionsCountOf(data, e), atLimit = generated >= INSTRUCTION_LIMIT;
-  const mail = data.instructionEmails?.[e.id], emailOk = !!mail && mail.state !== "Failed" && mail.state !== "Delivery Failed", emailFailed = !!mail && !emailOk;
   const [req, setReq] = useState<RequestType | null>(null);
   const [addingCourse, setAddingCourse] = useState(false);
   const [choosingBatch, setChoosingBatch] = useState(false);
@@ -768,10 +784,9 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose, onOpenA
       {hasDocuments ? <>
         <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
           <TarButton data={data} traineeId={e.trainee_id} reload={reload} className="portal-primary" />
-          <a href={`/api/documents/training-instructions/${e.id}`} target="_blank" rel="noreferrer">Instructions PDF</a>
-          {!atLimit && (!emailOk || emailFailed) && <button type="button" disabled={busy} onClick={() => void post({ action: "send-instructions", enrollmentId: e.id }, "Instructions emailed to the trainee.").catch(() => undefined)}>Resend Email</button>}
+          <GenerateInstructions data={data} enrollment={e} reload={reload} label="Generate Training Instructions" />
         </div>
-        <p className="portal-form-note full">Instructions are emailed automatically{emailStatusText(data.instructionEmails?.[e.id]) ? `: ${emailStatusText(data.instructionEmails?.[e.id])}.` : t?.email ? ` to ${t.email} once the trainee is paid.` : "."} Print the Training Admission Record here once the trainee is paid.</p>
+        <p className="portal-form-note full">Generating opens the half-Legal sheet to print and emails it{t?.email ? ` to ${t.email}` : ""}. Print the Training Admission Record here too.</p>
       </> : isApplication ? <>
         <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}><TarButton data={data} traineeId={e.trainee_id} reload={reload} className="portal-primary" /></div>
         <p className="portal-form-note full">The TAR prints regardless of payment and shows the balance. Training instructions become available once the trainee is paid and enrolled.</p>

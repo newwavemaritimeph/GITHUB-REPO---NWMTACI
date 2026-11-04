@@ -18,7 +18,9 @@ import { MoveBatch } from "./portal/move-batch";
 import { AdminConfiguration } from "./admin-configuration";
 import { DateReports } from "./date-reports";
 import { downloadCsv } from "@/lib/csv";
-import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer, CourseSourceCell, MetaThreadField, partnerOf, chargeTo } from "./portal/live-registration";
+import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer, CourseSourceCell, GenerateInstructions, MetaThreadField, partnerOf, chargeTo } from "./portal/live-registration";
+import { InstructionTemplates } from "./portal/instruction-templates";
+import type { CategoryTemplate } from "@/lib/instruction-templates";
 import { sourceLabel } from "@/lib/company-charge";
 import { PaymentVoidCell } from "./portal/payment-void";
 import { ALL_DATES, Badge, DataSince, Message, Modal, Page, PageHead, PeriodBar, manilaDay, submit, fullName, txWhen, useMonthRows, useNeedSince, usePaged, usePeriod } from "./portal/shared-ui";
@@ -42,7 +44,7 @@ import { ClassroomLinksImport, DefaultRoomsPanel } from "./portal/admin-setup";
 import { AdminHome, AdminSearchTrainee, AdminEnrollments, AdminVouchers, AdminHolidays } from "./portal/admin-home";
 import { askText, askConfirm, showAlert } from "./portal/dialogs";
 
-type Module = "Classroom links" | "Post-tests" | "Dashboard" | "Waiting" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Billing statement" | "MISMO dashboard" | "Completion records" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
+type Module = "Classroom links" | "Post-tests" | "Training instructions" | "Dashboard" | "Waiting" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Billing statement" | "MISMO dashboard" | "Completion records" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -79,6 +81,7 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   // Website enrollment number (NWMTACI-0000001) per trainee id; empty until migration 202610070003.
   applicationNumbers?:Record<string,string>;
   traineeFacebook?:Record<string,string>;
+  instructionCategories?:CategoryTemplate[];
   // Pending applications Registration handed to the Cashier: enrollment id → when (202610070004).
   handedToCashier?:Record<string,string>;
   traineeProofs?:TraineeProofRow[];
@@ -145,7 +148,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   admin_assistant: ["Dashboard","Batch schedules","Resource planning","Instructors","Reconciliation"],
   hr: [],
   // Admin (owner, 3 Nov 2026): Dashboard · Enrollments ▾ · Schedules ▾ · Reports ▾ · MISMO ▾ · Configuration ▾ (ADMIN_TABS).
-  admin: ["Dashboard","Search trainee","Enrollments","Batch schedules","Resource planning","Courses","Post-tests","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Holidays","Requests","Daily summary report","Receipts and TARs","Cash and sales summary","Billing statement","MISMO dashboard","Final list","Submissions","Completion records"],
+  admin: ["Dashboard","Search trainee","Enrollments","Batch schedules","Resource planning","Courses","Post-tests","Training instructions","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Holidays","Requests","Daily summary report","Receipts and TARs","Cash and sales summary","Billing statement","MISMO dashboard","Final list","Submissions","Completion records"],
   // Cashier (Accounting Officer), owner's menu of 7 Oct 2026, shown as top tabs:
   // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses,
   // Report (with opening and closing), Requests (CASHIER_TABS).
@@ -156,7 +159,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Dashboard",icon:"⌂",group:"Work"},{label:"Search trainee",icon:"⌕",roles:["admin"],group:"Work"},{label:"Trainee enrollments",icon:"◎",roles:["accounting"],group:"Work"},{label:"Trainees",icon:"◎",roles:["admin","registration","cashier","accounting"],group:"Work"},
-  {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting"],group:"Work"},{label:"Registration",icon:"✎",roles:["registration"],group:"Work"},{label:"Courses",icon:"◇",roles:["registration","admin"],group:"Work"},{label:"Post-tests",icon:"✓",roles:["admin"],group:"Configuration"},{label:"Classroom links",icon:"⇗",roles:["admin"],group:"Configuration"},
+  {label:"Enrollments",icon:"▤",roles:["admin","registration","accounting"],group:"Work"},{label:"Registration",icon:"✎",roles:["registration"],group:"Work"},{label:"Courses",icon:"◇",roles:["registration","admin"],group:"Work"},{label:"Post-tests",icon:"✓",roles:["admin"],group:"Configuration"},{label:"Training instructions",icon:"✎",roles:["admin"],group:"Configuration"},{label:"Classroom links",icon:"⇗",roles:["admin"],group:"Configuration"},
   {label:"Schedules",icon:"□",roles:["admin","registration"],group:"Work"},{label:"Instructions",icon:"✉",roles:["admin"],group:"Work"},{label:"Attendance",icon:"✓",roles:["admin"],group:"Work"},
   {label:"Rooms & facilities",icon:"▢",roles:["admin"],group:"Work"},{label:"Training calendar",icon:"▦",roles:["admin"],group:"Work"},{label:"Trainee scheduling",icon:"◎",roles:["admin"],group:"Work"},{label:"Instructor assignment",icon:"♙",roles:["admin"],group:"Work"},{label:"Schedule changes",icon:"↺",roles:["admin"],group:"Records"},{label:"Certificates",icon:"◈",roles:["admin","releasing_officer"],group:"Work"},{label:"Requests",icon:"↺",roles:["admin","accounting","cashier"],group:"Work"},
   {label:"Reports",icon:"↥",roles:["admin","accounting","releasing_officer","registration","cashier"],group:"Records"},
@@ -212,7 +215,7 @@ const ADMIN_TABS:TopTab[]=[
   {label:"Schedules",items:["Batch schedules","Resource planning"]},
   {label:"Reports",items:["Daily summary report","Receipts and TARs","Cash and sales summary","Billing statement"]},
   {label:"MISMO",items:["MISMO dashboard","Final list","Submissions","Completion records"]},
-  {label:"Configuration",items:["Courses","Post-tests","Classroom links","Instructors","Classrooms","Certifications","Holidays","Schedule of fees","Payment channels","Expense categories","Other income categories","Employee accounts","Partnered Centers"],
+  {label:"Configuration",items:["Courses","Post-tests","Training instructions","Classroom links","Instructors","Classrooms","Certifications","Holidays","Schedule of fees","Payment channels","Expense categories","Other income categories","Employee accounts","Partnered Centers"],
     heads:{Courses:"Training","Schedule of fees":"Fees and Accounts","Employee accounts":"People and Partners"}},
 ];
 function topTabsFor(role:string,allowed:Module[]):TopTab[]{
@@ -399,6 +402,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   // Admin › Configuration › Courses: add, edit and remove (owner, 20 Oct 2026); Registration keeps the read-only list.
   // Admin › Configuration › Post-Tests (owner, 20 Oct 2026).
   if(active==="Post-tests"&&gateRole==="admin")return <PostTestReview/>;
+  if(active==="Training instructions"&&gateRole==="admin")return <InstructionTemplates data={data} reload={reload}/>;
   // Admin one-time setup (owner, 20 Oct 2026): Classroom links per course or batch.
   if(active==="Classroom links"&&gateRole==="admin")return <ClassroomLinksImport data={data as unknown as Parameters<typeof ClassroomLinksImport>[0]["data"]} reload={reload}/>;
   if(active==="Courses"&&gateRole==="admin")return <AccountingConfiguration section="Courses" data={data as unknown as Parameters<typeof AccountingConfiguration>[0]["data"]} reload={reload}/>;
@@ -698,12 +702,12 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
       <div className="tp-cols">
         <div className="tp-main">
           <section className="tp-panel"><h4>Courses</h4>
-            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Course</th><th>Schedule</th><th>Source</th><th>Rebate</th><th>Status</th><th className="r">Due</th><th className="r">Paid</th><th className="r">Balance</th></tr></thead><tbody>
+            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Course</th><th>Schedule</th><th>Source</th><th>Rebate</th><th>Status</th><th className="r">Due</th><th className="r">Paid</th><th className="r">Balance</th>{canEdit&&<th>Training Instructions</th>}</tr></thead><tbody>
               {enrolls.map(e=>{const c=first(e.courses),cancelled=e.enrollment_status==="Cancelled",d=cancelled?0:dueCentavos(e),bal=cancelled?0:balanceOf(e);return <tr key={e.id} className={canEdit?"sa-click":undefined} onClick={canEdit?()=>setOpenEnrollment(e.id):undefined} title={canEdit?"Open this enrollment":undefined}>
                 <td><b>{c?.code??"Course"}</b><small>{c?.name} · {e.enrollment_number}</small></td><td>{when(e)}</td><td>{canEdit?<CourseSourceCell key={`${e.id}:${partnerOf(data,e)?.id??e.source}`} data={data} enrollment={e} busy={busy} post={post}/>:<span className={`cs-chip ${partnerOf(data,e)?"ag":"wk"}`}>{sourceLabel(e.source,partnerOf(data,e))||"Online"}</span>}</td><td>{rebateOf(e)}</td>
                 <td>{!cancelled&&chargeTo(data,e)?<Badge tone="pending">Company Charge</Badge>:<Badge tone={e.enrollment_status==="Enrolled"?"active":e.enrollment_status==="Cancelled"?"cancelled":"pending"}>{e.enrollment_status}</Badge>}</td>
-                <td className="r tp-mono">{money(d)}</td><td className="r tp-mono">{money(Math.max(0,d-bal))}</td><td className="r tp-mono">{money(bal)}</td></tr>})}
-              {!enrolls.length&&<tr><td colSpan={8} className="sa-empty">No courses yet.</td></tr>}
+                <td className="r tp-mono">{money(d)}</td><td className="r tp-mono">{money(Math.max(0,d-bal))}</td><td className="r tp-mono">{money(bal)}</td>{canEdit&&<td>{reload&&<GenerateInstructions data={data} enrollment={e} reload={reload}/>}</td>}</tr>})}
+              {!enrolls.length&&<tr><td colSpan={canEdit?9:8} className="sa-empty">No courses yet.</td></tr>}
             </tbody></table></div>
             {(account?.tarGroups?.length??0)>0&&<><h4 className="tp-sub">Transactions</h4>
             <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Transaction</th><th>Courses</th><th>TAR No.</th><th>Receipts</th></tr></thead><tbody>
