@@ -28,6 +28,8 @@ try {
     $doc = $word.Documents.Open($tmp, $false, $false, $false)
     try {
       $body = $doc.Content
+      # The signer's title (owner, 4 Nov 2026), as in convert.ps1.
+      foreach ($h in (Find-All $body "Operational Manager")) { $h.Text = "Operations Manager" }
       $conducted = (Find-All $body "Conducted " | Select-Object -First 1).Paragraphs.Item(1)
       $blanks = Find-All $conducted.Range "_{5,}" $true
       $names = if ($blanks.Count -ge 3) { @("[START DATE]", "[END DATE]", "[ASSESS DATE]") } else { @("[START DATE]", "[ASSESS DATE]") }

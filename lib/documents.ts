@@ -1162,7 +1162,7 @@ export async function createCashierReportPdf(s: CashierReportSnapshot) {
     if (y - need >= 70) return;
     footer();
     page = pdf.addPage([W, H]); pageNo += 1; y = H - M;
-    text(`Cashier summary report  |  ${s.dateLabel} (continued)`, M, y - 10, 8, bold, c.navy);
+    text(`Cashier Summary Report  |  ${s.dateLabel} (continued)`, M, y - 10, 8, bold, c.navy);
     y -= 22;
     again?.();
   };
@@ -1199,19 +1199,16 @@ export async function createCashierReportPdf(s: CashierReportSnapshot) {
     page.drawLine({ start: { x: M, y }, end: { x: W - M, y }, thickness: 0.4, color: c.hair });
   };
 
-  // Letterhead.
-  page.drawRectangle({ x: M, y: y - 50, width: CW, height: 50, color: c.navy });
-  if (logo) { page.drawCircle({ x: M + 25, y: y - 25, size: 18, color: c.white }); const d = logo.scale(30 / Math.max(logo.width, logo.height)); page.drawImage(logo, { x: M + 25 - d.width / 2, y: y - 25 - d.height / 2, width: d.width, height: d.height }); }
-  text("New Wave Maritime Training and Assessment Center, Inc.", M + 52, y - 21, 10.5, bold, c.white);
-  text("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000", M + 52, y - 33, 6.6, reg, rgb(.62, .89, .945));
-  right("CASHIER SUMMARY REPORT", W - M - 12, y - 21, 11, bold, c.white);
-  right(s.dateLabel, W - M - 12, y - 34, 8, reg, rgb(.62, .89, .945));
-  y -= 50;
-  const third = CW / 3;
-  page.drawRectangle({ x: M, y: y - 3, width: third, height: 3, color: c.orange });
-  page.drawRectangle({ x: M + third, y: y - 3, width: third, height: 3, color: c.cyan });
-  page.drawRectangle({ x: M + 2 * third, y: y - 3, width: CW - 2 * third, height: 3, color: c.blue });
-  y -= 10;
+  // Header 3 "Report First" (owner's choice, 4 Nov 2026): the report's name and date read first; New Wave's details on the right.
+  text("Cashier Summary Report", M, y - 17, 20, bold, c.navy);
+  text(s.dateLabel, M, y - 31, 9.5, bold, c.orange);
+  const logoS = 34, detailsX = W - M - (logo ? logoS + 7 : 0);
+  if (logo) { const d = logo.scaleToFit(logoS, logoS); page.drawImage(logo, { x: W - M - logoS + (logoS - d.width) / 2, y: y - logoS + (logoS - d.height) / 2, width: d.width, height: d.height }); }
+  right("New Wave Maritime Training and Assessment Center, Inc.", detailsX, y - 10, 7.6, bold, c.navy);
+  right("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000", detailsX, y - 19, 6.6, reg, c.muted);
+  right("0948-847-6530  |  (02) 8553 0310  |  newwavemaritime@gmail.com", detailsX, y - 27, 6.6, reg, c.muted);
+  page.drawRectangle({ x: M, y: y - 41, width: CW, height: 2, color: c.navy });
+  y -= 47;
 
   // 1. Cash position.
   section("1. Cash position", "Cash only");
