@@ -119,7 +119,7 @@ export function CashierPaymentQueue({ data, onPay, reload }: { data: PortalData;
     </tbody></table>{!rows.length && <p className="portal-empty-copy">No applicants waiting for payment. Registration hands them over once their requirements are complete.</p>}</div>
 
     <section className="portal-panel live-list" style={{ marginTop: 16 }}>
-      <div className="panel-heading"><div><h2>Paid · Training Admission Record</h2><p>Enrolled trainees paid in the last 7 days. The TAR prints twice; more needs the accounting manager&apos;s approval.</p></div><span className="slot-count">{toPrint.length}</span></div>
+      <div className="panel-heading"><div><h2>Paid · Training Admission Record</h2><p>Enrolled trainees paid in the last 7 days. The TAR prints twice; more needs Accounting&apos;s approval.</p></div><span className="slot-count">{toPrint.length}</span></div>
       {toPrint.map((t) => { const s = tarState(data, t.id); return <div className="live-row-item" key={t.id}>
         <div><strong>{fullName(t)}</strong><small>{data.applicationNumbers?.[t.id] ? <span className="app-no">{data.applicationNumbers[t.id]}</span> : null}{s.paid.map((e) => first(e.courses)?.code ?? first(e.courses)?.name).filter(Boolean).join(", ")}{s.record ? ` · ${s.record.ar_number} · printed ${s.printed} of ${s.allowed}` : " · not printed yet"}</small></div>
       </div>; })}
@@ -161,8 +161,8 @@ export function RequestChargeModal({ data, request, reload, onClose }: { data: P
         <label>Amount (PHP)<input type="number" min="0" step="0.01" value={amount} onChange={(ev) => setAmount(ev.target.value)} /></label>
       </>}
       </>}
-      <label className="full">Remarks (Optional)<input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="For the accounting manager" /></label>
-      <p className="portal-form-note full">The charge is added to the trainee&apos;s balance only when the accounting manager approves the request.</p>
+      <label className="full">Remarks (Optional)<input value={remarks} onChange={(ev) => setRemarks(ev.target.value)} placeholder="For Accounting" /></label>
+      <p className="portal-form-note full">The charge is added to the trainee&apos;s balance only when Accounting approves the request.</p>
       <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || (!ruled && !valid)} onClick={send}>{busy ? "Sending…" : "Send for Approval"}</button></div>
     </div>
   </Modal>;
