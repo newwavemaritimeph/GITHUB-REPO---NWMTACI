@@ -8,7 +8,7 @@ import { bsNumber, buildBillingRows, statementTotal } from "@/lib/billing-statem
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hardDeleteEnrollment, pruneUnpaidEnrollments, deletePastEmptyBatches } from "@/lib/enrollments";
-import { VALIDATION_MESSAGES, isEmail, isFacebookUrl, isPhContactNumber, isSrn, normalizeEmail, normalizeFacebookUrl, normalizePhContactNumber, normalizeSrn } from "@/lib/validation";
+import { VALIDATION_MESSAGES, isEmail, isMetaThreadUrl, isPhContactNumber, isSrn, normalizeEmail, normalizeMetaThreadUrl, normalizePhContactNumber, normalizeSrn } from "@/lib/validation";
 import { emailConfigured, processEmailJobs } from "@/lib/email-jobs";
 import { classroomEmailBlocks } from "@/lib/classroom";
 import { loadInstructionDetails } from "@/lib/training-instructions";
@@ -268,9 +268,9 @@ const traineeUpdateInput = z.object({ action: z.literal("trainee-update"), train
   address: z.string().trim().min(8, "Enter the complete address.").max(500), placeOfBirth: z.string().trim().max(160).optional(),
   rank: z.string().trim().max(100).optional(), company: z.string().trim().max(160).optional(), suffix: z.string().trim().max(20).optional(),
   emergencyContactName: z.string().trim().max(160).optional(), emergencyContactMobile: optionalContact,
-  facebookUrl: z.string().trim().max(300).optional().refine((v) => !v || isFacebookUrl(v), VALIDATION_MESSAGES.facebook) });
-// Registration records the trainee's Facebook link before the hand-over (owner, 3 Nov 2026).
-const traineeFacebookInput = z.object({ action: z.literal("trainee-facebook"), traineeId: z.string().uuid(), url: z.string().trim().max(300).refine(isFacebookUrl, VALIDATION_MESSAGES.facebook) });
+  facebookUrl: z.string().trim().max(1000).optional().refine((v) => !v || isMetaThreadUrl(v), VALIDATION_MESSAGES.metaThread) });
+// Registration records the Meta thread link (the conversation) before the hand-over (owner, 4 Nov 2026).
+const traineeFacebookInput = z.object({ action: z.literal("trainee-facebook"), traineeId: z.string().uuid(), url: z.string().trim().max(1000).refine(isMetaThreadUrl, VALIDATION_MESSAGES.metaThread) });
 // One TAR per enrollment date (owner, 3 Nov 2026): enrollmentIds picks the date group; without it, the newest.
 const admissionRecordInput = z.object({ action: z.literal("admission-record-issue"), traineeId: z.string().uuid(), enrollmentIds: z.array(z.string().uuid()).max(30).optional() });
 // Accounting reprints a receipt or a TAR from the Trainee Account, with a reason (owner, 3 Nov 2026).
@@ -422,9 +422,9 @@ async function setCourseSource(admin: ReturnType<typeof createSupabaseAdminClien
   return null;
 }
 
-// Trainee Facebook link (owner, 3 Nov 2026; migration 202610290070).
+// Meta thread link (owner, 4 Nov 2026), kept in the facebook_url column of migration 202610290070.
 async function saveFacebook(admin: ReturnType<typeof createSupabaseAdminClient>, traineeId: string, raw: string, actorId: string): Promise<{ url?: string; error?: string }> {
-  const url = normalizeFacebookUrl(raw);
+  const url = normalizeMetaThreadUrl(raw);
   const { data: prior, error: readError } = await admin.from("trainees").select("facebook_url").eq("id", traineeId).maybeSingle();
   if (readError) return { error: /facebook_url/.test(readError.message) ? "Apply database update 202610290070 first." : readError.message };
   if (!prior) return { error: "Trainee not found." };
@@ -435,7 +435,7 @@ async function saveFacebook(admin: ReturnType<typeof createSupabaseAdminClient>,
   return { url };
 }
 
-/** True when the application's trainee has no Facebook link yet; false before migration 070 so nothing is blocked. */
+/** True when the application's trainee has no Meta thread link yet; false before migration 070 so nothing is blocked. */
 async function facebookMissing(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentId: string) {
   const { data, error } = await admin.from("enrollments").select("trainees(facebook_url)").eq("id", enrollmentId).maybeSingle();
   if (error) return false;
@@ -1046,7 +1046,7 @@ export async function GET(request: Request) {
   // yet applied) yields none.
   let applicationNumbers: Record<string, string> = {};
   task(async () => { const { data: numberRows } = await db.from("trainees").select("id,application_number").not("application_number", "is", null).limit(5000); applicationNumbers = Object.fromEntries((numberRows ?? []).map((row: { id: string; application_number: string }) => [row.id, row.application_number])); });
-  // Trainee Facebook links (migration 070); none before it is applied.
+  // Meta thread links (migration 070); none before it is applied.
   const traineeFacebook: Record<string, string> = {};
   task(async () => { const r = await db.from("trainees").select("id,facebook_url").not("facebook_url", "is", null).limit(5000); if (!r.error) for (const x of (r.data ?? []) as { id: string; facebook_url: string }[]) traineeFacebook[x.id] = x.facebook_url; });
   // Applicants Registration has handed to the Cashier for payment (202610070004).
@@ -2101,12 +2101,12 @@ export async function POST(request: Request) {
       const { error } = await admin.from("trainees").update(next).eq("id", input.traineeId);
       if (error) throw error;
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "registration", action: "trainee.updated", record_type: "trainee", record_id: input.traineeId, prior_values: prior, new_values: next });
-      // A blank Facebook field keeps the link already recorded.
+      // A blank Meta thread field keeps the link already recorded.
       if (input.facebookUrl) { const fb = await saveFacebook(admin, input.traineeId, input.facebookUrl, staff.user.id); if (fb.error) return NextResponse.json({ error: fb.error }, { status: 400 }); }
       return NextResponse.json({ ok: true });
     }
     if (input.action === "trainee-facebook") {
-      if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Only Registration records the Facebook link." }, { status: 403 });
+      if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Only Registration records the Meta thread link." }, { status: 403 });
       const fb = await saveFacebook(createSupabaseAdminClient(), input.traineeId, input.url, staff.user.id);
       if (fb.error) return NextResponse.json({ error: fb.error }, { status: 400 });
       return NextResponse.json({ ok: true, url: fb.url });
@@ -2139,7 +2139,7 @@ export async function POST(request: Request) {
       const latest = new Map<string, string>();
       for (const c of checks ?? []) { const code = c.requirement === "medical_certificate" ? "medical_peme" : c.requirement; if (!latest.has(code)) latest.set(code, c.status); }
       if (!REQUIREMENT_CODES.every((code) => latest.get(code) === "Verified")) return NextResponse.json({ error: "Tick all four requirements (valid ID, PEME medical, 2x2 photo, seaman's book / SRN) before handing to the Cashier." }, { status: 400 });
-      if (await facebookMissing(admin, input.enrollmentId)) return NextResponse.json({ error: "Add the trainee's Facebook link first." }, { status: 400 });
+      if (await facebookMissing(admin, input.enrollmentId)) return NextResponse.json({ error: "Add the trainee's Meta thread link first." }, { status: 400 });
       const at = new Date().toISOString();
       const { error } = await admin.from("enrollments").update({ handed_to_cashier_at: at, handed_to_cashier_by: staff.user.id }).eq("id", input.enrollmentId).is("handed_to_cashier_at", null);
       if (error) throw error;
@@ -2162,7 +2162,7 @@ export async function POST(request: Request) {
       const latest = new Map<string, string>();
       for (const c of checks ?? []) { const code = c.requirement === "medical_certificate" ? "medical_peme" : c.requirement; if (!latest.has(code)) latest.set(code, c.status); }
       if (!REQUIREMENT_CODES.every((code) => latest.get(code) === "Verified")) return NextResponse.json({ error: "Tick all four requirements first." }, { status: 400 });
-      if (await facebookMissing(admin, input.enrollmentId)) return NextResponse.json({ error: "Add the trainee's Facebook link first." }, { status: 400 });
+      if (await facebookMissing(admin, input.enrollmentId)) return NextResponse.json({ error: "Add the trainee's Meta thread link first." }, { status: 400 });
       const at = new Date().toISOString();
       const { error } = await admin.from("enrollments").update({ enrollment_status: "Enrolled", enrolled_at: at, company_charge_agency_id: agency.id, referral_agency_id: agency.id, source: "Agency", updated_at: at }).eq("id", input.enrollmentId).eq("enrollment_status", "Pending");
       if (error) return NextResponse.json({ error: /company_charge_agency_id/.test(error.message) ? "Apply database update 202610290063 first." : error.message }, { status: 400 });

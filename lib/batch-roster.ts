@@ -38,7 +38,7 @@ export async function loadBatchRoster(db: ReturnType<typeof createSupabaseAdminC
   ]);
   const list = (ens ?? []) as unknown as { id: string; enrollment_status: string; source: string | null; selling_price_centavos: number; referral_agency_id: string | null; trainee_id: string; trainees: unknown }[];
   const ids = list.map((e) => e.id);
-  // Facebook links (migration 070) are read on their own, so the list still loads before it is applied.
+  // Meta thread links (migration 070) are read on their own, so the list still loads before it is applied.
   const traineeIds = [...new Set(list.map((e) => e.trainee_id))];
   const fbRes = traineeIds.length ? await db.from("trainees").select("id,facebook_url").in("id", traineeIds) : null;
   const facebook = new Map(((fbRes && !fbRes.error ? fbRes.data : []) ?? []).map((x) => [x.id as string, (x.facebook_url as string | null) ?? ""]));

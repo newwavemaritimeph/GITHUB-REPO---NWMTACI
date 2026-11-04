@@ -6,12 +6,12 @@
 export type CopyCourse = { course: string; center: string; date: string };
 export type CopyTrainee = { name: string; nwmtaciNo: string; birthDate: string; placeOfBirth: string; srn: string; rank: string; company: string; address: string; mobile: string; email: string; facebook: string; emergency: string; courses: CopyCourse[] };
 
-export const COPY_COLUMNS = ["Full Name", "NWMTACI No.", "Birth Date", "Place of Birth", "SRN", "Rank", "Company", "Address", "Mobile", "Email", "Facebook", "Emergency Contact", "Course", "Center", "Training Date"];
+export const COPY_COLUMNS = ["Full Name", "NWMTACI No.", "Birth Date", "Place of Birth", "SRN", "Rank", "Company", "Address", "Mobile", "Email", "Meta Thread", "Emergency Contact", "Course", "Center", "Training Date"];
 
 const clean = (v: string) => v.replace(/[\t\r\n]+/g, " ").trim();
 
 export function traineeCopy(t: CopyTrainee) {
-  const base: [string, string][] = [["Full Name", t.name], ["NWMTACI No.", t.nwmtaciNo], ["Birth Date", t.birthDate], ["Place of Birth", t.placeOfBirth], ["SRN", t.srn], ["Rank", t.rank], ["Company", t.company], ["Address", t.address], ["Mobile", t.mobile], ["Email", t.email], ["Facebook", t.facebook], ["Emergency Contact", t.emergency]];
+  const base: [string, string][] = [["Full Name", t.name], ["NWMTACI No.", t.nwmtaciNo], ["Birth Date", t.birthDate], ["Place of Birth", t.placeOfBirth], ["SRN", t.srn], ["Rank", t.rank], ["Company", t.company], ["Address", t.address], ["Mobile", t.mobile], ["Email", t.email], ["Meta Thread", t.facebook], ["Emergency Contact", t.emergency]];
   const courseLines = t.courses.map((c, i) => `Course${t.courses.length > 1 ? ` ${i + 1}` : ""}: ${[c.course, c.center, c.date].filter(Boolean).join(" · ")}`);
   const text = [...base.filter(([, v]) => v).map(([k, v]) => `${k}: ${clean(v)}`), ...courseLines].join("\n");
   const fields = base.map(([, v]) => clean(v));

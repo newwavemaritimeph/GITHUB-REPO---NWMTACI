@@ -343,7 +343,7 @@ function BatchRosterModal({ batch, onClose }: { batch: Batch; onClose: () => voi
     const text = (roster?.rows ?? []).map((r, i) => `${i + 1}. ${r.name} · ${r.nwmtaciNo}`).join("\n");
     try { await navigator.clipboard.writeText(text); setCopyBox(""); setNote(`Copied ${roster?.rows.length ?? 0} names. Paste them in Messenger or Viber.`); } catch { setCopyBox(text); }
   }
-  const csv = () => roster && downloadCsv(`batch-${roster.batch.batchNumber}.csv`, [["#", "Trainee", "NWMTACI No.", "SRN", "Rank", "Mobile", "Email", "Facebook", "Source", "Status", "Payment", "Requirements"], ...roster.rows.map((r, i) => [i + 1, r.name, r.nwmtaciNo, r.srn, r.rank, r.mobile, r.email, r.facebook, r.source, r.status, payText(r), `${r.requirements} of 4`])]);
+  const csv = () => roster && downloadCsv(`batch-${roster.batch.batchNumber}.csv`, [["#", "Trainee", "NWMTACI No.", "SRN", "Rank", "Mobile", "Email", "Meta Thread", "Source", "Status", "Payment", "Requirements"], ...roster.rows.map((r, i) => [i + 1, r.name, r.nwmtaciNo, r.srn, r.rank, r.mobile, r.email, r.facebook, r.source, r.status, payText(r), `${r.requirements} of 4`])]);
   return <Modal title={`Batch ${batch.batch_number}`} onClose={onClose} wide><div className="portal-form br">
     {error && <Message kind="error" text={error} />}
     {note && <Message kind="success" text={note} />}

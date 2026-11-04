@@ -104,19 +104,20 @@ export function normalizeEmail(value: string) {
   return (value ?? "").trim().toLowerCase();
 }
 
-/* ------------------------------------------------------------- facebook ----- */
+/* ---------------------------------------------------------- meta thread ----- */
 
-// Registration records each trainee's Facebook profile (owner, 3 Nov 2026).
+// Registration records the Meta conversation with the trainee, not a profile (owner, 4 Nov 2026):
+// Business Suite inbox, Facebook or Instagram messages, Messenger or m.me.
 // The domain must be followed by "/" so facebook.com.example.net is refused.
-const FACEBOOK = /^(https?:\/\/)?(www\.|m\.|web\.)?(facebook\.com|fb\.com|fb\.me)\/\S{2,}$/i;
+const META_THREAD = /^(https?:\/\/)?(?:(?:(?:www|m|web|business)\.)?facebook\.com\/(?:messages\/\S+|(?:[^\s?#]+\/)?inbox[/?]\S+)|(?:www\.)?messenger\.com\/\S+|m\.me\/\S+|(?:www\.)?instagram\.com\/direct\/\S+)$/i;
 
-export function isFacebookUrl(value: string) {
+export function isMetaThreadUrl(value: string) {
   const trimmed = (value ?? "").trim();
-  return trimmed.length <= 300 && FACEBOOK.test(trimmed);
+  return trimmed.length <= 1000 && META_THREAD.test(trimmed);
 }
 
 /** Always an https:// link, so the stored value is safe to use as an href. */
-export function normalizeFacebookUrl(value: string) {
+export function normalizeMetaThreadUrl(value: string) {
   const trimmed = (value ?? "").trim();
   return /^https?:\/\//i.test(trimmed) ? trimmed.replace(/^http:/i, "https:") : `https://${trimmed}`;
 }
@@ -128,5 +129,5 @@ export const VALIDATION_MESSAGES = {
   contact: "Enter a Philippine mobile or landline number, for example 0917 123 4567 or (02) 8553 0310.",
   srn: "The SRN must be exactly 10 digits.",
   email: "Enter a valid email address, for example name@example.com.",
-  facebook: "Use a facebook.com link, for example https://www.facebook.com/juan.delacruz.",
+  metaThread: "Paste the conversation link from Meta Business Suite or Messenger.",
 } as const;

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   formatPhMobile,
   isEmail,
-  isFacebookUrl,
-  normalizeFacebookUrl,
+  isMetaThreadUrl,
+  normalizeMetaThreadUrl,
   isPhContactNumber,
   isPhMobile,
   isSrn,
@@ -93,21 +93,28 @@ describe("email addresses", () => {
   });
 });
 
-describe("facebook links", () => {
-  it("accepts facebook.com, fb.com and fb.me profile links", () => {
-    expect(isFacebookUrl("https://www.facebook.com/juan.delacruz")).toBe(true);
-    expect(isFacebookUrl("facebook.com/profile.php?id=100012345678")).toBe(true);
-    expect(isFacebookUrl("m.facebook.com/juan")).toBe(true);
-    expect(isFacebookUrl("fb.me/juan")).toBe(true);
+describe("meta thread links", () => {
+  it("accepts conversation links", () => {
+    expect(isMetaThreadUrl("https://business.facebook.com/latest/inbox/all?asset_id=1&selected_item_id=2")).toBe(true);
+    expect(isMetaThreadUrl("https://www.facebook.com/messages/t/100012345678")).toBe(true);
+    expect(isMetaThreadUrl("https://www.facebook.com/messages/e2ee/t/100012345678")).toBe(true);
+    expect(isMetaThreadUrl("https://www.messenger.com/t/100012345678")).toBe(true);
+    expect(isMetaThreadUrl("m.me/juan.delacruz")).toBe(true);
+    expect(isMetaThreadUrl("https://www.instagram.com/direct/t/1234/")).toBe(true);
   });
-  it("rejects other sites and bare names", () => {
-    expect(isFacebookUrl("juan delacruz")).toBe(false);
-    expect(isFacebookUrl("https://facebook.com.example.net/juan")).toBe(false);
-    expect(isFacebookUrl("https://www.facebook.com/")).toBe(false);
-    expect(isFacebookUrl("javascript:alert(1)//facebook.com/x")).toBe(false);
+  it("rejects profiles, a bare inbox, other sites and bare names", () => {
+    expect(isMetaThreadUrl("https://www.facebook.com/juan.delacruz")).toBe(false);
+    expect(isMetaThreadUrl("facebook.com/profile.php?id=100012345678")).toBe(false);
+    expect(isMetaThreadUrl("https://business.facebook.com/latest/inbox")).toBe(false);
+    expect(isMetaThreadUrl("juan delacruz")).toBe(false);
+    expect(isMetaThreadUrl("https://facebook.com.example.net/messages/t/1")).toBe(false);
+    expect(isMetaThreadUrl("javascript:alert(1)//facebook.com/messages/t/1")).toBe(false);
+  });
+  it("takes the long links Business Suite gives", () => {
+    expect(isMetaThreadUrl(`https://business.facebook.com/latest/inbox/all?selected_item_id=${"1".repeat(700)}`)).toBe(true);
   });
   it("always stores an https link", () => {
-    expect(normalizeFacebookUrl("facebook.com/juan")).toBe("https://facebook.com/juan");
-    expect(normalizeFacebookUrl("http://www.facebook.com/juan")).toBe("https://www.facebook.com/juan");
+    expect(normalizeMetaThreadUrl("m.me/juan")).toBe("https://m.me/juan");
+    expect(normalizeMetaThreadUrl("http://www.messenger.com/t/1")).toBe("https://www.messenger.com/t/1");
   });
 });

@@ -725,7 +725,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
             <dl className="tp-kv">
               {([["Birth Date",trainee.birthdate?`${date(trainee.birthdate)}${trainee.place_of_birth?` · ${trainee.place_of_birth}`:""}`:""],["SRN",trainee.srn],["Trainee No.",trainee.trainee_number],["Mobile",trainee.mobile],["Email",trainee.email],["Address",trainee.address],["Company",trainee.company]] as [string,string|null|undefined][])
                 .filter(([,v])=>v).map(([k,v])=><Fragment key={k}><dt>{k}</dt><dd>{v}</dd></Fragment>)}
-              <dt>Facebook</dt><dd>{fb.startsWith("https://")?<a href={fb} target="_blank" rel="noreferrer">{fb.replace(/^https:\/\/(www\.)?/,"")}</a>:<span className="muted-text">Not yet recorded</span>}</dd>
+              <dt>Meta Thread</dt><dd>{fb.startsWith("https://")?<a href={fb} target="_blank" rel="noreferrer">Open Conversation</a>:<span className="muted-text">Not yet recorded</span>}</dd>
             </dl></section>}
           {em?.name&&<section className="tp-panel"><h4>Emergency Contact</h4><dl className="tp-kv"><dt>Name</dt><dd>{em.name}</dd>{em.mobile&&<><dt>Mobile</dt><dd>{em.mobile}</dd></>}</dl></section>}
 
@@ -760,7 +760,7 @@ function TraineeEditForm({trainee,facebook,reload,onDone}:{trainee:Trainee;faceb
   const [f,setF]=useState({mobile:trainee.mobile??"",email:trainee.email??"",address:trainee.address??"",placeOfBirth:trainee.place_of_birth??"",rank:trainee.rank??"",company:trainee.company??"",suffix:trainee.suffix??"",emergencyContactName:em?.name??"",emergencyContactMobile:em?.mobile??"",facebookUrl:facebook});
   const [busy,setBusy]=useState(false),[err,setErr]=useState("");
   const set=(k:keyof typeof f)=>(ev:{target:{value:string}})=>setF(c=>({...c,[k]:ev.target.value}));
-  async function save(){setBusy(true);setErr("");try{await submit({action:"trainee-update",traineeId:trainee.id,...f});await reload();onDone()}catch(e){setErr(e instanceof Error?e.message:"Could not save the changes.")}finally{setBusy(false)}}
+  async function save(){setBusy(true);setErr("");try{await submit({action:"trainee-update",traineeId:trainee.id,...f,facebookUrl:f.facebookUrl===facebook?undefined:f.facebookUrl});await reload();onDone()}catch(e){setErr(e instanceof Error?e.message:"Could not save the changes.")}finally{setBusy(false)}}
   return <section className="td-card td-edit"><h4>Edit Details</h4>
     {err&&<Message kind="error" text={err}/>}
     <p className="td-note">Name, SRN and birth date are kept as recorded.</p>
@@ -774,7 +774,7 @@ function TraineeEditForm({trainee,facebook,reload,onDone}:{trainee:Trainee;faceb
       <label>Company / Manning Agency<input value={f.company} onChange={set("company")}/></label>
       <label>Emergency Contact Person<input value={f.emergencyContactName} onChange={set("emergencyContactName")}/></label>
       <label>Emergency Contact Number<input value={f.emergencyContactMobile} onChange={set("emergencyContactMobile")} inputMode="tel"/></label>
-      <label className="full">Facebook Link<input className="lc" value={f.facebookUrl} onChange={set("facebookUrl")} inputMode="url" placeholder="https://www.facebook.com/juan.delacruz"/></label>
+      <label className="full">Meta Thread Link<input value={f.facebookUrl} onChange={set("facebookUrl")} inputMode="url" placeholder="https://business.facebook.com/latest/inbox/…"/></label>
       <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onDone}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={()=>void save()}>{busy?"Saving…":"Save Changes"}</button></div>
     </div>
   </section>;
