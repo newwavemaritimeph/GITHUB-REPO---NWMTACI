@@ -13,6 +13,11 @@ describe("In-House start dates on the public Courses page", () => {
     expect(fitsInWeek("2026-10-18", "1 day")).toBe(false);
     expect(fitsInWeek("2026-10-17", "1 day")).toBe(true);
   });
+  it("has no limit on how far back the date goes; only Sundays and the week rule refuse", () => {
+    expect(fitsInWeek("2020-01-06", "1 day")).toBe(true); // A past Monday
+    expect(fitsInWeek("2020-01-05", "1 day")).toBe(false); // A past Sunday
+    expect(fitsInWeek("2020-01-10", "3 days")).toBe(false); // A past Friday would cross Sunday
+  });
   it("starts courses of six or more days on Monday", () => {
     expect(fitsInWeek("2026-10-12", "5.5 days")).toBe(true);
     expect(fitsInWeek("2026-10-13", "6 days")).toBe(false);

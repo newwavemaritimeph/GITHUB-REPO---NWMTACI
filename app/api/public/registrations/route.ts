@@ -149,8 +149,8 @@ async function tagReferral(db: ReturnType<typeof createSupabaseAdminClient>, tra
  */
 async function attachDatedCourse(db: ReturnType<typeof createSupabaseAdminClient>, traineeId: string, pick: { courseCode: string; startDate: string }) {
   try {
-    const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
-    if ((PUBLIC_STCW_CODES as readonly string[]).includes(pick.courseCode) || pick.startDate <= today) return;
+    // Today or a previous date is allowed (owner, 4 Nov 2026); such a course used to be dropped silently.
+    if ((PUBLIC_STCW_CODES as readonly string[]).includes(pick.courseCode)) return;
     const { data: course } = await db.from("courses").select("id,duration_label").eq("code", pick.courseCode).eq("delivery_type", "In-House").eq("active", true).maybeSingle();
     if (!course || !fitsInWeek(pick.startDate, course.duration_label)) return;
     const { data: enrollment, error } = await db.rpc("assign_application_course", { target_trainee: traineeId, target_course: course.id, target_batch: null, actor: null });

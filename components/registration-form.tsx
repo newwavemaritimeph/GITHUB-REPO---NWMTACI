@@ -67,7 +67,7 @@ const pickedDate = (iso: string) => new Intl.DateTimeFormat("en-PH", { weekday: 
 const pickedRange = (start: string, end: string) => (start === end ? pickedDate(start) : `${pickedDate(start)} – ${pickedDate(end)}`);
 const weekday = (iso: string) => new Intl.DateTimeFormat("en-PH", { weekday: "long", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`));
 const chipRange = (start: string, end: string) => { const f = (iso: string, o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-PH", { ...o, timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`)); const a = f(start, { weekday: "short", month: "short", day: "numeric" }); return start === end ? a : `${a} – ${(start.slice(0, 7) === end.slice(0, 7) ? `${f(end, { weekday: "short" })} ${Number(end.slice(8, 10))}` : f(end, { weekday: "short", month: "short", day: "numeric" }))}`; };
-const manilaTomorrow = () => new Date(Date.now() + 8 * 3600000 + 86400000).toISOString().slice(0, 10);
+const manilaToday = () => new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
 
 function Wizard() {
   const [open, setOpen] = useState<SectionKey>("enrollment");
@@ -139,7 +139,8 @@ function Wizard() {
   const inHouseOf = (code: string) => catalog?.inHouse.find((c) => c.code === code) ?? null;
   const pkgOf = (code: string) => catalog?.packages?.find((c) => c.code === code) ?? null;
   const otherOf = (code: string) => (stcwOf(code) || inHouseOf(code) || pkgOf(code) ? null : catalog?.other.find((c) => c.code === code) ?? null);
-  const tomorrow = manilaTomorrow();
+  // In-House courses may start today or on a previous date (owner, 4 Nov 2026); the week rule still applies.
+  const today = manilaToday();
   /** The dates a row covers, once it has a batch or a valid start date. */
   function rangeOf(row: Row): PickRange | null {
     const pk = pkgOf(row.code);
@@ -147,7 +148,7 @@ function Wizard() {
     const st = stcwOf(row.code);
     if (st) { const b = st.batches.find((x) => x.id === row.batchId); return b ? { code: row.code, start: b.startsOn, end: b.endsOn } : null; }
     const ih = inHouseOf(row.code);
-    if (ih && row.start && row.start >= tomorrow && fitsInWeek(row.start, ih.duration)) return { code: row.code, start: row.start, end: automaticEndDate(row.start, ih.duration) };
+    if (ih && row.start && fitsInWeek(row.start, ih.duration)) return { code: row.code, start: row.start, end: automaticEndDate(row.start, ih.duration) };
     return null;
   }
   const othersOf = (index: number) => rows.map((r, i) => (i === index ? null : rangeOf(r))).filter((r): r is PickRange => !!r);
@@ -156,7 +157,7 @@ function Wizard() {
     if (!row.code || otherOf(row.code)) return "";
     const range = rangeOf(row);
     const ih = inHouseOf(row.code);
-    if (!range) return stcwOf(row.code) || pkgOf(row.code) ? "Choose a schedule." : !row.start ? "Choose a start date." : row.start < tomorrow ? "Choose a date from tomorrow onwards." : `A ${ih ? ih.duration : ""} course runs on consecutive days within one week (no Sundays).`;
+    if (!range) return stcwOf(row.code) || pkgOf(row.code) ? "Choose a schedule." : !row.start ? "Choose a start date." : `A ${ih ? ih.duration : ""} course runs on consecutive days within one week (no Sundays).`;
     return orderConflict(range, othersOf(index)) ?? "";
   }
   const setRow = (index: number, patch: Partial<Row>) => setRows((cur) => cur.map((r, i) => (i === index ? { ...r, ...patch } : r)));
@@ -368,10 +369,11 @@ function Wizard() {
               return <button type="button" role="radio" aria-checked={on} key={w.monday} disabled={w.full && !on} className={`ql-chip${on ? " on" : ""}${w.full ? " off" : ""}`} onClick={() => setRow(index, { start: w.monday })}><b>{on ? "✓ " : ""}{chipRange(w.monday, w.ends)}</b><small>{w.full ? "Full" : "Open"}</small></button>;
             })}</div> : <p className="ql-error">No open week for this package yet. Please choose another course.</p>)}
             {ih && <div className="ql-dates">
-              <label><span>Start date</span><input type="date" value={row.start} min={tomorrow} onChange={(e) => setRow(index, { start: e.target.value })} /></label>
+              <label><span>Start date</span><input type="date" value={row.start} onChange={(e) => setRow(index, { start: e.target.value })} /></label>
               <div className="ql-ends"><span>Ends</span><b>{rangeOf(row) ? pickedDate(rangeOf(row)!.end) : "—"}</b><small>{ih.duration} · online · Monday to Saturday</small></div>
             </div>}
             {row.code && problem && <p className="ql-rule-note">{problem}</p>}
+            {ih && !problem && row.start && row.start < today && <p className="ql-rule-note">This date has passed. Registration will confirm your training dates.</p>}
           </div>;
         })}
         {rows.length < MAX_COURSES && <button type="button" className="ql-link" onClick={addRow}>+ Add Another Course ({rows.length}/{MAX_COURSES})</button>}

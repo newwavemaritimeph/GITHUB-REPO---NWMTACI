@@ -1,0 +1,123 @@
+<title>In-House Start Dates</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: the website's course row beside what Registration then sees, with the before-and-after rules underneath. */
+:root{
+  --bg:#f2f6f8;--surface:#ffffff;--fg:#0f2638;--muted:#587184;--line:#dbe6ec;--soft:#eef4f8;--navy:#123F63;--head:#123F63;--orange:#F25615;--blue:#0571D0;--on-accent:#ffffff;
+  --good:#0a7a3e;--good-bg:#e2f5e9;--warn:#a2470b;--warn-bg:#fdf0e5;--bad:#b42318;--bad-bg:#fcebea;--info:#0571D0;--info-bg:#e5f1fb;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--head:#dbe8f2;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--head:#dbe8f2;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--sans)}
+.wrap{max-width:1040px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:24px 56px;display:grid;gap:20px}
+h1{margin:0;font-size:28px;font-weight:600;color:var(--head);text-wrap:balance}
+h2{margin:0;font-size:19px;font-weight:600;color:var(--head)}
+.eyebrow{display:block;font-size:13px;font-weight:600;color:var(--blue);margin-bottom:4px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:20px;align-items:start}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;display:grid;gap:14px;min-width:0}
+label{display:grid;gap:4px;font-size:14px;font-weight:500;color:var(--muted)}
+select,input{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;min-width:0}
+select:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.ends{display:grid;gap:4px;font-size:14px;font-weight:500;color:var(--muted)}
+.ends b{font-weight:600;font-size:16px;color:var(--fg);padding:10px 0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chips button{font:500 14px var(--sans);min-height:34px;padding:4px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);cursor:pointer}
+.chips button[aria-pressed="true"]{background:var(--navy);border-color:var(--navy);color:var(--on-accent)}
+.note{margin:0;padding:10px 12px;border-radius:10px;font-size:14.5px;font-weight:500;min-height:44px}
+.note.ok{background:var(--good-bg);color:var(--good)}.note.past{background:var(--warn-bg);color:var(--warn)}.note.bad{background:var(--bad-bg);color:var(--bad)}
+.btn{font:600 15px var(--sans);min-height:42px;padding:8px 16px;border:0;border-radius:10px;background:var(--orange);color:var(--on-accent);cursor:pointer;justify-self:start}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+dl{margin:0;display:grid;gap:0}
+dl div{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 16px;padding:9px 0;border-top:1px solid var(--line);font-size:15px}
+dl div:first-child{border-top:0}
+dt{color:var(--muted)}dd{margin:0;font-weight:500;text-align:right;min-width:0}
+.mono{font-family:var(--mono);font-size:14px}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;white-space:nowrap}
+.pill.ok{background:var(--good-bg);color:var(--good)}.pill.past{background:var(--warn-bg);color:var(--warn)}.pill.up{background:var(--info-bg);color:var(--info)}.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:15px;min-width:420px}
+th{text-align:left;font-size:13px;font-weight:600;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line)}
+td{padding:10px;border-bottom:1px solid var(--line)}
+tr:last-child td{border-bottom:0}
+</style>
+
+<div class="wrap">
+  <h1>In-House Start Dates</h1>
+  <div class="grid">
+    <section class="panel" aria-label="Website registration form">
+      <div><span class="eyebrow">Website</span><h2>Choose Your Course</h2></div>
+      <label for="course">Course<select id="course"></select></label>
+      <div class="two">
+        <label for="start">Start Date<input id="start" type="date"></label>
+        <div class="ends"><span>Ends</span><b id="ends">—</b></div>
+      </div>
+      <div class="chips" id="quick" role="group" aria-label="Try a date"></div>
+      <p class="note" id="note" role="status"></p>
+      <button type="button" class="btn" id="submit">Submit Application</button>
+    </section>
+    <section class="panel" aria-label="What Registration sees">
+      <div><span class="eyebrow">Portal</span><h2>What Registration Sees</h2></div>
+      <dl>
+        <div><dt>Trainee</dt><dd>SANTOS, Juan P.</dd></div>
+        <div><dt>Course</dt><dd id="rCourse"></dd></div>
+        <div><dt>Schedule</dt><dd id="rSched"></dd></div>
+        <div><dt>Training</dt><dd id="rState"></dd></div>
+        <div><dt>Application</dt><dd id="rApp"></dd></div>
+      </dl>
+    </section>
+  </div>
+  <section class="panel" aria-label="Rules for the website form">
+    <h2>Website Form Rules</h2>
+    <div class="tw"><table>
+      <thead><tr><th>Start Date</th><th>Today</th><th>After This Change</th></tr></thead>
+      <tbody>
+        <tr><td>Tomorrow or Later</td><td><span class="pill ok">Allowed</span></td><td><span class="pill ok">Allowed</span></td></tr>
+        <tr><td><b>Same Date (Today)</b></td><td><span class="pill bad">Blocked</span></td><td><span class="pill ok">Allowed</span></td></tr>
+        <tr><td><b>Previous Date</b></td><td><span class="pill bad">Blocked</span></td><td><span class="pill ok">Allowed</span></td></tr>
+        <tr><td>A Sunday</td><td><span class="pill bad">Blocked</span></td><td><span class="pill bad">Blocked</span></td></tr>
+        <tr><td>Cannot Finish by Saturday</td><td><span class="pill bad">Blocked</span></td><td><span class="pill bad">Blocked</span></td></tr>
+      </tbody>
+    </table></div>
+  </section>
+</div>
+
+<script>
+const COURSES=[["ABC","Awareness on Basic Computer",1],["AHPR","Awareness on Harassment Prevention and Response",2],["HPT","Hydraulic and Pneumatic Training",3],["BAC-2","Basic Arabic Course",2]];
+const DAY=86400000;
+const iso=(ms)=>new Date(ms).toISOString().slice(0,10);
+const today=iso(Date.now()+8*3600000);
+const utc=(d)=>new Date(d+"T00:00:00Z");
+const plus=(d,n)=>iso(utc(d).getTime()+n*DAY);
+const fmt=(d)=>new Intl.DateTimeFormat("en-PH",{weekday:"short",month:"short",day:"numeric",year:"numeric",timeZone:"UTC"}).format(utc(d));
+// Same rule as fitsInWeek in lib/scheduling.ts: no Sunday start; every day falls in one Monday to Saturday week.
+const fits=(d,days)=>{const w=utc(d).getUTCDay();if(w===0)return false;return days>=6?w===1:w+days-1<=6};
+const lastDow=(dow)=>{let d=plus(today,-1);while(utc(d).getUTCDay()!==dow)d=plus(d,-1);return d};
+const QUICK=[["Last Monday",lastDow(1)],["Yesterday",plus(today,-1)],["Today",today],["Tomorrow",plus(today,1)],["Last Sunday",lastDow(0)]];
+const $=(id)=>document.getElementById(id);
+$("course").innerHTML=COURSES.map((c,i)=>`<option value="${i}">${c[0]} · ${c[1]} · ${c[2]} Day${c[2]>1?"s":""}</option>`).join("");
+$("course").value="0";
+$("quick").innerHTML=QUICK.map(([t,d])=>`<button type="button" data-d="${d}">${t}</button>`).join("");
+$("start").value=QUICK[0][1];
+function render(){
+  const c=COURSES[Number($("course").value)],start=$("start").value,ok=!!start&&fits(start,c[2]),end=ok?plus(start,c[2]-1):"";
+  document.querySelectorAll("#quick button").forEach((b)=>b.setAttribute("aria-pressed",String(b.dataset.d===start)));
+  $("ends").textContent=ok?fmt(end):"—";
+  const n=$("note"),past=ok&&start<today;
+  n.className="note "+(!start?"bad":!ok?"bad":past?"past":"ok");
+  n.textContent=!start?"Choose a start date.":!ok?`A ${c[2]}-day course runs on consecutive days within one week (no Sundays).`:past?"This date has passed. Registration will confirm your training dates.":start===today?"Your training starts today.":"Your training dates are set.";
+  $("submit").disabled=!ok;
+  $("rCourse").textContent=c[0];
+  $("rSched").textContent=ok?(start===end?fmt(start):`${fmt(start)} to ${fmt(end)}`):"—";
+  $("rState").innerHTML=!ok?"—":end<today?'<span class="pill past">Backdated · Finished</span>':start<=today?'<span class="pill past">'+(start<today?"Backdated · In Progress":"Starts Today")+"</span>":'<span class="pill up">Upcoming</span>';
+  $("rApp").innerHTML=$("submit").dataset.sent==="1"&&ok?'<span class="pill ok">Received · Screening</span>':"Not Yet Sent";
+}
+$("course").addEventListener("change",()=>{$("submit").dataset.sent="";render()});
+$("start").addEventListener("input",()=>{$("submit").dataset.sent="";render()});
+$("quick").addEventListener("click",(e)=>{const b=e.target.closest("button");if(!b)return;$("start").value=b.dataset.d;$("submit").dataset.sent="";render()});
+$("submit").addEventListener("click",()=>{$("submit").dataset.sent="1";render()});
+render();
+</script>
