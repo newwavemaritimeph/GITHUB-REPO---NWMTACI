@@ -168,10 +168,10 @@ function useApprovals(data: PortalData): Approval[] {
     const out: Approval[] = [];
     const enr = new Map(data.enrollments.map((e) => [e.id, e]));
     const who = (id: string) => { const e = enr.get(id); const t = first(e?.trainees); return t ? `${t.legal_last_name}, ${t.legal_first_name}` : "—"; };
-    for (const x of data.expenses.filter((x) => x.status === "Pending")) out.push({ key: `x${x.id}`, type: "Expense", item: `${x.payee} · ${x.category}`, ref: x.expense_number, amount: Number(x.amount_centavos), with: "Accounting Manager" });
-    for (const d of data.pendingDiscounts) out.push({ key: `d${d.id}`, type: "Discount", item: `${who(d.enrollment_id)} · ${d.description}`, ref: enr.get(d.enrollment_id)?.enrollment_number ?? "—", amount: -Number(d.amount_centavos), with: "Accounting Manager" });
+    for (const x of data.expenses.filter((x) => x.status === "Pending")) out.push({ key: `x${x.id}`, type: "Expense", item: `${x.payee} · ${x.category}`, ref: x.expense_number, amount: Number(x.amount_centavos), with: "Accounting" });
+    for (const d of data.pendingDiscounts) out.push({ key: `d${d.id}`, type: "Discount", item: `${who(d.enrollment_id)} · ${d.description}`, ref: enr.get(d.enrollment_id)?.enrollment_number ?? "—", amount: -Number(d.amount_centavos), with: "Accounting" });
     const reqs = (data as unknown as { requests: { id: string; enrollment_id: string; request_type: string; status: string; stage?: string | null }[] }).requests ?? [];
-    for (const r of reqs.filter((r) => r.status === "Pending")) out.push({ key: `r${r.id}`, type: r.request_type, item: who(r.enrollment_id), ref: enr.get(r.enrollment_id)?.enrollment_number ?? "—", amount: null, with: r.stage === "With cashier" ? "Cashier (fee)" : "Accounting Manager" });
+    for (const r of reqs.filter((r) => r.status === "Pending")) out.push({ key: `r${r.id}`, type: r.request_type, item: who(r.enrollment_id), ref: enr.get(r.enrollment_id)?.enrollment_number ?? "—", amount: null, with: r.stage === "With cashier" ? "Cashier (fee)" : "Accounting" });
     for (const c of (data.certificates as unknown as { id: string; enrollment_id: string; void_status?: string | null; certificate_number?: string | null }[]).filter((c) => c.void_status === "Requested")) out.push({ key: `c${c.id}`, type: "Certificate Void", item: who(c.enrollment_id), ref: c.certificate_number ?? "—", amount: null, with: "Admin" });
     return out;
   }, [data]);

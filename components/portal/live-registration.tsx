@@ -794,7 +794,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose, onOpenA
 
       {isApplication && <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>{!e.batch_id && !e.scheduled_on && <button type="button" className="portal-primary" onClick={() => setChoosingBatch(true)}>Choose Batch</button>}{traineeRecord && <button type="button" onClick={() => setAddingCourse(true)}>+ Add Another Course</button>}</div>}
 
-      <div className="full"><strong>Request a change</strong> <small style={{ color: "var(--muted)" }}>goes to the Cashier for charges, then the Accounting Manager for approval</small></div>
+      <div className="full"><strong>Request a change</strong> <small style={{ color: "var(--muted)" }}>goes to the Cashier for charges, then Accounting for approval</small></div>
       <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
         {REG_REQUESTS.filter((type) => !(isApplication && (type === "Make-up Class" || type === "Reprinting" || type === "TAR reprint"))).map((type) => <button key={type} type="button" disabled={!canRequest || pendingTypes.has(type)} title={pendingTypes.has(type) ? "A request of this type is already pending" : undefined} onClick={() => setReq(type)}>{requestLabel(type, isApplication)}</button>)}
       </div>

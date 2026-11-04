@@ -7,7 +7,7 @@ type Admin = ReturnType<typeof createSupabaseAdminClient>;
 const peso = (c: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(c / 100);
 const shortDate = (d: string) => new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T12:00:00+08:00`));
 
-/** Active Accounting Manager email addresses. */
+/** Active Accounting email addresses. */
 async function accountingRecipients(db: Admin) {
   const { data } = await db.from("user_roles").select("profiles!inner(email,account_state),roles!inner(code)").eq("roles.code", "accounting");
   const emails = new Set<string>();
@@ -20,7 +20,7 @@ async function accountingRecipients(db: Admin) {
 
 /**
  * Daily reconciliation reminder (owner, 9 Oct 2026), sent with the 4:00 PM run:
- * one email to each Accounting Manager when GCash, PSBank or UnionBank payments
+ * one email to each Accounting when GCash, PSBank or UnionBank payments
  * from earlier days are still not reconciled. Idempotent per day and recipient.
  */
 export async function sendReconciliationReminder(db: Admin, options: { origin?: string } = {}) {

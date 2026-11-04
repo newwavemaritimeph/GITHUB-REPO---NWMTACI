@@ -50,7 +50,7 @@ export async function buildExpenseVoucher(db: Admin, id: string, options: { prin
     supportingDocument: l.supporting_document || (receiptCount ? `${receiptCount} receipt photo${receiptCount === 1 ? "" : "s"} attached (Google Drive)` : ""),
     requestedBy: requester, modeOfPayment: x.payment_channel ?? "", status: data.status === "Void" ? "VOID" : released ? "Released" : "Approved",
     preparedBy: requester, preparedAt: `Cashier · ${fmt(data.created_at)}`,
-    approvedBy: approver, approvedAt: `Accounting Manager · ${fmt(x.approved_at)}`,
+    approvedBy: approver, approvedAt: `Accounting · ${fmt(x.approved_at)}`,
     releasedBy: released ? (releaser as { complete_name?: string } | null)?.complete_name ?? "" : "",
     releasedAt: released && x.released_at ? `Cashier · ${fmtTime(x.released_at)}` : "Cashier",
     printLabel: data.status === "Void" ? "Voided by the Admin" : options.label ?? (options.printNumber && options.printNumber > 1 ? `Reprint ${options.printNumber - 1}` : undefined),

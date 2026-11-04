@@ -121,13 +121,13 @@ const expenseCreateInput = z.object({ action: z.literal("expense-create"), payee
   supportingDocument: z.string().trim().max(160).optional().default("") });
 const expenseDecideInput = z.object({ action: z.literal("expense-decide"), id: z.string().uuid(), decision: z.enum(["Approved", "Rejected", "Paid"]), remarks: z.string().trim().max(300).optional() });
 // The Cashier releases an approved voucher (cash or transfer) and marks it paid.
-// Voucher print limit (202610080020): one print, more only after the Accounting Manager approves a reprint.
+// Voucher print limit (202610080020): one print, more only after Accounting approves a reprint.
 const expenseReprintRequestInput = z.object({ action: z.literal("expense-reprint-request"), id: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
 const expenseReprintDecideInput = z.object({ action: z.literal("expense-reprint-decide"), requestId: z.string().uuid(), decision: z.enum(["Approved", "Rejected"]), remarks: z.string().trim().max(300).optional() });
 const expenseReleaseInput = z.object({ action: z.literal("expense-release"), id: z.string().uuid(), paymentChannel: z.string().trim().min(1).max(40), referenceNumber: z.string().trim().max(80).optional().default("") });
 const cashierOpenInput = z.object({ action: z.literal("cashier-open"), openingCashCentavos: z.number().int().nonnegative(), remarks: z.string().trim().max(300).optional() });
 const balanceSummaryInput = z.object({ action: z.literal("balance-summary-send") });
-// The Accounting Manager marks a submitted cashier closing reviewed (8 Oct 2026).
+// Accounting marks a submitted cashier closing reviewed (8 Oct 2026).
 const closingReviewInput = z.object({ action: z.literal("cashier-closing-review"), id: z.string().uuid(), remarks: z.string().trim().max(300).optional() });
 const closingInput = z.object({ action: z.literal("cashier-close"), closingDate: z.string().date(), openingCashCentavos: z.number().int().nonnegative(), actualCashCentavos: z.number().int().nonnegative(), remarks: z.string().trim().max(500).optional().default("") });
 // Other charges + agency rebates posted to an enrollment ledger (enrollment_charges).
@@ -363,7 +363,7 @@ async function saveResourcePlan(admin: ReturnType<typeof createSupabaseAdminClie
 // Class Schedules (owner, 21 Oct 2026): the Admin and the Admin Assistant open, edit, rename and cancel batches.
 const canSchedule = canAssist;
 const canManageHr = (roles: string[]) => roles.some((role) => ["admin"].includes(role));
-// Employee-charge management: the Accounting Manager owns it; admin + HR (who run payroll) included.
+// Employee-charge management: Accounting owns it; admin + HR (who run payroll) included.
 const canManageEmployeeCharges = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
 const canManageTraining = (roles: string[]) => roles.some((role) => ["admin"].includes(role));
 const canRelease = (roles: string[]) => roles.some((role) => ["admin", "releasing_officer"].includes(role));
@@ -436,7 +436,7 @@ async function tryAutoEnroll(admin: ReturnType<typeof createSupabaseAdminClient>
 // Charge-bearing requests (Change Course, Rescheduling, Make-up Class,
 // Cancellation, Reprinting, TAR reprint) are approved only after their fee is
 // paid to the Cashier (owner, 7 Oct 2026). Their charge is payable as soon as the
-// Cashier sets it; the Accounting Manager approves once it is collected.
+// Cashier sets it; Accounting approves once it is collected.
 const PAY_FIRST_REQUESTS = ["Change Course", "Rescheduling", "Make-up Class", "Cancellation", "Reprinting", "TAR reprint", "Certificate delivery"];
 /** How much of a request's charge has been collected: verified payments on the enrollment made after the charge was set. */
 async function chargeCollection(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentId: string, chargeId: string) {
@@ -497,7 +497,7 @@ async function applyApprovedRequest(admin: ReturnType<typeof createSupabaseAdmin
 /**
  * Once paid, implement automatically (owner, 7 Oct 2026): a pay-first request
  * whose fee is fully collected is applied and marked approved straight away,
- * without waiting for the Accounting Manager. Requests with no fee still go to
+ * without waiting for Accounting. Requests with no fee still go to
  * Accounting. Failures (for example a full batch) leave the request pending.
  */
 /** Give an agency a fresh, unique referral code (letters of its name + 6 digits). Null before migration 023. */
@@ -834,7 +834,7 @@ export async function GET(request: Request) {
     return { certificates: certificates as unknown[], templates, releases: rel.data ?? [], issuanceEnabled: Boolean(settings.data?.certificate_issuance_enabled), series: seriesRows, evaluationForms, feedbackAt, feedbackLinks, photos: photos.error ? null : (photos.data ?? []) as unknown[] };
   })();
 
-  // Non-discount charges awaiting the Accounting Manager approval queue.
+  // Non-discount charges awaiting Accounting approval queue.
   const pendingChargesUnit = (async (): Promise<unknown[]> => {
     if (!seesPendingCharges) return [];
     const { data } = await db.from("enrollment_charges").select("id,enrollment_id,description,amount_centavos,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name))").eq("event_type", "charge").eq("approval_status", "Pending").order("created_at", { ascending: false }).limit(200);
@@ -951,7 +951,7 @@ export async function GET(request: Request) {
     return { rows, names: new Map((people ?? []).map((p) => [p.id as string, p.complete_name as string])) };
   })();
 
-  // Employee-charge management for the Accounting Manager (admin / accounting / hr): the charge list
+  // Employee-charge management for Accounting (admin / accounting / hr): the charge list
   // plus a minimal employee roster to file against (accounting does not receive the full HR dataset).
   const employeeChargeUnit = (async () => {
     if (!seesEmployeeCharges) return { charges: [] as unknown[], employees: [] as unknown[] };
@@ -1009,7 +1009,7 @@ export async function GET(request: Request) {
   const task = (f: () => Promise<void>) => { tasks.push(f()); };
 
   // Collection status of pending Change Course / Rescheduling fees, shown to the
-  // Cashier and the Accounting Manager (approval waits for payment).
+  // Cashier and Accounting (approval waits for payment).
   const chargeCollected: Record<string, { amount: number; collected: number; paid: boolean }> = {};
   task(async () => {
     const admin = createSupabaseAdminClient();
@@ -1372,7 +1372,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "config-remove") {
-      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only the Accounting Manager can change the configuration." }, { status: 403 });
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting can change the configuration." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const result = input.entity === "rebate"
         ? (input.agencyId && input.courseId ? await admin.from("agency_course_rebates").delete().eq("agency_id", input.agencyId).eq("course_id", input.courseId) : { error: { message: "Choose the partner and course.", code: "" } })
@@ -1634,7 +1634,7 @@ export async function POST(request: Request) {
       { const probe = await createSupabaseAdminClient().from("expenses").select("receipt_files").limit(1); if (probe.error) return NextResponse.json({ error: "Apply database update 202610190044 first. The receipt photos are already in Google Drive." }, { status: 400 }); }
       if (input.lines.length && input.lines.reduce((sum, line) => sum + line.quantity * line.unitCentavos, 0) !== input.amountCentavos) return NextResponse.json({ error: "The lines do not add up to the total amount." }, { status: 400 });
       const admin = createSupabaseAdminClient();
-      // A request number now; the voucher number (CV) is issued when the Accounting Manager approves.
+      // A request number now; the voucher number (CV) is issued when Accounting approves.
       const { data: expenseNumber, error: numberError } = await admin.rpc("next_reference", { prefix: "ER", requested_year: Number(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric" }).format(new Date())) });
       if (numberError || !expenseNumber) throw numberError ?? new Error("Could not number the expense request.");
       const { data: created, error } = await admin.from("expenses").insert({ expense_number: expenseNumber, payee: input.payee, category: input.category, amount_centavos: input.amountCentavos, purpose: input.purpose, status: "Pending", requested_by: staff.user.id }).select("id").single();
@@ -1774,12 +1774,12 @@ export async function POST(request: Request) {
       if (r.status !== "Approved" && r.status !== "Paid") return NextResponse.json({ error: "Only an approved voucher can be reprinted." }, { status: 400 });
       if (r.print_count < 1 + r.reprints_approved) return NextResponse.json({ error: "This voucher can still be printed. No request is needed." }, { status: 400 });
       const { data: created, error } = await admin.from("expense_reprint_requests").insert({ expense_id: input.id, reason: input.reason, requested_by: staff.user.id }).select("id").single();
-      if (error) return NextResponse.json({ error: /duplicate|expense_reprint_one_pending/i.test(error.message) ? "A reprint request for this voucher is already waiting for the Accounting Manager." : error.message }, { status: 400 });
+      if (error) return NextResponse.json({ error: /duplicate|expense_reprint_one_pending/i.test(error.message) ? "A reprint request for this voucher is already waiting for Accounting." : error.message }, { status: 400 });
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("cashier") ? "cashier" : staff.roleCodes[0] ?? null, action: "expense_voucher.reprint_requested", record_type: "expense", record_id: input.id, new_values: { request_id: created.id }, reason: input.reason });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "expense-reprint-decide") {
-      if (!staff.roleCodes.includes("accounting")) return NextResponse.json({ error: "Only the Accounting Manager can approve voucher reprints." }, { status: 403 });
+      if (!staff.roleCodes.includes("accounting")) return NextResponse.json({ error: "Only Accounting can approve voucher reprints." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { data: req } = await admin.from("expense_reprint_requests").select("id,expense_id,status").eq("id", input.requestId).maybeSingle();
       if (!req) return NextResponse.json({ error: "Request not found." }, { status: 404 });
@@ -1827,7 +1827,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, ...result });
     }
     if (input.action === "cashier-closing-review") {
-      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only the Accounting Manager can review closings." }, { status: 403 });
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting can review closings." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const now = new Date().toISOString();
       const { data: done, error } = await admin.from("cashier_closings").update({ status: "Reviewed", reviewed_by: staff.user.id, reviewed_at: now }).eq("id", input.id).eq("status", "Submitted").select("id");
@@ -1863,7 +1863,7 @@ export async function POST(request: Request) {
       const allowed = isDiscount ? canManageAccounting(staff.roleCodes) : staff.roleCodes.some((role) => ["admin", "cashier", "accounting", "registration"].includes(role));
       if (!allowed) return NextResponse.json({ error: isDiscount ? "Only Accounting or Admin can post a rebate." : "Your account cannot post charges." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      // Charges raised by cashier/registration wait for the Accounting Manager's approval
+      // Charges raised by cashier/registration wait for Accounting's approval
       // (Pending + invalid, so they do not hit the trainee balance yet). Accounting/Admin post immediately.
       const pendingCharge = !isDiscount && !canManageAccounting(staff.roleCodes);
       const { error } = await admin.from("enrollment_charges").insert({ enrollment_id: input.enrollmentId, charge_catalog_id: input.chargeCatalogId ?? null, description: input.description, amount_centavos: input.amountCentavos, event_type: isDiscount ? "discount" : "charge", ...(isDiscount ? {} : { valid: !pendingCharge, approval_status: pendingCharge ? "Pending" : "Approved" }), created_by: staff.user.id });
@@ -2864,7 +2864,7 @@ export async function POST(request: Request) {
     }
     if (input.action === "employee-charge-file-self") {
       // Any signed-in employee files a charge against themselves (category + note, no amount).
-      // It stays Pending until the Accounting Manager sets the amount. Resolve employee by login email.
+      // It stays Pending until Accounting sets the amount. Resolve employee by login email.
       const admin = createSupabaseAdminClient();
       const { data: emp } = await admin.from("employees").select("id").ilike("work_email", staff.user.email ?? "___none___").maybeSingle();
       if (!emp) return NextResponse.json({ error: "No employee record is linked to your account. Ask HR to add you." }, { status: 400 });
@@ -2874,7 +2874,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "employee-charge-set-amount") {
-      // The Accounting Manager entering the amount IS the approval — it activates the charge.
+      // Accounting entering the amount IS the approval — it activates the charge.
       if (!canManageEmployeeCharges(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage employee charges." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { data: updated, error } = await admin.from("employee_charges").update({ amount_centavos: input.amountCentavos, balance_centavos: input.amountCentavos, status: "Active", activated_at: new Date().toISOString(), amount_set_by: staff.user.id }).eq("id", input.id).eq("status", "Pending").select("id");
@@ -2883,7 +2883,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "employee-charge-input") {
-      // The Accounting Manager inputs a charge directly for an employee — created already Active.
+      // Accounting inputs a charge directly for an employee — created already Active.
       if (!canManageEmployeeCharges(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot manage employee charges." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const effectiveOn = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());

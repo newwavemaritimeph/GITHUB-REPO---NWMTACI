@@ -86,7 +86,7 @@ const voucher = {
   number: "CV-2026-000131", requestNumber: "ER-2026-000209", issuedAt: "October 12, 2026", payee: "Meralco", category: "Utilities", purpose: "September electricity bill, main office",
   amountCentavos: 845000, lines: [{ description: "Electricity, Sep 2026 (Acct 1234-5678)", quantity: 1, unitCentavos: 820000 }, { description: "Late payment surcharge", quantity: 1, unitCentavos: 25000 }],
   paymentChannel: "GCash", referenceNumber: "7019988776655", supportingDocument: "Meralco bill no. 0098812", requestedBy: "Karen Mallari", modeOfPayment: "GCash", status: "Released",
-  preparedBy: "Karen Mallari", preparedAt: "Cashier · Oct 11, 2026", approvedBy: "Kat Garcia", approvedAt: "Accounting Manager · Oct 12, 2026", releasedBy: "Karen Mallari", releasedAt: "Cashier · Oct 12, 2026, 2:10 PM", logoBytes,
+  preparedBy: "Karen Mallari", preparedAt: "Cashier · Oct 11, 2026", approvedBy: "Kat Garcia", approvedAt: "Accounting · Oct 12, 2026", releasedBy: "Karen Mallari", releasedAt: "Cashier · Oct 12, 2026, 2:10 PM", logoBytes,
 };
 await save("04-expense-voucher.pdf", "Expense Voucher", await createExpenseVoucherPdf(voucher));
 await save("05-expense-voucher-reprint.pdf", "Expense Voucher (Reprint 1)", await createExpenseVoucherPdf({ ...voucher, printLabel: "Reprint 1" }));

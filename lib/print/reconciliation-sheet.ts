@@ -52,6 +52,6 @@ export async function createReconciliationSheetPdf(date: string, channel: string
   y -= 40;
   const sig = (label: string, x: number) => { page.drawLine({ start: { x, y }, end: { x: x + 200, y }, thickness: 0.7, color: ink }); page.drawText(label, { x, y: y - 12, size: 8.5, font: reg, color: muted }); };
   sig("Checked by (Admin Assistant)", M);
-  sig("Noted by (Accounting Manager)", W - M - 200);
+  sig("Noted by (Accounting)", W - M - 200);
   return pdf.save();
 }

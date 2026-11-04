@@ -942,7 +942,7 @@ export async function createExpenseVoucherPdf(snapshot: ExpenseVoucherSnapshot) 
   // 6. Signatures.
   const sigs = [
     { label: "Prepared by", name: snapshot.preparedBy, note: snapshot.preparedAt || "Cashier" },
-    { label: "Approved by", name: snapshot.approvedBy, note: snapshot.approvedAt || "Accounting Manager" },
+    { label: "Approved by", name: snapshot.approvedBy, note: snapshot.approvedAt || "Accounting" },
     { label: "Released by", name: snapshot.releasedBy ?? "", note: snapshot.releasedAt || "Cashier" },
     { label: "Received by", name: "", note: "Payee Signature Over Printed Name, Date" },
   ];
@@ -1289,7 +1289,7 @@ export async function createCashierReportPdf(s: CashierReportSnapshot) {
   ensure(70);
   y -= 34;
   const sw = (CW - 40) / 2;
-  [["Prepared by", s.preparedBy, "Cashier"], ["Checked by", s.checkedBy ?? "", "Accounting Manager"]].forEach(([label, name, role], i) => {
+  [["Prepared by", s.preparedBy, "Cashier"], ["Checked by", s.checkedBy ?? "", "Accounting"]].forEach(([label, name, role], i) => {
     const x = M + i * (sw + 40);
     if (name) text(name, x, y + 4, 9, bold);
     page.drawLine({ start: { x, y }, end: { x: x + sw, y }, thickness: 0.6, color: c.ink });

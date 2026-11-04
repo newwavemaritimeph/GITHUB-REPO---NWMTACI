@@ -5,7 +5,7 @@ import { createHmac, randomInt, timingSafeEqual } from "node:crypto";
  * (TOTP via Supabase, or an emailed one-time code) before reaching the portal.
  * Names must match the `roles.name` values in the database exactly.
  */
-export const MFA_ENFORCED_ROLES = ["Admin", "Accounting Manager"] as const;
+export const MFA_ENFORCED_ROLES = ["Admin", "Accounting"] as const;
 
 export function isMfaEnforced(roleNames: string[]): boolean {
   return roleNames.some((name) => (MFA_ENFORCED_ROLES as readonly string[]).includes(name));

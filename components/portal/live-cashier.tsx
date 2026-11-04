@@ -25,7 +25,7 @@ import { sourceLabel } from "@/lib/company-charge";
  *   Manager (each approval allows one more print).
  * - The charge step for change requests: Registration's requests come to the
  *   Cashier first, who adds the applicable fee (or "no charge") before the
- *   Accounting Manager decides.
+ *   Accounting decides.
  */
 
 type RequestRow = PortalData["requests"][number];
@@ -62,7 +62,7 @@ export function tarState(data: PortalData, traineeId: string, groupIds?: string[
   return { paid, record, printed, allowed, left: Math.max(0, allowed - printed), pendingReprint };
 }
 
-/** Print the TAR, or — once the limit is reached — ask the Accounting Manager for one more print. */
+/** Print the TAR, or — once the limit is reached — ask Accounting for one more print. */
 /** Print receipt (owner, 8 Oct 2026): prints twice; after the second print the button is gone. */
 export function ReceiptButton({ data, paymentId, reload, className = "portal-secondary" }: { data: PortalData; paymentId: string; reload?: () => Promise<void>; className?: string }) {
   const printed = data.receiptPrints?.[paymentId] ?? 0;
@@ -147,7 +147,7 @@ export function RequestChargeModal({ data, request, reload, onClose }: { data: P
     const item = catalog.find((c) => c.id === id);
     if (item) { setDescription(item.name); setAmount((Number(item.default_amount_centavos) / 100).toFixed(2)); setNoCharge(false); }
   }
-  const send = () => void post(ruled ? { action: "request-charge", id: request.id, amountCentavos: ruled.amountCentavos, remarks: remarks.trim() || undefined } : { action: "request-charge", id: request.id, chargeCatalogId: noCharge ? null : catalogId || null, description: noCharge ? undefined : description || `${typeLabel} fee`, amountCentavos: noCharge ? 0 : centavos, remarks: remarks.trim() || undefined }, "Sent to the Accounting Manager for approval.").then(onClose).catch(() => undefined);
+  const send = () => void post(ruled ? { action: "request-charge", id: request.id, amountCentavos: ruled.amountCentavos, remarks: remarks.trim() || undefined } : { action: "request-charge", id: request.id, chargeCatalogId: noCharge ? null : catalogId || null, description: noCharge ? undefined : description || `${typeLabel} fee`, amountCentavos: noCharge ? 0 : centavos, remarks: remarks.trim() || undefined }, "Sent to Accounting for approval.").then(onClose).catch(() => undefined);
   return <Modal title={`Charges · ${request.request_number}`} onClose={onClose}>
     <div className="portal-form">
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
@@ -611,7 +611,7 @@ export function CashierPayments({ data, onPay, reload }: { data: PortalData; onP
   </div>;
 }
 
-/** Discount requests filed by the Cashier; the Accounting Manager approves them. */
+/** Discount requests filed by the Cashier; Accounting approves them. */
 export function DiscountRequests({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   const { busy, msg, post } = usePost(reload);
   const [enrollmentId, setEnrollmentId] = useState("");
@@ -823,7 +823,7 @@ export function expenseTotalsByChannel(rows: { status: string; created_at: strin
 
 /**
  * Voucher print limit (owner, 8 Oct 2026): one print; each reprint needs the
- * Accounting Manager's approval. "print" = can print now, "request" = used up,
+ * Accounting's approval. "print" = can print now, "request" = used up,
  * "pending" = a request is waiting, "rejected" = the last request was refused.
  */
 export function voucherPrintState(e: { id: string; print_count?: number | null; reprints_approved?: number | null }, reprints: { expense_id: string; status: string; requested_at: string }[]) {
@@ -868,7 +868,7 @@ function VoucherDrawer({ e, reprints, isManager, onClose, onRelease, onRequestRe
   const released = e.status === "Paid";
   const steps: [string, string, boolean][] = [
     ["Recorded", `${e.request_number ?? e.expense_number}${e.requested_by_name ? ` · ${e.requested_by_name}` : ""} · ${fmtDate(day(e.created_at))}`, true],
-    ["Approved", e.approved_at ? `${e.approved_by_name ?? "Accounting Manager"} · ${fmtDate(day(e.approved_at))}` : "Waiting for the Accounting Manager", !!e.approved_at],
+    ["Approved", e.approved_at ? `${e.approved_by_name ?? "Accounting"} · ${fmtDate(day(e.approved_at))}` : "Waiting for Accounting", !!e.approved_at],
     ["Printed", p.used ? `${p.used} print${p.used > 1 ? "s" : ""}${p.state === "pending" ? " · reprint requested" : ""}` : "Not yet", p.used > 0],
     ["Released", released && e.released_at ? `${e.payment_channel ?? ""}${e.reference_number ? ` · ${e.reference_number}` : ""} · ${e.released_by_name ?? "Cashier"} · ${fmtDate(day(e.released_at))}` : "Waiting for the Cashier", released],
   ];
@@ -910,10 +910,10 @@ function VoucherPrint({ e, reprints, onRequest, reload }: { e: ExpenseRow; repri
 
 /**
  * Expenses (owner, 7–8 Oct 2026). Expenses: the Cashier records an expense
- * (ER-…), the Accounting Manager approves it (CV-…), the Cashier prints the
+ * (ER-…), Accounting approves it (CV-…), the Cashier prints the
  * voucher once and marks it released; a dashboard per payment channel with a
  * summary PDF. Vouchers: every voucher filed by month, with file copies,
- * prints and reprint requests (approved by the Accounting Manager).
+ * prints and reprint requests (approved by Accounting).
  */
 export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; role: string; reload: () => Promise<void> }) {
   const today = manilaToday();
@@ -949,7 +949,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   const pendingReprints = reprints.filter((r) => r.status === "Pending");
   const approve = (e: ExpenseRow) => void post({ action: "expense-decide", id: e.id, decision: "Approved" }, "Approved. The voucher number is issued and the voucher is filed in Google Drive.").catch(() => undefined);
   const reject = () => { if (!rejecting) return; void post({ action: "expense-decide", id: rejecting.id, decision: "Rejected", remarks: reason.trim() || undefined }, "Rejected.").then(() => { setRejecting(null); setReason(""); }).catch(() => undefined); };
-  const requestReprint = () => { if (!reprinting) return; void post({ action: "expense-reprint-request", id: reprinting.id, reason: reason.trim() }, "Reprint request sent to the Accounting Manager.").then(() => { setReprinting(null); setReason(""); }).catch(() => undefined); };
+  const requestReprint = () => { if (!reprinting) return; void post({ action: "expense-reprint-request", id: reprinting.id, reason: reason.trim() }, "Reprint request sent to Accounting.").then(() => { setReprinting(null); setReason(""); }).catch(() => undefined); };
   const decideReprint = (r: ReprintRow, decision: "Approved" | "Rejected", remarks?: string) => void post({ action: "expense-reprint-decide", requestId: r.id, decision, remarks }, decision === "Approved" ? "Reprint approved. The voucher can be printed once more." : "Reprint request rejected.").then(() => { setDeciding(null); setReason(""); }).catch(() => undefined);
   const printCell = (e: ExpenseRow) => <VoucherPrint e={e} reprints={reprints} onRequest={(x) => { setReprinting(x); setReason(""); }} reload={reload} />;
 
@@ -998,7 +998,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
             <td data-l="Requested by">{r.requested_by_name ?? "—"}<small>{fmtDate(day(r.requested_at))}</small></td>
             <td data-l=""><div className="cx-acts">{isManager
               ? <><button type="button" className="portal-primary" disabled={busy} onClick={() => decideReprint(r, "Approved")}>Approve Reprint</button><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setDeciding(r); setReason(""); }}>Reject</button></>
-              : <span className="cx-chip">Waiting for the Accounting Manager</span>}</div></td>
+              : <span className="cx-chip">Waiting for Accounting</span>}</div></td>
           </tr>; })}
         </tbody></table></div>
       </section>}
@@ -1010,7 +1010,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
           <div className="cx-tile" style={{ ["--c" as string]: "#123F63" }}><span>{cur?.label ?? "This month"}</span><b>{pesos(cur?.total ?? 0)}</b><small>{cur?.rows.length ?? 0} voucher{cur?.rows.length === 1 ? "" : "s"}</small></div>
           <div className="cx-tile" style={{ ["--c" as string]: "#0a7a3e" }}><span>Released</span><b>{pesos(sumOf(released))}</b><small>{released.length} paid out</small></div>
           <div className="cx-tile" style={{ ["--c" as string]: "#F25615" }}><span>Awaiting release</span><b>{pesos(sumOf(waiting))}</b><small>{waiting.length} approved, not yet paid</small></div>
-          <div className="cx-tile" style={{ ["--c" as string]: "#a2470b" }}><span>Reprint requests</span><b>{pendingReprints.length}</b><small>{isManager ? "waiting for you" : "waiting for the Accounting Manager"}</small></div>
+          <div className="cx-tile" style={{ ["--c" as string]: "#a2470b" }}><span>Reprint requests</span><b>{pendingReprints.length}</b><small>{isManager ? "waiting for you" : "waiting for Accounting"}</small></div>
         </div>;
       })()}
       <div className="cx-bar vx-filters">
@@ -1022,7 +1022,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
       {(() => {
         const term = vSearch.trim().toLowerCase();
         const groups = monthsShown.map((m) => ({ ...m, list: m.rows.filter((e) => voucherMatches(e, vFilter, reprints) && (!vChannel || e.payment_channel === vChannel) && (!term || `${e.voucher_number ?? e.expense_number} ${e.payee} ${e.category}`.toLowerCase().includes(term))) })).filter((m) => m.list.length);
-        if (!groups.length) return <section className="portal-panel cx-panel"><p className="portal-empty-copy">{months.length ? "No vouchers match." : "No vouchers yet. A voucher is issued when the Accounting Manager approves an expense."}</p></section>;
+        if (!groups.length) return <section className="portal-panel cx-panel"><p className="portal-empty-copy">{months.length ? "No vouchers match." : "No vouchers yet. A voucher is issued when Accounting approves an expense."}</p></section>;
         return groups.map((m) => { const isOpen = open[m.month] ?? (month ? true : m.month === thisMonth || m.month === months[0]?.month); const last = new Date(Number(m.month.slice(0, 4)), Number(m.month.slice(5, 7)), 0).getDate(); return <section className="portal-panel cx-panel cx-month" key={m.month}>
           <div className="cx-month-head vx-mhead">
             <button type="button" className="vx-mtoggle" aria-expanded={isOpen} onClick={() => setOpen((o) => ({ ...o, [m.month]: !isOpen }))}><span className="cx-month-name">{m.label}</span><span className="cx-month-meta">{m.list.length} voucher{m.list.length === 1 ? "" : "s"}</span><b className="cx-mono">{pesos(m.list.reduce((s, e) => s + Number(e.amount_centavos), 0))}</b><span aria-hidden="true" className="cx-month-caret">{isOpen ? "▾" : "▸"}</span></button>
@@ -1161,7 +1161,7 @@ function RecordExpenseModal({ data, onClose, post }: { data: PortalData; onClose
         <small>A photo or screenshot of the receipt or bill, e.g. a Shopee order receipt. Saved in Google Drive for Accounting.</small>
       </div>
       <label className="full">Supporting Document (Optional Note)<input placeholder="e.g. Meralco bill and official receipt" value={supporting} onChange={(e) => setSupporting(e.target.value)} /></label>
-      {!categories.length && <p className="portal-form-note full">The Accounting Manager adds expense categories in Configuration.</p>}
+      {!categories.length && <p className="portal-form-note full">Accounting adds expense categories in Configuration.</p>}
       <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!ready} onClick={() => void post({ action: "expense-create", payee: payee.trim(), category, amountCentavos: instructor ? single : total, purpose, lines: instructor ? [] : filled, receiptFiles: receipts.map((f) => ({ fileId: f.fileId, link: f.link, name: f.name, mime: f.mime })), paymentChannel: channel, referenceNumber: reference.trim(), supportingDocument: supporting.trim() }, "Expense recorded and sent for approval.").then(onClose).catch(() => undefined)}>Send for Approval</button></div>
     </div>
   </Modal>;

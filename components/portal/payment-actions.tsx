@@ -8,7 +8,7 @@ import { Message, Modal, fmtDate } from "./shared-ui";
 
 /**
  * Actions that sit next to a payment or an enrollment: raising a request for
- * the Accounting Manager, and (from Phase 2) the payment hub and its tabs.
+ * Accounting, and (from Phase 2) the payment hub and its tabs.
  * Shared by the Registration, Cashier and Accounting workspaces.
  */
 
@@ -16,7 +16,7 @@ export type RequestType = "Cancellation" | "Refund" | "Make-up Class" | "Resched
 
 /**
  * Raise a request against an enrollment. The server records it as Pending and
- * the Accounting Manager decides it; approved changes are applied there, never
+ * Accounting decides it; approved changes are applied there, never
  * here. `allow` narrows the type picker for roles that may raise only some.
  */
 export function RequestActionModal({ data, enrollment, reqType, onClose, post, embedded }: { data: PortalData; enrollment: Enrollment; reqType: RequestType; onClose: () => void; post: (body: Record<string, unknown>) => Promise<unknown>; embedded?: boolean }) {
@@ -55,7 +55,7 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
   const inner = <div className="portal-form">
     {err && <Message kind="error" text={err} />}
     <p className="portal-form-note full">Goes to the Cashier to collect the fee. The change is applied automatically once the fee is paid.</p>
-    {reqType === "TAR reprint" && <p className="portal-form-note full">The Training Admission Record has been printed twice. Each approval by the Accounting Manager allows one more print with the same AR number.</p>}
+    {reqType === "TAR reprint" && <p className="portal-form-note full">The Training Admission Record has been printed twice. Each approval by Accounting allows one more print with the same AR number.</p>}
     {reqType === "Make-up Class" && <p className="portal-form-note full">Make-up classes are for courses of three days or more; the fee is Php 350.00 per training day (Terms, section 5).</p>}
     {reqType === "Rescheduling" && <label className="full">New Batch<select value={batchId} onChange={(e) => setBatchId(e.target.value)}><option value="">Select a Schedule</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.batch_number} · {fmtDate(b.starts_on)}–{fmtDate(b.ends_on)} · {b.capacity - b.confirmed_count} slots</option>)}</select></label>}
     {reqType === "Change Course" && <>

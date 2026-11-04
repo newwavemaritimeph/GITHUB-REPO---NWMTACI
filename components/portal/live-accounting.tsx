@@ -54,7 +54,7 @@ const manilaDay = (value?: string | null) => (value ? new Intl.DateTimeFormat("e
 
 
 /**
- * Accounting Manager dashboard (owner spec, Aug 2026). Two views:
+ * Accounting dashboard (owner spec, Aug 2026). Two views:
  * "Operations" — an approval queue plus the daily financial control panels;
  * "Summary report" — the date-ranged period roll-up built earlier.
  * Every figure is derived from the existing payload; nothing is stubbed.
@@ -1259,7 +1259,7 @@ export function SetupList({ title, description, entityLabel, rows, canManage, bu
 }
 
 /* ---------------------------------------------------------------------------
- * Accounting Manager modules. These back the Collections / Approvals /
+ * Accounting modules. These back the Collections / Approvals /
  * Payables & cash sidebar groups; each reads the existing payload, and every
  * action reuses a handler that already exists in /api/staff/operations.
  * ------------------------------------------------------------------------- */
@@ -1317,7 +1317,7 @@ export function ApprovalsModule({ data, role, reload }: { data: AccountingData; 
     ? <div className="document-actions"><button type="button" disabled={busy} onClick={onYes}>Approve</button><button type="button" disabled={busy} onClick={onNo}>Reject</button></div>
     : <span className="portal-badge pending">Pending</span>;
   return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Financial control</span><h1>Approvals</h1><p>Everything waiting on an Accounting Manager decision.</p></div><span className="portal-badge pending">{total} pending</span></div>
+    <div className="portal-heading"><div><span className="portal-eyebrow">Financial control</span><h1>Approvals</h1><p>Everything waiting on an Accounting decision.</p></div><span className="portal-badge pending">{total} pending</span></div>
     {msg && <div className="portal-message error" role="alert">{msg}</div>}
     <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Expense Vouchers</h2><p>Approve before the cashier can print</p></div><span className="slot-count">{vouchers.length}</span></div>
       {vouchers.map((e) => <div className="live-row-item" key={e.id}><div><strong>{e.payee}</strong><small>{e.expense_number} · {e.category} · {peso2(e.amount_centavos)}</small></div><Actions onYes={() => void post({ action: "expense-decide", id: e.id, decision: "Approved" })} onNo={() => void post({ action: "expense-decide", id: e.id, decision: "Rejected" })} /></div>)}

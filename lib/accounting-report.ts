@@ -2,7 +2,7 @@ import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { PREVIOUS_LABEL, periodBuckets, periodTitle, type Period } from "@/lib/accounting-periods";
 
 /**
- * The Accounting Manager's period report (owner, 8 Oct 2026): collections and
+ * Accounting's period report (owner, 8 Oct 2026): collections and
  * expenses per bucket for the trend, and for the current period the split by
  * channel, by source (walk-in, agency, consultancy), expenses by category,
  * top courses, rebates and cashier closings. Read with the service role.

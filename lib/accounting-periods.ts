@@ -1,5 +1,5 @@
 /**
- * Report periods for the Accounting Manager (owner, 8 Oct 2026): daily,
+ * Report periods for Accounting (owner, 8 Oct 2026): daily,
  * weekly (Monday to Sunday), monthly, quarterly and annual buckets ending with
  * the period that contains `end` (that last one runs only to `end`, "to date").
  * Dates are Manila calendar dates as YYYY-MM-DD.

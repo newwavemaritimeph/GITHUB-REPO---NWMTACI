@@ -842,7 +842,7 @@
 .pipeline > span b { font-size: 16px; color: #0571d0; }
 .pipeline > span i { font-style: normal; color: var(--muted); margin-left: 4px; }
 
-/* Accounting Manager dashboard: accent stat cards, approval strip, 3-col panels. */
+/* Accounting dashboard: accent stat cards, approval strip, 3-col panels. */
 .fin-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 .fin-cards article { display: flex; gap: 12px; align-items: flex-start; background: #fff; border: 1px solid #e3ecf0; border-left: 4px solid #0571d0; border-radius: 12px; padding: 14px; box-shadow: var(--shadow-sm); }
 .fin-cards article i { font-style: normal; width: 36px; height: 36px; border-radius: 9px; display: grid; place-items: center; font-size: 16px; flex: 0 0 auto; }
@@ -1634,7 +1634,7 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .vx-df{margin-top:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;padding:16px 22px;border-top:1px solid #dbe5ec}
 @media (max-width:640px){.portal-shell .vx-kv{grid-template-columns:1fr}.portal-shell .vx-search{min-width:0;width:100%}.portal-shell .vx-mhead{flex-wrap:wrap;padding:0 16px 12px 0}}
 
-/* Accounting Manager module (8 Oct 2026) */
+/* Accounting module (8 Oct 2026) */
 .portal-shell .ac-day{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #dbe5ec;border-radius:12px;padding:4px}
 .portal-shell .ac-day button{border:0;background:none;font:600 18px inherit;width:36px;height:36px;border-radius:9px;cursor:pointer;color:#0f2638}
 .portal-shell .ac-day button:hover:not(:disabled){background:#eef4f8}

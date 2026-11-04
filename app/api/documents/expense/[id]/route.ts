@@ -13,7 +13,7 @@ const notice = (message: string, status: number) => new Response(
 /**
  * Expense voucher PDF. Cashier / Accounting / Admin, once Accounting has
  * approved it. It prints once; every further print needs a reprint request
- * approved by the Accounting Manager (202610080020).
+ * approved by Accounting (202610080020).
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const staff = await requireStaff();
@@ -28,12 +28,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (!voided) return notice("Voucher not found.", 404);
     return new Response(voided.bytes as BodyInit, { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="${voided.voucherNumber}-void.pdf"`, "cache-control": "private, no-store" } });
   }
-  if (row.status !== "Approved" && row.status !== "Paid") return notice("The voucher is issued once the Accounting Manager approves the expense.", 409);
+  if (row.status !== "Approved" && row.status !== "Paid") return notice("The voucher is issued once Accounting approves the expense.", 409);
 
   // ?copy=1: a file copy for viewing (Vouchers tab). Marked, and never counted as a print.
   if (new URL(request.url).searchParams.get("copy") === "1") {
     const copy = await buildExpenseVoucher(db, id, { label: "File copy - not for release" });
-    if (!copy) return notice("The voucher is issued once the Accounting Manager approves the expense.", 409);
+    if (!copy) return notice("The voucher is issued once Accounting approves the expense.", 409);
     return new Response(copy.bytes as BodyInit, { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="${copy.voucherNumber}-file-copy.pdf"`, "cache-control": "private, no-store" } });
   }
   const { data: printNumber, error } = await db.rpc("record_voucher_print", { target: id });
@@ -41,7 +41,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const missing = !!error && /record_voucher_print|function .* does not exist/i.test(error.message);
   if (error && !missing) return notice(error.message, 409);
   const voucher = await buildExpenseVoucher(db, id, { printNumber: missing ? undefined : Number(printNumber) });
-  if (!voucher) return notice("The voucher is issued once the Accounting Manager approves the expense.", 409);
+  if (!voucher) return notice("The voucher is issued once Accounting approves the expense.", 409);
   if (!missing) await db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("cashier") ? "cashier" : staff.roleCodes[0] ?? null, action: "expense_voucher.printed", record_type: "expense", record_id: id, new_values: { print: Number(printNumber), voucher: voucher.voucherNumber } });
   return new Response(voucher.bytes as BodyInit, { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="${voucher.voucherNumber}-expense-voucher.pdf"`, "cache-control": "private, no-store" } });
 }

@@ -17,7 +17,7 @@ import { tcl } from "@/lib/title-case";
 import { askText } from "./dialogs";
 
 /**
- * Accounting Manager (owner, 8 Oct 2026): a view-first dashboard like the
+ * Accounting (owner, 8 Oct 2026): a view-first dashboard like the
  * Cashier's with her approvals on top, an Approvals page, and one Reports page
  * for daily, weekly, monthly, quarterly and annual figures — half text, half charts.
  * Payments and expenses are recorded by the Cashier; she approves and reviews.

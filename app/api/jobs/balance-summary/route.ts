@@ -10,7 +10,7 @@ export const maxDuration = 60;
 
 /**
  * Daily at 4:00 PM Manila (Vercel cron, 08:00 UTC): email the Cashier and the
- * Accounting Manager the trainees whose training ended (or ends today) with a
+ * Accounting the trainees whose training ended (or ends today) with a
  * balance still due, remind Accounting of payments not reconciled, then send
  * any other queued emails.
  */
