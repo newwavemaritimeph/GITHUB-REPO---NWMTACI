@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { expenseState, expenseTotalsByChannel } from "@/components/portal/live-cashier";
 import { voucherNaming } from "@/lib/google-drive";
+import { fitVoucherLines } from "@/lib/documents";
 
 describe("expense vouchers", () => {
   const rows = [
@@ -57,3 +58,19 @@ describe("vouchers by month", () => {
     expect(groups[0].rows[0].voucher_number).toBe("CV-2026-000003");
   });
 });
+
+// Design 4 (owner, 4 Nov 2026): a line is never left off while the total still counts it.
+describe("fitVoucherLines", () => {
+  const space = 212;
+  const linesAt = (text: string, size: number) => Math.ceil((text.length * size * 0.5) / 289);
+  const rows = (text: string, n: number) => Array.from({ length: n }, () => text);
+  it("keeps full-size type for short lines", () => expect(fitVoucherLines(rows("Electric bill", 3), space, linesAt)).toBe(8));
+  it("shrinks until ten full-length lines fit", () => {
+    const long = "x".repeat(160), size = fitVoucherLines(rows(long, 10), space, linesAt);
+    expect(size).toBeLessThan(8);
+    expect(size).toBeGreaterThanOrEqual(6);
+    expect(10 * (3.8 + 2 * size * 1.18)).toBeLessThanOrEqual(space);
+  });
+  it("never goes below 6 pt", () => expect(fitVoucherLines(rows("x".repeat(160), 40), space, linesAt)).toBe(6));
+});
+

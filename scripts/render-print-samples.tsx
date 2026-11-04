@@ -90,6 +90,8 @@ const voucher = {
 };
 await save("04-expense-voucher.pdf", "Expense Voucher", await createExpenseVoucherPdf(voucher));
 await save("05-expense-voucher-reprint.pdf", "Expense Voucher (Reprint 1)", await createExpenseVoucherPdf({ ...voucher, printLabel: "Reprint 1" }));
+await save("05b-expense-voucher-void.pdf", "Expense Voucher (Void)", await createExpenseVoucherPdf({ ...voucher, status: "VOID", printLabel: "Voided by the Admin" }));
+await save("05c-expense-voucher-10-lines.pdf", "Expense Voucher (10 long lines)", await createExpenseVoucherPdf({ ...voucher, lines: Array.from({ length: 10 }, (_, i) => ({ description: `Line ${i + 1}: `.padEnd(160, "long particulars text "), quantity: i + 1, unitCentavos: 12550 })) }));
 
 // ---- Cashier summary report ------------------------------------------------------
 const channels = ["Cash", "GCash", "PSBank", "UnionBank"];

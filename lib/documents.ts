@@ -1,4 +1,4 @@
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
 import { pesosInWords } from "@/lib/amount-words";
 
 export type DocumentSnapshot = {
@@ -766,7 +766,7 @@ export type ExpenseVoucherSnapshot = {
   preparedBy: string;
   approvedBy: string;
   logoBytes?: Uint8Array;
-  // Design 2 "grid form" (owner's choice, 8 Oct 2026).
+  // Request number, lines, channel and signatures (8 Oct 2026).
   requestNumber?: string;
   lines?: ExpenseVoucherLine[];
   paymentChannel?: string;
@@ -780,13 +780,24 @@ export type ExpenseVoucherSnapshot = {
   printLabel?: string;
 };
 
+const VOUCHER_ROW_PAD = 3.8, VOUCHER_LEADING = 1.18;
+
 /**
- * Expense voucher, Design 2 "grid form" (owner's choice, 8 Oct 2026): half of
- * A4 in landscape, one bordered grid like the training instruction form.
- * Letterhead with the voucher number, a row of voucher details, payee and
- * supporting document, a numbered table of expense lines (blank rows fill the
- * sheet), the total with the amount in words, and four signatures:
- * prepared, approved, released and received by.
+ * The largest type, 8 pt down to 6 pt, that holds every voucher line (owner, 4 Nov 2026), so a line is
+ * never left off while the total still counts it. `linesAt` says how many lines a description wraps to.
+ * The server allows 10 expense lines (expenseCreateInput); ten two-line rows always fit at 6 pt.
+ */
+export function fitVoucherLines(descriptions: string[], space: number, linesAt: (text: string, size: number) => number) {
+  const height = (size: number) => descriptions.reduce((sum, d) => sum + VOUCHER_ROW_PAD + Math.min(2, linesAt(d, size)) * size * VOUCHER_LEADING, 0);
+  for (let size = 8; size > 6; size = Math.round((size - 0.2) * 10) / 10) if (height(size) <= space) return size;
+  return 6;
+}
+
+/**
+ * Expense voucher, Design 4 "Receipt Family" (owner's choice, 4 Nov 2026): half of A4 in landscape.
+ * Letterhead with a blank Control No. and Revision No. block on the upper right, the navy title bar with
+ * the orange rule used on the Training Instructions, a details grid, the expense lines, the amount in
+ * words and total, and four signatures: prepared, approved, released and received by.
  */
 export async function createExpenseVoucherPdf(snapshot: ExpenseVoucherSnapshot) {
   const pdf = await PDFDocument.create();
@@ -797,11 +808,12 @@ export async function createExpenseVoucherPdf(snapshot: ExpenseVoucherSnapshot) 
   const mono = await pdf.embedFont(StandardFonts.Courier);
   const monoBold = await pdf.embedFont(StandardFonts.CourierBold);
   type Font = typeof reg;
-  const c = { navy: rgb(.071, .247, .388), cyan: rgb(.208, .8, .98), ink: rgb(.08, .16, .23), muted: rgb(.37, .44, .5), rule: rgb(.73, .78, .83), hair: rgb(.86, .9, .93), tint: rgb(.933, .965, .984), white: rgb(1, 1, 1) };
-  const M = 20, FOOT = 18, X0 = M, X1 = W - M, CW = X1 - X0, PAD = 5;
+  const c = { navy: rgb(.071, .247, .388), lightcyan: rgb(.62, .89, .945), orange: rgb(.949, .337, .082), ink: rgb(.08, .16, .23), muted: rgb(.34, .41, .47), rule: rgb(.73, .78, .83), hair: rgb(.86, .9, .93), tint: rgb(.933, .965, .984), white: rgb(1, 1, 1) };
+  const M = 20, X0 = M, X1 = W - M, CW = X1 - X0, PAD = 4, TOP = H - 16;
   const money = (v: number) => (v / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const text = (s: string, x: number, y: number, size: number, font: Font = reg, color = c.ink) => page.drawText(ascii(s), { x, y, size, font, color });
   const right = (s: string, xr: number, y: number, size: number, font: Font = reg, color = c.ink) => text(s, xr - font.widthOfTextAtSize(ascii(s), size), y, size, font, color);
+  const center = (s: string, cx: number, y: number, size: number, font: Font = reg, color = c.ink) => text(s, cx - font.widthOfTextAtSize(ascii(s), size) / 2, y, size, font, color);
   const fit = (s: string, size: number, maxW: number, font: Font = reg) => {
     let t = ascii(s ?? "");
     if (font.widthOfTextAtSize(t, size) <= maxW) return t;
@@ -819,122 +831,138 @@ export async function createExpenseVoucherPdf(snapshot: ExpenseVoucherSnapshot) 
     return out.length ? out : [""];
   };
   const box = (x: number, y: number, w: number, h: number, fill?: typeof c.ink) => page.drawRectangle({ x, y, width: w, height: h, borderColor: c.rule, borderWidth: 0.5, ...(fill ? { color: fill } : {}) });
-  const cap = (s: string, x: number, y: number, color = c.muted) => text(s.toUpperCase(), x, y, 5.6, bold, color);
+  const cap = (s: string, x: number, y: number) => text(s, x, y, 6, bold, c.muted);
 
   const lines: ExpenseVoucherLine[] = snapshot.lines?.length
     ? snapshot.lines
     : [{ description: snapshot.purpose, quantity: snapshot.quantity ?? 1, unitCentavos: Math.round(snapshot.amountCentavos / Math.max(1, snapshot.quantity ?? 1)) }];
-  const top = H - M, bottom = FOOT + 8;
-  let y = top;
+  let y = TOP;
 
-  // 1. Letterhead: logo · organisation · voucher number on navy.
-  const headH = 46, logoW = 50, titleW = 160;
-  box(X0, y - headH, logoW, headH);
-  if (snapshot.logoBytes) { try { const img = await pdf.embedPng(snapshot.logoBytes); const d = img.scaleToFit(36, 36); page.drawImage(img, { x: X0 + (logoW - d.width) / 2, y: y - headH + (headH - d.height) / 2, width: d.width, height: d.height }); } catch { /* logo optional */ } }
-  box(X0 + logoW, y - headH, CW - logoW - titleW, headH);
-  text("NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", X0 + logoW + PAD + 2, y - 19, 9.6, bold, c.navy);
-  text("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000", X0 + logoW + PAD + 2, y - 30, 6.4, reg, c.muted);
-  text("0948-847-6530  |  (02) 8553 0310  |  newwavemaritime@gmail.com", X0 + logoW + PAD + 2, y - 39, 6.4, reg, c.muted);
-  page.drawRectangle({ x: X1 - titleW, y: y - headH, width: titleW, height: headH, color: c.navy });
-  text("EXPENSE VOUCHER", X1 - titleW + PAD + 3, y - 14, 6.6, bold, c.cyan);
-  text(snapshot.number, X1 - titleW + PAD + 3, y - 30, 12.5, monoBold, c.white);
-  text(snapshot.printLabel ? `${snapshot.status}  |  ${snapshot.printLabel}` : snapshot.status, X1 - titleW + PAD + 3, y - 41, 6.6, bold, c.white);
-  y -= headH;
-  page.drawLine({ start: { x: X0, y }, end: { x: X1, y }, thickness: 1.2, color: c.navy });
-
-  // 2. Voucher details.
-  const infoH = 27;
-  const info: [string, string, Font][] = [
-    ["Date issued", snapshot.issuedAt || "-", bold],
-    ["Request no.", snapshot.requestNumber || "-", monoBold],
-    ["Category", snapshot.category || "-", bold],
-    ["Mode of payment", snapshot.paymentChannel || "-", bold],
-    ["Reference no.", snapshot.referenceNumber || "-", monoBold],
-  ];
-  info.forEach(([label, value, font], i) => {
-    const w = CW / info.length, x = X0 + i * w;
-    box(x, y - infoH, w, infoH);
-    cap(label, x + PAD, y - 9);
-    text(fit(value, 8.6, w - 2 * PAD, font), x + PAD, y - 21, 8.6, font);
+  // 1. Letterhead, and the form's Control No. and Revision No., left blank for writing in (owner, 4 Nov 2026).
+  const logoS = 34, textX = X0 + logoS + 8, ctrlW = 128, ctrlLabel = 44;
+  if (snapshot.logoBytes) { try { const img = await pdf.embedPng(snapshot.logoBytes); const d = img.scaleToFit(logoS, logoS); page.drawImage(img, { x: X0 + (logoS - d.width) / 2, y: y - logoS + (logoS - d.height) / 2, width: d.width, height: d.height }); } catch { /* logo optional */ } }
+  const org = "NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", orgRoom = X1 - ctrlW - 8 - textX;
+  text(org, textX, y - 12, Math.min(10.6, 10.6 * orgRoom / bold.widthOfTextAtSize(org, 10.6)), bold, c.navy);
+  text("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000", textX, y - 22, 6.2, reg, c.muted);
+  text("0948-847-6530  |  (02) 8553 0310  |  newwavemaritime@gmail.com", textX, y - 30, 6.2, reg, c.muted);
+  const ctrlH = logoS / 2;
+  (["Control No.", "Revision No."]).forEach((label, i) => {
+    const top = y - i * ctrlH;
+    box(X1 - ctrlW, top - ctrlH, ctrlLabel, ctrlH, c.tint);
+    box(X1 - ctrlW + ctrlLabel, top - ctrlH, ctrlW - ctrlLabel, ctrlH);
+    cap(label, X1 - ctrlW + PAD, top - ctrlH / 2 - 2);
   });
-  y -= infoH;
+  y -= logoS + 3;
 
-  // 3. Payee and supporting document.
-  const payH = 27, payW = CW * 0.58;
-  box(X0, y - payH, payW, payH); cap("Payee", X0 + PAD, y - 9); text(fit(snapshot.payee, 9, payW - 2 * PAD, bold), X0 + PAD, y - 21, 9, bold);
-  box(X0 + payW, y - payH, CW - payW, payH); cap("Supporting document", X0 + payW + PAD, y - 9); text(fit(snapshot.supportingDocument || "-", 8.6, CW - payW - 2 * PAD, bold), X0 + payW + PAD, y - 21, 8.6, bold);
-  y -= payH;
+  // 2. Title bar with the orange rule, as on the Training Instructions.
+  const barH = 16, isVoid = snapshot.status === "VOID";
+  page.drawRectangle({ x: X0, y: y - barH, width: CW, height: barH, color: c.navy });
+  page.drawRectangle({ x: X0, y: y - barH - 2.2, width: CW, height: 2.2, color: c.orange });
+  const barText = y - barH + 5;
+  text("EXPENSE VOUCHER", X0 + 8, barText, 9.5, bold, c.white);
+  const state = `${isVoid && snapshot.printLabel ? `VOID - ${snapshot.printLabel}` : snapshot.status}  |  issued ${snapshot.issuedAt || "-"}`;
+  text(state, X0 + 8 + bold.widthOfTextAtSize("EXPENSE VOUCHER", 9.5) + 8, barText, 7, reg, c.lightcyan);
+  const numberW = monoBold.widthOfTextAtSize(ascii(snapshot.number), 9);
+  text(snapshot.number, X1 - 8 - numberW, barText, 9, monoBold, c.white);
+  const labelEnd = X1 - 8 - numberW - 4;
+  right("CV NO.", labelEnd, barText, 7, reg, c.lightcyan);
+  // Reprint and file-copy marks (print limit, 8 Oct 2026).
+  if (snapshot.printLabel && !isVoid) {
+    const chip = ascii(snapshot.printLabel).toUpperCase(), chipW = bold.widthOfTextAtSize(chip, 6.4) + 8, chipX = labelEnd - reg.widthOfTextAtSize("CV NO.", 7) - 8 - chipW;
+    page.drawRectangle({ x: chipX, y: barText - 2.5, width: chipW, height: 10, borderColor: c.white, borderWidth: 0.8 });
+    text(chip, chipX + 4, barText, 6.4, bold, c.white);
+  }
+  y -= barH + 2.2 + 3;
 
-  // 5 and 6 sizes first, so the lines table takes what is left.
-  const totalH = 34, sigH = 52;
-  const tableTop = y, tableBottom = bottom + sigH + totalH;
+  // 3. Details grid.
+  const rowH = 12.5, thW = CW * 0.13, tdW = (CW - 3 * thW) / 3;
+  const cell = (label: string, value: string, x: number, top: number, w: number, font: Font = bold) => {
+    box(x, top - rowH, thW, rowH, c.tint);
+    cap(label, x + PAD, top - 8.4);
+    box(x + thW, top - rowH, w, rowH);
+    text(fit(value || "-", 7.6, w - 2 * PAD, font), x + thW + PAD, top - 8.8, 7.6, font);
+  };
+  const col = (i: number) => X0 + i * (thW + tdW);
+  cell("Payee", snapshot.payee, col(0), y, tdW * 2 + thW);
+  cell("Request No.", snapshot.requestNumber || "-", col(2), y, tdW, monoBold);
+  y -= rowH;
+  cell("Category", snapshot.category, col(0), y, tdW);
+  cell("Mode of Payment", snapshot.paymentChannel || "-", col(1), y, tdW);
+  cell("Reference No.", snapshot.referenceNumber || "-", col(2), y, tdW, monoBold);
+  y -= rowH;
+  cell("Supporting Document", snapshot.supportingDocument || "-", col(0), y, CW - thW);
+  y -= rowH + 3;
+
+  // 6 and 5 sizes first, so the lines table takes what is left.
+  const footH = 14, sigH = 36, totalH = 25;
+  const tableTop = y, tableBottom = footH + sigH + 3 + totalH;
   const cols = [
-    { label: "No.", w: CW * 0.07, align: "left" as const },
-    { label: "Particulars", w: CW * 0.45, align: "left" as const },
-    { label: "Qty", w: CW * 0.10, align: "right" as const },
-    { label: "Unit cost", w: CW * 0.17, align: "right" as const },
-    { label: "Amount (PHP)", w: CW * 0.21, align: "right" as const },
+    { label: "No.", w: CW * 0.06, align: "left" as const },
+    { label: "Particulars", w: CW * 0.54, align: "left" as const },
+    { label: "Qty", w: CW * 0.08, align: "right" as const },
+    { label: "Unit Cost", w: CW * 0.15, align: "right" as const },
+    { label: "Amount (PHP)", w: CW * 0.17, align: "right" as const },
   ];
   const colX = cols.map((_, i) => X0 + cols.slice(0, i).reduce((s, k) => s + k.w, 0));
-  const headRow = 14, rowH = 14.5;
-  page.drawRectangle({ x: X0, y: tableTop - headRow, width: CW, height: headRow, color: c.tint });
+  const headRow = 12, descW = cols[1].w - 2 * PAD;
+  page.drawRectangle({ x: X0, y: tableTop - headRow, width: CW, height: headRow, color: c.navy });
   cols.forEach((k, i) => {
-    if (k.align === "right") right(k.label.toUpperCase(), colX[i] + k.w - PAD, tableTop - 9.5, 5.8, bold, c.navy);
-    else text(k.label.toUpperCase(), colX[i] + PAD, tableTop - 9.5, 5.8, bold, c.navy);
+    if (k.align === "right") right(k.label, colX[i] + k.w - PAD, tableTop - 8.4, 6, bold, c.white);
+    else text(k.label, colX[i] + PAD, tableTop - 8.4, 6, bold, c.white);
   });
+  // 4. Every line, in the largest type that holds them all.
+  const size = fitVoucherLines(lines.map((l) => l.description), tableTop - headRow - tableBottom, (t, s) => wrap(t, s, descW, reg, 3).length);
+  const lead = size * VOUCHER_LEADING;
   let ry = tableTop - headRow;
-  page.drawLine({ start: { x: X0, y: ry }, end: { x: X1, y: ry }, thickness: 0.5, color: c.rule });
   lines.forEach((ln, i) => {
-    const desc = wrap(ln.description, 8, cols[1].w - 2 * PAD, reg, 2);
-    const h = Math.max(rowH, 5 + desc.length * 9.6);
-    if (ry - h < tableBottom + 2) return; // never draw past the total row
-    const base = ry - 10;
-    text(String(i + 1), colX[0] + PAD, base, 8, mono);
-    desc.forEach((d, k) => text(d, colX[1] + PAD, base - k * 9.6, 8));
-    right(String(ln.quantity), colX[2] + cols[2].w - PAD, base, 8, mono);
-    right(money(ln.unitCentavos), colX[3] + cols[3].w - PAD, base, 8, mono);
-    right(money(ln.unitCentavos * ln.quantity), colX[4] + cols[4].w - PAD, base, 8, monoBold);
+    const desc = wrap(ln.description, size, descW, reg, 2);
+    const h = VOUCHER_ROW_PAD + desc.length * lead, base = ry - VOUCHER_ROW_PAD / 2 - size * 0.86;
+    text(String(i + 1), colX[0] + PAD, base, size, mono);
+    desc.forEach((d, k) => text(d, colX[1] + PAD, base - k * lead, size));
+    right(String(ln.quantity), colX[2] + cols[2].w - PAD, base, size, mono);
+    right(money(ln.unitCentavos), colX[3] + cols[3].w - PAD, base, size, mono);
+    right(money(ln.unitCentavos * ln.quantity), colX[4] + cols[4].w - PAD, base, size, monoBold);
     ry -= h;
     page.drawLine({ start: { x: X0, y: ry }, end: { x: X1, y: ry }, thickness: 0.4, color: c.hair });
   });
-  // Blank rows fill the rest of the table.
-  while (ry - rowH >= tableBottom + 0.5) { ry -= rowH; page.drawLine({ start: { x: X0, y: ry }, end: { x: X1, y: ry }, thickness: 0.4, color: c.hair }); }
-  colX.slice(1).forEach((x) => page.drawLine({ start: { x, y: tableTop }, end: { x, y: tableBottom }, thickness: 0.5, color: c.rule }));
+  colX.slice(1).forEach((x) => page.drawLine({ start: { x, y: tableTop - headRow }, end: { x, y: tableBottom }, thickness: 0.5, color: c.rule }));
   page.drawRectangle({ x: X0, y: tableBottom, width: CW, height: tableTop - tableBottom, borderColor: c.rule, borderWidth: 0.5 });
   y = tableBottom;
 
-  // 5. Total and amount in words.
+  // 5. Amount in words and total.
   const totW = 150;
-  page.drawRectangle({ x: X0, y: y - totalH, width: CW, height: totalH, color: c.tint });
   box(X0, y - totalH, CW - totW, totalH);
-  cap("Amount in words", X0 + PAD, y - 9);
-  wrap(pesosInWords(snapshot.amountCentavos), 8.4, CW - totW - 2 * PAD, bold, 2).forEach((l, k) => text(l, X0 + PAD, y - 20 - k * 9.6, 8.4, bold));
-  box(X1 - totW, y - totalH, totW, totalH);
-  cap("Total amount", X1 - totW + PAD, y - 9);
-  right(`PHP ${money(snapshot.amountCentavos)}`, X1 - PAD, y - 26, 12.5, bold, c.navy);
-  y -= totalH;
+  cap("Amount in Words", X0 + PAD + 1, y - 8.5);
+  wrap(pesosInWords(snapshot.amountCentavos), 8, CW - totW - 2 * PAD - 2, bold, 1).forEach((l) => text(l, X0 + PAD + 1, y - 19, 8, bold));
+  box(X1 - totW, y - totalH, totW, totalH, c.tint);
+  right("Total Amount", X1 - PAD - 1, y - 8.5, 6, bold, c.muted);
+  right(`PHP ${money(snapshot.amountCentavos)}`, X1 - PAD - 1, y - 20.5, 11.5, bold, c.navy);
+  y -= totalH + 3;
 
   // 6. Signatures.
   const sigs = [
-    { label: "Prepared by", name: snapshot.preparedBy, note: [snapshot.preparedAt].filter(Boolean).join("") || "Cashier" },
+    { label: "Prepared by", name: snapshot.preparedBy, note: snapshot.preparedAt || "Cashier" },
     { label: "Approved by", name: snapshot.approvedBy, note: snapshot.approvedAt || "Accounting Manager" },
     { label: "Released by", name: snapshot.releasedBy ?? "", note: snapshot.releasedAt || "Cashier" },
-    { label: "Received by", name: "", note: "Payee signature over printed name, date" },
+    { label: "Received by", name: "", note: "Payee Signature Over Printed Name, Date" },
   ];
+  const sigGap = 14, sigW = (CW - sigGap * (sigs.length - 1)) / sigs.length;
   sigs.forEach((s, i) => {
-    const w = CW / sigs.length, x = X0 + i * w;
-    box(x, y - sigH, w, sigH);
-    cap(s.label, x + PAD, y - 9);
-    const lineY = y - sigH + 17;
-    if (s.name) text(fit(s.name, 8.4, w - 2 * PAD, bold), x + PAD, lineY + 3, 8.4, bold);
-    page.drawLine({ start: { x: x + PAD, y: lineY }, end: { x: x + w - PAD, y: lineY }, thickness: 0.6, color: c.ink });
-    text(fit(s.note, 6, w - 2 * PAD), x + PAD, lineY - 9, 6, reg, c.muted);
+    const x = X0 + i * (sigW + sigGap), cx = x + sigW / 2, lineY = y - sigH + 8;
+    center(s.label, cx, y - 6, 6, bold, c.muted);
+    if (s.name) center(fit(s.name, 8, sigW, bold), cx, lineY + 2.5, 8, bold);
+    page.drawLine({ start: { x, y: lineY }, end: { x: x + sigW, y: lineY }, thickness: 0.6, color: c.ink });
+    center(fit(s.note, 5.6, sigW), cx, lineY - 6.5, 5.6, reg, c.muted);
   });
 
-  // Outer frame and footer.
-  page.drawRectangle({ x: X0, y: bottom, width: CW, height: top - bottom, borderColor: c.navy, borderWidth: 1.2 });
-  text("Keep with the official receipt for accounting and audit. Amounts are in Philippine peso.", X0, FOOT - 4, 6, reg, c.muted);
-  right("Form EV-02  |  Ride the New Wave of Maritime Excellence", X1, FOOT - 4, 6, reg, c.muted);
+  // Footer.
+  text("Keep with the official receipt for accounting and audit. Amounts are in Philippine peso.", X0, 6, 5.8, reg, c.muted);
+  right("Form EV-04  |  Ride the New Wave of Maritime Excellence", X1, 6, 5.8, reg, c.muted);
+
+  if (isVoid) {
+    const markW = bold.widthOfTextAtSize("VOID", 72), a = 16 * Math.PI / 180;
+    page.drawText("VOID", { x: W / 2 - (markW / 2) * Math.cos(a), y: H / 2 - (markW / 2) * Math.sin(a) - 20, size: 72, font: bold, color: c.orange, opacity: 0.18, rotate: degrees(16) });
+  }
   return pdf.save();
 }
 
