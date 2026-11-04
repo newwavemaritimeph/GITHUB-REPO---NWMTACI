@@ -123,6 +123,14 @@ export const fmtDate = (value?: string | null) =>
 export const fmtClock = (value?: string | null) =>
   value ? new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(value)) : "—";
 
+/** View is a round eye icon everywhere (owner, 4 Nov 2026); `label` names it on hover and for screen readers. A link when given `href`. */
+export function ViewIcon({ label, href, onClick, disabled }: { label: string; href?: string; onClick?: () => void; disabled?: boolean }) {
+  const eye = <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></svg>;
+  return href
+    ? <a className="view-icon" href={href} target="_blank" rel="noreferrer" aria-label={label} title={label}>{eye}</a>
+    : <button type="button" className="view-icon" aria-label={label} title={label} onClick={onClick} disabled={disabled}>{eye}</button>;
+}
+
 /** When a transaction was made: Nov 4, 9:12 AM. */
 export const txWhen = (iso: string) => new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso));
 

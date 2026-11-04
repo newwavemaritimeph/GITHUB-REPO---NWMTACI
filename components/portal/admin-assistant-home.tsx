@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, balanceOf, first, manilaToday, pesos2 } from "@/lib/portal-format";
 import { ROLES, accreditationFor, handles, moveTargets, planRows, rangesOverlap, type Accreditation, type Duty, type PlanBatch, type PlanRow } from "@/lib/admin-assistant";
-import { Badge, Message, Modal, fmtDate, periodRange, useNeedSince, usePost, usePaged } from "./shared-ui";
+import { Badge, Message, Modal, ViewIcon, fmtDate, periodRange, useNeedSince, usePost, usePaged } from "./shared-ui";
 import { CHANNELS, type Channel, type DaySummary, type ReconStatus } from "@/lib/reconciliation";
 import { MoveBatch } from "./move-batch";
 import { downloadCsv } from "@/lib/csv";
@@ -320,7 +320,7 @@ export function ClassSchedules({ data, reload, onOpenBatches, onCreate, canManag
                 <td className="r cl-mono">{st.enrolled}</td><td className="r cl-mono">{st.pending}</td>
                 <td><span className="bs-seat"><b className="cl-mono">{sl}</b> / {b.capacity}<span className={`bs-bar${sl === 0 ? " full" : sl <= 3 ? " low" : ""}`}><i style={{ width: `${Math.min(100, (Number(b.confirmed_count ?? 0) / Math.max(1, Number(b.capacity ?? 24))) * 100)}%` }} /></span></span></td>
                 <td><Badge tone={STATUS_TONE[s]}>{s === "Open" && sl > 0 && sl <= 3 ? "Almost Full" : s}</Badge>{s === "Cancelled" && cx ? <small>{cx.cancel_reason}{first(cx.canceller)?.complete_name ? ` · ${first(cx.canceller)?.complete_name}` : ""}{cx.cancelled_at ? ` · ${fmtDate(day(cx.cancelled_at))}` : ""}</small> : null}{s !== "Cancelled" && !b.published_at ? <small>Not on the public form</small> : null}</td>
-                <td><span className="cl-acts"><button type="button" className="portal-secondary" onClick={() => setRosterOf(b)}>View</button>{canManage && s !== "Cancelled" && s !== "Ended" && <><button type="button" className="portal-secondary" onClick={() => setEditing(b)}>Edit Batch</button>{s !== "Ongoing" && <button type="button" className="portal-secondary cs-danger" onClick={() => setCancelling(b)}>Cancel Batch</button>}</>}</span></td>
+                <td><span className="cl-acts"><ViewIcon label="View Trainees" onClick={() => setRosterOf(b)} />{canManage && s !== "Cancelled" && s !== "Ended" && <><button type="button" className="portal-secondary" onClick={() => setEditing(b)}>Edit Batch</button>{s !== "Ongoing" && <button type="button" className="portal-secondary cs-danger" onClick={() => setCancelling(b)}>Cancel Batch</button>}</>}</span></td>
               </tr>]; })}
         </tbody></table>{paged.pager}</div> : <p className="portal-empty-copy">No batches in this period.</p>}
       </section></div>
@@ -502,7 +502,7 @@ export function GcashReconciliation({ canCheck }: { canCheck: boolean }) {
           {rows.map((r, i) => [<tr key={r.id} className={`${r.status === "Reconciled" ? "rc-done" : r.status ? "rc-miss" : ""}${hit(r) ? " rc-hit" : ""}`}>
             {canCheck && <td className="rc-ck">{!r.status && <input type="checkbox" aria-label={`Tick ${r.reference_number ?? r.payment_number}`} checked={picked.has(r.id)} onChange={(e) => pick(r.id, e.target.checked)} />}</td>}
             <td className="cl-no">{i + 1}</td><td className="cl-mono">{clock(r.received_at)}</td><td className="cl-mono">{r.receipt_number ?? r.payment_number}</td><td>{r.trainee}</td><td className="cl-mono"><b>{r.reference_number ?? "—"}</b></td><td className="cl-mono">{pesos2(r.amount_centavos)}</td>
-            <td>{r.proof_link ? <a href={r.proof_link} target="_blank" rel="noreferrer">View</a> : <span className="cl-sub">—</span>}</td><td>{r.recorded_by ?? "—"}</td>
+            <td>{r.proof_link ? <ViewIcon label="View Proof" href={r.proof_link} /> : <span className="cl-sub">—</span>}</td><td>{r.recorded_by ?? "—"}</td>
             <td>{r.status === "Reconciled" ? <Badge tone="green">Reconciled</Badge> : r.status ? <Badge tone="red">Not in History</Badge> : <Badge tone="orange">To Check</Badge>}{r.checked_by && <small className="cl-sub cl-block">{r.checked_by}</small>}</td>
             {canCheck && <td>{r.status ? <button type="button" className="rc-mini" onClick={() => { setNoting({ id: r.id, kind: "undo" }); setNote(""); }}>Undo</button> : <button type="button" className="rc-mini" onClick={() => { setNoting({ id: r.id, kind: "missing" }); setNote(""); }}>Not in History</button>}</td>}
           </tr>,

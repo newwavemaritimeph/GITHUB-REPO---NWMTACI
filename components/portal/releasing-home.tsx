@@ -6,7 +6,7 @@ import type { PortalData, Enrollment } from "../portal-live-app";
 import { addDays, first, manilaToday, dueCentavos, pesos2 } from "@/lib/portal-format";
 import { automaticEndDate } from "@/lib/scheduling";
 import { canPrint, canSetSeries, certificateState, evaluationRequiredFor, formatCertificateNumber, nextOf, isStcwCategory, matchTemplateFiles, releaseProblem, type CertificateView } from "@/lib/certificate-rules";
-import { Badge, Message, MonthBar, fmtDate, useMonthRows, useNeedSince, usePaged, usePost } from "./shared-ui";
+import { Badge, Message, MonthBar, ViewIcon, fmtDate, useMonthRows, useNeedSince, usePaged, usePost } from "./shared-ui";
 import { ReleaseConfirm } from "./live-releasing";
 import { DeliveryAlert } from "./delivery-home";
 import { tcl } from "@/lib/title-case";
@@ -363,7 +363,7 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
     <div className="tpl-list">{rows.map((c) => { const t = active.get(c.id); const uploaded = !!t?.storage_path; return <div key={c.id} className="tpl-row">
       <div className="tpl-name"><b>{c.name}</b><small className="cl-mono">{c.code}</small></div>
       <div>{uploaded ? <Badge tone="green">{`Template · v${t!.version}${t!.approved_at ? ` · ${fmtDate(day(t!.approved_at) ?? "")}` : ""}`}</Badge> : <Badge tone="orange">No Template Yet</Badge>}</div>
-      <span className="cl-acts">{uploaded && <button type="button" className="portal-secondary" onClick={() => view(t!.id)}>View</button>}<label className={uploaded ? "portal-secondary tp-upload" : "portal-primary tp-upload"}>{uploading === c.id ? "Uploading…" : uploaded ? "Replace PDF" : "Upload PDF"}<input type="file" accept="application/pdf" hidden disabled={!!uploading} onChange={(e) => { void upload(c.id, e.target.files?.[0]); e.target.value = ""; }} /></label></span>
+      <span className="cl-acts">{uploaded && <ViewIcon label="View Template" onClick={() => view(t!.id)} />}<label className={uploaded ? "portal-secondary tp-upload" : "portal-primary tp-upload"}>{uploading === c.id ? "Uploading…" : uploaded ? "Replace PDF" : "Upload PDF"}<input type="file" accept="application/pdf" hidden disabled={!!uploading} onChange={(e) => { void upload(c.id, e.target.files?.[0]); e.target.value = ""; }} /></label></span>
     </div>; })}</div></div> : null;
   return <div className="portal-page cx ac">
     <Head title="Templates" note="View shows each template with its course description; the trainee's name, training dates, issue date, Certificate No., Registration No. and QR are filled in when a certificate is printed. A new upload replaces the one in use; earlier versions are kept." />
@@ -670,7 +670,7 @@ function CertificateCorrectionsPanel({ data, reload, mode }: { data: PortalData;
     {found.length > 0 && <div className="cc-found">{found.map((l) => <button type="button" key={l.e.id} onClick={() => pick(l)}><b>{l.name}</b><span>{l.course.code} · {l.cert?.certificate_number ?? "No number yet"}</span></button>)}</div>}
     {line ? <div className="cc-edit">
       <p className="cc-who"><b>{line.name}</b> · {line.course.code}{line.cert?.certificate_number ? <> · <span className="cl-mono">{line.cert.certificate_number}</span></> : null}<button type="button" className="ghost-button" onClick={() => setPickedId(null)}>Close</button></p>
-      {tracked && <div className="cc-photo"><span>2x2 Photo: {line.photo ? <><b>On file</b> <small className="cl-sub">{line.photo.file_name}</small></> : <b className="cl-x">Not uploaded</b>}</span><span className="cl-acts">{line.photo && <button type="button" className="portal-secondary" onClick={() => void openCertificatePhoto(line.e.id)}>View</button>}<button type="button" className="portal-secondary" onClick={() => setReplacing(true)}>{line.photo ? "Replace Photo" : "Upload Photo"}</button>{line.photo && <button type="button" className="cl-danger" onClick={() => void removePhoto()}>Remove Photo</button>}</span></div>}
+      {tracked && <div className="cc-photo"><span>2x2 Photo: {line.photo ? <><b>On file</b> <small className="cl-sub">{line.photo.file_name}</small></> : <b className="cl-x">Not uploaded</b>}</span><span className="cl-acts">{line.photo && <ViewIcon label="View Photo" onClick={() => void openCertificatePhoto(line.e.id)} />}<button type="button" className="portal-secondary" onClick={() => setReplacing(true)}>{line.photo ? "Replace Photo" : "Upload Photo"}</button>{line.photo && <button type="button" className="cl-danger" onClick={() => void removePhoto()}>Remove Photo</button>}</span></div>}
       <div className="cl-wrap"><table className="cl-log cl-light cc-table"><thead><tr><th>Field</th><th>From the Portal</th><th>Prints As (Correction)</th></tr></thead><tbody>
         {FIELDS.map(([k, label, type]) => <tr key={k}><td>{label}</td><td>{type === "date" && portal[k] && portal[k] !== "Print date" ? fmtDate(portal[k]) : portal[k] || "—"}</td><td><input className="cl-in" type={type} aria-label={`${label} correction`} value={form[k] ?? ""} placeholder="Same as the portal" onChange={(e) => setForm({ ...form, [k]: e.target.value })} /></td></tr>)}
       </tbody></table></div>

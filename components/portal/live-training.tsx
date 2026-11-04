@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { CertificatePdfModal, type CertPdfTarget } from "./certificate-pdf-modal";
 import { tcl } from "@/lib/title-case";
-import { Modal } from "./shared-ui";
+import { Modal, ViewIcon } from "./shared-ui";
 
 type Classroom = { id: string; name: string; venue: string; capacity: number; active: boolean };
 type CertEnrollment = { enrollment_number?: string; trainees?: unknown; courses?: unknown };
@@ -137,7 +137,7 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
                 const cert = data.certificates.find((x) => x.enrollment_id === e.id) ?? null;
                 return <tr key={e.id}><td><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</strong></td><td>{c?.name ?? "—"}</td><td>{e.enrollment_number}</td><td>{canManage
                   ? <select value={cert?.status ?? ""} disabled={busy} onChange={(ev) => { void post({ action: "certificate-status", enrollmentId: e.id, status: ev.target.value }); }}><option value="" disabled>Not Issued</option>{CERT_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-                  : (cert ? (CERT_STATUSES.find(([v]) => v === cert.status)?.[1] ?? cert.status) : "Not issued")}</td><td>{cert?.printed_at ? day(cert.printed_at) : "—"}</td>{canManage && <td className="document-actions">{(() => { const tid = activeTemplateFor(e.course_id); return <button disabled={busy || !tid} title={tid ? "Generate/view the certificate PDF (optional 2x2 photo)" : "Upload an active template for this course first"} onClick={() => setPdfTarget({ templateId: tid, traineeName: t ? `${t.legal_first_name} ${t.legal_last_name}` : "", courseName: c?.name ?? "", enrollmentNumber: e.enrollment_number, certificateNumber: null, conductedDate: cert?.printed_at ?? null })}>View PDF</button>; })()}</td>}</tr>;
+                  : (cert ? (CERT_STATUSES.find(([v]) => v === cert.status)?.[1] ?? cert.status) : "Not issued")}</td><td>{cert?.printed_at ? day(cert.printed_at) : "—"}</td>{canManage && <td className="document-actions">{(() => { const tid = activeTemplateFor(e.course_id); return <ViewIcon label={tid ? "View Certificate PDF" : "Upload an active template for this course first"} disabled={busy || !tid} onClick={() => setPdfTarget({ templateId: tid, traineeName: t ? `${t.legal_first_name} ${t.legal_last_name}` : "", courseName: c?.name ?? "", enrollmentNumber: e.enrollment_number, certificateNumber: null, conductedDate: cert?.printed_at ?? null })} />; })()}</td>}</tr>;
               })}
               {!data.enrollments.filter((e) => e.enrollment_status !== "Cancelled").length && <tr><td colSpan={canManage ? 6 : 5}><span className="portal-empty-copy">No enrollments to certify yet.</span></td></tr>}
             </tbody></table></div>

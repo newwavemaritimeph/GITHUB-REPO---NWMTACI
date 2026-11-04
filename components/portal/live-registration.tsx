@@ -6,7 +6,7 @@ import { first, manilaToday, dueCentavos, balanceOf, pesos, pesos2, addDays } fr
 import { LATE_ENROLLMENT_CODES, PUBLIC_STCW_CODES, automaticEndDate, fitsInWeek } from "@/lib/scheduling";
 import { isPackageCourse, packageWeeks } from "@/lib/packages";
 import { emailStatusText } from "@/lib/instruction-email-status";
-import { ALL_DATES, Badge, Message, Modal, PageHead, PeriodBar, useNeedSince, usePaged, usePost, usePeriod, submit, fullName, fmtDate, fmtClock } from "./shared-ui";
+import { ALL_DATES, Badge, Message, Modal, PageHead, PeriodBar, ViewIcon, useNeedSince, usePaged, usePost, usePeriod, submit, fullName, fmtDate, fmtClock } from "./shared-ui";
 import { RequestActionModal, type RequestType } from "./payment-actions";
 import { TarButton } from "./live-cashier";
 import { tcl } from "@/lib/title-case";
@@ -672,7 +672,7 @@ function ProofSection({ data, enrollment: e, reload }: { data: PortalData; enrol
   return <section className="full rg-proof">
     <div className="rg-proof-head"><strong>Proof of Payment</strong><span className="muted-text">{mine.length ? `${mine.length} waiting for receipt` : "Optional · for the Cashier to view"}</span></div>
     {mine.length > 0 && <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Uploaded</th><th>Mode</th><th className="fs-n">Amount</th><th>Reference</th><th>Status</th><th></th></tr></thead><tbody>
-      {mine.map((p) => <tr key={p.id}><td>{fmtDate(day(p.submitted_at))}<small>{fmtClock(p.submitted_at)}</small></td><td>{p.method}</td><td className="fs-n">{pesos2(p.amount_centavos)}</td><td className="cl-mono">{p.reference}</td><td><Badge tone="orange">Waiting for Receipt</Badge></td><td>{p.drive_link && <a href={p.drive_link} target="_blank" rel="noreferrer">View Proof</a>}</td></tr>)}
+      {mine.map((p) => <tr key={p.id}><td>{fmtDate(day(p.submitted_at))}<small>{fmtClock(p.submitted_at)}</small></td><td>{p.method}</td><td className="fs-n">{pesos2(p.amount_centavos)}</td><td className="cl-mono">{p.reference}</td><td><Badge tone="orange">Waiting for Receipt</Badge></td><td>{p.drive_link && <ViewIcon label="View Proof" href={p.drive_link} />}</td></tr>)}
     </tbody></table></div>}
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <div className="rg-proof-form">
@@ -733,8 +733,8 @@ export function GenerateInstructions({ data, enrollment: e, reload, label = "Gen
   const generate = () => { window.open(pdf, "_blank"); void post({ action: "send-instructions", enrollmentId: e.id }).catch(() => undefined); };
   if (e.enrollment_status === "Cancelled") return null;
   return <span className="gi" onClick={(ev) => ev.stopPropagation()}>
-    <button type="button" className={enrolled && !atLimit ? "portal-primary" : "portal-secondary"} disabled={busy || !enrolled || atLimit} onClick={generate}>{busy ? "Generating…" : label}</button>
-    <small>{!enrolled ? "Enrolled trainees only" : count ? `Generated ${count} of ${INSTRUCTION_LIMIT}${emailed ? ` · ${emailed}` : ""}` : "Not yet generated"}{enrolled && count > 0 && <> · <a href={pdf} target="_blank" rel="noreferrer">View PDF</a></>}</small>
+    <span className="gi-row"><button type="button" className={enrolled && !atLimit ? "portal-primary" : "portal-secondary"} disabled={busy || !enrolled || atLimit} onClick={generate}>{busy ? "Generating…" : label}</button>{enrolled && count > 0 && <ViewIcon label="View PDF" href={pdf} />}</span>
+    <small>{!enrolled ? "Enrolled trainees only" : count ? `Generated ${count} of ${INSTRUCTION_LIMIT}${emailed ? ` · ${emailed}` : ""}` : "Not yet generated"}</small>
     {msg?.kind === "error" && <small className="cx-bad">{msg.text}</small>}
   </span>;
 }

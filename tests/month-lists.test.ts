@@ -1,5 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ALL_DATES, periodRange } from "@/components/portal/shared-ui";
+import { ALL_DATES, ViewIcon, periodRange } from "@/components/portal/shared-ui";
 
 // Every list opens on the month (owner, 3 Nov 2026); the range must cover the whole month.
 describe("periodRange Monthly", () => {
@@ -13,5 +15,20 @@ describe("periodRange Monthly", () => {
   });
   it("All Dates reaches past the search floor", () => {
     expect(periodRange("All Dates", "2026-11-04").from < ALL_DATES).toBe(true);
+  });
+});
+
+// View is a round eye icon everywhere (owner, 4 Nov 2026), still named for screen readers.
+describe("ViewIcon", () => {
+  it("is a link with a name when given an address", () => {
+    const html = renderToStaticMarkup(createElement(ViewIcon, { label: "View Proof", href: "https://drive.google.com/x" }));
+    expect(html).toContain('href="https://drive.google.com/x"');
+    expect(html).toContain('aria-label="View Proof"');
+    expect(html).toContain('target="_blank"');
+  });
+  it("is a button otherwise and can be disabled", () => {
+    const html = renderToStaticMarkup(createElement(ViewIcon, { label: "View Photo", disabled: true }));
+    expect(html).toContain("<button");
+    expect(html).toContain("disabled");
   });
 });
