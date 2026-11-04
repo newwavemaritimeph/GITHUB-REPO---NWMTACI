@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { ALL_DATES, ViewIcon, periodRange } from "@/components/portal/shared-ui";
+import { needsFullRefresh } from "@/lib/portal-format";
 
 // Every list opens on the month (owner, 3 Nov 2026); the range must cover the whole month.
 describe("periodRange Monthly", () => {
@@ -30,5 +31,16 @@ describe("ViewIcon", () => {
     const html = renderToStaticMarkup(createElement(ViewIcon, { label: "View Photo", disabled: true }));
     expect(html).toContain("<button");
     expect(html).toContain("disabled");
+  });
+});
+
+// The refresh reloads only on news (owner, 4 Nov 2026: "make it faster").
+describe("needsFullRefresh", () => {
+  it("skips the reload when nothing changed", () => expect(needsFullRefresh("a", "a", 10000)).toBe(false));
+  it("reloads on a change", () => expect(needsFullRefresh("a", "b", 10000)).toBe(true));
+  it("reloads at least once a minute", () => expect(needsFullRefresh("a", "a", 60000)).toBe(true));
+  it("reloads as before when the database update is not run yet", () => {
+    expect(needsFullRefresh(null, null, 1000)).toBe(true);
+    expect(needsFullRefresh("a", null, 1000)).toBe(true);
   });
 });

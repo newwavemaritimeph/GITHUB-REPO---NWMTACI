@@ -2653,3 +2653,11 @@ button.rd-row:hover { background: #f6fafc; }
 .portal-shell .view-icon:hover:not(:disabled), .portal-shell .document-actions .view-icon:hover:not(:disabled) { border-color: var(--nw-blue); color: var(--nw-blue); background: var(--nw-surface); }
 .portal-shell .view-icon:disabled { opacity: .45; cursor: not-allowed; }
 .nw-shell .gi-row { display: inline-flex; gap: 6px; align-items: center; }
+
+/* After a save the records refresh behind the screen (owner, 4 Nov 2026): a thin bar, and the lists take no clicks until they are current. */
+.nw-shell .portal-workspace.nw-syncing { cursor: progress; }
+.nw-shell .portal-workspace.nw-syncing::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 3px; z-index: 300; background: linear-gradient(90deg, #F25615, #35CCFA, #F25615); background-size: 200% 100%; animation: nw-sync 1s linear infinite; }
+.nw-shell .portal-workspace.nw-syncing > * { pointer-events: none; }
+.nw-shell .portal-workspace.nw-syncing .portal-modal-backdrop, .nw-shell .portal-workspace.nw-syncing .vx-panel, .nw-shell .portal-workspace.nw-syncing .nw-dialog { pointer-events: auto; }
+@keyframes nw-sync { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .nw-shell .portal-workspace.nw-syncing::before { animation: none; } }

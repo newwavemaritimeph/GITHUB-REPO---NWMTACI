@@ -49,3 +49,6 @@ export const addDays = (iso: string, n: number) => {
   d.setDate(d.getDate() + n);
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(d);
 };
+
+/** The 10-second refresh reloads everything only on a change, and at least once a minute for what the stamp cannot see. */
+export const needsFullRefresh = (seen: string | null | undefined, now: string | null | undefined, sinceFullMs: number) => !seen || !now || seen !== now || sinceFullMs >= 60000;

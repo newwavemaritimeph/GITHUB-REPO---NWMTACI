@@ -698,6 +698,11 @@ export async function GET(request: Request) {
   // One service-role client for the whole handler.
   const db = createSupabaseAdminClient();
 
+  // Has anything changed (owner, 4 Nov 2026: "make it faster")? One small read for the portal's 10-second
+  // refresh, so it reloads everything only when there is news. Null before 202610290074: it then reloads as before.
+  const changeStamp = async () => { const { data, error } = await db.rpc("portal_change_stamp"); return error ? null : (data as string | null); };
+  if (new URL(request.url).searchParams.has("stamp")) return NextResponse.json({ stamp: await changeStamp() });
+
   // This Month (owner, 3 Nov 2026): every list opens on the current month and steps back month
   // by month, so records load from `since` (the 1st of this month unless the portal asks for an
   // older month). The newest rows still load as before, so open work older than the month stays
@@ -723,7 +728,7 @@ export async function GET(request: Request) {
     return { data: rows, error: null as E | null };
   };
   const shiftIso = (d: string, n: number) => { const x = new Date(`${d}T00:00:00Z`); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
-  const [traineesFrom, enrollmentsFrom, paymentsFrom, expensesFrom] = await Promise.all([reachBack("trainees", "created_at", 250), reachBack("enrollments", "created_at", 250), reachBack("payments", "received_at", 250), reachBack("expenses", "created_at", 250)]);
+  const [stamp, traineesFrom, enrollmentsFrom, paymentsFrom, expensesFrom] = await Promise.all([changeStamp(), reachBack("trainees", "created_at", 250), reachBack("enrollments", "created_at", 250), reachBack("payments", "received_at", 250), reachBack("expenses", "created_at", 250)]);
   // Batches: four months back (for training end dates) or the month asked for, plus every later batch.
   const batchesFrom = since < shiftIso(todayManila, -120) ? since : shiftIso(todayManila, -120);
 
@@ -783,7 +788,7 @@ export async function GET(request: Request) {
     const empty = { certificates: [] as unknown[], templates: [] as unknown[], releases: [] as unknown[], issuanceEnabled: false, series: [] as unknown[], evaluationForms: {} as Record<string, string>, feedbackAt: {} as Record<string, string>, feedbackLinks: {} as Record<string, string>, photos: null as unknown[] | null };
     if (!seesCertificates) return empty;
     const certificatesFrom = await reachBack("certificates", "created_at", 300);
-    const [base, extra, tpls, rel, settings] = await Promise.all([
+    const firstReads = Promise.all([
       allRows((from, to) => db.from("certificates").select("id,enrollment_id,status,printed_at,printed_by,reprint_count,snapshot,number_pool_id,template_id,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name,code))").gte("created_at", certificatesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
       // Release/courier/correction fields ship in a later migration — merge tolerantly
       // so a pre-migration database returns the base certificate rows instead of 500ing.
@@ -811,6 +816,7 @@ export async function GET(request: Request) {
       allRows((from, to) => db.from("certificates").select("id,revoked_at,revoked_reason,sticker_no,registration_number,printer:printed_by(complete_name)").gte("created_at", certificatesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
       db.from("training_feedback").select("enrollment_id,drive_link,comments").order("submitted_at", { ascending: false }).limit(2000),
     ]);
+    const [base, extra, tpls, rel, settings] = await firstReads;
     const regByCourse = new Map(((regSeries.error ? [] : regSeries.data ?? []) as { course_id: string }[]).map((r) => [r.course_id, r]));
     const seriesRows = ((series.data ?? []) as { course_id: string }[]).map((s) => ({ ...s, ...(regByCourse.get(s.course_id) ?? {}) }));
     let certificates = (base.data ?? []) as { id: string }[];
@@ -844,11 +850,11 @@ export async function GET(request: Request) {
     const types = ["Cancellation", "Refund", "Make-up Class", "Rescheduling", "Reprinting", "Change Course", "TAR reprint"];
     // stage / charge_id come from migration 202610070004; without it, fall back.
     const requestsFrom = await reachBack("enrollment_requests", "created_at", 200);
-    const routed = await allRows((from, to) => db.from("enrollment_requests").select(`${base},stage,charge_id,enrollment_charges!enrollment_requests_charge_id_fkey(amount_centavos,description,approval_status)`).in("request_type", types).gte("created_at", requestsFrom).order("created_at", { ascending: false }).order("id").range(from, to));
+    const [routed, datedRows] = await Promise.all([allRows((from, to) => db.from("enrollment_requests").select(`${base},stage,charge_id,enrollment_charges!enrollment_requests_charge_id_fkey(amount_centavos,description,approval_status)`).in("request_type", types).gte("created_at", requestsFrom).order("created_at", { ascending: false }).order("id").range(from, to)), allRows((from, to) => db.from("enrollment_requests").select("id,requested_on,fee_rule").gte("created_at", requestsFrom).order("created_at", { ascending: false }).order("id").range(from, to))]);
     if (!routed.error) {
       const list = (routed.data ?? []) as { id: string }[];
       // Request date and fee rule (202610080022); ignored before it.
-      const { data: dated } = list.length ? await allRows((from, to) => db.from("enrollment_requests").select("id,requested_on,fee_rule").gte("created_at", requestsFrom).order("created_at", { ascending: false }).order("id").range(from, to)) : { data: [] };
+      const dated = datedRows.data;
       const byId = new Map((dated ?? []).map((r) => [(r as { id: string }).id, r]));
       return list.map((r) => ({ ...r, ...(byId.get(r.id) ?? {}) }));
     }
@@ -923,19 +929,19 @@ export async function GET(request: Request) {
   const expenseExtrasUnit = (async () => {
     const { data: ex } = await allRows((from, to) => db.from("expenses").select("id,payment_channel,reference_number,purpose,requested_by").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to));
     if (!ex) return { rows: [] as { id: string }[], names: new Map<string, string>() };
-    // Voucher flow fields (202610070018).
-    const { data: flow } = await allRows((from, to) => db.from("expenses").select("id,request_number,voucher_number,approved_at,decision_remarks,released_at,drive_link,paid_at").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to));
+    // Voucher flow (202610070018), print counts (202610080020), lines and supporting document (202610080019),
+    // receipt photos (202610190044), who approved and released (202610070018). Read together; each is ignored before its update.
+    const [{ data: flow }, { data: prints }, { data: lines }, { data: receipts }, { data: people2 }] = await Promise.all([
+      allRows((from, to) => db.from("expenses").select("id,request_number,voucher_number,approved_at,decision_remarks,released_at,drive_link,paid_at").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
+      allRows((from, to) => db.from("expenses").select("id,print_count,reprints_approved").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
+      allRows((from, to) => db.from("expenses").select("id,line_items,supporting_document").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
+      allRows((from, to) => db.from("expenses").select("id,receipt_files").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
+      allRows((from, to) => db.from("expenses").select("id,approved_by,released_by").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
+    ]);
     const flowById = new Map((flow ?? []).map((r) => [(r as { id: string }).id, r]));
-    // Print counts (202610080020); ignored before it.
-    const { data: prints } = await allRows((from, to) => db.from("expenses").select("id,print_count,reprints_approved").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to));
     const printsById = new Map((prints ?? []).map((r) => [(r as { id: string }).id, r]));
-    // Voucher lines and supporting document (202610080019); who approved and released (202610070018). Ignored before them.
-    const { data: lines } = await allRows((from, to) => db.from("expenses").select("id,line_items,supporting_document").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to));
     const linesById = new Map((lines ?? []).map((r) => [(r as { id: string }).id, r]));
-    // Receipt photos (202610190044); ignored before it.
-    const { data: receipts } = await allRows((from, to) => db.from("expenses").select("id,receipt_files").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to));
     const receiptsById = new Map((receipts ?? []).map((r) => [(r as { id: string }).id, r]));
-    const { data: people2 } = await allRows((from, to) => db.from("expenses").select("id,approved_by,released_by").gte("created_at", expensesFrom).order("created_at", { ascending: false }).order("id").range(from, to));
     const peopleById = new Map((people2 ?? []).map((r) => [(r as { id: string }).id, r]));
     const rows = ex.map((r) => ({ ...r, ...(flowById.get((r as { id: string }).id) ?? {}), ...(printsById.get((r as { id: string }).id) ?? {}), ...(linesById.get((r as { id: string }).id) ?? {}), ...(receiptsById.get((r as { id: string }).id) ?? {}), ...(peopleById.get((r as { id: string }).id) ?? {}) })) as { id: string }[];
     // Display names for who raised, approved and released each voucher.
@@ -1312,7 +1318,7 @@ export async function GET(request: Request) {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, feedbackLinks: certs.feedbackLinks, certificatePhotos: certs.photos, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, applicationNumbers, traineeFacebook, instructionCategories, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, pendingRebates, deliveryRequests, instructors, accreditations, batchResources, batchCancels, certificateNumberSettings, legacyCertificates, holidays, otherIncome, incomeCategories, rebatesReceived, traineeProofs, companyCharge, billingStatements, paymentVoids, voidedPayments }, { headers: { "Cache-Control": "no-store" } });
+    centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, stamp, applicationNumbers, traineeFacebook, instructionCategories, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, pendingRebates, deliveryRequests, instructors, accreditations, batchResources, batchCancels, certificateNumberSettings, legacyCertificates, holidays, otherIncome, incomeCategories, rebatesReceived, traineeProofs, companyCharge, billingStatements, paymentVoids, voidedPayments }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /**

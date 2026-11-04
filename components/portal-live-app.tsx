@@ -35,7 +35,7 @@ import { ReleasingReports, ReleasingHome, CertificatesWorkspace, WaitingCertific
 import { AccountingHome, ApprovalHistory, AccountingReportsHub, FinanceSummaryReport, BillingStatementReport, AccountingPayments, AccountingDocuments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
-import { pesos, pesos2, first, dueCentavos, balanceOf, isUnpaid, manilaToday, addDays } from "@/lib/portal-format";
+import { pesos, pesos2, first, dueCentavos, balanceOf, isUnpaid, manilaToday, addDays, needsFullRefresh } from "@/lib/portal-format";
 import { tcl } from "@/lib/title-case";
 import { CompletionRecords } from "./portal/completion-records";
 import { OtherIncome } from "./portal/other-income";
@@ -81,6 +81,7 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   // Website enrollment number (NWMTACI-0000001) per trainee id; empty until migration 202610070003.
   applicationNumbers?:Record<string,string>;
   traineeFacebook?:Record<string,string>;
+  stamp?:string|null;
   instructionCategories?:CategoryTemplate[];
   // Pending applications Registration handed to the Cashier: enrollment id → when (202610070004).
   handedToCashier?:Record<string,string>;
@@ -296,14 +297,18 @@ export function PortalLiveApp(){
   // This Month (owner, 3 Nov 2026): the server sends the current month; `since` reaches back when a list steps to an older month.
   const sinceRef=useRef(""),[since,setSince]=useState("");
   const needSince=useCallback((from:string)=>{const loaded=sinceRef.current||`${new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date()).slice(0,8)}01`;if(from<loaded){sinceRef.current=from;setSince(from)}},[]);
-  const load=useCallback(async()=>{setLoading(true);setError("");try{const response=await fetch(recordsUrl(sinceRef.current),{cache:"no-store"});const body=await response.json();if(!response.ok)throw new Error(body.error??"Unable to load staff records.");setData(body);setRole((current:string)=>{const options=workingRolesFor(body.roles);return options.includes(current)?current:defaultWorkingRole(body.roles)})}catch(e){setError(e instanceof Error?e.message:"Unable to load staff records.")}finally{setLoading(false)}},[]);
+  // The newest load wins, so a slow older reply never paints over a save (owner, 4 Nov 2026: "make it faster").
+  const loadSeq=useRef(0),savesRefreshing=useRef(0),lastStamp=useRef<string|null>(null),lastFull=useRef(0),[syncing,setSyncing]=useState(false);
+  const load=useCallback(async()=>{const seq=++loadSeq.current;setLoading(true);setError("");try{const response=await fetch(recordsUrl(sinceRef.current),{cache:"no-store"});const body=await response.json();if(!response.ok)throw new Error(body.error??"Unable to load staff records.");if(seq!==loadSeq.current)return;lastStamp.current=body.stamp??null;lastFull.current=Date.now();setData(body);setRole((current:string)=>{const options=workingRolesFor(body.roles);return options.includes(current)?current:defaultWorkingRole(body.roles)})}catch(e){if(seq===loadSeq.current)setError(e instanceof Error?e.message:"Unable to load staff records.")}finally{if(seq===loadSeq.current)setLoading(false)}},[]);
+  // After a save the screen moves on at once and the records refresh behind it; the lists take no clicks until they are current.
+  const refresh=useCallback(async()=>{savesRefreshing.current+=1;setSyncing(true);void load().finally(()=>{savesRefreshing.current-=1;if(!savesRefreshing.current)setSyncing(false)})},[load]);
   useEffect(()=>{void load()},[load,since]);
   // Refresh every 10 seconds (owner, 21 Oct 2026), quietly. Skipped while the tab is hidden,
   // a window is open or a field has focus, so nothing being typed is lost.
   // A new Manila day re-opens the screens on today (owner, 21 Oct 2026: date tabs start on the current date).
   const manilaNow=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date());
   const [day,setDay]=useState(manilaNow);
-  useEffect(()=>{let running=false;const id=window.setInterval(async()=>{setDay(d=>{const now=manilaNow();return d===now?d:now});const el=document.activeElement;if(running||document.hidden||document.querySelector("[role=dialog]")||(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;running=true;try{const r=await fetch(recordsUrl(sinceRef.current),{cache:"no-store"});if(r.ok)setData(await r.json())}catch{/* next tick retries */}finally{running=false}},10000);return()=>window.clearInterval(id)},[]);
+  useEffect(()=>{let running=false;const id=window.setInterval(async()=>{setDay(d=>{const now=manilaNow();return d===now?d:now});const el=document.activeElement;if(running||savesRefreshing.current||document.hidden||document.querySelector("[role=dialog]")||(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;running=true;try{const s=await fetch("/api/staff/operations?stamp=1",{cache:"no-store"});const stamp=s.ok?(await s.json()).stamp as string|null:null;if(!needsFullRefresh(lastStamp.current,stamp,Date.now()-lastFull.current))return;const seq=++loadSeq.current;const r=await fetch(recordsUrl(sinceRef.current),{cache:"no-store"});if(r.ok){const body=await r.json();if(seq===loadSeq.current){lastStamp.current=body.stamp??null;lastFull.current=Date.now();setData(body)}}}catch{/* next tick retries */}finally{running=false}},10000);return()=>window.clearInterval(id)},[]);
   // Admin keeps an oversight-only workspace: Dashboard, Search trainee, Enrollments,
   // Accounting, Enrollment summary, Reports, MyHr and Setup. Everything else is the
   // day-to-day work of the specialised roles and is hidden here.
@@ -355,8 +360,8 @@ export function PortalLiveApp(){
       </div>})}</nav>
       {notices&&<div className="notification-popover nw-notices"><div><h3>Notifications</h3><button onClick={()=>void markRead()}>Mark All as Read</button></div>{data.notifications.length?data.notifications.map(item=><button key={item.id} onClick={()=>{if(item.deep_link)setNotices(false)}}><i style={{opacity:item.read_at?.length?0:1}}/><span><strong>{item.title}</strong><small>{item.body}</small></span></button>):<p className="portal-empty-copy">No notifications yet.</p>}</div>}
     </header>
-    <section className="portal-workspace">{error&&<div className="portal-inline-error"><Message kind="error" text={error}/></div>}<PortalContent key={day} modules={rebuildModules} recordsView={recordsView} setRecordsView={setRecordsView} active={active} role={role} data={data} query={query} go={go} open={setModal} onPay={(id:string)=>{setPayTarget(id);setModal("payment")}} canEnroll={canEnroll} canSchedule={canSchedule} canPay={canPay} reload={load}/></section>
-    {modal==="enrollment"&&<EnrollmentForm data={data} onClose={()=>setModal(null)} onSaved={load}/>} {modal==="batch"&&<BatchForm data={data} onClose={()=>setModal(null)} onSaved={load}/>} {modal==="payment"&&<RecordPaymentModal data={data} initialEnrollmentId={payTarget||undefined} onClose={()=>{setModal(null);setPayTarget("")}} onSaved={load}/>} {account&&<ChangePasswordModal email={data.profile.email} onClose={()=>setAccount(false)}/>}
+    <section className={`portal-workspace${syncing?" nw-syncing":""}`}>{error&&<div className="portal-inline-error"><Message kind="error" text={error}/></div>}<PortalContent key={day} modules={rebuildModules} recordsView={recordsView} setRecordsView={setRecordsView} active={active} role={role} data={data} query={query} go={go} open={setModal} onPay={(id:string)=>{setPayTarget(id);setModal("payment")}} canEnroll={canEnroll} canSchedule={canSchedule} canPay={canPay} reload={refresh}/></section>
+    {modal==="enrollment"&&<EnrollmentForm data={data} onClose={()=>setModal(null)} onSaved={refresh}/>} {modal==="batch"&&<BatchForm data={data} onClose={()=>setModal(null)} onSaved={refresh}/>} {modal==="payment"&&<RecordPaymentModal data={data} initialEnrollmentId={payTarget||undefined} onClose={()=>{setModal(null);setPayTarget("")}} onSaved={refresh}/>} {account&&<ChangePasswordModal email={data.profile.email} onClose={()=>setAccount(false)}/>}
   </main></DataSince.Provider>;
 }
 
