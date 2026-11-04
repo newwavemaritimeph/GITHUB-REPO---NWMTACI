@@ -11,6 +11,10 @@ import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 
+// Portal email goes out from the connected account (owner, 4 Nov 2026); this permission only sends, it cannot read mail.
+export const GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.send";
+export const hasGmailScope = (scopes?: string | null) => (scopes ?? "").split(/\s+/).includes(GMAIL_SCOPE);
+
 export const CLASSROOM_SCOPES = [
   "openid",
   "email",
@@ -18,6 +22,7 @@ export const CLASSROOM_SCOPES = [
   "https://www.googleapis.com/auth/classroom.rosters",
   // Proof-of-payment uploads (7 Oct 2026): the portal can see only the files and folders it creates.
   "https://www.googleapis.com/auth/drive.file",
+  GMAIL_SCOPE,
 ];
 export const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 export const hasDriveScope = (scopes?: string | null) => (scopes ?? "").split(/\s+/).includes(DRIVE_SCOPE);

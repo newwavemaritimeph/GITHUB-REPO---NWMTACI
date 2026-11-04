@@ -45,7 +45,7 @@ Known incomplete production modules:
 - Certificate template upload/approval, number pools, preview/print/void/reprint/release UI and full test coverage.
 - Complete expenses, vouchers, reconciliation, accounting locks, payables, refunds, and Cashier closing workflows.
 - HR attendance, leave, benefits, advances, payroll finalization, payslips, 13th-month calculations, and COE requests.
-- Resend production configuration, signature-verified webhooks, retrying jobs, weekly instructor email schedule, and delivery observability.
+- Portal email goes out from the connected Google account through the Gmail API, or through Resend when `RESEND_API_KEY` and `EMAIL_FROM` are set (owner, 4 Nov 2026). Signature-verified webhooks (Resend only), retrying jobs, weekly instructor email schedule, and delivery observability.
 - Role-complete end-to-end, accessibility, concurrency, backup/restore, security, and final acceptance tests.
 - Final pixel calibration of text overlays on the supplied admission and acknowledgment-receipt artwork.
 

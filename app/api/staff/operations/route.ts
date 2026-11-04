@@ -14,7 +14,7 @@ import { classroomEmailBlocks } from "@/lib/classroom";
 import { loadInstructionDetails } from "@/lib/training-instructions";
 import { fileVoucherInDrive } from "@/lib/expense-voucher";
 import { channelOf } from "@/lib/reconciliation";
-import { activeConnection, googleConfigured, hasDriveScope, inviteStudent, listClasses, revokeConnection } from "@/lib/google-classroom";
+import { activeConnection, googleConfigured, hasDriveScope, hasGmailScope, inviteStudent, listClasses, revokeConnection } from "@/lib/google-classroom";
 import { sendBalanceSummary } from "@/lib/balance-summary";
 import { RULED_REQUESTS, refundAfterDeduction, requestFee } from "@/lib/request-fees";
 import { applyReferralRebates, pendingFullPaymentRebates, suggestReferralCode } from "@/lib/referral";
@@ -1050,7 +1050,7 @@ export async function GET(request: Request) {
   });
   // Google Classroom connection status (no tokens leave the server), linked
   // class per course, and the latest invite per enrollment (migration 202610070013).
-  const classroom = { configured: googleConfigured(), connected: false, accountEmail: null as string | null, connectedAt: null as string | null, driveReady: false };
+  const classroom = { configured: googleConfigured(), connected: false, accountEmail: null as string | null, connectedAt: null as string | null, driveReady: false, mailReady: false };
   const classroomCourseIds: Record<string, string> = {};
   const classroomInvites: Record<string, { state: string; email: string; error: string | null; created_at: string }> = {};
   task(async () => {
@@ -1060,7 +1060,7 @@ export async function GET(request: Request) {
       db.from("courses").select("id,google_classroom_course_id").not("google_classroom_course_id", "is", null).limit(1000),
       admin.from("classroom_invitations").select("enrollment_id,state,email,error,created_at").order("created_at", { ascending: false }).limit(1000),
     ]);
-    if (connection) Object.assign(classroom, { connected: true, accountEmail: connection.account_email, connectedAt: connection.connected_at, driveReady: hasDriveScope(connection.scopes) });
+    if (connection) Object.assign(classroom, { connected: true, accountEmail: connection.account_email, connectedAt: connection.connected_at, driveReady: hasDriveScope(connection.scopes), mailReady: hasGmailScope(connection.scopes) });
     for (const r of (linkRows ?? []) as { id: string; google_classroom_course_id: string }[]) classroomCourseIds[r.id] = r.google_classroom_course_id;
     for (const r of (inviteRows ?? []) as { enrollment_id: string; state: string; email: string; error: string | null; created_at: string }[]) if (!classroomInvites[r.enrollment_id]) classroomInvites[r.enrollment_id] = r;
   });
@@ -1824,7 +1824,7 @@ export async function POST(request: Request) {
     if (input.action === "balance-summary-send") {
       if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot send the balance summary." }, { status: 403 });
       const result = await sendBalanceSummary(createSupabaseAdminClient(), { origin: new URL(request.url).origin, manual: true });
-      if (!result.configured) return NextResponse.json({ error: "Email is not set up yet (RESEND_API_KEY and EMAIL_FROM)." }, { status: 400 });
+      if (!result.configured) return NextResponse.json({ error: "Email is not set up yet. Reconnect Google in Classroom Links and allow sending email." }, { status: 400 });
       return NextResponse.json({ ok: true, ...result });
     }
     if (input.action === "cashier-closing-review") {

@@ -100,7 +100,7 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   // Cashier start-of-day opening cash (202610070015).
   cashierOpenings?:{id:string;opening_date:string;opening_cash_centavos:number;remarks:string|null;created_at:string}[];
   // Google Classroom connection (202610070013): status only, never tokens.
-  classroom?:{configured:boolean;connected:boolean;accountEmail:string|null;connectedAt:string|null;driveReady?:boolean};
+  classroom?:{configured:boolean;connected:boolean;accountEmail:string|null;connectedAt:string|null;driveReady?:boolean;mailReady?:boolean};
   classroomCourseIds?:Record<string,string>;
   classroomInvites?:Record<string,{state:string;email:string;error:string|null;created_at:string}>;
   referralByEnrollment?:Record<string,string>;
