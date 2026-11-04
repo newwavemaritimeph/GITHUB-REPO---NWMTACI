@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { passMark, picksProblem, questionsProblem, scorePostTest, forTrainee, type PostTestQuestion } from "../lib/post-test";
 import { draftFor } from "../lib/post-test-server";
-import { trainingEndBody } from "../lib/training-end-email";
+import { trainingEndBody, trainingEndDue } from "../lib/training-end-email";
 import { releaseProblem } from "../lib/certificate-rules";
 import { bundledLayout } from "../lib/certificate-template-layouts";
 import { conductedText } from "../lib/certificate-overlay";
@@ -43,6 +43,18 @@ describe("drafted questions", () => {
   it("each has 4 different choices and a valid answer", () => {
     for (const code of ["ABC", "HPT", "WH", "SOC"]) expect(questionsProblem(draftFor({ code, name: "" }))).toBeNull();
   });
+});
+
+describe("who gets the end-of-training email", () => {
+  const today = "2026-11-04", now = Date.parse("2026-11-04T08:00:00Z");
+  it("sends on the last training day", () => expect(trainingEndDue("2026-11-04", null, today, now)).toBe(true));
+  it("waits while training is still ahead", () => expect(trainingEndDue("2026-11-05", "2026-11-04T01:00:00Z", today, now)).toBe(false));
+  it("sends for a course that already ended when the trainee was enrolled in the last 3 days", () => expect(trainingEndDue("2026-10-20", "2026-11-03T01:00:00Z", today, now)).toBe(true));
+  it("does not email older finished courses", () => {
+    expect(trainingEndDue("2026-10-20", "2026-10-20T01:00:00Z", today, now)).toBe(false);
+    expect(trainingEndDue("2026-10-20", null, today, now)).toBe(false);
+  });
+  it("skips an enrollment with no schedule", () => expect(trainingEndDue(null, "2026-11-04T01:00:00Z", today, now)).toBe(false));
 });
 
 describe("end-of-training email", () => {

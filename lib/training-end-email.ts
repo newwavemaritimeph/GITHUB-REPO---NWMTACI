@@ -78,14 +78,24 @@ export async function sendTrainingEndEmail(db: Admin, enrollmentId: string, opti
   return { state: "Sent" as const, to: details.traineeEmail };
 }
 
-/** 4:00 PM on the last training day: the end-of-training email to everyone whose training ends today. */
+/**
+ * Who gets the end-of-training email in the daily 4:00 PM run: training ends today, or it already ended and the
+ * trainee was enrolled in the last 3 days (owner, 4 Nov 2026: a start date may be today or earlier, and a trainee may
+ * pay after the last day). The window keeps older finished courses from being emailed all at once.
+ */
+export function trainingEndDue(end: string | null | undefined, enrolledAt: string | null | undefined, today: string, nowMs: number) {
+  if (!end || end > today) return false;
+  if (end === today) return true;
+  return !!enrolledAt && new Date(enrolledAt).getTime() >= nowMs - 3 * 86_400_000;
+}
+
+/** 4:00 PM daily: the end-of-training email. Each enrollment gets it once (idempotency key in sendTrainingEndEmail). */
 export async function sendTrainingEndEmails(db: Admin, options: { origin: string }) {
-  const today = manilaToday();
-  const since = new Date(Date.now() - 20 * 86_400_000).toISOString().slice(0, 10);
-  const { data: rows } = await db.from("enrollments").select("id,scheduled_on,batches(ends_on),courses(duration_label)").eq("enrollment_status", "Enrolled").is("partner_offer_id", null).gte("created_at", new Date(Date.now() - 180 * 86_400_000).toISOString()).limit(3000);
+  const today = manilaToday(), now = Date.now();
+  const { data: rows } = await db.from("enrollments").select("id,scheduled_on,enrolled_at,batches(ends_on),courses(duration_label)").eq("enrollment_status", "Enrolled").is("partner_offer_id", null).gte("created_at", new Date(now - 180 * 86_400_000).toISOString()).limit(3000);
   const due = (rows ?? []).filter((r) => {
-    const end = first(r.batches as unknown as { ends_on: string } | null)?.ends_on ?? (r.scheduled_on && r.scheduled_on >= since ? automaticEndDate(r.scheduled_on, first(r.courses as unknown as { duration_label: string } | null)?.duration_label ?? "1 day") : null);
-    return end === today;
+    const end = first(r.batches as unknown as { ends_on: string } | null)?.ends_on ?? (r.scheduled_on ? automaticEndDate(r.scheduled_on, first(r.courses as unknown as { duration_label: string } | null)?.duration_label ?? "1 day") : null);
+    return trainingEndDue(end, r.enrolled_at as string | null, today, now);
   });
   let sent = 0;
   for (const r of due) { const res = await sendTrainingEndEmail(db, r.id as string, options).catch(() => ({ state: "Failed" as const })); if (res.state === "Sent") sent++; }
