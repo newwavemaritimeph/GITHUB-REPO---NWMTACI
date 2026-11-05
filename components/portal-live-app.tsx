@@ -200,6 +200,8 @@ const CASHIER_TABS:TopTab[]=[
 const GROUP_LABELS:Partial<Record<NavGroup,string>>={"Payables & cash":"Payables and cash"};
 // "Batch Schedules" reads "Schedules" (owner, 3 Nov 2026); the module key stays the same.
 const shownAs=(label:string)=>label==="Batch schedules"?"Schedules":label;
+// The report keeps the owner's spelling: titleCase would capitalize "from".
+const menuLabel=(label:string)=>label==="Sales from endorsed courses"?"Sales from Endorsed Courses":tcl(shownAs(label));
 const ACCOUNTING_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
   // Reprints of receipts and TARs live in the Trainee Account (owner, 3 Nov 2026).
@@ -356,8 +358,8 @@ export function PortalLiveApp(){
         </div>
       </div>
       <nav className="nw-tabs" aria-label="Staff workspace">{tabs.map(tab=>{const single=tab.items.length===1&&tab.items[0]===tab.label;const on=tab.items.includes(active);const isOpen=openTab===tab.label;const count=tab.items.includes("Requests")?openRequests:0;return <div key={tab.label} className={`nw-tab${on?" on":""}${isOpen?" open":""}`}>
-        <button type="button" aria-haspopup={single?undefined:"menu"} aria-expanded={single?undefined:isOpen} aria-current={on?"page":undefined} onClick={e=>{if(single){go(tab.items[0]);return}const r=e.currentTarget.getBoundingClientRect();setMenuAt({left:Math.max(16,Math.min(r.left,window.innerWidth-276)),top:r.bottom+6});setOpenTab(isOpen?"":tab.label)}}>{tcl(shownAs(tab.label))}{count>0&&<b className="nw-count">{count}</b>}{!single&&<span className="nw-caret" aria-hidden="true"/>}</button>
-        {!single&&isOpen&&<div className="nw-menu" role="menu" style={{left:menuAt.left,top:menuAt.top}}>{tab.items.map(item=><Fragment key={item}>{tab.heads?.[item]&&<div role="presentation" className="nw-menu-head">{tab.heads[item]}</div>}<button type="button" role="menuitem" className={active===item?"on":""} onClick={()=>go(item)}>{tcl(shownAs(item))}</button></Fragment>)}</div>}
+        <button type="button" aria-haspopup={single?undefined:"menu"} aria-expanded={single?undefined:isOpen} aria-current={on?"page":undefined} onClick={e=>{if(single){go(tab.items[0]);return}const r=e.currentTarget.getBoundingClientRect();setMenuAt({left:Math.max(16,Math.min(r.left,window.innerWidth-276)),top:r.bottom+6});setOpenTab(isOpen?"":tab.label)}}>{menuLabel(tab.label)}{count>0&&<b className="nw-count">{count}</b>}{!single&&<span className="nw-caret" aria-hidden="true"/>}</button>
+        {!single&&isOpen&&<div className="nw-menu" role="menu" style={{left:menuAt.left,top:menuAt.top}}>{tab.items.map(item=><Fragment key={item}>{tab.heads?.[item]&&<div role="presentation" className="nw-menu-head">{tab.heads[item]}</div>}<button type="button" role="menuitem" className={active===item?"on":""} onClick={()=>go(item)}>{menuLabel(item)}</button></Fragment>)}</div>}
       </div>})}</nav>
       {notices&&<div className="notification-popover nw-notices"><div><h3>Notifications</h3><button onClick={()=>void markRead()}>Mark All as Read</button></div>{data.notifications.length?data.notifications.map(item=><button key={item.id} onClick={()=>{if(item.deep_link)setNotices(false)}}><i style={{opacity:item.read_at?.length?0:1}}/><span><strong>{item.title}</strong><small>{item.body}</small></span></button>):<p className="portal-empty-copy">No notifications yet.</p>}</div>}
     </header>
