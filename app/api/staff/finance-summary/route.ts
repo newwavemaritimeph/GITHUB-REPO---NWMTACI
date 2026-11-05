@@ -14,5 +14,9 @@ export async function GET(request: Request) {
   const period = url.searchParams.get("period") as Period | null;
   const end = url.searchParams.get("end") ?? "";
   if (!period || !(PERIODS as readonly string[]).includes(period) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) return NextResponse.json({ error: "Choose a period and date." }, { status: 400 });
-  return NextResponse.json(await buildFinanceSummary(createSupabaseAdminClient(), period, end), { headers: { "Cache-Control": "no-store" } });
+  try {
+    return NextResponse.json(await buildFinanceSummary(createSupabaseAdminClient(), period, end), { headers: { "Cache-Control": "no-store" } });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : "Could not load the report." }, { status: 500 });
+  }
 }

@@ -38,6 +38,8 @@ export const DEFAULT_CATEGORY_TEMPLATES: Record<InstructionCategory, CategoryTem
 export const INSTRUCTION_PLACEHOLDERS = ["{{trainee}}", "{{course}}", "{{dates}}", "{{time}}", "{{room}}", "{{classroom_link}}", "{{class_code}}"];
 
 export const linesOf = (text: string | null | undefined) => (text ?? "").split("\n").map((l) => l.trim()).filter(Boolean);
+/** A course with no class yet does not tell the trainee to join one (owner, 5 Nov 2026). */
+export const remindersFor = (lines: string[], hasClass: boolean) => (hasClass ? lines : lines.filter((l) => !/google classroom|class code/i.test(l)));
 export const fillPlaceholders = (text: string, values: Record<string, string>) => text.replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => values[key] ?? "");
 
 /** "Payment: Full payment…" as [label, text]; a line without a label keeps its whole text. */

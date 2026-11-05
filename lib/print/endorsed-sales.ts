@@ -1,15 +1,17 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { EndorsedRow, endorsedSales } from "@/lib/endorsed-sales";
 import { ascii, day, money } from "@/lib/print/finance-summary";
+import type { DocumentControl } from "@/lib/document-controls";
+import { drawControlLine } from "@/lib/print/control-block";
 
 type Report = ReturnType<typeof endorsedSales> & { title: string; from: string; to: string };
 const COLUMNS: { head: string; w: number; right?: boolean }[] = [
-  { head: "Trainee", w: 0.21 }, { head: "Course", w: 0.07 }, { head: "Training Date", w: 0.09 }, { head: "Fee", w: 0.08, right: true }, { head: "Collected", w: 0.08, right: true }, { head: "Balance", w: 0.08, right: true },
-  { head: "Center", w: 0.08 }, { head: "Rebate", w: 0.07 }, { head: "Rebate Amount", w: 0.08, right: true }, { head: "Agency Share", w: 0.08, right: true }, { head: "New Wave Keeps", w: 0.08, right: true },
+  { head: "Trainee", w: 0.21 }, { head: "Course", w: 0.07 }, { head: "Training\nDate", w: 0.09 }, { head: "Course\nFee", w: 0.08, right: true }, { head: "Amount\nCollected", w: 0.08, right: true }, { head: "Outstanding\nBalance", w: 0.08, right: true },
+  { head: "Partnered\nCenter", w: 0.08 }, { head: "Rebate", w: 0.07 }, { head: "Rebate\nAmount", w: 0.08, right: true }, { head: "Agency\nCommission", w: 0.08, right: true }, { head: "Net Rebate\nIncome", w: 0.08, right: true },
 ];
 
 /** The Endorsed Courses report, A4 landscape, one ledger per center (Design 2) under Header 3. Amounts in PHP. */
-export async function createEndorsedSalesPdf(s: Report, printed: string, logoBytes?: Uint8Array) {
+export async function createEndorsedSalesPdf(s: Report, printed: string, logoBytes?: Uint8Array, control?: DocumentControl | null) {
   const pdf = await PDFDocument.create();
   const reg = await pdf.embedFont(StandardFonts.Helvetica), bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const navy = rgb(0.07, 0.25, 0.39), muted = rgb(0.31, 0.4, 0.47), ink = rgb(0.06, 0.15, 0.22), rule = rgb(0.86, 0.9, 0.93), tint = rgb(0.9, 0.96, 0.98), orange = rgb(0.95, 0.34, 0.08), red = rgb(0.71, 0.24, 0.05), white = rgb(1, 1, 1);
@@ -32,13 +34,18 @@ export async function createEndorsedSalesPdf(s: Report, printed: string, logoByt
     right("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000", detailsX, y - 19, 6.6, reg, muted);
     right("0948-847-6530  |  (02) 8553 0310  |  newwavemaritime@gmail.com", detailsX, y - 27, 6.6, reg, muted);
     page.drawRectangle({ x: M, y: y - 41, width: CW, height: 2, color: navy });
+    if (drawControlLine(page, reg, control, { right: W - M, y: y - 49 })) y -= 7;
     y -= 50;
   };
   const columnHeads = () => {
-    page.drawRectangle({ x: M, y: y - 14, width: CW, height: 14, color: navy });
+    page.drawRectangle({ x: M, y: y - 21, width: CW, height: 21, color: navy });
     let x = M;
-    for (const c of COLUMNS) { const w = CW * c.w; if (c.right) right(c.head, x + w - 4, y - 10, 6.8, bold, white); else text(c.head, x + 4, y - 10, 6.8, bold, white); x += w; }
-    y -= 14;
+    for (const c of COLUMNS) {
+      const w = CW * c.w, parts = c.head.split("\n");
+      parts.forEach((part, k) => { const at = y - (parts.length > 1 ? 9 : 13) - k * 8; if (c.right) right(part, x + w - 4, at, 6.8, bold, white); else text(part, x + 4, at, 6.8, bold, white); });
+      x += w;
+    }
+    y -= 21;
   };
   const newPage = (heads: boolean) => { page = pdf.addPage([W, H]); y = H - M; header(true); if (heads) columnHeads(); };
 
@@ -49,7 +56,7 @@ export async function createEndorsedSalesPdf(s: Report, printed: string, logoByt
     COLUMNS.forEach((c, i) => {
       const w = CW * c.w, v = cells(r)[i];
       if (i === 0) { text(fit(v, 7.8, w - 8, bold), x + 4, y - 9, 7.8, bold); text(fit(r.traineeNo, 6.4, w - 8), x + 4, y - 17, 6.4, reg, muted); }
-      else if (c.right) right(v, x + w - 4, y - 12, 7.8, reg, c.head === "Balance" && r.balance > 0 ? red : ink);
+      else if (c.right) right(v, x + w - 4, y - 12, 7.8, reg, i === 5 && r.balance > 0 ? red : ink);
       else text(fit(v, 7.8, w - 8), x + 4, y - 12, 7.8);
       x += w;
     });
@@ -71,7 +78,7 @@ export async function createEndorsedSalesPdf(s: Report, printed: string, logoByt
   for (const c of s.centers) {
     if (y - 70 < M + 16) newPage(false);
     text(c.name, M, y - 11, 11, bold, navy);
-    right(`${c.totals.trainees} Trainee${c.totals.trainees === 1 ? "" : "s"} - Paid to Center ${money(c.totals.centerPaid)} - Owed ${money(c.totals.centerOwed)}`, W - M, y - 11, 8, reg, muted);
+    right(`${c.totals.trainees} Trainee${c.totals.trainees === 1 ? "" : "s"} - Remitted to Partnered Center ${money(c.totals.centerPaid)} - Payable ${money(c.totals.centerOwed)}`, W - M, y - 11, 8, reg, muted);
     y -= 16;
     columnHeads();
     c.rows.forEach(row);
@@ -82,11 +89,11 @@ export async function createEndorsedSalesPdf(s: Report, printed: string, logoByt
   // Grand totals and signatures stay together.
   const t = s.totals;
   if (y - 120 < M) newPage(false);
-  const facts: [string, string][] = [["Trainees", String(t.trainees)], ["Fees Billed", money(t.fees)], ["Collected", money(t.collected)], ["Balance", money(t.balance)], ["Paid to Centers", money(t.centerPaid)], ["Owed to Centers", money(t.centerOwed)], ["Rebates Due", money(t.rebateDue)], ["Rebates Received", money(t.rebateReceived)], ["Agency Shares", money(t.share)], ["New Wave Keeps", money(t.keeps)]];
+  const facts: [string, string][] = [["Trainees", String(t.trainees)], ["Course\nFees", money(t.fees)], ["Amount\nCollected", money(t.collected)], ["Outstanding\nBalance", money(t.balance)], ["Remitted to\nPartnered Centers", money(t.centerPaid)], ["Payable to\nPartnered Centers", money(t.centerOwed)], ["Rebates\nReceivable", money(t.rebateDue)], ["Rebates\nReceived", money(t.rebateReceived)], ["Agency\nCommissions", money(t.share)], ["Net Rebate\nIncome", money(t.keeps)]];
   const fw = CW / facts.length;
-  page.drawRectangle({ x: M, y: y - 34, width: CW, height: 34, color: tint });
-  facts.forEach(([label, value], i) => { text(label, M + i * fw + 5, y - 12, 6.8, reg, muted); text(value, M + i * fw + 5, y - 25, 8.6, bold, navy); });
-  y -= 76;
+  page.drawRectangle({ x: M, y: y - 42, width: CW, height: 42, color: tint });
+  facts.forEach(([label, value], i) => { label.split("\n").forEach((part, k) => text(part, M + i * fw + 5, y - 11 - k * 8, 6.6, reg, muted)); text(value, M + i * fw + 5, y - 34, 8.6, bold, navy); });
+  y -= 84;
   const sign = (label: string, x: number) => { page.drawLine({ start: { x, y }, end: { x: x + 200, y }, thickness: 0.7, color: ink }); text(label, x, y - 12, 8, reg, muted); };
   sign("Prepared by (Accounting)", M);
   sign("Noted by (Admin)", W - M - 200);

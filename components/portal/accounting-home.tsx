@@ -7,7 +7,7 @@ import { Badge, Message, MonthBar, PeriodBar, ViewIcon, fmtClock, fmtDate, submi
 import { BarChart, Donut, HBars } from "./charts";
 import { REASONS, REJECT_REASONS, RejectInline } from "./reject-inline";
 import { PERIODS, percentChange, periodStart, type Period } from "@/lib/accounting-periods";
-import { channelTotal, channelsUsed, sideTotal, type FinanceSummary, type Line } from "@/lib/finance-summary";
+import { channelTotal, channelsUsed, sideTotal, type FinanceSummary, type Line, type SalesLine } from "@/lib/finance-summary";
 import type { AccountingReport } from "@/lib/accounting-report";
 import type { CenterState, EndorsedSales } from "@/lib/endorsed-sales";
 import type { BillingRow } from "@/lib/billing-statement";
@@ -551,8 +551,8 @@ const CENTER_TONE: Record<CenterState, "green" | "blue" | "orange"> = { Paid: "g
 function EndorsedCenter({ center }: { center: EndorsedSales["centers"][number] }) {
   const pg = usePaged(center.rows), t = center.totals;
   return <section className="portal-panel cx-panel">
-    <div className="panel-heading"><h2>{center.name}</h2><span className="muted-text">{t.trainees} Trainee{t.trainees === 1 ? "" : "s"} · Fees Billed {pesos2(t.fees)}</span></div>
-    <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Trainee</th><th>Course</th><th>Training Date</th><th className="fs-n">Fee</th><th className="fs-n">Collected</th><th className="fs-n">Balance</th><th>Center</th><th>Rebate</th><th className="fs-n">Rebate Amount</th><th className="fs-n">Agency Share</th><th className="fs-n">New Wave Keeps</th></tr></thead><tbody>
+    <div className="panel-heading"><h2>{center.name}</h2><span className="muted-text">{t.trainees} Trainee{t.trainees === 1 ? "" : "s"} · Course Fees {pesos2(t.fees)}</span></div>
+    <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Trainee</th><th>Course</th><th>Training Date</th><th className="fs-n">Course Fee</th><th className="fs-n">Amount Collected</th><th className="fs-n">Outstanding Balance</th><th>Partnered Center</th><th>Rebate</th><th className="fs-n">Rebate Amount</th><th className="fs-n">Agency Commission</th><th className="fs-n">Net Rebate Income</th></tr></thead><tbody>
       {pg.shown.map((r) => <tr key={r.id}>
         <td><b>{r.trainee}</b><small className="cl-sub cl-block">{r.traineeNo}{r.status === "Enrolled" ? "" : ` · ${r.status}`}</small></td>
         <td title={r.course}>{r.code}</td>
@@ -575,7 +575,7 @@ function EndorsedCenter({ center }: { center: EndorsedSales["centers"][number] }
 export function EndorsedStatements({ report }: { report: EndorsedSales }) {
   const t = report.totals;
   if (!report.rows.length) return <section className="portal-panel cx-panel"><p className="portal-empty-copy">No endorsed trainees in this period.</p></section>;
-  const facts: [string, string | number][] = [["Trainees", t.trainees], ["Fees Billed", pesos2(t.fees)], ["Collected", pesos2(t.collected)], ["Balance", pesos2(t.balance)], ["Paid to Centers", pesos2(t.centerPaid)], ["Owed to Centers", pesos2(t.centerOwed)], ["Rebates Due", pesos2(t.rebateDue)], ["Rebates Received", pesos2(t.rebateReceived)], ["Agency Shares", pesos2(t.share)], ["New Wave Keeps", pesos2(t.keeps)]];
+  const facts: [string, string | number][] = [["Trainees", t.trainees], ["Course Fees", pesos2(t.fees)], ["Amount Collected", pesos2(t.collected)], ["Outstanding Balance", pesos2(t.balance)], ["Remitted to Partnered Centers", pesos2(t.centerPaid)], ["Payable to Partnered Centers", pesos2(t.centerOwed)], ["Rebates Receivable", pesos2(t.rebateDue)], ["Rebates Received", pesos2(t.rebateReceived)], ["Agency Commissions", pesos2(t.share)], ["Net Rebate Income", pesos2(t.keeps)]];
   return <div className="es-stack">
     {report.centers.map((c) => <EndorsedCenter key={`${report.from}|${report.to}|${c.name}`} center={c} />)}
     <div className="es-grand">{facts.map(([label, value]) => <span key={label}>{label} <b>{value}</b></span>)}</div>
@@ -615,7 +615,7 @@ export function EndorsedSalesReport() {
 
 /**
  * Cash and Sales Summary (owner, 21 Oct 2026, prototype): cash received and
- * disbursed, and sales by training date, split Training Endorsement vs Direct
+ * disbursed, and sales by training date, split Endorsed Courses vs New Wave Courses
  * New Wave. Accounting and the Admin; PDF and Excel match the screen.
  */
 export function FinanceSummaryReport({ switcher }: { switcher?: ReactNode }) {
@@ -625,12 +625,19 @@ export function FinanceSummaryReport({ switcher }: { switcher?: ReactNode }) {
   const q = `period=${period}&end=${end}`;
   const { data: s, error } = useJson<FinanceSummary>(`/api/staff/finance-summary?${q}`);
   const rE = s ? sideTotal(s.received, "E") : 0, rD = s ? sideTotal(s.received, "D") : 0, dE = s ? sideTotal(s.disbursed, "E") : 0, dD = s ? sideTotal(s.disbursed, "D") : 0;
-  const neg = (v: number) => <td className="fs-n fs-neg">{pesos2(-v)}</td>;
+  // A zero is not a loss: only real amounts take the red or green.
+  const tone = (v: number, cls: string) => <td className={`fs-n${v ? ` ${cls}` : ""}`}>{pesos2(v)}</td>;
+  const neg = (v: number) => <td className={`fs-n${v ? " fs-neg" : ""}`}>{pesos2(0 - v)}</td>;
+  const saleCells = (r: SalesLine) => <><td className="fs-n">{r.trainees}</td><td className="fs-n">{pesos2(r.fees)}</td><td className="fs-n">{pesos2(r.charges)}</td>{neg(r.discounts)}<td className="fs-n"><b>{pesos2(r.sales)}</b></td>{tone(r.collected, "fs-pos")}{tone(r.balance, "fs-neg")}</>;
+  const saleHeads = (first: string) => <thead><tr><th>{first}</th><th className="fs-n">Trainees</th><th className="fs-n">Course Fees</th><th className="fs-n">Miscellaneous Charges</th><th className="fs-n">Less Discounts</th><th className="fs-n">Total Sales</th><th className="fs-n">Amount Collected</th><th className="fs-n">Outstanding Balance</th></tr></thead>;
+  const share = (v: number) => (s?.totalSales.sales ? `${Math.round((v / s.totalSales.sales) * 100)}% of Total Sales` : "No Sales in This Period");
+  const trainees = (n: number) => `${n} Trainee${n === 1 ? "" : "s"}`;
+  const none = (cols: number, text: string) => <tr><td colSpan={cols} className="muted-text">{text}</td></tr>;
   const cash = (title: string, ls: Line[]) => <section className="portal-panel cx-panel"><div className="panel-heading"><h2>{title}</h2></div>
-    <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Line</th><th className="fs-n">Endorsement</th><th className="fs-n">Direct</th><th className="fs-n">Total</th></tr></thead><tbody>
-      {(["E", "D"] as const).map((side) => { const mine = ls.filter((l) => l.side === side); return [<tr key={side} className="nb-group"><td colSpan={4}>{side === "E" ? "Training Endorsement" : "Direct New Wave"}</td></tr>,
+    <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Line</th><th className="fs-n">Endorsed Courses</th><th className="fs-n">New Wave Courses</th><th className="fs-n">Total</th></tr></thead><tbody>
+      {(["E", "D"] as const).map((side) => { const mine = ls.filter((l) => l.side === side); return [<tr key={side} className="nb-group"><td colSpan={4}>{side === "E" ? "Endorsed Courses" : "New Wave Courses"}</td></tr>,
         ...mine.map((l) => <tr key={`${side}${l.label}`} className="fs-sub"><td>{l.label}</td><td className="fs-n">{side === "E" ? pesos2(l.total) : "—"}</td><td className="fs-n">{side === "D" ? pesos2(l.total) : "—"}</td><td className="fs-n">{pesos2(l.total)}</td></tr>),
-        !mine.length && <tr key={`${side}-none`} className="fs-sub"><td colSpan={4} className="muted-text">None in this period</td></tr>]; })}
+        !mine.length && <tr key={`${side}-none`} className="fs-sub"><td colSpan={4} className="muted-text">None in This Period</td></tr>]; })}
       <tr className="fs-tot"><td>Total {title}</td><td className="fs-n">{pesos2(sideTotal(ls, "E"))}</td><td className="fs-n">{pesos2(sideTotal(ls, "D"))}</td><td className="fs-n">{pesos2(sideTotal(ls))}</td></tr>
       <tr className="nb-group"><td colSpan={4}>By Channel</td></tr>
       {channelsUsed(ls).map((ch) => { const ce = channelTotal(ls, "E", ch), cd = channelTotal(ls, "D", ch); return <tr key={ch} className="fs-sub"><td>{ch}</td><td className="fs-n">{pesos2(ce)}</td><td className="fs-n">{pesos2(cd)}</td><td className="fs-n">{pesos2(ce + cd)}</td></tr>; })}
@@ -646,40 +653,58 @@ export function FinanceSummaryReport({ switcher }: { switcher?: ReactNode }) {
       {s && <span className="pd-label"><b>{s.title}</b> · {fmtDate(s.from)} – {fmtDate(s.to)}</span>}</div>
     {error && <Message kind="error" text={error} />}
     {!s ? !error && <p className="portal-empty-copy">Loading the summary…</p> : <>
+      <div className="fs-section"><h2>Sales Summary</h2><small>By Training Date</small></div>
       <div className="cx-tiles ac-tiles fs-tiles">
-        <div className="cx-tile fs-tile" style={{ ["--c" as string]: "#0a7a3e" }}><span>Cash Received</span><b>{pesos2(rE + rD)}</b><small>Endorsement {pesos2(rE)} · Direct {pesos2(rD)}</small></div>
-        <div className="cx-tile fs-tile" style={{ ["--c" as string]: "#b42318" }}><span>Disbursements</span><b>{pesos2(dE + dD)}</b><small>Endorsement {pesos2(dE)} · Direct {pesos2(dD)}</small></div>
-        <div className="cx-tile fs-tile" style={{ ["--c" as string]: "#0571D0" }}><span>Net Cash</span><b>{pesos2(rE + rD - dE - dD)}</b><small>received less disbursed</small></div>
-        <div className="cx-tile fs-tile" style={{ ["--c" as string]: "#F25615" }}><span>Direct Sales</span><b>{pesos2(s.direct.sales)}</b><small>{s.direct.trainees} trainee{s.direct.trainees === 1 ? "" : "s"} by training date</small></div>
-        <div className="cx-tile fs-tile" style={{ ["--c" as string]: "#a2470b" }}><span>Endorsement Keeps</span><b>{pesos2(s.endorsement.keeps)}</b><small>{s.endorsement.trainees} trainee{s.endorsement.trainees === 1 ? "" : "s"} · rebates less agency shares</small></div>
+        <div className="cx-tile fs-tile" style={{ ["--c" as string]: "#123F63" }}><span>Total Sales</span><b>{pesos2(s.totalSales.sales)}</b><small>{trainees(s.totalSales.trainees)}</small></div>
+        <div className="cx-tile fs-tile" style={{ ["--c" as string]: "#0571D0" }}><span>Sales from New Wave Courses</span><b>{pesos2(s.direct.sales)}</b><small>{trainees(s.direct.trainees)} · {share(s.direct.sales)}</small></div>
+        <div className="cx-tile fs-tile" style={{ ["--c" as string]: "#F25615" }}><span>Sales from Endorsed Courses</span><b>{pesos2(s.endorsement.sales)}</b><small>{trainees(s.endorsement.trainees)} · {share(s.endorsement.sales)}</small></div>
+      </div>
+      <section className="portal-panel cx-panel"><div className="cl-wrap"><table className="cl-log">{saleHeads("Category")}<tbody>
+        <tr className="fs-total"><td>Total Sales</td>{saleCells(s.totalSales)}</tr>
+        <tr className="fs-lvl1" style={{ ["--c" as string]: "#0571D0" }}><td>Sales from New Wave Courses</td>{saleCells(s.direct)}</tr>
+        {s.direct.categories.map((c) => <tr key={c.name} className="fs-sub"><td>{c.name}</td>{saleCells(c)}</tr>)}
+        <tr className="fs-lvl1" style={{ ["--c" as string]: "#F25615" }}><td>Sales from Endorsed Courses</td>{saleCells(s.endorsement)}</tr>
+        {s.endorsement.centers.map((c) => <tr key={c.name} className="fs-sub"><td>{c.name}</td>{saleCells(c)}</tr>)}
+        {!s.endorsement.centers.length && none(8, "No Endorsed Training in This Period")}
+      </tbody></table></div><p className="ac-note">Sales from Endorsed Courses are shown in full, though most of the amount is remitted to the partnered centers. New Wave&apos;s own income from them is the Net Rebate Income below.</p></section>
+
+      <div className="fs-section"><h2>Sales from New Wave Courses</h2></div>
+      <section className="portal-panel cx-panel"><div className="cl-wrap"><table className="cl-log">{saleHeads("Course")}<tbody>
+        {s.direct.categories.map((c) => <Fragment key={c.name}>
+          <tr className="nb-group"><td colSpan={8}>{c.name}</td></tr>
+          {c.courses.map((r) => <tr key={r.code}><td><b>{r.code}</b><small className="cl-sub cl-block">{r.name}</small></td>{saleCells(r)}</tr>)}
+          {!c.courses.length && none(8, "No Training in This Period")}
+          <tr className="fs-tot"><td>Total {c.name}</td>{saleCells(c)}</tr>
+        </Fragment>)}
+        <tr className="fs-net"><td>Total Sales from New Wave Courses</td>{saleCells(s.direct)}</tr>
+        <tr><td colSpan={7}>Less Operating Expenses for the Period</td>{neg(s.direct.expenses)}</tr>
+        <tr className="fs-net"><td colSpan={7}>Gross Margin on New Wave Courses</td><td className="fs-n">{pesos2(s.direct.margin)}</td></tr>
+      </tbody></table></div></section>
+
+      <div className="fs-section"><h2>Sales from Endorsed Courses</h2></div>
+      <section className="portal-panel cx-panel"><div className="cl-wrap"><table className="cl-log">{saleHeads("Partnered Center")}<tbody>
+        {s.endorsement.centers.map((c) => <tr key={c.name}><td><b>{c.name}</b></td>{saleCells(c)}</tr>)}
+        {!s.endorsement.centers.length && none(8, "No Endorsed Training in This Period")}
+        <tr className="fs-net"><td>Total Sales from Endorsed Courses</td>{saleCells(s.endorsement)}</tr>
+      </tbody></table></div></section>
+      <section className="portal-panel cx-panel fs-gap"><div className="panel-heading"><h2>Rebates from Endorsed Courses</h2></div><div className="cl-wrap"><table className="cl-log"><thead><tr><th>Partnered Center</th><th className="fs-n">Payable to Partnered Center</th><th className="fs-n">Rebate</th><th className="fs-n">Rebate Received</th><th className="fs-n">Rebates Receivable</th><th className="fs-n">Agency Commission</th><th className="fs-n">Net Rebate Income</th></tr></thead><tbody>
+        {s.endorsement.centers.map((c) => <tr key={c.name}><td><b>{c.name}</b></td><td className="fs-n">{pesos2(c.payable)}</td><td className="fs-n">{pesos2(c.rebate)}</td>{tone(c.received, "fs-pos")}{tone(c.due, "fs-neg")}{neg(c.share)}<td className="fs-n"><b>{pesos2(c.keeps)}</b></td></tr>)}
+        {!s.endorsement.centers.length && none(7, "No Endorsed Training in This Period")}
+        <tr className="fs-net"><td>Total</td><td className="fs-n">{pesos2(s.endorsement.payable)}</td><td className="fs-n">{pesos2(s.endorsement.rebate)}</td><td className="fs-n">{pesos2(s.endorsement.received)}</td><td className="fs-n">{pesos2(s.endorsement.rebateDue)}</td><td className="fs-n">{pesos2(0 - s.endorsement.share)}</td><td className="fs-n">{pesos2(s.endorsement.keeps)}</td></tr>
+      </tbody></table></div></section>
+
+      <div className="fs-section"><h2>Cash Summary</h2><small>By Date Received and Released</small></div>
+      <div className="cx-tiles ac-tiles fs-tiles">
+        <div className="cx-tile fs-tile" style={{ ["--c" as string]: "#0a7a3e" }}><span>Cash Received</span><b>{pesos2(rE + rD)}</b><small>Endorsed {pesos2(rE)} · New Wave {pesos2(rD)}</small></div>
+        <div className="cx-tile fs-tile" style={{ ["--c" as string]: "#b42318" }}><span>Disbursements</span><b>{pesos2(dE + dD)}</b><small>Endorsed {pesos2(dE)} · New Wave {pesos2(dD)}</small></div>
+        <div className="cx-tile fs-tile" style={{ ["--c" as string]: "#0571D0" }}><span>Net Cash</span><b>{pesos2(rE + rD - dE - dD)}</b><small>Received Less Disbursed</small></div>
       </div>
       <div className="fs-grid">{cash("Cash Received", s.received)}{cash("Disbursements", s.disbursed)}</div>
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Net Cash</h2></div><div className="cl-wrap"><table className="cl-log"><thead><tr><th></th><th className="fs-n">Endorsement</th><th className="fs-n">Direct</th><th className="fs-n">Total</th></tr></thead><tbody>
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Net Cash</h2></div><div className="cl-wrap"><table className="cl-log"><thead><tr><th></th><th className="fs-n">Endorsed Courses</th><th className="fs-n">New Wave Courses</th><th className="fs-n">Total</th></tr></thead><tbody>
         <tr><td>Cash Received</td><td className="fs-n">{pesos2(rE)}</td><td className="fs-n">{pesos2(rD)}</td><td className="fs-n">{pesos2(rE + rD)}</td></tr>
         <tr><td>Less Disbursements</td>{neg(dE)}{neg(dD)}{neg(dE + dD)}</tr>
         <tr className="fs-net"><td>Net Cash</td><td className="fs-n">{pesos2(rE - dE)}</td><td className="fs-n">{pesos2(rD - dD)}</td><td className="fs-n">{pesos2(rE + rD - dE - dD)}</td></tr>
       </tbody></table></div></section>
-      <div className="fs-grid">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Direct Sales</h2></div><div className="cl-wrap"><table className="cl-log"><thead><tr><th>Course</th><th className="fs-n">Trainees</th><th className="fs-n">Sales</th></tr></thead><tbody>
-          {s.direct.courses.map((c) => <tr key={c.code}><td><b>{c.code}</b><small>{c.name}</small></td><td className="fs-n">{c.trainees}</td><td className="fs-n">{pesos2(c.sales)}</td></tr>)}
-          {!s.direct.courses.length && <tr><td colSpan={3} className="muted-text">No New Wave training in this period.</td></tr>}
-          <tr className="fs-tot"><td>Course Fees</td><td className="fs-n">{s.direct.trainees}</td><td className="fs-n">{pesos2(s.direct.fees)}</td></tr>
-          <tr className="fs-sub"><td>Add Miscellaneous Charges</td><td /><td className="fs-n">{pesos2(s.direct.charges)}</td></tr>
-          <tr className="fs-sub"><td>Less Discounts</td><td />{neg(s.direct.discounts)}</tr>
-          <tr className="fs-net"><td>Direct Sales</td><td /><td className="fs-n">{pesos2(s.direct.sales)}</td></tr>
-          <tr className="fs-sub"><td>Collected</td><td /><td className="fs-n fs-pos">{pesos2(s.direct.collected)}</td></tr>
-          <tr className="fs-sub"><td>Balance Still Due</td><td /><td className="fs-n fs-neg">{pesos2(s.direct.balance)}</td></tr>
-          <tr className="fs-sub"><td>Less Direct Expenses (period)</td><td />{neg(s.direct.expenses)}</tr>
-          <tr className="fs-net"><td>Direct Gross Margin</td><td /><td className="fs-n">{pesos2(s.direct.margin)}</td></tr>
-        </tbody></table></div></section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Training Endorsement</h2></div><div className="cl-wrap"><table className="cl-log"><thead><tr><th>Center</th><th className="fs-n">Trainees</th><th className="fs-n">Fees Billed</th><th className="fs-n">Paid to Center</th><th className="fs-n">Rebate</th><th className="fs-n">Agency Share</th><th className="fs-n">New Wave Keeps</th></tr></thead><tbody>
-          {s.endorsement.centers.map((c) => <tr key={c.name}><td><b>{c.name}</b><small>rebate received {pesos2(c.received)} of {pesos2(c.rebate)}</small></td><td className="fs-n">{c.trainees}</td><td className="fs-n">{pesos2(c.fees)}</td><td className="fs-n">{pesos2(c.payable)}</td><td className="fs-n">{pesos2(c.rebate)}</td>{neg(c.share)}<td className="fs-n">{pesos2(c.keeps)}</td></tr>)}
-          {!s.endorsement.centers.length && <tr><td colSpan={7} className="muted-text">No endorsed training in this period.</td></tr>}
-          <tr className="fs-tot"><td>Total</td><td className="fs-n">{s.endorsement.trainees}</td><td className="fs-n">{pesos2(s.endorsement.fees)}</td><td className="fs-n">{pesos2(s.endorsement.payable)}</td><td className="fs-n">{pesos2(s.endorsement.rebate)}</td>{neg(s.endorsement.share)}<td className="fs-n">{pesos2(s.endorsement.keeps)}</td></tr>
-          <tr className="fs-sub"><td colSpan={6}>Rebates still due from centers</td><td className="fs-n fs-neg">{pesos2(s.endorsement.rebateDue)}</td></tr>
-        </tbody></table></div>
-</section>
-      </div>
     </>}
   </div>;
 }

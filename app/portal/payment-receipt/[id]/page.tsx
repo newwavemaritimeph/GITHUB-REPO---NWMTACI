@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { loadDocumentControl } from "@/lib/document-controls";
 import { ReceiptSheets } from "./receipt-sheets";
 import "../../admission-record/[id]/admission-record.css";
 import "./receipt.css";
@@ -93,5 +94,6 @@ export default async function PaymentReceiptPage({ params, searchParams }: { par
   const cashier = (cashierRes.data as { complete_name?: string } | null)?.complete_name ?? "";
 
   const reprintCopy = reprint ? Number((receiptRes.data as { print_count?: number } | null)?.print_count ?? 0) : null;
-  return <ReceiptSheets {...({ receiptNo, name, received, reprintCopy, payment: { number: payment.payment_number, method: payment.method, reference: payment.reference_number, amount: Number(payment.amount_centavos), remarks: feeLabel ? null : payment.remarks }, trainee: { appNo: t.application_number ?? t.trainee_number, srn: t.srn, rank: t.rank, mobile: t.mobile, company: t.company }, appliedTo, totalDue, totalPaid, balance, status, cashier })} />;
+  const control = await loadDocumentControl(db, "ack_receipt");
+  return <ReceiptSheets {...({ control, receiptNo, name, received, reprintCopy, payment: { number: payment.payment_number, method: payment.method, reference: payment.reference_number, amount: Number(payment.amount_centavos), remarks: feeLabel ? null : payment.remarks }, trainee: { appNo: t.application_number ?? t.trainee_number, srn: t.srn, rank: t.rank, mobile: t.mobile, company: t.company }, appliedTo, totalDue, totalPaid, balance, status, cashier })} />;
 }

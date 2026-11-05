@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createDailyExpensesPdf } from "@/lib/documents";
+import { loadDocumentControl } from "@/lib/document-controls";
 
 export const runtime = "nodejs";
 
@@ -37,6 +38,6 @@ export async function GET(request: Request) {
   let logoBytes: Uint8Array | undefined;
   try { logoBytes = new Uint8Array(await (await fetch(new URL("/new-wave-emblem.png", request.url))).arrayBuffer()); } catch { logoBytes = undefined; }
 
-  const bytes = await createDailyExpensesPdf({ dateLabel, rows, totalCentavos, paidCentavos, preparedBy: profile?.complete_name ?? staff.user.email ?? "", logoBytes });
+  const bytes = await createDailyExpensesPdf({ control: await loadDocumentControl(db, "expenses_summary"), dateLabel, rows, totalCentavos, paidCentavos, preparedBy: profile?.complete_name ?? staff.user.email ?? "", logoBytes });
   return new Response(bytes as BodyInit, { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="daily-expenses-${date}.pdf"`, "cache-control": "private, no-store" } });
 }

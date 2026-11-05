@@ -1,5 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { BatchRoster } from "@/lib/batch-roster";
+import type { DocumentControl } from "@/lib/document-controls";
+import { drawControlBlock } from "@/lib/print/control-block";
 
 /** Batch trainee list (owner, 3 Nov 2026): A4 landscape, letterhead, batch box, numbered list, signatures. */
 const safe = (s: string) => s.replace(/[–—]/g, "-").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/·/g, "-").replace(/₱/g, "PHP ").replace(/[^\x20-\x7E\xA0-\xFF]/g, "");
@@ -7,7 +9,7 @@ const longDate = (d: string) => new Intl.DateTimeFormat("en-US", { month: "long"
 const peso = (c: number) => `PHP ${(c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const hhmm = (t: string | null) => (t ? new Date(`2000-01-01T${t.slice(0, 5)}:00`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" }) : "");
 
-export async function createBatchRosterPdf(r: BatchRoster, opts: { logo?: Uint8Array; preparedBy?: string | null } = {}) {
+export async function createBatchRosterPdf(r: BatchRoster, opts: { logo?: Uint8Array; preparedBy?: string | null; control?: DocumentControl | null } = {}) {
   const pdf = await PDFDocument.create();
   pdf.setTitle(`Batch ${r.batch.batchNumber} - Trainee List`);
   pdf.setAuthor("New Wave Maritime Training and Assessment Center, Inc.");
@@ -27,6 +29,7 @@ export async function createBatchRosterPdf(r: BatchRoster, opts: { logo?: Uint8A
     text("NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", lx, y - 12, 10, bold, navy);
     text("Ride the New Wave of Maritime Excellence", lx, y - 24, 8.5, reg, blue);
     text("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila - 0948 847 6530", lx, y - 34, 7.5, reg, muted);
+    drawControlBlock(page, { reg, bold }, opts.control, { right: W - M, top: y, width: 125, rowHeight: 9.5 });
     y -= 46;
     page.drawRectangle({ x: M, y, width: CW, height: 2, color: navy }); page.drawRectangle({ x: M, y: y - 1.4, width: CW * 0.25, height: 1.4, color: orange });
     y -= 20;

@@ -10,7 +10,7 @@ const expenses = [{ amount: 5500000, channel: "PSBank", category: "Partnered Cen
 const base = { center: "", payable: 0, rebate: 0, share: 0, charges: 0, discounts: 0, rebateReceived: 0 };
 const sales: SaleIn[] = [];
 for (const [code, name, n, price] of [["UBT-PSSR", "Updating Training on Basic Training - PSSR", 96, 130000], ["STPPDSPPS", "Safety (Passenger Spaces)", 40, 150000], ["PSCMT", "Crowd Management", 30, 180000], ["PSCMHBT", "Crisis Management and Human Behaviour", 28, 240000], ["ABC", "Awareness on Basic Computer", 8, 315000], ["ESEA", "Enclosed Space Entry Awareness", 12, 180000]] as const)
-  for (let i = 0; i < n; i++) sales.push({ ...base, endorsement: false, code, name, price, collected: i % 12 === 0 ? 0 : price, charges: i % 40 === 0 ? 111000 : 0, discounts: i % 51 === 0 ? 105000 : 0 });
+  for (let i = 0; i < n; i++) sales.push({ ...base, endorsement: false, category: ["UBT-PSSR", "STPPDSPPS", "PSCMT", "PSCMHBT"].includes(code) ? "STCW" : "In-House", code, name, price, collected: i % 12 === 0 ? 0 : price, charges: i % 40 === 0 ? 111000 : 0, discounts: i % 51 === 0 ? 105000 : 0 });
 for (const [center, n, rebate, received, share] of [["Nautical Options", 7, 130000, 130000, 100000], ["Altitude Maritime", 3, 120000, 40000, 0], ["Mariana", 2, 100000, 100000, 50000]] as const)
   for (let i = 0; i < n; i++) sales.push({ ...base, endorsement: true, code: "BT", name: "Basic Training", center, price: 550000, payable: 550000, rebate, share, collected: 550000, rebateReceived: i === 0 || received === rebate ? received : 0 });
 const s = summarize({ payments, income, expenses, sales });

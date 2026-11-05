@@ -1,3 +1,4 @@
+import { loadDocumentControl, type DocumentControl } from "@/lib/document-controls";
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isStcwCategory } from "@/lib/certificate-rules";
 import { MISMO_COURSE_CODES } from "@/lib/mismo";
@@ -9,6 +10,7 @@ const missingTable = (message?: string) => !!message && /training_completion_rec
 
 export type CompletionBatch = { id: string; batchNumber: string; startsOn: string; endsOn: string; courseId: string; courseCode: string; courseName: string; trainees: number; status: "Not Started" | "Draft" | "Ready" | "Printed" };
 export type CompletionPayload = {
+  control: DocumentControl;
   ready: boolean;
   batch: CompletionBatch;
   tasks: AssessmentTask[];
@@ -81,6 +83,7 @@ export async function loadCompletion(db: Admin, batchId: string): Promise<Comple
     if (last) lastSignatories = { assessor: String(last.assessor ?? ""), coaValidity: String(last.coa_validity ?? ""), director: String(last.director ?? "") };
   }
   return {
+    control: await loadDocumentControl(db, "completion_record"),
     ready,
     batch: { id: b.id as string, batchNumber: b.batch_number as string, startsOn: b.starts_on as string, endsOn: b.ends_on as string, courseId: b.course_id as string, courseCode: c?.code ?? "—", courseName: c?.name ?? "", trainees: trainees.length, status: (r?.status as CompletionBatch["status"]) ?? "Not Started" },
     tasks, courseTasks, trainees, fields, results,

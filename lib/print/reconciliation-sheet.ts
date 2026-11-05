@@ -1,5 +1,7 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { ReconRow } from "@/lib/reconciliation-server";
+import type { DocumentControl } from "@/lib/document-controls";
+import { drawControlBlock } from "@/lib/print/control-block";
 
 const longDate = (d: string) => new Intl.DateTimeFormat("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T00:00:00+08:00`));
 const time = (iso: string) => new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso));
@@ -7,7 +9,7 @@ const peso = (c: number) => `PHP ${(c / 100).toLocaleString("en-PH", { minimumFr
 const ascii = (s: string) => s.normalize("NFKD").replace(/[^\x20-\x7E]/g, "");
 
 /** Payment reconciliation day sheet (owner, 9 Oct 2026): the day's payments for one channel with an "In history" tick column. A4 portrait. */
-export async function createReconciliationSheetPdf(date: string, channel: string, day: { rows: ReconRow[] }) {
+export async function createReconciliationSheetPdf(date: string, channel: string, day: { rows: ReconRow[] }, control?: DocumentControl | null) {
   const pdf = await PDFDocument.create();
   const reg = await pdf.embedFont(StandardFonts.Helvetica), bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const navy = rgb(0.07, 0.25, 0.39), muted = rgb(0.37, 0.44, 0.5), ink = rgb(0.06, 0.15, 0.22), rule = rgb(0.85, 0.89, 0.92), green = rgb(0.04, 0.48, 0.24), red = rgb(0.71, 0.14, 0.09);
@@ -17,6 +19,7 @@ export async function createReconciliationSheetPdf(date: string, channel: string
   let page = pdf.addPage([W, H]);
   let y = H - M;
   const header = () => {
+    drawControlBlock(page, { reg, bold }, control, { right: W - M, top: y + 8, width: 125, rowHeight: 9 });
     page.drawText("NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", { x: M, y, size: 9, font: bold, color: navy });
     y -= 20;
     page.drawText(`${channel} Reconciliation - Day Sheet`, { x: M, y, size: 15, font: bold, color: ink });

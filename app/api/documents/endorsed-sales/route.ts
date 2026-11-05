@@ -6,6 +6,7 @@ import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { buildEndorsedSales, endorsedRange, type EndorsedTotals } from "@/lib/endorsed-sales";
 import { createEndorsedSalesPdf } from "@/lib/print/endorsed-sales";
+import { loadDocumentControl } from "@/lib/document-controls";
 
 export const runtime = "nodejs";
 
@@ -25,12 +26,12 @@ export async function GET(request: Request) {
     const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
     let logoBytes: Uint8Array | undefined;
     try { logoBytes = new Uint8Array(await readFile(path.join(process.cwd(), "public", "new-wave-emblem.png"))); } catch { logoBytes = undefined; }
-    const bytes = await createEndorsedSalesPdf(s, today, logoBytes);
+    const bytes = await createEndorsedSalesPdf(s, today, logoBytes, await loadDocumentControl(db, "endorsed_courses"));
     return new Response(Buffer.from(bytes), { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="${name}.pdf"`, "cache-control": "no-store" } });
   }
   const book = new ExcelJS.Workbook();
   const sheet = book.addWorksheet("Endorsed Courses");
-  const heads = ["Center", "Trainee", "NWMTACI No.", "Enrollment No.", "Status", "Course Code", "Course", "Training Date", "Fee", "Collected", "Balance", "Payable to Center", "Paid to Center", "Center Status", "Rebate", "Rebate Received", "Rebate Status", "Agency Share", "New Wave Keeps"];
+  const heads = ["Partnered Center", "Trainee", "NWMTACI No.", "Enrollment No.", "Status", "Course Code", "Course", "Training Date", "Course Fee", "Amount Collected", "Outstanding Balance", "Payable to Partnered Center", "Remitted to Partnered Center", "Partnered Center Status", "Rebate", "Rebate Received", "Rebate Status", "Agency Commission", "Net Rebate Income"];
   sheet.columns = heads.map((_, i) => ({ width: i === 1 || i === 6 ? 34 : 17 }));
   const peso = (c: number) => c / 100;
   const add = (cells: (string | number)[], bold = false) => { const r = sheet.addRow(cells); r.font = { bold }; r.eachCell((c) => { if (typeof c.value === "number") c.numFmt = "₱#,##0.00"; }); };

@@ -5,6 +5,7 @@ import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { bsNumber, coverageLabel, longDate, type BillingRow } from "@/lib/billing-statement";
 import { createBillingStatementPdf } from "@/lib/print/billing-statement";
+import { loadDocumentControl } from "@/lib/document-controls";
 
 export const runtime = "nodejs";
 
@@ -32,7 +33,7 @@ export async function GET(request: Request) {
   const s = saved as Saved;
   const logo = await readFile(path.join(process.cwd(), "public", "new-wave-emblem.png")).then((b) => new Uint8Array(b)).catch(() => undefined);
   const issuedDay = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(s.issued_at));
-  const bytes = await createBillingStatementPdf({ bsNumber: bsNumber(s.bs_number), date: longDate(issuedDay), billTo: s.bill_to, kind: "", coverage: coverageLabel(from, to), rows: s.rows, total: Number(s.total_centavos) }, logo);
+  const bytes = await createBillingStatementPdf({ bsNumber: bsNumber(s.bs_number), date: longDate(issuedDay), billTo: s.bill_to, kind: "", coverage: coverageLabel(from, to), rows: s.rows, total: Number(s.total_centavos) }, logo, undefined, await loadDocumentControl(db, "billing_statement"));
   await db.from("audit_logs").insert({ actor_id: staff.user.id, action: "billing_statement.printed", record_type: "billing_statement", record_id: bsNumber(s.bs_number), new_values: { agency, from, to, total: s.total_centavos } });
   return new Response(Buffer.from(bytes), { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="billing-statement-${bsNumber(s.bs_number)}.pdf"`, "cache-control": "no-store" } });
 }

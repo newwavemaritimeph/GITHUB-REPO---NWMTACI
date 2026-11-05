@@ -1,8 +1,9 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { createTrainingInstructionsPdf } from "@/lib/documents";
+import { loadDocumentControl, type DocumentControl } from "@/lib/document-controls";
 import { classroomJoin, type ClassroomJoin } from "@/lib/classroom";
-import { DEFAULT_CATEGORY_TEMPLATES, fillPlaceholders, instructionCategoryOf, isOnlineMode, linesOf, policyPairs, sheetSteps, type InstructionCategory } from "@/lib/instruction-templates";
+import { remindersFor, DEFAULT_CATEGORY_TEMPLATES, fillPlaceholders, instructionCategoryOf, isOnlineMode, linesOf, policyPairs, sheetSteps, type InstructionCategory } from "@/lib/instruction-templates";
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
@@ -13,7 +14,7 @@ export type InstructionDetails = {
   enrollmentId: string; enrollmentNumber: string; enrollmentStatus: string;
   traineeName: string; traineeEmail: string | null;
   courseName: string; dates: string; time: string; classroom: string;
-  join: ClassroomJoin; subject: string; body: string;
+  control: DocumentControl; join: ClassroomJoin; subject: string; body: string;
   // Grid form (Design 3, 7 Oct 2026) fields.
   formalName: string; nwmtaciNumber: string; srn: string; batchNumber: string; mode: string; duration: string;
   // Design 11 (3 Nov 2026): the category's template, filled for this trainee.
@@ -47,6 +48,7 @@ export async function loadInstructionDetails(db: Admin, enrollmentId: string): P
   const template = categoryRow ?? DEFAULT_CATEGORY_TEMPLATES[category];
   // A course's own template still wins for its subject and its "- " reminder lines.
   const ownReminders = body.split("\n").map((l) => l.trim()).filter((l) => /^[-•]\s/.test(l)).map((l) => l.replace(/^[-•]\s*/, ""));
+  const join = batchClass?.google_classroom_link ? classroomJoin(batchClass.google_classroom_link, batchClass.google_classroom_code) : classroomJoin(course?.google_classroom_link, (codeRow as { google_classroom_code?: string | null } | null)?.google_classroom_code);
   const details: InstructionDetails = {
     enrollmentId: data.id, enrollmentNumber: data.enrollment_number, enrollmentStatus: data.enrollment_status,
     traineeName: trainee ? `${trainee.legal_first_name} ${trainee.legal_middle_name ?? ""} ${trainee.legal_last_name}`.replace(/\s+/g, " ").trim() : "Trainee",
@@ -56,14 +58,15 @@ export async function loadInstructionDetails(db: Admin, enrollmentId: string): P
     dates: batch?.starts_on ? `${fmtDate(batch.starts_on)}${batch.ends_on && batch.ends_on !== batch.starts_on ? ` - ${fmtDate(batch.ends_on)}` : ""}` : data.scheduled_on ? fmtDate(data.scheduled_on) : "To be scheduled",
     time: batch?.daily_start ? `${clock(batch.daily_start)} - ${clock(batch.daily_end) || "5:00 PM"}` : "8:00 AM - 5:00 PM",
     classroom: one(batch?.classrooms)?.name ?? batch?.venue ?? "To be assigned",
-    join: batchClass?.google_classroom_link ? classroomJoin(batchClass.google_classroom_link, batchClass.google_classroom_code) : classroomJoin(course?.google_classroom_link, (codeRow as { google_classroom_code?: string | null } | null)?.google_classroom_code),
+    control: await loadDocumentControl(db, "instructions"),
+    join,
     subject: tpl?.subject ?? template.subject,
     body,
     category,
     firstName: trainee?.legal_first_name ?? "",
     online: isOnlineMode(b2?.mode),
     bring: linesOf(template.bring),
-    reminders: ownReminders.length ? ownReminders : linesOf(template.reminders),
+    reminders: remindersFor(ownReminders.length ? ownReminders : linesOf(template.reminders), !!(join.url || join.code)),
     policies: policyPairs(template.policies),
     formalName: trainee ? `${trainee.legal_last_name}, ${[trainee.legal_first_name, trainee.legal_middle_name, t2?.suffix].filter(Boolean).join(" ")}`.toUpperCase() : "TRAINEE",
     nwmtaciNumber: (appRow as { application_number?: string | null } | null)?.application_number ?? t2?.trainee_number ?? "",
@@ -87,6 +90,7 @@ async function logoBytes(origin?: string) {
 /** The half-Legal training instructions PDF; the same bytes are shown in the portal and attached to the email. */
 export async function buildTrainingInstructionsPdf(details: InstructionDetails, origin?: string) {
   return createTrainingInstructionsPdf({
+    control: details.control,
     traineeName: details.traineeName,
     formalName: details.formalName,
     nwmtaciNumber: details.nwmtaciNumber,

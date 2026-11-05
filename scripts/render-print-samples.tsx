@@ -24,6 +24,12 @@ import { TarSheets, type TarProps } from "../app/portal/admission-record/[id]/ta
 import { endorsedSales } from "../lib/endorsed-sales";
 import { createEndorsedSalesPdf } from "../lib/print/endorsed-sales";
 import { ReceiptSheets, type ReceiptProps } from "../app/portal/payment-receipt/[id]/receipt-sheets";
+import { createBillingStatementPdf } from "../lib/print/billing-statement";
+import { createBatchRosterPdf } from "../lib/print/batch-roster";
+import { createCompletionRecordPdf } from "../lib/print/completion-record";
+import { createFinanceSummaryPdf } from "../lib/print/finance-summary";
+import { summarize } from "../lib/finance-summary";
+import type { DocumentControl } from "../lib/document-controls";
 
 const OUT = path.resolve("output/print-templates");
 const root = path.resolve(".");
@@ -31,6 +37,8 @@ const logoBytes = new Uint8Array(await readFile("public/new-wave-emblem.png"));
 const css = await readFile("app/portal/admission-record/[id]/admission-record.css", "utf8");
 const browser = ["C:/Program Files/Google/Chrome/Application/chrome.exe", "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe", "/usr/bin/google-chrome", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"].find((p) => existsSync(p));
 const made: { file: string; title: string }[] = [];
+// Form Numbers: every sample shows its details, so the block is checked on each layout.
+const ctl = (formNo: string): DocumentControl => ({ formNo, revisionNo: "01", revisionDate: "11/05/2026", issuedDate: "11/05/2026" });
 
 async function save(file: string, title: string, bytes: Uint8Array) {
   await writeFile(path.join(OUT, file), bytes);
@@ -66,11 +74,11 @@ const tar: TarProps = {
   payments: [{ id: "p1", number: "PAY-2026-001498", dateLabel: "12 Oct", method: "GCash", ref: "7012345678901", amount: 200000 }],
   feesTotal: 310000, due: 315000, paid: 200000, balance: 115000, status: "PARTIALLY PAID", officer: "Sophia Ugadan", cashier: "Karen Mallari",
 };
-await printHtml("01-training-admission-record.pdf", "Training Admission Record", <TarSheets {...tar} />);
+await printHtml("01-training-admission-record.pdf", "Training Admission Record", <TarSheets {...tar} control={ctl("NW-REG-01")} termsControl={ctl("NW-REG-02")} />);
 const many = ["UBT-PSSR|Updating Training on Basic Training – PSSR", "STPPDSPPS|Ship Security Awareness", "PSCMT|Crowd Management Training", "PSCMHBT|Crisis Management and Human Behavior", "CCMD|Crisis Management – Domestic", "HPT|Hydraulic and Pneumatic Training", "SFA|Standard First Aid", "BOSH|Basic Occupational Safety and Health"]
   .map((x, i) => { const [code, name] = x.split("|"); return { id: String(i), code, name, dates: `${12 + i} Oct`, time: "8:00–17:00", room: i % 2 ? "ROOM 102" : "ROOM 101", fee: 120000 + i * 15000 }; });
 const manyFees = many.reduce((s, c) => s + c.fee, 0);
-await printHtml("02-training-admission-record-multi-course.pdf", "Training Admission Record (8 courses, 2 pages)", <TarSheets {...tar} arNumber="AR-2026-001205" courses={many} misc={[]} discounts={[]} feesTotal={manyFees} due={manyFees} paid={manyFees} balance={0} status="FULLY PAID"
+await printHtml("02-training-admission-record-multi-course.pdf", "Training Admission Record (8 courses, 2 pages)", <TarSheets {...tar} control={ctl("NW-REG-01")} termsControl={ctl("NW-REG-02")} arNumber="AR-2026-001205" courses={many} misc={[]} discounts={[]} feesTotal={manyFees} due={manyFees} paid={manyFees} balance={0} status="FULLY PAID"
   payments={[{ id: "a", number: "PAY-2026-001510", dateLabel: "12 Oct", method: "Cash", ref: "—", amount: 600000 }, { id: "b", number: "PAY-2026-001511", dateLabel: "12 Oct", method: "UnionBank", ref: "UB-88123007", amount: manyFees - 600000 }]} />);
 
 // ---- Acknowledgement receipt -----------------------------------------------------
@@ -81,10 +89,11 @@ const receipt: ReceiptProps = {
   appliedTo: [{ id: "e5", number: "ENR-2026-000862", code: "UBT-PSSR", name: "Updating Training on Basic Training – PSSR", dates: "12 Oct", applied: 75000, feeApplied: 50000, misc: [{ label: "Uniform", amount: 15000 }, { label: "ID Lace x 2", amount: 10000 }] }],
   totalDue: 205000, totalPaid: 75000, balance: 130000,
 };
-await printHtml("03-acknowledgement-receipt.pdf", "Acknowledgement Receipt", <ReceiptSheets {...receipt} />);
+await printHtml("03-acknowledgement-receipt.pdf", "Acknowledgement Receipt", <ReceiptSheets {...receipt} control={ctl("NW-CSH-01")} />);
 
 // ---- Expense voucher (first print and a reprint) ---------------------------------
 const voucher = {
+  control: ctl("NW-ACC-01"),
   number: "CV-2026-000131", requestNumber: "ER-2026-000209", issuedAt: "October 12, 2026", payee: "Meralco", category: "Utilities", purpose: "September electricity bill, main office",
   amountCentavos: 845000, lines: [{ description: "Electricity, Sep 2026 (Acct 1234-5678)", quantity: 1, unitCentavos: 820000 }, { description: "Late payment surcharge", quantity: 1, unitCentavos: 25000 }],
   paymentChannel: "GCash", referenceNumber: "7019988776655", supportingDocument: "Meralco bill no. 0098812", requestedBy: "Karen Mallari", modeOfPayment: "GCash", status: "Released",
@@ -99,6 +108,7 @@ await save("05c-expense-voucher-10-lines.pdf", "Expense Voucher (10 long lines)"
 const channels = ["Cash", "GCash", "PSBank", "UnionBank"];
 const cell = (vals: number[][]) => channels.map((channel, i) => ({ channel, count: vals[i][0], totalCentavos: vals[i][1] }));
 await save("06-cashier-summary-report.pdf", "Cashier Summary Report", await createCashierReportPdf({
+  control: ctl("NW-CSH-02"),
   dateLabel: "Monday, October 12, 2026", preparedBy: "Karen Mallari", checkedBy: "Kat Garcia", logoBytes, channels,
   position: { previousLabel: "Counted at closing, Oct 11", previousCentavos: 500000, cashCollectedCentavos: 360000, cashExpensesCentavos: 125000, onHandCentavos: 735000, countedCentavos: 734000, overShortCentavos: -1000 },
   matrix: [
@@ -126,6 +136,7 @@ await save("06-cashier-summary-report.pdf", "Cashier Summary Report", await crea
 
 // ---- Expenses summary (date range) -----------------------------------------------
 await save("07-expenses-summary.pdf", "Expenses Summary (Oct 1–12)", await createDailyExpensesPdf({
+  control: ctl("NW-ACC-02"),
   title: "Expenses Summary", dateLabel: "October 1 – 12, 2026", preparedBy: "Kat Garcia", logoBytes,
   rows: [
     { number: "CV-2026-000124", payee: "PLDT", category: "Utilities", channel: "GCash", reference: "7011100223", status: "Released", amountCentavos: 289900 },
@@ -140,6 +151,7 @@ await save("07-expenses-summary.pdf", "Expenses Summary (Oct 1–12)", await cre
 
 // ---- Enrollment record (payment invoice + admission slip) --------------------------
 await save("08-enrollment-record.pdf", "Enrollment Record (Invoice and Admission Slip)", await createAdmissionInvoicePdf({
+  control: ctl("NW-REG-03"),
   reference: "ENR-2026-000871", traineeName: "Juan Perez Dela Cruz", traineeNumber: "NWMTACI-0000411", srn: "SRN-2210441", mobile: "0917 100 2001", email: "juan.dc@example.com",
   courses: [{ course: "Updating Training on Basic Training – PSSR (UBT-PSSR)", schedule: "Oct 12, 2026", time: "8:00 AM – 5:00 PM", venue: "ROOM 101", instructor: "Capt. R. Villanueva" },
     { course: "Crowd Management Training (PSCMT)", schedule: "Oct 13–14, 2026", time: "8:00 AM – 5:00 PM", venue: "ROOM 102", instructor: "Engr. L. Cruz" }],
@@ -150,6 +162,7 @@ await save("08-enrollment-record.pdf", "Enrollment Record (Invoice and Admission
 
 // ---- Training instructions -------------------------------------------------------
 await save("09-training-instructions.pdf", "Training Instructions", await createTrainingInstructionsPdf({
+  control: ctl("NW-REG-04"),
   traineeName: "Juan Perez Dela Cruz", formalName: "DELA CRUZ, JUAN PEREZ", nwmtaciNumber: "NWMTACI-0000411", srn: "SRN-2210441",
   courseName: "UBT-PSSR - Updating Training on Basic Training", batchNumber: "26-609-139", dateOfTraining: "Oct 12, 2026", time: "8:00 AM - 5:00 PM", classroom: "ROOM 101",
   mode: "Face-to-face", online: false, reference: "ENR-2026-000871", issuedAt: "Oct 9, 2026", categoryLabel: "STCW Courses",
@@ -161,7 +174,7 @@ await save("10-payment-reconciliation-day-sheet.pdf", "Payment Reconciliation Da
   { id: "1", payment_number: "PAY-2026-001490", receipt_number: "AR-2026-001190", received_at: "2026-10-11T02:15:00Z", amount_centavos: 180000, reference_number: "7012345678901", trainee: "REYES, Paolo", recorded_by: "Karen Mallari", proof_link: null, status: "Reconciled", remarks: null, checked_by: "Admin Assistant", checked_at: null },
   { id: "2", payment_number: "PAY-2026-001491", receipt_number: "AR-2026-001191", received_at: "2026-10-11T03:40:00Z", amount_centavos: 130000, reference_number: "7012345611112", trainee: "AQUINO, Rey", recorded_by: "Kat Garcia", proof_link: null, status: null, remarks: null, checked_by: null, checked_at: null },
   { id: "3", payment_number: "PAY-2026-001492", receipt_number: "AR-2026-001192", received_at: "2026-10-11T06:05:00Z", amount_centavos: 250000, reference_number: "7012349900001", trainee: "MENDOZA, Carlo", recorded_by: "Karen Mallari", proof_link: null, status: "Not in History", remarks: "Not on the printout", checked_by: "Admin Assistant", checked_at: null },
-  { id: "4", payment_number: "PAY-2026-001493", receipt_number: "AR-2026-001193", received_at: "2026-10-11T07:30:00Z", amount_centavos: 90000, reference_number: "7012340000777", trainee: "BAUTISTA, Ana", recorded_by: "Karen Mallari", proof_link: null, status: null, remarks: null, checked_by: null, checked_at: null }] }));
+  { id: "4", payment_number: "PAY-2026-001493", receipt_number: "AR-2026-001193", received_at: "2026-10-11T07:30:00Z", amount_centavos: 90000, reference_number: "7012340000777", trainee: "BAUTISTA, Ana", recorded_by: "Karen Mallari", proof_link: null, status: null, remarks: null, checked_by: null, checked_at: null }] }, ctl("NW-ACC-07")));
 
 // ---- Resource plan ---------------------------------------------------------------
 const pb = (id: string, no: string, code: string, name: string, s: string, e: string, n: number, room: string | null, ins: string | null): PlanBatch => ({ id, batchNumber: no, courseId: code, courseCode: code, courseName: name, startsOn: s, endsOn: e, students: n, capacity: 24, classroomId: room, instructorId: ins });
@@ -176,7 +189,7 @@ const plan = planRows([
 ], [{ id: "r1", name: "ROOM 101", capacity: 24 }, { id: "r2", name: "ROOM 102", capacity: 24 }, { id: "r3", name: "Simulator Room", capacity: 12 }],
   [{ id: "i1", complete_name: "Capt. R. Villanueva" }, { id: "i2", complete_name: "C/E M. Ramos" }, { id: "i3", complete_name: "2/O J. Dizon" }, { id: "i4", complete_name: "Engr. L. Cruz" }],
   [{ instructor_id: "i1", course_id: "UBT-PSSR", valid_until: "2027-03-31" }, { instructor_id: "i3", course_id: "UBT-PSSR", valid_until: "2027-01-15" }, { instructor_id: "i3", course_id: "STPPDSPPS", valid_until: "2026-09-30" }, { instructor_id: "i4", course_id: "PSCMT", valid_until: "2027-04-30" }, { instructor_id: "i2", course_id: "HPT", valid_until: "2026-10-20" }]);
-await save("11-resource-plan.pdf", "Resource Plan", await createResourcePlanPdf("2026-10-12", "2026-10-25", "2026-10-12", plan));
+await save("11-resource-plan.pdf", "Resource Plan", await createResourcePlanPdf("2026-10-12", "2026-10-25", "2026-10-12", plan, ctl("NW-TRN-05")));
 
 // ---- MARINA MISMO lists ----------------------------------------------------------
 const tr = (id: string, last: string, first: string, mid: string | null, birth: string, srn: string, rank: string, due: number, p11: number, p16: number) => ({ enrollmentId: id, lastName: last, firstName: first, middleName: mid, birthdate: birth, srn, rank, dueCentavos: due, paidBy11: p11, paidBy16: p16, paidNow: p16 });
@@ -185,11 +198,12 @@ const mismo = [{ id: "b1", batchNumber: "BCH-2026-002475", courseName: "Updating
   tr("2", "GARCIA", "Liza", "Marie", "1992-11-30", "SRN-2001983", "OS", 180000, 50000, 180000),
   tr("3", "FLORES", "Ken", null, "1993-03-27", "SRN-1901777", "Oiler", 180000, 180000, 180000),
   tr("4", "VILLAR", "Mark", "Santos", "1997-07-07", "SRN-2400112", "Wiper", 180000, 0, 0)] }];
-await save("12-mismo-final-list.pdf", "MARINA MISMO Final List (4:00 PM)", await createMismoListPdf("2026-10-12", mismo, "final", { logo: logoBytes, preparedBy: "Ana Reyes" }));
-await save("13-mismo-unsettled-11am.pdf", "Not Settled as of 11:00 AM (for the instructor)", await createMismoListPdf("2026-10-12", mismo, "unsettled", { logo: logoBytes, preparedBy: "Ana Reyes" }));
+await save("12-mismo-final-list.pdf", "MARINA MISMO Final List (4:00 PM)", await createMismoListPdf("2026-10-12", mismo, "final", { logo: logoBytes, control: ctl("NW-TRN-02"), preparedBy: "Ana Reyes" }));
+await save("13-mismo-unsettled-11am.pdf", "Not Settled as of 11:00 AM (for the instructor)", await createMismoListPdf("2026-10-12", mismo, "unsettled", { logo: logoBytes, control: ctl("NW-TRN-03"), preparedBy: "Ana Reyes" }));
 
 // ---- Payslip -----------------------------------------------------------------------
 await save("14-payslip.pdf", "Payslip", await createPayslipPdf({
+  control: ctl("NW-PAY-01"),
   employeeNumber: "EMP-2026-000012", employeeName: "Karen Mallari", position: "Cashier", payFrequency: "Semi-monthly", dateHired: "March 1, 2024", period: "October 1 – 15, 2026", payDate: "October 15, 2026",
   earnings: [{ label: "Basic pay", amountCentavos: 1250000 }, { label: "Overtime (4 hrs)", amountCentavos: 85000 }],
   deductions: [{ label: "SSS", amountCentavos: 56250 }, { label: "PhilHealth", amountCentavos: 31250 }, { label: "Pag-IBIG", amountCentavos: 10000 }, { label: "Withholding tax", amountCentavos: 42000 }],
@@ -202,7 +216,28 @@ await save("15-endorsed-courses.pdf", "Endorsed Courses", await createEndorsedSa
   endorsedRow("1201", "DELA CRUZ, Juan P.", "Nautical Options", "BT", "2026-11-05", 550000, 550000, 130000, 100000, "Owed", false), endorsedRow("1202", "REYES, Maria L.", "Nautical Options", "AFF", "2026-11-05", 480000, 240000, 90000, 0, "Owed", false),
   endorsedRow("1203", "TORRES, Noel A.", "Nautical Options", "MEFA", "2026-11-03", 380000, 380000, 70000, 50000, "Paid", false), endorsedRow("1204", "SANTOS, Paolo R.", "Altitude Maritime", "BT", "2026-11-04", 520000, 520000, 100000, 0, "Owed", false),
   endorsedRow("1205", "BAUTISTA, Rey S.", "Altitude Maritime", "SDSD", "2026-11-02", 280000, 280000, 50000, 0, "Paid", true), endorsedRow("1206", "GARCIA, Liza M.", "Mariana", "II-4", "2026-11-04", 650000, 650000, 150000, 100000, "Paid", false),
-]) }, "2026-11-05", logoBytes));
+]) }, "2026-11-05", logoBytes, ctl("NW-ACC-06")));
+
+// ---- Billing Statement and Company Receipt ---------------------------------------------
+const billing = { bsNumber: "000029", date: "November 5, 2026", billTo: "Marine Force", kind: "", coverage: "October 1 - 31, 2026", total: 390000, rows: [{ enrolled: "Oct 5, 2026", name: "DELA CRUZ, Juan P.", training: "UBT-PSSR", status: "Completed", amount: 130000 }, { enrolled: "Oct 6, 2026", name: "REYES, Maria L.", training: "PSCMT", status: "Completed", amount: 260000 }] };
+await save("16-billing-statement.pdf", "Billing Statement", await createBillingStatementPdf(billing, logoBytes, undefined, ctl("NW-FMGR-04-24")));
+await save("17-company-receipt.pdf", "Company Receipt", await createBillingStatementPdf(billing, logoBytes, { method: "PSBank", reference: "778812", receivedOn: "Nov 5, 2026", amount: 390000, words: "Three thousand nine hundred pesos only", cashier: "Karen Mallari" }, ctl("NW-FMGR-04-25")));
+
+// ---- Batch Roster ----------------------------------------------------------------------
+await save("18-batch-roster.pdf", "Batch Roster", await createBatchRosterPdf({ batch: { id: "b", batchNumber: "26-609-139", code: "UBT-PSSR", course: "Updating Training on Basic Training - PSSR", startsOn: "2026-11-09", endsOn: "2026-11-09", dailyStart: "08:00", dailyEnd: "17:00", room: "ROOM 101", instructor: "Capt. R. Villanueva", capacity: 24, held: 2 }, rows: [
+  { enrollmentId: "1", name: "DELA CRUZ, Juan P.", nwmtaciNo: "NWMTACI-0000411", srn: "SRN-2210441", rank: "Able Seaman", mobile: "0917 100 2001", email: "juan@example.com", facebook: "", source: "Walk-In", status: "Enrolled", payment: "Paid", balanceCentavos: 0, requirements: 4 },
+  { enrollmentId: "2", name: "REYES, Maria L.", nwmtaciNo: "NWMTACI-0000412", srn: "SRN-2210442", rank: "Cadet", mobile: "0917 100 2002", email: "maria@example.com", facebook: "", source: "Online", status: "Pending", payment: "Balance", balanceCentavos: 65000, requirements: 3 },
+] }, { logo: logoBytes, preparedBy: "Admin Assistant", control: ctl("NW-TRN-04") }));
+
+// ---- Completion Record -----------------------------------------------------------------
+await save("19-completion-record.pdf", "Completion Record", await createCompletionRecordPdf({ control: { formNo: "05-00", revisionNo: "", revisionDate: "00", issuedDate: "09-14-2023" }, courseName: "Passenger Ship Crowd Management Training", startsOn: "2026-11-03", endsOn: "2026-11-04", tasks: [{ title: "Task 1", criteria: "Criteria" }], trainees: [{ enrollmentId: "1", name: "DELA CRUZ, Juan P.", birthdate: "1995-01-02", placeOfBirth: "Manila", rank: "Able Seaman" }], results: { "1": { pct: 90, ticks: [true], cert: "PSCMT-00123" } }, fields: { classNo: "12", resitClassNo: "", resitDuration: "", writtenPlace: "Manila", practicalPlace: "Manila", assessor: "Capt. R. Villanueva", coaValidity: "", assessedOn: "2026-11-04", director: "April Cantoneros", directorOn: "2026-11-05" }, logo: logoBytes } as Parameters<typeof createCompletionRecordPdf>[0]));
+
+// ---- Cash and Sales Summary ------------------------------------------------------------
+const saleBase = { center: "", payable: 0, rebate: 0, share: 0, charges: 3500, discounts: 0, rebateReceived: 0, collected: 100000 };
+await save("20-cash-and-sales-summary.pdf", "Cash and Sales Summary", await createFinanceSummaryPdf({ title: "November 2026", from: "2026-11-01", to: "2026-11-05", ...summarize({
+  payments: [{ amount: 130000, channel: "Cash", allocations: [{ amount: 130000, endorsement: false }] }, { amount: 550000, channel: "GCash", allocations: [{ amount: 550000, endorsement: true }] }], income: [{ amount: 130000, channel: "PSBank", source: "Endorsement Rebate" }], expenses: [{ amount: 550000, channel: "PSBank", category: "Partnered Center Payment" }, { amount: 50000, channel: "Cash", category: "Utilities" }],
+  sales: [{ ...saleBase, endorsement: false, category: "STCW", code: "UBT-PSSR", name: "Updating Training on Basic Training - PSSR", price: 130000 }, { ...saleBase, endorsement: false, category: "In-House", code: "APA", name: "Anti Piracy Awareness Prevention and Response", price: 70000, collected: 70000 }, { ...saleBase, endorsement: true, code: "BT", name: "Basic Training", center: "Nautical Options", price: 550000, payable: 550000, rebate: 130000, share: 100000, collected: 550000, rebateReceived: 130000 }],
+}) }, "2026-11-05", ctl("NW-ACC-05")));
 
 // ---- One combined file ---------------------------------------------------------------
 const all = await PDFDocument.create();

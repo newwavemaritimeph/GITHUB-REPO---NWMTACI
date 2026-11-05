@@ -1,4 +1,6 @@
 import { Fragment } from "react";
+import type { DocumentControl } from "@/lib/document-controls";
+import { ControlBlock } from "../../admission-record/[id]/control-block";
 import { PrintControls } from "../../admission-record/[id]/print-controls";
 
 /** The acknowledgement receipt sheets (TAR layout): original and duplicate on one legal 8.5 × 13 page. */
@@ -23,16 +25,16 @@ export function inWords(centavos: number) {
 }
 
 export type ReceiptProps = {
-  receiptNo: string; name: string; received: string; cashier: string; status: string; reprintCopy?: number | null;
+  control?: DocumentControl | null; receiptNo: string; name: string; received: string; cashier: string; status: string; reprintCopy?: number | null;
   payment: { number: string; method: string; reference: string | null; amount: number; remarks: string | null };
   trainee: { appNo: string; srn: string | null; rank: string | null; mobile: string | null; company: string | null };
   appliedTo: { id: string; number: string; code: string; name: string; dates: string; applied: number; feeApplied?: number; feeOnly?: boolean; misc?: { label: string; amount: number }[] }[];
   totalDue: number; totalPaid: number; balance: number;
 };
 
-export function ReceiptSheets({ receiptNo, name, received, cashier, status, reprintCopy, payment, trainee: t, appliedTo, totalDue, totalPaid, balance }: ReceiptProps) {
+export function ReceiptSheets({ control, receiptNo, name, received, cashier, status, reprintCopy, payment, trainee: t, appliedTo, totalDue, totalPaid, balance }: ReceiptProps) {
   const content = <>
-    <div className="tar-letter"><img src="/brand/new-wave-emblem.png" alt="" width={34} height={34} /><div><b>{ORG}</b><span>{ADDRESS}</span></div><i /></div>
+    <div className="tar-letter"><img src="/brand/new-wave-emblem.png" alt="" width={34} height={34} /><div><b>{ORG}</b><span>{ADDRESS}</span></div><ControlBlock control={control} /></div>
     <div className="tar-title"><div><b>ACKNOWLEDGEMENT RECEIPT</b> <span>· payment received · {received}</span></div><div>{reprintCopy ? <span className="tar-reprint">REPRINT – COPY {reprintCopy}</span> : null}<span>RECEIPT NO. </span><strong>{receiptNo}</strong></div></div>
     <table className="tar-grid"><tbody>
       <tr><th>Received From</th><td><b>{name}</b></td><th>Enrollment no.</th><td className="mono accent">{t.appNo}</td><th>SRN</th><td><b>{t.srn ?? "—"}</b></td></tr>

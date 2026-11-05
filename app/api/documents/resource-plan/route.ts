@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/security";
 import { createResourcePlanPdf } from "@/lib/print/resource-plan";
+import { loadDocumentControl } from "@/lib/document-controls";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { planRows, type PlanBatch } from "@/lib/admin-assistant";
 
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
   });
   const rows = planRows(batches, (roomRes.data ?? []).map((r) => ({ id: r.id as string, name: r.name as string, capacity: Number(r.capacity) })), (insRes.error ? [] : insRes.data ?? []) as { id: string; complete_name: string }[], (accRes.error ? [] : accRes.data ?? []) as { instructor_id: string; course_id: string; valid_until: string | null; role?: string | null }[]);
 
-  const bytes = await createResourcePlanPdf(from, to, today, rows);
+  const bytes = await createResourcePlanPdf(from, to, today, rows, await loadDocumentControl(db, "resource_plan"));
   await db.from("audit_logs").insert({ actor_id: staff.user.id, action: "report.exported", record_type: "report", record_id: `resource-plan:${from}:${to}`, new_values: { from, to, batches: rows.length } });
   return new Response(Buffer.from(bytes), { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="resource-plan-${from}-to-${to}.pdf"`, "cache-control": "no-store" } });
 }

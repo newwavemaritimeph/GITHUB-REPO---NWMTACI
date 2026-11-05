@@ -1,0 +1,241 @@
+<title>Sales Summary</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;700&display=swap">
+<style>
+/* Same sizes as the live report: table text 13px, tile figures 17px. Sales come first, segregated, then cash. */
+:root {
+  --bg: #f2f6f9; --fg: #123f63; --ink: #0f2a3d; --muted: #4d6a7d; --line: #d5e1e9; --panel: #ffffff; --thead: #e6f5fa; --tab: #e2ebf1; --tab-fg: #123f63; --tab-on: #123f63; --tab-on-fg: #ffffff; --accent: #0571d0; --focus: #f25615;
+  --ok: #0a7a3e; --bad: #b42318; --info: #0562b4; --info-bg: #e3f0fb; --warn: #b23d0c; --warn-bg: #fdeee6; --band: #eef4f8; --bar: #123f63; --c-total: #123f63; --c-nw: #0571d0; --c-end: #f25615;
+  --font: "Geist", "Segoe UI", Arial, sans-serif; --mono: "Geist Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0e1a24; --fg: #e4eef5; --ink: #e4eef5; --muted: #9db4c3; --line: #2a3d4c; --panel: #162734; --thead: #1e3444; --tab: #223544; --tab-fg: #d6e4ee; --tab-on: #35ccfa; --tab-on-fg: #082030; --accent: #6db6f2; --ok: #5fd39a; --bad: #ff8b80; --info: #8cc4f5; --info-bg: #15304a; --warn: #ff9a6b; --warn-bg: #3a2218; --band: #1b2f3e; --bar: #1e3444; --c-total: #9ee3f1; --c-nw: #6db6f2; --c-end: #ff9a6b; color-scheme: dark; } }
+:root[data-theme="dark"] { --bg: #0e1a24; --fg: #e4eef5; --ink: #e4eef5; --muted: #9db4c3; --line: #2a3d4c; --panel: #162734; --thead: #1e3444; --tab: #223544; --tab-fg: #d6e4ee; --tab-on: #35ccfa; --tab-on-fg: #082030; --accent: #6db6f2; --ok: #5fd39a; --bad: #ff8b80; --info: #8cc4f5; --info-bg: #15304a; --warn: #ff9a6b; --warn-bg: #3a2218; --band: #1b2f3e; --bar: #1e3444; --c-total: #9ee3f1; --c-nw: #6db6f2; --c-end: #ff9a6b; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.45; }
+button, input { font: inherit; color: inherit; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.top { background: var(--bar); color: #fff; padding-block: 12px 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.top-in { max-width: 1160px; margin: 0 auto; }
+.brand { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: #cfe3ef; }
+.brand b { color: #fff; font-size: 15px; font-weight: 600; }
+.proto { background: var(--focus); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; padding: 2px 7px; border-radius: 5px; margin-left: 8px; }
+.tabs { display: flex; gap: 2px; margin-top: 10px; overflow-x: auto; scrollbar-width: none; }
+.tabs span { color: #c3dbea; font-size: 14px; font-weight: 500; padding: 9px 14px; border-radius: 9px 9px 0 0; white-space: nowrap; }
+.tabs span.on { background: var(--bg); color: var(--ink); font-weight: 600; }
+.page { padding-block: 16px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1160px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.head { display: flex; flex-wrap: wrap; gap: 8px 12px; justify-content: space-between; align-items: flex-end; }
+.eyebrow { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { margin: 0; font-size: 22px; line-height: 1.2; font-weight: 700; color: var(--fg); }
+h2 { margin: 0; font-size: 15px; line-height: 1.3; font-weight: 700; color: var(--fg); }
+.acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.note-inline { font-size: 12.5px; color: var(--muted); }
+.btn { min-height: 34px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn.primary { background: var(--focus); border-color: var(--focus); color: #fff; }
+.btn.step { min-width: 32px; min-height: 32px; padding: 0; }
+.btn:disabled { opacity: .4; cursor: default; }
+.seg { display: inline-flex; align-self: flex-start; flex-wrap: wrap; gap: 3px; background: var(--tab); padding: 3px; border-radius: 9px; max-width: 100%; }
+.seg button { font-size: 13px; font-weight: 600; min-height: 32px; padding: 0 11px; border: 0; border-radius: 6px; background: transparent; color: var(--tab-fg); cursor: pointer; }
+.seg button.on { background: var(--tab-on); color: var(--tab-on-fg); }
+.date-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.date-bar input { font-size: 13px; min-height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); max-width: 100%; }
+.range { font-size: 13px; color: var(--muted); }
+.range b { color: var(--fg); }
+.sample { font-size: 11px; font-weight: 700; letter-spacing: .05em; padding: 2px 8px; border-radius: 99px; background: var(--info-bg); color: var(--info); margin-left: auto; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr)); gap: 10px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--c); border-radius: 10px; padding: 9px 12px; min-width: 0; }
+.tile span { display: block; font-size: 12.5px; color: var(--muted); }
+.tile b { display: block; font-family: var(--mono); font-size: 17px; color: var(--fg); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.tile small { display: block; font-size: 12px; color: var(--muted); }
+.section { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; margin-top: 8px; border-bottom: 2px solid var(--fg); padding-bottom: 4px; }
+.section h2 { font-size: 16px; }
+.section small { font-size: 12.5px; color: var(--muted); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; min-width: 0; overflow: hidden; }
+.ph { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; padding: 10px 14px; }
+.tw { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: var(--thead); color: var(--fg); font-size: 12px; font-weight: 700; text-align: left; padding: 7px 10px; white-space: nowrap; }
+td { padding: 6px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+td:first-child { min-width: 170px; }
+td small { display: block; color: var(--muted); font-size: 12px; }
+.n { text-align: right; white-space: nowrap; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+th.n { font-family: var(--font); font-size: 12px; }
+.lvl1 td { font-weight: 700; background: var(--band); color: var(--fg); }
+.lvl1 td:first-child { border-left: 4px solid var(--c); }
+.total td { font-weight: 700; background: var(--thead); color: var(--fg); }
+.total td:first-child { border-left: 4px solid var(--c-total); }
+.lvl2 td:first-child { padding-left: 24px; }
+.band td { background: var(--band); font-size: 11.5px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); padding: 5px 10px; }
+.sub td { font-weight: 700; }
+.net td { font-weight: 700; background: var(--thead); color: var(--fg); }
+.neg { color: var(--bad); }
+.pos { color: var(--ok); }
+.note { font-size: 12.5px; color: var(--muted); padding: 9px 14px; margin: 0; border-top: 1px solid var(--line); }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 460px), 1fr)); gap: 12px; align-items: start; }
+.flag { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: var(--warn-bg); color: var(--warn); margin-left: 6px; white-space: nowrap; }
+td.old { color: var(--muted); }
+td.new { font-weight: 600; color: var(--fg); }
+</style>
+
+<header class="top"><div class="top-in">
+  <div class="brand"><div><b>New Wave Maritime</b><span class="proto">PROTOTYPE</span></div><span>Working as Accounting · sample figures</span></div>
+  <div class="tabs"><span>Dashboard</span><span>Search Trainee</span><span>Approvals</span><span>Transactions ▾</span><span class="on">Reports ▾</span><span>Configuration ▾</span></div>
+</div></header>
+<main class="page"><div class="wrap">
+  <div class="head">
+    <div><span class="eyebrow">Accounting · Reports</span><h1>Cash and Sales Summary</h1></div>
+    <div class="acts"><span class="note-inline" id="xnote" hidden>Sample only. In the portal this opens the file, in the same order.</span><button type="button" class="btn" data-x="1">Download Excel</button><button type="button" class="btn primary" data-x="1">Print PDF</button></div>
+  </div>
+  <div class="seg" id="views" role="tablist" aria-label="Prototype views"></div>
+  <div class="date-bar" id="date-bar">
+    <div class="seg" id="periods" aria-label="Period"></div>
+    <button type="button" class="btn step" id="prev" aria-label="Previous period">‹</button>
+    <input type="date" id="asof" aria-label="As of" max="2026-11-05" value="2026-11-05">
+    <button type="button" class="btn step" id="next" aria-label="Next period">›</button>
+    <span class="range" id="range"></span>
+    <span class="sample">SAMPLE FIGURES</span>
+  </div>
+  <div id="body" style="display:flex;flex-direction:column;gap:12px"></div>
+</div></main>
+
+<script>
+(function () {
+  var TODAY = "2026-11-05", PERIODS = ["Daily", "Weekly", "Monthly", "Quarterly", "Annually"], MULT = { Daily: .05, Weekly: .25, Monthly: 1, Quarterly: 3, Annually: 12 };
+  // [code, course, trainees in a month, fee, charges per trainee, discount per trainee, share collected]
+  var NEW_WAVE = [
+    ["STCW Courses", [["UBT-PSSR", "Updating Training on Basic Training, PSSR", 96, 130000, 3500, 2000, .97], ["STPPDSPPS", "Security Training for Seafarers with Designated Security Duties", 40, 150000, 3000, 0, .95], ["PSCMT", "Crowd Management Training", 30, 180000, 2500, 4000, .9], ["PSCMHBT", "Crisis Management and Human Behavior Training", 28, 240000, 2500, 5000, .88], ["CCMD", "Crowd and Crisis Management, Domestic", 10, 200000, 0, 0, 1]]],
+    ["In-House Courses", [["APA", "Anti-Piracy Awareness", 18, 70000, 0, 0, 1], ["SSO", "Ship Security Officer", 6, 350000, 5000, 0, .85], ["HPT", "Hazmat Personnel Training", 4, 480000, 0, 10000, .8]]]
+  ];
+  // [center, trainees in a month, fee, charges, discount, collected, payable, rebate per trainee, share of rebate received, agency commission per trainee]
+  var CENTERS = [["Nautical Options", 15, 550000, 0, 0, .93, 550000, 120000, .6, 90000], ["Altitude Maritime", 9, 500000, 3500, 0, 1, 500000, 90000, .55, 0], ["Mariana", 6, 650000, 0, 5000, .96, 650000, 150000, .35, 100000]];
+  var EXPENSE_BASE = 19000000;
+  var REC = [["Endorsed Courses", [["Training Fees", 16400000], ["Endorsement Rebates", 1630000]]], ["New Wave Courses", [["Training Fees and Charges", 44800000], ["Rental", 500000], ["Interest", 1288]]]];
+  var DIS = [["Endorsed Courses", [["Payments to Partnered Centers", 16000000], ["Agency Shares Paid", 600000]]], ["New Wave Courses", [["Salary", 12000000], ["Utilities", 1845000], ["Office Supplies", 623000], ["Repairs and Maintenance", 580000], ["Transportation", 340000]]]];
+  var CHANNELS = [["Cash", .46, .55], ["GCash", .28, .05], ["PSBank", .16, .22], ["UnionBank", .1, .18]];
+
+  var view = "Report", period = "Monthly", asof = TODAY;
+  var body = document.getElementById("body");
+  var peso = function (c) { return (c < 0 ? "-₱" : "₱") + (Math.abs(c) / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var day = function (s) { return new Date(s + "T00:00:00Z"); };
+  var iso = function (t) { return t.toISOString().slice(0, 10); };
+  var human = function (s) { return new Intl.DateTimeFormat("en-PH", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" }).format(day(s)); };
+  function startOf(p, e) { var t = day(e), y = t.getUTCFullYear(), m = t.getUTCMonth(); if (p === "Daily") return e; if (p === "Weekly") return iso(new Date(Date.UTC(y, m, t.getUTCDate() - (t.getUTCDay() + 6) % 7))); if (p === "Monthly") return iso(new Date(Date.UTC(y, m, 1))); if (p === "Quarterly") return iso(new Date(Date.UTC(y, m - m % 3, 1))); return iso(new Date(Date.UTC(y, 0, 1))); }
+  function shift(p, e, dir) { var t = day(e), y = t.getUTCFullYear(), m = t.getUTCMonth(), o; if (p === "Daily") o = new Date(Date.UTC(y, m, t.getUTCDate() + dir)); else if (p === "Weekly") o = new Date(Date.UTC(y, m, t.getUTCDate() + 7 * dir)); else if (p === "Monthly") o = new Date(Date.UTC(y, m + dir + 1, 0)); else if (p === "Quarterly") o = new Date(Date.UTC(y, m - m % 3 + 3 * dir + 3, 0)); else o = new Date(Date.UTC(y + dir, 12, 0)); var s = iso(o); return s > TODAY ? TODAY : s; }
+  function title(p, e) { var t = day(e), mon = new Intl.DateTimeFormat("en-PH", { timeZone: "UTC", month: "long", year: "numeric" }).format(t); if (p === "Daily") return human(e); if (p === "Weekly") return "Week of " + human(startOf(p, e)); if (p === "Monthly") return mon; if (p === "Quarterly") return "Q" + (Math.floor(t.getUTCMonth() / 3) + 1) + " " + t.getUTCFullYear(); return String(t.getUTCFullYear()); }
+  // The same sample scales with the period, and moves a little per date, so everything still adds up.
+  function scale() { var s = 0; for (var i = 0; i < asof.length; i++) s += asof.charCodeAt(i) * (i + 1); return MULT[period] * (1 + (s % 5 - 2) / 12); }
+
+  var blank = function () { return { trainees: 0, fees: 0, charges: 0, discounts: 0, sales: 0, collected: 0, balance: 0 }; };
+  var add = function (t, r) { ["trainees", "fees", "charges", "discounts", "sales", "collected", "balance"].forEach(function (k) { t[k] += r[k]; }); return t; };
+  function line(trainees, fee, charge, discount, ratio) { var fees = trainees * fee, charges = trainees * charge, discounts = trainees * discount, sales = fees + charges - discounts, collected = Math.round(sales * ratio / 100) * 100; return { trainees: trainees, fees: fees, charges: charges, discounts: discounts, sales: sales, collected: collected, balance: sales - collected }; }
+
+  function compute() {
+    var m = scale();
+    var cats = NEW_WAVE.map(function (cat) { var total = blank(); var rows = cat[1].map(function (c) { var r = line(Math.round(c[2] * m), c[3], c[4], c[5], c[6]); r.code = c[0]; r.name = c[1]; add(total, r); return r; }).filter(function (r) { return r.trainees; }); return { name: cat[0], rows: rows, total: total }; });
+    var nw = cats.reduce(function (t, c) { return add(t, c.total); }, blank());
+    var centers = CENTERS.map(function (c) { var n = Math.round(c[1] * m), r = line(n, c[2], c[3], c[4], c[5]); r.name = c[0]; r.payable = n * c[6]; r.rebate = n * c[7]; r.received = Math.round(r.rebate * c[8] / 100) * 100; r.due = r.rebate - r.received; r.share = n * c[9]; r.keeps = r.rebate - r.share; return r; }).filter(function (r) { return r.trainees; });
+    var en = centers.reduce(function (t, c) { return add(t, c); }, blank());
+    ["payable", "rebate", "received", "due", "share", "keeps"].forEach(function (k) { en[k] = centers.reduce(function (s, c) { return s + c[k]; }, 0); });
+    var all = add(add(blank(), nw), en), expenses = Math.round(EXPENSE_BASE * m / 100) * 100;
+    return { cats: cats, nw: nw, centers: centers, en: en, all: all, expenses: expenses, margin: nw.sales - expenses, m: m };
+  }
+  var tone = function (cls, v) { return v ? "n " + cls : "n"; };
+  var cells = function (r) { return '<td class="n">' + r.trainees + '</td><td class="n">' + peso(r.fees) + '</td><td class="n">' + peso(r.charges) + '</td><td class="' + tone("neg", r.discounts) + '">' + peso(-r.discounts) + '</td><td class="n"><b>' + peso(r.sales) + '</b></td><td class="' + tone("pos", r.collected) + '">' + peso(r.collected) + '</td><td class="' + tone("neg", r.balance) + '">' + peso(r.balance) + "</td>"; };
+  var heads = function (first) { return "<th>" + first + '</th><th class="n">Trainees</th><th class="n">Course Fees</th><th class="n">Miscellaneous Charges</th><th class="n">Less Discounts</th><th class="n">Total Sales</th><th class="n">Amount Collected</th><th class="n">Outstanding Balance</th>'; };
+  var pct = function (a, b) { return b ? Math.round(a / b * 100) + "% of Total Sales" : "No Sales in This Period"; };
+  var tile = function (c, label, v, small) { return '<div class="tile" style="--c:var(' + c + ')"><span>' + label + "</span><b>" + peso(v) + "</b><small>" + small + "</small></div>"; };
+  var S = function (n) { return n + " Trainee" + (n === 1 ? "" : "s"); };
+
+  function cashTable(name, groups, m) {
+    var e = 0, d = 0, out = "", chan = {};
+    groups.forEach(function (g, gi) {
+      out += '<tr class="band"><td colspan="4">' + g[0] + "</td></tr>";
+      g[1].forEach(function (l) { var v = Math.round(l[1] * m / 100) * 100; if (gi === 0) e += v; else d += v; out += '<tr class="lvl2"><td>' + l[0] + '</td><td class="n">' + (gi === 0 ? peso(v) : "—") + '</td><td class="n">' + (gi === 1 ? peso(v) : "—") + '</td><td class="n">' + peso(v) + "</td></tr>"; });
+    });
+    out += '<tr class="net"><td>Total ' + name + '</td><td class="n">' + peso(e) + '</td><td class="n">' + peso(d) + '</td><td class="n">' + peso(e + d) + "</td></tr>";
+    out += '<tr class="band"><td colspan="4">By Channel</td></tr>';
+    var ix = name === "Cash Received" ? 1 : 2, le = 0, ld = 0;
+    CHANNELS.forEach(function (c, i) { var ce = i === CHANNELS.length - 1 ? e - le : Math.round(e * c[ix] / 100) * 100, cd = i === CHANNELS.length - 1 ? d - ld : Math.round(d * c[ix] / 100) * 100; le += ce; ld += cd; out += '<tr class="lvl2"><td>' + c[0] + '</td><td class="n">' + peso(ce) + '</td><td class="n">' + peso(cd) + '</td><td class="n">' + peso(ce + cd) + "</td></tr>"; });
+    return { html: '<section class="panel"><div class="ph"><h2>' + name + '</h2></div><div class="tw"><table><thead><tr><th>Line</th><th class="n">Endorsed Courses</th><th class="n">New Wave Courses</th><th class="n">Total</th></tr></thead><tbody>' + out + "</tbody></table></div></section>", e: e, d: d };
+  }
+
+  function drawReport() {
+    var r = compute(), o = "";
+    // 1. Sales Summary
+    o += '<div class="section"><h2>Sales Summary</h2><small>By Training Date</small></div>';
+    o += '<div class="tiles">' + tile("--c-total", "Total Sales", r.all.sales, S(r.all.trainees)) + tile("--c-nw", "Sales from New Wave Courses", r.nw.sales, S(r.nw.trainees) + " · " + pct(r.nw.sales, r.all.sales)) + tile("--c-end", "Sales from Endorsed Courses", r.en.sales, S(r.en.trainees) + " · " + pct(r.en.sales, r.all.sales)) + "</div>";
+    var sum = '<tr class="total"><td>Total Sales</td>' + cells(r.all) + "</tr>";
+    sum += '<tr class="lvl1" style="--c:var(--c-nw)"><td>Sales from New Wave Courses</td>' + cells(r.nw) + "</tr>";
+    r.cats.forEach(function (c) { sum += '<tr class="lvl2"><td>' + c.name + "</td>" + cells(c.total) + "</tr>"; });
+    sum += '<tr class="lvl1" style="--c:var(--c-end)"><td>Sales from Endorsed Courses</td>' + cells(r.en) + "</tr>";
+    r.centers.forEach(function (c) { sum += '<tr class="lvl2"><td>' + c.name + "</td>" + cells(c) + "</tr>"; });
+    if (!r.centers.length) sum += '<tr class="lvl2"><td colspan="8" style="color:var(--muted)">No Endorsed Training in This Period</td></tr>';
+    o += '<section class="panel"><div class="tw"><table id="summary"><thead><tr>' + heads("Category") + "</tr></thead><tbody>" + sum + '</tbody></table></div><p class="note">Sales from Endorsed Courses are shown in full, though most of the amount is remitted to the partnered centers. New Wave\'s own income from them is the Net Rebate Income below.</p></section>';
+    // 2. New Wave detail
+    var nw = "";
+    r.cats.forEach(function (c) { nw += '<tr class="band"><td colspan="8">' + c.name + "</td></tr>"; c.rows.forEach(function (x) { nw += "<tr><td><b>" + x.code + "</b><small>" + x.name + "</small></td>" + cells(x) + "</tr>"; }); if (!c.rows.length) nw += '<tr><td colspan="8" style="color:var(--muted)">No Training in This Period</td></tr>'; nw += '<tr class="sub"><td>Total ' + c.name + "</td>" + cells(c.total) + "</tr>"; });
+    nw += '<tr class="net"><td>Total Sales from New Wave Courses</td>' + cells(r.nw) + "</tr>";
+    nw += '<tr><td colspan="7">Less Operating Expenses for the Period</td><td class="n neg">' + peso(-r.expenses) + "</td></tr>";
+    nw += '<tr class="net"><td colspan="7">Gross Margin on New Wave Courses</td><td class="n">' + peso(r.margin) + "</td></tr>";
+    o += '<div class="section"><h2>Sales from New Wave Courses</h2></div><section class="panel"><div class="tw"><table><thead><tr>' + heads("Course") + "</tr></thead><tbody>" + nw + "</tbody></table></div></section>";
+    // 3. Endorsed detail
+    var en = "";
+    r.centers.forEach(function (c) { en += "<tr><td><b>" + c.name + "</b></td>" + cells(c) + "</tr>"; });
+    if (!r.centers.length) en = '<tr><td colspan="8" style="color:var(--muted)">No Endorsed Training in This Period</td></tr>';
+    en += '<tr class="net"><td>Total Sales from Endorsed Courses</td>' + cells(r.en) + "</tr>";
+    var inc = "";
+    r.centers.forEach(function (c) { inc += "<tr><td><b>" + c.name + '</b></td><td class="n">' + peso(c.payable) + '</td><td class="n">' + peso(c.rebate) + '</td><td class="' + tone("pos", c.received) + '">' + peso(c.received) + '</td><td class="' + tone("neg", c.due) + '">' + peso(c.due) + '</td><td class="' + tone("neg", c.share) + '">' + peso(-c.share) + '</td><td class="n"><b>' + peso(c.keeps) + "</b></td></tr>"; });
+    if (!r.centers.length) inc = '<tr><td colspan="7" style="color:var(--muted)">No Endorsed Training in This Period</td></tr>';
+    inc += '<tr class="net"><td>Total</td><td class="n">' + peso(r.en.payable) + '</td><td class="n">' + peso(r.en.rebate) + '</td><td class="n">' + peso(r.en.received) + '</td><td class="n">' + peso(r.en.due) + '</td><td class="n">' + peso(-r.en.share) + '</td><td class="n">' + peso(r.en.keeps) + "</td></tr>";
+    o += '<div class="section"><h2>Sales from Endorsed Courses</h2></div><section class="panel"><div class="tw"><table><thead><tr>' + heads("Partnered Center") + "</tr></thead><tbody>" + en + '</tbody></table></div></section>';
+    o += '<section class="panel"><div class="ph"><h2>Rebates from Endorsed Courses</h2></div><div class="tw"><table><thead><tr><th>Partnered Center</th><th class="n">Payable to Partnered Center</th><th class="n">Rebate</th><th class="n">Rebate Received</th><th class="n">Rebates Receivable</th><th class="n">Agency Commission</th><th class="n">Net Rebate Income</th></tr></thead><tbody>' + inc + "</tbody></table></div></section>";
+    // 4. Cash Summary
+    var a = cashTable("Cash Received", REC, r.m), b = cashTable("Disbursements", DIS, r.m);
+    o += '<div class="section"><h2>Cash Summary</h2><small>By Date Received and Released</small></div>';
+    o += '<div class="tiles">' + tile("--ok", "Cash Received", a.e + a.d, "Endorsed " + peso(a.e) + " · New Wave " + peso(a.d)) + tile("--bad", "Disbursements", b.e + b.d, "Endorsed " + peso(b.e) + " · New Wave " + peso(b.d)) + tile("--accent", "Net Cash", a.e + a.d - b.e - b.d, "Received Less Disbursed") + "</div>";
+    o += '<div class="grid2">' + a.html + b.html + "</div>";
+    o += '<section class="panel"><div class="ph"><h2>Net Cash</h2></div><div class="tw"><table><thead><tr><th></th><th class="n">Endorsed Courses</th><th class="n">New Wave Courses</th><th class="n">Total</th></tr></thead><tbody><tr><td>Cash Received</td><td class="n">' + peso(a.e) + '</td><td class="n">' + peso(a.d) + '</td><td class="n">' + peso(a.e + a.d) + '</td></tr><tr><td>Less Disbursements</td><td class="n neg">' + peso(-b.e) + '</td><td class="n neg">' + peso(-b.d) + '</td><td class="n neg">' + peso(-b.e - b.d) + '</td></tr><tr class="net"><td>Net Cash</td><td class="n">' + peso(a.e - b.e) + '</td><td class="n">' + peso(a.d - b.d) + '</td><td class="n">' + peso(a.e + a.d - b.e - b.d) + "</td></tr></tbody></table></div></section>";
+    body.innerHTML = o;
+  }
+
+  var WORDS = [
+    ["Direct Sales, Direct New Wave, Direct", "Sales from New Wave Courses; New Wave Courses in column headings", "Both Reports"],
+    ["Training Endorsement, Endorsement", "Sales from Endorsed Courses; Endorsed Courses in column headings", "Both Reports"],
+    ["Fees Billed, Fee", "Course Fees", "Both Reports"],
+    ["Add Miscellaneous Charges", "Miscellaneous Charges", "Cash and Sales Summary"],
+    ["Collected", "Amount Collected", "Both Reports"],
+    ["Balance, Balance Still Due", "Outstanding Balance", "Both Reports"],
+    ["Paid to Center (Cash and Sales Summary)", "Payable to Partnered Center", "Cash and Sales Summary", "Was Mislabeled"],
+    ["Payable to Center", "Payable to Partnered Center", "Endorsed Courses"],
+    ["Paid to Center (Endorsed Courses)", "Remitted to Partnered Center", "Endorsed Courses"],
+    ["Rebates Still Due, Rebates Due", "Rebates Receivable", "Both Reports"],
+    ["Agency Share", "Agency Commission", "Both Reports, and Partnered Centers Setup"],
+    ["New Wave Keeps, Endorsement Keeps, NW Keeps", "Net Rebate Income", "Both Reports"],
+    ["Less Direct Expenses (period)", "Less Operating Expenses for the Period", "Cash and Sales Summary"],
+    ["Direct Gross Margin", "Gross Margin on New Wave Courses", "Cash and Sales Summary"]
+  ];
+  function drawWording() {
+    body.innerHTML = '<section class="panel"><div class="ph"><h2>Formal Wording</h2></div><div class="tw"><table><thead><tr><th>Today</th><th>New</th><th>Report</th></tr></thead><tbody>' + WORDS.map(function (w) { return '<tr><td class="old">' + w[0] + '</td><td class="new">' + w[1] + (w[3] ? '<span class="flag">' + w[3] + "</span>" : "") + "</td><td>" + w[2] + "</td></tr>"; }).join("") + '</tbody></table></div><p class="note">"Paid to Center" on the Cash and Sales Summary was showing the amount payable, not what had been paid, so the new label corrects it. The amounts do not change.</p></section>';
+  }
+  function draw() {
+    document.getElementById("views").innerHTML = ["Report", "Wording"].map(function (v) { return '<button type="button" role="tab" class="' + (v === view ? "on" : "") + '" data-v="' + v + '">' + v + "</button>"; }).join("");
+    document.getElementById("periods").innerHTML = PERIODS.map(function (p) { return '<button type="button" class="' + (p === period ? "on" : "") + '" data-p="' + p + '">' + p + "</button>"; }).join("");
+    document.getElementById("date-bar").hidden = view !== "Report";
+    document.getElementById("date-bar").style.display = view === "Report" ? "" : "none";
+    document.getElementById("asof").value = asof;
+    document.getElementById("next").disabled = asof >= TODAY;
+    document.getElementById("range").innerHTML = "<b>" + title(period, asof) + "</b> · " + human(startOf(period, asof)) + " – " + human(asof);
+    if (view === "Report") drawReport(); else drawWording();
+  }
+  document.getElementById("views").addEventListener("click", function (e) { var v = e.target.getAttribute("data-v"); if (v) { view = v; draw(); } });
+  document.getElementById("periods").addEventListener("click", function (e) { var p = e.target.getAttribute("data-p"); if (p) { period = p; draw(); } });
+  document.getElementById("prev").addEventListener("click", function () { asof = shift(period, asof, -1); draw(); });
+  document.getElementById("next").addEventListener("click", function () { asof = shift(period, asof, 1); draw(); });
+  document.getElementById("asof").addEventListener("change", function (e) { if (e.target.value) { asof = e.target.value; draw(); } });
+  document.querySelector(".acts").addEventListener("click", function (e) { if (e.target.getAttribute("data-x")) document.getElementById("xnote").hidden = false; });
+  if (location.hash === "#wording") view = "Wording";
+  draw();
+})();
+</script>

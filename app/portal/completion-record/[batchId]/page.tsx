@@ -21,6 +21,6 @@ export default async function CompletionRecordPage({ params }: { params: Promise
   return <main className="tcr-page">
     <CompletionPrintControls batchId={batchId} title={`${record.batch.batchNumber} · ${record.batch.courseCode}`} complete={!problems.length} />
     {problems.length > 0 && <div className="tcr-warn">Not ready to print. Complete in Completion Records: {problems.join(" · ")}.</div>}
-    <CompletionSheet courseName={record.batch.courseName} startsOn={record.batch.startsOn} endsOn={record.batch.endsOn} tasks={record.tasks} trainees={record.trainees} results={record.results} fields={record.fields} />
+    <CompletionSheet control={record.control} courseName={record.batch.courseName} startsOn={record.batch.startsOn} endsOn={record.batch.endsOn} tasks={record.tasks} trainees={record.trainees} results={record.results} fields={record.fields} />
   </main>;
 }

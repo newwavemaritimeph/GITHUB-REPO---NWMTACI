@@ -1,12 +1,14 @@
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import type { PlanRow } from "@/lib/admin-assistant";
+import { controlIsSet, type DocumentControl } from "@/lib/document-controls";
+import { drawControlBlock } from "@/lib/print/control-block";
 
 const short = (d: string) => new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T12:00:00+08:00`));
 const longDay = (d: string) => new Intl.DateTimeFormat("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T12:00:00+08:00`));
 const ascii = (s: string) => s.replace(/[–—]/g, "-").replace(/·/g, "-").normalize("NFKD").replace(/[^\x20-\x7E]/g, "");
 
 /** Resource plan (owner, 9 Oct 2026, design 3): batches grouped by start day with classroom, students, instructor, assessor and notes. A4 landscape. */
-export async function createResourcePlanPdf(from: string, to: string, today: string, rows: PlanRow[]) {
+export async function createResourcePlanPdf(from: string, to: string, today: string, rows: PlanRow[], control?: DocumentControl | null) {
   const pdf = await PDFDocument.create();
   const reg = await pdf.embedFont(StandardFonts.Helvetica), bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const navy = rgb(0.07, 0.25, 0.39), muted = rgb(0.37, 0.44, 0.5), ink = rgb(0.06, 0.15, 0.22), rule = rgb(0.86, 0.9, 0.93), red = rgb(0.71, 0.14, 0.09), band = rgb(0.93, 0.96, 0.97);
@@ -16,10 +18,11 @@ export async function createResourcePlanPdf(from: string, to: string, today: str
   let y = H - M;
   const fit = (t: string, w: number, font = reg, size = 8.5) => { let s = ascii(t); while (s.length > 1 && font.widthOfTextAtSize(s, size) > w - 8) s = s.slice(0, -1); return s; };
   const header = () => {
+    drawControlBlock(page, { reg, bold }, control, { right: W - M, top: y + 8, width: 125, rowHeight: 8.2, size: 5.8 });
     page.drawText("NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", { x: M, y, size: 8.5, font: bold, color: navy });
     y -= 18;
     page.drawText(ascii(`Resource Plan - ${short(from)} to ${short(to)}, ${to.slice(0, 4)}`), { x: M, y, size: 15, font: bold, color: ink });
-    page.drawText(ascii(`${rows.length} batches - ${rows.filter((r) => r.issues.length).length} need attention - printed ${short(today)}`), { x: W - M - 260, y: y + 2, size: 9, font: reg, color: muted });
+    page.drawText(ascii(`${rows.length} batches - ${rows.filter((r) => r.issues.length).length} need attention - printed ${short(today)}`), { x: W - M - 260 - (controlIsSet(control) ? 133 : 0), y: y + 2, size: 9, font: reg, color: muted });
     y -= 20;
     page.drawRectangle({ x: M, y: y - 5, width: W - 2 * M, height: 17, color: navy });
     let x = M;

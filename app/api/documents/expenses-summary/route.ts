@@ -4,6 +4,7 @@ import path from "node:path";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createDailyExpensesPdf } from "@/lib/documents";
+import { loadDocumentControl } from "@/lib/document-controls";
 
 export const runtime = "nodejs";
 
@@ -35,6 +36,7 @@ export async function GET(request: Request) {
   try { logoBytes = new Uint8Array(await readFile(path.join(process.cwd(), "public", "new-wave-emblem.png"))); } catch { logoBytes = undefined; }
 
   const bytes = await createDailyExpensesPdf({
+    control: await loadDocumentControl(db, "expenses_summary"),
     title: "Expense Summary", dateLabel: from === to ? fmt(from) : `${fmt(from)} to ${fmt(to)}`, rows,
     totalCentavos: rows.reduce((s, r) => s + r.amountCentavos, 0),
     paidCentavos: rowsBase.filter((e) => e.status === "Paid").reduce((s, e) => s + Number(e.amount_centavos), 0),

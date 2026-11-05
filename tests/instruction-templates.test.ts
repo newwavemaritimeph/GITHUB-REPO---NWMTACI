@@ -1,10 +1,17 @@
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { createTrainingInstructionsPdf } from "@/lib/documents";
-import { DEFAULT_CATEGORY_TEMPLATES, emailSteps, fillPlaceholders, instructionCategoryOf, instructionEmailVariables, linesOf, policyPairs, sheetSteps } from "@/lib/instruction-templates";
+import { DEFAULT_CATEGORY_TEMPLATES, emailSteps, fillPlaceholders, instructionCategoryOf, instructionEmailVariables, linesOf, policyPairs, remindersFor, sheetSteps } from "@/lib/instruction-templates";
 
 describe("training instruction templates", () => {
   it("reads one item per line", () => expect(linesOf(" a \n\n b\n")).toEqual(["a", "b"]));
+  it("drops the Classroom reminder only when the course has no class", () => {
+    const lines = linesOf(DEFAULT_CATEGORY_TEMPLATES["In-House"].reminders);
+    expect(lines.some((l) => /Google Classroom/.test(l))).toBe(true);
+    expect(remindersFor(lines, true)).toEqual(lines);
+    expect(remindersFor(lines, false).some((l) => /Google Classroom|class code/i.test(l))).toBe(false);
+    expect(remindersFor(lines, false).length).toBe(lines.length - 1);
+  });
   it("fills placeholders and blanks the unknown", () => expect(fillPlaceholders("Hi {{trainee}} · {{ course }} {{nope}}", { trainee: "Juan", course: "HPT" })).toBe("Hi Juan · HPT "));
   it("splits a policy at its label", () => expect(policyPairs("Payment: Full: 50%\nNo label here")).toEqual([["Payment", "Full: 50%"], ["", "No label here"]]));
   it("sorts courses into STCW and In-House", () => {

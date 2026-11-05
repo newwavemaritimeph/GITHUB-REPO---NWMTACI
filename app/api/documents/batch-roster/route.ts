@@ -3,6 +3,7 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 import { loadBatchRoster } from "@/lib/batch-roster";
 import { createBatchRosterPdf } from "@/lib/print/batch-roster";
+import { loadDocumentControl } from "@/lib/document-controls";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
   if (!roster) return NextResponse.json({ error: "Batch not found." }, { status: 404 });
   const logo = await readFile(path.join(process.cwd(), "public", "new-wave-emblem.png")).then((b) => new Uint8Array(b)).catch(() => undefined);
   const { data: me } = await db.from("profiles").select("complete_name").eq("id", staff.user.id).maybeSingle();
-  const bytes = await createBatchRosterPdf(roster, { logo, preparedBy: (me?.complete_name as string | undefined) ?? null });
+  const bytes = await createBatchRosterPdf(roster, { logo, control: await loadDocumentControl(db, "batch_roster"), preparedBy: (me?.complete_name as string | undefined) ?? null });
   await db.from("audit_logs").insert({ actor_id: staff.user.id, action: "report.exported", record_type: "batch_roster", record_id: batchId, new_values: { batch: roster.batch.batchNumber, trainees: roster.rows.length } });
   return new Response(Buffer.from(bytes), { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="batch-${roster.batch.batchNumber}.pdf"`, "cache-control": "no-store" } });
 }

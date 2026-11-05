@@ -36,6 +36,10 @@
 .tar-letter b { display: block; font-size: 9pt; font-weight: 800; color: #123f63; }
 .tar-letter span { display: block; font-size: 5.6pt; color: #40606f; }
 .tar-letter i { width: .36in; }
+.tar-letter > .tar-ctl { flex: none; width: 1.2in; text-align: left; border: .5px solid #9fb2c0; border-bottom: 0; }
+.tar-ctl p { margin: 0; display: grid; grid-template-columns: .52in 1fr; border-bottom: .5px solid #9fb2c0; font-size: 4.8pt; line-height: 1.3; }
+.tar-letter .tar-ctl span { display: block; font-size: inherit; font-weight: 700; color: #40606f; background: #eef6fb; padding: 0 2px; border-right: .5px solid #9fb2c0; }
+.tar-ctl em { font-style: normal; font-weight: 700; color: #123f63; padding: 0 2px; overflow: hidden; white-space: nowrap; }
 .tar-title { display: flex; justify-content: space-between; align-items: flex-end; margin: 3px 0 2px; }
 .tar-title b { font-size: 9.6pt; font-weight: 800; color: #123f63; letter-spacing: .04em; }
 .tar-title span { font-size: 6pt; color: #40606f; }

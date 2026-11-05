@@ -1,10 +1,12 @@
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { periodStart, periodTitle, type Period } from "@/lib/accounting-periods";
+import { instructionCategoryOf, type InstructionCategory } from "@/lib/instruction-templates";
 
 /**
  * Cash and Sales Summary (owner, 21 Oct 2026): cash received, disbursements and
- * sales, split Training Endorsement (Other STCW courses at partnered centers)
- * vs Direct New Wave. Cash by date received / released; sales by training date.
+ * sales, split Endorsed Courses (Other STCW courses at partnered centers) vs New
+ * Wave Courses (owner, 5 Nov 2026: Total Sales first, then New Wave by category,
+ * then Endorsed by center). Cash by date received / released; sales by training date.
  */
 
 export type Side = "E" | "D";
@@ -16,7 +18,15 @@ export const ENDORSEMENT_REBATE = "Endorsement Rebate";
 export type PaymentIn = { amount: number; channel: string; allocations: { amount: number; endorsement: boolean }[] };
 export type IncomeIn = { amount: number; channel: string; source: string };
 export type ExpenseIn = { amount: number; channel: string | null; category: string };
-export type SaleIn = { endorsement: boolean; code: string; name: string; center: string; price: number; payable: number; rebate: number; share: number; charges: number; discounts: number; collected: number; rebateReceived: number };
+export type SaleIn = { endorsement: boolean; code: string; name: string; center: string; price: number; payable: number; rebate: number; share: number; charges: number; discounts: number; collected: number; rebateReceived: number; category?: InstructionCategory };
+export type SalesLine = { trainees: number; fees: number; charges: number; discounts: number; sales: number; collected: number; balance: number };
+
+/** Course fees plus charges less discounts, with what was collected (never more than the sale) and what is still owed. */
+export function salesLine(rows: SaleIn[]): SalesLine {
+  const t: SalesLine = { trainees: rows.length, fees: 0, charges: 0, discounts: 0, sales: 0, collected: 0, balance: 0 };
+  for (const s of rows) { const sale = s.price + s.charges - s.discounts, got = Math.min(s.collected, sale); t.fees += s.price; t.charges += s.charges; t.discounts += s.discounts; t.sales += sale; t.collected += got; t.balance += sale - got; }
+  return t;
+}
 
 const channelOf = (c: string | null | undefined) => { const v = (c ?? "").trim(); return /^cheque$/i.test(v) ? "Check" : v || "Not Set"; };
 
@@ -51,27 +61,26 @@ export function summarize(input: { payments: PaymentIn[]; income: IncomeIn[]; ex
   const disbursed = lines(input.expenses.map((e) => e.category === CENTER_PAYMENT ? { label: "Payments to Partnered Centers", side: "E" as Side, channel: e.channel ?? "", amount: e.amount } : { label: e.category || "Uncategorized", side: "D" as Side, channel: e.channel ?? "", amount: e.amount }), ["Payments to Partnered Centers"]);
 
   const direct = input.sales.filter((s) => !s.endorsement);
-  const byCourse = new Map<string, { code: string; name: string; trainees: number; sales: number }>();
-  for (const s of direct) { const c = byCourse.get(s.code) ?? { code: s.code, name: s.name, trainees: 0, sales: 0 }; c.trainees += 1; c.sales += s.price; byCourse.set(s.code, c); }
-  const fees = direct.reduce((t, s) => t + s.price, 0), charges = direct.reduce((t, s) => t + s.charges, 0), discounts = direct.reduce((t, s) => t + s.discounts, 0);
-  const directSales = fees + charges - discounts;
-  const collected = direct.reduce((t, s) => t + Math.min(s.collected, s.price + s.charges - s.discounts), 0);
-  const directExpenses = sideTotal(disbursed, "D");
+  const categories = (["STCW", "In-House"] as const).map((key) => {
+    const mine = direct.filter((s) => (s.category ?? "In-House") === key);
+    const courses = [...new Set(mine.map((s) => s.code))].map((code) => { const rows = mine.filter((s) => s.code === code); return { code, name: rows[0].name, ...salesLine(rows) }; }).sort((a, z) => z.sales - a.sales || a.code.localeCompare(z.code));
+    return { name: `${key} Courses`, courses, ...salesLine(mine) };
+  });
+  const directTotals = salesLine(direct), directExpenses = sideTotal(disbursed, "D");
 
   const endorsed = input.sales.filter((s) => s.endorsement);
-  const byCenter = new Map<string, { name: string; trainees: number; fees: number; payable: number; rebate: number; received: number; share: number; keeps: number }>();
-  for (const s of endorsed) {
-    const c = byCenter.get(s.center) ?? { name: s.center, trainees: 0, fees: 0, payable: 0, rebate: 0, received: 0, share: 0, keeps: 0 };
-    c.trainees += 1; c.fees += s.price; c.payable += s.payable; c.rebate += s.rebate; c.received += s.rebateReceived; c.share += s.share; c.keeps += s.rebate - s.share;
-    byCenter.set(s.center, c);
-  }
-  const centers = [...byCenter.values()].sort((a, z) => z.fees - a.fees || a.name.localeCompare(z.name));
-  const sum = (k: "trainees" | "fees" | "payable" | "rebate" | "received" | "share" | "keeps") => centers.reduce((t, c) => t + c[k], 0);
+  const add = (rows: SaleIn[], pick: (s: SaleIn) => number) => rows.reduce((t, s) => t + pick(s), 0);
+  const centers = [...new Set(endorsed.map((s) => s.center))].map((name) => {
+    const rows = endorsed.filter((s) => s.center === name), rebate = add(rows, (s) => s.rebate), share = add(rows, (s) => s.share), received = add(rows, (s) => s.rebateReceived);
+    return { name, ...salesLine(rows), payable: add(rows, (s) => s.payable), rebate, received, due: rebate - received, share, keeps: rebate - share };
+  }).sort((a, z) => z.fees - a.fees || a.name.localeCompare(z.name));
+  const rebate = add(endorsed, (s) => s.rebate), share = add(endorsed, (s) => s.share), rebateIn = add(endorsed, (s) => s.rebateReceived);
 
   return {
     received, disbursed,
-    direct: { courses: [...byCourse.values()].sort((a, z) => z.sales - a.sales || a.code.localeCompare(z.code)), trainees: direct.length, fees, charges, discounts, sales: directSales, collected, balance: directSales - collected, expenses: directExpenses, margin: directSales - directExpenses },
-    endorsement: { centers, trainees: sum("trainees"), fees: sum("fees"), payable: sum("payable"), rebate: sum("rebate"), received: sum("received"), share: sum("share"), keeps: sum("keeps"), rebateDue: sum("rebate") - sum("received") },
+    totalSales: salesLine(input.sales),
+    direct: { categories, ...directTotals, expenses: directExpenses, margin: directTotals.sales - directExpenses },
+    endorsement: { centers, ...salesLine(endorsed), payable: add(endorsed, (s) => s.payable), rebate, received: rebateIn, share, keeps: rebate - share, rebateDue: rebate - rebateIn },
   };
 }
 
@@ -105,12 +114,14 @@ export async function buildFinanceSummary(db: Admin, period: Period, end: string
 
   // Sales by training date: batch start, else the scheduled date (partnered centers).
   const batches = await all<{ id: string }>((a, b) => db.from("batches").select("id").gte("starts_on", from).lte("starts_on", to).range(a, b));
-  type Enr = { id: string; partner_offer_id: string | null; selling_price_centavos: number; partner_payable_centavos: number | null; rebate_centavos: number | null; agency_share_centavos?: number | null; enrollment_status: string; courses: { code: string; name: string } | { code: string; name: string }[] | null; partner_course_offers: { partner_centers: { name: string } | { name: string }[] | null } | { partner_centers: { name: string } | { name: string }[] | null }[] | null };
-  const cols = "id,partner_offer_id,selling_price_centavos,partner_payable_centavos,rebate_centavos,agency_share_centavos,enrollment_status,courses(code,name),partner_course_offers(partner_centers(name))";
+  type Enr = { id: string; partner_offer_id: string | null; selling_price_centavos: number; partner_payable_centavos: number | null; rebate_centavos: number | null; agency_share_centavos?: number | null; enrollment_status: string; courses: { code: string; name: string; course_categories?: { name: string } | { name: string }[] | null } | { code: string; name: string; course_categories?: { name: string } | { name: string }[] | null }[] | null; partner_course_offers: { partner_centers: { name: string } | { name: string }[] | null } | { partner_centers: { name: string } | { name: string }[] | null }[] | null };
+  const cols = "id,partner_offer_id,selling_price_centavos,partner_payable_centavos,rebate_centavos,agency_share_centavos,enrollment_status,courses(code,name,course_categories(name)),partner_course_offers(partner_centers(name))";
   const enrolled: Enr[] = [];
   const pick = async (q: (c: string) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>) => {
     let r = await q(cols);
     if (r.error && /agency_share/.test(r.error.message)) r = await q(cols.replace("agency_share_centavos,", ""));
+    // A failed read must show as an error: a short report that looks complete would mislead Accounting.
+    if (r.error) throw new Error(r.error.message);
     enrolled.push(...((r.data ?? []) as Enr[]));
   };
   for (const ids of chunks(batches.map((b) => b.id))) await pick((c) => db.from("enrollments").select(c).in("batch_id", ids).neq("enrollment_status", "Cancelled"));
@@ -133,7 +144,7 @@ export async function buildFinanceSummary(db: Admin, period: Period, end: string
     payments: pays.map((p) => ({ amount: Number(p.amount_centavos), channel: p.method, allocations: (p.payment_allocations ?? []).map((a) => ({ amount: Number(a.amount_centavos), endorsement: !!one(a.enrollments)?.partner_offer_id })) })),
     income: income.map((i) => ({ amount: Number(i.amount_centavos), channel: i.channel, source: i.source })),
     expenses: expenses.map((e) => ({ amount: Number(e.amount_centavos), channel: e.payment_channel, category: e.category })),
-    sales: enrolled.map((e) => { const c = one(e.courses), t = charges.get(e.id); return { endorsement: !!e.partner_offer_id, code: c?.code ?? "—", name: c?.name ?? "", center: one(one(e.partner_course_offers)?.partner_centers)?.name ?? "Partnered center", price: Number(e.selling_price_centavos ?? 0), payable: Number(e.partner_payable_centavos ?? 0), rebate: Number(e.rebate_centavos ?? 0), share: Number(e.agency_share_centavos ?? 0), charges: t?.charge ?? 0, discounts: t?.discount ?? 0, collected: collected.get(e.id) ?? 0, rebateReceived: rebateIn.get(e.id) ?? 0 }; }),
+    sales: enrolled.map((e) => { const c = one(e.courses), t = charges.get(e.id); return { endorsement: !!e.partner_offer_id, category: instructionCategoryOf(c?.code, one(c?.course_categories)?.name), code: c?.code ?? "—", name: c?.name ?? "", center: one(one(e.partner_course_offers)?.partner_centers)?.name ?? "Partnered center", price: Number(e.selling_price_centavos ?? 0), payable: Number(e.partner_payable_centavos ?? 0), rebate: Number(e.rebate_centavos ?? 0), share: Number(e.agency_share_centavos ?? 0), charges: t?.charge ?? 0, discounts: t?.discount ?? 0, collected: collected.get(e.id) ?? 0, rebateReceived: rebateIn.get(e.id) ?? 0 }; }),
   });
   return { period, end, from, to, title: periodTitle(period, end), ...result };
 }

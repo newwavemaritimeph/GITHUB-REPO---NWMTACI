@@ -1,5 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { BillingStatement } from "@/lib/billing-statement";
+import type { DocumentControl } from "@/lib/document-controls";
+import { drawControlBlock } from "@/lib/print/control-block";
 
 /** Billing Statement (owner, 22 Oct 2026), A4 portrait on New Wave letterhead. */
 const peso = (c: number) => (c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -11,7 +13,7 @@ const safe = (s: string) => s.replace(/[–—]/g, "-").replace(/[‘’]/g, "'"
  */
 export type StatementReceipt = { method: string; reference: string | null; receivedOn: string; amount: number; words: string; cashier: string };
 
-export async function createBillingStatementPdf(s: BillingStatement, logoBytes?: Uint8Array, receipt?: StatementReceipt) {
+export async function createBillingStatementPdf(s: BillingStatement, logoBytes?: Uint8Array, receipt?: StatementReceipt, control?: DocumentControl | null) {
   const pdf = await PDFDocument.create();
   pdf.setTitle(`${receipt ? "Acknowledgement Receipt" : "Billing Statement"} ${s.bsNumber}`);
   pdf.setAuthor("New Wave Maritime Training and Assessment Center, Inc.");
@@ -38,13 +40,8 @@ export async function createBillingStatementPdf(s: BillingStatement, logoBytes?:
       text("Ride the New Wave of Maritime Excellence", lx, y - 25, 8.5, reg, blue);
       text("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila", lx, y - 35, 7, reg, muted);
       text("0948 847 6530 - newwavemaritime@gmail.com", lx, y - 44, 7, reg, muted);
-      // Form block (owner, 22 Oct 2026): the form's own control details.
-      ([["Form No:", "NW-FMGR-04-24"], ["Revision No:", ""], ["Revision Date:", ""], ["Issued Date:", "12/03/2025"]] as [string, string][]).forEach(([k, v], i) => {
-        const yy = y - 10 - i * 9.5;
-        right(k, W - M - 62, yy, 6.6, bold, muted);
-        text(v, W - M - 59, yy, 6.6, reg, ink);
-      });
-      page.drawRectangle({ x: W - M - 112, y: y - 44, width: 112, height: 42, borderColor: rgb(0.75, 0.8, 0.84), borderWidth: 0.6 });
+      // The form's own details, from Form Numbers.
+      drawControlBlock(page, { reg, bold }, control, { right: W - M, top: y - 2, width: 125, rowHeight: 10.5, size: 6.4 });
       y -= 54;
       page.drawRectangle({ x: M, y, width: CW, height: 2.2, color: navy });
       page.drawRectangle({ x: M, y: y - 1.4, width: CW * 0.28, height: 1.4, color: orange });

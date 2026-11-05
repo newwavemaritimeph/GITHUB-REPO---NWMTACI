@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createAdmissionInvoicePdf, type AdmissionInvoiceLine } from "@/lib/documents";
+import { loadDocumentControl } from "@/lib/document-controls";
 
 export const runtime = "nodejs";
 const one = <T,>(value: T | T[] | null | undefined): T | null => (Array.isArray(value) ? value[0] ?? null : value ?? null);
@@ -71,6 +72,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try { logoBytes = new Uint8Array(await (await fetch(new URL("/new-wave-emblem.png", request.url))).arrayBuffer()); } catch { logoBytes = undefined; }
 
   const bytes = await createAdmissionInvoicePdf({
+    control: await loadDocumentControl(db, "enrollment_record"),
     reference: data.enrollment_number,
     traineeName: `${trainee.legal_first_name} ${trainee.legal_middle_name ?? ""} ${trainee.legal_last_name}${trainee.suffix ? ` ${trainee.suffix}` : ""}`.replace(/\s+/g, " ").trim(),
     traineeNumber: trainee.trainee_number,

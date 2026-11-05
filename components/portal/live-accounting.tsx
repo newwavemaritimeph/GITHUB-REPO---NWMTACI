@@ -1,5 +1,6 @@
 "use client";
 
+import { FormNumbers, type DocumentControlRow } from "./form-numbers";
 import { Fragment, useState } from "react";
 import { parseCsv, downloadCsv } from "@/lib/csv";
 import { pesos, first as one, dueCentavos as dueOf } from "@/lib/portal-format";
@@ -48,6 +49,7 @@ export type AccountingData = {
   pendingDiscounts: PendingDiscount[];
   pendingCharges: { id: string; enrollment_id: string; description: string; amount_centavos: number; created_at: string; enrollments?: { enrollment_number: string; trainees?: { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null; courses?: CourseRef | CourseRef[] | null } | { enrollment_number: string; trainees?: { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null; courses?: CourseRef | CourseRef[] | null }[] | null }[];
   announcements: { id: string; title: string; body: string; audience_roles: string[]; expires_at?: string | null }[];
+  documentControls?: DocumentControlRow[];
 };
 
 const manilaDay = (value?: string | null) => (value ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(value)) : "");
@@ -1380,7 +1382,7 @@ export function CashPositionModule({ data }: { data: AccountingData }) {
 
 type ConfigTrainee = { id: string; trainee_number: string; legal_first_name: string; legal_middle_name?: string | null; legal_last_name: string; email?: string | null; mobile?: string | null; srn?: string | null; company?: string | null; registered_at?: string | null };
 // Schedule of fees is fixed by the owner's ruling (Reprinting ₱500, Uniform ₱150, LBC ₱500), so it is not edited here.
-export const ACCOUNTING_CONFIG_SECTIONS = ["Payment channels", "Expense categories", "Other income categories", "Schedule of fees", "Partnered Centers"] as const;
+export const ACCOUNTING_CONFIG_SECTIONS = ["Payment channels", "Expense categories", "Other income categories", "Schedule of fees", "Partnered Centers", "Form numbers"] as const;
 export type AccountingConfigSection = (typeof ACCOUNTING_CONFIG_SECTIONS)[number];
 /**
  * Accounting › Configuration (owner, 7 Oct 2026): the referring agencies and
@@ -1534,7 +1536,7 @@ function EndorsedPrograms({ data, busy, post }: { data: AccountingData; busy: bo
       {centers.length > 0 && <div className="pm-tools"><select className="rb3-mode" aria-label="Partner center" value={center?.id ?? ""} onChange={(e) => { setCenterId(e.target.value); setProblem(""); setDone(""); }}>{centers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>}</div>
     {done && <div className="portal-message success">{done}</div>}
     {!center ? <p className="portal-empty-copy">No partner centers yet.</p> : <>
-      <div className="rb3-wrap"><table className="rb3-table"><thead><tr><th>Program</th><th>Duration</th><th className="r">Training Fee</th><th className="r">Rebate to New Wave</th><th className="r">Agency Share</th><th className="r">New Wave Keeps</th><th>Status</th><th /></tr></thead>
+      <div className="rb3-wrap"><table className="rb3-table"><thead><tr><th>Program</th><th>Duration</th><th className="r">Training Fee</th><th className="r">Rebate to New Wave</th><th className="r">Agency Commission</th><th className="r">Net Rebate Income</th><th>Status</th><th /></tr></thead>
         <tbody>{programs.map((o) => { const c = data.courses.find((x) => x.id === o.course_id) ?? one(o.courses); const name = c?.name ?? "—"; const archived = o.active === false;
           return <tr key={o.id} className={archived ? "pm-archived" : ""}>
             <td><strong>{name}</strong>{c?.code && <small className="cx-mono">{c.code}</small>}</td>
@@ -1561,7 +1563,7 @@ function EndorsedPrograms({ data, busy, post }: { data: AccountingData; busy: bo
         <label>Duration<input value={form.duration} maxLength={40} onChange={(e) => edit({ duration: e.target.value })} /></label>
         <label>Training Fee (PHP)<input inputMode="decimal" placeholder="0.00" value={form.fee} onChange={(e) => edit({ fee: e.target.value })} /></label>
         <label>Rebate to New Wave (PHP)<input inputMode="decimal" placeholder="0.00" value={form.rebate} onChange={(e) => edit({ rebate: e.target.value })} /></label>
-        <label>Agency Share (PHP)<input inputMode="decimal" placeholder="0.00" value={form.share} onChange={(e) => edit({ share: e.target.value })} /></label>
+        <label>Agency Commission (PHP)<input inputMode="decimal" placeholder="0.00" value={form.share} onChange={(e) => edit({ share: e.target.value })} /></label>
       </div>
       {tooMuch && <div className="portal-message error">The rebate cannot be more than the training fee, and the agency share cannot be more than the rebate.</div>}
       <p className="cl-legend">New Wave pays the center the full training fee; the center releases the rebate later (Other Income › Endorsement Rebates). The agency share goes to the consultancy or agency that referred the trainee.</p>
@@ -1670,6 +1672,7 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
       onAdd={(v) => post({ action: "income-category-save", name: v.name.trim() })}
       onRemove={(r) => post({ action: "income-category-save", id: r.id, name: r.values.name, remove: true })} />}
     {section === "Partnered Centers" && <PartnersModule data={data} busy={busy} post={post} />}
+    {section === "Form numbers" && <FormNumbers rows={data.documentControls ?? []} busy={busy} post={post} />}
     {section === "Courses" && <CoursesModule data={data} busy={busy} post={post} reload={reload} />}
     {section === "Expense categories" && <ConfigMatrix title="Expense Categories" entity="category" busy={busy}
       cols={[{ key: "name", label: "Category", kind: "text", placeholder: "e.g. Office Supplies" }]}

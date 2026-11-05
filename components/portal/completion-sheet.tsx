@@ -1,3 +1,4 @@
+import type { DocumentControl } from "@/lib/document-controls";
 import { durationText, formDate, practicalOk, remarkOf, resultOf, SHEET_LINES, type AssessmentTask, type CompletionFields, type CompletionTrainee, type TraineeResult } from "@/lib/completion-record";
 
 /**
@@ -6,14 +7,14 @@ import { durationText, formDate, practicalOk, remarkOf, resultOf, SHEET_LINES, t
  * "Nothing follows" after the last trainee, signatures and grading legend.
  * Pure markup, shared by the print page and the on-screen preview.
  */
-export function CompletionSheet({ courseName, startsOn, endsOn, tasks, trainees, results, fields }: {
-  courseName: string; startsOn: string; endsOn: string; tasks: AssessmentTask[]; trainees: CompletionTrainee[]; results: Record<string, TraineeResult>; fields: CompletionFields;
+export function CompletionSheet({ control, courseName, startsOn, endsOn, tasks, trainees, results, fields }: {
+  control?: DocumentControl | null; courseName: string; startsOn: string; endsOn: string; tasks: AssessmentTask[]; trainees: CompletionTrainee[]; results: Record<string, TraineeResult>; fields: CompletionFields;
 }) {
   const n = tasks.length, all = 11 + n;
   const lines = Array.from({ length: Math.max(SHEET_LINES, trainees.length + 1) }, (_, i) => i);
   return <div className="tcr-sheet">
     <div className="tcr-top">
-      <div className="tcr-doc">AD NO.: 05-00<br />Initial Issue Date: 09-14-2023<br />Revision Date: 00</div>
+      <div className="tcr-doc">AD NO.: {control?.formNo ?? "05-00"}<br />Initial Issue Date: {control?.issuedDate ?? "09-14-2023"}<br />Revision Date: {control?.revisionDate ?? "00"}{control?.revisionNo ? <><br />Revision No.: {control.revisionNo}</> : null}</div>
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img className="tcr-logo" src="/new-wave-emblem.png" alt="New Wave" />
       <h3>TRAINING COMPLETION AND RECORD OF ASSESSMENT REPORT</h3>

@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { loadDocumentControl } from "@/lib/document-controls";
 import { TarSheets } from "./tar-sheets";
 import "./admission-record.css";
 
@@ -114,7 +115,8 @@ export default async function AdmissionRecordPage({ params, searchParams }: { pa
   const issued = manila({ dateStyle: "medium", timeStyle: "short" }).format(new Date(record.issued_at));
   const officer = (officerRes.data as { complete_name?: string } | null)?.complete_name ?? "";
   const payDate = manila({ day: "numeric", month: "short" });
-  return <TarSheets arNumber={record.ar_number} reprintCopy={reprint ? Number(record.print_count ?? 0) : null} issued={issued} name={name}
+  const [control, termsControl] = await Promise.all([loadDocumentControl(db, "tar"), loadDocumentControl(db, "terms")]);
+  return <TarSheets control={control} termsControl={termsControl} arNumber={record.ar_number} reprintCopy={reprint ? Number(record.print_count ?? 0) : null} issued={issued} name={name}
     trainee={{ appNo: t.application_number ?? t.trainee_number, srn: t.srn, rank: t.rank, mobile: t.mobile, company: t.company }}
     courses={courses} misc={misc} discounts={discounts}
     payments={payments.map((p) => ({ id: p.id, number: p.number, dateLabel: payDate.format(new Date(p.date)), method: p.method, ref: p.ref, label: p.label, amount: p.amount }))}

@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
+import { startControl, type DocumentControl } from "@/lib/document-controls";
 import { TERMS, TERMS_AMEND_NOTICE } from "@/lib/terms";
+import { ControlBlock } from "./control-block";
 import { PrintControls } from "./print-controls";
 
 /**
@@ -26,6 +28,8 @@ export type TarProps = {
   trainee: { appNo: string; srn: string | null; rank: string | null; mobile: string | null; company: string | null };
   courses: TarCourse[]; misc: { label: string; amount: number }[]; discounts: { label: string; amount: number }[]; payments: TarPayment[];
   feesTotal: number; due: number; paid: number; balance: number; status: string; billedTo?: string | null; officer: string; cashier: string;
+  /** Form Numbers: the TAR front and the Terms and Conditions on its back. */
+  control?: DocumentControl | null; termsControl?: DocumentControl | null;
   /** Logo URL; the portal serves it from /brand, the sample script passes a file URL. */
   logoSrc?: string;
 };
@@ -35,7 +39,7 @@ export function TarSheets(p: TarProps) {
   const pages = more.length ? 2 : 1;
   const courseRows = (list: TarCourse[], offset: number) => list.map((c, i) => <tr key={c.id}><td className="c">{offset + i + 1}</td><td><b>{c.name}</b> <span className="dim">({c.code})</span></td><td className="nw">{c.dates}</td><td className="nw">{c.time}</td><td className="nw">{c.room}</td><td className="r nw">{peso(c.fee)}</td></tr>);
   const header = (page: number) => <>
-    <div className="tar-letter"><img src={p.logoSrc ?? "/brand/new-wave-emblem.png"} alt="" width={34} height={34} /><div><b>{ORG}</b><span>{ADDRESS}</span></div><i /></div>
+    <div className="tar-letter"><img src={p.logoSrc ?? "/brand/new-wave-emblem.png"} alt="" width={34} height={34} /><div><b>{ORG}</b><span>{ADDRESS}</span></div><ControlBlock control={p.control} /></div>
     <div className="tar-title"><div><b>TRAINING ADMISSION RECORD</b> <span>· admission slip · issued {p.issued}{pages > 1 ? ` · page ${page} of ${pages}` : ""}</span></div><div>{p.reprintCopy ? <span className="tar-reprint">REPRINT – COPY {p.reprintCopy}</span> : null}<span>{p.arNumber.startsWith("TAR-") ? "TAR NO. " : "AR NO. "}</span><strong>{p.arNumber}</strong></div></div>
   </>;
   // Page 1 (and page 2 when there are more than six courses). Each page is
@@ -74,6 +78,8 @@ export function TarSheets(p: TarProps) {
       <p className="dim tar-cont">Continuation of {p.arNumber} for {p.name}. Fees and payments are on page 1; the Terms and Conditions are at the back of page 1.</p>
   </> : null;
   const copies = [["ORIGINAL COPY", "Trainee"], ["DUPLICATE COPY", "Office File"]];
+  const terms = p.termsControl ?? startControl("terms");
+  const termsLines = [terms.formNo && `Form No. ${terms.formNo}`, terms.revisionNo && `Revision No. ${terms.revisionNo}`, terms.revisionDate && `Revision Date: ${terms.revisionDate}`, terms.issuedDate && `Issued Date: ${terms.issuedDate}`].filter(Boolean);
   const frontSheet = (content: ReactNode) => <section className="tar-legal">
     {copies.map(([label, holder]) => <div className="tar-copy" key={label}>
       <div className="tar-sheet"><span className="tar-copy-tag"><b>{label}</b> · {holder}</span>{content}</div>
@@ -86,7 +92,7 @@ export function TarSheets(p: TarProps) {
         <div className="tar-back-letter"><img src={p.logoSrc ?? "/brand/new-wave-emblem.png"} alt="" width={50} height={50} /><div><b>{ORG}</b><i>Ride the New Wave of Maritime Excellence</i><span>{STREET}</span><span>{CONTACTS}</span></div></div>
         <div className="tar-back-title"><b>TERMS AND CONDITIONS</b><span>Please read carefully.</span></div>
         <div className="tar-back-cols">{[TERMS.slice(0, 3), TERMS.slice(3)].map((column) => <div key={column[0].n}>{column.map((s) => <div className="tar-back-sec" key={s.n}><h4><i>{s.n}</i>{s.title}</h4><ul>{s.lines.map((line, i) => <li key={i}>{line}</li>)}</ul></div>)}</div>)}</div>
-        <div className="tar-back-foot"><em>{TERMS_AMEND_NOTICE}</em><small>Revision No. 03<br />Revision Date: 11/05/2026<br />Issued Date: 11/05/2026</small></div>
+        <div className="tar-back-foot"><em>{TERMS_AMEND_NOTICE}</em><small>{termsLines.map((line, i) => <span key={i}>{i > 0 && <br />}{line}</span>)}</small></div>
       </div>
     </div>)}
   </section>;

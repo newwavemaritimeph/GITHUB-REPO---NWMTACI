@@ -5,6 +5,7 @@ import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { bsNumber, coverageLabel, longDate, type BillingRow } from "@/lib/billing-statement";
 import { createBillingStatementPdf } from "@/lib/print/billing-statement";
+import { loadDocumentControl } from "@/lib/document-controls";
 import { inWords } from "@/app/portal/payment-receipt/[id]/receipt-sheets";
 
 export const runtime = "nodejs";
@@ -36,7 +37,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   const logo = await readFile(path.join(process.cwd(), "public", "new-wave-emblem.png")).then((b) => new Uint8Array(b)).catch(() => undefined);
   const bsNo = bsNumber(Number(bs.bs_number));
   const bytes = await createBillingStatementPdf({ bsNumber: bsNo, date: receivedOn, billTo: bs.bill_to as string, kind: "", coverage: coverageLabel(bs.coverage_from as string, bs.coverage_to as string), rows, total },
-    logo, { method: cp.method as string, reference: (cp.reference_number as string | null) ?? null, receivedOn, amount: Number(cp.amount_centavos), words: inWords(Number(cp.amount_centavos)), cashier: (cashier as { complete_name?: string } | null)?.complete_name ?? "" });
+    logo, { method: cp.method as string, reference: (cp.reference_number as string | null) ?? null, receivedOn, amount: Number(cp.amount_centavos), words: inWords(Number(cp.amount_centavos)), cashier: (cashier as { complete_name?: string } | null)?.complete_name ?? "" }, await loadDocumentControl(db, "company_receipt"));
   await db.from("audit_logs").insert({ actor_id: staff.user.id, action: "company_receipt.printed", record_type: "company_payment", record_id: id, new_values: { bs_number: bsNo } });
   return new Response(Buffer.from(bytes), { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="company-receipt-BS${bsNo}.pdf"`, "cache-control": "no-store" } });
 }

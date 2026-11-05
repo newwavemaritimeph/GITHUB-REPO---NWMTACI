@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createExpenseVoucherPdf, type ExpenseVoucherLine } from "@/lib/documents";
+import { loadDocumentControl } from "@/lib/document-controls";
 import { googleConfigured } from "@/lib/google-classroom";
 import { fileInDrive, replaceDriveFile, voucherNaming, VOUCHER_ROOT } from "@/lib/google-drive";
 
@@ -40,6 +41,7 @@ export async function buildExpenseVoucher(db: Admin, id: string, options: { prin
   const { data: releaser } = released && x.released_by ? await db.from("profiles").select("complete_name").eq("id", x.released_by).maybeSingle() : { data: null };
   const voucherNumber = x.voucher_number ?? data.expense_number;
   const bytes = await createExpenseVoucherPdf({
+    control: await loadDocumentControl(db, "expense_voucher"),
     number: voucherNumber,
     requestNumber: x.request_number && x.request_number !== voucherNumber ? x.request_number : "",
     issuedAt: fmt(x.approved_at ?? data.created_at),

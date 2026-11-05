@@ -1,5 +1,7 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import { balanceAt, finalList, leftOff, unsettledAt11, type MismoBatch, type MismoTrainee } from "@/lib/mismo";
+import type { DocumentControl } from "@/lib/document-controls";
+import { drawControlLine } from "@/lib/print/control-block";
 
 /**
  * MARINA MISMO lists (owner, 8–9 Oct 2026), one section per batch, A4 landscape:
@@ -8,7 +10,7 @@ import { balanceAt, finalList, leftOff, unsettledAt11, type MismoBatch, type Mis
  *  - unsettled: trainees not settled as of 11:00 AM, for the instructor to send to the Cashier.
  * Letterhead, a batch information box, a ruled table, a summary, signatures and page numbers.
  */
-export type MismoPdfOptions = { logo?: Uint8Array; preparedBy?: string | null; printedAt?: Date };
+export type MismoPdfOptions = { logo?: Uint8Array; preparedBy?: string | null; printedAt?: Date; control?: DocumentControl | null };
 
 const longDate = (d: string) => new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T12:00:00+08:00`));
 const shortDate = (d: string) => new Intl.DateTimeFormat("en-US", { month: "long", day: "2-digit", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T12:00:00+08:00`));
@@ -72,6 +74,7 @@ export async function createMismoListPdf(date: string, batches: MismoBatch[], li
       y -= 48;
       page.drawRectangle({ x: M, y, width: CW, height: 2.2, color: navy });
       page.drawRectangle({ x: M, y: y - 1.4, width: CW * 0.28, height: 1.4, color: orange });
+      drawControlLine(page, reg, options.control, { right: W - M, y: y - 9 });
       y -= 26;
       text(page, unsettled ? "Trainees Not Settled as of 11:00 AM" : "MARINA MISMO List of Trainees", M, y, 17, bold, ink);
       if (cont) right(page, "continued", W - M, y, 9, reg, muted);

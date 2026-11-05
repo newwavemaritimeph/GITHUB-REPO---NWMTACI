@@ -1,4 +1,6 @@
 import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
+import { drawControlBlock, drawControlLine } from "@/lib/print/control-block";
+import type { DocumentControl } from "@/lib/document-controls";
 import { pesosInWords } from "@/lib/amount-words";
 
 export type DocumentSnapshot = {
@@ -47,6 +49,7 @@ export async function createBrandedPdf(snapshot: DocumentSnapshot) {
 }
 
 export type TrainingInstructionsSnapshot = {
+  control?: DocumentControl | null;
   traineeName: string;
   formalName: string;
   nwmtaciNumber: string;
@@ -107,7 +110,8 @@ export async function createTrainingInstructionsPdf(s: TrainingInstructionsSnaps
   // The Acknowledgement Receipt header.
   if (logo) { const d = logo.scale(34 / Math.max(logo.width, logo.height)); page.drawImage(logo, { x: M, y: H - M - 34, width: d.width, height: d.height }); }
   write("NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", M + 42, H - M - 11, 10.5, bold, c.navy);
-  wrap("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000 | +63 948 847 6530 | (02) 8553 0310 | newwavemaritime@gmail.com | facebook.com/newwavemtc", 6.8, W - 2 * M - 42).forEach((l, i) => write(l, M + 42, H - M - 22 - i * 8.4, 6.8, reg, c.muted));
+  const ctlH = drawControlBlock(page, { reg, bold }, s.control, { right: W - M, top: H - M, width: 125, rowHeight: 9 });
+  wrap("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000 | +63 948 847 6530 | (02) 8553 0310 | newwavemaritime@gmail.com | facebook.com/newwavemtc", 6.8, W - 2 * M - 42 - (ctlH ? 133 : 0)).forEach((l, i) => write(l, M + 42, H - M - 22 - i * 8.4, 6.8, reg, c.muted));
   const barY = H - M - 58;
   page.drawRectangle({ x: M, y: barY, width: W - 2 * M, height: 17, color: c.navy });
   page.drawRectangle({ x: M, y: barY - 2.2, width: W - 2 * M, height: 2.2, color: c.orange });
@@ -243,6 +247,8 @@ export type HalfSheetDocument = {
   page?: { width: number; height: number };
   /** Prominent status stamp drawn in the header (e.g. payment status). */
   statusBadge?: { label: string; tone: "green" | "amber" | "red" };
+  /** The form's Form No. and revision details (Form Numbers), at the top right. */
+  control?: DocumentControl | null;
 };
 
 /**
@@ -294,6 +300,7 @@ export async function createHalfSheetDocument(doc: HalfSheetDocument) {
   page.drawText("NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", { x: headerX, y, size: 9.5, font: bold, color: ink });
   page.drawText("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000", { x: headerX, y: y - 12, size: 6.5, font: regular, color: muted });
   page.drawText(doc.title, { x: headerX, y: y - 28, size: 13, font: bold, color: orange });
+  drawControlBlock(page, { reg: regular, bold }, doc.control, { right, top: y + 10, width: 120, rowHeight: 8.5 });
 
   // Prominent status stamp (top-right) — used by instructors to verify enrollment.
   if (doc.statusBadge) {
@@ -494,6 +501,7 @@ export type AdmissionCourseLine = {
 };
 
 export type AdmissionInvoiceSnapshot = {
+  control?: DocumentControl | null;
   reference: string;
   traineeName: string;
   traineeNumber: string;
@@ -612,6 +620,7 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
 
     y -= 33;
     page.drawLine({ start: { x: left, y }, end: { x: right, y }, thickness: 1.2, color: blue });
+    drawControlLine(page, regular, snapshot.control, { right, y: y - 8, size: 5.6 });
     y -= 12;
 
     const contentW = right - left;
@@ -752,6 +761,7 @@ export async function createAdmissionInvoicePdf(snapshot: AdmissionInvoiceSnapsh
 export type ExpenseVoucherLine = { description: string; quantity: number; unitCentavos: number };
 
 export type ExpenseVoucherSnapshot = {
+  control?: DocumentControl | null;
   number: string;
   issuedAt: string;
   payee: string;
@@ -838,21 +848,15 @@ export async function createExpenseVoucherPdf(snapshot: ExpenseVoucherSnapshot) 
     : [{ description: snapshot.purpose, quantity: snapshot.quantity ?? 1, unitCentavos: Math.round(snapshot.amountCentavos / Math.max(1, snapshot.quantity ?? 1)) }];
   let y = TOP;
 
-  // 1. Letterhead, and the form's Control No. and Revision No., left blank for writing in (owner, 4 Nov 2026).
-  const logoS = 34, textX = X0 + logoS + 8, ctrlW = 128, ctrlLabel = 44;
+  // 1. Letterhead, a blank Control No. for writing in (owner, 4 Nov 2026), and the details from Form Numbers (owner, 5 Nov 2026).
+  const logoS = 34, textX = X0 + logoS + 8, ctrlW = 140, ctrlLabel = 50;
   if (snapshot.logoBytes) { try { const img = await pdf.embedPng(snapshot.logoBytes); const d = img.scaleToFit(logoS, logoS); page.drawImage(img, { x: X0 + (logoS - d.width) / 2, y: y - logoS + (logoS - d.height) / 2, width: d.width, height: d.height }); } catch { /* logo optional */ } }
   const org = "NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", orgRoom = X1 - ctrlW - 8 - textX;
   text(org, textX, y - 12, Math.min(10.6, 10.6 * orgRoom / bold.widthOfTextAtSize(org, 10.6)), bold, c.navy);
   text("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000", textX, y - 22, 6.2, reg, c.muted);
   text("0948-847-6530  |  (02) 8553 0310  |  newwavemaritime@gmail.com", textX, y - 30, 6.2, reg, c.muted);
-  const ctrlH = logoS / 2;
-  (["Control No.", "Revision No."]).forEach((label, i) => {
-    const top = y - i * ctrlH;
-    box(X1 - ctrlW, top - ctrlH, ctrlLabel, ctrlH, c.tint);
-    box(X1 - ctrlW + ctrlLabel, top - ctrlH, ctrlW - ctrlLabel, ctrlH);
-    cap(label, X1 - ctrlW + PAD, top - ctrlH / 2 - 2);
-  });
-  y -= logoS + 3;
+  const ctrlH = drawControlBlock(page, { reg, bold }, snapshot.control, { right: X1, top: y, width: ctrlW, labelWidth: ctrlLabel, rowHeight: 8, always: true, firstRows: [["Control No.", ""]] });
+  y -= Math.max(logoS, ctrlH) + 3;
 
   // 2. Title bar with the orange rule, as on the Training Instructions.
   const barH = 16, isVoid = snapshot.status === "VOID";
@@ -957,7 +961,7 @@ export async function createExpenseVoucherPdf(snapshot: ExpenseVoucherSnapshot) 
 
   // Footer.
   text("Keep with the official receipt for accounting and audit. Amounts are in Philippine peso.", X0, 6, 5.8, reg, c.muted);
-  right("Form EV-04  |  Ride the New Wave of Maritime Excellence", X1, 6, 5.8, reg, c.muted);
+  right(`${snapshot.control?.formNo ? `Form ${snapshot.control.formNo}  |  ` : ""}Ride the New Wave of Maritime Excellence`, X1, 6, 5.8, reg, c.muted);
 
   if (isVoid) {
     const markW = bold.widthOfTextAtSize("VOID", 72), a = 16 * Math.PI / 180;
@@ -967,6 +971,7 @@ export async function createExpenseVoucherPdf(snapshot: ExpenseVoucherSnapshot) 
 }
 
 export type DailyExpensesSnapshot = {
+  control?: DocumentControl | null;
   dateLabel: string;
   rows: { number: string; payee: string; category: string; channel: string; reference: string; status: string; amountCentavos: number }[];
   totalCentavos: number;
@@ -1007,6 +1012,7 @@ export async function createDailyExpensesPdf(snapshot: DailyExpensesSnapshot) {
     page.drawText("New Wave Maritime Training and Assessment Center, Inc.", { x: margin + 54, y: y - 8, size: 11, font: bold, color: dark });
     page.drawText(snapshot.title ?? "Daily Expenses Summary", { x: margin + 54, y: y - 24, size: 15, font: bold, color: orange });
     page.drawText(snapshot.dateLabel, { x: margin + 54, y: y - 40, size: 10, font, color: gray });
+    drawControlBlock(page, { reg: font, bold }, snapshot.control, { right: W - margin, top: y + 6, width: 125, rowHeight: 9 });
     y -= 66;
     drawHead();
   };
@@ -1056,6 +1062,7 @@ export async function createDailyExpensesPdf(snapshot: DailyExpensesSnapshot) {
 }
 
 export type PayslipSnapshot = {
+  control?: DocumentControl | null;
   employeeNumber: string;
   employeeName: string;
   position: string;
@@ -1077,6 +1084,7 @@ export async function createPayslipPdf(snapshot: PayslipSnapshot) {
   return createHalfSheetDocument({
     title: "PAYSLIP",
     logoBytes: snapshot.logoBytes,
+    control: snapshot.control,
     meta: [
       { label: "Employee", value: snapshot.employeeNumber },
       { label: "Period", value: snapshot.period },
@@ -1111,6 +1119,7 @@ export async function createPaymentInvoicePdf(snapshot:PaymentSnapshot){
 }
 
 export type CashierReportSnapshot = {
+  control?: DocumentControl | null;
   dateLabel: string;
   preparedBy: string;
   checkedBy?: string;
@@ -1208,6 +1217,7 @@ export async function createCashierReportPdf(s: CashierReportSnapshot) {
   right("Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000", detailsX, y - 19, 6.6, reg, c.muted);
   right("0948-847-6530  |  (02) 8553 0310  |  newwavemaritime@gmail.com", detailsX, y - 27, 6.6, reg, c.muted);
   page.drawRectangle({ x: M, y: y - 41, width: CW, height: 2, color: c.navy });
+  if (drawControlLine(page, reg, s.control, { right: W - M, y: y - 49 })) y -= 9;
   y -= 47;
 
   // 1. Cash position.

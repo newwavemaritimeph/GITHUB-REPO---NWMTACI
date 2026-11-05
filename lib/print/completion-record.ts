@@ -1,4 +1,5 @@
 import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import type { DocumentControl } from "@/lib/document-controls";
 import { durationText, formDate, practicalOk, remarkOf, resultOf, SHEET_LINES, type AssessmentTask, type CompletionFields, type CompletionTrainee, type TraineeResult } from "@/lib/completion-record";
 
 /**
@@ -6,7 +7,7 @@ import { durationText, formDate, practicalOk, remarkOf, resultOf, SHEET_LINES, t
  * drawn cell for cell like New Wave's form (AD NO. 05-00), A4 landscape, for the
  * TCROA folder in Google Drive and for printing.
  */
-export type CompletionPdfInput = { courseName: string; startsOn: string; endsOn: string; tasks: AssessmentTask[]; trainees: CompletionTrainee[]; results: Record<string, TraineeResult>; fields: CompletionFields; logo?: Uint8Array };
+export type CompletionPdfInput = { control?: DocumentControl | null; courseName: string; startsOn: string; endsOn: string; tasks: AssessmentTask[]; trainees: CompletionTrainee[]; results: Record<string, TraineeResult>; fields: CompletionFields; logo?: Uint8Array };
 
 /** Helvetica speaks WinAnsi: keep Latin-1 (Ñ, é) and swap typographic dashes and quotes. */
 const safe = (s: string) => s.replace(/[–—]/g, "-").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/·/g, "-").replace(/[^\x20-\x7E\xA0-\xFF]/g, "");
@@ -66,7 +67,8 @@ export async function createCompletionRecordPdf(input: CompletionPdfInput) {
 
   // Heading: document code, emblem, title.
   let y = H - 18;
-  write(["AD NO.: 05-00", "Initial Issue Date: 09-14-2023", "Revision Date: 00"], L - 2.5, y, 120, 30, 4.8, reg, "left", "top");
+  const ctl = input.control;
+  write([`AD NO.: ${ctl?.formNo ?? "05-00"}`, `Initial Issue Date: ${ctl?.issuedDate ?? "09-14-2023"}`, `Revision Date: ${ctl?.revisionDate ?? "00"}`, ...(ctl?.revisionNo ? [`Revision No.: ${ctl.revisionNo}`] : [])], L - 2.5, y, 120, 30, 4.8, reg, "left", "top");
   if (input.logo) { try { const img = await pdf.embedPng(input.logo); page.drawImage(img, { x: L + 170, y: y - 48, width: 46, height: 46 }); } catch { /* the form prints without the emblem */ } }
   page.drawText("TRAINING COMPLETION AND RECORD OF ASSESSMENT REPORT", { x: L + 290, y: y - 30, size: 11, font: bold, color: black });
   y -= 56;

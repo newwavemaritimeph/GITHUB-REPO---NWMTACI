@@ -27,7 +27,7 @@ describe("Endorsed Courses report", () => {
   it("agrees with the Cash and Sales Summary for the same trainees", () => {
     const s = endorsedSales(rows);
     const e = summarize({ payments: [], income: [], expenses: [], sales: rows.map((r) => ({ endorsement: true, code: r.code, name: r.course, center: r.center, price: r.fee, payable: r.payable, rebate: r.rebate, share: r.share, charges: 0, discounts: 0, collected: r.collected, rebateReceived: r.rebateReceived })) }).endorsement;
-    expect({ trainees: e.trainees, fees: e.fees, payable: e.payable, rebate: e.rebate, received: e.received, share: e.share, keeps: e.keeps, rebateDue: e.rebateDue }).toEqual({ trainees: s.totals.trainees, fees: s.totals.fees, payable: s.totals.payable, rebate: s.totals.rebate, received: s.totals.rebateReceived, share: s.totals.share, keeps: s.totals.keeps, rebateDue: s.totals.rebateDue });
+    expect({ trainees: e.trainees, fees: e.fees, collected: e.collected, balance: e.balance, payable: e.payable, rebate: e.rebate, received: e.received, share: e.share, keeps: e.keeps, rebateDue: e.rebateDue }).toEqual({ trainees: s.totals.trainees, fees: s.totals.fees, collected: s.totals.collected, balance: s.totals.balance, payable: s.totals.payable, rebate: s.totals.rebate, received: s.totals.rebateReceived, share: s.totals.share, keeps: s.totals.keeps, rebateDue: s.totals.rebateDue });
     expect(e.centers.map((c) => [c.name, c.fees, c.keeps])).toEqual(s.centers.map((c) => [c.name, c.totals.fees, c.totals.keeps]));
   });
   it("reads the center and rebate states as Pay the Centers and Other Income do", () => {

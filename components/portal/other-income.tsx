@@ -143,7 +143,7 @@ export function OtherIncome({ data, reload, canRecord, canVoid, canAddCategory =
       <div className="panel-heading"><h2>Endorsement Rebates</h2><small>{canRecord ? "Tick the trainees the partner paid for, then Record Received" : "View only"}</small></div>
       {partners.length ? partners.map((p) => { const rows = inView.filter((r) => r.partner === p); const pd = rows.filter((r) => !r.income && centerPaid(r.e.id)); return <div key={p} className="oi-partner">
         <div className="oi-partner-head"><b>{p}</b><span className="cx-mono">{pd.length ? `${pesos2(pd.reduce((s, r) => s + r.rebate, 0))} due · ${pd.length}` : "All received"}</span></div>
-        <div className="portal-table"><table><thead><tr>{canRecord && <th />}<th>Trainee</th><th>Course</th><th>Training Date</th><th className="r">Rebate</th><th>Status</th><th className="r">Agency Share</th></tr></thead><tbody>
+        <div className="portal-table"><table><thead><tr>{canRecord && <th />}<th>Trainee</th><th>Course</th><th>Training Date</th><th className="r">Rebate</th><th>Status</th><th className="r">Agency Commission</th></tr></thead><tbody>
           {rows.map((r) => <tr key={r.e.id} className={picked.has(r.e.id) ? "oi-sel" : r.income ? "oi-done" : ""}>
             {canRecord && <td>{!r.income && centerPaid(r.e.id) && <input type="checkbox" aria-label={`Select ${r.trainee}`} checked={picked.has(r.e.id)} onChange={() => { const next = new Set(picked); if (next.has(r.e.id)) next.delete(r.e.id); else next.add(r.e.id); setPicked(next); setForm(null); }} />}</td>}
             <td><strong>{r.trainee}</strong><small className="tc-mono">{r.number} · {r.e.enrollment_number}</small></td>
