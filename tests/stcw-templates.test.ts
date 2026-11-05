@@ -25,12 +25,14 @@ describe("STCW certificate templates (Safety, Crowd, Crisis)", () => {
 
 describe("UBT-PSSR training certificate", () => {
   const file = "course/00000000-0000-0000-0000-000000000000-UBT-PSSR---Training-Certificate.pdf";
-  it("has the layout of the owner's first page: dates, issued line, bold numbers, photo, no QR", () => {
+  it("has the layout of the owner's Word file: dates, issued line, numbers at the top right, photo, no QR", () => {
     const f = bundledLayout(file)!;
     expect(f.conducted?.text).toContain("[START DATE]");
     expect(f.conducted?.text).toContain("[ASSESS DATE]");
-    expect(f.issued?.x).toBe(56.55);
-    expect(f.certNo?.bold && f.regNo?.bold && f.sans).toBe(true);
+    expect(f.issued?.x).toBe(56.6);
+    expect(f.certNo!.y).toBeGreaterThan(600);
+    expect(f.regNo!.y).toBeLessThan(f.certNo!.y);
+    expect(f.sans).toBe(true);
     expect(f.photo).toBeTruthy();
     expect(f.qr).toBeUndefined();
   });

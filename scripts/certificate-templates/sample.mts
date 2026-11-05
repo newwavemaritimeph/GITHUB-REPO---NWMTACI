@@ -17,4 +17,4 @@ await drawTemplateFields(pdf, page, fields, { name, startsOn: start, endsOn: end
 const box = await detectPhotoBox(bytes);
 if (box) { page.drawRectangle({ x: box.x + 2, y: box.y + 2, width: box.w - 4, height: box.h - 4, color: rgb(0.86, 0.9, 0.93) }); const f = await pdf.embedFont(StandardFonts.Helvetica); page.drawText("2x2 PHOTO", { x: box.x + box.w / 2 - 22, y: box.y + box.h / 2, size: 8, font: f, color: rgb(0.4, 0.45, 0.5) }); }
 fs.writeFileSync(out, await pdf.save());
-console.log("photo box", box ? `${box.w.toFixed(0)}x${box.h.toFixed(0)} ${box.source}` : "none");
+console.log("photo box", box ? `${box.w.toFixed(1)}x${box.h.toFixed(1)} at ${box.x.toFixed(1)},${box.y.toFixed(1)} ${box.source}` : "none");
