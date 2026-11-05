@@ -1,5 +1,6 @@
 "use client";
 
+import { TERMS, TERMS_AMEND_NOTICE } from "@/lib/terms";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
@@ -23,16 +24,6 @@ const RANKS = [
   "BOSUN", "ABLE SEAMAN", "ORDINARY SEAMAN", "OILER", "WIPER", "FITTER", "MESSMAN", "CHIEF COOK",
   "ELECTRICIAN", "PUMPMAN", "OTHER",
 ] as const;
-
-/** The full New Wave Terms and Conditions, accepted with a single checkbox. */
-const TERMS_SECTIONS: { heading: string; items: string[] }[] = [
-  { heading: "1. Payment Terms", items: ["Full payment or a minimum of 50% down payment is required upon enrollment.", "Full payment must be settled before the completion of the training.", "Full payment is required for a 1-day course of New Wave."] },
-  { heading: "2. Cancellation Policy", items: ["Enrollment cancellations must be communicated to the Training Center prior to the scheduled training date.", "Applicable cancellation charges and deductions shall be in accordance with the Refund Policy of the Training Center."] },
-  { heading: "3. Rescheduling Policy", items: ["Trainees unable to attend a scheduled session for courses of one (1) to two (2) days may request to have their training rescheduled.", "Rescheduling is subject to slot availability and approval of the Training Center.", "Applicable reschedule charges and deductions shall be in accordance with the Refund Policy of the Training Center."] },
-  { heading: "4. Refund Policy", items: ["Refund requests made at least five (5) days before the scheduled training date shall be subject to a Php 350.00 processing fee.", "Refund requests made within five (5) days before the scheduled training date shall be subject to a deduction of 50% of the course fee plus a Php 250.00 processing fee."] },
-  { heading: "5. Make-up Class Policy", items: ["Make-up classes are available only for courses of three (3) days or more, subject to schedule availability and approval.", "Trainees unable to attend a scheduled session due to valid reasons must immediately inform the Training Center.", "A make-up class fee of Php 350.00 per training day shall be charged."] },
-  { heading: "6. Issuance of Certificate of Completion", items: ["Certificates of Completion shall be issued only to trainees who have successfully completed all course requirements and settled all outstanding balances."] },
-];
 
 /** Live catalog (/api/public/catalog): STCW courses with batches, In-House courses for a start date. */
 type CatalogBatch = { id: string; number: string; startsOn: string; endsOn: string; full: boolean };
@@ -279,8 +270,8 @@ function Wizard() {
             </section>
             <section className="op-panel">
               <h3>Terms and Conditions You Accepted</h3>
-              <div className="op-terms">{TERMS_SECTIONS.map((section) => <div key={section.heading}><strong>{section.heading}</strong><ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul></div>)}</div>
-              <p className="op-fine">New Wave Maritime Training and Assessment Center reserves the right to amend, revise, or update these details without prior notice.</p>
+              <div className="op-terms">{TERMS.map((section) => <div key={section.n}><strong>{section.n}. {section.title}</strong><ul>{section.lines.map((line, i) => <li key={i}>{line}</li>)}</ul></div>)}</div>
+              <p className="op-fine">{TERMS_AMEND_NOTICE}</p>
             </section>
             <div className="reg-success-actions"><Link className="button button-secondary" href="/registration-search">Check application status</Link><Link className="button button-secondary" href="/courses">Browse courses</Link></div>
           </div>
@@ -422,12 +413,12 @@ function Wizard() {
             <p className="ql-note">Your seats are held while our Registration team screens your application, confirms the fees, and collects your requirements and payment.</p>
             <h3 className="review-subhead">Terms and Conditions</h3>
             <div className="terms-box">
-              {TERMS_SECTIONS.map((section) => <div key={section.heading} className="terms-section"><strong>{section.heading}</strong><ul>{section.items.map((item) => <li key={item}>{item}</li>)}</ul></div>)}
-              <p className="terms-footer">New Wave Maritime Training and Assessment Center reserves the right to amend, revise, or update these details without prior notice.</p>
+              {TERMS.map((section) => <div key={section.n} className="terms-section"><strong>{section.n}. {section.title}</strong><ul>{section.lines.map((line, i) => <li key={i}>{line}</li>)}</ul></div>)}
+              <p className="terms-footer">{TERMS_AMEND_NOTICE}</p>
             </div>
             <label className="consent-row">
               <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
-              <span>I have read and accepted the New Wave Maritime Terms and Conditions, including the payment, cancellation, rescheduling, refund, make-up class, and certificate policies, and I confirm that the information I provided is complete and accurate.</span>
+              <span>I have read and accepted the New Wave Maritime Terms and Conditions, including the payment, no refund, rescheduling, cancellation, make-up class, and certificate policies, and I confirm that the information I provided is complete and accurate.</span>
             </label>
             {error && <p className="form-message" role="alert">{error}</p>}
             <div className="ql-actions"><button className="button button-primary" type="button" disabled={!accepted || !selectionsValid || submitting} onClick={submit}>{submitting ? "Submitting…" : "Submit Application"}</button></div>

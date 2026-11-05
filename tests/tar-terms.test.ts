@@ -1,7 +1,10 @@
+import { existsSync, readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { TarSheets, type TarCourse, type TarProps } from "@/app/portal/admission-record/[id]/tar-sheets";
+import { DEFAULT_CATEGORY_TEMPLATES, policyPairs } from "@/lib/instruction-templates";
+import { TERMS } from "@/lib/terms";
 
 const course = (i: number): TarCourse => ({ id: String(i), code: `C${i}`, name: `Course ${i}`, dates: "Nov 10", time: "8:00", room: "Room 1", fee: 100000 });
 const props = (courses: number): TarProps => ({
@@ -48,5 +51,27 @@ describe("Terms and Conditions on the back of the TAR", () => {
   });
   it("tells staff to print on both sides", () => {
     expect(render(1)).toContain("on both sides, flip on long edge");
+  });
+});
+
+describe("the same terms on the website and the Training Instructions", () => {
+  const form = readFileSync("components/registration-form.tsx", "utf8");
+  const migration = readFileSync("supabase/migrations/202610290077_terms_revision_03.sql", "utf8");
+  it("gives the TAR and the website one source of eight sections", () => {
+    expect(form).toContain('from "@/lib/terms"');
+    expect(form).not.toContain("Refund Policy of");
+    expect(form).toContain("no refund, rescheduling, cancellation");
+    expect(TERMS.map((s) => s.n)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+  it("gives both categories the seven short policy lines", () => {
+    for (const template of Object.values(DEFAULT_CATEGORY_TEMPLATES)) {
+      expect(policyPairs(template.policies).map(([label]) => label)).toEqual(["Payment", "Partial Payments", "No Refund", "Reschedule", "Cancellation", "Training in Progress", "Certificate"]);
+      expect(template.policies).not.toContain("Cancellation: 5+ days");
+    }
+  });
+  it("keeps the migration the same as the code and records the new version", () => {
+    for (const line of DEFAULT_CATEGORY_TEMPLATES.STCW.policies.split("\n")) expect(migration).toContain(line);
+    expect(migration).toContain("2026-11-05-r03");
+    expect(existsSync("public/document-templates/terms-and-conditions-r03.png")).toBe(true);
   });
 });

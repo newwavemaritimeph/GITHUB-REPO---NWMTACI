@@ -1,0 +1,419 @@
+<title>Endorsed Sales Report</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: the portal's report page, one shared date bar, five ways to read the same figures, then the consolidated menus. */
+:root {
+  --bg: #f2f6f9; --fg: #123f63; --ink: #0f2a3d; --muted: #4d6a7d; --line: #d5e1e9; --panel: #ffffff; --thead: #e6f5fa; --tab: #e2ebf1; --tab-fg: #123f63; --tab-on: #123f63; --tab-on-fg: #ffffff; --accent: #0571d0; --focus: #f25615;
+  --ok: #0a7a3e; --ok-bg: #e4f5ec; --warn: #b23d0c; --warn-bg: #fdeee6; --info: #0562b4; --info-bg: #e3f0fb; --rail: #123f63; --rail-fg: #ffffff; --rail-dim: #b9d3e4; --rail-line: #2b5678;
+  /* Chart series: checked for colorblind separation on each theme's surface. */
+  --c0: #0571d0; --c1: #f25615; --c2: #149a68; --grid: #e4ecf1;
+  --bar-a: #0571d0; --bar-b: #35ccfa; --on-bar: #ffffff; --tab-active-bg: #f2f6f9; --tab-active-fg: #0571d0;
+  --font: "Geist", "Segoe UI", Arial, sans-serif; --mono: "Geist Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0e1a24; --fg: #e4eef5; --ink: #e4eef5; --muted: #9db4c3; --line: #2a3d4c; --panel: #162734; --thead: #1e3444; --tab: #223544; --tab-fg: #d6e4ee; --tab-on: #35ccfa; --tab-on-fg: #082030; --accent: #6db6f2; --ok: #5fd39a; --ok-bg: #123527; --warn: #ff9a6b; --warn-bg: #3a2218; --info: #8cc4f5; --info-bg: #15304a; --rail: #1e3444; --rail-fg: #e4eef5; --rail-dim: #9db4c3; --rail-line: #2f4a5e; --c0: #3a8fe0; --c1: #e8672f; --c2: #1faf76; --grid: #24394a; --bar-a: #123f63; --bar-b: #0571d0; --tab-active-bg: #0e1a24; --tab-active-fg: #8cc4f5; color-scheme: dark; } }
+:root[data-theme="dark"] { --bg: #0e1a24; --fg: #e4eef5; --ink: #e4eef5; --muted: #9db4c3; --line: #2a3d4c; --panel: #162734; --thead: #1e3444; --tab: #223544; --tab-fg: #d6e4ee; --tab-on: #35ccfa; --tab-on-fg: #082030; --accent: #6db6f2; --ok: #5fd39a; --ok-bg: #123527; --warn: #ff9a6b; --warn-bg: #3a2218; --info: #8cc4f5; --info-bg: #15304a; --rail: #1e3444; --rail-fg: #e4eef5; --rail-dim: #9db4c3; --rail-line: #2f4a5e; --c0: #3a8fe0; --c1: #e8672f; --c2: #1faf76; --grid: #24394a; --bar-a: #123f63; --bar-b: #0571d0; --tab-active-bg: #0e1a24; --tab-active-fg: #8cc4f5; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.45; padding-block: 18px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1160px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+h1 { margin: 0; font-size: 22px; line-height: 1.2; font-weight: 700; color: var(--fg); text-wrap: balance; }
+h2 { margin: 0; font-size: 15px; line-height: 1.3; font-weight: 700; color: var(--fg); }
+button { font: inherit; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 3px; background: var(--tab); padding: 3px; border-radius: 9px; }
+.seg button { font-size: 13px; font-weight: 600; min-height: 32px; padding: 0 11px; border: 0; border-radius: 6px; background: transparent; color: var(--tab-fg); cursor: pointer; }
+.seg button[aria-selected="true"], .seg button.on { background: var(--tab-on); color: var(--tab-on-fg); }
+.page-head { display: flex; flex-wrap: wrap; gap: 8px 12px; justify-content: space-between; align-items: center; }
+.eyebrow { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.btn { min-height: 34px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn.primary { background: var(--focus); border-color: var(--focus); color: #fff; }
+.note { font-size: 12.5px; color: var(--muted); }
+.date-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.date-bar input[type="date"] { font: inherit; font-size: 13px; min-height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--panel); color: var(--ink); max-width: 100%; }
+.date-bar .step { min-width: 32px; min-height: 32px; padding: 0; }
+.date-bar .step:disabled { opacity: .4; cursor: default; }
+.range-label { font-size: 13px; color: var(--muted); }
+.range-label b { color: var(--fg); }
+.sample { font-size: 11px; font-weight: 700; letter-spacing: .05em; padding: 2px 8px; border-radius: 99px; background: var(--info-bg); color: var(--info); margin-left: auto; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; padding: 10px 14px; }
+.tw { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: var(--thead); color: var(--fg); font-size: 12px; font-weight: 700; text-align: left; padding: 7px 10px; white-space: nowrap; }
+td { padding: 7px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+.n { text-align: right; white-space: nowrap; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; }
+th.n { font-family: var(--font); font-size: 12px; }
+tfoot td, tr.tot td { font-weight: 700; background: var(--thead); color: var(--fg); }
+.sub { display: block; font-size: 12px; color: var(--muted); font-family: var(--mono); }
+.warn { color: var(--warn); }
+.chip { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 7px; border-radius: 99px; white-space: nowrap; }
+.chip.ok { background: var(--ok-bg); color: var(--ok); }
+.chip.due { background: var(--warn-bg); color: var(--warn); }
+.chip.wait { background: var(--info-bg); color: var(--info); }
+.link { border: 0; background: none; padding: 0; color: var(--fg); font-weight: 700; font-size: 13px; cursor: pointer; text-align: left; }
+.link:hover { color: var(--accent); }
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; vertical-align: 0; }
+.pager { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 8px 10px; font-size: 12.5px; color: var(--muted); border-top: 1px solid var(--line); }
+.pager button { min-height: 28px; font-size: 12.5px; padding: 0 9px; }
+.empty { padding: 26px 14px; text-align: center; color: var(--muted); }
+
+/* Design 1 */
+.d1 { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 12px; align-items: start; }
+.rail { background: var(--rail); color: var(--rail-fg); border-radius: 10px; padding: 12px 14px; }
+.rail dl { margin: 0; display: grid; gap: 0; }
+.rail div { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; padding: 6px 0; }
+.rail div + div { border-top: 1px solid var(--rail-line); }
+.rail dt { font-size: 12.5px; color: var(--rail-dim); }
+.rail dd { margin: 0; font-family: var(--mono); font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.rail .big dt { color: var(--rail-fg); font-weight: 600; }
+.rail .big dd { font-size: 14px; }
+.expand td { background: var(--bg); padding: 0; }
+.expand .tw { margin: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+
+/* Design 2 */
+.stack { display: flex; flex-direction: column; gap: 12px; }
+.grand { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 10px 14px; background: var(--thead); border: 1px solid var(--line); border-radius: 10px; font-size: 13px; }
+.grand b { font-family: var(--mono); color: var(--fg); }
+
+/* Design 3 */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; }
+.tile span { display: block; font-size: 12px; color: var(--muted); }
+.tile b { display: block; font-family: var(--mono); font-size: 15.5px; color: var(--fg); }
+.cell-btn { width: 100%; border: 0; background: none; cursor: pointer; color: inherit; padding: 2px 4px; border-radius: 6px; text-align: right; font-family: var(--mono); font-size: 12.5px; }
+.cell-btn small { display: block; font-family: var(--font); font-size: 11.5px; color: var(--muted); }
+.cell-btn:hover, .cell-btn.on { background: var(--thead); }
+.none { color: var(--muted); text-align: right; display: block; }
+
+/* Design 4 */
+.flow { padding: 12px 14px; border-top: 1px solid var(--line); }
+.flow:first-of-type { border-top: 0; }
+.flow h2 { margin-bottom: 8px; }
+.flow-row { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px 14px; }
+.step { position: relative; min-width: 0; }
+.step span { display: block; font-size: 12px; color: var(--muted); }
+.step b { display: block; font-family: var(--mono); font-size: 13.5px; color: var(--fg); margin-bottom: 4px; }
+.step + .step::before { content: "›"; position: absolute; left: -11px; top: 8px; color: var(--muted); font-weight: 700; }
+.track { height: 8px; border-radius: 4px; background: var(--grid); overflow: hidden; }
+.track i { display: block; height: 100%; border-radius: 4px; }
+
+/* Design 5 */
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--muted); }
+.chart { position: relative; padding: 6px 14px 10px; }
+.chart svg { display: block; width: 100%; height: auto; }
+.chart text { font-family: var(--font); font-size: 11.5px; fill: var(--muted); }
+.chart .gridline { stroke: var(--grid); stroke-width: 1; }
+.chart .hit { fill: transparent; cursor: pointer; }
+.chart .hit:hover { fill: var(--thead); }
+.chart .picked { fill: var(--thead); }
+.tip { position: absolute; pointer-events: none; z-index: 2; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; font-size: 12.5px; box-shadow: 0 6px 18px rgba(11, 31, 51, .2); min-width: 190px; }
+.tip b { display: block; color: var(--fg); margin-bottom: 3px; }
+.tip div { display: flex; justify-content: space-between; gap: 14px; }
+.tip em { font-style: normal; font-family: var(--mono); }
+
+/* Reports Menu */
+.mock-bar { background: linear-gradient(90deg, var(--bar-a), var(--bar-b)); border-radius: 10px; padding: 10px 10px 0; display: flex; flex-wrap: wrap; gap: 2px; }
+.mock-tab { position: relative; }
+.mock-tab > button { min-height: 36px; padding: 0 12px; border: 0; background: transparent; color: var(--on-bar); font-size: 13.5px; font-weight: 600; border-radius: 8px 8px 0 0; cursor: pointer; }
+.mock-tab.active > button { background: var(--tab-active-bg); color: var(--tab-active-fg); }
+.mock-list { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+.mock-list h2 { padding: 10px 14px 4px; }
+.mock-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 14px; border-top: 1px solid var(--line); font-size: 13.5px; font-weight: 600; color: var(--fg); }
+.menus { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 12px; align-items: start; }
+.role-col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+
+@media (max-width: 860px) {
+  .d1 { grid-template-columns: minmax(0, 1fr); }
+  .flow-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .step + .step::before { display: none; }
+  .sample { margin-left: 0; }
+}
+</style>
+
+<div class="wrap">
+  <div class="page-head">
+    <div><span class="eyebrow">Accounting · Reports</span><h1>Sales from Endorsed Courses</h1></div>
+    <div class="actions" id="exports"><span class="note" id="export-note" hidden>Sample only. In the portal this opens the file.</span><button type="button" class="btn" id="btn-excel">Download Excel</button><button type="button" class="btn primary" id="btn-pdf">Print PDF</button></div>
+  </div>
+  <div class="seg" role="tablist" aria-label="Designs" id="design-tabs"></div>
+  <div class="date-bar" id="date-bar">
+    <div class="seg" id="periods" aria-label="Period"></div>
+    <button type="button" class="btn step" id="prev" aria-label="Previous period">‹</button>
+    <input type="date" id="as-of" aria-label="As of">
+    <button type="button" class="btn step" id="next" aria-label="Next period">›</button>
+    <span id="custom-range" hidden><label class="note" for="from">From </label><input type="date" id="from"> <label class="note" for="to">To </label><input type="date" id="to"></span>
+    <span class="range-label" id="range-label"></span>
+    <span class="sample">SAMPLE FIGURES</span>
+  </div>
+  <div id="body"></div>
+</div>
+
+<script>
+(function () {
+  var TODAY = "2026-11-05";
+  var CENTERS = ["Nautical Options", "Altitude Maritime", "Mariana"];
+  var OFFERS = {
+    NBT: { c: 0, code: "BT", name: "Basic Training", fee: 550000, rebate: 130000, share: 100000 },
+    NAFF: { c: 0, code: "AFF", name: "Advanced Fire Fighting", fee: 480000, rebate: 90000, share: 60000 },
+    NMEFA: { c: 0, code: "MEFA", name: "Medical First Aid", fee: 380000, rebate: 70000, share: 50000 },
+    ABT: { c: 1, code: "BT", name: "Basic Training", fee: 520000, rebate: 100000, share: 0 },
+    AAFF: { c: 1, code: "AFF", name: "Advanced Fire Fighting", fee: 460000, rebate: 80000, share: 0 },
+    ASDSD: { c: 1, code: "SDSD", name: "Seafarers with Designated Security Duties", fee: 280000, rebate: 50000, share: 0 },
+    MII4: { c: 2, code: "II-4", name: "Rating Forming Part of a Navigational Watch", fee: 650000, rebate: 150000, share: 100000 },
+    MRASE: { c: 2, code: "RASE", name: "Rating as Able Seafarer Engine", fee: 700000, rebate: 150000, share: 80000 }
+  };
+  // [trainee, offer, training date, share of the fee paid, center state, rebate state, referred by an agency]
+  var RAW = [
+    ["DELA CRUZ, Juan P.", "NBT", "2026-11-05", 1, "Owed", "Due", 1], ["REYES, Maria L.", "NAFF", "2026-11-05", .5, "Owed", "Due", 0], ["SANTOS, Paolo R.", "ABT", "2026-11-04", 1, "For Approval", "Due", 0],
+    ["GARCIA, Liza M.", "MII4", "2026-11-04", 1, "Paid", "Due", 1], ["TORRES, Noel A.", "NMEFA", "2026-11-03", 1, "Paid", "Due", 1], ["RAMOS, Carlo B.", "AAFF", "2026-11-03", .5, "Owed", "Due", 0],
+    ["MENDOZA, Ana C.", "NBT", "2026-11-02", 1, "Paid", "Received", 1], ["CRUZ, Ramon D.", "MRASE", "2026-11-02", 1, "Paid", "Due", 1], ["BAUTISTA, Rey S.", "ASDSD", "2026-11-02", 1, "Paid", "Received", 0],
+    ["AQUINO, Mark T.", "NBT", "2026-10-26", 1, "Paid", "Received", 1], ["FLORES, Grace V.", "NAFF", "2026-10-26", 1, "Paid", "Received", 1], ["VILLANUEVA, Jose E.", "ABT", "2026-10-19", 1, "Paid", "Received", 0],
+    ["CASTRO, Nina F.", "MII4", "2026-10-19", 1, "Paid", "Received", 1], ["RIVERA, Leo G.", "NBT", "2026-10-12", 1, "Paid", "Received", 0], ["GOMEZ, Tess H.", "AAFF", "2026-10-12", 1, "Paid", "Received", 0],
+    ["PASCUAL, Dan I.", "MRASE", "2026-10-12", 1, "Paid", "Received", 1], ["NAVARRO, Ella J.", "NMEFA", "2026-10-05", 1, "Paid", "Received", 1], ["MORALES, Rico K.", "NBT", "2026-10-05", 1, "Paid", "Received", 1],
+    ["OCAMPO, Lea N.", "ABT", "2026-10-05", 1, "Paid", "Received", 0], ["DOMINGO, Vic O.", "NAFF", "2026-09-21", 1, "Paid", "Received", 1], ["SALAZAR, Joy P.", "MII4", "2026-09-21", 1, "Paid", "Received", 0],
+    ["LOPEZ, Ben Q.", "NBT", "2026-09-14", 1, "Paid", "Received", 1], ["HERRERA, Ivy R.", "ASDSD", "2026-09-07", 1, "Paid", "Received", 0], ["PEREZ, Gil U.", "AAFF", "2026-09-07", 1, "Paid", "Received", 0],
+    ["ROXAS, Mia W.", "NBT", "2026-08-24", 1, "Paid", "Received", 1], ["CORTEZ, Sam X.", "MRASE", "2026-08-17", 1, "Paid", "Received", 1], ["LIM, Faye Y.", "NMEFA", "2026-08-10", 1, "Paid", "Received", 0],
+    ["TAN, Oscar Z.", "ABT", "2026-07-20", 1, "Paid", "Received", 0], ["CHUA, Bea A.", "NBT", "2026-06-15", 1, "Paid", "Received", 1], ["YU, Art B.", "MII4", "2026-05-18", 1, "Paid", "Received", 1],
+    ["SY, Dina C.", "NAFF", "2026-03-09", 1, "Paid", "Received", 0], ["ONG, Fred D.", "ABT", "2026-01-19", 1, "Paid", "Received", 0], ["GO, Hana E.", "NBT", "2025-11-10", 1, "Paid", "Received", 1],
+    ["UY, Ian F.", "MRASE", "2025-08-18", 1, "Paid", "Received", 1]
+  ];
+  var ROWS = RAW.map(function (r, i) {
+    var o = OFFERS[r[1]];
+    return { name: r[0], no: "NWMTACI-" + String(1200 + i).padStart(7, "0"), offer: r[1], c: o.c, code: o.code, course: o.name, date: r[2], fee: o.fee, paid: Math.round(o.fee * r[3]), center: r[4], rebateState: r[5], rebate: o.rebate, share: r[6] ? o.share : 0 };
+  });
+
+  var peso = function (c) { return "₱" + (c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+  var shortPeso = function (c) { var v = c / 100; return v >= 1e6 ? "₱" + (v / 1e6).toFixed(1).replace(/\.0$/, "") + "M" : v >= 1000 ? "₱" + Math.round(v / 1000) + "K" : "₱" + Math.round(v); };
+  var day = function (s) { return new Date(s + "T00:00:00Z"); };
+  var iso = function (t) { return t.toISOString().slice(0, 10); };
+  var label = function (s, opts) { return new Intl.DateTimeFormat("en-PH", Object.assign({ timeZone: "UTC" }, opts)).format(day(s)); };
+  var human = function (s) { return label(s, { month: "short", day: "numeric", year: "numeric" }); };
+
+  function startOf(p, e) {
+    var t = day(e), y = t.getUTCFullYear(), m = t.getUTCMonth();
+    if (p === "Daily") return e;
+    if (p === "Weekly") return iso(new Date(Date.UTC(y, m, t.getUTCDate() - (t.getUTCDay() + 6) % 7)));
+    if (p === "Monthly") return iso(new Date(Date.UTC(y, m, 1)));
+    if (p === "Quarterly") return iso(new Date(Date.UTC(y, m - m % 3, 1)));
+    return iso(new Date(Date.UTC(y, 0, 1)));
+  }
+  function shift(p, e, dir) {
+    var t = day(e), y = t.getUTCFullYear(), m = t.getUTCMonth(), out;
+    if (p === "Daily") out = new Date(Date.UTC(y, m, t.getUTCDate() + dir));
+    else if (p === "Weekly") out = new Date(Date.UTC(y, m, t.getUTCDate() + 7 * dir));
+    else if (p === "Monthly") out = new Date(Date.UTC(y, m + dir + 1, 0));
+    else if (p === "Quarterly") out = new Date(Date.UTC(y, m - m % 3 + 3 * dir + 3, 0));
+    else out = new Date(Date.UTC(y + dir, 12, 0));
+    var s = iso(out);
+    return s > TODAY ? TODAY : s;
+  }
+  function periodName(p, e) {
+    var t = day(e);
+    if (p === "Daily") return human(e);
+    if (p === "Weekly") return "Week of " + label(startOf(p, e), { month: "short", day: "numeric" });
+    if (p === "Monthly") return label(e, { month: "long", year: "numeric" });
+    if (p === "Quarterly") return "Q" + (Math.floor(t.getUTCMonth() / 3) + 1) + " " + t.getUTCFullYear();
+    return String(t.getUTCFullYear());
+  }
+
+  var state = { design: 1, period: "Monthly", end: TODAY, from: "2026-10-01", to: TODAY, open: {}, pages: {}, cell: null };
+  var DESIGNS = ["1 · Summary Rail", "2 · Center Statements", "3 · Course Matrix", "4 · Money Flow", "5 · Trend", "Reports Menu"];
+  var PERIODS = ["Daily", "Weekly", "Monthly", "Quarterly", "Annually", "Custom"];
+  var range = function () { return state.period === "Custom" ? { from: state.from, to: state.to } : { from: startOf(state.period, state.end), to: state.end }; };
+  var inRange = function () { var r = range(); return ROWS.filter(function (x) { return x.date >= r.from && x.date <= r.to; }).sort(function (a, z) { return z.date.localeCompare(a.date) || a.name.localeCompare(z.name); }); };
+
+  function sum(rows) {
+    var t = { trainees: rows.length, fees: 0, paid: 0, balance: 0, centerPaid: 0, centerOwed: 0, rebate: 0, received: 0, due: 0, share: 0, keeps: 0 };
+    rows.forEach(function (x) {
+      t.fees += x.fee; t.paid += x.paid; t.balance += x.fee - x.paid; t.rebate += x.rebate; t.share += x.share; t.keeps += x.rebate - x.share;
+      if (x.center === "Paid") t.centerPaid += x.fee; else t.centerOwed += x.fee;
+      if (x.rebateState === "Received") t.received += x.rebate; else t.due += x.rebate;
+    });
+    return t;
+  }
+  var byCenter = function (rows) { return CENTERS.map(function (name, c) { var mine = rows.filter(function (x) { return x.c === c; }); return { name: name, c: c, rows: mine, t: sum(mine) }; }).filter(function (g) { return g.rows.length; }); };
+  var dot = function (c) { return '<i class="dot" style="background:var(--c' + c + ')"></i>'; };
+  var centerChip = function (s) { return '<span class="chip ' + (s === "Paid" ? "ok" : s === "For Approval" ? "wait" : "due") + '">' + s + "</span>"; };
+  var rebateChip = function (s) { return '<span class="chip ' + (s === "Received" ? "ok" : "due") + '">' + s + "</span>"; };
+  var bal = function (v) { return '<td class="n' + (v > 0 ? " warn" : "") + '">' + peso(v) + "</td>"; };
+  var EMPTY = '<div class="panel empty">No endorsed trainees in this period.</div>';
+
+  function traineeTable(rows, key, withCenter) {
+    var page = state.pages[key] || 0, per = 10, pages = Math.max(1, Math.ceil(rows.length / per));
+    if (page >= pages) page = pages - 1;
+    var shown = rows.slice(page * per, page * per + per);
+    var body = shown.map(function (x) {
+      return "<tr><td><b>" + x.name + '</b><span class="sub">' + x.no + "</span></td><td>" + x.code + (withCenter ? '<span class="sub" style="font-family:var(--font)">' + CENTERS[x.c] + "</span>" : "") + '</td><td style="white-space:nowrap">' + human(x.date) + '</td><td class="n">' + peso(x.fee) + '</td><td class="n">' + peso(x.paid) + "</td>" + bal(x.fee - x.paid) + "<td>" + centerChip(x.center) + '</td><td>' + rebateChip(x.rebateState) + '</td><td class="n">' + peso(x.rebate) + '</td><td class="n">' + peso(x.share) + '</td><td class="n">' + peso(x.rebate - x.share) + "</td></tr>";
+    }).join("");
+    var t = sum(rows);
+    var foot = '<tfoot><tr><td colspan="3">Total · ' + t.trainees + ' Trainee' + (t.trainees === 1 ? "" : "s") + '</td><td class="n">' + peso(t.fees) + '</td><td class="n">' + peso(t.paid) + '</td><td class="n">' + peso(t.balance) + '</td><td></td><td></td><td class="n">' + peso(t.rebate) + '</td><td class="n">' + peso(t.share) + '</td><td class="n">' + peso(t.keeps) + "</td></tr></tfoot>";
+    var pager = pages > 1 ? '<div class="pager"><span>Showing ' + (page * per + 1) + "–" + Math.min(rows.length, page * per + per) + " of " + rows.length + '</span><button type="button" class="btn" data-page="' + key + '" data-to="' + (page - 1) + '"' + (page === 0 ? " disabled" : "") + '>Prev</button><button type="button" class="btn" data-page="' + key + '" data-to="' + (page + 1) + '"' + (page === pages - 1 ? " disabled" : "") + ">Next</button></div>" : "";
+    return '<div class="tw"><table><thead><tr><th>Trainee</th><th>Course</th><th>Training Date</th><th class="n">Fee</th><th class="n">Collected</th><th class="n">Balance</th><th>Center</th><th>Rebate</th><th class="n">Rebate Amount</th><th class="n">Agency Share</th><th class="n">New Wave Keeps</th></tr></thead><tbody>' + body + "</tbody>" + foot + "</table></div>" + pager;
+  }
+
+  function design1(rows) {
+    var t = sum(rows), line = function (k, v, big) { return "<div" + (big ? ' class="big"' : "") + "><dt>" + k + "</dt><dd>" + v + "</dd></div>"; };
+    var rail = '<aside class="rail"><dl>' + line("Trainees", t.trainees) + line("Fees Billed", peso(t.fees), 1) + line("Collected", peso(t.paid)) + line("Balance", peso(t.balance)) + line("Paid to Centers", peso(t.centerPaid)) + line("Owed to Centers", peso(t.centerOwed)) + line("Rebates Due", peso(t.due)) + line("Rebates Received", peso(t.received)) + line("Agency Shares", peso(t.share)) + line("New Wave Keeps", peso(t.keeps), 1) + "</dl></aside>";
+    var rowsHtml = byCenter(rows).map(function (g) {
+      var open = state.open[g.name];
+      return "<tr><td>" + dot(g.c) + '<button type="button" class="link" data-open="' + g.name + '" aria-expanded="' + (open ? "true" : "false") + '">' + (open ? "▾ " : "▸ ") + g.name + '</button></td><td class="n">' + g.t.trainees + '</td><td class="n">' + peso(g.t.fees) + '</td><td class="n">' + peso(g.t.paid) + '</td><td class="n">' + peso(g.t.centerPaid) + '</td><td class="n">' + peso(g.t.rebate) + '</td><td class="n">' + peso(g.t.keeps) + "</td></tr>" + (open ? '<tr class="expand"><td colspan="7"><div class="tw">' + traineeTable(g.rows, "d1" + g.c) + "</div></td></tr>" : "");
+    }).join("");
+    return '<div class="d1">' + rail + '<div class="panel"><div class="tw"><table><thead><tr><th>Center</th><th class="n">Trainees</th><th class="n">Fees Billed</th><th class="n">Collected</th><th class="n">Paid to Center</th><th class="n">Rebate</th><th class="n">New Wave Keeps</th></tr></thead><tbody>' + rowsHtml + '</tbody><tfoot><tr><td>Total</td><td class="n">' + t.trainees + '</td><td class="n">' + peso(t.fees) + '</td><td class="n">' + peso(t.paid) + '</td><td class="n">' + peso(t.centerPaid) + '</td><td class="n">' + peso(t.rebate) + '</td><td class="n">' + peso(t.keeps) + "</td></tr></tfoot></table></div></div></div>";
+  }
+  function design2(rows) {
+    var t = sum(rows);
+    var blocks = byCenter(rows).map(function (g) { return '<section class="panel"><div class="panel-head"><h2>' + dot(g.c) + g.name + '</h2><span class="note">' + g.t.trainees + " Trainee" + (g.t.trainees === 1 ? "" : "s") + " · Fees Billed " + peso(g.t.fees) + "</span></div>" + traineeTable(g.rows, "d2" + g.c) + "</section>"; }).join("");
+    return '<div class="stack">' + blocks + '<div class="grand"><span>Trainees <b>' + t.trainees + "</b></span><span>Fees Billed <b>" + peso(t.fees) + "</b></span><span>Collected <b>" + peso(t.paid) + "</b></span><span>Paid to Centers <b>" + peso(t.centerPaid) + "</b></span><span>Rebates <b>" + peso(t.rebate) + "</b></span><span>Agency Shares <b>" + peso(t.share) + "</b></span><span>New Wave Keeps <b>" + peso(t.keeps) + "</b></span></div></div>";
+  }
+  function design3(rows) {
+    var t = sum(rows), courses = {};
+    rows.forEach(function (x) { courses[x.code] = courses[x.code] || { code: x.code, name: x.course }; });
+    var list = Object.keys(courses).sort().map(function (k) { return courses[k]; });
+    var tile = function (k, v) { return '<div class="tile"><span>' + k + "</span><b>" + v + "</b></div>"; };
+    var active = state.cell;
+    var rowsHtml = list.map(function (course) {
+      var cells = CENTERS.map(function (_, c) {
+        var mine = rows.filter(function (x) { return x.code === course.code && x.c === c; });
+        if (!mine.length) return '<td><span class="none">—</span></td>';
+        var key = course.code + "|" + c;
+        return '<td><button type="button" class="cell-btn' + (active === key ? " on" : "") + '" data-cell="' + key + '">' + peso(sum(mine).fees) + "<small>" + mine.length + " Trainee" + (mine.length === 1 ? "" : "s") + "</small></button></td>";
+      }).join("");
+      var all = sum(rows.filter(function (x) { return x.code === course.code; }));
+      return "<tr><td><b>" + course.code + '</b><span class="sub" style="font-family:var(--font)">' + course.name + "</span></td>" + cells + '<td class="n"><b>' + peso(all.fees) + '</b><span class="sub" style="font-family:var(--font)">' + all.trainees + " Trainee" + (all.trainees === 1 ? "" : "s") + "</span></td></tr>";
+    }).join("");
+    var foot = CENTERS.map(function (_, c) { return '<td class="n">' + peso(sum(rows.filter(function (x) { return x.c === c; })).fees) + "</td>"; }).join("");
+    var detail = "";
+    if (active) {
+      var p = active.split("|"), mine = rows.filter(function (x) { return x.code === p[0] && x.c === Number(p[1]); });
+      if (mine.length) detail = '<section class="panel"><div class="panel-head"><h2>' + p[0] + " · " + CENTERS[Number(p[1])] + "</h2></div>" + traineeTable(mine, "d3") + "</section>";
+    }
+    return '<div class="stack"><div class="tiles">' + tile("Trainees", t.trainees) + tile("Fees Billed", peso(t.fees)) + tile("Collected", peso(t.paid)) + tile("Rebates", peso(t.rebate)) + tile("New Wave Keeps", peso(t.keeps)) + '</div><div class="panel"><div class="tw"><table><thead><tr><th>Course</th>' + CENTERS.map(function (n, c) { return '<th class="n">' + dot(c) + n + "</th>"; }).join("") + '<th class="n">Total</th></tr></thead><tbody>' + rowsHtml + '</tbody><tfoot><tr><td>Total</td>' + foot + '<td class="n">' + peso(t.fees) + "</td></tr></tfoot></table></div></div>" + detail + "</div>";
+  }
+  function design4(rows) {
+    var groups = byCenter(rows), t = sum(rows), max = Math.max.apply(null, groups.map(function (g) { return g.t.fees; }));
+    var step = function (k, v, c) { var w = max ? Math.max(v ? 1.5 : 0, v / max * 100) : 0; return '<div class="step"><span>' + k + "</span><b>" + peso(v) + '</b><div class="track"><i style="width:' + w + "%;background:var(--c" + c + ')"></i></div></div>'; };
+    var flows = groups.map(function (g) { return '<div class="flow"><h2>' + dot(g.c) + g.name + ' · <span class="note">' + g.t.trainees + " Trainee" + (g.t.trainees === 1 ? "" : "s") + '</span></h2><div class="flow-row">' + step("Fees Billed", g.t.fees, g.c) + step("Paid to Center", g.t.centerPaid, g.c) + step("Rebate", g.t.rebate, g.c) + step("Agency Share", g.t.share, g.c) + step("New Wave Keeps", g.t.keeps, g.c) + "</div></div>"; }).join("");
+    return '<div class="stack"><div class="panel">' + flows + '</div><div class="panel"><div class="panel-head"><h2>All Trainees</h2></div>' + traineeTable(rows, "d4", true) + "</div></div>";
+  }
+  function bucketsFor(period, end) {
+    var counts = { Daily: 14, Weekly: 12, Monthly: 12, Quarterly: 8, Annually: 5 }, out = [], e = end;
+    for (var i = 0; i < counts[period]; i++) { out.unshift({ from: startOf(period, e), to: e }); e = iso(new Date(day(out[0].from).getTime() - 864e5)); }
+    return out;
+  }
+  function tick(p, b) {
+    var t = day(b.to);
+    if (p === "Daily") return label(b.to, { month: "short", day: "numeric" });
+    if (p === "Weekly") return label(b.from, { month: "short", day: "numeric" });
+    if (p === "Monthly") return label(b.to, { month: "short" });
+    if (p === "Quarterly") return "Q" + (Math.floor(t.getUTCMonth() / 3) + 1) + " '" + String(t.getUTCFullYear()).slice(2);
+    return String(t.getUTCFullYear());
+  }
+  function design5(rows) {
+    var p = state.period === "Custom" ? "Monthly" : state.period, end = state.period === "Custom" ? state.to : state.end;
+    var list = bucketsFor(p, end).map(function (b) {
+      var mine = ROWS.filter(function (x) { return x.date >= b.from && x.date <= b.to; });
+      b.parts = CENTERS.map(function (_, c) { return sum(mine.filter(function (x) { return x.c === c; })).fees; });
+      b.total = b.parts.reduce(function (a, z) { return a + z; }, 0); b.count = mine.length;
+      return b;
+    });
+    var peak = Math.max.apply(null, list.map(function (b) { return b.total; })) || 100000;
+    var stepBase = Math.pow(10, Math.floor(Math.log10(peak / 4))), stepVal = [1, 2, 2.5, 5, 10].map(function (k) { return k * stepBase; }).filter(function (v) { return v * 4 >= peak; })[0];
+    var W = 860, H = 250, L = 52, R = 8, T = 10, B = 26, plotW = W - L - R, plotH = H - T - B, yMax = stepVal * 4, bw = plotW / list.length, barW = Math.min(bw * .56, 34);
+    var y = function (v) { return T + plotH - v / yMax * plotH; };
+    var grid = [0, 1, 2, 3, 4].map(function (i) { var v = stepVal * i, yy = y(v); return '<line class="gridline" x1="' + L + '" x2="' + (W - R) + '" y1="' + yy + '" y2="' + yy + '"></line><text x="' + (L - 7) + '" y="' + (yy + 4) + '" text-anchor="end">' + shortPeso(v) + "</text>"; }).join("");
+    var marks = list.map(function (b, i) {
+      var x = L + i * bw + (bw - barW) / 2, picked = b.to === end, base = T + plotH, shapes = "", tops = b.parts.map(function (v, c) { return { v: v, c: c }; }).filter(function (s) { return s.v > 0; });
+      tops.forEach(function (s, idx) {
+        var h = s.v / yMax * plotH, top = base - h, isTop = idx === tops.length - 1, gap = isTop ? 0 : 2, hh = Math.max(1, h - gap), r = isTop ? Math.min(4, hh) : 0;
+        shapes += '<path fill="var(--c' + s.c + ')" d="M' + x + " " + (top + gap + hh) + "V" + (top + gap + r) + "Q" + x + " " + (top + gap) + " " + (x + r) + " " + (top + gap) + "H" + (x + barW - r) + "Q" + (x + barW) + " " + (top + gap) + " " + (x + barW) + " " + (top + gap + r) + "V" + (top + gap + hh) + 'Z"></path>';
+        base = top;
+      });
+      var every = list.length > 12 ? 2 : 1, show = (list.length - 1 - i) % every === 0;
+      return '<rect class="hit' + (picked ? " picked" : "") + '" x="' + (L + i * bw) + '" y="' + T + '" width="' + bw + '" height="' + (plotH + B - 2) + '" data-bar="' + i + '" tabindex="0" role="button" aria-label="' + tick(p, b) + ": " + peso(b.total) + '"></rect>' + shapes + (show ? '<text x="' + (L + i * bw + bw / 2) + '" y="' + (H - 8) + '" text-anchor="middle">' + tick(p, b) + "</text>" : "");
+    }).join("");
+    design5.list = list; design5.p = p;
+    var t = sum(rows);
+    var legend = '<div class="legend">' + CENTERS.map(function (n, c) { return "<span>" + dot(c) + n + "</span>"; }).join("") + "</div>";
+    var table = byCenter(rows).map(function (g) { return "<tr><td>" + dot(g.c) + g.name + '</td><td class="n">' + g.t.trainees + '</td><td class="n">' + peso(g.t.fees) + '</td><td class="n">' + peso(g.t.paid) + '</td><td class="n">' + peso(g.t.centerPaid) + '</td><td class="n">' + peso(g.t.rebate) + '</td><td class="n">' + peso(g.t.keeps) + "</td></tr>"; }).join("");
+    return '<div class="stack"><div class="panel"><div class="panel-head"><h2>Fees Billed by Training Date</h2>' + legend + '</div><div class="chart" id="chart"><svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Fees billed per period, stacked by center">' + grid + marks + '</svg><div class="tip" id="tip" hidden></div></div></div>' + (rows.length ? '<div class="panel"><div class="tw"><table><thead><tr><th>Center</th><th class="n">Trainees</th><th class="n">Fees Billed</th><th class="n">Collected</th><th class="n">Paid to Center</th><th class="n">Rebate</th><th class="n">New Wave Keeps</th></tr></thead><tbody>' + table + '</tbody><tfoot><tr><td>Total</td><td class="n">' + t.trainees + '</td><td class="n">' + peso(t.fees) + '</td><td class="n">' + peso(t.paid) + '</td><td class="n">' + peso(t.centerPaid) + '</td><td class="n">' + peso(t.rebate) + '</td><td class="n">' + peso(t.keeps) + "</td></tr></tfoot></table></div></div>" : EMPTY) + "</div>";
+  }
+
+  var MENUS = {
+    Accounting: { tabs: ["Dashboard", "Search Trainee", "Approvals", "Transactions ▾", "Reports ▾", "Configuration ▾"], reports: [["Cash and Sales Summary", "Includes Overview", "wait"], ["Sales from Endorsed Courses", "New", "ok"], ["Billing Statement", "", ""], ["Receivables", "Moved", "wait"], ["Cash Position", "Moved", "wait"]], workTitle: "Transactions ▾", work: ["Payments", "Other Income", "Expenses", "Payables"] },
+    Cashier: { tabs: ["Dashboard", "Enrollments ▾", "Accounting ▾", "Reports ▾"], reports: [["Daily Summary", "Moved", "wait"], ["Opening and Closing", "Moved", "wait"], ["Expenses Summary", "Moved", "wait"]], workTitle: "Accounting ▾", work: ["Payments", "Other Income", "Expenses", "Requests"] }
+  };
+  function menuPage() {
+    var col = function (role) {
+      var m = MENUS[role];
+      var bar = '<div class="mock-bar">' + m.tabs.map(function (t) { return '<div class="mock-tab' + (t === "Reports ▾" ? " active" : "") + '"><button type="button" tabindex="-1">' + t + "</button></div>"; }).join("") + "</div>";
+      var reports = '<div class="mock-list"><h2>Reports ▾</h2>' + m.reports.map(function (r) { return '<div class="mock-item"><span>' + r[0] + "</span>" + (r[1] ? '<span class="chip ' + r[2] + '">' + r[1] + "</span>" : "") + "</div>"; }).join("") + "</div>";
+      var work = '<div class="mock-list"><h2>' + m.workTitle + "</h2>" + m.work.map(function (w) { return '<div class="mock-item"><span>' + w + "</span></div>"; }).join("") + "</div>";
+      return '<div class="role-col"><h2>' + role + "</h2>" + bar + reports + work + "</div>";
+    };
+    var map = [["Overview", "Accounting › Reports, first pill", "Inside Cash and Sales Summary"], ["Cash and Sales Summary", "Accounting › Reports, second pill", "Accounting › Reports ▾"], ["Billing Statement", "Accounting › Reports, third pill", "Accounting › Reports ▾"], ["Sales from Endorsed Courses", "New", "Accounting › Reports ▾ and Admin › Reports ▾"], ["Receivables", "Accounting › Transactions ▾", "Accounting › Reports ▾"], ["Cash Position", "Accounting › Transactions ▾", "Accounting › Reports ▾"], ["Summary Report", "Cashier › Accounting ▾ › Report", "Cashier › Reports ▾ › Daily Summary"], ["Opening and Closing", "Cashier › Accounting ▾ › Report", "Cashier › Reports ▾"], ["Expenses Summary", "A PDF link inside Cashier › Expenses", "Cashier › Reports ▾"]];
+    return '<div class="stack"><div class="menus">' + col("Accounting") + col("Cashier") + '</div><div class="panel"><div class="panel-head"><h2>Where Each Report Goes</h2></div><div class="tw"><table><thead><tr><th>Report</th><th>Now</th><th>New</th></tr></thead><tbody>' + map.map(function (r) { return "<tr><td><b>" + r[0] + "</b></td><td>" + r[1] + "</td><td>" + r[2] + "</td></tr>"; }).join("") + "</tbody></table></div></div></div>";
+  }
+
+  var body = document.getElementById("body"), asOf = document.getElementById("as-of");
+  function render() {
+    var isMenu = state.design === 6;
+    document.getElementById("date-bar").hidden = isMenu;
+    document.getElementById("exports").hidden = isMenu;
+    document.getElementById("design-tabs").innerHTML = DESIGNS.map(function (d, i) { return '<button type="button" role="tab" aria-selected="' + (state.design === i + 1) + '" data-design="' + (i + 1) + '">' + d + "</button>"; }).join("");
+    document.getElementById("periods").innerHTML = PERIODS.map(function (p) { return '<button type="button" class="' + (state.period === p ? "on" : "") + '" data-period="' + p + '">' + p + "</button>"; }).join("");
+    var custom = state.period === "Custom";
+    document.getElementById("custom-range").hidden = !custom;
+    ["prev", "next", "as-of"].forEach(function (id) { document.getElementById(id).hidden = custom; });
+    asOf.value = state.end; asOf.max = TODAY;
+    document.getElementById("next").disabled = state.end >= TODAY;
+    document.getElementById("from").value = state.from; document.getElementById("to").value = state.to; document.getElementById("to").max = TODAY;
+    var r = range();
+    document.getElementById("range-label").innerHTML = "<b>" + (custom ? "Custom" : periodName(state.period, state.end)) + "</b> · " + human(r.from) + (r.to !== r.from ? " – " + human(r.to) : "") + " · By Training Date";
+    if (isMenu) { body.innerHTML = menuPage(); return; }
+    var rows = inRange();
+    if (!rows.length && state.design !== 5) { body.innerHTML = EMPTY; return; }
+    body.innerHTML = [design1, design2, design3, design4, design5][state.design - 1](rows);
+  }
+
+  document.addEventListener("click", function (ev) {
+    var el = ev.target.closest ? ev.target.closest("[data-design],[data-period],[data-open],[data-page],[data-cell],[data-bar]") : null;
+    if (!el) return;
+    if (el.dataset.design) { state.design = Number(el.dataset.design); }
+    else if (el.dataset.period) { var was = state.period; state.period = el.dataset.period; if (was === "Custom" && state.period !== "Custom") state.end = TODAY; state.pages = {}; state.cell = null; }
+    else if (el.dataset.open) { state.open[el.dataset.open] = !state.open[el.dataset.open]; }
+    else if (el.dataset.page) { state.pages[el.dataset.page] = Number(el.dataset.to); }
+    else if (el.dataset.cell) { state.cell = state.cell === el.dataset.cell ? null : el.dataset.cell; state.pages.d3 = 0; }
+    else if (el.dataset.bar) { state.end = design5.list[Number(el.dataset.bar)].to; if (state.period === "Custom") state.period = "Monthly"; state.pages = {}; }
+    render();
+  });
+  document.getElementById("prev").addEventListener("click", function () { state.end = shift(state.period, state.end, -1); state.pages = {}; state.cell = null; render(); });
+  document.getElementById("next").addEventListener("click", function () { state.end = shift(state.period, state.end, 1); state.pages = {}; state.cell = null; render(); });
+  asOf.addEventListener("change", function () { if (asOf.value) { state.end = asOf.value > TODAY ? TODAY : asOf.value; state.pages = {}; render(); } });
+  document.getElementById("from").addEventListener("change", function (e) { if (e.target.value) { state.from = e.target.value; state.pages = {}; render(); } });
+  document.getElementById("to").addEventListener("change", function (e) { if (e.target.value) { state.to = e.target.value; state.pages = {}; render(); } });
+  ["btn-excel", "btn-pdf"].forEach(function (id) { document.getElementById(id).addEventListener("click", function () { document.getElementById("export-note").hidden = false; }); });
+
+  function showTip(el) {
+    var tip = document.getElementById("tip"), chart = document.getElementById("chart");
+    if (!tip || !chart || !design5.list) return;
+    var b = design5.list[Number(el.dataset.bar)];
+    tip.innerHTML = "<b>" + tick(design5.p, b) + " · " + b.count + " Trainee" + (b.count === 1 ? "" : "s") + "</b>" + b.parts.map(function (v, c) { return "<div><span>" + dot(c) + CENTERS[c] + "</span><em>" + peso(v) + "</em></div>"; }).join("") + "<div><span><b style='display:inline;margin:0'>Total</b></span><em>" + peso(b.total) + "</em></div>";
+    tip.hidden = false;
+    var box = chart.getBoundingClientRect(), rect = el.getBoundingClientRect();
+    var left = rect.left - box.left + rect.width + 6;
+    if (left + tip.offsetWidth > box.width) left = Math.max(0, rect.left - box.left - tip.offsetWidth - 6);
+    tip.style.left = left + "px"; tip.style.top = "10px";
+  }
+  function hideTip() { var tip = document.getElementById("tip"); if (tip) tip.hidden = true; }
+  body.addEventListener("mouseover", function (ev) { var el = ev.target.closest && ev.target.closest("[data-bar]"); if (el) showTip(el); else hideTip(); });
+  body.addEventListener("focusin", function (ev) { var el = ev.target.closest && ev.target.closest("[data-bar]"); if (el) showTip(el); });
+  body.addEventListener("focusout", hideTip);
+  body.addEventListener("mouseleave", hideTip);
+  body.addEventListener("keydown", function (ev) { if ((ev.key === "Enter" || ev.key === " ") && ev.target.dataset && ev.target.dataset.bar) { ev.preventDefault(); ev.target.dispatchEvent(new MouseEvent("click", { bubbles: true })); } });
+
+  render();
+})();
+</script>

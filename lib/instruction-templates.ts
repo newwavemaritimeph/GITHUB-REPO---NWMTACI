@@ -10,14 +10,18 @@ import { MISMO_COURSE_CODES } from "@/lib/mismo";
 export type InstructionCategory = "STCW" | "In-House";
 export type CategoryTemplate = { category: InstructionCategory; subject: string; bring: string; reminders: string; policies: string };
 
+// Short forms of the Terms and Conditions; the full wording is on the back of the TAR.
 const POLICIES = [
   "Payment: Full payment for 1-day courses; 50% down payment otherwise.",
+  "Partial Payments: Settle in full by the 2nd day of training, particularly for STCW/MARINA courses.",
+  "No Refund: Fees paid are non-refundable for reasons attributable to the trainee.",
   "Reschedule: 5+ days before: Php 350.00. Under 5 days: 50% of the fee + Php 250.00.",
-  "Cancellation: 5+ days before: Php 350.00. Under 5 days: 50% of the fee + Php 250.00.",
+  "Cancellation: 6+ days before: Php 350.00. Under 6 days: transfer to another New Wave course only, within 12 months.",
+  "Training in Progress: No rescheduling or cancellation; all fees paid are forfeited.",
   "Certificate: Released after all requirements and balances are complete.",
 ].join("\n");
 
-/** The same text as migration 202610290073, used until it is run. */
+/** The same text as migrations 202610290073 and 202610290077, used until they are run. */
 export const DEFAULT_CATEGORY_TEMPLATES: Record<InstructionCategory, CategoryTemplate> = {
   STCW: {
     category: "STCW", subject: "Your training instructions · {{course}}", policies: POLICIES,

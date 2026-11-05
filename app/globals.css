@@ -5643,6 +5643,7 @@ code {
 .terms-section strong { display: block; font-size: 14px; color: var(--blue-dark); margin-bottom: 4px; }
 .terms-section ul { margin: 0; padding-left: 18px; }
 .terms-section li { font-size: 13px; color: var(--ink-soft); line-height: 1.55; margin-bottom: 3px; }
+.terms-section li b { color: var(--blue-dark); }
 .terms-footer { font-size: 12.5px; font-style: italic; color: var(--orange-dark); margin: 8px 0 0; }
 
 @media (max-width: 680px) {
