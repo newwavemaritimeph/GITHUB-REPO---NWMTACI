@@ -3,7 +3,8 @@ import path from "node:path";
 import { createTrainingInstructionsPdf } from "@/lib/documents";
 import { loadDocumentControl, type DocumentControl } from "@/lib/document-controls";
 import { classroomJoin, type ClassroomJoin } from "@/lib/classroom";
-import { remindersFor, DEFAULT_CATEGORY_TEMPLATES, fillPlaceholders, instructionCategoryOf, instructionMode, isOnlineMode, linesOf, policyPairs, sheetSteps, type InstructionCategory } from "@/lib/instruction-templates";
+import { arriveNote, remindersFor, DEFAULT_CATEGORY_TEMPLATES, fillPlaceholders, instructionCategoryOf, instructionMode, isModule, isOnlineMode, linesOf, moduleNote, moduleSheetSteps, policyPairs, sheetSteps, type InstructionCategory } from "@/lib/instruction-templates";
+import { automaticEndDate } from "@/lib/scheduling";
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
@@ -19,6 +20,8 @@ export type InstructionDetails = {
   formalName: string; nwmtaciNumber: string; srn: string; batchNumber: string; mode: string; duration: string;
   // Design 11 (3 Nov 2026): the category's template, filled for this trainee.
   category: InstructionCategory; firstName: string; online: boolean; bring: string[]; reminders: string[]; policies: [string, string][];
+  // An In-House course given online is a module (owner, 5 Nov 2026).
+  module: boolean; arriveNote: string; bringTitle: string;
 };
 /** "08:00" → "8:00 AM". */
 const clock = (v?: string | null) => { if (!v) return ""; const [h, m] = v.split(":").map(Number); return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`; };
@@ -26,7 +29,7 @@ const clock = (v?: string | null) => { if (!v) return ""; const [h, m] = v.split
 /** Everything the instructions PDF and email need for one enrollment, or null when it does not exist. */
 export async function loadInstructionDetails(db: Admin, enrollmentId: string): Promise<InstructionDetails | null> {
   const { data } = await db.from("enrollments")
-    .select("id,enrollment_number,enrollment_status,course_id,batch_id,scheduled_on,trainees(id,legal_first_name,legal_middle_name,legal_last_name,suffix,email,srn,trainee_number),courses(name,code,google_classroom_link,duration_label,training_mode,course_categories(name)),batches(batch_number,mode,starts_on,ends_on,daily_start,daily_end,venue,classrooms(name))")
+    .select("id,enrollment_number,enrollment_status,course_id,batch_id,scheduled_on,partner_offer_id,trainees(id,legal_first_name,legal_middle_name,legal_last_name,suffix,email,srn,trainee_number),courses(name,code,google_classroom_link,duration_label,training_mode,course_categories(name)),batches(batch_number,mode,starts_on,ends_on,daily_start,daily_end,venue,classrooms(name))")
     .eq("id", enrollmentId).maybeSingle();
   if (!data) return null;
   const trainee = one(data.trainees), course = one(data.courses), batch = one(data.batches);
@@ -49,16 +52,22 @@ export async function loadInstructionDetails(db: Admin, enrollmentId: string): P
   // A course's own template still wins for its subject and its "- " reminder lines.
   const ownReminders = body.split("\n").map((l) => l.trim()).filter((l) => /^[-•]\s/.test(l)).map((l) => l.replace(/^[-•]\s*/, ""));
   const join = batchClass?.google_classroom_link ? classroomJoin(batchClass.google_classroom_link, batchClass.google_classroom_code) : classroomJoin(course?.google_classroom_link, (codeRow as { google_classroom_code?: string | null } | null)?.google_classroom_code);
-  const mode = instructionMode(b2?.mode, (course as { training_mode?: string | null } | null)?.training_mode, category), online = isOnlineMode(mode);
+  // An endorsed course is held at the partner center, never as a New Wave module.
+  const row = data as { partner_offer_id?: string | null };
+  const mode = instructionMode(b2?.mode, (course as { training_mode?: string | null } | null)?.training_mode, row.partner_offer_id ? "STCW" : category), online = isOnlineMode(mode);
+  const asModule = !row.partner_offer_id && isModule(category, mode), hasClass = !!(join.url || join.code);
+  // A course booked by date runs for its duration, so the trainee sees by when to finish.
+  const lastDay = asModule && data.scheduled_on ? automaticEndDate(data.scheduled_on, course?.duration_label ?? "1 day") : null;
+  const dates = batch?.starts_on ? `${fmtDate(batch.starts_on)}${batch.ends_on && batch.ends_on !== batch.starts_on ? ` - ${fmtDate(batch.ends_on)}` : ""}` : data.scheduled_on ? `${fmtDate(data.scheduled_on)}${lastDay && lastDay !== data.scheduled_on ? ` - ${fmtDate(lastDay)}` : ""}` : "To be scheduled";
   const details: InstructionDetails = {
     enrollmentId: data.id, enrollmentNumber: data.enrollment_number, enrollmentStatus: data.enrollment_status,
     traineeName: trainee ? `${trainee.legal_first_name} ${trainee.legal_middle_name ?? ""} ${trainee.legal_last_name}`.replace(/\s+/g, " ").trim() : "Trainee",
     traineeEmail: trainee?.email ?? null,
     courseName: course ? `${course.code ? course.code + " - " : ""}${course.name}` : "Training course",
     // Batch range, else the picked / endorsed start date.
-    dates: batch?.starts_on ? `${fmtDate(batch.starts_on)}${batch.ends_on && batch.ends_on !== batch.starts_on ? ` - ${fmtDate(batch.ends_on)}` : ""}` : data.scheduled_on ? fmtDate(data.scheduled_on) : "To be scheduled",
-    time: batch?.daily_start ? `${clock(batch.daily_start)} - ${clock(batch.daily_end) || "5:00 PM"}` : "8:00 AM - 5:00 PM",
-    classroom: one(batch?.classrooms)?.name ?? batch?.venue ?? (!online ? "To be assigned" : join.url || join.code ? "Google Classroom" : "Class Link to Follow"),
+    dates,
+    time: asModule ? "Self-paced" : batch?.daily_start ? `${clock(batch.daily_start)} - ${clock(batch.daily_end) || "5:00 PM"}` : "8:00 AM - 5:00 PM",
+    classroom: (!asModule && (one(batch?.classrooms)?.name ?? batch?.venue)) || (!online ? "To be assigned" : hasClass ? "Google Classroom" : "Class Link to Follow"),
     control: await loadDocumentControl(db, "instructions"),
     join,
     subject: tpl?.subject ?? template.subject,
@@ -66,14 +75,15 @@ export async function loadInstructionDetails(db: Admin, enrollmentId: string): P
     category,
     firstName: trainee?.legal_first_name ?? "",
     online,
+    module: asModule, arriveNote: asModule ? moduleNote(dates) : arriveNote(online), bringTitle: asModule ? "What You Need" : "What to Bring",
     bring: linesOf(template.bring),
-    reminders: remindersFor(ownReminders.length ? ownReminders : linesOf(template.reminders), !!(join.url || join.code)),
+    reminders: remindersFor(ownReminders.length ? ownReminders : linesOf(template.reminders), hasClass),
     policies: policyPairs(template.policies),
     formalName: trainee ? `${trainee.legal_last_name}, ${[trainee.legal_first_name, trainee.legal_middle_name, t2?.suffix].filter(Boolean).join(" ")}`.toUpperCase() : "TRAINEE",
     nwmtaciNumber: (appRow as { application_number?: string | null } | null)?.application_number ?? t2?.trainee_number ?? "",
     srn: t2?.srn ?? "",
     batchNumber: b2?.batch_number ?? "",
-    mode,
+    mode: asModule ? "Module" : mode,
     duration: course?.duration_label ?? "",
   };
   const values = { trainee: details.traineeName, course: details.courseName, dates: details.dates, time: details.time, room: details.classroom, classroom_link: details.join.url ?? "", class_code: details.join.code ?? "" };
@@ -111,7 +121,9 @@ export async function buildTrainingInstructionsPdf(details: InstructionDetails, 
     bring: details.bring,
     reminders: details.reminders,
     policies: details.policies,
-    steps: sheetSteps(details.online, !!(details.join.url || details.join.code)),
+    arriveNote: details.arriveNote,
+    bringTitle: details.bringTitle,
+    steps: details.module ? moduleSheetSteps(!!(details.join.url || details.join.code)) : sheetSteps(details.online, !!(details.join.url || details.join.code)),
     logoBytes: await logoBytes(origin),
   });
 }

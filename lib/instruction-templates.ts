@@ -21,7 +21,7 @@ const POLICIES = [
   "Certificate: Released after all requirements and balances are complete.",
 ].join("\n");
 
-/** The same text as migrations 202610290073 and 202610290077, used until they are run. */
+/** The same text as migrations 202610290073, 202610290077 and 202610290081, used until they are run. */
 export const DEFAULT_CATEGORY_TEMPLATES: Record<InstructionCategory, CategoryTemplate> = {
   STCW: {
     category: "STCW", subject: "Your training instructions · {{course}}", policies: POLICIES,
@@ -30,8 +30,8 @@ export const DEFAULT_CATEGORY_TEMPLATES: Record<InstructionCategory, CategoryTem
   },
   "In-House": {
     category: "In-House", subject: "Your training instructions · {{course}}", policies: POLICIES,
-    bring: "Valid ID\nOwn tumbler and ballpen\nLaptop or phone with camera for online classes",
-    reminders: "Join the Google Classroom with the link and class code the day before.\nFull attendance is required; keep your camera on for online classes.\nComplete the post-test and the evaluation to release your certificate.",
+    bring: "Laptop or phone with internet\nThe Google (Gmail) account you registered with",
+    reminders: "The module is sent through Google Classroom. Join the class with the link and class code.\nFinish the module by your last training day. The post-test and evaluation links come by email at 4:00 PM that day.\nPass the post-test and answer the evaluation to release your certificate.",
   },
 };
 
@@ -59,14 +59,35 @@ export const isOnlineMode = (mode: string | null | undefined) => /online|virtual
 export const instructionMode = (batchMode: string | null | undefined, courseMode: string | null | undefined, category: InstructionCategory) =>
   batchMode || courseMode || (category === "In-House" ? "Online" : "Face-to-Face");
 export const arriveNote = (online: boolean) => (online ? "log in by 7:45 AM" : "report by 7:30 AM");
+/** An In-House course given online is a module sent through Google Classroom (owner, 5 Nov 2026), so no class hours or log-in time. */
+export const isModule = (category: InstructionCategory, mode: string | null | undefined) => category === "In-House" && isOnlineMode(mode);
+export const moduleNote = (dates: string) => (!/\d/.test(dates) ? "finish the module, then take the post-test" : dates.includes(" - ") ? "finish the module within these dates" : "finish the module on this date");
 
 /** The five boxes on the sheet. */
 export const sheetSteps = (online: boolean, hasClass: boolean): [string, string][] => [
   ["Before", hasClass ? "Join the Google Classroom the day before." : "Check your name on the TAR."],
   ["Arrive", online ? "Log in by 7:45 AM with your valid ID." : "Report by 7:30 AM with your valid ID."],
   ["During", online ? "Camera on, full attendance." : "Wear the uniform, full attendance."],
-  ["After", "Take the post-test and the evaluation."],
+  ["After", online ? "Take the post-test and the evaluation." : "Pass the assessment, then fill out the evaluation."],
   ["Certificate", "Released once requirements and balance are complete."],
+];
+
+/** The five boxes on a module's sheet. The post-test opens on the last training day (owner's Plan 4, 5 Nov 2026). */
+export const moduleSheetSteps = (hasClass: boolean): [string, string][] => [
+  ["Join", hasClass ? "Join the Google Classroom with the link above." : "Your class link follows by email."],
+  ["Study", "Finish the module in the class."],
+  ["Post-Test", "The link comes by email at 4:00 PM on your last training day."],
+  ["Evaluation", "The link is in the same email."],
+  ["Certificate", "Released once requirements and balance are complete."],
+];
+
+/** The five numbered lines in a module's email. */
+export const moduleEmailSteps = (hasClass: boolean): string[] => [
+  hasClass ? "Join the Google Classroom with the button above." : "Wait for your class link; it follows by email.",
+  "Finish the module posted in the class by your last training day.",
+  "Take the post-test; the link comes by email at 4:00 PM on your last training day.",
+  "Answer the evaluation; the link is in the same email.",
+  "Your certificate is released once requirements and balances are complete.",
 ];
 
 /** The five numbered lines in the email. */
@@ -77,6 +98,7 @@ export const emailSteps = (online: boolean, hasClass: boolean, room: string, fir
 type EmailDetails = {
   subject: string; firstName: string; formalName: string; nwmtaciNumber: string; srn: string; enrollmentNumber: string; courseName: string; batchNumber: string;
   dates: string; time: string; classroom: string; mode: string; online: boolean; join: ClassroomJoin; bring: string[]; reminders: string[]; policies: [string, string][];
+  module: boolean; arriveNote: string; bringTitle: string;
 };
 
 const listHtml = (items: string[]) => items.map((x) => `<li style="margin:0 0 3px">${escapeHtml(x)}</li>`).join("");
@@ -84,11 +106,12 @@ const listHtml = (items: string[]) => items.map((x) => `<li style="margin:0 0 3p
 /** Everything template training.instructions v2 fills. Variables ending in _html are built here, already escaped. */
 export function instructionEmailVariables(d: EmailDetails) {
   const firstDay = d.dates.split(" - ")[0];
-  const steps = emailSteps(d.online, !!(d.join.url || d.join.code), d.classroom, firstDay);
+  const hasClass = !!(d.join.url || d.join.code);
+  const steps = d.module ? moduleEmailSteps(hasClass) : emailSteps(d.online, hasClass, d.classroom, firstDay);
   const classroom = classroomEmailBlocks(d.join);
   return {
     email_subject: d.subject, first_name: d.firstName, formal_name: d.formalName, nwmtaci_number: d.nwmtaciNumber, srn_text: d.srn ? ` · SRN ${d.srn}` : "", enrollment_number: d.enrollmentNumber,
-    course_name: d.courseName, dates: d.dates, time: d.time, arrive_note: arriveNote(d.online), classroom: d.classroom, where_detail: `${d.mode} · ${d.courseName}${d.batchNumber ? ` · Batch ${d.batchNumber}` : ""}`,
+    course_name: d.courseName, dates: d.dates, time: d.time, arrive_note: d.arriveNote, bring_title: d.bringTitle.toUpperCase(), classroom: d.classroom, where_detail: `${d.mode} · ${d.courseName}${d.batchNumber ? ` · Batch ${d.batchNumber}` : ""}`,
     bring_html: listHtml(d.bring), reminders_html: listHtml(d.reminders),
     steps_html: steps.map((s, i) => `<tr><td style="width:30px;padding:0 8px 8px 0;vertical-align:top"><div style="width:24px;height:24px;line-height:24px;border-radius:50%;background:#0571D0;color:#ffffff;text-align:center;font-weight:700;font-size:12px">${i + 1}</div></td><td style="padding:2px 0 8px;font-size:13.5px;line-height:1.45">${escapeHtml(s)}</td></tr>`).join(""),
     policies_html: d.policies.map(([k, v]) => `${k ? `<b style="color:#0f2638">${escapeHtml(k)}:</b> ` : ""}${escapeHtml(v)}`).join("<br>"),

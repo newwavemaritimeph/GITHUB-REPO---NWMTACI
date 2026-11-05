@@ -165,7 +165,7 @@ await save("09-training-instructions.pdf", "Training Instructions", await create
   control: ctl("NW-REG-04"),
   traineeName: "Juan Perez Dela Cruz", formalName: "DELA CRUZ, JUAN PEREZ", nwmtaciNumber: "NWMTACI-0000411", srn: "SRN-2210441",
   courseName: "UBT-PSSR - Updating Training on Basic Training", batchNumber: "26-609-139", dateOfTraining: "Oct 12, 2026", time: "8:00 AM - 5:00 PM", classroom: "ROOM 101",
-  mode: "Face-to-face", online: false, reference: "ENR-2026-000871", issuedAt: "Oct 9, 2026", categoryLabel: "STCW Courses",
+  mode: "Face-to-face", online: false, reference: "ENR-2026-000871", issuedAt: "Oct 9, 2026", categoryLabel: "STCW Courses", arriveNote: "report by 7:30 AM", bringTitle: "What to Bring",
   bring: linesOf(DEFAULT_CATEGORY_TEMPLATES.STCW.bring), reminders: linesOf(DEFAULT_CATEGORY_TEMPLATES.STCW.reminders), policies: policyPairs(DEFAULT_CATEGORY_TEMPLATES.STCW.policies), steps: sheetSteps(false, false),
 }));
 

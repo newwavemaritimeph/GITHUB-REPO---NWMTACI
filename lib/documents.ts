@@ -66,6 +66,8 @@ export type TrainingInstructionsSnapshot = {
   reference: string;
   issuedAt: string;
   categoryLabel: string;
+  arriveNote: string;
+  bringTitle: string;
   bring: string[];
   reminders: string[];
   policies: [string, string][];
@@ -122,7 +124,7 @@ export async function createTrainingInstructionsPdf(s: TrainingInstructionsSnaps
 
   const hasClass = !!(s.googleClassroomLink || s.classCode), gap = 8, colW = (W - 2 * M - gap) / 2, bottom = M + 30;
   const whereLine = hasClass ? `${s.googleClassroomLink ?? ""}${s.classCode ? ` | code ${s.classCode}` : ""}` : s.online ? "" : "Bel-Air Apartment, 1020 Roxas Boulevard, Ermita";
-  const whenLine = `${s.time} | ${s.online ? "log in by 7:45 AM" : "report by 7:30 AM"}`;
+  const whenLine = `${s.time} | ${s.arriveNote}`;
 
   // Measured first (draw = false), then drawn at the first size that fits.
   const lay = (k: number, draw: boolean) => {
@@ -145,7 +147,7 @@ export async function createTrainingInstructionsPdf(s: TrainingInstructionsSnaps
     const when: Line[] = [{ text: s.dateOfTraining, font: bold }, { text: whenLine }];
     const where: Line[] = [{ text: `${s.classroom} | ${s.mode}`, font: bold }, ...(whereLine ? [{ text: whereLine }] : [])];
     const bring = s.bring.map((text): Line => ({ text, bullet: true })), reminders = s.reminders.map((text): Line => ({ text, bullet: true }));
-    for (const [[a, ac, al], [b, bc, bl]] of [[["When", c.blue, when], ["Where", c.navy, where]], [["What to Bring", c.orange, bring], ["Reminders", c.green, reminders]]] as [[string, typeof c.ink, Line[]], [string, typeof c.ink, Line[]]][]) {
+    for (const [[a, ac, al], [b, bc, bl]] of [[["When", c.blue, when], ["Where", c.navy, where]], [[s.bringTitle, c.orange, bring], ["Reminders", c.green, reminders]]] as [[string, typeof c.ink, Line[]], [string, typeof c.ink, Line[]]][]) {
       const h = 8 + head + 2 + Math.max(bodyH(al, colW), bodyH(bl, colW)) + 6;
       if (draw) { card(M, y, h, a, ac, al); card(M + colW + gap, y, h, b, bc, bl); }
       y -= h + 6;
