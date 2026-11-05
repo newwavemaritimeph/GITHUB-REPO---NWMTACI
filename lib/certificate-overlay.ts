@@ -1,5 +1,5 @@
 import QRCode from "qrcode";
-import { StandardFonts, rgb, type PDFDocument, type PDFPage } from "pdf-lib";
+import { PDFArray, PDFName, PDFRawStream, StandardFonts, decodePDFRawStream, rgb, type PDFDocument, type PDFPage, type PDFStream } from "pdf-lib";
 import { justified, ordinal } from "@/lib/certificate-layouts";
 
 /**
@@ -24,7 +24,12 @@ export type TemplateFieldsV2 = {
   photo?: { x: number; y: number; w: number; h: number };
   /** The name and the Conducted paragraph in a sans font, as in the MARINA STCW Word files (Arial). */
   sans?: boolean;
+  /** Sample text printed on the owner's PDF, removed before filling (UBT-PSSR, owner 5 Nov 2026). */
+  lift?: LiftZone[];
+  /** Words the owner's PDF lacks or has wrong, drawn on every certificate: centred on cx, or from x. */
+  fixed?: { text: string; cx?: number; x?: number; y: number; size: number; bold?: boolean }[];
 };
+export type LiftZone = { yMin: number; yMax: number; xMax?: number };
 export type OverlayFill = { name: string; startsOn: string | null; endsOn: string | null; issuedOn: string; certificateNumber: string; registrationNumber: string; verifyUrl: string | null;
   /** Template view (owner, 20 Oct 2026): the description with blank dates, a "TRAINEE NAME" guide, no numbers or QR. */
   blank?: boolean };
@@ -48,9 +53,36 @@ export function issuedText(text: string, issuedOn: string) {
   return text.replace(/Issued this\s*_+\s*day of\s*_+\s*20_+/, `Issued this ${day}${ordinal(day)} day of ${month} ${issuedOn.slice(0, 4)}`);
 }
 
+/**
+ * Removes the text blocks of a template page that start inside the zones, so a PDF made with sample text can be
+ * used as it is. Call it on the template's own document before copying the page. Returns how many were removed.
+ */
+export function liftTemplateText(doc: PDFDocument, page: PDFPage, zones: LiftZone[]) {
+  const contents = page.node.Contents();
+  if (!contents) return 0;
+  const streams = contents instanceof PDFArray ? contents.asArray().map((r) => doc.context.lookup(r)) : [contents];
+  let text = "";
+  for (const s of streams) text += Buffer.from(s instanceof PDFRawStream ? decodePDFRawStream(s).decode() : (s as PDFStream).getContents()).toString("latin1") + "\n";
+  let removed = 0;
+  const kept = text.replace(/BT\s[\s\S]*?\sET/g, (block) => {
+    const m = block.match(/1 0 0 1 (-?[\d.]+) (-?[\d.]+) Tm/);
+    if (!m) return block;
+    const x = Number(m[1]), y = Number(m[2]);
+    if (!zones.some((z) => y >= z.yMin && y <= z.yMax && (z.xMax === undefined || x < z.xMax))) return block;
+    removed += 1;
+    return "";
+  });
+  if (removed) page.node.set(PDFName.of("Contents"), doc.context.register(doc.context.flateStream(Buffer.from(kept, "latin1"))));
+  return removed;
+}
+
 export async function drawTemplateFields(pdf: PDFDocument, page: PDFPage, f: TemplateFieldsV2, fill: OverlayFill) {
   const reg = await pdf.embedFont(StandardFonts.TimesRoman), bold = await pdf.embedFont(StandardFonts.TimesRomanBold);
   const body = f.sans ? await pdf.embedFont(StandardFonts.Helvetica) : reg, bodyBold = f.sans ? await pdf.embedFont(StandardFonts.HelveticaBold) : bold;
+  for (const w of f.fixed ?? []) {
+    const font = w.bold ? bodyBold : body;
+    page.drawText(w.text, { x: w.x ?? (w.cx ?? 0) - font.widthOfTextAtSize(w.text, w.size) / 2, y: w.y, size: w.size, font, color: INK });
+  }
   if (f.name) {
     const font = f.name.bold === false ? body : bodyBold, name = fill.blank ? "TRAINEE NAME" : safe(fill.name.toUpperCase());
     let size = f.name.size;

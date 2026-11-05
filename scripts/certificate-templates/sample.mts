@@ -2,13 +2,14 @@
 //   npx tsx scripts/certificate-templates/sample.mts <out folder> <CODE> <sample.pdf> "<Name>" <start> <end> <Cert No.> <Reg No.>
 import fs from "node:fs";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import { drawTemplateFields } from "@/lib/certificate-overlay";
+import { drawTemplateFields, liftTemplateText } from "@/lib/certificate-overlay";
 import { detectPhotoBox } from "@/lib/certificate-template";
 const [dir, code, out, name, start, end, cert, regNo] = process.argv.slice(2);
 const bytes = new Uint8Array(fs.readFileSync(`${dir}/${code}.pdf`));
 const fields = JSON.parse(fs.readFileSync(`${dir}/${code}.json`, "utf8"));
 // As lib/certificates.ts does: the template is placed as an embedded page, so its graphics state cannot leak into the overlay.
 const src = await PDFDocument.load(bytes), pdf = await PDFDocument.create();
+if (fields.lift) console.log("lifted", liftTemplateText(src, src.getPages()[0], fields.lift));
 const [copied] = await pdf.copyPages(src, [0]);
 const page = pdf.addPage([copied.getWidth(), copied.getHeight()]);
 page.drawPage(await pdf.embedPage(copied), { x: 0, y: 0, width: copied.getWidth(), height: copied.getHeight() });

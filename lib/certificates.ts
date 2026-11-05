@@ -5,7 +5,7 @@ import { formatNumber, certificateState, evaluationRequiredFor, type Certificate
 import { corrected, type CertificateCorrections } from "@/lib/certificate-photo";
 import { detectPhotoBox } from "@/lib/certificate-template";
 import { certificateLayout, isHazmatCfr } from "@/lib/certificate-layouts";
-import { drawTemplateFields, isFieldsV2 } from "@/lib/certificate-overlay";
+import { drawTemplateFields, isFieldsV2, liftTemplateText } from "@/lib/certificate-overlay";
 import { bundledLayout } from "@/lib/certificate-template-layouts";
 import { postTestStatus } from "@/lib/post-test-server";
 import { newVerifyCode, verifyUrl } from "@/lib/certificate-verify";
@@ -202,6 +202,8 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
   let page;
   if (isPdf(tpl.bytes)) {
     const src = await PDFDocument.load(tpl.bytes);
+    const lift = bundledLayout(tpl.storagePath)?.lift;
+    if (lift) liftTemplateText(src, src.getPages()[0], lift);
     const [copied] = await pdf.copyPages(src, [0]);
     page = pdf.addPage([copied.getWidth(), copied.getHeight()]);
     page.drawPage(await pdf.embedPage(copied), { x: 0, y: 0, width: copied.getWidth(), height: copied.getHeight() });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
-import { drawTemplateFields, isFieldsV2 } from "@/lib/certificate-overlay";
+import { drawTemplateFields, isFieldsV2, liftTemplateText } from "@/lib/certificate-overlay";
 import { bundledLayout } from "@/lib/certificate-template-layouts";
 import { detectPhotoBox } from "@/lib/certificate-template";
 import { requireStaff } from "@/lib/security";
@@ -30,6 +30,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     let out: Uint8Array = bytes;
     if (template.storage_path.toLowerCase().endsWith(".pdf") && fields) {
       const src = await PDFDocument.load(bytes), pdf = await PDFDocument.create();
+      if (fields.lift) liftTemplateText(src, src.getPages()[0], fields.lift);
       const [copied] = await pdf.copyPages(src, [0]);
       const page = pdf.addPage([copied.getWidth(), copied.getHeight()]);
       page.drawPage(await pdf.embedPage(copied), { x: 0, y: 0, width: copied.getWidth(), height: copied.getHeight() });

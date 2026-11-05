@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { PDFRawStream } from "pdf-lib";
 import { conductedText } from "../lib/certificate-overlay";
 import { bundledLayout } from "../lib/certificate-template-layouts";
 import layouts from "../lib/certificate-template-layouts.json";
@@ -32,6 +33,23 @@ describe("UBT-PSSR training certificate", () => {
     expect(f.certNo?.bold && f.regNo?.bold && f.sans).toBe(true);
     expect(f.photo).toBeTruthy();
     expect(f.qr).toBeUndefined();
+  });
+  it("uses the owner's own PDF as it is: the sample text comes off and the title is printed", async () => {
+    const { PDFDocument, PDFName, decodePDFRawStream, StandardFonts } = await import("pdf-lib");
+    const { liftTemplateText } = await import("../lib/certificate-overlay");
+    for (const name of ["UBT-PSSR--TEMPLATE-.pdf", "NWMTACI-COC---UBT-PSSR.pdf"]) {
+      const f = bundledLayout(`course/00000000-0000-0000-0000-000000000000-${name}`)!;
+      expect(f.lift?.length).toBe(4);
+      expect(f.fixed?.map((w) => w.text)).toContain("Operations Manager");
+    }
+    const f = bundledLayout("course/00000000-0000-0000-0000-000000000000-UBT-PSSR--TEMPLATE-.pdf")!;
+    const made = await PDFDocument.create(), font = await made.embedFont(StandardFonts.Helvetica), blank = made.addPage([595.5, 842]);
+    for (const [text, x, y] of [["TRAINEES NAME", 200, 540], ["Keep me", 200, 622], ["conducted on May 25", 56, 350], ["Issued this 25th", 56, 267], ["Operational Manager", 60, 184], ["President", 400, 184]] as const) blank.drawText(text, { x, y, size: 12, font });
+    const doc = await PDFDocument.load(await made.save()), page = doc.getPages()[0];
+    expect(liftTemplateText(doc, page, f.lift!)).toBe(4);
+    const stream = doc.context.lookup(page.node.get(PDFName.of("Contents")));
+    const left = new TextDecoder("latin1").decode(decodePDFRawStream(stream as PDFRawStream).decode());
+    expect((left.match(/BT\s/g) ?? []).length).toBe(2);
   });
   it("draws every field on a page", async () => {
     const { PDFDocument } = await import("pdf-lib");
