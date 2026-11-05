@@ -20,14 +20,32 @@ export function voidStateOf(data: PortalData, p: VoidablePayment) {
   return { state: "Valid" as const, note: rejected ? `Void rejected: ${rejected.decision_remarks ?? ""}` : "" };
 }
 
-/** Status chip and, for the Cashier, the Request Void button. */
-export function PaymentVoidCell({ data, payment, canRequest, busy, post }: { data: PortalData; payment: VoidablePayment; canRequest: boolean; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<unknown> }) {
+type Post = (body: Record<string, unknown>, successText?: string) => Promise<unknown>;
+
+/** The one status a payment shows (owner, 5 Nov 2026): any payment that is not void is valid, so Valid no longer shows on its own. */
+export function paymentStatus(data: PortalData, payment: VoidablePayment & { verification_state?: string | null }) {
   const s = voidStateOf(data, payment);
-  async function request() {
-    const reason = await askReason(`Void ${payment.payment_number} (${payment.method}, ₱${(Number(payment.amount_centavos) / 100).toLocaleString("en-PH", { minimumFractionDigits: 2 })})? Accounting approves it.`, REASONS.paymentVoid, { title: "Request Void", okLabel: "Send to Accounting" });
-    if (!reason || reason.trim().length < 5) return;
-    await post({ action: "payment-void-request", paymentId: payment.id, reason: reason.trim() }, "Void request sent to Accounting.").catch(() => undefined);
-  }
+  if (s.state === "Void") return { label: "VOID", tone: "cancelled", note: s.note, canVoid: false };
+  if (s.state === "Requested") return { label: "Void Requested", tone: "orange", note: s.note, canVoid: false };
+  const v = payment.verification_state ?? "Verified";
+  return { label: v === "Duplicate Review" ? "Duplicate Reference" : v, tone: v === "Verified" ? "active" : "orange", note: s.note, canVoid: true };
+}
+
+async function askVoid(payment: VoidablePayment, post: Post) {
+  const reason = await askReason(`Void ${payment.payment_number} (${payment.method}, ₱${(Number(payment.amount_centavos) / 100).toLocaleString("en-PH", { minimumFractionDigits: 2 })})? Accounting approves it.`, REASONS.paymentVoid, { title: "Request Void", okLabel: "Send to Accounting" });
+  if (!reason || reason.trim().length < 5) return;
+  await post({ action: "payment-void-request", paymentId: payment.id, reason: reason.trim() }, "Void request sent to Accounting.").catch(() => undefined);
+}
+
+/** Request Void as a small icon, named on hover. */
+export function RequestVoidIcon({ payment, busy, post }: { payment: VoidablePayment; busy: boolean; post: Post }) {
+  return <button type="button" className="pv-icon d" title="Request Void" aria-label={`Request Void ${payment.payment_number}`} disabled={busy} onClick={() => void askVoid(payment, post)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m6 6 12 12" /></svg></button>;
+}
+
+/** Status chip and, for the Cashier, the Request Void button. */
+export function PaymentVoidCell({ data, payment, canRequest, busy, post }: { data: PortalData; payment: VoidablePayment; canRequest: boolean; busy: boolean; post: Post }) {
+  const s = voidStateOf(data, payment);
+  const request = () => askVoid(payment, post);
   return <span className="pv-cell">
     {s.state === "Void" ? <Badge tone="cancelled">VOID</Badge> : s.state === "Requested" ? <Badge tone="orange">Void Requested</Badge> : <Badge tone="active">Valid</Badge>}
     {s.note && <small>{s.note}</small>}
