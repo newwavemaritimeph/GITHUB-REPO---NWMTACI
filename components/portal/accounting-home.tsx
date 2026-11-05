@@ -266,7 +266,6 @@ function PaymentReceipts({ pills }: { pills: ReactNode }) {
 
 const EXPENSE_STATES = ["All", "For approval", "Awaiting release", "Released", "Rejected"] as const;
 export function AccountingExpenses({ data }: { data: PortalData }) {
-  // Opens on this month (owner, 3 Nov 2026).
   const p = usePeriod();
   const [st, setSt] = useState<(typeof EXPENSE_STATES)[number]>("All");
   type Ex = PortalData["expenses"][number] & { payment_channel?: string | null; reference_number?: string | null; voucher_number?: string | null; paid_at?: string | null; approved_at?: string | null };
@@ -281,7 +280,7 @@ export function AccountingExpenses({ data }: { data: PortalData }) {
   return <div className="portal-page cx ac">
     <TxHead title="Expenses" note={<span className="ac-ro">View only — the Cashier records and releases expenses</span>} />
     <MonthBar p={p} what="Expenses" count={`${list.length} voucher${list.length === 1 ? "" : "s"}`} />
-    <div className="ac-rail">
+    {p.picked && <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Released by Channel</h2></div><FigureColumn rows={byChannel} unit="voucher" totalLabel="Total released" /></section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By Status</h2></div>
@@ -296,7 +295,7 @@ export function AccountingExpenses({ data }: { data: PortalData }) {
           {pg.shown.map((e) => <tr key={e.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher_number ?? e.expense_number}</span><small>{fmtDate(day(e.created_at))}</small></td><td data-l="Payee"><strong>{e.payee}</strong><small>{e.category}</small></td><td data-l="Channel">{e.payment_channel || "—"}{e.reference_number ? <small className="cx-mono">{e.reference_number}</small> : null}</td><td data-l="Status"><Badge tone={tone(label(e))}>{label(e)}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(e.amount_centavos)}</strong></td><td data-l="">{e.voucher_number && <ViewIcon label="View Voucher" href={`/api/documents/expense/${e.id}?copy=1`} />}</td></tr>)}
         </tbody></table>{pg.pager}</div> : <p className="portal-empty-copy">{list.length ? "Nothing with this status." : "No expenses in this period."}</p>}
       </section>
-    </div>
+    </div>}
   </div>;
 }
 
@@ -364,7 +363,7 @@ export function AccountingPayables({ data, reload }: { data: PortalData; reload:
       <section className="portal-panel cx-panel">
         <div className="ac-chipbar">{PAYABLE_TABS.map((t) => <button key={t} type="button" className={`ac-chip${tab === t ? " on" : ""}`} onClick={() => setTab(t)}>{tcl(t)}<span>{t === "Open" ? open.length : t === "Paid" ? paidRows.length : items.filter((i) => stateOf(i) === t).length}</span></button>)}</div>
         {tab === "Paid" && <PeriodBar p={paidPeriod} what="Paid" count={`${paidRows.length} item${paidRows.length === 1 ? "" : "s"}`} />}
-        {shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Payee</th><th>Type</th><th>Due</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
+        {tab === "Paid" && !paidPeriod.picked ? null : shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Payee</th><th>Type</th><th>Due</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
           {pg.shown.map((i) => { const s = stateOf(i); return <tr key={`${i.kind}-${i.id}`}><td data-l="" className="lead"><span className="cx-name">{i.payee}</span>{i.what && <small>{i.what}</small>}</td><td data-l="Type">{i.kind === "Agency rebates" ? "Agency rebate" : "Bill or fee"}</td><td data-l="Due">{i.due ? fmtDate(i.due) : "—"}</td><td data-l="Status"><Badge tone={s === "Paid" ? "green" : s === "Overdue" ? "red" : s === "Due this week" ? "orange" : undefined}>{tcl(s)}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(i.amount)}</strong></td><td data-l="">{!i.paid && <button type="button" className="portal-primary" disabled={busy} onClick={() => void i.settle().catch(() => undefined)}>Mark Paid</button>}</td></tr>; })}
         </tbody></table>{pg.pager}</div> : <p className="portal-empty-copy">Nothing here.</p>}
       </section>
@@ -782,10 +781,10 @@ export function AccountingDocuments({ only, embedded }: { only?: "receipts" | "t
   const p = usePeriod();
   const [kindPick, setKind] = useState<"receipts" | "tars">(only ?? "receipts"), [q, setQ] = useState(""), [tick, setTick] = useState(0);
   const kind = only ?? kindPick;
-  const [custom, setCustom] = useState(false), [from, setFrom] = useState(p.today), [to, setTo] = useState(p.today);
-  const range = custom ? { from, to, label: `${fmtDate(from)} – ${fmtDate(to)}` } : p.period === "All Dates" ? { from: addDays(p.today, -365), to: p.today, label: "the last 12 months" } : p.range;
-  const { data, error } = useJson<{ rows: DocRow[] }>(range.from <= range.to ? `/api/staff/documents?kind=${kind}&from=${range.from}&to=${range.to}&n=${tick}` : null);
   const term = q.trim().toLowerCase();
+  // Nothing loads until a date is picked; a search looks across the last 12 months (owner, 5 Nov 2026).
+  const range = p.picked ? p.range : term ? { from: addDays(p.today, -365), to: p.today, label: "the last 12 months" } : null;
+  const { data, error } = useJson<{ rows: DocRow[] }>(range ? `/api/staff/documents?kind=${kind}&from=${range.from}&to=${range.to}&n=${tick}` : null);
   const rows = (data?.rows ?? []).filter((r) => !term || `${r.number} ${r.trainee} ${r.nwmtaciNo} ${r.label ?? ""} ${r.courses ?? ""}`.toLowerCase().includes(term));
   const pg = usePaged(rows);
   const rp = useReprint(() => setTick((n) => n + 1));
@@ -797,10 +796,9 @@ export function AccountingDocuments({ only, embedded }: { only?: "receipts" | "t
     {rp.msg && <Message kind={rp.msg.kind} text={rp.msg.text} />}
     {error && <Message kind="error" text={error} />}
     <section className="portal-panel cx-panel">
-      {custom ? <div className="pd-bar"><span className="cx-seg"><button type="button" onClick={() => setCustom(false)}>Daily · Weekly · Monthly</button><button type="button" className="on">Custom</button></span><label>From <input type="date" value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label><label>To <input type="date" value={to} onChange={(e) => e.target.value && setTo(e.target.value)} /></label></div>
-        : <div className="dc-bar"><PeriodBar p={p} what={kind === "receipts" ? "Receipts issued" : "TARs issued"} count={`${rows.length}`} /><button type="button" className="portal-secondary" onClick={() => setCustom(true)}>Custom</button></div>}
+      <PeriodBar p={p} what={kind === "receipts" ? "Receipts issued" : "TARs issued"} count={`${rows.length}`} />
       <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search receipts and TARs" placeholder="Search number, trainee or NWMTACI No." value={q} onChange={(e) => setQ(e.target.value)} /></div>
-      {!data ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : rows.length ? <div className="portal-table ac-table"><table><thead><tr>
+      {!range ? null : !data ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : rows.length ? <div className="portal-table ac-table"><table><thead><tr>
         {kind === "receipts" ? <><th>AR No.</th><th>Issued</th><th>Trainee</th><th>For</th><th>Mode</th><th className="r">Amount</th><th>Printed</th><th></th></> : <><th>TAR No.</th><th>Issued</th><th>Trainee</th><th>Courses</th><th>Payment</th><th>Printed</th><th></th></>}
       </tr></thead><tbody>
         {pg.shown.map((r) => <Fragment key={r.id}><tr className={r.valid === false ? "pv-void" : undefined}>
@@ -826,11 +824,11 @@ const DECISION_TONE: Record<string, "active" | "cancelled" | "pending"> = { Appr
 /** Accounting › Approvals (owner, 3 Nov 2026): a date-sensitive history of every decision, by category. Waiting items are on the Dashboard. */
 export function ApprovalHistory({ data, go }: { data: PortalData; go: (module: string) => void }) {
   const p = usePeriod();
-  const [custom, setCustom] = useState(false), [from, setFrom] = useState(p.today), [to, setTo] = useState(p.today);
   const [cat, setCat] = useState("All"), [q, setQ] = useState("");
-  const range = custom ? { from, to, label: `${fmtDate(from)} – ${fmtDate(to)}` } : p.period === "All Dates" ? { from: addDays(p.today, -365), to: p.today, label: "the last 12 months" } : p.range;
-  const { data: res, error } = useJson<{ rows: HistoryRow[]; notes: string[] }>(range.from <= range.to ? `/api/staff/approval-history?from=${range.from}&to=${range.to}` : null);
   const term = q.trim().toLowerCase();
+  // Nothing loads until a date is picked; a search looks across the last 12 months (owner, 5 Nov 2026).
+  const range = p.picked ? p.range : term ? { from: addDays(p.today, -365), to: p.today, label: "the last 12 months" } : null;
+  const { data: res, error } = useJson<{ rows: HistoryRow[]; notes: string[] }>(range ? `/api/staff/approval-history?from=${range.from}&to=${range.to}` : null);
   const inView = (res?.rows ?? []).filter((r) => !term || `${r.title} ${r.detail} ${r.remarks} ${r.by}`.toLowerCase().includes(term));
   const inFilter = (r: HistoryRow, f: string) => f === "All" || (HISTORY_FILTERS.find(([n]) => n === f)?.[1] ?? []).includes(r.category);
   const rows = inView.filter((r) => inFilter(r, cat));
@@ -845,16 +843,15 @@ export function ApprovalHistory({ data, go }: { data: PortalData; go: (module: s
     {error && <Message kind="error" text={error} />}
     {(res?.notes ?? []).length > 0 && <p className="ac-note">Not shown: {res!.notes.join(" · ")}</p>}
     <section className="portal-panel cx-panel">
-      {custom ? <div className="pd-bar"><span className="cx-seg"><button type="button" onClick={() => setCustom(false)}>Daily · Weekly · Monthly</button><button type="button" className="on">Custom</button></span><label>From <input type="date" value={from} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label><label>To <input type="date" value={to} onChange={(e) => e.target.value && setTo(e.target.value)} /></label></div>
-        : <div className="dc-bar"><PeriodBar p={p} what="Decided" count={`${rows.length}`} /><button type="button" className="portal-secondary" onClick={() => setCustom(true)}>Custom</button></div>}
+      <PeriodBar p={p} what="Decided" count={`${rows.length}`} />
       <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search approvals" placeholder="Search number, payee, trainee or remarks" value={q} onChange={(e) => setQ(e.target.value)} /></div>
       <div className="chips ac-chipbar ah-chips">{["All", ...HISTORY_FILTERS.map(([n]) => n)].map((c) => { const n = inView.filter((r) => inFilter(r, c)).length; return <button key={c} type="button" className={`ac-chip${cat === c ? " on" : ""}${n ? "" : " zero"}`} onClick={() => setCat(c)}>{c}<span className={n ? "has" : ""}>{n}</span></button>; })}</div>
-      <div className="ad-cash">
+      {range && <div className="ad-cash">
         <div><span>Decided</span><b>{rows.length}</b><small>{range.label}</small></div>
         <div><span>Approved · Paid · Reviewed</span><b>{pesos2(sum(okRows))}</b><small>{okRows.length} item{okRows.length === 1 ? "" : "s"}</small></div>
         <div><span>Rejected</span><b>{pesos2(sum(noRows))}</b><small>{noRows.length} item{noRows.length === 1 ? "" : "s"}</small></div>
-      </div>
-      {!res ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : rows.length ? <div className="portal-table ac-table"><table><thead><tr><th>Decided</th><th>Category</th><th>What</th><th className="r">Amount</th><th>Decision</th><th>By</th><th>Remarks</th></tr></thead><tbody>
+      </div>}
+      {!range ? null : !res ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : rows.length ? <div className="portal-table ac-table"><table><thead><tr><th>Decided</th><th>Category</th><th>What</th><th className="r">Amount</th><th>Decision</th><th>By</th><th>Remarks</th></tr></thead><tbody>
         {pg.shown.map((r) => <tr key={r.id}><td>{when(r.decidedAt)}</td><td><span className="ah-cat">{r.category}</span></td><td><b>{r.title}</b>{r.detail && <small>{r.detail}</small>}</td><td className="r cx-amt">{r.amountCentavos ? pesos2(r.amountCentavos) : "—"}</td><td><Badge tone={DECISION_TONE[r.decision] ?? "pending"}>{r.decision}</Badge></td><td>{r.by}</td><td>{r.remarks || "—"}</td></tr>)}
       </tbody></table>{pg.pager}</div> : <p className="portal-empty-copy">Nothing decided in this period.</p>}
     </section>

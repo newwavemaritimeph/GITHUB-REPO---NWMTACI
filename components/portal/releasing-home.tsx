@@ -5,11 +5,10 @@ import { downloadCsv } from "@/lib/csv";
 import type { PortalData, Enrollment } from "../portal-live-app";
 import { addDays, first, manilaToday, dueCentavos, pesos2 } from "@/lib/portal-format";
 import { automaticEndDate } from "@/lib/scheduling";
-import { canPrint, canSetSeries, certificateState, evaluationRequiredFor, formatCertificateNumber, formatNumber, formatProblem, nextOf, isStcwCategory, matchTemplateFiles, releaseProblem, type CertificateView } from "@/lib/certificate-rules";
-import { Badge, Message, MonthBar, ViewIcon, fmtDate, submit, useMonthRows, useNeedSince, usePaged, usePost } from "./shared-ui";
+import { CERTIFICATE_STAGES, canSetSeries, certificateStage, certificateState, evaluationRequiredFor, formatCertificateNumber, formatNumber, formatProblem, nextOf, isStcwCategory, matchTemplateFiles, releaseProblem, type CertificateStage, type CertificateView } from "@/lib/certificate-rules";
+import { ALL_DATES, Badge, Message, Modal, PeriodBar, ViewIcon, fmtDate, submit, useNeedSince, usePaged, usePeriod, usePost } from "./shared-ui";
 import { ReleaseConfirm } from "./live-releasing";
-import { DeliveryAlert } from "./delivery-home";
-import { tcl } from "@/lib/title-case";
+import { DeliveryAlert, deliveriesOf, deliveryAddress } from "./delivery-home";
 import { photoFileName, type CertificateCorrections } from "@/lib/certificate-photo";
 import { CertificatePhotoModal, openCertificatePhoto } from "./certificate-photo-modal";
 import { NO_REASON, REASONS, REJECT_REASONS, ReasonField, reasonReady, reasonText, type ReasonValue } from "./reject-inline";
@@ -20,7 +19,7 @@ import { askConfirm } from "./dialogs";
 /**
  * Releasing Officer (owner, 8 Oct 2026): certificates due to print, printed
  * once, reprinted only after a paid Reprinting request or an Admin-approved
- * void. The log is the formal certificate register (owner's choice, design C).
+ * void.
  * The Admin sets the numbering and decides void requests (AdminCertificateControls).
  */
 
@@ -63,8 +62,10 @@ export function certificateLines(data: PortalData, opts: { inTrainingDays?: numb
     const evalNeeded = evaluationRequiredFor(c.delivery_type, e.partner_offer_id);
     const fb = d.feedbackAt?.[e.id] ?? null;
     const balance = data.companyCharge?.[e.id] ? 0 : Math.max(0, dueCentavos(e) - Number(e.paid_centavos));
-    const view = certificateState({ enrollmentStatus: e.enrollment_status, trainingEnd: ended, balanceCentavos: balance, evaluationRequired: evalNeeded, evaluationOn: day(fb), paidOn: lastPaid.get(e.trainee_id) ?? null, cert: cert ? { status: cert.status, printCount: Number(cert.print_count ?? (["Printed", "Released"].includes(cert.status) ? 1 : 0)), reprintsAllowed: Number(cert.reprints_allowed ?? 0), voidStatus: cert.void_status, revoked: !!cert.revoked_at } : null, photoOnFile: photos ? photos.has(e.id) : undefined }, today);
+    const view = certificateState({ enrollmentStatus: e.enrollment_status, trainingEnd: ended, balanceCentavos: balance, paidCentavos: Number(e.paid_centavos), evaluationRequired: evalNeeded, evaluationOn: day(fb), paidOn: lastPaid.get(e.trainee_id) ?? null, cert: cert ? { status: cert.status, printCount: Number(cert.print_count ?? (["Printed", "Released"].includes(cert.status) ? 1 : 0)), reprintsAllowed: Number(cert.reprints_allowed ?? 0), voidStatus: cert.void_status, revoked: !!cert.revoked_at } : null, photoOnFile: photos ? photos.has(e.id) : undefined }, today);
     if (view.state === "Cancelled") continue;
+    // Not paid: off every Releasing Officer list until the Cashier records a payment (owner, 5 Nov 2026).
+    if (view.state === "Waiting for payment" && !view.printCount) continue;
     if (view.state === "Training not finished" && (opts.inTrainingDays === undefined || !ended || ended > addDays(today, opts.inTrainingDays))) continue;
     const t = first(e.trainees);
     const fileName = photoFileName({ lastName: t?.legal_last_name ?? "TRAINEE", firstName: t?.legal_first_name ?? "", middleName: (t as { legal_middle_name?: string | null } | null)?.legal_middle_name, courseCode: c.code, batchNumber: b?.batch_number ?? null, date: ended ?? today });
@@ -74,9 +75,6 @@ export function certificateLines(data: PortalData, opts: { inTrainingDays?: numb
   return lines.sort((a, b) => rank(a) - rank(b) || (a.ended ?? "").localeCompare(b.ended ?? ""));
 }
 
-const STATES: [string, string][] = [["Due", "#0571D0"], ["Waiting for photo", "#c2410c"], ["Waiting for evaluation", "#7a3fb8"], ["Waiting for payment", "#F25615"], ["Printed", "#0a7a3e"], ["Released", "#5d6f7e"], ["Void requested", "#b42318"], ["Revoked", "#8a1c12"]];
-const tone = (l: CertificateLine) => (l.view.overdue ? "red" : l.view.state === "Due" ? "blue" : l.view.state === "Printed" ? "green" : l.view.state === "Void requested" || l.view.state === "Revoked" ? "red" : l.view.state === "Waiting for payment" || l.view.state === "Waiting for photo" ? "orange" : undefined);
-const label = (l: CertificateLine) => (l.view.overdue ? "Overdue" : l.view.state === "Waiting for evaluation" ? "Evaluation" : l.view.state === "Waiting for photo" ? "Photo needed" : l.view.state === "Waiting for payment" ? "Payment" : l.view.state === "Printed" && l.view.printsLeft > 0 ? "Reprint ready" : l.view.state);
 
 /** Red alarm: due certificates not printed by the end of their due day. */
 export function CertificateAlarm({ data, admin, onOpen }: { data: PortalData; admin?: boolean; onOpen?: () => void }) {
@@ -92,210 +90,119 @@ export function CertificateAlarm({ data, admin, onOpen }: { data: PortalData; ad
   </div>;
 }
 
-function StateColumn({ lines, pick, onPick }: { lines: CertificateLine[]; pick?: string; onPick?: (s: string) => void }) {
-  const overdue = lines.filter((l) => l.view.overdue).length;
-  return <div className="cx-tiles ac-tiles ac-tiles-in">
-    {STATES.map(([s, c]) => { const n = lines.filter((l) => l.view.state === s).length; return onPick
-      ? <button type="button" key={s} className={`cx-tile ac-pick ac-count${pick === s ? " on" : ""}`} style={{ ["--c" as string]: c }} onClick={() => onPick(pick === s ? "" : s)}><span>{tcl(s)}</span><b>{n}</b></button>
-      : <div key={s} className="cx-tile ac-count" style={{ ["--c" as string]: c }}><span>{tcl(s)}</span><b>{n}</b></div>; })}
-    <div className={`cx-tile ac-count${overdue ? " cl-overdue" : ""}`} style={{ ["--c" as string]: "#b42318" }}><span>Overdue to print</span><b>{overdue}</b></div>
-  </div>;
-}
-
 /** STCW first, then In-House (owner, 20 Oct 2026): the course group of a certificate line. */
 const courseGroupOf = (data: PortalData) => { const byId = new Map(data.courses.map((c) => [c.id, c])); return (l: CertificateLine) => { const c = byId.get(l.course.id); return c && stcwCourse(c) ? "STCW Courses" : "In-House Courses"; }; };
 function byCourseGroup(data: PortalData, lines: CertificateLine[]) {
   const groupOf = courseGroupOf(data);
   return ["STCW Courses", "In-House Courses"].map((g) => ({ group: g, lines: lines.filter((l) => groupOf(l) === g) })).filter((x) => x.lines.length);
 }
-type Dot = { label: string; k: "y" | "n" | "w"; onClick?: () => void; href?: string; title?: string };
-/** Progress Steps (owner, 20 Oct 2026): ✓ done, ✗ missing, ◷ not yet due. A done Photo or Evaluation opens its file. */
-function ProgressDots({ dots }: { dots: Dot[] }) {
-  return <ol className="wt-prog" aria-label="Progress">{dots.map((d) => <li key={d.label} className={d.k} title={d.title ?? `${d.label}: ${d.k === "y" ? "done" : d.k === "w" ? "not yet" : "missing"}`}>
-    {d.href ? <a className="wt-dot" href={d.href} target="_blank" rel="noreferrer">✓</a> : d.onClick ? <button type="button" className="wt-dot" onClick={d.onClick}>✓</button> : <span className="wt-dot">{d.k === "y" ? "✓" : d.k === "w" ? "◷" : "✗"}</span>}<span>{d.label}</span></li>)}</ol>;
-}
-function certificateDots(l: CertificateLine, tracked: boolean, training = false): Dot[] {
-  const after = (done: boolean): "y" | "n" | "w" => done ? "y" : training ? "w" : "n";
-  return [
-    ...(training ? [{ label: "Training", k: "w" as const }] : []),
-    { label: "Paid", k: l.balance > 0 ? "n" : "y", title: l.balance > 0 ? `Balance ${pesos2(l.balance)}` : "Paid" },
-    ...(l.postTest?.required ? [{ label: "Post-Test", k: after(!!l.postTest.passed), title: l.postTest.best ? `Best ${l.postTest.best.score}/${l.postTest.best.total}` : undefined }] : []),
-    ...(l.evalNeeded ? [{ label: "Evaluation", k: after(l.evalDone), href: l.evalLink ?? undefined, title: l.evalLink ? "Open the evaluation PDF in Google Drive" : undefined }] : []),
-    ...(tracked ? [{ label: "Photo", k: (l.photo ? "y" : "n") as "y" | "n", onClick: l.photo ? () => void openCertificatePhoto(l.e.id) : undefined, title: l.photo?.file_name }] : []),
-  ];
-}
-
-/** The formal certificate log (design C): numbered lines, one line per certificate, one split action. */
-function CertificateLog({ data, lines, reload }: { data: PortalData; lines: CertificateLine[]; reload: () => Promise<void> }) {
-  const { busy, msg, post } = usePost(reload);
-  const [voiding, setVoiding] = useState<string | null>(null);
-  const [why, setWhy] = useState<ReasonValue>(NO_REASON);
-  const [releasing, setReleasing] = useState<CertificateLine | null>(null);
-  const [uploading, setUploading] = useState<CertificateLine | null>(null);
-  const tracked = (data as CertData).certificatePhotos != null;
-  const pdf = (l: CertificateLine, preview: boolean) => `/api/documents/certificate/${l.e.id}${preview ? "?preview=1" : ""}`;
-  // The print opens in a new tab; refresh so the counter (and the button) update.
-  const afterPrint = () => window.setTimeout(() => void reload(), 2500);
-  const paged = usePaged(byCourseGroup(data, lines).flatMap((x) => x.lines));
-  if (!lines.length) return <p className="portal-empty-copy">Nothing here.</p>;
-  return <>
-    {msg && <Message kind={msg.kind} text={msg.text} />}
-    <div className="cl-wrap"><table className="cl-log cl-cert"><thead><tr><th>#</th><th>Trainee · NWMTACI No.</th><th>Course · Ended</th><th>Certificate No.</th><th>Progress</th><th>Status</th><th>Action</th></tr></thead><tbody>
-      {byCourseGroup(data, paged.shown).flatMap(({ group, lines: g }) => [<tr key={group} className="nb-group"><td colSpan={7}><b>{group}</b> <span className="cl-sub">{g.length}</span></td></tr>, ...g.map((l, i) => { const printable = canPrint(l.view) && l.view.state !== "Void requested"; const printed = l.view.printCount > 0; return [
-        <tr key={l.e.id}>
-          <td className="cl-no">{i + 1}</td>
-          <td><b>{l.name}</b><small className="cl-mono cl-sub cl-block">{l.number.replace(/^NWMTACI-/, "")}</small></td>
-          <td title={l.course.name}><b>{l.course.code}</b><small className="cl-sub cl-block">Ended {short(l.ended)}</small></td>
-          <td><span className="cl-mono">{l.cert?.certificate_number ?? "—"}</span><small className="cl-sub cl-block">Prints {l.view.printCount}/{l.view.printsAllowed}</small></td>
-          <td><ProgressDots dots={certificateDots(l, tracked)} /></td>
-          <td><Badge tone={tone(l)}>{label(l)}</Badge>{l.view.state === "Waiting for payment" && <small className="cl-sub cl-block">{pesos2(l.balance)} due</small>}</td>
-          <td><span className="cl-acts">
-            {tracked && !l.photo && <button type="button" className={l.view.state === "Waiting for photo" ? "portal-primary cl-upload" : "portal-secondary cl-upload"} title="Upload the trainee's 2x2 photo" onClick={() => setUploading(l)}>Upload</button>}
-            {l.view.state !== "Cancelled" && <span className="cl-split"><a href={pdf(l, true)} target="_blank" rel="noreferrer" onClick={afterPrint} title="Draft for checking; never counts as a print">Preview</a>{printable && <a className="go" href={pdf(l, false)} target="_blank" rel="noreferrer" onClick={afterPrint}>{printed ? "Reprint" : "Print"}</a>}</span>}
-            {printed && l.view.state !== "Void requested" && <details className="cl-more"><summary aria-label="More actions">▾</summary><div>
-              <button type="button" disabled={busy} onClick={() => { setVoiding(l.e.id); setWhy(NO_REASON); }}>Request Void</button>
-              <button type="button" disabled={busy} onClick={() => void post({ action: "certificate-soft-copy", enrollmentId: l.e.id }, "Soft copy emailed.").catch(() => undefined)}>Email Soft Copy</button>
-              {l.view.state === "Printed" && <ReleaseButton l={l} onRelease={() => setReleasing(l)} />}
-            </div></details>}
-            {l.view.state === "Void requested" && <span className="cl-sub">With the Admin</span>}
-          </span></td>
-        </tr>,
-        voiding === l.e.id && <tr key={`${l.e.id}-void`} className="cl-voidrow"><td /><td colSpan={6}><div className="cl-void">
-          <ReasonField reasons={REASONS.certificateVoid} label="Reason for Voiding" value={why} onChange={setWhy} autoFocus />
-          <button type="button" className="portal-secondary" onClick={() => setVoiding(null)}>Keep</button>
-          <button type="button" className="cl-danger" disabled={busy || !reasonReady(why)} onClick={() => void post({ action: "certificate-void-request", enrollmentId: l.e.id, reason: reasonText(why) }, "Sent to the Admin for approval.").then(() => setVoiding(null)).catch(() => undefined)}>Send to the Admin</button>
-        </div></td></tr>,
-      ]; })])}
-    </tbody></table></div>
-    {paged.pager}
-    <p className="cl-legend">Prints shows copies used out of copies allowed: one, plus one for each paid Reprinting request or Admin-approved void. Preview never counts.{tracked ? " A certificate prints only once the trainee's 2x2 photo is on file." : ""}</p>
-    {uploading && <CertificatePhotoModal enrollmentId={uploading.e.id} traineeName={uploading.name} fileName={uploading.fileName} onClose={() => setUploading(null)} onDone={async () => { setUploading(null); await reload(); }} />}
-    {releasing && <ReleaseConfirm target={{ enrollmentId: releasing.e.id, name: releasing.name, course: releasing.course.name, certNo: releasing.cert?.certificate_number ?? "" }} onClose={() => setReleasing(null)} onDone={async () => { setReleasing(null); await reload(); }} />}
-    {data.certificateIssuanceEnabled === false && <p className="cl-legend cl-warn">Printing is turned off. The Admin turns it on in Certificate controls.</p>}
-  </>;
-}
+/** A printed reprint stays on To Print; a course post-test not passed waits, once the Admin approved it. */
+const stageOfLine = (l: CertificateLine): CertificateStage | null => { const s = certificateStage(l.view); return s === "To Print" && !l.view.printCount && l.postTest?.required && !l.postTest.passed ? "Waiting" : s; };
 
 function Head({ title, note }: { title: string; note?: string }) {
   return <><div className="cx-head"><div><span className="portal-eyebrow">Releasing Officer</span><h1>{title}</h1></div></div>{note && <p className="ac-note">{note}</p>}</>;
 }
 
-export function ReleasingHome({ data, reload, go }: { data: PortalData; reload: () => Promise<void>; go: (m: string) => void }) {
-  const lines = certificateLines(data);
-  const due = lines.filter((l) => l.view.state === "Due");
-  const today = manilaToday();
-  const certs = data.certificates as unknown as CertRow[];
-  return <div className="portal-page cx ac">
-    <Head title="Dashboard" note={new Intl.DateTimeFormat("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date())} />
-    <CertificateAlarm data={data} onOpen={() => go("Certificates")} />
-    <DeliveryAlert data={data} onOpen={() => go("Delivery")} />
-    <div className="ac-rail">
-      <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Certificates</h2></div><StateColumn lines={lines} /></section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Today</h2></div>
-          <dl className="ac-lines"><div><dt>Printed today</dt><dd>{certs.filter((c) => day((c as { printed_at?: string | null }).printed_at) === today).length}</dd></div><div><dt>Reprints approved, not printed</dt><dd>{lines.filter((l) => l.view.printCount > 0 && l.view.printsLeft > 0).length}</dd></div><div><dt>Soft copies emailed</dt><dd>{certs.filter((c) => day(c.soft_copy_sent_at) === today).length}</dd></div></dl>
-          <p className="ac-foot">Due means the training ended and the fee is settled. {"Release also needs the trainee's evaluation, submitted on the Trainee Status page."}</p>
-        </section>
-      </div>
-      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Due to Print</h2><span className="slot-count">{due.length}</span></div><CertificateLog data={data} lines={due} reload={reload} /></section>
-    </div>
-  </div>;
-}
-
-export function CertificatesWorkspace({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
-  const [pick, setPick] = useState(""), [q, setQ] = useState("");
-  const allLines = certificateLines(data);
-  const term = q.trim().toLowerCase();
-  // Not yet printed always shows; printed certificates by month, or every date while searching (owner, 3 Nov 2026).
-  const printedOn = (l: CertificateLine) => (l.cert as { printed_at?: string | null } | null | undefined)?.printed_at;
-  const { p, rows: printed } = useMonthRows(allLines.filter((l) => printedOn(l)), printedOn, !!term);
-  const kept = new Set(printed);
-  const lines = allLines.filter((l) => !printedOn(l) || kept.has(l));
-  const shown = lines.filter((l) => (!pick || l.view.state === pick) && (!term || `${l.name} ${l.number} ${l.cert?.certificate_number ?? ""} ${l.course.name} ${l.course.code}`.toLowerCase().includes(term)));
-  return <div className="portal-page cx ac">
-    <Head title="Certificates" />
-    <CertificateAlarm data={data} />
-    <MonthBar p={p} what="Printed" count={`${printed.length} certificate${printed.length === 1 ? "" : "s"}`} searching={!!term} />
-    <div className="ac-rail">
-      <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Status</h2><span className="muted-text">tap to filter</span></div><StateColumn lines={lines} pick={pick} onPick={setPick} /></section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Rules</h2></div>
-          <dl className="ac-lines"><div><dt>2x2 Photo</dt><dd>Before printing</dd></div><div><dt>Certificate No.</dt><dd>Admin only</dd></div><div><dt>Print</dt><dd>Once</dd></div><div><dt>Reprint</dt><dd>Paid request</dd></div><div><dt>Void for reprint</dt><dd>Admin approval</dd></div></dl>
-        </section>
-      </div>
-      <section className="portal-panel cx-panel">
-        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search certificates" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, NWMTACI number or certificate number" />{pick && <button type="button" className="portal-secondary" onClick={() => setPick("")}>Show All</button>}</div>
-        <CertificateLog data={data} lines={shown} reload={reload} />
-      </section>
-    </div>
-    <CertificateCorrectionsPanel data={data} reload={reload} mode="details" />
-  </div>;
-}
-
-/** What each waiting certificate is held up by, in the order the rules check them. */
-// Unpaid trainees are not listed (owner, 20 Oct 2026): they reach Waiting once paid.
-const WAITING: [CertificateView["state"], string, string][] = [["Training not finished", "In Training", "#64748b"], ["Waiting for evaluation", "Evaluation", "#7a3fb8"], ["Waiting for photo", "Photo Needed", "#c2410c"]];
+/** What a certificate still needs before it prints. */
 const WAIT_DAYS = 14;
 
 /**
- * Waiting (owner, 13 Oct 2026; design/releasing-waiting-prototype.html):
- * certificates that cannot print yet — training still running (ending within
- * two weeks), balance, evaluation or photo — each with a checklist and the
- * next step. A line moves to Certificates › Due by itself once every check passes.
+ * Releasing Officer › Certificates, Design 1 · Stage Tabs (owner, 5 Nov 2026; design/releasing-officer-designs.html): one page in
+ * place of the Dashboard, Certificates, Waiting, Released and Delivery tabs. A certificate moves by itself: Waiting, To Print,
+ * To Release, Released. A trainee with no payment and no Company Charge is not listed. The Certificate No. shows once printed.
  */
-export function WaitingCertificates({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
-  const [pick, setPick] = useState(""), [q, setQ] = useState("");
-  const [uploading, setUploading] = useState<CertificateLine | null>(null);
+export function ReleasingCertificates({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
+  const [stage, setStage] = useState<CertificateStage>("To Print"), [q, setQ] = useState("");
+  const [uploading, setUploading] = useState<CertificateLine | null>(null), [releasing, setReleasing] = useState<CertificateLine | null>(null), [correcting, setCorrecting] = useState<string | null>(null);
+  const [voiding, setVoiding] = useState<string | null>(null), [why, setWhy] = useState<ReasonValue>(NO_REASON);
+  const [shipping, setShipping] = useState<string | null>(null), [tracking, setTracking] = useState(""), [shippedOn, setShippedOn] = useState(manilaToday());
   const { busy, msg, post } = usePost(reload);
-  const today = manilaToday(), tomorrow = addDays(today, 1);
-  const tracked = (data as CertData).certificatePhotos != null;
-  const lines = certificateLines(data, { inTrainingDays: WAIT_DAYS }).filter((l) => l.balance === 0 && WAITING.some(([s]) => s === l.view.state)).sort((a, b) => (a.ended ?? "").localeCompare(b.ended ?? ""));
+  const per = usePeriod();
   const term = q.trim().toLowerCase();
-  const shown = lines.filter((l) => (!pick || l.view.state === pick) && (!term || `${l.name} ${l.number} ${l.course.name} ${l.course.code}`.toLowerCase().includes(term)));
-  const waitPaged = usePaged(byCourseGroup(data, shown).flatMap((x) => x.lines));
-  const range = (l: CertificateLine) => !l.starts || l.starts === l.ended ? short(l.ended) : `${short(l.starts)} – ${short(l.ended)}`;
-  const missing = (l: CertificateLine) => [l.balance > 0 && "payment", l.evalNeeded && !l.evalDone && "evaluation", tracked && !l.photo && "photo"].filter(Boolean) as string[];
-  const next = (l: CertificateLine): [string, string] => {
-    const m = missing(l);
-    if (l.view.state === "Training not finished") return [`Training ends ${short(l.ended)}`, m.length ? `Also needs: ${m.join(", ")}` : "Nothing else missing"];
-    if (l.view.state === "Waiting for payment") return [`Cashier collects ${pesos2(l.balance)}`, m.length > 1 ? `Then: ${m.slice(1).join(", ")}` : "Then it is Due"];
-    if (l.view.state === "Waiting for evaluation") return ["Trainee submits the evaluation", m.includes("photo") ? "Then: photo" : "From the Trainee Status page"];
-    return ["Upload the 2x2 photo", "White background"];
+  useNeedSince(term ? ALL_DATES : "");
+  const tracked = (data as CertData).certificatePhotos != null;
+  const deliveries = deliveriesOf(data);
+  const enrollmentOfCert = new Map((data.certificates as unknown as CertRow[]).map((c) => [c.id, c.enrollment_id]));
+  const lines = certificateLines(data, { inTrainingDays: WAIT_DAYS }).filter((l) => !term || `${l.name} ${l.number} ${l.cert?.certificate_number ?? ""} ${l.course.name} ${l.course.code}`.toLowerCase().includes(term));
+  const inStage = (s: CertificateStage) => lines.filter((l) => stageOfLine(l) === s);
+  // Released: the release events of the picked date, or every date while searching.
+  const released = releaseRows(data).filter((r) => (term ? `${r.name} ${r.course} ${r.courseName} ${r.certNo} ${r.sticker}`.toLowerCase().includes(term) : per.inRange(r.at)));
+  const workPaged = usePaged(stage === "Released" ? [] : byCourseGroup(data, inStage(stage)).flatMap((x) => x.lines));
+  const relPaged = usePaged(released);
+  const days = [...new Set(relPaged.shown.map((r) => r.day))].sort().reverse();
+  const count = (s: CertificateStage) => (s === "Released" ? (per.picked || term ? String(released.length) : "—") : String(inStage(s).length));
+  const csv = () => downloadCsv(`released-${per.range.from || "search"}-to-${per.range.to || "search"}.csv`, [["Date", "Time", "Trainee", "Course", "Certificate No.", "Released To", "ID", "Method", "Sticker No."], ...released.map((r) => [r.day, clock(r.at), r.name, r.course, r.certNo, r.to, r.idType, r.method, r.sticker])]);
+  const pdf = (l: CertificateLine, preview: boolean) => `/api/documents/certificate/${l.e.id}${preview ? "?preview=1" : ""}`;
+  // The print opens in a new tab; refresh so the row moves on by itself.
+  const afterPrint = () => window.setTimeout(() => void reload(), 2500);
+  const pay = (l: CertificateLine) => data.companyCharge?.[l.e.id] ? <Badge tone="blue">Company Charge</Badge> : l.balance > 0 ? <Badge tone="orange">Balance {pesos2(l.balance)}</Badge> : <Badge tone="green">Paid</Badge>;
+  const needs = (l: CertificateLine) => [l.view.state === "Training not finished" && `In Training · Ends ${short(l.ended)}`, l.postTest?.required && !l.postTest.passed && "Post-Test", l.evalNeeded && !l.evalDone && "Evaluation", tracked && !l.photo && "Photo"].filter(Boolean) as string[];
+  const printedOn = (l: CertificateLine) => short(day((l.cert as { printed_at?: string | null } | null)?.printed_at));
+  const more = (l: CertificateLine) => <details className="cl-more"><summary aria-label="More actions">▾</summary><div>
+    <button type="button" onClick={() => setCorrecting(l.e.id)}>Correct Details</button>
+    {l.photo && <button type="button" onClick={() => void openCertificatePhoto(l.e.id)}>View Photo</button>}
+    {l.evalLink && <a href={l.evalLink} target="_blank" rel="noreferrer">Open Evaluation</a>}
+    {l.view.printCount > 0 && l.view.state !== "Void requested" && <button type="button" disabled={busy} onClick={() => { setVoiding(l.e.id); setWhy(NO_REASON); }}>Request Void</button>}
+    {l.view.printCount > 0 && l.balance === 0 && <button type="button" disabled={busy} onClick={() => void post({ action: "certificate-soft-copy", enrollmentId: l.e.id }, "Soft copy emailed.").catch(() => undefined)}>Email Soft Copy</button>}
+  </div></details>;
+  const heads: Record<Exclude<CertificateStage, "Released">, string[]> = {
+    Waiting: ["#", "Trainee · NWMTACI No.", "Course", "Payment", "Still Needs", "Action"],
+    "To Print": ["#", "Trainee · NWMTACI No.", "Course", "Payment", "Action"],
+    "To Release": ["#", "Trainee · NWMTACI No.", "Course", "Certificate No.", "Payment", "Action"],
+  };
+  const row = (l: CertificateLine, i: number, cols: number) => {
+    const ship = deliveries.find((r) => r.status === "Paid" && r.enrollment_id === l.e.id), reprint = stage === "To Print" && l.view.printCount > 0, need = needs(l);
+    return [<tr key={l.e.id}>
+      <td className="cl-no st-no">{i + 1}</td>
+      <td data-l="Trainee"><b>{l.name}</b><small className="cl-mono cl-sub cl-block">{l.number.replace(/^NWMTACI-/, "")}</small>{l.view.overdue && <Badge tone="red">Overdue</Badge>}{reprint && <Badge tone="blue">Reprint</Badge>}{stage === "To Release" && ship && <Badge tone="blue">LBC · {ship.city}</Badge>}</td>
+      <td data-l="Course" title={l.course.name}><b>{l.course.code}</b><small className="cl-sub cl-block">{stage === "To Release" ? `Printed ${printedOn(l)}` : l.view.state === "Training not finished" ? `Ends ${short(l.ended)}` : `Ended ${short(l.ended)}`}</small></td>
+      {stage === "To Release" && <td data-l="Certificate No." className="cl-mono">{l.cert?.certificate_number ?? "—"}</td>}
+      <td data-l="Payment">{pay(l)}</td>
+      {stage === "Waiting" && <td data-l="Still Needs">{need.map((n) => <span key={n} className="st-need">{n}</span>)}</td>}
+      <td data-l=""><span className="cl-acts st-acts">
+        {stage === "Waiting" && tracked && !l.photo && <button type="button" className={`st-b${need.length === 1 ? " p" : ""}`} title="Upload the trainee's 2x2 photo" onClick={() => setUploading(l)}>Upload</button>}
+        {stage === "Waiting" && l.view.state !== "Training not finished" && (need.includes("Evaluation") || need.includes("Post-Test")) && <button type="button" className="st-b" disabled={busy} onClick={() => void post({ action: "training-end-email", enrollmentId: l.e.id }, `Post-test and evaluation email sent to ${l.name}.`).catch(() => undefined)}>Email Post-Test</button>}
+        {stage === "To Print" && <a className="st-b p" href={pdf(l, false)} target="_blank" rel="noreferrer" onClick={afterPrint}>{reprint ? "Reprint" : "Print"}</a>}
+        {stage !== "To Release" && <a className="st-b" href={pdf(l, true)} target="_blank" rel="noreferrer" title="Draft for checking; never counts as a print">Preview</a>}
+        {stage === "To Release" && (l.view.state === "Void requested" ? <span className="cl-sub">With the Admin</span> : ship ? <button type="button" className="st-b p" disabled={busy || l.balance > 0} title={l.balance > 0 ? `Balance ${pesos2(l.balance)} must be settled first` : undefined} onClick={() => { setShipping(ship.id); setTracking(""); setShippedOn(manilaToday()); }}>Mark Shipped</button> : <ReleaseButton primary l={l} onRelease={() => setReleasing(l)} />)}
+        {more(l)}
+      </span></td>
+    </tr>,
+    voiding === l.e.id && <tr key={`${l.e.id}-void`} className="cl-voidrow"><td /><td colSpan={cols - 1}><div className="cl-void">
+      <ReasonField reasons={REASONS.certificateVoid} label="Reason for Voiding" value={why} onChange={setWhy} autoFocus />
+      <button type="button" className="portal-secondary" onClick={() => setVoiding(null)}>Keep</button>
+      <button type="button" className="cl-danger" disabled={busy || !reasonReady(why)} onClick={() => void post({ action: "certificate-void-request", enrollmentId: l.e.id, reason: reasonText(why) }, "Sent to the Admin for approval.").then(() => setVoiding(null)).catch(() => undefined)}>Send to the Admin</button>
+    </div></td></tr>,
+    ship && shipping === ship.id && <tr key={`${l.e.id}-ship`} className="cl-voidrow"><td /><td colSpan={cols - 1}><div className="cl-void ms-ship">
+      <p className="cl-sub">Deliver to {deliveryAddress(ship)} · {ship.recipient_name} · {ship.mobile}</p>
+      <label>LBC Tracking Number (Required)<input value={tracking} autoFocus onChange={(e) => setTracking(e.target.value)} placeholder="e.g. 1234 5678 9012" /></label>
+      <label>Date Sent<input type="date" value={shippedOn} max={manilaToday()} onChange={(e) => setShippedOn(e.target.value)} /></label>
+      <button type="button" className="portal-secondary" onClick={() => setShipping(null)}>Cancel</button>
+      <button type="button" className="portal-primary" disabled={busy || tracking.trim().length < 4 || !shippedOn} onClick={() => void post({ action: "delivery-ship", id: ship.id, trackingNumber: tracking.trim(), shippedOn }, "Shipped. The trainee was emailed the tracking number.").then(() => setShipping(null)).catch(() => undefined)}>Mark Shipped</button>
+    </div></td></tr>];
   };
   return <div className="portal-page cx ac">
-    <Head title="Waiting" note="Certificates that cannot print yet and what each one still needs. Shaded lines can be ready by tomorrow." />
+    <Head title="Certificates" />
+    <CertificateAlarm data={data} />
+    <DeliveryAlert data={data} onOpen={() => setStage("To Release")} />
     {msg && <Message kind={msg.kind} text={msg.text} />}
-    <div className="ac-rail">
-      <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Waiting For</h2><span className="muted-text">tap to filter</span></div>
-          <div className="cx-tiles ac-tiles ac-tiles-in">
-            {WAITING.map(([s, text, c]) => <button type="button" key={s} className={`cx-tile ac-pick ac-count${pick === s ? " on" : ""}`} style={{ ["--c" as string]: c }} onClick={() => setPick(pick === s ? "" : s)}><span>{text}</span><b>{lines.filter((l) => l.view.state === s).length}</b></button>)}
-            <div className="cx-tile ac-count" style={{ ["--c" as string]: "#123F63" }}><span>Waiting</span><b>{lines.length}</b></div>
-          </div>
-        </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Ready Soon</h2></div>
-          <dl className="ac-lines"><div><dt>Training ends today</dt><dd>{lines.filter((l) => l.ended === today).length}</dd></div><div><dt>Ends tomorrow</dt><dd>{lines.filter((l) => l.ended === tomorrow).length}</dd></div>{tracked && <div><dt>Photos missing</dt><dd>{lines.filter((l) => !l.photo).length}</dd></div>}</dl>
-          <p className="ac-foot">Trainings ending within {WAIT_DAYS} days are listed. A certificate moves to Certificates › Due by itself once every check is green.</p>
-        </section>
-      </div>
-      <section className="portal-panel cx-panel">
-        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search waiting certificates" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, NWMTACI number or course" />{pick && <button type="button" className="portal-secondary" onClick={() => setPick("")}>Show All</button>}</div>
-        {!shown.length ? <p className="portal-empty-copy">Nothing waiting.</p> : <div className="cl-wrap"><table className="cl-log cl-cert wt-log"><thead><tr><th>#</th><th>Trainee · NWMTACI No.</th><th>Course · Training</th><th>Certificate No.</th><th>Progress</th><th>Status</th><th>Action</th></tr></thead><tbody>
-          {byCourseGroup(data, waitPaged.shown).flatMap(({ group, lines: g }) => [<tr key={group} className="nb-group"><td colSpan={7}><b>{group}</b> <span className="cl-sub">{g.length}</span></td></tr>, ...g.map((l, i) => { const [step, then] = next(l); const label = WAITING.find(([s]) => s === l.view.state)?.[1] ?? l.view.state; return <tr key={l.e.id} className={l.ended && l.ended <= tomorrow ? "wt-soon" : undefined}>
-            <td className="cl-no">{i + 1}</td>
-            <td><b>{l.name}</b><small className="cl-mono cl-sub cl-block">{l.number.replace(/^NWMTACI-/, "")}</small></td>
-            <td title={l.course.name}><b>{l.course.code}</b><small className="cl-sub cl-block">{range(l)}</small></td>
-            <td><span className="cl-mono">{l.cert?.certificate_number ?? "—"}</span><small className="cl-sub cl-block">Not printed yet</small></td>
-            <td><ProgressDots dots={certificateDots(l, tracked, l.view.state === "Training not finished")} /></td>
-            <td><Badge tone={l.view.state === "Waiting for photo" ? "orange" : undefined}>{label}</Badge><small className="cl-sub cl-block" title={then}>{step}</small></td>
-            <td><span className="cl-acts">
-              {(l.view.state === "Waiting for evaluation" || (l.postTest?.required && !l.postTest.passed)) && l.view.state !== "Training not finished" && <button type="button" className="portal-secondary cl-upload" disabled={busy} onClick={() => void post({ action: "training-end-email", enrollmentId: l.e.id }, `Post-test and evaluation email sent to ${l.name}.`).catch(() => undefined)}>Email Post-Test</button>}
-              {tracked && !l.photo && <button type="button" className={l.view.state === "Waiting for photo" ? "portal-primary cl-upload" : "portal-secondary cl-upload"} title="Upload the trainee's 2x2 photo" onClick={() => setUploading(l)}>Upload</button>}
-              <a className="portal-secondary cl-upload" href={`/api/documents/certificate/${l.e.id}?preview=1`} target="_blank" rel="noreferrer" title="Draft for checking; never counts as a print">Preview</a></span></td>
-          </tr>; })])}
-        </tbody></table></div>}
-      </section>
-    </div>
+    <div className="st-tabs" role="tablist" aria-label="Certificate stages">{CERTIFICATE_STAGES.map((s) => <button key={s} type="button" role="tab" aria-selected={stage === s} className={`st-tab${stage === s ? " on" : ""}`} onClick={() => setStage(s)}><span>{s}</span><b>{count(s)}</b></button>)}</div>
+    <section className="portal-panel cx-panel st-panel">
+      <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search certificates" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, NWMTACI number or certificate number" />{stage === "Released" && (per.picked || !!term) && <button type="button" className="st-b" disabled={!released.length} onClick={csv}>Download Excel</button>}</div>
+      {stage === "Released" ? <>
+        {term ? <p className="pd-label pd-pad">Searching all dates · {released.length} found</p> : <PeriodBar p={per} what="Released" count={`${released.length} certificate${released.length === 1 ? "" : "s"}`} />}
+        {(per.picked || !!term) && (released.length ? <><div className="st-wrap"><table className="cl-log st-log"><thead><tr><th>Time</th><th>Trainee</th><th>Course</th><th>Certificate No.</th><th>Released To</th><th>Method</th><th>Sticker No.</th></tr></thead><tbody>
+          {days.map((d) => { const g = relPaged.shown.filter((r) => r.day === d); return [<tr key={d} className="nb-group"><td colSpan={7}><b>{longDay(d)}</b> <span className="cl-sub">{g.length} released</span></td></tr>,
+            ...g.map((r) => { const sent = deliveries.find((x) => x.status === "Shipped" && x.enrollment_id === enrollmentOfCert.get(r.certId)); return <tr key={r.id}><td data-l="Time" className="cl-mono">{clock(r.at)}</td><td data-l="Trainee"><b>{r.name}</b></td><td data-l="Course" title={r.courseName}>{r.course}</td><td data-l="Certificate No." className="cl-mono">{r.certNo}</td><td data-l="Released To">{r.to}{r.idType && <small className="cl-sub cl-block">{r.idType}</small>}</td><td data-l="Method"><Badge tone={r.method === "Courier" ? undefined : "green"}>{r.method === "Pickup" ? "Picked Up" : r.method}</Badge>{sent && <><small className="cl-sub cl-block cl-mono">{sent.tracking_number}</small><button type="button" className="st-b" disabled={busy} onClick={() => void post({ action: "delivery-delivered", id: sent.id }, "Marked delivered.").catch(() => undefined)}>Mark Delivered</button></>}</td><td data-l="Sticker No." className="cl-mono">{r.sticker || "—"}</td></tr>; })]; })}
+        </tbody></table></div>{relPaged.pager}</> : <p className="portal-empty-copy">Nothing released on these dates.</p>)}
+      </> : workPaged.shown.length ? <><div className="st-wrap"><table className="cl-log st-log"><thead><tr>{heads[stage].map((h) => <th key={h}>{h}</th>)}</tr></thead><tbody>
+        {byCourseGroup(data, workPaged.shown).flatMap(({ group, lines: g }) => [<tr key={group} className="nb-group"><td colSpan={heads[stage].length}><b>{group}</b> <span className="cl-sub">{g.length}</span></td></tr>, ...g.flatMap((l, i) => row(l, i, heads[stage].length))])}
+      </tbody></table></div>{workPaged.pager}</> : <p className="portal-empty-copy">Nothing here.</p>}
+      {data.certificateIssuanceEnabled === false && <p className="cl-legend cl-warn">Printing is turned off. The Admin turns it on in Certificate controls.</p>}
+    </section>
     {uploading && <CertificatePhotoModal enrollmentId={uploading.e.id} traineeName={uploading.name} fileName={uploading.fileName} onClose={() => setUploading(null)} onDone={async () => { setUploading(null); await reload(); }} />}
+    {releasing && <ReleaseConfirm target={{ enrollmentId: releasing.e.id, name: releasing.name, course: releasing.course.name, certNo: releasing.cert?.certificate_number ?? "" }} onClose={() => setReleasing(null)} onDone={async () => { setReleasing(null); await reload(); }} />}
+    {correcting && <Modal title="Correct Details" wide onClose={() => setCorrecting(null)}><CertificateCorrectionsPanel data={data} reload={reload} mode="details" only={correcting} onClose={() => setCorrecting(null)} /></Modal>}
   </div>;
 }
 
@@ -410,7 +317,7 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
 /** Release needs the fee paid and the evaluation in (owner, 20 Oct 2026); the server checks again. */
 function ReleaseButton({ l, onRelease, primary }: { l: CertificateLine; onRelease: () => void; primary?: boolean }) {
   const why = releaseProblem({ balanceCentavos: l.balance, evaluationRequired: l.evalNeeded, evaluationOn: l.evalDone ? "in" : null, revoked: !!l.cert?.revoked_at, postTestRequired: l.postTest?.required, postTestPassed: l.postTest?.passed });
-  return <button type="button" className={primary ? "portal-primary" : undefined} disabled={!!why} title={why ?? undefined} onClick={onRelease}>{why ? `Release · ${why.replace(/:.*$/, "")}` : "Release"}</button>;
+  return <button type="button" className={primary ? "st-b p" : undefined} disabled={!!why} title={why ?? undefined} onClick={onRelease}>{why ? `Release · ${why.replace(/:.*$/, "")}` : "Release"}</button>;
 }
 
 /** Post-test result (20 Oct 2026): "—" when the course has no approved post-test. */
@@ -429,47 +336,6 @@ function releaseRows(data: PortalData) {
 }
 const clock = (iso: string) => new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso));
 const longDay = (d: string) => new Intl.DateTimeFormat("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T12:00:00+08:00`));
-
-/** Released (owner, 20 Oct 2026): ready to claim on top; released certificates by date, newest day first. */
-export function ReleasedCertificates({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
-  const [releasing, setReleasing] = useState<CertificateLine | null>(null);
-  const today = manilaToday();
-  const [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today), [q, setQ] = useState("");
-  useNeedSince(from);
-  const waiting = certificateLines(data).filter((l) => l.view.state === "Printed");
-  const term = q.trim().toLowerCase();
-  const rows = releaseRows(data).filter((r) => r.day >= from && r.day <= to && (!term || `${r.name} ${r.course} ${r.courseName} ${r.certNo} ${r.sticker}`.toLowerCase().includes(term)));
-  const relPaged = usePaged(rows);
-  const days = [...new Set(relPaged.shown.map((r) => r.day))].sort().reverse();
-  const quick = (f: string) => { setTo(today); setFrom(f); };
-  const csv = () => downloadCsv(`released-${from}-to-${to}.csv`, [["Date", "Time", "Trainee", "Course", "Certificate No.", "Released To", "ID", "Method", "Sticker No."], ...rows.map((r) => [r.day, clock(r.at), r.name, r.course, r.certNo, r.to, r.idType, r.method, r.sticker])]);
-  return <div className="portal-page cx ac">
-    <Head title="Released" />
-    <div className="ac-rail">
-      <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Release</h2></div>
-          <dl className="ac-lines"><div><dt>Ready for release</dt><dd>{waiting.length}</dd></div><div><dt>Released in range</dt><dd>{rows.length}</dd></div><div><dt>By courier</dt><dd>{rows.filter((r) => r.method === "Courier").length}</dd></div><div><dt>Days</dt><dd>{days.length}</dd></div></dl>
-        </section>
-      </div>
-      <div className="ac-stack">
-        {waiting.length > 0 && <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Ready for Release</h2><span className="slot-count">{waiting.length}</span></div>
-          <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Trainee · NWMTACI no.</th><th>Course</th><th>Certificate No.</th><th>Action</th></tr></thead><tbody>
-            {waiting.map((l, i) => <tr key={l.e.id}><td className="cl-no">{i + 1}</td><td><b>{l.name}</b> <span className="cl-mono cl-sub">{l.number.replace(/^NWMTACI-/, "")}</span></td><td title={l.course.name}>{l.course.code}</td><td className="cl-mono">{l.cert?.certificate_number ?? "—"}</td><td><ReleaseButton primary l={l} onRelease={() => setReleasing(l)} /></td></tr>)}
-          </tbody></table></div></section>}
-        <section className="portal-panel cx-panel">
-          <div className="cx-bar ac-bar rl-bar"><label>From <input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label><label>To <input type="date" value={to} min={from} onChange={(e) => setTo(e.target.value)} /></label>
-            <span className="cx-seg"><button type="button" onClick={() => quick(today)}>Today</button><button type="button" onClick={() => quick(addDays(today, -6))}>Last 7 Days</button><button type="button" onClick={() => quick(`${today.slice(0, 8)}01`)}>This Month</button></span>
-            <input className="vx-search" aria-label="Search released" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, course, certificate or sticker no." /><button type="button" className="portal-secondary" disabled={!rows.length} onClick={csv}>Download Excel</button></div>
-          {rows.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Time</th><th>Trainee</th><th>Course</th><th>Certificate No.</th><th>Released To</th><th>Method</th><th>Sticker No.</th></tr></thead><tbody>
-            {days.map((d) => { const g = relPaged.shown.filter((r) => r.day === d); return [<tr key={d} className="nb-group"><td colSpan={7}><b>{longDay(d)}</b> <span className="cl-sub">{g.length} released</span></td></tr>,
-              ...g.map((r) => <tr key={r.id}><td className="cl-mono">{clock(r.at)}</td><td><b>{r.name}</b></td><td title={r.courseName}>{r.course}</td><td className="cl-mono">{r.certNo}</td><td>{r.to}{r.idType && <small className="cl-sub cl-block">{r.idType}</small>}</td><td><Badge tone={r.method === "Courier" ? undefined : "green"}>{r.method === "Pickup" ? "Picked Up" : r.method}</Badge></td><td className="cl-mono">{r.sticker || "—"}</td></tr>)]; })}
-          </tbody></table>{relPaged.pager}</div> : <p className="portal-empty-copy">Nothing released in this range.</p>}
-        </section>
-      </div>
-    </div>
-    {releasing && <ReleaseConfirm target={{ enrollmentId: releasing.e.id, name: releasing.name, course: releasing.course.name, certNo: releasing.cert?.certificate_number ?? "" }} onClose={() => setReleasing(null)} onDone={async () => { setReleasing(null); await reload(); }} />}
-  </div>;
-}
 
 /** The days a Daily / Weekly (Monday–Sunday) / Monthly report covers, from a picked date. */
 export function reportRange(period: "Daily" | "Weekly" | "Monthly", date: string): { from: string; to: string; label: string } {
@@ -646,18 +512,20 @@ export function AdminCertificateControls({ data, reload }: { data: PortalData; r
  * removes the 2x2 photo ("details"). Only the Admin changes the Certificate
  * Number ("number"). Blank fields print the portal's registered value.
  */
-function CertificateCorrectionsPanel({ data, reload, mode }: { data: PortalData; reload: () => Promise<void>; mode: "details" | "number" }) {
+function CertificateCorrectionsPanel({ data, reload, mode, only, onClose }: { data: PortalData; reload: () => Promise<void>; mode: "details" | "number"; only?: string; onClose?: () => void }) {
   const { busy, msg, post } = usePost(reload);
   const [q, setQ] = useState("");
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [form, setForm] = useState<Record<string, string>>({});
   const [replacing, setReplacing] = useState(false);
-  const lines = certificateLines(data);
+  const lines = certificateLines(data, { inTrainingDays: WAIT_DAYS });
   const term = q.trim().toLowerCase();
   const found = term.length >= 2 ? lines.filter((l) => `${l.name} ${l.number} ${l.cert?.certificate_number ?? ""} ${l.course.code}`.toLowerCase().includes(term)).slice(0, 8) : [];
   const line = lines.find((l) => l.e.id === pickedId) ?? null;
   const tracked = (data as CertData).certificatePhotos != null;
   const pick = (l: CertificateLine) => { const c = ((l.cert as { corrections?: CertificateCorrections } | null)?.corrections ?? {}) as CertificateCorrections; setPickedId(l.e.id); setQ(""); setForm({ certificateNumber: l.cert?.certificate_number ?? "", name: c.name ?? "", courseName: c.courseName ?? "", batchLabel: c.batchLabel ?? "", startsOn: c.startsOn ?? "", endsOn: c.endsOn ?? "", issuedOn: c.issuedOn ?? "", reason: "" }); };
+  // Opened from a row: that trainee, no search.
+  if (only && pickedId !== only) { const l = lines.find((x) => x.e.id === only); if (l) pick(l); }
   const t = line ? first(line.e.trainees) : null, b = line ? first(line.e.batches) : null;
   const portal: Record<string, string> = line ? { name: t ? [t.legal_first_name, (t as { legal_middle_name?: string | null }).legal_middle_name, t.legal_last_name].filter(Boolean).join(" ") : "", courseName: line.course.name, batchLabel: line.cert?.batch_label ?? b?.batch_number ?? "", startsOn: b?.starts_on ?? line.e.scheduled_on ?? "", endsOn: line.ended ?? "", issuedOn: "Print date" } : {};
   const FIELDS: [string, string, string][] = [["name", "Name", "text"], ["courseName", "Course", "text"], ["batchLabel", "Batch", "text"], ["startsOn", "Training Start", "date"], ["endsOn", "Training End", "date"], ["issuedOn", "Issue Date", "date"]];
@@ -674,12 +542,12 @@ function CertificateCorrectionsPanel({ data, reload, mode }: { data: PortalData;
       <p className="ac-foot">Current: <span className="cl-mono">{line.cert?.certificate_number ?? "Not assigned yet"}</span>. Every change is recorded in the audit log. The Releasing Officer corrects the name, course, batch, dates and photo.</p>
     </div> : <p className="portal-empty-copy">Search a trainee to change their Certificate Number.</p>}
   </section>;
-  return <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Corrections and Photos</h2></div>
+  return <section className="portal-panel cx-panel">{!only && <div className="panel-heading"><h2>Corrections and Photos</h2></div>}
     {msg && <Message kind={msg.kind} text={msg.text} />}
-    <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search trainee" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, NWMTACI number or certificate number" /></div>
-    {found.length > 0 && <div className="cc-found">{found.map((l) => <button type="button" key={l.e.id} onClick={() => pick(l)}><b>{l.name}</b><span>{l.course.code} · {l.cert?.certificate_number ?? "No number yet"}</span></button>)}</div>}
+    {!only && <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search trainee" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, NWMTACI number or certificate number" /></div>}
+    {!only && found.length > 0 && <div className="cc-found">{found.map((l) => <button type="button" key={l.e.id} onClick={() => pick(l)}><b>{l.name}</b><span>{l.course.code} · {l.cert?.certificate_number ?? "No number yet"}</span></button>)}</div>}
     {line ? <div className="cc-edit">
-      <p className="cc-who"><b>{line.name}</b> · {line.course.code}{line.cert?.certificate_number ? <> · <span className="cl-mono">{line.cert.certificate_number}</span></> : null}<button type="button" className="ghost-button" onClick={() => setPickedId(null)}>Close</button></p>
+      <p className="cc-who"><b>{line.name}</b> · {line.course.code}{line.cert?.certificate_number ? <> · <span className="cl-mono">{line.cert.certificate_number}</span></> : null}<button type="button" className="ghost-button" onClick={() => (onClose ? onClose() : setPickedId(null))}>Close</button></p>
       {tracked && <div className="cc-photo"><span>2x2 Photo: {line.photo ? <><b>On file</b> <small className="cl-sub">{line.photo.file_name}</small></> : <b className="cl-x">Not uploaded</b>}</span><span className="cl-acts">{line.photo && <ViewIcon label="View Photo" onClick={() => void openCertificatePhoto(line.e.id)} />}<button type="button" className="portal-secondary" onClick={() => setReplacing(true)}>{line.photo ? "Replace Photo" : "Upload Photo"}</button>{line.photo && <button type="button" className="cl-danger" onClick={() => void removePhoto()}>Remove Photo</button>}</span></div>}
       <div className="cl-wrap"><table className="cl-log cl-light cc-table"><thead><tr><th>Field</th><th>From the Portal</th><th>Prints As (Correction)</th></tr></thead><tbody>
         {FIELDS.map(([k, label, type]) => <tr key={k}><td>{label}</td><td>{type === "date" && portal[k] && portal[k] !== "Print date" ? fmtDate(portal[k]) : portal[k] || "—"}</td><td><input className="cl-in" type={type} aria-label={`${label} correction`} value={form[k] ?? ""} placeholder="Same as the portal" onChange={(e) => setForm({ ...form, [k]: e.target.value })} /></td></tr>)}

@@ -70,10 +70,10 @@ export async function POST(request: Request) {
     const cancelled = e.enrollment_status === "Cancelled";
     const certificate = cancelled || e.partner_offer_id ? null
       : state === "Released" ? (d?.status === "Shipped" || d?.status === "Delivered" ? `Sent by LBC${d.tracking_number ? ` · tracking no. ${d.tracking_number}` : ""}` : "Released")
-      : state === "Printed" ? "Printed — ready for pick-up at our office (bring a valid ID)"
+      : state === "Printed" ? (ctx?.balanceCentavos ? "Printed — settle your balance to claim it" : "Printed — ready for pick-up at our office (bring a valid ID)")
       : state === "Void requested" ? "Being reprinted"
       : state === "Due" ? (ctx?.postTest.required && !ctx.postTest.passed ? "Pass the post-test" : "Being prepared")
-      : state === "Waiting for payment" ? "Settle your balance first"
+      : state === "Waiting for payment" ? "Make your payment first"
       : state === "Waiting for evaluation" ? "Submit your training evaluation"
       : "After your training";
     // Released on: the latest release event of the certificate.
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
       schedule: b ? `${longDate(b.starts_on)}${b.ends_on !== b.starts_on ? ` – ${longDate(b.ends_on)}` : ""}` : "Schedule to follow",
       status, trainingFinished, feeCentavos: paid + balance, paidCentavos: paid, balanceCentavos: billedTo.has(e.id) ? 0 : balance, billedTo: billedTo.get(e.id) ?? null,
       certificate, certificateNumber: (state === "Printed" || state === "Released") ? ctx?.cert?.certificate_number ?? null : null, releasedAt,
-      ready: state === "Printed", delivery: d ? d.status : null,
+      ready: state === "Printed" && !ctx?.balanceCentavos, delivery: d ? d.status : null,
       evaluation: { needed, submitted, url: needed && !submitted && trainingFinished && e.feedback_token ? `/feedback/${e.feedback_token}` : null },
       // Course post-test (20 Oct 2026): only for courses whose questions the Admin approved.
       postTest: { needed: !!ctx?.postTest.required && !cancelled, passed: !!ctx?.postTest.passed, best: ctx?.postTest.best ?? null, attempts: ctx?.postTest.attempts ?? 0, url: ctx?.postTest.required && !ctx.postTest.passed && trainingFinished && !cancelled && e.feedback_token ? `/post-test/${e.feedback_token}` : null },

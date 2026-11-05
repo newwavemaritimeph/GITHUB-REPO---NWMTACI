@@ -1,10 +1,21 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { ALL_DATES, ViewIcon, periodRange } from "@/components/portal/shared-ui";
+import { ALL_DATES, ViewIcon, periodRange, pickRange } from "@/components/portal/shared-ui";
 import { needsFullRefresh } from "@/lib/portal-format";
 
 // Every list opens on the month (owner, 3 Nov 2026); the range must cover the whole month.
+describe("Pick a Date First", () => {
+  it("turns each pick into its dates", () => {
+    expect(pickRange("Today", "2026-11-05", "", "")).toMatchObject({ from: "2026-11-05", to: "2026-11-05" });
+    expect(pickRange("This Week", "2026-11-05", "", "")).toMatchObject({ from: "2026-11-02", to: "2026-11-08" });
+    expect(pickRange("This Month", "2026-11-05", "", "")).toMatchObject({ from: "2026-11-01", to: "2026-11-30" });
+    expect(pickRange("Last Month", "2026-11-05", "", "")).toMatchObject({ from: "2026-10-01", to: "2026-10-31", label: "October 2026" });
+    expect(pickRange("Last Month", "2027-01-15", "", "")).toMatchObject({ from: "2026-12-01", to: "2026-12-31" });
+    expect(pickRange("Custom", "2026-11-05", "2026-10-03", "2026-10-09")).toMatchObject({ from: "2026-10-03", to: "2026-10-09" });
+  });
+});
+
 describe("periodRange Monthly", () => {
   it("covers the first to the last day of the month", () => {
     expect(periodRange("Monthly", "2026-11-04")).toMatchObject({ from: "2026-11-01", to: "2026-11-30", label: "November 2026" });

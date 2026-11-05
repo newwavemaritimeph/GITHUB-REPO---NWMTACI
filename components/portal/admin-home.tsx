@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
 import { groupNotices, holidayReminders, holidaysInMonth, totalsByChannel, voidReasonProblem, type HolidayDay, type MarinaStatus, type Notice } from "@/lib/admin-dashboard";
-import { ALL_DATES, Badge, Message, MonthBar, fmtDate, fullName, useMonthRows, useNeedSince, usePost as useRawPost } from "./shared-ui";
+import { ALL_DATES, Badge, Message, MonthBar, PeriodBar, usePeriod, fmtDate, fullName, useMonthRows, useNeedSince, usePost as useRawPost } from "./shared-ui";
 import { NO_REASON, REASONS, ReasonField, reasonReady, reasonText, type ReasonValue } from "./reject-inline";
 import { certificateLines } from "./releasing-home";
 import { upcoming } from "./admin-assistant-home";
@@ -41,11 +41,12 @@ function Head({ eyebrow = "Admin", title, children }: { eyebrow?: string; title:
   return <div className="cx-head"><div><span className="portal-eyebrow">{eyebrow}</span><h1>{title}</h1></div>{children}</div>;
 }
 
-function useJson<T>(url: string) {
+function useJson<T>(url: string | null) {
   const [state, setState] = useState<{ key: string; data: T | null; error: string }>({ key: "", data: null, error: "" });
   const [tick, setTick] = useState(0);
   const key = `${url}#${tick}`;
   useEffect(() => {
+    if (!url) return;
     let live = true;
     const k = `${url}#${tick}`;
     void fetch(url, { cache: "no-store" }).then(async (r) => { const body = await r.json(); if (!r.ok) throw new Error(body.error ?? "Could not load."); if (live) setState({ key: k, data: body as T, error: "" }); })
@@ -298,7 +299,7 @@ export function AdminEnrollments({ data, reload }: { data: PortalData; reload: (
   const [q, setQ] = useState(""), [status, setStatus] = useState("All"), [act, setAct] = useState<string | null>(null), [limit, setLimit] = useState(60);
   const { busy, msg, post } = usePost(reload);
   const statuses = ["All", "Pending", "Enrolled", "Open Schedule", "Cancelled"];
-  // This month first; a search looks across all dates (owner, 3 Nov 2026).
+  // Hidden until a date is picked; a search looks across all dates (owner, 5 Nov 2026).
   const { p, rows: inPeriod } = useMonthRows(data.enrollments, (e) => e.created_at, !!q.trim());
   const rows = inPeriod.filter((e) => (status === "All" || e.enrollment_status === status) && (() => { const s = q.trim().toLowerCase(); if (!s) return true; const t = first(e.trainees); const c = first(e.courses); return `${e.enrollment_number} ${t?.legal_last_name ?? ""} ${t?.legal_first_name ?? ""} ${t?.trainee_number ?? ""} ${c?.code ?? ""} ${first(e.batches)?.batch_number ?? ""}`.toLowerCase().includes(s); })());
   const due = (e: PortalData["enrollments"][number]) => Number(e.selling_price_centavos) + Number(e.charges_centavos ?? 0) - Number(e.discounts_centavos ?? 0);
@@ -308,7 +309,7 @@ export function AdminEnrollments({ data, reload }: { data: PortalData; reload: (
     <MonthBar p={p} what="Enrolled" count={`${rows.length} enrollment${rows.length === 1 ? "" : "s"}`} searching={!!q.trim()} />
     <div className="cx-status" role="tablist">{statuses.map((s) => { const n = s === "All" ? inPeriod.length : inPeriod.filter((e) => e.enrollment_status === s).length; return <button key={s} type="button" role="tab" aria-selected={status === s} className={status === s ? "on" : ""} onClick={() => setStatus(s)}>{s}{n > 0 && <span>{n}</span>}</button>; })}</div>
     <section className="portal-panel cx-panel"><div className="ad-search"><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search trainee, enrollment, course or batch" aria-label="Search enrollments" /></div>
-      <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Enrollment</th><th>Trainee</th><th>Course</th><th>Batch · Schedule</th><th>Status</th><th>Paid</th><th>Balance</th><th></th></tr></thead><tbody>
+      {(p.picked || !!q.trim()) && <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Enrollment</th><th>Trainee</th><th>Course</th><th>Batch · Schedule</th><th>Status</th><th>Paid</th><th>Balance</th><th></th></tr></thead><tbody>
         {rows.slice(0, limit).map((e) => { const t = first(e.trainees), c = first(e.courses), b = first(e.batches); return <tr key={e.id}>
           <td className="cl-mono">{e.enrollment_number}</td><td><b>{t ? `${t.legal_last_name}, ${t.legal_first_name}` : "—"}</b><small>{t?.trainee_number}</small></td><td>{c?.code ?? "—"}</td>
           <td>{b ? <span className="cl-mono">{b.batch_number}</span> : "No batch"}<small>{b ? fmtDate(b.starts_on) : e.scheduled_on ? fmtDate(e.scheduled_on) : ""}</small></td>
@@ -316,7 +317,7 @@ export function AdminEnrollments({ data, reload }: { data: PortalData; reload: (
           <td className="cl-mono">{pesos2(Number(e.paid_centavos))}</td><td className="cl-mono">{pesos2(Math.max(0, due(e) - Number(e.paid_centavos)))}</td>
           <td>{e.enrollment_status !== "Cancelled" && <button type="button" className="ad-danger-link" onClick={() => setAct(e.id)}>Cancel</button>}</td></tr>; })}
         {!rows.length && <tr><td colSpan={8}><span className="portal-empty-copy">No enrollments match.</span></td></tr>}
-      </tbody></table></div>
+      </tbody></table></div>}
       {rows.length > limit && <div className="ad-more"><button type="button" className="portal-secondary" onClick={() => setLimit(limit + 60)}>Show More ({rows.length - limit})</button></div>}
       {act && (() => { const e = data.enrollments.find((x) => x.id === act); if (!e) return null; const t = first(e.trainees), b = first(e.batches); return <VoidBox title="Cancel Enrollment" busy={busy} onCancel={() => setAct(null)}
         detail={`${t ? `${t.legal_last_name}, ${t.legal_first_name}` : "The trainee"} leaves ${first(e.courses)?.code ?? "the course"}${b ? ` ${b.batch_number} and the seat is released` : ""}.${Number(e.paid_centavos) ? ` The ${pesos2(Number(e.paid_centavos))} already paid stays on record; a refund still goes through a Refund request.` : ""}`}
@@ -329,21 +330,21 @@ export function AdminEnrollments({ data, reload }: { data: PortalData; reload: (
 
 type Voucher = { id: string; number: string; payee: string; category: string; amount: number; status: string; channel: string | null; createdAt: string; paidAt: string | null; voidReason: string | null; voidedAt: string | null };
 export function AdminVouchers() {
-  const today = manilaToday();
-  const [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today), [act, setAct] = useState<string | null>(null);
-  const { data, error, load } = useJson<{ vouchers: Voucher[] }>(`/api/staff/admin?view=vouchers&from=${from}&to=${to}`);
+  const p = usePeriod();
+  const [act, setAct] = useState<string | null>(null);
+  const { data, error, load } = useJson<{ vouchers: Voucher[] }>(p.picked ? `/api/staff/admin?view=vouchers&from=${p.range.from}&to=${p.range.to}` : null);
   const { busy, msg, post } = usePost(load);
   const list = data?.vouchers ?? [];
-  return <section className="portal-panel cx-panel ad"><div className="panel-heading"><h2>Expenses with Voucher Numbers</h2>
-    <div className="ad-range"><label>From<input type="date" value={from} max={to} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label><label>To<input type="date" value={to} min={from} max={today} onChange={(e) => e.target.value && setTo(e.target.value)} /></label></div></div>
+  return <section className="portal-panel cx-panel ad"><div className="panel-heading"><h2>Expenses with Voucher Numbers</h2></div>
+    <PeriodBar p={p} what="Issued" count={`${list.length} voucher${list.length === 1 ? "" : "s"}`} />
     {msg && <Message kind={msg.kind} text={msg.text} />}{error && <Message kind="error" text={error} />}
-    <div className="cl-wrap"><table className="cl-log"><thead><tr><th>CV No.</th><th>Date</th><th>Payee</th><th>Category</th><th>Channel</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
+    {p.picked && <div className="cl-wrap"><table className="cl-log"><thead><tr><th>CV No.</th><th>Date</th><th>Payee</th><th>Category</th><th>Channel</th><th>Amount</th><th>Status</th><th></th></tr></thead><tbody>
       {list.map((v) => <tr key={v.id} className={v.status === "Void" ? "ad-voided" : ""}><td className="cl-mono"><a href={`/api/documents/expense/${v.id}?copy=1`} target="_blank" rel="noreferrer">{v.number}</a></td><td>{fmtDate(v.createdAt.slice(0, 10))}</td><td>{v.payee}</td><td>{v.category}</td><td>{v.channel ?? "—"}</td>
         <td className="cl-mono">{v.status === "Void" ? <s>{pesos2(v.amount)}</s> : <b>{pesos2(v.amount)}</b>}</td>
         <td>{v.status === "Void" ? <><Badge tone="red">VOID</Badge><small>{v.voidReason}{v.voidedAt ? ` · ${when(v.voidedAt)}` : ""}</small></> : <Badge tone={v.status === "Paid" ? "green" : "blue"}>{v.status === "Paid" ? "Released" : v.status}</Badge>}</td>
         <td>{v.status !== "Void" && <button type="button" className="ad-danger-link" onClick={() => setAct(v.id)}>Void Voucher</button>}</td></tr>)}
       {data && !list.length && <tr><td colSpan={8}><span className="portal-empty-copy">No vouchers in these dates.</span></td></tr>}
-    </tbody></table></div>
+    </tbody></table></div>}
     {act && (() => { const v = list.find((x) => x.id === act); return v ? <VoidBox title="Void Voucher" busy={busy} onCancel={() => setAct(null)}
       detail={`${pesos2(v.amount)} to ${v.payee} leaves the expense totals and the cash position. The voucher prints VOID; ${v.number} is kept and never reused.${v.status === "Paid" && (v.channel ?? "Cash") === "Cash" ? " If the cash was handed out, return it to the drawer." : ""}`}
       onConfirm={async (reason) => { if (await post({ action: "expense-void", id: v.id, reason }, `${v.number} voided.`)) setAct(null); }} /> : null; })()}

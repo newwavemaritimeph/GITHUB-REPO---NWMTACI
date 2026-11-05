@@ -11,7 +11,7 @@ const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "cur
 const todayManila = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date()); // YYYY-MM-DD
 
 export function LiveCashierClosing({ data, reload, initialOpening }: { data: ClosingData; reload: () => Promise<void>; initialOpening?: number }) {
-  // Closings by month (owner, 3 Nov 2026).
+  // Closings stay hidden until a date is picked (owner, 5 Nov 2026).
   const period = usePeriod();
   const closings = data.cashierClosings.filter((c) => period.inRange(c.closing_date));
   // Starts from today's recorded opening cash, when there is one.
@@ -78,7 +78,7 @@ export function LiveCashierClosing({ data, reload, initialOpening }: { data: Clo
       <section className="portal-panel">
         <div className="panel-heading"><div><h2>Closings</h2><p>Submitted drawer counts</p></div></div>
         <PeriodBar p={period} what="Closed" count={`${closings.length} closing${closings.length === 1 ? "" : "s"}`} />
-        <div className="portal-table"><table><thead><tr><th>Date</th><th>Opening</th><th>Cash</th><th>Online</th><th>Expenses</th><th>Expected</th><th>Actual</th><th>Variance</th><th>Status</th></tr></thead><tbody>
+        {period.picked && <div className="portal-table"><table><thead><tr><th>Date</th><th>Opening</th><th>Cash</th><th>Online</th><th>Expenses</th><th>Expected</th><th>Actual</th><th>Variance</th><th>Status</th></tr></thead><tbody>
           {closings.map((c) => (
             <tr key={c.id}>
               <td><strong>{c.closing_date}</strong></td>
@@ -93,7 +93,7 @@ export function LiveCashierClosing({ data, reload, initialOpening }: { data: Clo
             </tr>
           ))}
           {!closings.length && <tr><td colSpan={9}><span className="portal-empty-copy">No closings in this period.</span></td></tr>}
-        </tbody></table></div>
+        </tbody></table></div>}
       </section>
     </div>
   );

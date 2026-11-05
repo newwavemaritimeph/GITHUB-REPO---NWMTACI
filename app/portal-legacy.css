@@ -2747,3 +2747,34 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .ms-tick input { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--nw-good); }
 .nw-shell .ms-copy { min-height: 28px; padding: 0 9px; font-size: 12.5px; }
 
+/* Pick a Date First (owner, 5 Nov 2026) */
+.nw-shell .pd-wait { margin: 12px 16px 16px; padding: 22px 16px; border: 1px dashed #b9dcec; border-radius: 10px; text-align: center; color: var(--nw-muted); font-size: 14px; }
+.nw-shell .pd-wait b { display: block; color: var(--nw-fg); font-size: 15px; margin-bottom: 2px; }
+.nw-shell .pd-bar .pd-on { background: var(--nw-navy); border-color: var(--nw-navy); color: #fff; }
+.nw-shell .pd-bar .pd-label { flex: 1 1 200px; min-width: 0; }
+
+/* Releasing Officer · Stage Tabs (owner, 5 Nov 2026) */
+.nw-shell .st-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+.nw-shell .st-tab { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; background: #fff; border: 1px solid var(--nw-line); border-radius: 10px; padding: 9px 12px; color: var(--nw-fg); cursor: pointer; font-family: var(--font-portal), sans-serif; text-align: left; }
+.nw-shell .st-tab span { font-size: 14px; font-weight: 600; color: var(--nw-muted); }
+.nw-shell .st-tab b { font: 600 17px var(--font-num), monospace; }
+.nw-shell .st-tab.on { background: var(--nw-navy); border-color: var(--nw-navy); color: #fff; }
+.nw-shell .st-tab.on span { color: #cfe3ef; }
+.nw-shell .st-panel { overflow: visible; }
+.nw-shell .portal-page > .st-panel { padding: 0; }
+.nw-shell .st-wrap { overflow: visible; }
+.nw-shell .st-log td { white-space: normal; }
+.nw-shell .st-acts { flex-wrap: wrap; }
+.nw-shell .st-b { display: inline-flex; align-items: center; height: 32px; padding: 0 13px; border-radius: 8px; border: 1px solid #b9dcec; background: #fff; color: var(--nw-blue); font: 600 14px var(--font-portal), sans-serif; white-space: nowrap; cursor: pointer; text-decoration: none; }
+.nw-shell .st-b.p { background: var(--nw-orange); border-color: var(--nw-orange); color: #fff; }
+.nw-shell .st-b[disabled] { background: #eef2f5; border-color: #dbe3e9; color: #8496a3; cursor: not-allowed; }
+.nw-shell .st-need { display: inline-block; margin: 1px 4px 1px 0; padding: 2px 8px; border-radius: 999px; background: var(--nw-soft); color: #40606f; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.nw-shell .cl-more > div a { display: block; padding: 8px 10px; border-radius: 7px; font: 500 14px inherit; color: var(--nw-fg); text-decoration: none; }
+@media (max-width: 640px) {
+  .nw-shell .st-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nw-shell .st-log, .nw-shell .st-log tbody, .nw-shell .st-log tr, .nw-shell .st-log td { display: block; width: 100%; box-sizing: border-box; border-right: 0; }
+  .nw-shell .st-log thead, .nw-shell .st-log .st-no { display: none; }
+  .nw-shell .st-log tr { border-bottom: 1px solid var(--nw-line); padding: 6px 0; }
+  .nw-shell .st-log td { border: 0; padding: 3px 12px; }
+  .nw-shell .st-log td[data-l]:not([data-l=""])::before { content: attr(data-l); display: block; font-size: 11.5px; font-weight: 600; color: var(--nw-muted); text-transform: uppercase; letter-spacing: .05em; }
+}

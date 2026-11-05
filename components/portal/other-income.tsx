@@ -30,7 +30,7 @@ function usePost(reload: () => Promise<void>) {
 export function OtherIncome({ data, reload, canRecord, canVoid, canAddCategory = false }: { data: PortalData; reload: () => Promise<void>; canRecord: boolean; canVoid: boolean; canAddCategory?: boolean }) {
   const x = data as unknown as Extra;
   const allIncomes = x.otherIncome ?? [];
-  // By month; rebates still to collect always show (owner, 3 Nov 2026).
+  // Rebates still to collect always show; the rest wait for a date (owner, 5 Nov 2026).
   const per = usePeriod();
   const incomes = allIncomes.filter((i) => per.inRange(i.received_on));
   // Categories Accounting keeps (owner, 21 Oct 2026); the built-in list until migration 055 runs.
@@ -138,7 +138,7 @@ export function OtherIncome({ data, reload, canRecord, canVoid, canAddCategory =
       <div className="cx-tile"><span>Oldest Rebate Due</span><b>{oldest ? fmtDate(oldest) : "—"}</b><small>{oldest ? "training date" : "nothing due"}</small></div>
     </div>
 
-    <MonthBar p={per} what={tab === "Other Income" ? "Received" : "Rebates received"} count={tab === "Other Income" ? `${incomes.length} receipt${incomes.length === 1 ? "" : "s"}` : `${inView.filter((r) => r.income).length} received`} />
+    <MonthBar p={per} what={tab === "Other Income" ? "Received" : "Rebates received"} count={tab === "Other Income" ? `${incomes.length} receipt${incomes.length === 1 ? "" : "s"}` : `${inView.filter((r) => r.income).length} received`} waitText={tab === "Other Income" ? undefined : "Pick a date to show rebates already received."} />
     {tab === "Endorsement Rebates" ? <section className="portal-panel cx-panel">
       <div className="panel-heading"><h2>Endorsement Rebates</h2><small>{canRecord ? "Tick the trainees the partner paid for, then Record Received" : "View only"}</small></div>
       {partners.length ? partners.map((p) => { const rows = inView.filter((r) => r.partner === p); const pd = rows.filter((r) => !r.income && centerPaid(r.e.id)); return <div key={p} className="oi-partner">
@@ -160,7 +160,7 @@ export function OtherIncome({ data, reload, canRecord, canVoid, canAddCategory =
     </section> : <section className="portal-panel cx-panel">
       <div className="panel-heading"><h2>Other Income</h2>{canRecord && !form ? <button type="button" className="portal-primary" onClick={() => open(0)}>Record Income</button> : <small>All income received outside trainee fees</small>}</div>
       {formView(false)}
-      {incomes.length ? <div className="portal-table"><table><thead><tr><th>Income No.</th><th>Date</th><th>Category</th><th>Received From</th><th>Channel</th><th className="r">Amount</th><th>Proof</th>{canVoid && <th />}</tr></thead><tbody>
+      {!per.picked ? null : incomes.length ? <div className="portal-table"><table><thead><tr><th>Income No.</th><th>Date</th><th>Category</th><th>Received From</th><th>Channel</th><th className="r">Amount</th><th>Proof</th>{canVoid && <th />}</tr></thead><tbody>
         {incP.shown.map((i) => <tr key={i.id} className={i.voided_at ? "oi-done" : ""}>
           <td className="cx-mono"><strong>{i.income_number}</strong></td><td className="tc-nowrap">{fmtDate(i.received_on)}</td>
           <td><Badge tone={i.source === "Endorsement Rebate" ? "blue" : "green"}>{i.source}</Badge></td>

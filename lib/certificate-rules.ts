@@ -8,6 +8,9 @@
  * The trainee's 2x2 photo must be on file before it prints (9 Oct 2026).
  * Since 20 Oct 2026 the evaluation is the portal's own form, required for every
  * New Wave course, and release needs the fee paid and the evaluation in.
+ * Since 5 Nov 2026 the Releasing Officer works only on trainees with a payment: an
+ * initial payment allows the photo, the preview and the print; release still needs
+ * the balance settled. Company Charge is billed to the partner, so it needs no payment.
  */
 
 export type CertificateState = "Training not finished" | "Waiting for payment" | "Waiting for evaluation" | "Waiting for photo" | "Due" | "Printed" | "Released" | "Void requested" | "Cancelled" | "Revoked";
@@ -17,10 +20,12 @@ export type CertificateFacts = {
   /** Last training day (YYYY-MM-DD), or null when not scheduled. */
   trainingEnd: string | null;
   balanceCentavos: number;
+  /** Valid payments so far. */
+  paidCentavos: number;
   evaluationRequired: boolean;
   /** Day the evaluation came in (YYYY-MM-DD), or null. */
   evaluationOn: string | null;
-  /** Day the fee was fully settled (latest payment day), or null. */
+  /** Latest payment day, or null. */
   paidOn: string | null;
   /** revoked: the Admin revoked it (202610200047); it never prints again and the QR shows REVOKED. */
   cert: { status: string; printCount: number; reprintsAllowed: number; voidStatus?: string | null; revoked?: boolean } | null;
@@ -32,6 +37,9 @@ export type CertificateView = { state: CertificateState; dueOn: string | null; o
 
 const later = (...days: (string | null)[]) => days.filter((d): d is string => !!d).sort().at(-1) ?? null;
 
+/** Something is owed and nothing was paid. A Company Charge or a free course owes nothing here, so it passes. */
+export const noPaymentYet = (f: { balanceCentavos: number; paidCentavos: number }) => f.balanceCentavos > 0 && f.paidCentavos <= 0;
+
 export function certificateState(f: CertificateFacts, today: string): CertificateView {
   const printCount = f.cert?.printCount ?? 0;
   const printsAllowed = 1 + (f.cert?.reprintsAllowed ?? 0);
@@ -41,9 +49,9 @@ export function certificateState(f: CertificateFacts, today: string): Certificat
   if (f.cert?.revoked) return { ...base, printsLeft: 0, state: "Revoked", dueOn: null, overdue: false };
   if (f.cert?.voidStatus === "Requested") return { ...base, state: "Void requested", dueOn: null, overdue: false };
   if (f.cert?.status === "Released") return { ...base, state: "Released", dueOn: null, overdue: false };
+  if (noPaymentYet(f)) return { ...base, state: "Waiting for payment", dueOn: null, overdue: false };
   if (printCount > 0) return { ...base, state: "Printed", dueOn: null, overdue: false };
   if (!f.trainingEnd || f.trainingEnd > today) return { ...base, state: "Training not finished", dueOn: null, overdue: false };
-  if (f.balanceCentavos > 0) return { ...base, state: "Waiting for payment", dueOn: null, overdue: false };
   if (f.evaluationRequired && !f.evaluationOn) return { ...base, state: "Waiting for evaluation", dueOn: null, overdue: false };
   if (f.photoOnFile === false) return { ...base, state: "Waiting for photo", dueOn: null, overdue: false };
   const dueOn = later(f.trainingEnd, f.paidOn, f.evaluationRequired ? f.evaluationOn : null);
@@ -64,6 +72,20 @@ export function releaseProblem(f: { balanceCentavos: number; evaluationRequired:
   if (f.postTestRequired && !f.postTestPassed) return "Post-test not passed yet.";
   if (f.evaluationRequired && !f.evaluationOn) return "Evaluation not submitted yet.";
   return null;
+}
+
+/**
+ * The Releasing Officer's tabs (owner, 5 Nov 2026: Stage Tabs). A certificate moves by itself: once printed it leaves
+ * Waiting and To Print; an approved reprint comes back to To Print once.
+ */
+export const CERTIFICATE_STAGES = ["Waiting", "To Print", "To Release", "Released"] as const;
+export type CertificateStage = (typeof CERTIFICATE_STAGES)[number];
+export function certificateStage(v: CertificateView): CertificateStage | null {
+  if (v.state === "Cancelled" || v.state === "Revoked") return null;
+  if (v.state === "Due" || ((v.state === "Printed" || v.state === "Released") && v.printsLeft > 0)) return "To Print";
+  if (v.state === "Released") return "Released";
+  if (v.state === "Printed" || v.state === "Void requested" || v.state === "Waiting for payment") return "To Release";
+  return "Waiting";
 }
 
 /** Admin › Courses › Remove (owner, 20 Oct 2026): an unused course is deleted; a used one is archived. */

@@ -32,9 +32,9 @@ function useLoad<T>(url: string | null, tick: number) {
 
 export function CompletionRecords({ eyebrow = "MISMO" }: { eyebrow?: string }) {
   const [tick, setTick] = useState(0), [pick, setPick] = useState<string | null>(null), [filter, setFilter] = useState("All");
-  // By the month training ended (owner, 3 Nov 2026).
+  // By the date training ended, hidden until a date is picked (owner, 5 Nov 2026).
   const p = usePeriod();
-  const list = useLoad<{ ready: boolean; batches: CompletionBatch[] }>(`${API}?from=${p.range.from < ALL_DATES ? ALL_DATES : p.range.from}`, tick);
+  const list = useLoad<{ ready: boolean; batches: CompletionBatch[] }>(`${API}?from=${!p.picked ? p.today : p.range.from < ALL_DATES ? ALL_DATES : p.range.from}`, tick);
   const batches = (list.data?.batches ?? []).filter((b) => p.inRange(b.endsOn));
   const shown = filter === "All" ? batches : batches.filter((b) => (filter === "To Do" ? b.status === "Not Started" || b.status === "Draft" : b.status === filter));
   return <div className="portal-page cx ac tcr-ui">
@@ -44,7 +44,7 @@ export function CompletionRecords({ eyebrow = "MISMO" }: { eyebrow?: string }) {
     <MonthBar p={p} what="Ended" count={`${batches.length} batch${batches.length === 1 ? "" : "es"}`} />
     <section className="portal-panel cx-panel"><div className="panel-heading"><h2>STCW Batches</h2>
       <div className="cx-seg">{["All", "To Do", "Ready", "Printed"].map((f) => <button key={f} type="button" className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{f === "Ready" ? "Ready to Print" : f}</button>)}</div></div>
-      {shown.length ? <div className="tcr-batches">{shown.map((b) => <button key={b.id} type="button" className={`tcr-bt${pick === b.id ? " on" : ""}`} onClick={() => setPick(b.id)}>
+      {!p.picked ? null : shown.length ? <div className="tcr-batches">{shown.map((b) => <button key={b.id} type="button" className={`tcr-bt${pick === b.id ? " on" : ""}`} onClick={() => setPick(b.id)}>
         <b>{b.batchNumber} · {b.courseCode}</b><small>{durationText(b.startsOn, b.endsOn)} · {b.trainees} trainee{b.trainees === 1 ? "" : "s"}</small><Badge tone={TONE[b.status]}>{LABEL[b.status]}</Badge></button>)}</div>
         : <p className="portal-empty-copy">{list.loading ? "Loading…" : "No STCW batch ended in this period."}</p>}
     </section>

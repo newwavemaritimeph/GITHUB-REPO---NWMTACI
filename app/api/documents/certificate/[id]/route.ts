@@ -13,7 +13,7 @@ const notice = (message: string, status: number) => new Response(
 
 const WHY: Record<string, string> = {
   "Training not finished": "The training has not finished yet.",
-  "Waiting for payment": "The training fee is not settled. The Cashier must record the balance first.",
+  "Waiting for payment": "No payment is recorded for this trainee yet. The Cashier must record a payment first.",
   "Waiting for evaluation": "The trainee has not submitted the evaluation form yet.",
   "Waiting for photo": "Upload the trainee's 2x2 photo first.",
   "Void requested": "A void request is waiting for the Admin.",
@@ -23,10 +23,10 @@ const WHY: Record<string, string> = {
 
 /**
  * Certificate PDF for one enrollment (owner, 8 Oct 2026). Admin and the
- * Releasing Officer only. ?preview=1 is watermarked and never counted; the
- * Certificate No. is assigned at the first preview. Without it the PDF is the
- * real print: fee settled, training ended, evaluation in, and one print (plus
- * one per paid reprint request or Admin-approved void).
+ * Releasing Officer only. ?preview=1 is watermarked, never counted and takes no
+ * Certificate No. (owner, 5 Nov 2026). Without it the PDF is the
+ * real print: a payment recorded or a Company Charge, training ended, evaluation
+ * in, and one print (plus one per paid reprint request or Admin-approved void).
  */
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const staff = await requireStaff();
@@ -36,18 +36,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const db = createSupabaseAdminClient();
   let ctx = await certificateContext(db, id);
   if (!ctx) return notice("Enrollment not found.", 404);
-  // Preview Draft at any stage (owner, 20 Oct 2026), for double-checking; only a cancelled or revoked certificate is refused.
-  if (WHY[ctx.view.state] && !(preview && !["Cancelled", "Revoked"].includes(ctx.view.state))) return notice(WHY[ctx.view.state], 409);
-  // Before it is printable, a draft creates nothing: no certificate row, Certificate No. or verify code is used up.
-  if (preview && WHY[ctx.view.state] && ctx.view.state !== "Waiting for photo") {
+  // Preview Draft at any stage (owner, 20 Oct 2026), for double-checking; a cancelled or revoked certificate is refused,
+  // and so is a trainee with no payment for the Releasing Officer (owner, 5 Nov 2026).
+  const noDraft = ["Cancelled", "Revoked"].includes(ctx.view.state) || (ctx.view.state === "Waiting for payment" && !staff.roleCodes.includes("admin"));
+  if (WHY[ctx.view.state] && (!preview || noDraft)) return notice(WHY[ctx.view.state], 409);
+  // A draft creates nothing: no certificate row, Certificate No. or verify code is used up.
+  if (preview) {
     try {
       const bytes = await buildCertificatePdf(db, ctx, "preview");
       await db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "releasing_officer", action: "certificate.draft_previewed", record_type: "enrollment", record_id: id, new_values: { state: ctx.view.state } });
       return new Response(Buffer.from(bytes), { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="certificate-${ctx.enrollment.enrollment_number}-draft.pdf"`, "cache-control": "no-store" } });
     } catch (error) { return notice(error instanceof Error ? error.message : "The draft could not be prepared.", 409); }
   }
-  if (!preview && !canPrint(ctx.view)) return notice("This certificate was already printed. A reprint needs a paid Reprinting request or an Admin-approved void.", 409);
-  if (!preview && !ctx.issuanceEnabled) return notice("Certificate printing is turned off. The Admin turns it on in Certificate numbering.", 409);
+  if (!canPrint(ctx.view)) return notice("This certificate was already printed. A reprint needs a paid Reprinting request or an Admin-approved void.", 409);
+  if (!ctx.issuanceEnabled) return notice("Certificate printing is turned off. The Admin turns it on in Certificate numbering.", 409);
   try {
     const certId = await ensureCertificate(db, ctx);
     if (!ctx.cert?.certificate_number) {
@@ -57,20 +59,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     // The QR verification code, once per certificate (202610200047; skipped before it).
     if (!ctx.cert?.verify_code && await ensureVerifyCode(db, certId)) ctx = (await certificateContext(db, id))!;
     // The Registration No. is taken at the print itself (migration 202610090037; skipped before it).
-    if (!preview && !ctx.numbers.reg) {
+    if (!ctx.numbers.reg) {
       const { error: numError } = await db.rpc("claim_certificate_registration_number", { target_certificate: certId, actor: staff.user.id });
       if (numError && !/claim_certificate_registration_number|does not exist|schema cache/i.test(numError.message)) return notice(numError.message, 409);
       if (!numError) ctx = (await certificateContext(db, id))!;
     }
     // Build first so a template problem never uses up the print.
-    const bytes = await buildCertificatePdf(db, ctx, preview ? "preview" : "print");
-    if (!preview) {
-      const { error } = await db.rpc("record_certificate_print", { target_certificate: certId, actor: staff.user.id });
-      if (error) return notice(error.message, 409);
-    } else {
-      await db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "releasing_officer", action: "certificate.previewed", record_type: "certificate", record_id: certId, new_values: { certificate_number: ctx.cert?.certificate_number ?? null } });
-    }
-    const name = `certificate-${ctx.cert?.certificate_number ?? ctx.enrollment.enrollment_number}${preview ? "-preview" : ""}.pdf`;
+    const bytes = await buildCertificatePdf(db, ctx, "print");
+    const { error } = await db.rpc("record_certificate_print", { target_certificate: certId, actor: staff.user.id });
+    if (error) return notice(error.message, 409);
+    const name = `certificate-${ctx.cert?.certificate_number ?? ctx.enrollment.enrollment_number}.pdf`;
     return new Response(Buffer.from(bytes), { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="${name}"`, "cache-control": "no-store" } });
   } catch (error) {
     return notice(error instanceof Error ? error.message : "The certificate could not be prepared.", 409);

@@ -1,0 +1,205 @@
+<title>In-House Course Plans</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+/* One look, matching the light-only portal and trainee pages. Layout: plan tabs on top, the flow, then the trainee's phone beside what staff see. */
+:root { --bg: #f2f9fc; --ink: #0f2638; --mute: #587184; --line: #d6e9f1; --soft: #eef4f8; --navy: #123F63; --blue: #0571D0; --orange: #F25615; --cyan: #9EE3F1; --good: #0a7a3e; --bad: #b42318; --font: "Geist", system-ui, sans-serif; --mono: "Geist Mono", ui-monospace, monospace; color-scheme: light; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.45 var(--font); margin: 0; }
+button { font-family: var(--font); }
+button:focus-visible, input:focus-visible, select:focus-visible, label:focus-within { outline: 2px solid var(--blue); outline-offset: 1px; }
+#tabs { background: #fff; border-bottom: 2px solid var(--navy); padding: 10px 16px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+#tabs b { color: var(--navy); margin-right: 6px; font-size: 16px; }
+#tabs button { height: 32px; padding: 0 11px; border-radius: 8px; border: 1px solid #b9dcec; background: #fff; color: var(--navy); font-weight: 600; font-size: 13.5px; cursor: pointer; }
+#tabs button.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+#tabs button.rec:not(.on) { border-color: var(--orange); color: #b23d0c; }
+main { max-width: 1240px; margin: 0 auto; padding: 18px 16px 48px; }
+h1 { margin: 0; font-size: 24px; line-height: 1.2; color: var(--ink); text-wrap: balance; }
+.sub { color: var(--mute); margin: 4px 0 12px; max-width: 72ch; }
+.tagrow { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; }
+.tag { background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 4px 9px; font-size: 13px; }
+.tag b { color: var(--mute); font-weight: 600; margin-right: 4px; }
+.rec-chip { display: inline-block; background: #fdeee6; color: #b23d0c; font: 600 12.5px var(--font); padding: 2px 8px; border-radius: 999px; vertical-align: middle; margin-left: 6px; }
+h2 { font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--navy); margin: 0 0 8px; }
+.flow { list-style: none; margin: 0 0 18px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; counter-reset: s; }
+.flow li { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; counter-increment: s; font-size: 13.5px; }
+.flow li.new { border-color: var(--orange); background: #fff8f4; }
+.flow li small { display: block; font-weight: 600; color: var(--blue); font-size: 12px; margin-bottom: 2px; }
+.flow li small::before { content: counter(s) " · "; }
+.cols { display: grid; grid-template-columns: minmax(0, 430px) minmax(0, 1fr); gap: 18px; align-items: start; }
+.tools { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.mini { height: 30px; padding: 0 10px; border-radius: 8px; border: 1px solid #b9dcec; background: #fff; color: var(--blue); font-weight: 600; font-size: 13px; cursor: pointer; }
+.mini[disabled] { color: #8496a3; border-color: #dbe3e9; cursor: not-allowed; background: #eef2f5; }
+.mini.p { background: var(--orange); border-color: var(--orange); color: #fff; }
+.dev { background: linear-gradient(160deg, #0571D0, #123F63); border-radius: 20px; padding: 14px; }
+.card { background: #fff; border-radius: 14px; padding: 18px 16px; }
+.card h3 { margin: 4px 0 8px; color: var(--navy); font-size: 21px; line-height: 1.2; }
+.eyebrow { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--blue); font-weight: 700; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; margin: 0 0 10px; color: #35607a; font-size: 14px; }
+.kv dt { font-weight: 600; color: var(--navy); } .kv dd { margin: 0; }
+.note { background: #e2effc; color: #0b5cad; border-radius: 10px; padding: 9px 11px; font-size: 14px; margin: 10px 0; }
+.warn { background: #fdeee6; color: #8f3208; border-radius: 10px; padding: 9px 11px; font-size: 14px; margin: 10px 0; }
+fieldset { border: 1px solid #d8e4ec; border-radius: 12px; padding: 10px 10px 4px; margin: 0 0 10px; min-width: 0; }
+legend { font-size: 14.5px; font-weight: 700; color: var(--navy); padding: 0 4px; }
+.opt { display: flex; gap: 9px; align-items: flex-start; border: 1px solid #d8e4ec; border-radius: 10px; padding: 9px 10px; margin: 0 0 7px; cursor: pointer; font-size: 14.5px; }
+.opt.on { border-color: var(--blue); background: #e2effc; }
+.opt input { margin-top: 3px; width: 17px; height: 17px; flex: none; }
+.big { width: 100%; min-height: 46px; border-radius: 10px; border: 0; background: var(--orange); color: #fff; font-size: 15.5px; font-weight: 700; cursor: pointer; margin-top: 4px; }
+.big.blue { background: var(--blue); }
+.big.ghost { background: #fff; color: var(--blue); border: 1px solid #b9dcec; }
+.big[disabled] { opacity: .55; cursor: not-allowed; }
+.hint { color: #35607a; font-size: 13px; text-align: center; margin: 6px 0 0; }
+.res { padding: 14px; border-radius: 12px; margin-top: 8px; }
+.res.y { background: #eaf8ee; border: 1px solid #b6e3c4; } .res.n { background: #fdecea; border: 1px solid #f5c2bc; }
+.res strong { font-size: 18px; } .res.y strong { color: var(--good); } .res.n strong { color: var(--bad); }
+.score { margin: 6px 0; font-size: 28px; font-weight: 700; color: var(--navy); }
+.score span { font-size: 14px; font-weight: 500; color: #35607a; }
+.mail { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; font-size: 14px; }
+.mail .when { color: var(--mute); font-size: 12.5px; }
+.mail b.subj { display: block; color: var(--navy); margin: 2px 0 6px; }
+.mail .btnbox { border: 1px solid #cfe6f2; border-radius: 10px; padding: 10px; margin-top: 8px; }
+.mail .btnbox.o { border-color: var(--orange); }
+.mail .btnbox p { margin: 0 0 8px; font-size: 13.5px; }
+.lnk { display: inline-block; background: var(--orange); color: #fff; border: 0; border-radius: 8px; padding: 10px 15px; font-weight: 700; font-size: 14px; cursor: pointer; }
+.lnk.blue { background: var(--blue); }
+.back { background: none; border: 0; color: var(--blue); font-weight: 600; font-size: 13.5px; cursor: pointer; padding: 0 0 8px; }
+.row { display: flex; justify-content: space-between; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; margin-bottom: 7px; font-size: 14px; }
+.row.done { background: #f3fbf6; border-color: #bfe5cd; }
+.row.lock { color: #8496a3; background: #f6f8fa; }
+.bar { height: 6px; background: var(--soft); border-radius: 3px; overflow: hidden; margin: 6px 0 12px; }
+.bar i { display: block; height: 100%; background: var(--blue); }
+.timer { font: 600 15px var(--mono); color: var(--bad); }
+label.f { display: block; font-size: 13px; font-weight: 600; color: var(--mute); margin-bottom: 9px; }
+label.f input, label.f select { display: block; width: 100%; height: 38px; margin-top: 3px; border: 1px solid var(--line); border-radius: 8px; padding: 0 10px; font: 14.5px var(--font); color: var(--ink); background: #fff; }
+.side { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.panel { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.panel ul { margin: 0; padding-left: 18px; font-size: 14px; }
+.panel li { margin-bottom: 3px; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+.chip { display: inline-block; padding: 2px 8px; border-radius: 999px; font: 600 12.5px var(--font); background: var(--soft); color: #40606f; margin: 1px 3px 1px 0; white-space: nowrap; }
+.chip.g { background: #e3f5ea; color: var(--good); } .chip.o { background: #fdeee6; color: #b23d0c; } .chip.b { background: #e6f1fb; color: #0b4f8f; } .chip.r { background: #fbe9e7; color: var(--bad); }
+.staff { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; font-size: 14px; }
+.staff .m { font-family: var(--mono); font-size: 12.5px; color: var(--mute); }
+.wrap { overflow-x: auto; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th { background: #e6f6fd; color: #0b4f8f; text-align: left; padding: 9px 10px; font-size: 12px; letter-spacing: .05em; text-transform: uppercase; white-space: nowrap; }
+td { padding: 9px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+td b { color: var(--navy); }
+.st { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 4px 10px; align-items: start; padding: 9px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.st:first-child { border-top: 0; }
+.st > span { width: 26px; height: 26px; line-height: 26px; border-radius: 50%; text-align: center; background: var(--navy); color: #fff; font: 600 12.5px var(--mono); }
+.st small { display: block; color: var(--mute); }
+#toast { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 90; background: var(--navy); color: #fff; padding: 9px 15px; border-radius: 10px; font-size: 14px; max-width: calc(100vw - 32px); }
+@media (max-width: 860px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+</style>
+<nav id="tabs" aria-label="Plans"></nav>
+<main id="app"></main>
+<div id="toast" hidden></div>
+<script>
+const QS = [["Which IMO code sets ship and port facility security requirements?", ["LSA Code", "IMDG Code", "IBC Code", "ISPS Code"], 3], ["How many security levels are there under the ISPS Code?", ["Three", "Four", "Two", "Five"], 0], ["What does the Ship Security Alert System (SSAS) do?", ["Sounds a loud alarm on deck", "Calls nearby fishing boats", "Sends a silent alert to shore authorities", "Broadcasts on VHF channel 16 only"], 2], ["Who is responsible onboard for implementing the Ship Security Plan?", ["Bosun", "Chief Cook", "Ship Security Officer (SSO)", "Port State Control Officer"], 2], ["Which is a recommended ship protection measure in Best Management Practices (BMP)?", ["Physical barriers such as razor wire", "Keeping only one lookout at night", "Slowing down when skiffs approach", "Allowing small boats alongside"], 0], ["What is a citadel?", ["The ship's bonded store", "A secure area where the crew can shelter with communications", "The captain's private cabin", "The lifeboat embarkation deck"], 1], ["What does access control onboard mean?", ["Checking identity and controlling who boards the ship", "Removing the gangway watch", "Letting anyone board in port", "Locking the galley only at night"], 0], ["If pirates board and take control, what should the crew do?", ["Jump overboard to escape", "Stay calm, cooperate and avoid actions that risk lives", "Fight the attackers with any weapons", "Take photos of the pirates"], 1], ["Which watchkeeping practice helps detect pirates early?", ["Reducing the bridge team at night", "Keeping lookouts inside the wheelhouse", "Watching only the AIS screen", "Extra lookouts with binoculars plus radar watch"], 3], ["How must the Ship Security Plan be kept?", ["Only at the company office", "Posted on social media", "Shared with every visitor", "Onboard and protected from unauthorized access"], 3]];
+const JOIN = { label: "Join Google Classroom", go: "classroom", box: "Sign in with your Google (Gmail) account, then tap the button to join the class.", code: "abc1234" };
+const TEST = { label: "Take the Post-Test", go: "test", box: "Open this after you finish the module. Answer 10 questions. You pass with 70% (7 correct). You can take it again; there is no limit on retakes.", o: true };
+const EVAL = { label: "Evaluate the Training", go: "eval", box: "Tell us how the training went. It takes about 3 minutes.", blue: true };
+const INSTR = { when: "When you are enrolled", subject: "Your training instructions · APA - Anti Piracy Awareness", lines: "Nov 9, 2026 · Self-paced · Google Classroom · Module" };
+const REG = ["Trainee", "Registers on the website and picks a start date"], CHECK = ["Registration", "Checks requirements and hands to the Cashier"], PAY = ["Cashier", "Records the payment; the trainee is enrolled"], SEND = ["Registration", "Sends the instructions email and PDF"], JOINF = ["Trainee", "Joins the Google Classroom"], MOD = ["Trainee", "Finishes the module"], EV = ["Trainee", "Answers the evaluation"], PRINT = ["Releasing Officer", "Uploads the photo and prints"], REL = ["Releasing Officer", "Releases or ships by LBC"];
+const n = (a) => [a[0], a[1], true];
+const PLANS = [
+  { id: 1, name: "Email Link Right Away", best: "The simplest way to do what you described: the link is in the instructions email from the start.", opens: "In the instructions email", where: "Portal page", tries: "Unlimited", cert: "Printed, then released", staff: "None added", build: "Small · already drafted", start: "email", style: "page", emails: [{ ...INSTR, buttons: [JOIN, TEST] }, { when: "Last training day, 4:00 PM", subject: "Please complete your evaluation", lines: "Your training has ended. Please answer the evaluation so we can release your certificate.", buttons: [EVAL] }], flow: [REG, CHECK, PAY, n(["Registration", "Sends the email with Join and Post-Test buttons"]), JOINF, MOD, n(["Trainee", "Opens the post-test from the same email"]), EV, PRINT, REL], good: ["No new screen; drafted in the working copy", "The trainee keeps one email for everything", "Works on a phone with no login"], watch: ["A trainee can take the test before studying", "A lost email means going to the Trainee Status page"], certMsg: "Your certificate goes to the Releasing Officer. It is released once your fee is settled." },
+  { id: 2, name: "Link Inside Google Classroom", best: "Makes the trainee join the class, because the test is only posted there.", opens: "Last item in the class", where: "Portal page, opened from the class", tries: "Unlimited", cert: "Printed, then released", staff: "Post one link in each class", build: "Medium", start: "email", style: "page", classTest: true, emails: [{ ...INSTR, buttons: [JOIN] }], flow: [REG, CHECK, PAY, SEND, JOINF, MOD, n(["Trainee", "Opens the Post-Test posted in the class"]), n(["Trainee", "Enters SRN and NWMTACI No. to open it"]), EV, PRINT, REL], good: ["Every trainee who tests has joined the class", "One place to study and test"], watch: ["One shared link, so the trainee must enter SRN and NWMTACI No.", "The link must be posted in each class"], certMsg: "Your certificate goes to the Releasing Officer. It is released once your fee is settled." },
+  { id: 3, rec: true, name: "I Finished the Module Button", best: "Matches your words: once done, they open the post-test from the email. Adds one tick so the portal records that they finished.", opens: "In the email, after a tick", where: "Portal page", tries: "Unlimited", cert: "Printed, then released", staff: "None added", build: "Small", start: "email", style: "page", emails: [{ ...INSTR, buttons: [JOIN, { ...TEST, go: "gate" }] }, { when: "Last training day, 4:00 PM", subject: "Please complete your evaluation", lines: "Your training has ended. Please answer the evaluation so we can release your certificate.", buttons: [EVAL] }], flow: [REG, CHECK, PAY, n(["Registration", "Sends the email with Join and Post-Test buttons"]), JOINF, MOD, n(["Trainee", "Ticks I Finished the Module, with the date saved"]), n(["Trainee", "Takes the post-test"]), EV, PRINT, REL], good: ["The record shows the date the module was finished", "Reminds the trainee to study first", "Still one email and no login"], watch: ["The tick is the trainee's word; the portal cannot see inside the class"], certMsg: "Your certificate goes to the Releasing Officer. It is released once your fee is settled." },
+  { id: 4, name: "Opens on the Last Training Day", best: "What the portal does today, unchanged.", opens: "4:00 PM on the last day", where: "Portal page", tries: "Unlimited", cert: "Printed, then released", staff: "None added", build: "None", start: "email", style: "page", emails: [{ ...INSTR, buttons: [JOIN] }, { when: "Last training day, 4:00 PM", subject: "Your training has ended: post-test and evaluation", lines: "Please complete your post-test and training evaluation so we can release your certificate.", buttons: [TEST, EVAL] }], flow: [REG, CHECK, PAY, SEND, JOINF, MOD, n(["Portal", "Emails the post-test and evaluation at 4:00 PM"]), n(["Trainee", "Takes the post-test"]), EV, PRINT, REL], good: ["Nothing to build", "The test cannot be taken on day one by email"], watch: ["A trainee who finishes early must wait", "Two emails to keep"], certMsg: "Your certificate goes to the Releasing Officer. It is released once your fee is settled." },
+  { id: 5, name: "My Training Page", best: "One page for each trainee with every step, so a lost email is no problem.", opens: "On the trainee's own page", where: "Portal page", tries: "Unlimited", cert: "Printed, then released", staff: "Fewer questions from trainees", build: "Medium", start: "email", style: "page", after: "status", emails: [{ ...INSTR, lines: "All your steps are on one page. Open it with this button, or with your SRN and NWMTACI No. at any time.", buttons: [{ label: "Open My Training Page", go: "status", box: "Join the class, take the post-test, answer the evaluation and follow your certificate.", o: true }] }], flow: [REG, CHECK, PAY, n(["Registration", "Sends one link to the trainee's page"]), n(["Trainee", "Opens the page: Join, Module, Post-Test, Evaluation"]), JOINF, MOD, n(["Trainee", "Takes the post-test from the page"]), EV, n(["Trainee", "Can upload the 2x2 photo on the page"]), PRINT, REL], good: ["The trainee always sees what is next", "Also solves the 2x2 photo for online trainees", "Builds on the Trainee Status page"], watch: ["A bigger change to the website", "Who checks a photo the trainee uploads"], certMsg: "Your certificate status stays on this page." },
+  { id: 6, name: "Post-Test and Evaluation in One", best: "Fewest steps: one form, one submit.", opens: "In the instructions email", where: "Portal page", tries: "Unlimited", cert: "Printed, then released", staff: "None added", build: "Medium", start: "email", style: "combo", emails: [{ ...INSTR, buttons: [JOIN, { ...TEST, label: "Take the Post-Test and Evaluation", box: "One form: 10 questions, then your evaluation. You pass with 70% (7 correct)." }] }], flow: [REG, CHECK, PAY, n(["Registration", "Sends the email with one form link"]), JOINF, MOD, n(["Trainee", "Answers the questions and the evaluation on one form"]), PRINT, REL], good: ["The trainee cannot forget the evaluation", "One less email and one less link"], watch: ["A retake repeats the form", "The evaluation is saved only after passing"], certMsg: "Your certificate goes to the Releasing Officer. It is released once your fee is settled." },
+  { id: 7, name: "Soft Copy Right After Passing", best: "Fastest for the trainee: paid, passed and evaluated means the soft copy is emailed at once.", opens: "In the instructions email", where: "Portal page", tries: "Unlimited", cert: "Soft copy by email; paper on request", staff: "Paper only on request", build: "Medium", start: "email", style: "page", emails: [{ ...INSTR, buttons: [JOIN, TEST] }], flow: [REG, CHECK, PAY, n(["Registration", "Sends the email with Join and Post-Test buttons"]), JOINF, MOD, n(["Trainee", "Takes the post-test"]), EV, n(["Portal", "Emails the soft copy at once"]), n(["Releasing Officer", "Prints paper only when requested"])], good: ["No waiting and no trip to the office", "Less printing"], watch: ["The 2x2 photo must be on file first", "A certificate leaves with no one checking it", "Balance must be ₱0"], certMsg: "Your soft copy was emailed to you. Request a printed copy from the Releasing Officer." },
+  { id: 8, name: "Timed Test, 3 Tries", best: "Stricter: 30 minutes, one question at a time, 3 tries. Registration reopens it after that.", opens: "In the instructions email", where: "Portal page", tries: "3, then Registration reopens", cert: "Printed, then released", staff: "Reopen tests on request", build: "Medium", start: "email", style: "one", timer: true, maxTries: 3, emails: [{ ...INSTR, buttons: [JOIN, { ...TEST, box: "Open this after you finish the module. You have 30 minutes and 3 tries. You pass with 70% (7 correct)." }] }], flow: [REG, CHECK, PAY, n(["Registration", "Sends the email with Join and Post-Test buttons"]), JOINF, MOD, n(["Trainee", "Takes the timed test, one question at a time"]), n(["Registration", "Reopens it after 3 failed tries"]), EV, PRINT, REL], good: ["Harder to copy answers", "Questions can be shuffled for each try"], watch: ["More requests for Registration", "A dropped phone signal can use up a try"], certMsg: "Your certificate goes to the Releasing Officer. It is released once your fee is settled." },
+  { id: 9, name: "Google Forms Quiz", best: "The test is a Google Forms quiz in the class; a script sends the score to the portal.", opens: "Inside the class", where: "Google Forms", tries: "As set in each form", cert: "Printed, then released", staff: "Keep a form per course", build: "Medium, plus 141 forms", start: "email", style: "form", classTest: true, emails: [{ ...INSTR, buttons: [JOIN] }], flow: [REG, CHECK, PAY, SEND, JOINF, MOD, n(["Trainee", "Answers the Google Forms quiz in the class"]), n(["Portal", "Receives the score by email address"]), EV, PRINT, REL], good: ["Google handles the form and scoring", "Instructors already know it"], watch: ["141 forms to make and keep", "The score matches by email, so a different Gmail is missed", "You moved the evaluation off Google Forms on 20 Oct"], certMsg: "Your certificate goes to the Releasing Officer. It is released once your fee is settled." },
+  { id: 10, name: "Scheduled Online Exam", best: "Strongest proof: a set date and time on Google Meet, camera on, with a proctor giving the code.", opens: "At the set time, with a code", where: "Portal page and Google Meet", tries: "1, retake by schedule", cert: "Printed, then released", staff: "A proctor for each session", build: "Large", start: "email", style: "exam", timer: true, maxTries: 1, emails: [{ ...INSTR, buttons: [JOIN, { label: "Open the Exam", go: "code", box: "Exam: Nov 9, 2026, 2:00 PM on Google Meet, camera on. The proctor gives the code.", o: true }] }], flow: [REG, CHECK, PAY, n(["Registration", "Books the exam date and proctor"]), SEND, JOINF, MOD, n(["Proctor", "Runs the session and gives the code"]), n(["Trainee", "Takes the 30-minute exam"]), EV, PRINT, REL], good: ["The strongest proof for an audit", "Same trainee, seen on camera"], watch: ["Needs staff and schedules for 141 courses", "Goes against self-paced study"], certMsg: "Your certificate goes to the Releasing Officer. It is released once your fee is settled." },
+];
+const TODAY_STEPS = [
+  ["Trainee Registers", "On the website, with course and start date.", "Live"],
+  ["Registration Checks", "Requirements, then hands to the Cashier.", "Live"],
+  ["Cashier Records the Payment", "Paid means enrolled, automatically.", "Live"],
+  ["Registration Sends Instructions", "Email, PDF and Google Classroom button. The Module wording is drafted and not live yet.", "Live"],
+  ["Trainee Studies the Module", "In Google Classroom. The portal cannot see whether it was finished.", "Outside the Portal"],
+  ["Post-Test", "Emailed at 4:00 PM on the last day, only for an approved course. 0 of 151 courses are approved, so none goes out today.", "Waiting for You"],
+  ["Evaluation", "Same email. The answers become a PDF in Google Drive.", "Live"],
+  ["Releasing Officer Prints", "Uploads the 2x2 photo and prints. An online trainee has no set way to send the photo.", "Gap"],
+  ["Release", "Pick-up or LBC. The soft copy goes out once the evaluation is in.", "Live"],
+];
+const fresh = (p) => ({ screen: p.start, picks: Array(10).fill(null), q: 0, tries: 0, result: null, passed: false, evalDone: false, modDone: false, photo: false, printed: false, released: false, secs: 1800, soft: false });
+let S = { tab: "today", plan: PLANS[3] }; let D = fresh(PLANS[3]);
+const correct = (picks) => picks.reduce((t, x, i) => t + (x === QS[i][2] ? 1 : 0), 0);
+const answered = () => D.picks.filter((x) => x != null).length;
+const head = (title, eyebrow = "New Wave Maritime Training") => `<div class="eyebrow">${eyebrow}</div><h3>${title}</h3><dl class="kv"><dt>Trainee</dt><dd>Juan Dela Cruz</dd><dt>Course</dt><dd>Anti Piracy Awareness (APA)</dd></dl>`;
+const back = (to, t = "‹ Back") => `<button type="button" class="back" data-go="${to}">${t}</button>`;
+const qBlock = (i) => `<fieldset><legend>${i + 1}. ${QS[i][0]}</legend>${QS[i][1].map((o, k) => `<label class="opt ${D.picks[i] === k ? "on" : ""}"><input type="radio" name="q${i}" data-q="${i}" data-k="${k}" ${D.picks[i] === k ? "checked" : ""}><span>${o}</span></label>`).join("")}</fieldset>`;
+function scr(p) {
+  const s = D.screen;
+  if (s === "email") return `<div class="card"><div class="eyebrow">Email (Sample)</div>${p.emails.map((m) => `<div class="mail" style="margin-top:8px"><div class="when">${m.when}</div><b class="subj">${m.subject}</b><div>${m.lines}</div>${m.buttons.map((b) => `<div class="btnbox ${b.o ? "o" : ""}"><p>${b.box}</p><button type="button" class="lnk ${b.blue ? "blue" : ""}" data-go="${b.go}">${b.label}</button>${b.code ? `<p style="margin:8px 0 0">Class Code: <b>${b.code}</b></p>` : ""}</div>`).join("")}</div>`).join("")}</div>`;
+  if (s === "classroom") return `<div class="card">${back(p.after === "status" ? "status" : "email")}<div class="eyebrow">Google Classroom (Sample)</div><h3>APA - Anti Piracy Awareness</h3><div class="row"><span>Module 1 · Ship Security Basics</span><span class="chip">PDF</span></div><div class="row"><span>Module 2 · Best Management Practices</span><span class="chip">Video</span></div>${p.classTest ? `<div class="row" style="border-color:var(--orange)"><span><b>Post-Test</b></span><button type="button" class="mini p" data-go="${p.style === "form" ? "test" : "identity"}">Open</button></div>` : ""}<p class="note">The portal cannot see inside the class, so it does not know when the module is finished.</p></div>`;
+  if (s === "identity") return `<div class="card">${back("classroom")}${head("Course Post-Test").replace(/<dl[\s\S]*<\/dl>/, "")}<p class="note">One link is shared by the whole class, so please enter your details.</p><label class="f" for="rx-srn">SRN<input id="rx-srn" value="1234567"></label><label class="f" for="rx-no">NWMTACI No.<input id="rx-no" value="NWMTACI-0000401"></label><button type="button" class="big" data-go="test">Open the Post-Test</button></div>`;
+  if (s === "gate") return `<div class="card">${back("email")}${head("Course Post-Test")}<p class="note">Please finish the module in Google Classroom first.</p><label class="opt ${D.modDone ? "on" : ""}"><input type="checkbox" id="rx-done" data-mod="1" ${D.modDone ? "checked" : ""}><span>I Finished the Module</span></label><button type="button" class="big" data-go="test" ${D.modDone ? "" : "disabled"}>Open the Post-Test</button></div>`;
+  if (s === "code") return `<div class="card">${back("email")}${head("Scheduled Exam")}<p class="warn"><b>Nov 9, 2026, 2:00 PM · Google Meet · Camera On.</b> The proctor gives the code when the session starts.</p><label class="f" for="rx-code">Exam Code<input id="rx-code" value="7Q4K2" autocomplete="off"></label><button type="button" class="big" data-go="test">Start the Exam</button></div>`;
+  if (s === "status") { const steps = [["Join the Google Classroom", true, `<button type="button" class="mini" data-go="classroom">Open</button>`], ["Finish the Module", D.modDone, D.modDone ? "" : `<button type="button" class="mini" data-markmod="1">I Finished</button>`], ["Post-Test", D.passed, D.passed ? "" : `<button type="button" class="mini p" data-go="test">Take</button>`], ["Evaluation", D.evalDone, D.evalDone ? "" : `<button type="button" class="mini" data-go="eval">Answer</button>`], ["2x2 Photo", D.photo, D.photo ? "" : `<button type="button" class="mini" data-photo="1">Upload</button>`], ["Certificate", D.released, D.printed ? "<span class=\"chip b\">Ready for Pick-Up</span>" : "<span class=\"chip\">Not Yet</span>"]]; return `<div class="card">${head("My Training")}${steps.map(([t, done, act]) => `<div class="row ${done ? "done" : ""}"><span>${done ? "✓ " : ""}${t}</span>${act}</div>`).join("")}<p class="hint">Also opens with your SRN and NWMTACI No. at any time.</p></div>`; }
+  if (s === "eval") return `<div class="card">${back(p.after === "status" ? "status" : D.result ? "test" : "email")}${head("Training Evaluation")}<label class="opt on"><input type="checkbox" checked> <span>I Confirm My Attendance</span></label>${["Course Content", "Module Materials", "Google Classroom Access"].map((x, i) => `<label class="f" for="rx-r${i}">${x}<select id="rx-r${i}"><option>Excellent</option><option>Very Good</option><option>Good</option><option>Fair</option><option>Poor</option></select></label>`).join("")}<label class="f" for="rx-c">Comments and Suggestions<input id="rx-c" placeholder="Optional"></label><button type="button" class="big blue" data-evalsubmit="1">Submit Evaluation</button></div>`;
+  if (s === "done") return `<div class="card">${head("Thank You")}<div class="res y"><strong>✓ All Steps Done</strong><p style="margin:8px 0 0;color:#35607a">${p.certMsg}</p></div>${D.soft ? `<div class="mail" style="margin-top:10px"><div class="when">Just now</div><b class="subj">Your certificate soft copy · APA</b><span class="chip">certificate-NWMTACI-APA2026000014.pdf</span></div>` : ""}<button type="button" class="big ghost" style="margin-top:10px" data-go="${p.after === "status" ? "status" : "email"}">Back</button></div>`;
+  if (s === "result") { const r = D.result, left = p.maxTries ? p.maxTries - D.tries : null; return `<div class="card">${head(p.style === "exam" ? "Scheduled Exam" : "Course Post-Test")}<div class="res ${r.passed ? "y" : "n"}" role="status"><strong>${r.passed ? "✓ Passed" : "✗ Not Passed Yet"}</strong><p class="score">${r.score}/10 <span>${r.score * 10}% · passing score 70%</span></p>${r.passed ? `<p style="margin:0 0 10px;color:#35607a">Your result is saved.${p.style === "combo" ? " Your evaluation is saved too." : ""}</p>${p.style === "combo" ? `<button type="button" class="big blue" data-go="done">Continue</button>` : `<button type="button" class="big blue" data-go="eval">Evaluate the Training</button>`}` : left === 0 ? `<p class="warn" style="margin:6px 0 0">${p.style === "exam" ? "Please ask Registration for a new exam schedule." : "All 3 tries are used. Please ask Registration to reopen the test."}</p><button type="button" class="big ghost" style="margin-top:8px" data-reopen="1">Registration Reopens It (Sample)</button>` : `<p style="margin:0 0 10px;color:#35607a">You need at least 7 correct answers. Review the module and take the test again.${left != null ? ` ${left} ${left === 1 ? "try" : "tries"} left.` : " There is no limit on retakes."}</p><button type="button" class="big" data-retake="1">Retake the Test</button>`}</div></div>`; }
+  // The test itself.
+  const title = p.style === "exam" ? "Scheduled Exam" : p.style === "combo" ? "Post-Test and Evaluation" : "Course Post-Test";
+  if (p.style === "one" || p.style === "exam") { const i = D.q, last = i === 9; return `<div class="card">${head(title)}<div style="display:flex;justify-content:space-between;align-items:center"><b style="color:var(--navy)">Question ${i + 1} of 10</b><span class="timer" id="rx-timer">30:00</span></div><div class="bar"><i style="width:${(i + 1) * 10}%"></i></div>${qBlock(i)}<div style="display:flex;gap:8px"><button type="button" class="big ghost" data-qstep="-1" ${i === 0 ? "disabled" : ""}>Previous</button>${last ? `<button type="button" class="big" data-submit="1" ${answered() < 10 ? "disabled" : ""}>Submit Answers</button>` : `<button type="button" class="big blue" data-qstep="1">Next</button>`}</div><p class="hint">${answered()} of 10 answered${p.maxTries ? ` · Try ${D.tries + 1} of ${p.maxTries}` : ""}</p></div>`; }
+  const intro = p.style === "form" ? `<div class="eyebrow">Google Forms Quiz (Sample)</div><h3>APA Post-Test</h3><p class="note">Signed in as juan@example.com. Your score goes to the portal by this email address.</p>` : `${head(title)}<p class="note">10 questions. Choose one answer each. You pass with 70% (7 correct).${D.tries ? ` This is retake ${D.tries}.` : ""}</p>`;
+  const extra = p.style === "combo" ? `<fieldset><legend>Training Evaluation</legend><label class="f" for="rx-ce">Course Content<select id="rx-ce"><option>Excellent</option><option>Very Good</option><option>Good</option></select></label><label class="f" for="rx-cc">Comments and Suggestions<input id="rx-cc" placeholder="Optional"></label></fieldset>` : "";
+  return `<div class="card">${intro}${QS.map((_, i) => qBlock(i)).join("")}${extra}<button type="button" class="big" data-submit="1" ${answered() < 10 ? "disabled" : ""}>Submit Answers</button>${answered() < 10 ? `<p class="hint">Answer all 10 questions to submit (${answered()} answered).</p>` : ""}</div>`;
+}
+const onTest = () => !["email", "classroom", "identity", "gate", "code", "status", "eval", "done", "result"].includes(D.screen);
+const device = (p) => `<div class="tools"><button type="button" class="mini" data-restart="1">Start Over</button>${onTest() ? `<button type="button" class="mini" data-fill="10">Answer All Correctly</button><button type="button" class="mini" data-fill="5">Answer 5 Correctly</button>` : ""}</div><div class="dev">${scr(p)}</div>`;
+function staffBox(p) {
+  const soft = D.soft, needs = [!D.passed && "Post-Test", !D.evalDone && "Evaluation", !D.photo && "Photo"].filter(Boolean);
+  const stage = D.released ? "Released" : soft ? "Soft Copy Emailed" : D.printed ? "To Release" : needs.length ? "Waiting" : "To Print";
+  const act = stage === "Waiting" && !D.photo ? `<button type="button" class="mini" data-photo="1">Upload</button>` : stage === "To Print" ? `<button type="button" class="mini p" data-print="1">Print</button>` : stage === "To Release" ? `<button type="button" class="mini p" data-release="1">Release</button>` : "";
+  return `<section class="panel"><h2>What the Releasing Officer Sees</h2><div class="staff"><div><b>DELA CRUZ, Juan</b> <span class="m">0000401</span><br><b>APA</b> · <span class="chip g">Paid</span></div><div><span class="chip ${stage === "To Print" ? "o" : stage === "Waiting" ? "" : "b"}">${stage}</span>${stage === "Waiting" ? needs.map((x) => `<span class="chip">${x}</span>`).join("") : ""}</div>${act}</div></section>`;
+}
+function planPage(p) {
+  return `<h1>Plan ${p.id} · ${p.name}${p.rec ? '<span class="rec-chip">Recommended</span>' : ""}</h1><p class="sub">${p.best}</p><div class="tagrow"><span class="tag"><b>Post-Test Opens</b>${p.opens}</span><span class="tag"><b>Where</b>${p.where}</span><span class="tag"><b>Tries</b>${p.tries}</span><span class="tag"><b>Certificate</b>${p.cert}</span><span class="tag"><b>Build</b>${p.build}</span></div><h2>The Process</h2><ol class="flow">${p.flow.map(([w, t, c]) => `<li class="${c ? "new" : ""}"><small>${w}</small>${t}</li>`).join("")}</ol><div class="cols"><div><h2>Try It as the Trainee</h2>${device(p)}</div><div class="side">${staffBox(p)}<div class="two"><section class="panel"><h2>Good</h2><ul>${p.good.map((x) => `<li>${x}</li>`).join("")}</ul></section><section class="panel"><h2>Watch Out</h2><ul>${p.watch.map((x) => `<li>${x}</li>`).join("")}</ul></section></div></div></div>`;
+}
+function todayPage(p) {
+  const tone = { Live: "g", "Outside the Portal": "b", "Waiting for You": "o", Gap: "r" };
+  return `<h1>Our In-House Process Today</h1><p class="sub">What the portal does now, step by step. Try the post-test on the right; it looks like the real page.</p><div class="cols" style="grid-template-columns:minmax(0,1fr) minmax(0,430px)"><section class="panel">${TODAY_STEPS.map(([t, d, st], i) => `<div class="st"><span>${i + 1}</span><div><b>${t}</b> <span class="chip ${tone[st]}">${st}</span><small>${d}</small></div></div>`).join("")}</section><div><h2>How the Post-Test Looks</h2>${device(p)}</div></div>`;
+}
+function comparePage() {
+  return `<h1>Compare the Plans</h1><p class="sub">Orange marks the one I recommend. You can also combine them, for example Plan 3 now and Plan 5 later.</p><div class="wrap"><table><thead><tr><th>Plan</th><th>Post-Test Opens</th><th>Where</th><th>Tries</th><th>Certificate</th><th>Staff Work</th><th>Build</th></tr></thead><tbody>${PLANS.map((p) => `<tr><td><button type="button" class="mini ${p.rec ? "p" : ""}" data-tab="${p.id}">${p.id}</button> <b>${p.name}</b></td><td>${p.opens}</td><td>${p.where}</td><td>${p.tries}</td><td>${p.cert}</td><td>${p.staff}</td><td>${p.build}</td></tr>`).join("")}</tbody></table></div><div class="two" style="margin-top:14px"><section class="panel"><h2>Can Be Added to Any Plan</h2><ul><li>The trainee uploads the 2x2 photo; the Releasing Officer checks it</li><li>Full payment required before the post-test opens</li><li>The right answers shown after passing</li><li>Passing mark other than 70%, set per course</li></ul></section><section class="panel"><h2>Needed in Every Plan</h2><ul><li>The Admin approves each course's questions; 0 of 151 are approved today</li><li>Each course needs its Google Classroom linked</li><li>A way to get the 2x2 photo from online trainees</li></ul></section></div>`;
+}
+let toastT;
+function toast(t) { const e = document.getElementById("toast"); e.textContent = t; e.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { e.hidden = true; }, 3000); }
+function render() {
+  document.getElementById("tabs").innerHTML = `<b>In-House Course Plans</b><button type="button" class="${S.tab === "today" ? "on" : ""}" data-tab="today">Today</button>${PLANS.map((p) => `<button type="button" class="${S.tab === p.id ? "on" : ""} ${p.rec ? "rec" : ""}" data-tab="${p.id}">${p.id} · ${p.name}</button>`).join("")}<button type="button" class="${S.tab === "compare" ? "on" : ""}" data-tab="compare">Compare</button>`;
+  document.getElementById("app").innerHTML = S.tab === "today" ? todayPage(S.plan) : S.tab === "compare" ? comparePage() : planPage(S.plan);
+}
+const submitTest = (p) => { const score = correct(D.picks); D.tries += 1; D.result = { score, passed: score >= 7 }; if (D.result.passed) { D.passed = true; if (p.style === "combo") D.evalDone = true; } D.screen = "result"; };
+const softCheck = (p) => { if (p.id === 7 && D.passed && D.evalDone && D.photo) D.soft = true; };
+document.addEventListener("click", (ev) => {
+  const t = ev.target.closest("button"); if (!t) return;
+  const d = t.dataset, p = S.plan;
+  if (d.tab) { S.tab = /^\d+$/.test(d.tab) ? Number(d.tab) : d.tab; if (typeof S.tab === "number") S.plan = PLANS[S.tab - 1]; else if (S.tab === "today") S.plan = PLANS[3]; D = fresh(S.plan); if (S.tab === "today") D.screen = "test"; render(); window.scrollTo({ top: 0 }); return; }
+  if (d.restart) { D = fresh(p); if (S.tab === "today") D.screen = "test"; return render(); }
+  if (d.go) { if (d.go === "test" && D.passed && p.after !== "status") { toast("You already passed this post-test."); return; } D.screen = d.go; return render(); }
+  if (d.fill) { const want = Number(d.fill); D.picks = QS.map((q, i) => (i < want ? q[2] : (q[2] + 1) % 4)); D.q = 9; return render(); }
+  if (d.qstep) { D.q = Math.max(0, Math.min(9, D.q + Number(d.qstep))); return render(); }
+  if (d.submit) { submitTest(p); softCheck(p); return render(); }
+  if (d.retake) { D.picks = Array(10).fill(null); D.q = 0; D.result = null; D.screen = "test"; return render(); }
+  if (d.reopen) { D.tries = 0; D.picks = Array(10).fill(null); D.q = 0; D.result = null; D.screen = "test"; toast("Registration reopened the test."); return render(); }
+  if (d.evalsubmit) { D.evalDone = true; softCheck(p); D.screen = p.after === "status" ? "status" : "done"; return render(); }
+  if (d.markmod) { D.modDone = true; return render(); }
+  if (d.photo) { D.photo = true; softCheck(p); toast("Photo saved."); return render(); }
+  if (d.print) { D.printed = true; toast("Printed. Moved to To Release."); return render(); }
+  if (d.release) { D.released = true; toast("Released to the trainee."); return render(); }
+});
+document.addEventListener("change", (ev) => {
+  const e = ev.target;
+  if (e.dataset.q !== undefined) { D.picks[Number(e.dataset.q)] = Number(e.dataset.k); render(); }
+  if (e.dataset.mod) { D.modDone = e.checked; render(); }
+});
+setInterval(() => { const e = document.getElementById("rx-timer"); if (!e) return; D.secs = Math.max(0, D.secs - 1); e.textContent = `${String(Math.floor(D.secs / 60)).padStart(2, "0")}:${String(D.secs % 60).padStart(2, "0")}`; }, 1000);
+D.screen = "test";
+render();
+</script>

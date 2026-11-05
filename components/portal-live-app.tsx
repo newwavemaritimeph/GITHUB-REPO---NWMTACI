@@ -31,8 +31,8 @@ import { NO_REASON, REASONS, ReasonField, RejectInline, reasonReady, reasonText,
 import { MismoDashboard, MismoFinalList, MismoSubmissions } from "./portal/mismo-home";
 import { MISMO_COURSE_CODES } from "@/lib/mismo";
 import { AssistantDashboard, ClassSchedules, ResourcePlanning, InstructorShortlist, GcashReconciliation, GcashNotInHistory } from "./portal/admin-assistant-home";
-import { RegistrationDeliveries, ReleasingDeliveries } from "./portal/delivery-home";
-import { ReleasingReports, ReleasingHome, CertificatesWorkspace, WaitingCertificates, CertificateTemplates, ReleasedCertificates, AdminCertificateControls, AdminNumberFormats, CertificateAlarm, ReleasingNumbering } from "./portal/releasing-home";
+import { RegistrationDeliveries } from "./portal/delivery-home";
+import { ReleasingReports, ReleasingCertificates, CertificateTemplates, AdminCertificateControls, AdminNumberFormats, CertificateAlarm, ReleasingNumbering } from "./portal/releasing-home";
 import { AccountingHome, ApprovalHistory, AccountingReportsHub, EndorsedSalesReport, FinanceSummaryReport, BillingStatementReport, AccountingPayments, AccountingDocuments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { InstructionsButton } from "./portal/instructions-window";
@@ -46,7 +46,7 @@ import { ClassroomLinksImport, DefaultRoomsPanel } from "./portal/admin-setup";
 import { AdminHome, AdminSearchTrainee, AdminEnrollments, AdminVouchers, AdminHolidays } from "./portal/admin-home";
 import { askText, askConfirm, showAlert } from "./portal/dialogs";
 
-type Module = "Form numbers" | "Classroom links" | "Post-tests" | "Training instructions" | "Dashboard" | "Waiting" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Daily summary" | "Opening and closing" | "Expenses summary" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Billing statement" | "Sales from endorsed courses" | "MISMO dashboard" | "Completion records" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
+type Module = "Form numbers" | "Classroom links" | "Post-tests" | "Training instructions" | "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Daily summary" | "Opening and closing" | "Expenses summary" | "Templates" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Billing statement" | "Sales from endorsed courses" | "MISMO dashboard" | "Completion records" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; training_mode?:string; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -144,8 +144,8 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // set classroom and instructor (Schedules → Edit, Instructor assignment).
   // Attendance stays off until it is rebuilt.
   instructor: [],
-  // Releasing Officer (owner, 8 Oct 2026): Dashboard · Certificates · Templates · Released (RELEASING_TABS).
-  releasing_officer: ["Dashboard","Certificates","Waiting","Released","Reports","Delivery"],
+  // Releasing Officer (owner, 5 Nov 2026): one Certificates page in stage tabs, and Reports (RELEASING_TABS).
+  releasing_officer: ["Certificates","Reports"],
   // MARINA MISMO Compliance Officer (owner, 8 Oct 2026): STCW trainees owing at 11:00 AM, the 4:00 PM final list, submissions.
   mismo_officer: ["Dashboard","Batch schedules","Final list","Submissions","Completion records"],
   // Admin Assistant (owner, 9 Oct 2026): resource planning, instructor shortlist. Requisitions removed (owner, 3 Nov 2026).
@@ -175,7 +175,7 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   // Cashier workspace (7 Oct 2026); the top tabs come from CASHIER_TABS.
   {label:"Daily summary",icon:"∑",roles:["cashier"],group:"Records"},{label:"Opening and closing",icon:"⚖",roles:["cashier"],group:"Records"},{label:"Expenses summary",icon:"∑",roles:["cashier"],group:"Records"},
   {label:"HR & payroll",icon:"♙",roles:["admin"],group:"People"},{label:"MyHr",icon:"☺",group:"People"},
-  {label:"Waiting",icon:"◷",roles:["releasing_officer"],group:"Work"},{label:"Templates",icon:"▤",roles:["releasing_officer"],group:"Work"},{label:"Numbering",icon:"№",roles:["releasing_officer"],group:"Work"},{label:"Released",icon:"⇥",roles:["releasing_officer"],group:"Work"},{label:"Delivery",icon:"⇥",roles:["releasing_officer"],group:"Work"},
+  {label:"Templates",icon:"▤",roles:["releasing_officer"],group:"Work"},{label:"Numbering",icon:"№",roles:["releasing_officer"],group:"Work"},
   {label:"Delivery requests",icon:"⇥",roles:["registration"],group:"Work"},
   {label:"Batch schedules",icon:"□",roles:["admin_assistant","registration","cashier","mismo_officer","admin"],group:"Work"},{label:"Resource planning",icon:"▢",roles:["admin_assistant","admin"],group:"Work"},{label:"Instructors",icon:"♙",roles:["admin_assistant","admin"],group:"Work"},{label:"Reconciliation",icon:"✓",roles:["admin_assistant","admin"],group:"Work"},
   {label:"Final list",icon:"▤",roles:["mismo_officer"],group:"Work"},{label:"Submissions",icon:"✓",roles:["mismo_officer"],group:"Work"},{label:"Completion records",icon:"▤",roles:["mismo_officer","admin"],group:"Work"},
@@ -214,7 +214,7 @@ const ACCOUNTING_TABS:TopTab[]=[
   {label:"Reports",items:["Cash and sales summary","Sales from endorsed courses","Billing statement","Receivables","Cash position"]},
   {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS]},
 ];
-const RELEASING_TABS:TopTab[]=[{label:"Dashboard",items:["Dashboard"]},{label:"Certificates",items:["Certificates"]},{label:"Waiting",items:["Waiting"]},{label:"Released",items:["Released"]},{label:"Reports",items:["Reports"]},{label:"Delivery",items:["Delivery"]}];
+const RELEASING_TABS:TopTab[]=[{label:"Certificates",items:["Certificates"]},{label:"Reports",items:["Reports"]}];
 // Admin tabs consolidated (owner, 3 Nov 2026): trainee work under Enrollments, schedules together, Configuration grouped and last.
 const ADMIN_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
@@ -346,6 +346,8 @@ export function PortalLiveApp(){
   // ones they hold (or their own role when it is none of these).
   const roleOptions=workingRolesFor(data.roles);
   const tabs=topTabsFor(role,allowedNav.map(item=>item.label));
+  // The Releasing Officer has no Dashboard; Certificates is the home page.
+  const current:Module=role==="releasing_officer"&&active==="Dashboard"?"Certificates":active;
   const openRequests=data.requests.filter(r=>r.status==="Pending"&&(r.stage==="With cashier"||(r.charge_id&&data.chargeCollected?.[r.id]&&!data.chargeCollected[r.id].paid))).length;
   const initials=data.profile.complete_name.split(" ").map(v=>v[0]).slice(0,2).join("").toUpperCase();
   return <DataSince.Provider value={needSince}><main className="portal-shell nw-shell">
@@ -360,13 +362,13 @@ export function PortalLiveApp(){
           <form action="/auth/signout" method="post"><button type="submit" className="nw-signout">Sign Out</button></form>
         </div>
       </div>
-      <nav className="nw-tabs" aria-label="Staff workspace">{tabs.map(tab=>{const single=tab.items.length===1&&tab.items[0]===tab.label;const on=tab.items.includes(active);const isOpen=openTab===tab.label;const count=tab.items.includes("Requests")?openRequests:0;return <div key={tab.label} className={`nw-tab${on?" on":""}${isOpen?" open":""}`}>
+      <nav className="nw-tabs" aria-label="Staff workspace">{tabs.map(tab=>{const single=tab.items.length===1&&tab.items[0]===tab.label;const on=tab.items.includes(current);const isOpen=openTab===tab.label;const count=tab.items.includes("Requests")?openRequests:0;return <div key={tab.label} className={`nw-tab${on?" on":""}${isOpen?" open":""}`}>
         <button type="button" aria-haspopup={single?undefined:"menu"} aria-expanded={single?undefined:isOpen} aria-current={on?"page":undefined} onClick={e=>{if(single){go(tab.items[0]);return}const r=e.currentTarget.getBoundingClientRect();setMenuAt({left:Math.max(16,Math.min(r.left,window.innerWidth-276)),top:r.bottom+6});setOpenTab(isOpen?"":tab.label)}}>{menuLabel(tab.label)}{count>0&&<b className="nw-count">{count}</b>}{!single&&<span className="nw-caret" aria-hidden="true"/>}</button>
         {!single&&isOpen&&<div className="nw-menu" role="menu" style={{left:menuAt.left,top:menuAt.top}}>{tab.items.map(item=><Fragment key={item}>{tab.heads?.[item]&&<div role="presentation" className="nw-menu-head">{tab.heads[item]}</div>}<button type="button" role="menuitem" className={active===item?"on":""} onClick={()=>go(item)}>{menuLabel(item)}</button></Fragment>)}</div>}
       </div>})}</nav>
       {notices&&<div className="notification-popover nw-notices"><div><h3>Notifications</h3><button onClick={()=>void markRead()}>Mark All as Read</button></div>{data.notifications.length?data.notifications.map(item=><button key={item.id} onClick={()=>{if(item.deep_link)setNotices(false)}}><i style={{opacity:item.read_at?.length?0:1}}/><span><strong>{item.title}</strong><small>{item.body}</small></span></button>):<p className="portal-empty-copy">No notifications yet.</p>}</div>}
     </header>
-    <section className={`portal-workspace${syncing?" nw-syncing":""}`}>{error&&<div className="portal-inline-error"><Message kind="error" text={error}/></div>}<PortalContent key={day} modules={rebuildModules} recordsView={recordsView} setRecordsView={setRecordsView} active={active} role={role} data={data} query={query} go={go} open={setModal} onPay={(id:string,courses?:string[])=>{setPayTarget(id);setPayCourses(courses);setModal("payment")}} canEnroll={canEnroll} canSchedule={canSchedule} canPay={canPay} reload={refresh}/></section>
+    <section className={`portal-workspace${syncing?" nw-syncing":""}`}>{error&&<div className="portal-inline-error"><Message kind="error" text={error}/></div>}<PortalContent key={day} modules={rebuildModules} recordsView={recordsView} setRecordsView={setRecordsView} active={current} role={role} data={data} query={query} go={go} open={setModal} onPay={(id:string,courses?:string[])=>{setPayTarget(id);setPayCourses(courses);setModal("payment")}} canEnroll={canEnroll} canSchedule={canSchedule} canPay={canPay} reload={refresh}/></section>
     {modal==="enrollment"&&<EnrollmentForm data={data} onClose={()=>setModal(null)} onSaved={refresh}/>} {modal==="batch"&&<BatchForm data={data} onClose={()=>setModal(null)} onSaved={refresh}/>} {modal==="payment"&&<RecordPaymentModal data={data} initialEnrollmentId={payTarget||undefined} initialCourses={payCourses} onClose={()=>{setModal(null);setPayTarget("")}} onSaved={refresh}/>} {account&&<ChangePasswordModal email={data.profile.email} onClose={()=>setAccount(false)}/>}
   </main></DataSince.Provider>;
 }
@@ -432,15 +434,11 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Submissions")return <MismoSubmissions/>;
   }
   if(gateRole==="releasing_officer"){
-    if(active==="Dashboard")return <ReleasingHome data={data} reload={reload} go={m=>go(m as Module)}/>;
-    if(active==="Certificates")return <CertificatesWorkspace data={data} reload={reload}/>;
-    if(active==="Waiting")return <WaitingCertificates data={data} reload={reload}/>;
+    if(active==="Certificates")return <ReleasingCertificates data={data} reload={reload}/>;
     if(active==="Templates")return <CertificateTemplates data={data} reload={reload}/>;
     if(active==="Numbering")return <ReleasingNumbering data={data} reload={reload}/>;
-    if(active==="Released")return <ReleasedCertificates data={data} reload={reload}/>;
     // Releasing Officer › Reports: Daily, Weekly, Monthly (owner, 20 Oct 2026).
     if(active==="Reports")return <ReleasingReports data={data}/>;
-    if(active==="Delivery")return <ReleasingDeliveries data={data} reload={reload}/>;
   }
   if(gateRole==="mismo_officer"){
     if(active==="Dashboard")return <MismoDashboard/>;
@@ -600,7 +598,7 @@ function Trainees({data,query,embedded,reload,role}:{data:PortalData;query:strin
         <label className="tl-search"><span aria-hidden="true">⌕</span><input value={lookup} onChange={e=>setLookup(e.target.value)} placeholder="Search name, NWMTACI number, SRN, email or mobile" aria-label="Search trainees"/></label>
       </div>
       {term?<p className="pd-label pd-pad">Searching all dates · {rows.length} found</p>:<PeriodBar p={p} what="Registered" count={`${rows.length} trainee${rows.length===1?"":"s"}`}/>}
-      <div className="portal-table tbl-compact"><table><thead><tr><th>Trainee · Contact</th><th>Courses</th><th className="num">Balance</th><th>Registered</th>{canRequest&&<th>Request</th>}</tr></thead><tbody>
+      {(term||p.picked)&&<div className="portal-table tbl-compact"><table><thead><tr><th>Trainee · Contact</th><th>Courses</th><th className="num">Balance</th><th>Registered</th>{canRequest&&<th>Request</th>}</tr></thead><tbody>
         {TRAINEE_GROUPS.flatMap(([g,label])=>{const list=paged.shown.filter(t=>groupOf(t.id)===g);if(!list.length)return [];const owed=rows.filter(t=>groupOf(t.id)===g).reduce((sum,t)=>sum+coursesOf(t.id).reduce((x,e)=>x+balanceOf(e),0),0);return [<tr key={g} className="tl-group"><td colSpan={canRequest?5:4}><b>{label}</b> <span>{rows.filter(t=>groupOf(t.id)===g).length} trainee{rows.filter(t=>groupOf(t.id)===g).length===1?"":"s"}{owed>0?` · ${pesos(owed)} to collect`:""}</span></td></tr>,...list.map(t=>{const list=coursesOf(t.id);const bal=list.reduce((sum,e)=>sum+balanceOf(e),0);const no=data.applicationNumbers?.[t.id];return <tr key={t.id} className="row-clickable" onClick={()=>setSelId(t.id)}>
           <td><strong>{fullName(t)}</strong><small>{no&&<><span className="app-no">{no}</span> · </>}<span className="tc-mono">{t.trainee_number}</span></small><small className="lc">{t.email} · {t.mobile}</small>{(()=>{const aid=list.map(e=>data.referralByEnrollment?.[e.id]).find(Boolean);const ag=aid?data.agencies.find(a=>a.id===aid):null;return ag?<span className="ref-chip">Referred by {ag.name}</span>:null})()}</td>
           <td>{list.length?<span className="tl-chips">{list.slice(0,3).map(e=><span key={e.id} className="tl-chip">{first(e.courses)?.code??first(e.courses)?.name}</span>)}{list.length>3&&<small>+{list.length-3} more</small>}</span>:<span className="muted-text">None yet</span>}</td>
@@ -608,7 +606,7 @@ function Trainees({data,query,embedded,reload,role}:{data:PortalData;query:strin
           <td className="tc-nowrap">{t.registered_at?date(manilaDay(t.registered_at)):"—"}</td>
           {canRequest&&<td onClick={e=>e.stopPropagation()}>{list.length?<div className="req-dd"><button type="button" className="portal-secondary req-dd-btn" aria-haspopup="menu" aria-expanded={menuFor===t.id} onClick={ev=>{const r=ev.currentTarget.getBoundingClientRect();setMenuPos({top:r.bottom+6,left:Math.max(8,Math.min(r.left,window.innerWidth-216))});setMenuFor(menuFor===t.id?null:t.id)}}>Request ▾</button>{openReqs(t.id)>0&&<small className="req-dd-open">{openReqs(t.id)} with the Cashier</small>}{menuFor===t.id&&<div className="req-dd-menu" role="menu" style={{top:menuPos.top,left:menuPos.left}}>{TRAINEE_REQUESTS.map(([type,lbl])=><button key={type} type="button" role="menuitem" onClick={()=>{setMenuFor(null);setReqFor({traineeId:t.id,type})}}>{lbl}</button>)}</div>}</div>:<span className="muted-text">—</span>}</td>}
         </tr>})];})}
-      </tbody></table>{!rows.length&&<p className="portal-empty-copy">{term?"No trainees match.":"No trainees registered in this period."}</p>}{paged.pager}</div>
+      </tbody></table>{!rows.length&&<p className="portal-empty-copy">{term?"No trainees match.":"No trainees registered in this period."}</p>}{paged.pager}</div>}
     </section>
     {reqMsg&&<Message kind="success" text={reqMsg}/>}
     {sel&&<TraineeDetailModal data={data} trainee={sel} reload={reload} role={role} onClose={()=>setSelId(null)}/>}
@@ -1101,7 +1099,7 @@ function LiveRequests({data,role,reload,embedded}:{data:PortalData;role:string;r
     {section("Waiting for payment",waitingPayment)}
     {section("For approval",forApproval)}
     {!pending.length&&<section className="portal-panel cx-panel"><p className="portal-empty-copy">No open requests.</p></section>}
-    {decidedAll.length>0&&<section className="portal-panel cx-panel"><button type="button" className="cx-month-head" aria-expanded={showDecided} onClick={()=>setShowDecided(v=>!v)}><span className="cx-month-name">Decided</span><span className="cx-month-meta">{decidedPeriod.range.label} · {decided.length}</span><span aria-hidden="true" className="cx-month-caret" style={{marginLeft:"auto"}}>{showDecided?"▾":"▸"}</span></button>{showDecided&&<><PeriodBar p={decidedPeriod} what="Decided" count={`${decided.length} request${decided.length===1?"":"s"}`}/>{decided.length?table(decided):<p className="portal-empty-copy">Nothing decided in this period.</p>}</>}</section>}
+    {decidedAll.length>0&&<section className="portal-panel cx-panel"><button type="button" className="cx-month-head" aria-expanded={showDecided} onClick={()=>setShowDecided(v=>!v)}><span className="cx-month-name">Decided</span><span className="cx-month-meta">{decidedPeriod.picked?`${decidedPeriod.range.label} · ${decided.length}`:"Pick a Date"}</span><span aria-hidden="true" className="cx-month-caret" style={{marginLeft:"auto"}}>{showDecided?"▾":"▸"}</span></button>{showDecided&&<><PeriodBar p={decidedPeriod} what="Decided" count={`${decided.length} request${decided.length===1?"":"s"}`}/>{decidedPeriod.picked&&(decided.length?table(decided):<p className="portal-empty-copy">Nothing decided in this period.</p>)}</>}</section>}
     {charging&&<RequestChargeModal data={data} request={charging} reload={reload} onClose={()=>setCharging(null)}/>}
     {collecting&&<RecordPaymentModal data={data} initialEnrollmentId={collecting.enrollmentId} initialAmountCentavos={collecting.amount} initialFeeLabel={collecting.label} onClose={()=>setCollecting(null)} onSaved={reload}/>}
   </div>;

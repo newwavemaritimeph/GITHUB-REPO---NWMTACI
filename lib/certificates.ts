@@ -114,7 +114,7 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
   const billed = await db.from("enrollments").select("company_charge_agency_id").eq("id", e.id).maybeSingle();
   if (!billed.error && (billed.data as { company_charge_agency_id?: string | null } | null)?.company_charge_agency_id) paid = Math.max(paid, due);
   const view = certificateState({
-    enrollmentStatus: e.enrollment_status, trainingEnd, balanceCentavos: Math.max(0, due - paid), evaluationRequired,
+    enrollmentStatus: e.enrollment_status, trainingEnd, balanceCentavos: Math.max(0, due - paid), paidCentavos: paid, evaluationRequired,
     evaluationOn: manilaDay((feedback as { submitted_at?: string } | null)?.submitted_at), paidOn: lastPaid,
     cert: cert ? { status: cert.status, printCount: Number(cert.print_count ?? 0), reprintsAllowed: Number(cert.reprints_allowed ?? 0), voidStatus: cert.void_status, revoked: !!cert.revoked_at } : null,
     photoOnFile: photo === undefined ? undefined : !!photo,
@@ -285,6 +285,8 @@ export async function trySendSoftCopy(db: Admin, enrollmentId: string, options: 
     const ctx = await certificateContext(db, enrollmentId);
     if (!ctx || !ctx.trainee.email || !ctx.issuanceEnabled) return { state: "Skipped" as const };
     if (!["Due", "Printed", "Released"].includes(ctx.view.state)) return { state: "Skipped" as const };
+    // A certificate printed on an initial payment stays at the office until the balance is settled (owner, 5 Nov 2026).
+    if (ctx.balanceCentavos > 0) return { state: "Skipped" as const };
     // Sent once the evaluation is in; without one it goes out only when asked from the screen.
     if (!options.force) {
       const { data: fb } = await db.from("training_feedback").select("id").eq("enrollment_id", enrollmentId).maybeSingle();

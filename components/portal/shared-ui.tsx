@@ -68,9 +68,9 @@ export function usePaged<T>(rows: T[], perPage = 10) {
 }
 
 /**
- * Records by date: lists open on the current month (owner, 3 Nov 2026, replacing "start on
- * today" of 20 Oct) and list the newest first. The portal loads the current month; a list that
- * steps back to an older month, or searches every date, asks for it through DataSince.
+ * Pick a Date First (owner, 5 Nov 2026; design/date-hidden-tables-prototype.html): record tables stay hidden until a
+ * date is picked, and hide again when the page is left. Lists of work still to do and setup lists are not date hidden.
+ * A search looks across every date. A list that needs an older date asks for it through DataSince.
  */
 export type Period = "Daily" | "Weekly" | "Monthly" | "All Dates";
 export const manilaDay = (iso?: string | null) => (iso ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(iso)) : "");
@@ -90,31 +90,41 @@ export function useNeedSince(from: string) {
   const need = useContext(DataSince);
   useEffect(() => { if (from) need?.(from < ALL_DATES ? ALL_DATES : from); }, [need, from]);
 }
-export function usePeriod(initial: Period = "Monthly") {
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
-  const [period, setPeriod] = useState<Period>(initial), [date, setDate] = useState(today);
-  const range = periodRange(period, date);
-  useNeedSince(range.from);
-  return { period, setPeriod, date, setDate, today, range, inRange: (iso?: string | null) => { const d = manilaDay(iso); return !!d && d >= range.from && d <= range.to; } };
+export const DATE_PICKS = ["Today", "This Week", "This Month", "Last Month"] as const;
+export type DatePick = (typeof DATE_PICKS)[number] | "Custom";
+export function pickRange(pick: DatePick, today: string, from: string, to: string): { from: string; to: string; label: string } {
+  if (pick === "Today") return periodRange("Daily", today);
+  if (pick === "This Week") return periodRange("Weekly", today);
+  if (pick === "This Month") return periodRange("Monthly", today);
+  if (pick === "Last Month") return periodRange("Monthly", shiftDay(`${today.slice(0, 8)}01`, -1));
+  const short = { month: "short", day: "numeric", year: "numeric" } as const;
+  return { from, to, label: `${utcLabel(from, short)} – ${utcLabel(to, short)}` };
 }
-/** A list by month: that month's rows, or every date while searching. */
+export function usePeriod() {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+  const [pick, setPick] = useState<DatePick | null>(null), [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today);
+  const range = pick && (pick !== "Custom" || (!!from && !!to && from <= to)) ? pickRange(pick, today, from, to) : null;
+  useNeedSince(range?.from ?? "");
+  return { pick, setPick, from, setFrom, to, setTo, today, picked: !!range, range: range ?? { from: "", to: "", label: "" }, inRange: (iso?: string | null) => { if (!range) return false; const d = manilaDay(iso); return !!d && d >= range.from && d <= range.to; } };
+}
+/** A dated list: the rows of the picked date, none before one is picked, or every date while searching. */
 export function useMonthRows<T>(rows: T[], dateOf: (row: T) => string | null | undefined, searching: boolean) {
   const p = usePeriod();
   useNeedSince(searching ? ALL_DATES : "");
   return { p, rows: searching ? rows : rows.filter((row) => p.inRange(dateOf(row))) };
 }
-export function PeriodBar({ p, what, count }: { p: ReturnType<typeof usePeriod>; what: string; count: string }) {
-  const monthly = p.period === "Monthly";
-  const step = (n: number) => p.setDate(p.period === "Daily" || p.period === "All Dates" ? shiftDay(p.date, n) : shiftDay(n < 0 ? p.range.from : p.range.to, n));
-  return <div className="pd-bar">
-    <span className="cx-seg">{(["Daily", "Weekly", "Monthly", "All Dates"] as Period[]).map((x) => <button key={x} type="button" className={p.period === x ? "on" : ""} onClick={() => p.setPeriod(x)}>{x}</button>)}</span>
-    {p.period !== "All Dates" && <><button type="button" className="portal-secondary" aria-label="Previous" onClick={() => step(-1)}>‹</button>{monthly ? <b className="pd-month">{p.range.label}</b> : <input type="date" value={p.date} aria-label="Date" onChange={(e) => e.target.value && p.setDate(e.target.value)} />}<button type="button" className="portal-secondary" aria-label="Next" onClick={() => step(1)}>›</button>{(monthly ? p.range.from !== periodRange("Monthly", p.today).from : p.date !== p.today) && <button type="button" className="portal-secondary" onClick={() => p.setDate(p.today)}>{monthly ? "This Month" : "Today"}</button>}</>}
-    <span className="pd-label">{what}{monthly ? "" : <> <b>{p.range.label}</b></>} · {count} · newest first</span>
-  </div>;
+export function PeriodBar({ p, what, count, waitText = "Pick a date above." }: { p: ReturnType<typeof usePeriod>; what: string; count: string; waitText?: string }) {
+  return <><div className="pd-bar">
+    <span className="cx-seg">{DATE_PICKS.map((x) => <button key={x} type="button" className={p.pick === x ? "on" : ""} onClick={() => p.setPick(x)}>{x}</button>)}</span>
+    <label className="cx-dt">From<input type="date" value={p.from} max={p.to || undefined} onChange={(e) => p.setFrom(e.target.value)} /></label>
+    <label className="cx-dt">To<input type="date" value={p.to} min={p.from || undefined} onChange={(e) => p.setTo(e.target.value)} /></label>
+    <button type="button" className={`portal-secondary${p.pick === "Custom" ? " pd-on" : ""}`} onClick={() => p.setPick("Custom")}>Show</button>
+    {p.picked && <><span className="pd-label">{what} <b>{p.range.label}</b> · {count} · newest first</span><button type="button" className="portal-secondary" onClick={() => p.setPick(null)}>Hide</button></>}
+  </div>{!p.picked && <p className="pd-wait"><b>No Records Shown</b> {waitText}</p>}</>;
 }
-/** The month bar, or "Searching all dates" while a search looks past the month. */
-export function MonthBar({ p, what, count, searching }: { p: ReturnType<typeof usePeriod>; what: string; count: string; searching?: boolean }) {
-  return <div className="portal-panel">{searching ? <p className="pd-label pd-pad">Searching all dates · {count} found</p> : <PeriodBar p={p} what={what} count={count} />}</div>;
+/** The date bar in its own panel, or "Searching all dates" while a search looks past it. */
+export function MonthBar({ p, what, count, searching, waitText }: { p: ReturnType<typeof usePeriod>; what: string; count: string; searching?: boolean; waitText?: string }) {
+  return <div className="portal-panel">{searching ? <p className="pd-label pd-pad">Searching all dates · {count} found</p> : <PeriodBar p={p} what={what} count={count} waitText={waitText} />}</div>;
 }
 
 export const fmtDate = (value?: string | null) =>

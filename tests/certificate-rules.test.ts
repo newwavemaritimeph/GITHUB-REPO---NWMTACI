@@ -1,17 +1,52 @@
 import { describe, expect, it } from "vitest";
-import { canPrint, certificateState, driveFileId, formatCertificateNumber, googleFormId, matchEvaluationEnrollment, type CertificateFacts } from "../lib/certificate-rules";
+import { canPrint, certificateStage, certificateState, driveFileId, formatCertificateNumber, googleFormId, matchEvaluationEnrollment, noPaymentYet, releaseProblem, type CertificateFacts } from "../lib/certificate-rules";
 
-const base: CertificateFacts = { enrollmentStatus: "Enrolled", trainingEnd: "2026-10-07", balanceCentavos: 0, evaluationRequired: false, evaluationOn: null, paidOn: "2026-10-05", cert: null };
+const base: CertificateFacts = { enrollmentStatus: "Enrolled", trainingEnd: "2026-10-07", balanceCentavos: 0, paidCentavos: 130000, evaluationRequired: false, evaluationOn: null, paidOn: "2026-10-05", cert: null };
 
 describe("certificate rules", () => {
   it("waits for the training to end", () => {
     expect(certificateState({ ...base, trainingEnd: "2026-10-09" }, "2026-10-08").state).toBe("Training not finished");
     expect(certificateState({ ...base, trainingEnd: null }, "2026-10-08").state).toBe("Training not finished");
   });
-  it("blocks printing until the fee is settled", () => {
-    const v = certificateState({ ...base, balanceCentavos: 45000 }, "2026-10-08");
+  it("blocks everything until a payment is recorded, even during training", () => {
+    const unpaid = { ...base, balanceCentavos: 130000, paidCentavos: 0 };
+    const v = certificateState(unpaid, "2026-10-08");
     expect(v.state).toBe("Waiting for payment");
     expect(canPrint(v)).toBe(false);
+    expect(certificateState({ ...unpaid, trainingEnd: "2026-10-30" }, "2026-10-08").state).toBe("Waiting for payment");
+  });
+  it("prints on an initial payment, and still needs the evaluation and the photo", () => {
+    const initial = { ...base, balanceCentavos: 65000, paidCentavos: 65000 };
+    const v = certificateState(initial, "2026-10-08");
+    expect(v.state).toBe("Due");
+    expect(canPrint(v)).toBe(true);
+    expect(certificateState({ ...initial, evaluationRequired: true }, "2026-10-08").state).toBe("Waiting for evaluation");
+    expect(certificateState({ ...initial, photoOnFile: false }, "2026-10-08").state).toBe("Waiting for photo");
+  });
+  it("prints a Company Charge with no payment recorded", () => {
+    const billed = { ...base, balanceCentavos: 0, paidCentavos: 0, paidOn: null };
+    expect(noPaymentYet(billed)).toBe(false);
+    expect(canPrint(certificateState(billed, "2026-10-08"))).toBe(true);
+  });
+  it("allows no reprint once the only payment is voided", () => {
+    const v = certificateState({ ...base, balanceCentavos: 130000, paidCentavos: 0, cert: { status: "Printed", printCount: 1, reprintsAllowed: 1 } }, "2026-10-08");
+    expect(v.state).toBe("Waiting for payment");
+    expect(canPrint(v)).toBe(false);
+  });
+  it("releases only when the balance is settled", () => {
+    expect(releaseProblem({ balanceCentavos: 65000, evaluationRequired: false, evaluationOn: null })).toMatch(/^Not paid/);
+    expect(releaseProblem({ balanceCentavos: 0, evaluationRequired: false, evaluationOn: null })).toBeNull();
+  });
+  it("puts each certificate on one Stage Tab, and moves it once printed", () => {
+    const stage = (f: Partial<CertificateFacts>) => certificateStage(certificateState({ ...base, ...f }, "2026-10-08"));
+    expect(stage({ trainingEnd: "2026-10-30" })).toBe("Waiting");
+    expect(stage({ evaluationRequired: true })).toBe("Waiting");
+    expect(stage({})).toBe("To Print");
+    expect(stage({ cert: { status: "Printed", printCount: 1, reprintsAllowed: 0 } })).toBe("To Release");
+    expect(stage({ cert: { status: "Printed", printCount: 1, reprintsAllowed: 1 } })).toBe("To Print");
+    expect(stage({ cert: { status: "Printed", printCount: 1, reprintsAllowed: 0, voidStatus: "Requested" } })).toBe("To Release");
+    expect(stage({ cert: { status: "Released", printCount: 1, reprintsAllowed: 0 } })).toBe("Released");
+    expect(stage({ cert: { status: "Printed", printCount: 1, reprintsAllowed: 0, revoked: true } })).toBeNull();
   });
   it("needs the evaluation only when the course has a form", () => {
     expect(certificateState({ ...base, evaluationRequired: true }, "2026-10-08").state).toBe("Waiting for evaluation");

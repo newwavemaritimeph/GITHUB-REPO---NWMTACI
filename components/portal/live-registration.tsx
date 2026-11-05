@@ -346,11 +346,11 @@ function EnrollmentQueue({ data, query, reload, initial, account }: { data: Port
   const [open, setOpen] = useState<Enrollment | null>(null);
   const [assigning, setAssigning] = useState<Trainee | null>(null);
   const term = (q || query).trim().toLowerCase();
-  // Date sensitive (owner, 3 Nov 2026): this month first, newest on top, grouped by status; a search looks across all dates.
+  // Applications still to work on always show; enrolled and cancelled records wait for a date (owner, 5 Nov 2026). A search looks across all dates.
   const per = usePeriod();
   useNeedSince(term ? ALL_DATES : "");
-  const all = data.enrollments.filter((e) => term || per.inRange(e.created_at)).map((e) => ({ e, r: e.enrollment_status === "Pending" ? readinessOf(data, e) : null }));
-  const awaiting = awaitingCourseOf(data).filter((t) => term || per.inRange(t.registered_at));
+  const all = data.enrollments.filter((e) => term || e.enrollment_status === "Pending" || per.inRange(e.created_at)).map((e) => ({ e, r: e.enrollment_status === "Pending" ? readinessOf(data, e) : null }));
+  const awaiting = awaitingCourseOf(data);
   const noCourse = awaiting.filter((t) => !term || `${fullName(t)} ${t.trainee_number} ${appNoOf(data, t.id) ?? ""} ${t.email} ${t.mobile}`.toLowerCase().includes(term));
   const rank = (x: (typeof all)[number]) => (x.r ? 0 : x.e.enrollment_status === "Cancelled" ? 2 : 1);
   const GROUPS = ["Applications · Pending", "Enrolled", "Cancelled"];
@@ -382,7 +382,7 @@ function EnrollmentQueue({ data, query, reload, initial, account }: { data: Port
       </div>
       <div className="ac-stack">
         <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search enrollments" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, NWMTACI number, SRN, course" /></div>
-        <div className="portal-panel">{term ? <p className="pd-label pd-pad">Searching all dates · {rows.length} found</p> : <PeriodBar p={per} what="Enrolled" count={`${rows.length} enrollment${rows.length === 1 ? "" : "s"}`} />}</div>
+        <div className="portal-panel">{term ? <p className="pd-label pd-pad">Searching all dates · {rows.length} found</p> : <PeriodBar p={per} what="Enrolled" count={`${rows.length} enrollment${rows.length === 1 ? "" : "s"}`} waitText="Pick a date to show enrolled and cancelled records." />}</div>
         {filter !== "For payment" && noCourse.length > 0 && <section className="portal-panel nc-panel">
           <div className="panel-heading"><div><h2>No Course Yet</h2><p>Assign a course and schedule, then screen the application</p></div><span className="slot-count">{noCourse.length}</span></div>
           {noCourse.map((t) => <div className="rd-row" key={t.id}>

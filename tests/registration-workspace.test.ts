@@ -132,10 +132,10 @@ describe("Registration Officer workspace", () => {
     expect(apps).toContain("NWMTACI-0000003");
     expect(apps).toContain("NWMTACI-0000001");
     const enrolls = renderToString(createElement(RegistrationRecords, { ...props, view: "enrollments" }));
-    expect(enrolls).toContain("ENR-0001");
-    expect(enrolls).toContain("Open Schedule");
-    expect(enrolls).toContain("ENR-0004"); // All enrollments includes applications
-    expect(enrolls).toContain("Partially Paid");
+    // Pick a Date First (5 Nov 2026): enrolled records wait for a date; applications still to work on always show.
+    expect(enrolls).not.toContain("ENR-0001");
+    expect(enrolls).toContain("No Records Shown");
+    expect(enrolls).toContain("ENR-0004");
     expect(enrolls).not.toContain("Record payment");
     expect(renderToString(createElement(RegistrationRecords, { ...props, view: "trainees" }))).toContain("TRAINEE-LIST");
   });

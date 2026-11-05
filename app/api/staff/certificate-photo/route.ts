@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { photoFileName } from "@/lib/certificate-photo";
-import { trySendSoftCopy } from "@/lib/certificates";
+import { certificateContext, trySendSoftCopy } from "@/lib/certificates";
 
 export const runtime = "nodejs";
 
@@ -51,6 +51,8 @@ export async function POST(request: Request) {
   if (width && height && Math.abs(width - height) > Math.max(width, height) * 0.05) return NextResponse.json({ error: "The photo must be square (2x2)." }, { status: 400 });
 
   const db = createSupabaseAdminClient();
+  // The Releasing Officer works only on trainees with a payment or a Company Charge (owner, 5 Nov 2026).
+  if (!isAdmin && (await certificateContext(db, enrollmentId.data))?.view.state === "Waiting for payment") return NextResponse.json({ error: "No payment is recorded for this trainee yet. The Cashier must record a payment first." }, { status: 400 });
   const { data: prior, error: priorError } = await db.from("certificate_photos").select("storage_path,file_name").eq("enrollment_id", enrollmentId.data).maybeSingle();
   if (priorError) return NextResponse.json({ error: /certificate_photos/i.test(priorError.message) ? "Apply database update 202610090034 first." : priorError.message }, { status: 400 });
 

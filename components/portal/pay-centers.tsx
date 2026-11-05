@@ -40,7 +40,7 @@ export function PayTheCenters({ data, reload, onRelease }: { data: PortalData; r
   const [picked, setPicked] = useState<Set<string>>(() => new Set(lines.filter((l) => l.state === "Due" && l.dueToday).map((l) => l.e.id)));
   const [raising, setRaising] = useState<string | null>(null), [channel, setChannel] = useState(""), [notes, setNotes] = useState("");
   const { busy, msg, post } = usePost(reload);
-  // Trainees still to pay always show; paid ones by month (owner, 3 Nov 2026).
+  // Trainees still to pay always show; paid ones wait for a date (owner, 5 Nov 2026).
   const { p: period, rows: paidRows } = useMonthRows(lines.filter((l) => l.state === "Paid"), (l) => l.p?.paid_at ?? l.enrolledOn, false);
   const keptPaid = new Set(paidRows);
   const inView = lines.filter((l) => l.state !== "Paid" || keptPaid.has(l));
@@ -56,7 +56,7 @@ export function PayTheCenters({ data, reload, onRelease }: { data: PortalData; r
   };
   return <>
     {msg && <Message kind={msg.kind} text={msg.text} />}
-    {lines.length > 0 && <MonthBar p={period} what="Paid" count={`${paidRows.length} trainee${paidRows.length === 1 ? "" : "s"}`} />}
+    {lines.length > 0 && <MonthBar p={period} what="Paid" count={`${paidRows.length} trainee${paidRows.length === 1 ? "" : "s"}`} waitText="Pick a date to show trainees already paid." />}
     {!lines.length ? <section className="portal-panel cx-panel"><p className="portal-empty-copy">No enrolled Other STCW trainees yet. They appear here on the day they are enrolled.</p></section> : <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Due to Centers</h2><span className="muted-text">full fee</span></div>

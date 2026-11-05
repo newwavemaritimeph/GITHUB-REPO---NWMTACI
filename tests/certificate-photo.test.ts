@@ -29,7 +29,7 @@ describe("certificate photo", () => {
     expect(corrected(null, undefined)).toBe(null);
   });
   it("waits for the photo before printing", () => {
-    const facts = { enrollmentStatus: "Enrolled", trainingEnd: "2026-10-08", balanceCentavos: 0, evaluationRequired: false, evaluationOn: null, paidOn: "2026-10-01", cert: null };
+    const facts = { enrollmentStatus: "Enrolled", trainingEnd: "2026-10-08", balanceCentavos: 0, paidCentavos: 0, evaluationRequired: false, evaluationOn: null, paidOn: "2026-10-01", cert: null };
     expect(certificateState({ ...facts, photoOnFile: false }, "2026-10-09").state).toBe("Waiting for photo");
     expect(certificateState({ ...facts, photoOnFile: true }, "2026-10-09").state).toBe("Due");
     expect(certificateState(facts, "2026-10-09").state).toBe("Due");

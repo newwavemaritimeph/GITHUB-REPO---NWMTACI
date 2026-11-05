@@ -2534,6 +2534,8 @@ export async function POST(request: Request) {
       // The Releasing Officer corrects what prints (owner, 9 Oct 2026); the Certificate Number stays with the Admin. Blank fields use the portal value.
       if (!staff.roleCodes.some((r) => ["admin", "releasing_officer"].includes(r))) return NextResponse.json({ error: "Only the Releasing Officer can correct certificate details." }, { status: 403 });
       const admin = createSupabaseAdminClient();
+      // Trainees with a payment or a Company Charge only (owner, 5 Nov 2026).
+      if (!isAdminRole(staff.roleCodes) && (await certificateContext(admin, input.enrollmentId))?.view.state === "Waiting for payment") return NextResponse.json({ error: "No payment is recorded for this trainee yet. The Cashier must record a payment first." }, { status: 400 });
       let { data: cert } = await admin.from("certificates").select("id,print_count,corrections").eq("enrollment_id", input.enrollmentId).maybeSingle();
       if (!cert) {
         const created = await admin.from("certificates").insert({ enrollment_id: input.enrollmentId, status: "Ready to Print", snapshot: {} }).select("id,print_count,corrections").single();
@@ -2580,6 +2582,8 @@ export async function POST(request: Request) {
       // The certificate must be printed before it can be sent.
       const { data: cert } = await admin.from("certificates").select("status").eq("enrollment_id", dr.enrollment_id).maybeSingle();
       if (!cert || !["Printed", "Released"].includes(cert.status)) return NextResponse.json({ error: "The certificate is not printed yet. Send this to the Cashier once it is." }, { status: 400 });
+      // A certificate printed on an initial payment does not leave the office until the balance is settled (owner, 5 Nov 2026).
+      if (((await certificateContext(admin, dr.enrollment_id))?.balanceCentavos ?? 0) > 0) return NextResponse.json({ error: "The trainee still has a balance. Settle it before the certificate is sent." }, { status: 400 });
       const { data: reference, error: refError } = await db.rpc("next_reference", { prefix: "REQ" });
       if (refError) throw refError;
       const { data: req, error: reqError } = await admin.from("enrollment_requests").insert({ request_number: reference, trainee_id: dr.trainee_id, enrollment_id: dr.enrollment_id, request_type: "Certificate delivery", requested_values: { deliveryRequestId: dr.id }, reason: `Certificate delivery by LBC to ${dr.city}, ${dr.province} (${dr.request_number})`, requester_id: staff.user.id, status: "Pending", stage: "With cashier" }).select("id").single();
@@ -2604,6 +2608,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
       if (dr.status !== "Paid") return NextResponse.json({ error: "Only paid delivery requests can be shipped." }, { status: 400 });
+      if (((await certificateContext(admin, dr.enrollment_id))?.balanceCentavos ?? 0) > 0) return NextResponse.json({ error: "The trainee still has a balance. Settle it before the certificate is sent." }, { status: 400 });
       const address = [dr.address_line, dr.city, dr.province, dr.zip].filter(Boolean).join(", ");
       await admin.from("delivery_requests").update({ status: "Shipped", tracking_number: input.trackingNumber, shipped_on: input.shippedOn, shipped_by: staff.user.id, updated_at: new Date().toISOString() }).eq("id", dr.id);
       // The certificate leaves the office by courier: record it as released.
@@ -2694,7 +2699,7 @@ export async function POST(request: Request) {
       const admin = createSupabaseAdminClient();
       const soft = await trySendSoftCopy(admin, input.enrollmentId, { force: true, actor: staff.user.id });
       if (soft.state === "Failed") return NextResponse.json({ error: soft.error }, { status: 400 });
-      if (soft.state !== "Queued") return NextResponse.json({ error: "The certificate is not ready, printing is turned off, or the trainee has no email." }, { status: 400 });
+      if (soft.state !== "Queued") return NextResponse.json({ error: "The certificate is not ready, the balance is not settled, printing is turned off, or the trainee has no email." }, { status: 400 });
       if (soft.jobId) await processEmailJobs(admin, { ids: [soft.jobId], origin: new URL(request.url).origin }).catch(() => undefined);
       return NextResponse.json({ ok: true, to: soft.to });
     }

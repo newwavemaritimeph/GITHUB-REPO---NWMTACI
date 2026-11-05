@@ -42,7 +42,7 @@ describe("evaluation, release and revoke rules", () => {
     expect(releaseProblem({ balanceCentavos: 0, evaluationRequired: false, evaluationOn: null, revoked: true })).toMatch(/revoked/);
   });
   it("a revoked certificate never prints again", () => {
-    const v = certificateState({ enrollmentStatus: "Enrolled", trainingEnd: "2026-10-10", balanceCentavos: 0, evaluationRequired: false, evaluationOn: null, paidOn: "2026-10-01", cert: { status: "Printed", printCount: 1, reprintsAllowed: 1, revoked: true } }, "2026-10-20");
+    const v = certificateState({ enrollmentStatus: "Enrolled", trainingEnd: "2026-10-10", balanceCentavos: 0, paidCentavos: 0, evaluationRequired: false, evaluationOn: null, paidOn: "2026-10-01", cert: { status: "Printed", printCount: 1, reprintsAllowed: 1, revoked: true } }, "2026-10-20");
     expect(v.state).toBe("Revoked");
     expect(v.printsLeft).toBe(0);
   });
