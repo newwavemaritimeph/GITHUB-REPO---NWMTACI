@@ -1,7 +1,8 @@
 import { PDFDocument } from "pdf-lib";
 import { describe, expect, it } from "vitest";
 import { createTrainingInstructionsPdf } from "@/lib/documents";
-import { DEFAULT_CATEGORY_TEMPLATES, emailSteps, fillPlaceholders, instructionCategoryOf, instructionEmailVariables, linesOf, policyPairs, remindersFor, sheetSteps } from "@/lib/instruction-templates";
+import { DEFAULT_CATEGORY_TEMPLATES, emailSteps, fillPlaceholders, instructionCategoryOf, instructionEmailVariables, instructionMode, linesOf, policyPairs, remindersFor, sheetSteps } from "@/lib/instruction-templates";
+import { loadInstructionDetails } from "@/lib/training-instructions";
 
 describe("training instruction templates", () => {
   it("reads one item per line", () => expect(linesOf(" a \n\n b\n")).toEqual(["a", "b"]));
@@ -57,5 +58,39 @@ describe("instructions sheet", () => {
     const long = Array.from({ length: 8 }, (_, i) => `Item ${i} ${"with a long reminder that runs across the card ".repeat(2)}`);
     const doc = await PDFDocument.load(await createTrainingInstructionsPdf({ ...base, bring: long, reminders: long, policies: policyPairs(long.map((l) => `Rule: ${l}`).join("\n")) }));
     expect(doc.getPageCount()).toBe(1);
+  });
+});
+
+describe("In-House and STCW face-to-face instructions differ", () => {
+  const load = async (course: Record<string, unknown>, batch: Record<string, unknown> | null) => {
+    const row = { id: "e1", enrollment_number: "ENR-1", enrollment_status: "Enrolled", course_id: "c1", batch_id: batch ? "b1" : null, scheduled_on: "2026-11-09", trainees: { id: "t1", legal_first_name: "Juan", legal_last_name: "Dela Cruz", email: "juan@example.com" }, courses: course, batches: batch };
+    const db = { from: (table: string) => { const q: Record<string, unknown> = { select: () => q, eq: () => q, order: () => q, limit: () => q, maybeSingle: async () => ({ data: table === "enrollments" ? row : null }) }; return q; } };
+    return (await loadInstructionDetails(db as never, "e1"))!;
+  };
+
+  it("takes the course's mode when the In-House course has no batch", async () => {
+    const d = await load({ code: "APA", name: "Anti Piracy Awareness", training_mode: "Online", google_classroom_link: "https://classroom.google.com/c/abc", course_categories: { name: "Maritime In-House" } }, null);
+    expect(d).toMatchObject({ category: "In-House", online: true, mode: "Online", classroom: "Google Classroom" });
+    expect(sheetSteps(d.online, true).flat().join(" ")).toContain("Log in by 7:45 AM");
+    expect(sheetSteps(d.online, true).flat().join(" ")).not.toMatch(/uniform|Report by/);
+    expect(d.bring.join(" ")).not.toMatch(/uniform|Seaman/);
+  });
+
+  it("does not promise a class that is not linked yet", async () => {
+    const d = await load({ code: "ABC", name: "Basic Computer", training_mode: "Online", course_categories: { name: "Maritime In-House" } }, null);
+    expect(d.classroom).toBe("Class Link to Follow");
+  });
+
+  it("keeps the face-to-face wording for an STCW class", async () => {
+    const d = await load({ code: "PSCMT", name: "Crowd Management", training_mode: "Face-to-Face", course_categories: { name: "Upcoming MARINA STCW" } }, { mode: "In-person", starts_on: "2026-11-10", ends_on: "2026-11-11", venue: "Room 103" });
+    expect(d).toMatchObject({ category: "STCW", online: false, mode: "In-person", classroom: "Room 103" });
+    expect(sheetSteps(d.online, false).flat().join(" ")).toContain("Report by 7:30 AM");
+    expect(d.bring.join(" ")).toMatch(/uniform/);
+  });
+
+  it("lets the batch's mode win, and treats an In-House course with no mode as online", () => {
+    expect(instructionMode("In-person", "Online", "In-House")).toBe("In-person");
+    expect(instructionMode(null, null, "In-House")).toBe("Online");
+    expect(instructionMode(null, null, "STCW")).toBe("Face-to-Face");
   });
 });

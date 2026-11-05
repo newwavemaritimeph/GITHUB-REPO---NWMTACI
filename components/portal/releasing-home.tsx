@@ -150,8 +150,8 @@ function CertificateLog({ data, lines, reload }: { data: PortalData; lines: Cert
           <td><ProgressDots dots={certificateDots(l, tracked)} /></td>
           <td><Badge tone={tone(l)}>{label(l)}</Badge>{l.view.state === "Waiting for payment" && <small className="cl-sub cl-block">{pesos2(l.balance)} due</small>}</td>
           <td><span className="cl-acts">
-            {tracked && !l.photo && <button type="button" className={l.view.state === "Waiting for photo" ? "portal-primary cl-upload" : "portal-secondary cl-upload"} onClick={() => setUploading(l)}>Upload Photo</button>}
-            {l.view.state !== "Cancelled" && <span className="cl-split"><a href={pdf(l, true)} target="_blank" rel="noreferrer" onClick={afterPrint} title="Draft for checking; never counts as a print">Preview Draft</a>{printable && <a className="go" href={pdf(l, false)} target="_blank" rel="noreferrer" onClick={afterPrint}>{printed ? "Reprint" : "Print"}</a>}</span>}
+            {tracked && !l.photo && <button type="button" className={l.view.state === "Waiting for photo" ? "portal-primary cl-upload" : "portal-secondary cl-upload"} title="Upload the trainee's 2x2 photo" onClick={() => setUploading(l)}>Upload</button>}
+            {l.view.state !== "Cancelled" && <span className="cl-split"><a href={pdf(l, true)} target="_blank" rel="noreferrer" onClick={afterPrint} title="Draft for checking; never counts as a print">Preview</a>{printable && <a className="go" href={pdf(l, false)} target="_blank" rel="noreferrer" onClick={afterPrint}>{printed ? "Reprint" : "Print"}</a>}</span>}
             {printed && l.view.state !== "Void requested" && <details className="cl-more"><summary aria-label="More actions">▾</summary><div>
               <button type="button" disabled={busy} onClick={() => { setVoiding(l.e.id); setWhy(NO_REASON); }}>Request Void</button>
               <button type="button" disabled={busy} onClick={() => void post({ action: "certificate-soft-copy", enrollmentId: l.e.id }, "Soft copy emailed.").catch(() => undefined)}>Email Soft Copy</button>
@@ -289,8 +289,8 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
             <td><Badge tone={l.view.state === "Waiting for photo" ? "orange" : undefined}>{label}</Badge><small className="cl-sub cl-block" title={then}>{step}</small></td>
             <td><span className="cl-acts">
               {(l.view.state === "Waiting for evaluation" || (l.postTest?.required && !l.postTest.passed)) && l.view.state !== "Training not finished" && <button type="button" className="portal-secondary cl-upload" disabled={busy} onClick={() => void post({ action: "training-end-email", enrollmentId: l.e.id }, `Post-test and evaluation email sent to ${l.name}.`).catch(() => undefined)}>Email Post-Test and Evaluation</button>}
-              {tracked && !l.photo && <button type="button" className={l.view.state === "Waiting for photo" ? "portal-primary cl-upload" : "portal-secondary cl-upload"} onClick={() => setUploading(l)}>Upload Photo</button>}
-              <a className="portal-secondary cl-upload" href={`/api/documents/certificate/${l.e.id}?preview=1`} target="_blank" rel="noreferrer" title="Draft for checking; never counts as a print">Preview Draft</a></span></td>
+              {tracked && !l.photo && <button type="button" className={l.view.state === "Waiting for photo" ? "portal-primary cl-upload" : "portal-secondary cl-upload"} title="Upload the trainee's 2x2 photo" onClick={() => setUploading(l)}>Upload</button>}
+              <a className="portal-secondary cl-upload" href={`/api/documents/certificate/${l.e.id}?preview=1`} target="_blank" rel="noreferrer" title="Draft for checking; never counts as a print">Preview</a></span></td>
           </tr>; })])}
         </tbody></table></div>}
       </section>

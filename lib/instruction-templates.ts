@@ -52,6 +52,12 @@ export const instructionCategoryOf = (code: string | null | undefined, categoryN
   isStcwCategory(categoryName) || MISMO_COURSE_CODES.includes((code ?? "").trim().toUpperCase()) ? "STCW" : "In-House";
 
 export const isOnlineMode = (mode: string | null | undefined) => /online|virtual|remote/i.test(mode ?? "");
+/**
+ * How the class is held: the batch's mode, else the course's. In-House courses are usually booked by date with no
+ * batch, so reading the batch alone gave them the STCW face-to-face wording (owner, 5 Nov 2026).
+ */
+export const instructionMode = (batchMode: string | null | undefined, courseMode: string | null | undefined, category: InstructionCategory) =>
+  batchMode || courseMode || (category === "In-House" ? "Online" : "Face-to-Face");
 export const arriveNote = (online: boolean) => (online ? "log in by 7:45 AM" : "report by 7:30 AM");
 
 /** The five boxes on the sheet. */

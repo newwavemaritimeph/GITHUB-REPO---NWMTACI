@@ -3,7 +3,7 @@ import path from "node:path";
 import { createTrainingInstructionsPdf } from "@/lib/documents";
 import { loadDocumentControl, type DocumentControl } from "@/lib/document-controls";
 import { classroomJoin, type ClassroomJoin } from "@/lib/classroom";
-import { remindersFor, DEFAULT_CATEGORY_TEMPLATES, fillPlaceholders, instructionCategoryOf, isOnlineMode, linesOf, policyPairs, sheetSteps, type InstructionCategory } from "@/lib/instruction-templates";
+import { remindersFor, DEFAULT_CATEGORY_TEMPLATES, fillPlaceholders, instructionCategoryOf, instructionMode, isOnlineMode, linesOf, policyPairs, sheetSteps, type InstructionCategory } from "@/lib/instruction-templates";
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
@@ -26,7 +26,7 @@ const clock = (v?: string | null) => { if (!v) return ""; const [h, m] = v.split
 /** Everything the instructions PDF and email need for one enrollment, or null when it does not exist. */
 export async function loadInstructionDetails(db: Admin, enrollmentId: string): Promise<InstructionDetails | null> {
   const { data } = await db.from("enrollments")
-    .select("id,enrollment_number,enrollment_status,course_id,batch_id,scheduled_on,trainees(id,legal_first_name,legal_middle_name,legal_last_name,suffix,email,srn,trainee_number),courses(name,code,google_classroom_link,duration_label,course_categories(name)),batches(batch_number,mode,starts_on,ends_on,daily_start,daily_end,venue,classrooms(name))")
+    .select("id,enrollment_number,enrollment_status,course_id,batch_id,scheduled_on,trainees(id,legal_first_name,legal_middle_name,legal_last_name,suffix,email,srn,trainee_number),courses(name,code,google_classroom_link,duration_label,training_mode,course_categories(name)),batches(batch_number,mode,starts_on,ends_on,daily_start,daily_end,venue,classrooms(name))")
     .eq("id", enrollmentId).maybeSingle();
   if (!data) return null;
   const trainee = one(data.trainees), course = one(data.courses), batch = one(data.batches);
@@ -49,6 +49,7 @@ export async function loadInstructionDetails(db: Admin, enrollmentId: string): P
   // A course's own template still wins for its subject and its "- " reminder lines.
   const ownReminders = body.split("\n").map((l) => l.trim()).filter((l) => /^[-•]\s/.test(l)).map((l) => l.replace(/^[-•]\s*/, ""));
   const join = batchClass?.google_classroom_link ? classroomJoin(batchClass.google_classroom_link, batchClass.google_classroom_code) : classroomJoin(course?.google_classroom_link, (codeRow as { google_classroom_code?: string | null } | null)?.google_classroom_code);
+  const mode = instructionMode(b2?.mode, (course as { training_mode?: string | null } | null)?.training_mode, category), online = isOnlineMode(mode);
   const details: InstructionDetails = {
     enrollmentId: data.id, enrollmentNumber: data.enrollment_number, enrollmentStatus: data.enrollment_status,
     traineeName: trainee ? `${trainee.legal_first_name} ${trainee.legal_middle_name ?? ""} ${trainee.legal_last_name}`.replace(/\s+/g, " ").trim() : "Trainee",
@@ -57,14 +58,14 @@ export async function loadInstructionDetails(db: Admin, enrollmentId: string): P
     // Batch range, else the picked / endorsed start date.
     dates: batch?.starts_on ? `${fmtDate(batch.starts_on)}${batch.ends_on && batch.ends_on !== batch.starts_on ? ` - ${fmtDate(batch.ends_on)}` : ""}` : data.scheduled_on ? fmtDate(data.scheduled_on) : "To be scheduled",
     time: batch?.daily_start ? `${clock(batch.daily_start)} - ${clock(batch.daily_end) || "5:00 PM"}` : "8:00 AM - 5:00 PM",
-    classroom: one(batch?.classrooms)?.name ?? batch?.venue ?? "To be assigned",
+    classroom: one(batch?.classrooms)?.name ?? batch?.venue ?? (!online ? "To be assigned" : join.url || join.code ? "Google Classroom" : "Class Link to Follow"),
     control: await loadDocumentControl(db, "instructions"),
     join,
     subject: tpl?.subject ?? template.subject,
     body,
     category,
     firstName: trainee?.legal_first_name ?? "",
-    online: isOnlineMode(b2?.mode),
+    online,
     bring: linesOf(template.bring),
     reminders: remindersFor(ownReminders.length ? ownReminders : linesOf(template.reminders), !!(join.url || join.code)),
     policies: policyPairs(template.policies),
@@ -72,7 +73,7 @@ export async function loadInstructionDetails(db: Admin, enrollmentId: string): P
     nwmtaciNumber: (appRow as { application_number?: string | null } | null)?.application_number ?? t2?.trainee_number ?? "",
     srn: t2?.srn ?? "",
     batchNumber: b2?.batch_number ?? "",
-    mode: b2?.mode ?? "Face-to-face",
+    mode,
     duration: course?.duration_label ?? "",
   };
   const values = { trainee: details.traineeName, course: details.courseName, dates: details.dates, time: details.time, room: details.classroom, classroom_link: details.join.url ?? "", class_code: details.join.code ?? "" };
