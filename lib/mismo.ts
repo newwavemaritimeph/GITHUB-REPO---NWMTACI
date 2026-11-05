@@ -11,7 +11,7 @@ export type MismoTrainee = {
   dueCentavos: number; paidBy11: number; paidBy16: number; paidNow: number;
   /** Company Charge (29 Oct 2026): the partner pays on its Billing Statement, so the trainee counts as settled. */
   companyCharge?: boolean;
-  /** When the officer ticked Input Done, and the last payment (5 Nov 2026). */
+  /** When the officer ticked Encoded, and the last payment (5 Nov 2026). */
   entryAt?: string | null; lastPaidAt?: string | null;
 };
 export type MismoBatch = { id: string; batchNumber: string; courseName: string; courseCode: string; startsOn: string; endsOn: string; room: string | null; instructor: string | null; trainees: MismoTrainee[]; submittedAt: string | null; submittedCount: number | null;
@@ -36,9 +36,9 @@ export const leftOff = (b: MismoBatch) => b.trainees.filter((t) => owesAt(t, "16
 export const cutDateOf = (startsOn: string, from: string) => (startsOn > from ? startsOn : from);
 
 /** Where a trainee stands for the officer's list (owner, 5 Nov 2026): only paid trainees with complete details can be input. */
-export type MismoState = "To Input" | "Done" | "Not Paid Yet" | "Missing Details";
+export type MismoState = "For Encoding" | "Encoded" | "Unpaid" | "For Completion";
 export const mismoMissing = (t: MismoTrainee) => [!t.srn && "SRN", !t.birthdate && "Birth Date"].filter(Boolean) as string[];
-export const mismoState = (t: MismoTrainee): MismoState => (owesAt(t, "now") ? "Not Paid Yet" : t.entryAt ? "Done" : mismoMissing(t).length ? "Missing Details" : "To Input");
+export const mismoState = (t: MismoTrainee): MismoState => (owesAt(t, "now") ? "Unpaid" : t.entryAt ? "Encoded" : mismoMissing(t).length ? "For Completion" : "For Encoding");
 /** Settled, but after the 4:00 PM cut-off: off the final list, still to be input. */
 export const paidLate = (t: MismoTrainee) => owesAt(t, "16") && !owesAt(t, "now");
 
@@ -56,7 +56,7 @@ export function mismoPaidCsv(batches: MismoBatch[]) {
 /** One trainee, tab separated, for pasting. */
 export const mismoCopyText = (t: MismoTrainee, b: MismoBatch) => csvRow(t, b).join("\t");
 
-/** Input Done ticks counted per batch and Manila day, for Submissions. */
+/** Encoded ticks counted per batch and Manila day, for Submissions. */
 export type EntryRow = { doneAt: string; by: string; batchId: string; batchNumber: string; code: string };
 export type EntryDay = { batchId: string; day: string; batchNumber: string; code: string; count: number; lastAt: string; by: string };
 export function entryDays(rows: EntryRow[]): EntryDay[] {

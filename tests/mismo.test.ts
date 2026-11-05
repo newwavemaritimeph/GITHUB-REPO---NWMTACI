@@ -6,17 +6,17 @@ const batch = (trainees: MismoTrainee[]): MismoBatch => ({ id: "b1", batchNumber
 
 describe("MISMO officer's list (Design 3)", () => {
   it("puts each trainee in one state; only paid trainees with complete details can be input", () => {
-    expect(mismoState(t("a", 100, 0, 0, 0))).toBe("Not Paid Yet");
-    expect(mismoState(t("b", 100, 100, 100, 100))).toBe("To Input");
-    expect(mismoState(t("c", 100, 100, 100, 100, { entryAt: "2026-11-05T02:00:00Z" }))).toBe("Done");
-    expect(mismoState(t("d", 100, 100, 100, 100, { srn: null }))).toBe("Missing Details");
+    expect(mismoState(t("a", 100, 0, 0, 0))).toBe("Unpaid");
+    expect(mismoState(t("b", 100, 100, 100, 100))).toBe("For Encoding");
+    expect(mismoState(t("c", 100, 100, 100, 100, { entryAt: "2026-11-05T02:00:00Z" }))).toBe("Encoded");
+    expect(mismoState(t("d", 100, 100, 100, 100, { srn: null }))).toBe("For Completion");
     expect(mismoMissing(t("e", 100, 100, 100, 100, { srn: null, birthdate: null }))).toEqual(["SRN", "Birth Date"]);
-    expect(mismoState(t("f", 100, 0, 0, 0, { companyCharge: true }))).toBe("To Input");
+    expect(mismoState(t("f", 100, 0, 0, 0, { companyCharge: true }))).toBe("For Encoding");
   });
   it("marks a trainee who paid after the 4:00 PM cut-off as Paid Late, still to input", () => {
     const late = t("late", 100, 0, 0, 100);
     expect(paidLate(late)).toBe(true);
-    expect(mismoState(late)).toBe("To Input");
+    expect(mismoState(late)).toBe("For Encoding");
     expect(finalList(batch([late]))).toEqual([]);
     expect(paidLate(t("onTime", 100, 0, 100, 100))).toBe(false);
   });

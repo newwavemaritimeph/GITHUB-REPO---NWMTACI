@@ -8,7 +8,7 @@ import { Badge, Message, fmtDate, periodRange, submit, txWhen, usePaged } from "
 /**
  * MARINA MISMO Compliance Officer (owner, 8 Oct 2026; Design 3 · One List, 5 Nov 2026). The officer inputs every paid
  * trainee in the MARINA MISMO System: one list of the trainees in class, with what they need to type, a Copy button
- * and an Input Done tick. The portal does not connect to MARINA. Every tab is date sensitive (owner, 5 Nov 2026).
+ * and an Encoded tick. The portal does not connect to MARINA. Every tab is date sensitive (owner, 5 Nov 2026).
  * The 11:00 AM list for the instructor and the 4:00 PM final list stay.
  */
 
@@ -70,13 +70,13 @@ function saveCsv(name: string, text: string) {
 }
 const spanName = (from: string, to: string) => (from === to ? from : `${from}-to-${to}`);
 
-const FILTERS: ("All" | MismoState)[] = ["All", "To Input", "Done", "Not Paid Yet", "Missing Details"];
+const FILTERS: ("All" | MismoState)[] = ["All", "For Encoding", "Encoded", "Unpaid", "For Completion"];
 
 export function MismoDashboard() {
   const span = useSpan("Daily");
   const { from, to } = span.range;
   const { data, error, reload } = useMismo(span.ready ? from : "", to);
-  const [filter, setFilter] = useState<"All" | MismoState>("To Input"), [q, setQ] = useState("");
+  const [filter, setFilter] = useState<"All" | MismoState>("For Encoding"), [q, setQ] = useState("");
   // A tick shows at once; the officer works through many in a row and should not wait on each save.
   const [ticks, setTicks] = useState<Record<string, boolean>>({});
   const [problem, setProblem] = useState(""), [copied, setCopied] = useState("");
@@ -95,34 +95,34 @@ export function MismoDashboard() {
     try { await navigator.clipboard.writeText(mismoCopyText(t, b)); setCopied(t.enrollmentId); window.setTimeout(() => setCopied((c) => (c === t.enrollmentId ? "" : c)), 1400); }
     catch { setProblem("The browser refused to copy. Select the row and copy it by hand."); }
   }
-  const canPrint11 = span.mode === "Daily" && count("Not Paid Yet") > 0 && (span.date < span.today || (span.date === span.today && manilaHour() >= 11));
+  const canPrint11 = span.mode === "Daily" && count("Unpaid") > 0 && (span.date < span.today || (span.date === span.today && manilaHour() >= 11));
   return <div className="portal-page cx ac ms-page">
     <Head title="Dashboard" />
     {span.bar(`${all.length} trainee${all.length === 1 ? "" : "s"}`)}
     {error && <Message kind="error" text={error} />}
     {problem && <Message kind="error" text={problem} />}
     <div className="cx-tiles ms-tiles">
-      <div className="cx-tile ms-key"><span>To Input</span><b>{count("To Input")}</b></div>
-      <div className="cx-tile" style={{ ["--c" as string]: "#0a7a3e" }}><span>Input Done</span><b>{count("Done")}</b></div>
-      <div className={`cx-tile${count("Not Paid Yet") ? " ms-alert" : ""}`} style={{ ["--c" as string]: "#b42318" }}><span>Not Paid Yet</span><b>{count("Not Paid Yet")}</b></div>
-      <div className={`cx-tile${count("Missing Details") ? " ms-alert" : ""}`} style={{ ["--c" as string]: "#a2470b" }}><span>Missing Details</span><b>{count("Missing Details")}</b></div>
+      <div className="cx-tile ms-key"><span>For Encoding</span><b>{count("For Encoding")}</b></div>
+      <div className="cx-tile" style={{ ["--c" as string]: "#0a7a3e" }}><span>Encoded</span><b>{count("Encoded")}</b></div>
+      <div className={`cx-tile${count("Unpaid") ? " ms-alert" : ""}`} style={{ ["--c" as string]: "#b42318" }}><span>Unpaid</span><b>{count("Unpaid")}</b></div>
+      <div className={`cx-tile${count("For Completion") ? " ms-alert" : ""}`} style={{ ["--c" as string]: "#a2470b" }}><span>For Completion</span><b>{count("For Completion")}</b></div>
     </div>
     <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Trainees in Class</h2><span className="cl-acts">
       {canPrint11 && <a className="portal-secondary" href={pdfUrl(span.date, "unsettled")} target="_blank" rel="noreferrer">Print for the Instructor</a>}
-      <button type="button" className="portal-secondary" disabled={!count("To Input") && !count("Done") && !count("Missing Details")} onClick={() => data && saveCsv(`MISMO-${spanName(from, to)}.csv`, mismoPaidCsv(data.batches))}>Excel / CSV</button>
+      <button type="button" className="portal-secondary" disabled={!count("For Encoding") && !count("Encoded") && !count("For Completion")} onClick={() => data && saveCsv(`MISMO-${spanName(from, to)}.csv`, mismoPaidCsv(data.batches))}>Excel / CSV</button>
     </span></div>
       <div className="cx-bar ac-bar ms-tools"><span className="cx-seg">{FILTERS.map((f) => <button key={f} type="button" className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{f} {f === "All" ? all.length : count(f)}</button>)}</span>
         <input className="vx-search" aria-label="Search trainee" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, SRN, course or batch" /></div>
       {!data ? <p className="portal-empty-copy">{error || !span.ready ? "" : "Loading…"}</p> : !all.length ? <p className="portal-empty-copy">No STCW class in this period.</p> : !rows.length ? <p className="portal-empty-copy">No trainees here.</p> : <>
         <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>#</th><th>Trainee</th><th>Batch</th><th>Birth Date</th><th>SRN</th><th>Rank</th><th>Paid</th><th></th><th>MARINA MISMO</th></tr></thead><tbody>
-          {paged.shown.map(({ b, t }, i) => { const s = mismoState(t), missing = mismoMissing(t); return <tr key={`${b.id}:${t.enrollmentId}`} className={s === "Done" ? "ms-done" : undefined}>
+          {paged.shown.map(({ b, t }, i) => { const s = mismoState(t), missing = mismoMissing(t); return <tr key={`${b.id}:${t.enrollmentId}`} className={s === "Encoded" ? "ms-done" : undefined}>
             <td className="cl-no">{paged.offset + i + 1}</td>
             <td><b>{t.lastName}, {t.firstName}{t.middleName ? ` ${t.middleName}` : ""}</b></td>
             <td>{b.courseCode}<small className="cl-sub cl-block cl-mono">{b.batchNumber}</small></td>
             <td className="cl-mono">{t.birthdate ?? "—"}</td><td className="cl-mono">{t.srn ?? "—"}</td><td>{t.rank ?? "—"}</td>
-            <td>{t.companyCharge ? "Company Charge" : t.lastPaidAt && s !== "Not Paid Yet" ? txWhen(t.lastPaidAt) : "—"}{paidLate(t) && <small className="cl-block"><Badge tone="orange">Paid Late</Badge></small>}</td>
-            <td>{s !== "Not Paid Yet" && !missing.length && <button type="button" className="portal-secondary ms-copy" onClick={() => void copy(t, b)}>{copied === t.enrollmentId ? "Copied" : "Copy"}</button>}</td>
-            <td>{s === "Not Paid Yet" ? <Badge tone="red">{pesos2(balanceAt(t, "now"))} Due</Badge> : s === "Missing Details" ? <Badge tone="orange">Missing {missing.join(", ")}</Badge> : <label className="ms-tick"><input type="checkbox" checked={s === "Done"} onChange={(e) => void tick(t, e.target.checked)} /> Input Done</label>}</td>
+            <td>{t.companyCharge ? "Company Charge" : t.lastPaidAt && s !== "Unpaid" ? txWhen(t.lastPaidAt) : "—"}{paidLate(t) && <small className="cl-block"><Badge tone="orange">Paid Late</Badge></small>}</td>
+            <td>{s !== "Unpaid" && !missing.length && <button type="button" className="portal-secondary ms-copy" onClick={() => void copy(t, b)}>{copied === t.enrollmentId ? "Copied" : "Copy"}</button>}</td>
+            <td>{s === "Unpaid" ? <Badge tone="red">{pesos2(balanceAt(t, "now"))} Due</Badge> : s === "For Completion" ? <Badge tone="orange">Missing {missing.join(", ")}</Badge> : <label className="ms-tick"><input type="checkbox" checked={s === "Encoded"} onChange={(e) => void tick(t, e.target.checked)} /> Encoded</label>}</td>
           </tr>; })}
         </tbody></table></div>{paged.pager}</>}
     </section>
@@ -147,7 +147,7 @@ export function MismoFinalList() {
         <div className="panel-heading"><h2>{b.batchNumber} · {b.courseName}</h2><span className="cl-acts">
           <button type="button" className="portal-secondary" disabled={!ok.length} onClick={() => saveCsv(`MISMO-${b.batchNumber}-${cut}.csv`, mismoCsv(b))}>Excel / CSV</button>
           <a className="portal-secondary" href={pdfUrl(cut, "final", b.id)} target="_blank" rel="noreferrer">Print PDF</a>
-          <Badge tone={ok.length && done === ok.length ? "green" : "orange"}>{done} of {ok.length} Input Done</Badge>
+          <Badge tone={ok.length && done === ok.length ? "green" : "orange"}>{done} of {ok.length} Encoded</Badge>
         </span></div>
         <p className="ms-sub"><b>{ok.length} trainee{ok.length === 1 ? "" : "s"} for MARINA</b> · Cut-Off {fmtDate(cut)}, 4:00 PM · {b.startsOn === b.endsOn ? fmtDate(b.startsOn) : `${fmtDate(b.startsOn)} – ${fmtDate(b.endsOn)}`} · {b.room ?? "Room not set"} · {b.instructor ?? "Instructor not set"}{out.length ? ` · ${out.length} left off (unpaid at 4:00 PM)` : ""}</p>
         <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Last Name</th><th>First Name</th><th>Middle Name</th><th>Birth Date</th><th>SRN</th><th>Rank</th><th>Course</th></tr></thead><tbody>
@@ -162,7 +162,7 @@ export function MismoSubmissions() {
   const span = useSpan("Monthly");
   const { from, to } = span.range;
   const { data, error } = useMismo(span.today, span.today);
-  // Input Done ticks per batch and day, then the batches marked submitted before the ticks (5 Nov 2026).
+  // Encoded ticks per batch and day, then the batches marked submitted before the ticks (5 Nov 2026).
   const merged = [
     ...(data?.entryDays ?? []).map((d) => ({ key: `e:${d.batchId}:${d.day}`, day: d.day, batch: d.batchNumber, code: d.code, count: d.count, at: d.lastAt, by: d.by })),
     ...(data?.history ?? []).map((h) => { const b = one(h.batches as { batch_number: string; courses: unknown } | null), c = one(b?.courses as { name: string; code: string } | null); return { key: `s:${h.batch_id}`, day: h.list_date, batch: b?.batch_number ?? "—", code: c?.code ?? "—", count: h.trainee_count, at: h.submitted_at, by: one(h.profiles)?.complete_name ?? "—" }; }),
@@ -172,8 +172,8 @@ export function MismoSubmissions() {
     <Head title="Submissions" />
     {span.bar(`${merged.length} ${merged.length === 1 ? "entry" : "entries"}`)}
     {error && <Message kind="error" text={error} />}
-    <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Input in the MARINA MISMO System</h2><span className="slot-count">{merged.length}</span></div>
-      {merged.length ? <><div className="cl-wrap"><table className="cl-log"><thead><tr><th>Date</th><th>Batch</th><th>Course</th><th>Trainees</th><th>Last Input</th><th>By</th></tr></thead><tbody>
+    <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Encoded in the MARINA MISMO System</h2><span className="slot-count">{merged.length}</span></div>
+      {merged.length ? <><div className="cl-wrap"><table className="cl-log"><thead><tr><th>Date</th><th>Batch</th><th>Course</th><th>Trainees</th><th>Last Encoded</th><th>By</th></tr></thead><tbody>
         {paged.shown.map((r) => <tr key={r.key}><td>{fmtDate(r.day)}</td><td className="cl-mono">{r.batch}</td><td>{r.code}</td><td className="cl-mono">{r.count}</td><td>{txWhen(r.at)}</td><td>{r.by}</td></tr>)}
       </tbody></table></div>{paged.pager}</> : <p className="portal-empty-copy">{data ? "Nothing input in this period." : error ? "" : "Loading…"}</p>}
     </section>

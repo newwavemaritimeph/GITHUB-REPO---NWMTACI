@@ -114,7 +114,7 @@ export function CashierPaymentQueue({ data, onPay, reload }: { data: PortalData;
           <td>{pesos(dueCentavos(e))}</td>
           <td>{pesos(paid)}</td>
           <td><strong>{pesos(balance)}</strong></td>
-          <td>{paid > 0 ? <Badge tone="active">{e.batch_id ? "Paid · Enrolling" : "Paid · Awaiting Batch"}</Badge> : <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record Payment</button>}</td>
+          <td>{paid > 0 ? <Badge tone="active">{e.batch_id ? "Paid · Enrolling" : "Paid · Awaiting Batch"}</Badge> : <button type="button" className="portal-primary" onClick={() => onPay(e.id)}>Record</button>}</td>
         </tr>;
       })}
     </tbody></table>{!rows.length && <p className="portal-empty-copy">No applicants waiting for payment. Registration hands them over once their requirements are complete.</p>}</div>
@@ -546,7 +546,7 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
         {(() => { const paid = centerLines(data).filter((l) => l.state === "Paid"); const got = (data as unknown as { rebatesReceived?: Record<string, string> }).rebatesReceived ?? {}; const toCollect = paid.filter((l) => !got[l.e.id] && Number(l.e.rebate_centavos) > 0); return paid.length ? <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Rebates to Collect</h2><span className="muted-text">from centers</span></div>
           <dl className="ac-lines"><div><dt>To collect · {toCollect.length}</dt><dd className="minus">{pesos2(toCollect.reduce((s, l) => s + Number(l.e.rebate_centavos), 0))}</dd></div></dl>
           {go && <div className="cr-act"><button type="button" className="portal-secondary" onClick={() => go("Other income")}>Open Rebates</button></div>}</section> : null; })()}
-        <button type="button" className="cr-big cr-pay" onClick={() => onPay("")}><b>Record Payment</b><small>{fresh.length} waiting to pay</small></button>
+        <button type="button" className="cr-big cr-pay" onClick={() => onPay("")}><b>Record</b><small>{fresh.length} waiting to pay</small></button>
         {(data.billingStatements ?? []).some((b) => b.paid_centavos < b.total_centavos) && <button type="button" className="cr-big cr-pay" onClick={() => setCompanyPay(true)}><b>Record Company Payment</b><small>{(data.billingStatements ?? []).filter((b) => b.paid_centavos < b.total_centavos).length} Billing Statement(s) to collect</small></button>}
         <button type="button" className="cr-big cr-exp" onClick={() => setRaising(true)}><b>Raise Expense</b><small>Sent to Accounting for approval</small></button>
       </div>
@@ -561,7 +561,7 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
               <td data-l="Mode">{p.method}</td>
               <td data-l="Amount" className="r"><strong className="cx-amt">{pesos(p.amount_centavos)}</strong></td>
               <td data-l="Reference" className="cl-mono">{p.reference}</td>
-              <td data-l=""><div className="cx-acts">{p.drive_link && <ViewIcon label="View Proof" href={p.drive_link} />}<button type="button" className="portal-primary" disabled={!g} onClick={() => setFromProof(p)}>Record Payment</button><button type="button" className="portal-secondary" onClick={() => setNotValid({ id: p.id, why: NO_REASON })}>Not Valid</button></div>
+              <td data-l=""><div className="cx-acts">{p.drive_link && <ViewIcon label="View Proof" href={p.drive_link} />}<button type="button" className="portal-primary" disabled={!g} onClick={() => setFromProof(p)}>Record</button><button type="button" className="portal-secondary" onClick={() => setNotValid({ id: p.id, why: NO_REASON })}>Not Valid</button></div>
                 {notValid?.id === p.id && <div className="cx-acts" style={{ marginTop: 6 }}><span className="cx-reasons"><ReasonField reasons={REASONS.proofNotValid} value={notValid.why} onChange={(why) => setNotValid({ id: p.id, why })} autoFocus /></span><button type="button" className="portal-primary" disabled={busy || !reasonReady(notValid.why)} onClick={async () => { await post({ action: "proof-dismiss", proofId: p.id, reason: reasonText(notValid.why) }, "Marked Not Valid."); setNotValid(null); }}>Confirm</button><button type="button" className="portal-secondary" onClick={() => setNotValid(null)}>Cancel</button></div>}</td>
             </tr>; })}
           </tbody></table>{proofP.pager}</div></section>}
@@ -622,7 +622,7 @@ export function CashierPayments({ data, onPay, reload }: { data: PortalData; onP
   for (const p of valid) byMode.set(p.method, (byMode.get(p.method) ?? 0) + Number(p.amount_centavos));
   const total = valid.reduce((s, p) => s + Number(p.amount_centavos), 0);
   return <div className="portal-page cx">
-    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Payments</h1></div><button type="button" className="portal-primary" onClick={() => onPay("")}>Record Payment</button></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Payments</h1></div><button type="button" className="portal-primary" onClick={() => onPay("")}>Record</button></div>
     <div className="cx-bar"><div className="cx-seg">{RANGES.map((r) => <button key={r} type="button" className={range === r ? "on" : ""} onClick={() => setRange(r)}>{r}</button>)}</div>
       {range === "Custom" && <><label className="cx-dt">From<input type="date" value={from} max={to} onChange={(e) => setFrom(e.target.value)} /></label><label className="cx-dt">To<input type="date" value={to} min={from} max={today} onChange={(e) => setTo(e.target.value)} /></label></>}
       <label className="cx-dt">Mode<select value={mode} onChange={(e) => setMode(e.target.value)}><option value="">All Modes</option>{[...new Set([...modeNames(data), ...data.payments.map((p) => p.method)])].map((m) => <option key={m} value={m}>{m}</option>)}</select></label>

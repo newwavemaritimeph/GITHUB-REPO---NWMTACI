@@ -37,7 +37,7 @@ const nameOf = (e: Enrollment) => { const t = first(e.trainees); return t ? full
 /** Request types a Registration Officer may raise (addendum: rescheduling, change of course, cancellation). */
 const REG_REQUESTS: RequestType[] = ["Rescheduling", "Change Course", "Make-up Class", "Reprinting", "TAR reprint", "Cancellation"];
 /** Button label for each request type a Registration Officer can raise. */
-const requestLabel = (type: RequestType, isApplication: boolean) => (type === "Rescheduling" ? "Change batch / reschedule" : type === "Change Course" ? "Change course" : type === "Make-up Class" ? "Make-up class" : type === "Reprinting" ? "Certificate reprint" : type === "TAR reprint" ? "TAR reprint" : isApplication ? "Decline application" : "Cancel enrollment");
+const requestLabel = (type: RequestType, isApplication: boolean) => (type === "Rescheduling" ? "Change batch / reschedule" : type === "Change Course" ? "Change course" : type === "Make-up Class" ? "Make-up class" : type === "Reprinting" ? "Certificate reprint" : type === "TAR reprint" ? "TAR reprint" : isApplication ? "Decline application" : "Cancel");
 /** Where a request is: with the Cashier for charges, with Accounting for approval, or decided. */
 const requestStage = (r: RequestRow) => (r.status !== "Pending" ? { text: r.status, tone: r.status === "Approved" ? "active" : "cancelled" } : r.stage === "With cashier" ? { text: "With the Cashier", tone: "orange" } : { text: "Awaiting approval", tone: "pending" });
 

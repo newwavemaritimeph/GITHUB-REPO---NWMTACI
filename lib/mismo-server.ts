@@ -45,7 +45,7 @@ export async function loadMismoDay(db: Admin, date: string, to: string = date): 
     if (!cur.last || p.received_at > cur.last) cur.last = p.received_at;
     paid.set(a.enrollment_id, cur);
   }
-  // Input Done ticks (migration 202610290080); none before it is run.
+  // Encoded ticks (migration 202610290080); none before it is run.
   const entries = ids.length ? await db.from("mismo_entries").select("enrollment_id,done_at").in("enrollment_id", ids) : { data: [], error: null };
   const doneAt = new Map(((entries.error ? [] : entries.data ?? []) as { enrollment_id: string; done_at: string }[]).map((x) => [x.enrollment_id, x.done_at]));
   const sub = new Map(((submissions.data ?? []) as { batch_id: string; submitted_at: string; trainee_count: number }[]).map((s) => [s.batch_id, s]));

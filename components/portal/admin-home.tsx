@@ -271,7 +271,7 @@ function TraineeLedger({ trainee, reload, onBack }: { trainee: PortalData["train
       <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Enrollment</th><th>Course</th><th>Batch · Schedule</th><th>Status</th><th>Due</th><th>Paid</th><th>Balance</th><th></th></tr></thead><tbody>
         {(ledger?.enrollments ?? []).map((e) => <tr key={e.id}><td className="cl-mono">{e.number}</td><td><b>{e.courseCode}</b><small>{e.courseName}</small></td><td>{e.batch ? <span className="cl-mono">{e.batch}</span> : "No batch"}<small>{e.startsOn ? `${fmtDate(e.startsOn)}${e.endsOn && e.endsOn !== e.startsOn ? ` – ${fmtDate(e.endsOn)}` : ""}` : ""}</small></td>
           <td><Badge tone={e.status === "Enrolled" ? "green" : e.status === "Cancelled" ? "red" : "orange"}>{e.status}</Badge></td><td className="cl-mono">{pesos2(e.due)}</td><td className="cl-mono">{pesos2(e.paid)}</td><td className="cl-mono">{pesos2(Math.max(0, e.due - e.paid))}</td>
-          <td>{e.status !== "Cancelled" && <button type="button" className="ad-danger-link" onClick={() => setAct({ kind: "enr", id: e.id })}>Cancel Enrollment</button>}</td></tr>)}
+          <td>{e.status !== "Cancelled" && <button type="button" className="ad-danger-link" onClick={() => setAct({ kind: "enr", id: e.id })}>Cancel</button>}</td></tr>)}
         {ledger && !ledger.enrollments.length && <tr><td colSpan={8}><span className="portal-empty-copy">No enrollments.</span></td></tr>}
       </tbody></table></div>
       {act?.kind === "enr" && (() => { const e = ledger?.enrollments.find((x) => x.id === act.id); return e ? <VoidBox title="Cancel Enrollment" busy={busy} onCancel={() => setAct(null)}
@@ -314,7 +314,7 @@ export function AdminEnrollments({ data, reload }: { data: PortalData; reload: (
           <td>{b ? <span className="cl-mono">{b.batch_number}</span> : "No batch"}<small>{b ? fmtDate(b.starts_on) : e.scheduled_on ? fmtDate(e.scheduled_on) : ""}</small></td>
           <td><Badge tone={e.enrollment_status === "Enrolled" ? "green" : e.enrollment_status === "Cancelled" ? "red" : "orange"}>{e.enrollment_status}</Badge></td>
           <td className="cl-mono">{pesos2(Number(e.paid_centavos))}</td><td className="cl-mono">{pesos2(Math.max(0, due(e) - Number(e.paid_centavos)))}</td>
-          <td>{e.enrollment_status !== "Cancelled" && <button type="button" className="ad-danger-link" onClick={() => setAct(e.id)}>Cancel Enrollment</button>}</td></tr>; })}
+          <td>{e.enrollment_status !== "Cancelled" && <button type="button" className="ad-danger-link" onClick={() => setAct(e.id)}>Cancel</button>}</td></tr>; })}
         {!rows.length && <tr><td colSpan={8}><span className="portal-empty-copy">No enrollments match.</span></td></tr>}
       </tbody></table></div>
       {rows.length > limit && <div className="ad-more"><button type="button" className="portal-secondary" onClick={() => setLimit(limit + 60)}>Show More ({rows.length - limit})</button></div>}
