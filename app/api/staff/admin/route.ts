@@ -3,7 +3,8 @@ import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { loadOverdue } from "@/lib/reconciliation-server";
 import { manilaDay, manilaDayBounds } from "@/lib/reconciliation";
-import { MISMO_COURSE_CODES } from "@/lib/mismo";
+import { MISMO_COURSE_CODES, finalList } from "@/lib/mismo";
+import { loadMismoDay } from "@/lib/mismo-server";
 import { isStcwCategory } from "@/lib/certificate-rules";
 import type { HolidayDay, MarinaStatus } from "@/lib/admin-dashboard";
 
@@ -86,13 +87,10 @@ async function dashboard(db: Db, today: string, from: string, to: string) {
       room: room?.name ?? null, roomSeats: room?.capacity ?? null, instructor: plan?.instructor_id ? personName.get(plan.instructor_id) ?? null : null };
   }).sort((a, z) => a.courseCode.localeCompare(z.courseCode));
 
-  // MARINA MISMO: today's MISMO batches still to submit after the 4:00 PM cut-off.
+  // MARINA MISMO: today's batches with someone on the final list still to encode.
   const mismoToday = classes.filter((c) => MISMO_COURSE_CODES.includes(c.courseCode.toUpperCase()));
-  let mismoSubmitted = 0;
-  if (mismoToday.length) {
-    const { data } = await db.from("mismo_submissions").select("batch_id").in("batch_id", mismoToday.map((c) => c.id)).eq("list_date", today);
-    mismoSubmitted = (data ?? []).length;
-  }
+  const mismoDay = mismoToday.length ? (await loadMismoDay(db, today, today, { staffing: false })).batches : [];
+  const mismoSubmitted = mismoDay.filter((b) => finalList(b).every((t) => t.entryAt)).length;
   const afterCutoff = new Date() >= new Date(`${today}T16:00:00+08:00`);
 
   // Unprinted certificates past their due day are computed in the browser from the portal data.
@@ -106,7 +104,7 @@ async function dashboard(db: Db, today: string, from: string, to: string) {
     collections: (pay.data ?? []).map((p) => ({ channel: p.method as string, amount: Number(p.amount_centavos) })),
     releases: (exp.data ?? []).map((e) => ({ channel: channelById.get(e.id as string) ?? "Cash", amount: Number(e.amount_centavos) })),
     classes,
-    mismo: { batches: mismoToday.length, submitted: mismoSubmitted, afterCutoff },
+    mismo: { batches: mismoDay.length, submitted: mismoSubmitted, afterCutoff },
     unreconciled: overdue.map((c) => ({ channel: c.channel, count: c.count, total: c.total, oldest: c.days.map((d) => d.day).sort()[0] ?? null })),
     holidays,
   };

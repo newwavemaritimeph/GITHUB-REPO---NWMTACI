@@ -30,15 +30,14 @@ function useLoad<T>(url: string | null, tick: number) {
   return { data: same ? state.data : null, error: state.key === key ? state.error : "", loading: state.key !== key };
 }
 
-export function CompletionRecords({ eyebrow = "MISMO" }: { eyebrow?: string }) {
+export function CompletionRecords() {
   const [tick, setTick] = useState(0), [pick, setPick] = useState<string | null>(null), [filter, setFilter] = useState("All");
   // By the date training ended, hidden until a date is picked (owner, 5 Nov 2026).
   const p = usePeriod();
   const list = useLoad<{ ready: boolean; batches: CompletionBatch[] }>(`${API}?from=${!p.picked ? p.today : p.range.from < ALL_DATES ? ALL_DATES : p.range.from}`, tick);
   const batches = (list.data?.batches ?? []).filter((b) => p.inRange(b.endsOn));
   const shown = filter === "All" ? batches : batches.filter((b) => (filter === "To Do" ? b.status === "Not Started" || b.status === "Draft" : b.status === filter));
-  return <div className="portal-page cx ac tcr-ui">
-    <div className="cx-head"><div><span className="portal-eyebrow">{eyebrow}</span><h1>Completion Records</h1></div></div>
+  return <div className="cx ac tcr-ui">
     {list.error && <Message kind="error" text={list.error} />}
     {list.data && !list.data.ready && <Message kind="error" text="The Completion Records tables are not in the database yet. Run database updates 202610090039 and 202610090040 (Supabase SQL Editor), then reload this page." />}
     <MonthBar p={p} what="Ended" count={`${batches.length} batch${batches.length === 1 ? "" : "es"}`} />

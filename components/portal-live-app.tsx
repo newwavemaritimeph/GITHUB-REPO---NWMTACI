@@ -28,7 +28,7 @@ import { classroomJoin } from "@/lib/classroom";
 import { ClassroomPanel } from "./portal/classroom-panel";
 import { RequestActionModal, TraineeRequestModal, type RequestType } from "./portal/payment-actions";
 import { NO_REASON, REASONS, ReasonField, RejectInline, reasonReady, reasonText, type ReasonValue } from "./portal/reject-inline";
-import { MismoDashboard, MismoFinalList, MismoSubmissions } from "./portal/mismo-home";
+import { MismoList } from "./portal/mismo-home";
 import { MISMO_COURSE_CODES } from "@/lib/mismo";
 import { AssistantDashboard, ClassSchedules, ResourcePlanning, InstructorShortlist, GcashReconciliation, GcashNotInHistory } from "./portal/admin-assistant-home";
 import { RegistrationDeliveries } from "./portal/delivery-home";
@@ -39,14 +39,13 @@ import { InstructionsButton } from "./portal/instructions-window";
 import { AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, pesos2, first, dueCentavos, balanceOf, isUnpaid, manilaToday, addDays, needsFullRefresh } from "@/lib/portal-format";
 import { tcl } from "@/lib/title-case";
-import { CompletionRecords } from "./portal/completion-records";
 import { OtherIncome } from "./portal/other-income";
 import { PostTestReview } from "./portal/post-test-review";
 import { ClassroomLinksImport, DefaultRoomsPanel } from "./portal/admin-setup";
 import { AdminHome, AdminSearchTrainee, AdminEnrollments, AdminVouchers, AdminHolidays } from "./portal/admin-home";
 import { askText, askConfirm, showAlert } from "./portal/dialogs";
 
-type Module = "Form numbers" | "Classroom links" | "Post-tests" | "Training instructions" | "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Daily summary" | "Opening and closing" | "Expenses summary" | "Templates" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Billing statement" | "Sales from endorsed courses" | "MISMO dashboard" | "Completion records" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
+type Module = "Form numbers" | "Classroom links" | "Post-tests" | "Training instructions" | "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Daily summary" | "Opening and closing" | "Expenses summary" | "Templates" | "Certificate controls" | "Delivery requests" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Billing statement" | "Sales from endorsed courses" | "MISMO List" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; training_mode?:string; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -147,12 +146,12 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // Releasing Officer (owner, 5 Nov 2026): one Certificates page in stage tabs, and Reports (RELEASING_TABS).
   releasing_officer: ["Certificates","Reports"],
   // MARINA MISMO Compliance Officer (owner, 8 Oct 2026): STCW trainees owing at 11:00 AM, the 4:00 PM final list, submissions.
-  mismo_officer: ["Dashboard","Batch schedules","Final list","Submissions","Completion records"],
+  mismo_officer: ["MISMO List","Batch schedules"],
   // Admin Assistant (owner, 9 Oct 2026): resource planning, instructor shortlist. Requisitions removed (owner, 3 Nov 2026).
   admin_assistant: ["Dashboard","Batch schedules","Resource planning","Instructors","Reconciliation"],
   hr: [],
   // Admin (owner, 3 Nov 2026): Dashboard · Enrollments ▾ · Schedules ▾ · Reports ▾ · MISMO ▾ · Configuration ▾ (ADMIN_TABS).
-  admin: ["Dashboard","Search trainee","Enrollments","Batch schedules","Resource planning","Courses","Post-tests","Training instructions","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Holidays","Requests","Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Billing statement","MISMO dashboard","Final list","Submissions","Completion records"],
+  admin: ["Dashboard","Search trainee","Enrollments","Batch schedules","Resource planning","Courses","Post-tests","Training instructions","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Holidays","Requests","Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Billing statement","MISMO List"],
   // Cashier (Accounting Officer), owner's menu of 7 Oct 2026, shown as top tabs:
   // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses, Requests ·
   // Reports ▾ Daily Summary, Opening and Closing, Expenses Summary (CASHIER_TABS; reports consolidated 5 Nov 2026).
@@ -177,11 +176,10 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"HR & payroll",icon:"♙",roles:["admin"],group:"People"},{label:"MyHr",icon:"☺",group:"People"},
   {label:"Templates",icon:"▤",roles:["releasing_officer"],group:"Work"},{label:"Numbering",icon:"№",roles:["releasing_officer"],group:"Work"},
   {label:"Delivery requests",icon:"⇥",roles:["registration"],group:"Work"},
-  {label:"Batch schedules",icon:"□",roles:["admin_assistant","registration","cashier","mismo_officer","admin"],group:"Work"},{label:"Resource planning",icon:"▢",roles:["admin_assistant","admin"],group:"Work"},{label:"Instructors",icon:"♙",roles:["admin_assistant","admin"],group:"Work"},{label:"Reconciliation",icon:"✓",roles:["admin_assistant","admin"],group:"Work"},
-  {label:"Final list",icon:"▤",roles:["mismo_officer"],group:"Work"},{label:"Submissions",icon:"✓",roles:["mismo_officer"],group:"Work"},{label:"Completion records",icon:"▤",roles:["mismo_officer","admin"],group:"Work"},
+  {label:"MISMO List",icon:"▤",roles:["mismo_officer","admin"],group:"Work"},{label:"Batch schedules",icon:"□",roles:["admin_assistant","registration","cashier","mismo_officer","admin"],group:"Work"},{label:"Resource planning",icon:"▢",roles:["admin_assistant","admin"],group:"Work"},{label:"Instructors",icon:"♙",roles:["admin_assistant","admin"],group:"Work"},{label:"Reconciliation",icon:"✓",roles:["admin_assistant","admin"],group:"Work"},
   {label:"Certificate controls",icon:"№",roles:["admin"],group:"Configuration"},
   {label:"Employee accounts",icon:"⚙",roles:["admin"],group:"Configuration"},{label:"Classrooms",icon:"▢",roles:["admin"],group:"Configuration"},{label:"Certifications",icon:"№",roles:["admin"],group:"Configuration"},{label:"Holidays",icon:"▦",roles:["admin"],group:"Configuration"},
-  {label:"Daily summary report",icon:"∑",roles:["admin"],group:"Records"},{label:"Receipts and TARs",icon:"▤",roles:["admin","accounting"],group:"Records"},{label:"Cash and sales summary",icon:"∑",roles:["admin","accounting"],group:"Records"},{label:"Sales from endorsed courses",icon:"∑",roles:["admin","accounting"],group:"Records"},{label:"Billing statement",icon:"∑",roles:["admin","accounting"],group:"Records"},{label:"MISMO dashboard",icon:"⌂",roles:["admin"],group:"Work"},
+  {label:"Daily summary report",icon:"∑",roles:["admin"],group:"Records"},{label:"Receipts and TARs",icon:"▤",roles:["admin","accounting"],group:"Records"},{label:"Cash and sales summary",icon:"∑",roles:["admin","accounting"],group:"Records"},{label:"Sales from endorsed courses",icon:"∑",roles:["admin","accounting"],group:"Records"},{label:"Billing statement",icon:"∑",roles:["admin","accounting"],group:"Records"},
   {label:"Endorsed courses",icon:"◇",group:"Configuration"},{label:"Configuration",icon:"⚙",roles:["admin"],group:"Configuration"},
   // Accounting › Configuration ▾: one dropdown item per section (owner, 7 Oct 2026).
   ...ACCOUNTING_CONFIG_SECTIONS.map(label=>({label,icon:"⚙",roles:["accounting"],group:"Configuration" as NavGroup})),
@@ -221,7 +219,7 @@ const ADMIN_TABS:TopTab[]=[
   {label:"Enrollments",items:["Search trainee","Enrollments","Requests"]},
   {label:"Schedules",items:["Batch schedules","Resource planning"]},
   {label:"Reports",items:["Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Billing statement"]},
-  {label:"MISMO",items:["MISMO dashboard","Final list","Submissions","Completion records"]},
+  {label:"MISMO List",items:["MISMO List"]},
   {label:"Configuration",items:["Courses","Post-tests","Training instructions","Classroom links","Instructors","Classrooms","Certifications","Holidays","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Employee accounts","Partnered Centers"],
     heads:{Courses:"Training","Schedule of fees":"Fees and Accounts","Employee accounts":"People and Partners"}},
 ];
@@ -347,7 +345,7 @@ export function PortalLiveApp(){
   const roleOptions=workingRolesFor(data.roles);
   const tabs=topTabsFor(role,allowedNav.map(item=>item.label));
   // The Releasing Officer has no Dashboard; Certificates is the home page.
-  const current:Module=role==="releasing_officer"&&active==="Dashboard"?"Certificates":active;
+  const current:Module=active==="Dashboard"&&role==="releasing_officer"?"Certificates":active==="Dashboard"&&role==="mismo_officer"?"MISMO List":active;
   const openRequests=data.requests.filter(r=>r.status==="Pending"&&(r.stage==="With cashier"||(r.charge_id&&data.chargeCollected?.[r.id]&&!data.chargeCollected[r.id].paid))).length;
   const initials=data.profile.complete_name.split(" ").map(v=>v[0]).slice(0,2).join("").toUpperCase();
   return <DataSince.Provider value={needSince}><main className="portal-shell nw-shell">
@@ -403,7 +401,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   // Other income (owner, 19 Oct 2026): endorsement rebates and other income; the Cashier records, Accounting views, the Admin voids.
   if(active==="Other income")return <OtherIncome data={data} reload={reload} canRecord={["cashier","accounting","admin"].includes(gateRole)} canVoid={data.roles.includes("admin")} canAddCategory={["accounting","admin"].includes(gateRole)}/>;
   // Training Completion and Record of Assessment Report (owner, 9 Oct 2026): MISMO Compliance Officer and Admin.
-  if(active==="Completion records"&&["mismo_officer","admin"].includes(gateRole))return <CompletionRecords/>;
+  if(active==="MISMO List"&&["mismo_officer","admin"].includes(gateRole))return <MismoList/>;
   if(active==="Dashboard"&&gateRole==="registration")return <RegistrationDashboard data={data} go={m=>go(m as Module)}/>;
   // Admin › Configuration › Courses: add, edit and remove (owner, 20 Oct 2026); Registration keeps the read-only list.
   // Admin › Configuration › Post-Tests (owner, 20 Oct 2026).
@@ -429,9 +427,6 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Billing statement")return <BillingStatementReport/>;
     if(active==="Receipts and TARs")return <AccountingDocuments/>;
     if(active==="Daily summary report")return <><CashierSummaryReport data={data}/><div className="portal-page" style={{paddingTop:0}}><AdminVouchers/></div></>;
-    if(active==="MISMO dashboard")return <MismoDashboard/>;
-    if(active==="Final list")return <MismoFinalList/>;
-    if(active==="Submissions")return <MismoSubmissions/>;
   }
   if(gateRole==="releasing_officer"){
     if(active==="Certificates")return <ReleasingCertificates data={data} reload={reload}/>;
@@ -439,11 +434,6 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Numbering")return <ReleasingNumbering data={data} reload={reload}/>;
     // Releasing Officer › Reports: Daily, Weekly, Monthly (owner, 20 Oct 2026).
     if(active==="Reports")return <ReleasingReports data={data}/>;
-  }
-  if(gateRole==="mismo_officer"){
-    if(active==="Dashboard")return <MismoDashboard/>;
-    if(active==="Final list")return <MismoFinalList/>;
-    if(active==="Submissions")return <MismoSubmissions/>;
   }
   if(gateRole==="admin_assistant"&&active==="Dashboard")return <AssistantDashboard data={data} go={m=>go(m as Module)}/>;
   if(active==="Batch schedules")return <ClassSchedulesTab data={data} open={open} reload={reload} canManage={canSchedule} courseCodes={gateRole==="mismo_officer"?MISMO_COURSE_CODES:undefined}/>;

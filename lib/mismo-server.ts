@@ -1,14 +1,23 @@
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { MISMO_COURSE_CODES, cutDateOf, manilaInstant, type MismoBatch, type MismoDay } from "@/lib/mismo";
+import { MISMO_COURSE_CODES, cutDateOf, entryMovedFrom, manilaInstant, type MismoBatch, type MismoDay, type MismoEntry } from "@/lib/mismo";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
+
+/** Long periods overrun the URL and the 1,000-row cap, and a read that failed quietly would show paid trainees as unpaid. */
+async function inChunks<T>(ids: string[], size: number, read: (part: string[]) => PromiseLike<{ data: unknown; error: { message: string } | null }>) {
+  const parts: string[][] = [];
+  for (let i = 0; i < ids.length; i += size) parts.push(ids.slice(i, i + size));
+  const results = await Promise.all(parts.map(read));
+  for (const r of results) if (r.error) throw new Error(r.error.message);
+  return results.flatMap((r) => (r.data ?? []) as T[]);
+}
 
 /**
  * Every STCW (MISMO) batch in class from `date` to `to`, with each trainee's due and what they had paid by 11:00 AM and
  * 4:00 PM of the batch's first class day in that period, and now.
  */
-export async function loadMismoDay(db: Admin, date: string, to: string = date): Promise<MismoDay> {
+export async function loadMismoDay(db: Admin, date: string, to: string = date, opts: { staffing?: boolean } = {}): Promise<MismoDay> {
   const { data: courses } = await db.from("courses").select("id,code,name").in("code", MISMO_COURSE_CODES);
   const courseById = new Map((courses ?? []).map((c) => [c.id as string, c as { id: string; code: string; name: string }]));
   if (!courseById.size) return { date, to, batches: [] };
@@ -16,24 +25,24 @@ export async function loadMismoDay(db: Admin, date: string, to: string = date): 
   const list = (batches ?? []) as { id: string; batch_number: string; course_id: string; starts_on: string; ends_on: string; venue: string | null }[];
   if (!list.length) return { date, to, batches: [] };
   const batchIds = list.map((b) => b.id);
-  const [{ data: enrollments }, staffing, submissions] = await Promise.all([
-    db.from("enrollments").select("id,batch_id,selling_price_centavos,enrollment_status,trainees(legal_last_name,legal_first_name,legal_middle_name,birthdate,srn,rank)").in("batch_id", batchIds).in("enrollment_status", ["Enrolled", "Pending", "Open Schedule"]),
-    loadStaffing(db, batchIds),
-    db.from("mismo_submissions").select("batch_id,submitted_at,trainee_count").in("batch_id", batchIds),
+  const [enrollments, staffing, submissions] = await Promise.all([
+    inChunks(batchIds, 30, (part) => db.from("enrollments").select("id,batch_id,selling_price_centavos,enrollment_status,trainees(legal_last_name,legal_first_name,legal_middle_name,birthdate,srn,rank)").in("batch_id", part).in("enrollment_status", ["Enrolled", "Pending", "Open Schedule"])),
+    opts.staffing === false ? new Map<string, { room: string | null; instructor: string | null }>() : loadStaffing(db, batchIds),
+    inChunks<{ batch_id: string; submitted_at: string; trainee_count: number }>(batchIds, 100, (part) => db.from("mismo_submissions").select("batch_id,submitted_at,trainee_count").in("batch_id", part)),
   ]);
-  const rows = (enrollments ?? []) as unknown as { id: string; batch_id: string; selling_price_centavos: number; trainees: { legal_last_name: string; legal_first_name: string; legal_middle_name: string | null; birthdate: string | null; srn: string | null; rank: string | null } | null }[];
+  const rows = enrollments as unknown as { id: string; batch_id: string; selling_price_centavos: number; trainees: { legal_last_name: string; legal_first_name: string; legal_middle_name: string | null; birthdate: string | null; srn: string | null; rank: string | null } | null }[];
   const ids = rows.map((e) => e.id);
-  const [{ data: charges }, { data: allocations }] = ids.length ? await Promise.all([
-    db.from("enrollment_charges").select("enrollment_id,amount_centavos,event_type").in("enrollment_id", ids).eq("valid", true),
-    db.from("payment_allocations").select("enrollment_id,amount_centavos,payments(received_at,valid)").in("enrollment_id", ids),
-  ]) : [{ data: [] }, { data: [] }];
-  const billed = new Set<string>();
-  if (ids.length) { const { data: cc } = await db.from("enrollments").select("id").in("id", ids).not("company_charge_agency_id", "is", null); for (const x of cc ?? []) billed.add(x.id as string); }
+  const [charges, allocations, companyCharged] = await Promise.all([
+    inChunks<{ enrollment_id: string; amount_centavos: number; event_type: string }>(ids, 100, (part) => db.from("enrollment_charges").select("enrollment_id,amount_centavos,event_type").in("enrollment_id", part).eq("valid", true)),
+    inChunks<{ enrollment_id: string; amount_centavos: number; payments: unknown }>(ids, 100, (part) => db.from("payment_allocations").select("enrollment_id,amount_centavos,payments(received_at,valid)").in("enrollment_id", part)),
+    inChunks<{ id: string }>(ids, 100, (part) => db.from("enrollments").select("id").in("id", part).not("company_charge_agency_id", "is", null)),
+  ]);
+  const billed = new Set(companyCharged.map((x) => x.id));
   const due = new Map<string, number>(rows.map((e) => [e.id, Number(e.selling_price_centavos ?? 0)]));
-  for (const c of charges ?? []) due.set(c.enrollment_id, (due.get(c.enrollment_id) ?? 0) + (c.event_type === "discount" ? -1 : 1) * Number(c.amount_centavos));
+  for (const c of charges) due.set(c.enrollment_id, (due.get(c.enrollment_id) ?? 0) + (c.event_type === "discount" ? -1 : 1) * Number(c.amount_centavos));
   const batchOf = new Map(rows.map((e) => [e.id, e.batch_id])), startOf = new Map(list.map((b) => [b.id, b.starts_on]));
   const paid = new Map<string, { b11: number; b16: number; now: number; last: string | null }>();
-  for (const a of allocations ?? []) {
+  for (const a of allocations) {
     const p = first(a.payments as unknown as { received_at: string; valid: boolean } | null);
     if (!p || p.valid === false) continue;
     const cur = paid.get(a.enrollment_id) ?? { b11: 0, b16: 0, now: 0, last: null };
@@ -45,16 +54,19 @@ export async function loadMismoDay(db: Admin, date: string, to: string = date): 
     if (!cur.last || p.received_at > cur.last) cur.last = p.received_at;
     paid.set(a.enrollment_id, cur);
   }
-  // Encoded ticks (migration 202610290080); none before it is run.
-  const entries = ids.length ? await db.from("mismo_entries").select("enrollment_id,done_at").in("enrollment_id", ids) : { data: [], error: null };
-  const doneAt = new Map(((entries.error ? [] : entries.data ?? []) as { enrollment_id: string; done_at: string }[]).map((x) => [x.enrollment_id, x.done_at]));
-  const sub = new Map(((submissions.data ?? []) as { batch_id: string; submitted_at: string; trainee_count: number }[]).map((s) => [s.batch_id, s]));
+  // Encoded ticks (migration 202610290080) and what they were encoded under (202610290082): tolerant before either is run.
+  type Tick = { enrollment_id: string; done_at: string; batch_number?: string | null; class_start?: string | null };
+  const readTicks = (cols: string) => inChunks<Tick>(ids, 100, (part) => db.from("mismo_entries").select(cols).in("enrollment_id", part));
+  const ticks = await readTicks("enrollment_id,done_at,batch_number,class_start").catch(() => readTicks("enrollment_id,done_at")).catch(() => [] as Tick[]);
+  const tickOf = new Map(ticks.map((x) => [x.enrollment_id, x]));
+  const sub = new Map(submissions.map((s) => [s.batch_id, s]));
   const out: MismoBatch[] = list.map((b) => {
     const c = courseById.get(b.course_id)!;
     const st = staffing.get(b.id);
     const trainees = rows.filter((e) => e.batch_id === b.id).map((e) => {
       const t = first(e.trainees); const p = paid.get(e.id) ?? { b11: 0, b16: 0, now: 0, last: null };
-      return { enrollmentId: e.id, lastName: t?.legal_last_name ?? "", firstName: t?.legal_first_name ?? "", middleName: t?.legal_middle_name ?? null, birthdate: t?.birthdate ?? null, srn: t?.srn ?? null, rank: t?.rank ?? null, dueCentavos: due.get(e.id) ?? 0, paidBy11: p.b11, paidBy16: p.b16, paidNow: p.now, companyCharge: billed.has(e.id), entryAt: doneAt.get(e.id) ?? null, lastPaidAt: p.last };
+      const tick = tickOf.get(e.id), moved = tick ? entryMovedFrom({ batchNumber: tick.batch_number, classStart: tick.class_start }, { batchNumber: b.batch_number, startsOn: b.starts_on }) : null;
+      return { enrollmentId: e.id, lastName: t?.legal_last_name ?? "", firstName: t?.legal_first_name ?? "", middleName: t?.legal_middle_name ?? null, birthdate: t?.birthdate ?? null, srn: t?.srn ?? null, rank: t?.rank ?? null, dueCentavos: due.get(e.id) ?? 0, paidBy11: p.b11, paidBy16: p.b16, paidNow: p.now, companyCharge: billed.has(e.id), entryAt: moved ? null : tick?.done_at ?? null, movedFrom: moved, lastPaidAt: p.last };
     }).sort((x, y) => x.lastName.localeCompare(y.lastName) || x.firstName.localeCompare(y.firstName));
     const s = sub.get(b.id);
     return { id: b.id, batchNumber: b.batch_number, courseName: c.name, courseCode: c.code, startsOn: b.starts_on, endsOn: b.ends_on, room: st?.room ?? b.venue ?? null, instructor: st?.instructor ?? null, trainees, submittedAt: s?.submitted_at ?? null, submittedCount: s?.trainee_count ?? null, cutDate: cutDateOf(b.starts_on, date) };
@@ -62,15 +74,39 @@ export async function loadMismoDay(db: Admin, date: string, to: string = date): 
   return { date, to, batches: out };
 }
 
+/** Every encoded trainee, newest first, for the Encoded tab. A tick that no longer holds because the trainee moved is left out. */
+export async function loadMismoEntries(db: Admin): Promise<MismoEntry[]> {
+  type One<T> = T | T[] | null;
+  type Row = { enrollment_id: string; done_at: string; batch_number?: string | null; class_start?: string | null; profiles: One<{ complete_name: string }>;
+    enrollments: One<{ enrollment_status: string; batches: One<{ batch_number: string; starts_on: string; ends_on: string; courses: One<{ code: string }> }>; trainees: One<{ legal_last_name: string; legal_first_name: string; legal_middle_name: string | null; srn: string | null }> }> };
+  const read = async (cols: string) => {
+    const out: Row[] = [];
+    for (let from = 0; from < 5000; from += 1000) {
+      const { data, error } = await db.from("mismo_entries").select(cols).order("done_at", { ascending: false }).range(from, from + 999);
+      if (error) throw new Error(error.message);
+      out.push(...((data ?? []) as unknown as Row[]));
+      if ((data ?? []).length < 1000) break;
+    }
+    return out;
+  };
+  const joins = "enrollment_id,done_at,profiles:done_by(complete_name),enrollments(enrollment_status,batches(batch_number,starts_on,ends_on,courses(code)),trainees(legal_last_name,legal_first_name,legal_middle_name,srn))";
+  const rows = await read(`${joins},batch_number,class_start`).catch(() => read(joins)).catch(() => [] as Row[]);
+  return rows.flatMap((r) => {
+    const e = first(r.enrollments), b = first(e?.batches), t = first(e?.trainees);
+    if (entryMovedFrom({ batchNumber: r.batch_number, classStart: r.class_start }, { batchNumber: b?.batch_number ?? "", startsOn: b?.starts_on ?? "" })) return [];
+    return [{ enrollmentId: r.enrollment_id, lastName: t?.legal_last_name ?? "", firstName: t?.legal_first_name ?? "", middleName: t?.legal_middle_name ?? null, srn: t?.srn ?? null, batchNumber: b?.batch_number ?? "—", code: first(b?.courses)?.code ?? "—", startsOn: b?.starts_on ?? "", endsOn: b?.ends_on ?? "", doneAt: r.done_at, by: first(r.profiles)?.complete_name ?? "—", cancelled: e?.enrollment_status === "Cancelled" }];
+  });
+}
+
 async function loadStaffing(db: Admin, batchIds: string[]) {
   const map = new Map<string, { room: string | null; instructor: string | null }>();
-  const { data: dates } = await db.from("batch_training_dates").select("id,batch_id").in("batch_id", batchIds);
-  if (!dates?.length) return map;
-  const { data: assigns } = await db.from("resource_assignments").select("batch_training_date_id,instructor_id,classroom_id").in("batch_training_date_id", dates.map((d) => d.id));
-  if (!assigns?.length) return map;
+  const dates = await inChunks<{ id: string; batch_id: string }>(batchIds, 100, (part) => db.from("batch_training_dates").select("id,batch_id").in("batch_id", part));
+  if (!dates.length) return map;
+  const assigns = await inChunks<{ batch_training_date_id: string; instructor_id: string | null; classroom_id: string | null }>(dates.map((d) => d.id), 100, (part) => db.from("resource_assignments").select("batch_training_date_id,instructor_id,classroom_id").in("batch_training_date_id", part));
+  if (!assigns.length) return map;
   const [{ data: emps }, { data: rooms }] = await Promise.all([
-    db.from("employees").select("id,complete_name").in("id", assigns.map((a) => a.instructor_id).filter(Boolean)),
-    db.from("classrooms").select("id,name").in("id", assigns.map((a) => a.classroom_id).filter(Boolean)),
+    db.from("employees").select("id,complete_name").in("id", [...new Set(assigns.map((a) => a.instructor_id).filter((x): x is string => !!x))]),
+    db.from("classrooms").select("id,name").in("id", [...new Set(assigns.map((a) => a.classroom_id).filter((x): x is string => !!x))]),
   ]);
   const dateToBatch = new Map(dates.map((d) => [d.id as string, d.batch_id as string]));
   const emp = new Map((emps ?? []).map((e) => [e.id as string, e.complete_name as string]));

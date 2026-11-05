@@ -9,6 +9,7 @@ import { bsNumber, buildBillingRows, statementTotal } from "@/lib/billing-statem
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hardDeleteEnrollment, pruneUnpaidEnrollments, deletePastEmptyBatches } from "@/lib/enrollments";
+import { entryMovedFrom } from "@/lib/mismo";
 import { VALIDATION_MESSAGES, isEmail, isMetaThreadUrl, isPhContactNumber, isSrn, normalizeEmail, normalizeMetaThreadUrl, normalizePhContactNumber, normalizeSrn } from "@/lib/validation";
 import { INSTRUCTION_SENDS, emailResult, instructionRecipient } from "@/lib/instruction-email-status";
 import { emailConfigured, processEmailJobs } from "@/lib/email-jobs";
@@ -208,6 +209,7 @@ const reconcileUndoInput = z.object({ action: z.literal("reconcile-undo"), payme
 const resourcePlanInput = z.object({ action: z.literal("resource-plan-save"), batchId: z.string().uuid(), classroomId: z.string().uuid().nullable(), instructorId: z.string().uuid().nullable(), altInstructorId: z.string().uuid().nullable().optional(), assessorId: z.string().uuid().nullable().optional() });
 // Input Done per trainee (owner, 5 Nov 2026, Design 3).
 const mismoEntryInput = z.object({ action: z.literal("mismo-entry"), enrollmentId: z.string().uuid(), done: z.boolean() });
+const mismoDetailsInput = z.object({ action: z.literal("mismo-details"), enrollmentId: z.string().uuid(), srn: z.string().trim().max(20).optional(), birthdate: z.string().date().optional() });
 const mismoSubmitInput = z.object({ action: z.literal("mismo-submit"), batchId: z.string().uuid(), listDate: z.string().date(), enrollmentIds: z.array(z.string().uuid()).max(200) });
 const certificateIssuanceToggleInput = z.object({ action: z.literal("certificate-issuance-toggle"), enabled: z.boolean() });
 const feedbackSendEmailInput = z.object({ action: z.literal("feedback-send-email"), enrollmentId: z.string().uuid() });
@@ -312,7 +314,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [mismoEntryInput, certificateFormatInput, documentControlsInput, instructionCategorySaveInput, paymentVoidRequestInput, paymentVoidDecideInput, statementIssueInput, statementVoidInput, enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, traineeFacebookInput, admissionRecordInput, documentReprintInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [mismoEntryInput, mismoDetailsInput, certificateFormatInput, documentControlsInput, instructionCategorySaveInput, paymentVoidRequestInput, paymentVoidDecideInput, statementIssueInput, statementVoidInput, enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, traineeFacebookInput, admissionRecordInput, documentReprintInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 /** A proof the trainee sent (29 Oct 2026) backs one payment of that trainee, unless marked Not Valid. Staff-filed proofs return null. */
 async function traineeProofProblem(admin: ReturnType<typeof createSupabaseAdminClient>, proofId: string, traineeId: string) {
@@ -2628,11 +2630,45 @@ export async function POST(request: Request) {
     if (input.action === "mismo-entry") {
       if (!staff.roleCodes.some((r) => ["admin", "mismo_officer"].includes(r))) return NextResponse.json({ error: "Only the MISMO Compliance Officer can record this." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      const { error } = input.done
-        ? await admin.from("mismo_entries").upsert({ enrollment_id: input.enrollmentId, done_by: staff.user.id, done_at: new Date().toISOString() }, { onConflict: "enrollment_id", ignoreDuplicates: true })
-        : await admin.from("mismo_entries").delete().eq("enrollment_id", input.enrollmentId);
+      let error: { message: string } | null = null;
+      if (!input.done) ({ error } = await admin.from("mismo_entries").delete().eq("enrollment_id", input.enrollmentId));
+      else {
+        const { data: enr } = await admin.from("enrollments").select("batches(batch_number,starts_on)").eq("id", input.enrollmentId).maybeSingle();
+        const batch = first((enr as unknown as { batches: { batch_number: string; starts_on: string } | { batch_number: string; starts_on: string }[] | null } | null)?.batches);
+        const tick = { enrollment_id: input.enrollmentId, done_by: staff.user.id, done_at: new Date().toISOString() };
+        const { data: had, error: noSnapshot } = await admin.from("mismo_entries").select("batch_number,class_start").eq("enrollment_id", input.enrollmentId).maybeSingle();
+        // Before 202610290082 there is nothing to compare, and the first tick stands.
+        if (noSnapshot) ({ error } = await admin.from("mismo_entries").upsert(tick, { onConflict: "enrollment_id", ignoreDuplicates: true }));
+        // A double click keeps the first time. A trainee who has since moved is encoded again under the new batch.
+        else if (!had || entryMovedFrom({ batchNumber: had.batch_number as string | null, classStart: had.class_start as string | null }, { batchNumber: batch?.batch_number ?? "", startsOn: batch?.starts_on ?? "" })) ({ error } = await admin.from("mismo_entries").upsert({ ...tick, batch_number: batch?.batch_number ?? null, class_start: batch?.starts_on ?? null }, { onConflict: "enrollment_id" }));
+      }
       if (error) return NextResponse.json({ error: /mismo_entries/.test(error.message) ? "Apply database update 202610290080 first." : error.message }, { status: 400 });
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("admin") ? "admin" : "mismo_officer", action: input.done ? "mismo.input_done" : "mismo.input_undone", record_type: "enrollment", record_id: input.enrollmentId, new_values: { done: input.done } });
+      return NextResponse.json({ ok: true });
+    }
+    // Fills only what is missing; a detail already on record is changed by Registration (owner, 5 Nov 2026).
+    if (input.action === "mismo-details") {
+      if (!staff.roleCodes.some((r) => ["admin", "mismo_officer"].includes(r))) return NextResponse.json({ error: "Only the MISMO Compliance Officer can add these details." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      const { data: enr } = await admin.from("enrollments").select("trainee_id").eq("id", input.enrollmentId).maybeSingle();
+      if (!enr?.trainee_id) return NextResponse.json({ error: "Enrollment not found." }, { status: 404 });
+      const { data: prior } = await admin.from("trainees").select("srn,birthdate").eq("id", enr.trainee_id).maybeSingle();
+      const next: { srn?: string; birthdate?: string } = {};
+      if (input.srn && !prior?.srn) {
+        const srn = normalizeSrn(input.srn);
+        if (!srn) return NextResponse.json({ error: VALIDATION_MESSAGES.srn }, { status: 400 });
+        const { data: clash } = await admin.from("trainees").select("trainee_number").eq("srn", srn).neq("id", enr.trainee_id).limit(1).maybeSingle();
+        if (clash) return NextResponse.json({ error: `This SRN is already on trainee ${clash.trainee_number}.` }, { status: 400 });
+        next.srn = srn;
+      }
+      if (input.birthdate && !prior?.birthdate) {
+        if (input.birthdate >= new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date())) return NextResponse.json({ error: "The birth date must be in the past." }, { status: 400 });
+        next.birthdate = input.birthdate;
+      }
+      if (!Object.keys(next).length) return NextResponse.json({ error: "Enter a missing detail. Details already on record stay as they are." }, { status: 400 });
+      const { error } = await admin.from("trainees").update(next).eq("id", enr.trainee_id);
+      if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("admin") ? "admin" : "mismo_officer", action: "trainee.details_completed", record_type: "trainee", record_id: enr.trainee_id, prior_values: { srn: prior?.srn ?? null, birthdate: prior?.birthdate ?? null }, new_values: next });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "mismo-submit") {

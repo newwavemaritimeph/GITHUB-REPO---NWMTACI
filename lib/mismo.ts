@@ -15,6 +15,8 @@ export type MismoTrainee = {
   companyCharge?: boolean;
   /** When the officer ticked Encoded, and the last payment (5 Nov 2026). */
   entryAt?: string | null; lastPaidAt?: string | null;
+  /** Encoded under another batch or start date: the tick no longer counts, and this names what it was under. */
+  movedFrom?: string | null;
 };
 export type MismoBatch = { id: string; batchNumber: string; courseName: string; courseCode: string; startsOn: string; endsOn: string; room: string | null; instructor: string | null; trainees: MismoTrainee[]; submittedAt: string | null; submittedCount: number | null;
   /** The day its 11:00 AM and 4:00 PM cut-offs are taken: its first class day in the period. */
@@ -51,22 +53,53 @@ const csvRow = (t: MismoTrainee, b: MismoBatch) => [t.lastName, t.firstName, t.m
 export function mismoCsv(b: MismoBatch) {
   return [CSV_HEAD, ...finalList(b).map((t) => csvRow(t, b))].map((r) => r.map(csvCell).join(",")).join("\r\n");
 }
-/** CSV of every trainee paid so far, across the batches in the period. */
-export function mismoPaidCsv(batches: MismoBatch[]) {
-  return [CSV_HEAD, ...batches.flatMap((b) => b.trainees.filter((t) => !owesAt(t, "now")).map((t) => csvRow(t, b)))].map((r) => r.map(csvCell).join(",")).join("\r\n");
+/** CSV of the rows on screen, in their order. */
+export function mismoRowsCsv(rows: MismoRow[]) {
+  return [CSV_HEAD, ...rows.map(({ b, t }) => csvRow(t, b))].map((r) => r.map(csvCell).join(",")).join("\r\n");
 }
 /** One trainee, tab separated, for pasting. */
 export const mismoCopyText = (t: MismoTrainee, b: MismoBatch) => csvRow(t, b).join("\t");
 
-/** Encoded ticks counted per batch and Manila day, for Submissions. */
-export type EntryRow = { doneAt: string; by: string; batchId: string; batchNumber: string; code: string };
-export type EntryDay = { batchId: string; day: string; batchNumber: string; code: string; count: number; lastAt: string; by: string };
-export function entryDays(rows: EntryRow[]): EntryDay[] {
-  const days = new Map<string, EntryDay>();
-  for (const r of rows) {
-    const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(r.doneAt)), key = `${r.batchId}|${day}`, cur = days.get(key);
-    if (!cur) days.set(key, { batchId: r.batchId, day, batchNumber: r.batchNumber, code: r.code, count: 1, lastAt: r.doneAt, by: r.by });
-    else { cur.count += 1; if (r.doneAt > cur.lastAt) { cur.lastAt = r.doneAt; cur.by = r.by; } }
-  }
-  return [...days.values()];
+/** For Encoding looks this far back, so nothing is missed, and this far ahead, for upcoming batches (owner, 5 Nov 2026). */
+export const MISMO_BACK_DAYS = 180, MISMO_AHEAD_DAYS = 180;
+
+export type MismoRow = { b: MismoBatch; t: MismoTrainee };
+/** The officer's to-do list: fully paid or on Company Charge, and not yet encoded. */
+export const mismoWork = (batches: MismoBatch[]) => batches.map((b) => ({ ...b, trainees: b.trainees.filter((t) => mismoListed(t) && !t.entryAt) })).filter((b) => b.trainees.length);
+
+/** What a tick is worth once the trainee has moved: the old batch, or the old start date when the same batch moved. Null when it still holds. */
+export function entryMovedFrom(entry: { batchNumber?: string | null; classStart?: string | null }, current: { batchNumber: string; startsOn: string }) {
+  if (!entry.batchNumber) return null;
+  if (entry.batchNumber !== current.batchNumber) return entry.batchNumber;
+  if (!entry.classStart || entry.classStart === current.startsOn) return null;
+  return new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${entry.classStart}T00:00:00Z`));
+}
+
+/** A trainee already encoded, for the Encoded tab. */
+export type MismoEntry = { enrollmentId: string; lastName: string; firstName: string; middleName: string | null; srn: string | null; batchNumber: string; code: string; startsOn: string; endsOn: string; doneAt: string; by: string; cancelled: boolean };
+
+export const MISMO_WHENS = ["All Dates", "Past Classes", "Today", "Upcoming"] as const;
+export type MismoWhen = (typeof MISMO_WHENS)[number];
+/** A class by today's date. A class in session counts as Today. */
+export const whenOf = (startsOn: string, endsOn: string, today: string): Exclude<MismoWhen, "All Dates"> => (endsOn < today ? "Past Classes" : startsOn > today ? "Upcoming" : "Today");
+
+export type MismoSort = "date" | "batch" | "course" | "name" | "at";
+export type MismoFilter = { q: string; course: string; batch: string; when: MismoWhen };
+export const NO_FILTER: MismoFilter = { q: "", course: "", batch: "", when: "All Dates" };
+/** What the tool bar works on. `at` is the time the Sort's last choice uses: paid on, or encoded on. */
+export type MismoLine = { name: string; srn: string; code: string; batchNumber: string; startsOn: string; endsOn: string; at: string };
+const fullName = (x: { lastName: string; firstName: string; middleName: string | null }) => `${x.lastName}, ${x.firstName}${x.middleName ? ` ${x.middleName}` : ""}`;
+export const lineOfRow = ({ b, t }: MismoRow): MismoLine => ({ name: fullName(t), srn: t.srn ?? "", code: b.courseCode, batchNumber: b.batchNumber, startsOn: b.startsOn, endsOn: b.endsOn, at: t.lastPaidAt ?? "" });
+export const lineOfEntry = (e: MismoEntry): MismoLine => ({ name: fullName(e), srn: e.srn ?? "", code: e.code, batchNumber: e.batchNumber, startsOn: e.startsOn, endsOn: e.endsOn, at: e.doneAt });
+
+export const mismoSearched = (l: MismoLine, q: string) => { const term = q.trim().toLowerCase(); return !term || `${l.name} ${l.srn} ${l.code} ${l.batchNumber}`.toLowerCase().includes(term); };
+/** The rows the search, course, batch and class date let through. `ignoreWhen` gives the counts inside the Class Date dropdown. */
+export const mismoFiltered = <T,>(rows: T[], lineOf: (row: T) => MismoLine, f: MismoFilter, today: string, ignoreWhen = false) => rows.filter((row) => {
+  const l = lineOf(row);
+  return mismoSearched(l, f.q) && (!f.course || l.code === f.course) && (!f.batch || l.batchNumber === f.batch) && (ignoreWhen || f.when === "All Dates" || whenOf(l.startsOn, l.endsOn, today) === f.when);
+});
+/** Class date runs oldest first: missed classes, then today, then upcoming. Ties go by batch, then name. */
+export function mismoSorted<T>(rows: T[], sort: MismoSort, lineOf: (row: T) => MismoLine) {
+  const main = (a: MismoLine, z: MismoLine) => (sort === "date" ? a.startsOn.localeCompare(z.startsOn) : sort === "batch" ? a.batchNumber.localeCompare(z.batchNumber) : sort === "course" ? a.code.localeCompare(z.code) : sort === "name" ? a.name.localeCompare(z.name) : z.at.localeCompare(a.at));
+  return rows.map((row) => ({ row, l: lineOf(row) })).sort((a, z) => main(a.l, z.l) || a.l.batchNumber.localeCompare(z.l.batchNumber) || a.l.name.localeCompare(z.l.name)).map((x) => x.row);
 }
