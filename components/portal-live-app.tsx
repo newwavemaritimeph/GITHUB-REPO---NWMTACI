@@ -200,8 +200,8 @@ const CASHIER_TABS:TopTab[]=[
 const GROUP_LABELS:Partial<Record<NavGroup,string>>={"Payables & cash":"Payables and cash"};
 // "Batch Schedules" reads "Schedules" (owner, 3 Nov 2026); the module key stays the same.
 const shownAs=(label:string)=>label==="Batch schedules"?"Schedules":label;
-// The report keeps the owner's spelling: titleCase would capitalize "from".
-const menuLabel=(label:string)=>label==="Sales from endorsed courses"?"Sales from Endorsed Courses":tcl(shownAs(label));
+// The owner's name for this report (5 Nov 2026); the module key stays, because "Endorsed courses" is another module.
+const menuLabel=(label:string)=>label==="Sales from endorsed courses"?"Endorsed Courses":tcl(shownAs(label));
 const ACCOUNTING_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
   // Reprints of receipts and TARs live in the Trainee Account (owner, 3 Nov 2026).

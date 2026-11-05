@@ -583,7 +583,7 @@ export function EndorsedStatements({ report }: { report: EndorsedSales }) {
 }
 
 /**
- * Sales from Endorsed Courses (owner, 5 Nov 2026, Design 2 · Center Statements): by training date, so the
+ * Endorsed Courses report (owner, 5 Nov 2026, Design 2 · Center Statements): sales by training date, so the
  * totals agree with the Cash and Sales Summary. Accounting and the Admin; PDF and Excel match the screen.
  */
 export function EndorsedSalesReport() {
@@ -595,7 +595,7 @@ export function EndorsedSalesReport() {
   const q = custom ? `from=${from}&to=${to}` : `period=${period}&end=${end}`;
   const { data: s, error } = useJson<EndorsedSales>(ready ? `/api/staff/endorsed-sales?${q}` : null);
   return <div className="portal-page cx ac">
-    <div className="cx-head"><div><span className="portal-eyebrow">Accounting · Reports</span><h1>Sales from Endorsed Courses</h1></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting · Reports</span><h1>Endorsed Courses</h1></div>
       {ready && <div className="ac-controls"><a className="portal-secondary" href={`/api/documents/endorsed-sales?${q}&format=xlsx`}>Download Excel</a><a className="portal-primary" href={`/api/documents/endorsed-sales?${q}`} target="_blank" rel="noreferrer">Print PDF</a></div>}</div>
     <div className="pd-bar cs-bar"><span className="cx-seg">{[...PERIODS, "Custom" as const].map((p) => <button key={p} type="button" className={period === p ? "on" : ""} onClick={() => setPeriod(p)}>{p}</button>)}</span>
       {period === "Custom" ? <>

@@ -3,7 +3,7 @@ import { PERIODS, periodStart, periodTitle, type Period } from "@/lib/accounting
 import { all, chunks, one } from "@/lib/finance-summary";
 
 /**
- * Sales from Endorsed Courses (owner, 5 Nov 2026, Design 2 · Center Statements): one ledger per partnered
+ * The Endorsed Courses report (owner, 5 Nov 2026, Design 2 · Center Statements): one ledger per partnered
  * center, by training date. Uses the same rule as the Cash and Sales Summary (endorsed = has a partner
  * offer; training date = batch start, else the scheduled date; only Cancelled left out), so the totals agree.
  */

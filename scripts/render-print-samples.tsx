@@ -196,9 +196,9 @@ await save("14-payslip.pdf", "Payslip", await createPayslipPdf({
   grossCentavos: 1335000, totalDeductionsCentavos: 139500, netCentavos: 1195500, preparedBy: "Kat Garcia", logoBytes,
 }));
 
-// ---- Sales from Endorsed Courses ----------------------------------------------------
+// ---- Endorsed Courses report ---------------------------------------------------------
 const endorsedRow = (id: string, trainee: string, center: string, code: string, trainingDate: string, fee: number, paid: number, rebate: number, share: number, centerState: "Paid" | "Owed", got: boolean) => ({ id, trainee, traineeNo: `NWMTACI-000${id}`, enrollmentNo: `ENR-2026-000${id}`, status: "Enrolled", center, code, course: code, trainingDate, fee, collected: paid, balance: fee - paid, payable: fee, centerPaid: centerState === "Paid" ? fee : 0, centerState, rebate, rebateReceived: got ? rebate : 0, rebateState: got ? "Received" as const : "Due" as const, share, keeps: rebate - share });
-await save("15-sales-from-endorsed-courses.pdf", "Sales from Endorsed Courses", await createEndorsedSalesPdf({ title: "November 2026 (to date)", from: "2026-11-01", to: "2026-11-05", ...endorsedSales([
+await save("15-endorsed-courses.pdf", "Endorsed Courses", await createEndorsedSalesPdf({ title: "November 2026 (to date)", from: "2026-11-01", to: "2026-11-05", ...endorsedSales([
   endorsedRow("1201", "DELA CRUZ, Juan P.", "Nautical Options", "BT", "2026-11-05", 550000, 550000, 130000, 100000, "Owed", false), endorsedRow("1202", "REYES, Maria L.", "Nautical Options", "AFF", "2026-11-05", 480000, 240000, 90000, 0, "Owed", false),
   endorsedRow("1203", "TORRES, Noel A.", "Nautical Options", "MEFA", "2026-11-03", 380000, 380000, 70000, 50000, "Paid", false), endorsedRow("1204", "SANTOS, Paolo R.", "Altitude Maritime", "BT", "2026-11-04", 520000, 520000, 100000, 0, "Owed", false),
   endorsedRow("1205", "BAUTISTA, Rey S.", "Altitude Maritime", "SDSD", "2026-11-02", 280000, 280000, 50000, 0, "Paid", true), endorsedRow("1206", "GARCIA, Liza M.", "Mariana", "II-4", "2026-11-04", 650000, 650000, 150000, 100000, "Paid", false),

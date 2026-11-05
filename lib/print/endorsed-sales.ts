@@ -8,7 +8,7 @@ const COLUMNS: { head: string; w: number; right?: boolean }[] = [
   { head: "Center", w: 0.08 }, { head: "Rebate", w: 0.07 }, { head: "Rebate Amount", w: 0.08, right: true }, { head: "Agency Share", w: 0.08, right: true }, { head: "New Wave Keeps", w: 0.08, right: true },
 ];
 
-/** Sales from Endorsed Courses, A4 landscape, one ledger per center (Design 2) under Header 3. Amounts in PHP. */
+/** The Endorsed Courses report, A4 landscape, one ledger per center (Design 2) under Header 3. Amounts in PHP. */
 export async function createEndorsedSalesPdf(s: Report, printed: string, logoBytes?: Uint8Array) {
   const pdf = await PDFDocument.create();
   const reg = await pdf.embedFont(StandardFonts.Helvetica), bold = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -24,7 +24,7 @@ export async function createEndorsedSalesPdf(s: Report, printed: string, logoByt
 
   // Header 3 "Report First" (owner's choice, 4 Nov 2026), as on the Cashier Summary Report.
   const header = (continued: boolean) => {
-    text(continued ? "Sales from Endorsed Courses (continued)" : "Sales from Endorsed Courses", M, y - 17, continued ? 13 : 20, bold, navy);
+    text(continued ? "Endorsed Courses (continued)" : "Endorsed Courses", M, y - 17, continued ? 13 : 20, bold, navy);
     text(`${s.title} - ${day(s.from)} to ${day(s.to)} - by training date - amounts in PHP - printed ${day(printed)}`, M, y - 31, 9, bold, orange);
     const logoS = 34, detailsX = W - M - (logo ? logoS + 7 : 0);
     if (logo) { const d = logo.scaleToFit(logoS, logoS); page.drawImage(logo, { x: W - M - logoS + (logoS - d.width) / 2, y: y - logoS + (logoS - d.height) / 2, width: d.width, height: d.height }); }

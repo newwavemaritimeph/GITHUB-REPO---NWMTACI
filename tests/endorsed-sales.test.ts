@@ -8,7 +8,7 @@ const row = (over: Partial<EndorsedRow>): EndorsedRow => ({
   fee: 550000, collected: 550000, balance: 0, payable: 550000, centerPaid: 0, centerState: "Owed", rebate: 130000, rebateReceived: 0, rebateState: "Due", share: 100000, keeps: 30000, ...over,
 });
 
-describe("Sales from Endorsed Courses", () => {
+describe("Endorsed Courses report", () => {
   const rows = [
     row({ id: "a" }),
     row({ id: "b", trainee: "REYES, Maria L.", trainingDate: "2026-11-03", fee: 480000, collected: 240000, balance: 240000, payable: 480000, centerPaid: 480000, centerState: "Paid", rebate: 90000, rebateReceived: 90000, rebateState: "Received", share: 0, keeps: 90000 }),

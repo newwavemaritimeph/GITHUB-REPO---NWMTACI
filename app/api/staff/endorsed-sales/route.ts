@@ -5,7 +5,7 @@ import { buildEndorsedSales, endorsedRange } from "@/lib/endorsed-sales";
 
 export const runtime = "nodejs";
 
-/** Sales from Endorsed Courses: ?period&end or ?from&to. Accounting / Admin. */
+/** The Endorsed Courses report: ?period&end or ?from&to. Accounting / Admin. */
 export async function GET(request: Request) {
   const staff = await requireStaff();
   if (!staff || !staff.roleCodes.some((role) => ["admin", "accounting"].includes(role))) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
