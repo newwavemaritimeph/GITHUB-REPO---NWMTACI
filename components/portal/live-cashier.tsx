@@ -68,7 +68,7 @@ export function tarState(data: PortalData, traineeId: string, groupIds?: string[
 export function ReceiptButton({ data, paymentId, reload, className = "portal-secondary" }: { data: PortalData; paymentId: string; reload?: () => Promise<void>; className?: string }) {
   const printed = data.receiptPrints?.[paymentId] ?? 0;
   if (printed >= 2) return null;
-  return <a className={className} href={`/portal/payment-receipt/${paymentId}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload?.(), 2500)}>Print Receipt</a>;
+  return <a className={className} href={`/portal/payment-receipt/${paymentId}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload?.(), 2500)}>Receipt</a>;
 }
 
 /** Print TAR (owner, 8 Oct 2026): prints twice; after the second print the button is gone. Registration prints it (owner, 20 Oct 2026). */

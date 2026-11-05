@@ -1,0 +1,261 @@
+<title>MISMO Officer Dashboard</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;700&display=swap">
+<style>
+/* Same sizes as the live portal: table text 13px, tile figures 17px. Sample names only. */
+:root {
+  --bg: #f2f6f9; --fg: #123f63; --ink: #0f2a3d; --muted: #4d6a7d; --line: #d5e1e9; --panel: #ffffff; --thead: #e6f5fa; --tab: #e2ebf1; --tab-fg: #123f63; --tab-on: #123f63; --tab-on-fg: #ffffff; --accent: #0571d0; --focus: #f25615; --bar: #123f63; --veil: rgba(11, 31, 51, .45); --track: #dfe9ef;
+  --ok: #0a7a3e; --ok-bg: #e4f5ec; --warn: #b23d0c; --warn-bg: #fdeee6; --info: #0562b4; --info-bg: #e3f0fb; --bad: #b42318; --bad-bg: #fdecea;
+  --font: "Geist", "Segoe UI", Arial, sans-serif; --mono: "Geist Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0e1a24; --fg: #e4eef5; --ink: #e4eef5; --muted: #9db4c3; --line: #2a3d4c; --panel: #162734; --thead: #1e3444; --tab: #223544; --tab-fg: #d6e4ee; --tab-on: #35ccfa; --tab-on-fg: #082030; --accent: #6db6f2; --bar: #1e3444; --veil: rgba(0, 0, 0, .6); --track: #2a3d4c; --ok: #5fd39a; --ok-bg: #123527; --warn: #ff9a6b; --warn-bg: #3a2218; --info: #8cc4f5; --info-bg: #15304a; --bad: #ff8f85; --bad-bg: #3b1d1a; color-scheme: dark; } }
+:root[data-theme="dark"] { --bg: #0e1a24; --fg: #e4eef5; --ink: #e4eef5; --muted: #9db4c3; --line: #2a3d4c; --panel: #162734; --thead: #1e3444; --tab: #223544; --tab-fg: #d6e4ee; --tab-on: #35ccfa; --tab-on-fg: #082030; --accent: #6db6f2; --bar: #1e3444; --veil: rgba(0, 0, 0, .6); --track: #2a3d4c; --ok: #5fd39a; --ok-bg: #123527; --warn: #ff9a6b; --warn-bg: #3a2218; --info: #8cc4f5; --info-bg: #15304a; --bad: #ff8f85; --bad-bg: #3b1d1a; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.45; }
+button, select, input { font: inherit; color: inherit; }
+button:focus-visible, select:focus-visible, input:focus-visible, summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.top { background: var(--bar); color: #fff; padding-block: 12px 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.top-in, .wrap { max-width: 1160px; margin: 0 auto; }
+.brand { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: #cfe3ef; }
+.brand b { color: #fff; font-size: 15px; font-weight: 600; }
+.proto { background: var(--focus); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; padding: 2px 7px; border-radius: 5px; margin-left: 8px; }
+.tabs { display: flex; gap: 2px; margin-top: 10px; overflow-x: auto; scrollbar-width: none; }
+.tabs span { color: #c3dbea; font-size: 14px; font-weight: 500; padding: 9px 14px; border-radius: 9px 9px 0 0; white-space: nowrap; }
+.tabs span.on { background: var(--bg); color: var(--ink); font-weight: 600; }
+.page { padding-block: 16px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { display: flex; flex-direction: column; gap: 12px; }
+.eyebrow { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { margin: 0; font-size: 22px; line-height: 1.2; font-weight: 700; color: var(--fg); }
+h2 { margin: 0; font-size: 15px; line-height: 1.3; font-weight: 700; color: var(--fg); }
+.seg { display: inline-flex; align-self: flex-start; flex-wrap: wrap; gap: 3px; background: var(--tab); padding: 3px; border-radius: 9px; max-width: 100%; }
+.seg button { font-size: 13px; font-weight: 600; min-height: 32px; padding: 0 11px; border: 0; border-radius: 6px; background: transparent; color: var(--tab-fg); cursor: pointer; }
+.seg button.on { background: var(--tab-on); color: var(--tab-on-fg); }
+#body { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; min-width: 0; overflow: hidden; }
+.ph { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 12px; padding: 10px 14px; }
+.ph small { display: block; color: var(--muted); font-size: 12.5px; font-weight: 400; }
+.tw { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: var(--thead); color: var(--fg); font-size: 12px; font-weight: 700; text-align: left; padding: 7px 10px; white-space: nowrap; }
+td { padding: 7px 10px; border-top: 1px solid var(--line); vertical-align: middle; }
+td small { display: block; color: var(--muted); font-size: 11.5px; }
+td.mono, .mono { font-family: var(--mono); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.chip { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
+.chip.ok { background: var(--ok-bg); color: var(--ok); }
+.chip.warn { background: var(--warn-bg); color: var(--warn); }
+.chip.info { background: var(--info-bg); color: var(--info); }
+.chip.bad { background: var(--bad-bg); color: var(--bad); }
+.btn { min-height: 32px; padding: 0 11px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn.primary { background: var(--focus); border-color: var(--focus); color: #fff; }
+.btn.small { min-height: 28px; padding: 0 9px; font-size: 12.5px; }
+.btn:disabled { opacity: .45; cursor: default; }
+.acts { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.tile { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-width: 0; }
+.tile span { display: block; font-size: 12.5px; color: var(--muted); }
+.tile b { display: block; font-size: 17px; font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; }
+.tile.key { background: var(--warn-bg); border-color: transparent; }
+.tile.key span, .tile.key b { color: var(--warn); }
+.tile.alert b { color: var(--bad); }
+.strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.strip > div { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 13px; min-width: 0; }
+.strip b { color: var(--fg); }
+.progress { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--fg); white-space: nowrap; }
+.track { width: 110px; height: 7px; border-radius: 99px; background: var(--track); overflow: hidden; }
+.track i { display: block; height: 100%; background: var(--ok); border-radius: 99px; }
+.tick { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.tick input { width: 16px; height: 16px; margin: 0; accent-color: var(--ok); }
+tr.done td { color: var(--muted); }
+tr.done td b { font-weight: 500; }
+details { border-top: 1px solid var(--line); }
+summary { padding: 8px 14px; font-size: 13px; font-weight: 600; color: var(--fg); cursor: pointer; }
+.board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: start; }
+.col { background: var(--tab); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.col h2 { padding: 2px 4px 4px; display: flex; justify-content: space-between; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 13px; display: flex; flex-direction: column; gap: 3px; }
+.card small { color: var(--muted); font-size: 11.5px; }
+.card .acts { margin-top: 3px; }
+.bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 14px 10px; }
+.fchips { display: flex; flex-wrap: wrap; gap: 4px; }
+.fchips button { font-size: 12.5px; font-weight: 600; min-height: 28px; padding: 0 9px; border-radius: 99px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
+.fchips button.on { background: var(--tab-on); border-color: var(--tab-on); color: var(--tab-on-fg); }
+.field { min-height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 5px 9px; font-size: 13px; background: var(--panel); min-width: 0; }
+.grow { flex: 1 1 180px; }
+.pager { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; padding: 8px 14px; border-top: 1px solid var(--line); font-size: 12.5px; color: var(--muted); }
+.veil { position: fixed; inset: 0; background: var(--veil); display: grid; place-items: center; padding: 16px; z-index: 5; overflow-y: auto; }
+.win { background: var(--panel); border-radius: 12px; width: min(720px, 100%); max-height: 100%; overflow-y: auto; border: 1px solid var(--line); }
+.win-h { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.win-h small { display: block; color: var(--muted); font-size: 12.5px; font-weight: 400; }
+.x { border: 0; background: none; font-size: 20px; line-height: 1; cursor: pointer; color: var(--muted); padding: 2px 6px; }
+.msg { padding: 8px 11px; border-radius: 8px; background: var(--info-bg); color: var(--info); font-size: 13px; font-weight: 500; }
+ol.q { margin: 0; padding: 4px 14px 14px 32px; font-size: 13.5px; display: flex; flex-direction: column; gap: 8px; }
+ol.q b { color: var(--fg); }
+@media (max-width: 760px) {
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .strip, .board { grid-template-columns: minmax(0, 1fr); }
+}
+</style>
+
+<header class="top"><div class="top-in">
+  <div class="brand"><div><b>New Wave Maritime</b><span class="proto">PROTOTYPE</span></div><span>Working as MISMO Compliance Officer · Sample Trainees</span></div>
+  <div class="tabs" id="tabs"></div>
+</div></header>
+<main class="page"><div class="wrap">
+  <div><span class="eyebrow">MISMO Compliance Officer</span><h1 id="title">Dashboard</h1></div>
+  <div class="seg" id="views" role="tablist" aria-label="Prototype views"></div>
+  <div id="body"></div>
+</div></main>
+<div id="modal"></div>
+
+<script>
+(function () {
+  var BATCHES = [
+    { id: "b1", no: "26-609-141", code: "UBT-PSSR", name: "Updating Course on BT-PSSR", dates: "Nov 5, 2026", room: "Room 101", inst: "Capt. R. Santos" },
+    { id: "b2", no: "26-507-024", code: "PSCMT", name: "Crowd Management", dates: "Nov 4 - 5, 2026", room: "Room 204", inst: "Capt. L. Reyes" },
+    { id: "b3", no: "26-508-024", code: "PSCMHBT", name: "Crisis Management", dates: "Nov 5 - 7, 2026", room: "Room 305", inst: "C/E M. Garcia" }
+  ];
+  // [batch, last, first, middle, birth date, SRN, rank, paid at, balance, done]
+  var T = [
+    ["b1", "AQUINO", "Noel", "Reyes", "1988-02-14", "1234501", "Able Seaman", "8:12 AM", "", true],
+    ["b1", "BAUTISTA", "Carlo", "Lim", "1992-07-03", "1234502", "Oiler", "8:30 AM", "", true],
+    ["b1", "CASTRO", "Leo", "Tan", "1990-11-21", "1234503", "Bosun", "9:05 AM", "", false],
+    ["b1", "DELA CRUZ", "Juan", "Perez", "1995-05-12", "1234504", "Ordinary Seaman", "9:40 AM", "", false],
+    ["b1", "FLORES", "Arvin", "Cruz", "1987-09-30", "", "Messman", "10:15 AM", "", false],
+    ["b1", "GARCIA", "Miguel", "Sy", "1993-01-08", "1234506", "Wiper", "", "₱650.00", false],
+    ["b2", "LOPEZ", "Ramil", "Ong", "1985-04-17", "1234507", "Chief Cook", "Nov 4", "", true],
+    ["b2", "MENDOZA", "Ryan", "Go", "1991-12-02", "1234508", "Second Mate", "Nov 4", "", false],
+    ["b2", "NAVARRO", "Gino", "Uy", "1989-06-25", "1234509", "Third Engineer", "8:50 AM", "", false],
+    ["b2", "PASCUAL", "Ian", "Chua", "1994-03-19", "1234510", "Able Seaman", "", "₱1,300.00", false],
+    ["b3", "RAMOS", "Dennis", "Lee", "1986-08-11", "1234511", "Chief Mate", "Nov 4", "", false],
+    ["b3", "SANTOS", "Mark", "Yap", "1990-10-05", "1234512", "Master", "9:22 AM", "", false],
+    ["b3", "TORRES", "Jomar", "Dy", "1992-02-27", "1234513", "Second Engineer", "", "₱900.00", false],
+    ["b3", "VILLANUEVA", "Rico", "Sia", "1984-12-16", "1234514", "Chief Engineer", "10:48 AM", "", true]
+  ].map(function (r, i) { return { i: i, b: r[0], last: r[1], first: r[2], mid: r[3], bd: r[4], srn: r[5], rank: r[6], paid: r[7], bal: r[8], done: r[9] }; });
+  var SCHEDULES = [
+    ["26-609-141", "UBT-PSSR", "Nov 5, 2026", 6, 18, "Ongoing"], ["26-507-024", "PSCMT", "Nov 4 - 5, 2026", 4, 20, "Ongoing"], ["26-508-024", "PSCMHBT", "Nov 5 - 7, 2026", 4, 20, "Ongoing"],
+    ["26-609-142", "UBT-PSSR", "Nov 6, 2026", 24, 0, "Full"], ["26-506-024", "STPPDSPPS", "Nov 9, 2026", 11, 13, "Open"], ["26-507-025", "PSCMT", "Nov 10 - 11, 2026", 9, 15, "Open"],
+    ["26-508-025", "PSCMHBT", "Nov 12 - 14, 2026", 7, 17, "Open"], ["CCMD0087", "CCMD", "Nov 9 - 11, 2026", 14, 10, "Open"]
+  ];
+  var VIEWS = [["design-1", "Design 1 · To Input"], ["design-2", "Design 2 · Batch Board"], ["design-3", "Design 3 · One List"], ["schedules", "Schedules"], ["confirm", "To Confirm"]];
+  var view = "design-1", filter = "To Input", q = "", page = 1, schedFilter = "All", openBatch = null, note = "";
+  var body = document.getElementById("body"), modal = document.getElementById("modal");
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+  var batchOf = function (id) { return BATCHES.filter(function (b) { return b.id === id; })[0]; };
+  var isPaid = function (t) { return !!t.paid; };
+  var missing = function (t) { return isPaid(t) && !t.srn; };
+  var state = function (t) { return !isPaid(t) ? "Not Paid Yet" : missing(t) ? "Missing Details" : t.done ? "Done" : "To Input"; };
+  var count = function (s, b) { return T.filter(function (t) { return state(t) === s && (!b || t.b === b); }).length; };
+  var nameOf = function (t) { return t.last + ", " + t.first + " " + t.mid; };
+
+  function tiles() {
+    return '<div class="tiles"><div class="tile key"><span>To Input</span><b>' + count("To Input") + '</b></div><div class="tile"><span>Input Done</span><b>' + count("Done") + '</b></div><div class="tile ' + (count("Not Paid Yet") ? "alert" : "") + '"><span>Not Paid Yet</span><b>' + count("Not Paid Yet") + '</b></div><div class="tile ' + (count("Missing Details") ? "alert" : "") + '"><span>Missing Details</span><b>' + count("Missing Details") + "</b></div></div>";
+  }
+  function strip() {
+    return '<div class="strip"><div><span><b>11:00 AM</b> · ' + count("Not Paid Yet") + ' Not Settled</span><button type="button" class="btn small" data-sample="the unpaid list for the instructor">Print for the Instructor</button></div><div><span><b>4:00 PM</b> · Payment Cut-Off for Today</span><button type="button" class="btn small" data-sample="the Excel file for MARINA">Excel / CSV</button></div></div>';
+  }
+  function tickCell(t) {
+    if (!isPaid(t)) return '<span class="chip bad">' + esc(t.bal) + " Due</span>";
+    if (missing(t)) return '<span class="chip warn">Missing SRN</span>';
+    return '<label class="tick"><input type="checkbox" data-done="' + t.i + '"' + (t.done ? " checked" : "") + "> Input Done</label>";
+  }
+  function row(t, n, withBatch) {
+    return '<tr class="' + (t.done ? "done" : "") + '"><td class="mono">' + n + "</td><td><b>" + esc(nameOf(t)) + "</b></td>" + (withBatch ? "<td>" + esc(batchOf(t.b).code) + "<small>" + esc(batchOf(t.b).no) + "</small></td>" : "") + '<td class="mono">' + esc(t.bd) + '</td><td class="mono">' + esc(t.srn || "—") + "</td><td>" + esc(t.rank) + "</td><td>" + esc(t.paid || "—") + '</td><td><button type="button" class="btn small" data-copy="' + t.i + '"' + (isPaid(t) && t.srn ? "" : " disabled") + ">Copy</button></td><td>" + tickCell(t) + "</td></tr>";
+  }
+  var HEAD = function (withBatch) { return "<thead><tr><th>#</th><th>Trainee</th>" + (withBatch ? "<th>Batch</th>" : "") + "<th>Birth Date</th><th>SRN</th><th>Rank</th><th>Paid</th><th></th><th>MARINA MISMO</th></tr></thead>"; };
+  function progress(b) {
+    var ready = T.filter(function (t) { return t.b === b.id && isPaid(t); }), done = ready.filter(function (t) { return t.done; }).length, pct = ready.length ? Math.round(done / ready.length * 100) : 0;
+    return '<span class="progress"><span class="track" role="img" aria-label="' + done + " of " + ready.length + ' done"><i style="width:' + pct + '%"></i></span>' + done + " of " + ready.length + " Done</span>";
+  }
+  function design1() {
+    return tiles() + strip() + BATCHES.map(function (b) {
+      var paid = T.filter(function (t) { return t.b === b.id && isPaid(t); }), unpaid = T.filter(function (t) { return t.b === b.id && !isPaid(t); });
+      return '<section class="panel"><div class="ph"><div><h2>' + esc(b.no) + " · " + esc(b.code) + "</h2><small>" + esc(b.dates) + " · " + esc(b.room) + " · " + esc(b.inst) + '</small></div><div class="acts">' + progress(b) + '<button type="button" class="btn small" data-sample="this batch\'s Excel file">Excel / CSV</button></div></div><div class="tw"><table>' + HEAD(false) + "<tbody>" + paid.map(function (t, i) { return row(t, i + 1, false); }).join("") + "</tbody></table></div>" +
+        (unpaid.length ? "<details><summary>Not Paid Yet · " + unpaid.length + '</summary><div class="tw"><table><tbody>' + unpaid.map(function (t) { return "<tr><td><b>" + esc(nameOf(t)) + "</b></td><td>" + esc(t.rank) + '</td><td><span class="chip bad">' + esc(t.bal) + " Due</span></td></tr>"; }).join("") + "</tbody></table></div></details>" : "") + "</section>";
+    }).join("");
+  }
+  function card(t) {
+    var s = state(t), b = batchOf(t.b);
+    return '<div class="card"><b>' + esc(nameOf(t)) + "</b><small>" + esc(b.code) + " · " + esc(b.no) + "</small>" + (s === "Not Paid Yet" ? '<span><span class="chip bad">' + esc(t.bal) + " Due</span></span>" : s === "Missing Details" ? '<span><span class="chip warn">Missing SRN</span></span>' : '<small class="mono">' + esc(t.bd) + " · SRN " + esc(t.srn) + '</small><div class="acts"><button type="button" class="btn small" data-copy="' + t.i + '">Copy</button><button type="button" class="btn small' + (s === "To Input" ? " primary" : "") + '" data-flip="' + t.i + '">' + (s === "To Input" ? "Input Done" : "Undo") + "</button></div>") + "</div>";
+  }
+  function design2() {
+    var cols = [["Not Paid Yet", ["Not Paid Yet", "Missing Details"]], ["To Input", ["To Input"]], ["Done", ["Done"]]];
+    return tiles() + strip() + '<div class="board">' + cols.map(function (c) {
+      var list = T.filter(function (t) { return c[1].indexOf(state(t)) >= 0; });
+      return '<div class="col"><h2>' + c[0] + "<span>" + list.length + "</span></h2>" + (list.map(card).join("") || '<div class="card"><small>None</small></div>') + "</div>";
+    }).join("") + "</div>";
+  }
+  function design3() {
+    var chips = ["All", "To Input", "Done", "Not Paid Yet", "Missing Details"], term = q.trim().toLowerCase();
+    var list = T.filter(function (t) { return (filter === "All" || state(t) === filter) && (!term || (nameOf(t) + " " + t.srn + " " + batchOf(t.b).code).toLowerCase().indexOf(term) >= 0); });
+    var pages = Math.max(1, Math.ceil(list.length / 10)); page = Math.min(page, pages);
+    var shown = list.slice((page - 1) * 10, page * 10);
+    return tiles() + '<section class="panel"><div class="ph"><h2>Trainees in Class Today</h2><button type="button" class="btn small" data-sample="the Excel file for MARINA">Excel / CSV</button></div><div class="bar"><div class="fchips">' + chips.map(function (c) { return '<button type="button" data-filter="' + c + '" class="' + (c === filter ? "on" : "") + '">' + c + " " + (c === "All" ? T.length : count(c)) + "</button>"; }).join("") + '</div><input class="field grow" id="q" aria-label="Search trainee" placeholder="Name, SRN or course" value="' + esc(q) + '"></div><div class="tw"><table>' + HEAD(true) + "<tbody>" + (shown.map(function (t, i) { return row(t, (page - 1) * 10 + i + 1, true); }).join("") || '<tr><td colspan="9">No trainees here.</td></tr>') + "</tbody></table></div>" +
+      (list.length > 10 ? '<div class="pager"><span>Showing ' + ((page - 1) * 10 + 1) + "-" + Math.min(page * 10, list.length) + " of " + list.length + '</span><span class="acts"><button type="button" class="btn small" data-page="-1"' + (page < 2 ? " disabled" : "") + '>Previous</button><button type="button" class="btn small" data-page="1"' + (page >= pages ? " disabled" : "") + ">Next</button></span></div>" : "") + "</section>";
+  }
+  function schedules() {
+    var chips = ["All", "Ongoing", "Open", "Full"];
+    var list = SCHEDULES.filter(function (s) { return schedFilter === "All" || s[5] === schedFilter; });
+    return '<section class="panel"><div class="ph"><h2>Batches · November 2026</h2><span class="chip info">View Only</span></div><div class="bar"><div class="fchips">' + chips.map(function (c) { return '<button type="button" data-sched="' + c + '" class="' + (c === schedFilter ? "on" : "") + '">' + c + "</button>"; }).join("") + '</div></div><div class="tw"><table><thead><tr><th>Batch No.</th><th>Course</th><th>Dates</th><th>Enrolled</th><th>Slots Left</th><th>Status</th><th></th></tr></thead><tbody>' + list.map(function (s) { return '<tr><td class="mono">' + s[0] + "</td><td><b>" + s[1] + "</b></td><td>" + s[2] + '</td><td class="mono">' + s[3] + '</td><td class="mono">' + s[4] + '</td><td><span class="chip ' + (s[5] === "Open" ? "ok" : s[5] === "Full" ? "warn" : "info") + '">' + s[5] + '</span></td><td><button type="button" class="btn small" data-roster="' + s[0] + '">Trainees</button></td></tr>'; }).join("") + "</tbody></table></div></section>";
+  }
+  function confirm() {
+    return '<section class="panel"><div class="ph"><h2>To Confirm Before Building</h2></div><ol class="q">' +
+      "<li><b>Which design.</b> Design 1 is my recommendation, because it follows how the officer works: one batch at a time, with the batch's room and instructor in view.</li>" +
+      "<li><b>MARINA's system stays separate.</b> The portal cannot type into the MARINA MISMO System for the officer, because no connection between them exists. It gives the list, a Copy button and an Excel file, and it tracks who is done. The officer still enters each trainee on MARINA's site.</li>" +
+      "<li><b>A tick per trainee.</b> Input Done replaces Mark as Submitted, which marks a whole batch once. The officer can stop and continue later, and sees exactly who is left. Each tick records who and when.</li>" +
+      "<li><b>Paid after 4:00 PM.</b> Today a trainee who pays after the cut-off stays off the list. I propose showing them as Paid Late under To Input, so they are not missed. Say if the cut-off must stay strict.</li>" +
+      "<li><b>Missing details.</b> A paid trainee without an SRN or birth date cannot be entered, so the tick stays off until Registration fills it in.</li>" +
+      "<li><b>Fields.</b> The list shows name, birth date, SRN, rank, course, batch and dates. If MARINA's form asks for anything else, a screenshot of it settles this.</li>" +
+      "<li><b>Schedules.</b> View only: no Open Batches, Edit or Cancel. This sample lists the five STCW courses MISMO covers. Say if the officer should see every course.</li>" +
+      "</ol></section>";
+  }
+  function drawRoster() {
+    if (!openBatch) { modal.innerHTML = ""; return; }
+    var b = BATCHES.filter(function (x) { return x.no === openBatch; })[0], s = SCHEDULES.filter(function (x) { return x[0] === openBatch; })[0];
+    var list = b ? T.filter(function (t) { return t.b === b.id; }) : [];
+    modal.innerHTML = '<div class="veil"><div class="win" role="dialog" aria-modal="true" aria-label="Batch trainees"><div class="win-h"><div><h2>' + esc(openBatch) + " · " + esc(s[1]) + "</h2><small>" + esc(s[2]) + " · " + s[3] + " Enrolled · " + s[4] + ' Slots Left</small></div><button type="button" class="x" data-close="1" aria-label="Close">×</button></div>' +
+      (list.length ? '<div class="tw"><table><thead><tr><th>#</th><th>Trainee</th><th>SRN</th><th>Rank</th><th>Payment</th><th>MARINA MISMO</th></tr></thead><tbody>' + list.map(function (t, i) { return '<tr><td class="mono">' + (i + 1) + "</td><td><b>" + esc(nameOf(t)) + '</b></td><td class="mono">' + esc(t.srn || "—") + "</td><td>" + esc(t.rank) + "</td><td>" + (isPaid(t) ? '<span class="chip ok">Paid</span>' : '<span class="chip bad">' + esc(t.bal) + " Due</span>") + "</td><td>" + (state(t) === "Done" ? '<span class="chip ok">Done</span>' : state(t) === "To Input" ? '<span class="chip warn">To Input</span>' : state(t) === "Missing Details" ? '<span class="chip warn">Missing SRN</span>' : "—") + "</td></tr>"; }).join("") + "</tbody></table></div>" : '<p style="padding:14px 16px;margin:0;font-size:13px">In the portal, this lists the ' + s[3] + " trainees of this batch.</p>") + "</div></div>";
+  }
+  function draw() {
+    document.getElementById("views").innerHTML = VIEWS.map(function (v) { return '<button type="button" role="tab" class="' + (v[0] === view ? "on" : "") + '" data-v="' + v[0] + '">' + v[1] + "</button>"; }).join("");
+    var onSched = view === "schedules";
+    document.getElementById("tabs").innerHTML = ["Dashboard", "Schedules", "Final List", "Submissions", "Completion Records"].map(function (t) { return '<span class="' + ((onSched ? t === "Schedules" : t === "Dashboard") ? "on" : "") + '">' + t + "</span>"; }).join("");
+    document.getElementById("title").textContent = onSched ? "Schedules" : view === "confirm" ? "To Confirm" : "Dashboard";
+    var html = view === "design-1" ? design1() : view === "design-2" ? design2() : view === "design-3" ? design3() : onSched ? schedules() : confirm();
+    body.innerHTML = (note ? '<div class="msg" role="status">' + esc(note) + "</div>" : "") + html;
+    drawRoster();
+  }
+  function copy(t, btn) {
+    var text = [t.last, t.first, t.mid, t.bd, t.srn, t.rank, batchOf(t.b).code, batchOf(t.b).no, batchOf(t.b).dates].join("\t");
+    var done = function () { btn.textContent = "Copied"; setTimeout(function () { btn.textContent = "Copy"; }, 1400); };
+    try { navigator.clipboard.writeText(text).then(done, done); } catch (e) { done(); }
+  }
+  document.getElementById("views").addEventListener("click", function (e) {
+    var v = e.target.getAttribute("data-v"); if (!v) return;
+    view = v; note = ""; page = 1; try { history.replaceState(null, "", "#" + v); } catch (err) { /* the viewer may not allow it */ }
+    draw();
+  });
+  body.addEventListener("click", function (e) {
+    var el = e.target, a = function (k) { return el.getAttribute(k); };
+    if (a("data-sample")) { note = "Sample only. In the portal this gives " + a("data-sample") + "."; draw(); return; }
+    if (a("data-copy")) { copy(T[Number(a("data-copy"))], el); return; }
+    if (a("data-flip")) { var t = T[Number(a("data-flip"))]; t.done = !t.done; draw(); return; }
+    if (a("data-filter")) { filter = a("data-filter"); page = 1; draw(); return; }
+    if (a("data-page")) { page += Number(a("data-page")); draw(); return; }
+    if (a("data-sched")) { schedFilter = a("data-sched"); draw(); return; }
+    if (a("data-roster")) { openBatch = a("data-roster"); drawRoster(); }
+  });
+  body.addEventListener("change", function (e) { var d = e.target.getAttribute("data-done"); if (d) { T[Number(d)].done = e.target.checked; draw(); } });
+  body.addEventListener("input", function (e) {
+    if (e.target.id !== "q") return;
+    q = e.target.value; page = 1; var at = e.target.selectionStart; draw();
+    var i = document.getElementById("q"); if (i) { i.focus(); i.setSelectionRange(at, at); }
+  });
+  modal.addEventListener("click", function (e) { if (e.target.getAttribute("data-close") || e.target.classList.contains("veil")) { openBatch = null; drawRoster(); } });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && openBatch) { openBatch = null; drawRoster(); } });
+  var deep = location.hash.slice(1);
+  if (VIEWS.some(function (v) { return v[0] === deep; })) view = deep;
+  draw();
+})();
+</script>

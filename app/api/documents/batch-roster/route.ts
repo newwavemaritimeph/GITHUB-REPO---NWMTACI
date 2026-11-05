@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 
 /** Batch trainee list as PDF (owner, 3 Nov 2026); audited as an export. */
 export async function GET(request: Request) {
-  const staff = await requireStaff(["admin", "admin_assistant", "registration", "cashier", "accounting"]);
+  const staff = await requireStaff(["admin", "admin_assistant", "registration", "cashier", "accounting", "mismo_officer"]);
   if (!staff) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   const batchId = new URL(request.url).searchParams.get("batchId") ?? "";
   if (!/^[0-9a-f-]{36}$/i.test(batchId)) return NextResponse.json({ error: "Choose a batch." }, { status: 400 });

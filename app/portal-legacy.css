@@ -2726,3 +2726,24 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .cn-chip small { margin-left: 6px; font: 400 11.5px var(--font-portal), sans-serif; color: var(--nw-muted); }
 .nw-shell .cl-in.cn-fmt { width: 100%; min-width: 200px; font-family: var(--font-geist-mono, ui-monospace, monospace); font-size: 12.5px; }
 .nw-shell .cn-savebar { position: sticky; bottom: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 16px; background: var(--nw-surface); border-top: 1px solid var(--nw-line); font-size: 13px; font-weight: 600; }
+
+/* MISMO Compliance Officer, Design 3 · One List (5 Nov 2026) */
+.nw-shell .ms-span { margin-bottom: 12px; }
+.nw-shell .ms-span .pd-bar { border-bottom: 0; }
+.nw-shell .ms-tiles { margin-bottom: 12px; }
+.nw-shell .ms-tiles .cx-tile { padding: 9px 12px 9px 16px; }
+.nw-shell .ms-tiles .cx-tile span { font-size: 12.5px; }
+.nw-shell .ms-tiles .cx-tile b { font-size: 17px; letter-spacing: 0; }
+.nw-shell .ms-tiles .ms-key { background: var(--nw-warn-bg); border-color: transparent; }
+.nw-shell .ms-tiles .ms-key::before { display: none; }
+.nw-shell .ms-tiles .ms-key span, .nw-shell .ms-tiles .ms-key b { color: var(--nw-warn); }
+.nw-shell .ms-tiles .ms-alert b { color: var(--nw-bad); }
+.nw-shell .ms-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.nw-shell .ms-tools .vx-search { flex: 1 1 200px; min-width: 0; }
+.nw-shell .ms-page .cl-log { font-size: 13px; }
+.nw-shell .ms-page tr.ms-done td { color: var(--nw-muted); }
+.nw-shell .ms-page tr.ms-done td b { font-weight: 500; }
+.nw-shell .ms-tick { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; font-weight: 400; white-space: nowrap; cursor: pointer; }
+.nw-shell .ms-tick input { width: 16px; height: 16px; margin: 0; flex: none; accent-color: var(--nw-good); }
+.nw-shell .ms-copy { min-height: 28px; padding: 0 9px; font-size: 12.5px; }
+

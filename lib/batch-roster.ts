@@ -7,6 +7,8 @@ import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 export type RosterRow = {
   enrollmentId: string; name: string; nwmtaciNo: string; srn: string; rank: string; mobile: string; email: string; facebook: string;
   source: string; status: string; payment: "Paid" | "Balance" | "Company Charge" | "Not Paid Yet"; balanceCentavos: number; requirements: number;
+  /** Input Done in the MARINA MISMO System (migration 202610290080). */
+  mismoDoneAt?: string | null;
 };
 export type BatchRoster = {
   batch: { id: string; batchNumber: string; code: string; course: string; startsOn: string; endsOn: string; dailyStart: string | null; dailyEnd: string | null; room: string | null; instructor: string | null; capacity: number; held: number };
@@ -56,6 +58,8 @@ export async function loadBatchRoster(db: ReturnType<typeof createSupabaseAdminC
   const paid = new Map<string, number>(), due = new Map<string, number>(list.map((e) => [e.id, Number(e.selling_price_centavos ?? 0)]));
   for (const a of (allocs ?? []) as { enrollment_id: string; amount_centavos: number }[]) paid.set(a.enrollment_id, (paid.get(a.enrollment_id) ?? 0) + Number(a.amount_centavos));
   for (const c of (charges ?? []) as { enrollment_id: string; amount_centavos: number; event_type: string }[]) due.set(c.enrollment_id, (due.get(c.enrollment_id) ?? 0) + (c.event_type === "discount" ? -1 : 1) * Number(c.amount_centavos));
+  const ticks = ids.length ? await db.from("mismo_entries").select("enrollment_id,done_at").in("enrollment_id", ids) : null;
+  const mismoDone = new Map(((ticks && !ticks.error ? ticks.data : []) ?? []).map((x) => [x.enrollment_id as string, x.done_at as string]));
   const latest = new Map<string, string>();
   for (const c of (checks ?? []) as { enrollment_id: string; requirement: string; status: string }[]) { const k = `${c.enrollment_id}|${c.requirement === "medical_certificate" ? "medical_peme" : c.requirement}`; if (!latest.has(k)) latest.set(k, c.status); }
   const rows = list.map((e): RosterRow => {
@@ -64,7 +68,7 @@ export async function loadBatchRoster(db: ReturnType<typeof createSupabaseAdminC
     const p = paymentState(due.get(e.id) ?? 0, paid.get(e.id) ?? 0, billed.has(e.id));
     return { enrollmentId: e.id, name: t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}${t.legal_middle_name ? ` ${t.legal_middle_name.charAt(0)}.` : ""}${t.suffix ? ` ${t.suffix}` : ""}` : "—",
       nwmtaciNo: t?.application_number ?? t?.trainee_number ?? "", srn: t?.srn ?? "", rank: t?.rank ?? "", mobile: t?.mobile ?? "", email: t?.email ?? "", facebook: facebook.get(e.trainee_id) ?? "",
-      source: sourceLabel(e.source, partner), status: e.enrollment_status, ...p, requirements: REQUIRED.filter((r) => latest.get(`${e.id}|${r}`) === "Verified").length };
+      source: sourceLabel(e.source, partner), status: e.enrollment_status, ...p, requirements: REQUIRED.filter((r) => latest.get(`${e.id}|${r}`) === "Verified").length, mismoDoneAt: mismoDone.get(e.id) ?? null };
   });
   const course = one(b.courses as unknown as { code: string; name: string } | null);
   const r = res as unknown as { classrooms?: unknown; instructors?: unknown } | null;

@@ -1,17 +1,20 @@
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { MISMO_COURSE_CODES, manilaInstant, type MismoBatch, type MismoDay } from "@/lib/mismo";
+import { MISMO_COURSE_CODES, cutDateOf, manilaInstant, type MismoBatch, type MismoDay } from "@/lib/mismo";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
 
-/** Every STCW (MISMO) batch in class on `date`, with each trainee's due and what they had paid by 11:00 AM, 4:00 PM and now. */
-export async function loadMismoDay(db: Admin, date: string): Promise<MismoDay> {
+/**
+ * Every STCW (MISMO) batch in class from `date` to `to`, with each trainee's due and what they had paid by 11:00 AM and
+ * 4:00 PM of the batch's first class day in that period, and now.
+ */
+export async function loadMismoDay(db: Admin, date: string, to: string = date): Promise<MismoDay> {
   const { data: courses } = await db.from("courses").select("id,code,name").in("code", MISMO_COURSE_CODES);
   const courseById = new Map((courses ?? []).map((c) => [c.id as string, c as { id: string; code: string; name: string }]));
-  if (!courseById.size) return { date, batches: [] };
-  const { data: batches } = await db.from("batches").select("id,batch_number,course_id,starts_on,ends_on,status,venue").in("course_id", [...courseById.keys()]).lte("starts_on", date).gte("ends_on", date).neq("status", "Cancelled").order("starts_on");
+  if (!courseById.size) return { date, to, batches: [] };
+  const { data: batches } = await db.from("batches").select("id,batch_number,course_id,starts_on,ends_on,status,venue").in("course_id", [...courseById.keys()]).lte("starts_on", to).gte("ends_on", date).neq("status", "Cancelled").order("starts_on");
   const list = (batches ?? []) as { id: string; batch_number: string; course_id: string; starts_on: string; ends_on: string; venue: string | null }[];
-  if (!list.length) return { date, batches: [] };
+  if (!list.length) return { date, to, batches: [] };
   const batchIds = list.map((b) => b.id);
   const [{ data: enrollments }, staffing, submissions] = await Promise.all([
     db.from("enrollments").select("id,batch_id,selling_price_centavos,enrollment_status,trainees(legal_last_name,legal_first_name,legal_middle_name,birthdate,srn,rank)").in("batch_id", batchIds).in("enrollment_status", ["Enrolled", "Pending", "Open Schedule"]),
@@ -28,31 +31,35 @@ export async function loadMismoDay(db: Admin, date: string): Promise<MismoDay> {
   if (ids.length) { const { data: cc } = await db.from("enrollments").select("id").in("id", ids).not("company_charge_agency_id", "is", null); for (const x of cc ?? []) billed.add(x.id as string); }
   const due = new Map<string, number>(rows.map((e) => [e.id, Number(e.selling_price_centavos ?? 0)]));
   for (const c of charges ?? []) due.set(c.enrollment_id, (due.get(c.enrollment_id) ?? 0) + (c.event_type === "discount" ? -1 : 1) * Number(c.amount_centavos));
-  const at11 = Date.parse(manilaInstant(date, 11)), at16 = Date.parse(manilaInstant(date, 16));
-  const paid = new Map<string, { b11: number; b16: number; now: number }>();
+  const batchOf = new Map(rows.map((e) => [e.id, e.batch_id])), startOf = new Map(list.map((b) => [b.id, b.starts_on]));
+  const paid = new Map<string, { b11: number; b16: number; now: number; last: string | null }>();
   for (const a of allocations ?? []) {
     const p = first(a.payments as unknown as { received_at: string; valid: boolean } | null);
     if (!p || p.valid === false) continue;
-    const cur = paid.get(a.enrollment_id) ?? { b11: 0, b16: 0, now: 0 };
+    const cur = paid.get(a.enrollment_id) ?? { b11: 0, b16: 0, now: 0, last: null };
     const amt = Number(a.amount_centavos);
     cur.now += amt;
-    const when = Date.parse(p.received_at);
-    if (when <= at16) cur.b16 += amt;
-    if (when <= at11) cur.b11 += amt;
+    const when = Date.parse(p.received_at), cut = cutDateOf(startOf.get(batchOf.get(a.enrollment_id) ?? "") ?? date, date);
+    if (when <= Date.parse(manilaInstant(cut, 16))) cur.b16 += amt;
+    if (when <= Date.parse(manilaInstant(cut, 11))) cur.b11 += amt;
+    if (!cur.last || p.received_at > cur.last) cur.last = p.received_at;
     paid.set(a.enrollment_id, cur);
   }
+  // Input Done ticks (migration 202610290080); none before it is run.
+  const entries = ids.length ? await db.from("mismo_entries").select("enrollment_id,done_at").in("enrollment_id", ids) : { data: [], error: null };
+  const doneAt = new Map(((entries.error ? [] : entries.data ?? []) as { enrollment_id: string; done_at: string }[]).map((x) => [x.enrollment_id, x.done_at]));
   const sub = new Map(((submissions.data ?? []) as { batch_id: string; submitted_at: string; trainee_count: number }[]).map((s) => [s.batch_id, s]));
   const out: MismoBatch[] = list.map((b) => {
     const c = courseById.get(b.course_id)!;
     const st = staffing.get(b.id);
     const trainees = rows.filter((e) => e.batch_id === b.id).map((e) => {
-      const t = first(e.trainees); const p = paid.get(e.id) ?? { b11: 0, b16: 0, now: 0 };
-      return { enrollmentId: e.id, lastName: t?.legal_last_name ?? "", firstName: t?.legal_first_name ?? "", middleName: t?.legal_middle_name ?? null, birthdate: t?.birthdate ?? null, srn: t?.srn ?? null, rank: t?.rank ?? null, dueCentavos: due.get(e.id) ?? 0, paidBy11: p.b11, paidBy16: p.b16, paidNow: p.now, companyCharge: billed.has(e.id) };
+      const t = first(e.trainees); const p = paid.get(e.id) ?? { b11: 0, b16: 0, now: 0, last: null };
+      return { enrollmentId: e.id, lastName: t?.legal_last_name ?? "", firstName: t?.legal_first_name ?? "", middleName: t?.legal_middle_name ?? null, birthdate: t?.birthdate ?? null, srn: t?.srn ?? null, rank: t?.rank ?? null, dueCentavos: due.get(e.id) ?? 0, paidBy11: p.b11, paidBy16: p.b16, paidNow: p.now, companyCharge: billed.has(e.id), entryAt: doneAt.get(e.id) ?? null, lastPaidAt: p.last };
     }).sort((x, y) => x.lastName.localeCompare(y.lastName) || x.firstName.localeCompare(y.firstName));
     const s = sub.get(b.id);
-    return { id: b.id, batchNumber: b.batch_number, courseName: c.name, courseCode: c.code, startsOn: b.starts_on, endsOn: b.ends_on, room: st?.room ?? b.venue ?? null, instructor: st?.instructor ?? null, trainees, submittedAt: s?.submitted_at ?? null, submittedCount: s?.trainee_count ?? null };
+    return { id: b.id, batchNumber: b.batch_number, courseName: c.name, courseCode: c.code, startsOn: b.starts_on, endsOn: b.ends_on, room: st?.room ?? b.venue ?? null, instructor: st?.instructor ?? null, trainees, submittedAt: s?.submitted_at ?? null, submittedCount: s?.trainee_count ?? null, cutDate: cutDateOf(b.starts_on, date) };
   });
-  return { date, batches: out };
+  return { date, to, batches: out };
 }
 
 async function loadStaffing(db: Admin, batchIds: string[]) {

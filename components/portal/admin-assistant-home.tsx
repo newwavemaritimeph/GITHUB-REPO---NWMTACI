@@ -256,7 +256,7 @@ const STATUS_TONE: Record<string, string> = { Open: "green", Full: "orange", Ong
  * edits, renames and cancels batches. Dates follow the course pattern; a
  * cancelled batch moves every trainee to another batch of the same course.
  */
-export function ClassSchedules({ data, reload, onOpenBatches, onCreate, canManage = true }: { data: PortalData; reload: () => Promise<void>; onOpenBatches: () => void; onCreate: () => void; canManage?: boolean }) {
+export function ClassSchedules({ data, reload, onOpenBatches, onCreate, canManage = true, courseCodes }: { data: PortalData; reload: () => Promise<void>; onOpenBatches: () => void; onCreate: () => void; canManage?: boolean; /** Only these courses, and each trainee's MARINA MISMO state (MISMO Compliance Officer, 5 Nov 2026). */ courseCodes?: string[] }) {
   const { today, range, bar } = usePlanPeriod();
   const [filter, setFilter] = useState<(typeof SCHEDULE_FILTERS)[number]>("All");
   const [editing, setEditing] = useState<Batch | null>(null);
@@ -268,7 +268,7 @@ export function ClassSchedules({ data, reload, onOpenBatches, onCreate, canManag
   const cancels = new Map(((data as { batchCancels?: CancelInfo[] }).batchCancels ?? []).map((c) => [c.id, c]));
   const plans = new Map(upcoming(data).map((r) => [r.id, r]));
   const course = new Map(data.courses.map((c) => [c.id, c]));
-  const periodBatches = data.batches.filter((b) => !b.partner_offer_id && rangesOverlap(b.starts_on, b.ends_on, range.from, range.to)).sort((a, z) => a.starts_on.localeCompare(z.starts_on) || a.batch_number.localeCompare(z.batch_number));
+  const periodBatches = data.batches.filter((b) => !b.partner_offer_id && rangesOverlap(b.starts_on, b.ends_on, range.from, range.to) && (!courseCodes || courseCodes.includes(course.get(b.course_id)?.code ?? ""))).sort((a, z) => a.starts_on.localeCompare(z.starts_on) || a.batch_number.localeCompare(z.batch_number));
   const term = q.trim().toLowerCase();
   const inPeriod = periodBatches.filter((b) => { if (courseId && b.course_id !== courseId) return false; if (!term) return true; const c = course.get(b.course_id), p = plans.get(b.id); return `${b.batch_number} ${c?.code ?? ""} ${c?.name ?? ""} ${p?.room?.name ?? b.venue ?? ""} ${p?.instructor?.complete_name ?? ""}`.toLowerCase().includes(term); });
   const courseOptions = [...new Map(periodBatches.map((b) => [b.course_id, course.get(b.course_id)])).entries()].filter((x): x is [string, NonNullable<ReturnType<typeof course.get>>] => !!x[1]).sort((a, z) => a[1].code.localeCompare(z[1].code));
@@ -325,14 +325,14 @@ export function ClassSchedules({ data, reload, onOpenBatches, onCreate, canManag
         </tbody></table>{paged.pager}</div> : <p className="portal-empty-copy">No batches in this period.</p>}
       </section></div>
     </div>
-    {rosterOf && <BatchRosterModal batch={rosterOf} onClose={() => setRosterOf(null)} />}
+    {rosterOf && <BatchRosterModal batch={rosterOf} showMismo={!!courseCodes} onClose={() => setRosterOf(null)} />}
     {editing && <EditBatch batch={editing} code={course.get(editing.course_id)?.code ?? ""} durationLabel={course.get(editing.course_id)?.duration_label ?? "1 day"} reload={reload} onClose={() => setEditing(null)} onDone={(t) => { setDone(t); setEditing(null); }} />}
     {cancelling && <CancelBatch data={data} batch={cancelling} code={course.get(cancelling.course_id)?.code ?? ""} today={today} reload={reload} onClose={() => setCancelling(null)} onDone={(t) => { setDone(t); setCancelling(null); }} />}
   </div>;
 }
 
 /** Every trainee on one batch, from the database (owner, 3 Nov 2026): Copy List, Excel and PDF. */
-function BatchRosterModal({ batch, onClose }: { batch: Batch; onClose: () => void }) {
+function BatchRosterModal({ batch, showMismo, onClose }: { batch: Batch; showMismo?: boolean; onClose: () => void }) {
   const [roster, setRoster] = useState<BatchRoster | null>(null), [error, setError] = useState(""), [find, setFind] = useState(""), [note, setNote] = useState(""), [copyBox, setCopyBox] = useState("");
   useEffect(() => { let live = true; fetch(`/api/staff/batch-roster?batchId=${batch.id}`, { cache: "no-store" }).then(async (r) => { const b = await r.json(); if (!r.ok) throw new Error(b.error ?? "Could not load the trainees."); if (live) setRoster(b as BatchRoster); }).catch((e: unknown) => { if (live) setError(e instanceof Error ? e.message : "Could not load the trainees."); }); return () => { live = false; }; }, [batch.id]);
   const t = find.trim().toLowerCase();
@@ -357,11 +357,11 @@ function BatchRosterModal({ batch, onClose }: { batch: Batch; onClose: () => voi
       </div>
       <div className="br-tools full"><label>Find<input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Name, NWMTACI No., SRN, mobile" /></label><span className="br-acts"><button type="button" className="portal-secondary" disabled={!roster.rows.length} onClick={() => void copy()}>Copy List</button><button type="button" className="portal-secondary" disabled={!roster.rows.length} onClick={csv}>Download Excel</button><a className="portal-primary" href={`/api/documents/batch-roster?batchId=${batch.id}`} target="_blank" rel="noreferrer">Print / Save PDF</a></span></div>
       {copyBox && <div className="sa-copybox full"><textarea readOnly rows={Math.min(14, copyBox.split("\n").length + 1)} value={copyBox} onFocus={(e) => e.currentTarget.select()} aria-label="Trainee list to copy" /><button type="button" className="portal-secondary" onClick={() => setCopyBox("")}>Close</button></div>}
-      <div className="cl-wrap full"><table className="cl-log"><thead><tr><th>#</th><th>Trainee</th><th>NWMTACI No.</th><th>SRN</th><th>Rank</th><th>Mobile</th><th>Source</th><th>Status</th><th>Payment</th><th>Requirements</th></tr></thead><tbody>
+      <div className="cl-wrap full"><table className="cl-log"><thead><tr><th>#</th><th>Trainee</th><th>NWMTACI No.</th><th>SRN</th><th>Rank</th><th>Mobile</th><th>Source</th><th>Status</th><th>Payment</th><th>Requirements</th>{showMismo && <th>MARINA MISMO</th>}</tr></thead><tbody>
         {rows.map((r, i) => <tr key={r.enrollmentId}><td>{i + 1}</td><td><b>{r.name}</b></td><td className="cl-mono">{r.nwmtaciNo}</td><td className="cl-mono">{r.srn || "—"}</td><td>{r.rank || "—"}</td><td className="cl-mono">{r.mobile || "—"}</td><td>{r.source}</td>
           <td><Badge tone={r.status === "Pending" ? "orange" : "active"}>{r.status}</Badge></td>
-          <td><Badge tone={r.payment === "Paid" ? "active" : r.payment === "Company Charge" ? "blue" : r.payment === "Balance" ? "orange" : "red"}>{payText(r)}</Badge></td><td>{r.requirements} of 4</td></tr>)}
-        {!rows.length && <tr><td colSpan={10} className="portal-empty-copy">{roster.rows.length ? "No trainee matches." : "No trainees on this batch yet."}</td></tr>}
+          <td><Badge tone={r.payment === "Paid" ? "active" : r.payment === "Company Charge" ? "blue" : r.payment === "Balance" ? "orange" : "red"}>{payText(r)}</Badge></td><td>{r.requirements} of 4</td>{showMismo && <td>{r.mismoDoneAt ? <Badge tone="green">Done</Badge> : r.payment === "Paid" || r.payment === "Company Charge" ? <Badge tone="orange">To Input</Badge> : "—"}</td>}</tr>)}
+        {!rows.length && <tr><td colSpan={showMismo ? 11 : 10} className="portal-empty-copy">{roster.rows.length ? "No trainee matches." : "No trainees on this batch yet."}</td></tr>}
       </tbody></table></div>
       <p className="portal-form-note full">Cancelled enrollments are left out.</p>
     </>}
