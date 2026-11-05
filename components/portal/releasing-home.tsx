@@ -288,7 +288,7 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
             <td><ProgressDots dots={certificateDots(l, tracked, l.view.state === "Training not finished")} /></td>
             <td><Badge tone={l.view.state === "Waiting for photo" ? "orange" : undefined}>{label}</Badge><small className="cl-sub cl-block" title={then}>{step}</small></td>
             <td><span className="cl-acts">
-              {(l.view.state === "Waiting for evaluation" || (l.postTest?.required && !l.postTest.passed)) && l.view.state !== "Training not finished" && <button type="button" className="portal-secondary cl-upload" disabled={busy} onClick={() => void post({ action: "training-end-email", enrollmentId: l.e.id }, `Post-test and evaluation email sent to ${l.name}.`).catch(() => undefined)}>Email Post-Test and Evaluation</button>}
+              {(l.view.state === "Waiting for evaluation" || (l.postTest?.required && !l.postTest.passed)) && l.view.state !== "Training not finished" && <button type="button" className="portal-secondary cl-upload" disabled={busy} onClick={() => void post({ action: "training-end-email", enrollmentId: l.e.id }, `Post-test and evaluation email sent to ${l.name}.`).catch(() => undefined)}>Email Post-Test</button>}
               {tracked && !l.photo && <button type="button" className={l.view.state === "Waiting for photo" ? "portal-primary cl-upload" : "portal-secondary cl-upload"} title="Upload the trainee's 2x2 photo" onClick={() => setUploading(l)}>Upload</button>}
               <a className="portal-secondary cl-upload" href={`/api/documents/certificate/${l.e.id}?preview=1`} target="_blank" rel="noreferrer" title="Draft for checking; never counts as a print">Preview</a></span></td>
           </tr>; })])}
