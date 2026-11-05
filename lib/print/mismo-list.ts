@@ -1,12 +1,12 @@
 import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
-import { balanceAt, finalList, leftOff, unsettledAt11, type MismoBatch, type MismoTrainee } from "@/lib/mismo";
+import { balanceAt, finalList, paidLate, unsettledAt11, type MismoBatch, type MismoTrainee } from "@/lib/mismo";
 import type { DocumentControl } from "@/lib/document-controls";
 import { drawControlLine } from "@/lib/print/control-block";
 
 /**
  * MARINA MISMO lists (owner, 8–9 Oct 2026), one section per batch, A4 landscape:
  *  - final: the List of Trainees settled by the 4:00 PM cut-off, for the MARINA MISMO Portal,
- *    with the trainees left off shown apart;
+ *    with trainees who paid after the cut-off shown apart; a trainee not yet paid is not on it (5 Nov 2026);
  *  - unsettled: trainees not settled as of 11:00 AM, for the instructor to send to the Cashier.
  * Letterhead, a batch information box, a ruled table, a summary, signatures and page numbers.
  */
@@ -60,7 +60,7 @@ export async function createMismoListPdf(date: string, batches: MismoBatch[], li
   const pages: PDFPage[] = [];
   for (const b of batches) {
     const rows = unsettled ? unsettledAt11(b) : finalList(b);
-    const off = unsettled ? [] : leftOff(b);
+    const off = unsettled ? [] : b.trainees.filter(paidLate);
     let page = pdf.addPage([W, H]); pages.push(page);
     let y = H - M;
 
@@ -82,7 +82,7 @@ export async function createMismoListPdf(date: string, batches: MismoBatch[], li
       if (!cont) {
         // Batch information box: two rows of four fields.
         const fields: [string, string][] = [["Course", `${b.courseName} (${b.courseCode})`], ["Batch No.", b.batchNumber], ["Training Dates", dates(b)], ["List Date", shortDate(date)],
-          ["Room", b.room ?? "-"], ["Instructor", b.instructor ?? "-"], ["Cut-off", unsettled ? "Settled by 11:00 AM" : "Settled by 4:00 PM"], [unsettled ? "Not Settled" : "On This List", `${rows.length} of ${b.trainees.length} trainee${b.trainees.length === 1 ? "" : "s"}`]];
+          ["Room", b.room ?? "-"], ["Instructor", b.instructor ?? "-"], ["Cut-off", unsettled ? "Settled by 11:00 AM" : "Settled by 4:00 PM"], [unsettled ? "Not Settled" : "On This List", unsettled ? `${rows.length} of ${b.trainees.length} trainee${b.trainees.length === 1 ? "" : "s"}` : `${rows.length} trainee${rows.length === 1 ? "" : "s"}`]];
         const bh = 52, widths = [CW * 0.4, CW * 0.2, CW * 0.22, CW * 0.18];
         page.drawRectangle({ x: M, y: y - bh, width: CW, height: bh, color: soft, borderColor: line, borderWidth: 0.6 });
         page.drawLine({ start: { x: M, y: y - bh / 2 }, end: { x: M + CW, y: y - bh / 2 }, thickness: 0.4, color: line });
@@ -131,17 +131,17 @@ export async function createMismoListPdf(date: string, batches: MismoBatch[], li
     const total = rows.reduce((s, t) => s + balanceAt(t, "11"), 0);
     text(page, unsettled
       ? `${rows.length} trainee${rows.length === 1 ? "" : "s"} not settled · total balance ${peso(total)} · please send them to the Cashier before the 4:00 PM cut-off.`
-      : `${rows.length} trainee${rows.length === 1 ? "" : "s"} settled by 4:00 PM and included · ${off.length} left off.`, M, y, 9, bold, ink);
+      : `${rows.length} trainee${rows.length === 1 ? "" : "s"} settled by 4:00 PM and included${off.length ? ` · ${off.length} paid after 4:00 PM` : ""}.`, M, y, 9, bold, ink);
     y -= 8;
 
-    // Left off (final list only): shown apart so they are not entered in the MARINA MISMO Portal.
+    // Paid after the cut-off (final list only): shown apart, not on this list.
     if (off.length) {
       const need = 24 + off.length * 13;
       if (y - need < M + 70) { page = pdf.addPage([W, H]); pages.push(page); y = H - M; letterhead(true); }
       y -= 10;
       page.drawRectangle({ x: M, y: y - need, width: CW, height: need, color: rgb(0.99, 0.93, 0.91), borderColor: red, borderWidth: 0.6 });
-      text(page, "NOT INCLUDED - BALANCE UNPAID AT 4:00 PM (do not enter in the MARINA MISMO Portal)", M + 8, y - 13, 7.6, bold, red);
-      off.forEach((t, i) => text(page, fit(`${i + 1}.  ${t.lastName.toUpperCase()}, ${t.firstName}${t.middleName ? ` ${t.middleName}` : ""}  ·  ${t.rank ?? "-"}  ·  balance ${peso(balanceAt(t, "16"))}`, reg, 8.6, CW - 16), M + 8, y - 26 - i * 13, 8.6, reg, ink));
+      text(page, "NOT ON THIS LIST - PAID AFTER THE 4:00 PM CUT-OFF", M + 8, y - 13, 7.6, bold, red);
+      off.forEach((t, i) => text(page, fit(`${i + 1}.  ${t.lastName.toUpperCase()}, ${t.firstName}${t.middleName ? ` ${t.middleName}` : ""}  ·  ${t.rank ?? "-"}`, reg, 8.6, CW - 16), M + 8, y - 26 - i * 13, 8.6, reg, ink));
       y -= need;
     }
 

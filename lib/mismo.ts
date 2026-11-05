@@ -2,7 +2,9 @@
  * MARINA MISMO list (owner, 8 Oct 2026). For the five STCW courses, trainees in
  * class on a given day who still owe at 11:00 AM go on the Compliance Officer's
  * dashboard (printed for the instructor); only trainees settled by 4:00 PM go on
- * the final list submitted to the MARINA MISMO Portal.
+ * the final list submitted to the MARINA MISMO Portal. Since 5 Nov 2026 a trainee not
+ * yet paid is off the officer's lists unless on Company Charge; only the instructor's
+ * 11:00 AM printout still names them.
  */
 export const MISMO_COURSE_CODES = ["UBT-PSSR", "STPPDSPPS", "PSCMT", "PSCMHBT", "CCMD"];
 
@@ -29,8 +31,8 @@ export const balanceAt = (t: MismoTrainee, when: "11" | "16" | "now") => t.compa
 export const unsettledAt11 = (b: MismoBatch) => b.trainees.filter((t) => owesAt(t, "11"));
 /** The final list for MARINA: settled by 4:00 PM. */
 export const finalList = (b: MismoBatch) => b.trainees.filter((t) => !owesAt(t, "16"));
-/** Left off the MARINA list: still owing at 4:00 PM. */
-export const leftOff = (b: MismoBatch) => b.trainees.filter((t) => owesAt(t, "16"));
+/** On the officer's lists: paid, or billed to the partner on Company Charge (owner, 5 Nov 2026). */
+export const mismoListed = (t: MismoTrainee) => !owesAt(t, "now");
 
 /** A batch's first class day in the period; for one day, that day. */
 export const cutDateOf = (startsOn: string, from: string) => (startsOn > from ? startsOn : from);

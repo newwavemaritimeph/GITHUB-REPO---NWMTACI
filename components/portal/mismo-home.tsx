@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { addDays, manilaToday, pesos2 } from "@/lib/portal-format";
-import { balanceAt, finalList, leftOff, mismoCopyText, mismoCsv, mismoMissing, mismoPaidCsv, mismoState, owesAt, paidLate, type EntryDay, type MismoBatch, type MismoDay, type MismoState, type MismoTrainee } from "@/lib/mismo";
+import { addDays, manilaToday } from "@/lib/portal-format";
+import { finalList, mismoCopyText, mismoCsv, mismoListed, mismoMissing, mismoPaidCsv, mismoState, paidLate, type EntryDay, type MismoBatch, type MismoDay, type MismoState, type MismoTrainee } from "@/lib/mismo";
 import { Badge, Message, fmtDate, periodRange, submit, txWhen, usePaged } from "./shared-ui";
 
 /**
@@ -70,7 +70,7 @@ function saveCsv(name: string, text: string) {
 }
 const spanName = (from: string, to: string) => (from === to ? from : `${from}-to-${to}`);
 
-const FILTERS: ("All" | MismoState)[] = ["All", "For Encoding", "Encoded", "Unpaid", "For Completion"];
+const FILTERS: ("All" | MismoState)[] = ["All", "For Encoding", "Encoded", "For Completion"];
 
 export function MismoDashboard() {
   const span = useSpan("Daily");
@@ -81,7 +81,9 @@ export function MismoDashboard() {
   const [ticks, setTicks] = useState<Record<string, boolean>>({});
   const [problem, setProblem] = useState(""), [copied, setCopied] = useState("");
   const withTick = (t: MismoTrainee): MismoTrainee => (t.enrollmentId in ticks ? { ...t, entryAt: ticks[t.enrollmentId] ? t.entryAt ?? "now" : null } : t);
-  const all = (data?.batches ?? []).flatMap((b) => b.trainees.map((t) => ({ b, t: withTick(t) })));
+  const inClass = (data?.batches ?? []).flatMap((b) => b.trainees.map((t) => ({ b, t: withTick(t) })));
+  // Not yet paid: off this list unless on Company Charge (owner, 5 Nov 2026). The count stays for the instructor's printout.
+  const all = inClass.filter((r) => mismoListed(r.t)), unpaid = inClass.length - all.length;
   const count = (s: MismoState) => all.filter((r) => mismoState(r.t) === s).length;
   const term = q.trim().toLowerCase();
   const rows = all.filter((r) => (filter === "All" || mismoState(r.t) === filter) && (!term || `${r.t.lastName} ${r.t.firstName} ${r.t.middleName ?? ""} ${r.t.srn ?? ""} ${r.b.courseCode} ${r.b.batchNumber}`.toLowerCase().includes(term)));
@@ -95,7 +97,7 @@ export function MismoDashboard() {
     try { await navigator.clipboard.writeText(mismoCopyText(t, b)); setCopied(t.enrollmentId); window.setTimeout(() => setCopied((c) => (c === t.enrollmentId ? "" : c)), 1400); }
     catch { setProblem("The browser refused to copy. Select the row and copy it by hand."); }
   }
-  const canPrint11 = span.mode === "Daily" && count("Unpaid") > 0 && (span.date < span.today || (span.date === span.today && manilaHour() >= 11));
+  const canPrint11 = span.mode === "Daily" && unpaid > 0 && (span.date < span.today || (span.date === span.today && manilaHour() >= 11));
   return <div className="portal-page cx ac ms-page">
     <Head title="Dashboard" />
     {span.bar(`${all.length} trainee${all.length === 1 ? "" : "s"}`)}
@@ -104,7 +106,7 @@ export function MismoDashboard() {
     <div className="cx-tiles ms-tiles">
       <div className="cx-tile ms-key"><span>For Encoding</span><b>{count("For Encoding")}</b></div>
       <div className="cx-tile" style={{ ["--c" as string]: "#0a7a3e" }}><span>Encoded</span><b>{count("Encoded")}</b></div>
-      <div className={`cx-tile${count("Unpaid") ? " ms-alert" : ""}`} style={{ ["--c" as string]: "#b42318" }}><span>Unpaid</span><b>{count("Unpaid")}</b></div>
+      <div className={`cx-tile${unpaid ? " ms-alert" : ""}`} style={{ ["--c" as string]: "#b42318" }}><span>Unpaid</span><b>{unpaid}</b></div>
       <div className={`cx-tile${count("For Completion") ? " ms-alert" : ""}`} style={{ ["--c" as string]: "#a2470b" }}><span>For Completion</span><b>{count("For Completion")}</b></div>
     </div>
     <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Trainees in Class</h2><span className="cl-acts">
@@ -113,16 +115,16 @@ export function MismoDashboard() {
     </span></div>
       <div className="cx-bar ac-bar ms-tools"><span className="cx-seg">{FILTERS.map((f) => <button key={f} type="button" className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>{f} {f === "All" ? all.length : count(f)}</button>)}</span>
         <input className="vx-search" aria-label="Search trainee" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, SRN, course or batch" /></div>
-      {!data ? <p className="portal-empty-copy">{error || !span.ready ? "" : "Loading…"}</p> : !all.length ? <p className="portal-empty-copy">No STCW class in this period.</p> : !rows.length ? <p className="portal-empty-copy">No trainees here.</p> : <>
+      {!data ? <p className="portal-empty-copy">{error || !span.ready ? "" : "Loading…"}</p> : !inClass.length ? <p className="portal-empty-copy">No STCW class in this period.</p> : !rows.length ? <p className="portal-empty-copy">No trainees here.</p> : <>
         <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>#</th><th>Trainee</th><th>Batch</th><th>Birth Date</th><th>SRN</th><th>Rank</th><th>Paid</th><th></th><th>MARINA MISMO</th></tr></thead><tbody>
           {paged.shown.map(({ b, t }, i) => { const s = mismoState(t), missing = mismoMissing(t); return <tr key={`${b.id}:${t.enrollmentId}`} className={s === "Encoded" ? "ms-done" : undefined}>
             <td className="cl-no">{paged.offset + i + 1}</td>
             <td><b>{t.lastName}, {t.firstName}{t.middleName ? ` ${t.middleName}` : ""}</b></td>
             <td>{b.courseCode}<small className="cl-sub cl-block cl-mono">{b.batchNumber}</small></td>
             <td className="cl-mono">{t.birthdate ?? "—"}</td><td className="cl-mono">{t.srn ?? "—"}</td><td>{t.rank ?? "—"}</td>
-            <td>{t.companyCharge ? "Company Charge" : t.lastPaidAt && s !== "Unpaid" ? txWhen(t.lastPaidAt) : "—"}{paidLate(t) && <small className="cl-block"><Badge tone="orange">Paid Late</Badge></small>}</td>
-            <td>{s !== "Unpaid" && !missing.length && <button type="button" className="portal-secondary ms-copy" onClick={() => void copy(t, b)}>{copied === t.enrollmentId ? "Copied" : "Copy"}</button>}</td>
-            <td>{s === "Unpaid" ? <Badge tone="red">{pesos2(balanceAt(t, "now"))} Due</Badge> : s === "For Completion" ? <Badge tone="orange">Missing {missing.join(", ")}</Badge> : <label className="ms-tick"><input type="checkbox" checked={s === "Encoded"} onChange={(e) => void tick(t, e.target.checked)} /> Encoded</label>}</td>
+            <td>{t.companyCharge ? "Company Charge" : t.lastPaidAt ? txWhen(t.lastPaidAt) : "—"}{paidLate(t) && <small className="cl-block"><Badge tone="orange">Paid Late</Badge></small>}</td>
+            <td>{!missing.length && <button type="button" className="portal-secondary ms-copy" onClick={() => void copy(t, b)}>{copied === t.enrollmentId ? "Copied" : "Copy"}</button>}</td>
+            <td>{s === "For Completion" ? <Badge tone="orange">Missing {missing.join(", ")}</Badge> : <label className="ms-tick"><input type="checkbox" checked={s === "Encoded"} onChange={(e) => void tick(t, e.target.checked)} /> Encoded</label>}</td>
           </tr>; })}
         </tbody></table></div>{paged.pager}</>}
     </section>
@@ -140,7 +142,7 @@ export function MismoFinalList() {
     {span.bar(`${data?.batches.length ?? 0} batch${data?.batches.length === 1 ? "" : "es"}`)}
     {error && <Message kind="error" text={error} />}
     {!data ? <p className="portal-empty-copy">{error || !span.ready ? "" : "Loading…"}</p> : !data.batches.length ? <section className="portal-panel cx-panel"><p className="portal-empty-copy">No STCW class in this period.</p></section>
-      : data.batches.map((b) => { const ok = finalList(b), out = leftOff(b), cut = b.cutDate ?? from, done = ok.filter((t) => t.entryAt).length; return !isReady(b) ? <section className="portal-panel cx-panel" key={b.id}>
+      : data.batches.map((b) => { const ok = finalList(b), out = b.trainees.filter(paidLate), cut = b.cutDate ?? from, done = ok.filter((t) => t.entryAt).length; return !isReady(b) ? <section className="portal-panel cx-panel" key={b.id}>
         <div className="panel-heading"><h2>{b.batchNumber} · {b.courseName}</h2></div>
         <div className="ms-banner amber"><b>The final list is made at 4:00 PM on {fmtDate(cut)}.</b><span>Trainees who settle before then are included.</span></div>
       </section> : <section className="portal-panel cx-panel" key={b.id}>
@@ -149,10 +151,10 @@ export function MismoFinalList() {
           <a className="portal-secondary" href={pdfUrl(cut, "final", b.id)} target="_blank" rel="noreferrer">Print PDF</a>
           <Badge tone={ok.length && done === ok.length ? "green" : "orange"}>{done} of {ok.length} Encoded</Badge>
         </span></div>
-        <p className="ms-sub"><b>{ok.length} trainee{ok.length === 1 ? "" : "s"} for MARINA</b> · Cut-Off {fmtDate(cut)}, 4:00 PM · {b.startsOn === b.endsOn ? fmtDate(b.startsOn) : `${fmtDate(b.startsOn)} – ${fmtDate(b.endsOn)}`} · {b.room ?? "Room not set"} · {b.instructor ?? "Instructor not set"}{out.length ? ` · ${out.length} left off (unpaid at 4:00 PM)` : ""}</p>
+        <p className="ms-sub"><b>{ok.length} trainee{ok.length === 1 ? "" : "s"} for MARINA</b> · Cut-Off {fmtDate(cut)}, 4:00 PM · {b.startsOn === b.endsOn ? fmtDate(b.startsOn) : `${fmtDate(b.startsOn)} – ${fmtDate(b.endsOn)}`} · {b.room ?? "Room not set"} · {b.instructor ?? "Instructor not set"}{out.length ? ` · ${out.length} paid after 4:00 PM` : ""}</p>
         <div className="cl-wrap"><table className="cl-log"><thead><tr><th>#</th><th>Last Name</th><th>First Name</th><th>Middle Name</th><th>Birth Date</th><th>SRN</th><th>Rank</th><th>Course</th></tr></thead><tbody>
           {ok.map((t, i) => <tr key={t.enrollmentId}><td className="cl-no">{i + 1}</td><td><b>{t.lastName}</b></td><td>{t.firstName}</td><td>{t.middleName || "—"}</td><td className="cl-mono">{t.birthdate ?? "—"}</td><td className="cl-mono">{t.srn ?? "—"}</td><td>{t.rank ?? "—"}</td><td>{b.courseCode}</td></tr>)}
-          {out.map((t) => <tr key={t.enrollmentId} className="ms-out"><td className="cl-no">—</td><td>{t.lastName}</td><td>{t.firstName}</td><td>{t.middleName || "—"}</td><td className="cl-mono">{t.birthdate ?? "—"}</td><td className="cl-mono">{t.srn ?? "—"}</td><td>{t.rank ?? "—"}</td><td>{owesAt(t, "now") ? `Left off · ${pesos2(balanceAt(t, "16"))} unpaid` : "Left off · Paid Late"}</td></tr>)}
+          {out.map((t) => <tr key={t.enrollmentId} className="ms-out"><td className="cl-no">—</td><td>{t.lastName}</td><td>{t.firstName}</td><td>{t.middleName || "—"}</td><td className="cl-mono">{t.birthdate ?? "—"}</td><td className="cl-mono">{t.srn ?? "—"}</td><td>{t.rank ?? "—"}</td><td>Left off · Paid Late</td></tr>)}
         </tbody></table></div>
       </section>; })}
   </div>;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balanceAt, cutDateOf, entryDays, finalList, leftOff, manilaInstant, mismoCopyText, mismoCsv, mismoMissing, mismoPaidCsv, mismoState, owesAt, paidLate, unsettledAt11, type MismoBatch, type MismoTrainee } from "../lib/mismo";
+import { balanceAt, cutDateOf, entryDays, finalList, manilaInstant, mismoListed, mismoCopyText, mismoCsv, mismoMissing, mismoPaidCsv, mismoState, owesAt, paidLate, unsettledAt11, type MismoBatch, type MismoTrainee } from "../lib/mismo";
 
 const t = (id: string, due: number, b11: number, b16: number, now: number, extra: Partial<MismoTrainee> = {}): MismoTrainee => ({ enrollmentId: id, lastName: id.toUpperCase(), firstName: "Juan", middleName: null, birthdate: "1990-01-01", srn: "SRN-1", rank: "AB", dueCentavos: due, paidBy11: b11, paidBy16: b16, paidNow: now, ...extra });
 const batch = (trainees: MismoTrainee[]): MismoBatch => ({ id: "b1", batchNumber: "BCH-1", courseName: "Crowd Management", courseCode: "PSCMT", startsOn: "2026-10-08", endsOn: "2026-10-09", room: "Room 1", instructor: "Capt. X", trainees, submittedAt: null, submittedCount: null });
@@ -53,7 +53,7 @@ describe("MARINA MISMO lists", () => {
     ]);
     expect(unsettledAt11(b).map((x) => x.enrollmentId)).toEqual(["paidAfternoon", "partial", "unpaid"]);
     expect(finalList(b).map((x) => x.enrollmentId)).toEqual(["paidEarly", "paidAfternoon"]);
-    expect(leftOff(b).map((x) => x.enrollmentId)).toEqual(["partial", "unpaid"]);
+    expect(b.trainees.filter(paidLate).map((x) => x.enrollmentId)).toEqual(["partial"]);
     expect(balanceAt(b.trainees[2], "16")).toBe(45000);
     expect(owesAt(b.trainees[2], "now")).toBe(false);
   });
@@ -62,6 +62,12 @@ describe("MARINA MISMO lists", () => {
     expect(unsettledAt11(b).map((x) => x.enrollmentId)).toEqual(["unpaid"]);
     expect(finalList(b).map((x) => x.enrollmentId)).toEqual(["billed"]);
     expect(balanceAt(b.trainees[0], "16")).toBe(0);
+  });
+  it("takes a trainee not yet paid off the officer's lists, unless on Company Charge", () => {
+    expect(mismoListed(t("paid", 100, 100, 100, 100))).toBe(true);
+    expect(mismoListed(t("billed", 100, 0, 0, 0, { companyCharge: true }))).toBe(true);
+    expect(mismoListed(t("unpaid", 100, 0, 0, 0))).toBe(false);
+    expect(mismoListed(t("balance", 100, 50, 50, 50))).toBe(false);
   });
   it("writes the CSV for settled trainees only, quoting commas", () => {
     const csv = mismoCsv(batch([t("ok", 100, 100, 100, 100, { middleName: "Dela Cruz, Jr." }), t("no", 100, 0, 0, 0)])).split("\r\n");
