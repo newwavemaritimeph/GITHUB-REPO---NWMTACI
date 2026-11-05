@@ -4,6 +4,7 @@ import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import type { PortalData } from "@/components/portal-live-app";
 import { CoursesAndCenters, RegistrationDashboard, RegistrationRecords, applicationReadiness } from "@/components/portal/live-registration";
+import { InstructionsButton, InstructionsWindow } from "@/components/portal/instructions-window";
 
 /**
  * Registration Officer workspace: renders every screen against a fixture and
@@ -148,11 +149,30 @@ describe("Registration Officer workspace", () => {
     expect(html).not.toContain("payable");
   });
 
+  it("keeps the Instructions button open at any number of sends, with Send To and Last Sent in the window", () => {
+    const e = fixture.enrollments.find((x) => x.id === "e1")!;
+    const enrolled = { ...e, enrollment_status: "Enrolled" };
+    const emails = { ...fixture, instructionEmails: { e1: { state: "Failed", to: "old@example.com", sent_at: null, last_error: null, created_at: "2026-11-05T02:00:00Z" } } } as PortalData;
+    const button = renderToString(createElement(InstructionsButton, { data: emails, enrollment: enrolled, reload }));
+    expect(button).toContain(">Instructions</button>");
+    expect(button).not.toContain("disabled");
+    expect(button).toContain("Sent 2 Times");
+    expect(button).not.toContain(" of 2");
+    const win = renderToString(createElement(InstructionsWindow, { data: emails, enrollment: enrolled, reload, onClose: noop, onSent: noop }));
+    expect(win).toContain("Send To");
+    expect(win).toContain("Last Sent");
+    expect(win).toContain("old@example.com");
+    expect(win).toContain("Failed");
+  });
+
   it("can only send the actions the role is allowed (MASTERPLAN §10: never a payment write)", () => {
     const source = readFileSync(new URL("../components/portal/live-registration.tsx", import.meta.url), "utf8");
     // Sent directly from the Registration screens.
     const direct = new Set([...source.matchAll(/action: ?"([a-z-]+)"/g)].map((m) => m[1]));
-    expect([...direct].sort()).toEqual(["application-assign", "application-enroll", "application-enroll-charge", "application-handover", "application-place-batch", "enrollment-set-start", "enrollment-source", "other-course-center", "package-assign", "requirement-check", "send-instructions", "trainee-facebook"]);
+    expect([...direct].sort()).toEqual(["application-assign", "application-enroll", "application-enroll-charge", "application-handover", "application-place-batch", "enrollment-set-start", "enrollment-source", "other-course-center", "package-assign", "requirement-check", "trainee-facebook"]);
+    // The Instructions window, its own file, sends only these.
+    const windowSource = readFileSync(new URL("../components/portal/instructions-window.tsx", import.meta.url), "utf8");
+    expect([...new Set([...windowSource.matchAll(/action: ?"([a-z-]+)"/g)].map((m) => m[1]))].sort()).toEqual(["classroom-classes", "classroom-course-link", "send-instructions"]);
     // The Training Admission Record is printed by the Cashier, never from here.
     expect(source).not.toContain("admission-record-issue");
     expect(source).not.toContain("openAdmissionRecord");

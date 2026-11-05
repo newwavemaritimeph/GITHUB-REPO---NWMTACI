@@ -5,10 +5,10 @@ import type { PortalData, Enrollment, Batch, Trainee } from "../portal-live-app"
 import { first, manilaToday, dueCentavos, balanceOf, pesos, pesos2, addDays } from "@/lib/portal-format";
 import { LATE_ENROLLMENT_CODES, PUBLIC_STCW_CODES, automaticEndDate, fitsInWeek } from "@/lib/scheduling";
 import { isPackageCourse, packageWeeks } from "@/lib/packages";
-import { emailStatusText } from "@/lib/instruction-email-status";
 import { ALL_DATES, Badge, Message, Modal, PageHead, PeriodBar, ViewIcon, useNeedSince, usePaged, usePost, usePeriod, submit, fullName, fmtDate, fmtClock } from "./shared-ui";
 import { RequestActionModal, type RequestType } from "./payment-actions";
 import { TarButton } from "./live-cashier";
+import { InstructionsButton, instructionsCountOf } from "./instructions-window";
 import { tcl } from "@/lib/title-case";
 import { shrinkProof } from "@/lib/proof-shrink";
 import { COMPANY_CHARGE, sourceLabel } from "@/lib/company-charge";
@@ -21,7 +21,7 @@ import { VALIDATION_MESSAGES, isMetaThreadUrl } from "@/lib/validation";
  * Instructions. New registrations come only from the website as Pending
  * applications; Registration screens them (three requirements) and hands them
  * to the Cashier. A paid applicant on a batch is enrolled automatically by the
- * server. Registration generates training instructions (at most twice) but
+ * server. Registration sends training instructions (no limit, 5 Nov 2026) but
  * never prints the Training Admission Record — the Cashier does. The role reads
  * payment status but never writes a payment; the server actions reachable from
  * here are requirement-check, application-handover, send-instructions and
@@ -215,9 +215,6 @@ const awaitingCourseOf = (data: PortalData) => (data.awaitingCourseIds ?? []).ma
 export const RECORD_FILTERS = ["All enrollments", "Screening", "For payment"] as const;
 type RecordFilter = (typeof RECORD_FILTERS)[number];
 const inFilter = (f: RecordFilter, r: ReturnType<typeof applicationReadiness> | null) => (f === "All enrollments" ? true : !r ? false : f === "For payment" ? forPayment(r) : !forPayment(r));
-/** Times instructions were generated for an enrollment (limit 2 for Registration). */
-export const INSTRUCTION_LIMIT = 2;
-const instructionsCountOf = (data: PortalData, e: Enrollment) => data.instructionsCount?.[e.id] ?? (e.instructions_sent_at ? 1 : 0);
 
 const NO_BATCH = "none";
 
@@ -721,24 +718,6 @@ function OtherCenterEditor({ data, enrollment: e, busy, post }: { data: PortalDa
   </div>;
 }
 
-/**
- * Registration generates the Training Instructions (owner, 3 Nov 2026), enrolled trainees only:
- * opens the half-Legal sheet to print and emails it to the trainee, at most twice.
- */
-export function GenerateInstructions({ data, enrollment: e, reload, label = "Generate" }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; label?: string }) {
-  const { busy, msg, post } = usePost(reload);
-  const pdf = `/api/documents/training-instructions/${e.id}`;
-  const count = instructionsCountOf(data, e), enrolled = ["Enrolled", "Open Schedule"].includes(e.enrollment_status), atLimit = count >= INSTRUCTION_LIMIT;
-  const emailed = emailStatusText(data.instructionEmails?.[e.id]);
-  const generate = () => { window.open(pdf, "_blank"); void post({ action: "send-instructions", enrollmentId: e.id }).catch(() => undefined); };
-  if (e.enrollment_status === "Cancelled") return null;
-  return <span className="gi" onClick={(ev) => ev.stopPropagation()}>
-    <span className="gi-row"><button type="button" className={enrolled && !atLimit ? "portal-primary" : "portal-secondary"} disabled={busy || !enrolled || atLimit} onClick={generate}>{busy ? "Generating…" : label}</button>{enrolled && count > 0 && <ViewIcon label="View PDF" href={pdf} />}</span>
-    <small>{!enrolled ? "Enrolled trainees only" : count ? `Generated ${count} of ${INSTRUCTION_LIMIT}${emailed ? ` · ${emailed}` : ""}` : "Not yet generated"}</small>
-    {msg?.kind === "error" && <small className="cx-bad">{msg.text}</small>}
-  </span>;
-}
-
 export function EnrollmentDrawer({ data, enrollment: e, reload, onClose, onOpenAccount }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void; onOpenAccount?: () => void }) {
   const { busy, msg, post } = usePost(reload);
   const [req, setReq] = useState<RequestType | null>(null);
@@ -784,9 +763,8 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose, onOpenA
       {hasDocuments ? <>
         <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
           <TarButton data={data} traineeId={e.trainee_id} reload={reload} className="portal-primary" />
-          <GenerateInstructions data={data} enrollment={e} reload={reload} label="Generate Training Instructions" />
+          <InstructionsButton data={data} enrollment={e} reload={reload} />
         </div>
-        <p className="portal-form-note full">Generating opens the half-Legal sheet to print and emails it{t?.email ? ` to ${t.email}` : ""}. Print the Training Admission Record here too.</p>
       </> : isApplication ? <>
         <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}><TarButton data={data} traineeId={e.trainee_id} reload={reload} className="portal-primary" /></div>
         <p className="portal-form-note full">The TAR prints regardless of payment and shows the balance. Training instructions become available once the trainee is paid and enrolled.</p>

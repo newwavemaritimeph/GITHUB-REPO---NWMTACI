@@ -1,0 +1,228 @@
+<title>Send Instructions</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;700&display=swap">
+<style>
+/* Same sizes as the live Trainee Account: table text 13px, one window over the page. Sample names only. */
+:root {
+  --bg: #f2f6f9; --fg: #123f63; --ink: #0f2a3d; --muted: #4d6a7d; --line: #d5e1e9; --panel: #ffffff; --thead: #e6f5fa; --tab: #e2ebf1; --tab-fg: #123f63; --tab-on: #123f63; --tab-on-fg: #ffffff; --accent: #0571d0; --focus: #f25615; --bar: #123f63; --veil: rgba(11, 31, 51, .45);
+  --ok: #0a7a3e; --ok-bg: #e4f5ec; --warn: #b23d0c; --warn-bg: #fdeee6; --info: #0562b4; --info-bg: #e3f0fb;
+  --font: "Geist", "Segoe UI", Arial, sans-serif; --mono: "Geist Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0e1a24; --fg: #e4eef5; --ink: #e4eef5; --muted: #9db4c3; --line: #2a3d4c; --panel: #162734; --thead: #1e3444; --tab: #223544; --tab-fg: #d6e4ee; --tab-on: #35ccfa; --tab-on-fg: #082030; --accent: #6db6f2; --bar: #1e3444; --veil: rgba(0, 0, 0, .6); --ok: #5fd39a; --ok-bg: #123527; --warn: #ff9a6b; --warn-bg: #3a2218; --info: #8cc4f5; --info-bg: #15304a; color-scheme: dark; } }
+:root[data-theme="dark"] { --bg: #0e1a24; --fg: #e4eef5; --ink: #e4eef5; --muted: #9db4c3; --line: #2a3d4c; --panel: #162734; --thead: #1e3444; --tab: #223544; --tab-fg: #d6e4ee; --tab-on: #35ccfa; --tab-on-fg: #082030; --accent: #6db6f2; --bar: #1e3444; --veil: rgba(0, 0, 0, .6); --ok: #5fd39a; --ok-bg: #123527; --warn: #ff9a6b; --warn-bg: #3a2218; --info: #8cc4f5; --info-bg: #15304a; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.45; }
+button, select, input { font: inherit; color: inherit; }
+button:focus-visible, select:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.top { background: var(--bar); color: #fff; padding-block: 12px 0; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.top-in, .wrap { max-width: 1160px; margin: 0 auto; }
+.brand { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; color: #cfe3ef; }
+.brand b { color: #fff; font-size: 15px; font-weight: 600; }
+.proto { background: var(--focus); color: #fff; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; padding: 2px 7px; border-radius: 5px; margin-left: 8px; }
+.tabs { display: flex; gap: 2px; margin-top: 10px; overflow-x: auto; scrollbar-width: none; }
+.tabs span { color: #c3dbea; font-size: 14px; font-weight: 500; padding: 9px 14px; border-radius: 9px 9px 0 0; white-space: nowrap; }
+.tabs span.on { background: var(--bg); color: var(--ink); font-weight: 600; }
+.page { padding-block: 16px 40px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { display: flex; flex-direction: column; gap: 12px; }
+.eyebrow { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+h1 { margin: 0; font-size: 22px; line-height: 1.2; font-weight: 700; color: var(--fg); }
+h2 { margin: 0; font-size: 15px; line-height: 1.3; font-weight: 700; color: var(--fg); }
+.seg { display: inline-flex; align-self: flex-start; flex-wrap: wrap; gap: 3px; background: var(--tab); padding: 3px; border-radius: 9px; max-width: 100%; }
+.seg button { font-size: 13px; font-weight: 600; min-height: 32px; padding: 0 11px; border: 0; border-radius: 6px; background: transparent; color: var(--tab-fg); cursor: pointer; }
+.seg button.on { background: var(--tab-on); color: var(--tab-on-fg); }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; min-width: 0; overflow: hidden; }
+.ph { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 12px; padding: 10px 14px; }
+.tw { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: var(--thead); color: var(--fg); font-size: 12px; font-weight: 700; text-align: left; padding: 7px 10px; white-space: nowrap; }
+td { padding: 7px 10px; border-top: 1px solid var(--line); vertical-align: top; }
+td small { display: block; color: var(--muted); font-size: 11.5px; }
+.chip { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
+.chip.ok { background: var(--ok-bg); color: var(--ok); }
+.chip.warn { background: var(--warn-bg); color: var(--warn); }
+.chip.info { background: var(--info-bg); color: var(--info); }
+.btn { min-height: 34px; padding: 0 13px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn.primary { background: var(--focus); border-color: var(--focus); color: #fff; }
+.btn:disabled { opacity: .45; cursor: default; }
+.veil { position: fixed; inset: 0; background: var(--veil); display: grid; place-items: center; padding: 16px; z-index: 5; overflow-y: auto; }
+.win { background: var(--panel); border-radius: 12px; width: min(560px, 100%); max-height: 100%; overflow-y: auto; border: 1px solid var(--line); }
+.win-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.win-b { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+.win-f { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--line); }
+.x { border: 0; background: none; font-size: 20px; line-height: 1; cursor: pointer; color: var(--muted); padding: 2px 6px; }
+.kv { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 4px 10px; font-size: 13px; }
+.kv span { color: var(--muted); }
+.kv b { font-weight: 600; overflow-wrap: anywhere; }
+.box { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.box h3 { margin: 0; font-size: 13.5px; font-weight: 700; color: var(--fg); display: flex; justify-content: space-between; gap: 8px; align-items: center; flex-wrap: wrap; }
+.box p { margin: 0; font-size: 13px; }
+select, .field { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 7px 9px; font-size: 13px; background: var(--panel); }
+.field.bad { border-color: var(--warn); }
+.err { margin: 0; font-size: 12.5px; font-weight: 500; color: var(--warn); }
+.hint { margin: 0; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.last { margin: 0; font-size: 12.5px; overflow-wrap: anywhere; }
+.last > span:first-child { color: var(--muted); margin-right: 6px; }
+#to-extra { display: flex; flex-direction: column; gap: 4px; }
+#to-extra:empty { display: none; }
+.tick { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; }
+.mono { font-family: var(--mono); font-size: 12.5px; }
+.link { color: var(--accent); font-weight: 600; font-size: 13px; background: none; border: 0; padding: 0; cursor: pointer; }
+.msg { padding: 8px 11px; border-radius: 8px; background: var(--ok-bg); color: var(--ok); font-size: 13px; font-weight: 500; }
+ol.q { margin: 0; padding: 4px 14px 14px 32px; font-size: 13.5px; display: flex; flex-direction: column; gap: 8px; }
+ol.q b { color: var(--fg); }
+.note { font-size: 12.5px; color: var(--muted); padding: 9px 14px; margin: 0; border-top: 1px solid var(--line); }
+/* The email keeps its own colours in both themes, as it does in an inbox. */
+.mail { max-width: 600px; margin: 0 auto 14px; background: #fff; color: #0f2638; border: 1px solid #d5e1e9; border-radius: 10px; overflow: hidden; }
+.mail-meta { padding: 10px 16px; font-size: 12.5px; color: #4d6a7d; border-bottom: 1px solid #e6edf2; }
+.mail-meta b { color: #0f2638; }
+.mail-head { background: #123f63; color: #fff; padding: 12px 16px; font-weight: 700; font-size: 14px; border-bottom: 3px solid #f25615; }
+.mail-body { padding: 16px; font-size: 14px; display: flex; flex-direction: column; gap: 10px; }
+.mail-body p { margin: 0; }
+.join { padding: 14px; border: 1px solid #cfe6f2; border-radius: 10px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.join b { color: #123f63; }
+.join-btn { background: #f25615; color: #fff; font-weight: 700; font-size: 14px; padding: 11px 18px; border-radius: 8px; border: 0; }
+.attach { font-size: 12.5px; border: 1px solid #d5e1e9; border-radius: 8px; padding: 6px 10px; color: #123f63; align-self: flex-start; }
+</style>
+
+<header class="top"><div class="top-in">
+  <div class="brand"><div><b>New Wave Maritime</b><span class="proto">PROTOTYPE</span></div><span>Working as Registration · sample trainee</span></div>
+  <div class="tabs"><span>Dashboard</span><span class="on">Enrollments ▾</span><span>Courses</span></div>
+</div></header>
+<main class="page"><div class="wrap">
+  <div><span class="eyebrow">Enrollments · Trainee Account</span><h1>DELA CRUZ, Juan P.</h1></div>
+  <div class="seg" id="views" role="tablist" aria-label="Prototype views"></div>
+  <div id="body"></div>
+</div></main>
+<div id="modal"></div>
+
+<script>
+(function () {
+  // A short sample of the class list; the portal lists every class in the connected Google account. Class codes here are made up.
+  var CLASSES = ["APC-Anti Piracy", "BTM-Bridge Team Management", "MARPOL-Marine Pollution", "HPT-Hydraulic and Pneumatic Training", "SVI-Sire and Vetting Inspection", "MLH-Marine Leadership and Human Behaviour"];
+  var email = "juan.delacruz@example.com", START = email, EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+  var rows = [
+    { id: "btm", code: "BTM", name: "Bridge Team Management", when: "Nov 9, 2026 · Online", cls: "BTM-Bridge Team Management", code2: "abc1234", sent: 0, last: "", lastTo: "", lastState: "", lastClass: false },
+    { id: "apa", code: "APA", name: "Anti Piracy Awareness Prevention and Response", when: "Nov 10, 2026 · Online", cls: "", suggest: "APC-Anti Piracy", code2: "xyz5678", sent: 1, last: "Nov 5, 2026", lastTo: email, lastState: "Failed", lastClass: false },
+    { id: "ubt", code: "UBT-PSSR", name: "Updating Course on BT-PSSR", when: "Nov 12, 2026 · Room 101", cls: "", code2: "", sent: 2, last: "Nov 5, 2026", lastTo: email, lastState: "Sent", lastClass: false, f2f: true }
+  ];
+  var view = "Trainee Account", open = null, pick = "", invite = true, toast = "", emailFor = "btm", to = "", saveIt = true;
+  var body = document.getElementById("body"), modal = document.getElementById("modal");
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+  var rowOf = function (id) { return rows.filter(function (r) { return r.id === id; })[0]; };
+
+  function drawViews() {
+    document.getElementById("views").innerHTML = ["Trainee Account", "The Email", "Classes to Confirm", "To Confirm"].map(function (v) { return '<button type="button" role="tab" class="' + (v === view ? "on" : "") + '" data-v="' + v + '">' + v + "</button>"; }).join("");
+  }
+  function drawAccount() {
+    body.innerHTML = (toast ? '<div class="msg" style="margin-bottom:12px">' + esc(toast) + "</div>" : "") + '<section class="panel" style="margin-bottom:12px"><div class="ph"><h2>Email on Record</h2><span><b>' + esc(email) + "</b>" + (email !== START ? ' <span class="chip ok">Updated</span>' : "") + '</span></div></section><section class="panel"><div class="ph"><h2>Courses</h2></div><div class="tw"><table><thead><tr><th>Course</th><th>Schedule</th><th>Status</th><th>Google Classroom</th><th>Training Instructions</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        var cls = r.cls ? '<span class="chip ok">Linked</span><small>' + esc(r.cls) + "</small>" : r.f2f ? '<span class="chip info">No Class Needed</span><small>Face to Face</small>' : '<span class="chip warn">Not Linked</span>';
+        return "<tr><td><b>" + r.code + "</b><small>" + esc(r.name) + "</small></td><td>" + esc(r.when) + '</td><td><span class="chip ok">Enrolled</span></td><td>' + cls + '</td><td><button type="button" class="btn primary" data-send="' + r.id + '">Instructions</button><small>' + (r.sent ? "Sent " + times(r.sent) : "Not Yet Sent") + "</small>" + (r.lastTo ? "<small>" + lastLine(r) + "</small>" : "") + "</td></tr>";
+      }).join("") + "</tbody></table></div></section>";
+  }
+  function lastLine(r) { return esc(r.lastTo) + " · " + esc(r.last) + (r.lastClass ? " · With Classroom Link" : "") + ' <span class="chip ' + (r.lastState === "Failed" ? "warn" : "ok") + '">' + r.lastState + "</span>"; }
+  function times(n) { return n + (n === 1 ? " Time" : " Times"); }
+  function sendToBox(r) { return '<div class="box"><h3><label for="to">Send To</label></h3><input class="field" id="to" type="email" autocomplete="off" spellcheck="false" value="' + esc(to) + '"><div id="to-extra"></div>' + (r.lastTo ? '<p class="last"><span>Last Sent</span>' + lastLine(r) + "</p>" : "") + "</div>"; }
+  // Repaints only what depends on the address, so typing keeps the cursor in the box.
+  function paintTo() {
+    var v = to.trim(), ok = EMAIL.test(v), changed = v.toLowerCase() !== email.toLowerCase();
+    document.getElementById("to").classList.toggle("bad", !ok);
+    document.getElementById("to-extra").innerHTML = !ok ? '<p class="err" role="alert">Enter a valid email address, for example name@example.com.</p>' : changed ? '<label class="tick"><input type="checkbox" id="save"' + (saveIt ? " checked" : "") + '> Save as the Trainee\'s Email</label><p class="hint">' + (saveIt ? "Replaces " + esc(email) + " on the trainee's record." : "This one time only. The record keeps " + esc(email) + ".") + "</p>" : "";
+    document.getElementById("send").disabled = !ok;
+  }
+  function drawWindow() {
+    if (!open) { modal.innerHTML = ""; return; }
+    var r = rowOf(open), chosen = r.cls || pick;
+    var classBox;
+    if (r.cls) classBox = '<div class="box"><h3>Google Classroom <span class="chip ok">Linked</span></h3><p><b>' + esc(r.cls) + '</b></p><p>Class Code <span class="mono">' + esc(r.code2) + '</span> · <button type="button" class="link" data-open="1">Open Classroom</button></p><label class="tick"><input type="checkbox" id="invite" ' + (invite ? "checked" : "") + '> Also send a Google Classroom invitation to this email</label></div>';
+    else if (r.f2f) classBox = '<div class="box"><h3>Google Classroom <span class="chip info">No Class Needed</span></h3><p>This course is face to face. The email goes out without a Classroom button.</p></div>';
+    else classBox = '<div class="box"><h3>Google Classroom <span class="chip warn">Not Linked</span></h3><label for="pick" style="font-size:13px">Choose the Class for This Course</label><select id="pick"><option value="">Send Without a Class</option>' + CLASSES.map(function (c) { return '<option value="' + esc(c) + '"' + (c === pick ? " selected" : "") + ">" + esc(c) + (c === r.suggest ? " (Suggested)" : "") + "</option>"; }).join("") + "</select>" + (pick ? '<label class="tick"><input type="checkbox" id="invite" ' + (invite ? "checked" : "") + '> Also send a Google Classroom invitation to this email</label><p style="color:var(--muted);font-size:12.5px">Saved to this course, so the next trainees get it too.</p>' : "") + "</div>";
+    modal.innerHTML = '<div class="veil"><div class="win" role="dialog" aria-modal="true" aria-label="Training Instructions"><div class="win-h"><h2>Training Instructions</h2><button type="button" class="x" data-close="1" aria-label="Close">×</button></div><div class="win-b">' + sendToBox(r) + '<div class="kv"><span>Course</span><b>' + r.code + " · " + esc(r.name) + "</b><span>Schedule</span><b>" + esc(r.when) + "</b><span>Sent</span><b>" + times(r.sent) + "</b></div>" + classBox + '</div><div class="win-f"><button type="button" class="btn" data-close="1">Cancel</button><button type="button" class="btn" data-pdf="1">View PDF</button><button type="button" class="btn primary" id="send">' + (chosen ? "Send With Classroom Link" : "Send") + "</button></div></div></div>";
+    paintTo();
+  }
+  function drawEmail() {
+    var r = rowOf(emailFor), hasClass = !!r.cls;
+    body.innerHTML = '<div class="seg" id="mail-for" style="margin-bottom:12px;display:inline-flex">' + rows.map(function (x) { return '<button type="button" class="' + (x.id === emailFor ? "on" : "") + '" data-m="' + x.id + '">' + x.code + "</button>"; }).join("") + "</div>" +
+      '<div class="mail"><div class="mail-meta"><b>New Wave Maritime</b> &lt;newwavemaritime@gmail.com&gt;<br>To: ' + esc(r.lastTo || email) + '<br>Subject: <b>Your training instructions · ' + esc(r.code) + " · " + esc(r.name) + '</b></div><div class="mail-head">NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.</div><div class="mail-body"><p>Dear Juan, you are enrolled.</p><p><b>When:</b> ' + esc(r.when) + "</p>" +
+      (hasClass ? '<div class="join"><b>Join our Google Classroom</b><span style="font-size:13.5px">Sign in with your Google (Gmail) account, then tap the button to join the class.</span><span class="join-btn">Join Google Classroom</span><span style="font-size:13px;color:#40606f">Class code: <b>' + esc(r.code2) + "</b></span></div>" : "") +
+      '<p>Your full instructions are attached.</p><span class="attach">training-instructions-ENR-2026-000301.pdf</span></div></div>' +
+      (hasClass ? "" : '<p style="text-align:center;color:var(--muted);font-size:13px;margin:0">' + (r.f2f ? "No button: this course is face to face." : "No button yet: choose a class on the Trainee Account tab, then send.") + "</p>");
+  }
+  var MATCH = [
+    ["HAZMAT-Hazardous Materials", "HAZMAT-CFR · HAZMAT with CFR Cargoes", 1],
+    ["HAZMAT - DHHC - BULK", "HAZMAT · Dangerous Hazardous and Harmful", 0],
+    ["ECDIS-Electronic Chart Display and Information System Generic", "ECDIS · Operational Use of Electronic Chart", 0],
+    ["SARTA_Search And Radar Transponder Awareness", "SARTA · Sart Awareness", 0],
+    ["RADROC-Radar Operation Course", "RADAROC · RADAR Operation Course", 0],
+    ["ESEA_Enclosed Space Entry Awareness", "ESE · Enclosed Space Entry", 0],
+    ["BSF-Bulk Ship Familiarization", "BULKFAM · Bulk Carrier Familiarization", 0],
+    ["SBCC-Shipboard Culinary Course", "SC · Shipboard Culinary", 0],
+    ["RAIIA_Risk Assessment, Incident Investigation and Analysis", "RAIA · Risk Assessment, Incident", 0],
+    ["ERM-Engine Room Resource Management", "ERRM · Engine Room Resource Management", 0],
+    ["AIRCA-Accident Investigation and Root Cause Analysis", "AIIRCA · Accident Investigation and Root", 0],
+    ["FPS-FRAMO Pump System", "FRAMO · FRAMO PUMP", 0],
+    ["HVC-High Voltage Course", "HVT · High Voltage Training", 0],
+    ["BAT-Banksman Awareness Training", "BMT · Banksman Training", 0],
+    ["MAM-Marine Auxiliary Machinery", "AMMS · Auxiliary Marine Machinery Systems", 0],
+    ["SDA-Smoke Diving Awareness", "SDC · Smoke Diving Course", 0],
+    ["HSGBA-(H2S) Hydrogen Sulfide Gas Basic Awareness", "HSBAT · Hydrogen Sulfide Basic Awareness", 0],
+    ["MCSA-Maritime Cyber Security Awareness", "CSA · Cyber Security Awareness", 0],
+    ["BN-HACCP-Basic Nutrition with HACCP", "BNHACCP · Basic Nutrition with HACCP", 0],
+    ["MECA-R-Medical Care Refresher", "MECAR · Medical Care - Refresher", 0],
+    ["MEFA-R-Medical Emergency First Aid Refresher Course", "MEFAR · Medical First Aid - Refresher", 0],
+    ["SMOS-Stress Management Onboard Ship", "SMC · Stress Management Course", 0],
+    ["FS-Food Safety and Sanitation", "FST · Food Safety Training", 0],
+    ["GH-Galley Hygiene", "GHFS · Galley Hygiene and Food Sanitation", 1],
+    ["HELM-Humen Element Leadership and Management", "", 2], ["COST-Cargo Operation Shorebased Training", "", 2], ["HCMO-Hatch Cover Maintenance and Operation", "", 2], ["DWK-Deck Watchkeeping", "", 2], ["CMAEN-Comprehensive Maritime English", "", 2], ["EWK-Engine Watch Keeping", "", 2], ["MRAC-Marine Refrigerator and Air Condition", "", 2], ["BWM-Ballast Water Management", "", 2]
+  ];
+  function drawMatches() {
+    body.innerHTML = '<section class="panel"><div class="ph"><h2>32 Classes to Confirm</h2><span class="chip ok">67 Courses Already Linked</span></div><div class="tw"><table><thead><tr><th>Class in Google Classroom</th><th>Link To</th><th></th></tr></thead><tbody>' +
+      MATCH.map(function (m) { return "<tr><td>" + esc(m[0]) + "</td><td>" + (m[1] ? esc(m[1]) : '<span style="color:var(--muted)">No Portal Course Found</span>') + "</td><td>" + (m[2] === 1 ? '<span class="chip warn">Please Check</span>' : m[2] === 2 ? '<span class="chip info">Name the Course</span>' : "") + "</td></tr>"; }).join("") +
+      '</tbody></table></div><p class="note">The 8 CCMD classes per batch, such as "CCMD0087 (Nov 9-11, 2026)", link when a CCMD batch with those dates is open. None is open now.</p></section>';
+  }
+  function drawConfirm() {
+    body.innerHTML = '<section class="panel"><div class="ph"><h2>To Confirm Before Building</h2></div><ol class="q">' +
+      "<li><b>The button.</b> Generate becomes <b>Instructions</b> and opens this window. It no longer sends on one click, so Registration sees the email address and the class first.</li>" +
+      "<li><b>Choosing a class.</b> Registration can link a course to a class from this window. It stays linked for later trainees.</li>" +
+      "<li><b>Changing the email.</b> Send To starts with the trainee's email and can be changed here, so everything stays in this one window. The Google Classroom invitation goes to the same address. Ticked, the new address replaces the old one on the trainee's record, and the change is logged with both. Unticked, it is used this one time only.</li>" +
+      "<li><b>No limit.</b> Registration can send as many times as needed. Every send stays on record with the address, date and result.</li>" +
+      "<li><b>When an email does not arrive.</b> Failed shows only when Google refuses to send. If the mailbox does not exist, Google still accepts the email, so the portal shows Sent and the bounce message goes to newwavemaritime@gmail.com. Registration changes the address when the trainee reports nothing came, or when that bounce appears.</li>" +
+      "<li><b>Invitations.</b> The box is ticked by default. Google sends its own invitation to the Send To address, on top of the button. The first real send will be the first live test of this.</li>" +
+      "<li><b>Enrolled only.</b> As today, the button works only for Enrolled and Open Schedule trainees.</li>" +
+      "</ol></section>";
+  }
+  function draw() { drawViews(); if (view === "Trainee Account") drawAccount(); else if (view === "The Email") drawEmail(); else if (view === "Classes to Confirm") drawMatches(); else drawConfirm(); drawWindow(); }
+  document.getElementById("views").addEventListener("click", function (e) { var v = e.target.getAttribute("data-v"); if (v) { view = v; toast = ""; draw(); } });
+  body.addEventListener("click", function (e) {
+    var s = e.target.getAttribute("data-send"), m = e.target.getAttribute("data-m");
+    if (s) { open = s; var r = rowOf(s); pick = !r.cls && r.suggest ? r.suggest : ""; invite = true; toast = ""; to = email; saveIt = true; drawWindow(); }
+    if (m) { emailFor = m; drawEmail(); }
+  });
+  modal.addEventListener("change", function (e) {
+    if (e.target.id === "pick") { pick = e.target.value; drawWindow(); }
+    if (e.target.id === "invite") invite = e.target.checked;
+    if (e.target.id === "save") { saveIt = e.target.checked; paintTo(); }
+  });
+  modal.addEventListener("input", function (e) { if (e.target.id === "to") { to = e.target.value; paintTo(); } });
+  modal.addEventListener("click", function (e) {
+    if (e.target.getAttribute("data-close")) { open = null; drawWindow(); return; }
+    if (e.target.getAttribute("data-pdf") || e.target.getAttribute("data-open")) { toast = "Sample only. In the portal this opens the " + (e.target.getAttribute("data-pdf") ? "PDF" : "class") + "."; open = null; draw(); return; }
+    if (e.target.id === "send") {
+      var r = rowOf(open), linkedNow = !r.cls && pick;
+      if (linkedNow) r.cls = pick;
+      var addr = to.trim(), changed = addr.toLowerCase() !== email.toLowerCase(), saved = changed && saveIt;
+      r.sent += 1;
+      r.last = "Nov 5, 2026"; r.lastTo = addr; r.lastState = "Sent"; r.lastClass = !!r.cls;
+      if (saved) email = addr;
+      toast = "Sent to " + addr + (r.cls ? (invite ? " with the Classroom link and an invitation." : " with the Classroom link.") : ".") + (saved ? " Saved as the trainee's email." : changed ? " This one time only. The record keeps " + email + "." : "");
+      emailFor = r.id; open = null; draw();
+    }
+  });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && open) { open = null; drawWindow(); } });
+  var deep = { email: "The Email", matches: "Classes to Confirm", confirm: "To Confirm" }[location.hash.slice(1)];
+  if (deep) view = deep;
+  draw();
+})();
+</script>
