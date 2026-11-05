@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PDFRawStream } from "pdf-lib";
 import { conductedText } from "../lib/certificate-overlay";
-import { bundledLayout } from "../lib/certificate-template-layouts";
+import { bundledLayout, courseLayout } from "../lib/certificate-template-layouts";
 import layouts from "../lib/certificate-template-layouts.json";
 
 describe("STCW certificate templates (Safety, Crowd, Crisis)", () => {
@@ -52,6 +52,15 @@ describe("UBT-PSSR training certificate", () => {
     const stream = doc.context.lookup(page.node.get(PDFName.of("Contents")));
     const left = new TextDecoder("latin1").decode(decodePDFRawStream(stream as PDFRawStream).decode());
     expect((left.match(/BT\s/g) ?? []).length).toBe(2);
+  });
+  it("takes the PDF exported from the Word file under any name, for UBT-PSSR only", () => {
+    const f = bundledLayout("course/00000000-0000-0000-0000-000000000000-NWMTACI-COC--UBT-PSSR-.pdf")!;
+    expect(f.lift?.length).toBe(5);
+    expect(f.fixed?.map((w) => w.text)).toEqual(["Certificate No:", "Registration No:"]);
+    expect(courseLayout("UBT-PSSR")).toEqual(f);
+    expect(bundledLayout("course/00000000-0000-0000-0000-000000000000-any-other-name.pdf")).toBeNull();
+    expect(courseLayout("HPT")).toBeNull();
+    expect(courseLayout(null)).toBeNull();
   });
   it("draws every field on a page", async () => {
     const { PDFDocument } = await import("pdf-lib");

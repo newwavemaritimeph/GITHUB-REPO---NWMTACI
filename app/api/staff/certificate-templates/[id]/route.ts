@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
 import { drawTemplateFields, isFieldsV2, liftTemplateText } from "@/lib/certificate-overlay";
-import { bundledLayout } from "@/lib/certificate-template-layouts";
+import { bundledLayout, courseLayout } from "@/lib/certificate-template-layouts";
 import { detectPhotoBox } from "@/lib/certificate-template";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -18,7 +18,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   if (!staff) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
   const { id } = await params;
   const db = createSupabaseAdminClient();
-  const { data: template } = await db.from("certificate_templates").select("id,storage_path,fields").eq("id", id).maybeSingle();
+  const { data: template } = await db.from("certificate_templates").select("id,storage_path,fields,courses(code)").eq("id", id).maybeSingle();
   if (!template) return NextResponse.json({ error: "Template not found." }, { status: 404 });
   // ?view=1 (owner, 20 Oct 2026): the template as a PDF with its course description, the dates,
   // name, numbers and QR left blank, for checking a template before any certificate is printed.
@@ -26,7 +26,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const { data: file } = await db.storage.from("certificate-templates").download(template.storage_path);
     if (!file) return NextResponse.json({ error: "The template file could not be read." }, { status: 404 });
     const bytes = new Uint8Array(await file.arrayBuffer());
-    const fields = bundledLayout(template.storage_path) ?? (isFieldsV2(template.fields) ? template.fields : null);
+    const owner = template.courses as unknown as { code: string } | { code: string }[] | null;
+    const fields = bundledLayout(template.storage_path) ?? (isFieldsV2(template.fields) ? template.fields : null) ?? courseLayout(Array.isArray(owner) ? owner[0]?.code : owner?.code);
     let out: Uint8Array = bytes;
     if (template.storage_path.toLowerCase().endsWith(".pdf") && fields) {
       const src = await PDFDocument.load(bytes), pdf = await PDFDocument.create();

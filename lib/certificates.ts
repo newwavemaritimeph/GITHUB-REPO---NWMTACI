@@ -6,7 +6,7 @@ import { corrected, type CertificateCorrections } from "@/lib/certificate-photo"
 import { detectPhotoBox } from "@/lib/certificate-template";
 import { certificateLayout, isHazmatCfr } from "@/lib/certificate-layouts";
 import { drawTemplateFields, isFieldsV2, liftTemplateText } from "@/lib/certificate-overlay";
-import { bundledLayout } from "@/lib/certificate-template-layouts";
+import { bundledLayout, courseLayout } from "@/lib/certificate-template-layouts";
 import { postTestStatus } from "@/lib/post-test-server";
 import { newVerifyCode, verifyUrl } from "@/lib/certificate-verify";
 
@@ -200,10 +200,12 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
   if (!tpl) throw new Error("No certificate template is uploaded for this course yet. The Admin imports the templates from the NWMTACI CERTIFICATES folder.");
   const pdf = await PDFDocument.create();
   let page;
+  // Templates converted from New Wave's Word files (scripts/certificate-templates, 20 Oct 2026):
+  // the bundled positions for that converted file (they carry fixes, e.g. CSF hours), else the upload's, else the course's.
+  const v2 = bundledLayout(tpl.storagePath) ?? (isFieldsV2(tpl.fields) ? tpl.fields : null) ?? (isPdf(tpl.bytes) ? courseLayout(ctx.course.code) : null);
   if (isPdf(tpl.bytes)) {
     const src = await PDFDocument.load(tpl.bytes);
-    const lift = bundledLayout(tpl.storagePath)?.lift;
-    if (lift) liftTemplateText(src, src.getPages()[0], lift);
+    if (v2?.lift) liftTemplateText(src, src.getPages()[0], v2.lift);
     const [copied] = await pdf.copyPages(src, [0]);
     page = pdf.addPage([copied.getWidth(), copied.getHeight()]);
     page.drawPage(await pdf.embedPage(copied), { x: 0, y: 0, width: copied.getWidth(), height: copied.getHeight() });
@@ -226,9 +228,6 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold), reg = await pdf.embedFont(StandardFonts.Helvetica);
   // A course with its own layout (HAZMAT with CFR) is filled like New Wave's sample certificate.
   const layout = certificateLayout(ctx.course);
-  // Templates converted from New Wave's Word files (scripts/certificate-templates, 20 Oct 2026):
-  // the bundled positions for that converted file (they carry fixes, e.g. CSF hours), else the upload's.
-  const v2 = bundledLayout(tpl.storagePath) ?? (isFieldsV2(tpl.fields) ? tpl.fields : null);
   if (v2) {
     await drawTemplateFields(pdf, page, v2, { name: String(traineeName), startsOn: startsOn ?? null, endsOn: endsOn ?? null, issuedOn: String(issuedOn), certificateNumber: number, registrationNumber: regNo ?? "", verifyUrl: ctx.cert?.verify_code ? verifyUrl(ctx.cert.verify_code) : null });
   } else if (layout) {
