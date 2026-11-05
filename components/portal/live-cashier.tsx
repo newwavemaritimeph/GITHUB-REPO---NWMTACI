@@ -535,7 +535,7 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
             <div><dt>− Cash expenses</dt><dd className="minus">{pesos(cashOut)}</dd></div>
             <div className="total"><dt>= Expected in drawer</dt><dd className="eq">{pesos(expected)}</dd></div>
           </dl>
-          {!closedToday && <div className="cr-act"><button type="button" className="portal-secondary" onClick={() => go?.("Report")}>{opening ? "Close Cash" : "Record Opening Cash"}</button></div>}
+          {!closedToday && <div className="cr-act"><button type="button" className="portal-secondary" onClick={() => go?.("Opening and closing")}>{opening ? "Close Cash" : "Record Opening Cash"}</button></div>}
         </section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Per Channel</h2><span className="muted-text">today</span></div>
           <dl className="ac-lines">
@@ -774,7 +774,7 @@ export function CashierSummaryReport({ embedded }: { data?: PortalData; embedded
   const expTotal = shown ? shown.expenses.reduce((s, e) => s + e.amountCentavos, 0) : 0;
   const cell = (n: number, v: number) => (n ? <><span className="cx-amt">{pesos(v)}</span><small>{n} receipt{n === 1 ? "" : "s"}</small></> : <span className="muted-text">—</span>);
   return <div className={embedded ? "" : "portal-page cx"}>
-    {!embedded && <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Report</h1></div></div>}
+    {!embedded && <div className="cx-head"><div><span className="portal-eyebrow">Reports</span><h1>Daily Summary</h1></div></div>}
     <div className="cx-bar">
       <label className="cx-dt">Date<input type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} /></label>
       <a className="portal-primary" href={`/api/documents/cashier-report?date=${date}`} target="_blank" rel="noreferrer">Generate Report (PDF)</a>
@@ -933,11 +933,31 @@ function VoucherPrint({ e, reprints, onRequest, reload }: { e: ExpenseRow; repri
   return <button type="button" className="portal-secondary" onClick={() => onRequest(e)}>{p.state === "rejected" ? "Request Reprint Again" : "Request Reprint"}</button>;
 }
 
+/** Reports › Expenses Summary (owner, 5 Nov 2026): totals per payment channel for a date range, with the PDF. */
+export function CashierExpensesSummary({ data }: { data: PortalData }) {
+  const today = manilaToday();
+  const [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today);
+  useNeedSince(from);
+  const channels = expenseTotalsByChannel(data.expenses as ExpenseRow[], from, to);
+  const total = channels.reduce((s, c) => s + c.total, 0), vouchers = channels.reduce((s, c) => s + c.count, 0);
+  return <div className="portal-page cx">
+    <div className="cx-head"><div><span className="portal-eyebrow">Reports</span><h1>Expenses Summary</h1></div>{from && to && <a className="portal-primary" href={`/api/documents/expenses-summary?from=${from}&to=${to}`} target="_blank" rel="noreferrer">Generate Summary (PDF)</a>}</div>
+    <div className="cx-bar">
+      <label className="cx-dt">From<input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} /></label>
+      <label className="cx-dt">To<input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} /></label>
+    </div>
+    <div className="cx-tiles">
+      <div className="cx-tile" style={{ ["--c" as string]: "#123F63" }}><span>Total expenses</span><b>{pesos(total)}</b><small>{vouchers} voucher{vouchers === 1 ? "" : "s"}</small></div>
+      {channels.map((c) => <div className="cx-tile" key={c.channel} style={{ ["--c" as string]: MODE_COLORS[c.channel] ?? "#0571D0" }}><span>{c.channel}</span><b>{pesos(c.total)}</b><small>{c.count} voucher{c.count === 1 ? "" : "s"}</small></div>)}
+    </div>
+  </div>;
+}
+
 /**
  * Expenses (owner, 7–8 Oct 2026). Expenses: the Cashier records an expense
  * (ER-…), Accounting approves it (CV-…), the Cashier prints the
- * voucher once and marks it released; a dashboard per payment channel with a
- * summary PDF. Vouchers: every voucher filed by month, with file copies,
+ * voucher once and marks it released; the channel totals and summary PDF are
+ * in Reports › Expenses Summary. Vouchers: every voucher filed by month, with file copies,
  * prints and reprint requests (approved by Accounting).
  */
 export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; role: string; reload: () => Promise<void> }) {
@@ -965,8 +985,6 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   const byId = new Map(rows.map((e) => [e.id, e]));
   const inRange = rows.filter((e) => { const d = day(e.created_at); return (!from || d >= from) && (!to || d <= to); });
   const shown = inRange.filter((e) => tab === "All" || expenseState(e) === tab);
-  const channels = expenseTotalsByChannel(rows, from, to);
-  const total = channels.reduce((s, c) => s + c.total, 0), vouchers = channels.reduce((s, c) => s + c.count, 0);
   const count = (t: string) => inRange.filter((e) => t === "All" || expenseState(e) === t).length;
   const months = vouchersByMonth(rows);
   const thisMonth = today.slice(0, 7);
@@ -987,11 +1005,6 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
       <div className="cx-bar">
         <label className="cx-dt">From<input type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} /></label>
         <label className="cx-dt">To<input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} /></label>
-        {from && to && <a className="portal-secondary" href={`/api/documents/expenses-summary?from=${from}&to=${to}`} target="_blank" rel="noreferrer">Generate Summary (PDF)</a>}
-      </div>
-      <div className="cx-tiles">
-        <div className="cx-tile" style={{ ["--c" as string]: "#123F63" }}><span>Total expenses</span><b>{pesos(total)}</b><small>{vouchers} voucher{vouchers === 1 ? "" : "s"}</small></div>
-        {channels.map((c) => <div className="cx-tile" key={c.channel} style={{ ["--c" as string]: MODE_COLORS[c.channel] ?? "#0571D0" }}><span>{c.channel}</span><b>{pesos(c.total)}</b><small>{c.count} voucher{c.count === 1 ? "" : "s"}</small></div>)}
       </div>
       <div className="cx-status" role="tablist">{EXPENSE_STATUSES.map((t) => <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>{tcl(t)}<span>{count(t)}</span></button>)}</div>
       <section className="portal-panel cx-panel">{shown.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Number</th><th>Payee</th><th>Category</th><th>Channel</th><th className="r">Amount</th><th>Status</th><th></th></tr></thead><tbody>

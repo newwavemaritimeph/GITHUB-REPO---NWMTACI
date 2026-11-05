@@ -7,7 +7,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { LiveAttendance } from "./portal/live-attendance";
 import { LiveAccounting, AccountingDashboard, ReceivablesModule, ApprovalsModule, PayablesModule, CashPositionModule, LiveVouchers, LiveInventory, LiveExpenses, SetupList, AccountingConfiguration, ACCOUNTING_CONFIG_SECTIONS, type AccountingConfigSection } from "./portal/live-accounting";
 import { LiveCashierClosing } from "./portal/live-cashier-closing";
-import { CashierPaymentQueue, RequestChargeModal, feeForRequest, TarButton, RecordPaymentModal, RecordTicked, CashierDashboard, CashierPayments, DiscountRequests, CashierEnrollments, CashierOpening, CashierSummaryReport, ExpensesWorkspace } from "./portal/live-cashier";
+import { CashierPaymentQueue, RequestChargeModal, feeForRequest, TarButton, RecordPaymentModal, RecordTicked, CashierDashboard, CashierPayments, DiscountRequests, CashierEnrollments, CashierExpensesSummary, CashierOpening, CashierSummaryReport, ExpensesWorkspace } from "./portal/live-cashier";
 import { LiveHr, type HrData } from "./portal/live-hr";
 import { LiveTraining, type TrainingData } from "./portal/live-training";
 import { ReleasingDashboard, LiveReleasing } from "./portal/live-releasing";
@@ -32,7 +32,7 @@ import { MismoDashboard, MismoFinalList, MismoSubmissions } from "./portal/mismo
 import { AssistantDashboard, ClassSchedules, ResourcePlanning, InstructorShortlist, GcashReconciliation, GcashNotInHistory } from "./portal/admin-assistant-home";
 import { RegistrationDeliveries, ReleasingDeliveries } from "./portal/delivery-home";
 import { ReleasingReports, ReleasingHome, CertificatesWorkspace, WaitingCertificates, CertificateTemplates, ReleasedCertificates, AdminCertificateControls, CertificateAlarm, ReleasingNumbering } from "./portal/releasing-home";
-import { AccountingHome, ApprovalHistory, AccountingReportsHub, FinanceSummaryReport, BillingStatementReport, AccountingPayments, AccountingDocuments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
+import { AccountingHome, ApprovalHistory, AccountingReportsHub, EndorsedSalesReport, FinanceSummaryReport, BillingStatementReport, AccountingPayments, AccountingDocuments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
 import { pesos, pesos2, first, dueCentavos, balanceOf, isUnpaid, manilaToday, addDays, needsFullRefresh } from "@/lib/portal-format";
@@ -44,7 +44,7 @@ import { ClassroomLinksImport, DefaultRoomsPanel } from "./portal/admin-setup";
 import { AdminHome, AdminSearchTrainee, AdminEnrollments, AdminVouchers, AdminHolidays } from "./portal/admin-home";
 import { askText, askConfirm, showAlert } from "./portal/dialogs";
 
-type Module = "Classroom links" | "Post-tests" | "Training instructions" | "Dashboard" | "Waiting" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Report" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Billing statement" | "MISMO dashboard" | "Completion records" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
+type Module = "Classroom links" | "Post-tests" | "Training instructions" | "Dashboard" | "Waiting" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Daily summary" | "Opening and closing" | "Expenses summary" | "Templates" | "Released" | "Certificate controls" | "Final list" | "Submissions" | "Delivery requests" | "Delivery" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Billing statement" | "Sales from endorsed courses" | "MISMO dashboard" | "Completion records" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -149,13 +149,13 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   admin_assistant: ["Dashboard","Batch schedules","Resource planning","Instructors","Reconciliation"],
   hr: [],
   // Admin (owner, 3 Nov 2026): Dashboard · Enrollments ▾ · Schedules ▾ · Reports ▾ · MISMO ▾ · Configuration ▾ (ADMIN_TABS).
-  admin: ["Dashboard","Search trainee","Enrollments","Batch schedules","Resource planning","Courses","Post-tests","Training instructions","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Holidays","Requests","Daily summary report","Receipts and TARs","Cash and sales summary","Billing statement","MISMO dashboard","Final list","Submissions","Completion records"],
+  admin: ["Dashboard","Search trainee","Enrollments","Batch schedules","Resource planning","Courses","Post-tests","Training instructions","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Holidays","Requests","Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Billing statement","MISMO dashboard","Final list","Submissions","Completion records"],
   // Cashier (Accounting Officer), owner's menu of 7 Oct 2026, shown as top tabs:
-  // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses,
-  // Report (with opening and closing), Requests (CASHIER_TABS).
-  cashier: ["Dashboard","Search trainee","Batch schedules","Payments","Other income","Expenses","Report","Requests"],
-  // Accounting (owner, 8 Oct 2026): five tabs — Dashboard · Approvals · Transactions ▾ · Reports · Configuration ▾ (ACCOUNTING_TABS).
-  accounting: ["Dashboard","Search trainee","Approvals","Reports","Payments","Other income","Expenses","Receivables","Payables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
+  // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses, Requests ·
+  // Reports ▾ Daily Summary, Opening and Closing, Expenses Summary (CASHIER_TABS; reports consolidated 5 Nov 2026).
+  cashier: ["Dashboard","Search trainee","Batch schedules","Payments","Other income","Expenses","Requests","Daily summary","Opening and closing","Expenses summary"],
+  // Accounting (owner, 8 Oct 2026): Dashboard · Approvals · Transactions ▾ · Reports ▾ · Configuration ▾ (ACCOUNTING_TABS; reports consolidated 5 Nov 2026).
+  accounting: ["Dashboard","Search trainee","Approvals","Payments","Other income","Expenses","Payables","Cash and sales summary","Sales from endorsed courses","Billing statement","Receivables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
 };
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
@@ -170,7 +170,7 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Payables",icon:"▦",roles:["accounting"],group:"Payables & cash"},{label:"Cash position",icon:"◈",roles:["accounting"],group:"Payables & cash"},
   {label:"Cashier closing",icon:"⚖",roles:["cashier","accounting"],group:"Cashier control"},{label:"Other income",icon:"₱",roles:["cashier","accounting"],group:"Accounting"},
   // Cashier workspace (7 Oct 2026); the top tabs come from CASHIER_TABS.
-  {label:"Report",icon:"∑",roles:["cashier"],group:"Accounting"},
+  {label:"Daily summary",icon:"∑",roles:["cashier"],group:"Records"},{label:"Opening and closing",icon:"⚖",roles:["cashier"],group:"Records"},{label:"Expenses summary",icon:"∑",roles:["cashier"],group:"Records"},
   {label:"HR & payroll",icon:"♙",roles:["admin"],group:"People"},{label:"MyHr",icon:"☺",group:"People"},
   {label:"Waiting",icon:"◷",roles:["releasing_officer"],group:"Work"},{label:"Templates",icon:"▤",roles:["releasing_officer"],group:"Work"},{label:"Numbering",icon:"№",roles:["releasing_officer"],group:"Work"},{label:"Released",icon:"⇥",roles:["releasing_officer"],group:"Work"},{label:"Delivery",icon:"⇥",roles:["releasing_officer"],group:"Work"},
   {label:"Delivery requests",icon:"⇥",roles:["registration"],group:"Work"},
@@ -178,7 +178,7 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"Final list",icon:"▤",roles:["mismo_officer"],group:"Work"},{label:"Submissions",icon:"✓",roles:["mismo_officer"],group:"Work"},{label:"Completion records",icon:"▤",roles:["mismo_officer","admin"],group:"Work"},
   {label:"Certificate controls",icon:"№",roles:["admin"],group:"Configuration"},
   {label:"Employee accounts",icon:"⚙",roles:["admin"],group:"Configuration"},{label:"Classrooms",icon:"▢",roles:["admin"],group:"Configuration"},{label:"Certifications",icon:"№",roles:["admin"],group:"Configuration"},{label:"Holidays",icon:"▦",roles:["admin"],group:"Configuration"},
-  {label:"Daily summary report",icon:"∑",roles:["admin"],group:"Records"},{label:"Receipts and TARs",icon:"▤",roles:["admin","accounting"],group:"Records"},{label:"Cash and sales summary",icon:"∑",roles:["admin"],group:"Records"},{label:"Billing statement",icon:"∑",roles:["admin"],group:"Records"},{label:"MISMO dashboard",icon:"⌂",roles:["admin"],group:"Work"},
+  {label:"Daily summary report",icon:"∑",roles:["admin"],group:"Records"},{label:"Receipts and TARs",icon:"▤",roles:["admin","accounting"],group:"Records"},{label:"Cash and sales summary",icon:"∑",roles:["admin","accounting"],group:"Records"},{label:"Sales from endorsed courses",icon:"∑",roles:["admin","accounting"],group:"Records"},{label:"Billing statement",icon:"∑",roles:["admin","accounting"],group:"Records"},{label:"MISMO dashboard",icon:"⌂",roles:["admin"],group:"Work"},
   {label:"Endorsed courses",icon:"◇",group:"Configuration"},{label:"Configuration",icon:"⚙",roles:["admin"],group:"Configuration"},
   // Accounting › Configuration ▾: one dropdown item per section (owner, 7 Oct 2026).
   ...ACCOUNTING_CONFIG_SECTIONS.map(label=>({label,icon:"⚙",roles:["accounting"],group:"Configuration" as NavGroup})),
@@ -194,7 +194,8 @@ type TopTab={label:string;items:Module[];heads?:Partial<Record<Module,string>>};
 const CASHIER_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
   {label:"Enrollments",items:["Search trainee","Batch schedules"]},
-  {label:"Accounting",items:["Payments","Other income","Expenses","Report","Requests"]},
+  {label:"Accounting",items:["Payments","Other income","Expenses","Requests"]},
+  {label:"Reports",items:["Daily summary","Opening and closing","Expenses summary"]},
 ];
 const GROUP_LABELS:Partial<Record<NavGroup,string>>={"Payables & cash":"Payables and cash"};
 // "Batch Schedules" reads "Schedules" (owner, 3 Nov 2026); the module key stays the same.
@@ -204,8 +205,8 @@ const ACCOUNTING_TABS:TopTab[]=[
   // Reprints of receipts and TARs live in the Trainee Account (owner, 3 Nov 2026).
   {label:"Search Trainee",items:["Search trainee"]},
   {label:"Approvals",items:["Approvals"]},
-  {label:"Transactions",items:["Payments","Other income","Expenses","Receivables","Payables","Cash position"]},
-  {label:"Reports",items:["Reports"]},
+  {label:"Transactions",items:["Payments","Other income","Expenses","Payables"]},
+  {label:"Reports",items:["Cash and sales summary","Sales from endorsed courses","Billing statement","Receivables","Cash position"]},
   {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS]},
 ];
 const RELEASING_TABS:TopTab[]=[{label:"Dashboard",items:["Dashboard"]},{label:"Certificates",items:["Certificates"]},{label:"Waiting",items:["Waiting"]},{label:"Released",items:["Released"]},{label:"Reports",items:["Reports"]},{label:"Delivery",items:["Delivery"]}];
@@ -214,7 +215,7 @@ const ADMIN_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
   {label:"Enrollments",items:["Search trainee","Enrollments","Requests"]},
   {label:"Schedules",items:["Batch schedules","Resource planning"]},
-  {label:"Reports",items:["Daily summary report","Receipts and TARs","Cash and sales summary","Billing statement"]},
+  {label:"Reports",items:["Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Billing statement"]},
   {label:"MISMO",items:["MISMO dashboard","Final list","Submissions","Completion records"]},
   {label:"Configuration",items:["Courses","Post-tests","Training instructions","Classroom links","Instructors","Classrooms","Certifications","Holidays","Schedule of fees","Payment channels","Expense categories","Other income categories","Employee accounts","Partnered Centers"],
     heads:{Courses:"Training","Schedule of fees":"Fees and Accounts","Employee accounts":"People and Partners"}},
@@ -373,13 +374,6 @@ function RebuildingWorkspace(){
 }
 
 
-/** A cashier screen with sub-tabs under one title (owner's menu, 7 Oct 2026). */
-function SubTabs({eyebrow,title,tabs,render,action}:{eyebrow:string;title:string;tabs:string[];render:(tab:string)=>React.ReactNode;action?:React.ReactNode}){
-  const [tab,setTab]=useState(tabs[0]);
-  return <div className="portal-page cx"><div className="cx-head"><div><span className="portal-eyebrow">{eyebrow}</span><h1>{title}</h1></div>{action}</div>
-    <div className="cx-status" role="tablist">{tabs.map(t=><button key={t} type="button" role="tab" aria-selected={tab===t} className={tab===t?"on":""} onClick={()=>setTab(t)}>{tcl(t)}</button>)}</div>
-    {render(tab)}</div>;
-}
 /** Requests by category. A request whose fee is paid is implemented automatically. */
 // Consolidated (8 Oct 2026): Changes = change course, rescheduling, reprinting and make-up class.
 const REQUEST_CATEGORIES:[string,string[]|null][]=[["All",null],["Changes",["Change Course","Rescheduling","Reprinting","Make-up Class"]],["Cancellation",["Cancellation"]],["TAR reprint",["TAR reprint"]],["Delivery",["Certificate delivery"]],["Discount",null]];
@@ -424,6 +418,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Certifications")return <AdminCertifications data={data} reload={reload}/>;
     if(active==="Holidays")return <AdminHolidays data={data} reload={reload}/>;
     if(active==="Cash and sales summary")return <FinanceSummaryReport/>;
+    if(active==="Sales from endorsed courses")return <EndorsedSalesReport/>;
     if(active==="Billing statement")return <BillingStatementReport/>;
     if(active==="Receipts and TARs")return <AccountingDocuments/>;
     if(active==="Daily summary report")return <><CashierSummaryReport data={data}/><div className="portal-page" style={{paddingTop:0}}><AdminVouchers/></div></>;
@@ -462,7 +457,9 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Dashboard")return <><div className="cl-admin-alarm"><GcashNotInHistory/></div><AccountingHome data={data} reload={reload} go={m=>go(m as Module)}/></>;
     // Approvals is the history of decisions (owner, 3 Nov 2026); waiting items are on the Dashboard.
     if(active==="Approvals")return <div className="portal-page cx ac"><div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Approvals</h1></div></div><ApprovalHistory data={data} go={m=>go(m as Module)}/></div>;
-    if(active==="Reports")return <AccountingReportsHub/>;
+    if(active==="Cash and sales summary")return <AccountingReportsHub/>;
+    if(active==="Sales from endorsed courses")return <EndorsedSalesReport/>;
+    if(active==="Billing statement")return <BillingStatementReport/>;
     if(active==="Search trainee")return <Trainees data={data} query={query} reload={reload} role={gateRole}/>;
     if(active==="Payments")return <AccountingPayments/>;
     if(active==="Receipts and TARs")return <AccountingDocuments/>;
@@ -475,7 +472,9 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Dashboard")return <CashierDashboard data={data} onPay={onPay} reload={reload} go={(m)=>go(m as Module)}/>;
     if(active==="Search trainee")return <CashierSearchTrainee data={data} onPay={onPay} reload={reload} role={gateRole}/>;
     if(active==="Payments")return <CashierPayments data={data} onPay={onPay} reload={reload}/>;
-    if(active==="Report")return <SubTabs eyebrow="Accounting" title="Report" tabs={["Summary report","Opening and closing"]} render={t=>t==="Summary report"?<CashierSummaryReport data={data} embedded/>:<><CashierOpening data={data} reload={reload}/><LiveCashierClosing data={data} reload={reload} initialOpening={(data.cashierOpenings??[]).find(o=>o.opening_date===manilaToday())?.opening_cash_centavos}/></>}/>;
+    if(active==="Daily summary")return <CashierSummaryReport data={data}/>;
+    if(active==="Opening and closing")return <div className="portal-page cx"><div className="cx-head"><div><span className="portal-eyebrow">Reports</span><h1>Opening and Closing</h1></div></div><CashierOpening data={data} reload={reload}/><LiveCashierClosing data={data} reload={reload} initialOpening={(data.cashierOpenings??[]).find(o=>o.opening_date===manilaToday())?.opening_cash_centavos}/></div>;
+    if(active==="Expenses summary")return <CashierExpensesSummary data={data}/>;
     if(active==="Requests")return <CashierRequests data={data} reload={reload}/>;
     if(active==="Expenses")return <ExpensesWorkspace data={data} role="cashier" reload={reload}/>;
   }

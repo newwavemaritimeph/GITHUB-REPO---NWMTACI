@@ -2,9 +2,9 @@ import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf
 import { channelTotal, channelsUsed, sideTotal, type Line, type summarize } from "@/lib/finance-summary";
 
 type Summary = ReturnType<typeof summarize> & { title: string; from: string; to: string };
-const ascii = (s: string) => s.replace(/[–—]/g, "-").replace(/·/g, "-").replace(/₱/g, "PHP ").normalize("NFKD").replace(/[^\x20-\x7E]/g, "");
-const money = (c: number) => `${c < 0 ? "-" : ""}${(Math.abs(c) / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const day = (d: string) => new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T00:00:00Z`));
+export const ascii = (s: string) => s.replace(/[–—]/g, "-").replace(/·/g, "-").replace(/₱/g, "PHP ").normalize("NFKD").replace(/[^\x20-\x7E]/g, "");
+export const money = (c: number) => `${c < 0 ? "-" : ""}${(Math.abs(c) / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export const day = (d: string) => new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T00:00:00Z`));
 
 /** Cash and Sales Summary, A4 portrait (owner, 21 Oct 2026). Amounts in PHP. */
 export async function createFinanceSummaryPdf(s: Summary, printed: string) {

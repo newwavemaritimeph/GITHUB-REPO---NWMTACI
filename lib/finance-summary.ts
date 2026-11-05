@@ -76,9 +76,9 @@ export function summarize(input: { payments: PaymentIn[]; income: IncomeIn[]; ex
 }
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
-const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
+export const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
 const startOf = (d: string) => `${d}T00:00:00+08:00`, endOf = (d: string) => `${d}T23:59:59.999+08:00`;
-async function all<T>(page: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>, cap = 20000) {
+export async function all<T>(page: (from: number, to: number) => PromiseLike<{ data: unknown[] | null; error: unknown }>, cap = 20000) {
   const rows: T[] = [];
   for (let from = 0; from < cap; from += 1000) {
     const { data, error } = await page(from, from + 999);
@@ -88,7 +88,7 @@ async function all<T>(page: (from: number, to: number) => PromiseLike<{ data: un
   }
   return rows;
 }
-const chunks = <T,>(xs: T[], n = 200) => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n));
+export const chunks = <T,>(xs: T[], n = 200) => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n));
 
 export type FinanceSummary = Awaited<ReturnType<typeof buildFinanceSummary>>;
 

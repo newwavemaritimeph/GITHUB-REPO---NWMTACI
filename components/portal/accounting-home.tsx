@@ -9,6 +9,7 @@ import { REASONS, REJECT_REASONS, RejectInline } from "./reject-inline";
 import { PERIODS, percentChange, periodStart, type Period } from "@/lib/accounting-periods";
 import { channelTotal, channelsUsed, sideTotal, type FinanceSummary, type Line } from "@/lib/finance-summary";
 import type { AccountingReport } from "@/lib/accounting-report";
+import type { CenterState, EndorsedSales } from "@/lib/endorsed-sales";
 import type { BillingRow } from "@/lib/billing-statement";
 import type { CashierReportSnapshot } from "@/lib/documents";
 import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balances";
@@ -525,12 +526,12 @@ export function AccountingReports({ switcher }: { switcher?: ReactNode } = {}) {
 
 /* ------------------------------------------------------------ cash and sales summary */
 
-const REPORT_VIEWS = ["Overview", "Cash and Sales Summary", "Billing Statement"] as const;
-/** Accounting › Reports (owner, 21 Oct 2026): Overview and the Cash and Sales Summary. */
+const REPORT_VIEWS = ["Cash and Sales Summary", "Overview"] as const;
+/** Accounting › Reports › Cash and Sales Summary, with the Overview inside it (owner, 5 Nov 2026). */
 export function AccountingReportsHub() {
-  const [view, setView] = useState<(typeof REPORT_VIEWS)[number]>("Overview");
+  const [view, setView] = useState<(typeof REPORT_VIEWS)[number]>("Cash and Sales Summary");
   const switcher = <div className="cx-seg fs-views" role="tablist">{REPORT_VIEWS.map((v) => <button key={v} type="button" className={view === v ? "on" : ""} onClick={() => setView(v)}>{v}</button>)}</div>;
-  return view === "Overview" ? <AccountingReports switcher={switcher} /> : view === "Billing Statement" ? <BillingStatementReport switcher={switcher} /> : <FinanceSummaryReport switcher={switcher} />;
+  return view === "Overview" ? <AccountingReports switcher={switcher} /> : <FinanceSummaryReport switcher={switcher} />;
 }
 
 /** End of the previous period, or the last day of the next one (never past today). */
@@ -543,6 +544,74 @@ const shiftPeriod = (period: Period, end: string, n: number, today: string) => {
   while (periodStart(period, addDays(d, 1)) === next) d = addDays(d, 1);
   return d > today ? today : d;
 };
+
+const CENTER_TONE: Record<CenterState, "green" | "blue" | "orange"> = { Paid: "green", Approved: "blue", "For Approval": "blue", Owed: "orange" };
+
+/** One center's ledger: its trainees, ten per page, and the subtotal. */
+function EndorsedCenter({ center }: { center: EndorsedSales["centers"][number] }) {
+  const pg = usePaged(center.rows), t = center.totals;
+  return <section className="portal-panel cx-panel">
+    <div className="panel-heading"><h2>{center.name}</h2><span className="muted-text">{t.trainees} Trainee{t.trainees === 1 ? "" : "s"} · Fees Billed {pesos2(t.fees)}</span></div>
+    <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Trainee</th><th>Course</th><th>Training Date</th><th className="fs-n">Fee</th><th className="fs-n">Collected</th><th className="fs-n">Balance</th><th>Center</th><th>Rebate</th><th className="fs-n">Rebate Amount</th><th className="fs-n">Agency Share</th><th className="fs-n">New Wave Keeps</th></tr></thead><tbody>
+      {pg.shown.map((r) => <tr key={r.id}>
+        <td><b>{r.trainee}</b><small className="cl-sub cl-block">{r.traineeNo}{r.status === "Enrolled" ? "" : ` · ${r.status}`}</small></td>
+        <td title={r.course}>{r.code}</td>
+        <td>{r.trainingDate ? fmtDate(r.trainingDate) : "—"}</td>
+        <td className="fs-n">{pesos2(r.fee)}</td>
+        <td className="fs-n">{pesos2(r.collected)}</td>
+        <td className={`fs-n${r.balance > 0 ? " fs-neg" : ""}`}>{pesos2(r.balance)}</td>
+        <td><Badge tone={CENTER_TONE[r.centerState]}>{r.centerState}</Badge></td>
+        <td>{r.rebateState === "None" ? "—" : <Badge tone={r.rebateState === "Received" ? "green" : "orange"}>{r.rebateState}</Badge>}</td>
+        <td className="fs-n">{pesos2(r.rebate)}</td>
+        <td className="fs-n">{pesos2(r.share)}</td>
+        <td className="fs-n">{pesos2(r.keeps)}</td>
+      </tr>)}
+      <tr className="fs-tot"><td colSpan={3}>Total · {t.trainees} Trainee{t.trainees === 1 ? "" : "s"}</td><td className="fs-n">{pesos2(t.fees)}</td><td className="fs-n">{pesos2(t.collected)}</td><td className="fs-n">{pesos2(t.balance)}</td><td /><td /><td className="fs-n">{pesos2(t.rebate)}</td><td className="fs-n">{pesos2(t.share)}</td><td className="fs-n">{pesos2(t.keeps)}</td></tr>
+    </tbody></table></div>{pg.pager}
+  </section>;
+}
+
+/** The statements themselves, one per center, then the grand totals. */
+export function EndorsedStatements({ report }: { report: EndorsedSales }) {
+  const t = report.totals;
+  if (!report.rows.length) return <section className="portal-panel cx-panel"><p className="portal-empty-copy">No endorsed trainees in this period.</p></section>;
+  const facts: [string, string | number][] = [["Trainees", t.trainees], ["Fees Billed", pesos2(t.fees)], ["Collected", pesos2(t.collected)], ["Balance", pesos2(t.balance)], ["Paid to Centers", pesos2(t.centerPaid)], ["Owed to Centers", pesos2(t.centerOwed)], ["Rebates Due", pesos2(t.rebateDue)], ["Rebates Received", pesos2(t.rebateReceived)], ["Agency Shares", pesos2(t.share)], ["New Wave Keeps", pesos2(t.keeps)]];
+  return <div className="es-stack">
+    {report.centers.map((c) => <EndorsedCenter key={`${report.from}|${report.to}|${c.name}`} center={c} />)}
+    <div className="es-grand">{facts.map(([label, value]) => <span key={label}>{label} <b>{value}</b></span>)}</div>
+  </div>;
+}
+
+/**
+ * Sales from Endorsed Courses (owner, 5 Nov 2026, Design 2 · Center Statements): by training date, so the
+ * totals agree with the Cash and Sales Summary. Accounting and the Admin; PDF and Excel match the screen.
+ */
+export function EndorsedSalesReport() {
+  const today = manilaToday();
+  const [period, setPeriod] = useState<Period | "Custom">("Monthly");
+  const [end, setEnd] = useState(today);
+  const [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today);
+  const custom = period === "Custom", ready = !custom || (!!from && !!to && from <= to);
+  const q = custom ? `from=${from}&to=${to}` : `period=${period}&end=${end}`;
+  const { data: s, error } = useJson<EndorsedSales>(ready ? `/api/staff/endorsed-sales?${q}` : null);
+  return <div className="portal-page cx ac">
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting · Reports</span><h1>Sales from Endorsed Courses</h1></div>
+      {ready && <div className="ac-controls"><a className="portal-secondary" href={`/api/documents/endorsed-sales?${q}&format=xlsx`}>Download Excel</a><a className="portal-primary" href={`/api/documents/endorsed-sales?${q}`} target="_blank" rel="noreferrer">Print PDF</a></div>}</div>
+    <div className="pd-bar cs-bar"><span className="cx-seg">{[...PERIODS, "Custom" as const].map((p) => <button key={p} type="button" className={period === p ? "on" : ""} onClick={() => setPeriod(p)}>{p}</button>)}</span>
+      {period === "Custom" ? <>
+        <label className="cx-dt">From<input type="date" value={from} max={to || today} onChange={(e) => setFrom(e.target.value)} /></label>
+        <label className="cx-dt">To<input type="date" value={to} min={from || undefined} max={today} onChange={(e) => setTo(e.target.value)} /></label>
+      </> : <>
+        <button type="button" className="portal-secondary" aria-label="Previous" onClick={() => setEnd(shiftPeriod(period, end, -1, today))}>‹</button>
+        <input type="date" value={end} max={today} aria-label="As of" onChange={(e) => e.target.value && setEnd(e.target.value)} />
+        <button type="button" className="portal-secondary" aria-label="Next" disabled={end >= today} onClick={() => setEnd(shiftPeriod(period, end, 1, today))}>›</button>
+      </>}
+      {s && <span className="pd-label"><b>{s.title}</b> · {fmtDate(s.from)} – {fmtDate(s.to)} · By Training Date</span>}</div>
+    {!ready && <Message kind="error" text="Choose a From date on or before the To date." />}
+    {error && <Message kind="error" text={error} />}
+    {ready && !s ? !error && <p className="portal-empty-copy">Loading the report…</p> : s && <EndorsedStatements report={s} />}
+  </div>;
+}
 
 /**
  * Cash and Sales Summary (owner, 21 Oct 2026, prototype): cash received and

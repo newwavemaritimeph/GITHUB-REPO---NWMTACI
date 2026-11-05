@@ -2680,3 +2680,8 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-dialog-reason label { display: grid; gap: 4px; font-size: 14px; color: #587184; }
 .nw-dialog-reason select, .nw-dialog-reason input { height: 44px; border: 1px solid #cfdbe3; border-radius: 10px; padding: 0 12px; font: inherit; font-size: 15px; color: #0f2638; background: #fff; width: 100%; box-sizing: border-box; }
 .nw-dialog-ok:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Sales from Endorsed Courses (Design 2 · Center Statements, 5 Nov 2026) */
+.nw-shell .es-stack { display: flex; flex-direction: column; gap: 14px; }
+.nw-shell .es-grand { display: flex; flex-wrap: wrap; gap: 6px 22px; padding: 10px 14px; background: #e6f5fa; border: 1px solid #d5e1e9; border-radius: 10px; font-size: 13px; color: #4d6a7d; }
+.nw-shell .es-grand b { font-family: var(--font-geist-mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; color: #123f63; }
