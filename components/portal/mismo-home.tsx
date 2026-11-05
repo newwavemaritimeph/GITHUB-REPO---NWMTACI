@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { addDays, manilaToday } from "@/lib/portal-format";
-import { MISMO_AHEAD_DAYS, MISMO_BACK_DAYS, MISMO_WHENS, NO_FILTER, finalList, lineOfEntry, lineOfRow, mismoCopyText, mismoCsv, mismoFiltered, mismoListed, mismoMissing, mismoRowsCsv, mismoSearched, mismoSorted, mismoState, paidLate, whenOf, type MismoBatch, type MismoDay, type MismoEntry, type MismoFilter, type MismoLine, type MismoRow, type MismoSort, type MismoTrainee } from "@/lib/mismo";
+import { MISMO_AHEAD_DAYS, MISMO_BACK_DAYS, MISMO_WHENS, NO_FILTER, finalList, lineOfEntry, lineOfRow, mismoCopyText, mismoCsv, mismoFiltered, mismoListed, mismoMissing, mismoRowsCsv, mismoSearched, mismoSorted, mismoState, paidLate, whenOf, type MismoBatch, type MismoDay, type MismoEntry, type MismoFilter, type MismoLine, type MismoRemoved, type MismoRow, type MismoSort, type MismoTrainee } from "@/lib/mismo";
 import { CompletionRecords } from "./completion-records";
 import { Badge, Message, Modal, PeriodBar, fmtDate, periodRange, submit, txWhen, usePaged, usePeriod } from "./shared-ui";
 
@@ -16,7 +16,7 @@ const STAGES = ["For Encoding", "For Completion", "Encoded", "Final List", "Comp
 type Stage = (typeof STAGES)[number];
 
 type History = { batch_id: string; list_date: string; trainee_count: number; submitted_at: string; profiles?: { complete_name: string } | { complete_name: string }[] | null; batches?: { batch_number: string; courses: { name: string; code: string } | { name: string; code: string }[] | null } | { batch_number: string; courses: unknown }[] | null };
-type Payload = MismoDay & { now: string };
+type Payload = MismoDay & { now: string; removed?: MismoRemoved[] };
 type LogPayload = { entries: MismoEntry[]; history: History[] };
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
 /** Manila hour now (0–23). */
@@ -210,6 +210,32 @@ function FinalList() {
   </div>;
 }
 
+/** Trainees a voided payment took off MISMO: MARINA still has them, so each stays here until the officer has corrected it (owner, 5 Nov 2026). */
+export function RemovedAlert({ rows, onCleared }: { rows: MismoRemoved[]; onCleared: () => void }) {
+  const paged = usePaged(rows);
+  const [busy, setBusy] = useState(""), [problem, setProblem] = useState("");
+  if (!rows.length) return null;
+  async function clear(id: string) {
+    setBusy(id); setProblem("");
+    try { await submit({ action: "mismo-alert-clear", alertId: id }); onCleared(); }
+    catch (e) { setBusy(""); setProblem(e instanceof Error ? e.message : "Could not save."); }
+  }
+  return <section className="portal-panel cx-panel st-panel ms-alert">
+    <div className="panel-heading"><h2>Payment Voided · Correct in MARINA</h2><span className="slot-count">{rows.length}</span></div>
+    {problem && <Message kind="error" text={problem} />}
+    <div className="st-wrap"><table className="cl-log st-log"><thead><tr><th>Trainee</th><th>Batch · Course</th><th>Class Day</th><th>Reason for Void</th><th>Removed</th><th></th></tr></thead><tbody>
+      {paged.shown.map((r) => <tr key={r.id}>
+        <td data-l="Trainee"><b>{r.name}</b>{r.srn && <small className="cl-sub cl-block cl-mono">{r.srn}</small>}</td>
+        <td data-l="Batch · Course"><b>{r.code ?? "—"}</b><small className="cl-sub cl-block cl-mono">{r.batchNumber ?? "—"}</small></td>
+        <td data-l="Class Day">{r.classStart ? shortDay(r.classStart) : "—"}</td>
+        <td data-l="Reason for Void">{r.reason || "—"}</td>
+        <td data-l="Removed">{txWhen(r.at)}</td>
+        <td data-l=""><button type="button" className="st-b p" disabled={busy === r.id} onClick={() => void clear(r.id)}>{busy === r.id ? "Saving…" : "Corrected in MARINA"}</button></td>
+      </tr>)}
+    </tbody></table></div>{paged.pager}
+  </section>;
+}
+
 export function MismoList() {
   const today = manilaToday(), hour = manilaHour();
   const [stage, setStage] = useState<Stage>("For Encoding"), [filter, setFilter] = useState<MismoFilter>(NO_FILTER), [sort, setSort] = useState<MismoSort>("date");
@@ -235,6 +261,7 @@ export function MismoList() {
     <div className="cx-head"><div><span className="portal-eyebrow">MISMO Compliance Officer</span><h1>MISMO List</h1></div></div>
     {problem && <Message kind="error" text={problem} />}
     {(work.error || day.error) && <Message kind="error" text={work.error || day.error} />}
+    <RemovedAlert rows={day.data?.removed ?? []} onCleared={day.reload} />
     <div className="ms-strip">
       <div className={after11 && unpaid ? "hot" : ""}><span><b>11:00 AM · Unpaid: {unpaid}</b><small>Not listed here. Names only on the instructor&apos;s printout.</small></span>{after11 && unpaid > 0 ? <a className="st-b" href={pdfUrl(today, "unsettled")} target="_blank" rel="noreferrer">Print for the Instructor</a> : !after11 && <span className="st-need">Opens at 11:00 AM</span>}</div>
       <div className={after16 && classes.length ? "ok" : ""}><span><b>4:00 PM · Final List</b><small>{classes.length ? (after16 ? "Ready for MARINA." : "Made at 4:00 PM.") : "No STCW class today."}</small></span>{after16 && classes.length > 0 ? <button type="button" className="st-b p" onClick={() => setStage("Final List")}>Open Final List</button> : classes.length > 0 && <span className="st-need">Not Yet</span>}</div>

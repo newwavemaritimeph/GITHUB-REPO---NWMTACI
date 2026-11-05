@@ -1,5 +1,5 @@
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { MISMO_COURSE_CODES, cutDateOf, entryMovedFrom, manilaInstant, ticksToClear, type MismoBatch, type MismoDay, type MismoEntry } from "@/lib/mismo";
+import { MISMO_COURSE_CODES, cutDateOf, entryMovedFrom, manilaInstant, ticksToClear, type MismoBatch, type MismoDay, type MismoEntry, type MismoRemoved } from "@/lib/mismo";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -101,29 +101,51 @@ export async function loadMismoEntries(db: Admin): Promise<MismoEntry[]> {
 
 /**
  * A payment voided after encoding takes the trainee off MISMO (owner, 5 Nov 2026): the tick goes, so if they pay again they
- * return to For Encoding. Called once the payment is void. The audit log keeps who was removed and why.
+ * return to For Encoding. Called once the payment is void. The audit log keeps who was removed and why, with what MARINA
+ * has them under, and that entry is the officer's alert.
  */
 export async function clearMismoAfterVoid(db: Admin, paymentId: string, actorId: string, reason: string) {
   const { data: hit } = await db.from("payment_allocations").select("enrollment_id").eq("payment_id", paymentId);
   const ids = [...new Set((hit ?? []).map((a) => a.enrollment_id as string))];
   if (!ids.length) return;
-  const { data: ticks } = await db.from("mismo_entries").select("enrollment_id").in("enrollment_id", ids);
-  const ticked = (ticks ?? []).map((t) => t.enrollment_id as string);
+  // "*": the batch encoded under needs 202610290082, and a column missing before it must not stop the removal.
+  const { data: ticks } = await db.from("mismo_entries").select("*").in("enrollment_id", ids);
+  const tickOf = new Map(((ticks ?? []) as { enrollment_id: string; batch_number?: string | null; class_start?: string | null }[]).map((t) => [t.enrollment_id, t]));
+  const ticked = [...tickOf.keys()];
   if (!ticked.length) return;
   const [{ data: enrollments }, { data: charges }, { data: allocations }] = await Promise.all([
-    db.from("enrollments").select("id,selling_price_centavos,company_charge_agency_id").in("id", ticked),
+    db.from("enrollments").select("id,selling_price_centavos,company_charge_agency_id,batches(batch_number,starts_on,courses(code)),trainees(legal_last_name,legal_first_name,legal_middle_name,srn)").in("id", ticked),
     db.from("enrollment_charges").select("enrollment_id,amount_centavos,event_type").in("enrollment_id", ticked).eq("valid", true),
     db.from("payment_allocations").select("enrollment_id,amount_centavos,payments(valid)").in("enrollment_id", ticked),
   ]);
+  type Enrollment = { id: string; selling_price_centavos: number; company_charge_agency_id?: string | null; batches?: unknown; trainees?: unknown };
+  const list = (enrollments ?? []) as unknown as Enrollment[];
   const clear = ticksToClear(
-    (enrollments ?? []) as { id: string; selling_price_centavos: number; company_charge_agency_id?: string | null }[],
+    list,
     (charges ?? []) as { enrollment_id: string; amount_centavos: number; event_type: string }[],
     ((allocations ?? []) as unknown as { enrollment_id: string; amount_centavos: number; payments: unknown }[]).map((a) => ({ enrollment_id: a.enrollment_id, amount_centavos: a.amount_centavos, valid: first(a.payments as { valid: boolean } | null)?.valid !== false })),
   );
   if (!clear.length) return;
   const { error } = await db.from("mismo_entries").delete().in("enrollment_id", clear);
   if (error) throw new Error(error.message);
-  await db.from("audit_logs").insert(clear.map((id) => ({ actor_id: actorId, action: "mismo.removed_after_void", record_type: "enrollment", record_id: id, new_values: { payment_id: paymentId }, reason })));
+  await db.from("audit_logs").insert(clear.map((id) => {
+    const e = list.find((x) => x.id === id), tick = tickOf.get(id);
+    const t = first(e?.trainees as { legal_last_name?: string; legal_first_name?: string; legal_middle_name?: string | null; srn?: string | null } | null);
+    const b = first(e?.batches as { batch_number?: string; starts_on?: string; courses?: unknown } | null);
+    return { actor_id: actorId, action: "mismo.removed_after_void", record_type: "enrollment", record_id: id, reason,
+      new_values: { payment_id: paymentId, name: `${t?.legal_last_name ?? ""}, ${t?.legal_first_name ?? ""}${t?.legal_middle_name ? ` ${t.legal_middle_name}` : ""}`, srn: t?.srn ?? null, code: first(b?.courses as { code?: string } | null)?.code ?? null, batch_number: tick?.batch_number ?? b?.batch_number ?? null, class_start: tick?.class_start ?? b?.starts_on ?? null } };
+  }));
+}
+
+/** Everyone a void took off MISMO whose MARINA entry the officer has not yet marked corrected, newest first. */
+export async function loadMismoRemoved(db: Admin): Promise<MismoRemoved[]> {
+  const read = (action: string) => db.from("audit_logs").select("id,record_id,new_values,reason,created_at").eq("action", action).order("created_at", { ascending: false }).limit(500);
+  const [{ data: removed }, { data: cleared }] = await Promise.all([read("mismo.removed_after_void"), read("mismo.void_alert_cleared")]);
+  const done = new Set((cleared ?? []).map((c) => (c.new_values as { alert_id?: string } | null)?.alert_id));
+  return (removed ?? []).filter((r) => !done.has(r.id as string)).map((r) => {
+    const v = (r.new_values ?? {}) as { name?: string; srn?: string | null; code?: string | null; batch_number?: string | null; class_start?: string | null };
+    return { id: r.id as string, enrollmentId: r.record_id as string, name: v.name ?? "—", srn: v.srn ?? null, code: v.code ?? null, batchNumber: v.batch_number ?? null, classStart: v.class_start ?? null, reason: (r.reason as string | null) ?? "", at: r.created_at as string };
+  });
 }
 
 async function loadStaffing(db: Admin, batchIds: string[]) {

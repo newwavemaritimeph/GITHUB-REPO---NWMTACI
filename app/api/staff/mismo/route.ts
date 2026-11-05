@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { mismoWork } from "@/lib/mismo";
-import { loadMismoDay, loadMismoEntries } from "@/lib/mismo-server";
+import { loadMismoDay, loadMismoEntries, loadMismoRemoved } from "@/lib/mismo-server";
 
 export const runtime = "nodejs";
 
@@ -26,6 +26,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ entries: await loadMismoEntries(db), history: history ?? [] }, fresh);
   }
   const work = params.get("work") === "1";
-  const day = await loadMismoDay(db, date, to, { staffing: !work });
-  return NextResponse.json({ ...day, batches: work ? mismoWork(day.batches) : day.batches, now: new Date().toISOString() }, fresh);
+  const [day, removed] = await Promise.all([loadMismoDay(db, date, to, { staffing: !work }), work ? [] : loadMismoRemoved(db)]);
+  return NextResponse.json({ ...day, batches: work ? mismoWork(day.batches) : day.batches, removed, now: new Date().toISOString() }, fresh);
 }

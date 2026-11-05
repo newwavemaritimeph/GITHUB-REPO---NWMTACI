@@ -85,6 +85,9 @@ export function ticksToClear(enrollments: { id: string; selling_price_centavos: 
   }).map((e) => e.id);
 }
 
+/** A trainee a void took off MISMO, shown until the officer has corrected MARINA (owner, 5 Nov 2026). */
+export type MismoRemoved = { id: string; enrollmentId: string; name: string; srn: string | null; code: string | null; batchNumber: string | null; classStart: string | null; reason: string; at: string };
+
 /** A trainee already encoded, for the Encoded tab. */
 export type MismoEntry = { enrollmentId: string; lastName: string; firstName: string; middleName: string | null; srn: string | null; batchNumber: string; code: string; startsOn: string; endsOn: string; doneAt: string; by: string; cancelled: boolean };
 

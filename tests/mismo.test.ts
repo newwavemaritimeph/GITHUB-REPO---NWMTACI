@@ -2,23 +2,25 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { NO_FILTER, balanceAt, cutDateOf, entryMovedFrom, finalList, lineOfEntry, lineOfRow, manilaInstant, mismoListed, mismoCopyText, mismoCsv, mismoFiltered, mismoMissing, mismoRowsCsv, mismoSorted, mismoState, mismoWork, owesAt, paidLate, ticksToClear, unsettledAt11, whenOf, type MismoBatch, type MismoEntry, type MismoRow, type MismoTrainee } from "../lib/mismo";
-import { clearMismoAfterVoid, loadMismoDay } from "../lib/mismo-server";
-import { MismoWorkList } from "../components/portal/mismo-home";
+import { clearMismoAfterVoid, loadMismoDay, loadMismoRemoved } from "../lib/mismo-server";
+import { MismoWorkList, RemovedAlert } from "../components/portal/mismo-home";
 
 const t = (id: string, due: number, b11: number, b16: number, now: number, extra: Partial<MismoTrainee> = {}): MismoTrainee => ({ enrollmentId: id, lastName: id.toUpperCase(), firstName: "Juan", middleName: null, birthdate: "1990-01-01", srn: "SRN-1", rank: "AB", dueCentavos: due, paidBy11: b11, paidBy16: b16, paidNow: now, ...extra });
 const batch = (trainees: MismoTrainee[]): MismoBatch => ({ id: "b1", batchNumber: "BCH-1", courseName: "Crowd Management", courseCode: "PSCMT", startsOn: "2026-10-08", endsOn: "2026-10-09", room: "Room 1", instructor: "Capt. X", trainees, submittedAt: null, submittedCount: null });
 
-/** A database stand-in: every call chains, and awaiting gives the table's rows, or its error. Records what is deleted and logged. */
-function fakeDb(tables: Record<string, unknown[] | { message: string }>) {
+/** A database stand-in: every call chains, `eq` filters on a column the rows have, and awaiting gives the rows or the table's error. Records what is deleted and logged. */
+function fakeDb(tables: Record<string, Record<string, unknown>[] | { message: string }>) {
   const deleted: string[] = [], logged: unknown[] = [];
   const db = {
     from(name: string) {
-      const chain: Record<string, unknown> = {};
-      for (const m of ["select", "in", "eq", "lte", "gte", "neq", "not", "order"]) chain[m] = () => chain;
-      chain.delete = () => ({ in: async (_: string, ids: string[]) => { deleted.push(...ids); return { error: null }; } });
-      chain.insert = async (rows: unknown[]) => { logged.push(...rows); return { error: null }; };
       const found = tables[name];
-      chain.then = (done: (v: unknown) => void) => done(Array.isArray(found) ? { data: found, error: null } : found ? { data: null, error: found } : { data: [], error: null });
+      let rows = Array.isArray(found) ? found : [];
+      const chain: Record<string, unknown> = {};
+      for (const m of ["select", "in", "lte", "gte", "neq", "not", "order", "limit"]) chain[m] = () => chain;
+      chain.eq = (col: string, val: unknown) => { rows = rows.filter((r) => !(col in r) || r[col] === val); return chain; };
+      chain.delete = () => ({ in: async (_: string, ids: string[]) => { deleted.push(...ids); return { error: null }; } });
+      chain.insert = async (added: unknown[]) => { logged.push(...added); return { error: null }; };
+      chain.then = (done: (v: unknown) => void) => done(found && !Array.isArray(found) ? { data: null, error: found } : { data: rows, error: null });
       return chain;
     },
   };
@@ -36,11 +38,29 @@ describe("a payment voided after encoding (owner, 5 Nov 2026)", () => {
     expect(ticksToClear([enrollment("a")], [{ enrollment_id: "a", amount_centavos: 50, event_type: "charge" }], paid)).toEqual(["a"]);
     expect(ticksToClear([enrollment("a")], [{ enrollment_id: "a", amount_centavos: 50, event_type: "discount" }], [{ enrollment_id: "a", amount_centavos: 50, valid: true }])).toEqual([]);
   });
-  it("removes the tick and records why", async () => {
-    const f = fakeDb({ payment_allocations: [{ enrollment_id: "e1", amount_centavos: 100, payments: { valid: false } }], mismo_entries: [{ enrollment_id: "e1" }], enrollments: [enrollment("e1")] });
+  it("removes the tick and records why, with what MARINA has the trainee under", async () => {
+    const f = fakeDb({
+      payment_allocations: [{ enrollment_id: "e1", amount_centavos: 100, payments: { valid: false } }],
+      mismo_entries: [{ enrollment_id: "e1", batch_number: "26-507-023", class_start: "2026-11-10" }],
+      enrollments: [{ ...enrollment("e1"), batches: { batch_number: "26-507-030", starts_on: "2026-12-01", courses: { code: "PSCMT" } }, trainees: { legal_last_name: "CRUZ", legal_first_name: "Juan", srn: "123" } }],
+    });
     await clearMismoAfterVoid(f.db, "pay1", "actor", "Wrong amount");
     expect(f.deleted).toEqual(["e1"]);
-    expect(f.logged).toMatchObject([{ action: "mismo.removed_after_void", record_id: "e1", reason: "Wrong amount" }]);
+    expect(f.logged).toMatchObject([{ action: "mismo.removed_after_void", record_id: "e1", reason: "Wrong amount", new_values: { name: "CRUZ, Juan", srn: "123", code: "PSCMT", batch_number: "26-507-023", class_start: "2026-11-10" } }]);
+  });
+  it("alerts the officer until the MARINA entry is marked corrected", async () => {
+    const f = fakeDb({ audit_logs: [
+      { id: "a1", action: "mismo.removed_after_void", record_id: "e1", reason: "Wrong amount", created_at: "2026-11-05T02:00:00Z", new_values: { name: "CRUZ, Juan", code: "PSCMT", batch_number: "26-507-023", class_start: "2026-11-10" } },
+      { id: "a2", action: "mismo.removed_after_void", record_id: "e2", reason: "Duplicate", created_at: "2026-11-05T01:00:00Z", new_values: { name: "REYES, Maria" } },
+      { id: "a3", action: "mismo.void_alert_cleared", record_id: "e2", created_at: "2026-11-05T03:00:00Z", new_values: { alert_id: "a2" } },
+    ] });
+    const open = await loadMismoRemoved(f.db);
+    expect(open).toMatchObject([{ id: "a1", enrollmentId: "e1", name: "CRUZ, Juan", batchNumber: "26-507-023", reason: "Wrong amount" }]);
+    const html = renderToStaticMarkup(createElement(RemovedAlert, { rows: open, onCleared: () => undefined }));
+    expect(html).toContain("Correct in MARINA");
+    expect(html).toContain("CRUZ, Juan");
+    expect(html).toContain("Corrected in MARINA");
+    expect(renderToStaticMarkup(createElement(RemovedAlert, { rows: [], onCleared: () => undefined }))).toBe("");
   });
   it("does nothing when the trainee was never encoded", async () => {
     const f = fakeDb({ payment_allocations: [{ enrollment_id: "e1", amount_centavos: 100, payments: { valid: false } }], mismo_entries: [] });

@@ -2806,6 +2806,7 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .ms-bar label.ms-grow { flex: 1 1 220px; }
 .nw-shell .ms-bar select, .nw-shell .ms-bar input { width: 100%; min-width: 0; box-sizing: border-box; }
 .nw-shell .ms-stack { display: flex; flex-direction: column; gap: 18px; }
+.nw-shell .ms-alert { border: 1px solid var(--nw-orange); background: #fff8f4; }
 .nw-shell .ms-chip { display: inline-block; margin-left: 6px; }
 .nw-shell .ms-note { margin: 10px 20px 14px; color: var(--nw-muted); font-size: 14px; }
 .nw-shell .ms-old { margin: 14px 14px 6px; font-size: 14px; color: var(--nw-navy); }
