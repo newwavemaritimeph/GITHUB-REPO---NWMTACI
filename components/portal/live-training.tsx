@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { CertificatePdfModal, type CertPdfTarget } from "./certificate-pdf-modal";
 import { tcl } from "@/lib/title-case";
 import { Modal, ViewIcon } from "./shared-ui";
 
@@ -30,7 +29,6 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
   const [tplFile, setTplFile] = useState<File | null>(null);
   const [tplBusy, setTplBusy] = useState(false);
   const [tplMsg, setTplMsg] = useState("");
-  const [pdfTarget, setPdfTarget] = useState<CertPdfTarget | null>(null);
   const activeTemplateFor = (courseId?: string) => (courseId ? data.certificateTemplates.find((t) => t.course_id === courseId && t.active)?.id ?? null : null);
   async function uploadTemplate() {
     if (!tplCourse || !tplFile) { setTplMsg("Pick a course and a file."); return; }
@@ -137,7 +135,7 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
                 const cert = data.certificates.find((x) => x.enrollment_id === e.id) ?? null;
                 return <tr key={e.id}><td><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</strong></td><td>{c?.name ?? "—"}</td><td>{e.enrollment_number}</td><td>{canManage
                   ? <select value={cert?.status ?? ""} disabled={busy} onChange={(ev) => { void post({ action: "certificate-status", enrollmentId: e.id, status: ev.target.value }); }}><option value="" disabled>Not Issued</option>{CERT_STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-                  : (cert ? (CERT_STATUSES.find(([v]) => v === cert.status)?.[1] ?? cert.status) : "Not issued")}</td><td>{cert?.printed_at ? day(cert.printed_at) : "—"}</td>{canManage && <td className="document-actions">{(() => { const tid = activeTemplateFor(e.course_id); return <ViewIcon label={tid ? "View Certificate PDF" : "Upload an active template for this course first"} disabled={busy || !tid} onClick={() => setPdfTarget({ templateId: tid, traineeName: t ? `${t.legal_first_name} ${t.legal_last_name}` : "", courseName: c?.name ?? "", enrollmentNumber: e.enrollment_number, certificateNumber: null, conductedDate: cert?.printed_at ?? null })} />; })()}</td>}</tr>;
+                  : (cert ? (CERT_STATUSES.find(([v]) => v === cert.status)?.[1] ?? cert.status) : "Not issued")}</td><td>{cert?.printed_at ? day(cert.printed_at) : "—"}</td>{canManage && <td className="document-actions">{(() => { const tid = activeTemplateFor(e.course_id); return <ViewIcon label={tid ? "View Certificate PDF" : "Upload an active template for this course first"} disabled={busy || !tid} onClick={() => window.open(`/api/documents/certificate/${e.id}?preview=1`, "_blank", "noopener")} />; })()}</td>}</tr>;
               })}
               {!data.enrollments.filter((e) => e.enrollment_status !== "Cancelled").length && <tr><td colSpan={canManage ? 6 : 5}><span className="portal-empty-copy">No enrollments to certify yet.</span></td></tr>}
             </tbody></table></div>
@@ -152,13 +150,12 @@ export function LiveTraining({ data, role, reload, initialTab = "Overview" }: { 
               <div className="full"><button type="button" className="portal-primary" disabled={tplBusy || !tplCourse || !tplFile} onClick={uploadTemplate}>{tplBusy ? "Uploading…" : "Upload Template"}</button></div>
             </div>
             <div className="portal-table"><table><thead><tr><th>Course</th><th>Version</th><th>Fields</th><th>Active</th></tr></thead><tbody>
-              {data.certificateTemplates.map((tp) => <tr key={tp.id}><td><strong>{one(tp.courses as { name: string } | { name: string }[] | null | undefined)?.name ?? "—"}</strong></td><td>v{tp.version}</td><td>{(tp.fields ?? []).map((f) => f.label).join(", ") || "—"}</td><td>{tp.active ? "Active" : "—"}</td></tr>)}
+              {data.certificateTemplates.map((tp) => <tr key={tp.id}><td><strong>{one(tp.courses as { name: string } | { name: string }[] | null | undefined)?.name ?? "—"}</strong></td><td>v{tp.version}</td><td>{Array.isArray(tp.fields) ? tp.fields.map((f) => f.label).join(", ") || "—" : "Read From the PDF"}</td><td>{tp.active ? "Active" : "—"}</td></tr>)}
               {!data.certificateTemplates.length && <tr><td colSpan={4}><span className="portal-empty-copy">No templates uploaded yet.</span></td></tr>}
             </tbody></table></div>
           </section>}
         </>
       )}
-      {pdfTarget && <CertificatePdfModal target={pdfTarget} onClose={() => setPdfTarget(null)} />}
       {room && <Modal title={room.id ? "Edit Classroom" : "Add Classroom"} onClose={() => setRoom(null)}>
         <form className="portal-form" onSubmit={(e) => { e.preventDefault(); if (!roomReady) return; void post({ action: "classroom-save", id: room.id, name: room.name.trim(), venue: room.venue.trim(), capacity: roomCapacity }).then(() => setRoom(null)); }}>
           {message && <div className="portal-message error full" role="alert">{message}</div>}

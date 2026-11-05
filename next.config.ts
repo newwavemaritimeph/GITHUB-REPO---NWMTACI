@@ -7,6 +7,8 @@ import { fileURLToPath } from "node:url";
 const projectRoot = dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
+  // Read at run time on the server (certificate templates); never bundled.
+  serverExternalPackages: ["pdfjs-dist"],
   turbopack: { root: projectRoot },
   outputFileTracingRoot: projectRoot,
 };

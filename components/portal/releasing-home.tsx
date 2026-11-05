@@ -300,6 +300,14 @@ export function WaitingCertificates({ data, reload }: { data: PortalData; reload
 }
 
 /** Certificate Templates (owner, 20 Oct 2026): one compact list; View shows the template with its description and blank details. */
+type TemplateRead = { found: string[]; missing: string[]; covered?: boolean } | null;
+/** What the portal read from an uploaded PDF. */
+export function templateReadText(read: TemplateRead) {
+  if (!read) return "";
+  return [read.found.length ? `Found: ${read.found.join(", ")}.` : "", read.missing.length ? `Not Found: ${read.missing.join(", ")}. Open View to check.` : "", read.covered ? "Sample text that could not be removed is covered with white boxes." : ""].filter(Boolean).join(" ");
+}
+const readNeedsCheck = (read: TemplateRead) => !!read && (read.missing.length > 0 || !!read.covered);
+
 export function CertificateTemplates({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   // Every New Wave course, with an uploaded PDF template (owner, 9 Oct 2026). The newest upload is the active one.
   const { msg, setMsg } = usePost(reload);
@@ -320,13 +328,14 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
       const body = await r.json();
       if (!r.ok) throw new Error(body.error ?? "The template could not be uploaded.");
       await reload();
+      const read = body.layout as TemplateRead;
       const box = body.photoBox as { w: number; h: number } | null;
-      setMsg({ kind: "success", text: `Template version ${body.version} uploaded and now in use. ${box ? `2x2 photo box found (${(box.w / 72).toFixed(1)} × ${(box.h / 72).toFixed(1)} in): the photo prints inside it.` : "No 2x2 photo box was found on this PDF: the photo prints at the lower right. Preview a certificate to check."}` });
+      setMsg({ kind: readNeedsCheck(read) ? "error" : "success", text: `Template version ${body.version} uploaded and now in use. ${read ? templateReadText(read) : box ? `2x2 photo box found (${(box.w / 72).toFixed(1)} × ${(box.h / 72).toFixed(1)} in): the photo prints inside it.` : "No 2x2 photo box was found on this PDF: the photo prints at the lower right. Preview a certificate to check."}` });
     } catch (e) { setMsg({ kind: "error", text: e instanceof Error ? e.message : "The template could not be uploaded." }); } finally { setUploading(null); }
   }
   // Upload Many (owner, 20 Oct 2026): pick the PDFs downloaded from the Drive folder; each is matched to its course by the file name.
   // Converted templates come with a "{CODE} - {Course}.json" of field positions, sent along as `layout`.
-  const [bulk, setBulk] = useState<{ file: File; layout?: File; courseId: string; result?: string }[] | null>(null);
+  const [bulk, setBulk] = useState<{ file: File; layout?: File; courseId: string; result?: string; read?: TemplateRead }[] | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   function pickMany(list: FileList | null) {
     const picked = [...(list ?? [])];
@@ -348,14 +357,14 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
         const form = new FormData(); form.set("courseId", r.courseId); form.set("template", r.file); if (r.layout) form.set("layout", await r.layout.text());
         const res = await fetch("/api/staff/certificate-templates", { method: "POST", body: form });
         const body = await res.json().catch(() => ({}));
-        rows[i] = { ...r, result: res.ok ? "Uploaded" : body.error ?? "Not uploaded." };
+        rows[i] = { ...r, result: res.ok ? "Uploaded" : body.error ?? "Not uploaded.", read: res.ok ? body.layout : null };
       } catch { rows[i] = { ...r, result: "Not uploaded." }; }
       setBulk([...rows]);
     }
     setBulkBusy(false);
     await reload();
-    const done = rows.filter((r) => r.result === "Uploaded").length, failed = rows.filter((r) => r.courseId && r.result !== "Uploaded").length, skipped = rows.filter((r) => !r.courseId).length;
-    setMsg({ kind: failed ? "error" : "success", text: `${done} template${done === 1 ? "" : "s"} uploaded and now in use.${failed ? ` ${failed} failed: see the list.` : ""}${skipped ? ` ${skipped} skipped (no course).` : ""}` });
+    const done = rows.filter((r) => r.result === "Uploaded").length, failed = rows.filter((r) => r.courseId && r.result !== "Uploaded").length, skipped = rows.filter((r) => !r.courseId).length, check = rows.filter((r) => readNeedsCheck(r.read ?? null)).length;
+    setMsg({ kind: failed || check ? "error" : "success", text: `${done} template${done === 1 ? "" : "s"} uploaded and now in use.${failed ? ` ${failed} failed: see the list.` : ""}${check ? ` ${check} to check: see the list.` : ""}${skipped ? ` ${skipped} skipped (no course).` : ""}` });
   }
   // The template with its course description; name, dates, numbers and QR left blank.
   const view = (id: string) => window.open(`/api/staff/certificate-templates/${id}?view=1`, "_blank", "noopener");
@@ -385,7 +394,7 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
             {bulk.map((r, i) => { const t = r.courseId ? active.get(r.courseId) : undefined; const twice = r.courseId && bulk.findIndex((x) => x.courseId === r.courseId) !== i; return <tr key={`${r.file.name}-${i}`}>
               <td className="cl-mono">{r.file.name}</td>
               <td><select className="cl-in" aria-label={`Course for ${r.file.name}`} disabled={bulkBusy || r.result === "Uploaded"} value={r.courseId} onChange={(e) => setBulk(bulk.map((x, j) => j === i ? { ...x, courseId: e.target.value, result: undefined } : x))}><option value="">Skip this file</option>{[...all].sort((a, b) => a.name.localeCompare(b.name)).map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></td>
-              <td>{r.result === "Uploaded" ? <Badge tone="green">Uploaded</Badge> : r.result ? <Badge tone="orange">{r.result}</Badge> : !r.courseId ? <span className="cl-sub">No course found · pick one or skip</span> : twice ? <Badge tone="orange">Same course as another file</Badge> : t ? <span className="cl-sub">Replaces Version {t.version}</span> : <span className="cl-sub">New template</span>}</td>
+              <td>{r.result === "Uploaded" ? <><Badge tone={readNeedsCheck(r.read ?? null) ? "orange" : "green"}>Uploaded</Badge>{r.read && <small className="cl-sub cl-block">{templateReadText(r.read)}</small>}</> : r.result ? <Badge tone="orange">{r.result}</Badge> : !r.courseId ? <span className="cl-sub">No course found · pick one or skip</span> : twice ? <Badge tone="orange">Same course as another file</Badge> : t ? <span className="cl-sub">Replaces Version {t.version}</span> : <span className="cl-sub">New template</span>}</td>
             </tr>; })}
           </tbody></table></div>
           <div className="cl-acts tp-bulk-acts"><button type="button" className="portal-secondary" disabled={bulkBusy} onClick={() => setBulk(null)}>Close</button><button type="button" className="portal-primary" disabled={bulkBusy || !bulk.some((r) => r.courseId && r.result !== "Uploaded")} onClick={() => void uploadAll()}>{bulkBusy ? "Uploading…" : `Upload All (${bulk.filter((r) => r.courseId && r.result !== "Uploaded").length})`}</button></div>

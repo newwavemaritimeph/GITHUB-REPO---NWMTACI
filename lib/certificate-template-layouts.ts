@@ -9,7 +9,6 @@ import { isFieldsV2, type TemplateFieldsV2 } from "@/lib/certificate-overlay";
  */
 const BY_FILE = layouts as unknown as Record<string, unknown>;
 
-/** Storage path "<courseId>/<uuid>-<file name>" → the bundled positions for that converted template, or null. */
 /**
  * A course's layout for a PDF uploaded under any other name. The owner exports UBT-PSSR from Word, and the
  * file name varies; without positions the portal's default placement prints over the page.
@@ -20,8 +19,19 @@ export function courseLayout(code: string | null | undefined): TemplateFieldsV2 
   return isFieldsV2(found) ? found : null;
 }
 
+/** Storage path "<courseId>/<uuid>-<file name>" → the bundled positions for that converted template, or null. */
 export function bundledLayout(storagePath: string | null | undefined): TemplateFieldsV2 | null {
   const file = storagePath?.split("/").pop()?.replace(/^[0-9a-f-]{36}-/i, "");
   const found = file ? BY_FILE[file] : null;
   return isFieldsV2(found) ? found : null;
+}
+
+/**
+ * The one rule for which positions a template prints with. Positions read from the uploaded file come first, so a
+ * new design under an old file name never prints on stale positions; then the bundled fixes, the upload's, the course's.
+ */
+export function templateLayout(t: { storagePath: string | null | undefined; fields: unknown; code: string | null | undefined; isPdf: boolean }): TemplateFieldsV2 | null {
+  const stored = isFieldsV2(t.fields) ? t.fields : null;
+  if (stored?.auto) return stored;
+  return bundledLayout(t.storagePath) ?? stored ?? (t.isPdf ? courseLayout(t.code) : null);
 }

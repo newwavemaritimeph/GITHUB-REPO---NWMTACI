@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { PDFDocument } from "pdf-lib";
-import { drawTemplateFields, isFieldsV2, liftTemplateText } from "@/lib/certificate-overlay";
-import { bundledLayout, courseLayout } from "@/lib/certificate-template-layouts";
+import { drawTemplateFields, liftTemplateText } from "@/lib/certificate-overlay";
+import { templateLayout } from "@/lib/certificate-template-layouts";
 import { detectPhotoBox } from "@/lib/certificate-template";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -27,7 +27,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (!file) return NextResponse.json({ error: "The template file could not be read." }, { status: 404 });
     const bytes = new Uint8Array(await file.arrayBuffer());
     const owner = template.courses as unknown as { code: string } | { code: string }[] | null;
-    const fields = bundledLayout(template.storage_path) ?? (isFieldsV2(template.fields) ? template.fields : null) ?? courseLayout(Array.isArray(owner) ? owner[0]?.code : owner?.code);
+    const fields = templateLayout({ storagePath: template.storage_path, fields: template.fields, code: Array.isArray(owner) ? owner[0]?.code : owner?.code, isPdf: template.storage_path.toLowerCase().endsWith(".pdf") });
     let out: Uint8Array = bytes;
     if (template.storage_path.toLowerCase().endsWith(".pdf") && fields) {
       const src = await PDFDocument.load(bytes), pdf = await PDFDocument.create();

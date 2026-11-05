@@ -51,7 +51,7 @@ describe("UBT-PSSR training certificate", () => {
     expect(liftTemplateText(doc, page, f.lift!)).toBe(4);
     const stream = doc.context.lookup(page.node.get(PDFName.of("Contents")));
     const left = new TextDecoder("latin1").decode(decodePDFRawStream(stream as PDFRawStream).decode());
-    expect((left.match(/BT\s/g) ?? []).length).toBe(2);
+    expect((left.match(/\bTj\b/g) ?? []).length).toBe(2);
   });
   it("takes the PDF exported from the Word file under any name, for UBT-PSSR only", () => {
     const f = bundledLayout("course/00000000-0000-0000-0000-000000000000-NWMTACI-COC--UBT-PSSR-.pdf")!;

@@ -5,8 +5,8 @@ import { formatNumber, certificateState, evaluationRequiredFor, type Certificate
 import { corrected, type CertificateCorrections } from "@/lib/certificate-photo";
 import { detectPhotoBox } from "@/lib/certificate-template";
 import { certificateLayout, isHazmatCfr } from "@/lib/certificate-layouts";
-import { drawTemplateFields, isFieldsV2, liftTemplateText } from "@/lib/certificate-overlay";
-import { bundledLayout, courseLayout } from "@/lib/certificate-template-layouts";
+import { drawTemplateFields, liftTemplateText } from "@/lib/certificate-overlay";
+import { templateLayout } from "@/lib/certificate-template-layouts";
 import { postTestStatus } from "@/lib/post-test-server";
 import { newVerifyCode, verifyUrl } from "@/lib/certificate-verify";
 
@@ -200,9 +200,7 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
   if (!tpl) throw new Error("No certificate template is uploaded for this course yet. The Admin imports the templates from the NWMTACI CERTIFICATES folder.");
   const pdf = await PDFDocument.create();
   let page;
-  // Templates converted from New Wave's Word files (scripts/certificate-templates, 20 Oct 2026):
-  // the bundled positions for that converted file (they carry fixes, e.g. CSF hours), else the upload's, else the course's.
-  const v2 = bundledLayout(tpl.storagePath) ?? (isFieldsV2(tpl.fields) ? tpl.fields : null) ?? (isPdf(tpl.bytes) ? courseLayout(ctx.course.code) : null);
+  const v2 = templateLayout({ storagePath: tpl.storagePath, fields: tpl.fields, code: ctx.course.code, isPdf: isPdf(tpl.bytes) });
   if (isPdf(tpl.bytes)) {
     const src = await PDFDocument.load(tpl.bytes);
     if (v2?.lift) liftTemplateText(src, src.getPages()[0], v2.lift);

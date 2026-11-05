@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { detectPhotoBox } from "@/lib/certificate-template";
+import { detectPhotoBox, hasPictureAt } from "@/lib/certificate-template";
+import { autoLayout, type ReadLayout } from "@/lib/certificate-autolayout";
+import { bundledLayout, templateLayout } from "@/lib/certificate-template-layouts";
 
 export const runtime = "nodejs";
 
@@ -38,7 +40,7 @@ export async function POST(request: Request) {
     const db = createSupabaseAdminClient();
     // Certificate templates are only for New Wave in-house courses (incl. STCW).
     // Endorsed / partner trainings are excluded — New Wave does not issue their certificates.
-    const { data: course, error: courseError } = await db.from("courses").select("delivery_type").eq("id", courseId).maybeSingle();
+    const { data: course, error: courseError } = await db.from("courses").select("delivery_type,code").eq("id", courseId).maybeSingle();
     if (courseError) throw courseError;
     if (!course) return NextResponse.json({ error: "Course not found." }, { status: 404 });
     if (course.delivery_type !== "In-House") return NextResponse.json({ error: "Certificate templates are only for New Wave in-house courses, not endorsed/partner trainings." }, { status: 400 });
@@ -46,6 +48,25 @@ export async function POST(request: Request) {
     const path = `${courseId}/${crypto.randomUUID()}-${safeName}`;
     const { error: uploadError } = await db.storage.from("certificate-templates").upload(path, file, { contentType: file.type, upsert: false });
     if (uploadError) throw uploadError;
+
+    // Read the positions from the PDF itself (owner, 5 Nov 2026), unless the upload came with its own measured ones.
+    // A PDF that cannot be read still goes live, and the uploader is told.
+    const bytes = file.type === "application/pdf" ? new Uint8Array(await file.arrayBuffer()) : null;
+    const photoBox = bytes ? await detectPhotoBox(bytes) : null;
+    let layout: Pick<ReadLayout, "found" | "missing" | "covered"> | null = null;
+    if (bytes && !rawLayout) {
+      const read = await autoLayout(bytes, { hasMeasuredLayout: !!bundledLayout(path) }).catch((error): ReadLayout => { console.error("Certificate template could not be read", error); return { fields: null, found: [], missing: ["Trainee Name", "Training Dates", "Issued Date", "Certificate No.", "Registration No."], lifted: [] }; });
+      if (read) {
+        layout = { found: read.found, missing: read.missing, covered: read.covered };
+        (photoBox ? layout.found : layout.missing).push("Photo Box");
+        // A new version keeps the QR box when its picture is still in the same place.
+        const { data: current } = await db.from("certificate_templates").select("storage_path,fields").eq("course_id", courseId).eq("active", true).maybeSingle();
+        const qr = current ? templateLayout({ storagePath: current.storage_path, fields: current.fields, code: course.code, isPdf: true })?.qr : undefined;
+        const keepQr = !!qr && await hasPictureAt(bytes, qr);
+        if (qr) (keepQr ? layout.found : layout.missing).push("QR Code");
+        if (read.fields) fields = { ...read.fields, ...(photoBox ? { photo: { x: photoBox.x, y: photoBox.y, w: photoBox.w, h: photoBox.h } } : {}), ...(keepQr ? { qr } : {}) };
+      }
+    }
 
     const { data: last } = await db.from("certificate_templates").select("version").eq("course_id", courseId).order("version", { ascending: false }).limit(1).maybeSingle();
     const version = (last?.version ?? 0) + 1;
@@ -55,8 +76,7 @@ export async function POST(request: Request) {
     }).select("id").single();
     if (insertError) { await db.storage.from("certificate-templates").remove([path]); throw insertError; }
     // Tell the uploader whether the 2x2 photo box was found (it is used automatically when printing).
-    const photoBox = file.type === "application/pdf" ? await detectPhotoBox(new Uint8Array(await file.arrayBuffer())) : null;
-    return NextResponse.json({ templateId: tpl.id, version, photoBox: photoBox ? { w: Math.round(photoBox.w), h: Math.round(photoBox.h), source: photoBox.source } : null });
+    return NextResponse.json({ templateId: tpl.id, version, layout, photoBox: photoBox ? { w: Math.round(photoBox.w), h: Math.round(photoBox.h), source: photoBox.source } : null });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Unable to store the template." }, { status: 400 });
   }

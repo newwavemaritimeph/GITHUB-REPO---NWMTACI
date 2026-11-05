@@ -13,19 +13,19 @@ import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFRawStream, PDFRe
  */
 export type PhotoBox = { x: number; y: number; w: number; h: number; source: "box" | "lines" | "picture"; pageW: number; pageH: number };
 
-type M = [number, number, number, number, number, number];
+export type M = [number, number, number, number, number, number];
 type Pt = [number, number];
 type Rect = { x: number; y: number; w: number; h: number; source: PhotoBox["source"] };
 type Seg = { x1: number; y1: number; x2: number; y2: number };
 
-const IDENTITY: M = [1, 0, 0, 1, 0, 0];
-const mul = (a: M, b: M): M => [a[0] * b[0] + a[1] * b[2], a[0] * b[1] + a[1] * b[3], a[2] * b[0] + a[3] * b[2], a[2] * b[1] + a[3] * b[3], a[4] * b[0] + a[5] * b[2] + b[4], a[4] * b[1] + a[5] * b[3] + b[5]];
-const apply = (m: M, x: number, y: number): Pt => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
+export const IDENTITY: M = [1, 0, 0, 1, 0, 0];
+export const mul = (a: M, b: M): M => [a[0] * b[0] + a[1] * b[2], a[0] * b[1] + a[1] * b[3], a[2] * b[0] + a[3] * b[2], a[2] * b[1] + a[3] * b[3], a[4] * b[0] + a[5] * b[2] + b[4], a[4] * b[1] + a[5] * b[3] + b[5]];
+export const apply = (m: M, x: number, y: number): Pt => [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]];
 const boundsOf = (pts: Pt[]) => { const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]); const x = Math.min(...xs), y = Math.min(...ys); return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y }; };
 const TOL = 1.5;
 
 /** Tokenises a content stream into numbers, names and operators (strings, arrays, dicts and inline images skipped). */
-function* tokens(src: string): Generator<{ t: "num"; v: number } | { t: "name"; v: string } | { t: "op"; v: string }> {
+export function* tokens(src: string): Generator<{ t: "num"; v: number } | { t: "name"; v: string } | { t: "op"; v: string; end: number }> {
   let i = 0;
   const n = src.length;
   const ws = (c: string) => c === " " || c === "\n" || c === "\r" || c === "\t" || c === "\f" || c === "\0";
@@ -45,7 +45,7 @@ function* tokens(src: string): Generator<{ t: "num"; v: number } | { t: "name"; 
     i = j > i ? j : i + 1;
     if (/^[+-]?(\d+\.?\d*|\.\d+)$/.test(word)) { yield { t: "num", v: Number(word) }; continue; }
     if (word === "BI") { const end = src.indexOf("EI", i); i = end < 0 ? n : end + 2; continue; }
-    yield { t: "op", v: word };
+    yield { t: "op", v: word, end: i };
   }
 }
 
@@ -136,21 +136,41 @@ export function pickPhotoBox(rects: Rect[], pageW: number, pageH: number): Rect 
   return scored[0]?.r ?? null;
 }
 
+/** Every box and line drawn on the first page of a PDF. */
+async function drawnShapes(bytes: Uint8Array) {
+  const doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
+  const page = doc.getPage(0);
+  const { width, height } = page.getSize();
+  const box = page.getMediaBox();
+  const contents = page.node.Contents();
+  const streams = contents instanceof PDFArray ? contents.asArray().map((r) => doc.context.lookup(r)) : contents ? [contents] : [];
+  const text = streams.map(streamText).join("\n");
+  const rects: Rect[] = [], segs: Seg[] = [];
+  walk(doc, text, page.node.Resources(), [1, 0, 0, 1, -box.x, -box.y], rects, segs, 0);
+  return { rects, segs, width, height };
+}
+
 /** The 2x2 photo box on the first page of a PDF template, or null when none is found. */
 export async function detectPhotoBox(bytes: Uint8Array): Promise<PhotoBox | null> {
   try {
-    const doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
-    const page = doc.getPage(0);
-    const { width, height } = page.getSize();
-    const box = page.getMediaBox();
-    const contents = page.node.Contents();
-    const streams = contents instanceof PDFArray ? contents.asArray().map((r) => doc.context.lookup(r)) : contents ? [contents] : [];
-    const text = streams.map(streamText).join("\n");
-    const rects: Rect[] = [], segs: Seg[] = [];
-    walk(doc, text, page.node.Resources(), [1, 0, 0, 1, -box.x, -box.y], rects, segs, 0);
+    const { rects, segs, width, height } = await drawnShapes(bytes);
     const best = pickPhotoBox([...rects, ...boxesFromLines(segs)], width, height);
     return best ? { ...best, pageW: width, pageH: height } : null;
   } catch {
     return null;
+  }
+}
+
+/** Whether a picture on the first page covers most of this box (a new version of a template that keeps its QR picture). */
+export async function hasPictureAt(bytes: Uint8Array, box: { x: number; y: number; w: number; h: number }) {
+  try {
+    const { rects } = await drawnShapes(bytes);
+    return rects.some((r) => {
+      if (r.source !== "picture") return false;
+      const w = Math.min(r.x + r.w, box.x + box.w) - Math.max(r.x, box.x), h = Math.min(r.y + r.h, box.y + box.h) - Math.max(r.y, box.y);
+      return w > 0 && h > 0 && w * h >= box.w * box.h * 0.5;
+    });
+  } catch {
+    return false;
   }
 }
