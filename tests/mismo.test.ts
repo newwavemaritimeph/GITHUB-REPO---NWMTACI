@@ -1,11 +1,65 @@
 import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
-import { NO_FILTER, balanceAt, cutDateOf, entryMovedFrom, finalList, lineOfEntry, lineOfRow, manilaInstant, mismoListed, mismoCopyText, mismoCsv, mismoFiltered, mismoMissing, mismoRowsCsv, mismoSorted, mismoState, mismoWork, owesAt, paidLate, unsettledAt11, whenOf, type MismoBatch, type MismoEntry, type MismoRow, type MismoTrainee } from "../lib/mismo";
+import { NO_FILTER, balanceAt, cutDateOf, entryMovedFrom, finalList, lineOfEntry, lineOfRow, manilaInstant, mismoListed, mismoCopyText, mismoCsv, mismoFiltered, mismoMissing, mismoRowsCsv, mismoSorted, mismoState, mismoWork, owesAt, paidLate, ticksToClear, unsettledAt11, whenOf, type MismoBatch, type MismoEntry, type MismoRow, type MismoTrainee } from "../lib/mismo";
+import { clearMismoAfterVoid, loadMismoDay } from "../lib/mismo-server";
 import { MismoWorkList } from "../components/portal/mismo-home";
 
 const t = (id: string, due: number, b11: number, b16: number, now: number, extra: Partial<MismoTrainee> = {}): MismoTrainee => ({ enrollmentId: id, lastName: id.toUpperCase(), firstName: "Juan", middleName: null, birthdate: "1990-01-01", srn: "SRN-1", rank: "AB", dueCentavos: due, paidBy11: b11, paidBy16: b16, paidNow: now, ...extra });
 const batch = (trainees: MismoTrainee[]): MismoBatch => ({ id: "b1", batchNumber: "BCH-1", courseName: "Crowd Management", courseCode: "PSCMT", startsOn: "2026-10-08", endsOn: "2026-10-09", room: "Room 1", instructor: "Capt. X", trainees, submittedAt: null, submittedCount: null });
+
+/** A database stand-in: every call chains, and awaiting gives the table's rows, or its error. Records what is deleted and logged. */
+function fakeDb(tables: Record<string, unknown[] | { message: string }>) {
+  const deleted: string[] = [], logged: unknown[] = [];
+  const db = {
+    from(name: string) {
+      const chain: Record<string, unknown> = {};
+      for (const m of ["select", "in", "eq", "lte", "gte", "neq", "not", "order"]) chain[m] = () => chain;
+      chain.delete = () => ({ in: async (_: string, ids: string[]) => { deleted.push(...ids); return { error: null }; } });
+      chain.insert = async (rows: unknown[]) => { logged.push(...rows); return { error: null }; };
+      const found = tables[name];
+      chain.then = (done: (v: unknown) => void) => done(Array.isArray(found) ? { data: found, error: null } : found ? { data: null, error: found } : { data: [], error: null });
+      return chain;
+    },
+  };
+  return { db: db as never, deleted, logged };
+}
+
+describe("a payment voided after encoding (owner, 5 Nov 2026)", () => {
+  const enrollment = (id: string, company = false) => ({ id, selling_price_centavos: 100, company_charge_agency_id: company ? "partner" : null });
+  it("takes off a trainee who now owes, and keeps Company Charge and one still fully paid", () => {
+    const allocations = [{ enrollment_id: "owes", amount_centavos: 100, valid: false }, { enrollment_id: "covered", amount_centavos: 100, valid: false }, { enrollment_id: "covered", amount_centavos: 100, valid: true }, { enrollment_id: "billed", amount_centavos: 100, valid: false }];
+    expect(ticksToClear([enrollment("owes"), enrollment("covered"), enrollment("billed", true)], [], allocations)).toEqual(["owes"]);
+  });
+  it("counts charges and discounts in what is due", () => {
+    const paid = [{ enrollment_id: "a", amount_centavos: 100, valid: true }];
+    expect(ticksToClear([enrollment("a")], [{ enrollment_id: "a", amount_centavos: 50, event_type: "charge" }], paid)).toEqual(["a"]);
+    expect(ticksToClear([enrollment("a")], [{ enrollment_id: "a", amount_centavos: 50, event_type: "discount" }], [{ enrollment_id: "a", amount_centavos: 50, valid: true }])).toEqual([]);
+  });
+  it("removes the tick and records why", async () => {
+    const f = fakeDb({ payment_allocations: [{ enrollment_id: "e1", amount_centavos: 100, payments: { valid: false } }], mismo_entries: [{ enrollment_id: "e1" }], enrollments: [enrollment("e1")] });
+    await clearMismoAfterVoid(f.db, "pay1", "actor", "Wrong amount");
+    expect(f.deleted).toEqual(["e1"]);
+    expect(f.logged).toMatchObject([{ action: "mismo.removed_after_void", record_id: "e1", reason: "Wrong amount" }]);
+  });
+  it("does nothing when the trainee was never encoded", async () => {
+    const f = fakeDb({ payment_allocations: [{ enrollment_id: "e1", amount_centavos: 100, payments: { valid: false } }], mismo_entries: [] });
+    await clearMismoAfterVoid(f.db, "pay1", "actor", "Wrong amount");
+    expect(f.deleted).toEqual([]);
+  });
+});
+
+it("still loads the list when the old mismo_submissions table is missing (live, 5 Nov 2026)", async () => {
+  const f = fakeDb({
+    courses: [{ id: "c1", code: "PSCMT", name: "Crowd" }],
+    batches: [{ id: "b1", batch_number: "26-507-023", course_id: "c1", starts_on: "2026-11-10", ends_on: "2026-11-11", venue: null }],
+    mismo_submissions: { message: "Could not find the table 'public.mismo_submissions' in the schema cache" },
+    enrollments: [{ id: "e1", batch_id: "b1", selling_price_centavos: 100, trainees: { legal_last_name: "CRUZ", legal_first_name: "Juan", legal_middle_name: null, birthdate: null, srn: null, rank: null } }],
+  });
+  const day = await loadMismoDay(f.db, "2026-11-10");
+  expect(day.batches[0].trainees.map((x) => x.lastName)).toEqual(["CRUZ"]);
+  expect(day.batches[0].submittedAt).toBeNull();
+});
 
 describe("MISMO officer's list (Design 3)", () => {
   it("puts each trainee in one state; only paid trainees with complete details can be input", () => {

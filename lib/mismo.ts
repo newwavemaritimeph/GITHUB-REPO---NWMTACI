@@ -75,6 +75,16 @@ export function entryMovedFrom(entry: { batchNumber?: string | null; classStart?
   return new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${entry.classStart}T00:00:00Z`));
 }
 
+/** Which encoded trainees a voided payment takes off MISMO: those who now owe. Company Charge stays, and so does a trainee whose other payments still cover the fee. */
+export function ticksToClear(enrollments: { id: string; selling_price_centavos: number; company_charge_agency_id?: string | null }[], charges: { enrollment_id: string; amount_centavos: number; event_type: string }[], allocations: { enrollment_id: string; amount_centavos: number; valid: boolean }[]) {
+  return enrollments.filter((e) => {
+    if (e.company_charge_agency_id) return false;
+    const due = charges.filter((c) => c.enrollment_id === e.id).reduce((n, c) => n + (c.event_type === "discount" ? -1 : 1) * Number(c.amount_centavos), Number(e.selling_price_centavos ?? 0));
+    const paid = allocations.filter((a) => a.enrollment_id === e.id && a.valid).reduce((n, a) => n + Number(a.amount_centavos), 0);
+    return due - paid > 0;
+  }).map((e) => e.id);
+}
+
 /** A trainee already encoded, for the Encoded tab. */
 export type MismoEntry = { enrollmentId: string; lastName: string; firstName: string; middleName: string | null; srn: string | null; batchNumber: string; code: string; startsOn: string; endsOn: string; doneAt: string; by: string; cancelled: boolean };
 

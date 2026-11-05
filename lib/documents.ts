@@ -1120,6 +1120,8 @@ export async function createPaymentInvoicePdf(snapshot:PaymentSnapshot){
   ],footer:"This invoice was generated automatically from an immutable payment snapshot. An acknowledgment receipt is issued separately."});
 }
 
+export type CashierReportRow = { paymentId?: string; rebateCentavos?: number; rebateStatus?: string; receipt: string; time: string; trainee: string; course: string; channel: string; reference: string; amountCentavos: number; proof?: boolean; receivedAt?: string; codes?: string; kind?: string; agency?: string; valid?: boolean; voidReason?: string | null; verificationState?: string | null };
+
 export type CashierReportSnapshot = {
   control?: DocumentControl | null;
   dateLabel: string;
@@ -1129,7 +1131,9 @@ export type CashierReportSnapshot = {
   position: { previousLabel: string; previousNote?: string; previousCentavos: number; cashCollectedCentavos: number; cashExpensesCentavos: number; onHandCentavos: number; countedCentavos: number | null; overShortCentavos: number | null };
   channels: string[];
   matrix: { source: string; cells: { channel: string; count: number; totalCentavos: number }[]; count: number; totalCentavos: number }[];
-  groups: { kind: string; name: string; rows: { paymentId?: string; rebateCentavos?: number; rebateStatus?: string; receipt: string; time: string; trainee: string; course: string; channel: string; reference: string; amountCentavos: number; proof?: boolean }[]; subtotalCentavos: number }[];
+  groups: { kind: string; name: string; rows: CashierReportRow[]; subtotalCentavos: number }[];
+  /** Voided that day, for Accounting's list. In no total, and not on the PDF. */
+  voided?: CashierReportRow[];
   expenses: { voucher: string; payee: string; category: string; channel: string; reference: string; status: string; amountCentavos: number }[];
   expenseTotals: { channel: string; totalCentavos: number }[];
   /** Other income received that day (202610190045): endorsement rebates, rental, etc. */

@@ -1514,8 +1514,12 @@ button.rd-row:hover { background: #f6fafc; }
   .nw-tab > button { padding: 12px 14px; font-size: 15.5px; }
   .nw-role span { display: none; }
   .cx-cards thead { display: none; }
+  /* A card fits the phone: the table's desktop min-width pushed each value off the card. */
+  .cx-cards table, .cx-cards tbody, .cx-cards tfoot { display: block; width: 100%; min-width: 0 !important; }
   .cx-cards tr { display: block; padding: 12px 16px; border-top: 1px solid var(--nw-line); }
-  .cx-cards td { display: flex; justify-content: space-between; gap: 12px; padding: 5px 0 !important; border: 0 !important; text-align: right; }
+  .cx-cards tr.pv-dayrow { display: flex; flex-wrap: wrap; justify-content: space-between; column-gap: 12px; background: var(--nw-soft); }
+  .cx-cards td { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; padding: 5px 0 !important; border: 0 !important; text-align: right; }
+  .cx-cards td small { flex-basis: 100%; }
   .cx-cards td::before { content: attr(data-l); font: 600 12px var(--font-portal), sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--nw-muted); text-align: left; padding-top: 3px; }
   .cx-cards td[data-l=""]::before { content: none; }
   .cx-cards td.lead { display: block; text-align: left; padding-bottom: 8px !important; }

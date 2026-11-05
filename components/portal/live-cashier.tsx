@@ -5,7 +5,7 @@ import type { PortalData, Enrollment, TraineeProofRow } from "../portal-live-app
 import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos, pesos2 } from "@/lib/portal-format";
 import { pesosInWords } from "@/lib/amount-words";
 import { ALL_DATES, Badge, Message, Modal, PageHead, ViewIcon, fullName, fmtDate, fmtClock, txWhen, useNeedSince, usePaged, usePost, openAdmissionRecord, submit, MonthBar, usePeriod } from "./shared-ui";
-import { RequestVoidIcon, paymentStatus } from "./payment-void";
+import { PrintGlyph, RequestVoidIcon, paymentStatus } from "./payment-void";
 import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balances";
 import { requestFee } from "@/lib/request-fees";
 import type { CashierReportSnapshot } from "@/lib/documents";
@@ -68,7 +68,7 @@ export function tarState(data: PortalData, traineeId: string, groupIds?: string[
 export function ReceiptButton({ data, paymentId, reload, className = "portal-secondary", icon }: { data: PortalData; paymentId: string; reload?: () => Promise<void>; className?: string; icon?: boolean }) {
   const printed = data.receiptPrints?.[paymentId] ?? 0;
   if (printed >= 2) return icon ? <small className="muted-text">Printed Twice</small> : null;
-  return <a className={icon ? "pv-icon" : className} title={icon ? "Print Receipt" : undefined} aria-label={icon ? "Print Receipt" : undefined} href={`/portal/payment-receipt/${paymentId}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload?.(), 2500)}>{icon ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9V3h12v6" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><path d="M6 14h12v7H6z" /></svg> : "Receipt"}</a>;
+  return <a className={icon ? "pv-icon" : className} title={icon ? "Print Receipt" : undefined} aria-label={icon ? "Print Receipt" : undefined} href={`/portal/payment-receipt/${paymentId}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload?.(), 2500)}>{icon ? <PrintGlyph /> : "Receipt"}</a>;
 }
 
 /**
@@ -327,7 +327,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
   const [proof, setProof] = useState<{ id: string; link: string; path: string; duplicate: boolean } | null>(initialProof ? { id: initialProof.id, link: initialProof.drive_link ?? "", path: "", duplicate: false } : null);
   const [dupWarning, setDupWarning] = useState(false), [dupConfirmed, setDupConfirmed] = useState(false);
 
-  // Company Charge courses are paid by the partner on its Billing Statement (Record Company Payment), never here.
+  // Company Charge courses are paid by the partner on its Billing Statement (Accounting records it, 5 Nov 2026), never here.
   const mine = data.enrollments.filter((e) => e.trainee_id === traineeId && e.enrollment_status !== "Cancelled" && !data.companyCharge?.[e.id]);
   const open = mine.filter((e) => balanceOf(e) > 0);
   const catalog = data.charges.filter((c) => c.active);
@@ -496,7 +496,6 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
  * balances still due after training (emailed daily at 4:00 PM).
  */
 export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData; onPay: (enrollmentId: string, courses?: string[]) => void; reload: () => Promise<void>; go?: (module: string) => void }) {
-  const [companyPay, setCompanyPay] = useState(false);
   const [raising, setRaising] = useState(false), [reqFilter, setReqFilter] = useState<"All" | "For Approval" | "Approved" | "Rejected">("All");
   const today = manilaToday();
   const handed = data.handedToCashier ?? {};
@@ -569,7 +568,6 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
           <dl className="ac-lines"><div><dt>To collect · {toCollect.length}</dt><dd className="minus">{pesos2(toCollect.reduce((s, l) => s + Number(l.e.rebate_centavos), 0))}</dd></div></dl>
           {go && <div className="cr-act"><button type="button" className="portal-secondary" onClick={() => go("Other income")}>Open Rebates</button></div>}</section> : null; })()}
         <button type="button" className="cr-big cr-pay" onClick={() => onPay("")}><b>Record</b><small>{fresh.length} waiting to pay</small></button>
-        {(data.billingStatements ?? []).some((b) => b.paid_centavos < b.total_centavos) && <button type="button" className="cr-big cr-pay" onClick={() => setCompanyPay(true)}><b>Record Company Payment</b><small>{(data.billingStatements ?? []).filter((b) => b.paid_centavos < b.total_centavos).length} Billing Statement(s) to collect</small></button>}
         <button type="button" className="cr-big cr-exp" onClick={() => setRaising(true)}><b>Raise Expense</b><small>Sent to Accounting for approval</small></button>
       </div>
       <div className="ac-stack">
@@ -616,7 +614,6 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
       </div>
     </div>
     {raising && <RecordExpenseModal data={data} onClose={() => setRaising(false)} post={post} />}
-    {companyPay && <CompanyPaymentModal data={data} reload={reload} onClose={() => setCompanyPay(false)} />}
     {fromProof && <RecordPaymentModal data={data} initialProof={fromProof} onClose={() => setFromProof(null)} onSaved={reload} />}
   </div>;
 }

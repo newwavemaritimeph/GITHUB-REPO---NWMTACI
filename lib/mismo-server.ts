@@ -1,5 +1,5 @@
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { MISMO_COURSE_CODES, cutDateOf, entryMovedFrom, manilaInstant, type MismoBatch, type MismoDay, type MismoEntry } from "@/lib/mismo";
+import { MISMO_COURSE_CODES, cutDateOf, entryMovedFrom, manilaInstant, ticksToClear, type MismoBatch, type MismoDay, type MismoEntry } from "@/lib/mismo";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -28,7 +28,8 @@ export async function loadMismoDay(db: Admin, date: string, to: string = date, o
   const [enrollments, staffing, submissions] = await Promise.all([
     inChunks(batchIds, 30, (part) => db.from("enrollments").select("id,batch_id,selling_price_centavos,enrollment_status,trainees(legal_last_name,legal_first_name,legal_middle_name,birthdate,srn,rank)").in("batch_id", part).in("enrollment_status", ["Enrolled", "Pending", "Open Schedule"])),
     opts.staffing === false ? new Map<string, { room: string | null; instructor: string | null }>() : loadStaffing(db, batchIds),
-    inChunks<{ batch_id: string; submitted_at: string; trainee_count: number }>(batchIds, 100, (part) => db.from("mismo_submissions").select("batch_id,submitted_at,trainee_count").in("batch_id", part)),
+    // Batch marks from before 5 Nov 2026. Nothing depends on them, and the live database has no such table: the list must still load.
+    inChunks<{ batch_id: string; submitted_at: string; trainee_count: number }>(batchIds, 100, (part) => db.from("mismo_submissions").select("batch_id,submitted_at,trainee_count").in("batch_id", part)).catch(() => []),
   ]);
   const rows = enrollments as unknown as { id: string; batch_id: string; selling_price_centavos: number; trainees: { legal_last_name: string; legal_first_name: string; legal_middle_name: string | null; birthdate: string | null; srn: string | null; rank: string | null } | null }[];
   const ids = rows.map((e) => e.id);
@@ -96,6 +97,33 @@ export async function loadMismoEntries(db: Admin): Promise<MismoEntry[]> {
     if (entryMovedFrom({ batchNumber: r.batch_number, classStart: r.class_start }, { batchNumber: b?.batch_number ?? "", startsOn: b?.starts_on ?? "" })) return [];
     return [{ enrollmentId: r.enrollment_id, lastName: t?.legal_last_name ?? "", firstName: t?.legal_first_name ?? "", middleName: t?.legal_middle_name ?? null, srn: t?.srn ?? null, batchNumber: b?.batch_number ?? "—", code: first(b?.courses)?.code ?? "—", startsOn: b?.starts_on ?? "", endsOn: b?.ends_on ?? "", doneAt: r.done_at, by: first(r.profiles)?.complete_name ?? "—", cancelled: e?.enrollment_status === "Cancelled" }];
   });
+}
+
+/**
+ * A payment voided after encoding takes the trainee off MISMO (owner, 5 Nov 2026): the tick goes, so if they pay again they
+ * return to For Encoding. Called once the payment is void. The audit log keeps who was removed and why.
+ */
+export async function clearMismoAfterVoid(db: Admin, paymentId: string, actorId: string, reason: string) {
+  const { data: hit } = await db.from("payment_allocations").select("enrollment_id").eq("payment_id", paymentId);
+  const ids = [...new Set((hit ?? []).map((a) => a.enrollment_id as string))];
+  if (!ids.length) return;
+  const { data: ticks } = await db.from("mismo_entries").select("enrollment_id").in("enrollment_id", ids);
+  const ticked = (ticks ?? []).map((t) => t.enrollment_id as string);
+  if (!ticked.length) return;
+  const [{ data: enrollments }, { data: charges }, { data: allocations }] = await Promise.all([
+    db.from("enrollments").select("id,selling_price_centavos,company_charge_agency_id").in("id", ticked),
+    db.from("enrollment_charges").select("enrollment_id,amount_centavos,event_type").in("enrollment_id", ticked).eq("valid", true),
+    db.from("payment_allocations").select("enrollment_id,amount_centavos,payments(valid)").in("enrollment_id", ticked),
+  ]);
+  const clear = ticksToClear(
+    (enrollments ?? []) as { id: string; selling_price_centavos: number; company_charge_agency_id?: string | null }[],
+    (charges ?? []) as { enrollment_id: string; amount_centavos: number; event_type: string }[],
+    ((allocations ?? []) as unknown as { enrollment_id: string; amount_centavos: number; payments: unknown }[]).map((a) => ({ enrollment_id: a.enrollment_id, amount_centavos: a.amount_centavos, valid: first(a.payments as { valid: boolean } | null)?.valid !== false })),
+  );
+  if (!clear.length) return;
+  const { error } = await db.from("mismo_entries").delete().in("enrollment_id", clear);
+  if (error) throw new Error(error.message);
+  await db.from("audit_logs").insert(clear.map((id) => ({ actor_id: actorId, action: "mismo.removed_after_void", record_type: "enrollment", record_id: id, new_values: { payment_id: paymentId }, reason })));
 }
 
 async function loadStaffing(db: Admin, batchIds: string[]) {

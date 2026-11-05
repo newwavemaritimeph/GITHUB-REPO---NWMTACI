@@ -16,6 +16,7 @@ import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balanc
 import { downloadCsv } from "@/lib/csv";
 import { tcl } from "@/lib/title-case";
 import { askReason } from "./dialogs";
+import { PrintGlyph, paymentStatus } from "./payment-void";
 
 /**
  * Accounting (owner, 8 Oct 2026): a view-first dashboard like the
@@ -222,21 +223,25 @@ function useReprint(onDone?: () => void) {
   return { toggle, formRow, msg, close: () => setOpen(null) };
 }
 
-export function AccountingPayments() {
+export function AccountingPayments({ data }: { data: PortalData }) {
   // Receipts and TARs are consolidated here (owner, 3 Nov 2026: "Consolidate Receipt and TARs in Payment").
   const [view, setView] = useState<"receipts" | "tars">("receipts");
   const pills = <div className="sub-pills">{([["receipts", "Acknowledgement Receipts"], ["tars", "Training Admission Records"]] as const).map(([k, label]) => <button key={k} type="button" className={view === k ? "on" : ""} onClick={() => setView(k)}>{label}</button>)}</div>;
   if (view === "tars") return <div className="portal-page cx ac"><TxHead title="Payments" />{pills}<AccountingDocuments only="tars" embedded /></div>;
-  return <PaymentReceipts pills={pills} />;
+  return <PaymentReceipts pills={pills} data={data} />;
 }
 
-function PaymentReceipts({ pills }: { pills: ReactNode }) {
+function PaymentReceipts({ pills, data }: { pills: ReactNode; data: PortalData }) {
   const today = manilaToday();
   const [date, setDate] = useState(today), [channel, setChannel] = useState(""), [q, setQ] = useState("");
   const { data: r, error } = useJson<PayDay>(`/api/staff/cashier-report?date=${date}`);
-  const rows = r ? r.groups.flatMap((g) => g.rows.map((x) => ({ ...x, source: g.kind === "Direct walk-in" ? "Walk-in" : g.name || g.kind }))) : [];
+  const sourceName = (kind: string, name: string) => (kind === "Direct walk-in" ? "Walk-in" : name || kind);
+  const rows = r ? r.groups.flatMap((g) => g.rows.map((x) => ({ ...x, source: sourceName(g.kind, g.name) }))) : [];
   const term = q.trim().toLowerCase();
-  const shown = rows.filter((x) => (!channel || x.channel === channel) && (!term || `${x.receipt} ${x.trainee} ${x.course} ${x.source}`.toLowerCase().includes(term)));
+  // Newest first, as on Cashier › Payments; voided payments stay listed, marked VOID, and count in no total.
+  const shown = [...rows, ...(r?.voided ?? []).map((x) => ({ ...x, source: sourceName(x.kind ?? "", x.agency ?? "") }))]
+    .filter((x) => (!channel || x.channel === channel) && (!term || `${x.receipt} ${x.trainee} ${x.course} ${x.source}`.toLowerCase().includes(term)))
+    .sort((a, b) => (b.receivedAt ?? "").localeCompare(a.receivedAt ?? ""));
   const pg = usePaged(shown);
   const byChannel = CHANNELS.map((c) => { const l = rows.filter((x) => x.channel === c); return { name: c, color: COLORS[c], count: l.length, amount: l.reduce((s, x) => s + x.amountCentavos, 0) }; });
   const proofOf = (x: (typeof rows)[number]) => (x.channel === "Cash" ? "Cash" : x.proof ? "Screenshot uploaded" : "Manual entry");
@@ -256,9 +261,17 @@ function PaymentReceipts({ pills }: { pills: ReactNode }) {
       </div>
       <section className="portal-panel cx-panel">
         <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search payments" placeholder="Search receipt, trainee, course or partner" value={q} onChange={(e) => setQ(e.target.value)} /><select aria-label="Channel" value={channel} onChange={(e) => setChannel(e.target.value)}><option value="">All Channels</option>{CHANNELS.map((c) => <option key={c} value={c}>{c}</option>)}</select></div>
-        {!r ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Receipt</th><th>Trainee</th><th>Source</th><th>Rebate</th><th>Channel and Reference</th><th className="r">Amount</th><th></th></tr></thead><tbody>
-          {pg.shown.map((x, i) => <Fragment key={`${x.receipt}-${i}`}><tr><td data-l="" className="lead"><span className="cx-name cx-mono">{x.receipt}</span><small>{x.time}</small></td><td data-l="Trainee">{x.trainee}<small>{x.course}</small></td><td data-l="Source"><span className={`cs-chip ${x.source === "Walk-in" ? "wk" : "ag"}`}>{x.source === "Walk-in" ? "Walk-In" : x.source}</span></td><td data-l="Rebate">{x.rebateCentavos ? <>{pesos2(x.rebateCentavos)}<small>{x.rebateStatus}</small></> : "—"}</td><td data-l="Channel">{x.channel}<small className="cx-mono">{x.reference || "—"}</small><small className={x.proof ? "ac-up" : ""}>{proofOf(x)}</small></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(x.amountCentavos)}</strong></td><td data-l="">{x.paymentId && <button type="button" className="portal-secondary" onClick={() => rp.toggle(x.paymentId!)}>Reprint</button>}</td></tr>{x.paymentId && rp.formRow("receipt", x.paymentId, x.receipt, 7)}</Fragment>)}
-        </tbody><tfoot><tr><td colSpan={5} data-l="">{shown.length} receipt{shown.length === 1 ? "" : "s"}{channel ? ` · ${channel}` : ""}</td><td data-l="Total" className="r cx-amt">{pesos2(shown.reduce((s, x) => s + x.amountCentavos, 0))}</td><td /></tr></tfoot></table>{pg.pager}</div> : <p className="portal-empty-copy">No payments match.</p>}
+        {/* Day Ledger with Icon Actions, the same row as Cashier › Payments (owner, 5 Nov 2026), plus Accounting's source and rebate. */}
+        {!r ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Time</th><th>Trainee</th><th>Source</th><th>Mode</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
+          {pg.shown.flatMap((x, i) => {
+            const s = paymentStatus(data, { id: x.paymentId ?? "", valid: x.valid, void_reason: x.voidReason, verification_state: x.verificationState }), isVoid = x.valid === false;
+            return [
+              !i && <tr key="day" className="pv-dayrow"><td data-l="" colSpan={5}>{fmtDate(date)} · {shown.length} Payment{shown.length === 1 ? "" : "s"}{channel ? ` · ${channel}` : ""}</td><td data-l="" className="r cx-amt">{pesos2(shown.filter((v) => v.valid !== false).reduce((n, v) => n + v.amountCentavos, 0))}</td><td data-l="" /></tr>,
+              <tr key={`${x.receipt}-${i}`} className={isVoid ? "pv-void" : undefined}><td data-l="Time" className="cx-mono">{x.time}</td><td data-l="" className="lead"><span className="cx-name">{x.trainee}</span><small className="cx-mono">{x.receipt}{x.codes ? ` · ${x.codes}` : ""}</small></td><td data-l="Source"><span className={`cs-chip ${x.source === "Walk-in" ? "wk" : "ag"}`}>{x.source === "Walk-in" ? "Walk-In" : x.source}</span>{x.rebateCentavos ? <small>Rebate {pesos2(x.rebateCentavos)} · {x.rebateStatus}</small> : null}</td><td data-l="Mode">{x.channel}{x.reference ? <small className="cx-mono">{x.reference}</small> : null}</td><td data-l="Status"><Badge tone={s.tone}>{s.label}</Badge>{s.note ? <small>{s.note}</small> : x.channel !== "Cash" ? <small className={x.proof ? "ac-up" : ""}>{tcl(proofOf(x))}</small> : null}</td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(x.amountCentavos)}</strong></td><td data-l="">{x.paymentId && !isVoid && <button type="button" className="pv-icon" title="Reprint" aria-label={`Reprint ${x.receipt}`} onClick={() => rp.toggle(x.paymentId!)}><PrintGlyph /></button>}</td></tr>,
+              x.paymentId ? <Fragment key={`${x.receipt}-${i}-reprint`}>{rp.formRow("receipt", x.paymentId, x.receipt, 7)}</Fragment> : null,
+            ];
+          })}
+        </tbody></table>{pg.pager}</div> : <p className="portal-empty-copy">No payments match.</p>}
       </section>
     </div>
   </div>;

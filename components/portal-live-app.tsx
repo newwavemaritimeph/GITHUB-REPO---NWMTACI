@@ -455,7 +455,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Sales from endorsed courses")return <EndorsedSalesReport/>;
     if(active==="Company Charge")return <CompanyChargeReport data={data} reload={reload}/>;
     if(active==="Search trainee")return <Trainees data={data} query={query} reload={reload} role={gateRole}/>;
-    if(active==="Payments")return <AccountingPayments/>;
+    if(active==="Payments")return <AccountingPayments data={data}/>;
     if(active==="Receipts and TARs")return <AccountingDocuments/>;
     if(active==="Expenses")return <AccountingExpenses data={data}/>;
     if(active==="Receivables")return <AccountingReceivables data={data}/>;

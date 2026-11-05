@@ -14,7 +14,7 @@ import type { CashierReportSnapshot } from "@/lib/documents";
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 export const SOURCES = ["Direct walk-ins", "Agencies", "Consultancies"] as const;
 export type SourceKind = "Direct walk-in" | "Agency" | "Consultancy";
-export type CollectionRow = { paymentId?: string; rebateCentavos?: number; rebateStatus?: string; receipt: string; time: string; trainee: string; course: string; channel: string; reference: string; amountCentavos: number; kind: SourceKind; agency: string; proof?: boolean };
+export type CollectionRow = { paymentId?: string; rebateCentavos?: number; rebateStatus?: string; receipt: string; time: string; trainee: string; course: string; channel: string; reference: string; amountCentavos: number; kind: SourceKind; agency: string; proof?: boolean; receivedAt?: string; codes?: string; valid?: boolean; voidReason?: string | null; verificationState?: string | null };
 
 const sourceOf = (kind: SourceKind) => (kind === "Direct walk-in" ? "Direct walk-ins" : kind === "Agency" ? "Agencies" : "Consultancies");
 
@@ -64,10 +64,15 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
   const start = `${date}T00:00:00+08:00`, end = `${date}T23:59:59.999+08:00`;
 
   // Collections.
-  const { data: pay } = await db.from("payments").select("id,payment_number,amount_centavos,method,reference_number,received_at,proof_id,trainees(legal_first_name,legal_middle_name,legal_last_name,marketing_agency_id)")
+  const payCols = "id,payment_number,amount_centavos,method,reference_number,received_at,proof_id,verification_state,trainees(legal_first_name,legal_middle_name,legal_last_name,marketing_agency_id)";
+  const { data: pay } = await db.from("payments").select(payCols)
     .eq("valid", true).gte("received_at", start).lte("received_at", end).order("received_at", { ascending: true }).limit(2000);
-  const payments = (pay ?? []) as unknown as { id: string; payment_number: string; amount_centavos: number; method: string; reference_number: string | null; received_at: string; proof_id: string | null; trainees: unknown }[];
-  const ids = payments.map((p) => p.id);
+  // Voided payments stay listed for Accounting, marked VOID, and count in no total (owner, 5 Nov 2026). Read apart, so the report stands before 202610090038.
+  const { data: voidPay } = await db.from("payments").select(`${payCols},void_reason`)
+    .eq("valid", false).gte("received_at", start).lte("received_at", end).order("received_at", { ascending: true }).limit(500);
+  type PayRow = { id: string; payment_number: string; amount_centavos: number; method: string; reference_number: string | null; received_at: string; proof_id: string | null; verification_state?: string | null; void_reason?: string | null; trainees: unknown };
+  const payments = (pay ?? []) as unknown as PayRow[], voidedPayments = (voidPay ?? []) as unknown as PayRow[];
+  const ids = [...payments, ...voidedPayments].map((p) => p.id);
   const [{ data: receipts }, { data: allocs }] = ids.length
     ? await Promise.all([
         db.from("receipts").select("payment_id,receipt_number").in("payment_id", ids),
@@ -85,7 +90,7 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
   if (!agencies) agencies = (await db.from("marketing_agencies").select("id,name")).data as { id: string; name: string }[] | null;
   const agencyById = new Map((agencies ?? []).map((a) => [a.id, a]));
 
-  const rows: CollectionRow[] = payments.map((p) => {
+  const toRow = (p: PayRow, valid: boolean): CollectionRow => {
     const mine = allocList.filter((a) => a.payment_id === p.id);
     const t = one(p.trainees as { legal_first_name?: string; legal_middle_name?: string; legal_last_name?: string; marketing_agency_id?: string | null } | null);
     // The paid course's own partner (owner, 3 Nov 2026), not the trainee's earlier one.
@@ -94,8 +99,10 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
     const kind: SourceKind = !agency ? "Direct walk-in" : agency.kind === "Consultancy" ? "Consultancy" : "Agency";
     const courses = [...new Set(mine.map((a) => { const c = one(one(a.enrollments as { courses?: unknown } | null)?.courses as { code?: string; name?: string } | null); return c?.name ? `${c.name}${c.code ? ` (${c.code})` : ""}` : ""; }).filter(Boolean))];
     const rebate = mine.map((a) => rebateOfEnrollment.get(a.enrollment_id)).find(Boolean);
-    return { paymentId: p.id, rebateCentavos: rebate?.amount, rebateStatus: rebate?.status, receipt: receiptOf.get(p.id) ?? p.payment_number, time: manilaTime(p.received_at), trainee: nameOf(t), course: courses.join(", ") || "—", channel: p.method, reference: p.reference_number ?? "", amountCentavos: Number(p.amount_centavos), kind, agency: agency?.name ?? "", proof: !!p.proof_id };
-  });
+    const codes = [...new Set(mine.map((a) => one(one(a.enrollments as { courses?: unknown } | null)?.courses as { code?: string } | null)?.code).filter(Boolean))].join(", ");
+    return { paymentId: p.id, rebateCentavos: rebate?.amount, rebateStatus: rebate?.status, receipt: receiptOf.get(p.id) ?? p.payment_number, time: manilaTime(p.received_at), trainee: nameOf(t), course: courses.join(", ") || "—", channel: p.method, reference: p.reference_number ?? "", amountCentavos: Number(p.amount_centavos), kind, agency: agency?.name ?? "", proof: !!p.proof_id, receivedAt: p.received_at, codes, valid, voidReason: p.void_reason ?? null, verificationState: p.verification_state ?? null };
+  };
+  const rows = payments.map((p) => toRow(p, true));
   const { data: methods } = await db.from("payment_methods").select("name,active,sort_order").eq("active", true).order("sort_order");
   const receivable = (methods ?? []).map((m) => m.name as string).filter((n) => ["Cash", "GCash", "PSBank", "UnionBank", "Cheque"].includes(n));
   const { channels, matrix, groups } = collectionsBySource(rows, receivable.length ? receivable : ["Cash", "GCash", "PSBank", "UnionBank", "Cheque"]);
@@ -145,7 +152,8 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
     dateLabel: longDate(date), preparedBy, logoBytes,
     position: { previousLabel: "Previous cash", previousNote, ...position },
     channels, matrix,
-    groups: groups.map((g) => ({ kind: g.kind, name: g.name, subtotalCentavos: g.subtotalCentavos, rows: g.rows.map((r) => ({ receipt: r.receipt, time: r.time, trainee: r.trainee, course: r.course, channel: r.channel, reference: r.reference, amountCentavos: r.amountCentavos, proof: r.proof })) })),
+    groups: groups.map((g) => ({ kind: g.kind, name: g.name, subtotalCentavos: g.subtotalCentavos, rows: g.rows })),
+    voided: voidedPayments.map((p) => toRow(p, false)),
     expenses,
     expenseTotals: [...expenseByChannel].map(([channel, totalCentavos]) => ({ channel, totalCentavos })),
     otherIncome,

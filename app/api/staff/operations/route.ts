@@ -10,6 +10,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hardDeleteEnrollment, pruneUnpaidEnrollments, deletePastEmptyBatches } from "@/lib/enrollments";
 import { entryMovedFrom } from "@/lib/mismo";
+import { clearMismoAfterVoid } from "@/lib/mismo-server";
 import { issueServiceInvoice, siFormatProblem } from "@/lib/service-invoice";
 import { VALIDATION_MESSAGES, isEmail, isMetaThreadUrl, isPhContactNumber, isSrn, normalizeEmail, normalizeMetaThreadUrl, normalizePhContactNumber, normalizeSrn } from "@/lib/validation";
 import { INSTRUCTION_SENDS, emailResult, instructionRecipient } from "@/lib/instruction-email-status";
@@ -1745,6 +1746,8 @@ export async function POST(request: Request) {
       if (input.approve) {
         const { error } = await admin.rpc("void_payment", { target_payment: req.payment_id, actor: staff.user.id, reason: req.reason });
         if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+        // The void has already gone through, so a failure here must not report it as failed.
+        await clearMismoAfterVoid(admin, req.payment_id, staff.user.id, req.reason).catch((e) => console.error("MISMO after void", e));
       }
       const { error: upError } = await admin.from("payment_void_requests").update({ status: input.approve ? "Approved" : "Rejected", decided_by: staff.user.id, decided_at: new Date().toISOString(), decision_remarks: input.remarks || null }).eq("id", req.id).eq("status", "Pending");
       if (upError) throw upError;
@@ -1759,6 +1762,7 @@ export async function POST(request: Request) {
         : admin.rpc("admin_cancel_enrollment", { target_enrollment: input.enrollmentId, actor: staff.user.id, reason: input.reason });
       const { error } = await call;
       if (error) return NextResponse.json({ error: /void_payment|void_expense|admin_cancel_enrollment|does not exist/i.test(error.message) ? "Apply database update 202610090038 first." : error.message }, { status: 400 });
+      if (input.action === "payment-void") await clearMismoAfterVoid(admin, input.paymentId, staff.user.id, input.reason).catch((e) => console.error("MISMO after void", e));
       return NextResponse.json({ ok: true });
     }
     if (input.action === "holiday-save" || input.action === "holiday-delete" || input.action === "holiday-marina") {
@@ -2272,7 +2276,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "company-payment") {
-      if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot post payments." }, { status: 403 });
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting records a company payment." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const modeProblem = await paymentModeProblem(admin, input.method, input.referenceNumber);
       if (modeProblem) return NextResponse.json({ error: modeProblem }, { status: 400 });
@@ -2314,7 +2318,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, companyPaymentId: cp.id, payments: paymentIds.length, enrolled, invoice });
     }
     if (input.action === "service-invoice-issue") {
-      if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot issue Service Invoices." }, { status: 403 });
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting issues Service Invoices." }, { status: 403 });
       try { return NextResponse.json({ ok: true, invoice: await issueServiceInvoice(createSupabaseAdminClient(), input.companyPaymentId, staff.user.id) }); }
       catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : "The Service Invoice could not be issued." }, { status: 400 }); }
     }
