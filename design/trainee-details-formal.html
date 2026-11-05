@@ -1,0 +1,301 @@
+<title>Trainee Details Designs</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap">
+<style>
+/* Layout: five full-width modal mock-ups of one trainee record, stacked; each a different formal treatment. */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA;
+  --desk:#e8eef2; --paper:#ffffff; --ink:#13283a; --muted:#5d6f7e; --rule:#cfdbe3; --hair:#e6edf2; --tint:#f3f7fa; --gold:#9a7b2f;
+  --good:#0a7a3e; --good-bg:#e3f4ea; --warn:#a2470b; --warn-bg:#fdf0e5; --bad:#b42318;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace; --serif:"Source Serif 4",Georgia,"Times New Roman",serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--desk:#0d1822;color-scheme:dark}}
+:root[data-theme="dark"]{--desk:#0d1822;color-scheme:dark}
+body{background:var(--desk);font-family:var(--sans);color:var(--ink)}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:16px;padding-block:32px 72px;display:grid;gap:44px}
+.intro h1{font:600 30px var(--serif);color:var(--navy);margin:0}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .intro h1,:root:not([data-theme="light"]) .intro p,:root:not([data-theme="light"]) .lab b,:root:not([data-theme="light"]) .lab span{color:#dbe8f2}}
+:root[data-theme="dark"] .intro h1,:root[data-theme="dark"] .intro p,:root[data-theme="dark"] .lab b,:root[data-theme="dark"] .lab span{color:#dbe8f2}
+.intro p{color:var(--muted);max-width:68ch;margin:8px 0 0;line-height:1.55}
+.lab{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+.lab b{font:600 19px var(--sans);color:var(--navy)}
+.lab span{color:var(--muted);font-size:15px}
+.modal{background:var(--paper);color:var(--ink);border-radius:14px;box-shadow:0 2px 4px rgba(0,0,0,.06),0 18px 44px rgba(18,63,99,.16);overflow:hidden}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.cap{font:600 11.5px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.btn{font:600 15px var(--sans);border-radius:9px;padding:9px 14px;border:1px solid var(--rule);background:#fff;color:var(--ink);cursor:pointer;white-space:nowrap}
+.btn.p{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.o{background:var(--orange);border-color:var(--orange);color:#fff}
+.btn:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.chip{display:inline-block;font:600 12.5px var(--sans);padding:2px 9px;border-radius:999px}
+.c-warn{background:var(--warn-bg);color:var(--warn)}.c-good{background:var(--good-bg);color:var(--good)}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+.tw{overflow-x:auto}
+.x{background:none;border:0;font-size:22px;color:var(--muted);cursor:pointer;line-height:1}
+.photo{background:repeating-linear-gradient(45deg,#eef3f7,#eef3f7 6px,#e4ecf2 6px,#e4ecf2 12px);border:1px solid var(--rule);display:grid;place-items:center;color:var(--muted);font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:center}
+.seal{width:42px;height:42px;border-radius:50%;border:2px solid var(--gold);display:grid;place-items:center;font:700 11px var(--serif);color:var(--gold);flex:none}
+
+/* ---------- 1. Official record sheet ---------- */
+.d1 .band{background:var(--navy);color:#fff;display:flex;align-items:center;gap:14px;padding:14px 22px}
+.d1 .band .seal{border-color:#e7c873;color:#e7c873}
+.d1 .band h2{font:600 18px var(--serif);margin:0;letter-spacing:.01em}
+.d1 .band small{display:block;color:#b9d6ea;font-size:12.5px}
+.d1 .band .x{color:#cfe3ef;margin-left:auto}
+.d1 .stripe{height:4px;background:linear-gradient(90deg,var(--orange) 0 33%,var(--cyan) 33% 66%,var(--blue) 66%)}
+.d1 .body{padding:20px 22px;display:grid;gap:18px}
+.d1 .idrow{display:grid;grid-template-columns:96px 1fr auto;gap:18px;align-items:start}
+.d1 .idrow .photo{width:96px;height:96px}
+.d1 .name{font:600 26px var(--serif);color:var(--navy);margin:0;letter-spacing:.01em}
+.d1 .nums{display:flex;gap:18px;flex-wrap:wrap;margin-top:6px;font-size:14px;color:var(--muted)}
+.d1 .nums b{color:var(--ink);font-family:var(--mono);font-weight:600}
+.d1 .acct{border:1px solid var(--rule);border-radius:10px;min-width:220px}
+.d1 .acct div{display:flex;justify-content:space-between;gap:16px;padding:8px 14px;border-bottom:1px solid var(--hair);font-size:14.5px}
+.d1 .acct div:last-child{border-bottom:0;background:var(--tint);font-weight:700}
+.d1 .acct b{font-family:var(--mono)}
+.d1 .sec h3{font:600 15px var(--serif);color:var(--navy);margin:0 0 8px;padding-bottom:6px;border-bottom:2px solid var(--navy);display:flex;justify-content:space-between;align-items:baseline}
+.d1 .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+.d1 .grid div{padding:8px 12px;border-right:1px solid var(--hair);border-bottom:1px solid var(--hair);min-width:0}
+.d1 .grid div:nth-child(4n){border-right:0}
+.d1 .grid .w2{grid-column:span 2}
+.d1 .grid b{display:block;font-weight:600;font-size:14.5px;margin-top:2px;overflow-wrap:anywhere}
+.d1 th{text-align:left;font:600 11.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--navy);background:var(--tint);padding:8px 12px;border-bottom:1px solid var(--rule)}
+.d1 td{padding:10px 12px;border-bottom:1px solid var(--hair)}
+.d1 .foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 22px;border-top:1px solid var(--rule);background:var(--tint)}
+.d1 .foot small{color:var(--muted)}
+
+/* ---------- 2. Profile card + numbered sections ---------- */
+.d2{display:grid;grid-template-columns:280px 1fr}
+.d2 aside{background:var(--tint);border-right:1px solid var(--rule);padding:22px;display:grid;gap:16px;align-content:start}
+.d2 aside .photo{width:120px;height:120px;border-radius:8px}
+.d2 aside h2{font:600 22px var(--serif);color:var(--navy);margin:0}
+.d2 dl{margin:0;display:grid;gap:10px}
+.d2 dt{font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.d2 dd{margin:1px 0 0;font-weight:600;font-size:14.5px;overflow-wrap:anywhere}
+.d2 .bal{border:1px solid var(--rule);background:#fff;border-radius:10px;padding:12px 14px}
+.d2 .bal b{display:block;font:700 22px var(--mono);color:var(--warn)}
+.d2 main{padding:0}
+.d2 .top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:16px 22px;border-bottom:1px solid var(--rule)}
+.d2 .top .ttl{font:600 13px var(--sans);letter-spacing:.1em;text-transform:uppercase;color:var(--navy)}
+.d2 .tabs{display:flex;gap:2px;padding:0 22px;border-bottom:1px solid var(--rule);overflow-x:auto}
+.d2 .tabs button{border:0;background:none;font:500 15px var(--sans);color:var(--muted);padding:12px 12px;border-bottom:3px solid transparent;cursor:pointer;white-space:nowrap}
+.d2 .tabs button.on{color:var(--navy);border-bottom-color:var(--navy);font-weight:600}
+.d2 .pane{padding:18px 22px;display:grid;gap:18px}
+.d2 .sec{display:grid;grid-template-columns:34px 1fr;gap:12px}
+.d2 .num{font:600 18px var(--serif);color:var(--gold)}
+.d2 .sec h3{font:600 16px var(--serif);color:var(--navy);margin:0 0 8px}
+.d2 .kv{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 18px}
+.d2 .kv b{display:block;font-weight:600;font-size:14.5px;overflow-wrap:anywhere}
+.d2 .item{display:flex;justify-content:space-between;gap:12px;align-items:center;border:1px solid var(--rule);border-radius:10px;padding:12px 14px}
+.d2 .item small{color:var(--muted);display:block}
+.d2 .actions{display:flex;gap:8px;justify-content:flex-end;padding:14px 22px;border-top:1px solid var(--rule)}
+
+/* ---------- 3. Statement of account ---------- */
+.d3 .hd{display:grid;grid-template-columns:1fr auto;gap:16px;padding:22px 24px 16px;border-bottom:3px double var(--navy)}
+.d3 .org{display:flex;gap:12px;align-items:center}
+.d3 .org b{display:block;font:600 15px var(--serif);color:var(--navy)}
+.d3 .org small{color:var(--muted);font-size:12.5px}
+.d3 .doc{text-align:right}
+.d3 .doc h2{font:600 22px var(--serif);color:var(--navy);margin:0;letter-spacing:.02em}
+.d3 .doc small{color:var(--muted)}
+.d3 .meta{display:grid;grid-template-columns:1.4fr 1fr;gap:16px;padding:16px 24px}
+.d3 .box{border:1px solid var(--rule);border-radius:8px;padding:12px 14px}
+.d3 .box h4{margin:0 0 6px}
+.d3 .who{font:600 20px var(--serif);color:var(--navy)}
+.d3 .box p{margin:2px 0;font-size:14.5px;color:var(--muted)}
+.d3 .sum div{display:flex;justify-content:space-between;padding:4px 0;font-size:14.5px}
+.d3 .sum .due{border-top:1px solid var(--ink);margin-top:6px;padding-top:8px;font-weight:700;font-size:16px}
+.d3 .sum b{font-family:var(--mono)}
+.d3 .led{padding:0 24px 8px}
+.d3 th{text-align:left;font:600 11.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:#fff;background:var(--navy);padding:9px 12px}
+.d3 td{padding:10px 12px;border-bottom:1px solid var(--hair)}
+.d3 td.r,.d3 th.r{text-align:right}
+.d3 tr.bal td{background:var(--tint);font-weight:700}
+.d3 .sig{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:22px 24px}
+.d3 .sig div{border-top:1px solid var(--ink);padding-top:6px;font-size:13px;color:var(--muted)}
+.d3 .foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:14px 24px;border-top:1px solid var(--rule)}
+
+/* ---------- 4. Identification card + dossier ---------- */
+.d4 .hd{display:flex;justify-content:space-between;align-items:center;padding:14px 22px;border-bottom:1px solid var(--rule)}
+.d4 .hd h2{font:600 17px var(--serif);color:var(--navy);margin:0}
+.d4 .card{margin:18px 22px 6px;border-radius:14px;overflow:hidden;border:1px solid var(--rule);display:grid;grid-template-columns:150px 1fr}
+.d4 .card .left{background:var(--navy);padding:16px;display:grid;justify-items:center;gap:10px;color:#fff}
+.d4 .card .left .photo{width:110px;height:110px;border-radius:8px;border-color:#2d5a80;background:repeating-linear-gradient(45deg,#1b4c75,#1b4c75 6px,#18456b 6px,#18456b 12px);color:#b9d6ea}
+.d4 .card .left small{font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:#9ec6e2}
+.d4 .card .right{padding:16px 20px;display:grid;gap:10px;background:linear-gradient(180deg,#fff,var(--tint))}
+.d4 .card h3{font:600 26px var(--serif);color:var(--navy);margin:0;letter-spacing:.01em}
+.d4 .ids{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.d4 .ids div{border:1px solid var(--rule);border-radius:8px;padding:8px 10px;background:#fff}
+.d4 .ids b{display:block;font:600 14.5px var(--mono)}
+.d4 .money{display:flex;gap:10px;flex-wrap:wrap}
+.d4 .money span{font-size:14px;color:var(--muted)}
+.d4 .money b{font-family:var(--mono);color:var(--ink)}
+.d4 .money .owe b{color:var(--warn)}
+.d4 .dossier{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0;margin:12px 22px 18px;border:1px solid var(--rule);border-radius:12px;overflow:hidden}
+.d4 .dossier section{padding:14px 16px;border-right:1px solid var(--rule)}
+.d4 .dossier section:last-child{border-right:0}
+.d4 .dossier h4{font:600 14px var(--serif);color:var(--navy);margin:0 0 10px;padding-bottom:6px;border-bottom:1px solid var(--hair)}
+.d4 .dossier p{margin:0 0 8px;font-size:14px}
+.d4 .dossier p span{display:block;font:600 10.5px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.d4 .row{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--hair);font-size:14px}
+.d4 .row:last-child{border-bottom:0}
+.d4 .foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--rule);background:var(--tint)}
+
+/* ---------- 5. Registry entry with history ---------- */
+.d5 .hd{padding:20px 24px 14px;display:flex;justify-content:space-between;gap:16px;align-items:flex-start;border-bottom:1px solid var(--rule)}
+.d5 .hd .k{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
+.d5 .hd h2{font:600 28px var(--serif);color:var(--navy);margin:4px 0 2px}
+.d5 .hd p{margin:0;color:var(--muted);font-size:14.5px}
+.d5 .strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-bottom:1px solid var(--rule)}
+.d5 .strip div{padding:12px 24px;border-right:1px solid var(--hair)}
+.d5 .strip div:last-child{border-right:0}
+.d5 .strip b{display:block;font:600 19px var(--mono)}
+.d5 .strip .owe b{color:var(--warn)}
+.d5 .cols{display:grid;grid-template-columns:1.25fr 1fr}
+.d5 .cols>div{padding:18px 24px;min-width:0}
+.d5 .cols>div+div{border-left:1px solid var(--rule);background:var(--tint)}
+.d5 details{border-bottom:1px solid var(--hair);padding:10px 0}
+.d5 summary{cursor:pointer;font:600 15.5px var(--serif);color:var(--navy);list-style:none;display:flex;justify-content:space-between}
+.d5 summary::-webkit-details-marker{display:none}
+.d5 summary::after{content:"+";font-family:var(--sans);color:var(--muted)}
+.d5 details[open] summary::after{content:"–"}
+.d5 .kv{display:grid;grid-template-columns:150px 1fr;gap:6px 12px;margin-top:10px;font-size:14.5px}
+.d5 .kv span{color:var(--muted)}
+.d5 .tl{list-style:none;margin:10px 0 0;padding:0}
+.d5 .tl li{display:grid;grid-template-columns:86px 14px 1fr;gap:10px;padding-bottom:14px;position:relative;font-size:14px}
+.d5 .tl li i{width:12px;height:12px;border-radius:50%;background:var(--navy);margin-top:4px}
+.d5 .tl li::before{content:"";position:absolute;left:101px;top:16px;bottom:0;width:2px;background:var(--rule)}
+.d5 .tl li:last-child::before{display:none}
+.d5 .tl time{color:var(--muted);font-family:var(--mono);font-size:12.5px}
+.d5 .tl small{display:block;color:var(--muted)}
+.d5 .foot{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:14px 24px;border-top:1px solid var(--rule)}
+
+@media (max-width:820px){
+  .d1 .idrow{grid-template-columns:72px 1fr}.d1 .idrow .photo{width:72px;height:72px}.d1 .acct{grid-column:1/-1}
+  .d1 .grid{grid-template-columns:repeat(2,minmax(0,1fr))}.d1 .grid div:nth-child(2n){border-right:0}
+  .d2{grid-template-columns:1fr}.d2 aside{border-right:0;border-bottom:1px solid var(--rule)}.d2 .kv{grid-template-columns:1fr 1fr}
+  .d3 .hd,.d3 .meta{grid-template-columns:1fr}.d3 .doc{text-align:left}
+  .d4 .card{grid-template-columns:1fr}.d4 .ids{grid-template-columns:1fr 1fr}.d4 .dossier{grid-template-columns:1fr}.d4 .dossier section{border-right:0;border-bottom:1px solid var(--rule)}
+  .d5 .strip{grid-template-columns:1fr 1fr}.d5 .cols{grid-template-columns:1fr}.d5 .cols>div+div{border-left:0;border-top:1px solid var(--rule)}
+}
+</style>
+
+<div class="wrap">
+  <header class="intro">
+    <h1>Trainee details · five designs</h1>
+    <p>The same trainee record in five formal layouts. Every design keeps the actions (add course, edit details, request, print TAR) and the account summary visible. The record below is sample data.</p>
+  </header>
+
+  <!-- 1 -->
+  <section>
+    <div class="lab"><b>1 · Official record sheet</b><span>Letterhead band, photo, numbered identifiers, ruled field grid, then the training and payment tables.</span></div>
+    <div class="modal d1">
+      <div class="band"><div class="seal">NW</div><div><h2>Trainee record</h2><small>New Wave Maritime Training and Assessment Center, Inc.</small></div><button class="x" aria-label="Close">×</button></div>
+      <div class="stripe"></div>
+      <div class="body">
+        <div class="idrow">
+          <div class="photo">2x2 photo</div>
+          <div><p class="name">DELA CRUZ, Juan P.</p>
+            <div class="nums"><span>NWMTACI no. <b>NWMTACI-0000008</b></span><span>Trainee no. <b>NWM-2026-000014</b></span><span>Registered <b>Oct 8, 2026</b></span></div>
+            <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn o">Add course</button><button class="btn">Edit details</button><button class="btn">Request ▾</button><button class="btn">Print TAR</button></div></div>
+          <div class="acct"><div><span class="cap">Enrollments</span><b>1</b></div><div><span class="cap">Total paid</span><b>₱1,000.00</b></div><div><span class="cap">Balance</span><b style="color:var(--warn)">₱300.00</b></div></div>
+        </div>
+        <div class="sec"><h3>I. Personal and contact information</h3>
+          <div class="grid">
+            <div><span class="cap">SRN</span><b class="mono">0101010101</b></div><div><span class="cap">Rank</span><b>Able seaman</b></div><div><span class="cap">Date of birth</span><b>Jul 1, 2003</b></div><div><span class="cap">Place of birth</span><b>Valenzuela</b></div>
+            <div><span class="cap">Mobile</span><b class="mono">+63 968 205 4162</b></div><div class="w2"><span class="cap">Email</span><b>juan.delacruz@example.com</b></div><div><span class="cap">Company</span><b>—</b></div>
+            <div class="w2"><span class="cap">Address</span><b>A. Mabini, Kalaw Avenue, Manila</b></div><div class="w2"><span class="cap">Emergency contact</span><b>Maria Dela Cruz · +63 969 091 9729</b></div>
+          </div></div>
+        <div class="sec"><h3>II. Training record</h3><div class="tw"><table><thead><tr><th>Course</th><th>Schedule</th><th>Batch</th><th>Status</th><th style="text-align:right">Balance</th></tr></thead><tbody>
+          <tr><td><b>Updating Training on Basic Training</b><br><small style="color:var(--muted)">ENR-2026-000019</small></td><td>Oct 9, 2026</td><td class="mono">BCH-2026-002473</td><td><span class="chip c-warn">Pending</span></td><td class="mono" style="text-align:right">₱300.00</td></tr></tbody></table></div></div>
+        <div class="sec"><h3>III. Payments <span class="cap">1 receipt</span></h3><div class="tw"><table><thead><tr><th>Payment no.</th><th>Date</th><th>Mode</th><th>Reference</th><th style="text-align:right">Amount</th></tr></thead><tbody>
+          <tr><td class="mono">PAY-2026-000015</td><td>Oct 8, 2026</td><td>Cash</td><td>—</td><td class="mono" style="text-align:right">₱1,000.00</td></tr></tbody></table></div></div>
+      </div>
+      <div class="foot"><small>No open requests.</small><button class="btn">Close</button></div>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section>
+    <div class="lab"><b>2 · Profile card with numbered sections</b><span>Identity and account in a left panel; tabs on the right with numbered, serif section titles.</span></div>
+    <div class="modal d2">
+      <aside>
+        <div class="photo">2x2 photo</div>
+        <div><h2>Juan P. Dela Cruz</h2><span class="chip c-warn" style="margin-top:6px">Pending enrollment</span></div>
+        <dl><div><dt>NWMTACI no.</dt><dd class="mono">NWMTACI-0000008</dd></div><div><dt>Trainee no.</dt><dd class="mono">NWM-2026-000014</dd></div><div><dt>SRN</dt><dd class="mono">0101010101</dd></div><div><dt>Registered</dt><dd>Oct 8, 2026</dd></div></dl>
+        <div class="bal"><span class="cap">Balance</span><b>₱300.00</b><small style="color:var(--muted)">₱1,000.00 paid of ₱1,300.00</small></div>
+      </aside>
+      <main>
+        <div class="top"><span class="ttl">Trainee details</span><div style="display:flex;gap:8px"><button class="btn o">Add course</button><button class="btn">Edit details</button><button class="x" aria-label="Close">×</button></div></div>
+        <div class="tabs"><button class="on">Overview</button><button>Enrollments (1)</button><button>Payments (1)</button><button>Requests (0)</button></div>
+        <div class="pane">
+          <div class="sec"><span class="num">I</span><div><h3>Personal and contact</h3><div class="kv"><div><span class="cap">Rank</span><b>Able seaman</b></div><div><span class="cap">Born</span><b>Jul 1, 2003 · Valenzuela</b></div><div><span class="cap">Company</span><b>—</b></div><div><span class="cap">Mobile</span><b class="mono">+63 968 205 4162</b></div><div style="grid-column:span 2"><span class="cap">Email</span><b>juan.delacruz@example.com</b></div><div style="grid-column:span 2"><span class="cap">Address</span><b>A. Mabini, Kalaw Avenue, Manila</b></div><div><span class="cap">Emergency contact</span><b>Maria Dela Cruz</b></div></div></div></div>
+          <div class="sec"><span class="num">II</span><div><h3>Current training</h3><div class="item"><div><b>Updating Training on Basic Training</b><small>Oct 9, 2026 · BCH-2026-002473 · ₱300.00 balance</small></div><span class="chip c-warn">Pending</span></div></div></div>
+          <div class="sec"><span class="num">III</span><div><h3>Latest payment</h3><div class="item"><div><b class="mono">PAY-2026-000015</b><small>Oct 8, 2026 · Cash</small></div><b class="mono">₱1,000.00</b></div></div></div>
+        </div>
+        <div class="actions"><button class="btn">Request ▾</button><button class="btn p">Print TAR</button></div>
+      </main>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section>
+    <div class="lab"><b>3 · Statement of account</b><span>Reads like an official statement: letterhead, trainee and account summary boxes, one running ledger of charges and payments.</span></div>
+    <div class="modal d3">
+      <div class="hd"><div class="org"><div class="seal">NW</div><div><b>New Wave Maritime Training and Assessment Center, Inc.</b><small>Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila</small></div></div>
+        <div class="doc"><h2>Trainee account</h2><small>As of Oct 8, 2026</small></div></div>
+      <div class="meta">
+        <div class="box"><h4 class="cap">Trainee</h4><div class="who">DELA CRUZ, Juan P.</div><p>NWMTACI-0000008 · NWM-2026-000014 · SRN 0101010101</p><p>Able seaman · +63 968 205 4162 · juan.delacruz@example.com</p><p>Emergency: Maria Dela Cruz · +63 969 091 9729</p></div>
+        <div class="box sum"><h4 class="cap">Account summary</h4><div><span>Training fees</span><b>₱1,300.00</b></div><div><span>Discounts and rebates</span><b>₱0.00</b></div><div><span>Payments received</span><b>(₱1,000.00)</b></div><div class="due"><span>Balance due</span><b style="color:var(--warn)">₱300.00</b></div></div>
+      </div>
+      <div class="led tw"><table><thead><tr><th>Date</th><th>Particulars</th><th>Reference</th><th class="r">Charge</th><th class="r">Payment</th><th class="r">Balance</th></tr></thead><tbody>
+        <tr><td>Oct 8</td><td>Updating Training on Basic Training · Oct 9 batch</td><td class="mono">ENR-2026-000019</td><td class="r mono">1,300.00</td><td class="r"></td><td class="r mono">1,300.00</td></tr>
+        <tr><td>Oct 8</td><td>Payment received · Cash</td><td class="mono">PAY-2026-000015</td><td class="r"></td><td class="r mono">1,000.00</td><td class="r mono">300.00</td></tr>
+        <tr class="bal"><td colspan="5">Balance due</td><td class="r mono">₱300.00</td></tr></tbody></table></div>
+      <div class="sig"><div>Prepared by · Registration</div><div>Received by · Trainee signature, date</div></div>
+      <div class="foot"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn o">Add course</button><button class="btn">Edit details</button><button class="btn">Request ▾</button></div><div style="display:flex;gap:8px"><button class="btn p">Print TAR</button><button class="btn">Close</button></div></div>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section>
+    <div class="lab"><b>4 · Identification card and dossier</b><span>An ID-card header with photo and three identifiers, then a three-column dossier: personal, training, payments.</span></div>
+    <div class="modal d4">
+      <div class="hd"><h2>Trainee details</h2><div style="display:flex;gap:8px;align-items:center"><button class="btn o">Add course</button><button class="btn">Edit details</button><button class="x" aria-label="Close">×</button></div></div>
+      <div class="card">
+        <div class="left"><div class="photo">2x2 photo</div><small>Trainee</small></div>
+        <div class="right"><h3>JUAN P. DELA CRUZ</h3>
+          <div class="ids"><div><span class="cap">NWMTACI no.</span><b>NWMTACI-0000008</b></div><div><span class="cap">Trainee no.</span><b>NWM-2026-000014</b></div><div><span class="cap">SRN</span><b>0101010101</b></div></div>
+          <div class="money"><span>Enrollments <b>1</b></span><span>·</span><span>Paid <b>₱1,000.00</b></span><span>·</span><span class="owe">Balance <b>₱300.00</b></span><span>·</span><span>Registered <b>Oct 8, 2026</b></span></div></div>
+      </div>
+      <div class="dossier">
+        <section><h4>Personal</h4><p><span>Rank</span>Able seaman</p><p><span>Born</span>Jul 1, 2003 · Valenzuela</p><p><span>Mobile</span>+63 968 205 4162</p><p><span>Email</span>juan.delacruz@example.com</p><p><span>Address</span>A. Mabini, Kalaw Avenue, Manila</p><p><span>Emergency contact</span>Maria Dela Cruz · +63 969 091 9729</p></section>
+        <section><h4>Training</h4><div class="row"><div><b>Updating Training on Basic Training</b><br><small style="color:var(--muted)">Oct 9, 2026 · BCH-2026-002473</small></div><span class="chip c-warn">Pending</span></div><div class="row"><span>Balance</span><b class="mono">₱300.00</b></div><div style="margin-top:10px"><button class="btn">Request ▾</button></div></section>
+        <section><h4>Payments</h4><div class="row"><div><b class="mono">PAY-2026-000015</b><br><small style="color:var(--muted)">Oct 8, 2026 · Cash</small></div><b class="mono">₱1,000.00</b></div><div class="row"><span>Open requests</span><span>None</span></div><div style="margin-top:10px"><button class="btn p">Print TAR</button></div></section>
+      </div>
+      <div class="foot"><button class="btn">Close</button></div>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section>
+    <div class="lab"><b>5 · Registry entry with history</b><span>Formal name block and key figures; folding sections on the left, a dated history of everything that happened on the right.</span></div>
+    <div class="modal d5">
+      <div class="hd"><div><span class="k">Trainee registry · NWMTACI-0000008</span><h2>Juan P. Dela Cruz</h2><p>NWM-2026-000014 · SRN 0101010101 · Able seaman · registered Oct 8, 2026</p></div><button class="x" aria-label="Close">×</button></div>
+      <div class="strip"><div><span class="cap">Enrollments</span><b>1</b></div><div><span class="cap">Total fees</span><b>₱1,300.00</b></div><div><span class="cap">Paid</span><b>₱1,000.00</b></div><div class="owe"><span class="cap">Balance</span><b>₱300.00</b></div></div>
+      <div class="cols">
+        <div>
+          <details open><summary>Personal and contact</summary><div class="kv"><span>Date of birth</span><b>Jul 1, 2003 · Valenzuela</b><span>Mobile</span><b class="mono">+63 968 205 4162</b><span>Email</span><b>juan.delacruz@example.com</b><span>Address</span><b>A. Mabini, Kalaw Avenue, Manila</b><span>Company</span><b>—</b><span>Emergency contact</span><b>Maria Dela Cruz · +63 969 091 9729</b></div></details>
+          <details open><summary>Enrollments</summary><div class="kv"><span>BT-PSSR updating</span><b>Oct 9, 2026 · BCH-2026-002473 · <span class="chip c-warn">Pending</span></b><span>Balance</span><b class="mono">₱300.00</b></div></details>
+          <details><summary>Payments</summary><div class="kv"><span>PAY-2026-000015</span><b class="mono">₱1,000.00 · Cash · Oct 8</b></div></details>
+          <details><summary>Requests</summary><div class="kv"><span>Open</span><b>None</b></div></details>
+        </div>
+        <div><span class="cap">History</span><ol class="tl">
+          <li><time>Oct 8 · 4:10 PM</time><i></i><div><b>Payment received</b><small>₱1,000.00 · Cash · PAY-2026-000015</small></div></li>
+          <li><time>Oct 8 · 2:05 PM</time><i></i><div><b>Handed to the Cashier</b><small>All four requirements ticked</small></div></li>
+          <li><time>Oct 8 · 1:40 PM</time><i></i><div><b>Course assigned</b><small>BT-PSSR updating · Oct 9 batch</small></div></li>
+          <li><time>Oct 8 · 1:22 PM</time><i></i><div><b>Registered on the website</b><small>NWMTACI-0000008 issued</small></div></li>
+        </ol></div>
+      </div>
+      <div class="foot"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn o">Add course</button><button class="btn">Edit details</button><button class="btn">Request ▾</button></div><div style="display:flex;gap:8px"><button class="btn p">Print TAR</button><button class="btn">Close</button></div></div>
+    </div>
+  </section>
+</div>

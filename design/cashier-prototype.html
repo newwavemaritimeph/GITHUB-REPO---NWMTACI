@@ -1,0 +1,494 @@
+<title>New Wave Cashier Prototype</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: navy brand bar with five top tabs; one working column; tables turn into cards on phones.
+   Type: Geist for words (400 body, 600 headings), Geist Mono for amounts and IDs. 8-pt spacing. */
+:root{
+  --orange:#F25615; --blue:#0571D0; --cyan:#35CCFA; --cyan-l:#9EE3F1; --navy:#123F63;
+  --bg:#f2f6f8; --surface:#ffffff; --fg:#0f2638; --muted:#587184; --line:#dbe6ec; --soft:#eef4f8;
+  --good:#0a7a3e; --good-bg:#e2f5e9; --warn:#a2470b; --warn-bg:#fdf0e5; --bad:#b42318; --bad-bg:#fcebea; --info:#0571D0; --info-bg:#e5f1fb;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:"Geist Mono",ui-monospace,"Cascadia Mono",Consolas,monospace;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --t-xs:14px; --t-sm:15.5px; --t-md:17px; --t-lg:19px; --t-xl:25px; --t-2xl:32px;
+  --r:12px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0a1722; --surface:#102231; --fg:#e3edf4; --muted:#91a9bb; --line:#20384b; --soft:#152d43;
+  --good:#61d396; --good-bg:#113523; --warn:#ffa56a; --warn-bg:#382313; --bad:#ff8b80; --bad-bg:#3b1918; --info:#5fb4ff; --info-bg:#122e48; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0a1722; --surface:#102231; --fg:#e3edf4; --muted:#91a9bb; --line:#20384b; --soft:#152d43;
+  --good:#61d396; --good-bg:#113523; --warn:#ffa56a; --warn-bg:#382313; --bad:#ff8b80; --bad-bg:#3b1918; --info:#5fb4ff; --info-bg:#122e48; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 var(--t-md)/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+h1,h2,h3{font-weight:600;line-height:1.2;margin:0;text-wrap:balance;letter-spacing:-.01em}
+.mono,.num,.amt{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* Top bar */
+.top{background:var(--navy);color:#fff;padding:var(--s4) var(--s4) 0}
+.wrap{max-width:1160px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:var(--s3);flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:var(--s3)}
+.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans);color:#fff}
+.logo b{font-size:var(--t-lg);font-weight:600}.logo b span{color:var(--orange)}
+.logo small{display:block;color:var(--cyan-l);font-size:var(--t-xs)}
+.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:var(--s2)}
+.who{font-size:var(--t-xs);color:#cfe3ef;display:flex;align-items:center;gap:var(--s2)}
+.who i{width:8px;height:8px;border-radius:50%;background:#5fe08f;display:inline-block}
+.tabs{display:flex;gap:2px;margin-top:var(--s4);overflow-x:auto;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{position:relative}
+.tab>button{background:none;border:0;color:#c3dbea;font:500 var(--t-md) var(--sans);padding:13px 20px;border-radius:10px 10px 0 0;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:8px}
+.tab>button:hover{color:#fff;background:#ffffff12}
+.tab.on>button{background:var(--bg);color:var(--fg);font-weight:600}
+.caret{width:9px;height:9px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:translateY(-3px) rotate(45deg);transition:transform .15s}
+.tab.open .caret{transform:translateY(2px) rotate(-135deg)}
+.menu{position:fixed;min-width:240px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:15;display:flex;flex-direction:column}
+.menu button{background:none;border:0;text-align:left;color:var(--fg);font:500 var(--t-md) var(--sans);padding:11px 14px;border-radius:8px;cursor:pointer;display:flex;justify-content:space-between;gap:12px}
+.menu button:hover{background:var(--soft)}
+.menu button.on{background:var(--info-bg);color:var(--info);font-weight:600}
+.menu small{font:600 12px var(--mono);background:var(--orange);color:#fff;border-radius:10px;padding:1px 7px}
+.tabs .n{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;margin-left:var(--s2);border-radius:10px;background:var(--orange);color:#fff;font:600 11.5px var(--mono)}
+
+main{max-width:1160px;margin:0 auto;padding-block:var(--s5) 64px;padding-inline:var(--s4)}
+.page{display:flex;flex-direction:column;gap:var(--s4)}
+
+/* Page header */
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--s3);flex-wrap:wrap;padding-bottom:var(--s2)}
+.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}
+.head h1{font-size:var(--t-2xl)}
+.head p{margin:6px 0 0;color:var(--muted);font-size:var(--t-sm);max-width:62ch}
+
+/* Buttons */
+.btn{font:500 var(--t-sm) var(--sans);border-radius:9px;padding:9px 15px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--fg);white-space:nowrap;line-height:1.2}
+.btn:hover{border-color:var(--blue);color:var(--blue)}
+.btn.pri{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600}
+.btn.pri:hover{filter:brightness(1.06);color:#fff}
+.btn.pri:disabled{opacity:.4;cursor:not-allowed;filter:none}
+.btn.sm{padding:7px 12px;font-size:13.5px}
+.btn.ghost{border-color:transparent;background:none;color:var(--blue);padding:6px 8px}
+:is(.btn,.tab>button,.menu button,.seg button,.chip,input,select,summary):focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+
+/* Mode tiles */
+.modes-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--s3)}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:var(--s4);display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden}
+.tile::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--c)}
+.tile .lab{display:flex;justify-content:space-between;align-items:center;font-size:var(--t-sm);color:var(--muted);font-weight:500}
+.tile .lab em{font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;font-style:normal;color:var(--c)}
+.tile b{font:600 var(--t-xl) var(--mono);letter-spacing:-.02em}
+.tile small{color:var(--muted);font-size:var(--t-xs)}
+.totalbar{display:flex;justify-content:space-between;align-items:center;gap:var(--s3);flex-wrap:wrap;background:var(--navy);color:#fff;border-radius:var(--r);padding:var(--s3) var(--s4)}
+.totalbar span{color:var(--cyan-l);font-size:var(--t-sm)}.totalbar b{font:600 var(--t-lg) var(--mono)}
+.stats{display:flex;gap:var(--s5);flex-wrap:wrap}.stats div{display:flex;flex-direction:column}.stats small{color:var(--cyan-l);font-size:var(--t-xs)}
+
+/* Panels and tables */
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;min-width:0;overflow:hidden}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:var(--s3);flex-wrap:wrap;padding:var(--s4) 20px}
+.ph h2{font-size:var(--t-lg)}.ph p{margin:4px 0 0;color:var(--muted);font-size:var(--t-xs)}
+.ph .tools{display:flex;gap:var(--s2);align-items:center;flex-wrap:wrap}
+.count{font:600 14px var(--mono);background:var(--soft);border-radius:20px;padding:3px 11px}
+table{width:100%;border-collapse:collapse;font-size:var(--t-sm)}
+th{text-align:left;font:600 13px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:10px 20px;background:var(--soft);white-space:nowrap}
+td{padding:14px 20px;border-top:1px solid var(--line);vertical-align:top}
+td small{display:block;color:var(--muted);font-size:var(--t-xs);margin-top:2px}
+th.r,td.r{text-align:right}
+.amt{white-space:nowrap}
+.name{font-weight:600}
+.id{font:500 13.5px var(--mono);color:var(--blue);display:block;margin-top:2px}
+.courses{display:flex;flex-direction:column;gap:4px}
+.courses div{display:flex;gap:var(--s2);align-items:baseline;flex-wrap:wrap}
+.code{font:500 13px var(--mono);background:var(--info-bg);color:var(--info);padding:2px 7px;border-radius:5px;white-space:nowrap}
+.code.misc{background:var(--warn-bg);color:var(--warn)}
+.pill{display:inline-block;font:600 13.5px var(--sans);border-radius:20px;padding:3px 10px;white-space:nowrap}
+.p-good{background:var(--good-bg);color:var(--good)}.p-warn{background:var(--warn-bg);color:var(--warn)}.p-bad{background:var(--bad-bg);color:var(--bad)}.p-info{background:var(--info-bg);color:var(--info)}
+.acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.empty{padding:28px 20px;color:var(--muted);text-align:center;font-size:var(--t-sm);border-top:1px solid var(--line);margin:0}
+
+/* Filters */
+.bar{display:flex;gap:var(--s3);flex-wrap:wrap;align-items:center}
+.search{flex:1 1 280px;max-width:440px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg);font:var(--t-md) var(--sans)}
+.seg{display:inline-flex;background:var(--soft);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{border:0;background:none;color:var(--muted);border-radius:8px;padding:7px 14px;font:500 var(--t-sm) var(--sans);cursor:pointer}
+.seg button.on{background:var(--surface);color:var(--fg);font-weight:600;box-shadow:0 1px 2px #0002}
+.seg button small{font:600 11px var(--mono);margin-left:6px;color:var(--orange)}
+
+.statusbar{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.statusbar button{background:none;border:0;border-bottom:3px solid transparent;padding:12px 18px;font:500 var(--t-md) var(--sans);color:var(--fg);cursor:pointer;white-space:nowrap;display:flex;gap:8px;align-items:baseline}
+.statusbar button span{font:500 var(--t-xs) var(--mono);color:var(--muted)}
+.statusbar button.on{color:var(--blue);border-bottom-color:var(--blue);font-weight:600}
+.statusbar button.on span{color:var(--blue)}
+.bar .dt{display:flex;align-items:center;gap:8px}.bar .dt .lbl{margin:0}.bar .dt input{width:auto}
+.two{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:var(--s4)}
+dl.sum{margin:0;padding:0 20px var(--s3)}dl.sum div{display:flex;justify-content:space-between;gap:var(--s3);padding:11px 0;border-top:1px solid var(--line)}
+dl.sum dt{color:var(--muted);font-size:var(--t-sm)}dl.sum dd{margin:0;font:600 var(--t-sm) var(--mono)}
+dl.sum .big dt{color:var(--fg);font-weight:600}dl.sum .big dd{font-size:var(--t-lg);color:var(--blue)}
+.foot{display:flex;justify-content:flex-end;gap:var(--s2);padding:var(--s3) 20px var(--s4)}
+
+/* Modal */
+.veil{position:fixed;inset:0;background:#06142099;display:flex;align-items:flex-start;justify-content:center;padding:28px 12px;overflow-y:auto;z-index:20}
+.modal{background:var(--surface);border-radius:16px;width:100%;max-width:780px;box-shadow:0 24px 60px #0007}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--line)}
+.mh h3{font-size:var(--t-lg)}.mh small{display:block;color:var(--muted);font-size:var(--t-xs);font-weight:400;margin-top:3px}
+.mb{padding:20px 22px;display:flex;flex-direction:column;gap:var(--s4)}
+.mf{display:flex;justify-content:flex-end;gap:var(--s2);padding:var(--s4) 22px;border-top:1px solid var(--line);flex-wrap:wrap;background:var(--soft);border-radius:0 0 16px 16px}
+.lbl{display:block;font:500 14.5px var(--sans);color:var(--muted);margin-bottom:6px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:var(--s3)}
+.f input,.f select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg);font:var(--t-md) var(--sans)}
+.f input.mono{font-family:var(--mono)}
+.choice{display:flex;gap:6px;flex-wrap:wrap}
+.choice button{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:9px;padding:9px 16px;font:500 var(--t-sm) var(--sans);cursor:pointer}
+.choice button.on{border-color:var(--blue);background:var(--info-bg);color:var(--info);font-weight:600}
+.whocard{background:var(--soft);border-radius:12px;padding:14px 16px;display:flex;justify-content:space-between;gap:var(--s3);flex-wrap:wrap;align-items:center}
+.whocard .amt{font-size:var(--t-lg);font-weight:600}
+.lines{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.lines td{padding:11px 14px;vertical-align:middle}.lines th{padding:9px 14px}
+.lines input{width:118px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;text-align:right;font:500 var(--t-sm) var(--mono);background:var(--surface);color:var(--fg)}
+.lines tr.sel td{background:var(--info-bg)}
+.lines tr.misc td{background:var(--warn-bg)}
+.addbox{border:1px dashed var(--line);border-radius:12px;padding:var(--s3) var(--s4)}
+.addbox summary{cursor:pointer;font-weight:600;color:var(--blue);font-size:var(--t-sm);list-style:none}
+.addbox summary::-webkit-details-marker{display:none}
+.addbox summary::before{content:"+";display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px;background:var(--info-bg);margin-right:var(--s2)}
+.addbox[open] summary{margin-bottom:var(--s3)}
+.tally{display:flex;justify-content:space-between;gap:var(--s3);flex-wrap:wrap;align-items:center;padding:12px 16px;border-radius:10px;font-weight:600;font-size:var(--t-sm)}
+.tally.ok{background:var(--good-bg);color:var(--good)}.tally.no{background:var(--warn-bg);color:var(--warn)}
+.results{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.results button{display:flex;justify-content:space-between;align-items:center;gap:var(--s3);text-align:left;background:var(--surface);color:var(--fg);border:0;border-top:1px solid var(--line);padding:12px 16px;cursor:pointer;font:var(--t-sm) var(--sans)}
+.results button:first-child{border-top:0}.results button:hover{background:var(--soft)}
+.rcpt{border:1px solid var(--line);border-radius:12px;padding:var(--s4);font-size:var(--t-sm);display:flex;flex-direction:column;gap:6px}
+.rcpt div{display:flex;justify-content:space-between;gap:var(--s3)}
+.rcpt .tot{border-top:1px solid var(--line);padding-top:10px;margin-top:4px;font-weight:600}
+.note{font-size:14.5px;color:var(--muted);margin:0;line-height:1.5}
+.flash{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font:500 var(--t-sm) var(--sans);box-shadow:0 8px 24px #0005;max-width:calc(100% - 32px);z-index:30}
+
+@media (max-width:900px){.modes-row{grid-template-columns:repeat(2,minmax(0,1fr))}.two{grid-template-columns:1fr}}
+/* Phone: work tables become cards */
+@media (max-width:640px){
+  .head h1{font-size:var(--t-xl)}
+  .tab>button{padding:12px 14px;font-size:var(--t-sm)}
+  .logo small,.who,.proto{display:none}
+  .menu{min-width:220px}
+  .grid2{grid-template-columns:1fr}
+  .cards thead{display:none}
+  .cards tr{display:block;padding:var(--s3) var(--s4);border-top:1px solid var(--line)}
+  .cards td{display:flex;justify-content:space-between;gap:var(--s3);padding:5px 0;border:0;text-align:right}
+  .cards td::before{content:attr(data-l);font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:left;padding-top:2px}
+  .cards td[data-l=""]::before{content:none}
+  .cards td.lead{display:block;text-align:left;padding-bottom:var(--s2)}
+  .cards td.lead::before{content:none}
+  .cards .courses{align-items:flex-end}
+  .cards .acts{justify-content:flex-end;width:100%;padding-top:6px}
+  .lines input{width:100px}
+}
+@media (prefers-reduced-motion:no-preference){.flash{animation:up .22s ease}@keyframes up{from{opacity:.3;transform:translate(-50%,8px)}}}
+</style>
+
+<header class="top"><div class="wrap">
+  <div class="brand">
+    <div class="logo"><div class="mark" aria-hidden="true">NW</div><div><b>New <span>Wave</span> Cashier</b><span class="proto">PROTOTYPE</span><small>Ride the New Wave of Maritime Excellence</small></div></div>
+    <div class="who"><i></i>Working as Cashier · sample data only</div>
+  </div>
+  <nav class="tabs" id="tabs" aria-label="Cashier workspace"></nav>
+</div></header>
+<main id="app"></main>
+<div id="modal"></div>
+<div id="flash" class="flash" hidden></div>
+
+<script>
+const TABS=["Dashboard","Trainees","Accounting","Expenses","Requests"];
+const MODES=[{n:"Cash",ref:false,c:"#0a7a3e"},{n:"GCash",ref:true,c:"#0571D0"},{n:"PSBank",ref:true,c:"#123F63"},{n:"UnionBank",ref:true,c:"#F25615"}];
+const TODAY="Oct 7";
+const peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const S={tab:"Dashboard",sub:{Accounting:"Payment Records",Expenses:"Expenses",Requests:"Change Requests"},filter:"All",q:"",from:"2026-10-01",to:"2026-10-07",range:"This Week",receipt:100247,
+ trainees:[
+  {id:"t1",date:"2026-10-07",name:"DELA CRUZ, Marco Santos",no:"NWMTACI-2610-0031",handed:"Oct 7 · 9:12 AM",courses:[
+    {id:"e1",code:"UBT-PSSR",name:"Updating Training on Basic Training – PSSR",dates:"Oct 12",fee:150000,paid:0},
+    {id:"e2",code:"STPPDSPPS",name:"Security Training for Seafarers with Designated Security Duties",dates:"Oct 12",fee:180000,paid:0},
+    {id:"e3",code:"PSCMT",name:"Crowd Management Training",dates:"Oct 13–14",fee:250000,paid:0}]},
+  {id:"t2",date:"2026-10-07",name:"REYES, Joanna Mae Villanueva",no:"NWMTACI-2610-0032",handed:"Oct 7 · 10:40 AM",courses:[
+    {id:"e4",code:"PSCMHBT",name:"Crisis Management and Human Behaviour Training",dates:"Oct 15–17",fee:320000,paid:0}]},
+  {id:"t3",date:"2026-10-07",name:"BAUTISTA, Rommel Aquino",no:"NWMTACI-2610-0033",handed:"Oct 7 · 11:05 AM",courses:[
+    {id:"e5",code:"PSCMT",name:"Crowd Management Training",dates:"Oct 13–14",fee:250000,paid:0},
+    {id:"e6",code:"PSCMHBT",name:"Crisis Management and Human Behaviour Training",dates:"Oct 15–17",fee:320000,paid:0}]},
+  {id:"t4",date:"2026-10-06",name:"GARCIA, Liza Mendoza",no:"NWMTACI-2610-0027",handed:"Oct 6 · 3:20 PM",courses:[
+    {id:"e7",code:"CCMD",name:"Crowd and Crisis Management (Domestic)",dates:"Oct 12–14",fee:280000,paid:280000}]},
+  {id:"t5",date:"2026-10-06",name:"SANTOS, Paolo Rivera",no:"NWMTACI-2610-0025",handed:"Oct 6 · 1:02 PM",courses:[
+    {id:"e8",code:"UBT-PSSR",name:"Updating Training on Basic Training – PSSR",dates:"Oct 8",fee:150000,paid:150000},
+    {id:"e9",code:"STPPDSPPS",name:"Security Training for Seafarers with Designated Security Duties",dates:"Oct 12",fee:180000,paid:90000}]},
+  {id:"t7",date:"2026-10-05",cancelled:true,name:"VILLAR, Kevin Ocampo",no:"NWMTACI-2610-0019",handed:"Oct 5 · 2:15 PM",courses:[
+    {id:"e11",code:"UBT-PSSR",name:"Updating Training on Basic Training – PSSR",dates:"Oct 9",fee:150000,paid:0}]},
+  {id:"t6",date:"2026-09-29",name:"MERCADO, Arnel Tan",no:"NWMTACI-2609-0198",handed:"Sep 29",ended:"Oct 3",courses:[
+    {id:"e10",code:"PSCMHBT",name:"Crisis Management and Human Behaviour Training",dates:"Oct 1–3",fee:320000,paid:160000}]}],
+ payments:[
+  {no:"AR-100247",time:"Oct 7 · 10:02 AM",trainee:"MERCADO, Arnel Tan",mode:"Cash",ref:"",amount:60000,lines:[["PSCMHBT",60000]]},
+  {no:"AR-100246",time:"Oct 7 · 9:31 AM",trainee:"SANTOS, Paolo Rivera",mode:"PSBank",ref:"PSB-77120934",amount:90000,lines:[["STPPDSPPS",90000]]},
+  {no:"AR-100245",time:"Oct 7 · 8:47 AM",trainee:"GARCIA, Liza Mendoza",mode:"GCash",ref:"9012 448 771",amount:280000,lines:[["CCMD",280000]]},
+  {no:"AR-100244",time:"Oct 6 · 1:30 PM",trainee:"SANTOS, Paolo Rivera",mode:"Cash",ref:"",amount:150000,lines:[["UBT-PSSR",150000]]},
+  {no:"AR-100243",time:"Oct 3 · 4:10 PM",trainee:"MERCADO, Arnel Tan",mode:"UnionBank",ref:"UB-4410982",amount:100000,lines:[["PSCMHBT",100000]]}],
+ catalog:[
+  {id:"k1",name:"T-Shirt",price:15000,kind:"Item"},{id:"k2",name:"ID Lace",price:5000,kind:"Item"},{id:"k3",name:"Training Logbook",price:20000,kind:"Item"},
+  {id:"k4",name:"Certificate Reprinting",price:20000,kind:"Fee"},{id:"k5",name:"Make-up Class (Per Day)",price:35000,kind:"Fee"},
+  {id:"k6",name:"Rescheduling",price:50000,kind:"Fee"},{id:"k7",name:"Cancellation Processing",price:35000,kind:"Fee"},{id:"k8",name:"TAR Reprint",price:10000,kind:"Fee"}],
+ expenses:[{no:"CV-0041",payee:"Meralco",purpose:"Electricity, September",status:"Approved",amount:1845000},{no:"CV-0042",payee:"Office Warehouse",purpose:"Bond paper and toner",status:"Pending",amount:367500}],
+ requests:[{no:"REQ-0019",tid:"t5",type:"Rescheduling",course:"STPPDSPPS",reason:"Vessel joining moved to Oct 20",stage:"With Cashier",charge:null,fee:"k6"},
+           {no:"REQ-0018",tid:"t6",type:"Make-up Class",course:"PSCMHBT",reason:"Absent on day 2 (medical)",stage:"Fee to Collect",charge:35000,fee:"k5"}],
+ discounts:[{trainee:"BAUTISTA, Rommel Aquino",course:"PSCMHBT",amount:30000,reason:"Agency rebate · Oceanic Crew Management",status:"Pending"}],
+ reprints:[{trainee:"GARCIA, Liza Mendoza",ar:"TAR-2610-0012",printed:"2 of 2",status:"Awaiting Approval"}]};
+
+const bal=c=>Math.max(0,c.fee-c.paid);
+const tPaid=t=>t.courses.reduce((s,c)=>s+c.paid,0), tDue=t=>t.courses.reduce((s,c)=>s+c.fee,0), tBal=t=>tDue(t)-tPaid(t);
+const state=t=>t.cancelled?"Cancelled":tPaid(t)===0?"Unpaid":tBal(t)===0?"Paid":"Partially Paid";
+const byId=id=>S.trainees.find(t=>t.id===id);
+const tone={Paid:"p-good",Approved:"p-good","Fully Paid":"p-good",Unpaid:"p-bad","Past Due":"p-bad","Partially Paid":"p-warn",Pending:"p-warn","Fee to Collect":"p-warn","With Cashier":"p-info","Awaiting Approval":"p-info"};
+const pill=s=>`<span class="pill ${tone[s]||"p-info"}">${esc(s)}</span>`;
+const courseList=t=>`<div class="courses">${t.courses.map(c=>`<div><span class="code">${c.code}</span><small>${c.dates}</small></div>`).join("")}</div>`;
+const who=t=>`<span class="name">${esc(t.name)}</span><span class="id">${t.no}</span>`;
+function flash(m){const f=document.getElementById("flash");f.textContent=m;f.hidden=false;clearTimeout(flash.t);flash.t=setTimeout(()=>f.hidden=true,2800)}
+function head(eyebrow,title,_text,action=""){return `<div class="head"><div><span class="eyebrow">${eyebrow}</span><h1>${title}</h1></div>${action}</div>`}
+function seg(tab,list,counts={}){return `<div class="seg" role="tablist">${list.map(s=>`<button type="button" role="tab" aria-selected="${S.sub[tab]===s}" class="${S.sub[tab]===s?"on":""}" data-sub="${tab}|${s}">${s}${counts[s]?`<small>${counts[s]}</small>`:""}</button>`).join("")}</div>`}
+const td=(l,html,cls="")=>`<td data-l="${l}" class="${cls}">${html}</td>`;
+
+const MENUS={Trainees:["Enrollments"],Accounting:["Payment Records","Opening & Closing","Summary Report","Schedule of Fees"],Expenses:["Expenses","Vouchers"],Requests:["Change Requests","Discount Requests","TAR Reprints"]};
+let OPEN="";
+function renderTabs(){
+  const open=S.requests.filter(r=>r.stage==="With Cashier"||r.stage==="Fee to Collect").length;
+  const badge={"Change Requests":open,"Discount Requests":S.discounts.filter(d=>d.status==="Pending").length};
+  const total=open+badge["Discount Requests"];
+  document.getElementById("tabs").innerHTML=TABS.map(t=>{const m=MENUS[t];
+    return `<div class="tab ${S.tab===t?"on":""} ${OPEN===t?"open":""}"><button type="button" ${m?`data-drop="${t}" aria-haspopup="true" aria-expanded="${OPEN===t}"`:`data-tab="${t}"`}>${t}${t==="Requests"&&total?`<span class="n">${total}</span>`:""}${m?`<span class="caret" aria-hidden="true"></span>`:""}</button>
+    ${m&&OPEN===t?`<div class="menu" role="menu">${m.map(x=>`<button type="button" role="menuitem" class="${S.tab===t&&(S.sub[t]||"Enrollments")===x?"on":""}" data-go="${t}|${x}">${x}${badge[x]?`<small>${badge[x]}</small>`:""}</button>`).join("")}</div>`:""}</div>`}).join("");
+  const menu=document.querySelector(".menu");if(menu){const r=menu.parentElement.firstElementChild.getBoundingClientRect();menu.style.top=(r.bottom+6)+"px";menu.style.left=Math.max(16,Math.min(r.left,innerWidth-menu.offsetWidth-16))+"px"}
+}
+window.addEventListener("resize",()=>{if(OPEN){OPEN="";renderTabs()}});
+
+/* ===== Dashboard */
+function dashboard(){
+  const todayPays=S.payments.filter(p=>p.time.startsWith(TODAY));
+  const fresh=S.trainees.filter(t=>!t.ended&&!t.cancelled&&tPaid(t)===0);
+  const paid=S.trainees.filter(t=>!t.ended&&tPaid(t)>0);
+  const after=S.trainees.filter(t=>t.ended&&tBal(t)>0);
+  const total=todayPays.reduce((s,p)=>s+p.amount,0);
+  return `<div class="page">
+  ${head("Wednesday, 7 October 2026","Cashier Dashboard","Today's collections by mode, trainees endorsed for payment, and those already paid and enrolled.",`<button type="button" class="btn pri" data-pay="">Record Payment</button>`)}
+  <div class="modes-row">${MODES.map(m=>{const l=todayPays.filter(p=>p.mode===m.n);return `<div class="tile" style="--c:${m.c}"><div class="lab">${m.n==="Cash"?"Cash Collected":m.n}</div><b>${peso(l.reduce((s,p)=>s+p.amount,0))}</b><small>${l.length} receipt${l.length===1?"":"s"}</small></div>`}).join("")}</div>
+  <div class="totalbar"><div><span>Total Collected Today</span><br><b>${peso(total)}</b></div>
+    <div class="stats"><div><b class="mono">${fresh.length}</b><small>New Enrollments</small></div><div><b class="mono">${paid.length}</b><small>Paid &amp; Enrolled</small></div><div><b class="mono">${peso(after.reduce((s,t)=>s+tBal(t),0))}</b><small>Unpaid After Training</small></div></div></div>
+
+  <section class="panel"><div class="ph"><div><h2>New Enrollments</h2></div><span class="count">${fresh.length}</span></div>
+  ${fresh.length?`<table class="cards"><thead><tr><th>Trainee</th><th>Courses</th><th>Endorsed</th><th class="r">Total Due</th><th></th></tr></thead><tbody>
+  ${fresh.map(t=>`<tr>${td("",who(t),"lead")}${td("Courses",courseList(t))}${td("Endorsed",t.handed)}${td("Total Due",`<strong class="amt">${peso(tDue(t))}</strong><small>${t.courses.length} course${t.courses.length>1?"s":""}</small>`,"r")}${td("",`<div class="acts"><button type="button" class="btn pri sm" data-pay="${t.id}">Record Payment</button></div>`)}</tr>`).join("")}
+  </tbody></table>`:`<p class="empty">Nobody is waiting for payment. Registration endorses trainees once their requirements are complete.</p>`}</section>
+
+  <section class="panel"><div class="ph"><div><h2>Paid &amp; Enrolled</h2></div><span class="count">${paid.length}</span></div>
+  ${paid.length?`<table class="cards"><thead><tr><th>Trainee</th><th>Courses</th><th class="r">Paid</th><th class="r">Balance</th><th>Status</th><th></th></tr></thead><tbody>
+  ${paid.map(t=>`<tr>${td("",who(t),"lead")}${td("Courses",courseList(t))}${td("Paid",`<span class="amt">${peso(tPaid(t))}</span>`,"r")}${td("Balance",`<strong class="amt">${peso(tBal(t))}</strong>`,"r")}${td("Status",pill(state(t)))}${td("",`<div class="acts">${tBal(t)>0?`<button type="button" class="btn sm" data-pay="${t.id}">Collect Balance</button>`:""}<button type="button" class="btn sm" data-flash="Acknowledgement Receipt opens in the TAR layout.">Receipt</button><button type="button" class="btn pri sm" data-flash="Training Admission Record opens for printing (1 of 2).">Print TAR</button></div>`)}</tr>`).join("")}
+  </tbody></table>`:`<p class="empty">No paid trainees yet.</p>`}</section>
+
+  <section class="panel"><div class="ph"><div><h2>Unpaid Balances · 4:00 PM Summary</h2></div><div class="tools"><button type="button" class="btn sm" data-flash="Summary emailed to the Cashier and Accounting Manager.">Email Summary Now</button></div></div>
+  ${after.length?`<table class="cards"><thead><tr><th>Trainee</th><th>Training</th><th>Status</th><th class="r">Balance</th><th></th></tr></thead><tbody>${after.map(t=>`<tr>${td("",who(t),"lead")}${td("Training",`${t.courses.map(c=>c.code).join(", ")}<small>Ended ${t.ended}</small>`)}${td("Status",pill("Past Due"))}${td("Balance",`<strong class="amt">${peso(tBal(t))}</strong><small>of ${peso(tDue(t))}</small>`,"r")}${td("",`<div class="acts"><button type="button" class="btn pri sm" data-pay="${t.id}">Record Payment</button></div>`)}</tr>`).join("")}</tbody></table>`:`<p class="empty">No unpaid balances after training.</p>`}</section>
+  </div>`;
+}
+
+/* ===== Trainees */
+function trainees(){
+  const q=S.q.toLowerCase();
+  const inRange=t=>(!S.from||t.date>=S.from)&&(!S.to||t.date<=S.to);
+  const base=S.trainees.filter(t=>inRange(t)&&(!q||`${t.name} ${t.no} ${t.courses.map(c=>c.code+" "+c.name).join(" ")}`.toLowerCase().includes(q)));
+  const ORDER=["Unpaid","Partially Paid","Paid","Cancelled"];
+  const rows=base.filter(t=>S.filter==="All"||state(t)===S.filter).sort((a,b)=>ORDER.indexOf(state(a))-ORDER.indexOf(state(b))||b.date.localeCompare(a.date));
+  const cnt=f=>base.filter(t=>f==="All"||state(t)===f).length;
+  const fmt=d=>new Date(d+"T00:00:00").toLocaleDateString("en-PH",{month:"short",day:"numeric",year:"numeric"});
+  return `<div class="page">${head("Trainees","Enrollments")}
+  <div class="statusbar" role="tablist">${["All",...ORDER].map(f=>`<button type="button" role="tab" aria-selected="${S.filter===f}" class="${S.filter===f?"on":""}" data-filter="${f}">${f}<span>${cnt(f)}</span></button>`).join("")}</div>
+  <div class="bar"><input class="search" id="q" placeholder="Search by name, NWMTACI number or course" value="${esc(S.q)}" aria-label="Search trainee">
+  <label class="f dt"><span class="lbl">From</span><input type="date" id="dfrom" value="${S.from}" max="${S.to||""}"></label><label class="f dt"><span class="lbl">To</span><input type="date" id="dto" value="${S.to}" min="${S.from||""}"></label>
+  ${S.from||S.to?`<button type="button" class="btn ghost" data-clrdate>Clear Dates</button>`:""}</div>
+  <section class="panel">${rows.length?`<table class="cards"><thead><tr><th>Trainee</th><th>Enrolled</th><th>Courses</th><th class="r">Total Due</th><th class="r">Paid</th><th class="r">Balance</th><th>Status</th><th></th></tr></thead><tbody>
+  ${rows.map(t=>`<tr>${td("",who(t),"lead")}${td("Enrolled",fmt(t.date))}${td("Courses",courseList(t))}${td("Total Due",`<span class="amt">${peso(tDue(t))}</span>`,"r")}${td("Paid",`<span class="amt">${peso(tPaid(t))}</span>`,"r")}${td("Balance",`<strong class="amt">${peso(tBal(t))}</strong>`,"r")}${td("Status",pill(state(t)))}${td("",`<div class="acts"><button type="button" class="btn ${tBal(t)>0?"pri":""} sm" data-pay="${t.id}">${tBal(t)>0?"Record Payment":"Add Charges"}</button>${tPaid(t)>0?`<button type="button" class="btn sm" data-flash="Training Admission Record opens for printing.">Print TAR</button>`:""}</div>`)}</tr>`).join("")}
+  </tbody></table>`:`<p class="empty">No enrollment matches these filters.</p>`}</section></div>`;
+}
+
+/* ===== Accounting */
+function accounting(){
+  const sub=S.sub.Accounting;let body="",action="";
+  if(sub==="Payment Records"){
+    action=`<button type="button" class="btn pri" data-pay="">Record Payment</button>`;
+    body=`<section class="panel"><div class="ph"><div><h2>Payment Records</h2></div><span class="count">${S.payments.length}</span></div><table class="cards"><thead><tr><th>Receipt</th><th>Trainee</th><th>Applied To</th><th>Mode</th><th class="r">Amount</th></tr></thead><tbody>
+    ${S.payments.map(p=>`<tr>${td("",`<span class="name mono">${p.no}</span><small>${p.time}</small>`,"lead")}${td("Trainee",esc(p.trainee))}${td("Applied To",`<div class="courses">${p.lines.map(l=>`<div><span class="code ${l[2]?"misc":""}">${esc(l[0])}</span><small class="amt">${peso(l[1])}</small></div>`).join("")}</div>`)}${td("Mode",`${p.mode}${p.ref?`<small class="mono">${esc(p.ref)}</small>`:""}`)}${td("Amount",`<strong class="amt">${peso(p.amount)}</strong>`,"r")}</tr>`).join("")}
+    </tbody></table></section>`;
+  } else if(sub==="Opening & Closing"){
+    const cash=S.payments.filter(p=>p.time.startsWith(TODAY)&&p.mode==="Cash").reduce((s,p)=>s+p.amount,0);
+    body=`<div class="two"><section class="panel"><div class="ph"><div><h2>Closing</h2></div>${pill("Not Yet Closed")}</div><dl class="sum"><div><dt>Opening Cash</dt><dd>${peso(500000)}</dd></div><div><dt>Cash Received Today</dt><dd>+${peso(cash)}</dd></div><div><dt>Expenses Paid in Cash</dt><dd>−${peso(0)}</dd></div><div class="big"><dt>Expected Cash in Drawer</dt><dd>${peso(500000+cash)}</dd></div></dl><div class="foot"><button type="button" class="btn pri" data-flash="Closing submitted to the Accounting Manager.">Count and Submit Closing</button></div></section>
+    <section class="panel"><div class="ph"><div><h2>Opening</h2></div>${pill("Recorded")}</div><dl class="sum"><div><dt>Opening Cash</dt><dd>${peso(500000)}</dd></div><div><dt>Recorded At</dt><dd>8:02 AM</dd></div></dl></section></div>`;
+  } else if(sub==="Summary Report"){
+    const by=MODES.map(m=>{const l=S.payments.filter(p=>p.mode===m.n);return [m.n,l.length,l.reduce((s,p)=>s+p.amount,0)]});
+    const tot=by.reduce((s,b)=>s+b[2],0);
+    action=`<div class="seg">${["Today","This Week","This Month","Custom"].map(r=>`<button type="button" class="${S.range===r?"on":""}" data-range="${r}">${r}</button>`).join("")}</div>`;
+    body=`<div class="two"><section class="panel"><div class="ph"><div><h2>Collections by Mode</h2></div></div><table><thead><tr><th>Mode</th><th class="r">Receipts</th><th class="r">Total</th></tr></thead><tbody>${by.map(b=>`<tr><td>${b[0]}</td><td class="r mono">${b[1]}</td><td class="r amt">${peso(b[2])}</td></tr>`).join("")}<tr><td><strong>Total</strong></td><td class="r mono"><strong>${S.payments.length}</strong></td><td class="r amt"><strong>${peso(tot)}</strong></td></tr></tbody></table></section>
+    <section class="panel"><div class="ph"><div><h2>Net Cash</h2></div></div><dl class="sum"><div><dt>Collections</dt><dd>${peso(tot)}</dd></div><div><dt>Expenses</dt><dd>−${peso(1845000)}</dd></div><div class="big"><dt>Net</dt><dd>${peso(tot-1845000)}</dd></div></dl></section></div>`;
+  } else {
+    action=`<button type="button" class="btn" data-flash="Admin and the Accounting Manager add items and set prices, e.g. T-Shirt ₱150.00.">Add to Schedule</button>`;
+    const grp=k=>`<table class="cards"><thead><tr><th>Name</th><th>How It Is Collected</th><th class="r">Price</th></tr></thead><tbody>${S.catalog.filter(x=>x.kind===k).map(x=>`<tr>${td("",`<span class="name">${esc(x.name)}</span>`,"lead")}${td("Collected",`<small style="margin:0">${k==="Item"?"Record Payment › Add Miscellaneous Charges · approved once paid":"Requests › Service Fee · Accounting Manager approves the change"}</small>`)}${td("Price",`<strong class="amt">${peso(x.price)}</strong>`,"r")}</tr>`).join("")}</tbody></table>`;
+    body=`<section class="panel"><div class="ph"><div><h2>Miscellaneous Items</h2></div></div>${grp("Item")}</section>
+    <section class="panel"><div class="ph"><div><h2>Service Fees</h2></div></div>${grp("Fee")}</section>`;
+  }
+  return `<div class="page">${head("Accounting",sub,"",action)}${body}</div>`;
+}
+
+/* ===== Expenses */
+function expenses(){
+  const sub=S.sub.Expenses;
+  const list=sub==="Expenses"?S.expenses:S.expenses.filter(x=>x.status!=="Pending");
+  return `<div class="page">${head("Expenses",sub,sub==="Expenses"?"Record an expense; the Accounting Manager approves it.":"A voucher prints once its expense is approved.",sub==="Expenses"?`<button type="button" class="btn pri" data-flash="The New Expense form opens here.">New Expense</button>`:"")}
+  <section class="panel"><table class="cards"><thead><tr><th>Voucher</th><th>Payee</th><th>Purpose</th><th>Status</th><th class="r">Amount</th><th></th></tr></thead><tbody>
+  ${list.map(x=>`<tr>${td("",`<span class="name mono">${x.no}</span>`,"lead")}${td("Payee",x.payee)}${td("Purpose",x.purpose)}${td("Status",pill(x.status))}${td("Amount",`<strong class="amt">${peso(x.amount)}</strong>`,"r")}${td("",`<div class="acts">${x.status!=="Pending"?`<button type="button" class="btn sm" data-flash="Voucher ${x.no} opens as a PDF.">Print Voucher</button>`:""}</div>`)}</tr>`).join("")}
+  </tbody></table></section></div>`;
+}
+
+/* ===== Requests */
+function requests(){
+  const sub=S.sub.Requests;let body="";
+  if(sub==="Change Requests") body=`<section class="panel"><div class="ph"><div><h2>Change Requests</h2></div></div><table class="cards"><thead><tr><th>Request</th><th>Trainee</th><th>Reason</th><th>Stage</th><th class="r">Service Fee</th><th></th></tr></thead><tbody>
+    ${S.requests.map((r,i)=>`<tr>${td("",`<span class="name">${r.type}</span><span class="id">${r.no}</span>`,"lead")}${td("Trainee",`${esc(byId(r.tid).name)}<small>${r.course}</small>`)}${td("Reason",esc(r.reason))}${td("Stage",pill(r.stage))}${td("Service Fee",r.charge==null?"—":`<span class="amt">${peso(r.charge)}</span>`,"r")}${td("",`<div class="acts">${r.stage==="With Cashier"?`<button type="button" class="btn pri sm" data-charge="${i}">Add Service Fee</button>`:r.stage==="Fee to Collect"?`<button type="button" class="btn pri sm" data-collect="${i}">Collect Fee</button>`:""}</div>`)}</tr>`).join("")}
+    </tbody></table></section>`;
+  else if(sub==="Discount Requests") body=`<section class="panel"><div class="ph"><div><h2>Discount Requests</h2></div><div class="tools"><button type="button" class="btn pri sm" data-flash="The Discount Request form opens here.">New Discount Request</button></div></div><table class="cards"><thead><tr><th>Trainee</th><th>Course</th><th>Reason</th><th class="r">Discount</th><th>Status</th></tr></thead><tbody>${S.discounts.map(d=>`<tr>${td("",`<span class="name">${esc(d.trainee)}</span>`,"lead")}${td("Course",`<span class="code">${d.course}</span>`)}${td("Reason",esc(d.reason))}${td("Discount",`<span class="amt">${peso(d.amount)}</span>`,"r")}${td("Status",pill(d.status))}</tr>`).join("")}</tbody></table></section>`;
+  else body=`<section class="panel"><div class="ph"><div><h2>TAR Reprints</h2></div></div><table class="cards"><thead><tr><th>Trainee</th><th>Record</th><th>Printed</th><th>Status</th></tr></thead><tbody>${S.reprints.map(r=>`<tr>${td("",`<span class="name">${esc(r.trainee)}</span>`,"lead")}${td("Record",`<span class="mono">${r.ar}</span>`)}${td("Printed",r.printed)}${td("Status",pill(r.status))}</tr>`).join("")}</tbody></table></section>`;
+  const open=S.requests.filter(r=>r.stage==="With Cashier"||r.stage==="Fee to Collect").length;
+  return `<div class="page">${head("Requests",sub)}${body}</div>`;
+}
+
+/* ===== Record Payment: split across courses + miscellaneous charges */
+let P=null;
+const itemTotal=it=>it.price*it.qty;
+const cents=v=>{const n=Math.round(Number(String(v).replace(/,/g,""))*100);return Number.isFinite(n)&&n>0?n:0};
+function openPay(tid,item){
+  P={tid:tid||"",q:"",mode:"Cash",ref:"",received:"",amt:{},items:[],addOpen:false,add:{k:"k1",qty:"1",course:"",name:"",price:""},done:null};
+  if(tid){const t=byId(tid);P.add.course=t.courses[0].code}
+  if(item){P.items.push(item);P.received=(itemTotal(item)/100).toFixed(2)}
+  drawPay();
+}
+function drawPay(){
+  const m=document.getElementById("modal");
+  if(!P){m.innerHTML="";return}
+  const t=byId(P.tid);let title="Record Payment",subt="",body="",foot="";
+  if(P.done){
+    const d=P.done;title="Payment Recorded";subt=d.no;
+    body=`<div class="tally ok"><span>${peso(d.amount)} received by ${d.mode}</span><span>Receipt ${d.no}</span></div>
+    <div class="rcpt"><div><span>Received From</span><strong>${esc(d.trainee)}</strong></div><div><span>Mode</span><span>${d.mode}${d.ref?` · <span class="mono">${esc(d.ref)}</span>`:""}</span></div>
+    ${d.lines.map(l=>`<div><span><span class="code ${l[2]?"misc":""}">${esc(l[0])}</span></span><span class="amt">${peso(l[1])}</span></div>`).join("")}<div class="tot"><span>Total</span><span class="amt">${peso(d.amount)}</span></div></div>`;
+    foot=`<button type="button" class="btn" data-flash="Acknowledgement Receipt ${d.no} opens in the TAR layout.">Receipt</button><button type="button" class="btn" data-flash="Training Admission Record opens for printing (1 of 2).">Print TAR</button><button type="button" class="btn pri" data-close>Done</button>`;
+  } else if(!t){
+        const q=P.q.toLowerCase();
+    const list=S.trainees.filter(x=>!q||`${x.name} ${x.no} ${x.courses.map(c=>c.code).join(" ")}`.toLowerCase().includes(q));
+    body=`<label class="f"><span class="lbl">Find Trainee</span><input id="pq" autofocus placeholder="Name, NWMTACI number or course" value="${esc(P.q)}"></label>
+    <div class="results">${list.map(x=>{const open=x.courses.filter(c=>bal(c)>0);return `<button type="button" data-pick="${x.id}"><span><b>${esc(x.name)}</b><br><small style="color:var(--muted)">${open.length?`${open.map(c=>c.code).join(" · ")} · ${open.length} unpaid course${open.length>1?"s":""}`:"All courses paid · miscellaneous charges only"}</small></span><strong class="amt">${peso(tBal(x))}</strong></button>`}).join("")||`<p class="empty">No trainee matches.</p>`}</div>`;
+    foot=`<button type="button" class="btn" data-close>Cancel</button>`;
+  } else {
+        const open=t.courses.filter(c=>bal(c)>0);
+    const misc=P.items.reduce((s,it)=>s+itemTotal(it),0);
+    const applied=open.reduce((s,c)=>s+Math.min(cents(P.amt[c.id]),bal(c)),0)+misc;
+    const over=open.some(c=>cents(P.amt[c.id])>bal(c));
+    const received=cents(P.received);
+    const refReq=MODES.find(x=>x.n===P.mode).ref;
+    const match=received>0&&received===applied;
+    const ok=applied>0&&!over&&match&&(!refReq||P.ref.trim());
+    const ak=S.catalog.find(k=>k.id===P.add.k);
+    body=`<div class="whocard"><div>${who(t)}</div><div style="text-align:right"><small style="color:var(--muted)">Course Balance</small><br><span class="amt">${peso(tBal(t))}</span></div></div>
+    <div class="grid2">
+      <label class="f"><span class="lbl">Amount Received (PHP)</span><input id="prec" class="mono" inputmode="decimal" placeholder="0.00" value="${esc(P.received)}"></label>
+      <div><span class="lbl">Apply the Amount</span><div class="choice"><button type="button" data-fill="all">Pay All in Full</button><button type="button" data-fill="dist">Distribute in Order</button><button type="button" data-fill="clear">Clear</button></div></div>
+    </div>
+    <div class="lines"><table><thead><tr><th>Course or Charge</th><th class="r">Balance</th><th class="r">Apply</th></tr></thead><tbody>
+    ${open.map(c=>`<tr class="${cents(P.amt[c.id])>0?"sel":""}"><td><span class="code">${c.code}</span> <small>${esc(c.name)} · ${c.dates} · fee ${peso(c.fee)}${c.paid?`, paid ${peso(c.paid)}`:""}</small></td><td class="r amt"><strong>${peso(bal(c))}</strong></td><td class="r"><input data-amt="${c.id}" inputmode="decimal" placeholder="0.00" value="${esc(P.amt[c.id]??"")}" aria-label="Amount for ${c.code}">${cents(P.amt[c.id])>bal(c)?`<small style="color:var(--bad)">More than the balance</small>`:""}</td></tr>`).join("")}
+    ${P.items.map((it,i)=>`<tr class="misc"><td><span class="code misc">${it.kind==="Item"?"MISC":"FEE"}</span> <strong>${esc(it.name)}</strong>${it.qty>1?` × ${it.qty}`:""}<small>${it.kind==="Item"?"Miscellaneous Item":"Service Fee"}${it.req?` · ${esc(it.req)}`:""} · for ${esc(it.course)}</small></td><td class="r amt"><strong>${peso(itemTotal(it))}</strong></td><td class="r"><span class="amt">${peso(itemTotal(it))}</span> <button type="button" class="btn ghost" data-unitem="${i}" aria-label="Remove ${esc(it.name)}">Remove</button></td></tr>`).join("")}
+    ${!open.length&&!P.items.length?`<tr><td colspan="3"><small>All courses are fully paid. Add a miscellaneous charge below.</small></td></tr>`:""}
+    </tbody></table></div>
+    <details class="addbox" ${P.addOpen?"open":""} data-addbox>
+      <summary>Add Miscellaneous Charges</summary>
+      <div class="grid2">
+        <label class="f"><span class="lbl">Charge</span><select id="ak">${[["Item","Miscellaneous Items"],["Fee","Service Fees"]].map(([g,l])=>`<optgroup label="${l}">${S.catalog.filter(k=>k.kind===g).map(k=>`<option value="${k.id}" ${P.add.k===k.id?"selected":""}>${esc(k.name)} · ${peso(k.price)}</option>`).join("")}</optgroup>`).join("")}<option value="other" ${P.add.k==="other"?"selected":""}>Other Charge (Enter Name and Amount)</option></select></label>
+        <label class="f"><span class="lbl">For Course</span><select id="ac">${t.courses.map(c=>`<option ${P.add.course===c.code?"selected":""}>${c.code}</option>`).join("")}</select></label>
+        ${P.add.k==="other"?`<label class="f"><span class="lbl">Charge Name</span><input id="an" value="${esc(P.add.name)}" placeholder="e.g. Notarial Fee"></label><label class="f"><span class="lbl">Amount (PHP)</span><input id="ap" class="mono" inputmode="decimal" value="${esc(P.add.price)}" placeholder="0.00"></label>`:""}
+        <label class="f"><span class="lbl">Quantity</span><input id="aq" class="mono" inputmode="numeric" value="${esc(P.add.qty)}"></label>
+        <div style="display:flex;align-items:flex-end"><button type="button" class="btn" data-additem style="width:100%">Add to This Payment</button></div>
+      </div>
+      <p class="note" style="margin-top:10px">${ak&&ak.kind==="Fee"?"Service fees for Rescheduling, Make-up Class, Cancellation and Reprinting are usually collected from Requests, because the change itself still needs the Accounting Manager's approval.":"Miscellaneous items such as a T-Shirt are approved once paid and print on the same receipt."}</p>
+    </details>
+    <div class="tally ${match?"ok":"no"}"><span>Applied <span class="amt">${peso(applied)}</span> of <span class="amt">${peso(received)}</span> received</span><span>${!received?"Enter the amount received":match?"Ready to record":applied<received?`${peso(received-applied)} not yet applied`:`${peso(applied-received)} more than received`}</span></div>
+    <div><span class="lbl">Mode of Payment</span><div class="choice" role="radiogroup" aria-label="Mode of payment">${MODES.map(x=>`<button type="button" role="radio" aria-checked="${P.mode===x.n}" class="${P.mode===x.n?"on":""}" data-mode="${x.n}">${x.n}</button>`).join("")}</div></div>
+    <div class="grid2"><label class="f"><span class="lbl">Reference Number${refReq?" (Required)":""}</span><input id="pref" class="mono" placeholder="${refReq?P.mode+" reference":"Not needed for cash"}" value="${esc(P.ref)}"></label><label class="f"><span class="lbl">Received At</span><input type="datetime-local" value="2026-10-07T14:30"></label></div>`;
+    foot=`<button type="button" class="btn" data-repick style="margin-right:auto">Change Trainee</button><button type="button" class="btn" data-close>Cancel</button><button type="button" class="btn pri" data-record ${ok?"":"disabled"}>Record ${received?peso(received):"Payment"}</button>`;
+  }
+  m.innerHTML=`<div class="veil" data-veil><div class="modal" role="dialog" aria-modal="true" aria-label="${title}"><div class="mh"><h3>${title}<small>${subt}</small></h3><button type="button" class="btn ghost" data-close aria-label="Close">Close</button></div><div class="mb">${body}</div><div class="mf">${foot}</div></div></div>`;
+}
+function keep(sel,fn){const el=document.querySelector(sel);const pos=el&&el.selectionStart;fn();const n=document.querySelector(sel);if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(e){}}}
+function record(){
+  const t=byId(P.tid);const lines=[];
+  t.courses.forEach(c=>{const a=Math.min(cents(P.amt[c.id]),bal(c));if(a>0){c.paid+=a;lines.push([c.code,a])}});
+  P.items.forEach(it=>{lines.push([`${it.kind==="Item"?"Misc":"Service Fee"}: ${it.name}${it.qty>1?" × "+it.qty:""}`,itemTotal(it),true]);if(it.reqIdx!=null)S.requests[it.reqIdx].stage="Awaiting Approval"});
+  const amount=lines.reduce((s,l)=>s+l[1],0);
+  const p={no:"AR-"+(++S.receipt),time:"Oct 7 · 2:30 PM",trainee:t.name,mode:P.mode,ref:P.ref.trim(),amount,lines};
+  S.payments.unshift(p);P.done=p;render();drawPay();
+}
+function addItem(){
+  let it;
+  const qty=Math.max(1,parseInt(P.add.qty,10)||1);
+  if(P.add.k==="other"){const pr=cents(P.add.price);if(!P.add.name.trim()||!pr){flash("Enter the charge name and amount.");return}it={name:P.add.name.trim(),price:pr,qty,kind:"Item",course:P.add.course}}
+  else{const k=S.catalog.find(x=>x.id===P.add.k);it={name:k.name,price:k.price,qty,kind:k.kind,course:P.add.course}}
+  P.items.push(it);P.received=((cents(P.received)+itemTotal(it))/100).toFixed(2);P.add.qty="1";P.add.name="";P.add.price="";drawPay();
+}
+
+/* ===== render + events */
+function render(){renderTabs();document.getElementById("app").innerHTML=({Dashboard:dashboard,Trainees:trainees,Accounting:accounting,Expenses:expenses,Requests:requests})[S.tab]();}
+document.addEventListener("click",e=>{
+  const b=e.target.closest("button,[data-veil]");if(!b)return;
+  const d=b.dataset;
+  if(d.veil!==undefined){if(e.target===b){P=null;drawPay()}return}
+  if(d.drop){OPEN=OPEN===d.drop?"":d.drop;renderTabs();return}
+  if(OPEN&&!b.closest(".menu")){OPEN="";renderTabs()}
+  if(d.go){const [t,x]=d.go.split("|");OPEN="";S.tab=t;if(t!=="Trainees")S.sub[t]=x;render();window.scrollTo(0,0)}
+  else if(d.tab){OPEN="";S.tab=d.tab;render();window.scrollTo(0,0)}
+  else if(d.sub){const [t,s]=d.sub.split("|");S.sub[t]=s;render()}
+  else if(d.filter){S.filter=d.filter;render()}
+  else if(d.clrdate!==undefined){S.from="";S.to="";render()}
+  else if(d.range){S.range=d.range;render()}
+  else if(d.pay!==undefined){openPay(d.pay)}
+  else if(d.pick){P.tid=d.pick;P.add.course=byId(d.pick).courses[0].code;if(!byId(d.pick).courses.some(c=>bal(c)>0))P.addOpen=true;drawPay()}
+  else if(d.repick!==undefined){P.tid="";P.amt={};P.items=[];drawPay()}
+  else if(d.close!==undefined){P=null;drawPay()}
+  else if(d.mode){P.mode=d.mode;drawPay()}
+  else if(d.additem!==undefined){addItem()}
+  else if(d.unitem){const it=P.items.splice(+d.unitem,1)[0];P.received=(Math.max(0,cents(P.received)-itemTotal(it))/100).toFixed(2);drawPay()}
+  else if(d.fill){const t=byId(P.tid);const open=t.courses.filter(c=>bal(c)>0);const misc=P.items.reduce((s,it)=>s+itemTotal(it),0);
+    if(d.fill==="all"){open.forEach(c=>P.amt[c.id]=(bal(c)/100).toFixed(2));P.received=((open.reduce((s,c)=>s+bal(c),0)+misc)/100).toFixed(2)}
+    else if(d.fill==="clear"){open.forEach(c=>P.amt[c.id]="")}
+    else{let left=cents(P.received)-misc;open.forEach(c=>{const a=Math.max(0,Math.min(left,bal(c)));P.amt[c.id]=a>0?(a/100).toFixed(2):"";left-=a})}
+    drawPay()}
+  else if(d.record!==undefined){record()}
+  else if(d.charge){const r=S.requests[+d.charge];r.charge=S.catalog.find(k=>k.id===r.fee).price;r.stage="Fee to Collect";render();flash(`${peso(r.charge)} ${r.type} fee added. Collect it next.`)}
+  else if(d.collect){const i=+d.collect,r=S.requests[i],k=S.catalog.find(x=>x.id===r.fee);openPay(r.tid,{name:k.name,price:r.charge,qty:1,kind:"Fee",req:r.no,reqIdx:i,course:r.course})}
+  else if(d.flash){flash(d.flash)}
+});
+document.addEventListener("toggle",e=>{if(e.target.matches&&e.target.matches("[data-addbox]")&&P)P.addOpen=e.target.open},true);
+document.addEventListener("input",e=>{
+  const el=e.target;
+  if(el.id==="q"){S.q=el.value;keep("#q",render)}
+  else if(el.id==="pq"){P.q=el.value;keep("#pq",drawPay)}
+  else if(el.id==="pref"){P.ref=el.value.toUpperCase();keep("#pref",drawPay)}
+  else if(el.id==="prec"){P.received=el.value;keep("#prec",drawPay)}
+  else if(el.id==="aq"){P.add.qty=el.value}
+  else if(el.id==="an"){P.add.name=el.value}
+  else if(el.id==="ap"){P.add.price=el.value}
+  else if(el.dataset.amt){P.amt[el.dataset.amt]=el.value;keep(`[data-amt="${el.dataset.amt}"]`,drawPay)}
+});
+document.addEventListener("change",e=>{
+  const el=e.target;
+  if(el.id==="dfrom"){S.from=el.value;render()}
+  else if(el.id==="dto"){S.to=el.value;render()}
+  else if(el.id==="ak"){P.add.k=el.value;drawPay()}
+  else if(el.id==="ac"){P.add.course=el.value}
+});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(OPEN){OPEN="";renderTabs()}else if(P){P=null;drawPay()}}});
+document.addEventListener("pointerdown",e=>{if(OPEN&&!e.target.closest(".tab")){OPEN="";renderTabs()}});
+render();
+</script>

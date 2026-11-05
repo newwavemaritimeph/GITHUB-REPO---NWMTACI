@@ -1,0 +1,280 @@
+<title>Accounting Dashboard Designs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: navy portal bar, a design switcher, then one of five dashboard layouts built from the same sample day. */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA;
+  --bg:#f3f6fa; --surface:#ffffff; --line:#dfe7ee; --fg:#0f2638; --muted:#5f7180; --soft:#eef4f8; --warnbg:#fde7dc;
+  --green:#15803d; --red:#c2410c; --amber:#b45309;
+  --c-cash:#15803d; --c-gcash:#0571D0; --c-psb:#F25615; --c-ub:#7c3aed; --c-chq:#64748b;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}
+.top{background:var(--navy);color:#fff;padding:14px 24px 0}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand b{font-size:19px;color:var(--cyan)} .brand small{display:block;font-size:10px;letter-spacing:.06em;color:#cfe3f1}
+.who{font-size:14px;color:#cfe3f1}
+.tabs{display:flex;gap:4px;margin-top:14px;overflow-x:auto}
+.tabs a{padding:10px 18px;color:#d6e6f2;text-decoration:none;font-weight:500;border-radius:10px 10px 0 0;white-space:nowrap}
+.tabs a.on{background:var(--bg);color:var(--fg)}
+.switch{max-width:1240px;margin:0 auto;padding:18px 24px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.switch span{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-right:4px}
+.switch button{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 14px var(--sans);padding:8px 14px;border-radius:99px;cursor:pointer}
+.switch button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.switch button i{font-style:normal;font-family:var(--mono);opacity:.7;margin-right:6px}
+.page{max-width:1240px;margin:0 auto;padding-block:18px 48px;padding-inline:24px;display:flex;flex-direction:column;gap:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}
+h1{margin:2px 0 0;font-size:28px;line-height:1.2}
+.dname{margin:-6px 0 0;color:var(--muted);font-size:14px}
+.dname b{color:var(--fg)}
+.day{display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px 10px;font:500 14px var(--sans)}
+.day b{color:var(--muted);font-weight:400;padding:0 6px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}
+.ph h2{margin:0;font-size:17px;font-weight:600} .ph .m{color:var(--muted);font-size:13.5px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+/* approvals */
+.chips{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:10px}
+.chips button{border:0;background:none;color:var(--muted);font:500 14px var(--sans);padding:6px 10px;border-radius:8px;cursor:pointer}
+.chips button.on{background:var(--soft);color:var(--blue)}
+.chips i{font-style:normal;font:600 11.5px var(--mono);background:var(--soft);color:var(--muted);border-radius:99px;padding:1px 7px;margin-left:6px}
+.chips button.has i{background:var(--warnbg);color:var(--orange)}
+.badge{font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:99px;background:var(--warnbg);color:var(--orange)}
+.arow{display:grid;grid-template-columns:1fr auto auto;gap:14px;align-items:center;padding:11px 2px;border-bottom:1px solid var(--line)}
+.arow:last-child{border-bottom:0} .arow small{display:block;color:var(--muted);font-size:13px}
+.acts{display:flex;gap:6px}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 13.5px var(--sans);padding:6px 12px;border-radius:8px;cursor:pointer}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+.empty{color:var(--muted);text-align:center;padding:14px 0 4px;font-size:14px}
+/* single-column channel list */
+.col{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.crow{display:grid;grid-template-columns:10px 1fr auto auto;gap:12px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--line)}
+.crow:last-child{border-bottom:0}
+.dot{width:10px;height:10px;border-radius:3px;background:var(--c)}
+.crow small{color:var(--muted);font-size:13px} .crow b{font:600 16px var(--mono);min-width:110px;text-align:right}
+.crow.tot{background:var(--navy);color:#fff} .crow.tot small{color:#c3dbea} .crow.tot .dot{background:var(--orange)}
+.crow.out.tot{background:#7a2e10}
+.split{display:flex;gap:16px;flex-wrap:wrap;margin:10px 2px 0;color:var(--muted);font-size:13.5px} .split b{color:var(--fg)}
+/* sums */
+.sum{display:grid;grid-template-columns:1fr 1fr;margin:0}
+.sum div{padding:10px 4px;border-bottom:1px solid var(--line)} .sum div:nth-child(odd){border-right:1px solid var(--line);padding-right:14px} .sum div:nth-child(even){padding-left:14px}
+.sum dt{color:var(--muted);font-size:13px} .sum dd{margin:2px 0 0;font:600 17px var(--mono)}
+.plus{color:var(--green)!important} .minus{color:var(--red)!important} .eq{color:var(--blue)!important} .warn{color:var(--amber)!important}
+.sum small{color:var(--muted);font-size:12px}
+.lines{margin:0}
+.lines div{display:flex;justify-content:space-between;gap:12px;padding:8px 2px;border-bottom:1px solid var(--line);font-size:14.5px}
+.lines div:last-child{border-bottom:0} .lines dt{color:var(--muted)} .lines dd{margin:0;font:600 15px var(--mono)}
+.lines .total{border-top:2px solid var(--fg);border-bottom:0} .lines .total dt{color:var(--fg);font-weight:600}
+.more{margin-top:10px;text-align:right} .more button{border:0;background:none;color:var(--blue);font:500 14px var(--sans);cursor:pointer;padding:0}
+.hb{display:grid;grid-template-columns:90px 1fr auto;gap:10px;align-items:center;font-size:14px;margin:8px 0}
+.hb .bar{height:10px;background:var(--soft);border-radius:99px;overflow:hidden} .hb .bar i{display:block;height:100%;background:var(--c)}
+table{width:100%;border-collapse:collapse;font-size:14px} td,th{padding:8px 4px;border-top:1px solid var(--line);text-align:left} td.r,th.r{text-align:right} th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;border-top:0}
+svg text{fill:var(--muted);font:12px var(--sans)}
+.legend{flex:1;min-width:150px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.legend div{display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:center}
+.legend2{display:flex;gap:14px;font-size:13px;color:var(--muted);margin-top:6px}
+.legend2 span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--c);margin-right:6px;vertical-align:-1px}
+.dwrap{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+/* design 2: rail */
+.rail{display:grid;grid-template-columns:360px minmax(0,1fr);gap:16px;align-items:start}
+/* design 3: figures strip + tabbed panel */
+.strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.strip div{padding:14px 18px;border-right:1px solid var(--line)} .strip div:last-child{border-right:0}
+.strip span{display:block;color:var(--muted);font-size:13px} .strip b{font:600 21px var(--mono)}
+.strip small{display:block;color:var(--muted);font-size:12.5px}
+.ptabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:-4px -4px 14px;flex-wrap:wrap}
+.ptabs button{border:0;background:none;font:500 14.5px var(--sans);color:var(--muted);padding:8px 12px;border-bottom:2px solid transparent;cursor:pointer}
+.ptabs button.on{color:var(--blue);border-bottom-color:var(--blue)}
+.tabbody{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}
+/* design 4: in / out */
+.io{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.io h2 .arrow{font-family:var(--mono);margin-right:6px}
+.net{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--navy);color:#fff;border-radius:14px;padding:16px 22px}
+.net span{color:#c3dbea;font-size:14px} .net b{font:600 24px var(--mono)}
+.net div{display:flex;flex-direction:column}
+/* design 5: statement */
+.sheet{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:28px 32px;max-width:860px;width:100%;margin:0 auto}
+.sheet header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid var(--navy);padding-bottom:12px;margin-bottom:6px;gap:12px;flex-wrap:wrap}
+.sheet header h2{margin:0;font-size:20px;color:var(--navy)} .sheet header small{color:var(--muted)}
+:root[data-theme="dark"] .sheet header h2{color:var(--cyan)}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .sheet header h2{color:var(--cyan)}}
+.sec{margin-top:18px}
+.sec h3{margin:0 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.sheet .lines div{padding:6px 2px}
+.sheet .lines .sub dt{padding-left:16px}
+.flag{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--warnbg);color:var(--orange);margin-left:6px}
+.view[hidden]{display:none!important}
+@media (max-width:980px){.rail{grid-template-columns:1fr}.tabbody{grid-template-columns:1fr}}
+@media (max-width:860px){.grid2,.io{grid-template-columns:1fr}.arow{grid-template-columns:1fr}.strip{grid-template-columns:repeat(2,minmax(0,1fr))}.strip div:nth-child(2){border-right:0}.strip div:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+@media (max-width:480px){.page,.switch{padding-inline:16px}.top{padding-inline:16px}.crow b{min-width:0}.sum{grid-template-columns:1fr}.sum div:nth-child(odd){border-right:0;padding-right:4px}.sum div:nth-child(even){padding-left:4px}.sheet{padding:18px 16px}}
+button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+</style>
+
+<header class="top">
+  <div class="brand"><div><b>New Wave</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div><div class="who">Working as Accounting · Kathleen Garcia</div></div>
+  <nav class="tabs"><a class="on" href="#">Dashboard</a><a href="#">Approvals</a><a href="#">Transactions ▾</a><a href="#">Reports</a><a href="#">Configuration ▾</a></nav>
+</header>
+
+<div class="switch" id="switch"><span>Design</span>
+  <button data-v="1" class="on"><i>1</i>Side by side</button>
+  <button data-v="2"><i>2</i>Summary rail</button>
+  <button data-v="3"><i>3</i>Figures and tabs</button>
+  <button data-v="4"><i>4</i>Money in, money out</button>
+  <button data-v="5"><i>5</i>Daily statement</button>
+</div>
+
+<main class="page">
+  <div class="head"><div><div class="eyebrow">Accounting</div><h1>Dashboard</h1></div><div class="day">‹ <b>Oct 8, 2026</b> ›</div></div>
+  <p class="dname" id="dname"></p>
+
+  <!-- 1 -->
+  <section class="view" data-view="1">
+    <div class="stack">
+      <div class="panel" data-approvals></div>
+      <div class="grid2">
+        <section class="panel"><div class="ph"><h2>Collections</h2><b class="mono" data-total></b></div><div data-col></div><div data-split></div></section>
+        <section class="panel"><div class="ph"><h2>By channel</h2><span class="m">Oct 8, 2026</span></div><div data-donut></div></section>
+      </div>
+      <div class="grid2">
+        <section class="panel"><div class="ph"><h2>Last 7 days</h2><span class="m">collections and expenses</span></div><div data-bars></div></section>
+        <section class="panel"><div class="ph"><h2>Cash position</h2><span class="m">cash only</span></div><div data-cash></div></section>
+      </div>
+      <div class="grid2">
+        <section class="panel"><div class="ph"><h2>Expenses released</h2><b class="mono">₱2,350.00</b></div><div data-exp></div></section>
+        <section class="panel"><div class="ph"><h2>Rebates</h2></div><div data-reb></div></section>
+      </div>
+      <section class="panel"><div class="ph"><h2>Unpaid after training</h2></div><div data-unpaid></div></section>
+    </div>
+  </section>
+
+  <!-- 2 -->
+  <section class="view" data-view="2" hidden>
+    <div class="rail">
+      <div class="stack">
+        <section class="panel"><div class="ph"><h2>Collections</h2><b class="mono" data-total></b></div><div data-col></div><div data-split></div></section>
+        <section class="panel"><div class="ph"><h2>Cash position</h2><span class="m">cash only</span></div><div data-cashlines></div></section>
+        <section class="panel"><div class="ph"><h2>Rebates</h2></div><div data-reb></div></section>
+        <section class="panel"><div class="ph"><h2>Unpaid after training</h2></div><div data-unpaid></div></section>
+      </div>
+      <div class="stack">
+        <div class="panel" data-approvals></div>
+        <section class="panel"><div class="ph"><h2>Last 7 days</h2><span class="m">collections and expenses</span></div><div data-bars></div></section>
+        <div class="grid2">
+          <section class="panel"><div class="ph"><h2>By channel</h2></div><div data-donut></div></section>
+          <section class="panel"><div class="ph"><h2>Expenses released</h2><b class="mono">₱2,350.00</b></div><div data-exp></div></section>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 -->
+  <section class="view" data-view="3" hidden>
+    <div class="stack">
+      <div class="strip">
+        <div><span>Collected</span><b>₱9,800.00</b><small>5 receipts</small></div>
+        <div><span>Expenses released</span><b>₱2,350.00</b><small>2 vouchers</small></div>
+        <div><span>Cash on hand</span><b class="eq">₱15,700.00</b><small>Not yet closed</small></div>
+        <div><span>Unpaid after training</span><b class="minus">₱6,300.00</b><small>4 trainees</small></div>
+      </div>
+      <div class="panel" data-approvals></div>
+      <section class="panel">
+        <div class="ptabs" id="ptabs"><button class="on" data-t="c">Collections</button><button data-t="e">Expenses</button><button data-t="k">Cash position</button><button data-t="r">Rebates</button><button data-t="w">Last 7 days</button></div>
+        <div class="tabbody" data-tb="c"><div><div data-col></div><div data-split></div></div><div data-donut></div></div>
+        <div class="tabbody" data-tb="e" hidden><div data-exp></div><div data-explist></div></div>
+        <div class="tabbody" data-tb="k" hidden><div data-cashlines></div><div data-closing></div></div>
+        <div class="tabbody" data-tb="r" hidden><div data-reb></div><div></div></div>
+        <div data-tb="w" hidden><div data-bars></div></div>
+      </section>
+    </div>
+  </section>
+
+  <!-- 4 -->
+  <section class="view" data-view="4" hidden>
+    <div class="stack">
+      <div class="panel" data-approvals></div>
+      <div class="io">
+        <section class="panel"><div class="ph"><h2><span class="arrow plus">↓</span>Money in</h2><b class="mono plus">₱9,800.00</b></div><div data-col></div><div data-split></div>
+          <div class="sec"><h3 style="margin:16px 0 4px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)">Rebates</h3><div data-reb></div></div></section>
+        <section class="panel"><div class="ph"><h2><span class="arrow minus">↑</span>Money out</h2><b class="mono minus">₱2,350.00</b></div><div data-colout></div>
+          <div data-explist style="margin-top:12px"></div></section>
+      </div>
+      <div class="net"><div><span>Net for the day</span><b>₱7,450.00</b></div><div><span>Cash on hand</span><b>₱15,700.00</b></div><div><span>Unpaid after training</span><b>₱6,300.00</b></div><div><span>Closing</span><b style="font-size:17px">Not yet closed</b></div></div>
+      <section class="panel"><div class="ph"><h2>Last 7 days</h2><span class="m">collections and expenses</span></div><div data-bars></div></section>
+    </div>
+  </section>
+
+  <!-- 5 -->
+  <section class="view" data-view="5" hidden>
+    <div class="stack">
+      <div class="panel" data-approvals></div>
+      <article class="sheet">
+        <header><div><h2>Daily statement</h2><small>Thursday, October 8, 2026 · prepared from the Cashier's records</small></div><small>Not yet closed</small></header>
+        <div class="sec"><h3>Collections</h3><dl class="lines" data-stmt-in></dl></div>
+        <div class="sec"><h3>By source</h3><dl class="lines"><div class="sub"><dt>Direct walk-ins</dt><dd>₱5,400.00</dd></div><div class="sub"><dt>Agencies</dt><dd>₱3,100.00</dd></div><div class="sub"><dt>Consultancies</dt><dd>₱1,300.00</dd></div></dl></div>
+        <div class="sec"><h3>Expenses released</h3><dl class="lines"><div class="sub"><dt>CV-2026-000125 · Meralco · Cash</dt><dd>₱850.00</dd></div><div class="sub"><dt>CV-2026-000126 · PLDT · GCash</dt><dd>₱1,500.00</dd></div><div class="total"><dt>Total expenses</dt><dd class="minus">₱2,350.00</dd></div></dl></div>
+        <div class="sec"><h3>Cash position</h3><dl class="lines"><div><dt>Previous cash (Oct 7 closing)</dt><dd>₱12,450.00</dd></div><div><dt>+ Cash collected</dt><dd class="plus">₱4,100.00</dd></div><div><dt>− Cash expenses</dt><dd class="minus">₱850.00</dd></div><div class="total"><dt>= Cash on hand</dt><dd class="eq">₱15,700.00</dd></div></dl></div>
+        <div class="sec"><h3>Rebates and receivables</h3><dl class="lines"><div><dt>Rebates deducted from payments</dt><dd>₱900.00</dd></div><div><dt>Rebates owed to agencies <span class="flag">2 agencies</span></dt><dd class="warn">₱1,950.00</dd></div><div><dt>Unpaid after training <span class="flag">4 trainees</span></dt><dd class="minus">₱6,300.00</dd></div></dl></div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<script>
+const peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+const pl=(n,w)=>n+" "+w+(n===1?"":"s");
+const CH=[["Cash","--c-cash",410000,2],["GCash","--c-gcash",320000,2],["PSBank","--c-psb",250000,1],["UnionBank","--c-ub",0,0],["Cheque","--c-chq",0,0]];
+const OUT=[["Cash","--c-cash",85000,1],["GCash","--c-gcash",150000,1],["PSBank","--c-psb",0,0],["UnionBank","--c-ub",0,0],["Cheque","--c-chq",0,0]];
+const total=CH.reduce((s,c)=>s+c[2],0),rc=CH.reduce((s,c)=>s+c[3],0);
+const NAMES={1:["Side by side","Collections in one column beside the channel chart; panels in pairs."],2:["Summary rail","Figures in one narrow column on the left; approvals and charts on the right."],3:["Figures and tabs","Four headline figures, approvals, then one tabbed panel for the details."],4:["Money in, money out","Collections and expenses facing each other, with the day's net underneath."],5:["Daily statement","The day read like a formal statement, top to bottom, in one column."]};
+const colHtml=(rows,w,lbl,out)=>`<div class="col">`+rows.map(c=>`<div class="crow" style="--c:var(${c[1]})"><span class="dot"></span><span>${c[0]}</span><small>${pl(c[3],w)}</small><b>${peso(c[2])}</b></div>`).join("")+`<div class="crow tot ${out?"out":""}"><span class="dot"></span><span>${lbl}</span><small>${pl(rows.reduce((s,c)=>s+c[3],0),w)}</small><b>${peso(rows.reduce((s,c)=>s+c[2],0))}</b></div></div>`;
+const css=getComputedStyle(document.documentElement);
+function donut(){let a=-Math.PI/2,R=70,r=46,cx=85,cy=85,s="";
+  CH.filter(c=>c[2]).forEach(c=>{const f=c[2]/total,b=a+f*2*Math.PI,l=f>.5?1:0,p=(g,d)=>[cx+d*Math.cos(g),cy+d*Math.sin(g)];
+    const[x1,y1]=p(a,R),[x2,y2]=p(b,R),[x3,y3]=p(b,r),[x4,y4]=p(a,r);
+    s+=`<path d="M${x1} ${y1}A${R} ${R} 0 ${l} 1 ${x2} ${y2}L${x3} ${y3}A${r} ${r} 0 ${l} 0 ${x4} ${y4}Z" fill="${css.getPropertyValue(c[1]).trim()}"/>`;a=b;});
+  s+=`<text x="85" y="84" text-anchor="middle" style="font:600 14px var(--mono);fill:var(--fg)">₱9,800</text><text x="85" y="101" text-anchor="middle">collected</text>`;
+  return `<div class="dwrap"><svg width="170" height="170" viewBox="0 0 170 170" role="img" aria-label="Collections by channel">${s}</svg><div class="legend">${CH.map(c=>`<div><span class="dot" style="--c:var(${c[1]})"></span><span>${c[0]}</span><b class="mono">${Math.round(c[2]/total*100)}%</b></div>`).join("")}</div></div>`;}
+function bars(){const D=[["Oct 2",620000,120000],["Oct 3",410000,90000],["Oct 5",880000,300000],["Oct 6",540000,60000],["Oct 7",720000,150000],["Oct 8",980000,235000]];
+  const max=1000000,H=150,t=10,L=46,w=(520-L-8)/D.length;let g="";
+  [0,.5,1].forEach(k=>{const y=t+H-H*k;g+=`<line x1="${L}" x2="512" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${L-6}" y="${y+4}" text-anchor="end">₱${max*k/100000}k</text>`;});
+  D.forEach((d,i)=>{const x=L+i*w+w*.18,bw=w*.3,h1=H*d[1]/max,h2=H*d[2]/max;g+=`<rect x="${x}" y="${t+H-h1}" width="${bw}" height="${h1}" rx="3" fill="#0571D0"/><rect x="${x+bw+3}" y="${t+H-h2}" width="${bw}" height="${h2}" rx="3" fill="#F25615"/><text x="${x+bw}" y="${t+H+18}" text-anchor="middle">${d[0]}</text>`;});
+  return `<svg viewBox="0 0 520 190" width="100%" role="img" aria-label="Collections and expenses, last 7 days">${g}</svg><div class="legend2"><span style="--c:var(--blue)">Collections</span><span style="--c:var(--orange)">Expenses released</span></div>`;}
+const T={
+  col:()=>colHtml(CH,"receipt","Total collected"),
+  colout:()=>colHtml(OUT,"voucher","Total released",true),
+  split:()=>`<div class="split"><span>Direct walk-ins <b class="mono">₱5,400.00</b></span><span>Agencies <b class="mono">₱3,100.00</b></span><span>Consultancies <b class="mono">₱1,300.00</b></span></div>`,
+  total:()=>peso(total), donut, bars,
+  cash:()=>`<dl class="sum"><div><dt>Previous cash</dt><dd>₱12,450.00</dd><small>Counted at Oct 7 closing</small></div><div><dt>+ Cash collected</dt><dd class="plus">₱4,100.00</dd></div><div><dt>− Cash expenses</dt><dd class="minus">₱850.00</dd></div><div><dt>= Cash on hand</dt><dd class="eq">₱15,700.00</dd></div><div><dt>Counted at closing</dt><dd>Not yet</dd></div><div><dt>Over / short</dt><dd>—</dd></div></dl>`,
+  cashlines:()=>`<dl class="lines"><div><dt>Previous cash</dt><dd>₱12,450.00</dd></div><div><dt>+ Cash collected</dt><dd class="plus">₱4,100.00</dd></div><div><dt>− Cash expenses</dt><dd class="minus">₱850.00</dd></div><div class="total"><dt>= Cash on hand</dt><dd class="eq">₱15,700.00</dd></div></dl>`,
+  closing:()=>`<dl class="lines"><div><dt>Counted at closing</dt><dd>Not yet</dd></div><div><dt>Over / short</dt><dd>—</dd></div><div><dt>Previous closing</dt><dd>Oct 7 · balanced</dd></div></dl>`,
+  exp:()=>`<div class="hb" style="--c:var(--c-cash)"><span>Cash</span><div class="bar"><i style="width:36%"></i></div><b class="mono">₱850.00</b></div><div class="hb" style="--c:var(--c-gcash)"><span>GCash</span><div class="bar"><i style="width:64%"></i></div><b class="mono">₱1,500.00</b></div><div class="more"><button>View vouchers</button></div>`,
+  explist:()=>`<table><tr><th>Voucher</th><th>Payee</th><th class="r">Amount</th></tr><tr><td class="mono">CV-2026-000125</td><td>Meralco · Cash</td><td class="r mono">₱850.00</td></tr><tr><td class="mono">CV-2026-000126</td><td>PLDT · GCash</td><td class="r mono">₱1,500.00</td></tr></table>`,
+  reb:()=>`<dl class="lines"><div><dt>Deducted from payments</dt><dd>₱900.00</dd></div><div><dt>Owed to agencies</dt><dd class="warn">₱1,950.00</dd></div></dl><table><tr><td>Qapla Maritime</td><td>3 trainees</td><td class="r mono">₱1,350.00</td></tr><tr><td>Costa Maritime</td><td>1 trainee</td><td class="r mono">₱600.00</td></tr></table><div class="more"><button>View payables</button></div>`,
+  unpaid:()=>`<dl class="lines"><div><dt>Balance</dt><dd class="minus">₱6,300.00</dd></div><div><dt>Trainees</dt><dd>4</dd></div></dl><div class="more"><button>View receivables</button></div>`,
+  "stmt-in":()=>CH.map(c=>`<div class="sub"><dt>${c[0]} · ${pl(c[3],"receipt")}</dt><dd>${peso(c[2])}</dd></div>`).join("")+`<div class="total"><dt>Total collected</dt><dd class="plus">${peso(total)}</dd></div>`
+};
+document.querySelectorAll("*").forEach(el=>{for(const k in T){if(el.hasAttribute("data-"+k))el.innerHTML=T[k]();}});
+// approvals, shared state across designs
+const A={"Expense requests":[["Meralco — electricity, September","Utilities · ER-2026-0014 · GCash","₱8,420.00"],["Office supplies — bond paper, toner","Supplies · ER-2026-0015 · Cash","₱1,150.00"]],"Voucher reprints":[["CV-2026-000124 · payee copy torn","Requested by the Cashier","—"]],"Refunds":[],"Discounts":[],"Rebates owed to partners":[],"Cashier closings":[]};
+let cur="Expense requests";
+function drawA(){const n=Object.values(A).reduce((s,l)=>s+l.length,0),l=A[cur];
+  const html=`<div class="ph"><h2>For your approval</h2><span class="badge">${n} waiting</span></div><div class="chips">${Object.keys(A).map(k=>`<button class="${k===cur?"on":""} ${A[k].length?"has":""}" data-k="${k}">${k}<i>${A[k].length}</i></button>`).join("")}</div>`+(l.length?l.map((x,i)=>`<div class="arow"><div><strong>${x[0]}</strong><small>${x[1]}</small></div><b class="mono">${x[2]}</b><div class="acts"><button class="btn" data-x="${i}">Reject</button><button class="btn pri" data-x="${i}">Approve</button></div></div>`).join(""):`<p class="empty">Nothing waiting.</p>`);
+  document.querySelectorAll("[data-approvals]").forEach(p=>p.innerHTML=html);}
+function show(v){document.querySelectorAll(".view").forEach(s=>s.hidden=s.dataset.view!==v);
+  document.querySelectorAll("#switch button").forEach(b=>b.classList.toggle("on",b.dataset.v===v));
+  document.getElementById("dname").innerHTML=`<b>Design ${v} · ${NAMES[v][0]}.</b> ${NAMES[v][1]} Sample figures.`;
+  try{localStorage.setItem("acd-v",v)}catch(e){}}
+document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;
+  if(b.dataset.v)show(b.dataset.v);
+  if(b.dataset.k){cur=b.dataset.k;drawA();}
+  if(b.dataset.x!=null){A[cur].splice(+b.dataset.x,1);drawA();}
+  if(b.dataset.t){document.querySelectorAll("#ptabs button").forEach(x=>x.classList.toggle("on",x===b));document.querySelectorAll("[data-tb]").forEach(x=>x.hidden=x.dataset.tb!==b.dataset.t);}});
+drawA();let v0="1";try{v0=localStorage.getItem("acd-v")||"1"}catch(e){}show(location.hash.match(/^#d([1-5])$/)?.[1]||v0);
+</script>

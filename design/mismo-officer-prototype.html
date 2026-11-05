@@ -1,0 +1,172 @@
+<title>MISMO Compliance Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: summary rail (approved). MARINA MISMO Compliance Officer workspace, plus the certificate Delivery flow (Registration → Cashier → Releasing Officer). */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA;
+  --bg:#f3f6fa; --surface:#ffffff; --line:#dfe7ee; --fg:#0f2638; --muted:#5f7180; --soft:#eef4f8; --warnbg:#fde7dc; --okbg:#e3f4ea; --badbg:#fbe4dc; --infobg:#e2effb;
+  --green:#15803d; --red:#b42318; --amber:#b45309; --violet:#7c3aed;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}
+.top{background:var(--navy);color:#fff;padding:14px 24px 0}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand b{font-size:19px;color:var(--cyan)} .brand small{display:block;font-size:10px;letter-spacing:.06em;color:#cfe3f1}
+.who{display:flex;align-items:center;gap:8px;font-size:14px;color:#cfe3f1}
+.who select{font:500 14px var(--sans);padding:6px 10px;border-radius:8px;border:1px solid #3b6a90;background:transparent;color:#fff}.who select option{color:#0f2638}
+.tabs{display:flex;gap:4px;margin-top:14px;overflow-x:auto}
+.tabs button{padding:10px 18px;color:#d6e6f2;font:500 15px var(--sans);border-radius:10px 10px 0 0;white-space:nowrap;background:none;border:0;cursor:pointer}
+.tabs button.on{background:var(--bg);color:var(--fg)}
+.clock{max-width:1240px;margin:0 auto;padding:14px 24px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.clock button{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 13.5px var(--sans);padding:6px 12px;border-radius:99px;cursor:pointer}
+.clock button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.page{max-width:1240px;margin:0 auto;padding-block:16px 48px;padding-inline:24px;display:flex;flex-direction:column;gap:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}
+h1{margin:2px 0 0;font-size:28px;line-height:1.2}
+.note{margin:-8px 0 0;color:var(--muted);font-size:14px}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 14px var(--sans);padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}.btn.org{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600}.btn.sm{padding:6px 11px;font-size:13.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.rail{display:grid;grid-template-columns:minmax(300px,350px) minmax(0,1fr);gap:20px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 20px 12px;flex-wrap:wrap}
+.ph h2{margin:0;font-size:17px;font-weight:600} .ph .m{color:var(--muted);font-size:13.5px}
+.pb{padding:0 20px 20px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.col{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.crow{display:grid;grid-template-columns:10px 1fr auto;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+.crow:last-child{border-bottom:0}.crow b{font:600 16px var(--mono)}
+.dot{width:10px;height:10px;border-radius:3px;background:var(--c)}
+.crow.tot{background:var(--navy);color:#fff}.crow.tot .dot{background:var(--orange)}
+.crow.alarm{background:var(--badbg)}.crow.alarm span,.crow.alarm b{color:var(--red);font-weight:700}
+.lines{margin:0}.lines>div{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}.lines>div:last-child{border-bottom:0}.lines dt{color:var(--muted)}.lines dd{margin:0;font:600 15px var(--mono)}
+.banner{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-radius:12px;padding:12px 16px}
+.banner.red{background:var(--red);color:#fff}.banner.amber{background:var(--warnbg);color:var(--amber)}.banner.green{background:var(--okbg);color:var(--green)}.banner.blue{background:var(--infobg);color:var(--blue)}
+.banner b{font-size:15.5px}.banner .sp{flex:1}.banner .btn{background:#fff}
+.log{width:100%;border-collapse:collapse;font-size:14.5px;border:1px solid #9fb2c1}
+.log th{background:var(--navy);color:#fff;font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:9px 10px;border-right:1px solid #2c5a7f;white-space:nowrap}
+.log td{padding:7px 10px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);white-space:nowrap}
+.log tbody tr:nth-child(even) td{background:var(--soft)}
+.log td.no{text-align:center;color:var(--muted);width:34px}.log td.r{text-align:right}
+.log tr.out td{color:var(--muted);text-decoration:line-through}
+.wrap{overflow-x:auto;margin:0 20px 20px}
+.batch{margin:0 20px 6px;display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.batch b{font-size:15px}.batch span{color:var(--muted);font-size:13.5px}
+.pill{display:inline-block;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.p-ok{background:var(--okbg);color:var(--green)}.p-warn{background:var(--warnbg);color:var(--orange)}.p-bad{background:var(--badbg);color:var(--red)}.p-info{background:var(--infobg);color:var(--blue)}.p-mute{background:var(--soft);color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:16px 20px 22px}
+.foot{margin:10px 0 0;font-size:13px;color:var(--muted)}
+/* printable sheet */
+.sheet{background:#fff;color:#0f2638;border:1px solid var(--line);border-radius:6px;padding:26px 30px;max-width:900px;margin:0 auto;width:100%}
+.sheet header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #123F63;padding-bottom:10px;margin-bottom:12px;gap:12px;flex-wrap:wrap}
+.sheet h2{margin:0;color:#123F63;font-size:19px}.sheet small{color:#5f7180}
+.sheet .log th{background:#123F63}.sheet .log tbody tr:nth-child(even) td{background:#f5f8fb}.sheet .log td{border-color:#dfe7ee;color:#0f2638}
+.sigs{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:34px}.sigs div{border-top:1px solid #0f2638;padding-top:6px;font-size:13px;text-align:center}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 20px 20px}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}.form .full{grid-column:1/-1}
+.form input,.form select{font:400 14.5px var(--sans);padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg)}
+.flow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:0 20px 18px;font-size:13.5px}
+.flow span{padding:5px 10px;border-radius:99px;background:var(--soft);color:var(--muted);font-weight:600}.flow span.done{background:var(--okbg);color:var(--green)}.flow span.now{background:var(--warnbg);color:var(--orange)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;z-index:10}
+@media (max-width:1040px){.rail{grid-template-columns:1fr}}
+@media (max-width:600px){.form{grid-template-columns:1fr}.sigs{grid-template-columns:1fr}}
+@media (max-width:480px){.page,.clock{padding-inline:16px}.top{padding-inline:16px}}
+@media print{.top,.clock,.noprint{display:none!important}body{background:#fff}.page{padding:0}}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+</style>
+
+<header class="top">
+  <div class="brand"><div><b>New Wave</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div>
+    <div class="who">Working as <select id="role" aria-label="Working as"><option value="mismo">MISMO Compliance Officer</option><option value="trainee">Trainee (website)</option><option value="reg">Registration</option><option value="ro">Releasing Officer</option></select></div></div>
+  <nav class="tabs" id="tabs"></nav>
+</header>
+<div class="clock noprint"><span>Sample time:</span><button data-t="9">9:30 AM</button><button data-t="11" class="on">11:15 AM</button><button data-t="16">4:20 PM</button><span>· Thursday, Oct 8, 2026 · switch to see the lists change</span></div>
+<main class="page" id="page"></main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+// Today's STCW batches and trainees. paidAt = hour the balance was settled (null = still unpaid).
+const BATCHES=[
+ {no:"BCH-2610-021",course:"Updating Basic Training - PSSR",code:"UBT-PSSR",dates:"Oct 8",room:"Room 1",inst:"Capt. L. Reyes"},
+ {no:"BCH-2610-011",course:"Crisis Management (PSCMHBT)",code:"PSCMHBT",dates:"Oct 8–10",room:"Room 2",inst:"Engr. M. Dizon"},
+];
+const T=[
+ {b:0,ln:"CRUZ",fn:"Ana",mn:"Santos",bd:"1994-02-11",srn:"SRN-000112233",rank:"OS",bal:0,paidAt:8},
+ {b:0,ln:"LIM",fn:"Rosa",mn:"Tan",bd:"1990-07-02",srn:"SRN-000445566",rank:"Steward",bal:60000,paidAt:13},
+ {b:0,ln:"NAVARRO",fn:"Dino",mn:"",bd:"1988-12-19",srn:"SRN-000778899",rank:"AB",bal:120000,paidAt:null},
+ {b:0,ln:"TORRES",fn:"Lea",mn:"Ramos",bd:"1997-05-30",srn:"SRN-000990011",rank:"Messman",bal:0,paidAt:7},
+ {b:1,ln:"RAMOS",fn:"Jose",mn:"Diaz",bd:"1985-03-14",srn:"SRN-000223344",rank:"C/M",bal:125000,paidAt:15},
+ {b:1,ln:"SANTOS",fn:"Mark",mn:"",bd:"1992-09-09",srn:"SRN-000556677",rank:"2/O",bal:0,paidAt:9},
+ {b:1,ln:"GARCIA",fn:"Paolo",mn:"Cruz",bd:"1993-01-21",srn:"SRN-000667788",rank:"3/E",bal:250000,paidAt:null},
+];
+let H=11,S={role:"mismo",tab:"Dashboard"},submitted={},DEL=[
+ {n:"BAUTISTA, Elle",co:"Passenger Courses Bundle",cert:"NWM-PCB-00012",addr:"Blk 4 Lot 2, Bacolod City, Negros Occidental",courier:"LBC",fee:50000,stage:"Paid · ready to ship",paidOn:"Oct 8"},
+ {n:"GARCIA, Paolo",co:"Crowd Management",cert:"NWM-CM-00811",addr:"12 Rizal St., Cebu City",courier:"LBC",fee:50000,stage:"With the Cashier",paidOn:null},
+];
+const unpaidAt=(t,h)=>t.paidAt===null||t.paidAt>h; // still owing at hour h
+const TABS={mismo:["Dashboard","Final list","Submissions"],trainee:["Delivery request form"],reg:["Delivery requests"],ro:["Dashboard","Delivery"]};
+let REQ=[
+ {id:1,n:"BAUTISTA, Elle",nw:"NWMTACI-2026-0420",co:"Passenger Courses Bundle",cert:"NWM-PCB-00012",addr:"Blk 4 Lot 2, Bacolod City, Negros Occidental",at:"Oct 8, 9:12 AM",st:"New"},
+ {id:2,n:"VILLANUEVA, Sam",nw:"NWMTACI-2026-0398",co:"Safety (STPPDSPPS)",cert:"—",addr:"88 Mabini St., Iloilo City",at:"Oct 8, 8:40 AM",st:"New",issue:"Certificate not printed yet"},
+];
+let sent=null;
+const head=(eb,t,right,note)=>`<div class="head"><div><div class="eyebrow">${eb}</div><h1>${t}</h1></div>${right||""}</div>${note?`<p class="note">${note}</p>`:""}`;
+const name=t=>`${t.ln}, ${t.fn}${t.mn?" "+t.mn[0]+".":""}`;
+function unpaidTable(list){return list.length?`<div class="wrap"><table class="log"><thead><tr><th>#</th><th>Trainee</th><th>Batch · course</th><th>Room · instructor</th><th class="r">Balance</th></tr></thead><tbody>${list.map((t,i)=>{const b=BATCHES[t.b];return `<tr><td class="no">${i+1}</td><td><b>${name(t)}</b></td><td>${b.no} · ${b.code}</td><td>${b.room} · ${b.inst}</td><td class="r mono">${peso(t.bal)}</td></tr>`;}).join("")}</tbody></table></div>`:`<p class="empty">Everyone in today's STCW classes has settled.</p>`;}
+const P={
+Dashboard(){
+ if(S.role==="ro"){const ready=DEL.filter(d=>d.stage==="Paid · ready to ship");return head("Releasing Officer","Dashboard")+(ready.length?`<div class="banner red"><b>${ready.length} paid delivery request${ready.length===1?"":"s"} to ship</b><span>${ready.map(d=>d.n.split(",")[0]).join(", ")}</span><span class="sp"></span><button class="btn sm" data-tab="Delivery">Open Delivery</button></div>`:"")+`<div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>Delivery</h2></div><div class="pb"><dl class="lines"><div><dt>Paid · ready to ship</dt><dd>${ready.length}</dd></div><div><dt>With the Cashier (unpaid)</dt><dd>${DEL.filter(d=>d.stage==="With the Cashier").length}</dd></div><div><dt>Shipped</dt><dd>${DEL.filter(d=>d.stage==="Shipped").length}</dd></div></dl></div></section></div><section class="panel"><div class="ph"><h2>Certificates due to print</h2><span class="m">(existing list)</span></div><p class="empty">The certificate log stays as built.</p></section></div>`;}
+ const today=T;const unpaid=T.filter(t=>unpaidAt(t,H));
+ const banner=H<11?`<div class="banner blue"><b>The 11:00 AM list opens at 11:00 AM.</b><span>Right now ${unpaid.length} trainee${unpaid.length===1?"":"s"} still owe a balance.</span></div>`:H<16?`<div class="banner red"><b>${unpaid.length} trainee${unpaid.length===1?"":"s"} not settled as of 11:00 AM</b><span>Print the list and give it to the instructor so they send the trainees to the Cashier.</span><span class="sp"></span><button class="btn sm" data-print>Print for the instructor</button></div>`:`<div class="banner green"><b>4:00 PM cut-off passed.</b><span>The final list is ready for the MARINA MISMO Portal.</span><span class="sp"></span><button class="btn sm" data-tab="Final list">Open final list</button></div>`;
+ const at11=T.filter(t=>unpaidAt(t,11));
+ return head("MISMO Compliance Officer","Dashboard","",`STCW classes today: ${BATCHES.map(b=>b.code).join(", ")}`)+banner+`<div class="rail"><div class="stack">
+  <section class="panel"><div class="ph"><h2>Today's STCW trainees</h2></div><div class="pb"><div class="col">
+   <div class="crow" style="--c:var(--green)"><span class="dot"></span><span>Settled</span><b>${today.length-unpaid.length}</b></div>
+   <div class="crow ${unpaid.length?"alarm":""}" style="--c:var(--red)"><span class="dot"></span><span>Not settled ${H>=16?"(dropped)":"yet"}</span><b>${unpaid.length}</b></div>
+   <div class="crow tot"><span class="dot"></span><span>In class today</span><b>${today.length}</b></div></div></div></section>
+  <section class="panel"><div class="ph"><h2>Deadlines</h2></div><div class="pb"><dl class="lines"><div><dt>11:00 AM</dt><dd>${H>=11?"Unsettled list ready":"Not yet"}</dd></div><div><dt>4:00 PM</dt><dd>${H>=16?"Final list ready":"Cut-off"}</dd></div><div><dt>Submitted to MARINA</dt><dd>${Object.keys(submitted).length} of ${BATCHES.length} batches</dd></div></dl><p class="foot">After 4:00 PM, trainees who still owe are left off the MARINA list automatically.</p></div></section>
+ </div><section class="panel"><div class="ph"><h2>Not settled as of 11:00 AM</h2><span class="m">${H>=11?at11.length+" trainees":"available from 11:00 AM"}</span></div>${H>=11?unpaidTable(at11.map(t=>({...t,paidNow:!unpaidAt(t,H)}))):`<p class="empty">The list is taken at 11:00 AM.</p>`}${H>=11?`<p class="foot" style="margin:-8px 20px 18px">Paid since 11:00 AM: ${at11.filter(t=>!unpaidAt(t,H)).map(name).join(", ")||"none yet"}.</p>`:""}</section></div>`;},
+"Final list"(){
+ if(H<16)return head("MISMO Compliance Officer","Final list")+`<div class="banner amber"><b>The final list is made at 4:00 PM.</b><span>Trainees who settle before then are included.</span></div>`;
+ return head("MISMO Compliance Officer","Final list","",`Thursday, Oct 8 · settled by 4:00 PM · for the MARINA MISMO Portal`)+BATCHES.map((b,bi)=>{const all=T.filter(t=>t.b===bi);const ok=all.filter(t=>!unpaidAt(t,16));const out=all.filter(t=>unpaidAt(t,16));return `<section class="panel"><div class="ph"><h2>${b.no} · ${b.course}</h2><span class="acts noprint"><button class="btn sm" data-toast="Downloads ${b.no}-MISMO.csv (Excel)">Excel / CSV</button><button class="btn sm" data-print>Print PDF</button>${submitted[b.no]?`<span class="pill p-ok">Submitted ${submitted[b.no]}</span>`:`<button class="btn sm pri" data-sub="${b.no}">Mark as submitted</button>`}</span></div>
+ <div class="batch"><b>${ok.length} trainee${ok.length===1?"":"s"} for MARINA</b><span>${b.dates} · ${b.room} · ${b.inst}${out.length?` · ${out.length} left off (unpaid at 4:00 PM)`:""}</span></div>
+ <div class="wrap"><table class="log"><thead><tr><th>#</th><th>Last name</th><th>First name</th><th>Middle name</th><th>Birth date</th><th>SRN</th><th>Rank</th><th>Course</th><th>Training dates</th></tr></thead><tbody>${ok.map((t,i)=>`<tr><td class="no">${i+1}</td><td><b>${t.ln}</b></td><td>${t.fn}</td><td>${t.mn||"—"}</td><td class="mono">${t.bd}</td><td class="mono">${t.srn}</td><td>${t.rank}</td><td>${b.code}</td><td>${b.dates}, 2026</td></tr>`).join("")}${out.map(t=>`<tr class="out"><td class="no">—</td><td>${t.ln}</td><td>${t.fn}</td><td>${t.mn||"—"}</td><td class="mono">${t.bd}</td><td class="mono">${t.srn}</td><td>${t.rank}</td><td>${b.code}</td><td>Left off · balance ${peso(t.bal)}</td></tr>`).join("")}</tbody></table></div></section>`;}).join("")+`<div class="sheet"><header><div><h2>MARINA MISMO — list of trainees</h2><small>New Wave Maritime Training and Assessment Center, Inc. · Thursday, October 8, 2026 · printable version (one page per batch)</small></div><small>Settled by 4:00 PM</small></header><p style="margin:0;color:#5f7180;font-size:13px">The PDF has the same columns as above, one page per batch, with signature lines.</p><div class="sigs"><div>Prepared by · MISMO Compliance Officer</div><div>Noted by · Admin</div></div></div>`;},
+Submissions(){return head("MISMO Compliance Officer","Submissions")+`<section class="panel"><div class="ph"><h2>Submitted to the MARINA MISMO Portal</h2></div><div class="wrap"><table class="log"><thead><tr><th>Date</th><th>Batch</th><th>Course</th><th class="r">Trainees</th><th>Submitted by</th></tr></thead><tbody>${[...Object.entries(submitted).map(([no,at])=>[`Oct 8`,no,BATCHES.find(b=>b.no===no).code,T.filter(t=>BATCHES[t.b].no===no&&!unpaidAt(t,16)).length,`Compliance Officer · ${at}`]),["Oct 7","BCH-2610-020","UBT-PSSR",19,"Compliance Officer · 4:42 PM"],["Oct 7","BCH-2610-010","PSCMHBT",22,"Compliance Officer · 4:50 PM"]].map(r=>`<tr><td>${r[0]}</td><td class="mono">${r[1]}</td><td>${r[2]}</td><td class="r mono">${r[3]}</td><td>${r[4]}</td></tr>`).join("")}</tbody></table></div></section>`;},
+"Delivery request form"(){
+ if(sent)return `<section class="panel" style="max-width:640px;margin:0 auto;width:100%"><div class="ph"><h2>Request received</h2><span class="pill p-ok">${sent}</span></div><div class="pb"><p style="margin:0 0 10px">We emailed you a copy. Next:</p><div class="flow" style="padding:0 0 10px"><span class="done">1 You requested</span>→<span class="now">2 Registration checks your certificate</span>→<span>3 Pay ₱500.00 at the Cashier (GCash / bank / cash)</span>→<span>4 We ship by LBC and email the tracking number</span></div><button class="btn" data-again>Submit another request</button></div></section>`;
+ return `<div class="head"><div><div class="eyebrow">newwavemaritimemtaci.com › Certificate delivery</div><h1>Request certificate delivery</h1></div></div><p class="note">For trainees who cannot claim their certificate at our office in Ermita, Manila. Delivery is by LBC for ₱500.00.</p>
+ <section class="panel" style="max-width:720px;width:100%"><div class="ph"><h2>Your details</h2></div><div class="form">
+ <label>NWMTACI number<input placeholder="NWMTACI-2026-0000"></label><label>Birth date (to confirm it is you)<input type="date"></label>
+ <label class="full">Course and training date<select><option>Choose after entering your number</option><option>Passenger Courses Bundle · Oct 5–10, 2026</option></select></label>
+ <label>Recipient name<input placeholder="Who will receive it"></label><label>Mobile number<input placeholder="09xx xxx xxxx"></label>
+ <label class="full">Delivery address<input placeholder="House no., street, barangay, city, province, ZIP"></label>
+ <label class="full">Email for updates<input placeholder="your@gmail.com"></label>
+ <label class="full" style="flex-direction:row;align-items:flex-start;gap:8px;color:var(--fg)"><input type="checkbox" style="margin-top:3px"><span>I agree that the certificate is sent to the address above and that New Wave is not liable once LBC has received the parcel.</span></label>
+ <div class="full acts"><button class="btn org" data-sendreq>Send request</button></div></div></section>`;},
+"Delivery requests"(){return head("Registration","Delivery requests","",`Requests from the website. Check the certificate, then send to the Cashier for the ₱500.00 LBC fee.`)+`<section class="panel"><div class="wrap" style="margin-top:16px"><table class="log"><thead><tr><th>#</th><th>Trainee · NWMTACI no.</th><th>Course</th><th>Certificate</th><th>Deliver to</th><th>Requested</th><th>Action</th></tr></thead><tbody>${REQ.map((r,i)=>`<tr><td class="no">${i+1}</td><td><b>${r.n}</b><br><small class="mono" style="color:var(--muted)">${r.nw}</small></td><td>${r.co}</td><td class="mono">${r.cert}${r.issue?`<br><span class="pill p-warn">${r.issue}</span>`:""}</td><td style="white-space:normal;max-width:240px">${r.addr}</td><td>${r.at}</td><td>${r.st==="New"?`<span class="acts"><button class="btn sm" data-rej="${i}">Decline</button><button class="btn sm org" data-tocash="${i}">Send to the Cashier</button></span>`:`<span class="pill ${r.st==="Declined"?"p-mute":"p-info"}">${r.st}</span>`}</td></tr>`).join("")}</tbody></table></div><p class="foot" style="margin:-8px 20px 18px">A request can wait until the certificate is printed; it is sent to the Cashier from here.</p></section>`;},
+"Request delivery-old"(){return head("Registration","Request certificate delivery","",`From the trainee's enrollment › Request ▾ › Certificate delivery`)+`<section class="panel"><div class="ph"><h2>BAUTISTA, Elle · Passenger Courses Bundle</h2><span class="pill p-ok">Certificate printed</span></div>
+ <div class="flow"><span class="now">1 Registration requests</span>→<span>2 Cashier collects ₱500.00 (LBC)</span>→<span>3 Releasing Officer ships</span></div>
+ <div class="form"><label class="full">Deliver to (full address)<input value="Blk 4 Lot 2, Bacolod City, Negros Occidental"></label><label>Recipient<input value="Elle Bautista"></label><label>Mobile<input value="0917 000 0000"></label><label>Courier<select><option>LBC</option></select></label><label>Fee<input value="₱500.00 (Schedule of fees)" disabled></label><label class="full">Note<input placeholder="Optional, e.g. call before delivery"></label><div class="full acts"><button class="btn org" data-toast="Sent to the Cashier. It reaches the Releasing Officer once paid.">Send to the Cashier</button></div></div></section>`;},
+Delivery(){return head("Releasing Officer","Delivery","",`Requests appear here once the Cashier has collected the delivery fee.`)+`<section class="panel"><div class="wrap" style="margin-top:16px"><table class="log"><thead><tr><th>#</th><th>Trainee</th><th>Certificate No.</th><th>Deliver to</th><th>Courier</th><th>Status</th><th>Action</th></tr></thead><tbody>${DEL.map((d,i)=>`<tr><td class="no">${i+1}</td><td><b>${d.n}</b><br><small style="color:var(--muted)">${d.co}</small></td><td class="mono">${d.cert}</td><td style="white-space:normal;max-width:260px">${d.addr}</td><td>${d.courier}</td><td><span class="pill ${d.stage==="Paid · ready to ship"?"p-info":d.stage==="Shipped"?"p-ok":"p-warn"}">${d.stage}</span>${d.paidOn?`<br><small style="color:var(--muted)">Paid ${d.paidOn}</small>`:""}</td><td>${d.stage==="Paid · ready to ship"?`<button class="btn sm pri" data-ship="${i}">Mark shipped</button>`:d.stage==="Shipped"?`<span class="mono">${d.track}</span>`:`<span style="color:var(--muted)">Waiting for payment</span>`}</td></tr>`).join("")}</tbody></table></div></section>`;}
+};
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,2200);}
+function draw(){document.getElementById("tabs").innerHTML=TABS[S.role].map(t=>`<button class="${S.tab===t?"on":""}" data-tab="${t}">${t}</button>`).join("");document.getElementById("role").value=S.role;document.getElementById("page").innerHTML=P[S.tab]();document.querySelectorAll("[data-t]").forEach(b=>b.classList.toggle("on",+b.dataset.t===H));}
+document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;const d=b.dataset;
+ if(d.t){H=+d.t;}else if(d.tab){S.tab=d.tab;}else if(d.sub){submitted[d.sub]=H>=16?"4:3"+Object.keys(submitted).length+" PM":"";toast("Recorded as submitted to MARINA");}
+ else if(d.sendreq!==undefined){sent="Request DR-2026-0031";toast("Request sent. Registration will check it.");}
+ else if(d.again!==undefined){sent=null;}
+ else if(d.tocash){REQ[+d.tocash].st="With the Cashier";toast("Sent to the Cashier for the ₱500.00 LBC fee");}
+ else if(d.rej){REQ[+d.rej].st="Declined";toast("Declined · the trainee is emailed the reason");}
+ else if(d.ship){DEL[+d.ship].stage="Shipped";DEL[+d.ship].track="LBC 1234 5678 90";toast("Marked shipped · the trainee is emailed the tracking number");}
+ else if(d.print!==undefined){toast("Opens the printable PDF");return;}else if(d.toast){toast(d.toast);return;}else return;draw();});
+document.getElementById("role").addEventListener("change",e=>{S.role=e.target.value;S.tab=TABS[S.role][0];draw();});
+draw();
+</script>

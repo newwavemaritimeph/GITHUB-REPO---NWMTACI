@@ -1,0 +1,583 @@
+<title>New Wave Portal Simulator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: navy top bar with role switch and test clock; summary rail (left) + formal log (right) per screen; issues and test-script drawers. */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA; --cyanlt:#9EE3F1;
+  --bg:#f2f6f9; --surface:#ffffff; --line:#dbe5ec; --fg:#0f2638; --muted:#5b6f7f; --soft:#eef4f8;
+  --okbg:#e3f4ea; --ok:#0a7a3e; --warnbg:#fde9dd; --warn:#b4480f; --badbg:#fbe4dc; --bad:#b42318; --infobg:#e2effb; --info:#0558a8;
+  --bar:#123F63; --barfg:#ffffff; --barmuted:#c9dceb;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0c1925;--surface:#122534;--line:#23394b;--fg:#e5eef5;--muted:#98adbf;--soft:#18303f;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;--bar:#0a2236;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c1925;--surface:#122534;--line:#23394b;--fg:#e5eef5;--muted:#98adbf;--soft:#18303f;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;--bar:#0a2236;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--bar);color:var(--barfg);padding:12px 20px 0}
+.topin{max-width:1320px;margin:0 auto}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand b{font-size:18px;letter-spacing:.02em;color:var(--cyan)}.brand small{display:block;font-size:10px;letter-spacing:.07em;color:var(--barmuted)}
+.ctl{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13.5px;color:var(--barmuted)}
+.ctl select,.ctl input{background:transparent;border:1px solid #3d6b90;border-radius:8px;color:var(--barfg);padding:6px 9px;font-size:14px}
+.ctl select option{color:#0f2638;background:#fff}
+.ctl .chipbtn{background:rgba(255,255,255,.1);border:1px solid #3d6b90;color:var(--barfg);border-radius:8px;padding:6px 10px;font-size:13.5px;font-weight:500}
+.ctl .chipbtn.alert{background:var(--orange);border-color:var(--orange)}
+.ctl label{display:flex;align-items:center;gap:6px}
+.tabs{display:flex;gap:2px;margin-top:12px;overflow-x:auto;scrollbar-width:none}
+.tabs button{background:none;border:0;color:#d4e4f1;padding:10px 16px;border-radius:10px 10px 0 0;font-weight:500;white-space:nowrap}
+.tabs button.on{background:var(--bg);color:var(--fg)}
+.page{max-width:1320px;margin:0 auto;padding-block:18px 60px;padding-inline:20px;display:flex;flex-direction:column;gap:18px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}
+h1{margin:2px 0 0;font-size:27px;line-height:1.2;text-wrap:balance}
+h2{margin:0;font-size:16.5px;font-weight:600}
+.acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 14px;font-weight:500;font-size:14px;white-space:nowrap}
+.btn:hover{border-color:var(--blue)}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.org{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.sm{padding:5px 10px;font-size:13px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.link{background:none;border:0;color:var(--blue);padding:0;font-weight:500;text-decoration:underline;font-size:13.5px}
+.rail{display:grid;grid-template-columns:minmax(280px,340px) minmax(0,1fr);gap:18px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:18px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 18px 10px;flex-wrap:wrap}
+.ph .m{color:var(--muted);font-size:13px}
+.pb{padding:0 18px 18px}
+.tiles{display:flex;flex-direction:column;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:0 18px 18px}
+.tile{display:grid;grid-template-columns:10px 1fr auto;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);background:none;border-left:0;border-right:0;border-top:0;text-align:left;width:100%}
+.tile:last-child{border-bottom:0}
+.tile i{width:10px;height:10px;border-radius:3px;background:var(--c,var(--blue))}
+.tile b{font:600 15.5px var(--mono)}
+.tile.tot{background:var(--navy);color:#fff}.tile.tot i{background:var(--orange)}
+.tile.alarm{background:var(--badbg)}.tile.alarm span,.tile.alarm b{color:var(--bad);font-weight:700}
+button.tile:hover{background:var(--soft)}button.tile.on{background:var(--infobg)}
+.lines{margin:0}.lines div{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}.lines div:last-child{border-bottom:0}.lines dt{color:var(--muted)}.lines dd{margin:0;font:600 14.5px var(--mono);text-align:right}
+.wrap{overflow-x:auto;margin:0 18px 18px}
+table.log{width:100%;border-collapse:collapse;font-size:14px}
+.log th{background:var(--navy);color:#fff;font:600 11.5px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:8px 10px;white-space:nowrap}
+.log td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.log tr:nth-child(even) td{background:var(--soft)}
+.log td.r,.log th.r{text-align:right}.log td.no{color:var(--muted);width:30px}
+.log small{display:block;color:var(--muted);font-size:12.5px}
+.log tr.done td{background:var(--okbg)}.log tr.miss td{background:var(--badbg)}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12.5px;font-weight:600;white-space:nowrap}
+.p-ok{background:var(--okbg);color:var(--ok)}.p-warn{background:var(--warnbg);color:var(--warn)}.p-bad{background:var(--badbg);color:var(--bad)}.p-info{background:var(--infobg);color:var(--info)}.p-mute{background:var(--soft);color:var(--muted)}
+.banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-radius:12px;padding:12px 16px}
+.banner.red{background:var(--bad);color:#fff}.banner.amber{background:var(--warnbg);color:var(--warn)}.banner.green{background:var(--okbg);color:var(--ok)}.banner.blue{background:var(--infobg);color:var(--info)}
+.banner .sp{flex:1}.banner .btn{background:var(--surface);color:var(--fg)}
+.empty{color:var(--muted);text-align:center;padding:14px 18px 20px;margin:0}
+.foot{color:var(--muted);font-size:13px;margin:0;padding:0 18px 16px}
+.form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;padding:0 18px 18px}
+.form .full{grid-column:1/-1}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500;min-width:0}
+label.f input,label.f select,label.f textarea,.inp{border:1px solid var(--line);border-radius:9px;background:var(--surface);padding:8px 11px;font-size:14.5px;color:var(--fg);min-width:0;width:100%}
+.inp.sm{padding:5px 8px;font-size:13.5px;width:auto;max-width:180px}
+.chk{display:flex;align-items:center;gap:8px;font-size:14px}
+.chk input{width:17px;height:17px}
+.req{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 16px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 13px;font-weight:600;font-size:13.5px;display:inline-flex;gap:7px;align-items:center}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.chip em{font-style:normal;font-size:11.5px;background:var(--warnbg);color:var(--warn);border-radius:99px;padding:1px 7px}
+.chip em.ok{background:var(--okbg);color:var(--ok)}.chip.on em{background:#fff;color:var(--navy)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.flowbar{display:flex;gap:6px;flex-wrap:wrap;font-size:12.5px}
+.flowbar span{padding:3px 9px;border-radius:99px;background:var(--soft);color:var(--muted);font-weight:600}
+.flowbar span.done{background:var(--okbg);color:var(--ok)}.flowbar span.now{background:var(--warnbg);color:var(--warn)}
+/* drawers & modal */
+.scrim{position:fixed;inset:0;background:rgba(6,20,32,.55);z-index:30;display:flex;justify-content:flex-end}
+.drawer{background:var(--surface);width:min(460px,100%);height:100%;overflow:auto;padding:18px 20px calc(24px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
+.drawer h2{font-size:19px}
+.issue{border:1px solid var(--line);border-left:4px solid var(--c,var(--warn));border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:4px}
+.issue b{font-size:14.5px}.issue small{color:var(--muted)}
+.modalbg{position:fixed;inset:0;background:rgba(6,20,32,.55);z-index:40;display:grid;place-items:center;padding:16px}
+.modal{background:var(--surface);border-radius:14px;width:min(720px,100%);max-height:92vh;overflow:auto}
+.modal header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--line)}
+.modal header h2{font-size:18px}.modal header button{border:0;background:none;font-size:22px;color:var(--muted)}
+.mb{padding:16px 18px;display:flex;flex-direction:column;gap:14px}
+.mf{display:flex;justify-content:flex-end;gap:8px;padding:0 18px 18px;flex-wrap:wrap}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;z-index:50;max-width:calc(100% - 32px);text-align:center}
+.cert{background:#fff;color:#123F63;border:6px double #123F63;border-radius:6px;padding:24px;position:relative;aspect-ratio:1.414;max-width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px}
+.cert .n{font-size:22px;font-weight:700}.cert .m{font-size:12px;color:#5b6f7f}
+.cert .ph2{position:absolute;right:6%;bottom:7%;width:72px;height:72px;border:1px solid #9fb2c1;background:#f5f8fb;display:grid;place-items:center;font-size:10px;color:#9fb2c1;overflow:hidden}.cert .ph2 img{width:100%;height:100%;object-fit:cover}
+.cert .wm{position:absolute;inset:0;display:grid;place-items:center;font-weight:800;font-size:30px;color:rgba(180,35,24,.16);transform:rotate(-18deg);pointer-events:none}
+.activity{display:flex;flex-direction:column;gap:6px;font-size:13.5px}
+.activity div{display:grid;grid-template-columns:auto 1fr;gap:8px}.activity time{color:var(--muted);font-family:var(--mono);font-size:12.5px}
+.note{background:var(--infobg);color:var(--info);border-radius:10px;padding:10px 14px;font-size:13.5px}
+@media (max-width:1000px){.rail{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}}
+@media (max-width:620px){.form{grid-template-columns:1fr}.req{grid-template-columns:1fr}.page,.top{padding-inline:16px}h1{font-size:23px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="top"><div class="topin">
+  <div class="brand">
+    <div><b>NEW WAVE</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC. · PORTAL SIMULATOR</small></div>
+    <div class="ctl">
+      <label>Working As <select id="role"></select></label>
+      <label>Test Date <input type="date" id="today"></label>
+      <label>Time <select id="hour"></select></label>
+      <button class="chipbtn" data-act="nextDay">Next Day ›</button>
+      <button class="chipbtn" id="issuesBtn" data-act="openIssues">Issues</button>
+      <button class="chipbtn" data-act="openGuide">Test Script</button>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs" aria-label="Modules"></nav>
+</div></div>
+<main class="page" id="page"></main>
+<div id="overlay"></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+/* ============================================================ helpers */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const peso=c=>"₱"+(Number(c||0)/100).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+const addDays=(d,n)=>{const x=new Date(d+"T12:00:00+08:00");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)};
+const fmt=d=>d?new Date(d+"T12:00:00+08:00").toLocaleDateString("en-PH",{month:"short",day:"numeric"}):"—";
+const fmtL=d=>d?new Date(d+"T12:00:00+08:00").toLocaleDateString("en-PH",{weekday:"long",month:"long",day:"numeric",year:"numeric"}):"";
+const hh=h=>{const n=Math.floor(h),m=Math.round((h-n)*60);return `${(n%12)||12}:${String(m).padStart(2,"0")} ${n<12?"AM":"PM"}`};
+const uid=()=>Math.random().toString(36).slice(2,9);
+function toast(t){const e=$("toast");e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2600)}
+const CHANNELS=["GCash","PSBank","UnionBank"];const MODES=["Cash",...CHANNELS];
+const STCW=["UBT-PSSR","STPPDSPPS","PSCMT","PSCMHBT","CCMD"];
+
+/* ============================================================ seed */
+function seed(){
+  const T="2026-10-12";
+  const S={v:3,today:T,hour:10,role:"registration",tab:"Dashboard",modal:null,drawer:null,ui:{},seq:{NWMTACI:420,AR:1200,ENR:880,CV:130,ER:210,RQ:6,DR:14,PAY:1500,REQ:40},
+  courses:[
+    {id:"c1",code:"UBT-PSSR",name:"Updating Training on Basic Training – PSSR",cat:"STCW",price:180000,days:1},
+    {id:"c2",code:"STPPDSPPS",name:"Ship Security Awareness",cat:"STCW",price:120000,days:1},
+    {id:"c3",code:"PSCMT",name:"Crowd Management Training",cat:"STCW",price:130000,days:2},
+    {id:"c4",code:"PSCMHBT",name:"Crisis Management and Human Behavior",cat:"STCW",price:250000,days:3},
+    {id:"c5",code:"CCMD",name:"Crisis Management – Domestic",cat:"STCW",price:220000,days:3},
+    {id:"c6",code:"HPT",name:"Hydraulic and Pneumatic Training",cat:"In-House",price:350000,days:3},
+    {id:"c7",code:"SFA",name:"Standard First Aid",cat:"In-House",price:150000,days:2},
+    {id:"c8",code:"BOSH",name:"Basic Occupational Safety and Health",cat:"In-House",price:200000,days:5}],
+  batches:[
+    {id:"b1",no:"BCH-2026-0412",course:"c1",start:T,end:T,cap:24,room:"r1",instr:"i1"},
+    {id:"b2",no:"BCH-2026-0413",course:"c3",start:addDays(T,1),end:addDays(T,2),cap:24,room:"r2",instr:"i1"},
+    {id:"b3",no:"BCH-2026-0405",course:"c1",start:addDays(T,-1),end:addDays(T,-1),cap:24,room:"r1",instr:"i3"},
+    {id:"b4",no:"BCH-2026-0398",course:"c6",start:addDays(T,-5),end:addDays(T,-3),cap:24,room:"r3",instr:"i2"},
+    {id:"b5",no:"BCH-2026-0416",course:"c4",start:addDays(T,3),end:addDays(T,5),cap:24,room:"",instr:""},
+    {id:"b6",no:"BCH-2026-0390",course:"c2",start:addDays(T,-7),end:addDays(T,-7),cap:24,room:"r1",instr:"i3"},
+    {id:"b7",no:"BCH-2026-0417",course:"c7",start:addDays(T,4),end:addDays(T,5),cap:12,room:"r3",instr:"i2"}],
+  rooms:[{id:"r1",name:"Room 1",cap:24},{id:"r2",name:"Room 2",cap:24},{id:"r3",name:"Simulator Room",cap:12}],
+  instructors:[
+    {id:"i1",name:"Capt. R. Villanueva",mobile:"0917 555 0101",acc:[{course:"c1",no:"ACC-1182",until:"2027-03-31"},{course:"c3",no:"ACC-1190",until:"2027-03-31"}]},
+    {id:"i2",name:"C/E M. Ramos",mobile:"0918 555 0144",acc:[{course:"c6",no:"ACC-1201",until:"2026-10-20"},{course:"c7",no:"ACC-1210",until:"2027-06-30"}]},
+    {id:"i3",name:"2/O J. Dizon",mobile:"0919 555 0177",acc:[{course:"c2",no:"ACC-1102",until:"2026-09-30"},{course:"c1",no:"ACC-1188",until:"2027-01-15"},{course:"c4",no:"ACC-1220",until:"2027-02-01"}]}],
+  trainees:[
+    {id:"t1",app:"NWMTACI-0000411",first:"Juan",last:"Dela Cruz",birth:"1990-04-12",srn:"SRN-2210441",email:"juan.dc@example.com",mobile:"0917 100 2001",created:T},
+    {id:"t2",app:"NWMTACI-0000412",first:"Maria",last:"Santos",birth:"1994-08-03",srn:"SRN-1932012",email:"maria.s@example.com",mobile:"0917 100 2002",created:addDays(T,-1)},
+    {id:"t3",app:"NWMTACI-0000405",first:"Paolo",last:"Reyes",birth:"1988-01-22",srn:"SRN-1022931",email:"paolo.r@example.com",mobile:"0917 100 2003",created:addDays(T,-3)},
+    {id:"t4",app:"NWMTACI-0000409",first:"Liza",last:"Garcia",birth:"1992-11-30",srn:"SRN-2001983",email:"liza.g@example.com",mobile:"0917 100 2004",created:addDays(T,-2)},
+    {id:"t5",app:"NWMTACI-0000398",first:"Carlo",last:"Mendoza",birth:"1985-06-15",srn:"SRN-0981234",email:"carlo.m@example.com",mobile:"0917 100 2005",created:addDays(T,-9)},
+    {id:"t6",app:"NWMTACI-0000390",first:"Ana",last:"Bautista",birth:"1996-02-09",srn:"SRN-2309911",email:"ana.b@example.com",mobile:"0917 100 2006",created:addDays(T,-10)},
+    {id:"t7",app:"NWMTACI-0000407",first:"Rey",last:"Aquino",birth:"1991-09-18",srn:"SRN-1877001",email:"rey.a@example.com",mobile:"0917 100 2007",created:addDays(T,-3)},
+    {id:"t8",app:"NWMTACI-0000419",first:"Ella",last:"Torres",birth:"1999-12-01",srn:"SRN-2411002",email:"ella.t@example.com",mobile:"0917 100 2008",created:T},
+    {id:"t9",app:"NWMTACI-0000410",first:"Ken",last:"Flores",birth:"1993-03-27",srn:"SRN-1901777",email:"ken.f@example.com",mobile:"0917 100 2009",created:addDays(T,-2)}],
+  enrollments:[
+    {id:"e1",no:"ENR-2026-000871",trainee:"t1",course:"c1",batch:"b1",status:"Pending",reqs:{id:true,med:false,photo:true,book:false},handed:false,created:T,price:180000},
+    {id:"e2",no:"ENR-2026-000868",trainee:"t2",course:"c3",batch:"b2",status:"Pending",reqs:{id:true,med:true,photo:true,book:true},handed:true,created:addDays(T,-1),price:130000},
+    {id:"e3",no:"ENR-2026-000869",trainee:"t2",course:"c7",batch:"b7",status:"Pending",reqs:{id:true,med:true,photo:true,book:true},handed:true,created:addDays(T,-1),price:150000},
+    {id:"e4",no:"ENR-2026-000855",trainee:"t3",course:"c1",batch:"b3",status:"Enrolled",reqs:{id:true,med:true,photo:true,book:true},handed:true,created:addDays(T,-3),enrolledOn:addDays(T,-1),price:180000},
+    {id:"e5",no:"ENR-2026-000862",trainee:"t4",course:"c1",batch:"b1",status:"Enrolled",reqs:{id:true,med:true,photo:true,book:true},handed:true,created:addDays(T,-2),enrolledOn:T,price:180000},
+    {id:"e6",no:"ENR-2026-000840",trainee:"t5",course:"c6",batch:"b4",status:"Enrolled",reqs:{id:true,med:true,photo:true,book:true},handed:true,created:addDays(T,-9),enrolledOn:addDays(T,-6),price:350000},
+    {id:"e7",no:"ENR-2026-000831",trainee:"t6",course:"c2",batch:"b6",status:"Enrolled",reqs:{id:true,med:true,photo:true,book:true},handed:true,created:addDays(T,-10),enrolledOn:addDays(T,-8),price:120000},
+    {id:"e8",no:"ENR-2026-000858",trainee:"t7",course:"c3",batch:"b2",status:"Enrolled",reqs:{id:true,med:true,photo:true,book:true},handed:true,created:addDays(T,-3),enrolledOn:addDays(T,-2),price:130000},
+    {id:"e9",no:"ENR-2026-000864",trainee:"t9",course:"c1",batch:"b1",status:"Enrolled",reqs:{id:true,med:true,photo:true,book:true},handed:true,created:addDays(T,-2),enrolledOn:addDays(T,-1),price:180000}],
+  payments:[
+    {id:"p1",no:"PAY-2026-001490",receipt:"AR-2026-001190",trainee:"t3",mode:"GCash",ref:"7012345678901",date:addDays(T,-1),hour:10.25,amount:180000,alloc:[{enr:"e4",amt:180000}],by:"Karen Mallari",recon:null},
+    {id:"p2",no:"PAY-2026-001498",receipt:"AR-2026-001198",trainee:"t4",mode:"PSBank",ref:"PSB-55120931",date:T,hour:9.5,amount:50000,alloc:[{enr:"e5",amt:50000}],by:"Karen Mallari",recon:null},
+    {id:"p3",no:"PAY-2026-001470",receipt:"AR-2026-001170",trainee:"t5",mode:"Cash",ref:"",date:addDays(T,-6),hour:14,amount:350000,alloc:[{enr:"e6",amt:350000}],by:"Kat Garcia",recon:null},
+    {id:"p4",no:"PAY-2026-001455",receipt:"AR-2026-001155",trainee:"t6",mode:"UnionBank",ref:"UB-88123007",date:addDays(T,-8),hour:11,amount:120000,alloc:[{enr:"e7",amt:120000}],by:"Karen Mallari",recon:"Reconciled"},
+    {id:"p5",no:"PAY-2026-001481",receipt:"AR-2026-001181",trainee:"t7",mode:"GCash",ref:"7012345611112",date:addDays(T,-2),hour:15.5,amount:130000,alloc:[{enr:"e8",amt:130000}],by:"Kat Garcia",recon:null},
+    {id:"p6",no:"PAY-2026-001488",receipt:"AR-2026-001188",trainee:"t9",mode:"Cash",ref:"",date:addDays(T,-1),hour:16.2,amount:180000,alloc:[{enr:"e9",amt:180000}],by:"Karen Mallari",recon:null}],
+  charges:[],
+  discounts:[{id:"d1",enr:"e2",amount:20000,reason:"Agency rebate (Qapla Maritime)",status:"Pending",date:addDays(T,-1)}],
+  expenses:[
+    {id:"x1",no:"ER-2026-000209",cv:"",payee:"Meralco",cat:"Utilities",amount:845000,purpose:"September electricity",mode:"GCash",status:"For Approval",date:addDays(T,-1)},
+    {id:"x2",no:"ER-2026-000207",cv:"CV-2026-000129",payee:"Office Warehouse",cat:"Supplies",amount:125000,purpose:"Printer ink",mode:"Cash",status:"Approved",date:addDays(T,-2)},
+    {id:"x3",no:"ER-2026-000205",cv:"CV-2026-000128",payee:"LBC Express",cat:"Courier",amount:50000,purpose:"Certificate shipping",mode:"Cash",status:"Released",date:addDays(T,-1),released:addDays(T,-1)}],
+  reqItems:[{id:"q1",name:"Coffee Cups",unit:"pack of 50",cost:18000},{id:"q2",name:"Coffee Beans",unit:"kg",cost:65000},{id:"q3",name:"Adapters",unit:"pc",cost:25000},{id:"q4",name:"Bond Paper A4",unit:"ream",cost:24000}],
+  requisitions:[{id:"rq1",no:"RQ-2026-0006",purpose:"Pantry restock",lines:[["Coffee Cups",4,18000],["Coffee Beans",2,65000]],status:"For Approval",date:T,expense:null}],
+  certs:{
+    e6:{number:"",prints:0,photo:true,released:false},
+    e7:{number:"NWM-SS-00088",prints:1,photo:true,released:false}},
+  series:{c1:{prefix:"NWM-BT-",next:1245},c2:{prefix:"NWM-SS-",next:89},c3:{prefix:"NWM-CM-",next:310},c6:{prefix:"NWM-HPT-",next:150},c7:{prefix:"NWM-SFA-",next:40}},
+  templates:{c1:1,c2:1,c3:1,c6:1},
+  deliveries:[{id:"dr1",no:"DR-2026-0014",enr:"e7",recipient:"Ana Bautista",address:"12 Mabini St., Iloilo City 5000",mobile:"0917 100 2006",status:"Requested",tracking:"",date:addDays(T,-1)}],
+  mismo:{},
+  users:[
+    {name:"Kate Esguerra",email:"admin@example.com",roles:["admin"]},
+    {name:"Sophia Ugadan",email:"registration@example.com",roles:["registration"]},
+    {name:"Karen Mallari",email:"cashier@example.com",roles:["cashier"]},
+    {name:"Kat Garcia",email:"accounting@example.com",roles:["cashier","accounting"]},
+    {name:"Rejanber Wariza",email:"releasing@example.com",roles:["releasing_officer","mismo_officer"]},
+    {name:"Admin Assistant",email:"assistant@example.com",roles:["admin_assistant"]}],
+  log:[{when:T+" 08:05",who:"System",what:"Test data loaded — 9 trainees, 7 batches, 6 payments"}],
+  script:{}};
+  return S;
+}
+let S;
+function load(){try{const raw=localStorage.getItem("nw-sim");if(raw){const s=JSON.parse(raw);if(s&&s.v===3)return s}}catch(e){}return seed()}
+function save(){try{localStorage.setItem("nw-sim",JSON.stringify({...S,modal:null,drawer:null}))}catch(e){}}
+S=load();
+
+/* ============================================================ model */
+const C=id=>S.courses.find(x=>x.id===id),B=id=>S.batches.find(x=>x.id===id),Tn=id=>S.trainees.find(x=>x.id===id),E=id=>S.enrollments.find(x=>x.id===id);
+const nameOf=t=>t?`${t.last.toUpperCase()}, ${t.first}`:"—";
+const roomName=id=>S.rooms.find(r=>r.id===id)?.name||"";
+const instrName=id=>S.instructors.find(i=>i.id===id)?.name||"";
+function next(prefix,pad=6){S.seq[prefix]=(S.seq[prefix]||0)+1;return prefix==="NWMTACI"?`NWMTACI-${String(S.seq[prefix]).padStart(7,"0")}`:`${prefix}-2026-${String(S.seq[prefix]).padStart(pad,"0")}`}
+function logA(who,what){S.log.unshift({when:`${S.today} ${hh(S.hour)}`,who,what});S.log=S.log.slice(0,80)}
+const paidOf=(eid,upto)=>S.payments.reduce((s,p)=>s+p.alloc.filter(a=>a.enr===eid&&(!upto||p.date<upto.date||(p.date===upto.date&&p.hour<=upto.hour))).reduce((x,a)=>x+a.amt,0),0);
+const dueOf=e=>e.price+S.charges.filter(c=>c.enr===e.id&&c.status!=="Rejected").reduce((s,c)=>s+c.amount,0)-S.discounts.filter(d=>d.enr===e.id&&d.status==="Approved").reduce((s,d)=>s+d.amount,0);
+const bal=(e,upto)=>Math.max(0,dueOf(e)-paidOf(e.id,upto));
+const reqsDone=e=>["id","med","photo","book"].every(k=>e.reqs[k]);
+const userOf=r=>({registration:"Sophia Ugadan",cashier:"Karen Mallari",accounting:"Kat Garcia",releasing_officer:"Rejanber Wariza",mismo_officer:"Rejanber Wariza",admin_assistant:"Admin Assistant",admin:"Kate Esguerra",public:"Website"}[r]||"Staff");
+function payState(e){const d=dueOf(e),p=paidOf(e.id);return p<=0?"Unpaid":p>=d?"Paid":"Partially Paid"}
+function certState(e){
+  if(e.status!=="Enrolled")return null;const b=B(e.batch);if(!b||b.end>S.today)return{s:"Training not finished"};
+  const c=S.certs[e.id]||{};if(c.released)return{s:"Released",c};if(c.prints>0)return{s:"Printed",c};
+  if(bal(e)>0)return{s:"Waiting for payment",c};if(!c.photo)return{s:"Waiting for photo",c};
+  return{s:"Due",c,overdue:b.end<addDays(S.today,-1)};
+}
+function autoEnroll(e){if(e.status==="Pending"&&e.handed&&reqsDone(e)&&e.batch&&paidOf(e.id)>0){e.status="Enrolled";e.enrolledOn=S.today;logA("System",`${nameOf(Tn(e.trainee))} enrolled automatically in ${C(e.course).code} (paid)`)}}
+function deliveryPaid(){for(const d of S.deliveries)if(d.status==="With the Cashier"){const e=E(d.enr);if(bal(e)===0){d.status="Paid";logA("System",`Delivery ${d.no} fee collected — ready to ship`)}}}
+
+/* ============================================================ issue checker */
+function issues(){
+  const out=[],T=S.today;
+  for(const e of S.enrollments){const t=Tn(e.trainee),b=B(e.batch),c=C(e.course);
+    if(e.status==="Pending"&&b&&b.start<=T&&!e.handed)out.push({sev:"bad",role:"registration",tab:"Registration",t:`${nameOf(t)} — training ${b.start===T?"starts today":"already started"} but not screened`,d:`${c.code} ${b.no}: requirements ${["id","med","photo","book"].filter(k=>e.reqs[k]).length} of 4, not handed to the Cashier.`});
+    if(e.status==="Pending"&&e.handed&&b&&b.start<=addDays(T,1)&&paidOf(e.id)===0)out.push({sev:"warn",role:"cashier",tab:"Dashboard",t:`${nameOf(t)} — with the Cashier, nothing paid, class ${b.start===T?"today":"tomorrow"}`,d:`${c.code} ${b.no}, ${peso(dueOf(e))} due.`});
+    const cs=certState(e);if(cs&&cs.s==="Due"&&cs.overdue)out.push({sev:"bad",role:"releasing_officer",tab:"Certificates",t:`Certificate overdue — ${nameOf(t)}`,d:`${c.code} ended ${fmt(b.end)}; settled and photo on file, not printed.`});
+    if(cs&&cs.s==="Waiting for photo")out.push({sev:"warn",role:"releasing_officer",tab:"Certificates",t:`2x2 photo missing — ${nameOf(t)}`,d:`${c.code} certificate is otherwise ready to print.`});
+    if(e.status==="Enrolled"&&b&&b.end<T&&bal(e)>0)out.push({sev:"warn",role:"cashier",tab:"Dashboard",t:`Unpaid after training — ${nameOf(t)}`,d:`${c.code} ended ${fmt(b.end)}; balance ${peso(bal(e))}.`});
+  }
+  const enrolledIn=b=>S.enrollments.filter(e=>e.batch===b.id&&e.status!=="Cancelled").length;
+  for(const b of S.batches){if(b.end<T)continue;const c=C(b.course),r=S.rooms.find(x=>x.id===b.room),n=enrolledIn(b);
+    if(!b.room||!b.instr)out.push({sev:b.start<=addDays(T,3)?"bad":"warn",role:"admin_assistant",tab:"Resource Planning",t:`${c.code} ${b.no} (${fmt(b.start)}) has no ${!b.room&&!b.instr?"room or instructor":!b.room?"room":"instructor"}`,d:`${n} trainee(s) booked.`});
+    if(r&&n>r.cap)out.push({sev:"bad",role:"admin_assistant",tab:"Resource Planning",t:`${b.no}: ${n} trainees, ${r.name} seats ${r.cap}`,d:`Move to a bigger room.`});
+    const ins=S.instructors.find(i=>i.id===b.instr);if(ins){const a=ins.acc.find(a=>a.course===b.course);if(!a||a.until<b.start)out.push({sev:"bad",role:"admin_assistant",tab:"Resource Planning",t:`${ins.name} ${!a?"not accredited":"accreditation expired"} for ${c.code}`,d:`Batch ${b.no} on ${fmt(b.start)}.`})}}
+  for(const ch of CHANNELS){const late=S.payments.filter(p=>p.mode===ch&&!p.recon&&p.date<T);if(late.length)out.push({sev:"warn",role:"admin_assistant",tab:"Reconciliation",t:`${late.length} ${ch} payment(s) not reconciled`,d:`Oldest ${fmt(late.map(p=>p.date).sort()[0])}. Accounting is alerted and emailed at 4:00 PM.`})}
+  const miss=S.payments.filter(p=>p.recon==="Not in History");if(miss.length)out.push({sev:"bad",role:"accounting",tab:"Dashboard",t:`${miss.length} payment(s) not in the transaction history`,d:"Accounting must follow up with the Cashier."});
+  for(const x of S.expenses){if(x.status==="For Approval"&&x.date<T)out.push({sev:"warn",role:"accounting",tab:"Approvals",t:`Expense waiting since ${fmt(x.date)} — ${x.payee}`,d:`${peso(x.amount)} ${x.cat}.`});if(x.status==="Approved"&&x.date<addDays(T,-1))out.push({sev:"warn",role:"cashier",tab:"Expenses",t:`Approved voucher not released — ${x.cv}`,d:`${x.payee} ${peso(x.amount)}.`})}
+  for(const r of S.requisitions)if(r.status==="For Approval"&&r.date<T)out.push({sev:"warn",role:"accounting",tab:"Approvals",t:`Requisition waiting — ${r.no}`,d:r.purpose});
+  for(const d of S.discounts)if(d.status==="Pending")out.push({sev:"warn",role:"accounting",tab:"Approvals",t:`Discount waiting — ${nameOf(Tn(E(d.enr).trainee))}`,d:`${peso(d.amount)} · ${d.reason}`});
+  for(const d of S.deliveries){if(d.status==="Requested")out.push({sev:"warn",role:"registration",tab:"Delivery Requests",t:`Delivery request to check — ${d.no}`,d:d.recipient});if(d.status==="Paid")out.push({sev:"bad",role:"releasing_officer",tab:"Delivery",t:`Paid delivery not shipped — ${d.no}`,d:d.recipient})}
+  for(const i of S.instructors)for(const a of i.acc)if(a.until<addDays(T,30))out.push({sev:a.until<T?"bad":"warn",role:"admin_assistant",tab:"Instructors",t:`${i.name}: ${C(a.course).code} accreditation ${a.until<T?"expired":"expires"} ${fmt(a.until)}`,d:a.no});
+  const mb=mismoBatches();if(S.hour>=16&&mb.some(b=>!S.mismo[b.id]))out.push({sev:"warn",role:"mismo_officer",tab:"Final List",t:"MARINA MISMO final list not submitted",d:`${mb.filter(b=>!S.mismo[b.id]).length} batch(es) today.`});
+  for(const c of S.courses)if(!S.templates[c.id]&&S.enrollments.some(e=>e.course===c.id&&e.status==="Enrolled"))out.push({sev:"warn",role:"releasing_officer",tab:"Templates",t:`No certificate template for ${c.code}`,d:"Upload the PDF before certificates are due."});
+  return out.sort((a,b)=>(a.sev==="bad"?0:1)-(b.sev==="bad"?0:1));
+}
+
+/* ============================================================ roles & tabs */
+const ROLES=[["public","Public Website"],["registration","Registration"],["cashier","Cashier"],["accounting","Accounting"],["releasing_officer","Releasing Officer"],["mismo_officer","MISMO Compliance Officer"],["admin_assistant","Admin Assistant"],["admin","Admin"]];
+const TABS={public:["Register","Trainee Status","Certificate Delivery"],registration:["Dashboard","Registration","Courses","Delivery Requests"],cashier:["Dashboard","Payments","Expenses","Requests","Report"],accounting:["Dashboard","Approvals","Transactions","Configuration"],releasing_officer:["Dashboard","Certificates","Templates","Numbering","Delivery"],mismo_officer:["Dashboard","Final List","Submissions"],admin_assistant:["Dashboard","Requisitions","Resource Planning","Instructors","Reconciliation"],admin:["Dashboard","Employee Accounts","Certificate Controls","Activity","Reset Data"]};
+const head=(e,t,a="")=>`<div class="head"><div><span class="eyebrow">${esc(e)}</span><h1>${esc(t)}</h1></div><div class="acts">${a}</div></div>`;
+const roleLabel=r=>ROLES.find(x=>x[0]===r)?.[1]||r;
+const tile=(label,val,c,extra="")=>`<div class="tile ${extra}" style="--c:${c}"><i></i><span>${esc(label)}</span><b>${val}</b></div>`;
+const pill=(t,k)=>`<span class="pill p-${k}">${esc(t)}</span>`;
+
+/* ============================================================ PUBLIC */
+const V={};
+V.public={
+  "Register":()=>{const opts=S.batches.filter(b=>b.start>S.today).map(b=>{const c=C(b.course);return `<option value="${b.id}">${c.code} · ${fmt(b.start)}${b.end!==b.start?"–"+fmt(b.end):""} · ${peso(c.price)}</option>`}).join("");
+    return head("Public Website","Online Registration")+`<section class="panel"><div class="ph"><h2>Trainee Details</h2><span class="m">Creates an application the Registration Officer screens</span></div>
+    <form id="regForm" class="form" data-form="register">
+     <label class="f">First Name<input id="rg_first" required value="Mark"></label><label class="f">Last Name<input id="rg_last" required value="Lopez"></label>
+     <label class="f">Birth Date<input id="rg_birth" type="date" required value="1995-05-05"></label><label class="f">SRN<input id="rg_srn" required value="SRN-2510001"></label>
+     <label class="f">Mobile Number<input id="rg_mobile" required value="0917 300 4001"></label><label class="f">Email Address<input id="rg_email" type="email" required value="mark.l@example.com"></label>
+     <label class="f full">Course and Schedule<select id="rg_batch"><option value="">I'll choose later (Registration assigns a course)</option>${opts}</select></label>
+     <label class="chk full"><input type="checkbox" id="rg_terms" checked> I agree to the Data Privacy Notice and training terms</label>
+     <div class="full acts"><button class="btn org" type="submit">Submit Application</button></div></form></section>`},
+  "Trainee Status":()=>{const q=S.ui.status||{};const t=q.app?S.trainees.find(x=>x.app===q.app.trim()&&x.birth===q.birth):null;
+    return head("Public Website","Trainee Status")+`<section class="panel"><div class="ph"><h2>Look Up</h2><span class="m">Try NWMTACI-0000398 · 1985-06-15</span></div>
+     <form class="form" data-form="status"><label class="f">NWMTACI Number<input id="st_app" value="${esc(q.app||"NWMTACI-0000398")}"></label><label class="f">Birth Date<input id="st_birth" type="date" value="${esc(q.birth||"1985-06-15")}"></label><div class="full acts"><button class="btn pri" type="submit">Check Status</button></div></form>
+     ${q.app?(t?`<div class="wrap"><table class="log"><thead><tr><th>Course</th><th>Schedule</th><th>Enrollment</th><th class="r">Balance</th><th>Certificate</th></tr></thead><tbody>${S.enrollments.filter(e=>e.trainee===t.id).map(e=>{const b=B(e.batch),cs=certState(e);return `<tr><td>${esc(C(e.course).name)}</td><td>${b?fmt(b.start):"To be scheduled"}</td><td>${pill(e.status==="Enrolled"?"Enrolled":e.handed?"For Payment":"Screening",e.status==="Enrolled"?"ok":"warn")}</td><td class="r mono">${peso(bal(e))}</td><td>${cs?(cs.s==="Printed"?pill("Ready for Pick-Up","ok"):cs.s==="Released"?pill("Released","ok"):pill(cs.s,"mute")):"—"}</td></tr>`}).join("")||`<tr><td colspan="5" class="empty">No course yet.</td></tr>`}</tbody></table></div>`:`<p class="empty">No trainee matches that NWMTACI number and birth date.</p>`):""}</section>`},
+  "Certificate Delivery":()=>{const ready=S.enrollments.filter(e=>{const cs=certState(e);return cs&&(cs.s==="Printed")&&!S.deliveries.some(d=>d.enr===e.id&&d.status!=="Declined")});
+    return head("Public Website","Certificate Delivery")+`<section class="panel"><div class="ph"><h2>Request LBC Delivery</h2><span class="m">₱500.00 fee, paid to the Cashier</span></div>
+     <form class="form" data-form="delivery"><label class="f full">Printed Certificate<select id="dl_enr">${ready.map(e=>`<option value="${e.id}">${esc(nameOf(Tn(e.trainee)))} · ${C(e.course).code}</option>`).join("")||`<option value="">No printed certificate waiting</option>`}</select></label>
+     <label class="f">Recipient<input id="dl_rec" value="Same as trainee"></label><label class="f">Mobile Number<input id="dl_mob" value="0917 555 1212"></label>
+     <label class="f full">Complete Address<input id="dl_addr" value="45 Rizal Ave., Cebu City 6000"></label>
+     <div class="full acts"><button class="btn org" type="submit" ${ready.length?"":"disabled"}>Send Request</button></div></form>
+     <div class="wrap"><table class="log"><thead><tr><th>Request No.</th><th>Trainee</th><th>Status</th><th>Tracking No.</th></tr></thead><tbody>${S.deliveries.map(d=>`<tr><td class="mono">${d.no}</td><td>${esc(nameOf(Tn(E(d.enr).trainee)))}</td><td>${pill(d.status,d.status==="Delivered"||d.status==="Shipped"?"ok":d.status==="Declined"?"bad":"warn")}</td><td class="mono">${esc(d.tracking||"—")}</td></tr>`).join("")}</tbody></table></div></section>`}
+};
+
+/* ============================================================ REGISTRATION */
+const regState=e=>e.status==="Enrolled"?["Enrolled","ok"]:e.handed?(paidOf(e.id)>0?["Paid · Choose Batch","info"]:["For Payment","warn"]):["Screening","mute"];
+V.registration={
+  "Dashboard":()=>{const T=S.today;const newApps=S.trainees.filter(t=>t.created>=addDays(T,-6)&&!S.enrollments.some(e=>e.trainee===t.id&&e.status==="Enrolled"));const enrolledToday=S.enrollments.filter(e=>e.enrolledOn===T);
+    return head("Registration","Dashboard",`<button class="btn pri" data-act="go" data-tab="Registration">Screen Applications</button>`)+`<div class="grid2">
+    <section class="panel"><div class="ph"><h2>New Registrations</h2><span class="m">${newApps.length}</span></div><div class="wrap"><table class="log"><thead><tr><th>Applicant</th><th>Course</th><th>State</th></tr></thead><tbody>${newApps.map(t=>{const es=S.enrollments.filter(e=>e.trainee===t.id);return `<tr><td><b>${esc(nameOf(t))}</b><small>${t.app} · ${fmt(t.created)}</small></td><td>${es.map(e=>C(e.course).code).join(", ")||"No course yet"}</td><td>${es.length?es.map(e=>pill(...regState(e))).join(" "):pill("No Course Yet","warn")}</td></tr>`}).join("")||`<tr><td colspan="3" class="empty">None.</td></tr>`}</tbody></table></div></section>
+    <section class="panel"><div class="ph"><h2>Enrolled Today</h2><span class="m">${fmtL(T)}</span></div><div class="wrap"><table class="log"><thead><tr><th>Trainee</th><th>Course</th><th class="r">Paid</th></tr></thead><tbody>${enrolledToday.map(e=>`<tr><td><b>${esc(nameOf(Tn(e.trainee)))}</b></td><td>${C(e.course).code}</td><td class="r mono">${peso(paidOf(e.id))}</td></tr>`).join("")||`<tr><td colspan="3" class="empty">No one enrolled on this day yet.</td></tr>`}</tbody></table></div></section></div>`},
+  "Registration":()=>{const rows=S.enrollments.filter(e=>e.status==="Pending");const noCourse=S.trainees.filter(t=>!S.enrollments.some(e=>e.trainee===t.id));
+    return head("Registration","Applications")+`<div class="note">Tick the four requirements, then hand the applicant to the Cashier. Once the Cashier records a payment, the trainee is enrolled automatically.</div>
+    ${noCourse.length?`<section class="panel"><div class="ph"><h2>No Course Yet</h2><span class="m">${noCourse.length}</span></div><div class="wrap"><table class="log"><thead><tr><th>Applicant</th><th>Assign Course and Batch</th><th></th></tr></thead><tbody>${noCourse.map(t=>`<tr><td><b>${esc(nameOf(t))}</b><small>${t.app} · ${esc(t.email)}</small></td><td><select class="inp" id="as_${t.id}">${S.batches.filter(b=>b.start>=S.today).map(b=>`<option value="${b.id}">${C(b.course).code} · ${fmt(b.start)} · ${peso(C(b.course).price)}</option>`).join("")}</select></td><td><button class="btn sm pri" data-act="assign" data-id="${t.id}">Assign</button></td></tr>`).join("")}</tbody></table></div></section>`:""}
+    <section class="panel"><div class="ph"><h2>Screening and For Payment</h2><span class="m">${rows.length}</span></div><div class="wrap"><table class="log"><thead><tr><th>Applicant</th><th>Course · Batch</th><th>Requirements</th><th>State</th><th></th></tr></thead><tbody>
+    ${rows.map(e=>{const t=Tn(e.trainee),b=B(e.batch),c=C(e.course);const R=[["id","Valid ID / Passport"],["med","Medical (PEME)"],["photo","2x2 Photo"],["book","Seaman's Book / SRN"]];return `<tr><td><b>${esc(nameOf(t))}</b><small>${t.app}</small></td><td>${c.code}<small>${b?`${b.no} · ${fmt(b.start)}`:"No batch"}</small></td>
+     <td><div class="req">${R.map(([k,l])=>`<label class="chk"><input type="checkbox" data-act="req" data-id="${e.id}" data-k="${k}" ${e.reqs[k]?"checked":""} ${e.handed?"disabled":""}> ${l}</label>`).join("")}</div></td>
+     <td>${pill(...regState(e))}</td><td>${e.handed?`<small>With the Cashier</small>`:`<button class="btn sm pri" data-act="handover" data-id="${e.id}" ${reqsDone(e)?"":"disabled"}>Hand to Cashier</button>`}</td></tr>`}).join("")||`<tr><td colspan="5" class="empty">No pending applications.</td></tr>`}
+    </tbody></table></div></section>`},
+  "Courses":()=>head("Registration","Courses")+`<section class="panel"><div class="wrap" style="margin-top:18px"><table class="log"><thead><tr><th>Course</th><th>Category</th><th class="r">Fee</th><th>Open Batches</th></tr></thead><tbody>${S.courses.map(c=>`<tr><td><b>${c.code}</b><small>${esc(c.name)}</small></td><td>${c.cat}</td><td class="r mono">${peso(c.price)}</td><td>${S.batches.filter(b=>b.course===c.id&&b.start>=S.today).map(b=>`${fmt(b.start)} (${S.enrollments.filter(e=>e.batch===b.id).length}/${b.cap})`).join(", ")||"—"}</td></tr>`).join("")}</tbody></table></div></section>`,
+  "Delivery Requests":()=>head("Registration","Delivery Requests")+`<section class="panel"><div class="wrap" style="margin-top:18px"><table class="log"><thead><tr><th>Request</th><th>Trainee · Certificate</th><th>Address</th><th>Status</th><th></th></tr></thead><tbody>${S.deliveries.map(d=>{const e=E(d.enr),cs=certState(e);return `<tr><td class="mono">${d.no}<small>${fmt(d.date)}</small></td><td>${esc(nameOf(Tn(e.trainee)))}<small>${C(e.course).code} · ${cs?.s||"—"}</small></td><td>${esc(d.recipient)}<small>${esc(d.address)}</small></td><td>${pill(d.status,d.status==="Requested"?"warn":d.status==="Declined"?"bad":"info")}</td><td>${d.status==="Requested"?`<span class="acts"><button class="btn sm" data-act="dlDecline" data-id="${d.id}">Decline</button><button class="btn sm pri" data-act="dlCheck" data-id="${d.id}" ${cs?.s==="Printed"?"":"disabled title='Certificate not printed yet'"}>Send to Cashier</button></span>`:""}</td></tr>`}).join("")||`<tr><td colspan="5" class="empty">No delivery requests.</td></tr>`}</tbody></table></div></section>`
+};
+
+/* ============================================================ CASHIER */
+function todaysPayments(d=S.today){return S.payments.filter(p=>p.date===d)}
+V.cashier={
+  "Dashboard":()=>{const ps=todaysPayments();const newE=S.enrollments.filter(e=>e.status==="Pending"&&e.handed&&paidOf(e.id)===0);const byT=[...new Set(newE.map(e=>e.trainee))];
+    const paid=S.enrollments.filter(e=>e.status==="Enrolled"&&S.payments.some(p=>p.date>=addDays(S.today,-2)&&p.alloc.some(a=>a.enr===e.id)));
+    const unpaidAfter=S.enrollments.filter(e=>e.status==="Enrolled"&&B(e.batch)&&B(e.batch).end<=S.today&&bal(e)>0);
+    return head("Cashier","Dashboard",`<button class="btn org" data-act="payModal">Record Payment</button>`)+`<div class="rail"><div class="stack">
+    <section class="panel"><div class="ph"><h2>Collections Today</h2><span class="m">${fmt(S.today)}</span></div><div class="tiles">${MODES.map((m,i)=>{const l=ps.filter(p=>p.mode===m);return tile(`${m} · ${l.length}`,peso(l.reduce((s,p)=>s+p.amount,0)),["#0a7a3e","#0571D0","#F25615","#7a3fb8"][i])}).join("")}${tile("Total Collected",peso(ps.reduce((s,p)=>s+p.amount,0)),"","tot")}</div></section>
+    <section class="panel"><div class="ph"><h2>Unpaid After Training</h2><span class="m">4:00 PM summary</span></div><div class="pb"><dl class="lines">${unpaidAfter.map(e=>`<div><dt>${esc(nameOf(Tn(e.trainee)))} · ${C(e.course).code}</dt><dd>${peso(bal(e))}</dd></div>`).join("")||`<div><dt>None</dt><dd>₱0.00</dd></div>`}</dl></div></section></div>
+    <div class="stack"><section class="panel"><div class="ph"><h2>New Enrollments</h2><span class="m">Handed over by Registration</span></div><div class="wrap"><table class="log"><thead><tr><th>Trainee</th><th>Courses</th><th class="r">Total Due</th><th></th></tr></thead><tbody>${byT.map(tid=>{const es=newE.filter(e=>e.trainee===tid);return `<tr><td><b>${esc(nameOf(Tn(tid)))}</b><small>${Tn(tid).app}</small></td><td>${es.map(e=>`${C(e.course).code} <small>${B(e.batch)?fmt(B(e.batch).start):""}</small>`).join("")}</td><td class="r mono">${peso(es.reduce((s,e)=>s+bal(e),0))}</td><td><button class="btn sm org" data-act="payModal" data-id="${tid}">Record Payment</button></td></tr>`}).join("")||`<tr><td colspan="4" class="empty">Nobody waiting for payment.</td></tr>`}</tbody></table></div></section>
+    <section class="panel"><div class="ph"><h2>Paid and Enrolled</h2><span class="m">Last 3 days</span></div><div class="wrap"><table class="log"><thead><tr><th>Trainee</th><th>Course</th><th class="r">Paid</th><th class="r">Balance</th><th>Status</th></tr></thead><tbody>${paid.map(e=>`<tr><td><b>${esc(nameOf(Tn(e.trainee)))}</b></td><td>${C(e.course).code}</td><td class="r mono">${peso(paidOf(e.id))}</td><td class="r mono">${peso(bal(e))}</td><td>${pill(payState(e),payState(e)==="Paid"?"ok":"warn")}</td></tr>`).join("")||`<tr><td colspan="5" class="empty">None yet.</td></tr>`}</tbody></table></div></section></div></div>`},
+  "Payments":()=>{const d=S.ui.payDate||S.today;const ps=S.payments.filter(p=>p.date===d);
+    return head("Cashier","Payment Records",`<input type="date" class="inp sm" id="payDate" value="${d}"> <button class="btn org" data-act="payModal">Record Payment</button>`)+`<section class="panel"><div class="wrap" style="margin-top:18px"><table class="log"><thead><tr><th>Receipt</th><th>Time</th><th>Trainee</th><th>Applied To</th><th>Mode</th><th>Reference</th><th class="r">Amount</th></tr></thead><tbody>${ps.map(p=>`<tr><td class="mono">${p.receipt}</td><td class="mono">${hh(p.hour)}</td><td>${esc(nameOf(Tn(p.trainee)))}</td><td>${p.alloc.map(a=>E(a.enr)?C(E(a.enr).course).code:"Charge").join(", ")}</td><td>${p.mode}</td><td class="mono">${esc(p.ref||"—")}</td><td class="r mono">${peso(p.amount)}</td></tr>`).join("")||`<tr><td colspan="7" class="empty">No payments on ${fmt(d)}.</td></tr>`}</tbody></table></div></section>`},
+  "Expenses":()=>head("Cashier","Expenses",`<button class="btn org" data-act="expModal">Record Expense</button>`)+`<div class="note">An expense gets its voucher number (CV) only when the Accounting Manager approves it. The Cashier then prints the voucher and marks it released.</div><section class="panel"><div class="wrap" style="margin-top:18px"><table class="log"><thead><tr><th>Number</th><th>Date</th><th>Payee · Category</th><th>Channel</th><th class="r">Amount</th><th>Status</th><th></th></tr></thead><tbody>${S.expenses.map(x=>`<tr><td class="mono">${x.cv||x.no}</td><td>${fmt(x.date)}</td><td>${esc(x.payee)}<small>${esc(x.cat)} · ${esc(x.purpose)}</small></td><td>${x.mode}</td><td class="r mono">${peso(x.amount)}</td><td>${pill(x.status,x.status==="Released"?"ok":x.status==="Approved"?"info":x.status==="Rejected"?"bad":"warn")}${x.reason?`<small>${esc(x.reason)}</small>`:""}</td><td>${x.status==="Approved"?`<button class="btn sm pri" data-act="expRelease" data-id="${x.id}">Mark Released</button>`:""}</td></tr>`).join("")}</tbody></table></div></section>`,
+  "Requests":()=>{const ch=S.charges.filter(c=>c.status!=="Rejected");return head("Cashier","Requests")+`<section class="panel"><div class="ph"><h2>Fees to Collect</h2><span class="m">Delivery fees and service charges</span></div><div class="wrap"><table class="log"><thead><tr><th>Trainee</th><th>Charge</th><th class="r">Amount</th><th>Status</th><th></th></tr></thead><tbody>${ch.map(c=>{const e=E(c.enr);const paid=bal(e)===0;return `<tr><td>${esc(nameOf(Tn(e.trainee)))}</td><td>${esc(c.desc)}</td><td class="r mono">${peso(c.amount)}</td><td>${pill(paid?"Paid":"Waiting for Payment",paid?"ok":"warn")}</td><td>${paid?"":`<button class="btn sm org" data-act="payModal" data-id="${e.trainee}">Collect Fee</button>`}</td></tr>`}).join("")||`<tr><td colspan="5" class="empty">No fees to collect.</td></tr>`}</tbody></table></div></section>`},
+  "Report":()=>{const ps=todaysPayments();const cashIn=ps.filter(p=>p.mode==="Cash").reduce((s,p)=>s+p.amount,0);const cashOut=S.expenses.filter(x=>x.status==="Released"&&x.released===S.today&&x.mode==="Cash").reduce((s,x)=>s+x.amount,0);
+    return head("Cashier","Daily Summary Report")+`<div class="rail"><section class="panel"><div class="ph"><h2>Cash Position</h2></div><div class="pb"><dl class="lines"><div><dt>Opening Cash</dt><dd>${peso(500000)}</dd></div><div><dt>+ Cash Collected</dt><dd>${peso(cashIn)}</dd></div><div><dt>− Cash Expenses Released</dt><dd>${peso(cashOut)}</dd></div><div><dt>= Cash on Hand</dt><dd>${peso(500000+cashIn-cashOut)}</dd></div></dl></div></section>
+    <section class="panel"><div class="ph"><h2>Collections by Channel</h2><span class="m">${fmtL(S.today)}</span></div><div class="wrap"><table class="log"><thead><tr><th>Channel</th><th class="r">Receipts</th><th class="r">Amount</th></tr></thead><tbody>${MODES.map(m=>{const l=ps.filter(p=>p.mode===m);return `<tr><td>${m}</td><td class="r mono">${l.length}</td><td class="r mono">${peso(l.reduce((s,p)=>s+p.amount,0))}</td></tr>`}).join("")}<tr><td><b>Total</b></td><td class="r mono"><b>${ps.length}</b></td><td class="r mono"><b>${peso(ps.reduce((s,p)=>s+p.amount,0))}</b></td></tr></tbody></table></div></section></div>`}
+};
+
+/* ============================================================ ACCOUNTING */
+function overdueRecon(){return CHANNELS.map(ch=>{const l=S.payments.filter(p=>p.mode===ch&&!p.recon&&p.date<S.today);return{ch,n:l.length,old:l.map(p=>p.date).sort()[0]}}).filter(x=>x.n)}
+V.accounting={
+  "Dashboard":()=>{const od=overdueRecon(),on=od.reduce((s,x)=>s+x.n,0),miss=S.payments.filter(p=>p.recon==="Not in History");const ps=todaysPayments();
+    const waiting={Expenses:S.expenses.filter(x=>x.status==="For Approval").length,Requisitions:S.requisitions.filter(r=>r.status==="For Approval").length,Discounts:S.discounts.filter(d=>d.status==="Pending").length};
+    return head("Accounting","Dashboard")+(on?`<div class="banner red"><b>${on} payment(s) not reconciled</b><span>${od.map(x=>`${x.ch} ${x.n} (oldest ${fmt(x.old)})`).join(" · ")}</span><span class="sp"></span><span style="font-size:13px">Also emailed daily at 4:00 PM</span></div>`:"")+
+    (miss.length?`<div class="banner amber"><b>${miss.length} payment(s) not in the transaction history</b><span>${miss.map(p=>`${p.mode} ${p.receipt} ${peso(p.amount)} — ${esc(p.note)}`).join(" · ")}</span></div>`:"")+
+    `<div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>For Your Approval</h2></div><div class="tiles">${Object.entries(waiting).map(([k,n])=>`<button class="tile" style="--c:#F25615" data-act="go" data-tab="Approvals"><i></i><span>${k}</span><b>${n}</b></button>`).join("")}</div></section>
+    <section class="panel"><div class="ph"><h2>Collections Today</h2></div><div class="tiles">${MODES.map((m,i)=>{const l=ps.filter(p=>p.mode===m);return tile(m,peso(l.reduce((s,p)=>s+p.amount,0)),["#0a7a3e","#0571D0","#F25615","#7a3fb8"][i])}).join("")}${tile("Total",peso(ps.reduce((s,p)=>s+p.amount,0)),"","tot")}</div></section></div>
+    <section class="panel"><div class="ph"><h2>Expenses by Status</h2></div><div class="wrap"><table class="log"><thead><tr><th>Status</th><th class="r">Count</th><th class="r">Amount</th></tr></thead><tbody>${["For Approval","Approved","Released","Rejected"].map(s=>{const l=S.expenses.filter(x=>x.status===s);return `<tr><td>${s}</td><td class="r mono">${l.length}</td><td class="r mono">${peso(l.reduce((a,x)=>a+x.amount,0))}</td></tr>`}).join("")}</tbody></table></div></section></div>`},
+  "Approvals":()=>{const sel=S.ui.appr||new Set();const items=[
+      ...S.expenses.filter(x=>x.status==="For Approval").map(x=>({k:"x:"+x.id,cat:"Expense",title:`${x.payee} · ${x.cat}`,d:x.purpose,amt:x.amount,ref:x.no})),
+      ...S.requisitions.filter(r=>r.status==="For Approval").map(r=>({k:"r:"+r.id,cat:"Requisition",title:r.purpose,d:r.lines.map(l=>`${l[0]} × ${l[1]}`).join(", "),amt:r.lines.reduce((s,l)=>s+l[1]*l[2],0),ref:r.no})),
+      ...S.discounts.filter(d=>d.status==="Pending").map(d=>({k:"d:"+d.id,cat:"Discount",title:nameOf(Tn(E(d.enr).trainee)),d:d.reason,amt:-d.amount,ref:E(d.enr).no}))];
+    return head("Accounting","Approvals",`<button class="btn pri" data-act="bulkApprove" ${items.length?"":"disabled"}>Approve Ticked</button>`)+`<section class="panel"><div class="wrap" style="margin-top:18px"><table class="log"><thead><tr><th></th><th>Type</th><th>Item</th><th>Reference</th><th class="r">Amount</th><th></th></tr></thead><tbody>${items.map(i=>`<tr><td><input type="checkbox" class="apck" value="${i.k}" aria-label="Tick ${esc(i.ref)}"></td><td>${pill(i.cat,"info")}</td><td><b>${esc(i.title)}</b><small>${esc(i.d)}</small></td><td class="mono">${i.ref}</td><td class="r mono">${peso(i.amt)}</td><td><span class="acts"><button class="btn sm" data-act="reject" data-k="${i.k}">Reject</button><button class="btn sm pri" data-act="approve" data-k="${i.k}">Approve</button></span></td></tr>`).join("")||`<tr><td colspan="6" class="empty">Nothing waiting.</td></tr>`}</tbody></table></div><p class="foot">Approving an expense or requisition issues a voucher (CV) for the Cashier to release.</p></section>`},
+  "Transactions":()=>head("Accounting","Transactions")+`<section class="panel"><div class="ph"><h2>Payments (All Dates)</h2></div><div class="wrap"><table class="log"><thead><tr><th>Date</th><th>Receipt</th><th>Trainee</th><th>Mode</th><th>Reconciled</th><th class="r">Amount</th></tr></thead><tbody>${[...S.payments].sort((a,b)=>b.date.localeCompare(a.date)||b.hour-a.hour).map(p=>`<tr><td>${fmt(p.date)}</td><td class="mono">${p.receipt}</td><td>${esc(nameOf(Tn(p.trainee)))}</td><td>${p.mode}</td><td>${p.mode==="Cash"?"—":p.recon?pill(p.recon,p.recon==="Reconciled"?"ok":"bad"):pill("To Check","warn")}</td><td class="r mono">${peso(p.amount)}</td></tr>`).join("")}</tbody></table></div></section>`,
+  "Configuration":()=>head("Accounting","Requisition Items")+`<section class="panel"><form class="form" data-form="reqItem" style="padding-top:18px"><label class="f">Item Name<input id="ri_name" placeholder="e.g. Whiteboard Markers"></label><label class="f">Unit<input id="ri_unit" placeholder="box"></label><label class="f">Default Cost (₱)<input id="ri_cost" type="number" min="0" step="0.01" placeholder="320.00"></label><div class="acts" style="align-self:end"><button class="btn pri" type="submit">Add Item</button></div></form><div class="wrap"><table class="log"><thead><tr><th>Item</th><th>Unit</th><th class="r">Default Cost</th></tr></thead><tbody>${S.reqItems.map(i=>`<tr><td>${esc(i.name)}</td><td>${esc(i.unit)}</td><td class="r mono">${peso(i.cost)}</td></tr>`).join("")}</tbody></table></div></section>`
+};
+
+/* ============================================================ RELEASING OFFICER */
+const certRows=()=>S.enrollments.map(e=>({e,cs:certState(e)})).filter(x=>x.cs&&x.cs.s!=="Training not finished");
+function certTone(cs){return cs.overdue?"bad":cs.s==="Due"?"info":cs.s==="Printed"||cs.s==="Released"?"ok":"warn"}
+V.releasing_officer={
+  "Dashboard":()=>{const rows=certRows(),due=rows.filter(x=>x.cs.s==="Due"),over=due.filter(x=>x.cs.overdue),paidD=S.deliveries.filter(d=>d.status==="Paid");
+    return head("Releasing Officer","Dashboard")+(over.length?`<div class="banner red"><b>${over.length} certificate(s) overdue to print</b><span>${over.map(x=>nameOf(Tn(x.e.trainee))).join(", ")}</span><span class="sp"></span><button class="btn sm" data-act="go" data-tab="Certificates">Print Now</button></div>`:"")+(paidD.length?`<div class="banner amber"><b>${paidD.length} paid delivery request(s) to ship</b><span class="sp"></span><button class="btn sm" data-act="go" data-tab="Delivery">Open Delivery</button></div>`:"")+
+    `<div class="rail"><section class="panel"><div class="ph"><h2>Certificates</h2></div><div class="tiles">${["Due","Waiting for photo","Waiting for payment","Printed","Released"].map((s,i)=>tile(s,rows.filter(x=>x.cs.s===s).length,["#0571D0","#c2410c","#F25615","#0a7a3e","#5b6f7f"][i])).join("")}${tile("Overdue",over.length,"#b42318",over.length?"alarm":"")}</div></section>
+    <section class="panel"><div class="ph"><h2>Due to Print</h2></div>${certTable(due)}</section></div>`},
+  "Certificates":()=>head("Releasing Officer","Certificates")+`<section class="panel">${certTable(certRows())}<p class="foot">A certificate prints once, after the training ended, the fee is settled and the trainee's 2x2 photo is on file. A reprint needs a paid Reprinting request or an Admin-approved void.</p></section>`,
+  "Templates":()=>head("Releasing Officer","Templates")+`<section class="panel"><div class="wrap" style="margin-top:18px"><table class="log"><thead><tr><th>Course</th><th>Group</th><th>Template (PDF)</th><th></th></tr></thead><tbody>${S.courses.map(c=>`<tr><td><b>${c.code}</b><small>${esc(c.name)}</small></td><td>${c.cat}</td><td>${S.templates[c.id]?pill(`Version ${S.templates[c.id]}`,"ok"):pill("No template yet","warn")}</td><td><button class="btn sm ${S.templates[c.id]?"":"pri"}" data-act="tplUpload" data-id="${c.id}">${S.templates[c.id]?"Replace PDF":"Upload PDF"}</button></td></tr>`).join("")}</tbody></table></div><p class="foot">Uploading finds the 2x2 photo box on the PDF automatically.</p></section>`,
+  "Numbering":()=>head("Releasing Officer","Numbering")+`<section class="panel"><div class="wrap" style="margin-top:18px"><table class="log"><thead><tr><th>Course</th><th>Prefix</th><th>Next No.</th><th>Next Certificate</th><th></th></tr></thead><tbody>${S.courses.map(c=>{const s=S.series[c.id]||{prefix:"",next:1};const can=c.cat==="In-House";return `<tr><td><b>${c.code}</b><small>${c.cat}</small></td><td>${can?`<input class="inp sm" id="sp_${c.id}" value="${esc(s.prefix)}">`:`<span class="mono">${esc(s.prefix||"—")}</span>`}</td><td>${can?`<input class="inp sm" type="number" min="1" id="sn_${c.id}" value="${s.next}">`:`<span class="mono">${s.next}</span>`}</td><td class="mono">${s.prefix?esc(s.prefix)+String(s.next).padStart(5,"0"):"Not set"}</td><td>${can?`<button class="btn sm pri" data-act="seriesSave" data-id="${c.id}">Save</button>`:`<small>Set by the Admin</small>`}</td></tr>`}).join("")}</tbody></table></div></section>`,
+  "Delivery":()=>head("Releasing Officer","Delivery")+`<section class="panel"><div class="wrap" style="margin-top:18px"><table class="log"><thead><tr><th>Request</th><th>Trainee</th><th>Address</th><th>Status</th><th>LBC Tracking No.</th><th></th></tr></thead><tbody>${S.deliveries.filter(d=>["Paid","Shipped","Delivered"].includes(d.status)).map(d=>`<tr><td class="mono">${d.no}</td><td>${esc(nameOf(Tn(E(d.enr).trainee)))}</td><td>${esc(d.address)}</td><td>${pill(d.status,d.status==="Paid"?"warn":"ok")}</td><td>${d.status==="Paid"?`<input class="inp sm" id="trk_${d.id}" placeholder="Required">`:`<span class="mono">${esc(d.tracking)}</span>`}</td><td>${d.status==="Paid"?`<button class="btn sm pri" data-act="ship" data-id="${d.id}">Mark Shipped</button>`:d.status==="Shipped"?`<button class="btn sm" data-act="delivered" data-id="${d.id}">Mark Delivered</button>`:""}</td></tr>`).join("")||`<tr><td colspan="6" class="empty">No paid delivery requests.</td></tr>`}</tbody></table></div></section>`
+};
+function certTable(rows){if(!rows.length)return `<p class="empty">Nothing here.</p>`;return `<div class="wrap"><table class="log"><thead><tr><th>Trainee</th><th>Course · Ended</th><th>Certificate No.</th><th>Photo</th><th>Prints</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(({e,cs})=>{const c=cs.c||{};return `<tr><td><b>${esc(nameOf(Tn(e.trainee)))}</b><small>${Tn(e.trainee).app}</small></td><td>${C(e.course).code}<small>${fmt(B(e.batch).end)}</small></td><td class="mono">${esc(c.number||"—")}</td><td>${c.photo?pill("On File","ok"):`<button class="btn sm" data-act="photoModal" data-id="${e.id}">Upload Photo</button>`}</td><td class="mono">${c.prints||0}/1</td><td>${pill(cs.overdue?"Overdue":cs.s==="Waiting for photo"?"Photo Needed":cs.s==="Printed"?"Printed · For Pick-Up":cs.s,certTone(cs))}${cs.s==="Waiting for payment"?`<small>${peso(bal(e))} due</small>`:""}</td><td><span class="acts">${["Due","Waiting for photo","Printed"].includes(cs.s)?`<button class="btn sm" data-act="preview" data-id="${e.id}">Preview</button>`:""}${cs.s==="Due"?`<button class="btn sm pri" data-act="print" data-id="${e.id}">Print</button>`:""}${cs.s==="Printed"?`<button class="btn sm" data-act="release" data-id="${e.id}">Release</button>`:""}</span></td></tr>`}).join("")}</tbody></table></div>`}
+
+/* ============================================================ MISMO */
+function mismoBatches(){return S.batches.filter(b=>STCW.includes(C(b.course).code)&&b.start<=S.today&&b.end>=S.today)}
+const at=(h)=>({date:S.today,hour:h});
+V.mismo_officer={
+  "Dashboard":()=>{const bs=mismoBatches();const rows=bs.flatMap(b=>S.enrollments.filter(e=>e.batch===b.id&&e.status==="Enrolled").map(e=>({e,b})));const at11=rows.filter(x=>bal(x.e,at(11))>0);
+    return head("MISMO Compliance Officer","Dashboard")+`<div class="note">Uses the test clock at the top: set the time to 11:00 AM or 4:00 PM to see each list.</div>`+(S.hour<11?`<div class="banner blue"><b>The 11:00 AM list opens at 11:00 AM.</b></div>`:S.hour<16?(at11.length?`<div class="banner red"><b>${at11.length} trainee(s) not settled as of 11:00 AM</b><span>Print the list for the instructor.</span></div>`:`<div class="banner green"><b>Everyone in today's STCW classes settled by 11:00 AM.</b></div>`):`<div class="banner green"><b>4:00 PM cut-off passed — the final list is ready.</b><span class="sp"></span><button class="btn sm" data-act="go" data-tab="Final List">Open Final List</button></div>`)+
+    `<div class="rail"><section class="panel"><div class="ph"><h2>Today's STCW Trainees</h2></div><div class="tiles">${tile("In class",rows.length,"#0571D0")}${tile("Owing now",rows.filter(x=>bal(x.e)>0).length,"#b42318")}${tile("Batches",bs.length,"#5b6f7f")}</div></section>
+    <section class="panel"><div class="ph"><h2>Not Settled as of 11:00 AM</h2></div>${S.hour<11?`<p class="empty">The list is taken at 11:00 AM.</p>`:`<div class="wrap"><table class="log"><thead><tr><th>Trainee</th><th>Batch · Course</th><th>Room · Instructor</th><th class="r">Balance at 11:00</th><th>Now</th></tr></thead><tbody>${at11.map(({e,b})=>`<tr><td><b>${esc(nameOf(Tn(e.trainee)))}</b></td><td>${b.no} · ${C(b.course).code}</td><td>${roomName(b.room)||"—"} · ${instrName(b.instr)||"—"}</td><td class="r mono">${peso(bal(e,at(11)))}</td><td>${bal(e)>0?pill("Still owing","bad"):pill("Paid since","ok")}</td></tr>`).join("")||`<tr><td colspan="5" class="empty">None.</td></tr>`}</tbody></table></div>`}</section></div>`},
+  "Final List":()=>{const bs=mismoBatches();return head("MISMO Compliance Officer","Final List")+(S.hour<16?`<div class="banner amber"><b>The final list is made at 4:00 PM.</b><span>Set the test clock to 4:00 PM.</span></div>`:"")+bs.map(b=>{const es=S.enrollments.filter(e=>e.batch===b.id&&e.status==="Enrolled");const ok=es.filter(e=>bal(e,at(16))===0),out=es.filter(e=>bal(e,at(16))>0);
+    return `<section class="panel"><div class="ph"><h2>${b.no} · ${esc(C(b.course).name)}</h2><span class="acts"><button class="btn sm" data-act="copyCsv" data-id="${b.id}" ${S.hour<16?"disabled":""}>Copy CSV</button>${S.mismo[b.id]?pill("Submitted","ok"):`<button class="btn sm pri" data-act="mismoSubmit" data-id="${b.id}" ${S.hour<16||!ok.length?"disabled":""}>Mark Submitted</button>`}</span></div><div class="wrap"><table class="log"><thead><tr><th>#</th><th>Last Name</th><th>First Name</th><th>Birth Date</th><th>SRN</th><th>Status</th></tr></thead><tbody>${ok.map((e,i)=>{const t=Tn(e.trainee);return `<tr><td class="no">${i+1}</td><td><b>${esc(t.last)}</b></td><td>${esc(t.first)}</td><td class="mono">${t.birth}</td><td class="mono">${t.srn}</td><td>${pill("For MARINA","ok")}</td></tr>`}).join("")}${out.map(e=>{const t=Tn(e.trainee);return `<tr class="miss"><td class="no">—</td><td>${esc(t.last)}</td><td>${esc(t.first)}</td><td class="mono">${t.birth}</td><td class="mono">${t.srn}</td><td>${pill("Left off · unpaid at 4 PM","bad")}</td></tr>`}).join("")||""}</tbody></table></div></section>`}).join("")||`<section class="panel"><p class="empty">No STCW class today.</p></section>`},
+  "Submissions":()=>head("MISMO Compliance Officer","Submissions")+`<section class="panel"><div class="wrap" style="margin-top:18px"><table class="log"><thead><tr><th>Batch</th><th>Course</th><th>Submitted</th></tr></thead><tbody>${Object.entries(S.mismo).map(([bid,when])=>`<tr><td class="mono">${B(bid).no}</td><td>${C(B(bid).course).code}</td><td>${esc(when)}</td></tr>`).join("")||`<tr><td colspan="3" class="empty">Nothing submitted yet.</td></tr>`}</tbody></table></div></section>`
+};
+
+/* ============================================================ ADMIN ASSISTANT */
+V.admin_assistant={
+  "Dashboard":()=>{const iss=issues().filter(i=>i.role==="admin_assistant");return head("Admin Assistant","Dashboard",`<button class="btn pri" data-act="go" data-tab="Requisitions">New Requisition</button>`)+`<section class="panel"><div class="ph"><h2>Needs Attention</h2><span class="m">${iss.length}</span></div><div class="pb" style="display:flex;flex-direction:column;gap:8px">${iss.map(issueCard).join("")||`<p class="empty">All clear.</p>`}</div></section>`},
+  "Requisitions":()=>{const d=S.ui.rqDraft||[["Coffee Cups",1,18000]];const tot=d.reduce((s,l)=>s+l[1]*l[2],0);
+    return head("Admin Assistant","Requisitions")+`<section class="panel"><div class="ph"><h2>New Requisition</h2></div><div class="form"><label class="f full">Purpose<input id="rq_purpose" value="Pantry restock"></label></div><div class="wrap"><table class="log"><thead><tr><th>Item</th><th>Qty</th><th class="r">Unit Cost</th><th class="r">Amount</th><th></th></tr></thead><tbody>${d.map((l,i)=>`<tr><td><select class="inp" data-act="rqItem" data-i="${i}">${S.reqItems.map(it=>`<option ${it.name===l[0]?"selected":""}>${esc(it.name)}</option>`).join("")}</select></td><td><input class="inp sm" type="number" min="1" value="${l[1]}" data-act="rqQty" data-i="${i}"></td><td class="r mono">${peso(l[2])}</td><td class="r mono">${peso(l[1]*l[2])}</td><td><button class="btn sm" data-act="rqRemove" data-i="${i}">Remove</button></td></tr>`).join("")}</tbody></table></div><div class="mf"><button class="btn" data-act="rqAdd">Add Item</button><span style="margin-right:auto;align-self:center">Total <b class="mono">${peso(tot)}</b></span><button class="btn org" data-act="rqSend" ${d.length?"":"disabled"}>Send for Approval</button></div></section>
+    <section class="panel"><div class="ph"><h2>Requisition Log</h2></div><div class="wrap"><table class="log"><thead><tr><th>RQ No.</th><th>Date</th><th>Items</th><th class="r">Total</th><th>Status</th></tr></thead><tbody>${S.requisitions.map(r=>{const x=S.expenses.find(e=>e.id===r.expense);const st=r.status==="Approved"?(x&&x.status==="Released"?"Released":"Approved"):r.status;return `<tr><td class="mono">${r.no}</td><td>${fmt(r.date)}</td><td>${r.lines.map(l=>`${esc(l[0])} × ${l[1]}`).join(", ")}</td><td class="r mono">${peso(r.lines.reduce((s,l)=>s+l[1]*l[2],0))}</td><td>${pill(st+(x?.cv?` · ${x.cv}`:""),st==="Released"?"ok":st==="Approved"?"info":st==="Rejected"?"bad":"warn")}</td></tr>`}).join("")}</tbody></table></div></section>`},
+  "Resource Planning":()=>head("Admin Assistant","Resource Planning")+`<section class="panel"><div class="wrap" style="margin-top:18px"><table class="log"><thead><tr><th>Course</th><th>Batch · Dates</th><th>Classroom</th><th class="r">Students</th><th>Instructor</th></tr></thead><tbody>${S.batches.filter(b=>b.end>=S.today).sort((a,b)=>a.start.localeCompare(b.start)).map(b=>{const c=C(b.course),n=S.enrollments.filter(e=>e.batch===b.id).length,r=S.rooms.find(x=>x.id===b.room),ins=S.instructors.find(i=>i.id===b.instr),a=ins?.acc.find(a=>a.course===b.course);
+    const warnR=!b.room?"No classroom":r&&n>r.cap?`Over capacity (${r.cap})`:"";const warnI=!ins?"No instructor":!a?"Not accredited":a.until<b.start?"Accreditation expired":"";
+    return `<tr><td><b>${c.code}</b><small>${esc(c.name)}</small></td><td class="mono">${b.no}<small>${fmt(b.start)}${b.end!==b.start?"–"+fmt(b.end):""}</small></td><td><select class="inp" data-act="planRoom" data-id="${b.id}"><option value="">Choose Classroom</option>${S.rooms.map(x=>`<option value="${x.id}" ${x.id===b.room?"selected":""}>${x.name} (${x.cap})</option>`).join("")}</select>${warnR?`<small style="color:var(--bad);font-weight:600">${warnR}</small>`:""}</td><td class="r mono">${n} / ${b.cap}</td><td><select class="inp" data-act="planInstr" data-id="${b.id}"><option value="">Choose Instructor</option>${S.instructors.map(i=>{const aa=i.acc.find(x=>x.course===b.course);return `<option value="${i.id}" ${i.id===b.instr?"selected":""}>${esc(i.name)}${aa?(aa.until<b.start?" · expired":" · accredited"):" · not accredited"}</option>`}).join("")}</select>${warnI?`<small style="color:var(--bad);font-weight:600">${warnI}</small>`:""}</td></tr>`}).join("")}</tbody></table></div></section>`,
+  "Instructors":()=>head("Admin Assistant","Instructors")+`<section class="panel"><div class="wrap" style="margin-top:18px"><table class="log"><thead><tr><th>Instructor</th><th>Mobile</th><th>Course Accreditations</th><th>Add Accreditation</th></tr></thead><tbody>${S.instructors.map(i=>`<tr><td><b>${esc(i.name)}</b></td><td class="mono">${esc(i.mobile)}</td><td><div class="chips">${i.acc.map(a=>pill(`${C(a.course).code} · ${a.no} · until ${fmt(a.until)}`,a.until<S.today?"bad":a.until<addDays(S.today,30)?"warn":"ok")).join("")}</div></td><td><span class="acts"><select class="inp sm" id="ac_c_${i.id}">${S.courses.map(c=>`<option value="${c.id}">${c.code}</option>`).join("")}</select><input class="inp sm" type="date" id="ac_u_${i.id}" value="2027-06-30"><button class="btn sm" data-act="accAdd" data-id="${i.id}">Add</button></span></td></tr>`).join("")}</tbody></table></div></section>`,
+  "Reconciliation":()=>reconView()
+};
+function reconView(){const ch=S.ui.ch||"GCash",day=S.ui.rday||S.today;const rows=S.payments.filter(p=>p.mode===ch&&p.date===day).sort((a,b)=>a.hour-b.hour);const days=[...Array(10)].map((_,i)=>addDays(S.today,-i));
+  const toCheck=c=>S.payments.filter(p=>p.mode===c&&!p.recon&&p.date<=S.today).length;
+  return head("Admin Assistant","Payment Reconciliation",`<input type="date" class="inp sm" id="rday" value="${day}" max="${S.today}">`)+`<div class="chips">${CHANNELS.map(c=>{const n=toCheck(c);return `<button class="chip ${c===ch?"on":""}" data-act="ch" data-v="${c}">${c}<em class="${n?"":"ok"}">${n?n+" to check":"✓"}</em></button>`}).join("")}</div>
+  <div class="rail"><section class="panel"><div class="ph"><h2>Last 10 Days</h2><span class="m">${ch}</span></div><div class="tiles">${days.map(d=>{const l=S.payments.filter(p=>p.mode===ch&&p.date===d),t=l.filter(p=>!p.recon).length;return `<button class="tile ${d===day?"on":""}" style="--c:${t?(d<S.today?"#b42318":"#F25615"):"#0a7a3e"}" data-act="rday" data-v="${d}"><i></i><span>${d===S.today?"Today":fmt(d)} · ${l.length}</span><b>${t?t+" to check":l.length?"✓":"—"}</b></button>`}).join("")}</div></section>
+  <section class="panel"><div class="ph"><h2>${ch} Payments · ${fmt(day)}</h2><span class="acts"><button class="btn sm pri" data-act="reconMark">Mark Ticked Reconciled</button></span></div><div class="wrap"><table class="log"><thead><tr><th></th><th>Time</th><th>Receipt</th><th>Trainee</th><th>${ch} Ref. No.</th><th class="r">Amount</th><th>Status</th><th></th></tr></thead><tbody>${rows.map(p=>`<tr class="${p.recon==="Reconciled"?"done":p.recon?"miss":""}"><td>${p.recon?"":`<input type="checkbox" class="rcck" value="${p.id}" aria-label="Tick ${esc(p.ref)}">`}</td><td class="mono">${hh(p.hour)}</td><td class="mono">${p.receipt}</td><td>${esc(nameOf(Tn(p.trainee)))}</td><td class="mono"><b>${esc(p.ref)}</b></td><td class="r mono">${peso(p.amount)}</td><td>${p.recon?pill(p.recon,p.recon==="Reconciled"?"ok":"bad"):pill("To Check","warn")}${p.note?`<small>${esc(p.note)}</small>`:""}</td><td>${p.recon?`<button class="link" data-act="reconUndo" data-id="${p.id}">Undo</button>`:`<button class="link" data-act="reconMiss" data-id="${p.id}">Not in History</button>`}</td></tr>`).join("")||`<tr><td colspan="8" class="empty">No ${ch} payments on this day.</td></tr>`}</tbody></table></div><p class="foot">Tick the payments you find on the printed ${ch} transaction history.</p></section></div>`}
+
+/* ============================================================ ADMIN */
+V.admin={
+  "Dashboard":()=>{const iss=issues();const counts={Trainees:S.trainees.length,Enrollments:S.enrollments.length,Payments:S.payments.length,Expenses:S.expenses.length,Batches:S.batches.length,Deliveries:S.deliveries.length};
+    return head("Admin","Dashboard")+`<div class="rail"><section class="panel"><div class="ph"><h2>System</h2></div><div class="tiles">${Object.entries(counts).map(([k,v])=>tile(k,v,"#0571D0")).join("")}${tile("Open Issues",iss.length,"#b42318",iss.some(i=>i.sev==="bad")?"alarm":"")}</div></section>
+    <section class="panel"><div class="ph"><h2>Issues Across All Roles</h2><span class="m">${iss.length}</span></div><div class="pb" style="display:flex;flex-direction:column;gap:8px">${iss.map(issueCard).join("")||`<p class="empty">No issues found.</p>`}</div></section></div>`},
+  "Employee Accounts":()=>head("Admin","Employee Accounts")+`<section class="panel"><div class="ph"><h2>Add Employee Account</h2><span class="m">Up to two roles, switched in Working As</span></div><form class="form" data-form="user"><label class="f">Complete Name<input id="us_name" value="Jose Rizal Jr."></label><label class="f">Email<input id="us_email" value="jose.r@example.com"></label><label class="f">Role<select id="us_r1">${ROLES.slice(1).map(([k,l])=>`<option value="${k}">${l}</option>`).join("")}</select></label><label class="f">Second Role (Optional)<select id="us_r2"><option value="">None</option>${ROLES.slice(1).map(([k,l])=>`<option value="${k}">${l}</option>`).join("")}</select></label><div class="full acts"><button class="btn pri" type="submit">Create Account</button><small style="color:var(--muted)">The temporary password is typed by the Admin in the real portal.</small></div></form>
+   <div class="wrap"><table class="log"><thead><tr><th>Employee</th><th>Roles</th></tr></thead><tbody>${S.users.map(u=>`<tr><td><b>${esc(u.name)}</b><small>${esc(u.email)}</small></td><td><div class="chips">${u.roles.map(r=>pill(roleLabel(r),"ok")).join("")}</div></td></tr>`).join("")}</tbody></table></div></section>`,
+  "Certificate Controls":()=>{const printed=S.enrollments.filter(e=>S.certs[e.id]?.number);return head("Admin","Certificate Controls")+`<section class="panel"><div class="ph"><h2>Change a Certificate Number</h2><span class="m">Admin only · audited</span></div><div class="wrap"><table class="log"><thead><tr><th>Trainee</th><th>Course</th><th>Certificate No.</th><th>Reason</th><th></th></tr></thead><tbody>${printed.map(e=>`<tr><td>${esc(nameOf(Tn(e.trainee)))}</td><td>${C(e.course).code}</td><td><input class="inp sm" id="cn_${e.id}" value="${esc(S.certs[e.id].number)}"></td><td><input class="inp sm" id="cr_${e.id}" placeholder="Required"></td><td><button class="btn sm pri" data-act="certNo" data-id="${e.id}">Save</button></td></tr>`).join("")||`<tr><td colspan="5" class="empty">No numbered certificates yet.</td></tr>`}</tbody></table></div></section>
+   <section class="panel"><div class="ph"><h2>STCW Numbering</h2></div><div class="wrap"><table class="log"><thead><tr><th>Course</th><th>Prefix</th><th>Next No.</th><th></th></tr></thead><tbody>${S.courses.filter(c=>c.cat==="STCW").map(c=>{const s=S.series[c.id]||{prefix:"",next:1};return `<tr><td><b>${c.code}</b></td><td><input class="inp sm" id="sp_${c.id}" value="${esc(s.prefix)}"></td><td><input class="inp sm" type="number" min="1" id="sn_${c.id}" value="${s.next}"></td><td><button class="btn sm pri" data-act="seriesSave" data-id="${c.id}">Save</button></td></tr>`}).join("")}</tbody></table></div></section>`},
+  "Activity":()=>head("Admin","Activity Log")+`<section class="panel"><div class="pb" style="padding-top:16px"><div class="activity">${S.log.map(l=>`<div><time>${esc(l.when)}</time><span><b>${esc(l.who)}</b> — ${esc(l.what)}</span></div>`).join("")}</div></div></section>`,
+  "Reset Data":()=>{const r=S.ui.reset||{from:addDays(S.today,-3),to:S.today};const inR=d=>d>=r.from&&d<=r.to;const cnt={Trainees:S.trainees.filter(t=>inR(t.created)).length,Enrollments:S.enrollments.filter(e=>inR(e.created)).length,Payments:S.payments.filter(p=>inR(p.date)).length,Expenses:S.expenses.filter(x=>inR(x.date)).length,Requisitions:S.requisitions.filter(x=>inR(x.date)).length,"Batches starting in range":S.batches.filter(b=>inR(b.start)).length};
+    return head("Admin","Reset Data")+`<div class="note">Planned feature, shown here on test data only. In the real portal this needs your approval of the deletion step before it is built.</div><section class="panel"><div class="form" style="padding-top:18px"><label class="f">From<input type="date" id="rs_from" value="${r.from}"></label><label class="f">To<input type="date" id="rs_to" value="${r.to}"></label></div><div class="wrap"><table class="log"><thead><tr><th>Records to erase</th><th class="r">Count</th></tr></thead><tbody>${Object.entries(cnt).map(([k,v])=>`<tr><td>${k}</td><td class="r mono">${v}</td></tr>`).join("")}</tbody></table></div><div class="pb"><div class="banner amber"><b>This permanently erases these records.</b><span>Staff accounts, courses, configuration, templates and the audit log are kept.</span></div></div><div class="mf"><input class="inp sm" id="rs_word" placeholder="Type RESET"><button class="btn danger" data-act="resetRange">Erase Records</button><button class="btn" data-act="resetAll">Reload All Test Data</button></div></section>`}
+};
+
+/* ============================================================ issue card, drawers, modals */
+function issueCard(i){return `<div class="issue" style="--c:${i.sev==="bad"?"var(--bad)":"var(--warn)"}"><b>${esc(i.t)}</b><small>${esc(i.d)}</small><span class="acts"><span class="pill p-mute">${roleLabel(i.role)} › ${esc(i.tab)}</span><button class="link" data-act="goIssue" data-role="${i.role}" data-tab="${esc(i.tab)}">Open</button></span></div>`}
+const SCRIPT=[
+ ["Public Website › Register","Submit the sample application. It appears in Registration › Applications under No Course Yet or Screening."],
+ ["Registration › Applications","Tick all four requirements for Juan Dela Cruz and click Hand to Cashier."],
+ ["Cashier › Record Payment","Record Maria Santos paying both courses in one GCash payment (split). Try leaving the reference blank first."],
+ ["Cashier","Pay Juan Dela Cruz in Cash. He becomes Enrolled automatically; check Registration › Dashboard › Enrolled Today."],
+ ["Accounting › Approvals","Approve the Meralco expense (a CV number appears) and the pantry requisition; reject the discount with a reason."],
+ ["Cashier › Expenses","Mark the approved vouchers Released; the requisition shows Released for the Admin Assistant."],
+ ["Releasing Officer › Certificates","Upload a 2x2 photo for Paolo Reyes (any image, or the sample), Preview, then Print. Print Carlo Mendoza's overdue certificate."],
+ ["Registration › Delivery Requests","Send Ana Bautista's request to the Cashier; collect the ₱500 fee in Cashier › Requests; ship it with a tracking number as Releasing Officer."],
+ ["Test clock 11:00 AM / 4:00 PM","As MISMO Officer, see Liza Garcia owing at 11:00 AM. Pay her balance as Cashier, then at 4:00 PM she is on the final list. Mark Submitted."],
+ ["Admin Assistant › Reconciliation","Tick yesterday's GCash payment Reconciled, mark another Not in History; check Accounting's dashboard alert."],
+ ["Admin Assistant › Resource Planning","Give BCH-2026-0416 a room and an accredited instructor; watch the issue disappear."],
+ ["Next Day","Click Next Day and open Issues: overdue certificates, unreconciled payments and unpaid balances update automatically."]];
+function overlay(){
+  const o=$("overlay");if(S.drawer==="issues"){const l=issues();o.innerHTML=`<div class="scrim" data-act="closeDrawer"><aside class="drawer" role="dialog" aria-label="Issues" data-stop="1"><div class="head"><h2>Issues Found (${l.length})</h2><button class="btn sm" data-act="closeDrawer">Close</button></div><p style="margin:0;color:var(--muted);font-size:13.5px">Checked live against the test data and the test clock, across every role.</p>${l.map(issueCard).join("")||`<p class="empty">No issues found.</p>`}</aside></div>`;return}
+  if(S.drawer==="guide"){o.innerHTML=`<div class="scrim" data-act="closeDrawer"><aside class="drawer" role="dialog" aria-label="Test script" data-stop="1"><div class="head"><h2>Test Script</h2><button class="btn sm" data-act="closeDrawer">Close</button></div><p style="margin:0;color:var(--muted);font-size:13.5px">Walk one trainee from registration to certificate. Tick each step as you go; your progress stays in this browser.</p>${SCRIPT.map((s,i)=>`<label class="issue" style="--c:${S.script[i]?"var(--ok)":"var(--line)"}"><span class="chk"><input type="checkbox" data-act="scriptTick" data-i="${i}" ${S.script[i]?"checked":""}> <b>${i+1}. ${esc(s[0])}</b></span><small>${esc(s[1])}</small></label>`).join("")}<button class="btn" data-act="resetAll">Reload All Test Data</button></aside></div>`;return}
+  if(!S.modal){o.innerHTML="";return}
+  const m=S.modal;let body="",foot="",title="";
+  if(m.type==="pay"){title="Record Payment";const tid=m.tid||"";const cands=[...new Set(S.enrollments.filter(e=>e.status!=="Cancelled"&&(e.handed||e.status==="Enrolled")&&bal(e)>0).map(e=>e.trainee))];
+    const es=tid?S.enrollments.filter(e=>e.trainee===tid&&e.status!=="Cancelled"&&bal(e)>0):[];
+    body=`<label class="f">Trainee<select id="pm_t" data-act="pmT"><option value="">Choose trainee</option>${cands.map(t=>`<option value="${t}" ${t===tid?"selected":""}>${esc(nameOf(Tn(t)))} · ${Tn(t).app}</option>`).join("")}</select></label>
+    ${es.length?`<div class="wrap" style="margin:0"><table class="log"><thead><tr><th>Course</th><th class="r">Balance</th><th class="r">Amount to Apply (₱)</th></tr></thead><tbody>${es.map(e=>`<tr><td>${C(e.course).code}<small>${E(e.id).no}${S.charges.some(c=>c.enr===e.id)?" · includes fees":""}</small></td><td class="r mono">${peso(bal(e))}</td><td class="r"><input class="inp sm pmA" type="number" min="0" step="0.01" data-enr="${e.id}" value="${(bal(e)/100).toFixed(2)}"></td></tr>`).join("")}</tbody></table></div>`:tid?`<p class="empty">No balance for this trainee.</p>`:""}
+    <div class="chips">${MODES.map(x=>`<button class="chip ${x===(m.mode||"Cash")?"on":""}" data-act="pmMode" data-v="${x}">${x}</button>`).join("")}</div>
+    ${(m.mode||"Cash")!=="Cash"?`<div class="form" style="padding:0"><label class="f">${m.mode} Reference No. (required)<input id="pm_ref"></label><label class="chk" style="align-self:end"><input type="checkbox" id="pm_proof" checked> Proof uploaded to Google Drive</label></div>`:""}
+    <p id="pm_msg" style="margin:0;color:var(--bad);font-weight:600"></p>`;
+    foot=`<button class="btn" data-act="closeModal">Cancel</button><button class="btn org" data-act="pmSave" ${es.length?"":"disabled"}>Record Payment</button>`}
+  if(m.type==="exp"){title="Record Expense";body=`<div class="form" style="padding:0"><label class="f">Payee<input id="ex_payee" value="PLDT"></label><label class="f">Category<select id="ex_cat"><option>Utilities</option><option>Supplies</option><option>Courier</option><option>Repairs</option></select></label><label class="f">Amount (₱)<input id="ex_amt" type="number" value="2899"></label><label class="f">Payment Channel<select id="ex_mode">${MODES.map(x=>`<option>${x}</option>`).join("")}</select></label><label class="f full">Purpose<input id="ex_purpose" value="October internet"></label></div>`;foot=`<button class="btn" data-act="closeModal">Cancel</button><button class="btn org" data-act="expSave">Send for Approval</button>`}
+  if(m.type==="photo"){const e=E(m.id),t=Tn(e.trainee);title="Upload 2x2 Photo";body=`<p style="margin:0"><b>${esc(nameOf(t))}</b><br><span class="mono" style="font-size:12.5px;color:var(--muted)">${esc(`${t.last.toUpperCase()}, ${t.first.toUpperCase()} - ${C(e.course).code} - ${B(e.batch).no} - ${B(e.batch).end}.jpg`)}</span></p>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start"><div style="width:160px;height:160px;border:1px dashed var(--line);border-radius:10px;display:grid;place-items:center;overflow:hidden;background:var(--soft)">${m.url?`<img src="${m.url}" alt="2x2 preview" style="width:100%;height:100%;object-fit:cover">`:`<span style="color:var(--muted)">2 × 2</span>`}</div>
+    <div style="display:flex;flex-direction:column;gap:8px;flex:1;min-width:200px"><label class="btn" style="align-self:flex-start">Choose Photo<input type="file" accept="image/*" id="ph_file" hidden></label><button class="btn" data-act="phSample" style="align-self:flex-start">Use Sample Photo</button>${m.info?`<small style="color:var(--muted)">${esc(m.info)}</small>`:""}${m.url?(m.white?`<b style="color:var(--ok)">✓ White background</b>`:`<b style="color:var(--bad)">⚠ The background does not look white. Retake against a white wall.</b>`):""}</div></div>
+    <label class="chk"><input type="checkbox" id="ph_conf" ${m.url?"":"disabled"}> White background and white polo with collar</label>`;
+    foot=`<button class="btn" data-act="closeModal">Cancel</button><button class="btn pri" data-act="phSave">Save Photo</button>`}
+  if(m.type==="preview"){const e=E(m.id),t=Tn(e.trainee),c=S.certs[e.id]||{},b=B(e.batch);title="Certificate Preview";body=`<div class="cert"><small style="letter-spacing:.2em;color:#5b6f7f">CERTIFICATE OF COMPLETION</small><small>This certifies that</small><div class="n">${esc((t.first+" "+t.last).toUpperCase())}</div><small>has successfully completed</small><b>${esc(C(e.course).name)}</b><div class="m">Certificate No. ${esc(c.number||nextCertNo(e.course,true))} · Batch ${b.no} · Conducted ${fmt(b.start)}${b.end!==b.start?"–"+fmt(b.end):""}</div><div class="ph2">${c.photoUrl?`<img src="${c.photoUrl}" alt="">`:c.photo?"2x2 photo":"No photo"}</div>${m.watermark?`<div class="wm">PREVIEW</div>`:""}</div>`;foot=`<button class="btn" data-act="closeModal">Close</button>`}
+  if(m.type==="reject"){title="Reject";body=`<label class="f">Reason (required)<select id="rj_reason"><option>Incomplete supporting documents</option><option>Amount does not match the receipt</option><option>Not budgeted this month</option><option>Duplicate request</option></select></label>`;foot=`<button class="btn" data-act="closeModal">Cancel</button><button class="btn danger" data-act="rejectSave">Reject</button>`}
+  if(m.type==="miss"){title="Not in History";body=`<label class="f">What did you find?<input id="ms_note" value="Not on the printout — asked the Cashier"></label>`;foot=`<button class="btn" data-act="closeModal">Cancel</button><button class="btn danger" data-act="missSave">Mark Not in History</button>`}
+  o.innerHTML=`<div class="modalbg"><div class="modal" role="dialog" aria-modal="true" aria-label="${esc(title)}"><header><h2>${esc(title)}</h2><button data-act="closeModal" aria-label="Close">×</button></header><div class="mb">${body}</div><div class="mf">${foot}</div></div></div>`;
+}
+function nextCertNo(cid,peek){const s=S.series[cid];if(!s||!s.prefix)return peek?"(numbering not set)":null;const n=s.prefix+String(s.next).padStart(5,"0");if(!peek)s.next++;return n}
+
+/* ============================================================ render */
+function render(){
+  const tabs=TABS[S.role];if(!tabs.includes(S.tab))S.tab=tabs[0];
+  $("role").innerHTML=ROLES.map(([k,l])=>`<option value="${k}" ${k===S.role?"selected":""}>${l}</option>`).join("");
+  $("today").value=S.today;
+  $("hour").innerHTML=[8,9,10,11,12,13,14,15,16,17].map(h=>`<option value="${h}" ${h===Math.floor(S.hour)?"selected":""}>${hh(h)}</option>`).join("");
+  $("tabs").innerHTML=tabs.map(t=>`<button class="${t===S.tab?"on":""}" data-act="tab" data-tab="${t}">${t}</button>`).join("");
+  const n=issues().length;$("issuesBtn").textContent=`Issues (${n})`;$("issuesBtn").classList.toggle("alert",n>0);
+  try{$("page").innerHTML=V[S.role][S.tab]()}catch(err){$("page").innerHTML=`<section class="panel"><p class="empty">This screen hit an error: ${esc(err.message)}. Click Reload All Test Data in Test Script.</p></section>`;console.error(err)}
+  overlay();save();
+}
+
+/* ============================================================ actions */
+const A={};
+A.tab=d=>{S.tab=d.tab};
+A.go=d=>{S.tab=d.tab};
+A.goIssue=d=>{S.role=d.role;S.tab=d.tab;S.drawer=null};
+A.nextDay=()=>{S.today=addDays(S.today,1);S.hour=8;logA("Test clock",`Moved to ${fmtL(S.today)}`);toast(`Now ${fmtL(S.today)}, 8:00 AM`)};
+A.openIssues=()=>{S.drawer="issues"};A.openGuide=()=>{S.drawer="guide"};A.closeDrawer=()=>{S.drawer=null};A.closeModal=()=>{S.modal=null};
+A.scriptTick=(d,el)=>{S.script[d.i]=el.checked};
+A.resetAll=()=>{const keepRole=S.role;S=seed();S.role=keepRole;toast("Test data reloaded")};
+A.req=(d,el)=>{const e=E(d.id);e.reqs[d.k]=el.checked};
+A.handover=d=>{const e=E(d.id);e.handed=true;logA(userOf("registration"),`Handed ${nameOf(Tn(e.trainee))} to the Cashier (${C(e.course).code})`);toast("Handed to the Cashier")};
+A.assign=d=>{const b=B($("as_"+d.id).value);if(!b)return;const c=C(b.course);S.enrollments.push({id:uid(),no:next("ENR"),trainee:d.id,course:c.id,batch:b.id,status:"Pending",reqs:{id:false,med:false,photo:false,book:false},handed:false,created:S.today,price:c.price});logA(userOf("registration"),`Assigned ${c.code} ${b.no} to ${nameOf(Tn(d.id))}`);toast("Course assigned — tick the requirements next")};
+A.dlCheck=d=>{const dr=S.deliveries.find(x=>x.id===d.id);dr.status="With the Cashier";S.charges.push({id:uid(),enr:dr.enr,desc:"Certificate delivery (LBC)",amount:50000,status:"Pending"});logA(userOf("registration"),`Sent delivery ${dr.no} to the Cashier (₱500 fee)`);toast("Sent to the Cashier — collect the ₱500 fee")};
+A.dlDecline=d=>{const dr=S.deliveries.find(x=>x.id===d.id);dr.status="Declined";logA(userOf("registration"),`Declined delivery ${dr.no}`);toast("Declined — the trainee is emailed")};
+A.payModal=d=>{S.modal={type:"pay",tid:d.id||"",mode:"Cash"}};
+A.pmMode=d=>{S.modal.mode=d.v;const sel=$("pm_t");if(sel)S.modal.tid=sel.value};
+A.pmSave=()=>{const m=S.modal;const allocs=[...document.querySelectorAll(".pmA")].map(i=>({enr:i.dataset.enr,amt:Math.round((+i.value||0)*100)})).filter(a=>a.amt>0);const msg=$("pm_msg");
+  if(!allocs.length){msg.textContent="Enter an amount for at least one course.";return}
+  for(const a of allocs){if(a.amt>bal(E(a.enr))){msg.textContent=`${C(E(a.enr).course).code}: amount is more than the balance.`;return}}
+  const mode=m.mode||"Cash";const ref=$("pm_ref")?.value.trim()||"";if(mode!=="Cash"&&!ref){msg.textContent=`${mode} needs a reference number.`;return}
+  if(mode!=="Cash"&&S.payments.some(p=>p.ref===ref)){msg.textContent="This reference number was already used — check for a duplicate.";return}
+  const total=allocs.reduce((s,a)=>s+a.amt,0);S.payments.push({id:uid(),no:next("PAY"),receipt:next("AR"),trainee:m.tid,mode,ref,date:S.today,hour:S.hour,amount:total,alloc:allocs,by:userOf("cashier"),recon:null});
+  for(const a of allocs)autoEnroll(E(a.enr));deliveryPaid();logA(userOf("cashier"),`Recorded ${mode} ${peso(total)} for ${nameOf(Tn(m.tid))} across ${allocs.length} course(s)`);S.modal=null;toast(`Payment recorded · receipt ${S.payments.at(-1).receipt}`)};
+A.expModal=()=>{S.modal={type:"exp"}};
+A.expSave=()=>{const amt=Math.round((+$("ex_amt").value||0)*100);if(!amt||!$("ex_payee").value.trim()){toast("Enter the payee and amount");return}S.expenses.unshift({id:uid(),no:next("ER"),cv:"",payee:$("ex_payee").value.trim(),cat:$("ex_cat").value,amount:amt,purpose:$("ex_purpose").value.trim(),mode:$("ex_mode").value,status:"For Approval",date:S.today});logA(userOf("cashier"),`Recorded expense ${S.expenses[0].no} for approval`);S.modal=null;toast("Sent to the Accounting Manager")};
+A.expRelease=d=>{const x=S.expenses.find(e=>e.id===d.id);x.status="Released";x.released=S.today;logA(userOf("cashier"),`Released voucher ${x.cv} (${peso(x.amount)})`);toast("Voucher released")};
+function decide(k,ok,reason){const [t,id]=k.split(":");
+  if(t==="x"){const x=S.expenses.find(e=>e.id===id);if(ok){x.status="Approved";x.cv=next("CV")}else{x.status="Rejected";x.reason=reason}logA(userOf("accounting"),`${ok?"Approved":"Rejected"} expense ${x.no}${ok?" → "+x.cv:""}`)}
+  if(t==="r"){const r=S.requisitions.find(e=>e.id===id);if(ok){r.status="Approved";const amt=r.lines.reduce((s,l)=>s+l[1]*l[2],0);const x={id:uid(),no:next("ER"),cv:next("CV"),payee:`Requisition ${r.no}`,cat:"Supplies",amount:amt,purpose:r.purpose,mode:"Cash",status:"Approved",date:S.today};S.expenses.unshift(x);r.expense=x.id}else{r.status="Rejected"}logA(userOf("accounting"),`${ok?"Approved":"Rejected"} requisition ${r.no}`)}
+  if(t==="d"){const dd=S.discounts.find(e=>e.id===id);dd.status=ok?"Approved":"Rejected";logA(userOf("accounting"),`${ok?"Approved":"Rejected"} discount for ${nameOf(Tn(E(dd.enr).trainee))}`)}}
+A.approve=d=>{decide(d.k,true);toast("Approved")};
+A.bulkApprove=()=>{const ks=[...document.querySelectorAll(".apck:checked")].map(i=>i.value);if(!ks.length){toast("Tick at least one item");return}ks.forEach(k=>decide(k,true));toast(`${ks.length} approved`)};
+A.reject=d=>{S.modal={type:"reject",k:d.k}};A.rejectSave=()=>{decide(S.modal.k,false,$("rj_reason").value);S.modal=null;toast("Rejected")};
+A.photoModal=d=>{S.modal={type:"photo",id:d.id}};
+A.phSample=()=>{const cv=document.createElement("canvas");cv.width=cv.height=600;const x=cv.getContext("2d");x.fillStyle="#fbfbfb";x.fillRect(0,0,600,600);x.fillStyle="#d9b38c";x.beginPath();x.arc(300,250,110,0,7);x.fill();x.fillStyle="#ffffff";x.fillRect(150,380,300,220);x.strokeStyle="#ccd6dd";x.lineWidth=6;x.beginPath();x.moveTo(260,385);x.lineTo(300,440);x.lineTo(340,385);x.stroke();S.modal.url=cv.toDataURL("image/jpeg",.85);S.modal.white=true;S.modal.info="Sample photo · 600 × 600"};
+A.phSave=()=>{const m=S.modal;if(!m.url){toast("Choose a photo first");return}if(!$("ph_conf").checked){toast("Confirm the white background and collared polo");return}S.certs[m.id]={...(S.certs[m.id]||{number:"",prints:0}),photo:true,photoUrl:m.url};logA(userOf("releasing_officer"),`Uploaded 2x2 photo for ${nameOf(Tn(E(m.id).trainee))}`);S.modal=null;toast("Photo saved")};
+A.preview=d=>{S.modal={type:"preview",id:d.id,watermark:true}};
+A.print=d=>{const e=E(d.id),c=S.certs[e.id]||(S.certs[e.id]={prints:0});if(!S.templates[e.course]){toast(`Upload the ${C(e.course).code} template first`);return}if(!c.number){const n=nextCertNo(e.course);if(!n){toast(`Set numbering for ${C(e.course).code} first`);return}c.number=n}c.prints=1;logA(userOf("releasing_officer"),`Printed certificate ${c.number} for ${nameOf(Tn(e.trainee))}`);toast(`Printed ${c.number}`)};
+A.release=d=>{S.certs[d.id].released=true;logA(userOf("releasing_officer"),`Released certificate to ${nameOf(Tn(E(d.id).trainee))} (pick-up)`);toast("Released")};
+A.tplUpload=d=>{S.templates[d.id]=(S.templates[d.id]||0)+1;logA(userOf("releasing_officer"),`Uploaded ${C(d.id).code} template v${S.templates[d.id]}`);toast("Template uploaded · 2x2 photo box found (2.0 × 2.0 in)")};
+A.seriesSave=d=>{const p=$("sp_"+d.id).value.trim(),n=Math.max(1,+$("sn_"+d.id).value||1);S.series[d.id]={prefix:p,next:n};logA(userOf(S.role),`Set ${C(d.id).code} numbering to ${p}${String(n).padStart(5,"0")}`);toast("Numbering saved")};
+A.ship=d=>{const dr=S.deliveries.find(x=>x.id===d.id);const t=$("trk_"+d.id).value.trim();if(t.length<4){toast("Enter the LBC tracking number");return}dr.status="Shipped";dr.tracking=t;S.certs[dr.enr].released=true;logA(userOf("releasing_officer"),`Shipped ${dr.no} via LBC ${t}`);toast("Shipped — the trainee can track it")};
+A.delivered=d=>{S.deliveries.find(x=>x.id===d.id).status="Delivered";toast("Marked delivered")};
+A.copyCsv=d=>{const b=B(d.id);const rows=S.enrollments.filter(e=>e.batch===b.id&&e.status==="Enrolled"&&bal(e,at(16))===0).map(e=>{const t=Tn(e.trainee);return [t.last,t.first,t.birth,t.srn,C(e.course).code].join(",")});const csv=["Last Name,First Name,Birth Date,SRN,Course",...rows].join("\n");navigator.clipboard?.writeText(csv).then(()=>toast("CSV copied")).catch(()=>toast("Copy not allowed here — the real portal downloads the file"))};
+A.mismoSubmit=d=>{S.mismo[d.id]=`${fmt(S.today)} ${hh(S.hour)}`;logA(userOf("mismo_officer"),`Submitted ${B(d.id).no} to the MARINA MISMO Portal`);toast("Recorded as submitted")};
+A.rqAdd=()=>{(S.ui.rqDraft=S.ui.rqDraft||[["Coffee Cups",1,18000]]).push([S.reqItems[0].name,1,S.reqItems[0].cost])};
+A.rqRemove=d=>{S.ui.rqDraft=(S.ui.rqDraft||[]).filter((_,i)=>i!=d.i)};
+A.rqSend=()=>{const d=S.ui.rqDraft||[["Coffee Cups",1,18000]];S.requisitions.unshift({id:uid(),no:next("RQ",4),purpose:$("rq_purpose").value.trim()||"Supplies",lines:d.map(l=>[...l]),status:"For Approval",date:S.today,expense:null});S.ui.rqDraft=null;logA(userOf("admin_assistant"),`Sent requisition ${S.requisitions[0].no}`);toast("Sent for approval")};
+A.accAdd=d=>{const i=S.instructors.find(x=>x.id===d.id);const c=$("ac_c_"+d.id).value,u=$("ac_u_"+d.id).value;const ex=i.acc.find(a=>a.course===c);if(ex)ex.until=u;else i.acc.push({course:c,no:"ACC-"+(1300+Math.floor(Math.random()*600)),until:u});toast("Accreditation saved")};
+A.ch=d=>{S.ui.ch=d.v};A.rday=d=>{S.ui.rday=d.v};
+A.reconMark=()=>{const ids=[...document.querySelectorAll(".rcck:checked")].map(i=>i.value);if(!ids.length){toast("Tick the payments you found on the printout");return}ids.forEach(id=>{S.payments.find(p=>p.id===id).recon="Reconciled"});logA(userOf("admin_assistant"),`Reconciled ${ids.length} ${S.ui.ch||"GCash"} payment(s)`);toast(`${ids.length} reconciled`)};
+A.reconMiss=d=>{S.modal={type:"miss",id:d.id}};A.missSave=()=>{const p=S.payments.find(x=>x.id===S.modal.id);p.recon="Not in History";p.note=$("ms_note").value.trim();logA(userOf("admin_assistant"),`Marked ${p.receipt} Not in History`);S.modal=null;toast("Accounting will see it")};
+A.reconUndo=d=>{const p=S.payments.find(x=>x.id===d.id);p.recon=null;p.note="";toast("Back to To Check")};
+A.certNo=d=>{const v=$("cn_"+d.id).value.trim(),r=$("cr_"+d.id).value.trim();if(r.length<3){toast("Enter the reason");return}if(S.enrollments.some(e=>e.id!==d.id&&S.certs[e.id]?.number===v)){toast("That Certificate Number is already used");return}const old=S.certs[d.id].number;S.certs[d.id].number=v;logA("Kate Esguerra",`Changed certificate ${old} → ${v} (${r})`);toast("Certificate Number changed")};
+A.resetRange=()=>{if($("rs_word").value.trim()!=="RESET"){toast("Type RESET to confirm");return}const r=S.ui.reset||{from:addDays(S.today,-3),to:S.today};const inR=d=>d>=r.from&&d<=r.to;
+  const eIds=new Set(S.enrollments.filter(e=>inR(e.created)).map(e=>e.id));const pIds=new Set(S.payments.filter(p=>inR(p.date)||p.alloc.some(a=>eIds.has(a.enr))).map(p=>p.id));
+  S.payments=S.payments.filter(p=>!pIds.has(p.id));S.enrollments=S.enrollments.filter(e=>!eIds.has(e.id));S.trainees=S.trainees.filter(t=>!(inR(t.created)&&!S.enrollments.some(e=>e.trainee===t.id)));
+  S.expenses=S.expenses.filter(x=>!inR(x.date));S.requisitions=S.requisitions.filter(x=>!inR(x.date));S.deliveries=S.deliveries.filter(d=>S.enrollments.some(e=>e.id===d.enr));S.charges=S.charges.filter(c=>S.enrollments.some(e=>e.id===c.enr));S.discounts=S.discounts.filter(c=>S.enrollments.some(e=>e.id===c.enr));
+  S.batches=S.batches.filter(b=>!(inR(b.start)&&!S.enrollments.some(e=>e.batch===b.id)));logA("Kate Esguerra",`Reset data ${fmt(r.from)}–${fmt(r.to)}`);toast("Records erased (test data only)")};
+function submitForm(kind){
+  if(kind==="register"){const f=["first","last","birth","srn","mobile","email"].map(k=>$("rg_"+k).value.trim());if(f.some(v=>!v)||!$("rg_terms").checked){toast("Complete every field and accept the terms");return}
+    if(S.trainees.some(t=>t.srn===f[3])){toast("This SRN already has an application");return}
+    const t={id:uid(),app:next("NWMTACI"),first:f[0],last:f[1],birth:f[2],srn:f[3],mobile:f[4],email:f[5],created:S.today};S.trainees.push(t);
+    const bid=$("rg_batch").value;if(bid){const b=B(bid),c=C(b.course);S.enrollments.push({id:uid(),no:next("ENR"),trainee:t.id,course:c.id,batch:b.id,status:"Pending",reqs:{id:false,med:false,photo:false,book:false},handed:false,created:S.today,price:c.price})}
+    logA("Website",`Application ${t.app} from ${nameOf(t)}`);toast(`Application received · ${t.app}`)}
+  if(kind==="status"){S.ui.status={app:$("st_app").value,birth:$("st_birth").value}}
+  if(kind==="delivery"){const enr=$("dl_enr").value;if(!enr)return;S.deliveries.push({id:uid(),no:next("DR",4),enr,recipient:$("dl_rec").value,address:$("dl_addr").value,mobile:$("dl_mob").value,status:"Requested",tracking:"",date:S.today});logA("Website",`Delivery request ${S.deliveries.at(-1).no}`);toast("Request received — Registration checks it")}
+  if(kind==="reqItem"){const n=$("ri_name").value.trim();if(!n){toast("Enter the item name");return}S.reqItems.push({id:uid(),name:n,unit:$("ri_unit").value.trim()||"pc",cost:Math.round((+$("ri_cost").value||0)*100)});toast("Item added")}
+  if(kind==="user"){const r1=$("us_r1").value,r2=$("us_r2").value;S.users.push({name:$("us_name").value.trim(),email:$("us_email").value.trim(),roles:[r1,...(r2&&r2!==r1?[r2]:[])]});toast("Account created")}
+  render();
+}
+document.addEventListener("click",e=>{const el=e.target.closest("[data-act]");if(!el)return;if(el.dataset.act==="closeDrawer"&&e.target.closest("[data-stop]")&&!e.target.closest("button"))return;
+  if(el.tagName==="INPUT"||el.tagName==="SELECT")return;const fn=A[el.dataset.act];if(!fn)return;e.preventDefault();fn(el.dataset,el);render()});
+document.addEventListener("change",e=>{const el=e.target;
+  if(el.id==="role"){S.role=el.value;S.tab=TABS[S.role][0];render();return}
+  if(el.id==="today"&&el.value){S.today=el.value;render();return}
+  if(el.id==="hour"){S.hour=+el.value;render();return}
+  if(el.id==="payDate"){S.ui.payDate=el.value;render();return}
+  if(el.id==="rday"&&el.value){S.ui.rday=el.value;render();return}
+  if(el.id==="rs_from"||el.id==="rs_to"){S.ui.reset={from:$("rs_from").value,to:$("rs_to").value};render();return}
+  if(el.id==="pm_t"){S.modal.tid=el.value;render();return}
+  if(el.id==="ph_file"&&el.files[0]){const f=el.files[0];createImageBitmap(f).then(bmp=>{const side=Math.min(bmp.width,bmp.height),cv=document.createElement("canvas");cv.width=cv.height=600;const x=cv.getContext("2d");x.drawImage(bmp,(bmp.width-side)/2,(bmp.height-side)/2,side,side,0,0,600,600);const d=x.getImageData(0,0,600,600).data;let tot=0,w=0;for(let y=0;y<600;y+=4)for(let xx=0;xx<600;xx+=4){if(xx>=48&&xx<552&&y>=48&&y<552)continue;const i=(y*600+xx)*4,mn=Math.min(d[i],d[i+1],d[i+2]),mx=Math.max(d[i],d[i+1],d[i+2]);tot++;if(mn>=215&&mx-mn<=30)w++}
+    S.modal.url=cv.toDataURL("image/jpeg",.85);S.modal.white=w/tot>=.85;S.modal.info=`Resized from ${bmp.width} × ${bmp.height} · ${(f.size/1024/1024).toFixed(1)} MB to 600 × 600`;render()}).catch(()=>toast("That file could not be read"));return}
+  const d=el.dataset;
+  if(d.act==="req"){A.req(d,el);render();return}
+  if(d.act==="scriptTick"){A.scriptTick(d,el);save();return}
+  if(d.act==="rqItem"){const it=S.reqItems.find(x=>x.name===el.value);const dr=S.ui.rqDraft=S.ui.rqDraft||[["Coffee Cups",1,18000]];dr[d.i]=[it.name,dr[d.i][1],it.cost];render();return}
+  if(d.act==="rqQty"){const dr=S.ui.rqDraft=S.ui.rqDraft||[["Coffee Cups",1,18000]];dr[d.i][1]=Math.max(1,+el.value||1);render();return}
+  if(d.act==="planRoom"){B(d.id).room=el.value;logA(userOf("admin_assistant"),`Set room for ${B(d.id).no}`);render();return}
+  if(d.act==="planInstr"){B(d.id).instr=el.value;logA(userOf("admin_assistant"),`Set instructor for ${B(d.id).no}`);render();return}
+});
+document.addEventListener("submit",e=>{e.preventDefault();const k=e.target.dataset.form;if(k)submitForm(k)});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&(S.modal||S.drawer)){S.modal=null;S.drawer=null;render()}});
+render();
+</script>

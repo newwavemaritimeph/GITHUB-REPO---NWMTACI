@@ -1,0 +1,131 @@
+<title>Reject Reason Designs</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,600&display=swap">
+<style>
+/* Layout: three stacked stages, each showing one way to ask for a rejection reason inside the portal (instead of the browser's prompt). */
+:root{--navy:#123F63;--blue:#0571D0;--orange:#F25615;--bg:#e8eef2;--paper:#fff;--ink:#13283a;--muted:#5d6f7e;--line:#d5e0e8;--soft:#f3f7fa;--bad:#b42318;--bad-bg:#fcebea;--good:#0a7a3e;--sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace;--serif:"Source Serif 4",Georgia,serif}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0d1822;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1822;color-scheme:dark}
+body{background:var(--bg);font-family:var(--sans);color:var(--ink)}
+.wrap{max-width:980px;margin:0 auto;padding-inline:16px;padding-block:30px 70px;display:grid;gap:40px}
+.intro h1{font:600 28px var(--serif);color:var(--navy);margin:0}
+.intro p{color:var(--muted);max-width:66ch;margin:8px 0 0}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .intro h1,:root:not([data-theme="light"]) .intro p,:root:not([data-theme="light"]) .lab b,:root:not([data-theme="light"]) .lab span{color:#dbe8f2}}
+:root[data-theme="dark"] .intro h1,:root[data-theme="dark"] .intro p,:root[data-theme="dark"] .lab b,:root[data-theme="dark"] .lab span{color:#dbe8f2}
+.lab{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+.lab b{font:600 19px var(--sans);color:var(--navy)}.lab span{color:var(--muted);font-size:15px}
+.stage{position:relative;background:#5f6f7c;border-radius:16px;min-height:430px;display:grid;place-items:center;padding:28px 16px;overflow:hidden}
+.stage::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,#6b7a86 0 1px,transparent 1px 64px);opacity:.25}
+.card{position:relative;background:var(--paper);color:var(--ink);border-radius:14px;box-shadow:0 24px 60px rgba(0,0,0,.35);width:min(560px,100%);overflow:hidden}
+.btn{font:600 15.5px var(--sans);border-radius:10px;padding:10px 16px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer}
+.btn.red{background:var(--bad);border-color:var(--bad);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible,.pick:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+textarea,select,input[type=text]{font:400 15.5px var(--sans);color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%;min-width:0;box-sizing:border-box}
+textarea{min-height:90px;resize:vertical}
+.cap{font:600 11.5px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.mono{font-family:var(--mono)}
+.err{color:var(--bad);font-size:13.5px;font-weight:600}
+.sent{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 16px;border-radius:10px;font-size:14.5px}
+
+/* 1 */
+.d1 .hd{display:flex;gap:12px;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}
+.d1 .ic{width:38px;height:38px;border-radius:50%;background:var(--bad-bg);color:var(--bad);display:grid;place-items:center;font:700 18px var(--sans);flex:none}
+.d1 .hd h2{font:600 19px var(--sans);margin:0}
+.d1 .hd small{color:var(--muted)}
+.d1 .sum{margin:16px 20px 0;border:1px solid var(--line);border-radius:10px;background:var(--soft);padding:12px 14px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.d1 .sum b{display:block}.d1 .sum small{color:var(--muted)}
+.d1 .sum .amt{font:600 17px var(--mono)}
+.d1 .bd{padding:16px 20px;display:grid;gap:10px}
+.d1 .chips{display:flex;gap:8px;flex-wrap:wrap}
+.d1 .pick{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;font:500 14px var(--sans);cursor:pointer;color:var(--ink)}
+.d1 .pick.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.d1 .ft{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 20px;border-top:1px solid var(--line);background:var(--soft);flex-wrap:wrap}
+.d1 .ft small{color:var(--muted)}
+
+/* 2 */
+.d2{width:min(760px,100%)}
+.d2 .row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:14px 20px}
+.d2 .row small{display:block;color:var(--muted)}
+.d2 .amt{font:600 17px var(--mono)}
+.d2 .open{border-top:3px solid var(--bad);background:#fffafa;padding:14px 20px 16px;display:grid;grid-template-columns:220px 1fr;gap:12px}
+.d2 .open .full{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px}
+.d2 .muted-row{opacity:.55}
+.d2 label{display:grid;gap:6px;font-size:14px;color:var(--muted);font-weight:500}
+
+/* 3 */
+.stage.s3{place-items:stretch;justify-items:end;padding:0}
+.d3{width:min(440px,100%);border-radius:0;height:100%;min-height:430px;display:flex;flex-direction:column}
+.d3 .hd{background:var(--navy);color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center}
+.d3 .hd h2{font:600 18px var(--serif);margin:0}
+.d3 .hd button{background:none;border:0;color:#cfe3ef;font-size:22px;cursor:pointer}
+.d3 .stripe{height:4px;background:linear-gradient(90deg,var(--orange) 0 33%,#35CCFA 33% 66%,var(--blue) 66%)}
+.d3 .bd{padding:16px 20px;display:grid;gap:14px;flex:1;align-content:start}
+.d3 dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:14.5px}
+.d3 dt{color:var(--muted)}.d3 dd{margin:0;font-weight:600}
+.d3 .opts{display:grid;gap:6px}
+.d3 .opt{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;font-size:15px}
+.d3 .opt.on{border-color:var(--bad);background:#fffafa}
+.d3 .opt input{margin-top:3px;accent-color:var(--bad)}
+.d3 .chk{display:flex;gap:8px;align-items:center;font-size:14.5px;color:var(--muted)}
+.d3 .ft{display:flex;gap:8px;justify-content:flex-end;padding:14px 20px;border-top:1px solid var(--line)}
+@media (max-width:640px){.d2 .row{grid-template-columns:1fr}.d2 .open{grid-template-columns:1fr}}
+</style>
+
+<div class="wrap">
+  <header class="intro"><h1>Reject with a reason · three designs</h1><p>Replaces the browser's "Reason for rejecting? (optional)" box. Each design shows what is being rejected, makes the reason required (it is kept in the record and shown to the Cashier), and uses the portal's own look. Try them; sample data only.</p></header>
+
+  <section><div class="lab"><b>1 · Confirmation dialog with quick reasons</b><span>A centred window: what you are rejecting, common reasons as one-tap chips, a note box, then Reject.</span></div>
+    <div class="stage"><div class="card d1" id="d1">
+      <div class="hd"><div class="ic" aria-hidden="true">!</div><div><h2>Reject expense request</h2><small>The Cashier sees your reason.</small></div></div>
+      <div class="sum"><div><b>Meralco · Utilities</b><small class="mono">ER-2026-000031 · Karen Mallari · Oct 8</small></div><div class="amt">₱18,450.75</div></div>
+      <div class="bd">
+        <span class="cap">Reason</span>
+        <div class="chips" role="group" aria-label="Common reasons"></div>
+        <textarea id="t1" placeholder="Add details (required if you pick Other)"></textarea>
+        <span class="err" id="e1"></span>
+      </div>
+      <div class="ft"><small>This cannot be undone.</small><div style="display:flex;gap:8px"><button class="btn">Cancel</button><button class="btn red" id="b1" disabled>Reject request</button></div></div>
+    </div></div></section>
+
+  <section><div class="lab"><b>2 · Inline, inside the list</b><span>No pop-up: the row opens in place with a reason list and a note; other rows dim until you finish.</span></div>
+    <div class="stage"><div class="card d2">
+      <div class="row muted-row"><div><b>Office Warehouse · Office supplies</b><small class="mono">ER-2026-000032 · Karen Mallari</small></div><span class="amt">₱4,860.00</span><button class="btn" disabled>Approve</button></div>
+      <div class="row"><div><b>Meralco · Utilities</b><small class="mono">ER-2026-000031 · Karen Mallari</small></div><span class="amt">₱18,450.75</span><span class="cap" style="color:var(--bad)">Rejecting</span></div>
+      <div class="open">
+        <label>Reason<select id="s2"><option value="">Choose a reason</option><option>Missing or unclear receipt</option><option>Amount does not match the receipt</option><option>Wrong category</option><option>Not an approved expense</option><option>Duplicate request</option><option>Other</option></select></label>
+        <label>Note for the Cashier<input type="text" id="t2" placeholder="e.g. Attach the official receipt and resubmit"></label>
+        <div class="full"><span class="err" id="e2" style="margin-right:auto"></span><button class="btn">Keep</button><button class="btn red" id="b2" disabled>Reject request</button></div>
+      </div>
+      <div class="row muted-row"><div><b>Juan Water Refilling · Pantry</b><small class="mono">ER-2026-000033 · Karen Mallari</small></div><span class="amt">₱450.00</span><button class="btn" disabled>Approve</button></div>
+    </div></div></section>
+
+  <section><div class="lab"><b>3 · Side panel with full details</b><span>Slides in from the right: the request's details, a list of reasons to choose from, an optional note, and "Tell the Cashier" ticked.</span></div>
+    <div class="stage s3"><aside class="card d3">
+      <div class="hd"><h2>Reject request</h2><button aria-label="Close">×</button></div><div class="stripe"></div>
+      <div class="bd">
+        <dl><dt>Request</dt><dd class="mono">ER-2026-000031</dd><dt>Payee</dt><dd>Meralco · Utilities</dd><dt>Amount</dt><dd class="mono">₱18,450.75</dd><dt>Requested by</dt><dd>Karen Mallari · Oct 8, 9:15 AM</dd></dl>
+        <span class="cap">Why are you rejecting it?</span>
+        <div class="opts" id="o3"></div>
+        <textarea id="t3" placeholder="Note (optional, required for Other)"></textarea>
+        <label class="chk"><input type="checkbox" checked> Tell the Cashier by notification</label>
+      </div>
+      <div class="ft"><button class="btn">Cancel</button><button class="btn red" id="b3" disabled>Reject request</button></div>
+    </aside></div></section>
+</div>
+
+<script>
+const REASONS=["Missing or unclear receipt","Amount does not match","Wrong category","Not an approved expense","Duplicate request","Other"];
+function done(stage){const t=document.createElement("div");t.className="sent";t.textContent="Rejected. The Cashier sees your reason.";stage.appendChild(t);setTimeout(()=>t.remove(),2200)}
+// 1
+let pick1="";const chips=document.querySelector("#d1 .chips"),t1=document.getElementById("t1"),b1=document.getElementById("b1"),e1=document.getElementById("e1");
+function r1(){chips.innerHTML=REASONS.map(r=>`<button type="button" class="pick ${pick1===r?"on":""}" aria-pressed="${pick1===r}">${r}</button>`).join("");chips.querySelectorAll("button").forEach((b,i)=>b.onclick=()=>{pick1=REASONS[i];r1()});const ok=pick1&&(pick1!=="Other"||t1.value.trim());b1.disabled=!ok;e1.textContent=pick1==="Other"&&!t1.value.trim()?"Add details for Other.":""}
+t1.oninput=r1;b1.onclick=()=>{done(b1.closest(".stage"));pick1="";t1.value="";r1()};r1();
+// 2
+const s2=document.getElementById("s2"),t2=document.getElementById("t2"),b2=document.getElementById("b2"),e2=document.getElementById("e2");
+function r2(){const ok=s2.value&&(s2.value!=="Other"||t2.value.trim());b2.disabled=!ok;e2.textContent=s2.value==="Other"&&!t2.value.trim()?"Add a note for Other.":""}
+s2.onchange=r2;t2.oninput=r2;b2.onclick=()=>{done(b2.closest(".stage"));s2.value="";t2.value="";r2()};
+// 3
+let pick3="";const o3=document.getElementById("o3"),t3=document.getElementById("t3"),b3=document.getElementById("b3");
+function r3(){o3.innerHTML=REASONS.map(r=>`<label class="opt ${pick3===r?"on":""}"><input type="radio" name="r3" ${pick3===r?"checked":""}>${r}</label>`).join("");o3.querySelectorAll("input").forEach((x,i)=>x.onchange=()=>{pick3=REASONS[i];r3()});b3.disabled=!(pick3&&(pick3!=="Other"||t3.value.trim()))}
+t3.oninput=r3;b3.onclick=()=>{done(b3.closest(".stage"));pick3="";t3.value="";r3()};r3();
+</script>

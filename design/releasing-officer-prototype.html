@@ -1,0 +1,195 @@
+<title>Releasing Officer Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: the approved summary rail. Releasing Officer tabs plus the Admin's numbering and void approvals, sharing one sample state. */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA;
+  --bg:#f3f6fa; --surface:#ffffff; --line:#dfe7ee; --fg:#0f2638; --muted:#5f7180; --soft:#eef4f8; --warnbg:#fde7dc; --okbg:#e3f4ea; --badbg:#fbe4dc; --infobg:#e2effb;
+  --green:#15803d; --red:#b42318; --amber:#b45309; --violet:#7c3aed; --slate:#64748b;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}
+.top{background:var(--navy);color:#fff;padding:14px 24px 0}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand b{font-size:19px;color:var(--cyan)} .brand small{display:block;font-size:10px;letter-spacing:.06em;color:#cfe3f1}
+.who{display:flex;align-items:center;gap:8px;font-size:14px;color:#cfe3f1}
+.who select{font:500 14px var(--sans);padding:6px 10px;border-radius:8px;border:1px solid #3b6a90;background:transparent;color:#fff}
+.who select option{color:#0f2638}
+.tabs{display:flex;gap:4px;margin-top:14px;overflow-x:auto}
+.tabs button{padding:10px 18px;color:#d6e6f2;font:500 15px var(--sans);border-radius:10px 10px 0 0;white-space:nowrap;background:none;border:0;cursor:pointer}
+.tabs button.on{background:var(--bg);color:var(--fg)}
+.page{max-width:1240px;margin:0 auto;padding-block:20px 48px;padding-inline:24px;display:flex;flex-direction:column;gap:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}
+h1{margin:2px 0 0;font-size:28px;line-height:1.2}
+.note{margin:-8px 0 0;color:var(--muted);font-size:14px}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 14px var(--sans);padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.org{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600}
+.btn.red{color:var(--red)}
+.btn.sm{padding:6px 11px;font-size:13.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.rail{display:grid;grid-template-columns:minmax(300px,350px) minmax(0,1fr);gap:20px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 20px 20px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}
+.ph h2{margin:0;font-size:17px;font-weight:600} .ph .m{color:var(--muted);font-size:13.5px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.col{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.crow{display:grid;grid-template-columns:10px 1fr auto;gap:12px;align-items:center;padding:10px 14px;border:0;border-bottom:1px solid var(--line);width:100%;background:none;font:inherit;color:inherit;text-align:left}
+.crow:last-child{border-bottom:0}
+button.crow{cursor:pointer} button.crow:hover{background:var(--soft)} button.crow.sel{background:var(--infobg)}
+.dot{width:10px;height:10px;border-radius:3px;background:var(--c);display:inline-block}
+.crow b{font:600 16px var(--mono);text-align:right}
+.crow.alarm{background:var(--badbg)} .crow.alarm b,.crow.alarm span{color:var(--red);font-weight:600}
+.crow.tot{background:var(--navy);color:#fff} .crow.tot .dot{background:var(--orange)}
+.lines{margin:0}
+.lines>div{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}
+.lines>div:last-child{border-bottom:0} .lines dt{color:var(--muted)} .lines dd{margin:0;font:600 15px var(--mono)}
+.foot{margin:10px 0 0;font-size:13px;color:var(--muted)}
+.alarmbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--red);color:#fff;border-radius:12px;padding:12px 16px}
+.alarmbar b{font-size:16px} .alarmbar span{opacity:.9;font-size:14px} .alarmbar .sp{flex:1}
+.alarmbar .btn{background:#fff;color:var(--red);border-color:#fff}
+@media (prefers-reduced-motion:no-preference){.alarmbar .pulse{width:10px;height:10px;border-radius:99px;background:#fff;animation:p 1.4s infinite}@keyframes p{50%{opacity:.25}}}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.bar input{font:400 14px var(--sans);padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg);flex:1;min-width:180px}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+td small{display:block;color:var(--muted);font-size:13px}
+.acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.pill{display:inline-block;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.p-ok{background:var(--okbg);color:var(--green)} .p-warn{background:var(--warnbg);color:var(--orange)} .p-bad{background:var(--badbg);color:var(--red)} .p-info{background:var(--infobg);color:var(--blue)} .p-mute{background:var(--soft);color:var(--muted)}
+.ck{font-size:13px;color:var(--muted)} .ck.y{color:var(--green)} .ck.n{color:var(--orange)}
+.empty{color:var(--muted);text-align:center;padding:18px 0 8px}
+.form{display:grid;grid-template-columns:repeat(4,minmax(0,1fr)) auto;gap:10px;align-items:end}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:500}
+.form input,.form select,.inp{font:400 14px var(--sans);padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);min-width:0}
+.next{font:600 15px var(--mono);color:var(--blue)}
+.rj{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:end;background:var(--badbg);border-radius:10px;padding:12px;margin-top:8px}
+.rj label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:500}
+/* preview */
+.scrim{position:fixed;inset:0;background:rgba(10,25,40,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:9}
+.sheetwrap{background:var(--surface);border-radius:16px;max-width:860px;width:100%;max-height:100%;overflow:auto;padding:18px 20px calc(18px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:14px}
+.cert{position:relative;aspect-ratio:1.414/1;max-width:100%;background:#fffdf7;border:10px double #123F63;border-radius:4px;color:#0f2638;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:4% 6%;overflow:hidden}
+.cert .org{font:600 clamp(10px,1.6vw,15px) var(--sans);letter-spacing:.12em;color:#123F63}
+.cert .t{font:700 clamp(18px,3.6vw,34px) Georgia,serif;margin:2% 0 1%;color:#123F63}
+.cert .nm{font:700 clamp(16px,3vw,28px) Georgia,serif;border-bottom:1px solid #123F63;padding:0 4% 1%;margin:2% 0}
+.cert .c{font:400 clamp(10px,1.5vw,14px) var(--sans)} .cert .meta{display:flex;gap:6%;margin-top:4%;font:500 clamp(9px,1.2vw,12px) var(--mono);color:#334}
+.wm{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:800 clamp(28px,7vw,72px) var(--sans);color:rgba(180,35,24,.16);transform:rotate(-18deg);pointer-events:none;text-transform:uppercase;letter-spacing:.06em}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;z-index:10}
+@media (max-width:1040px){.rail{grid-template-columns:1fr}.form{grid-template-columns:1fr 1fr}}
+@media (max-width:700px){
+  .cards thead{display:none}.cards tr{display:block;padding:10px 0;border-bottom:1px solid var(--line)}.cards tbody tr:last-child{border-bottom:0}
+  .cards td{display:flex;justify-content:space-between;gap:12px;border:0;padding:3px 4px;text-align:right}
+  .cards td::before{content:attr(data-l);color:var(--muted);font-size:13px;text-align:left}
+  .cards td.lead{display:block;text-align:left;font-weight:600}.cards td.lead::before{content:none}
+  .acts{justify-content:flex-start}.rj{grid-template-columns:1fr}}
+@media (max-width:480px){.page{padding-inline:16px}.top{padding-inline:16px}.form{grid-template-columns:1fr}}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+</style>
+
+<header class="top">
+  <div class="brand"><div><b>New Wave</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div>
+    <div class="who">Working as <select id="role" aria-label="Working as"><option value="ro">Releasing Officer</option><option value="admin">Admin</option></select></div></div>
+  <nav class="tabs" id="tabs"></nav>
+</header>
+<main class="page" id="page"></main>
+<div id="modal"></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const S={role:"ro",tab:"Dashboard",f:"",q:"",preview:null,voiding:null};
+const SERIES=[
+ {code:"UBT-PSSR",name:"Updating Basic Training - PSSR",prefix:"NWM-BT-",next:1245,pad:5,bprefix:"BT-",nb:318,set:"Oct 1 by April Cantoneros"},
+ {code:"PSCMT",name:"Crowd Management",prefix:"NWM-CM-",next:812,pad:5,bprefix:"CM-",nb:104,set:"Oct 1 by April Cantoneros"},
+ {code:"PSCMHBT",name:"Crisis Management",prefix:"NWM-CR-",next:655,pad:5,bprefix:"CR-",nb:98,set:"Oct 1 by April Cantoneros"},
+ {code:"SSO",name:"Ship Security Officer (In-House)",prefix:"NWM-SSO-",next:41,pad:4,bprefix:"SSO-",nb:12,set:"Not set yet"},
+];
+const fmtNo=s=>s.prefix+String(s.next).padStart(s.pad,"0");
+let C=[
+ {id:1,n:"CRUZ, Ana",nw:"NWMTACI-2026-0447",co:"UBT-PSSR",ended:"Oct 7",due:"Oct 7",paid:true,evalNeeded:false,evalDone:false,state:"Due",no:null,prints:0,allowed:1},
+ {id:2,n:"RAMOS, Jose",nw:"NWMTACI-2026-0448",co:"PSCMHBT",ended:"Oct 8",due:"Oct 8",paid:true,evalNeeded:false,evalDone:false,state:"Due",no:null,prints:0,allowed:1},
+ {id:3,n:"LIM, Rosa",nw:"NWMTACI-2026-0452",co:"SSO",ended:"Oct 6",due:null,paid:true,evalNeeded:true,evalDone:false,state:"Waiting for evaluation",no:null,prints:0,allowed:1},
+ {id:4,n:"NAVARRO, Dino",nw:"NWMTACI-2026-0440",co:"PSCMT",ended:"Oct 7",due:null,paid:false,bal:"₱450.00",evalNeeded:false,evalDone:false,state:"Waiting for payment",no:null,prints:0,allowed:1},
+ {id:5,n:"TORRES, Lea",nw:"NWMTACI-2026-0449",co:"UBT-PSSR",ended:"Oct 5",due:"Oct 5",paid:true,evalNeeded:false,state:"Printed",no:"NWM-BT-01243",prints:1,allowed:1,soft:"Oct 5"},
+ {id:6,n:"GARCIA, Paolo",nw:"NWMTACI-2026-0431",co:"PSCMT",ended:"Oct 3",due:"Oct 3",paid:true,evalNeeded:false,state:"Printed",no:"NWM-CM-00811",prints:1,allowed:2,reprint:"Paid reprint request REQ-2026-0091"},
+ {id:7,n:"BAUTISTA, Elle",nw:"NWMTACI-2026-0420",co:"SSO",ended:"Oct 2",due:"Oct 2",paid:true,evalNeeded:true,evalDone:true,state:"Void requested",no:"NWM-SSO-0040",prints:1,allowed:1,voidReason:"Misprint — name spelled wrong",voidBy:"Releasing Officer · Oct 8"},
+ {id:8,n:"SANTOS, Mark",nw:"NWMTACI-2026-0410",co:"PSCMHBT",ended:"Sep 30",due:"Sep 30",paid:true,evalNeeded:false,state:"Released",no:"NWM-CR-00654",prints:1,allowed:1,rel:"Picked up Oct 2 · ID checked"},
+];
+const courseOf=c=>SERIES.find(s=>s.code===c.co);
+const isOverdue=c=>c.state==="Due"&&c.due&&c.due!=="Oct 8";
+const STATES=[["Due","--blue"],["Waiting for evaluation","--violet"],["Waiting for payment","--orange"],["Printed","--green"],["Released","--slate"],["Void requested","--red"]];
+const pill=s=>({"Due":"p-info","Waiting for evaluation":"p-mute","Waiting for payment":"p-warn","Printed":"p-ok","Released":"p-mute","Void requested":"p-bad"})[s];
+const TABS={ro:["Dashboard","Certificates","Templates","Released"],admin:["Dashboard","Certificate numbering","Void requests"]};
+const head=(eb,t,right,note)=>`<div class="head"><div><div class="eyebrow">${eb}</div><h1>${t}</h1></div>${right||""}</div>${note?`<p class="note">${note}</p>`:""}`;
+const overdue=()=>C.filter(isOverdue);
+const alarm=(admin)=>{const o=overdue();return o.length?`<div class="alarmbar" role="alert"><span class="pulse" aria-hidden="true"></span><b>${o.length} certificate${o.length===1?"":"s"} overdue to print</b><span>${o.map(c=>c.n.split(",")[0]).join(", ")} · due since ${o.map(c=>c.due).join(", ")}</span><span class="sp"></span>${admin?`<button class="btn sm" data-tab="Dashboard" data-role="ro">View as Releasing Officer</button>`:`<button class="btn sm" data-f="Due" data-tab="Certificates">Print now</button>`}</div>`:"";};
+const checks=c=>`<small><span class="ck ${c.paid?"y":"n"}">${c.paid?"✓ Paid":"✗ Balance "+(c.bal||"")}</span> · <span class="ck ${!c.evalNeeded||c.evalDone?"y":"n"}">${!c.evalNeeded?"No evaluation needed":c.evalDone?"✓ Evaluation submitted":"✗ Evaluation not submitted"}</span></small>`;
+function actions(c){
+ if(c.state==="Due")return `<button class="btn sm" data-prev="${c.id}">Preview</button><button class="btn sm org" data-print="${c.id}">Print</button>`;
+ if(c.state==="Printed"){const left=c.allowed-c.prints;return `<button class="btn sm" data-prev="${c.id}">Preview</button>${left>0?`<button class="btn sm org" data-print="${c.id}">Reprint (${c.prints+1} of ${c.allowed})</button>`:`<span class="pill p-mute">Printed ${c.prints} of ${c.allowed}</span>`}<button class="btn sm red" data-void="${c.id}">Request void</button><button class="btn sm" data-toast="Soft copy emailed again to the trainee">Email soft copy</button>`;}
+ if(c.state==="Void requested")return `<span class="pill p-bad">Waiting for Admin</span>`;
+ if(c.state==="Released")return `<button class="btn sm" data-prev="${c.id}">Preview</button>`;
+ return `<span class="pill p-mute">Not yet</span>`;}
+function rowDetail(c){return c.state==="Waiting for payment"?"Cashier must settle the balance first":c.state==="Waiting for evaluation"?"Unlocks when the Google Form is submitted":c.reprint?c.reprint:c.voidReason?c.voidReason:c.rel?c.rel:c.soft?"Soft copy emailed "+c.soft:"";}
+const voidBox=c=>S.voiding===c.id?`<tr><td colspan="6"><div class="rj"><label>Reason for voiding<input class="inp" id="vr" placeholder="e.g. Misprint — wrong spelling of the name"></label><div class="acts"><button class="btn sm" data-keep>Keep</button><button class="btn sm pri" style="background:var(--red);border-color:var(--red)" data-dovoid="${c.id}">Send to Admin</button></div></div></td></tr>`:"";
+const table=list=>list.length?`<div class="scroll"><table class="cards"><thead><tr><th>Trainee</th><th>Course</th><th>Training ended</th><th>Certificate No.</th><th>Status</th><th></th></tr></thead><tbody>${list.map(c=>`<tr><td class="lead">${c.n}<small class="mono">${c.nw}</small>${checks(c)}</td><td data-l="Course">${courseOf(c).name}</td><td data-l="Ended">${c.ended}</td><td data-l="Certificate No." class="mono">${c.no||`<span class="ck">Assigned at preview</span>`}</td><td data-l="Status"><span class="pill ${isOverdue(c)?"p-bad":pill(c.state)}">${isOverdue(c)?"Overdue":c.state}</span><small>${rowDetail(c)}</small></td><td data-l=""><div class="acts">${actions(c)}</div></td></tr>${voidBox(c)}`).join("")}</tbody></table></div>`:`<p class="empty">Nothing here.</p>`;
+const stateCol=(sel)=>`<div class="col">${STATES.map(s=>{const n=C.filter(c=>c.state===s[0]).length;return `<button class="crow ${sel&&S.f===s[0]?"sel":""}" data-f="${s[0]}" data-tab="Certificates" style="--c:var(${s[1]})"><span class="dot"></span><span>${s[0]}</span><b>${n}</b></button>`;}).join("")}<div class="crow ${overdue().length?"alarm":""}" style="--c:var(--red)"><span class="dot"></span><span>Overdue to print</span><b>${overdue().length}</b></div></div>`;
+const P={
+Dashboard(){if(S.role==="admin")return head("Admin","Dashboard","",`Thursday, October 8, 2026 · certificate controls`)+alarm(true)+`<div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>Certificates</h2></div>${stateCol(false)}</section></div><div class="stack">${voidPanel()}<section class="panel"><div class="ph"><h2>Certificate numbering</h2><button class="btn sm" data-tab="Certificate numbering">Edit</button></div><dl class="lines">${SERIES.map(s=>`<div><dt>${s.name}</dt><dd class="next">${s.set==="Not set yet"?"Not set":fmtNo(s)}</dd></div>`).join("")}</dl></section></div></div>`;
+ const due=C.filter(c=>c.state==="Due");
+ return head("Releasing Officer","Dashboard","",`Thursday, October 8, 2026`)+alarm(false)+`<div class="rail"><div class="stack">
+  <section class="panel"><div class="ph"><h2>Certificates</h2><span class="m">tap to open</span></div>${stateCol(false)}</section>
+  <section class="panel"><div class="ph"><h2>Today</h2></div><dl class="lines"><div><dt>Printed today</dt><dd>${C.filter(c=>c.printedToday).length}</dd></div><div><dt>Reprints approved</dt><dd>${C.filter(c=>c.allowed>1&&c.prints<c.allowed).length}</dd></div><div><dt>Soft copies emailed</dt><dd>${C.filter(c=>c.soft).length}</dd></div></dl><p class="foot">Due means the training ended, the fee is paid and, for Google Classroom courses, the evaluation is submitted.</p></section>
+ </div><section class="panel"><div class="ph"><h2>Due to print</h2><span class="m">${due.length}</span></div>${table(due)}</section></div>`;},
+Certificates(){const q=S.q.toLowerCase();const list=C.filter(c=>(!S.f||c.state===S.f)&&(!q||`${c.n} ${c.nw} ${c.no||""}`.toLowerCase().includes(q)));
+ return head("Releasing Officer","Certificates")+alarm(false)+`<div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>Status</h2><span class="m">tap to filter</span></div>${stateCol(true)}</section>
+ <section class="panel"><div class="ph"><h2>Rules</h2></div><dl class="lines"><div><dt>Print once</dt><dd>1 copy</dd></div><div><dt>Reprint</dt><dd>Paid request</dd></div><div><dt>Void</dt><dd>Admin approval</dd></div></dl></section></div>
+ <section class="panel"><div class="bar"><input id="q" placeholder="Search trainee, NWMTACI number or certificate number" value="${S.q}">${S.f?`<button class="btn" data-f="">Show all</button>`:""}</div>${table(list)}</section></div>`;},
+Templates(){return head("Releasing Officer","Templates","",`Templates are kept in Google Drive. Share each file as "Anyone with the link can view".`)+`<div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>Setup</h2></div><dl class="lines"><div><dt>Courses with a template</dt><dd>3 of 4</dd></div><div><dt>Google Form linked</dt><dd>1 of 1 in-house</dd></div><div><dt>Evaluation script</dt><dd style="color:var(--green)">Receiving</dd></div></dl></section></div>
+ <section class="panel"><div class="scroll"><table class="cards"><thead><tr><th>Course</th><th>Template (Drive link)</th><th>Evaluation form</th><th></th></tr></thead><tbody>${SERIES.map((s,i)=>`<tr><td class="lead">${s.name}<small class="mono">${s.code}</small></td><td data-l="Template"><input class="inp" style="width:100%" value="${i<3?"https://drive.google.com/file/d/1aBc"+i+"…/view":""}" placeholder="Paste the Drive link"><small>${i<3?"✓ Link works · version "+(i+1):"No template yet"}</small></td><td data-l="Form">${s.code==="SSO"?`<input class="inp" style="width:100%" value="https://docs.google.com/forms/d/1FaIp…/edit"><small>Required before printing</small>`:`<span class="ck">Not needed (face-to-face)</span>`}</td><td data-l=""><div class="acts"><button class="btn sm" data-toast="Downloads the file and checks it is a readable PDF">Test link</button><button class="btn sm pri" data-toast="Saved">Save</button></div></td></tr>`).join("")}</tbody></table></div></section></div>`;},
+Released(){const list=C.filter(c=>c.state==="Printed"||c.state==="Released");return head("Releasing Officer","Released")+`<div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>Release</h2></div><dl class="lines"><div><dt>Ready for release</dt><dd>${C.filter(c=>c.state==="Printed").length}</dd></div><div><dt>Released</dt><dd>${C.filter(c=>c.state==="Released").length}</dd></div><div><dt>By courier (LBC)</dt><dd>0</dd></div></dl></section></div>
+ <section class="panel"><div class="scroll"><table class="cards"><thead><tr><th>Trainee</th><th>Certificate No.</th><th>Status</th><th></th></tr></thead><tbody>${list.map(c=>`<tr><td class="lead">${c.n}<small>${courseOf(c).name}</small></td><td data-l="No." class="mono">${c.no}</td><td data-l="Status"><span class="pill ${pill(c.state)}">${c.state==="Printed"?"Ready for release":"Released"}</span><small>${c.rel||""}</small></td><td data-l=""><div class="acts">${c.state==="Printed"?`<button class="btn sm pri" data-rel="${c.id}">Release</button>`:""}</div></td></tr>`).join("")}</tbody></table></div></section></div>`;},
+"Certificate numbering"(){return head("Admin","Certificate numbering","",`Set the first Certificate No. and batch number once. The system continues the numbering after that.`)+SERIES.map((s,i)=>`<section class="panel"><div class="ph"><h2>${s.name}</h2><span class="m">${s.set}</span></div><div class="form"><label>Prefix<input data-s="${i}" data-k="prefix" value="${s.prefix}"></label><label>Next certificate No.<input data-s="${i}" data-k="next" type="number" min="1" value="${s.next}"></label><label>Batch prefix<input data-s="${i}" data-k="bprefix" value="${s.bprefix}"></label><label>Next batch No.<input data-s="${i}" data-k="nb" type="number" min="1" value="${s.nb}"></label><button class="btn pri" data-saveser="${i}">Save</button></div><p class="foot">Next certificate: <span class="next">${fmtNo(s)}</span> · next batch: <span class="next">${s.bprefix}${s.nb}</span></p></section>`).join("");},
+"Void requests"(){return head("Admin","Void requests")+voidPanel(true);}
+};
+function voidPanel(full){const v=C.filter(c=>c.state==="Void requested");return `<section class="panel"><div class="ph"><h2>Void requests</h2><span class="m">${v.length} waiting</span></div>${v.length?v.map(c=>`<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)"><div><strong>${c.n} · <span class="mono">${c.no}</span></strong><small style="display:block;color:var(--muted)">${courseOf(c).name} · ${c.voidReason} · ${c.voidBy}</small></div><div class="acts"><button class="btn sm red" data-vno="${c.id}">Reject</button><button class="btn sm pri" data-vok="${c.id}">Approve void</button></div></div>`).join("")+`<p class="foot">Approving voids the printed copy and allows one more print with the same certificate number.</p>`:`<p class="empty">No void requests.</p>`}</section>`;}
+function preview(){const el=document.getElementById("modal");const c=C.find(x=>x.id===S.preview);if(!c){el.innerHTML="";return;}
+ const s=courseOf(c);el.innerHTML=`<div class="scrim" data-close><div class="sheetwrap" role="dialog" aria-label="Certificate preview"><div class="ph" style="margin:0"><h2>Preview · ${c.n}</h2><button class="btn sm" data-close>Close</button></div>
+ <div class="cert"><div class="wm">Preview · not for release</div><div class="org">NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.</div><div class="t">Certificate of Completion</div><div class="c">This is to certify that</div><div class="nm">${c.n.split(", ").reverse().join(" ")}</div><div class="c">has successfully completed the training on<br><b>${s.name}</b></div><div class="meta"><span>Cert No. ${c.no}</span><span>Batch ${s.bprefix}${s.nb}</span><span>Conducted ${c.ended}, 2026</span></div></div>
+ <div class="acts"><span class="ck" style="margin-right:auto">Template from Google Drive · preview does not count as a print</span>${c.state==="Due"||(c.state==="Printed"&&c.prints<c.allowed)?`<button class="btn org" data-print="${c.id}">Print</button>`:""}</div></div></div>`;}
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,2000);}
+function draw(focus){document.getElementById("tabs").innerHTML=TABS[S.role].map(t=>`<button class="${S.tab===t?"on":""}" data-tab="${t}">${t}</button>`).join("");
+ document.getElementById("role").value=S.role;
+ document.getElementById("page").innerHTML=P[S.tab]();preview();
+ if(focus){const q=document.getElementById("q");if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length);}}}
+function assign(c){if(!c.no){const s=courseOf(c);c.no=fmtNo(s);s.next++;}}
+document.addEventListener("click",e=>{if(e.target.classList.contains("scrim")||e.target.closest("button[data-close]")){S.preview=null;draw();return;}
+ const b=e.target.closest("button");if(!b)return;const d=b.dataset;
+ if(d.role){S.role=d.role;}
+ if(d.tab){S.tab=d.tab;if(d.f===undefined)S.f="";S.voiding=null;}
+ if(d.f!==undefined){S.f=S.tab==="Certificates"&&S.f===d.f&&!d.tab?"":d.f;S.tab="Certificates";}
+ if(d.prev){const c=C.find(x=>x.id===+d.prev);assign(c);S.preview=c.id;}
+ else if(d.print){const c=C.find(x=>x.id===+d.print);assign(c);c.prints++;c.state="Printed";c.printedToday=true;c.soft=c.soft||"Oct 8";S.preview=null;toast(`Printed ${c.no} (${c.prints} of ${c.allowed}). The Print button is now closed.`);}
+ else if(d.void){S.voiding=+d.void;}
+ else if(d.keep!==undefined){S.voiding=null;}
+ else if(d.dovoid){const r=document.getElementById("vr").value.trim();if(!r){toast("Add a reason for the Admin");return;}const c=C.find(x=>x.id===+d.dovoid);c.state="Void requested";c.voidReason=r;c.voidBy="Releasing Officer · Oct 8";S.voiding=null;toast("Sent to the Admin for approval");}
+ else if(d.vok){const c=C.find(x=>x.id===+d.vok);c.state="Printed";c.allowed++;delete c.voidReason;c.reprint="Void approved by Admin · one more print allowed";toast("Void approved. One more print allowed.");}
+ else if(d.vno){const c=C.find(x=>x.id===+d.vno);c.state="Printed";delete c.voidReason;toast("Void request rejected");}
+ else if(d.rel){const c=C.find(x=>x.id===+d.rel);c.state="Released";c.rel="Picked up Oct 8 · ID checked";toast("Released");}
+ else if(d.saveser){const i=+d.saveser;document.querySelectorAll(`[data-s="${i}"]`).forEach(inp=>{const v=inp.value.trim();SERIES[i][inp.dataset.k]=inp.type==="number"?Math.max(1,parseInt(v||"1",10)):v;});SERIES[i].set="Oct 8 by April Cantoneros";toast("Numbering saved. The next certificate will be "+fmtNo(SERIES[i]));}
+ else if(d.toast){toast(d.toast);return;}
+ else if(!d.tab&&!d.role&&d.f===undefined)return;
+ draw();});
+document.getElementById("role").addEventListener("change",e=>{S.role=e.target.value;S.tab="Dashboard";S.f="";draw();});
+document.addEventListener("input",e=>{if(e.target.id==="q"){S.q=e.target.value;draw(true);}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.preview){S.preview=null;draw();}});
+draw();
+</script>

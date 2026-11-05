@@ -1,0 +1,218 @@
+<title>Registration Summary Rail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: the approved summary rail for every Registration tab: a narrow column of figures on the left (rows filter the list), the working list on the right. */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA;
+  --bg:#f3f6fa; --surface:#ffffff; --line:#dfe7ee; --fg:#0f2638; --muted:#5f7180; --soft:#eef4f8; --warnbg:#fde7dc; --okbg:#e3f4ea; --badbg:#fbe4dc; --infobg:#e2effb;
+  --green:#15803d; --red:#c2410c; --amber:#b45309; --violet:#7c3aed; --slate:#64748b;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}
+.top{background:var(--navy);color:#fff;padding:14px 24px 0}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand b{font-size:19px;color:var(--cyan)} .brand small{display:block;font-size:10px;letter-spacing:.06em;color:#cfe3f1}
+.who{font-size:14px;color:#cfe3f1}
+.tabs{display:flex;gap:4px;margin-top:14px;overflow-x:auto}
+.tabs button{padding:10px 18px;color:#d6e6f2;font:500 15px var(--sans);border-radius:10px 10px 0 0;white-space:nowrap;background:none;border:0;cursor:pointer}
+.tabs button.on{background:var(--bg);color:var(--fg)}
+.page{max-width:1240px;margin:0 auto;padding-block:20px 48px;padding-inline:24px;display:flex;flex-direction:column;gap:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}
+h1{margin:2px 0 0;font-size:28px;line-height:1.2}
+.note{margin:-8px 0 0;color:var(--muted);font-size:14px}
+.hacts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 14px var(--sans);padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.org{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600}
+.btn.sm{padding:6px 11px;font-size:13.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.day{display:flex;align-items:center;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px}
+.day button{border:0;background:none;color:var(--muted);font-size:18px;width:32px;height:30px;cursor:pointer;border-radius:8px}
+.day span{font:500 14px var(--sans);padding:0 8px;white-space:nowrap}
+.rail{display:grid;grid-template-columns:minmax(300px,350px) minmax(0,1fr);gap:16px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}
+.ph h2{margin:0;font-size:17px;font-weight:600} .ph .m{color:var(--muted);font-size:13.5px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.col{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.crow{display:grid;grid-template-columns:10px 1fr auto;gap:12px;align-items:center;padding:10px 14px;border:0;border-bottom:1px solid var(--line);width:100%;background:none;font:inherit;color:inherit;text-align:left}
+.crow:last-child{border-bottom:0}
+button.crow{cursor:pointer} button.crow:hover{background:var(--soft)} button.crow.sel{background:var(--infobg)}
+.dot{width:10px;height:10px;border-radius:3px;background:var(--c);display:inline-block}
+.crow b{font:600 16px var(--mono);text-align:right} .crow small{display:block;color:var(--muted);font-size:12.5px}
+.crow.tot{background:var(--navy);color:#fff} .crow.tot .dot{background:var(--orange)} .crow.tot small{color:#c3dbea}
+.meter{height:6px;background:var(--soft);border-radius:99px;overflow:hidden;margin-top:4px} .meter i{display:block;height:100%;background:var(--blue)} .meter i.low{background:var(--orange)}
+.lines{margin:0}
+.lines>div{display:flex;justify-content:space-between;gap:12px;padding:8px 2px;border-bottom:1px solid var(--line)}
+.lines>div:last-child{border-bottom:0} .lines dt{color:var(--muted)} .lines dd{margin:0;font:600 15px var(--mono)}
+.foot{margin:8px 2px 0;font-size:13px;color:var(--muted)}
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.bar input,.bar select{font:400 14px var(--sans);padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg);min-width:0}
+.bar input{flex:1;min-width:180px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 13.5px var(--sans);padding:6px 11px;border-radius:99px;cursor:pointer;display:inline-flex;gap:7px;align-items:center}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.chip i{font-style:normal;font:600 11.5px var(--mono);padding:0 6px;border-radius:99px;background:var(--soft);color:var(--muted)} .chip.on i{background:rgba(255,255,255,.2);color:#fff}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+tbody tr.click{cursor:pointer} tbody tr.click:hover td{background:var(--soft)}
+td small{display:block;color:var(--muted);font-size:13px}
+.r{text-align:right}
+.nw{font:500 12.5px var(--mono);color:var(--muted)}
+.pill{display:inline-block;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.p-ok{background:var(--okbg);color:var(--green)} .p-warn{background:var(--warnbg);color:var(--orange)} .p-bad{background:var(--badbg);color:var(--red)} .p-info{background:var(--infobg);color:var(--blue)} .p-mute{background:var(--soft);color:var(--muted)}
+.req{display:inline-flex;gap:3px;vertical-align:middle;margin-right:6px} .req i{width:9px;height:9px;border-radius:2px;background:var(--line)} .req i.y{background:var(--green)}
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:11px 2px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0} .row small{display:block;color:var(--muted);font-size:13px}
+.empty{color:var(--muted);text-align:center;padding:18px 0 8px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:none;padding:8px 14px;font:500 14px var(--sans);color:var(--muted);cursor:pointer}
+.seg button.on{background:var(--navy);color:#fff}
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(10,25,40,.35);display:flex;justify-content:flex-end;z-index:9}
+.drawer{width:min(520px,100%);height:100%;background:var(--surface);padding:22px 24px calc(22px + env(safe-area-inset-bottom,0px));overflow-y:auto;display:flex;flex-direction:column;gap:14px}
+.drawer h2{margin:0;font-size:21px}
+.steps{display:flex;gap:6px;flex-wrap:wrap}
+.steps span{font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:99px;background:var(--soft);color:var(--muted)}
+.steps span.done{background:var(--okbg);color:var(--green)} .steps span.now{background:var(--warnbg);color:var(--orange)}
+.check{display:grid;grid-template-columns:22px minmax(0,1fr);gap:10px;align-items:start;padding:10px 0;border-bottom:1px solid var(--line)}
+.check input[type=checkbox]{width:18px;height:18px;margin-top:2px;accent-color:var(--blue)}
+.check input[type=text]{width:100%;margin-top:6px;font:400 13.5px var(--sans);padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;z-index:10}
+@media (max-width:1040px){.rail{grid-template-columns:1fr}}
+@media (max-width:700px){
+  .cards thead{display:none}.cards tr{display:block;padding:10px 0;border-bottom:1px solid var(--line)}.cards tbody tr:last-child{border-bottom:0}
+  .cards td{display:flex;justify-content:space-between;gap:12px;border:0;padding:3px 4px;text-align:right}
+  .cards td::before{content:attr(data-l);color:var(--muted);font-size:13px;text-align:left}
+  .cards td.lead{display:block;text-align:left;font-weight:600}.cards td.lead::before{content:none}
+  .row{grid-template-columns:1fr}}
+@media (max-width:480px){.page{padding-inline:16px}.top{padding-inline:16px}}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+</style>
+
+<header class="top">
+  <div class="brand"><div><b>New Wave</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div><div class="who">Working as Registration · sample officer</div></div>
+  <nav class="tabs" id="tabs"></nav>
+</header>
+<main class="page" id="page"></main>
+<div id="drawer"></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+const pl=(n,w)=>n+" "+w+(n===1?"":"s");
+const TABS=["Dashboard","Registration","Courses","Instructions"];
+const REQ=["Valid ID / passport","Medical certificate (PEME format)","2x2 photo","Seaman's book / SRN"];
+const APPS=[
+ {id:1,n:"DELA CRUZ, Andres",nw:"NWMTACI-2026-0451",co:"Basic Training (BT-PSSR)",sch:"Oct 12",src:"Online enrollment",req:[1,1,0,1],paid:0,state:"Screening",at:"Today 8:05 AM",fee:180000},
+ {id:2,n:"LIM, Rosa",nw:"NWMTACI-2026-0452",co:"Crowd Management (PSCMT)",sch:"Oct 13–14",src:"Agency · Qapla Maritime",req:[1,1,1,1],paid:0,state:"For payment",at:"Today 9:20 AM",fee:90000},
+ {id:3,n:"SANTOS, Mark",nw:"NWMTACI-2026-0453",co:"Passenger Courses Bundle",sch:"Oct 12–17",src:"Walk-in",req:[1,0,0,0],paid:0,state:"Screening",at:"Today 10:41 AM",fee:410000},
+ {id:4,n:"NAVARRO, Dino",nw:"NWMTACI-2026-0440",co:"Crisis Management (PSCMHBT)",sch:"No batch yet",src:"Online enrollment",req:[1,1,1,1],paid:250000,state:"Paid · choose batch",at:"Yesterday",fee:250000},
+ {id:5,n:"CRUZ, Ana",nw:"NWMTACI-2026-0447",co:"Basic Training (BT-PSSR)",sch:"Oct 9",src:"Walk-in",req:[1,1,1,1],paid:180000,state:"Enrolled",at:"Today 11:02 AM",fee:180000},
+ {id:6,n:"RAMOS, Jose",nw:"NWMTACI-2026-0448",co:"Crisis Management (PSCMHBT)",sch:"Oct 15–17",src:"Agency · Costa Maritime",req:[1,1,1,1],paid:250000,state:"Enrolled",at:"Today 2:10 PM",fee:250000},
+ {id:7,n:"TAN, Kevin",nw:"NWMTACI-2026-0454",co:"No course yet",sch:"—",src:"Online enrollment",req:[0,0,0,0],paid:0,state:"No course yet",at:"Today 3:30 PM",fee:0},
+];
+const STATES=[["Screening","--blue"],["For payment","--orange"],["Paid · choose batch","--violet"],["Enrolled","--green"],["No course yet","--slate"]];
+const pillOf={"Screening":"p-info","For payment":"p-warn","Paid · choose batch":"p-info","Enrolled":"p-ok","No course yet":"p-mute"};
+const STCW=[["Basic Training (BT-PSSR)","Oct 9 · BCH-2610-021",19,24],["Safety (STPPDSPPS)","Oct 12 · BCH-2610-004",22,24],["Crowd Management (PSCMT)","Oct 13–14 · BCH-2610-007",8,24],["Crisis Management (PSCMHBT)","Oct 15–17 · BCH-2610-011",21,24],["CCM Domestic (CCMD)","Oct 12–14 · BCH-2610-030",3,24]];
+const COURSES=[
+ ["UBT-PSSR","Updating Basic Training - Personal Safety and Social Responsibilities","STCW","1 day",120000,"Oct 9",5],
+ ["STPPDSPPS","Safety (Passenger Ships)","STCW","1 day",80000,"Oct 12",2],
+ ["PSCMT","Crowd Management","STCW","2 days",90000,"Oct 13",16],
+ ["PSCMHBT","Crisis Management and Human Behaviour","STCW","3 days",250000,"Oct 15",3],
+ ["CCMD","CCM Domestic","STCW","3 days",230000,"Oct 12",21],
+ ["PCB","Passenger Courses Bundle (Safety, Crowd and Crisis)","In-House · Passenger ships","6 days",410000,"Pick a Monday",null],
+ ["SSO","Ship Security Officer","In-House · Security","3 days",450000,"Pick a date",null],
+ ["ECDIS","ECDIS Generic","In-House · Navigation","5 days",950000,"Pick a date",null],
+ ["MEFA","Medical First Aid","In-House · Medical","3 days",350000,"Pick a date",null],
+];
+const INSTR=[
+ {n:"CRUZ, Ana",co:"Basic Training",start:"Oct 9",email:"ana.sample@gmail.com",count:1,st:"Emailed",when:"Oct 8, 11:20 AM"},
+ {n:"RAMOS, Jose",co:"Crisis Management",start:"Oct 15",email:"jose.sample@gmail.com",count:0,st:"Ready to send"},
+ {n:"TORRES, Lea",co:"Safety",start:"Oct 12",email:"lea.sample@yahoo.com",count:1,st:"Email failed",when:"Oct 8, 9:02 AM"},
+ {n:"GARCIA, Paolo",co:"Crowd Management",start:"Oct 13",email:"paolo.sample@gmail.com",count:2,st:"Emailed",when:"Oct 7, 4:10 PM"},
+ {n:"BAUTISTA, Elle",co:"Passenger Courses Bundle",start:"Oct 12",email:"elle.sample@gmail.com",count:0,st:"Ready to send"},
+];
+const S={tab:"Dashboard",f:"",q:"",view:"Enrollments",cat:"",ist:"",open:null,day:0};
+const days=["Oct 8, 2026","Oct 7, 2026","Oct 6, 2026"];
+const reqN=a=>a.req.reduce((s,x)=>s+x,0);
+const reqDots=a=>`<span class="req">${a.req.map(x=>`<i class="${x?"y":""}"></i>`).join("")}</span>${reqN(a)} of 4`;
+const head=(eb,t,right,note)=>`<div class="head"><div><div class="eyebrow">${eb}</div><h1>${t}</h1></div>${right||""}</div>${note?`<p class="note">${note}</p>`:""}`;
+const col=(rows,key,total)=>`<div class="col">${rows.map(r=>`<button class="crow ${S[key]===r[0]?"sel":""}" data-${key}="${r[0]}" style="--c:var(${r[1]})"><span class="dot"></span><span>${r[0]}${r[3]?`<small>${r[3]}</small>`:""}</span><b>${r[2]}</b></button>`).join("")}${total?`<div class="crow tot"><span class="dot"></span><span>${total[0]}</span><b>${total[1]}</b></div>`:""}</div>`;
+const P={
+Dashboard(){const today=APPS.filter(a=>a.at.startsWith("Today"));const enrolled=APPS.filter(a=>a.state==="Enrolled");
+ return head("Registration","Dashboard",`<div class="hacts"><button class="btn" data-tab="Registration">Search trainee</button><button class="btn org" data-tab="Registration">Screen applications</button></div>`,"Thursday, October 8, 2026")+`<div class="rail"><div class="stack">
+  <section class="panel"><div class="ph"><h2>Applications</h2><span class="m">tap to open the list</span></div><div class="col">${STATES.map(s=>`<button class="crow" data-go="${s[0]}" style="--c:var(${s[1]})"><span class="dot"></span><span>${s[0]}</span><b>${APPS.filter(a=>a.state===s[0]).length}</b></button>`).join("")}<div class="crow tot"><span class="dot"></span><span>New today</span><b>${today.length}</b></div></div></section>
+  <section class="panel"><div class="ph"><h2>STCW seats open</h2><span class="m">next batch</span></div><div class="col">${STCW.map(c=>{const left=c[3]-c[2];return `<div class="crow" style="--c:var(${left<=3?"--orange":"--blue"})"><span class="dot"></span><span>${c[0].replace(/ \(.*\)/,"")}<small>${c[1]}</small><div class="meter"><i class="${left<=3?"low":""}" style="width:${c[2]/c[3]*100}%"></i></div></span><b>${left}</b></div>`;}).join("")}<div class="crow tot"><span class="dot"></span><span>Seats left</span><b>${STCW.reduce((s,c)=>s+c[3]-c[2],0)}</b></div></div></section>
+  <section class="panel"><div class="ph"><h2>Tomorrow</h2><span class="m">Oct 9</span></div><dl class="lines"><div><dt>Trainees in class</dt><dd>19</dd></div><div><dt>Batches</dt><dd>1</dd></div><div><dt>Instructions not yet sent</dt><dd class="mono" style="color:var(--orange)">2</dd></div></dl></section>
+ </div><div class="stack">
+  <section class="panel"><div class="ph"><h2>New registrations</h2><button class="btn sm" data-tab="Registration">View all</button></div>${APPS.filter(a=>a.state!=="Enrolled").map(a=>`<div class="row"><div><strong>${a.n}</strong><small><span class="nw">${a.nw}</span> · ${a.co}</small><small>${a.src} · ${a.at}</small></div><span class="pill ${pillOf[a.state]}">${a.state}</span><button class="btn sm" data-open="${a.id}">Open</button></div>`).join("")}</section>
+  <section class="panel"><div class="ph"><h2>Enrolled on</h2><div class="day"><button data-day="1" aria-label="Previous day">‹</button><span>${days[S.day]}</span><button data-day="-1" aria-label="Next day" ${S.day?"":"disabled"}>›</button></div></div>${S.day?`<p class="empty">No trainees enrolled on this day.</p>`:enrolled.map(a=>`<div class="row"><div><strong>${a.n}</strong><small><span class="nw">${a.nw}</span> · ${a.co} · ${a.sch}</small></div><b class="mono">${peso(a.paid)}</b><span class="pill p-ok">Enrolled</span></div>`).join("")}</section>
+ </div></div>`;},
+Registration(){const q=S.q.toLowerCase();
+ if(S.view==="Trainees"){const tr=APPS.filter(a=>!q||`${a.n} ${a.nw}`.toLowerCase().includes(q));
+  return head("Registration","Trainees",`<div class="seg"><button data-view="Enrollments">Enrollments</button><button class="on" data-view="Trainees">Trainees</button></div>`)+`<div class="rail"><div class="stack">
+  <section class="panel"><div class="ph"><h2>Trainee records</h2></div><dl class="lines"><div><dt>All trainees</dt><dd>${APPS.length}</dd></div><div><dt>Record complete</dt><dd>${APPS.filter(a=>reqN(a)===4).length}</dd></div><div><dt>Missing SRN or ID</dt><dd style="color:var(--orange)">${APPS.filter(a=>reqN(a)<4).length}</dd></div><div><dt>Registered this week</dt><dd>${APPS.length}</dd></div></dl></section>
+  <section class="panel"><div class="ph"><h2>By enrollment type</h2></div><dl class="lines">${["Online enrollment","Walk-in","Agency"].map(k=>`<div><dt>${k}</dt><dd>${APPS.filter(a=>a.src.startsWith(k)).length}</dd></div>`).join("")}</dl></section>
+  </div><section class="panel"><div class="bar"><input id="q" placeholder="Search name, NWMTACI number or SRN" value="${S.q}"></div><div class="scroll"><table class="cards"><thead><tr><th>Trainee</th><th>Enrollment type</th><th>Courses</th><th>Record</th><th></th></tr></thead><tbody>${tr.map(a=>`<tr class="click" data-open="${a.id}"><td class="lead">${a.n}<small class="nw">${a.nw}</small></td><td data-l="Type">${a.src}</td><td data-l="Courses">${a.co}</td><td data-l="Record">${reqN(a)===4?`<span class="pill p-ok">Complete</span>`:`<span class="pill p-warn">${4-reqN(a)} missing</span>`}</td><td data-l=""><button class="btn sm" data-open="${a.id}">Details</button></td></tr>`).join("")}</tbody></table></div></section></div>`;}
+ const shown=APPS.filter(a=>(!S.f||a.state===S.f)&&(!q||`${a.n} ${a.nw} ${a.co}`.toLowerCase().includes(q)));
+ return head("Registration","Enrollments",`<div class="seg"><button class="on" data-view="Enrollments">Enrollments</button><button data-view="Trainees">Trainees</button></div>`)+`<div class="rail"><div class="stack">
+  <section class="panel"><div class="ph"><h2>Queue</h2><span class="m">tap to filter</span></div>${col(STATES.map(s=>[s[0],s[1],APPS.filter(a=>a.state===s[0]).length]),"f",["All enrollments",APPS.length])}</section>
+  <section class="panel"><div class="ph"><h2>Requirements</h2></div><dl class="lines">${REQ.map((r,i)=>`<div><dt>${r}</dt><dd>${APPS.filter(a=>a.req[i]).length} of ${APPS.length}</dd></div>`).join("")}</dl><p class="foot">Hand to the Cashier once all four are ticked.</p></section>
+  <section class="panel"><div class="ph"><h2>By enrollment type</h2></div><dl class="lines">${["Online enrollment","Walk-in","Agency"].map(k=>`<div><dt>${k}</dt><dd>${APPS.filter(a=>a.src.startsWith(k)).length}</dd></div>`).join("")}</dl></section>
+ </div><section class="panel"><div class="bar"><input id="q" placeholder="Search applicant, NWMTACI number or course" value="${S.q}">${S.f?`<button class="btn" data-f="${S.f}">Show all</button>`:""}</div>
+  ${shown.length?`<div class="scroll"><table class="cards"><thead><tr><th>Applicant</th><th>Course and schedule</th><th>Requirements</th><th>Payment</th><th>Status</th><th></th></tr></thead><tbody>${shown.map(a=>`<tr class="click" data-open="${a.id}"><td class="lead">${a.n}<small class="nw">${a.nw}</small><small>${a.src}</small></td><td data-l="Course">${a.co}<small>${a.sch}</small></td><td data-l="Requirements">${reqDots(a)}</td><td data-l="Payment">${a.fee?(a.paid>=a.fee?`<span class="pill p-ok">Paid</span>`:a.paid?`<span class="pill p-warn">Partially paid</span>`:`<span class="pill p-mute">Unpaid</span>`):"—"}</td><td data-l="Status"><span class="pill ${pillOf[a.state]}">${a.state}</span></td><td data-l=""><button class="btn sm" data-open="${a.id}">Open</button></td></tr>`).join("")}</tbody></table></div>`:`<p class="empty">No applications match.</p>`}</section></div>`;},
+Courses(){const cats=[...new Set(COURSES.map(c=>c[2]))];const q=S.q.toLowerCase();const shown=COURSES.filter(c=>(!S.cat||c[2]===S.cat)&&(!q||`${c[0]} ${c[1]}`.toLowerCase().includes(q)));
+ return head("Registration","Courses","",`${COURSES.length} New Wave courses · sample list`)+`<div class="rail"><div class="stack">
+  <section class="panel"><div class="ph"><h2>Categories</h2><span class="m">tap to filter</span></div>${col(cats.map((c,i)=>[c,["--blue","--orange","--violet","--green","--slate","--blue"][i%6],COURSES.filter(x=>x[2]===c).length]),"cat",["All courses",COURSES.length])}</section>
+  <section class="panel"><div class="ph"><h2>STCW batches</h2><span class="m">October</span></div><dl class="lines"><div><dt>Open batches</dt><dd>31</dd></div><div><dt>Seats left</dt><dd>${STCW.reduce((s,c)=>s+c[3]-c[2],0)}</dd></div><div><dt>Nearly full (3 seats or fewer)</dt><dd style="color:var(--orange)">2</dd></div></dl></section>
+ </div><section class="panel"><div class="bar"><input id="q" placeholder="Search course name or code" value="${S.q}"></div><div class="scroll"><table class="cards"><thead><tr><th>Course</th><th>Duration</th><th>Next start</th><th>Seats left</th><th class="r">Fee</th></tr></thead><tbody>${shown.map(c=>`<tr><td class="lead">${c[1]}<small class="nw">${c[0]} · ${c[2]}</small></td><td data-l="Duration">${c[3]}</td><td data-l="Next start">${c[5]}</td><td data-l="Seats left">${c[6]==null?"—":`<span class="pill ${c[6]<=3?"p-warn":"p-mute"}">${c[6]} of 24</span>`}</td><td data-l="Fee" class="r mono"><strong>${peso(c[4])}</strong></td></tr>`).join("")}</tbody></table></div></section></div>`;},
+Instructions(){const sts=[["Ready to send","--blue"],["Emailed","--green"],["Email failed","--orange"]];const shown=INSTR.filter(i=>!S.ist||i.st===S.ist);
+ return head("Registration","Instructions",`<button class="btn pri" data-toast="Generates and emails every ready row (skips rows at 2 of 2)">Send all ready</button>`)+`<div class="rail"><div class="stack">
+  <section class="panel"><div class="ph"><h2>Status</h2><span class="m">tap to filter</span></div>${col(sts.map(s=>[s[0],s[1],INSTR.filter(i=>i.st===s[0]).length]),"ist",["Enrolled trainees",INSTR.length])}</section>
+  <section class="panel"><div class="ph"><h2>Limits</h2></div><dl class="lines"><div><dt>Generated twice (limit)</dt><dd>${INSTR.filter(i=>i.count>=2).length}</dd></div><div><dt>Starting in 3 days, not sent</dt><dd style="color:var(--orange)">${INSTR.filter(i=>i.count===0).length}</dd></div></dl></section>
+  <section class="panel"><div class="ph"><h2>Google Classroom</h2></div><dl class="lines"><div><dt>Courses with a class link</dt><dd>4 of 5</dd></div><div><dt>Connection</dt><dd style="color:var(--green)">Connected</dd></div></dl></section>
+ </div><section class="panel"><div class="scroll"><table class="cards"><thead><tr><th>Trainee</th><th>Starts</th><th>Email</th><th>Status</th><th></th></tr></thead><tbody>${shown.map((i,k)=>`<tr><td class="lead">${i.n}<small>${i.co}</small></td><td data-l="Starts">${i.start}</td><td data-l="Email">${i.email}</td><td data-l="Status"><span class="pill ${i.st==="Emailed"?"p-ok":i.st==="Email failed"?"p-warn":"p-info"}">${i.st}</span>${i.when?`<small>${i.when}</small>`:""}</td><td data-l="">${i.count>=2?`<span class="pill p-mute">2 of 2 used</span>`:`<button class="btn sm pri" data-gen="${INSTR.indexOf(i)}">${i.count?"Generate again":"Generate and email"} (${i.count+1} of 2)</button>`}</td></tr>`).join("")}</tbody></table></div></section></div>`;}
+};
+function drawer(){const el=document.getElementById("drawer");const a=APPS.find(x=>x.id===S.open);if(!a){el.innerHTML="";return;}
+ const all=reqN(a)===4;
+ el.innerHTML=`<div class="scrim" data-close><aside class="drawer" role="dialog" aria-label="Application"><div style="display:flex;justify-content:space-between;gap:10px"><div><span class="nw">${a.nw}</span><h2>${a.n}</h2><p class="note" style="margin:2px 0 0">${a.co} · ${a.sch} · ${a.src}</p></div><button class="btn sm" data-close>Close</button></div>
+ <div class="steps"><span class="${all?"done":"now"}">Requirements</span><span class="${a.state==="For payment"?"now":a.paid?"done":""}">For payment</span><span class="${a.state==="Enrolled"?"done":""}">Enrolled</span></div>
+ <section><div class="ph" style="margin:6px 0 0"><h2 style="font-size:16px">Checklist with remarks</h2><span class="m">${reqN(a)} of 4</span></div>${REQ.map((r,i)=>`<div class="check"><input type="checkbox" id="rq${i}" data-rq="${i}" ${a.req[i]?"checked":""}><label for="rq${i}"><strong>${r}</strong>${a.req[i]?`<small style="display:block;color:var(--muted);font-size:13px">Verified · sample officer · today</small>`:`<input type="text" placeholder="Remarks, e.g. Expired, ask for renewal" aria-label="Remarks for ${r}">`}</label></div>`).join("")}</section>
+ <dl class="lines"><div><dt>Fee</dt><dd>${a.fee?peso(a.fee):"—"}</dd></div><div><dt>Paid</dt><dd>${peso(a.paid)}</dd></div></dl>
+ <div class="hacts" style="margin-top:auto">${a.state==="No course yet"?`<button class="btn pri" data-toast="Opens Assign course">Assign course</button>`:a.state==="Paid · choose batch"?`<button class="btn pri" data-toast="Opens Choose batch">Choose batch</button>`:a.state==="Enrolled"?`<button class="btn" data-toast="Opens Request a change">Request a change</button>`:`<button class="btn org" ${all&&a.state==="Screening"?"":"disabled"} data-hand="${a.id}">Hand to Cashier</button><button class="btn" data-toast="Opens Request a change">Request a change</button>`}</div></aside></div>`;}
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,1800);}
+function draw(focus){document.getElementById("tabs").innerHTML=TABS.map(t=>`<button class="${S.tab===t?"on":""}" data-tab="${t}">${t}</button>`).join("");
+ document.getElementById("page").innerHTML=P[S.tab]();drawer();
+ if(focus){const q=document.getElementById("q");if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length);}}
+ try{localStorage.setItem("reg-tab",S.tab)}catch(_){}}
+document.addEventListener("click",e=>{if(e.target.classList.contains("scrim")||e.target.closest("button[data-close]")){S.open=null;draw();return;}
+ const b=e.target.closest("button,tr.click");if(!b)return;const d=b.dataset;
+ if(d.tab){S.tab=d.tab;S.f="";S.q="";S.cat="";S.ist="";S.view="Enrollments";}
+ else if(d.go){S.tab="Registration";S.view="Enrollments";S.f=d.go;}
+ else if(d.f!==undefined){S.f=S.f===d.f?"":d.f;}
+ else if(d.cat!==undefined){S.cat=S.cat===d.cat?"":d.cat;}
+ else if(d.ist!==undefined){S.ist=S.ist===d.ist?"":d.ist;}
+ else if(d.view){S.view=d.view;S.q="";}
+ else if(d.open){S.open=+d.open;}
+ else if(d.day){S.day=Math.max(0,Math.min(2,S.day+ +d.day));}
+ else if(d.hand){const a=APPS.find(x=>x.id===+d.hand);a.state="For payment";toast("Handed to the Cashier");}
+ else if(d.gen){const i=INSTR[+d.gen];i.count++;i.st="Emailed";i.when="Oct 8, just now";toast("Generated and emailed to "+i.email);}
+ else if(d.toast){toast(d.toast);return;}
+ else return;
+ draw();});
+document.addEventListener("change",e=>{const c=e.target.closest("[data-rq]");if(!c)return;const a=APPS.find(x=>x.id===S.open);a.req[+c.dataset.rq]=c.checked?1:0;draw();});
+document.addEventListener("input",e=>{if(e.target.id==="q"){S.q=e.target.value;draw(true);}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.open){S.open=null;draw();}});
+try{const t=localStorage.getItem("reg-tab");if(TABS.includes(t))S.tab=t;}catch(_){}
+draw();
+</script>

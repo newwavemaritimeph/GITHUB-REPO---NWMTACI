@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Partner Rebates Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Configuration › Rebates per Agency (owner, 9 Oct 2026): quick percentages for In-House courses, fixed peso amounts for the five STCW courses. */
+:root{--navy:#123F63;--blue:#0571D0;--orange:#F25615;--cyan:#35CCFA;--bg:#f2f6f9;--surface:#fff;--line:#dbe5ec;--fg:#0f2638;--muted:#5b6f7f;--soft:#eef4f8;--okbg:#e3f4ea;--ok:#0a7a3e;--warnbg:#fde9dd;--warn:#b4480f;--badbg:#fbe4dc;--bad:#b42318;--infobg:#e2effb;--info:#0558a8;--sans:"Geist",system-ui,sans-serif;--mono:"Geist Mono",ui-monospace,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0c1925;--surface:#122534;--line:#23394b;--fg:#e5eef5;--muted:#98adbf;--soft:#18303f;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c1925;--surface:#122534;--line:#23394b;--fg:#e5eef5;--muted:#98adbf;--soft:#18303f;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding:12px 20px 0}.brand{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.brand b{color:var(--cyan);font-size:18px}.brand small{display:block;font-size:10px;letter-spacing:.07em;color:#c9dceb}
+.who{font-size:13.5px;color:#c9dceb}.who select{background:transparent;border:1px solid #3d6b90;border-radius:8px;color:#fff;padding:6px 9px}.who option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:12px;flex-wrap:wrap}.tabs span{color:#d4e4f1;padding:10px 16px;border-radius:10px 10px 0 0;font-weight:500}.tabs span.on{background:var(--bg);color:var(--fg)}
+.page{max-width:1440px;margin:0 auto;padding:18px 20px 60px;display:flex;flex-direction:column;gap:16px}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}h1{margin:2px 0 0;font-size:27px;line-height:1.2}h2{margin:0;font-size:16px;font-weight:600}h3{margin:0;font-size:14px;font-weight:600}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;min-width:0}.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 18px 10px;flex-wrap:wrap}.ph .m{color:var(--muted);font-size:13px}.pb{padding:0 18px 18px}
+.wrap{overflow-x:auto;margin:0 18px 18px}table{width:100%;border-collapse:collapse;font-size:14px}th{background:var(--navy);color:#fff;font:600 11.5px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:8px 10px;white-space:nowrap}td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}td small{display:block;color:var(--muted);font-size:12.5px}th.r,td.r{text-align:right}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600}.p-ok{background:var(--okbg);color:var(--ok)}.p-info{background:var(--infobg);color:var(--info)}.p-warn{background:var(--warnbg);color:var(--warn)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:7px 13px;font-weight:500}.pri{background:var(--blue);color:#fff;border:0;border-radius:9px;padding:8px 15px;font-weight:600}
+.chips{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:6px 14px;font-weight:600;font-family:var(--mono)}.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.other{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:99px;padding:2px 10px 2px 4px}.other.on{border-color:var(--navy);box-shadow:0 0 0 1px var(--navy)}.other input{width:70px;border:0;background:transparent;padding:4px 6px;font-family:var(--mono);text-align:right}
+.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}.field select,.amt{border:1px solid var(--line);border-radius:9px;background:var(--surface);padding:8px 10px}
+.amt{width:130px;font-family:var(--mono);text-align:right}
+.edit{border-top:1px solid var(--line);background:var(--soft);padding:16px 18px;display:flex;flex-direction:column;gap:16px;border-radius:0 0 14px 14px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.note{background:var(--infobg);color:var(--info);border-radius:10px;padding:10px 14px;font-size:13.5px}
+.err{color:var(--bad);font-weight:600;margin:0}
+.ex{font-size:13.5px;color:var(--muted)}.ex b{color:var(--fg)}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface);align-self:flex-start}.seg button{border:0;background:none;padding:7px 14px;font-weight:600;font-size:13.5px}.seg button.on{background:var(--navy);color:#fff}
+.chips.sm{flex-wrap:nowrap}.chips.sm .chip{padding:4px 9px;font-size:12.5px}.chips.sm .other input{width:62px;font-family:var(--sans);font-size:12.5px}.amt.sm::placeholder{color:var(--muted)}.amt.sm{width:96px;padding:6px 8px}
+.msel{border:1px solid var(--line);border-radius:9px;background:var(--surface);padding:7px 9px;font-size:13.5px}
+.matrix td{vertical-align:middle}.matrix th small,.matrix td small{display:block;font-weight:500;text-transform:none;letter-spacing:0;opacity:.85}.matrix tr.dirty td{background:var(--infobg)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px}.lab{margin:4px 0 8px;font-size:12.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.stiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px}.stile{border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:3px}.stile span{font-weight:600}.stile small{color:var(--muted);font-size:12px}.stile .amt{width:100%}
+.savebar{position:sticky;bottom:12px;margin:0 18px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 14px;color:var(--muted);box-shadow:0 6px 20px rgba(6,20,32,.08)}.savebar.on{border-color:var(--blue);color:var(--fg)}.savebar button:disabled{opacity:.5;cursor:default}
+.cards+.savebar{margin:0}
+@media (max-width:560px){.page,.top{padding-inline:16px}.wrap{margin-inline:12px}.cards{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="top"><div class="brand"><div><b>NEW WAVE</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div><span class="who">Working As <select id="role"><option>Accounting</option><option>Admin</option></select></span></div>
+<nav class="tabs" id="tabs"></nav></div>
+<main class="page" id="page"></main>
+<script>
+const peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
+const PRESETS=[10,20,30,50];
+// The five STCW courses take a fixed peso rebate per partner (encoded by hand), not a percentage.
+const STCW=[["UBT-PSSR","BT-PSSR","Updating Training on Basic Training – PSSR",180000],["STPPDSPPS","Safety","Safety Training for Personnel Providing Direct Service to Passengers in Passenger Spaces",120000],["PSCMT","Crowd","Passenger Ship Crowd Management Training",130000],["PSCMHBT","Crisis","Passenger Ship Crisis Management and Human Behavior Training",150000],["CCMD","CCM Domestic","Crowd and Crisis Management – Domestic",250000]];
+const S={role:"Accounting",edit:null,err:"",msg:"",partners:[
+ {name:"Blue Anchor Consultancy",kind:"Consultancy",pct:50,mode:"Deducted",stcw:{"UBT-PSSR":30000,"STPPDSPPS":20000,"PSCMT":25000,"PSCMHBT":25000,"CCMD":50000}},
+ {name:"Harborline Crewing",kind:"Agency",pct:30,mode:"No deduction",stcw:{"UBT-PSSR":20000,"STPPDSPPS":0,"PSCMT":20000,"PSCMHBT":20000,"CCMD":0}},
+ {name:"Pacific Crew Agency",kind:"Agency",pct:20,mode:"Deducted",stcw:{}},
+ {name:"Southwind Maritime",kind:"Consultancy",pct:15,mode:"Deducted",stcw:{"UBT-PSSR":25000}}]};
+const how=m=>m==="No deduction"?"Paid to the partner later":"Deducted from the trainee's payment";
+/* ---- Three layouts (owner, 9 Oct 2026): 1 Table with an editor, 2 Partner cards, 3 Matrix edited in place ---- */
+S.design=S.design||3;S.draft=null;
+const clone=()=>S.partners.map(p=>({...p,stcw:{...p.stcw}}));
+const draft=()=>S.draft||(S.draft=clone());
+const changed=()=>S.draft?S.draft.filter((p,i)=>JSON.stringify(p)!==JSON.stringify(S.partners[i])).length:0;
+const pctPicker=(p,i,compact)=>{const custom=!PRESETS.includes(p.pct);return `<div class="chips${compact?" sm":""}">${PRESETS.map(v=>`<button type="button" class="chip ${p.pct===v?"on":""}" data-dpct="${i}:${v}">${v}%</button>`).join("")}<span class="other ${custom?"on":""}"><input data-dother="${i}" type="number" min="1" max="100" step="0.5" value="${custom?p.pct:""}" placeholder="Other" aria-label="Other percentage for ${p.name}">%</span></div>`};
+const modeSel=(p,i)=>`<select class="msel" data-dmode="${i}"><option value="Deducted" ${p.mode==="Deducted"?"selected":""}>Deducted From Payment</option><option value="No deduction" ${p.mode==="No deduction"?"selected":""}>Paid to the Partner Later</option></select>`;
+const amt=(p,i,c)=>`<input class="amt sm" data-damt="${i}:${c[0]}" type="number" min="0" step="0.01" value="${p.stcw[c[0]]?(p.stcw[c[0]]/100).toFixed(2):""}" placeholder="—" aria-label="${p.name} ${c[1]} rebate">`;
+const saveBar=()=>{const n=changed();return `<div class="savebar ${n?"on":""}"><span>${n?`${n} partner${n===1?"":"s"} changed`:"No changes"}</span><span style="display:flex;gap:8px"><button class="btn" data-discard="1" ${n?"":"disabled"}>Discard</button><button class="pri" data-saveall="1" ${n?"":"disabled"}>Save Changes</button></span></div>`};
+function design2(){const ps=draft();return `<div class="cards">${ps.map((p,i)=>`<section class="panel card"><div class="ph"><div><h2>${p.name}</h2><span class="m">${p.kind}</span></div>${modeSel(p,i)}</div>
+  <div class="pb"><h3 class="lab">In-House Courses · % of the Training Fee</h3>${pctPicker(p,i)}<p class="ex">₱1,000.00 fee → <b>${peso(Math.round(100000*p.pct/100))}</b></p>
+  <h3 class="lab">STCW Courses · Fixed Amount</h3><div class="stiles">${STCW.map(c=>`<label class="stile"><span>${c[1]}</span><small>Fee ${peso(c[3])}</small>${amt(p,i,c)}</label>`).join("")}</div></div></section>`).join("")}</div>${saveBar()}`}
+function design3(){const ps=draft();return `<section class="panel"><div class="ph"><h2>Rebates per Partner</h2><span class="m">Change any cell, then Save Changes · a blank STCW cell gives no rebate</span></div>
+  <div class="wrap"><table class="matrix"><thead><tr><th>Partner</th><th>In-House Courses<small>% of the training fee</small></th>${STCW.map(c=>`<th class="r">${c[1]}<small>Fee ${peso(c[3])}</small></th>`).join("")}<th>How It Is Given</th></tr></thead><tbody>
+  ${ps.map((p,i)=>{const dirty=JSON.stringify(p)!==JSON.stringify(S.partners[i]);return `<tr class="${dirty?"dirty":""}"><td><b>${p.name}</b><small>${p.kind}</small></td><td>${pctPicker(p,i,true)}</td>${STCW.map(c=>`<td class="r">${amt(p,i,c)}</td>`).join("")}<td>${modeSel(p,i)}</td></tr>`}).join("")}
+  </tbody></table></div>${saveBar()}</section>`}
+function render(){
+  document.getElementById("tabs").innerHTML=(S.role==="Accounting"?["Dashboard","Approvals","Transactions ▾","Reports","Configuration ▾"]:["Dashboard","Search Trainee","Enrollments","Resource Planning","Configuration ▾","Requests","Reports ▾","MISMO ▾"]).map(t=>`<span class="${t.startsWith("Configuration")?"on":""}">${t}</span>`).join("");
+  const e=S.edit;
+  document.getElementById("page").innerHTML=`<div><span class="eyebrow">${S.role} › Configuration</span><h1>${S.role==="Admin"?"Partner Rebates":"Rebates per Agency"}</h1></div>
+  <div class="seg" role="tablist" aria-label="Design">${[[1,"Design 1 · Table and Editor"],[2,"Design 2 · Partner Cards"],[3,"Design 3 · Matrix"]].map(([n,l])=>`<button role="tab" aria-selected="${S.design===n}" class="${S.design===n?"on":""}" data-design="${n}">${l}</button>`).join("")}</div>
+  ${S.msg?`<div class="note" style="background:var(--okbg);color:var(--ok)">${S.msg}</div>`:""}
+  ${S.design===2?design2():S.design===3?design3():`<section class="panel"><div class="ph"><h2>Rebates per Partner</h2><span class="m">${S.partners.length} active partners</span></div>
+  <div class="wrap"><table><thead><tr><th>Partner</th><th>Type</th><th class="r">In-House Courses</th><th>STCW Courses (Fixed Amount)</th><th>How It Is Given</th><th></th></tr></thead><tbody>
+  ${S.partners.map((p,i)=>{const set=STCW.filter(c=>p.stcw[c[0]]>0);return `<tr><td><b>${p.name}</b></td><td>${p.kind}</td><td class="r"><b class="mono">${p.pct}%</b><small>of the training fee</small></td>
+   <td>${set.length?set.map(c=>`<span class="mono">${c[1]} ${peso(p.stcw[c[0]])}</span>`).join("<br>"):`<span class="pill p-warn">Not set · no rebate</span>`}${set.length&&set.length<5?`<small>${5-set.length} not set · no rebate</small>`:""}</td>
+   <td>${how(p.mode)}</td><td><button class="btn" data-edit="${i}">Edit</button></td></tr>`}).join("")}
+  </tbody></table></div>
+  ${e?editor(e):""}</section>`}
+  <div class="note">In-House courses: the rebate is a percentage of the actual training fee — pick 10%, 20%, 30% or 50%, or type another. STCW courses (BT-PSSR, Safety, Crowd, Crisis and CCM Domestic): type the peso amount per partner; a course left blank gives no rebate. Accounting and the Admin edit the same settings, and every change is recorded in the audit log.</div>`;
+}
+function editor(e){
+  const p=S.partners[e.i];const custom=!PRESETS.includes(e.pct);
+  const fee=180000, sample=STCW[0];
+  return `<div class="edit"><div class="ph" style="padding:0"><h2>Edit Rebate · ${p.name}</h2></div>
+   <div class="grid2">
+    <div style="display:flex;flex-direction:column;gap:8px"><h3>In-House Courses · % of the Training Fee</h3>
+     <div class="chips" role="radiogroup" aria-label="Rebate percentage">${PRESETS.map(v=>`<button type="button" role="radio" aria-checked="${e.pct===v}" class="chip ${e.pct===v&&!e.other?"on":""}" data-pct="${v}">${v}%</button>`).join("")}
+      <span class="other ${custom||e.other?"on":""}"><button type="button" class="chip ${custom||e.other?"on":""}" data-other="1" style="border:0;padding:4px 10px">Other</button><input id="e_other" type="number" min="1" max="100" step="0.5" value="${custom||e.other?e.pct:""}" placeholder="e.g. 25" aria-label="Other percentage">%</span></div>
+     <p class="ex">Example: a ₱1,000.00 In-House course at <b>${e.pct}%</b> gives <b>${peso(Math.round(100000*e.pct/100))}</b>.</p>
+     <label class="field">How It Is Given<select id="e_mode"><option value="Deducted" ${e.mode==="Deducted"?"selected":""}>Deducted From the Trainee's Payment</option><option value="No deduction" ${e.mode==="No deduction"?"selected":""}>Paid to the Partner Later</option></select></label>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px"><h3>STCW Courses · Fixed Amount per Trainee</h3>
+     <table><thead><tr><th>Course</th><th class="r">Training Fee</th><th class="r">Rebate (₱)</th><th class="r">Trainee Pays</th></tr></thead><tbody>
+     ${STCW.map(c=>{const v=e.stcw[c[0]]??0;return `<tr><td><b>${c[1]}</b><small>${c[0]}</small></td><td class="r mono">${peso(c[3])}</td><td class="r"><input class="amt" data-stcw="${c[0]}" type="number" min="0" step="0.01" value="${v?(v/100).toFixed(2):""}" placeholder="0.00" aria-label="${c[1]} rebate"></td><td class="r mono">${e.mode==="No deduction"?peso(c[3]):peso(c[3]-v)}</td></tr>`}).join("")}
+     </tbody></table>
+     <small class="ex">Leave blank for no rebate on that course.${e.mode==="No deduction"?" Paid to the partner later: the trainee pays the full fee and the rebate goes to Accounting › Payables.":""}</small>
+    </div>
+   </div>
+   ${S.err?`<p class="err">${S.err}</p>`:""}
+   <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-cancel="1">Cancel</button><button class="pri" data-save="1">Save Rebate</button></div></div>`;
+}
+document.addEventListener("click",ev=>{const t=ev.target.closest("button");if(!t)return;const d=t.dataset;
+  if(d.design){S.design=+d.design;S.draft=null;S.edit=null;S.msg=""}
+  else if(d.dpct){const [i,v]=d.dpct.split(":").map(Number);draft()[i].pct=v}
+  else if(d.discard){S.draft=null}
+  else if(d.saveall){const ps=draft();const bad=ps.find(p=>!(p.pct>=1&&p.pct<=100));const over=ps.flatMap(p=>STCW.filter(c=>(p.stcw[c[0]]??0)>c[3]).map(c=>p.name+" "+c[1]));
+    if(bad)S.msg="Enter a percentage from 1 to 100 for "+bad.name+".";else if(over.length)S.msg="A rebate cannot be more than the training fee: "+over.join(", ")+".";
+    else{const n=changed();S.partners=ps.map(p=>({...p,stcw:{...p.stcw}}));S.draft=null;S.msg="Saved "+n+" partner"+(n===1?"":"s")+". Each change is recorded in the audit log."}}
+  else if(d.edit){const p=S.partners[+d.edit];S.edit={i:+d.edit,pct:p.pct,mode:p.mode,stcw:{...p.stcw},other:false};S.err="";S.msg=""}
+  else if(d.pct){S.edit.pct=+d.pct;S.edit.other=false}
+  else if(d.other){S.edit.other=true;setTimeout(()=>document.getElementById("e_other")?.focus())}
+  else if(d.cancel){S.edit=null;S.err=""}
+  else if(d.save){const e=S.edit;if(!(e.pct>=1&&e.pct<=100)){S.err="Enter a percentage from 1 to 100.";render();return}
+    const bad=STCW.find(c=>(e.stcw[c[0]]??0)>c[3]);if(bad){S.err=`The ${bad[1]} rebate cannot be more than its ${peso(bad[3])} training fee.`;render();return}
+    const p=S.partners[e.i];Object.assign(p,{pct:e.pct,mode:e.mode,stcw:e.stcw});S.msg=`${p.name}: ${e.pct}% for In-House courses; STCW amounts saved.`;S.edit=null;S.err=""}
+  else return;render()});
+document.addEventListener("input",ev=>{const t=ev.target;
+  if(t.dataset.dother!==undefined||t.dataset.damt!==undefined){const ps=draft();if(t.dataset.dother!==undefined){const v=parseFloat(t.value);if(v>0)ps[+t.dataset.dother].pct=v}else{const [i,k]=t.dataset.damt.split(":");ps[+i].stcw[k]=Math.round((parseFloat(t.value)||0)*100)}
+    const key=t.dataset.dother!==undefined?'[data-dother="'+t.dataset.dother+'"]':'[data-damt="'+t.dataset.damt+'"]';render();const el=document.querySelector(key);el.focus();return}
+  if(!S.edit)return;
+  if(t.id==="e_other"){const v=parseFloat(t.value);if(v>0){S.edit.pct=v;S.edit.other=true}const p=t.selectionStart;render();const i=document.getElementById("e_other");i.focus();try{i.setSelectionRange(p,p)}catch{}}
+  else if(t.dataset.stcw){S.edit.stcw[t.dataset.stcw]=Math.round((parseFloat(t.value)||0)*100);const k=t.dataset.stcw;render();const i=document.querySelector(`[data-stcw="${k}"]`);i.focus()}});
+document.addEventListener("change",ev=>{if(ev.target.dataset.dmode!==undefined){draft()[+ev.target.dataset.dmode].mode=ev.target.value;render();return}if(ev.target.id==="e_mode"){S.edit.mode=ev.target.value;render()}if(ev.target.id==="role"){S.role=ev.target.value;render()}});
+render();
+</script>
+</body>
+</html>

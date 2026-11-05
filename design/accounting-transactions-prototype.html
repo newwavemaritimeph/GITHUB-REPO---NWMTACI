@@ -1,0 +1,221 @@
+<title>Accounting Transactions Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: same summary rail as the approved dashboard: a narrow left column of figures, the records table on the right. One page per Transactions sub-tab. */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA;
+  --bg:#f3f6fa; --surface:#ffffff; --line:#dfe7ee; --fg:#0f2638; --muted:#5f7180; --soft:#eef4f8; --warnbg:#fde7dc; --okbg:#e3f4ea; --badbg:#fbe4dc; --infobg:#e2effb;
+  --green:#15803d; --red:#c2410c; --amber:#b45309;
+  --c-cash:#15803d; --c-gcash:#0571D0; --c-psb:#F25615; --c-ub:#7c3aed; --c-chq:#64748b;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}
+.top{background:var(--navy);color:#fff;padding:14px 24px 0;position:relative}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand b{font-size:19px;color:var(--cyan)} .brand small{display:block;font-size:10px;letter-spacing:.06em;color:#cfe3f1}
+.who{font-size:14px;color:#cfe3f1}
+.tabs{display:flex;gap:4px;margin-top:14px;overflow-x:auto}
+.tabs>a,.tabs>button{padding:10px 18px;color:#d6e6f2;text-decoration:none;font:500 15px var(--sans);border-radius:10px 10px 0 0;white-space:nowrap;background:none;border:0;cursor:pointer}
+.tabs .on{background:var(--bg);color:var(--fg)}
+.menu{position:absolute;top:100%;margin-top:2px;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 32px rgba(15,38,56,.18);padding:6px;min-width:220px;z-index:5}
+.menu button{display:flex;justify-content:space-between;width:100%;border:0;background:none;text-align:left;padding:10px 12px;border-radius:8px;font:500 14.5px var(--sans);color:var(--fg);cursor:pointer}
+.menu button:hover,.menu button.on{background:var(--soft)} .menu button.on{color:var(--blue)}
+.sub{max-width:1240px;margin:0 auto;padding:16px 24px 0;display:flex;gap:6px;flex-wrap:wrap}
+.sub button{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 14px var(--sans);padding:7px 14px;border-radius:99px;cursor:pointer}
+.sub button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.sub span{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;align-self:center;margin-right:4px}
+.page{max-width:1240px;margin:0 auto;padding-block:18px 48px;padding-inline:24px;display:flex;flex-direction:column;gap:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}
+h1{margin:2px 0 0;font-size:28px;line-height:1.2}
+.note{margin:-8px 0 0;color:var(--muted);font-size:14px}
+.ro{display:inline-block;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:99px;background:var(--infobg);color:var(--blue);margin-left:6px}
+.day{display:flex;align-items:center;gap:2px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px}
+.day button{border:0;background:none;color:var(--muted);font-size:18px;width:32px;height:30px;cursor:pointer;border-radius:8px}
+.day button:hover{background:var(--soft)} .day span{font:500 14px var(--sans);padding:0 8px;white-space:nowrap}
+.rail{display:grid;grid-template-columns:minmax(300px,360px) minmax(0,1fr);gap:16px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}
+.ph h2{margin:0;font-size:17px;font-weight:600} .ph .m{color:var(--muted);font-size:13.5px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+/* single-column figure list */
+.col{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.crow{display:grid;grid-template-columns:10px 1fr auto auto;gap:12px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--line);width:100%;background:none;border-left:0;border-right:0;border-top:0;font:inherit;color:inherit;text-align:left}
+.crow:last-child{border-bottom:0}
+button.crow{cursor:pointer} button.crow:hover{background:var(--soft)} button.crow.sel{background:var(--infobg)}
+.dot{width:10px;height:10px;border-radius:3px;background:var(--c)}
+.crow small{color:var(--muted);font-size:13px} .crow b{font:600 15.5px var(--mono);text-align:right}
+.crow.tot{background:var(--navy);color:#fff} .crow.tot small{color:#c3dbea} .crow.tot .dot{background:var(--orange)}
+.lines{margin:0}
+.lines>div{display:flex;justify-content:space-between;gap:12px;padding:8px 2px;border-bottom:1px solid var(--line)}
+.lines>div:last-child{border-bottom:0} .lines dt{color:var(--muted)} .lines dd{margin:0;font:600 15px var(--mono)}
+.lines .total{border-top:2px solid var(--fg)} .lines .total dt{color:var(--fg);font-weight:600}
+.plus{color:var(--green)!important} .minus{color:var(--red)!important} .eq{color:var(--blue)!important} .warn{color:var(--amber)!important}
+.foot{margin:8px 2px 0;font-size:13px;color:var(--muted)}
+/* toolbar + table */
+.bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.bar input,.bar select{font:400 14px var(--sans);padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg);min-width:0}
+.bar input{flex:1;min-width:180px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 13.5px var(--sans);padding:6px 11px;border-radius:99px;cursor:pointer;display:inline-flex;gap:7px;align-items:center}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.chip i{font-style:normal;font:600 11.5px var(--mono);padding:0 6px;border-radius:99px;background:var(--soft);color:var(--muted)}
+.chip.on i{background:rgba(255,255,255,.2);color:#fff}
+.scroll{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14.5px}
+th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody tr:last-child td{border-bottom:0}
+td small{display:block;color:var(--muted);font-size:13px}
+.r{text-align:right} td.r strong{font-family:var(--mono)}
+tfoot td{border-top:2px solid var(--fg);border-bottom:0;font-weight:600}
+.pill{display:inline-block;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.p-ok{background:var(--okbg);color:var(--green)} .p-warn{background:var(--warnbg);color:var(--orange)} .p-bad{background:var(--badbg);color:var(--red)} .p-info{background:var(--infobg);color:var(--blue)} .p-mute{background:var(--soft);color:var(--muted)}
+.proof{font-size:12.5px;color:var(--muted)} .proof.up{color:var(--green)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 13.5px var(--sans);padding:6px 12px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+.empty{color:var(--muted);text-align:center;padding:22px 0 12px}
+.age{display:grid;grid-template-columns:1fr auto;gap:4px 10px;align-items:center;margin:10px 0 2px}
+.age .bar2{grid-column:1/-1;height:8px;background:var(--soft);border-radius:99px;overflow:hidden} .age .bar2 i{display:block;height:100%;background:var(--c)}
+svg text{fill:var(--muted);font:12px var(--sans)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px}
+@media (max-width:1040px){.rail{grid-template-columns:1fr}}
+@media (max-width:700px){
+  .cards thead{display:none}.cards tr{display:block;padding:10px 0;border-bottom:1px solid var(--line)}.cards tbody tr:last-child{border-bottom:0}
+  .cards td{display:flex;justify-content:space-between;gap:12px;border:0;padding:3px 4px;text-align:right}
+  .cards td::before{content:attr(data-l);color:var(--muted);font-size:13px;text-align:left}
+  .cards td.lead{display:block;text-align:left;font-weight:600}.cards td.lead::before{content:none}
+  .cards tfoot tr{border-top:2px solid var(--fg)}}
+@media (max-width:480px){.page,.sub{padding-inline:16px}.top{padding-inline:16px}}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+</style>
+
+<header class="top">
+  <div class="brand"><div><b>New Wave</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div><div class="who">Working as Accounting · Kathleen Garcia</div></div>
+  <nav class="tabs"><a href="#">Dashboard</a><a href="#">Approvals</a><button class="on" id="tx" aria-haspopup="true" aria-expanded="false">Transactions ▾</button><a href="#">Reports</a><a href="#">Configuration ▾</a></nav>
+  <div class="menu" id="menu" hidden></div>
+</header>
+<div class="sub" id="sub"><span>Transactions</span></div>
+<main class="page" id="page"></main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const peso=c=>(c<0?"−":"")+"₱"+(Math.abs(c)/100).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+const pl=(n,w)=>n+" "+w+(n===1?"":"s");
+const CH=[["Cash","--c-cash"],["GCash","--c-gcash"],["PSBank","--c-psb"],["UnionBank","--c-ub"],["Cheque","--c-chq"]];
+const colorOf=c=>`var(${(CH.find(x=>x[0]===c)||[0,"--c-chq"])[1]})`;
+const TABS=["Payments","Expenses","Receivables","Payables","Cash position"];
+const S={tab:"Payments",ch:"",q:"",st:"All",bucket:"",ptab:"Open",day:0};
+const PAY=[
+ ["AR-2026-000318","8:42 AM","A. Cruz (sample)","Basic Training (BT-PSSR)","Walk-in","Cash","",false,180000],
+ ["AR-2026-000319","9:10 AM","R. Lim (sample)","Crowd Management (PSCMT)","Qapla Maritime","GCash","1029 384 5521",true,90000],
+ ["AR-2026-000320","10:05 AM","J. Ramos (sample)","Crisis Management (PSCMHBT)","Walk-in","PSBank","PSB-77820193",true,250000],
+ ["AR-2026-000321","11:30 AM","M. Santos (sample)","Passenger Courses Bundle","Costa Maritime","GCash","1029 384 9902",false,230000],
+ ["AR-2026-000322","2:15 PM","L. Torres (sample)","Safety (STPPDSPPS)","Walk-in","Cash","",false,230000],
+];
+const EXP=[
+ ["CV-2026-000125","Meralco","Utilities","Cash","",85000,"Released"],
+ ["CV-2026-000126","PLDT","Utilities","GCash","1029 555 0011",150000,"Released"],
+ ["CV-2026-000127","National Book Store","Supplies","Cash","",115000,"Awaiting release"],
+ ["ER-2026-0016","Aqua Fresh Station","Utilities","Cash","",35000,"For approval"],
+ ["ER-2026-0013","Jollibee catering","Meals","GCash","",420000,"Rejected"],
+];
+const REC=[
+ ["P. Garcia (sample)","Basic Training","Sep 12",180000,90000,26,"Walk-in"],
+ ["K. Reyes (sample)","Crowd Management","Sep 28",90000,0,10,"Qapla Maritime"],
+ ["D. Navarro (sample)","Crisis Management","Oct 3",250000,125000,5,"Walk-in"],
+ ["S. Villanueva (sample)","Safety","Aug 20",230000,100000,49,"Costa Maritime"],
+ ["E. Bautista (sample)","Passenger Courses Bundle","Jul 30",410000,200000,70,"Walk-in"],
+];
+let PAYB=[
+ ["Qapla Maritime","Agency rebate","3 trainees · October","Oct 15",135000,"Open"],
+ ["Costa Maritime","Agency rebate","1 trainee · October","Oct 15",60000,"Open"],
+ ["Lito Instructor (sample)","Instructor fee","Crowd Management Oct 6–7","Oct 10",400000,"Open"],
+ ["Room rental — Annex","Facilities","October","Oct 5",800000,"Open"],
+ ["Tara Sea Partner (sample)","Agency rebate","2 trainees · September","Sep 30",90000,"Paid"],
+];
+const CLOS=[["Oct 8","Karen Mallari",1245000,410000,85000,1570000,null,"Not yet closed"],["Oct 7","Karen Mallari",1100000,390000,243000,1247000,1245000,"Reviewed"],["Oct 6","Karen Mallari",980000,250000,130000,1100000,1100000,"Reviewed"],["Oct 5","Karen Mallari",900000,180000,100000,980000,980000,"Submitted"],["Oct 3","Karen Mallari",760000,240000,100000,900000,900000,"Reviewed"]];
+const days=["Thursday, October 8, 2026","Wednesday, October 7, 2026","Tuesday, October 6, 2026"];
+const dayPick=()=>`<div class="day"><button data-day="1" aria-label="Previous day">‹</button><span>${days[S.day].replace(/^\w+, /,"")}</span><button data-day="-1" aria-label="Next day" ${S.day?"":"disabled"}>›</button></div>`;
+const head=(t,right,note)=>`<div class="head"><div><div class="eyebrow">Accounting · Transactions</div><h1>${t}</h1></div>${right||""}</div>${note?`<p class="note">${note}</p>`:""}`;
+const chColumn=(rows,w,lbl,clickable)=>`<div class="col">${CH.map(([c,v])=>{const l=rows.filter(r=>r.ch===c),t=l.reduce((s,r)=>s+r.amt,0);const tag=clickable?"button":"div";return `<${tag} class="crow ${clickable&&S.ch===c?"sel":""}" ${clickable?`data-ch="${c}"`:""} style="--c:var(${v})"><span class="dot"></span><span>${c}</span><small>${pl(l.length,w)}</small><b>${peso(t)}</b></${tag}>`;}).join("")}<div class="crow tot"><span class="dot"></span><span>${lbl}</span><small>${pl(rows.length,w)}</small><b>${peso(rows.reduce((s,r)=>s+r.amt,0))}</b></div></div>`;
+const P={
+Payments(){const rows=PAY.map(p=>({rec:p[0],time:p[1],tr:p[2],co:p[3],src:p[4],ch:p[5],ref:p[6],up:p[7],amt:p[8]}));
+ const q=S.q.toLowerCase(),shown=rows.filter(r=>(!S.ch||r.ch===S.ch)&&(!q||`${r.rec} ${r.tr} ${r.co} ${r.src}`.toLowerCase().includes(q)));
+ const src=k=>rows.filter(r=>k==="Walk-in"?r.src==="Walk-in":r.src!=="Walk-in").reduce((s,r)=>s+r.amt,0);
+ return head("Payments",dayPick(),`${days[S.day]}<span class="ro">View only</span>`)+`<div class="rail"><div class="stack">
+  <section class="panel"><div class="ph"><h2>By channel</h2><span class="m">tap to filter</span></div>${chColumn(rows,"receipt","Total collected",true)}</section>
+  <section class="panel"><div class="ph"><h2>By source</h2></div><dl class="lines"><div><dt>Direct walk-ins</dt><dd>${peso(src("Walk-in"))}</dd></div><div><dt>Agencies</dt><dd>${peso(90000+230000)}</dd></div><div><dt>Consultancies</dt><dd>${peso(0)}</dd></div></dl></section>
+  <section class="panel"><div class="ph"><h2>Proof of payment</h2></div><dl class="lines"><div><dt>Screenshot uploaded</dt><dd>${rows.filter(r=>r.up).length}</dd></div><div><dt>Manual entry</dt><dd>${rows.filter(r=>!r.up&&r.ch!=="Cash").length}</dd></div><div><dt>Cash (no proof needed)</dt><dd>${rows.filter(r=>r.ch==="Cash").length}</dd></div></dl></section>
+ </div><section class="panel"><div class="bar"><input id="q" placeholder="Search receipt, trainee, course or partner" value="${S.q}"><select id="chsel"><option value="">All channels</option>${CH.map(c=>`<option ${S.ch===c[0]?"selected":""}>${c[0]}</option>`).join("")}</select></div>
+  ${shown.length?`<div class="scroll"><table class="cards"><thead><tr><th>Receipt</th><th>Trainee</th><th>Source</th><th>Channel and reference</th><th class="r">Amount</th></tr></thead><tbody>${shown.map(r=>`<tr><td class="lead mono">${r.rec}<small>${r.time}</small></td><td data-l="Trainee">${r.tr}<small>${r.co}</small></td><td data-l="Source">${r.src}</td><td data-l="Channel"><span><span class="dot" style="--c:${colorOf(r.ch)};display:inline-block;margin-right:6px"></span>${r.ch}<small class="mono">${r.ref||"—"}</small><small class="proof ${r.up?"up":""}">${r.ch==="Cash"?"Cash":r.up?"Screenshot uploaded":"Manual entry"}</small></span></td><td data-l="Amount" class="r"><strong>${peso(r.amt)}</strong></td></tr>`).join("")}</tbody><tfoot><tr><td colspan="4" data-l="">${pl(shown.length,"receipt")}${S.ch?" · "+S.ch:""}</td><td class="r mono" data-l="Total">${peso(shown.reduce((s,r)=>s+r.amt,0))}</td></tr></tfoot></table></div>`:`<p class="empty">No payments match.</p>`}</section></div>`;},
+Expenses(){const rows=EXP.map(e=>({no:e[0],payee:e[1],cat:e[2],ch:e[3],ref:e[4],amt:e[5],st:e[6]}));const rel=rows.filter(r=>r.st==="Released");
+ const sts=["All","For approval","Awaiting release","Released","Rejected"];const shown=rows.filter(r=>S.st==="All"||r.st===S.st);
+ const pc={"Released":"p-ok","Awaiting release":"p-info","For approval":"p-warn","Rejected":"p-bad"};
+ return head("Expenses",dayPick(),`${days[S.day]}<span class="ro">View only</span>`)+`<div class="rail"><div class="stack">
+  <section class="panel"><div class="ph"><h2>Released by channel</h2></div>${chColumn(rel,"voucher","Total released")}</section>
+  <section class="panel"><div class="ph"><h2>By status</h2></div><dl class="lines">${sts.slice(1).map(s=>`<div><dt>${s}</dt><dd>${rows.filter(r=>r.st===s).length} · ${peso(rows.filter(r=>r.st===s).reduce((a,r)=>a+r.amt,0))}</dd></div>`).join("")}</dl><p class="foot">Requests for your decision are in Approvals.</p></section>
+  <section class="panel"><div class="ph"><h2>By category</h2></div><dl class="lines"><div><dt>Utilities</dt><dd>${peso(270000)}</dd></div><div><dt>Supplies</dt><dd>${peso(115000)}</dd></div><div><dt>Meals</dt><dd>${peso(420000)}</dd></div></dl></section>
+ </div><section class="panel"><div class="bar"><div class="chips">${sts.map(s=>`<button class="chip ${S.st===s?"on":""}" data-st="${s}">${s}<i>${s==="All"?rows.length:rows.filter(r=>r.st===s).length}</i></button>`).join("")}</div></div>
+  <div class="scroll"><table class="cards"><thead><tr><th>Voucher</th><th>Payee</th><th>Channel</th><th>Status</th><th class="r">Amount</th><th></th></tr></thead><tbody>${shown.map(r=>`<tr><td class="lead mono">${r.no}<small>Oct 8</small></td><td data-l="Payee"><strong>${r.payee}</strong><small>${r.cat}</small></td><td data-l="Channel">${r.ch}<small class="mono">${r.ref||""}</small></td><td data-l="Status"><span class="pill ${pc[r.st]}">${r.st}</span></td><td data-l="Amount" class="r"><strong>${peso(r.amt)}</strong></td><td data-l="">${r.no.startsWith("CV")?`<button class="btn" data-toast="Opens the file copy (does not use a print)">View</button>`:""}</td></tr>`).join("")}</tbody></table></div></section></div>`;},
+Receivables(){const rows=REC.map(r=>({tr:r[0],co:r[1],end:r[2],fee:r[3],paid:r[4],days:r[5],src:r[6]}));
+ const B=[["0–15 days","--c-gcash",0,15],["16–30 days","--c-psb",16,30],["31–60 days","--c-ub",31,60],["Over 60 days","--c-chq",61,9999]];
+ const bal=r=>r.fee-r.paid;const inB=(r,b)=>r.days>=b[2]&&r.days<=b[3];const shown=rows.filter(r=>!S.bucket||inB(r,B.find(b=>b[0]===S.bucket))).sort((a,b)=>b.days-a.days);
+ const total=rows.reduce((s,r)=>s+bal(r),0);
+ return head("Receivables","",`Balances still due after training ended · as of Oct 8, 2026`)+`<div class="rail"><div class="stack">
+  <section class="panel"><div class="ph"><h2>Aging</h2><span class="m">tap to filter</span></div><div class="col">${B.map(b=>{const l=rows.filter(r=>inB(r,b));return `<button class="crow ${S.bucket===b[0]?"sel":""}" data-bk="${b[0]}" style="--c:var(${b[1]})"><span class="dot"></span><span>${b[0]}</span><small>${pl(l.length,"trainee")}</small><b>${peso(l.reduce((s,r)=>s+bal(r),0))}</b></button>`;}).join("")}<div class="crow tot"><span class="dot"></span><span>Total unpaid</span><small>${pl(rows.length,"trainee")}</small><b>${peso(total)}</b></div></div></section>
+  <section class="panel"><div class="ph"><h2>By source</h2></div><dl class="lines"><div><dt>Direct walk-ins</dt><dd>${peso(rows.filter(r=>r.src==="Walk-in").reduce((s,r)=>s+bal(r),0))}</dd></div><div><dt>Agencies</dt><dd>${peso(rows.filter(r=>r.src!=="Walk-in").reduce((s,r)=>s+bal(r),0))}</dd></div></dl></section>
+ </div><section class="panel"><div class="ph"><h2>${S.bucket||"All balances"}</h2>${S.bucket?`<button class="btn" data-bk="">Show all</button>`:`<span class="m">oldest first</span>`}</div>
+  <div class="scroll"><table class="cards"><thead><tr><th>Trainee</th><th>Training ended</th><th class="r">Fee</th><th class="r">Paid</th><th class="r">Balance</th><th>Overdue</th></tr></thead><tbody>${shown.map(r=>`<tr><td class="lead">${r.tr}<small>${r.co} · ${r.src}</small></td><td data-l="Training ended">${r.end}</td><td data-l="Fee" class="r mono">${peso(r.fee)}</td><td data-l="Paid" class="r mono">${peso(r.paid)}</td><td data-l="Balance" class="r"><strong class="minus">${peso(bal(r))}</strong></td><td data-l="Overdue"><span class="pill ${r.days>60?"p-bad":r.days>30?"p-warn":"p-mute"}">${r.days} days</span></td></tr>`).join("")}</tbody><tfoot><tr><td colspan="4" data-l="">${pl(shown.length,"trainee")}</td><td class="r mono minus" data-l="Total">${peso(shown.reduce((s,r)=>s+bal(r),0))}</td><td></td></tr></tfoot></table></div></section></div>`;},
+Payables(){const rows=PAYB.map((p,i)=>({i,payee:p[0],kind:p[1],what:p[2],due:p[3],amt:p[4],st:p[5]}));const dueN=d=>+d.split(" ")[1]+(d.startsWith("Sep")?0:30);const today=38;
+ const state=r=>r.st==="Paid"?"Paid":dueN(r.due)<today?"Overdue":dueN(r.due)<=today+7?"Due this week":"Open";
+ const tabs=["Open","Due this week","Overdue","Paid"];const open=rows.filter(r=>r.st!=="Paid");
+ const shown=rows.filter(r=>S.ptab==="Open"?r.st!=="Paid":state(r)===S.ptab);
+ const kinds=[...new Set(rows.map(r=>r.kind))];
+ return head("Payables","",`Amounts New Wave owes · as of Oct 8, 2026`)+`<div class="rail"><div class="stack">
+  <section class="panel"><div class="ph"><h2>Owed now</h2></div><div class="col">${kinds.map((k,i)=>{const l=open.filter(r=>r.kind===k);return `<div class="crow" style="--c:var(${["--c-psb","--c-gcash","--c-ub"][i%3]})"><span class="dot"></span><span>${k}</span><small>${l.length} open</small><b>${peso(l.reduce((s,r)=>s+r.amt,0))}</b></div>`;}).join("")}<div class="crow tot"><span class="dot"></span><span>Total owed</span><small>${open.length} open</small><b>${peso(open.reduce((s,r)=>s+r.amt,0))}</b></div></div></section>
+  <section class="panel"><div class="ph"><h2>Timing</h2></div><dl class="lines"><div><dt>Overdue</dt><dd class="minus">${peso(open.filter(r=>state(r)==="Overdue").reduce((s,r)=>s+r.amt,0))}</dd></div><div><dt>Due this week</dt><dd class="warn">${peso(open.filter(r=>state(r)==="Due this week").reduce((s,r)=>s+r.amt,0))}</dd></div><div><dt>Paid this month</dt><dd class="plus">${peso(rows.filter(r=>r.st==="Paid").reduce((s,r)=>s+r.amt,0))}</dd></div></dl></section>
+ </div><section class="panel"><div class="bar"><div class="chips">${tabs.map(t=>`<button class="chip ${S.ptab===t?"on":""}" data-pt="${t}">${t}<i>${t==="Open"?open.length:rows.filter(r=>state(r)===t).length}</i></button>`).join("")}</div><span style="flex:1"></span><button class="btn" data-toast="Opens the new payable form">Add payable</button></div>
+  ${shown.length?`<div class="scroll"><table class="cards"><thead><tr><th>Payee</th><th>Type</th><th>Due</th><th>Status</th><th class="r">Amount</th><th></th></tr></thead><tbody>${shown.map(r=>{const s=state(r);return `<tr><td class="lead">${r.payee}<small>${r.what}</small></td><td data-l="Type">${r.kind}</td><td data-l="Due">${r.due}</td><td data-l="Status"><span class="pill ${s==="Paid"?"p-ok":s==="Overdue"?"p-bad":s==="Due this week"?"p-warn":"p-mute"}">${s}</span></td><td data-l="Amount" class="r"><strong>${peso(r.amt)}</strong></td><td data-l="">${r.st==="Paid"?"":`<button class="btn pri" data-paid="${r.i}">Mark paid</button>`}</td></tr>`;}).join("")}</tbody></table></div>`:`<p class="empty">Nothing here.</p>`}</section></div>`;},
+"Cash position"(){const c=CLOS[0];
+ const pts=CLOS.slice().reverse(),max=1700000,W=520,H=140,L=50;const x=i=>L+i*(W-L-20)/(pts.length-1),y=v=>12+H-H*v/max;
+ let g="";[0,.5,1].forEach(k=>{g+=`<line x1="${L}" x2="${W-10}" y1="${y(max*k)}" y2="${y(max*k)}" stroke="var(--line)"/><text x="${L-6}" y="${y(max*k)+4}" text-anchor="end">₱${max*k/100000}k</text>`;});
+ g+=`<path d="M${pts.map((p,i)=>`${x(i)} ${y(p[5])}`).join("L")}L${x(pts.length-1)} ${y(0)}L${x(0)} ${y(0)}Z" fill="#0571D0" opacity=".12"/><polyline fill="none" stroke="#0571D0" stroke-width="2.5" points="${pts.map((p,i)=>`${x(i)},${y(p[5])}`).join(" ")}"/>`;
+ pts.forEach((p,i)=>{g+=`<circle cx="${x(i)}" cy="${y(p[5])}" r="${i===pts.length-1?5:3.5}" fill="#0571D0"/><text x="${x(i)}" y="${12+H+18}" text-anchor="middle">${p[0]}</text>`;});
+ return head("Cash position",dayPick(),`Cash only · ${days[S.day]}`)+`<div class="rail"><div class="stack">
+  <section class="panel"><div class="ph"><h2>Today</h2><span class="pill p-warn">Not yet closed</span></div><dl class="lines"><div><dt>Previous cash</dt><dd>${peso(c[2])}</dd></div><div><dt>+ Cash collected</dt><dd class="plus">${peso(c[3])}</dd></div><div><dt>− Cash expenses</dt><dd class="minus">${peso(c[4])}</dd></div><div class="total"><dt>= Cash on hand</dt><dd class="eq">${peso(c[5])}</dd></div><div><dt>Counted at closing</dt><dd>Not yet</dd></div><div><dt>Over / short</dt><dd>—</dd></div></dl><p class="foot">Previous cash is the counted amount at the Oct 7 closing.</p></section>
+  <section class="panel"><div class="ph"><h2>Bank and e-wallet</h2><span class="m">collected today</span></div><div class="col">${[["GCash","--c-gcash",320000],["PSBank","--c-psb",250000],["UnionBank","--c-ub",0]].map(b=>`<div class="crow" style="--c:var(${b[1]})"><span class="dot"></span><span>${b[0]}</span><small></small><b>${peso(b[2])}</b></div>`).join("")}</div><p class="foot">Shown for reference; not part of cash on hand.</p></section>
+ </div><div class="stack"><section class="panel"><div class="ph"><h2>Cash on hand, last 5 days</h2></div><svg viewBox="0 0 520 180" width="100%" role="img" aria-label="Cash on hand by day">${g}</svg></section>
+  <section class="panel"><div class="ph"><h2>Daily closings</h2></div><div class="scroll"><table class="cards"><thead><tr><th>Date</th><th class="r">Opening</th><th class="r">Cash in</th><th class="r">Cash out</th><th class="r">Expected</th><th class="r">Counted</th><th class="r">Over / short</th><th>Status</th></tr></thead><tbody>${CLOS.map(d=>{const os=d[6]==null?null:d[6]-d[5];return `<tr><td class="lead">${d[0]}<small>${d[1]}</small></td><td data-l="Opening" class="r mono">${peso(d[2])}</td><td data-l="Cash in" class="r mono plus">${peso(d[3])}</td><td data-l="Cash out" class="r mono minus">${peso(d[4])}</td><td data-l="Expected" class="r mono">${peso(d[5])}</td><td data-l="Counted" class="r mono">${d[6]==null?"—":peso(d[6])}</td><td data-l="Over / short" class="r mono ${os?os<0?"minus":"plus":""}">${os==null?"—":os===0?"Balanced":peso(os)}</td><td data-l="Status"><span class="pill ${d[7]==="Reviewed"?"p-ok":d[7]==="Submitted"?"p-info":"p-warn"}">${d[7]}</span></td></tr>`;}).join("")}</tbody></table></div></section></div></div>`;}
+};
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,1800);}
+function draw(keepFocus){document.getElementById("sub").innerHTML=`<span>Transactions</span>`+TABS.map(t=>`<button class="${S.tab===t?"on":""}" data-tab="${t}">${t}</button>`).join("");
+ document.getElementById("menu").innerHTML=TABS.map(t=>`<button class="${S.tab===t?"on":""}" data-tab="${t}">${t}</button>`).join("");
+ document.getElementById("page").innerHTML=P[S.tab]();
+ if(keepFocus){const q=document.getElementById("q");if(q){q.focus();q.setSelectionRange(q.value.length,q.value.length);}}
+ try{localStorage.setItem("atx-tab",S.tab)}catch(_){}}
+const menu=document.getElementById("menu"),tx=document.getElementById("tx");
+tx.addEventListener("click",e=>{e.stopPropagation();const r=tx.getBoundingClientRect();menu.style.left=(r.left)+"px";menu.hidden=!menu.hidden;tx.setAttribute("aria-expanded",String(!menu.hidden));});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"){menu.hidden=true;tx.setAttribute("aria-expanded","false");}});
+document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b||b===tx){if(!e.target.closest("#menu"))menu.hidden=true;return;}const d=b.dataset;
+ if(d.tab){S.tab=d.tab;S.ch="";S.q="";S.st="All";S.bucket="";S.ptab="Open";menu.hidden=true;}
+ else if(d.ch!==undefined){S.ch=S.ch===d.ch?"":d.ch;}
+ else if(d.st){S.st=d.st;}
+ else if(d.bk!==undefined){S.bucket=S.bucket===d.bk?"":d.bk;}
+ else if(d.pt){S.ptab=d.pt;}
+ else if(d.day){S.day=Math.max(0,Math.min(days.length-1,S.day+ +d.day));}
+ else if(d.paid){PAYB[+d.paid][5]="Paid";toast("Marked paid");}
+ else if(d.toast){toast(d.toast);return;}
+ else{menu.hidden=true;return;}
+ menu.hidden=true;draw();});
+document.addEventListener("input",e=>{if(e.target.id==="q"){S.q=e.target.value;draw(true);}});
+document.addEventListener("change",e=>{if(e.target.id==="chsel"){S.ch=e.target.value;draw();}});
+try{const t=localStorage.getItem("atx-tab");if(TABS.includes(t))S.tab=t;}catch(_){}
+const h=location.hash.slice(1).toLowerCase();const ht=TABS.find(t=>t.toLowerCase().replace(" ","-")===h);if(ht)S.tab=ht;
+draw();
+</script>

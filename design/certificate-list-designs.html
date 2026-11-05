@@ -1,0 +1,99 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Certificate List Designs</title>
+<style>
+@page{size:A4 landscape;margin:12mm}
+*{box-sizing:border-box}
+body{margin:0;font:400 12.5px/1.45 "Segoe UI",system-ui,sans-serif;color:#0f2638;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.mono{font-family:Consolas,"Cascadia Mono",monospace;font-variant-numeric:tabular-nums}
+.page{page-break-after:always;min-height:180mm;display:flex;flex-direction:column;gap:10px}
+.page:last-child{page-break-after:auto}
+.cap{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #123F63;padding-bottom:6px}
+.cap h1{margin:0;font-size:20px;color:#123F63} .cap p{margin:2px 0 0;color:#5f7180;font-size:12px}
+.cap .tag{font:600 11px "Segoe UI";letter-spacing:.1em;text-transform:uppercase;color:#F25615}
+.why{display:flex;gap:18px;color:#5f7180;font-size:11.5px;margin:0} .why b{color:#0f2638}
+.frame{border:1px solid #dfe7ee;border-radius:10px;padding:10px 12px;background:#f8fafc}
+.bar{display:flex;gap:8px;margin-bottom:8px}
+.bar .s{flex:1;border:1px solid #dfe7ee;border-radius:7px;padding:6px 10px;color:#8a9aa8;background:#fff}
+.chip{border:1px solid #dfe7ee;border-radius:99px;padding:5px 10px;background:#fff;font-weight:500}
+.chip.on{background:#123F63;color:#fff;border-color:#123F63}
+table{width:100%;border-collapse:collapse;background:#fff}
+th{font:600 10.5px "Segoe UI";letter-spacing:.07em;text-transform:uppercase;color:#5f7180;text-align:left;padding:7px 8px;border-bottom:1px solid #cfd9e1;white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid #e6edf2;vertical-align:middle}
+.r{text-align:right}
+.pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:99px;white-space:nowrap}
+.ok{background:#e3f4ea;color:#15803d}.due{background:#e2effb;color:#0571D0}.od{background:#fbe4dc;color:#b42318}.wt{background:#fde7dc;color:#c2410c}.mu{background:#eef4f8;color:#5f7180}
+.btn{display:inline-block;border:1px solid #cfd9e1;border-radius:6px;padding:3px 9px;font-weight:500;background:#fff;white-space:nowrap}
+.btn.p{background:#F25615;border-color:#F25615;color:#fff;font-weight:600}
+.btn.ghost{border-color:transparent;color:#0571D0;padding:3px 4px}
+.sub{color:#5f7180;font-size:11.5px}
+.ck{font-size:12px;font-weight:700} .ck.y{color:#15803d} .ck.n{color:#c2410c} .ck.na{color:#a3b1bd;font-weight:400}
+/* A */
+.a td{height:34px}
+.a .name{font-weight:600} .a .name span{font-weight:400;color:#5f7180;margin-left:6px}
+/* B */
+.b .row{display:grid;grid-template-columns:4px minmax(0,2.2fr) minmax(0,2.4fr) minmax(0,1.3fr) auto;gap:12px;align-items:center;background:#fff;border:1px solid #e6edf2;border-radius:8px;padding:8px 12px 8px 0;margin-bottom:6px}
+.b .stripe{align-self:stretch;border-radius:8px 0 0 8px;background:var(--s)}
+.b .l1{font-weight:600} .b .l2{color:#5f7180;font-size:11.5px}
+.b .acts{display:flex;gap:6px;align-items:center}
+/* C */
+.c table{border:1px solid #9fb2c1}
+.c th{background:#123F63;color:#fff;border-bottom:0;border-right:1px solid #2c5a7f}
+.c td{border-right:1px solid #dfe7ee;border-bottom:1px solid #dfe7ee;height:30px;padding:5px 8px}
+.c tr:nth-child(even) td{background:#f7fafc}
+.c .no{color:#5f7180;text-align:center;width:28px}
+.c .split{display:inline-flex;border:1px solid #cfd9e1;border-radius:6px;overflow:hidden}
+.c .split span{padding:3px 9px;font-weight:500} .c .split span+span{border-left:1px solid #cfd9e1;background:#F25615;color:#fff;font-weight:600}
+.legend{display:flex;gap:16px;font-size:11px;color:#5f7180;margin-top:6px}
+.notes{margin:0;padding-left:16px;color:#334;font-size:12px} .notes li{margin:2px 0}
+</style></head><body>
+
+<!-- A -->
+<section class="page">
+  <div class="cap"><div><div class="tag">Design A</div><h1>Compact register</h1><p>One line per certificate. Name and NWMTACI no. share a cell; paid and evaluation shrink to two tick columns; actions sit on one line.</p></div><div class="mono sub">Releasing Officer › Certificates</div></div>
+  <div class="frame a">
+    <div class="bar"><div class="s">Search trainee, NWMTACI number or certificate number</div><span class="chip on">Due 2</span><span class="chip">Waiting 2</span><span class="chip">Printed 2</span><span class="chip">Released 1</span></div>
+    <table><thead><tr><th>Trainee</th><th>Course</th><th>Ended</th><th>Certificate No.</th><th title="Paid">Paid</th><th title="Evaluation">Eval.</th><th>Status</th><th class="r">Action</th></tr></thead><tbody>
+      <tr><td class="name">CRUZ, Ana<span class="mono">0447</span></td><td>UBT-PSSR</td><td>Oct 7</td><td class="mono sub">— at preview</td><td><span class="ck y">✓</span></td><td><span class="ck na">n/a</span></td><td><span class="pill od">Overdue</span></td><td class="r"><span class="btn ghost">Preview</span> <span class="btn p">Print</span></td></tr>
+      <tr><td class="name">RAMOS, Jose<span class="mono">0448</span></td><td>PSCMHBT</td><td>Oct 8</td><td class="mono sub">— at preview</td><td><span class="ck y">✓</span></td><td><span class="ck na">n/a</span></td><td><span class="pill due">Due</span></td><td class="r"><span class="btn ghost">Preview</span> <span class="btn p">Print</span></td></tr>
+      <tr><td class="name">LIM, Rosa<span class="mono">0452</span></td><td>SSO</td><td>Oct 6</td><td class="mono sub">—</td><td><span class="ck y">✓</span></td><td><span class="ck n">✗</span></td><td><span class="pill mu">Waiting for evaluation</span></td><td class="r sub">—</td></tr>
+      <tr><td class="name">NAVARRO, Dino<span class="mono">0440</span></td><td>PSCMT</td><td>Oct 7</td><td class="mono sub">—</td><td><span class="ck n">✗</span></td><td><span class="ck na">n/a</span></td><td><span class="pill wt">Balance ₱450.00</span></td><td class="r sub">—</td></tr>
+      <tr><td class="name">TORRES, Lea<span class="mono">0449</span></td><td>UBT-PSSR</td><td>Oct 5</td><td class="mono">NWM-BT-01243</td><td><span class="ck y">✓</span></td><td><span class="ck na">n/a</span></td><td><span class="pill ok">Printed 1/1</span></td><td class="r"><span class="btn ghost">Preview</span> <span class="btn ghost">Void</span> <span class="btn ghost">Email</span></td></tr>
+      <tr><td class="name">GARCIA, Paolo<span class="mono">0431</span></td><td>PSCMT</td><td>Oct 3</td><td class="mono">NWM-CM-00811</td><td><span class="ck y">✓</span></td><td><span class="ck na">n/a</span></td><td><span class="pill ok">Printed 1/2</span></td><td class="r"><span class="btn ghost">Preview</span> <span class="btn p">Reprint</span></td></tr>
+    </tbody></table>
+    <div class="legend"><span>Course shown as code; full name on hover.</span><span>NWMTACI no. shown as last 4 digits; full number on hover and in search.</span></div>
+  </div>
+  <ul class="notes"><li><b>Row height</b> about a third of the current one; 12–14 certificates fit on screen.</li><li><b>Best for</b> a Releasing Officer working down a long list every day.</li></ul>
+</section>
+
+<!-- B -->
+<section class="page">
+  <div class="cap"><div><div class="tag">Design B</div><h1>Two-line rows</h1><p>No table header. Each row reads left to right: who, what, number, then status and action. A coloured edge marks the state.</p></div><div class="mono sub">Releasing Officer › Certificates</div></div>
+  <div class="frame b">
+    <div class="bar"><div class="s">Search trainee, NWMTACI number or certificate number</div><span class="chip on">Due 2</span><span class="chip">Waiting 2</span><span class="chip">Printed 2</span></div>
+    <div class="row" style="--s:#b42318"><span class="stripe"></span><div><div class="l1">CRUZ, Ana</div><div class="l2 mono">NWMTACI-2026-0447</div></div><div><div class="l1">Updating Basic Training - PSSR</div><div class="l2">Ended Oct 7 · ✓ Paid · no evaluation needed</div></div><div><div class="l2">Certificate No.</div><div class="mono sub">Assigned at preview</div></div><div class="acts"><span class="pill od">Overdue</span><span class="btn">Preview</span><span class="btn p">Print</span></div></div>
+    <div class="row" style="--s:#0571D0"><span class="stripe"></span><div><div class="l1">RAMOS, Jose</div><div class="l2 mono">NWMTACI-2026-0448</div></div><div><div class="l1">Crisis Management</div><div class="l2">Ended Oct 8 · ✓ Paid · no evaluation needed</div></div><div><div class="l2">Certificate No.</div><div class="mono sub">Assigned at preview</div></div><div class="acts"><span class="pill due">Due</span><span class="btn">Preview</span><span class="btn p">Print</span></div></div>
+    <div class="row" style="--s:#a3b1bd"><span class="stripe"></span><div><div class="l1">LIM, Rosa</div><div class="l2 mono">NWMTACI-2026-0452</div></div><div><div class="l1">Ship Security Officer</div><div class="l2">Ended Oct 6 · ✓ Paid · <b style="color:#c2410c">evaluation not submitted</b></div></div><div><div class="l2">Certificate No.</div><div class="mono sub">—</div></div><div class="acts"><span class="pill mu">Waiting for evaluation</span></div></div>
+    <div class="row" style="--s:#F25615"><span class="stripe"></span><div><div class="l1">NAVARRO, Dino</div><div class="l2 mono">NWMTACI-2026-0440</div></div><div><div class="l1">Crowd Management</div><div class="l2">Ended Oct 7 · <b style="color:#c2410c">balance ₱450.00</b></div></div><div><div class="l2">Certificate No.</div><div class="mono sub">—</div></div><div class="acts"><span class="pill wt">Waiting for payment</span></div></div>
+    <div class="row" style="--s:#15803d"><span class="stripe"></span><div><div class="l1">TORRES, Lea</div><div class="l2 mono">NWMTACI-2026-0449</div></div><div><div class="l1">Updating Basic Training - PSSR</div><div class="l2">Ended Oct 5 · soft copy emailed Oct 5</div></div><div><div class="l2">Certificate No.</div><div class="mono">NWM-BT-01243</div></div><div class="acts"><span class="pill ok">Printed 1 of 1</span><span class="btn">Preview</span><span class="btn">More ▾</span></div></div>
+  </div>
+  <ul class="notes"><li><b>Full names</b> of trainees and courses stay readable; nothing is cut to a code.</li><li><b>Secondary actions</b> (void, email soft copy) move into a "More" menu so only one or two buttons show.</li><li><b>Works well on a phone:</b> each row stacks naturally.</li></ul>
+</section>
+
+<!-- C -->
+<section class="page">
+  <div class="cap"><div><div class="tag">Design C</div><h1>Formal certificate log</h1><p>A ruled logbook like the printed registers: numbered lines, navy header, every cell one line, one split action button.</p></div><div class="mono sub">Releasing Officer › Certificates</div></div>
+  <div class="frame c">
+    <div class="bar"><div class="s">Search trainee, NWMTACI number or certificate number</div><span class="chip on">Due 2</span><span class="chip">All 6</span></div>
+    <table><thead><tr><th>#</th><th>Trainee · NWMTACI no.</th><th>Course · ended</th><th>Certificate No.</th><th>Paid</th><th>Eval.</th><th>Prints</th><th>Status</th><th>Action</th></tr></thead><tbody>
+      <tr><td class="no">1</td><td><b>CRUZ, Ana</b> <span class="mono sub">2026-0447</span></td><td>UBT-PSSR <span class="sub">· Oct 7</span></td><td class="mono sub">—</td><td><span class="ck y">✓</span></td><td><span class="ck na">—</span></td><td class="mono">0/1</td><td><span class="pill od">Overdue</span></td><td><span class="split"><span>Preview</span><span>Print</span></span></td></tr>
+      <tr><td class="no">2</td><td><b>RAMOS, Jose</b> <span class="mono sub">2026-0448</span></td><td>PSCMHBT <span class="sub">· Oct 8</span></td><td class="mono sub">—</td><td><span class="ck y">✓</span></td><td><span class="ck na">—</span></td><td class="mono">0/1</td><td><span class="pill due">Due</span></td><td><span class="split"><span>Preview</span><span>Print</span></span></td></tr>
+      <tr><td class="no">3</td><td><b>LIM, Rosa</b> <span class="mono sub">2026-0452</span></td><td>SSO <span class="sub">· Oct 6</span></td><td class="mono sub">—</td><td><span class="ck y">✓</span></td><td><span class="ck n">✗</span></td><td class="mono">0/1</td><td><span class="pill mu">Evaluation</span></td><td class="sub">—</td></tr>
+      <tr><td class="no">4</td><td><b>NAVARRO, Dino</b> <span class="mono sub">2026-0440</span></td><td>PSCMT <span class="sub">· Oct 7</span></td><td class="mono sub">—</td><td><span class="ck n">✗</span></td><td><span class="ck na">—</span></td><td class="mono">0/1</td><td><span class="pill wt">Payment</span></td><td class="sub">—</td></tr>
+      <tr><td class="no">5</td><td><b>TORRES, Lea</b> <span class="mono sub">2026-0449</span></td><td>UBT-PSSR <span class="sub">· Oct 5</span></td><td class="mono">NWM-BT-01243</td><td><span class="ck y">✓</span></td><td><span class="ck na">—</span></td><td class="mono">1/1</td><td><span class="pill ok">Printed</span></td><td><span class="btn">Preview ▾</span></td></tr>
+      <tr><td class="no">6</td><td><b>GARCIA, Paolo</b> <span class="mono sub">2026-0431</span></td><td>PSCMT <span class="sub">· Oct 3</span></td><td class="mono">NWM-CM-00811</td><td><span class="ck y">✓</span></td><td><span class="ck na">—</span></td><td class="mono">1/2</td><td><span class="pill ok">Reprint ready</span></td><td><span class="split"><span>Preview</span><span>Reprint</span></span></td></tr>
+    </tbody></table>
+    <div class="legend"><span>Prints column shows used / allowed (1 + approved reprints).</span><span>"▾" opens Void request and Email soft copy.</span></div>
+  </div>
+  <ul class="notes"><li><b>Looks like</b> an official register, consistent with the printed TAR and vouchers.</li><li><b>Prints column</b> makes the "print once, reprint only when approved" rule visible at a glance.</li></ul>
+</section>
+</body></html>

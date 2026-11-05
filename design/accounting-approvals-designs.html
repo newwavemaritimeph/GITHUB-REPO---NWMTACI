@@ -1,0 +1,220 @@
+<title>Accounting Approvals Designs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: navy portal bar, design switcher, then one of five approval layouts sharing the same queue of sample requests. */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA;
+  --bg:#f3f6fa; --surface:#ffffff; --line:#dfe7ee; --fg:#0f2638; --muted:#5f7180; --soft:#eef4f8; --warnbg:#fde7dc; --okbg:#e3f4ea; --badbg:#fbe4dc;
+  --green:#15803d; --red:#c2410c; --amber:#b45309;
+  --g-out:#F25615; --g-fee:#0571D0; --g-cash:#15803d;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}
+.top{background:var(--navy);color:#fff;padding:14px 24px 0}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand b{font-size:19px;color:var(--cyan)} .brand small{display:block;font-size:10px;letter-spacing:.06em;color:#cfe3f1}
+.who{font-size:14px;color:#cfe3f1}
+.tabs{display:flex;gap:4px;margin-top:14px;overflow-x:auto}
+.tabs a{padding:10px 18px;color:#d6e6f2;text-decoration:none;font-weight:500;border-radius:10px 10px 0 0;white-space:nowrap}
+.tabs a.on{background:var(--bg);color:var(--fg)}
+.switch{max-width:1240px;margin:0 auto;padding:18px 24px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.switch>span{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-right:4px}
+.switch button{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 14px var(--sans);padding:8px 14px;border-radius:99px;cursor:pointer}
+.switch button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.switch button i{font-style:normal;font-family:var(--mono);opacity:.7;margin-right:6px}
+.switch .reset{margin-left:auto;border-style:dashed;color:var(--muted)}
+.page{max-width:1240px;margin:0 auto;padding-block:18px 48px;padding-inline:24px;display:flex;flex-direction:column;gap:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}
+h1{margin:2px 0 0;font-size:28px;line-height:1.2}
+.dname{margin:-6px 0 0;color:var(--muted);font-size:14px} .dname b{color:var(--fg)}
+.waitpill{font:600 13px var(--sans);padding:6px 12px;border-radius:99px;background:var(--warnbg);color:var(--orange)}
+.waitpill.zero{background:var(--okbg);color:var(--green)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;min-width:0}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 13.5px var(--sans);padding:7px 13px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.bad{color:var(--red)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.type{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;color:var(--muted);white-space:nowrap}
+.type::before{content:"";width:8px;height:8px;border-radius:2px;background:var(--g)}
+.age{font-size:12.5px;color:var(--muted)} .age.old{color:var(--red);font-weight:600}
+.allclear{display:flex;align-items:center;gap:12px;padding:20px;border:1px dashed var(--line);border-radius:14px;color:var(--muted);background:var(--surface)}
+.allclear b{color:var(--green);font-size:16px}
+/* reject inline (design 2 from before) */
+.rj{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr) auto;gap:10px;align-items:end;background:var(--badbg);border-radius:10px;padding:12px;margin-top:10px}
+.rj label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:500}
+.rj select,.rj input{font:400 14px var(--sans);padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);min-width:0}
+.rj .acts{align-self:end}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 14px var(--sans);padding:7px 12px;border-radius:99px;cursor:pointer;display:inline-flex;gap:8px;align-items:center}
+.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.chip i{font-style:normal;font:600 12px var(--mono);padding:0 7px;border-radius:99px;background:var(--soft);color:var(--muted)}
+.chip.has i{background:var(--warnbg);color:var(--orange)}
+.chip.on i{background:rgba(255,255,255,.18);color:#fff}
+.chip.zero{color:var(--muted)}
+/* 1 queue table */
+.tbl{width:100%;border-collapse:collapse;font-size:14.5px}
+.tbl th{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+.tbl td{padding:12px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.tbl tr:last-child td{border-bottom:0}
+.tbl td small{display:block;color:var(--muted);font-size:13px}
+.tbl .r{text-align:right}
+.tbl .rjrow td{padding-top:0}
+.scroll{overflow-x:auto}
+/* 2 inbox */
+.inbox{display:grid;grid-template-columns:minmax(280px,380px) minmax(0,1fr);gap:16px;align-items:start}
+.ilist{padding:6px}
+.ilist button{display:grid;grid-template-columns:1fr auto;gap:2px 10px;width:100%;text-align:left;border:0;background:none;padding:12px;border-radius:10px;cursor:pointer;color:var(--fg);font:inherit;border-left:3px solid transparent}
+.ilist button+button{margin-top:2px}
+.ilist button.on{background:var(--soft);border-left-color:var(--g)}
+.ilist strong{font-weight:600;font-size:14.5px} .ilist small{color:var(--muted);font-size:13px}
+.ilist .amt{font:600 14px var(--mono);text-align:right}
+.ilist .grp{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;padding:12px 12px 4px}
+.detail h2{margin:4px 0 2px;font-size:21px}
+.dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin:16px 0}
+.dl div{padding:10px 0;border-bottom:1px solid var(--line)} .dl dt{font-size:12.5px;color:var(--muted)} .dl dd{margin:2px 0 0;font-weight:500}
+.big{font:600 28px var(--mono)}
+/* 3 cards */
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;text-align:left;cursor:pointer;font:inherit;color:var(--fg);display:flex;flex-direction:column;gap:4px;border-top:4px solid var(--g)}
+.card.on{outline:2px solid var(--blue);outline-offset:-1px}
+.card.zero{opacity:.62;border-top-color:var(--line)}
+.card span{font-size:14px;color:var(--muted)} .card b{font:600 26px var(--mono)} .card small{font-size:13px;color:var(--muted)}
+.list .item{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:12px 2px;border-bottom:1px solid var(--line)}
+.list .item:last-child{border-bottom:0} .list small{display:block;color:var(--muted);font-size:13px}
+.list .wrap{border-bottom:1px solid var(--line)} .list .wrap:last-child{border-bottom:0} .list .wrap .item{border-bottom:0}
+/* 4 columns */
+.board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}
+.lane{background:var(--soft);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.lane h2{margin:2px 4px;font-size:15px;display:flex;justify-content:space-between;align-items:center}
+.lane h2 i{font-style:normal;font:600 12px var(--mono);padding:1px 8px;border-radius:99px;background:var(--surface);color:var(--muted)}
+.tkt{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;border-left:4px solid var(--g)}
+.tkt .row{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.tkt strong{font-size:14.5px} .tkt small{display:block;color:var(--muted);font-size:13px;margin:2px 0 10px}
+.tkt .acts{justify-content:flex-start}
+.lane .none{font-size:13.5px;color:var(--muted);padding:8px 4px}
+/* 5 checklist */
+.bulk{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 14px;background:var(--navy);color:#fff;border-radius:12px}
+.bulk b{font-family:var(--mono)} .bulk .btn{background:#fff;color:var(--navy);border-color:#fff}
+.bulk .sp{flex:1}
+.ghead{display:flex;justify-content:space-between;align-items:center;padding:10px 2px 6px;border-bottom:2px solid var(--fg);margin-top:8px}
+.ghead h2{margin:0;font-size:15px}
+.crow{display:grid;grid-template-columns:28px minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:11px 2px;border-bottom:1px solid var(--line)}
+.crow input{width:18px;height:18px;accent-color:var(--blue)}
+.crow small{display:block;color:var(--muted);font-size:13px}
+.clearlist{color:var(--muted);font-size:14px;margin-top:10px}
+.clearlist b{color:var(--green)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px}
+.view[hidden]{display:none!important}
+@media (max-width:980px){.inbox{grid-template-columns:1fr}.board{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:640px){.rj{grid-template-columns:1fr}.list .item{grid-template-columns:1fr}.list .item .acts{justify-content:flex-start}.dl{grid-template-columns:1fr}
+  .tbl thead{display:none}.tbl tr{display:block;padding:10px 0;border-bottom:1px solid var(--line)}.tbl td{display:block;border:0;padding:3px 4px}.tbl .r{text-align:left}.tbl .acts{justify-content:flex-start;margin-top:6px}}
+@media (max-width:480px){.page,.switch{padding-inline:16px}.top{padding-inline:16px}.cards{grid-template-columns:1fr 1fr}.crow{grid-template-columns:24px minmax(0,1fr)}.crow .amt,.crow .acts{grid-column:2}}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+</style>
+
+<header class="top">
+  <div class="brand"><div><b>New Wave</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div><div class="who">Working as Accounting · Kathleen Garcia</div></div>
+  <nav class="tabs"><a href="#">Dashboard</a><a class="on" href="#">Approvals</a><a href="#">Transactions ▾</a><a href="#">Reports</a><a href="#">Configuration ▾</a></nav>
+</header>
+
+<div class="switch" id="switch"><span>Design</span>
+  <button data-v="1" class="on"><i>1</i>One queue</button>
+  <button data-v="2"><i>2</i>Inbox and detail</button>
+  <button data-v="3"><i>3</i>Category cards</button>
+  <button data-v="4"><i>4</i>Three lanes</button>
+  <button data-v="5"><i>5</i>Checklist with bulk approve</button>
+  <button class="reset" id="reset">Reset sample</button>
+</div>
+
+<main class="page">
+  <div class="head"><div><div class="eyebrow">Accounting</div><h1>Approvals</h1></div><span class="waitpill" id="wp"></span></div>
+  <p class="dname" id="dname"></p>
+  <section class="view" data-view="1"></section>
+  <section class="view" data-view="2" hidden></section>
+  <section class="view" data-view="3" hidden></section>
+  <section class="view" data-view="4" hidden></section>
+  <section class="view" data-view="5" hidden></section>
+</main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const CATS=[["Expense requests","Money out","--g-out"],["Voucher reprints","Money out","--g-out"],["Refunds","Money out","--g-out"],["Discounts","Fees","--g-fee"],["Rebates owed to partners","Fees","--g-fee"],["Cashier closings","Cash control","--g-cash"]];
+const GROUPS=["Money out","Fees","Cash control"];
+const REASONS={"Expense requests":["Missing or unclear receipt","Amount does not match the receipt","Wrong category","Not an approved expense","Duplicate request","Other"]};
+const DEF=["Not covered by the policy","Missing documents","Amount is incorrect","Duplicate request","Other"];
+const SEED=[
+ {id:1,cat:"Expense requests",title:"Meralco — electricity, September",sub:"Utilities · ER-2026-0014 · GCash",by:"Karen Mallari",age:0,amt:842000,extra:[["Payee","Manila Electric Company"],["Lines","1 item"],["Receipt","Uploaded"],["Channel","GCash"]]},
+ {id:2,cat:"Expense requests",title:"Office supplies — bond paper, toner",sub:"Supplies · ER-2026-0015 · Cash",by:"Karen Mallari",age:1,amt:115000,extra:[["Payee","National Book Store"],["Lines","3 items"],["Receipt","Uploaded"],["Channel","Cash"]]},
+ {id:3,cat:"Expense requests",title:"Water refill, 10 gallons",sub:"Utilities · ER-2026-0016 · Cash",by:"Karen Mallari",age:3,amt:35000,extra:[["Payee","Aqua Fresh Station"],["Lines","1 item"],["Receipt","Not attached"],["Channel","Cash"]]},
+ {id:4,cat:"Voucher reprints",title:"CV-2026-000124 · reprint",sub:"Payee copy torn · printed 1 of 1",by:"Karen Mallari",age:0,amt:null,extra:[["Voucher","CV-2026-000124"],["Original amount","₱4,200.00"],["Prints used","1 of 1"],["Reason","Payee copy torn"]]},
+ {id:5,cat:"Refunds",title:"Refund — Basic Training, cancelled 7 days ahead",sub:"ENR-2026-0412 · sample trainee A. Cruz",by:"Karen Mallari",age:2,amt:150000,extra:[["Paid","₱1,800.00"],["Cancellation fee","₱300.00"],["Refund","₱1,500.00"],["Rule","5+ days before start: ₱300"]]},
+ {id:6,cat:"Discounts",title:"Senior citizen discount, 20%",sub:"ENR-2026-0418 · PSCMT · sample trainee R. Lim",by:"Registration",age:0,amt:36000,extra:[["Course fee","₱1,800.00"],["Discount","20%"],["Supporting ID","Uploaded"],["Balance after","₱1,440.00"]]},
+ {id:7,cat:"Rebates owed to partners",title:"Qapla Maritime — 3 trainees",sub:"No-deduction partner · October",by:"System",age:5,amt:135000,extra:[["Partner","Qapla Maritime"],["Trainees","3"],["Rebate","50% of in-house fee"],["Settle by","Mark paid"]]},
+ {id:8,cat:"Cashier closings",title:"Closing — Oct 7, Karen Mallari",sub:"Counted ₱12,450.00 · expected ₱12,470.00",by:"Karen Mallari",age:1,amt:-2000,extra:[["Expected cash","₱12,470.00"],["Counted","₱12,450.00"],["Over / short","−₱20.00"],["Remarks","Coins short"]]},
+];
+let Q=JSON.parse(JSON.stringify(SEED)),cur="1",filter="All",sel=1,rejecting=null,checked=new Set();
+const catOf=c=>CATS.find(x=>x[0]===c);
+const g=c=>`var(${catOf(c)[2]})`;
+const peso=c=>c==null?"—":(c<0?"−":"")+"₱"+(Math.abs(c)/100).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+const ageTxt=a=>a===0?"Today":a===1?"Yesterday":a+" days ago";
+const age=a=>`<span class="age ${a>=3?"old":""}">${ageTxt(a)}</span>`;
+const verb=c=>c==="Rebates owed to partners"?"Mark paid":c==="Cashier closings"?"Mark reviewed":"Approve";
+const count=c=>Q.filter(x=>x.cat===c).length;
+const NAMES={1:["One queue","Everything waiting in one table, oldest first. Chips filter by type; empty types show as a greyed chip, not a box."],2:["Inbox and detail","Pick a request on the left, read the full details on the right, decide there."],3:["Category cards","Six small count cards on top; the list below shows the chosen type. Empty types fade out."],4:["Three lanes","Money out, Fees and Cash control side by side as columns of request cards."],5:["Checklist with bulk approve","Tick several and approve them together. Only groups with requests are shown; empty ones are listed in one line."]};
+function rjBox(it){const rs=REASONS[it.cat]||DEF;return `<div class="rj" data-rjbox="${it.id}"><label>Reason<select id="rs${it.id}"><option value="">Choose a reason</option>${rs.map(r=>`<option>${r}</option>`).join("")}</select></label><label>Note for the Cashier<input id="rn${it.id}" placeholder="e.g. Attach the official receipt and resubmit"></label><div class="acts"><button class="btn" data-keep>Keep</button><button class="btn pri" style="background:var(--red);border-color:var(--red)" data-dorj="${it.id}">Reject request</button></div></div>`;}
+const actBtns=it=>it.cat==="Rebates owed to partners"?`<div class="acts"><button class="btn pri" data-ok="${it.id}">Mark paid</button></div>`:`<div class="acts"><button class="btn bad" data-rj="${it.id}">Reject</button><button class="btn pri" data-ok="${it.id}">${verb(it.cat)}</button></div>`;
+function chips(){return `<div class="chips"><button class="chip ${filter==="All"?"on":""} ${Q.length?"has":""}" data-f="All">All<i>${Q.length}</i></button>${CATS.map(c=>`<button class="chip ${filter===c[0]?"on":""} ${count(c[0])?"has":"zero"}" data-f="${c[0]}">${c[0]}<i>${count(c[0])}</i></button>`).join("")}</div>`;}
+const clear=t=>`<div class="allclear"><b>✓</b><span>${t}</span></div>`;
+const sorted=list=>list.slice().sort((a,b)=>b.age-a.age);
+const R={
+1(){const list=sorted(filter==="All"?Q:Q.filter(x=>x.cat===filter));
+ return `<div style="display:flex;flex-direction:column;gap:14px">${chips()}${list.length?`<div class="panel scroll" style="padding:6px 10px"><table class="tbl"><thead><tr><th>Type</th><th>Request</th><th>From</th><th>Waiting</th><th class="r">Amount</th><th></th></tr></thead><tbody>${list.map(it=>`<tr><td><span class="type" style="--g:${g(it.cat)}">${it.cat}</span></td><td><strong>${it.title}</strong><small>${it.sub}</small></td><td>${it.by}</td><td>${age(it.age)}</td><td class="r mono"><strong>${peso(it.amt)}</strong></td><td>${actBtns(it)}</td></tr>${rejecting===it.id?`<tr class="rjrow"><td colspan="6">${rjBox(it)}</td></tr>`:""}`).join("")}</tbody></table></div>`:clear(filter==="All"?"Nothing waiting for your approval.":"No "+filter.toLowerCase()+" waiting.")}</div>`;},
+2(){if(!Q.find(x=>x.id===sel))sel=sorted(Q)[0]?.id;const it=Q.find(x=>x.id===sel);
+ if(!Q.length)return clear("Nothing waiting for your approval.");
+ return `<div class="inbox"><div class="panel ilist">${GROUPS.map(gr=>{const l=sorted(Q.filter(x=>catOf(x.cat)[1]===gr));return l.length?`<div class="grp">${gr} · ${l.length}</div>`+l.map(x=>`<button class="${x.id===sel?"on":""}" style="--g:${g(x.cat)}" data-sel="${x.id}"><strong>${x.title}</strong><span class="amt">${peso(x.amt)}</span><small>${x.cat}</small>${age(x.age)}</button>`).join(""):"";}).join("")}</div>
+ <div class="panel detail"><span class="type" style="--g:${g(it.cat)}">${it.cat}</span><h2>${it.title}</h2><p class="muted" style="margin:0">${it.sub} · from ${it.by} · ${ageTxt(it.age).toLowerCase()}</p>
+ <div class="big" style="margin-top:14px">${peso(it.amt)}</div>
+ <dl class="dl">${it.extra.map(e=>`<div><dt>${e[0]}</dt><dd>${e[1]}</dd></div>`).join("")}</dl>
+ ${actBtns(it)}${rejecting===it.id?rjBox(it):""}</div></div>`;},
+3(){const shown=filter==="All"?Q:Q.filter(x=>x.cat===filter);
+ return `<div style="display:flex;flex-direction:column;gap:14px"><div class="cards">${CATS.map(c=>{const l=Q.filter(x=>x.cat===c[0]),old=l.length?Math.max(...l.map(x=>x.age)):0;return `<button class="card ${count(c[0])?"":"zero"} ${filter===c[0]?"on":""}" style="--g:var(${c[2]})" data-f="${filter===c[0]?"All":c[0]}"><span>${c[0]}</span><b>${l.length}</b><small>${l.length?"Oldest: "+ageTxt(old).toLowerCase():"All clear"}</small></button>`;}).join("")}</div>
+ ${shown.length?`<div class="panel list"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px"><strong>${filter==="All"?"All waiting":filter}</strong>${filter!=="All"?`<button class="btn" data-f="All">Show all</button>`:""}</div>${sorted(shown).map(it=>`<div class="wrap"><div class="item"><div><span class="type" style="--g:${g(it.cat)}">${it.cat}</span><strong style="display:block">${it.title}</strong><small>${it.sub} · ${ageTxt(it.age)}</small></div><b class="mono">${peso(it.amt)}</b>${actBtns(it)}</div>${rejecting===it.id?rjBox(it):""}</div>`).join("")}</div>`:clear("Nothing waiting here.")}</div>`;},
+4(){return `<div class="board">${GROUPS.map(gr=>{const l=sorted(Q.filter(x=>catOf(x.cat)[1]===gr));return `<div class="lane"><h2>${gr}<i>${l.length}</i></h2>${l.length?l.map(it=>`<div class="tkt" style="--g:${g(it.cat)}"><div class="row"><span class="type" style="--g:${g(it.cat)}">${it.cat}</span>${age(it.age)}</div><div class="row" style="margin-top:4px"><strong>${it.title}</strong><b class="mono">${peso(it.amt)}</b></div><small>${it.sub}</small>${actBtns(it)}${rejecting===it.id?rjBox(it):""}</div>`).join(""):`<p class="none">✓ Nothing waiting</p>`}</div>`;}).join("")}</div>`;},
+5(){const groups=CATS.filter(c=>count(c[0]));const empty=CATS.filter(c=>!count(c[0])).map(c=>c[0]);
+ const can=[...checked].filter(id=>{const x=Q.find(q=>q.id===id);return x});const total=can.reduce((s,id)=>s+(Q.find(q=>q.id===id).amt||0),0);
+ if(!Q.length)return clear("Nothing waiting for your approval.");
+ return `<div style="display:flex;flex-direction:column;gap:12px"><div class="bulk"><span><b>${can.length}</b> selected · <b>${peso(total)}</b></span><span class="sp"></span><button class="btn" data-all>Select all</button><button class="btn" data-bulk ${can.length?"":"disabled"}>Approve selected</button></div>
+ <div class="panel">${groups.map(c=>`<div class="ghead"><h2>${c[0]}</h2><span class="muted" style="font-size:13px">${c[1]} · ${count(c[0])} waiting</span></div>${sorted(Q.filter(x=>x.cat===c[0])).map(it=>`<div class="crow"><input type="checkbox" id="ck${it.id}" data-ck="${it.id}" ${checked.has(it.id)?"checked":""} aria-label="Select ${it.title}"><label for="ck${it.id}"><strong>${it.title}</strong><small>${it.sub} · ${ageTxt(it.age)}</small></label><b class="mono amt">${peso(it.amt)}</b>${actBtns(it)}</div>${rejecting===it.id?rjBox(it):""}`).join("")}`).join("")}
+ ${empty.length?`<p class="clearlist"><b>✓ Nothing waiting:</b> ${empty.join(", ")}.</p>`:""}</div></div>`;}
+};
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,1800);}
+function draw(){const wp=document.getElementById("wp");wp.textContent=Q.length?Q.length+" waiting":"All clear";wp.classList.toggle("zero",!Q.length);
+ document.querySelectorAll(".view").forEach(s=>{s.hidden=s.dataset.view!==cur;if(!s.hidden)s.innerHTML=R[cur]();});
+ document.querySelectorAll("#switch [data-v]").forEach(b=>b.classList.toggle("on",b.dataset.v===cur));
+ document.getElementById("dname").innerHTML=`<b>Design ${cur} · ${NAMES[cur][0]}.</b> ${NAMES[cur][1]} Sample requests.`;}
+function done(id,msg){Q=Q.filter(x=>x.id!==id);checked.delete(id);rejecting=null;toast(msg);draw();}
+document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;const d=b.dataset;
+ if(d.v){cur=d.v;rejecting=null;try{localStorage.setItem("apd-v",cur)}catch(_){}}
+ else if(b.id==="reset"){Q=JSON.parse(JSON.stringify(SEED));checked.clear();rejecting=null;filter="All";sel=1;}
+ else if(d.f){filter=d.f;rejecting=null;}
+ else if(d.sel){sel=+d.sel;rejecting=null;}
+ else if(d.ok){const it=Q.find(x=>x.id===+d.ok);return done(it.id,verb(it.cat)==="Approve"?"Approved":verb(it.cat)==="Mark paid"?"Marked paid":"Marked reviewed");}
+ else if(d.rj){rejecting=+d.rj;}
+ else if(d.keep!==undefined){rejecting=null;}
+ else if(d.dorj){const id=+d.dorj,r=document.getElementById("rs"+id).value,n=document.getElementById("rn"+id).value.trim();if(!r||(r==="Other"&&!n)){toast(r?"Add a note for Other":"Choose a reason");return;}return done(id,"Rejected · sent back to the Cashier");}
+ else if(d.all!==undefined){Q.forEach(x=>checked.add(x.id));}
+ else if(d.bulk!==undefined){const n=checked.size;Q=Q.filter(x=>!checked.has(x.id));checked.clear();toast(n+" approved");}
+ else return;
+ draw();});
+document.addEventListener("change",e=>{const c=e.target.closest("[data-ck]");if(!c)return;const id=+c.dataset.ck;c.checked?checked.add(id):checked.delete(id);draw();});
+try{cur=localStorage.getItem("apd-v")||"1"}catch(_){}
+draw();
+</script>

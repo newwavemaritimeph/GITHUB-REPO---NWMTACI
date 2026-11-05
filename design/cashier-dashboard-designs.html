@@ -1,0 +1,213 @@
+<title>Cashier Dashboard Designs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: navy portal bar, design switcher, then one of five Cashier dashboards built from the same sample day. */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA;
+  --bg:#f3f6fa; --surface:#ffffff; --line:#dfe7ee; --fg:#0f2638; --muted:#5f7180; --soft:#eef4f8; --warnbg:#fde7dc; --okbg:#e3f4ea; --badbg:#fbe4dc; --infobg:#e2effb;
+  --green:#15803d; --red:#c2410c; --amber:#b45309;
+  --c-cash:#15803d; --c-gcash:#0571D0; --c-psb:#F25615; --c-ub:#7c3aed; --c-chq:#64748b;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}
+.top{background:var(--navy);color:#fff;padding:14px 24px 0}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand b{font-size:19px;color:var(--cyan)} .brand small{display:block;font-size:10px;letter-spacing:.06em;color:#cfe3f1}
+.who{font-size:14px;color:#cfe3f1}
+.tabs{display:flex;gap:4px;margin-top:14px;overflow-x:auto}
+.tabs a{padding:10px 18px;color:#d6e6f2;text-decoration:none;font-weight:500;border-radius:10px 10px 0 0;white-space:nowrap}
+.tabs a.on{background:var(--bg);color:var(--fg)}
+.switch{max-width:1240px;margin:0 auto;padding:18px 24px 0;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.switch>span{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-right:4px}
+.switch button{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 14px var(--sans);padding:8px 14px;border-radius:99px;cursor:pointer}
+.switch button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.switch button i{font-style:normal;font-family:var(--mono);opacity:.7;margin-right:6px}
+.page{max-width:1240px;margin:0 auto;padding-block:18px 48px;padding-inline:24px;display:flex;flex-direction:column;gap:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}
+h1{margin:2px 0 0;font-size:28px;line-height:1.2}
+.dname{margin:-6px 0 0;color:var(--muted);font-size:14px} .dname b{color:var(--fg)}
+.hacts{display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 14px var(--sans);padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600}
+.btn.blue{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.sm{padding:6px 11px;font-size:13.5px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}
+.ph h2{margin:0;font-size:17px;font-weight:600} .ph .m{color:var(--muted);font-size:13.5px}
+.cnt{font:600 12px var(--mono);padding:2px 8px;border-radius:99px;background:var(--soft);color:var(--muted);margin-left:8px;vertical-align:2px}
+.cnt.hot{background:var(--warnbg);color:var(--orange)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.stack{display:flex;flex-direction:column;gap:16px;min-width:0}
+.rail{display:grid;grid-template-columns:minmax(300px,350px) minmax(0,1fr);gap:16px;align-items:start}
+/* channel column */
+.col{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.crow{display:grid;grid-template-columns:10px 1fr auto auto;gap:12px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--line)}
+.crow:last-child{border-bottom:0}
+.dot{width:10px;height:10px;border-radius:3px;background:var(--c);display:inline-block}
+.crow small{color:var(--muted);font-size:13px} .crow b{font:600 15.5px var(--mono);text-align:right}
+.crow.tot{background:var(--navy);color:#fff} .crow.tot small{color:#c3dbea} .crow.tot .dot{background:var(--orange)}
+.lines{margin:0}
+.lines>div{display:flex;justify-content:space-between;gap:12px;padding:8px 2px;border-bottom:1px solid var(--line)}
+.lines>div:last-child{border-bottom:0} .lines dt{color:var(--muted)} .lines dd{margin:0;font:600 15px var(--mono)}
+.lines .total{border-top:2px solid var(--fg)} .lines .total dt{color:var(--fg);font-weight:600}
+.plus{color:var(--green)!important} .minus{color:var(--red)!important} .eq{color:var(--blue)!important}
+/* rows */
+.row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:14px;align-items:center;padding:12px 2px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row small{display:block;color:var(--muted);font-size:13px}
+.row .who strong{font-weight:600} .nw{font:500 12.5px var(--mono);color:var(--muted)}
+.acts{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+.pill{display:inline-block;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.p-ok{background:var(--okbg);color:var(--green)} .p-warn{background:var(--warnbg);color:var(--orange)} .p-bad{background:var(--badbg);color:var(--red)} .p-info{background:var(--infobg);color:var(--blue)} .p-mute{background:var(--soft);color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:14px 0 6px}
+/* 1 tiles */
+.tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.tile{position:relative;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px 14px 20px;overflow:hidden}
+.tile::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--c)}
+.tile span{color:var(--muted);font-size:14px} .tile b{display:block;font:600 21px var(--mono)} .tile small{color:var(--muted);font-size:13px}
+.tile.tot{background:var(--navy);color:#fff;--c:var(--orange)} .tile.tot span,.tile.tot small{color:#c3dbea}
+/* 3 shift */
+.steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.step{padding:14px 18px;border-right:1px solid var(--line);position:relative}
+.step:last-child{border-right:0}
+.step .n{font:600 12px var(--mono);color:var(--muted)} .step strong{display:block;font-size:15.5px;margin-top:2px} .step small{display:block;color:var(--muted);font-size:13px}
+.step.done{background:var(--okbg)} .step.done .n{color:var(--green)}
+.step.now{box-shadow:inset 0 -3px 0 var(--orange)} .step.now .n{color:var(--orange)}
+.step b{font:600 17px var(--mono);display:block;margin-top:4px}
+/* 4 board */
+.board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;align-items:start}
+.lane{background:var(--soft);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.lane h2{margin:2px 4px;font-size:15px;display:flex;justify-content:space-between;align-items:center}
+.lane h2 i{font-style:normal;font:600 12px var(--mono);padding:1px 8px;border-radius:99px;background:var(--surface);color:var(--muted)}
+.lane .sum{margin:-6px 4px 0;font-size:13px;color:var(--muted)}
+.tkt{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;border-left:4px solid var(--c)}
+.tkt .t{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.tkt small{display:block;color:var(--muted);font-size:13px;margin:2px 0 10px}
+.tkt .acts{justify-content:flex-start}
+/* 5 counter */
+.hero{background:var(--navy);color:#fff;border-radius:16px;padding:22px 24px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:18px;align-items:center}
+.hero h2{margin:0 0 10px;font-size:20px}
+.search{display:flex;gap:8px}
+.search input{flex:1;min-width:0;font:400 16px var(--sans);padding:12px 14px;border-radius:10px;border:0;background:#fff;color:#0f2638}
+.qa{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.qa button{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:10px;padding:10px 14px;font:500 14px var(--sans);cursor:pointer;text-align:left}
+.qa button b{display:block;font:600 18px var(--mono)}
+.results{margin-top:10px;background:#fff;border-radius:10px;color:#0f2638;overflow:hidden}
+.results button{display:flex;justify-content:space-between;width:100%;border:0;border-bottom:1px solid #e6edf2;background:none;padding:10px 14px;font:inherit;color:inherit;cursor:pointer;text-align:left}
+.results button:hover{background:#eef4f8}
+.feed .f{display:grid;grid-template-columns:54px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 2px;border-bottom:1px solid var(--line)}
+.feed .f:last-child{border-bottom:0} .feed time{font:500 13px var(--mono);color:var(--muted)} .feed small{display:block;color:var(--muted);font-size:13px}
+.strip{display:flex;flex-wrap:wrap;gap:0;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.strip div{flex:1 1 120px;padding:10px 14px;border-right:1px solid var(--line)} .strip div:last-child{border-right:0}
+.strip span{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--muted)} .strip b{font:600 16px var(--mono)}
+.strip .tot{background:var(--navy);color:#fff} .strip .tot span{color:#c3dbea}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px}
+.view[hidden]{display:none!important}
+@media (max-width:1040px){.rail{grid-template-columns:1fr}.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}.hero{grid-template-columns:1fr}}
+@media (max-width:860px){.grid2,.board{grid-template-columns:1fr}.steps{grid-template-columns:repeat(2,minmax(0,1fr))}.step:nth-child(2){border-right:0}.step:nth-child(-n+2){border-bottom:1px solid var(--line)}}
+@media (max-width:600px){.row{grid-template-columns:1fr}.row .acts{justify-content:flex-start}.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.tile.tot{grid-column:1/-1}}
+@media (max-width:480px){.page,.switch{padding-inline:16px}.top{padding-inline:16px}.search{flex-direction:column}.qa{grid-template-columns:1fr 1fr}}
+button:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+</style>
+
+<header class="top">
+  <div class="brand"><div><b>New Wave</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div><div class="who">Working as Cashier · Karen Mallari</div></div>
+  <nav class="tabs"><a class="on" href="#">Dashboard</a><a href="#">Enrollments ▾</a><a href="#">Accounting ▾</a></nav>
+</header>
+
+<div class="switch" id="switch"><span>Design</span>
+  <button data-v="1" class="on"><i>1</i>Tiles and queues</button>
+  <button data-v="2"><i>2</i>Summary rail</button>
+  <button data-v="3"><i>3</i>Shift steps</button>
+  <button data-v="4"><i>4</i>Payment board</button>
+  <button data-v="5"><i>5</i>Counter</button>
+</div>
+
+<main class="page">
+  <div class="head"><div><div class="eyebrow">Cashier</div><h1>Dashboard</h1></div><div class="hacts"><button class="btn" data-toast="Opens Record expense">Record expense</button><button class="btn pri" data-toast="Opens Record payment">Record payment</button></div></div>
+  <p class="dname" id="dname"></p>
+  <section class="view" data-view="1"></section>
+  <section class="view" data-view="2" hidden></section>
+  <section class="view" data-view="3" hidden></section>
+  <section class="view" data-view="4" hidden></section>
+  <section class="view" data-view="5" hidden></section>
+</main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const peso=c=>(c<0?"−":"")+"₱"+(Math.abs(c)/100).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+const pl=(n,w)=>n+" "+w+(n===1?"":"s");
+const CH=[["Cash","--c-cash",410000,2],["GCash","--c-gcash",320000,2],["PSBank","--c-psb",250000,1],["UnionBank","--c-ub",0,0],["Cheque","--c-chq",0,0]];
+const total=CH.reduce((s,c)=>s+c[2],0),rc=CH.reduce((s,c)=>s+c[3],0);
+const NEW=[
+ {n:"DELA CRUZ, Andres (sample)",nw:"NWMTACI-2026-0451",co:"Basic Training · Oct 12",due:180000,src:"Walk-in",t:"8:05 AM"},
+ {n:"LIM, Rosa (sample)",nw:"NWMTACI-2026-0452",co:"Crowd + Crisis · Oct 13–17",due:340000,src:"Qapla Maritime",t:"9:20 AM"},
+ {n:"SANTOS, Mark (sample)",nw:"NWMTACI-2026-0453",co:"Passenger Courses Bundle · Oct 12–17",due:410000,src:"Walk-in",t:"10:41 AM"},
+];
+const PART=[{n:"NAVARRO, Dino (sample)",nw:"NWMTACI-2026-0440",co:"Crisis Management · Oct 15",paid:125000,due:250000,src:"Walk-in"}];
+const PAID=[
+ {n:"CRUZ, Ana (sample)",nw:"NWMTACI-2026-0447",co:"Basic Training · Oct 9",rec:"AR-2026-000318",amt:180000,ch:"Cash",tar:0},
+ {n:"RAMOS, Jose (sample)",nw:"NWMTACI-2026-0448",co:"Crisis Management · Oct 15",rec:"AR-2026-000320",amt:250000,ch:"PSBank",tar:1},
+ {n:"TORRES, Lea (sample)",nw:"NWMTACI-2026-0449",co:"Safety · Oct 12",rec:"AR-2026-000322",amt:230000,ch:"Cash",tar:2},
+];
+const UNPAID=[{n:"GARCIA, Paolo (sample)",co:"Basic Training · ended Sep 12",bal:90000},{n:"VILLANUEVA, Sam (sample)",co:"Safety · ended Aug 20",bal:130000},{n:"BAUTISTA, Elle (sample)",co:"Passenger Courses Bundle · ended Oct 8",bal:210000,today:true}];
+const unpaidTotal=UNPAID.reduce((s,u)=>s+u.bal,0);
+const FEED=[["2:15 PM","TORRES, Lea","Safety · Cash","AR-2026-000322",230000],["11:30 AM","SANTOS, Maria","Bundle · GCash","AR-2026-000321",230000],["10:05 AM","RAMOS, Jose","Crisis · PSBank","AR-2026-000320",250000],["9:10 AM","LIM, Rosa","Crowd · GCash","AR-2026-000319",90000],["8:42 AM","CRUZ, Ana","Basic Training · Cash","AR-2026-000318",180000]];
+const NAMES={1:["Tiles and queues","Today's design, tidied: channel tiles in one row, then the three work lists side by side."],2:["Summary rail","Same layout as the new Accounting dashboard: figures in one narrow column, work lists on the right."],3:["Shift steps","The day as four steps — opening, collecting, expenses, closing — with the work lists under them."],4:["Payment board","Trainees move across three columns: to collect, partially paid, paid and enrolled."],5:["Counter","Built for the front desk: find a trainee first, quick actions, then today's receipts as a running feed."]};
+const tarBtn=p=>p.tar>=2?`<span class="pill p-mute">TAR printed 2 of 2</span>`:`<button class="btn sm" data-toast="Prints the TAR (${p.tar+1} of 2)">Print TAR</button>`;
+const newRows=(n)=>NEW.slice(0,n).map(x=>`<div class="row"><div class="who"><strong>${x.n}</strong><small><span class="nw">${x.nw}</span> · ${x.co}</small><small>${x.src} · handed over ${x.t}</small></div><b class="mono">${peso(x.due)}</b><div class="acts"><button class="btn sm blue" data-toast="Opens Record payment for ${x.n.split(",")[0]}">Record payment</button></div></div>`).join("");
+const partRows=()=>PART.map(x=>`<div class="row"><div class="who"><strong>${x.n}</strong><small><span class="nw">${x.nw}</span> · ${x.co}</small><small>Paid ${peso(x.paid)} of ${peso(x.due)}</small></div><b class="mono minus">${peso(x.due-x.paid)}</b><div class="acts"><button class="btn sm blue" data-toast="Collect the balance">Collect balance</button></div></div>`).join("");
+const paidRows=()=>PAID.map(x=>`<div class="row"><div class="who"><strong>${x.n}</strong><small><span class="nw">${x.nw}</span> · ${x.co}</small><small class="mono">${x.rec} · ${x.ch}</small></div><b class="mono plus">${peso(x.amt)}</b><div class="acts"><button class="btn sm" data-toast="Opens the receipt">Receipt</button>${tarBtn(x)}</div></div>`).join("");
+const unpaidRows=()=>UNPAID.map(u=>`<div class="row"><div class="who"><strong>${u.n}</strong><small>${u.co}</small></div><b class="mono minus">${peso(u.bal)}</b><div class="acts">${u.today?`<span class="pill p-warn">Ends today</span>`:""}<button class="btn sm" data-toast="Opens Record payment">Collect</button></div></div>`).join("");
+const chCol=()=>`<div class="col">${CH.map(c=>`<div class="crow" style="--c:var(${c[1]})"><span class="dot"></span><span>${c[0]}</span><small>${pl(c[3],"receipt")}</small><b>${peso(c[2])}</b></div>`).join("")}<div class="crow tot"><span class="dot"></span><span>Total collected</span><small>${pl(rc,"receipt")}</small><b>${peso(total)}</b></div></div>`;
+const cashLines=()=>`<dl class="lines"><div><dt>Opening cash</dt><dd>₱12,450.00</dd></div><div><dt>+ Cash collected</dt><dd class="plus">₱4,100.00</dd></div><div><dt>− Cash expenses</dt><dd class="minus">₱850.00</dd></div><div class="total"><dt>= Expected in drawer</dt><dd class="eq">₱15,700.00</dd></div></dl>`;
+const panel=(t,c,body,m)=>`<section class="panel"><div class="ph"><h2>${t}${c!=null?`<span class="cnt ${c?"hot":""}">${c}</span>`:""}</h2>${m?`<span class="m">${m}</span>`:""}</div>${body}</section>`;
+const R={
+1(){return `<div class="stack"><div class="tiles">${CH.slice(0,4).map(c=>`<div class="tile" style="--c:var(${c[1]})"><span>${c[0]}</span><b>${peso(c[2])}</b><small>${pl(c[3],"receipt")}</small></div>`).join("")}<div class="tile tot"><span>Total today</span><b>${peso(total)}</b><small>${pl(rc,"receipt")}</small></div></div>
+ <div class="grid2">${panel("New enrollments",NEW.length,newRows(3)+partRows(),"handed over by Registration")}${panel("Paid and enrolled",PAID.length,paidRows(),"today")}</div>
+ ${panel("Unpaid balances · 4:00 PM summary",UNPAID.length,unpaidRows(),peso(unpaidTotal))}</div>`;},
+2(){return `<div class="rail"><div class="stack">
+ ${panel("Collections today",null,chCol())}
+ ${panel("Cash drawer",null,cashLines()+`<p style="margin:10px 2px 0;font-size:13px;color:var(--muted)">Opening recorded 7:52 AM · not yet closed</p>`)}
+ ${panel("Today",null,`<dl class="lines"><div><dt>New enrollments</dt><dd>${NEW.length}</dd></div><div><dt>Paid and enrolled</dt><dd>${PAID.length}</dd></div><div><dt>Expenses released</dt><dd>₱2,350.00</dd></div><div><dt>Unpaid after training</dt><dd class="minus">${peso(unpaidTotal)}</dd></div></dl>`)}
+ </div><div class="stack">${panel("To collect",NEW.length+PART.length,newRows(3)+partRows(),"handed over by Registration")}${panel("Paid and enrolled",PAID.length,paidRows(),"receipts and TAR")}${panel("Unpaid balances · 4:00 PM summary",UNPAID.length,unpaidRows(),peso(unpaidTotal))}</div></div>`;},
+3(){return `<div class="stack"><div class="steps">
+ <div class="step done"><span class="n">1 · DONE</span><strong>Opening</strong><b>₱12,450.00</b><small>Recorded 7:52 AM</small></div>
+ <div class="step now"><span class="n">2 · NOW</span><strong>Collecting</strong><b>${peso(total)}</b><small>${pl(rc,"receipt")} · ${NEW.length+PART.length} to collect</small></div>
+ <div class="step"><span class="n">3</span><strong>Expenses</strong><b>₱2,350.00</b><small>2 released · 1 awaiting release</small></div>
+ <div class="step"><span class="n">4</span><strong>Closing</strong><b>₱15,700.00</b><small>Expected in drawer · count at 5:00 PM</small></div></div>
+ <div class="grid2"><div class="stack">${panel("To collect",NEW.length+PART.length,newRows(3)+partRows())}</div><div class="stack">${panel("By channel",null,chCol())}</div></div>
+ <div class="grid2">${panel("Paid and enrolled",PAID.length,paidRows())}${panel("Unpaid balances · 4:00 PM summary",UNPAID.length,unpaidRows(),peso(unpaidTotal))}</div></div>`;},
+4(){const lane=(t,items,sum,cards)=>`<div class="lane"><h2>${t}<i>${items}</i></h2><p class="sum">${sum}</p>${cards}</div>`;
+ return `<div class="stack"><div class="strip">${CH.map(c=>`<div><span><span class="dot" style="--c:var(${c[1]})"></span>${c[0]}</span><b>${peso(c[2])}</b></div>`).join("")}<div class="tot"><span>Total today</span><b>${peso(total)}</b></div></div>
+ <div class="board">
+ ${lane("To collect",NEW.length,peso(NEW.reduce((s,x)=>s+x.due,0))+" due",NEW.map(x=>`<div class="tkt" style="--c:var(--orange)"><div class="t"><strong>${x.n.split(" (")[0]}</strong><b class="mono">${peso(x.due)}</b></div><small>${x.co}<br>${x.src}</small><div class="acts"><button class="btn sm blue" data-toast="Opens Record payment">Record payment</button></div></div>`).join(""))}
+ ${lane("Partially paid",PART.length,peso(PART.reduce((s,x)=>s+x.due-x.paid,0))+" balance",PART.map(x=>`<div class="tkt" style="--c:var(--amber)"><div class="t"><strong>${x.n.split(" (")[0]}</strong><b class="mono minus">${peso(x.due-x.paid)}</b></div><small>${x.co}<br>Paid ${peso(x.paid)} of ${peso(x.due)}</small><div class="acts"><button class="btn sm blue" data-toast="Collect the balance">Collect balance</button></div></div>`).join(""))}
+ ${lane("Paid and enrolled",PAID.length,peso(PAID.reduce((s,x)=>s+x.amt,0))+" today",PAID.map(x=>`<div class="tkt" style="--c:var(--green)"><div class="t"><strong>${x.n.split(" (")[0]}</strong><b class="mono plus">${peso(x.amt)}</b></div><small>${x.co}<br><span class="mono">${x.rec}</span> · ${x.ch}</small><div class="acts"><button class="btn sm" data-toast="Opens the receipt">Receipt</button>${tarBtn(x)}</div></div>`).join(""))}
+ </div>${panel("Unpaid balances · 4:00 PM summary",UNPAID.length,unpaidRows(),peso(unpaidTotal))}</div>`;},
+5(){return `<div class="stack"><div class="hero"><div><h2>Who is paying?</h2><div class="search"><input id="find" placeholder="Name, NWMTACI number or receipt number" autocomplete="off"><button class="btn pri" data-toast="Opens Record payment">Record payment</button></div><div class="results" id="res" hidden></div></div>
+ <div class="qa"><button data-toast="Shows the to-collect list">To collect<b>${NEW.length+PART.length}</b></button><button data-toast="Shows paid and enrolled">Paid today<b>${PAID.length}</b></button><button data-toast="Opens Record expense">Record expense<b>+</b></button><button data-toast="Opens Opening and closing">Expected drawer<b>₱15,700</b></button></div></div>
+ <div class="strip">${CH.map(c=>`<div><span><span class="dot" style="--c:var(${c[1]})"></span>${c[0]}</span><b>${peso(c[2])}</b></div>`).join("")}<div class="tot"><span>Total today</span><b>${peso(total)}</b></div></div>
+ <div class="grid2">${panel("Waiting at the counter",NEW.length+PART.length,newRows(3)+partRows(),"handed over by Registration")}${panel("Today's receipts",FEED.length,`<div class="feed">${FEED.map(f=>`<div class="f"><time>${f[0]}</time><div><strong>${f[1]}</strong><small>${f[2]} · <span class="mono">${f[3]}</span></small></div><b class="mono">${peso(f[4])}</b></div>`).join("")}</div>`)}</div>
+ ${panel("Unpaid balances · 4:00 PM summary",UNPAID.length,unpaidRows(),peso(unpaidTotal))}</div>`;}
+};
+let cur="1";
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,1800);}
+function draw(){document.querySelectorAll(".view").forEach(s=>{s.hidden=s.dataset.view!==cur;if(!s.hidden)s.innerHTML=R[cur]();});
+ document.querySelectorAll("#switch button").forEach(b=>b.classList.toggle("on",b.dataset.v===cur));
+ document.getElementById("dname").innerHTML=`<b>Design ${cur} · ${NAMES[cur][0]}.</b> ${NAMES[cur][1]} Thursday, October 8, 2026 · sample figures.`;
+ try{localStorage.setItem("cxd-v",cur)}catch(_){}}
+document.addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;if(b.dataset.v){cur=b.dataset.v;draw();}else if(b.dataset.toast)toast(b.dataset.toast);});
+document.addEventListener("input",e=>{if(e.target.id!=="find")return;const q=e.target.value.trim().toLowerCase(),res=document.getElementById("res");
+ const all=[...NEW.map(x=>[x.n,x.nw,peso(x.due)+" due"]),...PART.map(x=>[x.n,x.nw,peso(x.due-x.paid)+" balance"]),...PAID.map(x=>[x.n,x.rec,"Paid"])];
+ const hits=q?all.filter(a=>a.join(" ").toLowerCase().includes(q)).slice(0,5):[];res.hidden=!hits.length;
+ res.innerHTML=hits.map(h=>`<button data-toast="Opens Record payment for ${h[0].split(",")[0]}"><span><strong>${h[0]}</strong> <span class="mono" style="color:#5f7180;font-size:13px">${h[1]}</span></span><span class="mono">${h[2]}</span></button>`).join("");});
+try{cur=localStorage.getItem("cxd-v")||"1"}catch(_){}
+draw();
+</script>

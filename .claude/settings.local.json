@@ -7,7 +7,16 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/)",
       "Bash(cd \"C:/Users/Kate Esguerra/Desktop/GITHUB-REPO---NWMTACI-main\" && echo \"=== CertificateStatus ===\"; grep -rn \"CertificateStatus\\\\s*=\" lib/*.ts lib/system/*.ts; echo \"=== printCertificate numbering ===\"; sed -n '/const printCertificate = useCallback/,/^  \\);/p' lib/system/store.tsx | head -30; echo \"=== Batch type fields ===\"; sed -n '/export type Batch = {/,/};/p' lib/system/types.ts)",
       "Bash(grep -v \"//\")",
-      "Bash(grep -aB3 \"never used\\\\|no-unused-vars\")"
+      "Bash(grep -aB3 \"never used\\\\|no-unused-vars\")",
+      "Bash(grep -o 'active===\"[^\"]*\"[^:]\\\\{0,40\\\\}<[A-Za-z]*' components/portal-live-app.tsx)",
+      "Bash(mv newwave-app *)",
+      "Bash(npx vitest *)",
+      "Bash(node -e ' *)",
+      "Bash(curl -s --max-time 30 https://newwavemaritimemtaci.com/api/public/catalog)",
+      "Bash(node -e 'let s=\"\";process.stdin.on\\(\"data\",d=>s+=d\\).on\\(\"end\",\\(\\)=>{const j=JSON.parse\\(s\\);for\\(const c of j.stcw??[]\\)console.log\\(c.code,\"|\",c.name,\"|\",\\(c.batches??[]\\).length,\"batches\"\\)}\\)')",
+      "Bash(node -e 'let s=\"\";process.stdin.on\\(\"data\",d=>s+=d\\).on\\(\"end\",\\(\\)=>{const j=JSON.parse\\(s\\);for\\(const c of j.stcw??[]\\)console.log\\(c.code,\"|\",c.name,\"|\",\\(c.batches??[]\\).map\\(b=>\\(b.batch_number??b.batchNumber??b.id\\)+\" \"+\\(b.starts_on??b.startsOn??\"\"\\)\\).join\\(\", \"\\)||\"no batches\"\\)}\\)')",
+      "Bash(node -e 'let s=\"\";process.stdin.on\\(\"data\",d=>s+=d\\).on\\(\"end\",\\(\\)=>{const j=JSON.parse\\(s\\);for\\(const c of j.stcw??[]\\)console.log\\(c.code,\\(c.batches??[]\\).length,JSON.stringify\\(\\(c.batches??[]\\)[0]??null\\)\\)}\\)')",
+      "mcp__ec3ae950-114b-4e55-b1ad-cf191d2b0bb3__list_projects"
     ]
   }
 }

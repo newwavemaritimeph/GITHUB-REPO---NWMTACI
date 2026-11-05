@@ -22,8 +22,8 @@ import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAn
 import { InstructionTemplates } from "./portal/instruction-templates";
 import type { CategoryTemplate } from "@/lib/instruction-templates";
 import { sourceLabel } from "@/lib/company-charge";
-import { PaymentVoidCell } from "./portal/payment-void";
-import { ALL_DATES, Badge, DataSince, Message, Modal, Page, PageHead, PeriodBar, ViewIcon, manilaDay, submit, fullName, txWhen, useMonthRows, useNeedSince, usePaged, usePeriod } from "./portal/shared-ui";
+import { PaymentDayRow, PrintGlyph, RequestVoidIcon, paymentStatus } from "./portal/payment-void";
+import { ALL_DATES, Badge, DataSince, Message, Modal, Page, PageHead, PeriodBar, ViewIcon, fmtClock, manilaDay, submit, fullName, txWhen, useMonthRows, useNeedSince, usePaged, usePeriod } from "./portal/shared-ui";
 import { classroomJoin } from "@/lib/classroom";
 import { ClassroomPanel } from "./portal/classroom-panel";
 import { RequestActionModal, TraineeRequestModal, type RequestType } from "./portal/payment-actions";
@@ -426,7 +426,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Cash and sales summary")return <FinanceSummaryReport/>;
     if(active==="Sales from endorsed courses")return <EndorsedSalesReport/>;
     if(active==="Company Charge")return <CompanyChargeReport data={data} reload={reload}/>;
-    if(active==="Receipts and TARs")return <AccountingDocuments/>;
+    if(active==="Receipts and TARs")return <AccountingDocuments data={data}/>;
     if(active==="Daily summary report")return <><CashierSummaryReport data={data}/><div className="portal-page" style={{paddingTop:0}}><AdminVouchers/></div></>;
   }
   if(gateRole==="releasing_officer"){
@@ -456,7 +456,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Company Charge")return <CompanyChargeReport data={data} reload={reload}/>;
     if(active==="Search trainee")return <Trainees data={data} query={query} reload={reload} role={gateRole}/>;
     if(active==="Payments")return <AccountingPayments data={data}/>;
-    if(active==="Receipts and TARs")return <AccountingDocuments/>;
+    if(active==="Receipts and TARs")return <AccountingDocuments data={data}/>;
     if(active==="Expenses")return <AccountingExpenses data={data}/>;
     if(active==="Receivables")return <AccountingReceivables data={data}/>;
     if(active==="Payables")return <AccountingPayables data={data} reload={reload}/>;
@@ -718,11 +718,15 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
               {[...account!.tarGroups!].reverse().map((g,n)=><tr key={g.ids.join("|")}><td><b>Transaction {n+1}</b><small>{txWhen(g.at)}</small></td><td>{g.ids.map(id=>first(data.enrollments.find(e=>e.id===id)?.courses)?.code).filter(Boolean).join(", ")||`${g.ids.length} course${g.ids.length===1?"":"s"}`}</td><td className="tp-mono">{g.tar??<span className="muted-text">Not Yet Printed</span>}</td><td className="tp-mono">{g.receipts.length?g.receipts.join(", "):<span className="muted-text">Not Yet Paid</span>}</td></tr>)}
             </tbody></table></div></>}
             <h4 className="tp-sub">Payments</h4>
-            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Receipt</th><th>Date</th><th>Mode</th><th className="r">Amount</th><th>Status</th>{canReprint&&<th></th>}</tr></thead><tbody>
-              {payRows.map(p=>{const no=p.receipt_number??p.payment_number;return <Fragment key={p.id}><tr className={p.valid===false?"pv-void":undefined}><td className="tp-mono">{no}{feeLabel(p)&&<small>{feeLabel(p)}</small>}</td><td>{day(p.received_at)}</td><td>{p.method}{p.reference_number?` · Ref ${p.reference_number}`:""}</td><td className="r tp-mono">{money(Number(p.amount_centavos))}</td><td><PaymentVoidCell data={data} payment={p} canRequest={canVoid} busy={busy} post={post}/></td>
-                {canReprint&&<td>{p.valid!==false&&p.receipt_number&&<button type="button" className="portal-secondary" onClick={()=>{setReprint({kind:"receipt",id:p.id,no});setWhy("");setWhyOther("")}}>Reprint{p.print_count?` · ${p.print_count} printed`:""}</button>}</td>}</tr>
-                {reprint?.kind==="receipt"&&reprint.id===p.id&&reprintForm(6)}</Fragment>})}
-              {!payRows.length&&<tr><td colSpan={canReprint?6:5} className="sa-empty">No payments yet.</td></tr>}
+            <div className="tp-scroll"><table className="tp-table"><thead><tr><th>Time</th><th>Receipt</th><th>Mode</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
+              {/* Day Ledger with Icon Actions, the same row as Cashier › Payments (owner, 5 Nov 2026). */}
+              {[...payRows].sort((a,b)=>b.received_at.localeCompare(a.received_at)).flatMap((p,i,all)=>{const no=p.receipt_number??p.payment_number,d=day(p.received_at),isVoid=p.valid===false,s=paymentStatus(data,p),onDay=all.filter(x=>day(x.received_at)===d);return [
+                (!i||day(all[i-1].received_at)!==d)&&<PaymentDayRow key={`day-${d}`} day={d} count={onDay.length} span={4} total={pesos2(onDay.filter(x=>x.valid!==false).reduce((n,x)=>n+Number(x.amount_centavos),0))}/>,
+                <tr key={p.id} className={isVoid?"pv-void":undefined}><td className="tp-mono">{fmtClock(p.received_at)}</td><td className="tp-mono">{no}{feeLabel(p)&&<small>{feeLabel(p)}</small>}</td><td>{p.method}{p.reference_number&&<small className="tp-mono">{p.reference_number}</small>}</td><td><Badge tone={s.tone}>{s.label}</Badge>{s.note&&<small>{s.note}</small>}</td><td className="r tp-mono">{pesos2(Number(p.amount_centavos))}</td>
+                  <td><div className="cx-acts">{canReprint&&!isVoid&&p.receipt_number&&<button type="button" className="pv-icon" title={`Reprint${p.print_count?` · Printed ${p.print_count} Time${p.print_count===1?"":"s"}`:""}`} aria-label={`Reprint ${no}`} onClick={()=>{setReprint({kind:"receipt",id:p.id,no});setWhy("");setWhyOther("")}}><PrintGlyph/></button>}{canVoid&&s.canVoid&&<RequestVoidIcon payment={p} busy={busy} post={post}/>}</div></td></tr>,
+                <Fragment key={`${p.id}-reprint`}>{reprint?.kind==="receipt"&&reprint.id===p.id&&reprintForm(6)}</Fragment>,
+              ]})}
+              {!payRows.length&&<tr><td colSpan={6} className="sa-empty">No payments yet.</td></tr>}
             </tbody></table></div>
             {(account?.tars?.length??0)>0&&<><h4 className="tp-sub">Training Admission Records</h4>
             <div className="tp-scroll"><table className="tp-table"><thead><tr><th>TAR No.</th><th>Issued</th><th>Courses</th><th>Printed</th>{canReprint&&<th></th>}</tr></thead><tbody>

@@ -1,0 +1,102 @@
+<title>Course Post-Tests</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: Ocean Wave portal shell; trainee pages framed as a phone, staff pages as compact Design 1 tables. */
+:root{--blue:#0571D0;--cyan:#35CCFA;--lcyan:#9EE3F1;--orange:#F25615;--navy:#123F63;--bg:#f1f6f9;--surface:#fff;--line:#d8e4ec;--fg:#0f2638;--muted:#58707f;--soft:#eaf6fa;--th:#e3f6fb;--okbg:#e3f4ea;--ok:#0a7a3e;--warnbg:#fde9dd;--warn:#b4480f;--badbg:#fbe4dc;--bad:#b42318;--infobg:#e2effc;--info:#0b5cad;--sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}button,input,select,textarea{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.bar{background:linear-gradient(100deg,#0571D0,#1c9be3 60%,#35CCFA);color:#fff;padding-block:12px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.brand{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.brand b{font-size:17px;letter-spacing:.04em}.brand span{font-size:13px;opacity:.9}
+.views{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap;align-items:flex-end}.views small{font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.8;padding:0 6px 10px 2px}
+.views button{border:0;background:none;color:#fff;padding:9px 13px;font-weight:500;font-size:14px;border-radius:10px 10px 0 0}.views button.on{background:var(--bg);color:var(--fg);box-shadow:inset 0 3px 0 var(--orange)}
+.page{max-width:1180px;margin:0 auto;padding-block:18px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:14px}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}h1{margin:2px 0 0;font-size:26px;text-wrap:balance}h2{margin:0;font-size:16px}h3{margin:0;font-size:15px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.note{background:var(--infobg);color:var(--info);border-radius:10px;padding:10px 14px;font-size:13.5px}.note.warn{background:var(--warnbg);color:var(--warn)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;flex-wrap:wrap}.ph small{color:var(--muted)}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14px}th{background:var(--th);color:var(--muted);font:600 11.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;text-align:left;padding:8px 12px;white-space:nowrap}td{padding:8px 12px;border-top:1px solid var(--line);vertical-align:top}td small{display:block;color:var(--muted);font-size:12.5px}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}.ok{background:var(--okbg);color:var(--ok)}.warn{background:var(--warnbg);color:var(--warn)}.bad{background:var(--badbg);color:var(--bad)}.info{background:var(--infobg);color:var(--info)}.mut{background:var(--soft);color:var(--muted)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:7px 13px;font-weight:500}.pri{background:var(--orange);color:#fff;border:0;border-radius:9px;padding:9px 16px;font-weight:600}.pri:disabled,.btn:disabled{opacity:.5;cursor:default}
+.phone{max-width:430px;width:100%;margin:0 auto;background:var(--surface);border:1px solid var(--line);border-radius:26px;overflow:hidden;box-shadow:0 12px 34px rgba(18,63,99,.12)}
+.url{background:var(--soft);padding:8px 14px;font:500 12.5px var(--mono);color:var(--muted);border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.site{padding:16px;display:flex;flex-direction:column;gap:12px}
+.q{border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px}.q b{font-size:14.5px}
+.opt{display:flex;gap:10px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:9px 11px;cursor:pointer;font-size:14px}.opt input{margin-top:3px;accent-color:var(--blue)}.opt.on{border-color:var(--blue);background:var(--infobg)}
+.state{border-radius:14px;padding:14px;font-weight:700;font-size:17px}.state.v{background:var(--okbg);color:var(--ok)}.state.x{background:var(--badbg);color:var(--bad)}
+.score{font:700 40px var(--mono)}
+.steps{display:flex;flex-wrap:wrap;gap:6px}.step{font-size:12.5px;padding:3px 9px;border-radius:99px;font-weight:600}.step.y{background:var(--okbg);color:var(--ok)}.step.n{background:var(--warnbg);color:var(--warn)}.step.w{background:var(--soft);color:var(--muted)}
+.grid2{display:grid;grid-template-columns:minmax(240px,320px) 1fr;gap:14px;align-items:start}@media (max-width:820px){.grid2{grid-template-columns:1fr}}
+.clist{max-height:520px;overflow:auto}.clist button{display:block;width:100%;text-align:left;border:0;border-top:1px solid var(--line);background:none;padding:8px 14px;font-size:13.5px}.clist button.on{background:var(--infobg);box-shadow:inset 3px 0 0 var(--orange)}.clist small{display:block;color:var(--muted)}
+.rq{padding:10px 16px;border-top:1px solid var(--line)}.rq ol{margin:6px 0 4px;padding-left:20px}.rq li.c{color:var(--ok);font-weight:600}.rq .why{font-size:13px;color:var(--muted)}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.tools input,.tools select{border:1px solid var(--line);border-radius:9px;padding:7px 10px;background:var(--surface)}
+</style>
+
+<div class="bar"><div class="brand"><b>NEW WAVE · PROTOTYPE</b><span>Course post-tests · 10 questions per course · pass 70% · unlimited retakes · sample data</span></div><nav class="views" id="views"></nav></div>
+<main class="page" id="page"></main>
+
+<script>
+const DATA=__DATA__;
+const COURSES=__COURSES__;
+const PASS=70;
+const S={view:"Post-Test",course:null,answers:{},result:null,attempts:[],review:null,q:"",filter:"All",approved:new Set(),releaseMsg:null};
+const withQ=COURSES.filter(c=>DATA[c.key]);S.course=withQ[0]?.key;S.review=withQ[0]?.key;
+const VIEWS=[["Trainee",["Post-Test","Trainee Status"]],["Staff",["Releasing Officer","Admin · Review Questions"]]];
+function bar(){document.getElementById("views").innerHTML=VIEWS.map(([g,v])=>`<small>${g}</small>`+v.map(x=>`<button class="${S.view===x?"on":""}" data-view="${x}">${x}</button>`).join("")).join("")}
+function render(){bar();document.getElementById("page").innerHTML=({"Post-Test":postTest,"Trainee Status":status,"Releasing Officer":releasing,"Admin · Review Questions":review})[S.view]();}
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;");
+function postTest(){
+  const c=COURSES.find(x=>x.key===S.course),qs=DATA[S.course]||[];
+  const picker=`<div class="tools"><label>Sample course <select id="pick">${withQ.map(x=>`<option value="${esc(x.key)}" ${x.key===S.course?"selected":""}>${esc(x.code)} · ${esc(x.course)}</option>`).join("")}</select></label><small style="color:var(--muted)">${withQ.length} of ${COURSES.length} courses drafted so far</small></div>`;
+  let body;
+  if(S.result){const r=S.result,pass=r.pct>=PASS;
+    body=`<div class="state ${pass?"v":"x"}">${pass?"✓ Passed":"✗ Not passed yet"}</div>
+     <div style="display:flex;align-items:baseline;gap:12px"><span class="score">${r.score}/${qs.length}</span><span style="color:var(--muted)">${r.pct}% · passing score ${PASS}%</span></div>
+     ${pass?`<p style="margin:0;font-size:14px">Your result is saved. Your certificate can be released once your fee is settled and your evaluation is submitted.</p><button class="btn" data-view="Trainee Status">Back to Trainee Status</button>`
+      :`<p style="margin:0;font-size:14px">You need at least ${Math.ceil(qs.length*PASS/100)} correct answers. Review the course topics and take the test again. There is no limit on retakes.</p><button class="pri" data-act="retake">Retake the Test</button>`}
+     <small style="color:var(--muted)">Attempt ${S.attempts.length}. The correct answers are not shown, so each retake is a fair test.</small>`;}
+  else{const done=qs.every((_,i)=>S.answers[i]!=null);
+    body=`<dl style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:14px"><dt style="color:var(--muted)">Trainee</dt><dd style="margin:0;font-weight:600">Juan Miguel P. Dela Cruz</dd><dt style="color:var(--muted)">Course</dt><dd style="margin:0;font-weight:600">${esc(c.course)} <span class="mono" style="color:var(--muted)">${esc(c.code)}</span></dd></dl>
+     <div class="note">${qs.length} questions. Choose one answer each. You pass with ${PASS}% (${Math.ceil(qs.length*PASS/100)} correct).${S.attempts.length?` This is retake ${S.attempts.length}.`:""}</div>
+     ${qs.map((q,i)=>`<div class="q"><b>${i+1}. ${esc(q.q)}</b>${q.options.map((o,k)=>`<label class="opt ${S.answers[i]===k?"on":""}"><input type="radio" name="q${i}" data-q="${i}" value="${k}" ${S.answers[i]===k?"checked":""}><span>${esc(o)}</span></label>`).join("")}</div>`).join("")}
+     <button class="pri" data-act="submit" ${done?"":"disabled"}>Submit Answers</button>${done?"":`<small style="color:var(--muted)">Answer all ${qs.length} questions to submit (${Object.keys(S.answers).length} answered).</small>`}`;}
+  return `<div class="head"><div><span class="eyebrow">Website › Trainee Status › Take Post-Test</span><h1>Course Post-Test</h1></div></div>${picker}
+   <div class="phone"><div class="url">newwavemaritimemtaci.com/post-test/…</div><div class="site">${body}</div></div>`;}
+function status(){const passed=S.attempts.some(a=>a.pct>=PASS),last=S.attempts.at(-1);
+  return `<div class="head"><div><span class="eyebrow">Website › Trainee Status</span><h1>The Post-Test Step</h1></div></div>
+  <div class="phone"><div class="url">newwavemaritimemtaci.com/registration-search</div><div class="site">
+   <div style="border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:8px"><b>${esc(COURSES.find(x=>x.key===S.course).course)}</b><small style="color:var(--muted)">ENR-2026-000031 · Oct 12–16, 2026 · <span class="pill ok">Enrolled</span></small>
+    <div class="steps"><span class="step y">✓ Training Finished</span><span class="step y">✓ Paid</span><span class="step ${passed?"y":"n"}">${passed?`✓ Post-Test ${last.score}/10`:last?`✗ Post-Test ${last.score}/10`:"✗ Post-Test"}</span><span class="step n">✗ Evaluation</span><span class="step w">Certificate After Both</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${passed?"":`<button class="pri" data-view="Post-Test">${last?"Retake Post-Test":"Take Post-Test"}</button>`}<button class="btn">Evaluate Training</button></div></div>
+  </div></div>
+  <div class="note">Order on the status page: the post-test first, then the evaluation. The certificate is released only when the fee is paid, the post-test is passed and the evaluation is in.</div>`;}
+function releasing(){const rows=[{n:"DELA CRUZ, Juan Miguel",c:"ECDIS",t:"9/10 · 1 attempt",ok:true,ev:true},{n:"REYES, Maria Clara",c:"SAM",t:"6/10 · 2 attempts",ok:false,ev:true},{n:"SANTOS, Paolo",c:"SNC",t:"Not taken",ok:false,ev:false}];
+  return `<div class="head"><div><span class="eyebrow">Releasing Officer › Certificates</span><h1>Post-Test Column</h1></div></div>
+  ${S.releaseMsg?`<div class="note">${S.releaseMsg}</div>`:""}
+  <div class="panel"><div class="wrap"><table><thead><tr><th>#</th><th>Trainee</th><th>Course</th><th>Paid</th><th>Post-Test</th><th>Eval.</th><th>Status</th><th>Action</th></tr></thead><tbody>
+  ${rows.map((r,i)=>`<tr><td class="mono">${i+1}</td><td><b>${r.n}</b></td><td>${r.c}</td><td style="color:var(--ok)">✓</td><td>${r.ok?`<span class="pill ok">Passed</span><small>${r.t}</small>`:r.t==="Not taken"?`<span class="pill mut">Not Taken</span>`:`<span class="pill warn">Not Passed</span><small>${r.t}</small>`}</td><td>${r.ev?`<span style="color:var(--ok)">✓ PDF</span>`:`<span style="color:var(--bad)">✗</span>`}</td><td><span class="pill ok">Ready for Release</span></td>
+   <td>${r.ok&&r.ev?`<button class="pri" data-act="release">Release</button>`:`<button class="btn" disabled>Release</button><small>${!r.ok?"Post-test not passed yet":"Evaluation not submitted yet"}</small>`}</td></tr>`).join("")}</tbody></table></div></div>
+  <div class="note">Waiting gets a "Post-Test" checklist item and an Email Post-Test Link button, the same as the evaluation.</div>`;}
+function review(){const term=S.q.trim().toLowerCase();const list=COURSES.filter(c=>(!term||`${c.code} ${c.course}`.toLowerCase().includes(term))&&(S.filter==="All"||(S.filter==="Drafted"?DATA[c.key]&&!S.approved.has(c.key):S.filter==="Approved"?S.approved.has(c.key):!DATA[c.key])));
+  const c=COURSES.find(x=>x.key===S.review),qs=DATA[S.review]||[];
+  return `<div class="head"><div><span class="eyebrow">Admin › Configuration › Courses › Post-Test</span><h1>Review Questions</h1></div></div>
+  <div class="note warn">Draft questions written from each certificate's course description. An instructor checks each course, edits anything wrong, then approves. A course's post-test goes live only after it is approved. Until then, its certificates release without a post-test.</div>
+  <div class="grid2"><div class="panel"><div class="ph"><div class="tools"><input id="q" placeholder="Search course" value="${esc(S.q)}" aria-label="Search courses"><select id="f">${["All","Drafted","Approved","Not drafted"].map(x=>`<option ${S.filter===x?"selected":""}>${x}</option>`).join("")}</select></div></div>
+   <div class="clist">${list.map(x=>`<button class="${x.key===S.review?"on":""}" data-rev="${esc(x.key)}"><b>${esc(x.code)}</b> · ${esc(x.course)}<small>${S.approved.has(x.key)?"✓ Approved":DATA[x.key]?"10 questions · to review":"Drafting…"}</small></button>`).join("")}</div></div>
+  <div class="panel"><div class="ph"><div><h2>${esc(c.code)} · ${esc(c.course)}</h2><small>${qs.length?`${qs.length} questions · passing score ${PASS}%`:"Questions are still being drafted"}</small></div>${qs.length?(S.approved.has(c.key)?`<span class="pill ok">Approved · Live</span>`:`<button class="pri" data-act="approve">Approve Questions</button>`):""}</div>
+   ${qs.map((q,i)=>`<div class="rq"><b>${i+1}. ${esc(q.q)}</b><ol type="A">${q.options.map((o,k)=>`<li class="${k===q.answer?"c":""}">${esc(o)}${k===q.answer?" ✓":""}</li>`).join("")}</ol><div class="why">Why: ${esc(q.why)}</div><button class="btn" style="margin-top:6px">Edit</button></div>`).join("")}
+  </div></div>`;}
+document.addEventListener("click",e=>{const t=e.target.closest("[data-view],[data-act],[data-rev]");if(!t)return;
+ if(t.dataset.view)S.view=t.dataset.view;else if(t.dataset.rev)S.review=t.dataset.rev;else{const a=t.dataset.act;const qs=DATA[S.course];
+  if(a==="submit"){const score=qs.reduce((s,q,i)=>s+(S.answers[i]===q.answer?1:0),0);const pct=Math.round(score/qs.length*100);S.result={score,pct};S.attempts.push({score,pct});}
+  if(a==="retake"){S.result=null;S.answers={};}
+  if(a==="release")S.releaseMsg="Released. (Prototype.)";
+  if(a==="approve")S.approved.add(S.review);}
+ render();});
+document.addEventListener("change",e=>{if(e.target.dataset.q!==undefined){S.answers[e.target.dataset.q]=Number(e.target.value);render()}
+ if(e.target.id==="pick"){S.course=e.target.value;S.answers={};S.result=null;S.attempts=[];render()}if(e.target.id==="f"){S.filter=e.target.value;render()}});
+document.addEventListener("input",e=>{if(e.target.id==="q"){S.q=e.target.value;const p=e.target.selectionStart;render();const el=document.getElementById("q");el.focus();el.setSelectionRange(p,p)}});
+render();
+</script>

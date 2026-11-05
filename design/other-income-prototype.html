@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Other Income</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Cashier › Accounting › Other Income (owner, 19 Oct 2026): endorsement rebates received from partner centers and any other income. */
+:root{--navy:#123F63;--blue:#0571D0;--orange:#F25615;--cyan:#35CCFA;--bg:#f2f6f9;--surface:#fff;--line:#dbe5ec;--fg:#0f2638;--muted:#5b6f7f;--soft:#eef4f8;--okbg:#e3f4ea;--ok:#0a7a3e;--warnbg:#fde9dd;--warn:#b4480f;--badbg:#fbe4dc;--bad:#b42318;--infobg:#e2effb;--info:#0558a8;--sans:"Geist",system-ui,sans-serif;--mono:"Geist Mono",ui-monospace,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0c1925;--surface:#122534;--line:#23394b;--fg:#e5eef5;--muted:#98adbf;--soft:#18303f;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c1925;--surface:#122534;--line:#23394b;--fg:#e5eef5;--muted:#98adbf;--soft:#18303f;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding:12px 20px 0}.brand{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.brand b{color:var(--cyan);font-size:18px}.who{font-size:13.5px;color:#c9dceb}.who select{background:transparent;border:1px solid #3d6b90;border-radius:8px;color:#fff;padding:6px 9px}.who option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:12px;flex-wrap:wrap}.tabs span{color:#d4e4f1;padding:10px 16px;border-radius:10px 10px 0 0;font-weight:500}.tabs span.on{background:var(--bg);color:var(--fg)}
+.page{max-width:1240px;margin:0 auto;padding:18px 20px 60px;display:flex;flex-direction:column;gap:14px}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}h1{margin:2px 0 0;font-size:27px}h2{margin:0;font-size:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}.seg button{border:0;background:none;padding:8px 15px;font-weight:600;font-size:13.5px}.seg button.on{background:var(--navy);color:#fff}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:11px 14px}.tile span{display:block;font-size:12.5px;color:var(--muted)}.tile b{font:600 21px var(--mono)}.tile small{display:block;color:var(--muted);font-size:12.5px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 16px;flex-wrap:wrap}.ph small{color:var(--muted)}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--soft);color:var(--muted);font:600 11.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;text-align:left;padding:9px 12px;white-space:nowrap}td{padding:9px 12px;border-top:1px solid var(--line);vertical-align:top;line-height:1.35}td b{white-space:nowrap}td small{display:block;color:var(--muted);font-size:12.5px;white-space:nowrap}th.r,td.r{text-align:right}tr.sel td{background:var(--infobg)}tr.done td{opacity:.65}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}.ok{background:var(--okbg);color:var(--ok)}.warn{background:var(--warnbg);color:var(--warn)}.info{background:var(--infobg);color:var(--info)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:7px 13px;font-weight:500}.pri{background:var(--blue);color:#fff;border:0;border-radius:9px;padding:8px 15px;font-weight:600}.pri:disabled,.btn:disabled{opacity:.5;cursor:default}
+.partner{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 16px;background:var(--soft);border-top:1px solid var(--line);flex-wrap:wrap}.partner b{font-size:15px}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 14px;padding:4px 16px 14px}.form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}.form input,.form select{border:1px solid var(--line);border-radius:9px;padding:7px 10px;background:var(--surface);color:var(--fg)}
+.drop{grid-column:1/-1;border:1px dashed #9fb6c6;border-radius:12px;padding:10px 12px;font-size:13.5px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.drop.okd{border-style:solid;border-color:var(--ok);color:var(--ok)}
+.acts{grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end}
+.msg{border-radius:10px;padding:10px 14px;font-size:14px}.msg.okm{background:var(--okbg);color:var(--ok)}.msg.err{background:var(--badbg);color:var(--bad)}
+.note{background:var(--infobg);color:var(--info);border-radius:10px;padding:10px 14px;font-size:13.5px}
+.sum{padding:10px 16px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center}
+@media (max-width:560px){.page,.top{padding-inline:16px}}
+</style>
+</head>
+<body>
+<div class="top"><div class="brand"><b>NEW WAVE</b><span class="who">Working As <select id="role"><option>Cashier</option><option>Accounting</option></select></span></div><nav class="tabs" id="tabs"></nav></div>
+<main class="page" id="page"></main>
+<script>
+const peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
+const fmt=d=>new Date(d+"T12:00:00+08:00").toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
+let seq=2;
+const S={role:"Cashier",tab:"Endorsement Rebates",sel:new Set(),form:null,income:null,msg:null,
+ rebates:[
+  {id:"r1",partner:"Bluewater Maritime Training Center",trainee:"SANTOS, MIGUEL REYES",tno:"NWM-2026-000004",course:"Ship Security Officer",enr:"ENR-2026-000011",dates:"2026-10-05",due:150000,inc:null},
+  {id:"r2",partner:"Bluewater Maritime Training Center",trainee:"FLORES, KEN SALAZAR",tno:"NWM-2026-000006",course:"Ship Security Officer",enr:"ENR-2026-000012",dates:"2026-10-05",due:150000,inc:null},
+  {id:"r3",partner:"Bluewater Maritime Training Center",trainee:"AQUINO, REY BAUTISTA",tno:"NWM-2026-000009",course:"Advanced Fire Fighting",enr:"ENR-2026-000015",dates:"2026-10-12",due:200000,inc:null},
+  {id:"r4",partner:"Pacific Seafarers Academy",trainee:"MENDOZA, CARLO LIM",tno:"NWM-2026-000010",course:"Medical First Aid",enr:"ENR-2026-000016",dates:"2026-09-28",due:120000,inc:null},
+  {id:"r5",partner:"Pacific Seafarers Academy",trainee:"GARCIA, NOEL ABAD",tno:"NWM-2026-000003",course:"Radar Navigation",enr:"ENR-2026-000007",dates:"2026-09-21",due:180000,inc:"INC-2026-000001"}],
+ log:[
+  {no:"INC-2026-000001",date:"2026-10-02",source:"Endorsement Rebate",payer:"Pacific Seafarers Academy",channel:"UnionBank",ref:"UB-77120034",amt:180000},
+  {no:"INC-2026-000002",date:"2026-10-08",source:"Rental",payer:"Harbor Review Center (Room 102, 1 day)",channel:"Cash",ref:"—",amt:350000}]};
+const due=()=>S.rebates.filter(r=>!r.inc);
+function render(){
+  document.getElementById("tabs").innerHTML=(S.role==="Cashier"?["Dashboard","Enrollments ▾","Accounting ▾"]:["Dashboard","Approvals","Transactions ▾","Reports","Configuration ▾"]).map(t=>`<span class="${t.startsWith(S.role==="Cashier"?"Accounting":"Transactions")?"on":""}">${t}</span>`).join("");
+  const d=due(),month=S.log.filter(l=>l.date.startsWith("2026-10")),oldest=d.map(r=>r.dates).sort()[0];
+  document.getElementById("page").innerHTML=`<div class="head"><div><span class="eyebrow">${S.role==="Cashier"?"Accounting":"Transactions"}</span><h1>Other Income</h1></div>
+   <div class="seg">${["Endorsement Rebates","Other Income"].map(t=>`<button class="${S.tab===t?"on":""}" data-tab="${t}">${t}</button>`).join("")}</div></div>
+  ${S.msg?`<div class="msg ${S.msg.k}">${S.msg.t}</div>`:""}
+  <div class="tiles"><div class="tile"><span>Rebates Due From Partners</span><b>${peso(d.reduce((s,r)=>s+r.due,0))}</b><small>${d.length} endorsed trainee${d.length===1?"":"s"}</small></div>
+   <div class="tile"><span>Other Income This Month</span><b>${peso(month.reduce((s,l)=>s+l.amt,0))}</b><small>${month.length} receipt${month.length===1?"":"s"}</small></div>
+   <div class="tile"><span>Oldest Rebate Due</span><b style="font-size:17px">${oldest?fmt(oldest):"—"}</b><small>${oldest?"training date":"nothing due"}</small></div></div>
+  ${S.tab==="Endorsement Rebates"?rebatesView():incomeView()}
+  ${S.role==="Accounting"?`<div class="note">Accounting sees this view only. Other income appears as its own line in the Daily Summary Report and the dashboard collections, apart from trainee fees.</div>`:`<div class="note">Rebates are what partner centers pay New Wave for trainees endorsed to them, from each endorsed course's rebate in Configuration › Endorsed Rates. Every receipt gets an income number and a proof photo in Google Drive, and appears in the Daily Summary Report under Other Income.</div>`}`;
+}
+function rebatesView(){
+  const partners=[...new Set(S.rebates.map(r=>r.partner))];const cash=S.role==="Cashier";
+  const selTotal=S.rebates.filter(r=>S.sel.has(r.id)).reduce((s,r)=>s+r.due,0);const selPartner=[...new Set(S.rebates.filter(r=>S.sel.has(r.id)).map(r=>r.partner))];
+  return `<section class="panel"><div class="ph"><h2>Endorsement Rebates</h2><small>${cash?"Tick the trainees the partner paid for, then Record Received":"View only"}</small></div>
+   ${partners.map(p=>{const rows=S.rebates.filter(r=>r.partner===p);const pd=rows.filter(r=>!r.inc);return `<div class="partner"><b>${p}</b><span class="mono">${pd.length?`${peso(pd.reduce((s,r)=>s+r.due,0))} due · ${pd.length}`:"All received"}</span></div>
+    <div class="wrap"><table><thead><tr>${cash?"<th></th>":""}<th>Trainee</th><th>Course</th><th>Training Date</th><th class="r">Rebate</th><th>Status</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr class="${S.sel.has(r.id)?"sel":""} ${r.inc?"done":""}">${cash?`<td>${r.inc?"":`<input type="checkbox" data-pick="${r.id}" ${S.sel.has(r.id)?"checked":""} aria-label="Select ${r.trainee}">`}</td>`:""}<td><b>${r.trainee}</b><small class="mono">${r.tno} · ${r.enr}</small></td><td>${r.course}</td><td style="white-space:nowrap">${fmt(r.dates)}</td><td class="r mono"><b>${peso(r.due)}</b></td><td>${r.inc?`<span class="pill ok">Received</span><small class="mono">${r.inc}</small>`:`<span class="pill warn">Due</span>`}</td></tr>`).join("")}
+    </tbody></table></div>`}).join("")}
+   ${cash?`<div class="sum"><span>${S.sel.size?`${S.sel.size} selected · <b class="mono">${peso(selTotal)}</b>${selPartner.length>1?` · <span style="color:var(--bad)">choose one partner at a time</span>`:""}`:"Nothing selected"}</span><button class="pri" data-receive="1" ${!S.sel.size||selPartner.length>1?"disabled":""}>Record Received</button></div>`:""}
+   ${S.form?formView(true,selPartner[0],selTotal):""}</section>`;
+}
+function formView(rebate,partner,total){const f=rebate?S.form:S.income;return `<div class="ph" style="border-top:1px solid var(--line)"><h2>${rebate?`Record Rebate Received · ${partner}`:"Record Income"}</h2></div><div class="form">
+  ${rebate?"":`<label>Source<select data-f="source">${["Rental","Sale of Items","Refund from Supplier","Interest","Others"].map(o=>`<option ${f.source===o?"selected":""}>${o}</option>`).join("")}</select></label><label>Received From<input data-f="payer" value="${f.payer}" placeholder="e.g. Harbor Review Center"></label>`}
+  <label>Amount Received (PHP)<input data-f="amount" class="mono" value="${f.amount}" inputmode="decimal"></label>
+  <label>Channel<select data-f="channel">${["Cash","GCash","PSBank","UnionBank","Check"].map(o=>`<option ${f.channel===o?"selected":""}>${o}</option>`).join("")}</select></label>
+  <label>Reference No.<input data-f="ref" class="mono" value="${f.ref}" placeholder="${f.channel==="Cash"?"Not needed for cash":"Required"}"></label>
+  <label>Date Received<input data-f="date" type="date" value="${f.date}"></label>
+  <div class="drop ${f.proof?"okd":""}">${f.proof?`✓ ${f.proof} · saved to Google Drive`:"Proof Photo (Required): deposit slip, transfer screenshot or official receipt"}<button class="btn" data-proof="1">${f.proof?"Replace":"Attach Photo"}</button></div>
+  ${rebate&&Math.round(parseFloat(f.amount||0)*100)!==total?`<p style="grid-column:1/-1;margin:0;color:var(--warn);font-size:13px">The amount differs from the ${peso(total)} due; the difference is noted on the income record.</p>`:""}
+  <div class="acts"><button class="btn" data-cancel="1">Cancel</button><button class="pri" data-save="${rebate?"rebate":"income"}">Save · Issue Income No.</button></div></div>`}
+function incomeView(){const cash=S.role==="Cashier";return `<section class="panel"><div class="ph"><h2>Other Income</h2>${cash&&!S.income?`<button class="pri" data-newincome="1">Record Income</button>`:"<small>All income received outside trainee fees</small>"}</div>
+  ${S.income?formView(false):""}
+  <div class="wrap"><table><thead><tr><th>Income No.</th><th>Date</th><th>Source</th><th>Received From</th><th>Channel</th><th class="r">Amount</th></tr></thead><tbody>
+  ${S.log.slice().reverse().map(l=>`<tr><td class="mono"><b>${l.no}</b></td><td style="white-space:nowrap">${fmt(l.date)}</td><td><span class="pill ${l.source==="Endorsement Rebate"?"info":"ok"}">${l.source}</span></td><td>${l.payer}</td><td>${l.channel}<small class="mono">${l.ref}</small></td><td class="r mono"><b>${peso(l.amt)}</b></td></tr>`).join("")}
+  </tbody></table></div></section>`}
+const blank=(amt)=>({source:"Rental",payer:"",amount:amt?(amt/100).toFixed(2):"",channel:"UnionBank",ref:"",date:"2026-10-19",proof:""});
+function capture(){const t=S.form||S.income;if(!t)return;document.querySelectorAll("[data-f]").forEach(i=>t[i.dataset.f]=i.value)}
+document.addEventListener("click",e=>{const b=e.target.closest("button,input[type=checkbox]");if(!b)return;const d=b.dataset;capture();
+ if(d.tab){S.tab=d.tab;S.form=null;S.income=null;S.msg=null}
+ else if(d.pick){S.sel.has(d.pick)?S.sel.delete(d.pick):S.sel.add(d.pick);S.form=null;S.msg=null}
+ else if(d.receive){S.form=blank(S.rebates.filter(r=>S.sel.has(r.id)).reduce((s,r)=>s+r.due,0))}
+ else if(d.newincome){S.income=blank(0);S.income.channel="Cash";S.msg=null}
+ else if(d.cancel){S.form=null;S.income=null}
+ else if(d.proof){(S.form||S.income).proof="deposit-slip-"+String(seq+1).padStart(3,"0")+".jpg"}
+ else if(d.save){const f=d.save==="rebate"?S.form:S.income;const amt=Math.round(parseFloat(f.amount||0)*100);
+  const err=!amt?"Enter the amount received.":f.channel!=="Cash"&&!f.ref.trim()?"Enter the reference number.":!f.proof?"Attach the proof photo.":d.save==="income"&&!f.payer.trim()?"Enter who paid.":"";
+  if(err){S.msg={k:"err",t:err}}else{const no=`INC-2026-${String(++seq).padStart(6,"0")}`;
+   if(d.save==="rebate"){const rows=S.rebates.filter(r=>S.sel.has(r.id));rows.forEach(r=>r.inc=no);S.log.push({no,date:f.date,source:"Endorsement Rebate",payer:rows[0].partner,channel:f.channel,ref:f.ref||"—",amt});S.sel.clear();S.form=null;S.msg={k:"okm",t:`${no} recorded: ${peso(amt)} from ${rows[0].partner} for ${rows.length} trainee${rows.length===1?"":"s"}.`}}
+   else{S.log.push({no,date:f.date,source:f.source,payer:f.payer,channel:f.channel,ref:f.ref||"—",amt});S.income=null;S.msg={k:"okm",t:`${no} recorded: ${peso(amt)} ${f.source.toLowerCase()} from ${f.payer}.`}}}}
+ else return;render()});
+document.addEventListener("change",e=>{if(e.target.id==="role"){S.role=e.target.value;S.form=null;S.income=null;S.sel.clear();render()}else if(e.target.dataset.f==="channel"){capture();render()}});
+render();
+</script>
+</body>
+</html>

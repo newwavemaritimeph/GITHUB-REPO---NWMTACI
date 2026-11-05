@@ -1,0 +1,106 @@
+<title>Certificate How-To</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: a step rail on the left drives a mock of the real Releasing Officer screen on the right; the highlighted control is what to click next. */
+:root{--blue:#0571D0;--cyan:#35CCFA;--orange:#F25615;--navy:#123F63;--bg:#f1f6f9;--surface:#fff;--line:#d8e4ec;--fg:#0f2638;--muted:#58707f;--soft:#eaf6fa;--th:#e3f6fb;--okbg:#e3f4ea;--ok:#0a7a3e;--warnbg:#fde9dd;--warn:#b4480f;--infobg:#e2effc;--info:#0b5cad;--sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0b1824;--surface:#112434;--line:#24394b;--fg:#e4eef5;--muted:#9ab0c1;--soft:#152d3d;--th:#173447;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:linear-gradient(100deg,#0571D0,#1c9be3 60%,#35CCFA);color:#fff;padding-block:12px 0;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.brand{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center}.brand b{letter-spacing:.04em}.brand span{font-size:13px;opacity:.9}
+.tasks{display:flex;gap:4px;margin-top:10px;flex-wrap:wrap}.tasks button{border:0;background:none;color:#fff;padding:9px 14px;border-radius:10px 10px 0 0;font-weight:500}.tasks button.on{background:var(--bg);color:var(--fg);box-shadow:inset 0 3px 0 var(--orange)}
+.page{max-width:1200px;margin:0 auto;padding-block:18px 60px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;grid-template-columns:minmax(250px,320px) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:860px){.page{grid-template-columns:1fr}}
+.rail{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;flex-direction:column;gap:10px;position:sticky;top:max(12px,env(safe-area-inset-top,0px))}
+.rail h2{margin:0;font-size:17px;text-wrap:balance}.rail p{margin:0;font-size:13.5px;color:var(--muted)}
+.steps{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.steps li button{width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 10px;display:flex;gap:10px;align-items:flex-start;font-size:13.5px}
+.steps li button.on{border-color:var(--orange);background:var(--warnbg)}.steps li button.done{opacity:.75}
+.steps .n{flex:none;width:22px;height:22px;border-radius:50%;background:var(--navy);color:#fff;display:grid;place-items:center;font:600 12px var(--mono)}.steps li button.done .n{background:var(--ok)}
+.nav{display:flex;gap:8px;justify-content:space-between}.nav button{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:7px 12px;font-weight:600}.nav .go{background:var(--orange);color:#fff;border:0}
+.rule{font-size:12.5px;background:var(--infobg);color:var(--info);border-radius:9px;padding:8px 10px}
+.screen{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;min-width:0}
+.pbar{background:#123F63;color:#fff;padding:8px 14px;display:flex;gap:4px;flex-wrap:wrap;font-size:13.5px}.pbar span{padding:5px 10px;border-radius:7px;opacity:.85}.pbar span.on{background:rgba(255,255,255,.15);opacity:1;box-shadow:inset 0 -2px 0 var(--orange)}
+.body{padding:14px;display:flex;flex-direction:column;gap:12px}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}h3{margin:0;font-size:20px}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;font-size:13.5px}th{background:var(--th);color:var(--muted);font:600 11px var(--sans);letter-spacing:.07em;text-transform:uppercase;text-align:left;padding:7px 10px;white-space:nowrap}td{padding:7px 10px;border-top:1px solid var(--line);vertical-align:middle}td small{display:block;color:var(--muted);font-size:12px}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}.ok{background:var(--okbg);color:var(--ok)}.warn{background:var(--warnbg);color:var(--warn)}.info{background:var(--infobg);color:var(--info)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 10px;font-weight:500;font-size:13px}.pri{background:var(--orange);color:#fff;border:0;border-radius:8px;padding:6px 12px;font-weight:600;font-size:13px}
+.hl{outline:3px solid var(--orange);outline-offset:2px;border-radius:8px;animation:pulse 1.4s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.hl{animation:none}}
+@keyframes pulse{50%{outline-color:rgba(242,86,21,.35)}}
+.tip{background:var(--warnbg);color:var(--warn);border-radius:9px;padding:8px 12px;font-size:13.5px;font-weight:500}
+.modal{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--surface);box-shadow:0 10px 30px rgba(18,63,99,.15);max-width:520px;display:flex;flex-direction:column;gap:10px}
+.modal h4{margin:0;font-size:16px}
+.photo{width:120px;height:120px;border-radius:6px;background:linear-gradient(160deg,#fff,#e9eef2);border:1px solid var(--line);display:grid;place-items:center;font-weight:700;color:#7a8a97}
+.photo.big{width:160px;height:120px;background:linear-gradient(160deg,#cfd9e0,#9fb0bd)}
+.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}.field input{border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--surface);color:var(--fg)}
+.cert{border:1px solid var(--line);border-radius:6px;padding:16px;text-align:center;background:#fff;color:#111;font-family:Georgia,serif;max-width:420px}.cert b{font-family:var(--sans)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+</style>
+
+<div class="top"><div class="brand"><b>NEW WAVE · HOW-TO</b><span>Releasing Officer · click through each step · sample data</span></div><nav class="tasks" id="tasks"></nav></div>
+<main class="page"><aside class="rail" id="rail"></aside><section class="screen" id="screen"></section></main>
+
+<script>
+const TASKS={
+ photo:{label:"1 · Upload the 2x2 Photo",intro:"Every certificate needs the trainee's 2x2 photo before it can print. Do this first.",rule:"White background, white polo with collar. The portal crops it square, resizes it and checks the background for you.",steps:[
+  ["Open Releasing Officer › Certificates (or Waiting)","menu"],["Find the trainee and click Upload Photo","upload"],["Choose the photo from your phone or computer","pick"],["Check the result, tick the box, click Save","save"],["Done: the Photo column shows ✓ On File","done"]]},
+ number:{label:"2 · Set the Certificate Number",intro:"Certificate numbers continue from the last number you already used on paper, per course. You set it once; the portal does the rest.",rule:"The number is given automatically at the first Preview, in order. The Registration No. (NWMTC…) is fully automatic. Only the Admin can change a number after it is given.",steps:[
+  ["Open Releasing Officer › Numbering","menu"],["Find the course (search by name or code)","find"],["Type the last Certificate No. already used","type"],["Click Save: the next certificate number shows","save"],["The Admin changes an issued number in Certifications › Certificate Controls","admin"]]},
+ print:{label:"3 · Print the Certificate",intro:"A certificate is Due once the training ended, the fee is paid and the photo is on file. Preview first, then Print.",rule:"Preview never counts. Print works once; a reprint needs a paid Reprinting request or an Admin-approved void. Release needs the post-test passed and the evaluation in.",steps:[
+  ["Open Releasing Officer › Certificates","menu"],["Click Due in Status to see what is ready","filter"],["Click Preview to check the certificate","preview"],["Click Print, then print on the certificate paper","printit"],["Release it when the trainee claims it","release"]]},
+};
+let task="photo",step=0;
+function tasksBar(){document.getElementById("tasks").innerHTML=Object.entries(TASKS).map(([k,t])=>`<button class="${k===task?"on":""}" data-task="${k}">${t.label}</button>`).join("")}
+function rail(){const t=TASKS[task];document.getElementById("rail").innerHTML=`<h2>${t.label.replace(/^\d · /,"")}</h2><p>${t.intro}</p>
+ <ol class="steps">${t.steps.map(([s],i)=>`<li><button class="${i===step?"on":i<step?"done":""}" data-step="${i}"><span class="n">${i<step?"✓":i+1}</span><span>${s}</span></button></li>`).join("")}</ol>
+ <div class="nav"><button data-move="-1" ${step===0?"disabled":""}>Back</button><button class="go" data-move="1">${step===t.steps.length-1?(task==="print"?"Start Over":"Next Task"):"Next Step"}</button></div><div class="rule">${t.rule}</div>`}
+const tabs=on=>`<div class="pbar">${["Dashboard","Certificates","Waiting","Numbering","Released","Delivery"].map(x=>`<span class="${x===on?"on":""}${(x===on&&step===0)?" hl":""}">${x}</span>`).join("")}</div>`;
+const H=(cond)=>cond?"hl":"";
+function screen(){const s=TASKS[task].steps[step][1];let html="";
+ if(task==="photo"){
+  const tableRow=(photoCell)=>`<div class="wrap"><table><thead><tr><th>#</th><th>Trainee</th><th>Course</th><th>Paid</th><th>Photo</th><th>Status</th></tr></thead><tbody>
+   <tr><td class="mono">1</td><td><b>DELA CRUZ, Juan Miguel</b></td><td>ECDIS</td><td style="color:var(--ok)">✓</td><td>${photoCell}</td><td>${s==="done"?`<span class="pill info">Due</span>`:`<span class="pill warn">Photo needed</span>`}</td></tr>
+   <tr><td class="mono">2</td><td><b>REYES, Maria Clara</b></td><td>ABC</td><td style="color:var(--ok)">✓</td><td><span class="pill ok">✓ On File</span></td><td><span class="pill info">Due</span></td></tr></tbody></table></div>`;
+  html=tabs("Certificates")+`<div class="body"><span class="eyebrow">Releasing Officer</span><h3>Certificates</h3>`;
+  if(s==="menu")html+=`<div class="tip">Click Certificates in the top bar. Waiting also has the Upload Photo button.</div>`+tableRow(`<button class="btn">Upload Photo</button>`);
+  if(s==="upload")html+=`<div class="tip">In the Photo column, click Upload Photo on the trainee's row.</div>`+tableRow(`<button class="btn hl">Upload Photo</button>`);
+  if(s==="pick")html+=`<div class="modal"><h4>2x2 Photo · DELA CRUZ, Juan Miguel</h4><div class="row"><div class="photo big">📷</div><div style="font-size:13.5px">Choose a JPEG, PNG or WebP photo (up to 20 MB). On a phone you can take the photo directly.</div></div><button class="pri hl" style="align-self:flex-start">Choose Photo</button></div>`;
+  if(s==="save")html+=`<div class="modal"><h4>2x2 Photo · DELA CRUZ, Juan Miguel</h4><div class="row"><div class="photo">JD</div><div style="font-size:13px"><b>Resized</b> from 4032 × 3024 · 3.2 MB to 600 × 600 · 180 KB<br><span style="color:var(--ok);font-weight:600">✓ White background</span><br>File name: <span class="mono">DELA CRUZ, JUAN M - ECDIS - BCH-2026-0412 - 2026-10-16.jpg</span></div></div>
+   <label class="row hl" style="font-size:13.5px;padding:6px"><input type="checkbox" checked> White background and white polo with collar</label><div class="row"><button class="btn">Cancel</button><button class="pri hl">Save Photo</button></div></div>`;
+  if(s==="done")html+=`<div class="tip">Saved. The photo prints inside the 2x2 box. To replace it later, use Corrections and Photos at the bottom of Certificates.</div>`+tableRow(`<span class="pill ok hl">✓ On File</span>`);
+  html+=`</div>`;}
+ if(task==="number"){
+  const row=(last,next,hl)=>`<div class="wrap"><table><thead><tr><th>Course</th><th>Prefix</th><th>Last No. Used</th><th>Digits</th><th>Next Certificate</th><th></th></tr></thead><tbody>
+   <tr class="${hl==="find"?"hl":""}"><td><b>Hydraulic and Pneumatic Training</b><small>HPT · ${last?"Set Oct 20, 2026":"Not set yet"}</small></td><td><span class="field"><input value="HPT-" style="width:70px"></span></td><td><span class="field"><input class="mono ${hl==="type"?"hl":""}" value="${last}" placeholder="e.g. 149" style="width:90px"></span></td><td><span class="field"><input value="5" style="width:50px"></span></td><td class="mono ${hl==="save"?"hl":""}"><b>${next}</b></td><td><button class="pri ${hl==="save"?"hl":""}">Save</button></td></tr>
+   <tr><td><b>Awareness on Basic Computer</b><small>ABC · Set Oct 18, 2026</small></td><td>ABC-</td><td class="mono">41</td><td>5</td><td class="mono">ABC-00042</td><td><button class="btn">Save</button></td></tr></tbody></table></div>`;
+  if(s==="admin"){html=`<div class="pbar"><span>Dashboard</span><span class="on">Configuration ▾ Certifications</span><span>Requests</span></div><div class="body"><span class="eyebrow">Admin</span><h3>Certificate Controls › Change a Certificate Number</h3><div class="tip">Only the Admin changes a number already given, with a reason. It is recorded in the audit log.</div>
+   <div class="modal"><span class="field">Search<input value="DELA CRUZ"></span><div style="font-size:13.5px"><b>DELA CRUZ, Juan Miguel</b> · ECDIS · current <span class="mono">ECDIS-00150</span></div><span class="field">New Certificate No.<input class="mono hl" value="ECDIS-00151"></span><span class="field">Reason<input value="Typed wrongly on the paper log"></span><button class="pri" style="align-self:flex-start">Change Number</button></div></div>`;}
+  else{html=tabs("Numbering")+`<div class="body"><span class="eyebrow">Releasing Officer</span><h3>Numbering</h3>`;
+   if(s==="menu")html+=`<div class="tip">Click Numbering in the top bar.</div>`+row("","HPT-00001","");
+   if(s==="find")html+=`<div class="row"><span class="field" style="flex:1">Search<input class="hl" value="HPT"></span></div>`+row("","HPT-00001","find");
+   if(s==="type")html+=`<div class="tip">Type the last number you already used on paper, e.g. 149. Leave it blank to start at 1.</div>`+row("149","HPT-00150","type");
+   if(s==="save")html+=`<div class="tip">Click Save. The next HPT certificate is HPT-00150, and the portal keeps counting from there.</div>`+row("149","HPT-00150","save");
+   html+=`</div>`;}}
+ if(task==="print"){
+  const tbl=(hl)=>`<div class="wrap"><table><thead><tr><th>#</th><th>Trainee</th><th>Course</th><th>Certificate No.</th><th>Paid</th><th>Post-Test</th><th>Eval.</th><th>Photo</th><th>Status</th><th>Action</th></tr></thead><tbody>
+   <tr><td class="mono">1</td><td><b>DELA CRUZ, Juan Miguel</b></td><td>ECDIS</td><td class="mono">${hl==="release"||hl==="printit"?"ECDIS-00150":"—"}</td><td style="color:var(--ok)">✓</td><td><span class="pill ok">Passed</span><small>9/10</small></td><td style="color:var(--ok)">✓ PDF</td><td><span class="pill ok">✓ On File</span></td><td>${hl==="release"?`<span class="pill ok">Ready for Release</span>`:`<span class="pill info">Due</span>`}</td>
+    <td><span class="row" style="gap:6px">${hl==="release"?`<button class="pri hl">Release</button>`:`<button class="btn ${hl==="preview"?"hl":""}">Preview</button><button class="pri ${hl==="printit"?"hl":""}">Print</button>`}</span></td></tr></tbody></table></div>`;
+  html=tabs("Certificates")+`<div class="body"><span class="eyebrow">Releasing Officer</span><h3>Certificates</h3>`;
+  if(s==="menu")html+=`<div class="tip">Click Certificates in the top bar.</div>`+tbl("");
+  if(s==="filter")html+=`<div class="row"><button class="btn hl">Due <b>3</b></button><button class="btn">Waiting for photo <b>1</b></button><button class="btn">Printed <b>12</b></button></div>`+tbl("");
+  if(s==="preview")html+=`<div class="tip">Preview opens the certificate in a new tab, marked PREVIEW. It gives the Certificate No. and never uses up the print.</div>`+tbl("preview")+`<div class="cert"><b style="color:#b42318;opacity:.35">PREVIEW - NOT FOR RELEASE</b><h4 style="margin:6px 0">CERTIFICATE OF COMPLETION</h4>is issued to<br><b style="font-size:18px">JUAN MIGUEL P. DELA CRUZ</b><br>Operational Use of ECDIS<br><small>Certificate No. ECDIS-00150 · QR · 2x2 photo</small></div>`;
+  if(s==="printit")html+=`<div class="tip">Click Print. The certificate opens without the watermark; print it on the certificate paper (A4, actual size). It counts as the one print.</div>`+tbl("printit");
+  if(s==="release")html+=`<div class="tip">When the trainee claims it, click Release (in the ▾ menu on the row, or under Released). Enter who received it, check the ID and type the Hologram Sticker No. Release needs the post-test passed and the evaluation in.</div>`+tbl("release");
+  html+=`</div>`;}
+ document.getElementById("screen").innerHTML=html;}
+function render(){tasksBar();rail();screen()}
+document.addEventListener("click",e=>{const t=e.target.closest("[data-task],[data-step],[data-move]");if(!t)return;
+ if(t.dataset.task){task=t.dataset.task;step=0}else if(t.dataset.step)step=Number(t.dataset.step);
+ else{const n=TASKS[task].steps.length,m=Number(t.dataset.move);if(m>0&&step===n-1){const keys=Object.keys(TASKS);task=keys[(keys.indexOf(task)+1)%keys.length];step=0}else step=Math.max(0,Math.min(n-1,step+m))}
+ render()});
+render();
+</script>

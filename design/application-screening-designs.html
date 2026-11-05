@@ -1,0 +1,270 @@
+<title>Application Screening Designs</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&display=swap">
+<style>
+/* Layout: five full-width mock-ups of the Registration "Application" window, stacked; applicant first in every one. */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA; --gold:#9a7b2f;
+  --desk:#e8eef2; --paper:#fff; --ink:#13283a; --muted:#5d6f7e; --rule:#cfdbe3; --hair:#e6edf2; --tint:#f3f7fa;
+  --good:#0a7a3e; --good-bg:#e3f4ea; --warn:#a2470b; --warn-bg:#fdf0e5; --bad:#b42318; --bad-bg:#fcebea;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace; --serif:"Source Serif 4",Georgia,serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--desk:#0d1822;color-scheme:dark}}
+:root[data-theme="dark"]{--desk:#0d1822;color-scheme:dark}
+body{background:var(--desk);font-family:var(--sans);color:var(--ink)}
+.wrap{max-width:1040px;margin:0 auto;padding-inline:16px;padding-block:32px 72px;display:grid;gap:44px}
+.intro h1{font:600 30px var(--serif);color:var(--navy);margin:0}
+.intro p{color:var(--muted);max-width:68ch;margin:8px 0 0;line-height:1.55}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .intro h1,:root:not([data-theme="light"]) .intro p,:root:not([data-theme="light"]) .lab b,:root:not([data-theme="light"]) .lab span{color:#dbe8f2}}
+:root[data-theme="dark"] .intro h1,:root[data-theme="dark"] .intro p,:root[data-theme="dark"] .lab b,:root[data-theme="dark"] .lab span{color:#dbe8f2}
+.lab{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+.lab b{font:600 19px var(--sans);color:var(--navy)}.lab span{color:var(--muted);font-size:15px}
+.modal{background:var(--paper);color:var(--ink);border-radius:14px;box-shadow:0 2px 4px rgba(0,0,0,.06),0 18px 44px rgba(18,63,99,.16);overflow:hidden}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.cap{font:600 11.5px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.btn{font:600 15px var(--sans);border-radius:9px;padding:9px 14px;border:1px solid var(--rule);background:#fff;color:var(--ink);cursor:pointer;white-space:nowrap}
+.btn.p{background:var(--navy);border-color:var(--navy);color:#fff}.btn.o{background:var(--orange);border-color:var(--orange);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,input:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.chip{display:inline-block;font:600 12.5px var(--sans);padding:3px 10px;border-radius:999px;white-space:nowrap}
+.c-warn{background:var(--warn-bg);color:var(--warn)}.c-good{background:var(--good-bg);color:var(--good)}.c-bad{background:var(--bad-bg);color:var(--bad)}.c-info{background:#e5f1fb;color:var(--blue)}
+.x{background:none;border:0;font-size:22px;color:var(--muted);cursor:pointer;line-height:1}
+.seal{width:40px;height:40px;border-radius:50%;border:2px solid var(--gold);display:grid;place-items:center;font:700 11px var(--serif);color:var(--gold);flex:none}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+.tw{overflow-x:auto}
+input[type=checkbox]{width:20px;height:20px;accent-color:var(--good);margin:0}
+input[type=text]{font:400 15px var(--sans);border:1px solid var(--rule);border-radius:8px;padding:8px 10px;width:100%;min-width:0;background:#fff;color:var(--ink)}
+.foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 22px;border-top:1px solid var(--rule);background:var(--tint)}
+.foot small{color:var(--muted)}
+
+/* 1 · Screening sheet (form) */
+.d1 .band{display:flex;align-items:center;gap:12px;padding:16px 22px;border-bottom:3px double var(--navy)}
+.d1 .band h2{font:600 19px var(--serif);color:var(--navy);margin:0}
+.d1 .band small{color:var(--muted)}
+.d1 .band .right{margin-left:auto;text-align:right}
+.d1 .band .right b{display:block;font:600 16px var(--mono);color:var(--navy)}
+.d1 .info{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-bottom:1px solid var(--rule)}
+.d1 .info div{padding:12px 16px;border-right:1px solid var(--hair);min-width:0}
+.d1 .info div:last-child{border-right:0}
+.d1 .info b{display:block;font-weight:600;font-size:14.5px;margin-top:2px;overflow-wrap:anywhere}
+.d1 .info .w2{grid-column:span 2}
+.d1 .body{padding:16px 22px;display:grid;gap:14px}
+.d1 h3{font:600 15px var(--serif);color:var(--navy);margin:0;padding-bottom:6px;border-bottom:2px solid var(--navy);display:flex;justify-content:space-between}
+.d1 th{text-align:left;font:600 11.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--navy);background:var(--tint);padding:9px 12px;border-bottom:1px solid var(--rule)}
+.d1 td{padding:10px 12px;border-bottom:1px solid var(--hair);vertical-align:middle}
+.d1 td.c{width:44px;text-align:center}
+.d1 .pay{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border:1px solid var(--rule);border-radius:8px;overflow:hidden}
+.d1 .pay div{padding:10px 14px;border-right:1px solid var(--hair)}
+.d1 .pay div:last-child{border-right:0;background:var(--good-bg)}
+.d1 .pay b{display:block;font:600 17px var(--mono)}
+
+/* 2 · Two panels */
+.d2 .hd{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:1px solid var(--rule)}
+.d2 .hd h2{font:600 20px var(--serif);color:var(--navy);margin:0}
+.d2 .cols{display:grid;grid-template-columns:330px 1fr}
+.d2 aside{background:var(--tint);border-right:1px solid var(--rule);padding:20px 22px;display:grid;gap:16px;align-content:start}
+.d2 aside h3{font:600 22px var(--serif);color:var(--navy);margin:2px 0 0}
+.d2 dl{margin:0;display:grid;gap:10px}
+.d2 dt{font:600 11px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.d2 dd{margin:1px 0 0;font-weight:600;font-size:14.5px;overflow-wrap:anywhere}
+.d2 .money{background:#fff;border:1px solid var(--rule);border-radius:10px;padding:12px 14px;display:grid;gap:6px}
+.d2 .money div{display:flex;justify-content:space-between;font-size:14.5px}
+.d2 .money b{font-family:var(--mono)}
+.d2 main{padding:20px 22px;display:grid;gap:14px;align-content:start}
+.d2 .prog{display:flex;align-items:center;gap:14px}
+.d2 .ring{width:64px;height:64px;flex:none}
+.d2 .ring text{font:700 15px var(--mono);fill:var(--navy)}
+.d2 .req{display:grid;grid-template-columns:28px 1fr auto;gap:12px;align-items:center;padding:12px 14px;border:1px solid var(--rule);border-radius:10px}
+.d2 .req.ok{border-color:#b9e2c9;background:var(--good-bg)}
+.d2 .req small{display:block;color:var(--muted);font-size:13.5px}
+
+/* 3 · Stepper first, card grid */
+.d3 .hd{padding:18px 22px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.d3 .hd h2{font:600 22px var(--serif);color:var(--navy);margin:0}
+.d3 .hd p{margin:4px 0 0;color:var(--muted);font-size:14.5px}
+.d3 .steps{display:grid;grid-template-columns:repeat(3,1fr);margin:16px 22px 0;border:1px solid var(--rule);border-radius:12px;overflow:hidden}
+.d3 .step{padding:12px 16px;display:flex;gap:10px;align-items:center;border-right:1px solid var(--rule);background:#fff}
+.d3 .step:last-child{border-right:0}
+.d3 .step i{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:700 13px var(--sans);font-style:normal;background:var(--tint);color:var(--muted);border:2px solid var(--rule);flex:none}
+.d3 .step.now{background:#e5f1fb}.d3 .step.now i{background:var(--blue);border-color:var(--blue);color:#fff}
+.d3 .step.done i{background:var(--good);border-color:var(--good);color:#fff}
+.d3 .step b{display:block;font-size:14.5px}.d3 .step small{color:var(--muted);font-size:13px}
+.d3 .body{padding:16px 22px;display:grid;gap:14px}
+.d3 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.d3 .card{border:1px solid var(--rule);border-radius:12px;padding:14px;display:grid;gap:8px;cursor:pointer}
+.d3 .card.ok{border-color:#9fd6b5;background:var(--good-bg)}
+.d3 .card .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.d3 .card b{font-size:15.5px}
+.d3 .card small{color:var(--muted)}
+.d3 .who{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;border:1px solid var(--rule);border-radius:12px;overflow:hidden}
+.d3 .who div{padding:10px 14px;border-right:1px solid var(--hair);min-width:0}.d3 .who div:last-child{border-right:0}
+.d3 .who b{display:block;font-size:14.5px;overflow-wrap:anywhere}
+
+/* 4 · Government-style checklist with remarks */
+.d4 .hd{background:var(--navy);color:#fff;padding:14px 22px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.d4 .hd h2{font:600 18px var(--serif);margin:0}
+.d4 .hd small{color:#b9d6ea}
+.d4 .hd .x{color:#cfe3ef}
+.d4 .stripe{height:4px;background:linear-gradient(90deg,var(--orange) 0 33%,var(--cyan) 33% 66%,var(--blue) 66%)}
+.d4 .ident{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:16px;padding:16px 22px;border-bottom:1px solid var(--rule)}
+.d4 .ident h3{font:600 20px var(--serif);color:var(--navy);margin:2px 0}
+.d4 .ident p{margin:2px 0;color:var(--muted);font-size:14px}
+.d4 .ident b{display:block;font-weight:600}
+.d4 .body{padding:16px 22px}
+.d4 th{text-align:left;font:600 11.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:#fff;background:var(--navy);padding:9px 12px}
+.d4 td{padding:9px 12px;border-bottom:1px solid var(--hair);vertical-align:middle}
+.d4 .rad{display:flex;gap:12px;font-size:14px;white-space:nowrap}
+.d4 .rad label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.d4 .tot td{background:var(--tint);font-weight:700}
+.d4 .ack{display:grid;grid-template-columns:1fr 1fr;gap:24px;padding:18px 22px 6px}
+.d4 .ack div{border-top:1px solid var(--ink);padding-top:6px;font-size:13px;color:var(--muted)}
+
+/* 5 · Summary header + sticky action bar */
+.d5 .hd{padding:18px 22px;display:grid;grid-template-columns:1fr auto;gap:12px;border-bottom:1px solid var(--rule)}
+.d5 .hd .k{font:600 12px var(--sans);letter-spacing:.12em;text-transform:uppercase;color:var(--gold)}
+.d5 .hd h2{font:600 26px var(--serif);color:var(--navy);margin:2px 0}
+.d5 .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.d5 .facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-bottom:1px solid var(--rule)}
+.d5 .facts div{padding:12px 22px;border-right:1px solid var(--hair);min-width:0}.d5 .facts div:last-child{border-right:0}
+.d5 .facts b{display:block;font-size:15px;overflow-wrap:anywhere}
+.d5 .bar{padding:14px 22px 0}
+.d5 .meter{height:10px;background:var(--hair);border-radius:6px;overflow:hidden;margin-top:6px}
+.d5 .meter i{display:block;height:100%;background:var(--good);border-radius:6px}
+.d5 .list{padding:8px 22px 14px}
+.d5 .item{display:grid;grid-template-columns:28px 1fr auto;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--hair)}
+.d5 .item small{display:block;color:var(--muted);font-size:13.5px}
+.d5 .sticky{position:sticky;bottom:0;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 22px;border-top:1px solid var(--rule);background:#fff;box-shadow:0 -8px 20px rgba(18,63,99,.06)}
+
+@media (max-width:820px){
+  .d1 .info,.d1 .pay{grid-template-columns:1fr 1fr}.d1 .info .w2{grid-column:span 2}
+  .d2 .cols{grid-template-columns:1fr}.d2 aside{border-right:0;border-bottom:1px solid var(--rule)}
+  .d3 .steps,.d3 .grid,.d3 .who{grid-template-columns:1fr}.d3 .step{border-right:0;border-bottom:1px solid var(--rule)}
+  .d4 .ident{grid-template-columns:1fr}.d5 .facts{grid-template-columns:1fr 1fr}
+}
+</style>
+
+<div class="wrap">
+  <header class="intro">
+    <h1>Application window · five designs</h1>
+    <p>Registration's screening window, in five formal layouts. In every design the applicant, course and schedule come first, and the requirement ticks, payment and the "Hand to Cashier" button stay in view. Click the boxes to tick requirements. The applicant shown is sample data.</p>
+  </header>
+
+  <section><div class="lab"><b>1 · Screening sheet</b><span>Letterhead, a ruled information strip, a numbered requirements table with who received each item, then the payment row.</span></div>
+    <div class="modal d1" data-req>
+      <div class="band"><div class="seal">NW</div><div><h2>Application screening</h2><small>New Wave Maritime Training and Assessment Center, Inc.</small></div><div class="right"><span class="cap">Application</span><b>NWMTACI-0000007</b></div><button class="x" aria-label="Close">×</button></div>
+      <div class="info">
+        <div class="w2"><span class="cap">Applicant</span><b>DELA CRUZ, Juan P.</b><small style="color:var(--muted)">NWM-2026-000012 · juan.delacruz@example.com · +63 927 558 1824</small></div>
+        <div><span class="cap">Course</span><b>BT-PSSR updating</b><small style="color:var(--muted)">UBT-PSSR · New Wave</small></div>
+        <div><span class="cap">Schedule</span><b>Oct 9, 2026</b><small style="color:var(--muted)">BCH-2026-002473 · In-person</small></div>
+      </div>
+      <div class="body">
+        <h3>Requirements <span class="cap" data-count>0 of 4 received</span></h3>
+        <div class="tw"><table><thead><tr><th class="c">✓</th><th>Requirement</th><th>Status</th><th>Received by</th></tr></thead><tbody>
+          <tr><td class="c"><input type="checkbox" aria-label="Valid ID"></td><td><b>1. Valid ID / passport</b></td><td data-st><span class="chip c-warn">Not received</span></td><td data-by>—</td></tr>
+          <tr><td class="c"><input type="checkbox" aria-label="Medical"></td><td><b>2. Medical certificate (PEME format)</b></td><td data-st><span class="chip c-warn">Not received</span></td><td data-by>—</td></tr>
+          <tr><td class="c"><input type="checkbox" aria-label="Photo"></td><td><b>3. 2x2 photo</b></td><td data-st><span class="chip c-warn">Not received</span></td><td data-by>—</td></tr>
+          <tr><td class="c"><input type="checkbox" aria-label="Seaman's book"></td><td><b>4. Seaman's book / SRN</b></td><td data-st><span class="chip c-warn">Not received</span></td><td data-by>—</td></tr>
+          <tr><td class="c"><input type="checkbox" aria-label="Other" data-opt></td><td><b>5. Other (optional)</b><input type="text" placeholder="What is it? e.g. COP for BT-PSSR" style="margin-top:6px"></td><td><span class="chip c-info">Optional</span></td><td>—</td></tr>
+        </tbody></table></div>
+        <h3>Payment <span class="cap">recorded by the Cashier</span></h3>
+        <div class="pay"><div><span class="cap">Fee</span><b>₱1,300.00</b></div><div><span class="cap">Total due</span><b>₱1,300.00</b></div><div><span class="cap">Balance</span><b>₱0.00</b></div><div><span class="cap">Paid</span><b style="color:var(--good)">₱1,300.00</b></div></div>
+      </div>
+      <div class="foot"><small data-left>Still to tick: all four requirements</small><div style="display:flex;gap:8px"><button class="btn">Request ▾</button><button class="btn o" data-go disabled>Hand to Cashier</button></div></div>
+    </div></section>
+
+  <section><div class="lab"><b>2 · Applicant panel and checklist</b><span>Who and what on the left, with the money; the checklist and its progress on the right.</span></div>
+    <div class="modal d2" data-req>
+      <div class="hd"><h2>Application NWMTACI-0000007</h2><div style="display:flex;gap:8px;align-items:center"><span class="chip c-bad">Paid · requirements missing</span><button class="x" aria-label="Close">×</button></div></div>
+      <div class="cols">
+        <aside>
+          <div><span class="cap">Applicant</span><h3>Juan P. Dela Cruz</h3></div>
+          <dl><div><dt>Trainee no.</dt><dd class="mono">NWM-2026-000012</dd></div><div><dt>Contact</dt><dd>+63 927 558 1824<br>juan.delacruz@example.com</dd></div><div><dt>Course</dt><dd>Updating Training on Basic Training (UBT-PSSR)</dd></div><div><dt>Schedule</dt><dd>Oct 9, 2026 · BCH-2026-002473 · In-person</dd></div><div><dt>Submitted</dt><dd>Oct 7, 2026 · website</dd></div></dl>
+          <div class="money"><span class="cap">Payment</span><div><span>Total due</span><b>₱1,300.00</b></div><div><span>Paid</span><b style="color:var(--good)">₱1,300.00</b></div><div><span>Balance</span><b>₱0.00</b></div></div>
+        </aside>
+        <main>
+          <div class="prog"><svg class="ring" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="26" fill="none" stroke="#e6edf2" stroke-width="7"/><circle data-ring cx="32" cy="32" r="26" fill="none" stroke="#0a7a3e" stroke-width="7" stroke-dasharray="0 164" transform="rotate(-90 32 32)" stroke-linecap="round"/><text x="32" y="37" text-anchor="middle" data-count>0/4</text></svg><div><b style="font-size:17px">Requirements</b><div style="color:var(--muted)">Tick each document as you receive it.</div></div></div>
+          <label class="req"><input type="checkbox"><div><b>Valid ID / passport</b><small data-by>Not received yet</small></div><span></span></label>
+          <label class="req"><input type="checkbox"><div><b>Medical certificate (PEME format)</b><small data-by>Not received yet</small></div><span></span></label>
+          <label class="req"><input type="checkbox"><div><b>2x2 photo</b><small data-by>Not received yet</small></div><span></span></label>
+          <label class="req"><input type="checkbox"><div><b>Seaman's book / SRN</b><small data-by>Not received yet</small></div><span></span></label>
+          <label class="req"><input type="checkbox" data-opt><div><b>Other (optional)</b><small>Anything extra a course needs</small></div><span class="chip c-info">Optional</span></label>
+        </main>
+      </div>
+      <div class="foot"><small data-left>Still to tick: all four requirements</small><div style="display:flex;gap:8px"><button class="btn">Request ▾</button><button class="btn o" data-go disabled>Hand to Cashier</button></div></div>
+    </div></section>
+
+  <section><div class="lab"><b>3 · Steps and requirement cards</b><span>The three steps across the top; the four requirements as large tick cards in a grid; the applicant facts in one row.</span></div>
+    <div class="modal d3" data-req>
+      <div class="hd"><div><h2>Juan P. Dela Cruz</h2><p>Application NWMTACI-0000007 · submitted Oct 7, 2026 on the website</p></div><button class="x" aria-label="Close">×</button></div>
+      <div class="steps"><div class="step now"><i>1</i><div><b>Requirements</b><small data-count>0 of 4</small></div></div><div class="step done"><i>✓</i><div><b>Payment</b><small>₱1,300.00 paid</small></div></div><div class="step"><i>3</i><div><b>Enrolled</b><small>Once all are ticked</small></div></div></div>
+      <div class="body">
+        <div class="who"><div><span class="cap">Course</span><b>BT-PSSR updating</b></div><div><span class="cap">Schedule</span><b>Oct 9, 2026</b></div><div><span class="cap">Batch</span><b class="mono">BCH-2026-002473</b></div><div><span class="cap">Contact</span><b>+63 927 558 1824</b></div></div>
+        <div class="grid">
+          <label class="card"><div class="top"><b>Valid ID / passport</b><input type="checkbox"></div><small data-by>Not received yet</small></label>
+          <label class="card"><div class="top"><b>Medical (PEME format)</b><input type="checkbox"></div><small data-by>Not received yet</small></label>
+          <label class="card"><div class="top"><b>2x2 photo</b><input type="checkbox"></div><small data-by>Not received yet</small></label>
+          <label class="card"><div class="top"><b>Seaman's book / SRN</b><input type="checkbox"></div><small data-by>Not received yet</small></label>
+        </div>
+        <label style="display:grid;gap:6px;font-size:14.5px;color:var(--muted)">Other requirement (optional)<input type="text" placeholder="What is it? e.g. COP for BT-PSSR"></label>
+      </div>
+      <div class="foot"><small data-left>Still to tick: all four requirements</small><div style="display:flex;gap:8px"><button class="btn">Request ▾</button><button class="btn o" data-go disabled>Hand to Cashier</button></div></div>
+    </div></section>
+
+  <section><div class="lab"><b>4 · Checklist with remarks</b><span>Government-form style: navy header, identification block, received / not received per item with a remarks column, and signature lines.</span></div>
+    <div class="modal d4" data-req>
+      <div class="hd"><div><h2>Requirements checklist</h2><small>Application NWMTACI-0000007 · Registration</small></div><button class="x" aria-label="Close">×</button></div>
+      <div class="stripe"></div>
+      <div class="ident">
+        <div><span class="cap">Applicant</span><h3>DELA CRUZ, Juan P.</h3><p>NWM-2026-000012 · +63 927 558 1824</p><p>juan.delacruz@example.com</p></div>
+        <div><span class="cap">Training</span><b>BT-PSSR updating</b><p>Oct 9, 2026 · BCH-2026-002473</p><p>In-person</p></div>
+        <div><span class="cap">Payment</span><b style="color:var(--good)">₱1,300.00 paid</b><p>Balance ₱0.00</p><p><span class="chip c-bad">Requirements missing</span></p></div>
+      </div>
+      <div class="body tw"><table><thead><tr><th>Requirement</th><th>Received</th><th>Remarks</th></tr></thead><tbody>
+        <tr><td><b>Valid ID / passport</b></td><td class="rad"><label><input type="checkbox">Received</label></td><td><input type="text" placeholder="e.g. Passport, expires 2030"></td></tr>
+        <tr><td><b>Medical certificate (PEME format)</b></td><td class="rad"><label><input type="checkbox">Received</label></td><td><input type="text" placeholder="Clinic and date"></td></tr>
+        <tr><td><b>2x2 photo</b></td><td class="rad"><label><input type="checkbox">Received</label></td><td><input type="text" placeholder="Optional"></td></tr>
+        <tr><td><b>Seaman's book / SRN</b></td><td class="rad"><label><input type="checkbox">Received</label></td><td><input type="text" placeholder="Optional"></td></tr>
+        <tr><td><b>Other (optional)</b></td><td class="rad"><label><input type="checkbox" data-opt>Received</label></td><td><input type="text" placeholder="What is it? e.g. COP for BT-PSSR"></td></tr>
+        <tr class="tot"><td>Received</td><td colspan="2" data-count>0 of 4</td></tr>
+      </tbody></table></div>
+      <div class="ack"><div>Checked by · Registration officer</div><div>Date and time</div></div>
+      <div class="foot"><small data-left>Still to tick: all four requirements</small><div style="display:flex;gap:8px"><button class="btn">Request ▾</button><button class="btn o" data-go disabled>Hand to Cashier</button></div></div>
+    </div></section>
+
+  <section><div class="lab"><b>5 · Summary header and progress bar</b><span>The name and status chips first, four key facts, a progress bar, the checklist, and a bar of actions that stays at the bottom.</span></div>
+    <div class="modal d5" data-req>
+      <div class="hd"><div><span class="k">Application · NWMTACI-0000007</span><h2>Juan P. Dela Cruz</h2><div class="chips"><span class="chip c-good">Paid ₱1,300.00</span><span class="chip c-bad" data-state>Requirements missing</span><span class="chip c-info">Website · Oct 7, 2026</span></div></div><button class="x" aria-label="Close">×</button></div>
+      <div class="facts"><div><span class="cap">Course</span><b>BT-PSSR updating</b></div><div><span class="cap">Schedule</span><b>Oct 9, 2026</b></div><div><span class="cap">Batch</span><b class="mono">BCH-2026-002473</b></div><div><span class="cap">Contact</span><b>+63 927 558 1824</b></div></div>
+      <div class="bar"><div style="display:flex;justify-content:space-between"><b>Requirements</b><span class="mono" data-count>0 of 4</span></div><div class="meter"><i data-meter style="width:0%"></i></div></div>
+      <div class="list">
+        <label class="item"><input type="checkbox"><div><b>Valid ID / passport</b><small data-by>Not received yet</small></div><span></span></label>
+        <label class="item"><input type="checkbox"><div><b>Medical certificate (PEME format)</b><small data-by>Not received yet</small></div><span></span></label>
+        <label class="item"><input type="checkbox"><div><b>2x2 photo</b><small data-by>Not received yet</small></div><span></span></label>
+        <label class="item"><input type="checkbox"><div><b>Seaman's book / SRN</b><small data-by>Not received yet</small></div><span></span></label>
+        <label class="item"><input type="checkbox" data-opt><div><b>Other (optional)</b><small>Anything extra a course needs</small></div><span class="chip c-info">Optional</span></label>
+      </div>
+      <div class="sticky"><small data-left style="color:var(--muted)">Still to tick: all four requirements</small><div style="display:flex;gap:8px"><button class="btn">Request ▾</button><button class="btn o" data-go disabled>Hand to Cashier</button></div></div>
+    </div></section>
+</div>
+
+<script>
+// Ticking works in every design: counts, "received by", progress and the Hand to Cashier button update.
+const NAMES=["Valid ID / passport","Medical (PEME)","2x2 photo","Seaman's book / SRN"];
+document.querySelectorAll("[data-req]").forEach((m)=>{
+  const boxes=[...m.querySelectorAll("input[type=checkbox]")].filter((b)=>!b.hasAttribute("data-opt"));
+  const update=()=>{
+    const n=boxes.filter((b)=>b.checked).length;
+    m.querySelectorAll("[data-count]").forEach((el)=>{el.textContent=el.tagName==="text"?`${n}/4`:`${n} of 4${el.closest(".d1")?" received":""}`;});
+    boxes.forEach((b,i)=>{const row=b.closest("tr,label,.card");if(!row)return;
+      row.classList.toggle("ok",b.checked);
+      const by=row.querySelector("[data-by]");if(by)by.textContent=b.checked?"Received · Registration · Oct 8, 2026":(by.closest("td")?"—":"Not received yet");
+      const st=row.querySelector("[data-st]");if(st)st.innerHTML=b.checked?'<span class="chip c-good">Received</span>':'<span class="chip c-warn">Not received</span>';});
+    const left=boxes.map((b,i)=>b.checked?null:NAMES[i]).filter(Boolean);
+    m.querySelectorAll("[data-left]").forEach((el)=>el.textContent=left.length?`Still to tick: ${left.join(", ")}`:"All requirements received. Paid, so the trainee is enrolled once handed over.");
+    m.querySelectorAll("[data-go]").forEach((b)=>b.disabled=n<4);
+    const ring=m.querySelector("[data-ring]");if(ring)ring.setAttribute("stroke-dasharray",`${163.4*n/4} 164`);
+    const meter=m.querySelector("[data-meter]");if(meter)meter.style.width=`${25*n}%`;
+    const state=m.querySelector("[data-state]");if(state){state.textContent=n<4?"Requirements missing":"Requirements complete";state.className=`chip ${n<4?"c-bad":"c-good"}`;}
+  };
+  boxes.forEach((b)=>b.addEventListener("change",update));update();
+});
+</script>

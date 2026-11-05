@@ -48,7 +48,7 @@ export async function GET(request: Request) {
 
     if (kind === "receipts") {
       const rows = await ranged<{ receipt_number: string; issued_at: string; print_count: number | null; payment_id: string }>("receipts", "receipt_number,issued_at,print_count,payment_id");
-      const pays = new Map((await byIds<{ id: string; trainee_id: string; amount_centavos: number; method: string; reference_number: string | null; valid: boolean; remarks: string | null }>("payments", "id,trainee_id,amount_centavos,method,reference_number,valid,remarks", "id", rows.map((r) => r.payment_id))).map((p) => [p.id, p]));
+      const pays = new Map((await byIds<{ id: string; trainee_id: string; amount_centavos: number; method: string; reference_number: string | null; valid: boolean; remarks: string | null; verification_state: string | null; void_reason: string | null }>("payments", "id,trainee_id,amount_centavos,method,reference_number,valid,remarks,verification_state,void_reason", "id", rows.map((r) => r.payment_id))).map((p) => [p.id, p]));
       const allocs = await byIds<{ payment_id: string; enrollment_id: string }>("payment_allocations", "payment_id,enrollment_id", "payment_id", rows.map((r) => r.payment_id));
       const [who, codes] = await Promise.all([people([...pays.values()].map((p) => p.trainee_id)), courses(allocs.map((a) => a.enrollment_id))]);
       return NextResponse.json({ rows: rows.map((r) => {
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
         const list = [...new Set(allocs.filter((a) => a.payment_id === r.payment_id).map((a) => codes.get(a.enrollment_id)?.code).filter(Boolean))].join(", ");
         const fee = p?.remarks && /^(Miscellaneous|Service Fee) · /.test(p.remarks) ? p.remarks : null;
         const t = p ? who.get(p.trainee_id) : undefined;
-        return { id: r.payment_id, number: r.receipt_number, issuedAt: r.issued_at, trainee: nameOf(t), nwmtaciNo: t?.application_number ?? t?.trainee_number ?? "", label: fee ?? `Training Fee${list ? ` · ${list}` : ""}`, method: p?.method ?? "", reference: p?.reference_number ?? "", amount: Number(p?.amount_centavos ?? 0), valid: p?.valid !== false, printCount: Number(r.print_count ?? 0) };
+        return { id: r.payment_id, number: r.receipt_number, issuedAt: r.issued_at, trainee: nameOf(t), nwmtaciNo: t?.application_number ?? t?.trainee_number ?? "", label: fee ?? `Training Fee${list ? ` · ${list}` : ""}`, method: p?.method ?? "", reference: p?.reference_number ?? "", amount: Number(p?.amount_centavos ?? 0), valid: p?.valid !== false, voidReason: p?.void_reason ?? null, verificationState: p?.verification_state ?? null, printCount: Number(r.print_count ?? 0) };
       }) }, { headers: { "Cache-Control": "no-store" } });
     }
 

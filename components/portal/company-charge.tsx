@@ -51,6 +51,7 @@ export function CompanyChargeReport({ data, reload }: { data: PortalData; reload
   const unpaid = sortStatements(statements.filter((s) => balanceOf(s) > 0), sort), paid = sortPayments(payments, sort);
   const unpaidPage = usePaged(unpaid), paidPage = usePaged(paid);
   const figures = chargeFigures(statements, payments, today);
+  const canRecord = canRecordCompanyPayment(data.roles);
   async function issueInvoice(p: ChargePayment) {
     setBusy(p.id); setProblem("");
     try { await submit({ action: "service-invoice-issue", companyPaymentId: p.id }); load(); }
@@ -75,7 +76,7 @@ export function CompanyChargeReport({ data, reload }: { data: PortalData; reload
           <td data-l="Coverage">{fmtDate(s.from)} – {fmtDate(s.to)}<small>{s.trainees} Trainee{s.trainees === 1 ? "" : "s"}</small></td>
           <td data-l="Total" className="r cx-amt">{pesos2(s.total)}</td><td data-l="Paid" className="r cx-amt">{pesos2(s.paid)}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos2(balanceOf(s))}</strong></td>
           <td data-l="Issued">{fmtDate(manilaDay(s.issuedAt))}<small><Badge tone={days > 30 ? "cancelled" : "pending"}>{`${days} Day${days === 1 ? "" : "s"}`}</Badge></small></td>
-          <td data-l=""><div className="cx-acts"><a className="st-b" href={`/api/documents/billing-statement?agency=${s.agencyId}&from=${s.from}&to=${s.to}`} target="_blank" rel="noreferrer">Statement</a><button type="button" className="st-b p" onClick={() => setRecording(s.id)}>Record Payment</button></div></td>
+          <td data-l=""><div className="cx-acts"><a className="st-b" href={`/api/documents/billing-statement?agency=${s.agencyId}&from=${s.from}&to=${s.to}`} target="_blank" rel="noreferrer">Statement</a>{canRecord && <button type="button" className="st-b p" onClick={() => setRecording(s.id)}>Record Payment</button>}</div></td>
         </tr>; })}
       </tbody></table>{unpaidPage.pager}</div> : <p className="portal-empty-copy">Every statement is paid.</p>) : (paid.length ? <div className="portal-table cx-cards"><table><thead><tr><th>SI No.</th><th>Date Paid</th><th>Mode</th><th>Proof</th><th className="r">Amount</th><th></th></tr></thead><tbody>
         {paidPage.shown.map((p) => <tr key={p.id}>
@@ -84,7 +85,7 @@ export function CompanyChargeReport({ data, reload }: { data: PortalData; reload
           <td data-l="Mode">{p.method}{p.reference && <small className="cl-mono">{p.reference}</small>}</td>
           <td data-l="Proof">{p.proofLink ? <a className="cc-link" href={p.proofLink} target="_blank" rel="noreferrer">View Proof</a> : <small>{p.method === "Cash" ? "No Proof, Cash" : "No Proof"}</small>}</td>
           <td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(p.amount)}</strong><small>{p.statementBalance > 0 ? `${pesos2(p.statementBalance)} Left` : <Badge tone="active">Fully Paid</Badge>}</small></td>
-          <td data-l=""><div className="cx-acts">{p.invoiceId ? <a className="st-b" href={`/api/documents/service-invoice/${p.invoiceId}`} target="_blank" rel="noreferrer">Service Invoice</a> : <button type="button" className="st-b p" disabled={busy === p.id || !charge.setup} onClick={() => void issueInvoice(p)}>{busy === p.id ? "Issuing…" : "Issue Invoice"}</button>}</div></td>
+          <td data-l=""><div className="cx-acts">{p.invoiceId ? <a className="st-b" href={`/api/documents/service-invoice/${p.invoiceId}`} target="_blank" rel="noreferrer">Service Invoice</a> : canRecord && <button type="button" className="st-b p" disabled={busy === p.id || !charge.setup} onClick={() => void issueInvoice(p)}>{busy === p.id ? "Issuing…" : "Issue Invoice"}</button>}</div></td>
         </tr>)}
       </tbody></table>{paidPage.pager}</div> : <p className="portal-empty-copy">No company has paid yet.</p>)}
     </section>

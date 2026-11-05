@@ -4,6 +4,9 @@
  */
 export const COMPANY_CHARGE = "Company Charge";
 
+/** Only the Accounting Head records what a company paid and issues its Service Invoice (owner, 5 Nov 2026); the Admin views. */
+export const canRecordCompanyPayment = (roles: string[]) => roles.includes("accounting");
+
 /**
  * Splits one company payment across the statement's enrollments, in statement order, up to
  * each one's balance. Paying more than the statement still owes is refused.

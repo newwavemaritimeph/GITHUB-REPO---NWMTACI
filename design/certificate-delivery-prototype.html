@@ -1,0 +1,165 @@
+<title>Certificate Delivery Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one delivery request walked through four places — the trainee's website form, Registration, the Cashier, the Releasing Officer — with the trainee's tracking page. Summary-rail portal screens. */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA;
+  --bg:#f3f6fa; --surface:#ffffff; --line:#dfe7ee; --fg:#0f2638; --muted:#5f7180; --soft:#eef4f8; --warnbg:#fde7dc; --okbg:#e3f4ea; --badbg:#fbe4dc; --infobg:#e2effb;
+  --green:#15803d; --red:#b42318; --amber:#b45309;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}
+.steps{position:sticky;top:0;z-index:5;background:var(--navy);color:#fff;padding:12px 24px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.steps b{font-size:15px;margin-right:6px;color:var(--cyan)}
+.steps button{border:1px solid rgba(255,255,255,.3);background:transparent;color:#d6e6f2;font:500 14px var(--sans);padding:7px 13px;border-radius:99px;cursor:pointer}
+.steps button.on{background:#fff;color:var(--navy);border-color:#fff;font-weight:600}
+.steps button i{font-style:normal;font-family:var(--mono);opacity:.7;margin-right:6px}
+.steps .reset{margin-left:auto;border-style:dashed}
+.page{max-width:1180px;margin:0 auto;padding-block:20px 48px;padding-inline:24px;display:flex;flex-direction:column;gap:16px}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}
+h1{margin:2px 0 0;font-size:28px;line-height:1.2}
+.note{margin:0;color:var(--muted);font-size:14.5px;max-width:70ch}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 14px var(--sans);padding:9px 15px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}.btn.org{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600}.btn.sm{padding:6px 11px;font-size:13.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 20px 12px;flex-wrap:wrap}
+.ph h2{margin:0;font-size:17px;font-weight:600}.ph .m{color:var(--muted);font-size:13.5px}
+.pb{padding:0 20px 20px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.rail{display:grid;grid-template-columns:minmax(300px,340px) minmax(0,1fr);gap:20px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.lines{margin:0}.lines>div{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}.lines>div:last-child{border-bottom:0}.lines dt{color:var(--muted)}.lines dd{margin:0;font-weight:600;text-align:right}
+.pill{display:inline-block;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.p-ok{background:var(--okbg);color:var(--green)}.p-warn{background:var(--warnbg);color:var(--orange)}.p-bad{background:var(--badbg);color:var(--red)}.p-info{background:var(--infobg);color:var(--blue)}.p-mute{background:var(--soft);color:var(--muted)}
+.banner{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-radius:12px;padding:12px 16px}
+.banner.red{background:var(--red);color:#fff}.banner.blue{background:var(--infobg);color:var(--blue)}.banner .sp{flex:1}.banner .btn{background:#fff}
+.log{width:100%;border-collapse:collapse;font-size:14.5px;border:1px solid #9fb2c1}
+.log th{background:var(--navy);color:#fff;font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:9px 10px;border-right:1px solid #2c5a7f;white-space:nowrap}
+.log td{padding:9px 10px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);vertical-align:top}
+.log tbody tr:nth-child(even) td{background:var(--soft)}
+.log td.no{text-align:center;color:var(--muted);width:34px}
+.log small{display:block;color:var(--muted);font-size:13px}
+.wrap{overflow-x:auto;margin:0 20px 20px}
+.empty{color:var(--muted);text-align:center;padding:16px 20px 22px}
+/* public site */
+.site{background:#fff;border:1px solid var(--line);border-radius:16px;overflow:hidden;color:#0f2638}
+.site .bar{display:flex;justify-content:space-between;align-items:center;padding:14px 22px;border-bottom:1px solid #e6edf2;gap:10px;flex-wrap:wrap}
+.site .bar b{color:#0571D0;font-size:18px}.site .bar span{font-size:13.5px;color:#5f7180}
+.site .hero{background:linear-gradient(120deg,#123F63,#0571D0);color:#fff;padding:26px 22px}
+.site .hero h1{color:#fff;font-size:26px}.site .hero p{margin:6px 0 0;color:#d6e6f2;max-width:62ch}
+.site .body{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:22px;padding:22px}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form label{display:flex;flex-direction:column;gap:5px;font-size:13px;color:#5f7180;font-weight:500}.form .full{grid-column:1/-1}
+.form input,.form select,.form textarea{font:400 15px var(--sans);padding:10px 12px;border:1px solid #cfd9e1;border-radius:9px;background:#fff;color:#0f2638}
+.form input:focus,.form select:focus{outline:none;border-color:#0571D0;box-shadow:0 0 0 3px rgba(5,113,208,.15)}
+.form .ok{color:#15803d;font-size:13px}.form .err{color:#b42318;font-size:13px}
+.legend{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#5f7180;font-weight:600;grid-column:1/-1;margin-top:6px;border-top:1px solid #e6edf2;padding-top:12px}
+.side{background:#f5f8fb;border-radius:12px;padding:16px 18px;align-self:start}
+.side h3{margin:0 0 8px;font-size:15px}.side ol{margin:0;padding-left:18px;font-size:14px;color:#334}.side li{margin:4px 0}
+.fee{display:flex;justify-content:space-between;border-top:1px solid #dfe7ee;margin-top:12px;padding-top:10px;font-weight:600}
+.agree{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;color:#0f2638}
+/* tracker */
+.track{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;padding:6px 20px 20px}
+.track div{position:relative;text-align:center;font-size:13px;color:var(--muted);padding-top:30px}
+.track div::before{content:"";position:absolute;top:8px;left:50%;transform:translateX(-50%);width:18px;height:18px;border-radius:99px;background:var(--soft);border:2px solid var(--line);z-index:1}
+.track div::after{content:"";position:absolute;top:16px;left:-50%;width:100%;height:3px;background:var(--line)}
+.track div:first-child::after{display:none}
+.track div.done{color:var(--fg)}.track div.done::before{background:var(--green);border-color:var(--green)}.track div.done::after{background:var(--green)}
+.track div.now{color:var(--orange);font-weight:600}.track div.now::before{background:#fff;border-color:var(--orange)}
+.track b{display:block;font-size:13.5px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;z-index:10}
+.modal{position:fixed;inset:0;background:rgba(10,25,40,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:9}
+.modal .panel{max-width:520px;width:100%}
+@media (max-width:980px){.rail{grid-template-columns:1fr}.site .body{grid-template-columns:1fr}}
+@media (max-width:600px){.form{grid-template-columns:1fr}.track{grid-template-columns:1fr;gap:6px}.track div{text-align:left;padding:0 0 0 30px}.track div::before{top:1px;left:0;transform:none}.track div::after{display:none}}
+@media (max-width:480px){.page{padding-inline:16px}.steps{padding-inline:16px}}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+</style>
+
+<nav class="steps" id="steps"></nav>
+<main class="page" id="page"></main>
+<div id="modal"></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const VIEWS=[["form","Trainee · request form"],["track","Trainee · tracking"],["reg","Registration"],["cash","Cashier"],["ro","Releasing Officer"]];
+const STAGES=["Requested","Checked by Registration","Fee paid","Shipped","Delivered"];
+const init=()=>({stage:-1,no:null,decl:null,track:null,form:{nw:"",bd:"",course:"",name:"",mobile:"",addr:"",city:"",prov:"",zip:"",email:"",agree:false},others:[
+ {n:"VILLANUEVA, Sam",nw:"NWMTACI-2026-0398",co:"Safety (STPPDSPPS)",cert:null,addr:"88 Mabini St., Iloilo City",at:"Oct 8, 8:40 AM",st:"Requested"},
+ {n:"GARCIA, Paolo",nw:"NWMTACI-2026-0431",co:"Crowd Management",cert:"NWM-CM-00811",addr:"12 Rizal St., Cebu City",at:"Oct 7, 3:02 PM",st:"Checked by Registration"}]});
+let S=init(),view="form";
+const fee=50000,peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
+const ME={n:"BAUTISTA, Elle",nw:"NWMTACI-2026-0420",co:"Passenger Courses Bundle",dates:"Oct 5–10, 2026",cert:"NWM-PCB-00012"};
+const pillFor=st=>({"Requested":"p-warn","Checked by Registration":"p-info","Fee paid":"p-info","Shipped":"p-ok","Delivered":"p-ok","Declined":"p-mute"})[st]||"p-mute";
+const myRow=()=>S.stage<0?null:{n:ME.n,nw:ME.nw,co:ME.co,cert:ME.cert,addr:[S.form.addr,S.form.city,S.form.prov,S.form.zip].filter(Boolean).join(", ")||"Blk 4 Lot 2, Bacolod City, Negros Occidental 6100",at:"Oct 8, just now",st:S.decl?"Declined":STAGES[S.stage],mine:true};
+const rows=()=>[myRow(),...S.others].filter(Boolean);
+const V={
+form(){const f=S.form,known=f.nw.trim().toUpperCase()==="NWMTACI-2026-0420"&&f.bd==="1996-04-02";
+ if(S.no)return site(`<div class="panel" style="border:0"><div class="ph" style="padding-left:0"><h2>Request received · <span class="mono">${S.no}</span></h2><span class="pill p-ok">Emailed to you</span></div><p class="note">Registration will check your certificate. You will get an email with the payment instructions for the ₱500.00 LBC fee. Follow your request any time on the tracking page.</p><div class="acts" style="margin-top:14px"><button class="btn pri" data-view="track">Track my request</button></div></div>`,"Request received");
+ return site(`<div class="form">
+  <div class="legend" style="margin-top:0;border-top:0;padding-top:0">1 · Confirm it is you</div>
+  <label>NWMTACI number<input data-f="nw" value="${f.nw}" placeholder="NWMTACI-2026-0000"></label>
+  <label>Birth date<input data-f="bd" type="date" value="${f.bd}"></label>
+  ${f.nw&&f.bd?(known?`<span class="ok full">✓ Found: Elle Bautista</span>`:`<span class="err full">We could not match this number and birth date. Check both, or use the sample: NWMTACI-2026-0420 · 1996-04-02.</span>`):`<span class="full" style="font-size:13px;color:#5f7180">Sample: NWMTACI-2026-0420 · April 2, 1996</span>`}
+  <label class="full">Certificate to deliver<select data-f="course" ${known?"":"disabled"}><option value="">${known?"Choose the course":"Enter your number and birth date first"}</option>${known?`<option ${f.course?"selected":""}>${ME.co} · ${ME.dates}</option>`:""}</select></label>
+  <div class="legend">2 · Where to send it</div>
+  <label>Recipient name<input data-f="name" value="${f.name}" placeholder="Who will receive the parcel"></label>
+  <label>Mobile number<input data-f="mobile" value="${f.mobile}" placeholder="09xx xxx xxxx" inputmode="tel"></label>
+  <label class="full">House no., street, barangay<input data-f="addr" value="${f.addr}"></label>
+  <label>City / municipality<input data-f="city" value="${f.city}"></label>
+  <label>Province<input data-f="prov" value="${f.prov}"></label>
+  <label>ZIP code<input data-f="zip" value="${f.zip}" inputmode="numeric"></label>
+  <label>Email for updates<input data-f="email" value="${f.email}" placeholder="your@gmail.com"></label>
+  <div class="legend">3 · Agreement</div>
+  <label class="agree full"><input type="checkbox" data-f="agree" ${f.agree?"checked":""}><span>Send my certificate to the address above. New Wave is not liable once LBC has received the parcel.</span></label>
+  <div class="full acts"><button class="btn org" data-send ${known&&f.course&&f.name&&f.mobile&&f.addr&&f.city&&f.email&&f.agree?"":"disabled"}>Send request</button><button class="btn" data-fill>Fill with sample</button></div>
+ </div>`,"Request certificate delivery");},
+track(){if(S.stage<0)return `<div class="panel"><div class="ph"><h2>Track a delivery request</h2></div><div class="pb"><p class="note">No request yet. Send one from the request form first.</p><div class="acts" style="margin-top:12px"><button class="btn pri" data-view="form">Open the form</button></div></div></div>`;
+ return site(`<div class="panel" style="border:0"><div class="ph" style="padding-left:0"><h2>Request <span class="mono">${S.no}</span></h2><span class="pill ${pillFor(S.decl?"Declined":STAGES[S.stage])}">${S.decl?"Declined":STAGES[S.stage]}</span></div>
+ ${S.decl?`<p class="note">Registration declined the request: ${S.decl}</p>`:`<div class="track">${STAGES.map((s,i)=>`<div class="${i<S.stage?"done":i===S.stage?"done":i===S.stage+1?"now":""}"><b>${s}</b>${i===2&&S.stage===1?"Pay at the Cashier":""}${i===3&&S.track?`<span class="mono">${S.track}</span>`:""}</div>`).join("")}</div>`}
+ ${S.stage===1&&!S.decl?`<div class="side" style="margin-top:4px"><h3>Pay the ₱500.00 delivery fee</h3><ol><li>GCash 0917 000 0000 (New Wave Maritime)</li><li>PSBank / UnionBank — details in your email</li><li>Or pay in cash at our office</li></ol><p style="margin:8px 0 0;font-size:13.5px;color:#5f7180">Send the receipt to the Cashier with your request number <span class="mono">${S.no}</span>.</p></div>`:""}
+ <p class="note" style="margin-top:12px">Look it up again any time with your request number and birth date.</p></div>`,"Track my certificate delivery");},
+reg(){const list=rows();const nw=list.filter(r=>r.st==="Requested");
+ return portal("Registration","Delivery requests",`From the website. Check that the certificate is printed, then send to the Cashier for the ${peso(fee)} LBC fee.`,nw.length?`<div class="banner blue"><b>${nw.length} new delivery request${nw.length===1?"":"s"}</b><span>waiting for your check</span></div>`:"",
+ `<section class="panel"><div class="ph"><h2>Requests</h2></div><div class="pb"><dl class="lines"><div><dt>New</dt><dd>${nw.length}</dd></div><div><dt>With the Cashier</dt><dd>${list.filter(r=>r.st==="Checked by Registration").length}</dd></div><div><dt>Paid · with Releasing</dt><dd>${list.filter(r=>r.st==="Fee paid").length}</dd></div><div><dt>Shipped</dt><dd>${list.filter(r=>r.st==="Shipped"||r.st==="Delivered").length}</dd></div></dl></div></section>`,
+ table(list,r=>r.st==="Requested"?`<span class="acts"><button class="btn sm" data-decline="${r.mine?"me":r.nw}">Decline</button><button class="btn sm org" data-check="${r.mine?"me":r.nw}" ${r.cert?"":"disabled title=\"Certificate not printed yet\""}>Send to the Cashier</button></span>${r.cert?"":`<small>Wait until the certificate is printed</small>`}`:`<span class="pill ${pillFor(r.st)}">${r.st==="Checked by Registration"?"With the Cashier":r.st}</span>`));},
+cash(){const list=rows().filter(r=>r.st==="Checked by Registration");
+ return portal("Cashier","Requests › Delivery",`Delivery fee from the Schedule of fees: LBC ${peso(fee)}. The request moves to the Releasing Officer once paid.`,"",
+ `<section class="panel"><div class="ph"><h2>Delivery fees</h2></div><div class="pb"><dl class="lines"><div><dt>To collect</dt><dd>${list.length} · ${peso(list.length*fee)}</dd></div><div><dt>Fee</dt><dd>LBC ${peso(fee)}</dd></div></dl></div></section>`,
+ list.length?table(list,r=>`<button class="btn sm org" data-pay="${r.mine?"me":r.nw}">Record payment · ${peso(fee)}</button>`):`<section class="panel"><p class="empty">No delivery fees to collect. Requests appear after Registration checks them.</p></section>`);},
+ro(){const list=rows().filter(r=>["Fee paid","Shipped","Delivered"].includes(r.st));const toShip=list.filter(r=>r.st==="Fee paid");
+ return portal("Releasing Officer","Delivery",`Only paid requests appear here.`,toShip.length?`<div class="banner red"><b>${toShip.length} paid delivery request${toShip.length===1?"":"s"} to ship</b><span>${toShip.map(r=>r.n.split(",")[0]).join(", ")}</span></div>`:"",
+ `<section class="panel"><div class="ph"><h2>Delivery</h2></div><div class="pb"><dl class="lines"><div><dt>To ship</dt><dd>${toShip.length}</dd></div><div><dt>Shipped</dt><dd>${list.filter(r=>r.st==="Shipped").length}</dd></div><div><dt>Delivered</dt><dd>${list.filter(r=>r.st==="Delivered").length}</dd></div></dl><p style="margin:10px 0 0;font-size:13px;color:var(--muted)">This alert also shows on the Releasing Officer's dashboard.</p></div></section>`,
+ list.length?table(list,r=>r.st==="Fee paid"?`<button class="btn sm pri" data-ship="${r.mine?"me":r.nw}">Mark shipped</button>`:r.st==="Shipped"?`<span class="mono">${r.mine?S.track:"LBC 0000 1111 22"}</span><br><button class="btn sm" data-deliv="${r.mine?"me":r.nw}" style="margin-top:6px">Mark delivered</button>`:`<span class="pill p-ok">Delivered</span>`):`<section class="panel"><p class="empty">No paid delivery requests yet.</p></section>`);}
+};
+function site(body,title){return `<div class="site"><div class="bar"><b>New Wave</b><span>newwavemaritimemtaci.com › Certificate delivery</span></div><div class="hero"><h1>${title}</h1><p>For trainees who cannot claim their certificate at our office in Ermita, Manila. We send it by LBC anywhere in the Philippines.</p></div><div class="body"><div>${body}</div><aside class="side"><h3>How it works</h3><ol><li>Send this request</li><li>Registration checks your certificate</li><li>Pay the delivery fee (email has the details)</li><li>We ship by LBC and email the tracking number</li></ol><div class="fee"><span>Delivery fee</span><span>${peso(fee)}</span></div></aside></div></div>`;}
+function portal(eb,t,note,banner,left,right){return `<div><div class="eyebrow">${eb}</div><h1>${t}</h1></div><p class="note">${note}</p>${banner}<div class="rail"><div class="stack">${left}</div>${right.startsWith("<section")?right:`<section class="panel">${right}</section>`}</div>`;}
+function table(list,act){return `<div class="wrap" style="margin-top:16px"><table class="log"><thead><tr><th>#</th><th>Trainee · NWMTACI no.</th><th>Certificate</th><th>Deliver to</th><th>Requested</th><th>Action</th></tr></thead><tbody>${list.map((r,i)=>`<tr><td class="no">${i+1}</td><td><b>${r.n}</b>${r.mine?` <span class="pill p-info">this request</span>`:""}<small class="mono">${r.nw}</small><small>${r.co}</small></td><td class="mono">${r.cert??`<span class="pill p-warn">Not printed yet</span>`}</td><td style="max-width:240px">${r.addr}</td><td>${r.at}</td><td>${act(r)}</td></tr>`).join("")}</tbody></table></div>`;}
+function setSt(key,st){if(key==="me"){if(st==="Declined")return;S.stage=STAGES.indexOf(st);}else{const o=S.others.find(x=>x.nw===key);o.st=st;}}
+function toast(t){const el=document.getElementById("toast");el.textContent=t;el.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>el.hidden=true,2400);}
+function draw(){document.getElementById("steps").innerHTML=`<b>Certificate delivery</b>`+VIEWS.map(([k,l],i)=>`<button class="${view===k?"on":""}" data-view="${k}"><i>${i+1}</i>${l}</button>`).join("")+`<button class="reset" data-reset>Start over</button>`;document.getElementById("page").innerHTML=V[view]();}
+function modal(html){document.getElementById("modal").innerHTML=html?`<div class="modal" data-close><div class="panel">${html}</div></div>`:"";}
+document.addEventListener("input",e=>{const k=e.target.dataset.f;if(!k)return;S.form[k]=e.target.type==="checkbox"?e.target.checked:e.target.value;const pos=e.target.selectionStart;draw();const el=document.querySelector(`[data-f="${k}"]`);if(el&&el.type!=="checkbox"&&el.type!=="date"){el.focus();try{el.setSelectionRange(pos,pos)}catch(_){}}});
+document.addEventListener("change",e=>{const k=e.target.dataset.f;if(k&&(e.target.tagName==="SELECT"||e.target.type==="checkbox"||e.target.type==="date")){S.form[k]=e.target.type==="checkbox"?e.target.checked:e.target.value;draw();}});
+document.addEventListener("click",e=>{if(e.target.matches("[data-close]")){modal("");return;}const b=e.target.closest("button");if(!b)return;const d=b.dataset;
+ if(d.view)view=d.view;
+ else if(d.reset!==undefined){S=init();view="form";}
+ else if(d.fill!==undefined){Object.assign(S.form,{nw:"NWMTACI-2026-0420",bd:"1996-04-02",course:"1",name:"Elle Bautista",mobile:"0917 123 4567",addr:"Blk 4 Lot 2, Purok Malipayon, Brgy. Mansilingan",city:"Bacolod City",prov:"Negros Occidental",zip:"6100",email:"elle.sample@gmail.com",agree:true});}
+ else if(d.send!==undefined){S.stage=0;S.no="DR-2026-0031";toast("Request sent. A copy was emailed to you.");}
+ else if(d.check){setSt(d.check,"Checked by Registration");toast("Sent to the Cashier for the ₱500.00 LBC fee. The trainee is emailed the payment details.");}
+ else if(d.decline){modal(`<div class="ph"><h2>Decline request</h2></div><div class="pb"><div class="form"><label class="full">Reason (emailed to the trainee)<select id="dr"><option>Certificate not yet printed — request again after release</option><option>Training fee not settled</option><option>Address incomplete</option><option>Duplicate request</option></select></label><div class="full acts"><button class="btn" data-close>Keep</button><button class="btn org" data-dodecl="${d.decline}">Decline</button></div></div></div>`);return;}
+ else if(d.dodecl){const why=document.getElementById("dr").value;if(d.dodecl==="me")S.decl=why;else S.others.find(x=>x.nw===d.dodecl).st="Declined";modal("");toast("Declined · the trainee is emailed the reason");}
+ else if(d.pay){setSt(d.pay,"Fee paid");toast("Payment recorded · receipt issued · sent to the Releasing Officer");}
+ else if(d.ship){modal(`<div class="ph"><h2>Mark shipped</h2></div><div class="pb"><div class="form"><label class="full">LBC tracking number<input id="tn" value="LBC 1234 5678 90"></label><label class="full">Date sent<input type="date" value="2026-10-09"></label><div class="full acts"><button class="btn" data-close>Cancel</button><button class="btn pri" data-doship="${d.ship}">Mark shipped</button></div></div></div>`);return;}
+ else if(d.doship){const tn=document.getElementById("tn").value;if(d.doship==="me")S.track=tn;setSt(d.doship,"Shipped");modal("");toast("Shipped · the trainee is emailed the tracking number");}
+ else if(d.deliv){setSt(d.deliv,"Delivered");toast("Marked delivered");}
+ else if(d.close!==undefined){modal("");return;}
+ else return;draw();});
+draw();
+</script>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portal Colors</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Portal colours from the New Wave logo (owner, 19 Oct 2026): orange #F25615 (helm), blue #0571D0 and cyan #35CCFA
+   (wave), light cyan #9EE3F1, dark blue #123F63. Three ways to apply them to the staff portal. */
+:root{--orange:#F25615;--blue:#0571D0;--cyan:#35CCFA;--lcyan:#9EE3F1;--navy:#123F63;--sans:"Geist",system-ui,sans-serif;--mono:"Geist Mono",ui-monospace,monospace}
+*{box-sizing:border-box}body{margin:0;background:#e9eef2;color:#0f2638;font:400 15px/1.5 var(--sans)}button{font:inherit;cursor:pointer}
+.chooser{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid #dbe5ec;padding:12px 20px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.chooser b{font-size:15px}.seg{display:inline-flex;border:1px solid #dbe5ec;border-radius:10px;overflow:hidden}.seg button{border:0;background:#fff;padding:8px 14px;font-weight:600;font-size:13.5px;color:#0f2638}.seg button.on{background:#123F63;color:#fff}
+.sw{display:flex;gap:6px;align-items:center;font-size:12px;color:#5b6f7f}.sw i{display:inline-block;width:18px;height:18px;border-radius:5px;border:1px solid #0001}
+.frame{max-width:1200px;margin:18px auto 60px;border-radius:16px;overflow:hidden;box-shadow:0 10px 40px #0f263822;background:var(--bg)}
+.bar{background:var(--barbg);color:var(--barfg);padding:12px 22px 0}
+.brand{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:10px}.logo svg{width:40px;height:40px}.logo b{display:block;font-size:19px;letter-spacing:.02em;color:var(--logotext)}.logo small{display:block;font-size:9.5px;letter-spacing:.08em;color:var(--logosub)}
+.tools{display:flex;gap:10px;align-items:center;font-size:13.5px;color:var(--barmuted)}.tools .sel{border:1px solid var(--barline);border-radius:8px;padding:5px 10px;color:var(--barfg)}.tools .pw{border:1px solid var(--barline);border-radius:9px;padding:6px 12px;color:var(--barfg)}
+.tabs{display:flex;gap:2px;margin-top:12px;flex-wrap:wrap}.tabs span{padding:10px 16px;border-radius:10px 10px 0 0;font-weight:500;color:var(--tabfg)}.tabs span.on{background:var(--bg);color:var(--tabon);box-shadow:inset 0 3px 0 var(--tabaccent)}
+.accent-line{height:4px;background:var(--line4)}
+.page{padding:20px 22px 26px;display:flex;flex-direction:column;gap:14px}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--eyebrow);font-weight:600}h1{margin:2px 0 0;font-size:26px;color:var(--h1)}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.btn{border-radius:9px;padding:8px 15px;font-weight:600;border:1px solid var(--line)}.pri{background:var(--pri);color:#fff;border-color:var(--pri)}.sec{background:var(--surface);color:var(--secfg)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px;border-top:4px solid var(--c)}.tile span{display:block;font-size:12.5px;color:var(--muted)}.tile b{font:600 21px var(--mono);color:var(--h1)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}.ph{display:flex;justify-content:space-between;align-items:center;padding:12px 16px}.ph h2{margin:0;font-size:16px;color:var(--h1)}
+table{width:100%;border-collapse:collapse;font-size:14.5px}th{background:var(--thbg);color:var(--thfg);font:600 11.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;text-align:left;padding:9px 12px}td{padding:9px 12px;border-top:1px solid var(--line);line-height:1.35}td b{color:var(--h1)}td small{display:block;color:var(--muted);font-size:12.5px}.r{text-align:right}
+.app{color:var(--orange);font-family:var(--mono);font-weight:600}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600}.p1{background:var(--okbg);color:var(--ok)}.p2{background:var(--warnbg);color:var(--warn)}.p3{background:var(--infobg);color:var(--info)}
+.alert{border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center;background:var(--alertbg);color:var(--alertfg);border-left:5px solid var(--orange)}
+.note{padding:0 22px 22px;color:var(--muted);font-size:13.5px}
+.mono{font-family:var(--mono)}
+/* Design 1 — Navy Helm: dark-blue bar, orange active-tab marker and buttons, cyan accents. */
+.d1{--bg:#f3f7fa;--surface:#fff;--line:#dbe5ec;--muted:#5b6f7f;--h1:#123F63;--barbg:#123F63;--barfg:#fff;--barmuted:#c9dceb;--barline:#3d6b90;--logotext:#35CCFA;--logosub:#c9dceb;--tabfg:#d4e4f1;--tabon:#123F63;--tabaccent:#F25615;--line4:linear-gradient(90deg,#F25615 0 22%,#35CCFA 22% 62%,#0571D0 62%);--eyebrow:#0571D0;--pri:#F25615;--secfg:#123F63;--thbg:#123F63;--thfg:#fff;--okbg:#e3f4ea;--ok:#0a7a3e;--warnbg:#fde9dd;--warn:#b4480f;--infobg:#dff4fc;--info:#0571D0;--alertbg:#fff4ee;--alertfg:#7a2f0a}
+/* Design 2 — Ocean Wave: blue-to-cyan gradient bar like the logo's wave, white text, orange buttons. */
+.d2{--bg:#f2f9fc;--surface:#fff;--line:#d6e9f1;--muted:#557085;--h1:#123F63;--barbg:linear-gradient(100deg,#0571D0 0%,#2aa6ec 60%,#35CCFA 100%);--barfg:#fff;--barmuted:#e6f6fd;--barline:#ffffff66;--logotext:#fff;--logosub:#e6f6fd;--tabfg:#eaf7fd;--tabon:#0571D0;--tabaccent:#F25615;--line4:#9EE3F1;--eyebrow:#0571D0;--pri:#F25615;--secfg:#0571D0;--thbg:#e6f6fd;--thfg:#0b4f8f;--okbg:#e3f4ea;--ok:#0a7a3e;--warnbg:#fde9dd;--warn:#b4480f;--infobg:#e6f6fd;--info:#0571D0;--alertbg:#e6f6fd;--alertfg:#0b4f8f}
+/* Design 3 — White Logo Bar: white bar showing the full-colour logo, blue tabs with an orange underline, navy table headers. */
+.d3{--bg:#f4f8fb;--surface:#fff;--line:#dbe5ec;--muted:#5b6f7f;--h1:#123F63;--barbg:#fff;--barfg:#123F63;--barmuted:#5b6f7f;--barline:#cfdde7;--logotext:#0571D0;--logosub:#0571D0;--tabfg:#0571D0;--tabon:#fff;--tabaccent:#F25615;--line4:linear-gradient(90deg,#0571D0,#35CCFA);--eyebrow:#F25615;--pri:#0571D0;--secfg:#0571D0;--thbg:#123F63;--thfg:#fff;--okbg:#e3f4ea;--ok:#0a7a3e;--warnbg:#fde9dd;--warn:#b4480f;--infobg:#e2effb;--info:#0571D0;--alertbg:#fff4ee;--alertfg:#7a2f0a}
+.d3 .tabs span.on{background:#0571D0;color:#fff;box-shadow:inset 0 -3px 0 #F25615}
+</style>
+</head>
+<body>
+<div class="chooser"><b>Portal Colors</b><div class="seg" id="seg"></div>
+ <span class="sw"><i style="background:#F25615"></i>Orange <i style="background:#0571D0"></i>Blue <i style="background:#35CCFA"></i>Cyan <i style="background:#9EE3F1"></i>Light Cyan <i style="background:#123F63"></i>Dark Blue</span></div>
+<div id="frame"></div>
+<script>
+const LOGO=`<svg viewBox="0 0 64 64" aria-hidden="true"><g fill="#F25615"><circle cx="30" cy="26" r="15" fill="none" stroke="#F25615" stroke-width="5"/><circle cx="30" cy="26" r="4"/>${[0,45,90,135,180,225,270,315].map(a=>`<rect x="28.5" y="2" width="3" height="10" rx="1.5" transform="rotate(${a} 30 26)"/>`).join("")}</g><path d="M8 54c8-14 20-20 30-18-6 4-8 10-6 16-6-8-14-6-24 2z" fill="#0571D0"/><path d="M26 56c6-12 18-20 30-14 4 2 4 8-1 9 2-6-6-8-12-3-6 5-8 9-17 8z" fill="#35CCFA"/></svg>`;
+const D=[["d1","Design 1 · Navy Helm","Dark-blue top bar (like today) with the logo's colours: an orange marker on the active tab and orange main buttons, cyan logo text, and the orange–cyan–blue stripe under the bar. Closest to the current portal, so staff need no adjustment."],
+ ["d2","Design 2 · Ocean Wave","A blue-to-cyan gradient top bar taken from the logo's wave, white text, orange main buttons and light-cyan table headers. Brighter and most like the logo."],
+ ["d3","Design 3 · White Logo Bar","A white top bar that shows the full-colour logo as it appears on printed documents, blue tabs with an orange underline, navy table headers and blue main buttons. Cleanest, with the logo standing out."]];
+let cur=0;
+function render(){
+  document.getElementById("seg").innerHTML=D.map((d,i)=>`<button class="${i===cur?"on":""}" data-i="${i}">${d[1]}</button>`).join("");
+  const [cls,,about]=D[cur];
+  document.getElementById("frame").innerHTML=`<div class="frame ${cls}">
+  <div class="bar"><div class="brand"><div class="logo">${LOGO}<div><b>NEW WAVE</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div></div>
+   <div class="tools">Working As <span class="sel">Cashier ▾</span><span class="pw">⚿ Change Password</span><span>Karen Mallari</span></div></div>
+   <nav class="tabs"><span class="on">Dashboard</span><span>Enrollments ▾</span><span>Accounting ▾</span></nav></div>
+  <div class="accent-line"></div>
+  <div class="page">
+   <div class="head"><div><span class="eyebrow">Cashier</span><h1>Dashboard</h1></div><div style="display:flex;gap:8px"><button class="btn sec">Print Summary</button><button class="btn pri">Record Payment</button></div></div>
+   <div class="alert"><span><b>3 trainees</b> still owe after training · ₱4,900.00</span><button class="btn sec">Open</button></div>
+   <div class="tiles"><div class="tile" style="--c:#0571D0"><span>Cash Collected</span><b>₱12,600.00</b></div><div class="tile" style="--c:#35CCFA"><span>GCash</span><b>₱8,400.00</b></div><div class="tile" style="--c:#F25615"><span>PSBank</span><b>₱3,100.00</b></div><div class="tile" style="--c:#123F63"><span>UnionBank</span><b>₱1,800.00</b></div></div>
+   <section class="panel"><div class="ph"><h2>New Enrollments</h2><button class="btn sec">View All</button></div>
+    <table><thead><tr><th>Trainee</th><th>Enrollment No.</th><th>Course</th><th>Status</th><th class="r">Balance</th></tr></thead><tbody>
+     <tr><td><b>SANTOS, MIGUEL REYES</b><small class="mono">NWM-2026-000004</small></td><td><span class="app">NWMTACI-0000004</span></td><td>Updating Training on Basic Training – PSSR<small>Oct 20, 2026</small></td><td><span class="pill p2">For Payment</span></td><td class="r mono"><b>₱1,800.00</b></td></tr>
+     <tr><td><b>GARET, KATHLEEN PUWEE</b><small class="mono">NWM-2026-000002</small></td><td><span class="app">NWMTACI-0000002</span></td><td>Crowd Management Training<small>Oct 21–22, 2026</small></td><td><span class="pill p1">Enrolled</span></td><td class="r mono"><b>₱0.00</b></td></tr>
+     <tr><td><b>FLORES, KEN SALAZAR</b><small class="mono">NWM-2026-000006</small></td><td><span class="app">NWMTACI-0000006</span></td><td>Safety Training for Personnel<small>Oct 26, 2026</small></td><td><span class="pill p3">Screening</span></td><td class="r mono"><b>₱1,200.00</b></td></tr>
+    </tbody></table></section>
+  </div>
+  <p class="note">${about}</p></div>`;
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-i]");if(b){cur=+b.dataset.i;render()}});
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,243 @@
+<title>Requests Flow Prototype</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: the portal's navy top bar; a role switch (Registration / Cashier) drives one working column. Same tokens as the cashier prototype. */
+:root{
+  --orange:#F25615; --blue:#0571D0; --cyan:#35CCFA; --cyan-l:#9EE3F1; --navy:#123F63;
+  --bg:#f2f6f8; --surface:#ffffff; --fg:#0f2638; --muted:#587184; --line:#dbe6ec; --soft:#eef4f8;
+  --good:#0a7a3e; --good-bg:#e2f5e9; --warn:#a2470b; --warn-bg:#fdf0e5; --bad:#b42318; --bad-bg:#fcebea; --info:#0571D0; --info-bg:#e5f1fb;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 17px/1.5 var(--sans)}
+h1,h2,h3{font-weight:600;line-height:1.2;margin:0;text-wrap:balance}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding:16px 16px 0}
+.wrap{max-width:1160px;margin:0 auto}
+.brand{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:12px}
+.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}
+.logo b{font-size:19px}.logo b span{color:var(--orange)}
+.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.role{display:flex;gap:4px;background:#ffffff14;padding:4px;border-radius:10px}
+.role button{background:none;border:0;color:#c3dbea;font:500 15px var(--sans);padding:8px 14px;border-radius:8px;cursor:pointer}
+.role button.on{background:#fff;color:var(--navy);font-weight:600}
+.tabs{display:flex;gap:2px;margin-top:16px;overflow-x:auto}
+.tabs span{color:#c3dbea;font:500 17px var(--sans);padding:13px 20px;white-space:nowrap}
+.tabs span.on{background:var(--bg);color:var(--fg);font-weight:600;border-radius:10px 10px 0 0}
+main{max-width:1160px;margin:0 auto;padding-block:24px 64px;padding-inline:16px;display:grid;gap:16px}
+.steps{display:flex;gap:8px;flex-wrap:wrap}
+.step{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:15px;color:var(--muted)}
+.step b{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--soft);font:600 12px var(--mono);color:var(--muted)}
+.step.done{color:var(--good);border-color:transparent;background:var(--good-bg)}.step.done b{background:var(--good);color:#fff}
+.step.now{color:var(--info);border-color:var(--info);font-weight:600}.step.now b{background:var(--info);color:#fff}
+.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}
+.head h1{font-size:32px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ph h2{font-size:19px}
+.count{font:600 13px var(--mono);background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:2px 9px}
+.profile{display:flex;gap:16px;align-items:center;padding:20px;flex-wrap:wrap}
+.avatar{width:56px;height:56px;border-radius:50%;background:var(--info-bg);color:var(--info);display:grid;place-items:center;font:600 20px var(--sans)}
+.profile h2{font-size:22px}
+.tag{font:600 13px var(--mono);background:var(--warn-bg);color:var(--orange);padding:2px 8px;border-radius:6px}
+.meta{color:var(--muted);font-size:15px}
+.totals{margin-left:auto;display:flex;gap:24px}
+.totals div span{display:block;font-size:13px;color:var(--muted)}
+.totals div b{font:600 18px var(--mono)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:15.5px}
+th{text-align:left;font:600 13px var(--sans);letter-spacing:.04em;color:var(--muted);padding:12px 16px;background:var(--soft);white-space:nowrap}
+td{padding:14px 16px;border-top:1px solid var(--line);vertical-align:top}
+td small{display:block;color:var(--muted);font-size:14px}
+.r{text-align:right}
+.chip{display:inline-block;font:600 13px var(--sans);padding:3px 10px;border-radius:999px;white-space:nowrap}
+.c-warn{background:var(--warn-bg);color:var(--warn)}.c-good{background:var(--good-bg);color:var(--good)}.c-info{background:var(--info-bg);color:var(--info)}.c-bad{background:var(--bad-bg);color:var(--bad)}
+.btn{font:600 15.5px var(--sans);border-radius:10px;padding:10px 16px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--fg);white-space:nowrap}
+.btn.p{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,.role button:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.note{background:var(--info-bg);color:var(--info);border-radius:12px;padding:14px 18px;font-size:15.5px}
+.empty{padding:24px 20px;color:var(--muted)}
+.dd{position:relative;display:inline-block}
+.ddm{position:absolute;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:5;min-width:220px;display:grid}
+.ddm button{background:none;border:0;text-align:left;font:500 16px var(--sans);color:var(--fg);padding:10px 12px;border-radius:8px;cursor:pointer}
+.ddm button:hover{background:var(--soft)}
+.ovl{position:fixed;inset:0;background:#0b1a2699;display:grid;place-items:center;padding:16px;z-index:20}
+.modal{background:var(--surface);border-radius:16px;width:min(620px,100%);max-height:92vh;overflow:auto;box-shadow:0 24px 60px #0006}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--line)}
+.mh h3{font-size:21px}
+.x{background:none;border:0;font-size:24px;color:var(--muted);cursor:pointer}
+.mb{padding:20px 22px;display:grid;gap:14px;grid-template-columns:1fr 1fr}
+.mb .full{grid-column:1/-1}
+label{display:grid;gap:6px;font:500 15px var(--sans);color:var(--muted)}
+input,select{font:400 16.5px var(--sans);color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0;width:100%}
+.who{background:var(--soft);border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.who b{display:block}
+.fee{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.fee span{color:var(--muted);font-size:14.5px}
+.fee b{font:600 22px var(--mono);color:var(--navy)}
+:root[data-theme="dark"] .fee b{color:var(--fg)}
+.mf{display:flex;justify-content:flex-end;gap:8px;padding:16px 22px;border-top:1px solid var(--line)}
+.lines{display:grid;gap:8px}
+.line{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:10px 14px;border:1px solid var(--line);border-radius:10px}
+.line b{font-family:var(--mono)}
+.lnk{background:none;border:0;color:var(--bad);font:500 14px var(--sans);cursor:pointer}
+.misc{display:grid;grid-template-columns:1.2fr 1fr 1fr auto;gap:8px;align-items:end}
+.total{display:flex;justify-content:space-between;font-weight:600;padding:4px 2px}
+.total b{font:700 20px var(--mono)}
+.modes{display:flex;gap:8px;flex-wrap:wrap}
+.modes button{font:500 15.5px var(--sans);padding:9px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.modes button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:12px;font-size:15.5px;z-index:30;max-width:calc(100% - 32px)}
+.seg{display:inline-flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;width:max-content}
+.seg button{border:0;background:none;font:600 16px var(--sans);color:var(--fg);padding:9px 16px;border-radius:9px;display:flex;gap:8px;align-items:center}
+.seg button span{font:600 12px var(--mono);background:var(--soft);border-radius:10px;padding:1px 8px}
+.seg button.on{background:var(--blue);color:#fff}.seg button.on span{background:#ffffff33}
+.filters{display:flex;gap:12px;align-items:center;padding:16px 20px;flex-wrap:wrap}
+.search{flex:1;min-width:0}
+.tname{color:var(--navy);display:block}
+:root[data-theme="dark"] .tname{color:var(--fg)}
+.btn.sm{padding:7px 12px;font-size:14.5px}
+.openreq{display:block;color:var(--warn);font-size:13px;margin-top:4px}
+@media (max-width:640px){
+  .mb{grid-template-columns:1fr}.misc{grid-template-columns:1fr 1fr}.totals{margin-left:0}
+  table,thead,tbody,tr,td{display:block}thead{display:none}
+  tr{border-top:1px solid var(--line);padding:10px 16px}td{border:0;padding:4px 0}
+  td[data-l]:not([data-l=""])::before{content:attr(data-l);display:block;font:600 12px var(--sans);color:var(--muted);letter-spacing:.04em}
+  .r{text-align:left}
+}
+</style>
+
+<header class="top"><div class="wrap">
+  <div class="brand">
+    <div class="logo"><div class="mark">NW</div><b>New <span>Wave</span> portal</b><span class="proto">PROTOTYPE</span></div>
+    <div class="role" role="tablist" aria-label="Working as">
+      <button id="r-reg" class="on" onclick="setRole('reg')">Registration</button>
+      <button id="r-cash" onclick="setRole('cash')">Cashier</button>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs"></nav>
+</div></header>
+<main id="app"></main>
+<div id="layer"></div>
+
+<script>
+const peso=v=>"₱"+(v/100).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+const peso0=v=>"₱"+(v/100).toLocaleString("en-PH",{maximumFractionDigits:2});
+const fmt=iso=>new Date(iso+"T00:00:00").toLocaleDateString("en-PH",{month:"short",day:"numeric",year:"numeric"});
+const days=(a,b)=>Math.round((new Date(b+"T00:00:00")-new Date(a+"T00:00:00"))/864e5);
+const TODAY="2026-10-08";
+const TYPES=["Cancellation","Rescheduling","Change course","Make-up class","Reprinting"];
+const label=t=>t==="Rescheduling"?"Reschedule":t;
+// Fee rules (owner, 8 Oct 2026).
+function policyFee(type,fee,start,asked){
+  const d=days(asked,start), when=d>1?`${d} days before the start`:d===1?"1 day before the start":d===0?"on the start date":"after the start";
+  if(type==="Rescheduling") return d>=3?{amt:30000,rule:`${when}: ₱300.00`}:{amt:Math.round(fee/2)+25000,rule:`${when}: 50% of ${peso(fee)} + ₱250.00`};
+  if(type==="Cancellation") return d>=5?{amt:30000,rule:`${when}: ₱300.00`}:{amt:Math.round(fee/2)+25000,rule:`${when}: 50% of ${peso(fee)} + ₱250.00`};
+  if(type==="Make-up class") return {amt:35000,rule:"₱350.00 per make-up training day"};
+  if(type==="Reprinting") return {amt:15000,rule:"Certificate reprinting fee"};
+  if(type==="Change course") return {amt:0,rule:"Price difference, if any, is set by the Cashier"};
+  return null;
+}
+const S={role:"reg",menu:null,toast:"",search:"",
+  trainees:[
+    {id:"t1",name:"TEST DRYRUN",no:"NWMTACI-0000003",reg:"NWM-2026-000013",email:"dryrun.test@example.com",mobile:"+639170000001",registered:"Oct 7, 2026",
+      enrollments:[{id:"e1",no:"ENR-2026-000021",code:"CCMI",course:"Crowd and Crisis Management (CCMI)",start:"2026-10-13",fee:250000,paid:250000,status:"Enrolled"}]},
+    {id:"t2",name:"PUWEE GARET GARCIA",no:"NWMTACI-0000007",reg:"NWM-2026-000012",email:"kgaret13@gmail.com",mobile:"+639275581824",registered:"Oct 7, 2026",
+      enrollments:[{id:"e2",no:"ENR-2026-000019",code:"PSCMT",course:"Crowd Management Training (PSCMT)",start:"2026-10-13",fee:160000,paid:0,status:"Pending"},
+                   {id:"e3",no:"ENR-2026-000022",code:"PSCMHBT",course:"Crisis Management (PSCMHBT)",start:"2026-10-09",fee:350000,paid:350000,status:"Enrolled"}]},
+    {id:"t3",name:"KATE ESGUERRA",no:"NWMTACI-0000001",reg:"NWM-2026-000011",email:"pkmesguerra.ph@gmail.comm",mobile:"+639152932722",registered:"Oct 7, 2026",
+      enrollments:[{id:"e4",no:"ENR-2026-000020",code:"STPPDSPPS",course:"Safety (STPPDSPPS)",start:"2026-10-12",fee:150000,paid:150000,status:"Enrolled"}]},
+  ],
+  requests:[]};
+const balanceOf=t=>t.enrollments.filter(e=>e.status!=="Cancelled").reduce((s,e)=>s+e.fee-e.paid,0);
+const statusOf=t=>t.enrollments.some(e=>e.status==="Pending")?"Pending":t.enrollments.every(e=>e.status==="Cancelled")?"Cancelled":"Enrolled";
+function toast(t){S.toast=t;render();setTimeout(()=>{S.toast="";render()},3400)}
+function setRole(r){S.role=r;S.menu=null;document.getElementById("r-reg").className=r==="reg"?"on":"";document.getElementById("r-cash").className=r==="cash"?"on":"";render()}
+function chip(stage){return stage==="cashier"?'<span class="chip c-warn">With the Cashier · unpaid</span>':'<span class="chip c-good">Paid · applied</span>'}
+function steps(active){const L=["Registration requests","Cashier collects the fee","Applied once paid"];return '<div class="steps">'+L.map((l,i)=>`<div class="step ${i<active?"done":i===active?"now":""}"><b>${i+1}</b>${l}</div>`).join("")+'</div>'}
+document.addEventListener("click",e=>{if(S.menu&&!e.target.closest(".dd")){S.menu=null;render()}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&(S.menu||S.modal)){S.menu=null;S.modal=null;render()}});
+
+function regView(){
+  const q=S.search.toLowerCase(), list=S.trainees.filter(t=>`${t.name} ${t.no} ${t.email} ${t.mobile}`.toLowerCase().includes(q));
+  const last=S.requests[0];
+  return `${steps(last?(last.stage==="applied"?3:1):0)}
+  <div class="head"><span class="eyebrow">Enrollments · trainees</span><h1>Registration</h1></div>
+  <div class="seg"><button>Enrollments <span>9</span></button><button class="on">Trainees <span>${S.trainees.length}</span></button></div>
+  <section class="panel">
+    <div class="filters"><input class="search" placeholder="Search name, NWMTACI number, SRN, email or mobile" value="${S.search}" oninput="S.search=this.value;render();document.querySelector('.search').focus()"><span class="meta">${list.length} of ${S.trainees.length}</span></div>
+    <div class="tw"><table><thead><tr><th>Trainee</th><th>Contact</th><th>Courses</th><th>Status</th><th class="r">Balance</th><th>Request</th><th>Registered</th></tr></thead><tbody>
+    ${list.map(t=>{const st=statusOf(t),open=S.requests.filter(r=>r.tid===t.id&&r.stage==="cashier").length;return `<tr>
+      <td data-l=""><b class="tname">${t.name}</b><div><span class="tag">${t.no}</span> <span class="meta">${t.reg}</span></div></td>
+      <td data-l="Contact">${t.email}<small>${t.mobile}</small></td>
+      <td data-l="Courses">${t.enrollments[0].code}${t.enrollments.length>1?`<small>+${t.enrollments.length-1} more</small>`:""}</td>
+      <td data-l="Status"><span class="chip ${st==="Pending"?"c-warn":st==="Cancelled"?"c-bad":"c-good"}">${st}</span></td>
+      <td data-l="Balance" class="r"><b class="mono">${peso0(balanceOf(t))}</b></td>
+      <td data-l="Request"><div class="dd"><button class="btn sm" aria-haspopup="menu" aria-expanded="${S.menu===t.id}" onclick="S.menu=S.menu==='${t.id}'?null:'${t.id}';render()">Request ▾</button>${open?`<small class="openreq">${open} with the Cashier</small>`:""}
+        ${S.menu===t.id?`<div class="ddm" role="menu">${TYPES.map(x=>`<button role="menuitem" onclick="openRequest('${t.id}','${x}')">${label(x)}</button>`).join("")}</div>`:""}</div></td>
+      <td data-l="Registered">${t.registered}</td></tr>`}).join("")}
+    </tbody></table></div>
+  </section>
+  ${S.requests.length?`<section class="panel"><div class="ph"><h2>Requests sent</h2><span class="count">${S.requests.length}</span></div><div class="tw"><table><thead><tr><th>Trainee</th><th>Request</th><th>Requested on</th><th class="r">Fee</th><th>Status</th></tr></thead><tbody>${S.requests.map(r=>`<tr><td data-l=""><b>${r.trainee}</b><small class="mono">${r.tno}</small></td><td data-l="Request"><b>${label(r.type)}</b><small>${r.course} · ${r.reason}</small></td><td data-l="Requested on">${fmt(r.asked)}</td><td data-l="Fee" class="r"><b class="mono">${peso(r.fee.amt)}</b><small>${r.fee.rule}</small></td><td data-l="Status">${chip(r.stage)}</td></tr>`).join("")}</tbody></table></div></section>`:""}`;
+}
+function cashView(){
+  const open=S.requests.filter(r=>r.stage==="cashier"), done=S.requests.filter(r=>r.stage==="applied");
+  return `${steps(open.length?1:done.length?3:1)}
+  <div class="head"><span class="eyebrow">Accounting</span><h1>Requests</h1></div>
+  <section class="panel"><div class="ph"><h2>Waiting for payment</h2>${open.length?`<span class="count">${open.length}</span>`:""}</div>${open.length?`<div class="tw"><table><thead><tr><th>Trainee</th><th>Request</th><th>Training starts</th><th>Requested on</th><th class="r">Fee</th><th></th></tr></thead><tbody>${open.map(r=>`<tr><td data-l=""><b>${r.trainee}</b><small class="mono">${r.tno}</small></td><td data-l="Request"><b>${label(r.type)}</b><small>${r.course}${r.target?` → ${r.target}`:""}</small><small>${r.reason}</small></td><td data-l="Training starts">${fmt(r.start)}</td><td data-l="Requested on">${fmt(r.asked)}</td><td data-l="Fee" class="r"><b class="mono">${peso(r.fee.amt)}</b><small>${r.fee.rule}</small></td><td data-l=""><button class="btn p" onclick="openPay('${r.id}')">${r.fee.amt?"Collect fee":"Apply (no fee)"}</button></td></tr>`).join("")}</tbody></table></div>`:'<p class="empty">No requests waiting for payment. Switch to Registration and use Request ▾ on a trainee.</p>'}</section>
+  ${done.length?`<section class="panel"><div class="ph"><h2>Applied</h2></div><div class="tw"><table><tbody>${done.map(r=>`<tr><td data-l=""><b>${r.trainee}</b><small>${label(r.type)} · ${r.course}</small></td><td data-l="Receipt" class="mono">${r.receipt}</td><td data-l="Paid" class="r mono">${peso(r.fee.amt)}</td><td data-l="">${chip("applied")}</td></tr>`).join("")}</tbody></table></div></section>`:""}
+  <div class="note">The request is applied automatically the moment its fee is fully paid. A cancellation cancels the enrollment and frees the seat; a reschedule moves the trainee to the new batch.</div>`;
+}
+function render(){
+  document.getElementById("tabs").innerHTML=S.role==="reg"?'<span>Dashboard</span><span>Courses</span><span>Instructions</span><span class="on">Trainees and enrollments</span>':'<span>Dashboard</span><span>Enrollments ▾</span><span class="on">Accounting ▾ · Requests</span>';
+  document.getElementById("app").innerHTML=S.role==="reg"?regView():cashView();
+  document.getElementById("layer").innerHTML=(S.modal?S.modal():"")+(S.toast?`<div class="toast" role="status">${S.toast}</div>`:"");
+}
+
+// Registration: request form (pick the course when the trainee has more than one)
+let F={};
+function openRequest(tid,type){const t=S.trainees.find(x=>x.id===tid);S.menu=null;const usable=t.enrollments.filter(e=>e.status!=="Cancelled");F={t,type,eid:usable.length===1?usable[0].id:"",asked:TODAY,reason:"",target:""};S.modal=requestModal;render()}
+function requestModal(){const {t,type}=F, usable=t.enrollments.filter(e=>e.status!=="Cancelled"), e=usable.find(x=>x.id===F.eid), fee=e?policyFee(type,e.fee,e.start,F.asked||TODAY):null;
+  return `<div class="ovl"><div class="modal" role="dialog" aria-label="Request"><div class="mh"><h3>${label(type)} request</h3><button class="x" onclick="S.modal=null;render()" aria-label="Close">×</button></div>
+  <div class="mb"><div class="who full"><div><b>${t.name}</b><span class="meta mono">${t.no}</span></div><div class="meta">${t.mobile}</div></div>
+  <label class="full">Course<select onchange="F.eid=this.value;render()">${usable.length>1?'<option value="">Choose the course</option>':""}${usable.map(x=>`<option value="${x.id}" ${F.eid===x.id?"selected":""}>${x.course} · starts ${fmt(x.start)}</option>`).join("")}</select></label>
+  <label>Date requested<input type="date" value="${F.asked}" max="${TODAY}" oninput="F.asked=this.value;render()"></label>
+  ${type==="Rescheduling"?`<label>New batch<select onchange="F.target=this.value"><option value="">Choose</option><option ${F.target==="Oct 16, 2026 batch"?"selected":""}>Oct 16, 2026 batch</option><option ${F.target==="Oct 23, 2026 batch"?"selected":""}>Oct 23, 2026 batch</option></select></label>`:type==="Change course"?`<label>New course<select onchange="F.target=this.value"><option value="">Choose</option><option>Basic Training (BT)</option><option>Ship Security Awareness</option></select></label>`:"<span></span>"}
+  <label class="full">Reason<input value="${F.reason}" oninput="F.reason=this.value" placeholder="Why is this being requested?"></label>
+  ${fee?`<div class="fee full"><div><span>Fee to collect at the Cashier</span><div>${fee.rule}</div></div><b>${peso(fee.amt)}</b></div>`:e?"":'<p class="meta full">Choose the course to see the fee.</p>'}
+  </div><div class="mf"><button class="btn" onclick="S.modal=null;render()">Cancel</button><button class="btn p" ${e?"":"disabled"} onclick="sendRequest()">Send to Cashier</button></div></div></div>`}
+function sendRequest(){if(!F.reason.trim()){toast("Enter a reason for the request.");return}const {t,type}=F,e=t.enrollments.find(x=>x.id===F.eid),fee=policyFee(type,e.fee,e.start,F.asked||TODAY);
+  S.requests.unshift({id:"q"+Date.now(),no:"REQ-2026-0000"+(18+S.requests.length),tid:t.id,trainee:t.name,tno:t.no,enr:e.no,course:e.course,type,asked:F.asked||TODAY,start:e.start,fee,stage:"cashier",reason:F.reason.trim(),target:F.target});
+  S.modal=null;toast("Sent to the Cashier. It is applied once the trainee pays "+peso(fee.amt)+".")}
+
+// Cashier: record payment for the request fee (+ Uniform / Others)
+let P={};
+const MISC=[{name:"Uniform",amt:15000},{name:"Others",amt:0}];
+function openPay(id){const r=S.requests.find(x=>x.id===id);P={r,items:[],mode:"Cash",ref:"",pick:"Uniform",qty:1,oname:"",oamt:""};S.modal=payModal;render()}
+function payTotal(){return P.r.fee.amt+P.items.reduce((s,i)=>s+i.amt*i.qty,0)}
+function payModal(){const r=P.r;
+  return `<div class="ovl"><div class="modal" role="dialog" aria-label="Record payment"><div class="mh"><h3>Record payment</h3><button class="x" onclick="S.modal=null;render()" aria-label="Close">×</button></div>
+  <div class="mb"><div class="who full"><div><b>${r.trainee}</b><span class="meta mono">${r.tno}</span></div><div class="meta">${r.no}</div></div>
+  <div class="lines full">
+    <div class="line"><div><b style="font-family:var(--sans)">${label(r.type)} fee</b><div class="meta">${r.fee.rule}</div></div><b>${peso(r.fee.amt)}</b><span></span></div>
+    ${P.items.map((i,k)=>`<div class="line"><div>Miscellaneous: ${i.name}${i.qty>1?` × ${i.qty}`:""}</div><b>${peso(i.amt*i.qty)}</b><button class="lnk" onclick="P.items.splice(${k},1);render()">Remove</button></div>`).join("")}
+  </div>
+  <div class="full"><label style="margin-bottom:6px">Add miscellaneous charges</label><div class="misc">
+    <select onchange="P.pick=this.value;render()">${MISC.map(m=>`<option ${P.pick===m.name?"selected":""}>${m.name}</option>`).join("")}</select>
+    ${P.pick==="Others"?`<input placeholder="What is it?" value="${P.oname}" oninput="P.oname=this.value"><input class="mono" inputmode="decimal" placeholder="Amount" value="${P.oamt}" oninput="P.oamt=this.value">`:`<input class="mono" inputmode="numeric" value="${P.qty}" oninput="P.qty=Math.max(1,parseInt(this.value)||1)" aria-label="Quantity"><input class="mono" value="${peso(15000)} each" disabled>`}
+    <button class="btn" onclick="addMisc()">Add</button></div></div>
+  <div class="full total"><span>Total to collect</span><b>${peso(payTotal())}</b></div>
+  <div class="full"><label style="margin-bottom:6px">Mode of payment</label><div class="modes">${["Cash","GCash","PSBank","UnionBank"].map(m=>`<button class="${P.mode===m?"on":""}" onclick="P.mode='${m}';render()">${m}</button>`).join("")}</div></div>
+  ${P.mode!=="Cash"?`<label class="full">Reference number (required)<input class="mono" value="${P.ref}" oninput="P.ref=this.value.toUpperCase()"></label>`:""}
+  </div><div class="mf"><button class="btn" onclick="S.modal=null;render()">Cancel</button><button class="btn p" onclick="pay()">Record ${peso(payTotal())}</button></div></div></div>`}
+function addMisc(){if(P.pick==="Others"){const a=Math.round(parseFloat(String(P.oamt).replace(/,/g,""))*100);if(!P.oname.trim()||!(a>0)){toast("Enter what it is and the amount.");return}P.items.push({name:P.oname.trim(),amt:a,qty:1});P.oname="";P.oamt=""}else P.items.push({name:"Uniform",amt:15000,qty:P.qty});render()}
+function pay(){if(P.mode!=="Cash"&&!P.ref.trim()){toast("Enter the "+P.mode+" reference number.");return}const r=P.r;r.stage="applied";r.receipt="OR-2026-000"+(421+S.requests.indexOf(r));
+  const t=S.trainees.find(x=>x.id===r.tid),e=t?.enrollments.find(x=>x.no===r.enr);if(e){if(r.type==="Cancellation")e.status="Cancelled";if(r.type==="Rescheduling"&&r.target){const d=r.target.match(/Oct (\d+)/);if(d)e.start=`2026-10-${d[1]}`}}
+  S.modal=null;toast(`Paid ${peso(payTotal())}. ${r.type==="Cancellation"?"The enrollment is cancelled and the seat is freed.":r.type==="Rescheduling"?"The trainee is moved to the new batch.":"The request is applied."}`)}
+render();
+</script>

@@ -1,0 +1,210 @@
+<title>Admin Assistant Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Admin Assistant: requisitions, resource planning, instructor shortlist. */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA;
+  --bg:#f3f6fa; --surface:#ffffff; --line:#dfe7ee; --fg:#0f2638; --muted:#5f7180; --soft:#eef4f8; --warnbg:#fde7dc; --okbg:#e3f4ea; --badbg:#fbe4dc; --infobg:#e2effb;
+  --green:#15803d; --red:#b42318; --amber:#b45309; --violet:#7c3aed;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}
+.top{background:var(--navy);color:#fff;padding:14px 24px 0}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand b{font-size:19px;color:var(--cyan)} .brand small{display:block;font-size:10px;letter-spacing:.06em;color:#cfe3f1}
+.who{display:flex;align-items:center;gap:8px;font-size:14px;color:#cfe3f1}
+.who select{font:500 14px var(--sans);padding:6px 10px;border-radius:8px;border:1px solid #3b6a90;background:transparent;color:#fff}.who select option{color:#0f2638}
+.tabs{display:flex;gap:4px;margin-top:14px;overflow-x:auto}
+.tabs button{padding:10px 18px;color:#d6e6f2;font:500 15px var(--sans);border-radius:10px 10px 0 0;white-space:nowrap;background:none;border:0;cursor:pointer}
+.tabs button.on{background:var(--bg);color:var(--fg)}
+.clock{max-width:1240px;margin:0 auto;padding:14px 24px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.clock button{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 13.5px var(--sans);padding:6px 12px;border-radius:99px;cursor:pointer}
+.clock button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.page{max-width:1240px;margin:0 auto;padding-block:16px 48px;padding-inline:24px;display:flex;flex-direction:column;gap:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}
+h1{margin:2px 0 0;font-size:28px;line-height:1.2}
+.note{margin:-8px 0 0;color:var(--muted);font-size:14px}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 14px var(--sans);padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}.btn.org{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600}.btn.sm{padding:6px 11px;font-size:13.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.rail{display:grid;grid-template-columns:minmax(300px,350px) minmax(0,1fr);gap:20px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 20px 12px;flex-wrap:wrap}
+.ph h2{margin:0;font-size:17px;font-weight:600} .ph .m{color:var(--muted);font-size:13.5px}
+.pb{padding:0 20px 20px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.col{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.crow{display:grid;grid-template-columns:10px 1fr auto;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+.crow:last-child{border-bottom:0}.crow b{font:600 16px var(--mono)}
+.dot{width:10px;height:10px;border-radius:3px;background:var(--c)}
+.crow.tot{background:var(--navy);color:#fff}.crow.tot .dot{background:var(--orange)}
+.crow.alarm{background:var(--badbg)}.crow.alarm span,.crow.alarm b{color:var(--red);font-weight:700}
+.lines{margin:0}.lines>div{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}.lines>div:last-child{border-bottom:0}.lines dt{color:var(--muted)}.lines dd{margin:0;font:600 15px var(--mono)}
+.banner{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-radius:12px;padding:12px 16px}
+.banner.red{background:var(--red);color:#fff}.banner.amber{background:var(--warnbg);color:var(--amber)}.banner.green{background:var(--okbg);color:var(--green)}.banner.blue{background:var(--infobg);color:var(--blue)}
+.banner b{font-size:15.5px}.banner .sp{flex:1}.banner .btn{background:#fff}
+.log{width:100%;border-collapse:collapse;font-size:14.5px;border:1px solid #9fb2c1}
+.log th{background:var(--navy);color:#fff;font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:9px 10px;border-right:1px solid #2c5a7f;white-space:nowrap}
+.log td{padding:7px 10px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);white-space:nowrap}
+.log tbody tr:nth-child(even) td{background:var(--soft)}
+.log td.no{text-align:center;color:var(--muted);width:34px}.log td.r{text-align:right}
+.log tr.out td{color:var(--muted);text-decoration:line-through}
+.wrap{overflow-x:auto;margin:0 20px 20px}
+.batch{margin:0 20px 6px;display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.batch b{font-size:15px}.batch span{color:var(--muted);font-size:13.5px}
+.pill{display:inline-block;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.p-ok{background:var(--okbg);color:var(--green)}.p-warn{background:var(--warnbg);color:var(--orange)}.p-bad{background:var(--badbg);color:var(--red)}.p-info{background:var(--infobg);color:var(--blue)}.p-mute{background:var(--soft);color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:16px 20px 22px}
+.foot{margin:10px 0 0;font-size:13px;color:var(--muted)}
+/* printable sheet */
+.sheet{background:#fff;color:#0f2638;border:1px solid var(--line);border-radius:6px;padding:26px 30px;max-width:900px;margin:0 auto;width:100%}
+.sheet header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #123F63;padding-bottom:10px;margin-bottom:12px;gap:12px;flex-wrap:wrap}
+.sheet h2{margin:0;color:#123F63;font-size:19px}.sheet small{color:#5f7180}
+.sheet .log th{background:#123F63}.sheet .log tbody tr:nth-child(even) td{background:#f5f8fb}.sheet .log td{border-color:#dfe7ee;color:#0f2638}
+.sigs{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:34px}.sigs div{border-top:1px solid #0f2638;padding-top:6px;font-size:13px;text-align:center}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 20px 20px}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}.form .full{grid-column:1/-1}
+.form input,.form select{font:400 14.5px var(--sans);padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg)}
+.flow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:0 20px 18px;font-size:13.5px}
+.flow span{padding:5px 10px;border-radius:99px;background:var(--soft);color:var(--muted);font-weight:600}.flow span.done{background:var(--okbg);color:var(--green)}.flow span.now{background:var(--warnbg);color:var(--orange)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;z-index:10}
+@media (max-width:1040px){.rail{grid-template-columns:1fr}}
+@media (max-width:600px){.form{grid-template-columns:1fr}.sigs{grid-template-columns:1fr}}
+@media (max-width:480px){.page,.clock{padding-inline:16px}.top{padding-inline:16px}}
+@media print{.top,.clock,.noprint{display:none!important}body{background:#fff}.page{padding:0}}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+</style>
+<style>
+.lines-tbl input,.lines-tbl select{font:400 14px var(--sans);padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);width:100%}
+.lines-tbl td{white-space:normal}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.warn{color:var(--red);font-size:12.5px;font-weight:600;display:block;margin-top:3px}
+.tot-row{display:flex;justify-content:flex-end;gap:14px;align-items:center;padding:0 20px 18px;font-size:15px}
+.tot-row b{font:700 18px var(--mono)}
+.who-tag{font-size:12px;color:var(--muted)}
+</style>
+<div class="top">
+  <div class="brand"><div><b>NEW WAVE</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div>
+    <div class="who">Working As <select id="role"><option value="aa">Admin Assistant</option><option value="acct">Accounting</option><option value="cash">Cashier</option></select></div></div>
+  <nav class="tabs" id="tabs"></nav>
+</div>
+<main class="page" id="page"></main>
+<div class="toast" id="toast" hidden></div>
+<script>
+const peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
+const S={role:"aa",tab:"Dashboard",
+ items:[{n:"Coffee Cups",u:"pack of 50",c:18000,a:true},{n:"Coffee Beans",u:"kg",c:65000,a:true},{n:"Adapters",u:"pc",c:25000,a:true},{n:"Bond Paper A4",u:"ream",c:24000,a:true},{n:"Whiteboard Markers",u:"box",c:32000,a:true}],
+ reqs:[
+  {no:"RQ-2026-0004",d:"Oct 9",purpose:"Pantry restock",need:"Oct 12",lines:[["Coffee Cups",4,18000],["Coffee Beans",2,65000]],st:"For Approval"},
+  {no:"RQ-2026-0003",d:"Oct 7",purpose:"Room 2 projector",need:"Oct 8",lines:[["Adapters",2,25000]],st:"Approved",cv:"CV-2026-000131",by:"Accounting"},
+  {no:"RQ-2026-0002",d:"Oct 3",purpose:"Classroom supplies",need:"Oct 5",lines:[["Whiteboard Markers",3,32000],["Bond Paper A4",5,24000]],st:"Released",cv:"CV-2026-000122",by:"Admin"},
+  {no:"RQ-2026-0001",d:"Oct 1",purpose:"Pantry",need:"Oct 2",lines:[["Coffee Beans",6,65000]],st:"Rejected",why:"Stock still available"}],
+ draft:[["Coffee Cups",1,18000]],
+ rooms:[{n:"Room 1",cap:24},{n:"Room 2",cap:24},{n:"Simulator Room",cap:12},{n:"Pool Area",cap:30}],
+ inst:[
+  {n:"Capt. R. Villanueva",m:"0917 555 0101",e:"rvillanueva@gmail.com",acc:[["UBT-PSSR","ACC-1182","2027-03-31"],["PSCMT","ACC-1190","2027-03-31"]]},
+  {n:"C/E M. Ramos",m:"0918 555 0144",e:"mramos@gmail.com",acc:[["PSCMHBT","ACC-1201","2026-10-20"],["CCMD","ACC-1210","2027-06-30"]]},
+  {n:"2/O J. Dizon",m:"0919 555 0177",e:"jdizon@gmail.com",acc:[["STPPDSPPS","ACC-1102","2026-09-30"],["UBT-PSSR","ACC-1188","2027-01-15"]]}],
+ batches:[
+  {c:"UBT-PSSR",name:"Updating Training on BT – PSSR",b:"BCH-2026-0412",d:"Oct 10",st:22,room:"Room 1",i:"Capt. R. Villanueva"},
+  {c:"STPPDSPPS",name:"Ship Security Awareness",b:"BCH-2026-0413",d:"Oct 12",st:18,room:"",i:"2/O J. Dizon"},
+  {c:"PSCMT",name:"Crowd Management",b:"BCH-2026-0414",d:"Oct 13–14",st:26,room:"Room 2",i:"Capt. R. Villanueva"},
+  {c:"CCMD",name:"Crisis Management – Domestic",b:"BCH-2026-0415",d:"Oct 12–14",st:9,room:"Simulator Room",i:""},
+  {c:"PSCMHBT",name:"Crisis Management & Human Behavior",b:"BCH-2026-0416",d:"Oct 15–17",st:20,room:"",i:"C/E M. Ramos"}],
+ adding:false};
+const TODAY="2026-10-09";
+const total=r=>r.lines.reduce((s,l)=>s+l[1]*l[2],0);
+const pill=st=>({"For Approval":"p-warn","Approved":"p-info","Released":"p-ok","Rejected":"p-bad"})[st];
+function toast(t){const e=document.getElementById("toast");e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2200)}
+function accFor(name,code){const i=S.inst.find(x=>x.n===name);if(!i)return null;return i.acc.find(a=>a[0]===code)||false}
+function issues(b){const out=[];const r=S.rooms.find(x=>x.n===b.room);
+ if(!b.room)out.push("No classroom");else if(r&&b.st>r.cap)out.push(`Students exceed room capacity (${r.cap})`);
+ if(!b.i)out.push("No instructor");else{const a=accFor(b.i,b.c);if(a===false)out.push("Instructor not accredited for "+b.c);else if(a&&a[2]<TODAY)out.push("Accreditation expired");}
+ return out}
+const TABS={aa:["Dashboard","Requisitions","Resource Planning","Instructors"],acct:["Approvals","Requisition Items"],cash:["Expenses"]};
+function render(){
+ const tabs=TABS[S.role];if(!tabs.includes(S.tab))S.tab=tabs[0];
+ document.getElementById("tabs").innerHTML=tabs.map(t=>`<button class="${t===S.tab?"on":""}" data-tab="${t}">${t}</button>`).join("");
+ document.getElementById("page").innerHTML=({Dashboard:dash,Requisitions:reqs,"Resource Planning":plan,Instructors:insts,Approvals:appr,"Requisition Items":itemsCfg,Expenses:cash})[S.tab]();
+}
+function head(e,t,act=""){return `<div class="head"><div><span class="eyebrow">${e}</span><h1>${t}</h1></div><div class="acts">${act}</div></div>`}
+function dash(){
+ const wait=S.reqs.filter(r=>r.st==="For Approval").length,appr=S.reqs.filter(r=>r.st==="Approved").length,rel=S.reqs.filter(r=>r.st==="Released").length;
+ const gaps=S.batches.filter(b=>issues(b).length),exp=S.inst.flatMap(i=>i.acc.filter(a=>a[2]<="2026-11-08").map(a=>[i.n,...a]));
+ return head("Admin Assistant","Dashboard",`<button class="btn pri" data-go="Requisitions" data-new="1">New Requisition</button>`)+`
+ <div class="rail"><div class="stack">
+  <section class="panel"><div class="ph"><h2>Requisitions</h2><span class="m">October 2026</span></div><div class="pb"><div class="col">
+   <div class="crow" style="--c:var(--orange)"><i class="dot"></i><span>For Approval</span><b>${wait}</b></div>
+   <div class="crow" style="--c:var(--blue)"><i class="dot"></i><span>Approved · Waiting for Cashier</span><b>${appr}</b></div>
+   <div class="crow" style="--c:var(--green)"><i class="dot"></i><span>Released</span><b>${rel}</b></div>
+   <div class="crow tot"><i class="dot"></i><span>Released This Month</span><b>${peso(S.reqs.filter(r=>r.st==="Released").reduce((s,r)=>s+total(r),0))}</b></div></div></div></section>
+  <section class="panel"><div class="ph"><h2>Resources This Week</h2></div><div class="pb"><dl class="lines">
+   <div><dt>Batches</dt><dd>${S.batches.length}</dd></div><div><dt>Students</dt><dd>${S.batches.reduce((s,b)=>s+b.st,0)}</dd></div>
+   <div><dt>Need Attention</dt><dd style="color:var(--red)">${gaps.length}</dd></div><div><dt>Instructors on Shortlist</dt><dd>${S.inst.length}</dd></div></dl></div></section>
+ </div><div class="stack">
+  ${gaps.length?`<div class="banner red"><b>${gaps.length} batches need a classroom, an instructor or a check</b><span class="sp"></span><button class="btn sm" data-go="Resource Planning">Open Resource Planning</button></div>`:""}
+  <section class="panel"><div class="ph"><h2>Batches That Need Attention</h2></div><div class="wrap"><table class="log"><thead><tr><th>#</th><th>Batch</th><th>Course</th><th>Dates</th><th>Issue</th></tr></thead><tbody>
+   ${gaps.map((b,i)=>`<tr><td class="no">${i+1}</td><td class="mono">${b.b}</td><td>${b.c}</td><td>${b.d}</td><td style="color:var(--red)">${issues(b).join(" · ")}</td></tr>`).join("")}</tbody></table></div></section>
+  <section class="panel"><div class="ph"><h2>Accreditations Expiring or Expired</h2><span class="m">Next 30 days</span></div><div class="wrap"><table class="log"><thead><tr><th>Instructor</th><th>Course</th><th>Accreditation No.</th><th>Valid Until</th></tr></thead><tbody>
+   ${exp.map(x=>`<tr><td>${x[0]}</td><td>${x[1]}</td><td class="mono">${x[2]}</td><td><span class="pill ${x[3]<TODAY?"p-bad":"p-warn"}">${x[3]}${x[3]<TODAY?" · Expired":""}</span></td></tr>`).join("")}</tbody></table></div></section>
+ </div></div>`}
+function reqForm(){const tot=S.draft.reduce((s,l)=>s+l[1]*l[2],0);
+ return `<section class="panel"><div class="ph"><h2>New Requisition</h2><span class="m">RQ-2026-0005</span></div>
+ <div class="form"><label>Purpose<input id="rp" value="Pantry restock"></label><label>Needed By<input type="date" id="rn" value="2026-10-13"></label></div>
+ <div class="wrap"><table class="log lines-tbl"><thead><tr><th>Item</th><th>Quantity</th><th>Unit Cost</th><th>Amount</th><th></th></tr></thead><tbody>
+ ${S.draft.map((l,i)=>`<tr><td><select data-li="${i}" data-k="0">${S.items.filter(x=>x.a).map(x=>`<option ${x.n===l[0]?"selected":""}>${x.n}</option>`).join("")}</select></td><td><input type="number" min="1" value="${l[1]}" data-li="${i}" data-k="1"></td><td><input type="number" min="0" step="0.01" value="${(l[2]/100).toFixed(2)}" data-li="${i}" data-k="2"></td><td class="mono r">${peso(l[1]*l[2])}</td><td><button class="btn sm" data-rm="${i}">Remove</button></td></tr>`).join("")}
+ </tbody></table></div>
+ <div class="tot-row"><button class="btn sm" id="addl">Add Item</button><span class="sp" style="flex:1"></span>Total <b>${peso(tot)}</b><button class="btn" id="cancel">Cancel</button><button class="btn org" id="send">Send for Approval</button></div></section>`}
+function reqs(){return head("Admin Assistant","Requisitions",S.adding?"":`<button class="btn pri" id="newreq">New Requisition</button>`)+(S.adding?reqForm():"")+`
+ <section class="panel"><div class="ph"><h2>Requisition Log</h2><span class="m">Approved by the Admin or the Accounting Manager · funds released by the Cashier</span></div><div class="wrap"><table class="log"><thead><tr><th>#</th><th>RQ No.</th><th>Date</th><th>Items</th><th>Purpose</th><th class="r">Total</th><th>Status</th></tr></thead><tbody>
+ ${S.reqs.map((r,i)=>`<tr><td class="no">${i+1}</td><td class="mono">${r.no}</td><td>${r.d}</td><td>${r.lines.map(l=>`${l[0]} × ${l[1]}`).join(", ")}</td><td>${r.purpose}</td><td class="mono r">${peso(total(r))}</td><td><span class="pill ${pill(r.st)}">${r.st}${r.cv?" · "+r.cv:""}</span>${r.why?`<span class="who-tag"> ${r.why}</span>`:""}</td></tr>`).join("")}
+ </tbody></table></div></section>`}
+function plan(){return head("Admin Assistant","Resource Planning")+`
+ <section class="panel"><div class="ph"><h2>Upcoming Batches</h2><span class="m">Course › Batch › Classroom › Number of Students › Instructor</span></div><div class="wrap"><table class="log lines-tbl"><thead><tr><th>Course</th><th>Batch</th><th>Dates</th><th>Classroom</th><th class="r">Students</th><th>Instructor</th></tr></thead><tbody>
+ ${S.batches.map((b,i)=>{const iss=issues(b);return `<tr><td><b>${b.c}</b><span class="who-tag" style="display:block">${b.name}</span></td><td class="mono">${b.b}</td><td>${b.d}</td>
+  <td><select data-bi="${i}" data-f="room"><option value="">Choose Classroom</option>${S.rooms.map(r=>`<option value="${r.n}" ${r.n===b.room?"selected":""}>${r.n} (${r.cap} seats)</option>`).join("")}</select>${iss.filter(x=>/room|classroom/i.test(x)).map(x=>`<span class="warn">${x}</span>`).join("")}</td>
+  <td class="mono r">${b.st} / 24</td>
+  <td><select data-bi="${i}" data-f="i"><option value="">Choose Instructor</option>${S.inst.map(x=>{const a=x.acc.find(a=>a[0]===b.c);return `<option value="${x.n}" ${x.n===b.i?"selected":""}>${x.n}${a?(a[2]<TODAY?" · expired":" · accredited"):" · not accredited"}</option>`}).join("")}</select>${iss.filter(x=>/instructor|accredit/i.test(x)).map(x=>`<span class="warn">${x}</span>`).join("")}</td></tr>`}).join("")}
+ </tbody></table></div><p class="foot" style="padding:0 20px 18px">The instructor list shows only the shortlist; accredited instructors for the course are marked.</p></section>`}
+function insts(){return head("Admin Assistant","Instructors",`<button class="btn pri" id="addi">Add Instructor</button>`)+`
+ <section class="panel"><div class="ph"><h2>Instructor Shortlist</h2></div><div class="wrap"><table class="log"><thead><tr><th>#</th><th>Instructor</th><th>Mobile</th><th>Email</th><th>Course Accreditations</th><th></th></tr></thead><tbody>
+ ${S.inst.map((x,i)=>`<tr><td class="no">${i+1}</td><td><b>${x.n}</b></td><td class="mono">${x.m}</td><td>${x.e}</td><td><div class="chips">${x.acc.map(a=>`<span class="pill ${a[2]<TODAY?"p-bad":a[2]<="2026-11-08"?"p-warn":"p-ok"}" title="${a[1]}">${a[0]} · ${a[1]} · until ${a[2]}</span>`).join("")}</div></td><td><button class="btn sm" data-toast="Edit form opens">Edit</button></td></tr>`).join("")}
+ </tbody></table></div></section>`}
+function appr(){const w=S.reqs.filter(r=>r.st==="For Approval");return head("Accounting","For Your Approval")+`
+ <section class="panel"><div class="ph"><h2>Requisitions</h2><span class="m">${w.length} waiting</span></div><div class="wrap"><table class="log"><thead><tr><th>RQ No.</th><th>Requested By</th><th>Items</th><th class="r">Total</th><th></th></tr></thead><tbody>
+ ${w.map(r=>`<tr><td class="mono">${r.no}</td><td>Admin Assistant</td><td>${r.lines.map(l=>`${l[0]} × ${l[1]}`).join(", ")}</td><td class="mono r">${peso(total(r))}</td><td><div class="acts"><button class="btn sm" data-rej="${r.no}">Reject</button><button class="btn sm pri" data-ok="${r.no}">Approve</button></div></td></tr>`).join("")||`<tr><td colspan="5" class="empty">Nothing waiting</td></tr>`}
+ </tbody></table></div><p class="foot" style="padding:0 20px 18px">Approving issues a check voucher (CV) in Expenses for the Cashier to release.</p></section>`}
+function itemsCfg(){return head("Accounting › Configuration","Requisition Items",`<button class="btn pri" data-toast="New item row added">Add Item</button>`)+`
+ <section class="panel"><div class="wrap" style="margin-top:20px"><table class="log"><thead><tr><th>Item</th><th>Unit</th><th class="r">Default Cost</th><th>Status</th></tr></thead><tbody>
+ ${S.items.map(x=>`<tr><td>${x.n}</td><td>${x.u}</td><td class="mono r">${peso(x.c)}</td><td><span class="pill ${x.a?"p-ok":"p-mute"}">${x.a?"Active":"Inactive"}</span></td></tr>`).join("")}</tbody></table></div></section>`}
+function cash(){const v=S.reqs.filter(r=>r.cv);return head("Cashier","Expenses")+`
+ <section class="panel"><div class="ph"><h2>Requisition Vouchers</h2></div><div class="wrap"><table class="log"><thead><tr><th>CV No.</th><th>Payee</th><th class="r">Amount</th><th>Status</th><th></th></tr></thead><tbody>
+ ${v.map(r=>`<tr><td class="mono">${r.cv}</td><td>Requisition ${r.no}</td><td class="mono r">${peso(total(r))}</td><td><span class="pill ${r.st==="Released"?"p-ok":"p-info"}">${r.st==="Released"?"Released":"Approved"}</span></td><td>${r.st==="Approved"?`<div class="acts"><button class="btn sm" data-toast="Voucher PDF opens">Print Voucher</button><button class="btn sm pri" data-rel="${r.no}">Mark Released</button></div>`:""}</td></tr>`).join("")}
+ </tbody></table></div></section>`}
+document.addEventListener("click",e=>{const t=e.target.closest("button");if(!t)return;const d=t.dataset;
+ if(d.tab){S.tab=d.tab;S.adding=false}
+ else if(d.go){S.tab=d.go;S.adding=!!d.new}
+ else if(t.id==="newreq")S.adding=true;
+ else if(t.id==="cancel")S.adding=false;
+ else if(t.id==="addl")S.draft.push([S.items[0].n,1,S.items[0].c]);
+ else if(d.rm){S.draft.splice(+d.rm,1)}
+ else if(t.id==="send"){if(!S.draft.length)return;S.reqs.unshift({no:"RQ-2026-0005",d:"Oct 9",purpose:document.getElementById("rp").value,need:"Oct 13",lines:S.draft.map(l=>[...l]),st:"For Approval"});S.adding=false;S.draft=[[S.items[0].n,1,S.items[0].c]];toast("Sent for approval")}
+ else if(d.ok){const r=S.reqs.find(x=>x.no===d.ok);r.st="Approved";r.cv="CV-2026-000"+(132+Math.floor(Math.random()*9));toast("Approved · "+r.cv+" issued")}
+ else if(d.rej){const r=S.reqs.find(x=>x.no===d.rej);r.st="Rejected";r.why="Not needed this week";toast("Rejected")}
+ else if(d.rel){S.reqs.find(x=>x.no===d.rel).st="Released";toast("Released")}
+ else if(d.toast){toast(d.toast);return}
+ else if(t.id==="addi"){toast("Add Instructor form: name, mobile, email, accreditations");return}
+ else return;render()});
+document.addEventListener("change",e=>{const t=e.target;
+ if(t.id==="role"){S.role=t.value;S.tab="";render();return}
+ if(t.dataset.bi){S.batches[+t.dataset.bi][t.dataset.f]=t.value;render();return}
+ if(t.dataset.li){const l=S.draft[+t.dataset.li],k=+t.dataset.k;if(k===0){l[0]=t.value;l[2]=S.items.find(x=>x.n===t.value).c}else if(k===1)l[1]=Math.max(1,+t.value||1);else l[2]=Math.round((+t.value||0)*100);render()}});
+render();
+</script>

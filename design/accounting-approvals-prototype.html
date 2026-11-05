@@ -1,0 +1,218 @@
+<title>Accounting Approvals Prototype</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: the portal's navy top bar; a role switch (Registration / Cashier) drives one working column. Same tokens as the cashier prototype. */
+:root{
+  --orange:#F25615; --blue:#0571D0; --cyan:#35CCFA; --cyan-l:#9EE3F1; --navy:#123F63;
+  --bg:#f2f6f8; --surface:#ffffff; --fg:#0f2638; --muted:#587184; --line:#dbe6ec; --soft:#eef4f8;
+  --good:#0a7a3e; --good-bg:#e2f5e9; --warn:#a2470b; --warn-bg:#fdf0e5; --bad:#b42318; --bad-bg:#fcebea; --info:#0571D0; --info-bg:#e5f1fb;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0a1722;--surface:#102231;--fg:#e3edf4;--muted:#91a9bb;--line:#20384b;--soft:#152d43;--good:#61d396;--good-bg:#113523;--warn:#ffa56a;--warn-bg:#382313;--bad:#ff8b80;--bad-bg:#3b1918;--info:#5fb4ff;--info-bg:#122e48;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 17px/1.5 var(--sans)}
+h1,h2,h3{font-weight:600;line-height:1.2;margin:0;text-wrap:balance}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding:16px 16px 0}
+.wrap{max-width:1160px;margin:0 auto}
+.brand{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:12px}
+.mark{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--cyan),var(--blue));display:grid;place-items:center;font:700 15px var(--sans)}
+.logo b{font-size:19px}.logo b span{color:var(--orange)}
+.proto{background:var(--orange);font:600 11px var(--sans);letter-spacing:.08em;padding:2px 8px;border-radius:5px;margin-left:8px}
+.role{display:flex;gap:4px;background:#ffffff14;padding:4px;border-radius:10px}
+.role button{background:none;border:0;color:#c3dbea;font:500 15px var(--sans);padding:8px 14px;border-radius:8px;cursor:pointer}
+.role button.on{background:#fff;color:var(--navy);font-weight:600}
+.tabs{display:flex;gap:2px;margin-top:16px;overflow-x:auto}
+.tabs span{color:#c3dbea;font:500 17px var(--sans);padding:13px 20px;white-space:nowrap}
+.tabs span.on{background:var(--bg);color:var(--fg);font-weight:600;border-radius:10px 10px 0 0}
+main{max-width:1160px;margin:0 auto;padding-block:24px 64px;padding-inline:16px;display:grid;gap:16px}
+.steps{display:flex;gap:8px;flex-wrap:wrap}
+.step{display:flex;align-items:center;gap:8px;padding:8px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:15px;color:var(--muted)}
+.step b{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--soft);font:600 12px var(--mono);color:var(--muted)}
+.step.done{color:var(--good);border-color:transparent;background:var(--good-bg)}.step.done b{background:var(--good);color:#fff}
+.step.now{color:var(--info);border-color:var(--info);font-weight:600}.step.now b{background:var(--info);color:#fff}
+.eyebrow{display:block;font:600 13px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--blue);margin-bottom:6px}
+.head h1{font-size:32px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.ph h2{font-size:19px}
+.count{font:600 13px var(--mono);background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:2px 9px}
+.profile{display:flex;gap:16px;align-items:center;padding:20px;flex-wrap:wrap}
+.avatar{width:56px;height:56px;border-radius:50%;background:var(--info-bg);color:var(--info);display:grid;place-items:center;font:600 20px var(--sans)}
+.profile h2{font-size:22px}
+.tag{font:600 13px var(--mono);background:var(--warn-bg);color:var(--orange);padding:2px 8px;border-radius:6px}
+.meta{color:var(--muted);font-size:15px}
+.totals{margin-left:auto;display:flex;gap:24px}
+.totals div span{display:block;font-size:13px;color:var(--muted)}
+.totals div b{font:600 18px var(--mono)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:15.5px}
+th{text-align:left;font:600 13px var(--sans);letter-spacing:.04em;color:var(--muted);padding:12px 16px;background:var(--soft);white-space:nowrap}
+td{padding:14px 16px;border-top:1px solid var(--line);vertical-align:top}
+td small{display:block;color:var(--muted);font-size:14px}
+.r{text-align:right}
+.chip{display:inline-block;font:600 13px var(--sans);padding:3px 10px;border-radius:999px;white-space:nowrap}
+.c-warn{background:var(--warn-bg);color:var(--warn)}.c-good{background:var(--good-bg);color:var(--good)}.c-info{background:var(--info-bg);color:var(--info)}.c-bad{background:var(--bad-bg);color:var(--bad)}
+.btn{font:600 15.5px var(--sans);border-radius:10px;padding:10px 16px;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--fg);white-space:nowrap}
+.btn.p{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn:focus-visible,.role button:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.note{background:var(--info-bg);color:var(--info);border-radius:12px;padding:14px 18px;font-size:15.5px}
+.empty{padding:24px 20px;color:var(--muted)}
+.dd{position:relative;display:inline-block}
+.ddm{position:absolute;right:0;top:calc(100% + 6px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;padding:6px;z-index:5;min-width:220px;display:grid}
+.ddm button{background:none;border:0;text-align:left;font:500 16px var(--sans);color:var(--fg);padding:10px 12px;border-radius:8px;cursor:pointer}
+.ddm button:hover{background:var(--soft)}
+.ovl{position:fixed;inset:0;background:#0b1a2699;display:grid;place-items:center;padding:16px;z-index:20}
+.modal{background:var(--surface);border-radius:16px;width:min(620px,100%);max-height:92vh;overflow:auto;box-shadow:0 24px 60px #0006}
+.mh{display:flex;justify-content:space-between;align-items:center;padding:18px 22px;border-bottom:1px solid var(--line)}
+.mh h3{font-size:21px}
+.x{background:none;border:0;font-size:24px;color:var(--muted);cursor:pointer}
+.mb{padding:20px 22px;display:grid;gap:14px;grid-template-columns:1fr 1fr}
+.mb .full{grid-column:1/-1}
+label{display:grid;gap:6px;font:500 15px var(--sans);color:var(--muted)}
+input,select{font:400 16.5px var(--sans);color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-width:0;width:100%}
+.who{background:var(--soft);border-radius:12px;padding:12px 16px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.who b{display:block}
+.fee{border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.fee span{color:var(--muted);font-size:14.5px}
+.fee b{font:600 22px var(--mono);color:var(--navy)}
+:root[data-theme="dark"] .fee b{color:var(--fg)}
+.mf{display:flex;justify-content:flex-end;gap:8px;padding:16px 22px;border-top:1px solid var(--line)}
+.lines{display:grid;gap:8px}
+.line{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:10px 14px;border:1px solid var(--line);border-radius:10px}
+.line b{font-family:var(--mono)}
+.lnk{background:none;border:0;color:var(--bad);font:500 14px var(--sans);cursor:pointer}
+.misc{display:grid;grid-template-columns:1.2fr 1fr 1fr auto;gap:8px;align-items:end}
+.total{display:flex;justify-content:space-between;font-weight:600;padding:4px 2px}
+.total b{font:700 20px var(--mono)}
+.modes{display:flex;gap:8px;flex-wrap:wrap}
+.modes button{font:500 15.5px var(--sans);padding:9px 14px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.modes button.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:12px;font-size:15.5px;z-index:30;max-width:calc(100% - 32px)}
+.seg{display:inline-flex;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px;width:max-content}
+.seg button{border:0;background:none;font:600 16px var(--sans);color:var(--fg);padding:9px 16px;border-radius:9px;display:flex;gap:8px;align-items:center}
+.seg button span{font:600 12px var(--mono);background:var(--soft);border-radius:10px;padding:1px 8px}
+.seg button.on{background:var(--blue);color:#fff}.seg button.on span{background:#ffffff33}
+.filters{display:flex;gap:12px;align-items:center;padding:16px 20px;flex-wrap:wrap}
+.search{flex:1;min-width:0}
+.tname{color:var(--navy);display:block}
+:root[data-theme="dark"] .tname{color:var(--fg)}
+.btn.sm{padding:7px 12px;font-size:14.5px}
+.openreq{display:block;color:var(--warn);font-size:13px;margin-top:4px}
+@media (max-width:640px){
+  .mb{grid-template-columns:1fr}.misc{grid-template-columns:1fr 1fr}.totals{margin-left:0}
+  table,thead,tbody,tr,td{display:block}thead{display:none}
+  tr{border-top:1px solid var(--line);padding:10px 16px}td{border:0;padding:4px 0}
+  td[data-l]:not([data-l=""])::before{content:attr(data-l);display:block;font:600 12px var(--sans);color:var(--muted);letter-spacing:.04em}
+  .r{text-align:left}
+}
+</style>
+<style>
+.navtabs{display:flex;gap:2px;margin-top:16px;overflow-x:auto}
+.navtabs button{background:none;border:0;color:#c3dbea;font:500 17px var(--sans);padding:13px 20px;border-radius:10px 10px 0 0;cursor:pointer;white-space:nowrap}
+.navtabs button.on{background:var(--bg);color:var(--fg);font-weight:600}
+.navtabs .n{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:var(--orange);color:#fff;font:600 11.5px var(--mono)}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.head h1{font-size:32px}
+.day{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:4px}
+.day button{border:0;background:none;font:600 18px var(--sans);color:var(--fg);width:36px;height:36px;border-radius:9px;cursor:pointer}
+.day button:disabled{opacity:.35}
+.day input{border:0;width:auto;padding:6px}
+.ro{display:inline-flex;align-items:center;gap:6px;font:600 13px var(--sans);color:var(--muted);background:var(--soft);border-radius:999px;padding:4px 10px}
+.tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px;border-top:4px solid var(--c,var(--blue));min-width:0}
+.tile span{display:block;font-size:14px;color:var(--muted);font-weight:500}
+.tile b{display:block;font:600 21px var(--mono);margin-top:4px}
+.tile small{color:var(--muted);font-size:13.5px}
+.tile.total{background:var(--navy);color:#fff;border-top-color:var(--orange)}.tile.total span,.tile.total small{color:#c3dbea}
+.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.filters select,.filters input{width:auto}.filters input{flex:1;min-width:220px}
+.vt td,.vt th{padding-left:20px;padding-right:20px}
+.proof{font-size:13.5px;color:var(--muted)}
+.proof.up{color:var(--good)}
+.layout{display:grid;grid-template-columns:240px 1fr;gap:16px;align-items:start}
+.cats{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:8px;display:grid;gap:2px;position:sticky;top:12px}
+.cats button{display:flex;justify-content:space-between;align-items:center;gap:8px;border:0;background:none;text-align:left;font:500 15.5px var(--sans);color:var(--fg);padding:10px 12px;border-radius:9px;cursor:pointer}
+.cats button:hover{background:var(--soft)}
+.cats button.on{background:var(--info-bg);color:var(--info);font-weight:600}
+.cats button span{font:600 12px var(--mono);background:var(--warn-bg);color:var(--warn);border-radius:10px;padding:1px 8px}
+.cats button span.zero{background:var(--soft);color:var(--muted)}
+.cats .grp{font:600 11.5px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:10px 12px 4px}
+.catsec{display:grid;gap:12px}
+.catsec h2{font-size:19px;display:flex;gap:10px;align-items:center}
+.req{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:14px 20px;border-top:1px solid var(--line)}
+.req:first-of-type{border-top:0}
+.req small{display:block;color:var(--muted);font-size:14px}
+.req .amt{font:600 17px var(--mono)}
+.done{color:var(--good);font-weight:600}.rej{color:var(--bad);font-weight:600}
+@media (max-width:900px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}.layout{grid-template-columns:1fr}.cats{position:static;grid-template-columns:repeat(2,1fr)}.cats .grp{grid-column:1/-1}}
+@media (max-width:560px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.tile.total{grid-column:1/-1}.req{grid-template-columns:1fr}.cats{grid-template-columns:1fr}}
+</style>
+
+<header class="top"><div class="wrap">
+  <div class="brand"><div class="logo"><div class="mark">NW</div><b>New <span>Wave</span> portal</b><span class="proto">PROTOTYPE</span></div><div class="meta" style="color:#cfe3ef">Working as Accounting Manager</div></div>
+  <nav class="navtabs" id="nav"></nav>
+</div></header>
+<main id="app"></main>
+<div id="layer"></div>
+
+<script>
+const peso=v=>"₱"+(v/100).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+const add=(iso,n)=>{const d=new Date(iso+"T00:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+const long=iso=>new Date(iso+"T00:00:00").toLocaleDateString("en-PH",{weekday:"long",month:"long",day:"numeric",year:"numeric"});
+const TODAY="2026-10-08", CH=["Cash","GCash","PSBank","UnionBank"], COL={Cash:"#0a7a3e",GCash:"#0571D0",PSBank:"#F25615",UnionBank:"#7a3fb8"};
+const PAY={"2026-10-08":[
+  ["AR-2026-000412","8:05 AM","DELA CRUZ, Juan P.","BT-PSSR (Updating)","Walk-in","Cash","",180000,false],
+  ["AR-2026-000413","8:22 AM","REYES, Mark A.","Safety (STPPDSPPS)","Walk-in","GCash","1029384756",150000,true],
+  ["AR-2026-000414","8:40 AM","VILLANUEVA, Ramon T.","BT-PSSR (Updating)","Magsaysay Maritime","UnionBank","UB-88231045",90000,true],
+  ["AR-2026-000415","9:10 AM","SANTOS, Liza M.","Crowd (PSCMT)","Walk-in","Cash","",250000,false],
+  ["AR-2026-000417","10:15 AM","AQUINO, Jerome D.","Crowd (PSCMT)","Bluewave Crewing","GCash","1029385511",125000,true],
+  ["AR-2026-000419","1:45 PM","GARCIA, Paolo R.","Crisis (PSCMHBT)","Walk-in","PSBank","PSB-55120931",350000,true]],
+ "2026-10-07":[["AR-2026-000405","9:00 AM","MENDOZA, Ariel B.","Safety (STPPDSPPS)","Walk-in","Cash","",150000,false],["AR-2026-000408","2:10 PM","TORRES, Kevin S.","CCM Domestic (CCMD)","Magsaysay Maritime","UnionBank","UB-88230011",225000,true]]};
+const EXP={"2026-10-08":[
+  ["CV-2026-000006","Manila Electric Company (Meralco)","Utilities","GCash","1029384756",1845075,"Released","2:40 PM"],
+  ["CV-2026-000005","National Book Store","Office supplies","Cash","",123500,"Released","11:05 AM"],
+  ["CV-2026-000007","Juan Water Refilling","Pantry","Cash","",45000,"Awaiting release","—"]],
+ "2026-10-07":[["CV-2026-000004","LBC Express","Courier","Cash","",60000,"Released","4:05 PM"]]};
+const S={page:"Approvals",date:TODAY,ch:"All",q:"",cat:"all",toast:"",
+ approvals:[
+  {id:1,cat:"Expense requests",grp:"Money out",title:"Meralco · Utilities",detail:"Electricity Sep 2026 + late charge · 2 lines · GCash",ref:"ER-2026-000031",who:"Karen Mallari · Oct 8, 9:15 AM",amt:1845075,ok:"Approve",no:"Reject"},
+  {id:2,cat:"Expense requests",grp:"Money out",title:"Office Warehouse · Office supplies",detail:"Bond paper, toner · 3 lines · Cash",ref:"ER-2026-000032",who:"Karen Mallari · Oct 8, 10:40 AM",amt:486000,ok:"Approve",no:"Reject"},
+  {id:3,cat:"Voucher reprints",grp:"Money out",title:"CV-2026-000004 · LBC Express",detail:"Reason: original was damaged",ref:"Reprint 1",who:"Karen Mallari · Oct 8, 11:20 AM",amt:60000,ok:"Approve",no:"Reject"},
+  {id:4,cat:"Refunds",grp:"Money out",title:"TORRES, Kevin S. · CCMD",detail:"Medical not fit to train · cancellation approved earlier",ref:"REQ-2026-000044",who:"Karen Mallari · Oct 8, 1:00 PM",amt:120000,ok:"Approve",no:"Reject"},
+  {id:5,cat:"Discounts",grp:"Fees",title:"DELA CRUZ, Juan P. · BT-PSSR",detail:"Senior seafarer discount",ref:"ENR-2026-000041",who:"Karen Mallari · Oct 8, 8:50 AM",amt:20000,ok:"Approve",no:"Reject"},
+  {id:6,cat:"Rebates owed to partners",grp:"Fees",title:"Bluewave Crewing Consultancy",detail:"2 trainees · no-deduction partner · pay out",ref:"Payable",who:"Recorded automatically · Oct 8",amt:130000,ok:"Mark paid",no:null},
+  {id:7,cat:"Cashier closings",grp:"Cash control",title:"Closing · Oct 8, 2026",detail:"Expected ₱19,115.00 · counted ₱19,095.00",ref:"Short ₱20.00",who:"Karen Mallari · Oct 8, 5:10 PM",amt:-2000,ok:"Mark reviewed",no:null},
+ ]};
+const CATS=[["Money out",["Expense requests","Voucher reprints","Refunds"]],["Fees",["Discounts","Rebates owed to partners"]],["Cash control",["Cashier closings"]]];
+const open=c=>S.approvals.filter(a=>!a.done&&(c==="all"||a.cat===c)).length;
+function toast(t){S.toast=t;render();setTimeout(()=>{S.toast="";render()},2400)}
+function decide(id,ok){const a=S.approvals.find(x=>x.id===id);a.done=ok?a.ok.replace("Mark ","").replace("Approve","Approved").replace("paid","Paid").replace("reviewed","Reviewed"):"Rejected";toast(ok?"Done.":"Rejected.")}
+function dayBar(){return `<div class="day"><button aria-label="Previous day" onclick="S.date=add(S.date,-1);render()">‹</button><input type="date" value="${S.date}" max="${TODAY}" onchange="S.date=this.value;render()"><button aria-label="Next day" ${S.date>=TODAY?"disabled":""} onclick="S.date=add(S.date,1);render()">›</button></div>`}
+function payments(){const rows=(PAY[S.date]||[]).filter(r=>(S.ch==="All"||r[5]===S.ch)&&`${r[0]} ${r[2]} ${r[3]} ${r[4]}`.toLowerCase().includes(S.q.toLowerCase()));const all=PAY[S.date]||[];
+  return `<div class="head"><div><span class="eyebrow">Accounting</span><h1>Payments</h1></div>${dayBar()}</div>
+  <div class="meta">${long(S.date)} · <span class="ro">👁 View only — the Cashier records payments</span></div>
+  <div class="tiles">${CH.map(c=>{const l=all.filter(r=>r[5]===c);return `<div class="tile" style="--c:${COL[c]}"><span>${c}</span><b>${peso(l.reduce((s,r)=>s+r[7],0))}</b><small>${l.length} receipt${l.length===1?"":"s"}</small></div>`}).join("")}<div class="tile total"><span>Total collected</span><b>${peso(all.reduce((s,r)=>s+r[7],0))}</b><small>${all.length} receipts</small></div></div>
+  <div class="filters"><select onchange="S.ch=this.value;render()">${["All",...CH].map(c=>`<option ${S.ch===c?"selected":""} value="${c}">${c==="All"?"All channels":c}</option>`).join("")}</select><input placeholder="Search receipt, trainee, course or partner" value="${S.q}" oninput="S.q=this.value;render();const i=document.querySelector('.filters input');i.focus();i.setSelectionRange(i.value.length,i.value.length)"></div>
+  <section class="panel">${rows.length?`<div class="tw"><table class="vt"><thead><tr><th>Receipt</th><th>Trainee</th><th>Source</th><th>Channel</th><th>Reference and proof</th><th class="r">Amount</th></tr></thead><tbody>${rows.map(r=>`<tr><td data-l=""><b class="mono">${r[0]}</b><small>${r[1]}</small></td><td data-l="Trainee">${r[2]}<small>${r[3]}</small></td><td data-l="Source">${r[4]}</td><td data-l="Channel">${r[5]}</td><td data-l="Reference and proof">${r[6]||"—"}<small class="proof ${r[8]?"up":""}">${r[8]?"Screenshot uploaded":"Manual entry"}</small></td><td data-l="Amount" class="r"><b class="mono">${peso(r[7])}</b></td></tr>`).join("")}</tbody></table></div>`:'<p class="empty">No payments on this day.</p>'}</section>`}
+function expenses(){const all=EXP[S.date]||[],rel=all.filter(r=>r[6]==="Released");
+  return `<div class="head"><div><span class="eyebrow">Accounting</span><h1>Expenses</h1></div>${dayBar()}</div>
+  <div class="meta">${long(S.date)} · <span class="ro">👁 View only — the Cashier records and releases expenses</span></div>
+  <div class="tiles">${CH.map(c=>{const l=rel.filter(r=>r[3]===c);return `<div class="tile" style="--c:${COL[c]}"><span>${c}</span><b>${peso(l.reduce((s,r)=>s+r[5],0))}</b><small>${l.length} released</small></div>`}).join("")}<div class="tile total"><span>Total released</span><b>${peso(rel.reduce((s,r)=>s+r[5],0))}</b><small>${all.length-rel.length} awaiting release</small></div></div>
+  <section class="panel">${all.length?`<div class="tw"><table class="vt"><thead><tr><th>Voucher</th><th>Payee</th><th>Channel</th><th>Status</th><th class="r">Amount</th></tr></thead><tbody>${all.map(r=>`<tr><td data-l=""><b class="mono">${r[0]}</b><small>${r[7]}</small></td><td data-l="Payee"><b>${r[1]}</b><small>${r[2]}</small></td><td data-l="Channel">${r[3]}${r[4]?`<small class="mono">${r[4]}</small>`:""}</td><td data-l="Status"><span class="chip ${r[6]==="Released"?"c-good":"c-info"}">${r[6]}</span></td><td data-l="Amount" class="r"><b class="mono">${peso(r[5])}</b></td></tr>`).join("")}</tbody></table></div>`:'<p class="empty">No expenses on this day.</p>'}</section>
+  <div class="note">Expense requests waiting for your decision are under Approvals › Expense requests.</div>`}
+function approvals(){const shown=CATS.map(([g,cs])=>[g,cs.filter(c=>S.cat==="all"||S.cat===c)]).filter(([,cs])=>cs.length);
+  return `<div class="head"><div><span class="eyebrow">Accounting</span><h1>Approvals</h1></div><span class="count">${open("all")} waiting</span></div>
+  <div class="layout"><nav class="cats" aria-label="Categories"><button class="${S.cat==="all"?"on":""}" onclick="S.cat='all';render()">All<span class="${open("all")?"":"zero"}">${open("all")}</span></button>
+    ${CATS.map(([g,cs])=>`<div class="grp">${g}</div>${cs.map(c=>`<button class="${S.cat===c?"on":""}" onclick="S.cat='${c}';render()">${c}<span class="${open(c)?"":"zero"}">${open(c)}</span></button>`).join("")}`).join("")}</nav>
+    <div class="catsec">${shown.map(([g,cs])=>cs.map(c=>{const list=S.approvals.filter(a=>a.cat===c);return `<section class="panel"><div class="ph"><h2>${c}</h2><span class="meta">${g} · ${list.filter(a=>!a.done).length} waiting</span></div>${list.length?list.map(a=>`<div class="req"><div><b>${a.title}</b><small>${a.detail}</small><small class="mono">${a.ref} · ${a.who}</small></div><div class="amt" style="${a.amt<0?"color:var(--bad)":""}">${peso(a.amt)}</div><div>${a.done?`<span class="${a.done==="Rejected"?"rej":"done"}">${a.done}</span>`:`<div class="acts"><button class="btn p" onclick="decide(${a.id},true)">${a.ok}</button>${a.no?`<button class="btn" onclick="decide(${a.id},false)">${a.no}</button>`:""}</div>`}</div></div>`).join(""):'<p class="empty">Nothing waiting.</p>'}</section>`}).join("")).join("")}</div></div>`}
+function render(){const pages=["Dashboard","Approvals","Payments","Expenses","Reports","Configuration"];
+  document.getElementById("nav").innerHTML=pages.map(p=>`<button class="${S.page===p?"on":""}" onclick="S.page='${p}';render()">${p}${p==="Approvals"&&open("all")?`<span class="n">${open("all")}</span>`:""}${p==="Configuration"?" ▾":""}</button>`).join("");
+  document.getElementById("app").innerHTML=S.page==="Payments"?payments():S.page==="Expenses"?expenses():S.page==="Approvals"?approvals():`<div class="head"><div><span class="eyebrow">Accounting</span><h1>${S.page}</h1></div></div><div class="note">${S.page==="Dashboard"?"Same as the dashboard you saw before: approvals on top, today's collections, expenses, cash position, rebates.":S.page==="Reports"?"Daily · weekly · monthly · quarterly · annual reports with charts (already built).":"Schedule of fees · Payment channels · Expense categories · Rebates per agency · Partners."}</div>`;
+  document.getElementById("layer").innerHTML=S.toast?`<div class="toast" role="status">${S.toast}</div>`:""}
+render();
+</script>

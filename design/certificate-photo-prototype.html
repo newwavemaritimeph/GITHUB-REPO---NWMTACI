@@ -1,0 +1,248 @@
+<title>Certificate Photo Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Certificate 2x2 photo (Releasing Officer) and Admin corrections. */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA;
+  --bg:#f3f6fa; --surface:#ffffff; --line:#dfe7ee; --fg:#0f2638; --muted:#5f7180; --soft:#eef4f8; --warnbg:#fde7dc; --okbg:#e3f4ea; --badbg:#fbe4dc; --infobg:#e2effb;
+  --green:#15803d; --red:#b42318; --amber:#b45309; --violet:#7c3aed;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}
+.top{background:var(--navy);color:#fff;padding:14px 24px 0}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand b{font-size:19px;color:var(--cyan)} .brand small{display:block;font-size:10px;letter-spacing:.06em;color:#cfe3f1}
+.who{display:flex;align-items:center;gap:8px;font-size:14px;color:#cfe3f1}
+.who select{font:500 14px var(--sans);padding:6px 10px;border-radius:8px;border:1px solid #3b6a90;background:transparent;color:#fff}.who select option{color:#0f2638}
+.tabs{display:flex;gap:4px;margin-top:14px;overflow-x:auto}
+.tabs button{padding:10px 18px;color:#d6e6f2;font:500 15px var(--sans);border-radius:10px 10px 0 0;white-space:nowrap;background:none;border:0;cursor:pointer}
+.tabs button.on{background:var(--bg);color:var(--fg)}
+.clock{max-width:1240px;margin:0 auto;padding:14px 24px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.clock button{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 13.5px var(--sans);padding:6px 12px;border-radius:99px;cursor:pointer}
+.clock button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.page{max-width:1240px;margin:0 auto;padding-block:16px 48px;padding-inline:24px;display:flex;flex-direction:column;gap:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}
+h1{margin:2px 0 0;font-size:28px;line-height:1.2}
+.note{margin:-8px 0 0;color:var(--muted);font-size:14px}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 14px var(--sans);padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}.btn.org{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600}.btn.sm{padding:6px 11px;font-size:13.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.rail{display:grid;grid-template-columns:minmax(300px,350px) minmax(0,1fr);gap:20px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 20px 12px;flex-wrap:wrap}
+.ph h2{margin:0;font-size:17px;font-weight:600} .ph .m{color:var(--muted);font-size:13.5px}
+.pb{padding:0 20px 20px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.col{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.crow{display:grid;grid-template-columns:10px 1fr auto;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+.crow:last-child{border-bottom:0}.crow b{font:600 16px var(--mono)}
+.dot{width:10px;height:10px;border-radius:3px;background:var(--c)}
+.crow.tot{background:var(--navy);color:#fff}.crow.tot .dot{background:var(--orange)}
+.crow.alarm{background:var(--badbg)}.crow.alarm span,.crow.alarm b{color:var(--red);font-weight:700}
+.lines{margin:0}.lines>div{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}.lines>div:last-child{border-bottom:0}.lines dt{color:var(--muted)}.lines dd{margin:0;font:600 15px var(--mono)}
+.banner{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-radius:12px;padding:12px 16px}
+.banner.red{background:var(--red);color:#fff}.banner.amber{background:var(--warnbg);color:var(--amber)}.banner.green{background:var(--okbg);color:var(--green)}.banner.blue{background:var(--infobg);color:var(--blue)}
+.banner b{font-size:15.5px}.banner .sp{flex:1}.banner .btn{background:#fff}
+.log{width:100%;border-collapse:collapse;font-size:14.5px;border:1px solid #9fb2c1}
+.log th{background:var(--navy);color:#fff;font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:9px 10px;border-right:1px solid #2c5a7f;white-space:nowrap}
+.log td{padding:7px 10px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);white-space:nowrap}
+.log tbody tr:nth-child(even) td{background:var(--soft)}
+.log td.no{text-align:center;color:var(--muted);width:34px}.log td.r{text-align:right}
+.log tr.out td{color:var(--muted);text-decoration:line-through}
+.wrap{overflow-x:auto;margin:0 20px 20px}
+.batch{margin:0 20px 6px;display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.batch b{font-size:15px}.batch span{color:var(--muted);font-size:13.5px}
+.pill{display:inline-block;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.p-ok{background:var(--okbg);color:var(--green)}.p-warn{background:var(--warnbg);color:var(--orange)}.p-bad{background:var(--badbg);color:var(--red)}.p-info{background:var(--infobg);color:var(--blue)}.p-mute{background:var(--soft);color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:16px 20px 22px}
+.foot{margin:10px 0 0;font-size:13px;color:var(--muted)}
+/* printable sheet */
+.sheet{background:#fff;color:#0f2638;border:1px solid var(--line);border-radius:6px;padding:26px 30px;max-width:900px;margin:0 auto;width:100%}
+.sheet header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #123F63;padding-bottom:10px;margin-bottom:12px;gap:12px;flex-wrap:wrap}
+.sheet h2{margin:0;color:#123F63;font-size:19px}.sheet small{color:#5f7180}
+.sheet .log th{background:#123F63}.sheet .log tbody tr:nth-child(even) td{background:#f5f8fb}.sheet .log td{border-color:#dfe7ee;color:#0f2638}
+.sigs{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:34px}.sigs div{border-top:1px solid #0f2638;padding-top:6px;font-size:13px;text-align:center}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 20px 20px}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}.form .full{grid-column:1/-1}
+.form input,.form select{font:400 14.5px var(--sans);padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg)}
+.flow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:0 20px 18px;font-size:13.5px}
+.flow span{padding:5px 10px;border-radius:99px;background:var(--soft);color:var(--muted);font-weight:600}.flow span.done{background:var(--okbg);color:var(--green)}.flow span.now{background:var(--warnbg);color:var(--orange)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;z-index:10}
+@media (max-width:1040px){.rail{grid-template-columns:1fr}}
+@media (max-width:600px){.form{grid-template-columns:1fr}.sigs{grid-template-columns:1fr}}
+@media (max-width:480px){.page,.clock{padding-inline:16px}.top{padding-inline:16px}}
+@media print{.top,.clock,.noprint{display:none!important}body{background:#fff}.page{padding:0}}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+</style>
+<style>
+.photo-ok{border:0;background:var(--okbg);color:var(--green);font:600 12.5px var(--sans);padding:4px 9px;border-radius:99px;cursor:pointer;white-space:nowrap}
+.split{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}.split a,.split button{padding:5px 10px;font:500 13px var(--sans);color:var(--fg);background:var(--surface);border:0;text-decoration:none;cursor:pointer}.split .go{background:var(--blue);color:#fff}.split .off{background:var(--soft);color:var(--muted);cursor:not-allowed}
+.modal-bg{position:fixed;inset:0;background:rgba(10,25,40,.55);display:grid;place-items:center;padding:16px;z-index:20}
+.modal{background:var(--surface);border-radius:14px;width:min(620px,100%);max-height:92vh;overflow:auto;padding:0 0 18px}
+.modal header{display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}.modal header h2{margin:0;font-size:18px}.modal header button{border:0;background:none;font-size:22px;cursor:pointer;color:var(--muted)}
+.mb{padding:14px 20px;display:flex;flex-direction:column;gap:14px}
+.who b{display:block}.who span{font:500 12.5px var(--mono);color:var(--muted);word-break:break-all}
+.pbody{display:grid;grid-template-columns:200px 1fr;gap:18px;align-items:start}
+.frame{width:200px;height:200px;border:1px dashed #9fb2c1;border-radius:10px;display:grid;place-items:center;background:var(--soft);color:#9fb2c1;font-weight:600;overflow:hidden}.frame img{width:100%;height:100%;object-fit:cover}
+.rules{margin:0;padding-left:18px;color:var(--muted);font-size:14px;line-height:1.6}
+.ok{color:var(--green);font-weight:600;margin:0}.bad{color:var(--red);font-weight:600;background:var(--badbg);padding:8px 10px;border-radius:8px;margin:0}
+.confirm{display:flex;gap:8px;align-items:center;font-weight:600}
+.ends{display:flex;justify-content:flex-end;gap:8px;padding:0 20px}
+.small{font-size:13px;color:var(--muted);margin:0}
+.found{display:flex;flex-direction:column;gap:4px;padding:0 20px 12px}.found button{display:flex;justify-content:space-between;gap:12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:9px;padding:8px 12px;cursor:pointer;font:inherit;text-align:left}.found span{color:var(--muted);font-size:13px}
+.photobar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 20px;background:var(--soft);border-block:1px solid var(--line)}
+.log input{font:400 14px var(--sans);padding:6px 9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);width:100%;max-width:260px}
+.reason{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;padding:0 20px}.reason label{flex:1;min-width:220px;display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}.reason input{font:400 14.5px var(--sans);padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg)}
+.cert{background:#fff;color:#123F63;border:6px double #123F63;border-radius:6px;padding:26px;position:relative;aspect-ratio:1.414;max-width:620px;margin:0 auto;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:6px}
+.cert .t{font-size:13px;letter-spacing:.2em;color:#5f7180}.cert .n{font-size:24px;font-weight:700}.cert .c{font-weight:600}.cert .m{font-size:12px;color:#5f7180}
+.cert .ph{position:absolute;right:6%;bottom:7%;width:72px;height:72px;border:1px solid #9fb2c1;background:#f5f8fb;display:grid;place-items:center;font-size:10px;color:#9fb2c1;overflow:hidden}.cert .ph img{width:100%;height:100%;object-fit:cover}
+.cert .wm{position:absolute;inset:0;display:grid;place-items:center;font-weight:800;font-size:34px;color:rgba(180,35,24,.16);transform:rotate(-18deg);pointer-events:none}
+@media (max-width:560px){.pbody{grid-template-columns:1fr}.frame{width:160px;height:160px}}
+</style>
+<div class="top">
+  <div class="brand"><div><b>NEW WAVE</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div>
+    <div class="who">Working As <select id="role"><option value="ro">Releasing Officer</option><option value="admin">Admin</option></select></div></div>
+  <nav class="tabs" id="tabs"></nav>
+</div>
+<main class="page" id="page"></main>
+<div id="modal"></div>
+<div class="toast" id="toast" hidden></div>
+<script>
+const S={role:"ro",tab:"Certificates",pick:null,q:"",
+ rows:[
+  {id:"e1",last:"DELA CRUZ",first:"Juan",mid:"Perez",no:"2610-0412",code:"UBT-PSSR",course:"Updating Training on Basic Training – PSSR",batch:"BCH-2026-0412",start:"2026-10-08",end:"2026-10-08",cert:"NWM-BT-01245",photo:null,prints:0,fix:{}},
+  {id:"e2",last:"SANTOS",first:"Maria",mid:"Lopez",no:"2610-0398",code:"PSCMT",course:"Crowd Management Training",batch:"BCH-2026-0391",start:"2026-10-06",end:"2026-10-07",cert:"NWM-CM-00310",photo:"SANTOS, MARIA L - PSCMT - BCH-2026-0391 - 2026-10-07.jpg",photoUrl:null,prints:0,fix:{}},
+  {id:"e3",last:"REYES",first:"Paolo",mid:"",no:"2610-0377",code:"PSCMHBT",course:"Crisis Management and Human Behavior Training",batch:"BCH-2026-0380",start:"2026-10-01",end:"2026-10-03",cert:"NWM-CR-00122",photo:"REYES, PAOLO - PSCMHBT - BCH-2026-0380 - 2026-10-03.jpg",photoUrl:null,prints:1,fix:{}}]};
+S.courses=[
+ {code:"UBT-PSSR",name:"Updating Training on Basic Training – PSSR",g:"STCW",tpl:{v:2,on:"2026-10-02"}},
+ {code:"STPPDSPPS",name:"Ship Security Awareness",g:"STCW",tpl:null},
+ {code:"PSCMT",name:"Crowd Management Training",g:"STCW",tpl:{v:1,on:"2026-09-28"}},
+ {code:"PSCMHBT",name:"Crisis Management and Human Behavior Training",g:"STCW",tpl:null},
+ {code:"CCMD",name:"Crisis Management – Domestic",g:"STCW",tpl:null},
+ {code:"HPT",name:"Hydraulic and Pneumatic Training",g:"In-House",tpl:{v:1,on:"2026-10-05"},form:"https://forms.gle/hpt-eval"},
+ {code:"BOSH",name:"Basic Occupational Safety and Health",g:"In-House",tpl:null},
+ {code:"SFA",name:"Standard First Aid",g:"In-House",tpl:null},
+ {code:"MARPOL",name:"MARPOL Awareness",g:"In-House",tpl:null}];
+S.series={"UBT-PSSR":{prefix:"NWM-BT-",next:1245,pad:5,bp:"BT-",nb:412},PSCMT:{prefix:"NWM-CM-",next:310,pad:5,bp:"CM-",nb:91},HPT:{prefix:"NWM-HPT-",next:150,pad:5,bp:"HPT-",nb:12}};
+S.tq="";S.missing=false;
+const fmtNo=(p,n,d)=>p+String(Math.max(1,+n||1)).padStart(Math.min(10,Math.max(1,+d||5)),"0");
+function seriesTable(rows,editable){return `<div class="wrap"><table class="log"><thead><tr><th>Course</th><th>Prefix</th><th>Next No.</th><th>Digits</th><th>Batch Prefix</th><th>Next Batch</th><th>Next Certificate</th><th></th></tr></thead><tbody>
+ ${rows.map(c=>{const v=S.series[c.code]||{prefix:"",next:1,pad:5,bp:"",nb:1};const can=editable(c);return `<tr><td><b>${c.code}</b><span class="small" style="display:block">${c.name}</span></td>
+ ${["prefix","next","pad","bp","nb"].map(k=>`<td>${can?`<input data-ser="${c.code}" data-k="${k}" value="${v[k]}" style="max-width:${k==="prefix"||k==="bp"?120:80}px">`:`<span class="mono">${v[k]}</span>`}</td>`).join("")}
+ <td class="mono" style="color:var(--blue);font-weight:600">${fmtNo(v.prefix,v.next,v.pad)}</td><td>${can?`<button class="btn sm pri" data-saveser="${c.code}">Save</button>`:`<span class="small">Set by the Admin</span>`}</td></tr>`}).join("")}
+ </tbody></table></div>`}
+function numbering(){return head("Releasing Officer","Numbering")+`<section class="panel"><div class="ph"><h2>In-House Courses</h2><span class="m">Set the starting Certificate No. and batch number; the system continues from there</span></div>${seriesTable(S.courses.filter(c=>c.g==="In-House"),()=>true)}</section>
+ <section class="panel"><div class="ph"><h2>STCW Courses</h2><span class="m">Set by the Admin</span></div>${seriesTable(S.courses.filter(c=>c.g==="STCW"),()=>false)}</section>`}
+function templates(){const t=S.tq.toLowerCase();const list=S.courses.filter(c=>(!t||(c.code+" "+c.name).toLowerCase().includes(t))&&(!S.missing||!c.tpl));const have=S.courses.filter(c=>c.tpl).length;
+ return head("Releasing Officer","Templates")+`<div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>Setup</h2></div><div class="pb"><dl class="lines"><div><dt>Courses with a template</dt><dd>${have} of ${S.courses.length}</dd></div><div><dt>File</dt><dd>PDF</dd></div><div><dt>New upload</dt><dd>Becomes active</dd></div></dl></div></section></div>
+ <section class="panel"><div class="ph" style="gap:10px"><input id="tq" value="${S.tq}" placeholder="Search course" style="flex:1;min-width:180px;font:400 14.5px var(--sans);padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg)"><label class="small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="missing" ${S.missing?"checked":""}> Without template</label></div>
+ ${["STCW","In-House"].map(g=>{const rows=list.filter(c=>c.g===g);return rows.length?`<div class="batch"><b>${g} Courses</b><span class="small">${rows.length}</span></div><div class="wrap"><table class="log"><thead><tr><th>Course</th><th>Template (PDF)</th><th>Evaluation Form in Classroom</th><th></th></tr></thead><tbody>
+ ${rows.map(c=>`<tr><td><b>${c.code}</b><span class="small" style="display:block">${c.name}</span></td><td>${c.tpl?`<span class="pill p-ok">Version ${c.tpl.v} · ${long(c.tpl.on)}</span>`:`<span class="pill p-warn">No template yet</span>`}</td>
+ <td><input data-form="${c.code}" value="${c.form||""}" placeholder="Paste the Google Form link (optional)" style="max-width:260px"></td>
+ <td><span class="acts">${c.tpl?`<button class="btn sm" data-tview="${c.code}">View</button>`:""}<label class="btn sm ${c.tpl?"":"pri"}">${c.tpl?"Replace PDF":"Upload PDF"}<input type="file" accept="application/pdf" data-tpl="${c.code}" hidden></label></span></td></tr>`).join("")}</tbody></table></div>`:""}).join("")}
+ ${!list.length?`<p class="empty">No courses match.</p>`:""}</section></div>`}
+const fname=r=>`${r.last}, ${r.first.toUpperCase()}${r.mid?" "+r.mid[0]:""} - ${r.code} - ${r.batch} - ${r.end}.jpg`;
+const long=d=>d?new Date(d+"T00:00:00+08:00").toLocaleDateString("en-PH",{month:"long",day:"numeric",year:"numeric"}):"";
+const state=r=>r.prints>0?"Printed":r.photo?"Due":"Photo needed";
+function toast(t){const e=document.getElementById("toast");e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2400)}
+function head(e,t){return `<div class="head"><div><span class="eyebrow">${e}</span><h1>${t}</h1></div></div>`}
+function render(){
+ const tabs=S.role==="ro"?["Dashboard","Certificates","Templates","Numbering","Released","Delivery"]:["Dashboard","Certificate Controls"];
+ if(!tabs.includes(S.tab))S.tab=S.role==="ro"?"Certificates":"Certificate Controls";
+ document.getElementById("tabs").innerHTML=tabs.map(t=>`<button class="${t===S.tab?"on":""}" data-tab="${t}">${t}</button>`).join("");
+ document.getElementById("page").innerHTML=S.tab==="Certificates"?certs():S.tab==="Templates"?templates():S.tab==="Numbering"?numbering():S.tab==="Certificate Controls"?controls():`${head(S.role==="ro"?"Releasing Officer":"Admin",S.tab)}<section class="panel"><p class="empty">Not part of this prototype. Open ${S.role==="ro"?"Certificates":"Certificate Controls"}.</p></section>`;
+}
+function certs(){const waiting=S.rows.filter(r=>!r.photo).length;
+ return head("Releasing Officer","Certificates")+`<div class="rail"><div class="stack">
+ <section class="panel"><div class="ph"><h2>Status</h2></div><div class="pb"><div class="col">
+  <div class="crow" style="--c:var(--blue)"><i class="dot"></i><span>Due</span><b>${S.rows.filter(r=>state(r)==="Due").length}</b></div>
+  <div class="crow" style="--c:#c2410c"><i class="dot"></i><span>Waiting for Photo</span><b>${waiting}</b></div>
+  <div class="crow" style="--c:var(--green)"><i class="dot"></i><span>Printed</span><b>${S.rows.filter(r=>r.prints).length}</b></div></div></div></section>
+ <section class="panel"><div class="ph"><h2>Rules</h2></div><div class="pb"><dl class="lines"><div><dt>2x2 Photo</dt><dd>Before printing</dd></div><div><dt>Print</dt><dd>Once</dd></div><div><dt>Correct details and photo</dt><dd>Releasing Officer</dd></div><div><dt>Certificate No.</dt><dd>Admin only</dd></div></dl></div></section>
+ </div><section class="panel"><div class="ph"><h2>Certificate Log</h2></div><div class="wrap"><table class="log"><thead><tr><th>#</th><th>Trainee · NWMTACI No.</th><th>Course · Ended</th><th>Certificate No.</th><th>Photo</th><th>Prints</th><th>Status</th><th>Action</th></tr></thead><tbody>
+ ${S.rows.map((r,i)=>{const s=state(r);return `<tr><td class="no">${i+1}</td><td><b>${r.last}, ${r.first}</b> <span class="mono" style="color:var(--muted)">${r.no}</span></td><td>${r.code} · ${long(r.end).replace(/, \d{4}/,"")}</td><td class="mono">${r.cert}</td>
+ <td>${r.photo?`<button class="photo-ok" title="${r.photo}" data-view="${r.id}">✓ On File</button>`:`<button class="btn sm" data-up="${r.id}">Upload Photo</button>`}</td>
+ <td class="mono">${r.prints}/1</td><td><span class="pill ${s==="Due"?"p-info":s==="Printed"?"p-ok":"p-warn"}">${s}</span></td>
+ <td><span class="split"><button data-prev="${r.id}">Preview</button>${s==="Due"?`<button class="go" data-print="${r.id}">Print</button>`:s==="Photo needed"?`<button class="off" title="Upload the trainee's 2x2 photo first" data-blocked="1">Print</button>`:""}</span></td></tr>`}).join("")}
+ </tbody></table></div><p class="foot" style="padding:0 20px 18px">A certificate prints only once the trainee's 2x2 photo is on file. The Releasing Officer corrects details and photos below; only the Admin changes the Certificate Number.</p></section></div>`+details()}
+function details(){const r=S.rows.find(x=>x.id===S.pick);const found=S.q.length>=2?S.rows.filter(x=>`${x.last} ${x.first} ${x.no} ${x.cert}`.toLowerCase().includes(S.q.toLowerCase())):[];
+ const F=[["name","Name",`${r?r.first+" "+(r.mid?r.mid+" ":"")+r.last[0]+r.last.slice(1).toLowerCase():""}`,"text"],["courseName","Course",r?.course,"text"],["batchLabel","Batch",r?.batch,"text"],["startsOn","Training Start",r&&long(r.start),"date"],["endsOn","Training End",r&&long(r.end),"date"],["issuedOn","Issue Date","Print date","date"]];
+ return `<section class="panel"><div class="ph"><h2>Corrections and Photos</h2><span class="m">Releasing Officer</span></div>
+ <div class="pb" style="padding-bottom:12px"><input id="q" value="${S.q}" placeholder="Search trainee, NWMTACI number or certificate number" style="width:100%;font:400 14.5px var(--sans);padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg)"></div>
+ ${found.length?`<div class="found">${found.map(x=>`<button data-pick="${x.id}"><b>${x.last}, ${x.first}</b><span>${x.code} · ${x.cert}</span></button>`).join("")}</div>`:""}
+ ${r?`<div class="photobar"><span>2x2 Photo: ${r.photo?`<b>On file</b> <span class="small" style="display:inline">${r.photo}</span>`:`<b style="color:var(--red)">Not uploaded</b>`}</span><span class="acts">${r.photo?`<button class="btn sm" data-view="${r.id}">View</button>`:""}<button class="btn sm" data-up="${r.id}" data-replace="1">${r.photo?"Replace Photo":"Upload Photo"}</button>${r.photo?`<button class="btn sm" style="color:var(--red)" data-rm="${r.id}">Remove Photo</button>`:""}</span></div>
+ <div class="wrap" style="margin-top:12px"><table class="log"><thead><tr><th>Field</th><th>From the Portal</th><th>Prints As (Correction)</th></tr></thead><tbody>
+ ${F.map(([k,l,v,t])=>`<tr><td>${l}</td><td>${v||"—"}</td><td><input type="${t}" data-fix="${k}" value="${r.fix[k]??""}" placeholder="Same as the portal"></td></tr>`).join("")}
+ </tbody></table></div>
+ <div class="reason"><label>Reason for the Correction<input id="why" placeholder="e.g. Name spelled as in the passport"></label><button class="btn pri" id="savefix">Save Correction</button><button class="btn" data-prev="${r.id}">Preview</button></div>
+ <p class="foot" style="padding:8px 20px 18px">Leave a field blank to print the portal's registered value. A certificate already printed needs an approved void or a paid Reprinting request for a corrected copy.</p>`:`<p class="empty">Search a trainee to correct their certificate details or photo. Try “Dela Cruz”.</p>`}
+ </section>`}
+function controls(){const r=S.rows.find(x=>x.id===S.npick);const found=(S.nq||"").length>=2?S.rows.filter(x=>`${x.last} ${x.first} ${x.no} ${x.cert}`.toLowerCase().includes(S.nq.toLowerCase())):[];
+ return head("Admin","Certificate Controls")+`<section class="panel"><div class="ph"><h2>Change a Certificate Number</h2><span class="m">Admin only</span></div>
+ <div class="pb" style="padding-bottom:12px"><input id="nq" value="${S.nq||""}" placeholder="Search trainee, NWMTACI number or certificate number" style="width:100%;font:400 14.5px var(--sans);padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg)"></div>
+ ${found.length?`<div class="found">${found.map(x=>`<button data-npick="${x.id}"><b>${x.last}, ${x.first}</b><span>${x.code} · ${x.cert}</span></button>`).join("")}</div>`:""}
+ ${r?`<div class="reason"><label>Certificate Number<input id="num" class="mono" value="${r.cert}"></label><label>Reason<input id="nwhy" placeholder="e.g. Number series corrected"></label><button class="btn pri" id="savenum">Save Number</button></div><p class="foot" style="padding:8px 20px 18px">${r.last}, ${r.first} · ${r.code}. Every change is recorded in the audit log. The Releasing Officer corrects the name, course, batch, dates and photo.</p>`:`<p class="empty">Search a trainee to change their Certificate Number. Try “Santos”.</p>`}</section>
+ <section class="panel"><div class="ph"><h2>STCW Certificate Numbering</h2><span class="m">In-House numbering is set by the Releasing Officer</span></div>${seriesTable(S.courses.filter(c=>c.g==="STCW"),()=>true)}</section>`}
+function uploadModal(r,replacing){
+ document.getElementById("modal").innerHTML=`<div class="modal-bg"><div class="modal"><header><h2>${replacing&&r.photo?"Replace":"Upload"} 2x2 Photo</h2><button data-close>×</button></header><div class="mb">
+ <div class="who"><b>${r.last}, ${r.first}</b><span>${fname(r)}</span></div>
+ <div class="pbody"><div class="frame" id="frame">2 × 2</div><div style="display:flex;flex-direction:column;gap:10px">
+  <label class="btn" style="align-self:flex-start">Choose Photo<input type="file" id="file" accept="image/jpeg,image/png,image/webp" hidden></label>
+  <ul class="rules"><li>White background</li><li>White polo with collar</li><li>Face centred, looking straight ahead</li></ul><div id="result"><p class="small">Pick any phone photo — it is cropped to a square and resized automatically.</p></div></div></div>
+ <label class="confirm"><input type="checkbox" id="conf" disabled> White background and white polo with collar</label></div>
+ <div class="ends"><button class="btn" data-close>Cancel</button><button class="btn pri" id="savephoto" disabled data-for="${r.id}">Save Photo</button></div>
+ </div></div>`;
+}
+let prepared=null;
+async function prep(file){
+ const bmp=await createImageBitmap(file);const side=Math.min(bmp.width,bmp.height);const cv=document.createElement("canvas");cv.width=cv.height=600;const cx=cv.getContext("2d");
+ cx.fillStyle="#fff";cx.fillRect(0,0,600,600);cx.drawImage(bmp,(bmp.width-side)/2,(bmp.height-side)/2,side,side,0,0,600,600);
+ const d=cx.getImageData(0,0,600,600).data;let tot=0,w=0;const band=48;for(let y=0;y<600;y+=3)for(let x=0;x<600;x+=3){if(x>=band&&x<600-band&&y>=band&&y<600-band)continue;const i=(y*600+x)*4,mn=Math.min(d[i],d[i+1],d[i+2]),mx=Math.max(d[i],d[i+1],d[i+2]);tot++;if(mn>=215&&mx-mn<=30)w++}
+ let q=.92,blob;for(;;){blob=await new Promise(r=>cv.toBlob(r,"image/jpeg",q));if(blob.size<=512000||q<=.5)break;q-=.07}
+ const kb=n=>n>=1048576?(n/1048576).toFixed(1)+" MB":Math.max(1,Math.round(n/1024))+" KB";
+ return {url:URL.createObjectURL(blob),from:`${bmp.width} × ${bmp.height} · ${kb(file.size)}`,to:`600 × 600 · ${kb(blob.size)}`,white:w/tot>=.85}
+}
+function preview(r){const f=r.fix;const name=(f.name||`${r.first} ${r.mid?r.mid+" ":""}${r.last[0]+r.last.slice(1).toLowerCase()}`).toUpperCase();
+ document.getElementById("modal").innerHTML=`<div class="modal-bg"><div class="modal" style="width:min(720px,100%)"><header><h2>Preview</h2><button data-close>×</button></header><div class="mb">
+ <div class="cert"><div class="t">CERTIFICATE OF COMPLETION</div><div class="small">This certifies that</div><div class="n">${name}</div><div class="small">has successfully completed</div><div class="c">${f.courseName||r.course}</div>
+ <div class="m">Certificate No. ${r.cert} · Batch ${f.batchLabel||r.batch} · Conducted ${long(f.startsOn||r.start)}${(f.endsOn||r.end)!==(f.startsOn||r.start)?" – "+long(f.endsOn||r.end):""}</div><div class="m">Issued ${f.issuedOn?long(f.issuedOn):long("2026-10-09")}</div>
+ <div class="ph">${r.photoUrl?`<img src="${r.photoUrl}" alt="">`:r.photo?"2x2 photo":"No photo"}</div><div class="wm">PREVIEW</div></div>
+ <p class="small">Layout is illustrative — positions follow each course's template once the Drive templates are linked. The photo prints 2 × 2 inches.</p></div></div></div>`}
+document.addEventListener("click",async e=>{const t=e.target.closest("button,[data-close]");if(!t)return;const d=t.dataset;
+ if(d.tab){S.tab=d.tab;render();return}
+ if("close" in d){document.getElementById("modal").innerHTML="";return}
+ if(d.up){prepared=null;uploadModal(S.rows.find(r=>r.id===d.up),!!d.replace);return}
+ if(d.view){const r=S.rows.find(x=>x.id===d.view);toast(r.photoUrl?"Opening the photo":"Sample photo: "+r.photo);if(r.photoUrl)window.open(r.photoUrl,"_blank");return}
+ if(d.prev){preview(S.rows.find(r=>r.id===d.prev));return}
+ if(d.print){const r=S.rows.find(x=>x.id===d.print);r.prints=1;toast("Printed "+r.cert);render();return}
+ if(d.blocked){toast("Upload the trainee's 2x2 photo first.");return}
+ if(d.pick){S.pick=d.pick;S.q="";render();return}
+ if(d.rm){const r=S.rows.find(x=>x.id===d.rm);if(confirm("Remove this trainee's 2x2 photo? The certificate cannot print until a new photo is uploaded.")){r.photo=null;r.photoUrl=null;toast("Photo removed");render()}return}
+ if(t.id==="savephoto"){const r=S.rows.find(x=>x.id===d.for);r.photo=fname(r);r.photoUrl=prepared.url;document.getElementById("modal").innerHTML="";toast("Photo saved as "+r.photo);render();return}
+ if(d.saveser){const c=d.saveser;const v={prefix:"",next:1,pad:5,bp:"",nb:1,...(S.series[c]||{})};document.querySelectorAll(`[data-ser="${c}"]`).forEach(i=>v[i.dataset.k]=i.dataset.k==="prefix"||i.dataset.k==="bp"?i.value:+i.value||1);S.series[c]=v;toast(`Saved. Next certificate: ${fmtNo(v.prefix,v.next,v.pad)}`);render();return}
+ if(d.tview){const c=S.courses.find(x=>x.code===d.tview);if(c.tpl.url)window.open(c.tpl.url,"_blank");else toast("Sample: opens the uploaded PDF");return}
+ if(d.npick){S.npick=d.npick;S.nq="";render();return}
+ if(t.id==="savenum"){const r=S.rows.find(x=>x.id===S.npick);const v=document.getElementById("num").value.trim();if((document.getElementById("nwhy").value||"").trim().length<3){toast("Enter the reason.");return}if(S.rows.some(x=>x!==r&&x.cert===v)){toast("That Certificate Number is already used by another certificate.");return}r.cert=v;toast("Certificate Number changed to "+v);render();return}
+ if(t.id==="savefix"){const r=S.rows.find(x=>x.id===S.pick);if((document.getElementById("why").value||"").trim().length<3){toast("Enter the reason for the correction.");return}document.querySelectorAll("[data-fix]").forEach(i=>{if(i.value)r.fix[i.dataset.fix]=i.value;else delete r.fix[i.dataset.fix]});toast("Correction saved — open Preview to see it");render();return}
+});
+document.addEventListener("change",async e=>{const t=e.target;
+ if(t.id==="role"){S.role=t.value;S.tab="";render();return}
+ if(t.id==="file"&&t.files[0]){document.getElementById("result").innerHTML=`<p class="small">Resizing…</p>`;prepared=await prep(t.files[0]);
+  document.getElementById("frame").innerHTML=`<img src="${prepared.url}" alt="">`;
+  document.getElementById("result").innerHTML=`<p class="small">Resized from ${prepared.from} to ${prepared.to}.</p>${prepared.white?`<p class="ok">✓ White background</p>`:`<p class="bad">⚠ The background does not look white. Retake the photo against a white wall.</p>`}`;
+  const c=document.getElementById("conf");c.disabled=false;c.checked=false;document.getElementById("savephoto").disabled=true;return}
+ if(t.dataset&&t.dataset.tpl&&t.files[0]){const c=S.courses.find(x=>x.code===t.dataset.tpl);if(t.files[0].type!=="application/pdf"){toast("Choose a PDF file.");return}c.tpl={v:(c.tpl?.v||0)+1,on:"2026-10-09",url:URL.createObjectURL(t.files[0])};toast(`${c.code}: template version ${c.tpl.v} uploaded and active`);render();return}
+ if(t.id==="missing"){S.missing=t.checked;render();return}
+ if(t.dataset&&t.dataset.ser){const c=t.dataset.ser,v={prefix:"",next:1,pad:5,bp:"",nb:1,...(S.series[c]||{})};v[t.dataset.k]=t.dataset.k==="prefix"||t.dataset.k==="bp"?t.value:+t.value||1;S.series[c]=v;render();return}
+ if(t.id==="conf"){document.getElementById("savephoto").disabled=!(t.checked&&prepared);return}
+});
+document.addEventListener("input",e=>{const id=e.target.id;if(id==="q"||id==="nq"||id==="tq"){S[id]=e.target.value;const pos=e.target.selectionStart;render();const q=document.getElementById(id);q.focus();q.setSelectionRange(pos,pos)}});
+render();
+</script>

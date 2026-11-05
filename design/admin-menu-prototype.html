@@ -1,0 +1,311 @@
+<title>Admin Menu Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Admin top tabs trimmed to the owner's list, with Configuration and MISMO as dropdowns. */
+:root{--navy:#123F63;--blue:#0571D0;--orange:#F25615;--cyan:#35CCFA;--bg:#f2f6f9;--surface:#fff;--line:#dbe5ec;--fg:#0f2638;--muted:#5b6f7f;--soft:#eef4f8;--okbg:#e3f4ea;--ok:#0a7a3e;--warnbg:#fde9dd;--warn:#b4480f;--badbg:#fbe4dc;--bad:#b42318;--infobg:#e2effb;--info:#0558a8;--sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0c1925;--surface:#122534;--line:#23394b;--fg:#e5eef5;--muted:#98adbf;--soft:#18303f;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c1925;--surface:#122534;--line:#23394b;--fg:#e5eef5;--muted:#98adbf;--soft:#18303f;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}
+*{box-sizing:border-box}body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}button{font:inherit;color:inherit;cursor:pointer}:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding:12px 20px 0}.brand{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.brand b{color:var(--cyan);font-size:18px}.brand small{display:block;font-size:10px;letter-spacing:.07em;color:#c9dceb}
+.who{font-size:13.5px;color:#c9dceb}.who select{background:transparent;border:1px solid #3d6b90;border-radius:8px;color:#fff;padding:6px 9px}.who option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:12px;flex-wrap:wrap}
+.tab{position:relative}
+.tab>button{background:none;border:0;color:#d4e4f1;padding:10px 16px;border-radius:10px 10px 0 0;font-weight:500;white-space:nowrap;display:flex;gap:6px;align-items:center}
+.tab>button.on{background:var(--bg);color:var(--fg)}
+.menu{position:absolute;top:100%;left:0;min-width:240px;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(6,20,32,.18);padding:6px;z-index:20;display:flex;flex-direction:column}
+.menu button{background:none;border:0;text-align:left;padding:9px 12px;border-radius:8px;font-weight:500}.menu button:hover,.menu button.on{background:var(--infobg);color:var(--info)}
+.menu small{display:block;color:var(--muted);font-size:12px;font-weight:400}
+.page{max-width:1240px;margin:0 auto;padding-block:18px 60px;padding-inline:20px;display:flex;flex-direction:column;gap:16px}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}h1{margin:2px 0 0;font-size:27px;line-height:1.2}h2{margin:0;font-size:16px;font-weight:600}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;min-width:0}.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 18px 10px;flex-wrap:wrap}.ph .m{color:var(--muted);font-size:13px}
+.pb{padding:0 18px 18px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}.tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 14px}.tile span{display:block;font-size:12.5px;color:var(--muted)}.tile b{font:600 22px var(--mono)}.tile.bad b{color:var(--bad)}
+.wrap{overflow-x:auto;margin:0 18px 18px}table{width:100%;border-collapse:collapse;font-size:14px}th{background:var(--navy);color:#fff;font:600 11.5px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:8px 10px;white-space:nowrap}td{padding:8px 10px;border-bottom:1px solid var(--line)}tr:nth-child(even) td{background:var(--soft)}td.r,th.r{text-align:right}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600}.p-ok{background:var(--okbg);color:var(--ok)}.p-warn{background:var(--warnbg);color:var(--warn)}.p-bad{background:var(--badbg);color:var(--bad)}.p-info{background:var(--infobg);color:var(--info)}
+.note{background:var(--infobg);color:var(--info);border-radius:10px;padding:10px 14px;font-size:13.5px}
+.removed{display:flex;flex-wrap:wrap;gap:6px}.removed span{background:var(--soft);color:var(--muted);border-radius:99px;padding:3px 10px;font-size:12.5px;text-decoration:line-through}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}.seg button{border:0;background:none;padding:7px 14px;font-weight:600;font-size:13.5px}.seg button.on{background:var(--navy);color:#fff}
+.range{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}.range label{display:flex;flex-direction:column;font-size:12.5px;color:var(--muted);font-weight:500;gap:3px}.range input{border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg);padding:6px 9px;font:inherit;font-size:14px}
+.sub{margin:-6px 0 0;color:var(--muted);font-size:13.5px}.dim{color:var(--muted);display:block;font-size:12.5px}.over{color:var(--bad);font-weight:700}
+.bars{display:flex;align-items:flex-end;gap:6px;height:110px;overflow-x:auto}.bars div{display:flex;flex-direction:column;align-items:center;gap:4px;min-width:22px}.bars i{display:block;width:16px;background:var(--blue);border-radius:4px 4px 0 0}.bars small{font-size:11px;color:var(--muted)}
+.nlist{display:flex;flex-direction:column;gap:8px}.ni{display:flex;justify-content:space-between;align-items:center;gap:10px;border:1px solid var(--line);border-left:4px solid var(--orange);border-radius:10px;padding:9px 12px}.ni.bad{border-left-color:var(--bad);background:var(--badbg)}.ni small{display:block;color:var(--muted);font-size:12.5px}.ni button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:5px 10px;font-size:13px}
+.vlink{border:1px solid var(--bad);color:var(--bad);background:var(--surface);border-radius:8px;padding:4px 10px;font-size:13px;font-weight:600;white-space:nowrap}
+.vform{margin:0 18px 18px;border:1px solid var(--bad);background:var(--badbg);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}.vform p{margin:0;font-size:13.5px}.vbtn{background:var(--bad);color:#fff;border:0;border-radius:9px;padding:8px 14px;font-weight:600}.verr{color:var(--bad);font-weight:600;margin:0}
+.ngroup+.ngroup{margin-top:14px}.ngroup h3{display:flex;align-items:center;gap:8px;margin:0 0 8px;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}.ncount{display:inline-block;min-width:20px;padding:0 6px;border-radius:99px;background:var(--soft);color:var(--fg);font:600 12px var(--mono);text-align:center;letter-spacing:0}.seg.ncats{flex-wrap:wrap;max-width:100%}.seg button.on .ncount{background:#ffffff33;color:#fff}
+@media (max-width:560px){.page,.top{padding-inline:16px}}
+</style>
+<div class="top"><div class="brand"><div><b>NEW WAVE</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div><span class="who">Working As <select id="workas"><option>Admin</option><option>Registration</option><option>Cashier</option><option>Accounting</option><option>Releasing Officer</option><option>MISMO Compliance Officer</option><option>Admin Assistant</option></select></span></div><nav class="tabs" id="tabs"></nav></div>
+<main class="page" id="page"></main>
+<script>
+const NAV=[["Dashboard"],["Search Trainee"],["Enrollments"],["Resource Planning"],["Configuration",["Employee Accounts","List of Instructors","Classrooms","Certifications","Partners","Partner Rebates","Holidays","Reset Data"]],["Requests"],["Reports",["Daily Summary Report"]],["MISMO",["MISMO Dashboard","Final List","Submissions"]]];
+const S={page:"Dashboard",open:null,certTab:"Numbering"};
+const peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
+const head=(e,t,x="")=>`<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap"><div><span class="eyebrow">${e}</span><h1>${t}</h1></div>${x}</div>`;
+const table=(cols,rows)=>`<div class="wrap"><table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join("")}</tr></thead><tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+const V={
+ "Dashboard":()=>dashboard(),
+ "Search Trainee":()=>searchTrainee(),
+ "Enrollments":()=>enrollmentsView(),
+ "Resource Planning":()=>head("Admin","Resource Planning",`<button style="border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 14px">Print PDF</button>`)+`<div class="note">Same screen as the Admin Assistant's (Design 3): batches with problems first, then classroom and instructor cards.</div><section class="panel">${table(["Batch","Course","Dates","Classroom","Instructor","Status"],[["BCH-2026-002493","CCMD","Oct 12–14","ROOM 102","—",`<span class="pill p-warn">No instructor</span>`],["BCH-2026-002466","PSCMT","Oct 13–14","ROOM 101","Engr. L. Cruz",`<span class="pill p-bad">26 students, 24 seats</span>`],["BCH-2026-002475","UBT-PSSR","Oct 12","ROOM 101","Capt. R. Villanueva",`<span class="pill p-ok">Ready</span>`]])}</section>`,
+ "Employee Accounts":()=>employees(),
+ "List of Instructors":()=>head("Admin › Configuration","List of Instructors",`<button style="background:var(--blue);color:#fff;border:0;border-radius:9px;padding:8px 14px">Add Instructor</button>`)+`<section class="panel">${table(["Instructor","Mobile","Course Accreditations"],[["Capt. R. Villanueva","0917 555 0101",`<span class="pill p-ok">UBT-PSSR · until Mar 31, 2027</span> <span class="pill p-ok">PSCMT · until Mar 31, 2027</span>`],["C/E M. Ramos","0918 555 0144",`<span class="pill p-warn">HPT · until Oct 20</span>`],["2/O J. Dizon","0919 555 0177",`<span class="pill p-bad">STPPDSPPS · expired Sep 30</span>`]])}</section>`,
+ "Classrooms":()=>head("Admin › Configuration","Classrooms",`<button style="background:var(--blue);color:#fff;border:0;border-radius:9px;padding:8px 14px">Add Classroom</button>`)+`<section class="panel">${table(["Classroom","Venue","Seats","Status"],[["ROOM 101","Bel-Air, Ermita","24",`<span class="pill p-ok">Active</span>`],["ROOM 102","Bel-Air, Ermita","24",`<span class="pill p-ok">Active</span>`],["Simulator Room","Bel-Air, Ermita","12",`<span class="pill p-ok">Active</span>`]])}</section>`,
+ "Certifications":()=>head("Admin › Configuration","Certifications",`<span class="seg">${["Numbering","Issued Before the Portal","Void Requests","Change a Number"].map(t=>`<button class="${S.certTab===t?"on":""}" data-cert="${t}">${t}</button>`).join("")}</span>`)+`<div class="note">Certificate Controls and Certificate Numbers in one place.</div>`+({
+   "Numbering":`<div class="grid2"><section class="panel"><div class="ph"><h2>Registration No.</h2><span class="m">New on every certificate</span></div><div class="pb">Last used <b class="mono">NWMTC007548</b> · next prints <b class="mono" style="color:var(--blue)">NWMTC007549-102026</b></div></section><section class="panel"><div class="ph"><h2>Certificate Printing</h2></div><div class="pb"><span class="pill p-ok">On</span> · templates uploaded for 9 of 148 courses</div></section></div><section class="panel"><div class="ph"><h2>Certificate No. per Course</h2></div>${table(["Course","Prefix","Last No. Used","Next"],[["FSH","FSH","55",`<b class="mono" style="color:var(--blue)">FSH000056</b>`],["UBT-PSSR","NWM-BT-","1244",`<b class="mono" style="color:var(--blue)">NWM-BT-01245</b>`]])}</section>`,
+   "Issued Before the Portal":`<section class="panel"><div class="ph"><h2>Recorded</h2><span class="m">CSV upload or one at a time</span></div>${table(["Trainee","Course","Certificate No.","Registration No.","Match"],[["REYES, Paolo","FSH","FSH000055","NWMTC007548-092026",`<span class="pill p-ok">Matched · Released</span>`]])}</section>`,
+   "Void Requests":`<section class="panel">${table(["Trainee","Certificate No.","Reason",""],[["SANTOS, Maria","NWM-CM-00310","Misprint — wrong spelling",`<button>Reject</button> <button>Approve</button>`]])}</section>`,
+   "Change a Number":`<section class="panel"><div class="pb" style="padding-top:16px">Search a trainee, enter the new Certificate No. and the reason. Every change is recorded in the audit log.</div></section>`}[S.certTab]),
+ "Partners":()=>partners(),
+ "Partner Rebates":()=>partnerRebates(),
+ "Holidays":()=>holidaysConfig(),
+ "Reset Data":()=>resetData(),
+ "Requests":()=>head("Admin","Requests")+`<section class="panel">${table(["Trainee","Request","Fee","Stage"],[["SANTOS, Maria","Rescheduling",peso(30000),`<span class="pill p-warn">Waiting for payment</span>`],["AQUINO, Rey","Change Course","—",`<span class="pill p-info">For approval</span>`],["BAUTISTA, Ana","Reprinting",peso(50000),`<span class="pill p-ok">Paid · applied</span>`]])}</section>`,
+ "Daily Summary Report":()=>vMsg()+head("Admin › Reports","Daily Summary Report",`<button style="border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 14px">Print PDF</button>`)+`<div class="note">The Accounting daily summary: cash position, collections by source and channel, receipts and expenses with voucher numbers — the same report as the PDF you received.</div><div class="tiles"><div class="tile"><span>Cash on hand</span><b>${peso(735000)}</b></div><div class="tile"><span>Collected</span><b>${peso(1090000)}</b></div><div class="tile"><span>Expenses released</span><b>${peso(970000)}</b></div><div class="tile bad"><span>Over / short</span><b>−₱10.00</b></div></div><section class="panel"><div class="ph"><h2>Collections by Channel</h2></div>${table(["Source","Cash","GCash","PSBank","UnionBank","Total"],[["Direct walk-ins",peso(360000),peso(180000),peso(50000),"—",peso(590000)],["Agencies","—",peso(130000),"—",peso(120000),peso(250000)],["Consultancies","—","—",peso(250000),"—",peso(250000)]])}</section>`+expensesPanel(),
+ "MISMO Dashboard":()=>head("MISMO","Dashboard")+`<div class="note">The MISMO Compliance Officer's screens, under one MISMO tab.</div><section class="panel"><div class="ph"><h2>Pending Balances at 11:00 AM</h2><button>Print All Batches</button></div>${table(["Batch","Trainees owing","Total",""],[["BCH-2026-002475 · UBT-PSSR","2",peso(310000),`<button>Print</button>`]])}</section>`,
+ "Final List":()=>head("MISMO","Final List")+`<section class="panel">${table(["#","Last Name","First Name","SRN","Status"],[["1","DELA CRUZ","Juan","SRN-2210441",`<span class="pill p-ok">For MARINA</span>`],["2","FLORES","Ken","SRN-1901777",`<span class="pill p-ok">For MARINA</span>`],["—","VILLAR","Mark","SRN-2400112",`<span class="pill p-bad">Left off · unpaid at 4 PM</span>`]])}</section>`,
+ "Submissions":()=>head("MISMO","Submissions")+`<section class="panel">${table(["List Date","Batch","Course","Trainees","Submitted"],[["Oct 9","BCH-2026-002460","PSCMT","18","Oct 9, 4:32 PM"]])}</section>`};
+/* ---- Admin Dashboard (owner, 9 Oct 2026): up to date, with a Start and End date ---- */
+const TODAY="2026-10-12";
+const addD=(d,n)=>{const x=new Date(d+"T12:00:00+08:00");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)};
+const fmt=d=>new Date(d+"T12:00:00+08:00").toLocaleDateString("en-PH",{month:"short",day:"numeric",year:"numeric"});
+S.from=S.from||"2026-10-01";S.to=S.to||TODAY;
+// Sample daily figures for Oct 1–12.
+const DAYS=[...Array(12)].map((_,i)=>{const d=addD("2026-10-01",i),k=(i*7+3)%5;return{d,enr:6+k*2,ch:{Cash:180000*(1+k%3),GCash:130000*(2+k%2),PSBank:250000*(k%2),UnionBank:120000*((k+1)%2)},rel:{Cash:50000*(1+k%2),GCash:k===2?845000:0}}});
+const ONGOING=[["BCH-2026-002475","UBT-PSSR","Updating Training on Basic Training – PSSR","ROOM 101","Capt. R. Villanueva",18,24],["BCH-2026-002493","CCMD","Crowd and Crisis Management – Domestic","ROOM 102","—",9,24],["BCH-2026-002469","STPPDSPPS","Safety Training for Personnel","—","2/O J. Dizon",14,24],["BCH-2026-002466","PSCMT","Crowd Management Training","ROOM 101","Engr. L. Cruz",26,24]];
+const APPROVALS=[["Expense","Meralco · Utilities","ER-2026-000209",845000,"Accounting Manager"],["Discount","SANTOS, Maria · Agency rebate","ENR-2026-000868",-20000,"Accounting Manager"],["Void","SANTOS, Maria · misprint","NWM-CM-00310",0,"Admin"],["Rescheduling","AQUINO, Rey · Oct 13 → Oct 20","REQ-2026-000041",30000,"Cashier (fee) → automatic"],["Delivery","BAUTISTA, Ana · LBC","DR-2026-0014",50000,"Registration"]];
+const REQS=[["RQ-2026-0006","Oct 12","Coffee Cups × 4, Coffee Beans × 2",202000,"For Approval"],["RQ-2026-0005","Oct 9","Bond Paper A4 × 5, Markers × 3",216000,"Approved · CV-2026-000130"],["RQ-2026-0004","Oct 7","Adapters × 2",50000,"Released"]];
+const DUE_CERTS=[["REYES, Paolo","UBT-PSSR","BCH-2026-002405","Oct 11","Overdue · due Oct 11"],["MENDOZA, Carlo","HPT","BCH-2026-002398","Oct 9","Overdue · due Oct 10"],["DELA CRUZ, Juan","UBT-PSSR","BCH-2026-002475","Oct 12","Due today"],["FLORES, Ken","UBT-PSSR","BCH-2026-002475","Oct 12","Due today · photo missing"]];
+// Notifications grouped by category; categories with urgent items first, urgent items first inside each.
+const NCATS=["Classes and Rooms","Certificates","Payments and Reconciliation","MISMO","Holidays and MARINA Requests"];
+S.nCat=S.nCat??"All";
+function noticeGroups(items){
+  const groups=NCATS.map(c=>({c,list:items.filter(i=>i.cat===c).sort((a,b)=>(a.sev==="bad"?0:1)-(b.sev==="bad"?0:1))})).filter(g=>g.list.length)
+    .sort((a,b)=>(a.list.some(i=>i.sev==="bad")?0:1)-(b.list.some(i=>i.sev==="bad")?0:1));
+  const chips=`<div class="seg ncats" style="margin-bottom:12px">${["All",...groups.map(g=>g.c)].map(c=>{const n=c==="All"?items.length:groups.find(g=>g.c===c).list.length;return `<button class="${S.nCat===c?"on":""}" data-ncat="${c}">${c} <span class="ncount">${n}</span></button>`}).join("")}</div>`;
+  const shown=S.nCat==="All"?groups:groups.filter(g=>g.c===S.nCat);
+  return chips+shown.map(g=>{const urgent=g.list.filter(i=>i.sev==="bad").length;return `<div class="ngroup"><h3>${g.c}<span class="ncount">${g.list.length}</span>${urgent?`<span class="pill p-bad">${urgent} Urgent</span>`:""}</h3><div class="nlist">${g.list.map(i=>`<div class="ni ${i.sev}"><div><b>${i.t}</b><small>${i.d}</small></div>${i.go?`<button data-ngo="${i.go}">Open</button>`:""}</div>`).join("")}</div></div>`}).join("");
+}
+function notices(){
+  const today=DUE_CERTS.filter(c=>c[4].startsWith("Due today")),over=DUE_CERTS.filter(c=>c[4].startsWith("Overdue"));
+  const items=[
+   {cat:"Certificates",sev:"bad",t:`${over.length} certificate${over.length===1?"":"s"} overdue to print`,d:over.map(c=>`${c[0]} (${c[1]})`).join(", "),go:"cert"},
+   {cat:"Certificates",sev:"warn",t:`${today.length} certificate${today.length===1?"":"s"} due to print today, not printed yet`,d:today.map(c=>`${c[0]} (${c[1]})`).join(", "),go:"cert"},
+   {cat:"Classes and Rooms",sev:"bad",t:"2 STCW classes today have no room or instructor",d:"BCH-2026-002493 CCMD (no instructor) · BCH-2026-002469 STPPDSPPS (no room)",go:"Resource Planning"},
+   {cat:"Classes and Rooms",sev:"bad",t:"PSCMT BCH-2026-002466: 26 students, ROOM 101 seats 24",d:"Move to a bigger room in Resource Planning.",go:"Resource Planning"},
+   {cat:"Payments and Reconciliation",sev:"warn",t:"3 payments not reconciled from earlier days",d:"GCash 2 (oldest Oct 10) · PSBank 1 (oldest Oct 11)",go:null},
+   ...upcomingHolidayConflicts().map(h=>({cat:"Holidays and MARINA Requests",sev:"warn",t:`Holiday on a training day: ${h.n}, ${hLabel(h.d)}`,d:`${h.bs.length} batches in class (${h.bs.map(b=>b.c).join(", ")}). Request MARINA's permission to conduct training, or move the classes.`,go:"hol:"+h.d.slice(0,7)})),
+   {cat:"MISMO",sev:"warn",t:"MARINA MISMO final list not yet submitted today",d:"Due after the 4:00 PM cut-off · 2 batches",go:"Final List"}];
+  return `<section class="panel notices"><div class="ph"><h2>Important Notifications</h2><span class="m">${items.length}</span></div><div class="pb">${noticeGroups(items)}</div>
+   <div class="ph" style="padding-top:0"><h2 style="font-size:14.5px">Unprinted Certificates Due</h2><span class="m">Today and overdue</span></div>${table(["Trainee","Course","Batch","Training Ended","Status"],DUE_CERTS.map(c=>[`<b>${c[0]}</b>`,c[1],`<span class="mono">${c[2]}</span>`,c[3],`<span class="pill ${c[4].startsWith("Overdue")?"p-bad":"p-warn"}">${c[4]}</span>`]))}</section>`;
+}
+function dashboard(){
+  const inR=DAYS.filter(x=>x.d>=S.from&&x.d<=S.to);const sum=f=>inR.reduce((s,x)=>s+f(x),0);
+  const enr=sum(x=>x.enr),ch=["Cash","GCash","PSBank","UnionBank"],coll=ch.map(c=>[c,sum(x=>x.ch[c])]),rel=ch.map(c=>[c,sum(x=>x.rel[c]||0)]);
+  const tc=coll.reduce((s,x)=>s+x[1],0),tr=rel.reduce((s,x)=>s+x[1],0);
+  const quick=[["Today",TODAY,TODAY],["This Week",addD(TODAY,-6),TODAY],["This Month","2026-10-01",TODAY]];
+  const range=`<div class="range"><label>Start<input type="date" id="from" value="${S.from}" max="${S.to}"></label><label>End<input type="date" id="to" value="${S.to}" min="${S.from}" max="${TODAY}"></label><span class="seg">${quick.map(([l,a,b])=>`<button class="${S.from===a&&S.to===b?"on":""}" data-range="${a}|${b}">${l}</button>`).join("")}</span></div>`;
+  return head("Admin",`Dashboard`,range)+`<p class="sub">Up to date as of ${fmt(TODAY)}, 10:42 AM · figures for <b>${fmt(S.from)}</b> to <b>${fmt(S.to)}</b></p>${notices()}
+  <div class="tiles"><div class="tile"><span>Enrollments</span><b>${enr}</b></div><div class="tile"><span>Collections</span><b>${peso(tc)}</b></div><div class="tile"><span>Releases (expenses paid)</span><b>${peso(tr)}</b></div><div class="tile ${APPROVALS.length?"bad":""}"><span>Requests and approvals waiting</span><b>${APPROVALS.length}</b></div><div class="tile"><span>Requisitions for approval</span><b>${REQS.filter(r=>r[4]==="For Approval").length}</b></div></div>
+  <section class="panel"><div class="ph"><h2>Ongoing Classes · STCW Courses</h2><span class="m">In class today, ${fmt(TODAY)}</span></div>${table(["Batch No.","Course","Room","Instructor","No. of Students"],ONGOING.map(o=>[`<span class="mono">${o[0]}</span>`,`<b>${o[1]}</b><small class="dim">${o[2]}</small>`,o[3]==="—"?`<span class="pill p-warn">No room</span>`:o[3],o[4]==="—"?`<span class="pill p-warn">No instructor</span>`:o[4],`<span class="mono ${o[5]>o[6]?"over":""}">${o[5]} / ${o[6]}</span>`]))}</section>
+  <div class="grid2">
+   <section class="panel"><div class="ph"><h2>Requests and Approvals</h2><span class="m">${APPROVALS.length} waiting</span></div>${table(["Type","Item","Reference","Amount","With"],APPROVALS.map(a=>[`<span class="pill p-info">${a[0]}</span>`,a[1],`<span class="mono">${a[2]}</span>`,a[3]?peso(a[3]):"—",`<small class="dim">${a[4]}</small>`]))}</section>
+   <section class="panel"><div class="ph"><h2>No. of Enrollments</h2><span class="m">${fmt(S.from)} – ${fmt(S.to)}</span></div><div class="pb"><div class="bars">${inR.map(x=>`<div title="${fmt(x.d)}: ${x.enr}"><i style="height:${x.enr*5}px"></i><small>${new Date(x.d+"T12:00:00+08:00").getDate()}</small></div>`).join("")}</div><p class="dim" style="margin:8px 0 0">${enr} enrollments · ${inR.length} day${inR.length===1?"":"s"}</p></div></section>
+  </div>
+  <section class="panel"><div class="ph"><h2>Collections and Releases</h2><span class="m">${fmt(S.from)} – ${fmt(S.to)}</span></div>${table(["Channel","Collections","Releases","Net"],[...ch.map((c,i)=>[c,peso(coll[i][1]),peso(rel[i][1]),peso(coll[i][1]-rel[i][1])]),[`<b>Total</b>`,`<b>${peso(tc)}</b>`,`<b>${peso(tr)}</b>`,`<b>${peso(tc-tr)}</b>`]])}</section>
+  ${holidayPanel()}
+  <section class="panel"><div class="ph"><h2>Requisition Requests</h2><span class="m">From the Admin Assistant</span></div>${table(["RQ No.","Date","Items","Total","Status"],REQS.map(r=>[`<span class="mono">${r[0]}</span>`,r[1],r[2],peso(r[3]),`<span class="pill ${r[4]==="For Approval"?"p-warn":r[4]==="Released"?"p-ok":"p-info"}">${r[4]}</span>`]))}</section>`;
+}
+const TRAINEES=[
+ {app:"NWMTACI-0000411",name:"DELA CRUZ, Juan Perez",srn:"SRN-2210441",mobile:"0917 100 2001",email:"juan.dc@example.com",company:"Qapla Maritime",courses:[["UBT-PSSR","BCH-2026-002475","Oct 12","Enrolled",180000,0,"Due · photo on file"],["PSCMT","BCH-2026-002466","Oct 13–14","Enrolled",130000,105000,"Training not finished"]]},
+ {app:"NWMTACI-0000409",name:"GARCIA, Liza Marie",srn:"SRN-2001983",mobile:"0917 100 2004",email:"liza.g@example.com",company:"—",courses:[["UBT-PSSR","BCH-2026-002475","Oct 12","Enrolled",180000,130000,"Waiting for payment"]]},
+ {app:"NWMTACI-0000412",name:"SANTOS, Maria Lopez",srn:"SRN-1932012",mobile:"0917 100 2002",email:"maria.s@example.com",company:"Qapla Maritime",courses:[["PSCMT","BCH-2026-002466","Oct 13–14","For Payment",130000,130000,"—"],["SFA","BCH-2026-002482","Oct 16–17","For Payment",150000,150000,"—"]]},
+ {app:"NWMTACI-0000390",name:"BAUTISTA, Ana",srn:"SRN-2309911",mobile:"0917 100 2006",email:"ana.b@example.com",company:"—",courses:[["STPPDSPPS","BCH-2026-002390","Oct 5","Enrolled",120000,0,"Printed · LBC delivery requested"]]}];
+S.q=S.q??"";S.pick=S.pick??null;
+function searchTrainee(){
+  const q=S.q.trim().toLowerCase();const hits=q.length>=2?TRAINEES.filter(t=>(t.name+" "+t.app+" "+t.srn+" "+t.mobile+" "+t.email).toLowerCase().includes(q)):[];
+  const t=TRAINEES.find(x=>x.app===S.pick);
+  return head("Admin","Search Trainee")+vMsg()+`<section class="panel"><div class="pb" style="padding-top:16px"><input id="q" value="${S.q}" placeholder="Search by name, NWMTACI number, SRN, mobile or email" style="width:100%;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--fg);padding:11px 14px;font:inherit;font-size:15px"><p class="dim" style="margin:8px 0 0">Try “Santos”, “0000411” or “SRN-2001983”.</p></div>
+   ${hits.length?table(["Trainee","NWMTACI No.","SRN","Courses",""],hits.map(h=>[`<b>${h.name}</b><small class="dim">${h.mobile} · ${h.email}</small>`,`<span class="mono">${h.app}</span>`,`<span class="mono">${h.srn}</span>`,h.courses.map(c=>c[0]).join(", "),`<button data-pick="${h.app}">Open</button>`])):q.length>=2?`<p class="dim" style="padding:0 18px 18px">No trainee matches.</p>`:""}</section>
+   ${t?`<section class="panel"><div class="ph"><div><h2>${t.name}</h2><span class="m">${t.app} · ${t.srn} · ${t.mobile} · ${t.company}</span></div><span class="m">Void Payment and Cancel Enrollment are Admin-only</span></div>${table(["Course","Batch","Schedule","Status","Fee","Balance","Certificate",""],t.courses.map(c=>[`<b>${c[0]}</b>`,`<span class="mono">${c[1]}</span>`,c[2],`<span class="pill ${c[3]==="Enrolled"?"p-ok":"p-warn"}">${c[3]}</span>`,peso(c[4]),c[5]?`<span style="color:var(--bad);font-weight:600">${peso(c[5])}</span>`:peso(0),`<small class="dim">${c[6]}</small>`,enrCancelBtn(t,c)]))}</section>`+traineePayments(t):""}`;
+}
+S.partners=S.partners||[
+ {name:"Qapla Maritime",kind:"Agency",contact:"R. Santos",mobile:"0917 222 3001",code:"QAPLA050698",mode:"Deducted",active:true},
+ {name:"Costa Crewing Consultancy",kind:"Consultancy",contact:"M. Cruz",mobile:"0917 222 3002",code:"COSTA123456",mode:"No deduction",active:true},
+ {name:"Pacific Crew Agency",kind:"Agency",contact:"L. Tan",mobile:"0917 222 3003",code:"PACIF771204",mode:"Deducted",active:false}];
+const RCOURSES=[["UBT-PSSR",180000],["STPPDSPPS",120000],["PSCMT",130000],["PSCMHBT",250000],["CCMD",220000],["HPT",350000],["SFA",150000]];
+S.rebates=S.rebates||{"Qapla Maritime":{"UBT-PSSR":30000,"STPPDSPPS":20000,"PSCMT":25000,"PSCMHBT":40000,"CCMD":35000},"Costa Crewing Consultancy":{"UBT-PSSR":25000,"PSCMT":20000,"HPT":50000},"Pacific Crew Agency":{"UBT-PSSR":20000}};
+S.pAdd=S.pAdd||null;S.rbPartner=S.rbPartner||"Qapla Maritime";
+const suggestCode=n=>(n.toUpperCase().replace(/[^A-Z]/g,"").slice(0,5)||"NWM")+String(100000+Math.floor(Math.random()*900000));
+const INP="border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg);padding:8px 11px;font:inherit;width:100%";
+const BTN="border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 14px";
+const PRI="background:var(--blue);color:#fff;border:0;border-radius:9px;padding:8px 14px";
+S.pct=S.pct||{"Qapla Maritime":50,"Costa Crewing Consultancy":40,"Pacific Crew Agency":30};S.rbEdit=S.rbEdit??null;
+function partners(){
+  const a=S.pAdd;
+  return head("Admin › Configuration","Partners",a?"":`<button data-padd="1" style="${PRI}">Add Partner</button>`)+`<div class="note">Same screen as Accounting › Configuration › Partners — a change here shows there too.</div>
+  ${a?`<section class="panel"><div class="ph"><h2>Add Partner</h2></div><div class="pb" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">
+    <label class="dim">Name<input id="p_name" style="${INP}" value="${a.name}" placeholder="e.g. Blue Anchor Consultancy"></label>
+    <label class="dim">Type<select id="p_kind" style="${INP}"><option ${a.kind==="Agency"?"selected":""}>Agency</option><option ${a.kind==="Consultancy"?"selected":""}>Consultancy</option></select></label>
+    <label class="dim">Contact Person<input id="p_contact" style="${INP}" value="${a.contact}"></label>
+    <label class="dim">Email<input id="p_email" type="email" style="${INP}" value="${a.email||""}"></label>
+    <label class="dim">Mobile<input id="p_mobile" style="${INP}" value="${a.mobile}"></label>
+    <label class="dim">Referral Code (Optional)<span style="display:flex;gap:6px"><input id="p_code" class="mono" style="${INP}" value="${a.code}" placeholder="Made automatically if blank"><button data-pgen="1" style="${BTN};padding:0 10px">Generate</button></span></label>
+    <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button data-pcancel="1" style="${BTN}">Cancel</button><button data-psave="1" style="${PRI}">Save Partner</button></div>
+    ${a.err?`<p style="grid-column:1/-1;margin:0;color:var(--bad);font-weight:600">${a.err}</p>`:""}</div></section>`:""}
+  <section class="panel"><div class="ph"><h2>Partners</h2><span class="m">${S.partners.filter(p=>p.active).length} active</span></div>${table(["Name","Type","Contact","Status",""],S.partners.map((p,i)=>[`<b>${p.name}</b>`,p.kind,`${p.contact}<small class="dim">${p.mobile}</small>`,`<span class="pill ${p.active?"p-ok":"p-warn"}">${p.active?"Active":"Archived"}</span>`,`<button data-parch="${i}">${p.active?"Archive":"Restore"}</button>`]))}</section>
+  <section class="panel"><div class="ph"><h2>Referral Codes</h2></div>${table(["Partner","Type","Rebate","Referral Code",""],S.partners.filter(p=>p.active).map(p=>{const i=S.partners.indexOf(p);return [`<b>${p.name}</b>`,p.kind,`${p.mode==="No deduction"?"Paid to the agency":"Deducted from payment"}<small class="dim">${S.pct[p.name]??50}% of the training fee</small>`,`<b class="mono">${p.code}</b>`,`<span style="display:flex;gap:6px;flex-wrap:wrap"><button data-pcopy="${i}">Copy</button><button data-pnew="${i}">New Code</button></span>`]}))}<p class="dim" style="padding:0 18px 16px;margin:0">New Code replaces the old one; the old code stops working on the website registration.</p></section>`;
+}
+function partnerRebates(){
+  const e=S.rbEdit;
+  return head("Admin › Configuration","Partner Rebates")+`<div class="note">Same screen as Accounting › Configuration › Rebates per Agency.</div>
+  <section class="panel"><div class="ph"><h2>Rebates per Agency</h2><span class="m">In-house courses · % of the actual training fee</span></div>${table(["Partner","Type","Rebate","How It Is Given",""],S.partners.filter(p=>p.active).map(p=>{const pct=S.pct[p.name]??50;return e===p.name?[`<b>${p.name}</b>`,p.kind,`<input id="rb_pct" type="number" min="1" max="100" value="${pct}" style="${INP};max-width:90px"> %`,`<select id="rb_mode" style="${INP}"><option value="Deducted" ${p.mode==="Deducted"?"selected":""}>Deducted from payment</option><option value="No deduction" ${p.mode==="No deduction"?"selected":""}>Paid to the agency</option></select>`,`<span style="display:flex;gap:6px"><button data-rbcancel="1">Cancel</button><button data-rbsave1="${p.name}">Save</button></span>`]:[`<b>${p.name}</b>`,p.kind,`<b class="mono">${pct}%</b>`,p.mode==="No deduction"?"Paid to the agency":"Deducted from payment",`<button data-rbedit="${p.name}">Edit</button>`]}))}
+  ${S.rbErr?`<p style="padding:0 18px;color:var(--bad);font-weight:600">${S.rbErr}</p>`:""}<p class="dim" style="padding:0 18px 16px;margin:0">Example: a ₱1,800.00 course at 50% gives ₱900.00. Deducted: the trainee pays ₱900.00. Paid to the agency: the trainee pays ₱1,800.00 and ₱900.00 goes to Accounting › Payables.</p></section>`;
+}
+S.rs=S.rs||{from:"2026-10-09",to:"2026-10-14",word:"",done:null,err:""};
+function resetData(){
+  const r=S.rs;const days=Math.max(1,Math.round((new Date(r.to)-new Date(r.from))/864e5)+1);
+  const counts=[["Trainees (registered in the range)",9*days],["Enrollments",14*days],["Payments and receipts",11*days],["Expenses and vouchers",3*days],["Requisitions",Math.ceil(days/2)],["Requests and charges",4*days],["Certificates, photos and deliveries",5*days],["Payment reconciliation checks",8*days],["Batches starting in the range (with no other trainees)",4*days],["Cashier openings and closings",2*days]];
+  const total=counts.reduce((s,c)=>s+c[1],0);
+  return head("Admin › Configuration","Reset Data")+`<div class="note">For the dry run: erase the test records made between two dates. Staff accounts, courses, partners, rebates, classrooms, instructors, templates, numbering setup and the audit log are kept. Receipt, voucher, NWMTACI and other numbers start again from the last one still in use.</div>
+  <section class="panel"><div class="ph"><h2>1. Choose the Dates</h2></div><div class="pb" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end"><label class="dim">From<input type="date" id="rs_from" value="${r.from}" style="${INP}"></label><label class="dim">To<input type="date" id="rs_to" value="${r.to}" style="${INP}"></label><span class="dim">${days} day${days===1?"":"s"}</span></div></section>
+  <section class="panel"><div class="ph"><h2>2. Check What Will Be Erased</h2><span class="m">${total} records</span></div>${table(["Records","Count"],[...counts.map(c=>[c[0],`<span class="mono">${c[1]}</span>`]),["<b>Total</b>",`<b class="mono">${total}</b>`]])}</section>
+  <section class="panel"><div class="ph"><h2>3. Confirm</h2></div><div class="pb" style="display:flex;flex-direction:column;gap:10px">
+   <div style="background:var(--badbg);color:var(--bad);border-radius:10px;padding:10px 14px;font-weight:600">This permanently erases these ${total} records. It cannot be undone.</div>
+   <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><input id="rs_word" placeholder="Type RESET" value="${r.word}" style="${INP};max-width:200px"><button data-rserase="1" style="background:var(--bad);color:#fff;border:0;border-radius:9px;padding:8px 14px">Erase Records</button></div>
+   ${r.err?`<p style="margin:0;color:var(--bad);font-weight:600">${r.err}</p>`:""}
+   ${r.done?`<p style="margin:0;color:var(--ok);font-weight:600">${r.done}</p>`:""}</div></section>`;
+}
+const ROLE_LIST=["Registration","Cashier","Accounting","Releasing Officer","MISMO Compliance Officer","Admin Assistant","Admin"];
+S.emps=S.emps||[
+ {name:"Kate Esguerra",email:"pkmesguerra.ph@example.com",position:"General Manager",roles:["Admin"]},
+ {name:"Karen Mallari",email:"accounting.newwave@example.com",position:"Cashier",roles:["Cashier"]},
+ {name:"Kat Garcia",email:"kgaret@example.com",position:"Accounting Manager",roles:["Cashier","Accounting"]},
+ {name:"Rejanber Wariza",email:"rejanber@example.com",position:"IT / Tech",roles:["Releasing Officer","MISMO Compliance Officer"]}];
+S.empAct=S.empAct||null;S.empMsg=S.empMsg||"";
+function employees(){
+  const a=S.empAct;const roleSel=(id,val,none)=>`<select id="${id}" style="${INP}">${none?`<option value="">None</option>`:""}${ROLE_LIST.map(r=>`<option ${r===val?"selected":""}>${r}</option>`).join("")}</select>`;
+  const panel=(i)=>{if(!a||a.i!==i)return"";const e=S.emps[i];
+    if(a.kind==="edit")return `<tr><td colspan="4"><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;padding:6px 0"><label class="dim">Complete Name<input id="e_name" style="${INP}" value="${e.name}"></label><label class="dim">Position<input id="e_pos" style="${INP}" value="${e.position}"></label><label class="dim">Role${roleSel("e_r1",e.roles[0])}</label><label class="dim">Second Role (Optional)${roleSel("e_r2",e.roles[1]||"",true)}</label><div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button data-ecancel="1" style="${BTN}">Cancel</button><button data-esave="${i}" style="${PRI}">Save Changes</button></div></div></td></tr>`;
+    if(a.kind==="reset")return `<tr><td colspan="4"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;padding:6px 0"><label class="dim">Temporary Password<input id="e_pw" type="text" autocomplete="new-password" placeholder="At least 8 characters" style="${INP};max-width:240px"></label><button data-ecancel="1" style="${BTN}">Cancel</button><button data-epw="${i}" style="${PRI}">Set Password</button><span class="dim">The employee signs in with it, then changes it.</span></div></td></tr>`;
+    if(a.kind==="delete")return `<tr><td colspan="4"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:var(--badbg);border-radius:10px;padding:10px 12px;margin:6px 0"><span style="color:var(--bad);font-weight:600">Delete ${e.name}'s account? They can no longer sign in. Their past records stay, and the email can be registered again.</span><button data-ecancel="1" style="${BTN}">Keep</button><button data-edel="${i}" style="background:var(--bad);color:#fff;border:0;border-radius:9px;padding:8px 14px">Delete Account</button></div></td></tr>`;
+    return "";};
+  return head("Admin › Configuration","Employee Accounts",`<button data-eadd="1" style="${PRI}">Add Employee Account</button>`)+(S.empMsg?`<div class="note">${S.empMsg}</div>`:"")+
+  (a&&a.kind==="add"?`<section class="panel"><div class="ph"><h2>Add Employee Account</h2></div><div class="pb" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px"><label class="dim">Complete Name<input id="n_name" style="${INP}"></label><label class="dim">Email<input id="n_email" type="email" style="${INP}"></label><label class="dim">Temporary Password<input id="n_pw" type="text" autocomplete="new-password" placeholder="At least 8 characters" style="${INP}"></label><label class="dim">Position<input id="n_pos" style="${INP}"></label><label class="dim">Role${roleSel("n_r1","Cashier")}</label><label class="dim">Second Role (Optional)${roleSel("n_r2","",true)}</label><div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button data-ecancel="1" style="${BTN}">Cancel</button><button data-ecreate="1" style="${PRI}">Create Account</button></div></div></section>`:"")+
+  `<section class="panel"><div class="ph"><h2>Employees</h2><span class="m">${S.emps.length}</span></div><div class="wrap"><table><thead><tr><th>Employee</th><th>Position</th><th>Roles</th><th>Actions</th></tr></thead><tbody>${S.emps.map((e,i)=>`<tr><td><b>${e.name}</b><small class="dim">${e.email}</small></td><td>${e.position||"—"}</td><td>${e.roles.map(r=>`<span class="pill p-ok">${r}</span>`).join(" ")}</td><td><span style="display:flex;gap:6px;flex-wrap:wrap"><button data-eedit="${i}">Edit</button><button data-ereset="${i}">Reset Password</button><button data-edelask="${i}" style="color:var(--bad)">Delete</button></span></td></tr>${panel(i)}`).join("")}</tbody></table></div><p class="dim" style="padding:0 18px 16px;margin:0">Each employee can hold up to two roles and switches between them in Working As. You cannot delete your own account or remove your own Admin role.</p></section>`;
+}
+const ROLE_TABS={"Registration":["Dashboard","Registration","Courses","Delivery Requests"],"Cashier":["Dashboard","Enrollments ▾ Search Trainee","Accounting ▾ Payments, Expenses, Report, Requests"],"Accounting":["Dashboard","Approvals","Transactions ▾","Reports","Configuration ▾ (Payment Channels, Expense Categories, Requisition Items, Rebates per Agency, Partners)"],"Releasing Officer":["Dashboard","Certificates","Templates","Numbering","Released","Delivery"],"MISMO Compliance Officer":["Dashboard","Final List","Submissions"],"Admin Assistant":["Dashboard","Requisitions","Resource Planning","Instructors","Reconciliation"]};
+S.workAs=S.workAs||"Admin";
+function roleView(){const r=S.workAs;return head("Working As "+r,r+" Workspace")+`<div class="note">The Admin can open any role from Working As and work in it with that role's own tabs. Switch back to Admin from the same menu.</div><section class="panel"><div class="ph"><h2>${r} tabs</h2></div><div class="pb" style="display:flex;gap:8px;flex-wrap:wrap">${ROLE_TABS[r].map(t=>`<span class="pill p-info" style="font-size:13px;padding:5px 11px">${t}</span>`).join("")}</div></section><p class="dim">In the real portal this opens the full ${r} workspace. Try every role in the portal simulator.</p>`}
+/* ---- Admin voids (owner, 9 Oct 2026): void a payment/receipt, void a released voucher, cancel an enrollment ---- */
+S.vAct=S.vAct??null;S.vErr=S.vErr??"";S.vMsg=S.vMsg??"";
+const PAYS=[
+ {no:"OR-2026-000512",app:"NWMTACI-0000411",course:"UBT-PSSR",date:"Oct 12, 9:14 AM",mode:"GCash",ref:"1012 334 556",amt:180000,by:"Karen Mallari",v:null},
+ {no:"OR-2026-000513",app:"NWMTACI-0000411",course:"PSCMT",date:"Oct 12, 9:16 AM",mode:"Cash",ref:"—",amt:25000,by:"Karen Mallari",v:null},
+ {no:"OR-2026-000498",app:"NWMTACI-0000409",course:"UBT-PSSR",date:"Oct 11, 3:40 PM",mode:"PSBank",ref:"PSB-88121",amt:50000,by:"Karen Mallari",v:null},
+ {no:"OR-2026-000431",app:"NWMTACI-0000390",course:"STPPDSPPS",date:"Oct 5, 8:02 AM",mode:"Cash",ref:"—",amt:120000,by:"Karen Mallari",v:null}];
+S.enrs=S.enrs||[
+ {no:"ENR-2026-000871",name:"DELA CRUZ, Juan",course:"UBT-PSSR",batch:"BCH-2026-002475",sched:"Oct 12",status:"Enrolled",paid:180000,bal:0,seats:[18,24]},
+ {no:"ENR-2026-000868",name:"SANTOS, Maria",course:"PSCMT",batch:"BCH-2026-002466",sched:"Oct 13–14",status:"For Payment",paid:0,bal:130000,seats:[26,24]},
+ {no:"ENR-2026-000869",name:"SANTOS, Maria",course:"SFA",batch:"BCH-2026-002482",sched:"Oct 16–17",status:"For Payment",paid:0,bal:150000,seats:[11,24]},
+ {no:"ENR-2026-000860",name:"GARCIA, Liza",course:"UBT-PSSR",batch:"BCH-2026-002475",sched:"Oct 12",status:"Enrolled",paid:50000,bal:130000,seats:[18,24]}];
+S.exps=S.exps||[
+ {cv:"CV-2026-000131",payee:"Meralco",cat:"Utilities",ch:"GCash",amt:845000,status:"Released"},
+ {cv:"CV-2026-000130",payee:"Requisition RQ-2026-0005",cat:"Supplies",ch:"Cash",amt:216000,status:"Released"},
+ {cv:"CV-2026-000129",payee:"J. Reyes (Courier)",cat:"Transportation",ch:"Cash",amt:50000,status:"Approved"}];
+const vChip=v=>`<span class="pill p-bad">VOID</span><small class="dim">${v.reason} · ${v.at}</small>`;
+function vForm(kind,id,label,detail){
+  if(!(S.vAct&&S.vAct.kind===kind&&S.vAct.id===id))return "";
+  return `<div class="vform" role="group" aria-label="${label}"><b>${label}: ${id}</b><p>${detail}</p><label class="dim">Reason (required)<input id="v_reason" style="${INP}" placeholder="e.g. Wrong trainee, duplicate receipt, wrong amount"></label>${S.vErr?`<p class="verr">${S.vErr}</p>`:""}<div style="display:flex;gap:8px;justify-content:flex-end"><button data-vcancel="1" style="${BTN}">Keep It</button><button data-vok="1" class="vbtn">${label}</button></div></div>`;
+}
+const vMsg=()=>S.vMsg?`<div class="note" style="background:var(--okbg);color:var(--ok)">${S.vMsg}</div>`:"";
+function traineePayments(t){
+  const rows=PAYS.filter(p=>p.app===t.app);
+  return `<section class="panel"><div class="ph"><h2>Payments</h2><span class="m">${rows.length} receipt${rows.length===1?"":"s"}</span></div>${table(["Receipt No.","Date","Course","Mode","Reference","Amount","Recorded By",""],rows.map(p=>[`<span class="mono">${p.no}</span>`,p.date,p.course,p.mode,`<span class="mono">${p.ref}</span>`,p.v?`<s class="mono">${peso(p.amt)}</s>`:`<b class="mono">${peso(p.amt)}</b>`,p.by,p.v?vChip(p.v):`<button data-vpay="${p.no}" class="vlink">Void Payment</button>`]))}
+  ${rows.map(p=>vForm("pay",p.no,"Void Payment",`${peso(p.amt)} ${p.mode} for ${p.course} goes back to ${t.name.split(",")[0]}'s balance. The receipt prints VOID and the payment leaves the day's collections and reconciliation. A reversal record and the audit log keep the history; nothing is erased.`)).join("")}</section>`;
+}
+function enrollmentsView(){
+  const r=S.enrs;
+  return head("Admin","Enrollments")+vMsg()+`<section class="panel">${table(["Enrollment","Trainee","Course","Batch · Schedule","Status","Paid","Balance",""],r.map(e=>[`<span class="mono">${e.no}</span>`,`<b>${e.name}</b>`,e.course,`<span class="mono">${e.batch}</span><small class="dim">${e.sched}</small>`,e.status==="Cancelled"?`<span class="pill p-bad">Cancelled</span><small class="dim">${e.v.reason} · ${e.v.at}</small>`:`<span class="pill ${e.status==="Enrolled"?"p-ok":"p-warn"}">${e.status}</span>`,peso(e.paid),peso(e.bal),e.status==="Cancelled"?"":`<button data-venr="${e.no}" class="vlink">Cancel Enrollment</button>`]))}
+  ${r.map(e=>vForm("enr",e.no,"Cancel Enrollment",`${e.name} leaves ${e.course} ${e.batch} and the seat is released (${e.seats[0]} → ${e.seats[0]-1} of ${e.seats[1]}).${e.paid?` The ${peso(e.paid)} already paid stays on record; a refund still goes through a Refund request.`:""}`)).join("")}</section>`;
+}
+function expensesPanel(){
+  return `<section class="panel"><div class="ph"><h2>Expenses with Voucher Numbers</h2><span class="m">Approved and released</span></div>${table(["CV No.","Payee","Category","Channel","Amount","Status",""],S.exps.map(x=>[`<span class="mono">${x.cv}</span>`,x.payee,x.cat,x.ch,x.status==="Void"?`<s class="mono">${peso(x.amt)}</s>`:`<b class="mono">${peso(x.amt)}</b>`,x.status==="Void"?vChip(x.v):`<span class="pill ${x.status==="Released"?"p-ok":"p-info"}">${x.status}</span>`,x.status==="Void"?"":`<button data-vexp="${x.cv}" class="vlink">Void Voucher</button>`]))}
+  ${S.exps.map(x=>vForm("exp",x.cv,"Void Voucher",`${peso(x.amt)} to ${x.payee} leaves the expense totals and the cash position. The voucher prints VOID; ${x.cv} is kept and never reused.${x.payee.startsWith("Requisition")?" The requisition shows Voided.":""}${x.status==="Released"&&x.ch==="Cash"?" If the cash was handed out, return it to the drawer.":""}`)).join("")}</section>`;
+}
+function enrCancelBtn(t,c){const e=S.enrs.find(x=>x.batch===c[1]&&x.name.startsWith(t.name.split(",")[0]));if(!e)return "";return e.status==="Cancelled"?`<span class="pill p-bad">Cancelled</span>`:`<button data-venrgo="${e.no}" class="vlink">Cancel Enrollment</button>`}
+function applyVoid(){
+  const reason=(document.getElementById("v_reason")?.value||"").trim();const a=S.vAct;
+  if(reason.length<5){S.vErr="Enter the reason (at least 5 characters).";return}
+  const v={reason,at:"Oct 12, 10:45 AM · Admin"};S.vErr="";
+  if(a.kind==="pay"){const p=PAYS.find(x=>x.no===a.id);p.v=v;const t=TRAINEES.find(x=>x.app===p.app);const c=t.courses.find(c=>c[0]===p.course);if(c)c[5]+=p.amt;S.vMsg=`${p.no} voided. ${peso(p.amt)} is back on the balance.`}
+  if(a.kind==="enr"){const e=S.enrs.find(x=>x.no===a.id);e.status="Cancelled";e.v=v;S.enrs.filter(x=>x.batch===e.batch).forEach(x=>x.seats=[x.seats[0]-1,x.seats[1]]);S.vMsg=`${e.no} cancelled. Seat released on ${e.batch}.`}
+  if(a.kind==="exp"){const x=S.exps.find(x=>x.cv===a.id);x.status="Void";x.v=v;S.vMsg=`${x.cv} voided. It no longer counts in expenses.`}
+  S.vAct=null;
+}
+/* ---- Holidays on training dates (owner, 9 Oct 2026): remind the Admin to request MARINA permission ---- */
+S.hol=S.hol||[
+ {d:"2026-11-01",n:"All Saints' Day",t:"Special Non-Working"},
+ {d:"2026-11-02",n:"All Souls' Day",t:"Special Non-Working"},
+ {d:"2026-11-30",n:"Bonifacio Day",t:"Regular"},
+ {d:"2026-12-08",n:"Feast of the Immaculate Conception",t:"Special Non-Working"},
+ {d:"2026-12-24",n:"Christmas Eve",t:"Special Non-Working"},
+ {d:"2026-12-25",n:"Christmas Day",t:"Regular"},
+ {d:"2026-12-30",n:"Rizal Day",t:"Regular"},
+ {d:"2026-12-31",n:"Last Day of the Year",t:"Special Non-Working"}];
+S.hMonth=S.hMonth||"2026-11";S.marina=S.marina||{};S.hAdd=S.hAdd??false;S.hErr=S.hErr??"";
+const DOW=d=>new Date(d+"T12:00:00+08:00").getUTCDay();
+const WD=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+// The weekly STCW pattern: which courses are in class on each weekday.
+const BY_DAY={1:["UBT-PSSR","STPPDSPPS","CCMD"],2:["UBT-PSSR","PSCMT","CCMD"],3:["UBT-PSSR","PSCMT","CCMD"],4:["UBT-PSSR","PSCMHBT"],5:["UBT-PSSR","PSCMHBT"],6:["UBT-PSSR","PSCMHBT"],0:[]};
+function batchesOn(d){const day=+d.slice(8);return BY_DAY[DOW(d)].map((c,i)=>({c,b:`BCH-2026-00${2600+day*7+i}`,n:6+((day+i*5)%15)}))}
+const hLabel=d=>`${WD[DOW(d)]}, ${fmt(d)}`;
+function holidayRows(month){return S.hol.filter(h=>h.d.startsWith(month)).sort((a,b)=>a.d.localeCompare(b.d)).map(h=>({...h,bs:batchesOn(h.d)}))}
+function upcomingHolidayConflicts(){return S.hol.filter(h=>h.d>TODAY&&h.d<=addD(TODAY,60)).map(h=>({...h,bs:batchesOn(h.d)})).filter(h=>h.bs.length&&!["Sent","Approved"].includes(S.marina[h.d]?.s))}
+function marinaCell(h){const m=S.marina[h.d];if(!h.bs.length)return `<small class="dim">No class (Sunday)</small>`;
+  if(m?.s==="Approved")return `<span class="pill p-ok">MARINA Approved</span><small class="dim">${m.at}</small>`;
+  if(m?.s==="Moved")return `<span class="pill p-info">Classes Moved</span><small class="dim">${m.at}</small>`;
+  if(m?.s==="Sent")return `<span class="pill p-info">Request Sent</span><small class="dim">${m.at}</small><span style="display:flex;gap:6px;margin-top:4px"><button data-mok="${h.d}">Mark Approved</button><button data-mmove="${h.d}">Classes Moved</button></span>`;
+  return `<span class="pill p-warn">Request Not Sent</span><span style="display:flex;gap:6px;margin-top:4px"><button data-msent="${h.d}">Mark Request Sent</button><button data-mmove="${h.d}">Classes Moved</button></span>`}
+function holidayPanel(){
+  const months=[["2026-10","October"],["2026-11","November"],["2026-12","December"],["2027-01","January 2027"]];
+  const rows=holidayRows(S.hMonth);const hit=rows.filter(h=>h.bs.length);const trainees=hit.reduce((s,h)=>s+h.bs.reduce((a,b)=>a+b.n,0),0);
+  return `<section class="panel" id="holidays"><div class="ph"><h2>Holidays on Training Dates</h2><span class="seg">${months.map(([v,l])=>`<button class="${S.hMonth===v?"on":""}" data-hmonth="${v}">${l}</button>`).join("")}</span></div>
+  <div class="pb" style="padding-bottom:8px">${rows.length?hit.length?`<b>${hit.length} holiday${hit.length===1?"":"s"}</b> fall on training days this month · ${hit.reduce((s,h)=>s+h.bs.length,0)} batches · about ${trainees} trainees. Request MARINA's permission to conduct training on these dates, or move the classes.`:"The holidays this month fall on Sundays; no classes are affected.":"No holidays this month."}</div>
+  ${rows.length?table(["Date","Holiday","Type","Training on That Day","MARINA Request"],rows.map(h=>[`<b>${hLabel(h.d)}</b>`,h.n,`<span class="pill ${h.t==="Regular"?"p-bad":"p-warn"}">${h.t}</span>`,h.bs.length?h.bs.map(b=>`<span class="mono">${b.b}</span> ${b.c} · ${b.n} trainees`).join("<br>"):`<small class="dim">—</small>`,marinaCell(h)])):""}
+  <p class="dim" style="padding:0 18px 16px;margin:0">The Admin keeps the holiday list in Configuration › Holidays, updated from each year's Proclamation and any special days declared later.</p></section>`;
+}
+function holidaysConfig(){
+  return head("Admin › Configuration","Holidays",S.hAdd?"":`<button data-hadd="1" style="${PRI}">Add Holiday</button>`)+`${S.hAdd?`<section class="panel"><div class="ph"><h2>Add Holiday</h2></div><div class="pb" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px"><label class="dim">Date<input id="h_d" type="date" style="${INP}"></label><label class="dim">Holiday<input id="h_n" style="${INP}" placeholder="e.g. Special Non-Working Day"></label><label class="dim">Type<select id="h_t" style="${INP}"><option>Regular</option><option>Special Non-Working</option><option>Special Working</option><option>Local (Manila)</option></select></label><div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-end"><button data-hcancel="1" style="${BTN}">Cancel</button><button data-hsave="1" style="${PRI}">Save Holiday</button></div>${S.hErr?`<p class="verr" style="grid-column:1/-1">${S.hErr}</p>`:""}</div></section>`:""}
+  <section class="panel"><div class="ph"><h2>Holidays</h2><span class="m">${S.hol.length} listed</span></div>${table(["Date","Holiday","Type","Training That Day",""],[...S.hol].sort((a,b)=>a.d.localeCompare(b.d)).map(h=>{const bs=batchesOn(h.d);return [`<b>${hLabel(h.d)}</b>`,h.n,h.t,bs.length?`${bs.length} batches`:`<small class="dim">None</small>`,`<button data-hdel="${h.d}">Remove</button>`]}))}</section>`;
+}
+const groupOf=p=>NAV.find(([l,items])=>items?items.includes(p):l===p)?.[0];
+function render(){document.getElementById("tabs").innerHTML=NAV.map(([label,items])=>`<div class="tab"><button class="${groupOf(S.page)===label?"on":""}" data-tab="${label}" aria-expanded="${S.open===label}">${label}${items?" ▾":""}</button>${items&&S.open===label?`<div class="menu" role="menu">${items.map(i=>`<button class="${S.page===i?"on":""}" data-go="${i}" role="menuitem">${i}</button>`).join("")}</div>`:""}</div>`).join("");document.getElementById("tabs").style.display=S.workAs==="Admin"?"":"none";document.getElementById("page").innerHTML=S.workAs==="Admin"?V[S.page]():roleView()}
+document.addEventListener("click",e=>{const t=e.target.closest("button");if(!t){S.open=null;render();return}const d=t.dataset;
+ if(d.tab){const items=NAV.find(n=>n[0]===d.tab)[1];if(items){S.open=S.open===d.tab?null:d.tab}else{S.page=d.tab;S.open=null}}
+ else if(d.go){S.page=d.go;S.open=null}else if(d.range){[S.from,S.to]=d.range.split("|")}else if(d.eadd){S.empAct={kind:"add"};S.empMsg=""}else if(d.ecancel){S.empAct=null}
+ else if(d.eedit){S.empAct={kind:"edit",i:+d.eedit};S.empMsg=""}else if(d.ereset){S.empAct={kind:"reset",i:+d.ereset};S.empMsg=""}
+ else if(d.edelask){const e=S.emps[+d.edelask];if(e.name==="Kate Esguerra"){S.empMsg="You cannot delete your own account.";S.empAct=null}else{S.empAct={kind:"delete",i:+d.edelask};S.empMsg=""}}
+ else if(d.esave){const e=S.emps[+d.esave],g=id=>document.getElementById(id).value.trim();const r1=g("e_r1"),r2=g("e_r2");if(e.name==="Kate Esguerra"&&r1!=="Admin"&&r2!=="Admin"){S.empMsg="You cannot remove your own Admin role."}else{e.name=g("e_name");e.position=g("e_pos");e.roles=[r1,...(r2&&r2!==r1?[r2]:[])];S.empMsg=`${e.name}'s account updated.`;S.empAct=null}}
+ else if(d.epw){const p=document.getElementById("e_pw").value;if(p.length<8){S.empMsg="The temporary password needs at least 8 characters."}else{S.empMsg=`Temporary password set for ${S.emps[+d.epw].name}. Give it to them in person; they change it after signing in.`;S.empAct=null}}
+ else if(d.edel){const e=S.emps.splice(+d.edel,1)[0];S.empMsg=`${e.name}'s account was deleted. Their records stay; the email can be registered again.`;S.empAct=null}
+ else if(d.ecreate){const g=id=>document.getElementById(id).value.trim();const n={name:g("n_name"),email:g("n_email"),position:g("n_pos"),roles:[g("n_r1"),...(g("n_r2")&&g("n_r2")!==g("n_r1")?[g("n_r2")]:[])]};if(n.name.length<2||!n.email.includes("@")||g("n_pw").length<8){S.empMsg="Enter the name, a valid email and a temporary password of at least 8 characters."}else{S.emps.push(n);S.empMsg=`Account created for ${n.name}.`;S.empAct=null}}
+ else if(d.rserase){const w=document.getElementById("rs_word").value.trim();S.rs.word=w;if(w!=="RESET"){S.rs.err="Type RESET in capital letters to confirm.";S.rs.done=null}else{S.rs.err="";S.rs.word="";S.rs.done="Erased. The audit log records who reset which dates (prototype only — nothing real was erased)."}}else if(d.padd){S.pAdd={name:"",kind:"Consultancy",contact:"",mobile:"",code:""}}else if(d.pcancel){S.pAdd=null}else if(d.pgen){const g=id=>document.getElementById(id).value;S.pAdd={...S.pAdd,name:g("p_name"),kind:g("p_kind"),contact:g("p_contact"),email:g("p_email"),mobile:g("p_mobile"),code:suggestCode(g("p_name"))}}
+ else if(d.psave){const v=id=>document.getElementById(id).value.trim();const a={name:v("p_name"),kind:v("p_kind"),contact:v("p_contact"),email:v("p_email"),mobile:v("p_mobile"),code:v("p_code").toUpperCase().replace(/[^A-Z0-9]/g,"")};if(!a.code&&a.name.length>=2)a.code=suggestCode(a.name);const code=a.code;
+   if(a.name.length<2)a.err="Enter the partner name.";else if(code.length<4)a.err="Enter a referral code of at least 4 letters or numbers, or click Generate.";else if(S.partners.some(p=>p.code===code))a.err="That referral code is already used by another partner.";
+   if(a.err){S.pAdd=a}else{S.partners.unshift({...a,mode:"Deducted",active:true});S.pct[a.name]=50;S.pAdd=null}}
+ else if(d.pcopy){navigator.clipboard?.writeText(S.partners[+d.pcopy].code).catch(()=>{})}else if(d.pnew){S.partners[+d.pnew].code=suggestCode(S.partners[+d.pnew].name)}else if(d.parch){S.partners[+d.parch].active=!S.partners[+d.parch].active}
+ else if(d.rbedit){S.rbEdit=d.rbedit;S.rbErr=""}else if(d.rbcancel){S.rbEdit=null;S.rbErr=""}else if(d.rbsave1){const pct=+document.getElementById("rb_pct").value;if(!(pct>=1&&pct<=100)){S.rbErr="Enter a percentage from 1 to 100."}else{S.pct[d.rbsave1]=pct;S.partners.find(p=>p.name===d.rbsave1).mode=document.getElementById("rb_mode").value;S.rbEdit=null;S.rbErr=""}}
+ else if(d.vpay||d.venr||d.vexp){S.vAct={kind:d.vpay?"pay":d.venr?"enr":"exp",id:d.vpay||d.venr||d.vexp};S.vErr="";S.vMsg=""}else if(d.venrgo){S.page="Enrollments";S.vAct={kind:"enr",id:d.venrgo};S.vErr="";S.vMsg=""}else if(d.vcancel){S.vAct=null;S.vErr=""}else if(d.vok){applyVoid()}
+ else if(d.ncat){S.nCat=d.ncat}else if(d.hmonth){S.hMonth=d.hmonth}else if(d.msent||d.mok||d.mmove){const k=d.msent||d.mok||d.mmove;S.marina[k]={s:d.msent?"Sent":d.mok?"Approved":"Moved",at:"Oct 12 · Admin"}}
+ else if(d.hadd){S.hAdd=true;S.hErr=""}else if(d.hcancel){S.hAdd=false}else if(d.hdel){S.hol=S.hol.filter(h=>h.d!==d.hdel)}
+ else if(d.hsave){const g=id=>document.getElementById(id).value.trim();const h={d:g("h_d"),n:g("h_n"),t:g("h_t")};if(!h.d||h.n.length<3)S.hErr="Enter the date and the holiday name.";else if(S.hol.some(x=>x.d===h.d))S.hErr="That date is already listed.";else{S.hol.push(h);S.hAdd=false;S.hErr=""}}
+ else if(d.ngo&&d.ngo.startsWith("hol:")){S.page="Dashboard";S.hMonth=d.ngo.slice(4);render();document.getElementById("holidays")?.scrollIntoView({behavior:"smooth"});return}
+ else if(d.ngo){if(d.ngo==="cert"){S.page="Certifications";S.certTab="Numbering"}else S.page=d.ngo}else if(d.pick){S.pick=d.pick}else if(d.cert){S.certTab=d.cert}else return;render()});
+document.addEventListener("input",e=>{if(e.target.id==="q"){S.q=e.target.value;const p=e.target.selectionStart;render();const i=document.getElementById("q");i.focus();i.setSelectionRange(p,p)}});
+document.addEventListener("change",e=>{if(e.target.id==="workas"){S.workAs=e.target.value;render();return}if(e.target.id==="rs_from"||e.target.id==="rs_to"){S.rs[e.target.id==="rs_from"?"from":"to"]=e.target.value;S.rs.done=null;render();return}if(e.target.id==="rb_partner"){S.rbPartner=e.target.value;render();return}if(e.target.id==="from"&&e.target.value){S.from=e.target.value;render()}if(e.target.id==="to"&&e.target.value){S.to=e.target.value;render()}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.open){S.open=null;render()}});
+render();
+</script>

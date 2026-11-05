@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { sourceLabel, splitStatementPayment } from "@/lib/company-charge";
+import { canRecordCompanyPayment, sourceLabel, splitStatementPayment } from "@/lib/company-charge";
 import { referralAction } from "@/lib/referral";
+
+describe("who records a company payment", () => {
+  it("is the Accounting Head only: not the Cashier, and not the Admin unless they also hold Accounting", () => {
+    expect(canRecordCompanyPayment(["accounting"])).toBe(true);
+    expect(canRecordCompanyPayment(["admin", "accounting"])).toBe(true);
+    expect(canRecordCompanyPayment(["admin"])).toBe(false);
+    expect(canRecordCompanyPayment(["cashier"])).toBe(false);
+  });
+});
 
 describe("company payment for a Billing Statement", () => {
   const rows = [{ enrollmentId: "a", balanceCentavos: 130000 }, { enrollmentId: "b", balanceCentavos: 90000 }, { enrollmentId: "c", balanceCentavos: 0 }];

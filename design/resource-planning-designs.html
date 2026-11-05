@@ -1,0 +1,118 @@
+<title>Resource Planning Designs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Three layouts for Admin Assistant › Resource Planning, switched at the top; each has Print PDF (sheet preview). */
+:root{--navy:#123F63;--blue:#0571D0;--orange:#F25615;--cyan:#35CCFA;--bg:#f2f6f9;--surface:#fff;--line:#dbe5ec;--fg:#0f2638;--muted:#5b6f7f;--soft:#eef4f8;--okbg:#e3f4ea;--ok:#0a7a3e;--warnbg:#fde9dd;--warn:#b4480f;--badbg:#fbe4dc;--bad:#b42318;--infobg:#e2effb;--info:#0558a8;--sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;--mono:"Geist Mono",ui-monospace,Consolas,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0c1925;--surface:#122534;--line:#23394b;--fg:#e5eef5;--muted:#98adbf;--soft:#18303f;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c1925;--surface:#122534;--line:#23394b;--fg:#e5eef5;--muted:#98adbf;--soft:#18303f;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}
+*{box-sizing:border-box}body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}button,select,input{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding:12px 20px 0}.top b{color:var(--cyan);font-size:18px}.top small{display:block;font-size:10px;letter-spacing:.07em;color:#c9dceb}
+.tabs{display:flex;gap:2px;margin-top:12px;overflow-x:auto}.tabs button{background:none;border:0;color:#d4e4f1;padding:10px 16px;border-radius:10px 10px 0 0;font-weight:500;white-space:nowrap}.tabs button.on{background:var(--bg);color:var(--fg)}
+.page{max-width:1320px;margin:0 auto;padding-block:18px 60px;padding-inline:20px;display:flex;flex-direction:column;gap:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}h1{margin:2px 0 0;font-size:27px;line-height:1.2}h2{margin:0;font-size:16px;font-weight:600}
+.acts{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:8px 14px;font-weight:500;font-size:14px;white-space:nowrap}.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}.btn.sm{padding:5px 10px;font-size:13px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}.seg button{border:0;background:none;padding:7px 14px;font-weight:600;font-size:13.5px}.seg button.on{background:var(--navy);color:#fff}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 18px 10px;flex-wrap:wrap}.ph .m{color:var(--muted);font-size:13px}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}.p-ok{background:var(--okbg);color:var(--ok)}.p-warn{background:var(--warnbg);color:var(--warn)}.p-bad{background:var(--badbg);color:var(--bad)}.p-mute{background:var(--soft);color:var(--muted)}.p-info{background:var(--infobg);color:var(--info)}
+.sel{border:1px solid var(--line);border-radius:8px;background:var(--surface);padding:6px 9px;font-size:13.5px;width:100%;min-width:0}
+.sel.bad{border-color:var(--bad);background:var(--badbg)}
+.code{font-weight:700}.cname{display:block;color:var(--muted);font-size:12.5px;line-height:1.35}
+.seats{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted)}.bar{flex:1;height:6px;border-radius:99px;background:var(--soft);overflow:hidden;min-width:50px}.bar i{display:block;height:100%;background:var(--blue)}
+.summary{display:flex;gap:10px;flex-wrap:wrap}.sum{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;min-width:130px}.sum b{font:600 20px var(--mono)}.sum span{font-size:12.5px;color:var(--muted)}.sum.bad b{color:var(--bad)}
+/* Design 1: week board */
+.board{display:grid;grid-template-columns:repeat(7,minmax(180px,1fr));gap:10px;overflow-x:auto;padding:0 18px 18px}
+.day{display:flex;flex-direction:column;gap:8px;min-width:180px}.dayh{display:flex;justify-content:space-between;font-size:13px;font-weight:600;padding:6px 2px;border-bottom:2px solid var(--line)}.dayh.today{border-color:var(--orange);color:var(--orange)}
+.card{border:1px solid var(--line);border-left:4px solid var(--c,var(--ok));border-radius:10px;padding:9px 10px;display:flex;flex-direction:column;gap:6px;background:var(--surface)}
+.card .t{display:flex;justify-content:space-between;gap:6px;align-items:baseline}.card .no{font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.cont{font-size:11.5px;color:var(--muted);font-style:italic}
+/* Design 2: grouped list */
+.group{border-top:1px solid var(--line)}.gh{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 18px;background:var(--soft);font-weight:600;font-size:14px;flex-wrap:wrap}.gh small{font-weight:500;color:var(--muted)}
+.row{display:grid;grid-template-columns:minmax(200px,2.2fr) 120px minmax(150px,1fr) 110px minmax(170px,1.2fr) 120px;gap:12px;align-items:center;padding:10px 18px;border-top:1px solid var(--line)}
+.row .lab{display:none;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.rowh{font:600 11.5px var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding-block:8px;border-top:0}
+/* Design 3: split editor */
+.split{display:grid;grid-template-columns:minmax(280px,380px) minmax(0,1fr);gap:16px;align-items:start}
+.queue{display:flex;flex-direction:column}.qi{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 16px;border:0;border-top:1px solid var(--line);background:none;text-align:left;width:100%}.qi:hover{background:var(--soft)}.qi.on{background:var(--infobg)}.qi small{color:var(--muted);font-size:12.5px}
+.choices{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;padding:0 18px 18px}
+.choice{border:1px solid var(--line);border-radius:12px;padding:10px 12px;text-align:left;background:var(--surface);display:flex;flex-direction:column;gap:4px}.choice.on{border-color:var(--blue);box-shadow:0 0 0 2px var(--blue) inset}.choice.no{opacity:.6}
+.choice small{color:var(--muted);font-size:12.5px}
+.warnline{color:var(--bad);font-size:12.5px;font-weight:600}
+/* print sheet */
+.sheet{background:#fff;color:#0f2638;border:1px solid var(--line);border-radius:6px;padding:24px 28px;max-width:1000px;margin:0 auto;width:100%}
+.sheet header{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:2px solid #123F63;padding-bottom:10px;margin-bottom:12px}.sheet h2{color:#123F63;font-size:18px}.sheet small{color:#5b6f7f}
+.sheet table{width:100%;border-collapse:collapse;font-size:12.5px}.sheet th{background:#123F63;color:#fff;text-align:left;padding:6px 8px;font-size:11px;letter-spacing:.05em;text-transform:uppercase}.sheet td{padding:6px 8px;border-bottom:1px solid #dbe5ec}.sheet tr.daysep td{background:#eef4f8;font-weight:700;color:#123F63}
+.sigs{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:30px}.sigs div{border-top:1px solid #0f2638;padding-top:6px;font-size:12px;text-align:center}
+.wrap{overflow-x:auto}
+.note{background:var(--infobg);color:var(--info);border-radius:10px;padding:10px 14px;font-size:13.5px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;z-index:50}
+@media (max-width:1000px){.split{grid-template-columns:1fr}.row{grid-template-columns:1fr 1fr;}.row .lab{display:block}.rowh{display:none}}
+@media (max-width:560px){.row{grid-template-columns:1fr}.page,.top{padding-inline:16px}}
+</style>
+<div class="top"><b>NEW WAVE</b><small>ADMIN ASSISTANT · RESOURCE PLANNING · 3 DESIGNS</small><nav class="tabs" id="tabs"></nav></div>
+<main class="page" id="page"></main>
+<div class="toast" id="toast" hidden></div>
+<script>
+const T="2026-10-12";
+const addDays=(d,n)=>{const x=new Date(d+"T12:00:00+08:00");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)};
+const fmt=d=>new Date(d+"T12:00:00+08:00").toLocaleDateString("en-PH",{month:"short",day:"numeric"});
+const dow=d=>new Date(d+"T12:00:00+08:00").toLocaleDateString("en-PH",{weekday:"short"});
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function toast(t){const e=document.getElementById("toast");e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2200)}
+const COURSES={PSCMHBT:"Passenger Ship Crisis Management and Human Behaviour",["UBT-PSSR"]:"Updating Training on Basic Training – PSSR",CCMD:"Crowd and Crisis Management – Domestic",STPPDSPPS:"Safety Training for Personnel Providing Direct Service",PSCMT:"Crowd Management Training",HPT:"Hydraulic and Pneumatic Training",SFA:"Standard First Aid"};
+const ROOMS=[{id:"r1",name:"ROOM 101",cap:24},{id:"r2",name:"ROOM 102",cap:24},{id:"r3",name:"Simulator Room",cap:12},{id:"r4",name:"Fire Field",cap:30}];
+const INS=[{id:"i1",name:"Capt. R. Villanueva",acc:{["UBT-PSSR"]:"2027-03-31",PSCMT:"2027-03-31",CCMD:"2027-05-01"}},{id:"i2",name:"C/E M. Ramos",acc:{HPT:"2026-10-20",SFA:"2027-06-30"}},{id:"i3",name:"2/O J. Dizon",acc:{STPPDSPPS:"2026-09-30",["UBT-PSSR"]:"2027-01-15",PSCMHBT:"2027-02-01"}},{id:"i4",name:"Engr. L. Cruz",acc:{PSCMHBT:"2027-04-30",CCMD:"2027-04-30",PSCMT:"2027-04-30"}}];
+let n=2460;const mk=(code,start,days,stud,room="",ins="")=>({id:"b"+(n++),no:"BCH-2026-00"+n,code,start,end:addDays(start,days-1),stud,cap:24,room,ins});
+const S={design:1,sel:null,filter:"attention",sheet:false,batches:[
+ mk("PSCMHBT",addDays(T,-4),3,0,"r1",""),mk("UBT-PSSR",addDays(T,-3),1,0),mk("UBT-PSSR",addDays(T,-2),1,0),
+ mk("UBT-PSSR",T,1,18,"r1","i1"),mk("CCMD",T,3,9,"r2",""),mk("STPPDSPPS",T,1,14,"","i3"),
+ mk("PSCMT",addDays(T,1),2,26,"r1","i4"),mk("UBT-PSSR",addDays(T,1),1,6,"r1","i3"),mk("HPT",addDays(T,2),3,10,"r3","i2"),
+ mk("PSCMHBT",addDays(T,3),3,11),mk("UBT-PSSR",addDays(T,4),1,3),mk("SFA",addDays(T,4),2,8,"r3","i2"),mk("UBT-PSSR",addDays(T,5),1,0)]};
+const days=b=>{const out=[];for(let d=b.start;d<=b.end;d=addDays(d,1))out.push(d);return out};
+const room=id=>ROOMS.find(r=>r.id===id),ins=id=>INS.find(i=>i.id===id);
+function issues(b){const out=[];const r=room(b.room),i=ins(b.ins);
+  if(!r)out.push("No classroom");else if(b.stud>r.cap)out.push(`Over capacity (${r.cap} seats)`);
+  if(!i)out.push("No instructor");else{const u=i.acc[b.code];if(!u)out.push("Instructor not accredited");else if(u<b.start)out.push("Accreditation expired")}
+  for(const o of S.batches){if(o===b)continue;const overlap=days(o).some(d=>days(b).includes(d));if(!overlap)continue;if(b.room&&o.room===b.room)out.push(`${r.name} double-booked with ${o.code}`);if(b.ins&&o.ins===b.ins)out.push(`${i.name} double-booked with ${o.code}`)}
+  return [...new Set(out)]}
+const status=b=>{const is=issues(b);return is.length?{t:is[0]+(is.length>1?` +${is.length-1}`:""),k:is.some(x=>/double|capacity|expired|not accredited/.test(x))?"bad":"warn",c:is.some(x=>/double|capacity|expired|not accredited/.test(x))?"var(--bad)":"var(--orange)"}:{t:"Ready",k:"ok",c:"var(--ok)"}};
+const upcoming=()=>S.batches.filter(b=>b.end>=T).sort((a,z)=>a.start.localeCompare(z.start)||a.code.localeCompare(z.code));
+const roomSel=b=>`<select class="sel ${!b.room||issues(b).some(x=>/capacity|ROOM|Room|Field/.test(x))?"bad":""}" data-room="${b.id}" aria-label="Classroom for ${b.no}"><option value="">Choose Classroom</option>${ROOMS.map(r=>`<option value="${r.id}" ${r.id===b.room?"selected":""}>${r.name} · ${r.cap} seats</option>`).join("")}</select>`;
+const insSel=b=>`<select class="sel ${!b.ins||issues(b).some(x=>/accredit|expired|Capt|C\/E|2\/O|Engr/.test(x))?"bad":""}" data-ins="${b.id}" aria-label="Instructor for ${b.no}"><option value="">Choose Instructor</option>${INS.map(i=>{const u=i.acc[b.code];return `<option value="${i.id}" ${i.id===b.ins?"selected":""}>${esc(i.name)} · ${u?(u<b.start?"expired":"accredited"):"not accredited"}</option>`}).join("")}</select>`;
+const seats=b=>`<div class="seats"><span class="mono">${b.stud}/${room(b.room)?.cap??b.cap}</span><span class="bar"><i style="width:${Math.min(100,b.stud/(room(b.room)?.cap??b.cap)*100)}%;${b.stud>(room(b.room)?.cap??b.cap)?"background:var(--bad)":""}"></i></span></div>`;
+const dates=b=>b.start===b.end?`${dow(b.start)} ${fmt(b.start)}`:`${fmt(b.start)}–${fmt(b.end)}`;
+function summary(){const u=upcoming();const att=u.filter(b=>issues(b).length);const nr=u.filter(b=>!b.room).length,ni=u.filter(b=>!b.ins).length,conf=u.filter(b=>issues(b).some(x=>/double|capacity/.test(x))).length;
+  return `<div class="summary"><div class="sum"><b>${u.length}</b><span>Upcoming batches</span></div><div class="sum ${att.length?"bad":""}"><b>${att.length}</b><span>Need attention</span></div><div class="sum"><b>${nr}</b><span>No classroom</span></div><div class="sum"><b>${ni}</b><span>No instructor</span></div><div class="sum ${conf?"bad":""}"><b>${conf}</b><span>Conflicts</span></div></div>`}
+function head(){return `<div class="head"><div><span class="eyebrow">Admin Assistant</span><h1>Resource Planning</h1></div><div class="acts"><button class="btn" data-print="1">Print PDF</button></div></div>`}
+/* Design 1 — Week board */
+function d1(){const week=[...Array(7)].map((_,i)=>addDays(T,i));return head()+summary()+`<div class="note">Design 1 · Week Board: one column per day, a card per batch. Multi-day batches show on every day they run.</div><section class="panel"><div class="ph"><h2>Week of ${fmt(week[0])}</h2><span class="m">Card edge: green ready · orange missing · red conflict</span></div><div class="board">${week.map(d=>{const bs=upcoming().filter(b=>days(b).includes(d));return `<div class="day"><div class="dayh ${d===T?"today":""}"><span>${dow(d)} ${fmt(d)}</span><span>${bs.length}</span></div>${bs.map(b=>{const st=status(b);const first=b.start===d||(d===T&&b.start<T);return first?`<div class="card" style="--c:${st.c}"><div class="t"><span class="code">${b.code}</span><span class="no">${b.no.slice(-6)}</span></div><span class="cname">${esc(COURSES[b.code])}</span>${seats(b)}${roomSel(b)}${insSel(b)}${issues(b).length?`<span class="warnline">${esc(issues(b).join(" · "))}</span>`:""}</div>`:`<div class="card" style="--c:${st.c};opacity:.75"><span class="code">${b.code}</span><span class="cont">Continues · ${room(b.room)?.name||"no room"} · ${ins(b.ins)?.name||"no instructor"}</span></div>`}).join("")||`<span class="cont">No class</span>`}</div>`}).join("")}</div></section>`}
+/* Design 2 — Grouped by date, compact rows */
+function d2(){const u=upcoming().filter(b=>S.filter==="all"||issues(b).length);const by={};u.forEach(b=>(by[b.start<T?T:b.start]=by[b.start<T?T:b.start]||[]).push(b));
+  return head()+summary()+`<div class="note">Design 2 · By Date: batches grouped under each start date, one compact line per batch with the problem written in the Status column.</div><section class="panel"><div class="ph"><h2>Upcoming Batches</h2><span class="seg"><button class="${S.filter==="attention"?"on":""}" data-filter="attention">Needs Attention</button><button class="${S.filter==="all"?"on":""}" data-filter="all">All</button></span></div>
+  <div class="row rowh"><span>Course</span><span>Batch</span><span>Classroom</span><span>Students</span><span>Instructor</span><span>Status</span></div>
+  ${Object.entries(by).map(([d,bs])=>`<div class="group"><div class="gh"><span>${d===T?"Today · ":""}${new Date(d+"T12:00:00+08:00").toLocaleDateString("en-PH",{weekday:"long",month:"long",day:"numeric"})}</span><small>${bs.length} batch${bs.length===1?"":"es"} · ${bs.filter(b=>issues(b).length).length} need attention</small></div>${bs.map(b=>{const st=status(b);return `<div class="row"><div><span class="lab">Course</span><span class="code">${b.code}</span><span class="cname">${esc(COURSES[b.code])}</span></div><div><span class="lab">Batch</span><span class="mono" style="font-size:13px">${b.no}</span><span class="cname">${dates(b)}</span></div><div><span class="lab">Classroom</span>${roomSel(b)}</div><div><span class="lab">Students</span>${seats(b)}</div><div><span class="lab">Instructor</span>${insSel(b)}</div><div><span class="lab">Status</span><span class="pill p-${st.k}" title="${esc(issues(b).join(" · "))}">${esc(st.t)}</span></div></div>`}).join("")}</div>`).join("")||`<p style="padding:16px 18px;color:var(--muted);margin:0">Every upcoming batch has a classroom and an accredited instructor.</p>`}</section>`}
+/* Design 3 — Queue + editor */
+function d3(){const u=upcoming();const q=[...u].sort((a,z)=>(issues(z).length?1:0)-(issues(a).length?1:0)||a.start.localeCompare(z.start));const b=u.find(x=>x.id===S.sel)||q[0];S.sel=b.id;const is=issues(b);
+  const busy=(kind,id)=>S.batches.find(o=>o!==b&&o[kind]===id&&days(o).some(d=>days(b).includes(d)));
+  return head()+summary()+`<div class="note">Design 3 · Queue and Editor: batches that need attention come first; pick one and choose a room and instructor from cards that show seats, accreditation and clashes.</div><div class="split"><section class="panel"><div class="ph"><h2>Batches</h2><span class="m">Problems first</span></div><div class="queue">${q.map(x=>{const st=status(x);return `<button class="qi ${x.id===b.id?"on":""}" data-sel="${x.id}"><b>${x.code} <span class="mono" style="font-weight:500;color:var(--muted);font-size:12px">${x.no.slice(-6)}</span></b><span class="pill p-${st.k}">${st.k==="ok"?"Ready":issues(x).length+" issue"+(issues(x).length>1?"s":"")}</span><small>${dates(x)} · ${x.stud} students</small><small style="text-align:right">${room(x.room)?.name||"—"}</small></button>`}).join("")}</div></section>
+  <section class="panel"><div class="ph"><div><h2>${b.code} · ${b.no}</h2><span class="m">${esc(COURSES[b.code])} · ${dates(b)} · ${b.stud} students</span></div><span class="pill p-${status(b).k}">${is.length?is.length+" to fix":"Ready"}</span></div>
+   ${is.length?`<div style="padding:0 18px 12px">${is.map(x=>`<div class="warnline">• ${esc(x)}</div>`).join("")}</div>`:""}
+   <div class="ph" style="padding-top:4px"><h2>Classroom</h2></div><div class="choices">${ROOMS.map(r=>{const clash=busy("room",r.id);const small=b.stud>r.cap;return `<button class="choice ${r.id===b.room?"on":""} ${clash||small?"no":""}" data-setroom="${r.id}"><b>${r.name}</b><small>${r.cap} seats${small?` · too small for ${b.stud}`:""}</small><small>${clash?`<span style="color:var(--bad)">Booked: ${clash.code} ${dates(clash)}</span>`:"Free on these dates"}</small></button>`}).join("")}</div>
+   <div class="ph" style="padding-top:4px"><h2>Instructor</h2></div><div class="choices">${INS.map(i=>{const u=i.acc[b.code],clash=busy("ins",i.id);return `<button class="choice ${i.id===b.ins?"on":""} ${!u||u<b.start||clash?"no":""}" data-setins="${i.id}"><b>${esc(i.name)}</b><small>${u?(u<b.start?`<span style="color:var(--bad)">Accreditation expired ${fmt(u)}</span>`:`Accredited until ${fmt(u)}`):`<span style="color:var(--bad)">Not accredited for ${b.code}</span>`}</small><small>${clash?`<span style="color:var(--bad)">Teaching ${clash.code} ${dates(clash)}</span>`:"Free on these dates"}</small></button>`}).join("")}</div></section></div>`}
+/* Print sheet */
+function sheet(){const u=upcoming();const by={};u.forEach(b=>(by[b.start<T?T:b.start]=by[b.start<T?T:b.start]||[]).push(b));
+  return `<div class="head"><div><span class="eyebrow">Print PDF · Preview</span><h1>Resource Plan Sheet</h1></div><div class="acts"><button class="btn" data-back="1">‹ Back to Design ${S.design}</button></div></div><div class="note">The real portal opens this as a PDF (A4 landscape) for the chosen date range, ready to print or file.</div>
+  <div class="sheet"><header><div><h2>Resource Plan · ${fmt(T)} to ${fmt(addDays(T,6))}, 2026</h2><small>New Wave Maritime Training and Assessment Center, Inc.</small></div><small>Printed ${fmt(T)}, 2026 · ${u.length} batches · ${u.filter(b=>issues(b).length).length} need attention</small></header>
+  <div class="wrap"><table><thead><tr><th>Batch</th><th>Course</th><th>Dates</th><th>Classroom</th><th>Students</th><th>Instructor</th><th>Notes</th></tr></thead><tbody>${Object.entries(by).map(([d,bs])=>`<tr class="daysep"><td colspan="7">${new Date(d+"T12:00:00+08:00").toLocaleDateString("en-PH",{weekday:"long",month:"long",day:"numeric"})}</td></tr>${bs.map(b=>`<tr><td class="mono">${b.no}</td><td><b>${b.code}</b> ${esc(COURSES[b.code])}</td><td>${dates(b)}</td><td>${room(b.room)?.name||"—"}</td><td>${b.stud}/${room(b.room)?.cap??b.cap}</td><td>${esc(ins(b.ins)?.name||"—")}</td><td style="color:#b42318">${esc(issues(b).join("; "))}</td></tr>`).join("")}`).join("")}</tbody></table></div>
+  <div class="sigs"><div>Prepared by (Admin Assistant)</div><div>Noted by (Admin)</div></div></div>`}
+function render(){document.getElementById("tabs").innerHTML=[1,2,3].map(i=>`<button class="${!S.sheet&&S.design===i?"on":""}" data-design="${i}">Design ${i} · ${["Week Board","By Date","Queue and Editor"][i-1]}</button>`).join("");
+  document.getElementById("page").innerHTML=S.sheet?sheet():[d1,d2,d3][S.design-1]()}
+document.addEventListener("click",e=>{const t=e.target.closest("button");if(!t)return;const d=t.dataset;
+  if(d.design){S.design=+d.design;S.sheet=false}else if(d.print){S.sheet=true}else if(d.back){S.sheet=false}else if(d.filter){S.filter=d.filter}else if(d.sel){S.sel=d.sel}
+  else if(d.setroom){const b=S.batches.find(x=>x.id===S.sel);b.room=b.room===d.setroom?"":d.setroom;toast("Classroom saved")}else if(d.setins){const b=S.batches.find(x=>x.id===S.sel);b.ins=b.ins===d.setins?"":d.setins;toast("Instructor saved")}else return;render()});
+document.addEventListener("change",e=>{const t=e.target;if(t.dataset.room){S.batches.find(x=>x.id===t.dataset.room).room=t.value;toast("Classroom saved")}else if(t.dataset.ins){S.batches.find(x=>x.id===t.dataset.ins).ins=t.value;toast("Instructor saved")}else return;render()});
+render();
+</script>

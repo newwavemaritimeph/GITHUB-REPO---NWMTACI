@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Partners Module Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Configuration › Partners (owner, 9 Oct 2026): Partners and Partner Rebates combined in one module, using the
+   Rebates matrix (Design 3): details, referral code, In-House %, STCW fixed amounts and how the rebate is given. */
+:root{--navy:#123F63;--blue:#0571D0;--orange:#F25615;--cyan:#35CCFA;--bg:#f2f6f9;--surface:#fff;--line:#dbe5ec;--fg:#0f2638;--muted:#5b6f7f;--soft:#eef4f8;--okbg:#e3f4ea;--ok:#0a7a3e;--warnbg:#fde9dd;--warn:#b4480f;--badbg:#fbe4dc;--bad:#b42318;--infobg:#e2effb;--info:#0558a8;--sans:"Geist",system-ui,sans-serif;--mono:"Geist Mono",ui-monospace,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0c1925;--surface:#122534;--line:#23394b;--fg:#e5eef5;--muted:#98adbf;--soft:#18303f;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c1925;--surface:#122534;--line:#23394b;--fg:#e5eef5;--muted:#98adbf;--soft:#18303f;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}button,input,select{font:inherit;color:inherit}button{cursor:pointer}:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.top{background:var(--navy);color:#fff;padding:12px 20px 0}.brand{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.brand b{color:var(--cyan);font-size:18px}.brand small{display:block;font-size:10px;letter-spacing:.07em;color:#c9dceb}
+.who{font-size:13.5px;color:#c9dceb}.who select{background:transparent;border:1px solid #3d6b90;border-radius:8px;color:#fff;padding:6px 9px}.who option{color:#0f2638}
+.tabs{display:flex;gap:2px;margin-top:12px;flex-wrap:wrap}.tabs span{color:#d4e4f1;padding:10px 16px;border-radius:10px 10px 0 0;font-weight:500}.tabs span.on{background:var(--bg);color:var(--fg)}
+.page{max-width:1500px;margin:0 auto;padding:18px 20px 60px;display:flex;flex-direction:column;gap:16px}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}h1{margin:2px 0 0;font-size:27px;line-height:1.2}h2{margin:0;font-size:16px;font-weight:600}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;min-width:0}.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:14px 18px 10px;flex-wrap:wrap}.ph .m{color:var(--muted);font-size:13px}
+.wrap{overflow-x:auto;margin:0 18px 14px}
+table{width:100%;border-collapse:collapse;font-size:14px}th{background:var(--navy);color:#fff;font:600 11px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:9px 10px;white-space:nowrap;vertical-align:bottom}th small{display:block;font-weight:500;text-transform:none;letter-spacing:0;opacity:.85}th.r,td.r{text-align:right}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:middle}td small{display:block;color:var(--muted);font-size:12.5px}
+tr.dirty>td{background:var(--infobg)}tr.archived>td{opacity:.55}tr.details>td{background:var(--soft)}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}.p-ok{background:var(--okbg);color:var(--ok)}.p-warn{background:var(--warnbg);color:var(--warn)}.p-info{background:var(--infobg);color:var(--info)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;padding:7px 13px;font-weight:500;white-space:nowrap}.pri{background:var(--blue);color:#fff;border:0;border-radius:9px;padding:8px 15px;font-weight:600;white-space:nowrap}.link{border:0;background:none;color:var(--blue);font-weight:600;padding:0;font-size:13px}
+.btn:disabled,.pri:disabled{opacity:.5;cursor:default}
+.chips{display:flex;gap:5px;align-items:center;flex-wrap:nowrap}.chip{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:4px 9px;font:600 12.5px var(--mono)}.chip.on{background:var(--navy);border-color:var(--navy);color:#fff}
+.other{display:inline-flex;align-items:center;gap:2px;border:1px solid var(--line);border-radius:99px;padding:1px 9px 1px 3px;font-size:12.5px}.other.on{border-color:var(--navy);box-shadow:0 0 0 1px var(--navy)}.other input{width:58px;border:0;background:transparent;padding:4px 6px;text-align:right}
+.amt{width:92px;border:1px solid var(--line);border-radius:9px;background:var(--surface);padding:6px 8px;font-family:var(--mono);text-align:right}
+.msel,.inp{border:1px solid var(--line);border-radius:9px;background:var(--surface);padding:7px 9px;font-size:13.5px}
+.pname{min-width:210px}.pname b{white-space:nowrap}.code{display:flex;flex-direction:column;gap:3px;white-space:nowrap}.code b{font-family:var(--mono);font-size:13.5px}.code span{display:flex;gap:10px}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.form label{display:flex;flex-direction:column;gap:4px;font-size:12.5px;color:var(--muted);font-weight:500}
+.addp{padding:0 18px 16px}
+.savebar{position:sticky;bottom:12px;margin:0 18px 18px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 14px;color:var(--muted);box-shadow:0 6px 20px rgba(6,20,32,.08)}.savebar.on{border-color:var(--blue);color:var(--fg)}
+.note{background:var(--infobg);color:var(--info);border-radius:10px;padding:10px 14px;font-size:13.5px}.okmsg{background:var(--okbg);color:var(--ok)}.errmsg{background:var(--badbg);color:var(--bad)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}.seg button{border:0;background:none;padding:7px 14px;font-weight:600;font-size:13.5px}.seg button.on{background:var(--navy);color:#fff}
+.search{border:1px solid var(--line);border-radius:10px;padding:8px 12px;min-width:240px;background:var(--surface)}
+@media (max-width:560px){.page,.top{padding-inline:16px}.wrap{margin-inline:10px}}
+</style>
+</head>
+<body>
+<div class="top"><div class="brand"><div><b>NEW WAVE</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div><span class="who">Working As <select id="role"><option>Accounting</option><option>Admin</option></select></span></div><nav class="tabs" id="tabs"></nav></div>
+<main class="page" id="page"></main>
+<script>
+const peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
+const PRESETS=[10,20,30,50];
+const STCW=[["UBT-PSSR","BT-PSSR",180000],["STPPDSPPS","Safety",120000],["PSCMT","Crowd",130000],["PSCMHBT","Crisis",150000],["CCMD","CCM Domestic",250000]];
+const code=n=>(n.toUpperCase().replace(/[^A-Z]/g,"").slice(0,5)||"NW")+String(Math.floor(Math.random()*1e6)).padStart(6,"0");
+const S={role:"Accounting",filter:"Active",q:"",add:null,open:null,msg:null,draft:null,partners:[
+ {id:1,name:"Blue Anchor Consultancy",kind:"Consultancy",contact:"R. Santos",email:"ops@blueanchor.example",mobile:"0917 222 3001",code:"BLUEA050698",active:true,pct:50,mode:"Deducted",stcw:{"UBT-PSSR":30000,"STPPDSPPS":20000,"PSCMT":25000,"PSCMHBT":25000,"CCMD":50000}},
+ {id:2,name:"Harborline Crewing",kind:"Agency",contact:"M. Cruz",email:"",mobile:"0917 222 3002",code:"HARBO123456",active:true,pct:30,mode:"No deduction",stcw:{"UBT-PSSR":20000,"PSCMT":20000,"PSCMHBT":20000}},
+ {id:3,name:"Pacific Crew Agency",kind:"Agency",contact:"L. Garcia",email:"hr@pacificcrew.example",mobile:"",code:"PACIF482913",active:true,pct:20,mode:"Deducted",stcw:{}},
+ {id:4,name:"Southwind Maritime",kind:"Consultancy",contact:"",email:"",mobile:"0918 555 0101",code:"SOUTH774120",active:true,pct:15,mode:"Deducted",stcw:{"UBT-PSSR":25000}},
+ {id:5,name:"Old Harbor Services",kind:"Agency",contact:"",email:"",mobile:"",code:"OLDHA300112",active:false,pct:null,mode:"Deducted",stcw:{}}]};
+const clone=ps=>ps.map(p=>({...p,stcw:{...p.stcw}}));
+const draft=()=>S.draft||(S.draft=clone(S.partners));
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const changed=()=>S.draft?S.draft.filter(p=>!same(p,S.partners.find(x=>x.id===p.id))).length:0;
+function render(){
+  document.getElementById("tabs").innerHTML=(S.role==="Accounting"?["Dashboard","Approvals","Transactions ▾","Reports","Configuration ▾"]:["Dashboard","Search Trainee","Enrollments","Resource Planning","Configuration ▾","Requests","Reports ▾","MISMO ▾"]).map(t=>`<span class="${t.startsWith("Configuration")?"on":""}">${t}</span>`).join("");
+  const ps=draft(),q=S.q.trim().toLowerCase();
+  const list=ps.filter(p=>(S.filter==="All"||(S.filter==="Active"?p.active:!p.active))&&(!q||`${p.name} ${p.code} ${p.contact} ${p.kind}`.toLowerCase().includes(q)));
+  const n=changed();
+  document.getElementById("page").innerHTML=`<div class="head"><div><span class="eyebrow">${S.role} › Configuration</span><h1>Partners</h1></div>${S.add?"":`<button class="pri" data-addopen="1">Add Partner</button>`}</div>
+  ${S.msg?`<div class="note ${S.msg.kind==="ok"?"okmsg":"errmsg"}">${S.msg.text}</div>`:""}
+  ${S.add?addForm():""}
+  <section class="panel"><div class="ph"><h2>Partners and Rebates</h2><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><input class="search" id="q" value="${S.q}" placeholder="Search partner or referral code"><div class="seg">${["Active","Archived","All"].map(f=>`<button class="${S.filter===f?"on":""}" data-filter="${f}">${f} <span class="mono">${ps.filter(p=>f==="All"||(f==="Active"?p.active:!p.active)).length}</span></button>`).join("")}</div></div></div>
+   <div class="wrap"><table><thead><tr><th>Partner</th><th>Referral Code</th><th>In-House Courses<small>% of the training fee</small></th>${STCW.map(c=>`<th class="r">${c[1]}<small>Fee ${peso(c[2])}</small></th>`).join("")}<th>How It Is Given</th><th></th></tr></thead><tbody>
+   ${list.map(p=>row(p)).join("")||`<tr><td colspan="${STCW.length+5}"><small>No partners match.</small></td></tr>`}
+   </tbody></table></div>
+   <div class="savebar ${n?"on":""}"><span>${n?`${n} partner${n===1?"":"s"} changed`:"No changes"}</span><span style="display:flex;gap:8px"><button class="btn" data-discard="1" ${n?"":"disabled"}>Discard</button><button class="pri" data-saveall="1" ${n?"":"disabled"}>Save Changes</button></span></div>
+  </section>
+  <div class="note">One screen for partners and their rebates. In-House courses: 10%, 20%, 30% or 50% of the actual training fee, or another percentage. BT-PSSR, Safety, Crowd, Crisis and CCM Domestic: a fixed peso amount (blank = no rebate). Trainees type the referral code on the website registration. Deducted: the trainee pays the fee less the rebate. Paid to the partner later: the trainee pays the full fee and the rebate goes to Payables. Accounting and the Admin use the same screen; every change is recorded in the audit log.</div>`;
+}
+function row(p){
+  const base=S.partners.find(x=>x.id===p.id),dirty=!same(p,base),custom=p.pct!=null&&!PRESETS.includes(p.pct),i=S.draft.indexOf(p);
+  const main=`<tr class="${dirty?"dirty":""} ${p.active?"":"archived"}">
+   <td class="pname"><b>${p.name}</b><small>${p.kind}${p.contact?` · ${p.contact}`:""}</small><button class="link" data-details="${p.id}">${S.open===p.id?"Hide Details":"Details"}</button></td>
+   <td><div class="code"><b>${p.code}</b><span><button class="link" data-copy="${p.id}">Copy</button><button class="link" data-newcode="${p.id}">New Code</button></span></div></td>
+   <td><div class="chips">${PRESETS.map(v=>`<button class="chip ${p.pct===v?"on":""}" data-pct="${i}:${v}">${v}%</button>`).join("")}<span class="other ${custom?"on":""}"><input data-other="${i}" type="number" min="1" max="100" step="0.5" value="${custom?p.pct:""}" placeholder="Other" aria-label="Other percentage for ${p.name}">%</span></div>${p.pct==null?`<small style="color:var(--warn);font-weight:600">Not set</small>`:""}</td>
+   ${STCW.map(c=>`<td class="r"><input class="amt" data-amt="${i}:${c[0]}" type="number" min="0" step="0.01" value="${p.stcw[c[0]]?(p.stcw[c[0]]/100).toFixed(2):""}" placeholder="—" aria-label="${p.name} ${c[1]} rebate"></td>`).join("")}
+   <td><select class="msel" data-mode="${i}"><option value="Deducted" ${p.mode==="Deducted"?"selected":""}>Deducted From Payment</option><option value="No deduction" ${p.mode==="No deduction"?"selected":""}>Paid to the Partner Later</option></select></td>
+   <td>${p.active?`<span class="pill p-ok">Active</span>`:`<span class="pill p-warn">Archived</span>`}</td></tr>`;
+  const det=S.open===p.id?`<tr class="details"><td colspan="${STCW.length+5}"><div class="form">
+    <label>Name<input class="inp" data-f="${i}:name" value="${p.name}"></label>
+    <label>Type<select class="inp" data-f="${i}:kind"><option ${p.kind==="Agency"?"selected":""}>Agency</option><option ${p.kind==="Consultancy"?"selected":""}>Consultancy</option></select></label>
+    <label>Contact Person<input class="inp" data-f="${i}:contact" value="${p.contact}"></label>
+    <label>Email<input class="inp" type="email" data-f="${i}:email" value="${p.email}"></label>
+    <label>Mobile<input class="inp" data-f="${i}:mobile" value="${p.mobile}"></label>
+    <div style="display:flex;align-items:flex-end;gap:8px"><button class="btn" data-archive="${i}">${p.active?"Archive Partner":"Restore Partner"}</button></div>
+   </div><small style="margin-top:8px">Archived partners keep their history; their referral code stops working on the website.</small></td></tr>`:"";
+  return main+det;
+}
+function addForm(){const a=S.add;return `<section class="panel"><div class="ph"><h2>Add Partner</h2></div><div class="addp"><div class="form">
+  <label>Name<input class="inp" id="a_name" value="${a.name}" placeholder="e.g. Blue Anchor Consultancy"></label>
+  <label>Type<select class="inp" id="a_kind"><option ${a.kind==="Agency"?"selected":""}>Agency</option><option ${a.kind==="Consultancy"?"selected":""}>Consultancy</option></select></label>
+  <label>Contact Person<input class="inp" id="a_contact" value="${a.contact}"></label>
+  <label>Email<input class="inp" id="a_email" type="email" value="${a.email}"></label>
+  <label>Mobile<input class="inp" id="a_mobile" value="${a.mobile}"></label>
+ </div><p style="margin:10px 0;color:var(--muted);font-size:13px">A referral code is made automatically. Set the rebates in the table after saving.</p>
+ <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" data-addcancel="1">Cancel</button><button class="pri" data-addsave="1">Save Partner</button></div></div></section>`}
+function grab(){if(!S.add)return;const g=id=>document.getElementById(id)?.value??"";S.add={name:g("a_name"),kind:g("a_kind"),contact:g("a_contact"),email:g("a_email"),mobile:g("a_mobile")}}
+document.addEventListener("click",e=>{const t=e.target.closest("button");if(!t)return;const d=t.dataset;grab();
+ if(d.addopen){S.add={name:"",kind:"Agency",contact:"",email:"",mobile:""};S.msg=null}
+ else if(d.addcancel){S.add=null}
+ else if(d.addsave){if(S.add.name.trim().length<2){S.msg={kind:"err",text:"Enter the partner name."}}else{const p={id:Date.now(),...S.add,name:S.add.name.trim(),code:code(S.add.name),active:true,pct:null,mode:"Deducted",stcw:{}};S.partners.unshift(p);if(S.draft)S.draft.unshift(clone([p])[0]);S.add=null;S.msg={kind:"ok",text:`${p.name} added with referral code ${p.code}. Set its rebates in the table.`}}}
+ else if(d.filter){S.filter=d.filter}
+ else if(d.details){S.open=S.open===+d.details?null:+d.details}
+ else if(d.copy){const p=draft().find(x=>x.id===+d.copy);navigator.clipboard?.writeText(p.code).catch(()=>{});S.msg={kind:"ok",text:`Copied ${p.code}.`}}
+ else if(d.newcode){const p=draft().find(x=>x.id===+d.newcode);p.code=code(p.name);S.msg={kind:"ok",text:`New code ${p.code} for ${p.name}. Save Changes to keep it; the old code then stops working.`}}
+ else if(d.pct){const [i,v]=d.pct.split(":").map(Number);draft()[i].pct=v}
+ else if(d.archive){const p=draft()[+d.archive];p.active=!p.active}
+ else if(d.discard){S.draft=null;S.msg=null}
+ else if(d.saveall){const ps=draft();const bad=ps.find(p=>p.pct!=null&&!(p.pct>0&&p.pct<=100));const over=ps.flatMap(p=>STCW.filter(c=>(p.stcw[c[0]]??0)>c[2]).map(c=>p.name+" "+c[1]));const noname=ps.find(p=>p.name.trim().length<2);
+   if(noname)S.msg={kind:"err",text:"Every partner needs a name."};else if(bad)S.msg={kind:"err",text:`Enter a percentage from 1 to 100 for ${bad.name}.`};else if(over.length)S.msg={kind:"err",text:`A rebate cannot be more than the training fee: ${over.join(", ")}.`};
+   else{const n=changed();S.partners=clone(ps);S.draft=null;S.msg={kind:"ok",text:`Saved ${n} partner${n===1?"":"s"}. Each change is recorded in the audit log.`}}}
+ else return;render()});
+document.addEventListener("input",e=>{const t=e.target,d=t.dataset;
+ if(t.id==="q"){S.q=t.value;const pos=t.selectionStart;render();const el=document.getElementById("q");el.focus();el.setSelectionRange(pos,pos);return}
+ if(d.other!==undefined||d.amt!==undefined||d.f!==undefined){const ps=draft();
+  if(d.other!==undefined){const v=parseFloat(t.value);ps[+d.other].pct=t.value===""?null:v}
+  else if(d.amt!==undefined){const [i,k]=d.amt.split(":");ps[+i].stcw[k]=Math.round((parseFloat(t.value)||0)*100)}
+  else{const [i,k]=d.f.split(":");ps[+i][k]=t.value}
+  const sel=d.other!==undefined?`[data-other="${d.other}"]`:d.amt!==undefined?`[data-amt="${d.amt}"]`:`[data-f="${d.f}"]`;const pos=t.selectionStart;render();const el=document.querySelector(sel);el.focus();try{el.setSelectionRange(pos,pos)}catch{}}});
+document.addEventListener("change",e=>{const t=e.target,d=t.dataset;
+ if(t.id==="role"){S.role=t.value;render();return}
+ if(d.mode!==undefined){draft()[+d.mode].mode=t.value;render()}
+ else if(d.f!==undefined&&t.tagName==="SELECT"){const [i,k]=d.f.split(":");draft()[+i][k]=t.value;render()}});
+render();
+</script>
+</body>
+</html>

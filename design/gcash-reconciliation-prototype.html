@@ -1,0 +1,195 @@
+<title>Payment Reconciliation Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Admin Assistant: GCash reconciliation against the printed transaction history. */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA;
+  --bg:#f3f6fa; --surface:#ffffff; --line:#dfe7ee; --fg:#0f2638; --muted:#5f7180; --soft:#eef4f8; --warnbg:#fde7dc; --okbg:#e3f4ea; --badbg:#fbe4dc; --infobg:#e2effb;
+  --green:#15803d; --red:#b42318; --amber:#b45309; --violet:#7c3aed;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;--warnbg:#3a2418;--okbg:#14301f;--badbg:#3a1f16;--infobg:#132f4a;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}
+.top{background:var(--navy);color:#fff;padding:14px 24px 0}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand b{font-size:19px;color:var(--cyan)} .brand small{display:block;font-size:10px;letter-spacing:.06em;color:#cfe3f1}
+.who{display:flex;align-items:center;gap:8px;font-size:14px;color:#cfe3f1}
+.who select{font:500 14px var(--sans);padding:6px 10px;border-radius:8px;border:1px solid #3b6a90;background:transparent;color:#fff}.who select option{color:#0f2638}
+.tabs{display:flex;gap:4px;margin-top:14px;overflow-x:auto}
+.tabs button{padding:10px 18px;color:#d6e6f2;font:500 15px var(--sans);border-radius:10px 10px 0 0;white-space:nowrap;background:none;border:0;cursor:pointer}
+.tabs button.on{background:var(--bg);color:var(--fg)}
+.clock{max-width:1240px;margin:0 auto;padding:14px 24px 0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--muted)}
+.clock button{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 13.5px var(--sans);padding:6px 12px;border-radius:99px;cursor:pointer}
+.clock button.on{background:var(--navy);color:#fff;border-color:var(--navy)}
+.page{max-width:1240px;margin:0 auto;padding-block:16px 48px;padding-inline:24px;display:flex;flex-direction:column;gap:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}
+h1{margin:2px 0 0;font-size:28px;line-height:1.2}
+.note{margin:-8px 0 0;color:var(--muted);font-size:14px}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 14px var(--sans);padding:8px 14px;border-radius:9px;cursor:pointer;white-space:nowrap}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}.btn.org{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:600}.btn.sm{padding:6px 11px;font-size:13.5px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.acts{display:flex;gap:8px;flex-wrap:wrap}
+.rail{display:grid;grid-template-columns:minmax(300px,350px) minmax(0,1fr);gap:20px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:20px;min-width:0}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:16px 20px 12px;flex-wrap:wrap}
+.ph h2{margin:0;font-size:17px;font-weight:600} .ph .m{color:var(--muted);font-size:13.5px}
+.pb{padding:0 20px 20px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.col{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.crow{display:grid;grid-template-columns:10px 1fr auto;gap:12px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line)}
+.crow:last-child{border-bottom:0}.crow b{font:600 16px var(--mono)}
+.dot{width:10px;height:10px;border-radius:3px;background:var(--c)}
+.crow.tot{background:var(--navy);color:#fff}.crow.tot .dot{background:var(--orange)}
+.crow.alarm{background:var(--badbg)}.crow.alarm span,.crow.alarm b{color:var(--red);font-weight:700}
+.lines{margin:0}.lines>div{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}.lines>div:last-child{border-bottom:0}.lines dt{color:var(--muted)}.lines dd{margin:0;font:600 15px var(--mono)}
+.banner{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border-radius:12px;padding:12px 16px}
+.banner.red{background:var(--red);color:#fff}.banner.amber{background:var(--warnbg);color:var(--amber)}.banner.green{background:var(--okbg);color:var(--green)}.banner.blue{background:var(--infobg);color:var(--blue)}
+.banner b{font-size:15.5px}.banner .sp{flex:1}.banner .btn{background:#fff}
+.log{width:100%;border-collapse:collapse;font-size:14.5px;border:1px solid #9fb2c1}
+.log th{background:var(--navy);color:#fff;font:600 12px var(--sans);letter-spacing:.06em;text-transform:uppercase;text-align:left;padding:9px 10px;border-right:1px solid #2c5a7f;white-space:nowrap}
+.log td{padding:7px 10px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);white-space:nowrap}
+.log tbody tr:nth-child(even) td{background:var(--soft)}
+.log td.no{text-align:center;color:var(--muted);width:34px}.log td.r{text-align:right}
+.log tr.out td{color:var(--muted);text-decoration:line-through}
+.wrap{overflow-x:auto;margin:0 20px 20px}
+.batch{margin:0 20px 6px;display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.batch b{font-size:15px}.batch span{color:var(--muted);font-size:13.5px}
+.pill{display:inline-block;font-size:12.5px;font-weight:600;padding:2px 9px;border-radius:99px;white-space:nowrap}
+.p-ok{background:var(--okbg);color:var(--green)}.p-warn{background:var(--warnbg);color:var(--orange)}.p-bad{background:var(--badbg);color:var(--red)}.p-info{background:var(--infobg);color:var(--blue)}.p-mute{background:var(--soft);color:var(--muted)}
+.empty{color:var(--muted);text-align:center;padding:16px 20px 22px}
+.foot{margin:10px 0 0;font-size:13px;color:var(--muted)}
+/* printable sheet */
+.sheet{background:#fff;color:#0f2638;border:1px solid var(--line);border-radius:6px;padding:26px 30px;max-width:900px;margin:0 auto;width:100%}
+.sheet header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:2px solid #123F63;padding-bottom:10px;margin-bottom:12px;gap:12px;flex-wrap:wrap}
+.sheet h2{margin:0;color:#123F63;font-size:19px}.sheet small{color:#5f7180}
+.sheet .log th{background:#123F63}.sheet .log tbody tr:nth-child(even) td{background:#f5f8fb}.sheet .log td{border-color:#dfe7ee;color:#0f2638}
+.sigs{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:34px}.sigs div{border-top:1px solid #0f2638;padding-top:6px;font-size:13px;text-align:center}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 20px 20px}
+.form label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}.form .full{grid-column:1/-1}
+.form input,.form select{font:400 14.5px var(--sans);padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg)}
+.flow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:0 20px 18px;font-size:13.5px}
+.flow span{padding:5px 10px;border-radius:99px;background:var(--soft);color:var(--muted);font-weight:600}.flow span.done{background:var(--okbg);color:var(--green)}.flow span.now{background:var(--warnbg);color:var(--orange)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--navy);color:#fff;padding:10px 18px;border-radius:99px;font-size:14px;z-index:10}
+@media (max-width:1040px){.rail{grid-template-columns:1fr}}
+@media (max-width:600px){.form{grid-template-columns:1fr}.sigs{grid-template-columns:1fr}}
+@media (max-width:480px){.page,.clock{padding-inline:16px}.top{padding-inline:16px}}
+@media print{.top,.clock,.noprint{display:none!important}body{background:#fff}.page{padding:0}}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+</style>
+<style>
+.days{display:flex;flex-direction:column}
+.day{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:10px 14px;border:0;border-bottom:1px solid var(--line);background:none;color:var(--fg);text-align:left;cursor:pointer;font:inherit}
+.day:last-child{border-bottom:0}.day:hover{background:var(--soft)}.day.on{background:var(--infobg)}
+.day b{font-size:14.5px}.day .amt{font:600 14px var(--mono);text-align:right}.day small{color:var(--muted);font-size:12.5px}
+.day .st{font-size:12.5px;font-weight:600;text-align:right}.st.ok{color:var(--green)}.st.todo{color:var(--orange)}.st.late{color:var(--red)}
+.dp{display:flex;align-items:center;gap:6px}.dp button{border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;width:34px;height:34px;cursor:pointer;font-size:16px}.dp input{font:500 14px var(--sans);padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:0 20px 12px}
+.bar input[type=search]{flex:1;min-width:200px;font:400 14.5px var(--sans);padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--fg)}
+.log td.ck,.log th.ck{width:34px;text-align:center}.log input[type=checkbox]{width:17px;height:17px}
+.log tr.done td{background:var(--okbg)!important}.log tr.miss td{background:var(--badbg)!important}
+.log tr.hit td{outline:2px solid var(--cyan);outline-offset:-2px}
+.link{color:var(--blue);text-decoration:none;font-weight:500}
+.mini{border:0;background:none;color:var(--muted);font:500 13px var(--sans);cursor:pointer;padding:2px 4px;text-decoration:underline}
+.remark{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;padding:6px 0}.remark label{flex:1;min-width:220px;display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}.remark input{font:400 14px var(--sans);padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
+.sheet .log td.box{width:60px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}.chip{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:99px;padding:7px 14px;font:600 14px var(--sans);cursor:pointer}.chip.on{background:var(--navy);color:#fff;border-color:var(--navy)}.chip i{font-style:normal;font-size:12px;padding:1px 7px;border-radius:99px;background:var(--warnbg);color:var(--orange)}.chip.on i{background:#fff;color:var(--navy)}.chip i.ok{background:var(--okbg);color:var(--green)}
+.acct{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+</style>
+<div class="top">
+  <div class="brand"><div><b>NEW WAVE</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div>
+    <div class="who">Working As <select id="role"><option value="aa">Admin Assistant</option><option value="acct">Accounting</option></select></div></div>
+  <nav class="tabs" id="tabs"></nav>
+</div>
+<main class="page" id="page"></main>
+<div class="toast" id="toast" hidden></div>
+<script>
+const TODAY="2026-10-09";
+const peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2});
+const addDays=(d,n)=>{const x=new Date(d+"T12:00:00+08:00");x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)};
+const dname=d=>new Date(d+"T12:00:00+08:00").toLocaleDateString("en-PH",{weekday:"short",month:"short",day:"numeric"});
+const NAMES=["DELA CRUZ, Juan","SANTOS, Maria","REYES, Paolo","GARCIA, Liza","MENDOZA, Carlo","AQUINO, Rey","BAUTISTA, Ana","CRUZ, Mark","VILLANUEVA, Joy","RAMOS, Ben","TORRES, Ella","FLORES, Gino"];
+const AMTS=[180000,130000,90000,250000,65000,180000,350000,120000];
+// sample payments for 14 days
+let seed=7;const rnd=n=>{seed=(seed*9301+49297)%233280;return Math.floor(seed/233280*n)};
+const P=[];let rc=4120;
+for(let k=13;k>=0;k--){const d=addDays(TODAY,-k);const n=k===0?6:3+rnd(5);for(let i=0;i<n;i++){const h=8+rnd(9),m=rnd(60);P.push({id:"p"+P.length,ch:["GCash","GCash","PSBank","UnionBank"][rnd(4)],day:d,time:`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`,rcpt:"OR-2026-0"+(rc++),name:NAMES[rnd(NAMES.length)],ref:String(1000000000000+rnd(899999999999)).slice(0,13),amt:AMTS[rnd(AMTS.length)],by:rnd(2)?"Karen Mallari":"Kat Garcia",proof:true,st:k>2?"Reconciled":k===2&&i<2?"Reconciled":"",note:""})}}
+P.find(p=>p.day===addDays(TODAY,-5)).st="Not in History";P.find(p=>p.day===addDays(TODAY,-5)).note="Not on the 4 Oct printout — asked Cashier";
+const CH=["GCash","PSBank","UnionBank"];const REF={GCash:"GCash Ref. No.",PSBank:"PSBank Ref. No.",UnionBank:"UnionBank Ref. No."};
+const S={ch:"GCash",role:"aa",tab:"Reconciliation",day:TODAY,q:"",picked:new Set(),missing:null,undo:null,sheet:false};
+const dayRows=(d,ch=S.ch)=>P.filter(p=>p.day===d&&p.ch===ch).sort((a,b)=>a.time.localeCompare(b.time));
+const todo=(d,ch=S.ch)=>dayRows(d,ch).filter(p=>!p.st).length;
+const chTodo=ch=>[...Array(14)].map((_,i)=>addDays(TODAY,-i)).reduce((s,d)=>s+todo(d,ch),0);
+const chips=()=>`<div class="chips">${CH.map(c=>{const n=chTodo(c);return `<button class="chip ${c===S.ch?"on":""}" data-ch="${c}">${c}<i class="${n?"":"ok"}">${n?n+" to check":"✓"}</i></button>`}).join("")}</div>`;
+function toast(t){const e=document.getElementById("toast");e.textContent=t;e.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>e.hidden=true,2400)}
+function head(e,t,a=""){return `<div class="head"><div><span class="eyebrow">${e}</span><h1>${t}</h1></div><div class="acts">${a}</div></div>`}
+function render(){
+ const tabs=S.role==="aa"?["Dashboard","Requisitions","Resource Planning","Instructors","Reconciliation"]:["Dashboard","Approvals","Transactions","Reports","Configuration"];
+ if(!tabs.includes(S.tab))S.tab=tabs[0];
+ document.getElementById("tabs").innerHTML=tabs.map(t=>`<button class="${t===S.tab?"on":""}" data-tab="${t}">${t}</button>`).join("");
+ document.getElementById("page").innerHTML=S.sheet?sheet():S.tab==="Reconciliation"?recon():S.tab==="Dashboard"?(S.role==="aa"?dash():acct()):`${head(S.role==="aa"?"Admin Assistant":"Accounting",S.tab)}<section class="panel"><p class="empty">Not part of this prototype. Open ${S.role==="aa"?"Reconciliation or Dashboard":"Dashboard"}.</p></section>`;
+}
+function recon(){
+ const rows=dayRows(S.day);const q=S.q.trim().toLowerCase().replace(/[₱,\s]/g,"");
+ const hit=p=>q&&(p.ref.includes(q)||String(p.amt/100).includes(q)||(p.amt/100).toFixed(2).includes(q));
+ const tot=rows.reduce((s,p)=>s+p.amt,0),ok=rows.filter(p=>p.st==="Reconciled"),miss=rows.filter(p=>p.st==="Not in History");
+ const days=[...Array(14)].map((_,i)=>addDays(TODAY,-i));
+ return head("Admin Assistant","Payment Reconciliation",`<div class="dp"><button data-shift="-1" aria-label="Previous day">‹</button><input type="date" id="day" value="${S.day}" max="${TODAY}"><button data-shift="1" aria-label="Next day" ${S.day>=TODAY?"disabled":""}>›</button></div><button class="btn" id="print">Print Day Sheet</button>`)+chips()+
+ `<div class="rail"><div class="stack">
+  <section class="panel"><div class="ph"><h2>${dname(S.day)}</h2><span class="m">${S.ch}</span></div><div class="pb"><div class="col">
+   <div class="crow" style="--c:var(--blue)"><i class="dot"></i><span>${S.ch} Received · ${rows.length}</span><b>${peso(tot)}</b></div>
+   <div class="crow" style="--c:var(--green)"><i class="dot"></i><span>Reconciled · ${ok.length}</span><b>${peso(ok.reduce((s,p)=>s+p.amt,0))}</b></div>
+   <div class="crow ${rows.length-ok.length-miss.length&&S.day<TODAY?"alarm":""}" style="--c:var(--orange)"><i class="dot"></i><span>To Check</span><b>${rows.length-ok.length-miss.length}</b></div>
+   <div class="crow" style="--c:var(--red)"><i class="dot"></i><span>Not in History</span><b>${miss.length}</b></div></div></div></section>
+  <section class="panel"><div class="ph"><h2>Last 14 Days</h2></div><div class="days">${days.map(d=>{const r=dayRows(d),t=todo(d),m=r.filter(p=>p.st==="Not in History").length;return `<button class="day ${d===S.day?"on":""}" data-day="${d}"><b>${d===TODAY?"Today":dname(d)}</b><span class="amt">${peso(r.reduce((s,p)=>s+p.amt,0))}</span><small>${r.length} ${S.ch} payment${r.length===1?"":"s"}</small><span class="st ${t?(d<TODAY?"late":"todo"):m?"late":"ok"}">${t?`${t} to check`:m?`${m} not in history`:"All reconciled ✓"}</span></button>`}).join("")}</div></section>
+ </div>
+ <section class="panel"><div class="ph"><h2>${S.ch} Payments</h2><span class="m">Check each line against the printed ${S.ch} transaction history</span></div>
+  <div class="bar"><input type="search" id="q" value="${S.q}" placeholder="Find by ${S.ch} reference no. or amount"><span class="m" style="color:var(--muted);font-size:13.5px">${S.picked.size} ticked</span><button class="btn pri" id="markok" ${S.picked.size?"":"disabled"}>Mark Reconciled</button></div>
+  <div class="wrap"><table class="log"><thead><tr><th class="ck"><input type="checkbox" id="all" aria-label="Tick all to check"></th><th>#</th><th>Time</th><th>Receipt No.</th><th>Trainee</th><th>${REF[S.ch]}</th><th class="r">Amount</th><th>Proof</th><th>Recorded By</th><th>Status</th><th></th></tr></thead><tbody>
+  ${rows.map((p,i)=>`<tr class="${p.st==="Reconciled"?"done":p.st?"miss":""} ${hit(p)?"hit":""}"><td class="ck">${p.st?"":`<input type="checkbox" data-pick="${p.id}" ${S.picked.has(p.id)?"checked":""}>`}</td><td class="no">${i+1}</td><td class="mono">${p.time}</td><td class="mono">${p.rcpt}</td><td>${p.name}</td><td class="mono"><b>${p.ref}</b></td><td class="mono r">${peso(p.amt)}</td><td><a class="link" href="#" data-proof="1">View</a></td><td>${p.by}</td>
+   <td>${p.st==="Reconciled"?`<span class="pill p-ok">Reconciled</span>`:p.st?`<span class="pill p-bad" title="${p.note}">Not in History</span>`:`<span class="pill p-warn">To Check</span>`}</td>
+   <td>${p.st?`<button class="mini" data-undo="${p.id}">Undo</button>`:`<button class="mini" data-miss="${p.id}">Not in History</button>`}</td></tr>
+   ${S.missing===p.id?`<tr><td></td><td colspan="10"><div class="remark"><label>What did you find?<input id="mnote" placeholder="e.g. Not on the printout — ask the Cashier"></label><button class="btn sm" data-cancel="1">Cancel</button><button class="btn sm" style="background:var(--red);color:#fff;border-color:var(--red)" data-savemiss="${p.id}">Mark Not in History</button></div></td></tr>`:""}
+   ${S.undo===p.id?`<tr><td></td><td colspan="10"><div class="remark"><label>Reason for undoing<input id="unote" placeholder="e.g. Ticked by mistake"></label><button class="btn sm" data-cancel="1">Cancel</button><button class="btn sm pri" data-saveundo="${p.id}">Undo</button></div></td></tr>`:""}
+   ${p.st==="Not in History"&&p.note&&S.undo!==p.id?`<tr><td></td><td colspan="10" style="color:var(--red);font-size:13px;white-space:normal">↳ ${p.note}</td></tr>`:""}`).join("")||`<tr><td colspan="11" class="empty">No ${S.ch} payments on this day.</td></tr>`}
+  </tbody></table></div>
+  <p class="foot" style="padding:0 20px 18px">Tick the payments you find on the printed ${S.ch} history, then Mark Reconciled. Payments missing from the history go to Accounting as “Not in History”.</p></section></div>`}
+function sheet(){const rows=dayRows(S.day);return `<div class="noprint acts" style="justify-content:space-between"><button class="btn" id="back">‹ Back</button><button class="btn pri" onclick="window.print()">Print</button></div>
+ <div class="sheet"><header><div><h2>${S.ch} Reconciliation — Day Sheet</h2><small>${new Date(S.day+"T12:00:00+08:00").toLocaleDateString("en-PH",{weekday:"long",month:"long",day:"numeric",year:"numeric"})} · ${rows.length} payments · ${peso(rows.reduce((s,p)=>s+p.amt,0))}</small></div><small>New Wave Maritime Training and Assessment Center, Inc.</small></header>
+ <table class="log"><thead><tr><th>#</th><th>Time</th><th>Receipt No.</th><th>Trainee</th><th>${REF[S.ch]}</th><th>Amount</th><th>In History ✓</th></tr></thead><tbody>${rows.map((p,i)=>`<tr><td class="no">${i+1}</td><td>${p.time}</td><td>${p.rcpt}</td><td>${p.name}</td><td><b>${p.ref}</b></td><td class="r">${peso(p.amt)}</td><td class="box">${p.st==="Reconciled"?"✓":""}</td></tr>`).join("")}</tbody></table>
+ <div class="sigs"><div>Checked by (Admin Assistant)</div><div>Noted by (Accounting Manager)</div></div></div>`}
+function dash(){const all=[...Array(14)].map((_,i)=>addDays(TODAY,-i));const per=CH.map(c=>({c,n:chTodo(c),old:all.filter(d=>todo(d,c)).pop()}));const n=per.reduce((s,x)=>s+x.n,0);const oldest=per.map(x=>x.old).filter(Boolean).sort()[0];
+ return head("Admin Assistant","Dashboard")+`${n?`<div class="banner ${oldest<TODAY?"red":"amber"}"><b>${n} payment${n===1?"":"s"} to reconcile</b><span>${per.filter(x=>x.n).map(x=>x.c+" "+x.n).join(" · ")}</span><span>Oldest: ${dname(oldest)}</span><span class="sp"></span><button class="btn sm" data-tab="Reconciliation">Open Reconciliation</button></div>`:""}
+ <div class="rail"><div class="stack"><section class="panel"><div class="ph"><h2>Payment Reconciliation</h2></div><div class="pb"><dl class="lines">${per.map(x=>`<div><dt>${x.c} to reconcile</dt><dd>${x.n}</dd></div>`).join("")}<div><dt>Oldest Day</dt><dd>${oldest?dname(oldest):"—"}</dd></div><div><dt>Not in History</dt><dd style="color:var(--red)">${P.filter(p=>p.st==="Not in History").length}</dd></div></dl></div></section></div>
+ <section class="panel"><p class="empty">Requisitions, resource planning and accreditations stay as they are on the dashboard.</p></section></div>`}
+function acct(){const miss=P.filter(p=>p.st==="Not in History");const over=CH.map(c=>({c,n:P.filter(p=>p.ch===c&&!p.st&&p.day<TODAY).length,old:P.filter(p=>p.ch===c&&!p.st&&p.day<TODAY).map(p=>p.day).sort()[0]}));const on=over.reduce((s,x)=>s+x.n,0);return head("Accounting","Dashboard")+(on?`<div class="banner red"><b>${on} payments not reconciled</b><span>${over.filter(x=>x.n).map(x=>`${x.c} ${x.n} (oldest ${dname(x.old)})`).join(" · ")}</span><span class="sp"></span><span style="font-size:13px">Also emailed daily at 4:00 PM</span></div>`:"")+`<section class="panel"><div class="ph"><h2>Payment Reconciliation</h2></div><div class="pb"><div class="acct"><span>Not in history: <b style="color:var(--red)">${miss.length}</b> · Not reconciled (before today): <b>${on}</b></span></div>
+ ${miss.length?`<div class="wrap" style="margin:12px 0 0"><table class="log"><thead><tr><th>Date</th><th>Channel</th><th>Receipt No.</th><th>Trainee</th><th>Ref. No.</th><th class="r">Amount</th><th>Admin Assistant's Note</th></tr></thead><tbody>${miss.map(p=>`<tr><td>${dname(p.day)}</td><td>${p.ch}</td><td class="mono">${p.rcpt}</td><td>${p.name}</td><td class="mono">${p.ref}</td><td class="mono r">${peso(p.amt)}</td><td style="white-space:normal">${p.note}</td></tr>`).join("")}</tbody></table></div>`:""}</div></section>
+ <section class="panel"><p class="empty">The rest of the Accounting dashboard stays as it is.</p></section>`}
+document.addEventListener("click",e=>{const t=e.target.closest("button,a");if(!t)return;const d=t.dataset;
+ if(d.tab){S.tab=d.tab;S.sheet=false;render();return}
+ if(d.ch){S.ch=d.ch;S.picked.clear();S.missing=S.undo=null;S.q="";render();return}
+ if(d.day){S.day=d.day;S.picked.clear();S.missing=S.undo=null;render();return}
+ if(d.shift){const n=addDays(S.day,+d.shift);if(n<=TODAY){S.day=n;S.picked.clear();render()}return}
+ if(d.proof){e.preventDefault();toast("Opens the proof of payment in Google Drive");return}
+ if(t.id==="markok"){P.filter(p=>S.picked.has(p.id)).forEach(p=>p.st="Reconciled");toast(`${S.picked.size} marked reconciled`);S.picked.clear();render();return}
+ if(d.miss){S.missing=d.miss;S.undo=null;render();document.getElementById("mnote").focus();return}
+ if(d.undo){S.undo=d.undo;S.missing=null;render();document.getElementById("unote").focus();return}
+ if(d.cancel){S.missing=S.undo=null;render();return}
+ if(d.savemiss){const v=document.getElementById("mnote").value.trim();if(v.length<3){toast("Write what you found.");return}const p=P.find(x=>x.id===d.savemiss);p.st="Not in History";p.note=v;S.picked.delete(p.id);S.missing=null;toast("Marked Not in History — Accounting will see it");render();return}
+ if(d.saveundo){const v=document.getElementById("unote").value.trim();if(v.length<3){toast("Write the reason.");return}const p=P.find(x=>x.id===d.saveundo);p.st="";p.note="";S.undo=null;toast("Back to To Check");render();return}
+ if(t.id==="print"){S.sheet=true;render();return}
+ if(t.id==="back"){S.sheet=false;render();return}
+});
+document.addEventListener("change",e=>{const t=e.target;
+ if(t.id==="role"){S.role=t.value;S.tab="";S.sheet=false;render();return}
+ if(t.id==="day"&&t.value&&t.value<=TODAY){S.day=t.value;S.picked.clear();render();return}
+ if(t.dataset.pick){t.checked?S.picked.add(t.dataset.pick):S.picked.delete(t.dataset.pick);render();return}
+ if(t.id==="all"){dayRows(S.day).filter(p=>!p.st).forEach(p=>t.checked?S.picked.add(p.id):S.picked.delete(p.id));render();return}
+});
+document.addEventListener("input",e=>{if(e.target.id==="q"){S.q=e.target.value;const pos=e.target.selectionStart;render();const q=document.getElementById("q");q.focus();q.setSelectionRange(pos,pos)}});
+render();
+</script>

@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Registration Tables</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Registration › Enrollments and Trainees tables (owner, 19 Oct 2026): three compact layouts to choose from. */
+:root{--navy:#123F63;--blue:#0571D0;--orange:#F25615;--cyan:#35CCFA;--bg:#f2f6f9;--surface:#fff;--line:#dbe5ec;--fg:#0f2638;--muted:#5b6f7f;--soft:#eef4f8;--okbg:#e3f4ea;--ok:#0a7a3e;--warnbg:#fde9dd;--warn:#b4480f;--badbg:#fbe4dc;--bad:#b42318;--infobg:#e2effb;--info:#0558a8;--sans:"Geist",system-ui,sans-serif;--mono:"Geist Mono",ui-monospace,monospace}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0c1925;--surface:#122534;--line:#23394b;--fg:#e5eef5;--muted:#98adbf;--soft:#18303f;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0c1925;--surface:#122534;--line:#23394b;--fg:#e5eef5;--muted:#98adbf;--soft:#18303f;--okbg:#12301f;--ok:#5fd493;--warnbg:#3a2516;--warn:#ffad78;--badbg:#3c1d16;--bad:#ff8a7a;--infobg:#132f4a;--info:#7cc0ff;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}button{font:inherit;color:inherit;cursor:pointer}:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.top{background:var(--navy);color:#fff;padding:12px 20px 0}.top b{color:var(--cyan);font-size:18px}.tabs{display:flex;gap:2px;margin-top:12px}.tabs span{color:#d4e4f1;padding:10px 16px;border-radius:10px 10px 0 0;font-weight:500}.tabs span.on{background:var(--bg);color:var(--fg)}
+.page{max-width:1280px;margin:0 auto;padding:18px 20px 60px;display:flex;flex-direction:column;gap:16px}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}h1{margin:2px 0 0;font-size:27px}h2{margin:0;font-size:16px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--surface)}.seg button{border:0;background:none;padding:8px 15px;font-weight:600;font-size:13.5px}.seg button.on{background:var(--navy);color:#fff}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}.ph{display:flex;justify-content:space-between;align-items:center;padding:12px 16px}.ph small{color:var(--muted)}
+.wrap{overflow-x:auto}table{width:100%;border-collapse:collapse}th{background:var(--soft);color:var(--muted);font:600 11.5px var(--sans);letter-spacing:.07em;text-transform:uppercase;text-align:left;white-space:nowrap}
+td{border-top:1px solid var(--line);vertical-align:top}th.r,td.r{text-align:right}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}.muted{color:var(--muted)}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600;white-space:nowrap}.ok{background:var(--okbg);color:var(--ok)}.warn{background:var(--warnbg);color:var(--warn)}.info{background:var(--infobg);color:var(--info)}
+.app{color:var(--orange);font-family:var(--mono);font-weight:600}
+.reqbtn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 10px;font-size:13px}
+/* Design 1 — Compact: one line per value, numbers in mono below the name */
+.d1 th{padding:9px 12px}.d1 td{padding:9px 12px;line-height:1.35}
+.d1 td b{white-space:nowrap}.d1 td small{display:block;font-size:12.5px;color:var(--muted);white-space:nowrap}
+.d1 .tag{display:inline-block;margin-left:6px;padding:0 7px;border-radius:99px;background:var(--soft);font-size:11px;font-weight:600;color:var(--muted);vertical-align:1px}
+/* Design 2 — Single line: everything on one row, extra details on hover */
+.d2 th{padding:8px 12px}.d2 td{padding:8px 12px;white-space:nowrap;vertical-align:middle}
+.d2 .sub{color:var(--muted);font-size:12.5px;margin-left:6px}
+/* Design 3 — Stacked name card: name, number chips and contact in one column, fewer columns */
+.d3 th{padding:9px 14px}.d3 td{padding:10px 14px;vertical-align:middle}
+.d3 .who b{display:block;white-space:nowrap}.d3 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:3px}.d3 .chip{font-size:11.5px;padding:0 7px;border-radius:6px;background:var(--soft);color:var(--muted);font-family:var(--mono);white-space:nowrap}.d3 .chip.app{background:var(--warnbg)}
+.d3 small{display:block;color:var(--muted);font-size:12.5px;white-space:nowrap}
+.note{background:var(--infobg);color:var(--info);border-radius:10px;padding:10px 14px;font-size:13.5px}
+@media (max-width:560px){.page,.top{padding-inline:16px}}
+</style>
+</head>
+<body>
+<div class="top"><b>NEW WAVE</b><nav class="tabs"><span>Dashboard</span><span class="on">Registration</span><span>Courses</span><span>Instructions</span></nav></div>
+<main class="page">
+ <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap"><div><span class="eyebrow">Registration</span><h1>Enrollments and Trainees</h1></div>
+  <div class="seg" role="tablist" id="seg"></div></div>
+ <section class="panel"><div class="ph"><h2>Enrollments</h2><small>Queue · All Enrollments</small></div><div class="wrap" id="enr"></div></section>
+ <section class="panel"><div class="ph"><h2>Trainees</h2><small>All trainees</small></div><div class="wrap" id="trn"></div></section>
+ <div class="note" id="about"></div>
+</main>
+<script>
+// Sample data (fictional).
+const ENR=[
+ {name:"CEZAR GALLANO SALAZAR",tno:"NWM-2026-000001",app:"NWMTACI-0000001",enr:"ENR-2026-000001",type:"Online Enrollment",course:"Updating Training on Basic Training – PSSR",sched:"Oct 19, 2026",req:"0 of 4",reqOk:false,pay:"Not yet",status:["Screening","warn"]},
+ {name:"KATHLEEN PUWEE GARET",tno:"NWM-2026-000002",app:"NWMTACI-0000002",enr:"ENR-2026-000002",type:"Walk-In",course:"Crowd Management Training",sched:"Oct 20–21, 2026",req:"4 of 4",reqOk:true,pay:"₱1,450.00",status:["Enrolled","ok"]},
+ {name:"MIGUEL REYES SANTOS",tno:"NWM-2026-000003",app:"NWMTACI-0000003",enr:"ENR-2026-000003",type:"Online Enrollment",course:"Collision Regulation on Rules of the Coxswain",sched:"Nov 16–18, 2026",req:"2 of 4",reqOk:false,pay:"With cashier",status:["For Payment","info"]}];
+const TRN=[
+ {name:"KATHLEEN PUWEE GARET",app:"NWMTACI-0000002",tno:"NWM-2026-000002",email:"kgaret13@example.com",mobile:"+639275581824",courses:"UBT-PSSR",more:3,status:["Enrolled","ok"],bal:"₱0.00",reg:"Oct 19, 2026"},
+ {name:"CEZAR GALLANO SALAZAR",app:"NWMTACI-0000001",tno:"NWM-2026-000001",email:"cezar.s@example.com",mobile:"+639171234567",courses:"UBT-PSSR",more:0,status:["Screening","warn"],bal:"₱1,800.00",reg:"Oct 19, 2026"}];
+let D=1;
+const designs={
+ 1:{label:"Design 1 · Compact",about:"Compact: the same columns, tighter rows. The name stays on one line with the enrollment type as a small tag; numbers sit in one line underneath.",
+  enr:()=>`<table class="d1"><thead><tr><th>Trainee</th><th>Enrollment No.</th><th>Course and Schedule</th><th>Requirements</th><th>Payment</th><th>Status</th></tr></thead><tbody>${ENR.map(e=>`<tr><td><b>${e.name}</b><span class="tag">${e.type}</span><small class="mono">${e.tno}</small></td><td><span class="app">${e.app}</span><small class="mono">${e.enr}</small></td><td>${e.course}<small>${e.sched}</small></td><td class="mono" style="color:${e.reqOk?"var(--ok)":"var(--warn)"};font-weight:600">${e.req}</td><td class="muted">${e.pay}</td><td><span class="pill ${e.status[1]}">${e.status[0]}</span></td></tr>`).join("")}</tbody></table>`,
+  trn:()=>`<table class="d1"><thead><tr><th>Trainee</th><th>Contact</th><th>Courses</th><th>Status</th><th class="r">Balance</th><th>Request</th><th>Registered</th></tr></thead><tbody>${TRN.map(t=>`<tr><td><b>${t.name}</b><small><span class="app">${t.app}</span> · <span class="mono">${t.tno}</span></small></td><td>${t.email}<small>${t.mobile}</small></td><td>${t.courses}${t.more?`<small>+${t.more} more</small>`:""}</td><td><span class="pill ${t.status[1]}">${t.status[0]}</span></td><td class="r mono"><b>${t.bal}</b></td><td><button class="reqbtn">Request ▾</button></td><td style="white-space:nowrap">${t.reg}</td></tr>`).join("")}</tbody></table>`},
+ 2:{label:"Design 2 · Single Line",about:"Single line: every row is one line high, so about twice as many fit on the screen. Secondary details (trainee no., schedule) sit beside the main value in grey.",
+  enr:()=>`<table class="d2"><thead><tr><th>Trainee</th><th>Enrollment No.</th><th>Course</th><th>Schedule</th><th>Req.</th><th>Payment</th><th>Status</th></tr></thead><tbody>${ENR.map(e=>`<tr><td><b>${e.name}</b><span class="sub">${e.type}</span></td><td><span class="app">${e.app}</span></td><td>${e.course}</td><td class="muted">${e.sched}</td><td class="mono" style="color:${e.reqOk?"var(--ok)":"var(--warn)"};font-weight:600">${e.req}</td><td class="muted">${e.pay}</td><td><span class="pill ${e.status[1]}">${e.status[0]}</span></td></tr>`).join("")}</tbody></table>`,
+  trn:()=>`<table class="d2"><thead><tr><th>Trainee</th><th>Enrollment No.</th><th>Mobile</th><th>Courses</th><th>Status</th><th class="r">Balance</th><th>Registered</th><th></th></tr></thead><tbody>${TRN.map(t=>`<tr><td><b>${t.name}</b></td><td><span class="app">${t.app}</span></td><td class="mono">${t.mobile}</td><td>${t.courses}${t.more?`<span class="sub">+${t.more}</span>`:""}</td><td><span class="pill ${t.status[1]}">${t.status[0]}</span></td><td class="r mono"><b>${t.bal}</b></td><td class="muted">${t.reg}</td><td><button class="reqbtn">Request ▾</button></td></tr>`).join("")}</tbody></table>`},
+ 3:{label:"Design 3 · Name Card",about:"Name card: the trainee column carries the name with the enrollment no., trainee no. and type as small chips, so the table needs fewer columns and wraps less.",
+  enr:()=>`<table class="d3"><thead><tr><th>Trainee</th><th>Course and Schedule</th><th>Requirements</th><th>Payment</th><th>Status</th></tr></thead><tbody>${ENR.map(e=>`<tr><td class="who"><b>${e.name}</b><span class="chips"><span class="chip app">${e.app}</span><span class="chip">${e.enr}</span><span class="chip">${e.type}</span></span></td><td>${e.course}<small>${e.sched}</small></td><td class="mono" style="color:${e.reqOk?"var(--ok)":"var(--warn)"};font-weight:600">${e.req}</td><td class="muted">${e.pay}</td><td><span class="pill ${e.status[1]}">${e.status[0]}</span></td></tr>`).join("")}</tbody></table>`,
+  trn:()=>`<table class="d3"><thead><tr><th>Trainee</th><th>Contact</th><th>Courses</th><th>Status</th><th class="r">Balance</th><th></th></tr></thead><tbody>${TRN.map(t=>`<tr><td class="who"><b>${t.name}</b><span class="chips"><span class="chip app">${t.app}</span><span class="chip">${t.tno}</span><span class="chip">Registered ${t.reg}</span></span></td><td>${t.email}<small>${t.mobile}</small></td><td>${t.courses}${t.more?`<small>+${t.more} more</small>`:""}</td><td><span class="pill ${t.status[1]}">${t.status[0]}</span></td><td class="r mono"><b>${t.bal}</b></td><td><button class="reqbtn">Request ▾</button></td></tr>`).join("")}</tbody></table>`}};
+function render(){
+  document.getElementById("seg").innerHTML=[1,2,3].map(n=>`<button role="tab" aria-selected="${D===n}" class="${D===n?"on":""}" data-d="${n}">${designs[n].label}</button>`).join("");
+  document.getElementById("enr").innerHTML=designs[D].enr();document.getElementById("trn").innerHTML=designs[D].trn();document.getElementById("about").textContent=designs[D].about;
+}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-d]");if(b){D=+b.dataset.d;render()}});
+render();
+</script>
+</body>
+</html>

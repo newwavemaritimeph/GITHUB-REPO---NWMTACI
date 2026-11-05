@@ -1,0 +1,186 @@
+<title>Accounting Dashboard Layout</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: navy top bar, then approvals, then pairs of panels; collections as one compact column beside the channel chart. */
+:root{
+  --navy:#123F63; --blue:#0571D0; --orange:#F25615; --cyan:#35CCFA;
+  --bg:#f3f6fa; --surface:#ffffff; --line:#dfe7ee; --fg:#0f2638; --muted:#5f7180; --soft:#eef4f8;
+  --green:#15803d; --red:#c2410c; --amber:#b45309;
+  --c-cash:#15803d; --c-gcash:#0571D0; --c-psb:#F25615; --c-ub:#7c3aed; --c-chq:#64748b;
+  --sans:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0d1b27;--surface:#132636;--line:#24394b;--fg:#e6eef5;--muted:#9bb0c1;--soft:#1b3246;color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:400 15px/1.5 var(--sans)}
+.top{background:var(--navy);color:#fff;padding:14px 24px 0}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.brand b{font-size:19px;color:var(--cyan)} .brand small{display:block;font-size:10px;letter-spacing:.06em;color:#cfe3f1}
+.who{display:flex;gap:10px;align-items:center;font-size:14px;color:#cfe3f1}
+.who span{border:1px solid #3b6a90;border-radius:8px;padding:6px 12px;color:#fff}
+.tabs{display:flex;gap:4px;margin-top:14px;overflow-x:auto}
+.tabs a{padding:10px 18px;color:#d6e6f2;text-decoration:none;font-weight:500;border-radius:10px 10px 0 0;white-space:nowrap}
+.tabs a.on{background:var(--bg);color:var(--fg)}
+.page{max-width:1240px;margin:0 auto;padding-block:24px 48px;padding-inline:24px;display:flex;flex-direction:column;gap:16px}
+.head{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.eyebrow{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--blue);font-weight:600}
+h1{margin:2px 0 0;font-size:28px;line-height:1.2}
+.note{margin:-8px 0 0;color:var(--muted);font-size:14px}
+.day{display:flex;align-items:center;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:4px}
+.day button{border:0;background:none;color:var(--muted);font-size:18px;width:32px;height:32px;cursor:pointer;border-radius:8px}
+.day button:hover{background:var(--soft)} .day input{border:0;background:none;color:var(--fg);font:500 14px var(--sans)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px 20px;min-width:0}
+.ph{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:12px}
+.ph h2{margin:0;font-size:17px;font-weight:600} .ph .m{color:var(--muted);font-size:13.5px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+/* approvals */
+.chips{display:flex;gap:6px;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:10px}
+.chips button{border:0;background:none;color:var(--muted);font:500 14px var(--sans);padding:6px 10px;border-radius:8px;cursor:pointer}
+.chips button.on{background:var(--soft);color:var(--blue)}
+.chips i{font-style:normal;font:600 11.5px var(--mono);background:var(--soft);color:var(--muted);border-radius:99px;padding:1px 7px;margin-left:6px}
+.chips button.has i{background:#fde7dc;color:var(--orange)}
+.badge{font-size:12.5px;font-weight:600;padding:3px 10px;border-radius:99px;background:#fde7dc;color:var(--orange)}
+.arow{display:grid;grid-template-columns:1fr auto auto;gap:14px;align-items:center;padding:11px 2px;border-bottom:1px solid var(--line)}
+.arow:last-child{border-bottom:0} .arow small{display:block;color:var(--muted);font-size:13px}
+.arow .acts{display:flex;gap:6px}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);font:500 13.5px var(--sans);padding:6px 12px;border-radius:8px;cursor:pointer}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff}
+.empty{color:var(--muted);text-align:center;padding:14px 0 4px;font-size:14px}
+/* collections column */
+.col{border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.crow{display:grid;grid-template-columns:10px 1fr auto auto;gap:12px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--line)}
+.crow:last-child{border-bottom:0}
+.dot{width:10px;height:10px;border-radius:3px;background:var(--c)}
+.crow small{color:var(--muted);font-size:13px} .crow b{font:600 16px var(--mono);min-width:120px;text-align:right}
+.crow.tot{background:var(--navy);color:#fff} .crow.tot small{color:#c3dbea} .crow.tot .dot{background:var(--orange)}
+.split{display:flex;gap:16px;flex-wrap:wrap;margin:10px 2px 0;color:var(--muted);font-size:13.5px} .split b{color:var(--fg)}
+/* donut */
+.dwrap{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.legend{flex:1;min-width:160px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.legend div{display:grid;grid-template-columns:10px 1fr auto;gap:10px;align-items:center}
+/* cash position */
+.sum{display:grid;grid-template-columns:1fr 1fr;margin:0}
+.sum div{padding:10px 4px;border-bottom:1px solid var(--line)} .sum div:nth-child(odd){border-right:1px solid var(--line);padding-right:14px} .sum div:nth-child(even){padding-left:14px}
+.sum dt{color:var(--muted);font-size:13px} .sum dd{margin:2px 0 0;font:600 17px var(--mono)}
+.sum .plus dd{color:var(--green)} .sum .minus dd{color:var(--red)} .sum .eq dd{color:var(--blue)}
+.sum small{color:var(--muted);font-size:12px}
+.more{margin-top:10px;text-align:right} .more button{border:0;background:none;color:var(--blue);font:500 14px var(--sans);cursor:pointer}
+.hb{display:grid;grid-template-columns:90px 1fr auto;gap:10px;align-items:center;font-size:14px;margin:8px 0}
+.hb .bar{height:10px;background:var(--soft);border-radius:99px;overflow:hidden} .hb .bar i{display:block;height:100%;background:var(--c)}
+table{width:100%;border-collapse:collapse;font-size:14px} td{padding:8px 2px;border-top:1px solid var(--line)} td.r{text-align:right}
+svg text{fill:var(--muted);font:12px var(--sans)}
+.legend2{display:flex;gap:14px;font-size:13px;color:var(--muted);margin-top:6px}
+.legend2 span::before{content:"";display:inline-block;width:10px;height:10px;border-radius:3px;background:var(--c);margin-right:6px;vertical-align:-1px}
+.tag{display:inline-block;font-size:11.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+@media (max-width:860px){.grid2{grid-template-columns:1fr}.arow{grid-template-columns:1fr}}
+@media (max-width:480px){.page{padding-inline:16px}.top{padding-inline:16px}.crow b{min-width:0}.sum{grid-template-columns:1fr}.sum div:nth-child(odd){border-right:0;padding-right:4px}.sum div:nth-child(even){padding-left:4px}}
+button:focus-visible,input:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+</style>
+
+<header class="top">
+  <div class="brand"><div><b>New Wave</b><small>MARITIME TRAINING AND ASSESSMENT CENTER, INC.</small></div>
+    <div class="who">Working as <span>Accounting</span> Kathleen Garcia</div></div>
+  <nav class="tabs"><a class="on" href="#">Dashboard</a><a href="#">Approvals</a><a href="#">Transactions ▾</a><a href="#">Reports</a><a href="#">Configuration ▾</a></nav>
+</header>
+
+<main class="page">
+  <div class="head"><div><div class="eyebrow">Accounting</div><h1>Dashboard</h1></div>
+    <div class="day"><button id="prev" aria-label="Previous day">‹</button><input id="d" type="date" value="2026-10-08" max="2026-10-08" aria-label="Date"><button id="next" aria-label="Next day">›</button></div></div>
+  <p class="note" id="dl">Thursday, October 8, 2026 · view only. The Cashier records payments and expenses. Sample figures.</p>
+
+  <section class="panel">
+    <div class="ph"><h2>For your approval</h2><span class="badge" id="wait">3 waiting</span></div>
+    <div class="chips" id="chips"></div>
+    <div id="alist"></div>
+  </section>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="ph"><h2>Collections</h2><b class="mono" id="ctot"></b></div>
+      <div class="col" id="col"></div>
+      <div class="split"><span>Direct walk-ins <b class="mono">₱5,400.00</b></span><span>Agencies <b class="mono">₱3,100.00</b></span><span>Consultancies <b class="mono">₱1,300.00</b></span></div>
+    </section>
+    <section class="panel">
+      <div class="ph"><h2>By channel</h2><span class="m">Oct 8, 2026</span></div>
+      <div class="dwrap"><svg id="donut" width="170" height="170" viewBox="0 0 170 170" role="img" aria-label="Collections by channel"></svg><div class="legend" id="leg"></div></div>
+    </section>
+  </div>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="ph"><h2>Last 7 days</h2><span class="m">collections and expenses</span></div>
+      <svg id="bars" viewBox="0 0 520 200" width="100%" role="img" aria-label="Collections and expenses, last 7 days"></svg>
+      <div class="legend2"><span style="--c:var(--blue)">Collections</span><span style="--c:var(--orange)">Expenses released</span></div>
+    </section>
+    <section class="panel">
+      <div class="ph"><h2>Cash position</h2><span class="m">cash only</span></div>
+      <dl class="sum">
+        <div><dt>Previous cash</dt><dd>₱12,450.00</dd><small>Counted at Oct 7 closing</small></div>
+        <div class="plus"><dt>+ Cash collected</dt><dd>₱4,100.00</dd></div>
+        <div class="minus"><dt>− Cash expenses</dt><dd>₱850.00</dd></div>
+        <div class="eq"><dt>= Cash on hand</dt><dd>₱15,700.00</dd></div>
+        <div><dt>Counted at closing</dt><dd>Not yet</dd></div>
+        <div><dt>Over / short</dt><dd>—</dd></div>
+      </dl>
+    </section>
+  </div>
+
+  <div class="grid2">
+    <section class="panel">
+      <div class="ph"><h2>Expenses released</h2><b class="mono">₱2,350.00</b></div>
+      <div class="hb" style="--c:var(--c-cash)"><span>Cash</span><div class="bar"><i style="width:36%"></i></div><b class="mono">₱850.00</b></div>
+      <div class="hb" style="--c:var(--c-gcash)"><span>GCash</span><div class="bar"><i style="width:64%"></i></div><b class="mono">₱1,500.00</b></div>
+      <div class="more"><button>View vouchers</button></div>
+    </section>
+    <section class="panel">
+      <div class="ph"><h2>Rebates</h2></div>
+      <dl class="sum"><div><dt>Deducted from payments</dt><dd>₱900.00</dd><small>Oct 8, 2026</small></div><div><dt>Owed to agencies</dt><dd style="color:var(--amber)">₱1,950.00</dd></div></dl>
+      <table><tr><td>Qapla Maritime</td><td>3 trainees</td><td class="r mono">₱1,350.00</td></tr><tr><td>Costa Maritime</td><td>1 trainee</td><td class="r mono">₱600.00</td></tr></table>
+      <div class="more"><button>View payables</button></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="ph"><h2>Unpaid after training</h2><div class="more" style="margin:0"><button>View receivables</button></div></div>
+    <dl class="sum"><div><dt>Balance</dt><dd style="color:var(--red)">₱6,300.00</dd></div><div><dt>Trainees</dt><dd>4</dd></div></dl>
+  </section>
+</main>
+
+<script>
+const peso=c=>"₱"+(c/100).toLocaleString("en-PH",{minimumFractionDigits:2,maximumFractionDigits:2});
+const CH=[["Cash","--c-cash",410000,2],["GCash","--c-gcash",320000,2],["PSBank","--c-psb",250000,1],["UnionBank","--c-ub",0,0],["Cheque","--c-chq",0,0]];
+const total=CH.reduce((s,c)=>s+c[2],0),rc=CH.reduce((s,c)=>s+c[3],0);
+const pl=n=>n+" receipt"+(n===1?"":"s");
+document.getElementById("col").innerHTML=CH.map(c=>`<div class="crow" style="--c:var(${c[1]})"><span class="dot"></span><span>${c[0]}</span><small>${pl(c[3])}</small><b>${peso(c[2])}</b></div>`).join("")+`<div class="crow tot"><span class="dot"></span><span>Total collected</span><small>${pl(rc)}</small><b>${peso(total)}</b></div>`;
+document.getElementById("ctot").textContent=peso(total);
+// donut
+let a=-Math.PI/2,R=70,r=46,cx=85,cy=85,svg="";
+const css=getComputedStyle(document.documentElement);
+CH.filter(c=>c[2]).forEach(c=>{const f=c[2]/total,b=a+f*2*Math.PI,l=f>.5?1:0;
+  const p=(ang,rad)=>[cx+rad*Math.cos(ang),cy+rad*Math.sin(ang)];
+  const[x1,y1]=p(a,R),[x2,y2]=p(b,R),[x3,y3]=p(b,r),[x4,y4]=p(a,r);
+  svg+=`<path d="M${x1} ${y1}A${R} ${R} 0 ${l} 1 ${x2} ${y2}L${x3} ${y3}A${r} ${r} 0 ${l} 0 ${x4} ${y4}Z" fill="${css.getPropertyValue(c[1]).trim()}"/>`;a=b;});
+svg+=`<text x="85" y="82" text-anchor="middle" style="font:600 14px var(--mono);fill:var(--fg)">${peso(total).replace(".00","")}</text><text x="85" y="100" text-anchor="middle">collected</text>`;
+document.getElementById("donut").innerHTML=svg;
+document.getElementById("leg").innerHTML=CH.map(c=>`<div><span class="dot" style="--c:var(${c[1]})"></span><span>${c[0]}</span><b class="mono">${Math.round(c[2]/total*100)}%</b></div>`).join("");
+// bars
+const days=["Oct 2","Oct 3","Oct 5","Oct 6","Oct 7","Oct 8","Today"].slice(0,6).concat([]);
+const D=[["Oct 2",620000,120000],["Oct 3",410000,90000],["Oct 5",880000,300000],["Oct 6",540000,60000],["Oct 7",720000,150000],["Oct 8",980000,235000]];
+const max=1000000,H=150,top=10,left=46,w=(520-left-8)/D.length;let g="";
+[0,.5,1].forEach(t=>{const y=top+H-H*t;g+=`<line x1="${left}" x2="512" y1="${y}" y2="${y}" stroke="var(--line)"/><text x="${left-6}" y="${y+4}" text-anchor="end">₱${(max*t/100000).toLocaleString()}k</text>`;});
+D.forEach((d,i)=>{const x=left+i*w+w*.18,bw=w*.3;const h1=H*d[1]/max,h2=H*d[2]/max;
+  g+=`<rect x="${x}" y="${top+H-h1}" width="${bw}" height="${h1}" rx="3" fill="#0571D0"/><rect x="${x+bw+3}" y="${top+H-h2}" width="${bw}" height="${h2}" rx="3" fill="#F25615"/><text x="${x+bw}" y="${top+H+18}" text-anchor="middle">${d[0]}</text>`;});
+document.getElementById("bars").innerHTML=g;
+// approvals
+const A={"Expense requests":[["Meralco — electricity, September","Utilities · ER-2026-0014 · GCash","₱8,420.00"],["Office supplies — bond paper, toner","Supplies · ER-2026-0015 · Cash","₱1,150.00"]],"Voucher reprints":[["CV-2026-000124 · Juan Ramos (sample)","Reason: payee copy torn","—"]],"Refunds":[],"Discounts":[],"Rebates owed to partners":[],"Cashier closings":[]};
+let cur="Expense requests";
+function draw(){const n=Object.values(A).reduce((s,l)=>s+l.length,0);document.getElementById("wait").textContent=n+" waiting";
+  document.getElementById("chips").innerHTML=Object.keys(A).map(k=>`<button class="${k===cur?"on":""} ${A[k].length?"has":""}" data-k="${k}">${k}<i>${A[k].length}</i></button>`).join("");
+  const l=A[cur];document.getElementById("alist").innerHTML=l.length?l.map((x,i)=>`<div class="arow"><div><strong>${x[0]}</strong><small>${x[1]}</small></div><b class="mono">${x[2]}</b><div class="acts"><button class="btn" data-r="${i}">Reject</button><button class="btn pri" data-a="${i}">Approve</button></div></div>`).join(""):`<p class="empty">Nothing waiting.</p>`;}
+document.addEventListener("click",e=>{const t=e.target.closest("button");if(!t)return;
+  if(t.dataset.k){cur=t.dataset.k;draw();}
+  if(t.dataset.a!=null||t.dataset.r!=null){A[cur].splice(+(t.dataset.a??t.dataset.r),1);draw();}});
+draw();
+</script>
