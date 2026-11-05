@@ -54,4 +54,14 @@ describe("2x2 photo box detection", () => {
     ], 842, 595);
     expect(pick).toMatchObject({ x: 600, source: "box" });
   });
+
+  it("takes the empty frame beside a framed QR code, whatever the page's background picture", () => {
+    const pick = pickPhotoBox([
+      { x: -51, y: -55, w: 774, h: 574, source: "picture" },
+      { x: 436, y: 50, w: 85, h: 85, source: "box" },
+      { x: 345, y: 50, w: 85, h: 85, source: "picture" },
+      { x: 344.7, y: 49.2, w: 85.75, h: 85.75, source: "box" },
+    ], 595, 842);
+    expect(pick).toMatchObject({ x: 436, source: "box" });
+  });
 });

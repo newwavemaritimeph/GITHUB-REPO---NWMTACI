@@ -127,10 +127,16 @@ function boxesFromLines(segs: Seg[]): Rect[] {
 }
 
 /** Picks the most likely 2x2 photo box from the candidates (exported for tests). */
+/** A picture about this box's size sits over most of it. A page-wide background picture does not count. */
+const filledBy = (p: Rect, box: { x: number; y: number; w: number; h: number }) => {
+  const w = Math.min(p.x + p.w, box.x + box.w) - Math.max(p.x, box.x), h = Math.min(p.y + p.h, box.y + box.h) - Math.max(p.y, box.y);
+  return p.source === "picture" && p.w <= box.w * 1.3 && p.h <= box.h * 1.3 && w > 0 && h > 0 && w * h >= box.w * box.h * 0.5;
+};
+
 export function pickPhotoBox(rects: Rect[], pageW: number, pageH: number): Rect | null {
   const scored = rects
     .filter((r) => r.w >= 54 && r.h >= 54 && r.w <= 260 && r.h <= 260 && r.w < pageW * 0.6 && r.h < pageH * 0.6)
-    .map((r) => { const aspect = Math.max(r.w, r.h) / Math.min(r.w, r.h); return { r, aspect, score: Math.abs(r.w - 144) + Math.abs(r.h - 144) + 220 * (aspect - 1) + (r.source === "picture" ? 60 : 0) }; })
+    .map((r) => { const aspect = Math.max(r.w, r.h) / Math.min(r.w, r.h); return { r, aspect, score: Math.abs(r.w - 144) + Math.abs(r.h - 144) + 220 * (aspect - 1) + (r.source === "picture" ? 60 : rects.some((p) => filledBy(p, r)) ? 100 : 0) }; })
     .filter((c) => c.aspect <= 1.35)
     .sort((a, b) => a.score - b.score);
   return scored[0]?.r ?? null;
@@ -165,11 +171,7 @@ export async function detectPhotoBox(bytes: Uint8Array): Promise<PhotoBox | null
 export async function hasPictureAt(bytes: Uint8Array, box: { x: number; y: number; w: number; h: number }) {
   try {
     const { rects } = await drawnShapes(bytes);
-    return rects.some((r) => {
-      if (r.source !== "picture") return false;
-      const w = Math.min(r.x + r.w, box.x + box.w) - Math.max(r.x, box.x), h = Math.min(r.y + r.h, box.y + box.h) - Math.max(r.y, box.y);
-      return w > 0 && h > 0 && w * h >= box.w * box.h * 0.5;
-    });
+    return rects.some((r) => filledBy(r, box));
   } catch {
     return false;
   }

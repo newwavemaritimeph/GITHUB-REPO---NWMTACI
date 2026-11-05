@@ -15,7 +15,7 @@ const centre = (l: TemplateLine) => (l.x + l.right) / 2;
 const MONTH = "(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\\.?";
 const DAY = "\\d{1,2}(?:st|nd|rd|th)?";
 const RANGE = `${MONTH}\\s+${DAY}\\s*(?:-|–|to)\\s*(?:${MONTH}\\s+)?${DAY},?\\s+\\d{4}`;
-const DATE = new RegExp(`\\[(?:START DATE|END DATE|ASSESS DATE|DATE)\\]|_{3,}|\\b${RANGE}|\\b${MONTH}\\s+${DAY},?\\s+\\d{4}|\\b${DAY}\\s+(?:day\\s+of\\s+)?${MONTH},?\\s+\\d{4}|\\b\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}\\b`, "gi");
+const DATE = new RegExp(`\\[(?:START DATE|END DATE|ASSESS DATE|DATE)\\]|\\((?:training\\s+)?date\\)|_{3,}|\\b${RANGE}|\\b${MONTH}\\s+${DAY},?\\s+\\d{4}|\\b${DAY}\\s+(?:day\\s+of\\s+)?${MONTH},?\\s+\\d{4}|\\b\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}\\b`, "gi");
 
 /** The paragraph with its sample dates or blanks turned into the placeholders the certificate fills. */
 export function dateSlots(paragraph: string) {
@@ -87,14 +87,15 @@ export function layoutFromLines(lines: TemplateLine[], pageW: number, pageH: num
   }
   report(f.conducted, "Training Dates");
 
-  // The issue date: "Issued this ___ day of ___ 20__ ...", or a "Date of Issue:" label.
+  // The issue date: "Issued this ___ day of ___ 20__ ...", a "Date of Issue:" label, or both on one page.
   const issued = sorted.find((l) => ISSUED.test(l.text));
-  const issueLabel = issued ? null : sorted.find((l) => ISSUE_LABEL.test(l.text));
+  const issueLabel = sorted.find((l) => ISSUE_LABEL.test(l.text));
   if (issued) {
     const text = issued.text.replace(ISSUED, "Issued this ______ day of ________________ 20____");
     f.issued = Math.abs(centre(issued) - pageW / 2) < 4 ? { cx: round(centre(issued)), y: issued.y, size: issued.size, text } : { x: issued.x, y: issued.y, size: issued.size, text };
     lifted.push(issued);
-  } else if (issueLabel) {
+  }
+  if (issueLabel) {
     const m = issueLabel.text.match(ISSUE_LABEL)!;
     if (m[2].replace(/[\s:.]/g, "")) { f.issueDate = { x: issueLabel.x, y: issueLabel.y, size: issueLabel.size, label: m[1].trim(), body: true, bold: issueLabel.bold }; lifted.push(issueLabel); }
     else f.issueDate = { x: round(issueLabel.right + issueLabel.size * 0.3), y: issueLabel.y, size: issueLabel.size, body: true };

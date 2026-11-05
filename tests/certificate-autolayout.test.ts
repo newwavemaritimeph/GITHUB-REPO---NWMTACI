@@ -112,6 +112,27 @@ describe("reading a certificate's details from an uploaded PDF", () => {
     expect(dateSlots("Conducted on [DATE], with a total of 8 hours").text).toBe("Conducted on [DATE], with a total of 8 hours");
     expect(dateSlots("Conducted with no date").slots).toBe(0);
   });
+
+  // Safety, Crowd and Crisis (owner, 5 Nov 2026): the Word files print "Issued this" and a bare "Date of Issue:" label.
+  it("reads a (Training Date) sample and a sample date range with years", () => {
+    expect(dateSlots("conducted on (Training Date), as approved, after having been assessed by the Assessor on (Training Date) in accordance").text).toBe("conducted on [START DATE], as approved, after having been assessed by the Assessor on [ASSESS DATE] in accordance");
+    expect(dateSlots("conducted on May 25, 2026 to May 26, 2026, as approved, after having been assessed by the Assessor on May 26, 2026 in accordance").text).toBe("conducted on [START DATE] to [END DATE], as approved, after having been assessed by the Assessor on [ASSESS DATE] in accordance");
+  });
+  it("fills both the Issued line and the Date of Issue label when a page has both", () => {
+    const { fields: f, found } = layoutFromLines([
+      line("TRAINEES NAME", 214.8, 380.4, 581, 20, { bold: true }),
+      line("conducted on (Training Date), as approved by MARINA.", 56.6, 400, 418),
+      line("Issued this 25th day of May 2026 in the City of Manila, Philippines", 56.6, 405, 321),
+      line("Certificate No:", 56.6, 134, 139),
+      line("Registration No:", 56.6, 142, 125),
+      line("Date of Issue:", 56.6, 130, 111),
+    ], W, H);
+    expect(f?.issued?.text).toBe("Issued this ______ day of ________________ 20____ in the City of Manila, Philippines");
+    expect(f?.issueDate).toMatchObject({ y: 111, body: true });
+    expect(f?.issueDate?.x).toBeGreaterThan(130);
+    expect(f?.certNo?.x).toBeGreaterThan(134);
+    expect(found.filter((x) => x === "Issued Date")).toHaveLength(1);
+  });
 });
 
 describe("removing sample text", () => {
