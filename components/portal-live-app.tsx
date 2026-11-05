@@ -29,11 +29,12 @@ import { ClassroomPanel } from "./portal/classroom-panel";
 import { RequestActionModal, TraineeRequestModal, type RequestType } from "./portal/payment-actions";
 import { NO_REASON, REASONS, ReasonField, RejectInline, reasonReady, reasonText, type ReasonValue } from "./portal/reject-inline";
 import { MismoList } from "./portal/mismo-home";
+import { CompanyChargeReport } from "./portal/company-charge";
 import { MISMO_COURSE_CODES } from "@/lib/mismo";
 import { AssistantDashboard, ClassSchedules, ResourcePlanning, InstructorShortlist, GcashReconciliation, GcashNotInHistory } from "./portal/admin-assistant-home";
 import { RegistrationDeliveries } from "./portal/delivery-home";
 import { ReleasingReports, ReleasingCertificates, CertificateTemplates, AdminCertificateControls, AdminNumberFormats, CertificateAlarm, ReleasingNumbering } from "./portal/releasing-home";
-import { AccountingHome, ApprovalHistory, AccountingReportsHub, EndorsedSalesReport, FinanceSummaryReport, BillingStatementReport, AccountingPayments, AccountingDocuments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
+import { AccountingHome, ApprovalHistory, AccountingReportsHub, EndorsedSalesReport, FinanceSummaryReport, AccountingPayments, AccountingDocuments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { InstructionsButton } from "./portal/instructions-window";
 import { AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
@@ -45,7 +46,7 @@ import { ClassroomLinksImport, DefaultRoomsPanel } from "./portal/admin-setup";
 import { AdminHome, AdminSearchTrainee, AdminEnrollments, AdminVouchers, AdminHolidays } from "./portal/admin-home";
 import { askText, askConfirm, showAlert } from "./portal/dialogs";
 
-type Module = "Form numbers" | "Classroom links" | "Post-tests" | "Training instructions" | "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Daily summary" | "Opening and closing" | "Expenses summary" | "Templates" | "Certificate controls" | "Delivery requests" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Billing statement" | "Sales from endorsed courses" | "MISMO List" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
+type Module = "Form numbers" | "Classroom links" | "Post-tests" | "Training instructions" | "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Daily summary" | "Opening and closing" | "Expenses summary" | "Templates" | "Certificate controls" | "Delivery requests" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Company Charge" | "Sales from endorsed courses" | "MISMO List" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; training_mode?:string; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -151,13 +152,13 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   admin_assistant: ["Dashboard","Batch schedules","Resource planning","Instructors","Reconciliation"],
   hr: [],
   // Admin (owner, 3 Nov 2026): Dashboard · Enrollments ▾ · Schedules ▾ · Reports ▾ · MISMO ▾ · Configuration ▾ (ADMIN_TABS).
-  admin: ["Dashboard","Search trainee","Enrollments","Batch schedules","Resource planning","Courses","Post-tests","Training instructions","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Holidays","Requests","Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Billing statement","MISMO List"],
+  admin: ["Dashboard","Search trainee","Enrollments","Batch schedules","Resource planning","Courses","Post-tests","Training instructions","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Holidays","Requests","Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Company Charge","MISMO List"],
   // Cashier (Accounting Officer), owner's menu of 7 Oct 2026, shown as top tabs:
   // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses, Requests ·
   // Reports ▾ Daily Summary, Opening and Closing, Expenses Summary (CASHIER_TABS; reports consolidated 5 Nov 2026).
   cashier: ["Dashboard","Search trainee","Batch schedules","Payments","Other income","Expenses","Requests","Daily summary","Opening and closing","Expenses summary"],
   // Accounting (owner, 8 Oct 2026): Dashboard · Approvals · Transactions ▾ · Reports ▾ · Configuration ▾ (ACCOUNTING_TABS; reports consolidated 5 Nov 2026).
-  accounting: ["Dashboard","Search trainee","Approvals","Payments","Other income","Expenses","Payables","Cash and sales summary","Sales from endorsed courses","Billing statement","Receivables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
+  accounting: ["Dashboard","Search trainee","Approvals","Payments","Other income","Expenses","Payables","Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
 };
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
@@ -179,7 +180,7 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   {label:"MISMO List",icon:"▤",roles:["mismo_officer","admin"],group:"Work"},{label:"Batch schedules",icon:"□",roles:["admin_assistant","registration","cashier","mismo_officer","admin"],group:"Work"},{label:"Resource planning",icon:"▢",roles:["admin_assistant","admin"],group:"Work"},{label:"Instructors",icon:"♙",roles:["admin_assistant","admin"],group:"Work"},{label:"Reconciliation",icon:"✓",roles:["admin_assistant","admin"],group:"Work"},
   {label:"Certificate controls",icon:"№",roles:["admin"],group:"Configuration"},
   {label:"Employee accounts",icon:"⚙",roles:["admin"],group:"Configuration"},{label:"Classrooms",icon:"▢",roles:["admin"],group:"Configuration"},{label:"Certifications",icon:"№",roles:["admin"],group:"Configuration"},{label:"Holidays",icon:"▦",roles:["admin"],group:"Configuration"},
-  {label:"Daily summary report",icon:"∑",roles:["admin"],group:"Records"},{label:"Receipts and TARs",icon:"▤",roles:["admin","accounting"],group:"Records"},{label:"Cash and sales summary",icon:"∑",roles:["admin","accounting"],group:"Records"},{label:"Sales from endorsed courses",icon:"∑",roles:["admin","accounting"],group:"Records"},{label:"Billing statement",icon:"∑",roles:["admin","accounting"],group:"Records"},
+  {label:"Daily summary report",icon:"∑",roles:["admin"],group:"Records"},{label:"Receipts and TARs",icon:"▤",roles:["admin","accounting"],group:"Records"},{label:"Cash and sales summary",icon:"∑",roles:["admin","accounting"],group:"Records"},{label:"Sales from endorsed courses",icon:"∑",roles:["admin","accounting"],group:"Records"},{label:"Company Charge",icon:"∑",roles:["admin","accounting"],group:"Records"},
   {label:"Endorsed courses",icon:"◇",group:"Configuration"},{label:"Configuration",icon:"⚙",roles:["admin"],group:"Configuration"},
   // Accounting › Configuration ▾: one dropdown item per section (owner, 7 Oct 2026).
   ...ACCOUNTING_CONFIG_SECTIONS.map(label=>({label,icon:"⚙",roles:["accounting"],group:"Configuration" as NavGroup})),
@@ -209,7 +210,7 @@ const ACCOUNTING_TABS:TopTab[]=[
   {label:"Search Trainee",items:["Search trainee"]},
   {label:"Approvals",items:["Approvals"]},
   {label:"Transactions",items:["Payments","Other income","Expenses","Payables"]},
-  {label:"Reports",items:["Cash and sales summary","Sales from endorsed courses","Billing statement","Receivables","Cash position"]},
+  {label:"Reports",items:["Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position"]},
   {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS]},
 ];
 const RELEASING_TABS:TopTab[]=[{label:"Certificates",items:["Certificates"]},{label:"Reports",items:["Reports"]}];
@@ -218,7 +219,7 @@ const ADMIN_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
   {label:"Enrollments",items:["Search trainee","Enrollments","Requests"]},
   {label:"Schedules",items:["Batch schedules","Resource planning"]},
-  {label:"Reports",items:["Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Billing statement"]},
+  {label:"Reports",items:["Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Company Charge"]},
   {label:"MISMO List",items:["MISMO List"]},
   {label:"Configuration",items:["Courses","Post-tests","Training instructions","Classroom links","Instructors","Classrooms","Certifications","Holidays","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Employee accounts","Partnered Centers"],
     heads:{Courses:"Training","Schedule of fees":"Fees and Accounts","Employee accounts":"People and Partners"}},
@@ -424,7 +425,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Holidays")return <AdminHolidays data={data} reload={reload}/>;
     if(active==="Cash and sales summary")return <FinanceSummaryReport/>;
     if(active==="Sales from endorsed courses")return <EndorsedSalesReport/>;
-    if(active==="Billing statement")return <BillingStatementReport/>;
+    if(active==="Company Charge")return <CompanyChargeReport data={data} reload={reload}/>;
     if(active==="Receipts and TARs")return <AccountingDocuments/>;
     if(active==="Daily summary report")return <><CashierSummaryReport data={data}/><div className="portal-page" style={{paddingTop:0}}><AdminVouchers/></div></>;
   }
@@ -452,7 +453,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Approvals")return <div className="portal-page cx ac"><div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Approvals</h1></div></div><ApprovalHistory data={data} go={m=>go(m as Module)}/></div>;
     if(active==="Cash and sales summary")return <AccountingReportsHub/>;
     if(active==="Sales from endorsed courses")return <EndorsedSalesReport/>;
-    if(active==="Billing statement")return <BillingStatementReport/>;
+    if(active==="Company Charge")return <CompanyChargeReport data={data} reload={reload}/>;
     if(active==="Search trainee")return <Trainees data={data} query={query} reload={reload} role={gateRole}/>;
     if(active==="Payments")return <AccountingPayments/>;
     if(active==="Receipts and TARs")return <AccountingDocuments/>;

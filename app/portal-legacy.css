@@ -2821,3 +2821,16 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .pv-icon svg { width: 15px; height: 15px; }
 .nw-shell .pv-icon.d { color: var(--nw-bad); border-color: #efc9c4; }
 .nw-shell .pv-icon[disabled] { opacity: .5; cursor: not-allowed; }
+
+/* Company Charge, Design 1 (owner, 5 Nov 2026) */
+.nw-shell .cc-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+.nw-shell .cc-tile { background: #fff; border: 1px solid var(--nw-line); border-radius: 10px; padding: 9px 12px; min-width: 0; }
+.nw-shell .cc-tile span { display: block; font-size: 13px; font-weight: 600; color: var(--nw-muted); }
+.nw-shell .cc-tile b { font: 600 17px var(--font-num), monospace; font-variant-numeric: tabular-nums; }
+.nw-shell .cc-tile.hot b { color: var(--nw-bad); }
+.nw-shell .cc-tile.ok b { color: var(--nw-good); }
+.nw-shell .cc-tools { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid var(--nw-line); }
+.nw-shell .cc-sort { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--nw-muted); }
+.nw-shell .cc-sort select { height: 34px; border: 1px solid #cfdbe3; border-radius: 8px; padding: 0 10px; background: #fff; color: var(--nw-fg); font-size: 14px; }
+.nw-shell .cc-link { color: var(--nw-blue); font-weight: 600; white-space: nowrap; }
+@media (max-width: 640px) { .nw-shell .cc-tiles { grid-template-columns: minmax(0, 1fr); } }

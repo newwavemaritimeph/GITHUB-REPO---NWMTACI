@@ -6,7 +6,8 @@ import { instructionCategoryOf, type InstructionCategory } from "@/lib/instructi
  * Cash and Sales Summary (owner, 21 Oct 2026): cash received, disbursements and
  * sales, split Endorsed Courses (Other STCW courses at partnered centers) vs New
  * Wave Courses (owner, 5 Nov 2026: Total Sales first, then New Wave by category,
- * then Endorsed by center). Cash by date received / released; sales by training date.
+ * then Endorsed by center). Cash by date received / released; sales by training date, except Company Charge,
+ * which counts on the day the company paid, for what it paid (owner, 5 Nov 2026).
  */
 
 export type Side = "E" | "D";
@@ -18,7 +19,7 @@ export const ENDORSEMENT_REBATE = "Endorsement Rebate";
 export type PaymentIn = { amount: number; channel: string; allocations: { amount: number; endorsement: boolean }[] };
 export type IncomeIn = { amount: number; channel: string; source: string };
 export type ExpenseIn = { amount: number; channel: string | null; category: string };
-export type SaleIn = { endorsement: boolean; code: string; name: string; center: string; price: number; payable: number; rebate: number; share: number; charges: number; discounts: number; collected: number; rebateReceived: number; category?: InstructionCategory };
+export type SaleIn = { endorsement: boolean; code: string; name: string; center: string; price: number; payable: number; rebate: number; share: number; charges: number; discounts: number; collected: number; rebateReceived: number; category?: InstructionCategory; companyCharge?: boolean };
 export type SalesLine = { trainees: number; fees: number; charges: number; discounts: number; sales: number; collected: number; balance: number };
 
 /** Course fees plus charges less discounts, with what was collected (never more than the sale) and what is still owed. */
@@ -79,6 +80,7 @@ export function summarize(input: { payments: PaymentIn[]; income: IncomeIn[]; ex
   return {
     received, disbursed,
     totalSales: salesLine(input.sales),
+    companyCharge: salesLine(input.sales.filter((s) => s.companyCharge)),
     direct: { categories, ...directTotals, expenses: directExpenses, margin: directTotals.sales - directExpenses },
     endorsement: { centers, ...salesLine(endorsed), payable: add(endorsed, (s) => s.payable), rebate, received: rebateIn, share, keeps: rebate - share, rebateDue: rebate - rebateIn },
   };
@@ -114,20 +116,32 @@ export async function buildFinanceSummary(db: Admin, period: Period, end: string
 
   // Sales by training date: batch start, else the scheduled date (partnered centers).
   const batches = await all<{ id: string }>((a, b) => db.from("batches").select("id").gte("starts_on", from).lte("starts_on", to).range(a, b));
-  type Enr = { id: string; partner_offer_id: string | null; selling_price_centavos: number; partner_payable_centavos: number | null; rebate_centavos: number | null; agency_share_centavos?: number | null; enrollment_status: string; courses: { code: string; name: string; course_categories?: { name: string } | { name: string }[] | null } | { code: string; name: string; course_categories?: { name: string } | { name: string }[] | null }[] | null; partner_course_offers: { partner_centers: { name: string } | { name: string }[] | null } | { partner_centers: { name: string } | { name: string }[] | null }[] | null };
-  const cols = "id,partner_offer_id,selling_price_centavos,partner_payable_centavos,rebate_centavos,agency_share_centavos,enrollment_status,courses(code,name,course_categories(name)),partner_course_offers(partner_centers(name))";
+  type Enr = { id: string; partner_offer_id: string | null; selling_price_centavos: number; partner_payable_centavos: number | null; rebate_centavos: number | null; agency_share_centavos?: number | null; enrollment_status: string; company_charge_agency_id?: string | null; courses: { code: string; name: string; course_categories?: { name: string } | { name: string }[] | null } | { code: string; name: string; course_categories?: { name: string } | { name: string }[] | null }[] | null; partner_course_offers: { partner_centers: { name: string } | { name: string }[] | null } | { partner_centers: { name: string } | { name: string }[] | null }[] | null };
+  const cols = "id,partner_offer_id,selling_price_centavos,partner_payable_centavos,rebate_centavos,agency_share_centavos,enrollment_status,company_charge_agency_id,courses(code,name,course_categories(name)),partner_course_offers(partner_centers(name))";
   const enrolled: Enr[] = [];
-  const pick = async (q: (c: string) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>) => {
+  const pick = async (q: (c: string) => PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>, into: Enr[] = enrolled) => {
     let r = await q(cols);
     if (r.error && /agency_share/.test(r.error.message)) r = await q(cols.replace("agency_share_centavos,", ""));
     // A failed read must show as an error: a short report that looks complete would mislead Accounting.
     if (r.error) throw new Error(r.error.message);
-    enrolled.push(...((r.data ?? []) as Enr[]));
+    into.push(...((r.data ?? []) as Enr[]));
   };
   for (const ids of chunks(batches.map((b) => b.id))) await pick((c) => db.from("enrollments").select(c).in("batch_id", ids).neq("enrollment_status", "Cancelled"));
   await pick((c) => db.from("enrollments").select(c).is("batch_id", null).gte("scheduled_on", from).lte("scheduled_on", to).neq("enrollment_status", "Cancelled").limit(5000));
 
-  const ids = enrolled.map((e) => e.id);
+  // Company Charge counts on the day the company paid, for what it paid, not on the training date.
+  const onDate = enrolled.filter((e) => !e.company_charge_agency_id);
+  const companyPays = await all<{ payment_ids: string[] | null }>((a, b) => db.from("company_payments").select("payment_ids").gte("received_at", startOf(from)).lte("received_at", endOf(to)).order("received_at").range(a, b));
+  const companyPaid = new Map<string, number>();
+  for (const part of chunks(companyPays.flatMap((c) => c.payment_ids ?? []))) {
+    const { data, error } = await db.from("payment_allocations").select("enrollment_id,amount_centavos,payments!inner(valid)").in("payment_id", part).eq("payments.valid", true);
+    if (error) throw new Error(error.message);
+    for (const a of (data ?? []) as { enrollment_id: string; amount_centavos: number }[]) companyPaid.set(a.enrollment_id, (companyPaid.get(a.enrollment_id) ?? 0) + Number(a.amount_centavos));
+  }
+  const companyEnrolled: Enr[] = [];
+  for (const part of chunks([...companyPaid.keys()])) await pick((c) => db.from("enrollments").select(c).in("id", part), companyEnrolled);
+
+  const ids = onDate.map((e) => e.id);
   const charges = new Map<string, { charge: number; discount: number }>(), collected = new Map<string, number>(), rebateIn = new Map<string, number>();
   for (const part of chunks(ids)) {
     const [ch, al, rb] = await Promise.all([
@@ -144,7 +158,7 @@ export async function buildFinanceSummary(db: Admin, period: Period, end: string
     payments: pays.map((p) => ({ amount: Number(p.amount_centavos), channel: p.method, allocations: (p.payment_allocations ?? []).map((a) => ({ amount: Number(a.amount_centavos), endorsement: !!one(a.enrollments)?.partner_offer_id })) })),
     income: income.map((i) => ({ amount: Number(i.amount_centavos), channel: i.channel, source: i.source })),
     expenses: expenses.map((e) => ({ amount: Number(e.amount_centavos), channel: e.payment_channel, category: e.category })),
-    sales: enrolled.map((e) => { const c = one(e.courses), t = charges.get(e.id); return { endorsement: !!e.partner_offer_id, category: instructionCategoryOf(c?.code, one(c?.course_categories)?.name), code: c?.code ?? "—", name: c?.name ?? "", center: one(one(e.partner_course_offers)?.partner_centers)?.name ?? "Partnered center", price: Number(e.selling_price_centavos ?? 0), payable: Number(e.partner_payable_centavos ?? 0), rebate: Number(e.rebate_centavos ?? 0), share: Number(e.agency_share_centavos ?? 0), charges: t?.charge ?? 0, discounts: t?.discount ?? 0, collected: collected.get(e.id) ?? 0, rebateReceived: rebateIn.get(e.id) ?? 0 }; }),
+    sales: [...companyEnrolled.map((e) => { const c = one(e.courses), amount = companyPaid.get(e.id) ?? 0; return { companyCharge: true, endorsement: !!e.partner_offer_id, category: instructionCategoryOf(c?.code, one(c?.course_categories)?.name), code: c?.code ?? "—", name: c?.name ?? "", center: one(one(e.partner_course_offers)?.partner_centers)?.name ?? "Partnered center", price: amount, payable: 0, rebate: 0, share: 0, charges: 0, discounts: 0, collected: amount, rebateReceived: 0 }; }), ...onDate.map((e) => { const c = one(e.courses), t = charges.get(e.id); return { endorsement: !!e.partner_offer_id, category: instructionCategoryOf(c?.code, one(c?.course_categories)?.name), code: c?.code ?? "—", name: c?.name ?? "", center: one(one(e.partner_course_offers)?.partner_centers)?.name ?? "Partnered center", price: Number(e.selling_price_centavos ?? 0), payable: Number(e.partner_payable_centavos ?? 0), rebate: Number(e.rebate_centavos ?? 0), share: Number(e.agency_share_centavos ?? 0), charges: t?.charge ?? 0, discounts: t?.discount ?? 0, collected: collected.get(e.id) ?? 0, rebateReceived: rebateIn.get(e.id) ?? 0 }; })],
   });
   return { period, end, from, to, title: periodTitle(period, end), ...result };
 }

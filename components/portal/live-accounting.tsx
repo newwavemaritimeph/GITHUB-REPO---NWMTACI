@@ -1,6 +1,7 @@
 "use client";
 
 import { FormNumbers, type DocumentControlRow } from "./form-numbers";
+import { ServiceInvoiceSetup } from "./company-charge";
 import { Fragment, useState } from "react";
 import { parseCsv, downloadCsv } from "@/lib/csv";
 import { pesos, first as one, dueCentavos as dueOf } from "@/lib/portal-format";
@@ -1672,7 +1673,7 @@ export function AccountingConfiguration({ section, data, reload }: { section: Ac
       onAdd={(v) => post({ action: "income-category-save", name: v.name.trim() })}
       onRemove={(r) => post({ action: "income-category-save", id: r.id, name: r.values.name, remove: true })} />}
     {section === "Partnered Centers" && <PartnersModule data={data} busy={busy} post={post} />}
-    {section === "Form numbers" && <FormNumbers rows={data.documentControls ?? []} busy={busy} post={post} />}
+    {section === "Form numbers" && <><ServiceInvoiceSetup busy={busy} post={post} /><FormNumbers rows={data.documentControls ?? []} busy={busy} post={post} /></>}
     {section === "Courses" && <CoursesModule data={data} busy={busy} post={post} reload={reload} />}
     {section === "Expense categories" && <ConfigMatrix title="Expense Categories" entity="category" busy={busy}
       cols={[{ key: "name", label: "Category", kind: "text", placeholder: "e.g. Office Supplies" }]}

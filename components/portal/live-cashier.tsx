@@ -223,38 +223,52 @@ const Who = ({ name, number }: { name: string; number?: string }) => <><span cla
 const payState = (e: Enrollment) => (e.enrollment_status === "Cancelled" ? "Cancelled" : balanceOf(e) === 0 ? "Paid" : paidOf(e) > 0 ? "Partially paid" : "Unpaid");
 const PAY_TONE: Record<string, string> = { Paid: "active", "Partially paid": "orange", Unpaid: "red", Cancelled: "cancelled", "Company Charge": "pending" };
 
-/** Company Charge (owner, 29 Oct 2026): one payment for a partner's whole Billing Statement, one receipt to the company. */
-function CompanyPaymentModal({ data, reload, onClose }: { data: PortalData; reload: () => Promise<void>; onClose: () => void }) {
+/** Company Charge (owner, 29 Oct 2026; 5 Nov 2026): one payment for a partner's Billing Statement, with its proof, and one Service Invoice to the company. */
+export function CompanyPaymentModal({ data, reload, onClose, initialId }: { data: PortalData; reload: () => Promise<void>; onClose: () => void; initialId?: string }) {
   const open = (data.billingStatements ?? []).filter((b) => b.paid_centavos < b.total_centavos);
-  const [id, setId] = useState(open[0]?.id ?? "");
+  const [id, setId] = useState(initialId ?? open[0]?.id ?? "");
   const st = open.find((b) => b.id === id);
   const left = st ? st.total_centavos - st.paid_centavos : 0;
   const [amount, setAmount] = useState(left ? (left / 100).toFixed(2) : "");
   const modes = modeNames(data);
   const [method, setMethod] = useState(modes.find((m) => m !== "Cash") ?? modes[0] ?? "Cash"), [reference, setReference] = useState("");
   const [receivedAt, setReceivedAt] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
-  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [done, setDone] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false), [error, setError] = useState(""), [done, setDone] = useState<string | null>(null), [proofFile, setProofFile] = useState<File | null>(null), [invoice, setInvoice] = useState<{ id?: string; number?: string; error?: string } | null>(null);
   const cents = toCentavos(amount), needRef = needsReference(data, method);
-  const valid = !!st && cents > 0 && cents <= left && (!needRef || reference.trim().length > 0);
+  const valid = !!st && cents > 0 && cents <= left && (!needRef || (reference.trim().length > 0 && !!proofFile));
   async function save() {
     setBusy(true); setError("");
-    try { const r = await submit({ action: "company-payment", billingStatementId: id, amountCentavos: cents, method, referenceNumber: reference.trim(), receivedAt: new Date(receivedAt).toISOString() }) as { companyPaymentId?: string }; setDone(r.companyPaymentId ?? ""); await reload(); }
+    try {
+      let proofId: string | undefined;
+      if (needRef && proofFile && st) {
+        const form = new FormData();
+        form.append("proof", await shrinkProof(proofFile)); form.append("companyName", st.bill_to); form.append("mode", method); form.append("receivedAt", new Date(receivedAt).toISOString()); form.append("reference", reference.trim());
+        const res = await fetch("/api/staff/payment-proofs/drive", { method: "POST", body: form });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error ?? "Could not save the proof to Google Drive.");
+        proofId = body.proofId;
+      }
+      const r = await submit({ action: "company-payment", billingStatementId: id, amountCentavos: cents, method, referenceNumber: reference.trim(), receivedAt: new Date(receivedAt).toISOString(), proofId }) as { companyPaymentId?: string; invoice?: { id?: string; number?: string; error?: string } };
+      setInvoice(r.invoice ?? null); setDone(r.companyPaymentId ?? ""); await reload();
+    }
     catch (e) { setError(e instanceof Error ? e.message : "Could not record the payment."); } finally { setBusy(false); }
   }
   const range = (b: NonNullable<typeof st>) => `${fmtDate(b.coverage_from)} – ${fmtDate(b.coverage_to)}`;
   if (done !== null) return <Modal title="Company Payment Recorded" onClose={onClose}><div className="portal-form">
-    <div className="full"><Message kind="success" text={`${pesos(cents)} received from ${st?.bill_to ?? "the company"} · applied to its trainees.`} /></div>
-    <div className="portal-form-actions full">{done && <a className="portal-primary" href={`/api/documents/company-receipt/${done}`} target="_blank" rel="noreferrer">Print Company Receipt</a>}<button type="button" className="portal-secondary" onClick={onClose}>Done</button></div>
+    <div className="full"><Message kind="success" text={`${pesos(cents)} received from ${st?.bill_to ?? "the company"} · applied to its trainees and counted as sales on the date paid.`} /></div>
+    {invoice?.error && <div className="full"><Message kind="error" text={`The payment is recorded, but the Service Invoice was not issued: ${invoice.error} Issue it from Company Charge › Paid.`} /></div>}
+    <div className="portal-form-actions full">{invoice?.id && <a className="portal-primary" href={`/api/documents/service-invoice/${invoice.id}`} target="_blank" rel="noreferrer">Print Service Invoice {invoice.number}</a>}<button type="button" className="portal-secondary" onClick={onClose}>Done</button></div>
   </div></Modal>;
   return <Modal title="Record Company Payment" onClose={onClose}><div className="portal-form">
     {error && <div className="full"><Message kind="error" text={error} /></div>}
     <label className="full">Billing Statement<select value={id} onChange={(e) => { setId(e.target.value); const b = open.find((x) => x.id === e.target.value); setAmount(b ? ((b.total_centavos - b.paid_centavos) / 100).toFixed(2) : ""); }}>{open.map((b) => <option key={b.id} value={b.id}>BS No. {String(b.bs_number).padStart(6, "0")} · {b.bill_to} · {range(b)} · {pesos(b.total_centavos - b.paid_centavos)} left</option>)}</select></label>
     <label>Amount Received (₱)<input inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} />{cents > left && <small className="field-error">More than the {pesos(left)} left on this statement.</small>}</label>
-    <label>Received At<input type="datetime-local" value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} /></label>
+    <label>Date Paid<input type="datetime-local" value={receivedAt} onChange={(e) => setReceivedAt(e.target.value)} /></label>
     <div className="full"><span className="pay-label">Mode of Payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{modes.map((m) => <button type="button" role="radio" aria-checked={method === m} key={m} className={method === m ? "on" : ""} onClick={() => setMethod(m)}>{m}</button>)}</div></div>
     {needRef && <label className="full">Reference No.<input value={reference} onChange={(e) => setReference(e.target.value.toUpperCase())} placeholder="Bank or e-wallet reference" /></label>}
-    <p className="portal-form-note full">The amount is applied to the statement&apos;s trainees in order. Each trainee gets a receipt, and one Acknowledgement Receipt goes to the company.</p>
-    <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !valid} onClick={() => void save()}>{busy ? "Recording…" : "Record and Issue Receipt"}</button></div>
+    {needRef && <label className="full">Proof of Payment (Photo or PDF)<input type="file" accept="image/*,application/pdf" onChange={(e) => setProofFile(e.target.files?.[0] ?? null)} /></label>}
+    <p className="portal-form-note full">The amount is applied to the statement&apos;s trainees in order and counts as sales on the date paid. One Service Invoice goes to the company.</p>
+    <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !valid} onClick={() => void save()}>{busy ? "Recording…" : "Record and Issue Invoice"}</button></div>
   </div></Modal>;
 }
 

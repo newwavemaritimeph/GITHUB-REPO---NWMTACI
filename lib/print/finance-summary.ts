@@ -78,7 +78,7 @@ export async function createFinanceSummaryPdf(s: Summary, printed: string, contr
   const band2 = (label: string) => { need(14); page.drawRectangle({ x: M, y: y - 4, width: IW, height: 14, color: soft }); text(label.toUpperCase(), M + 5, 6.8, bold, muted); y -= 14; };
 
   // 1. Sales Summary.
-  section("Sales Summary", "By Training Date");
+  section("Sales Summary", "By Training Date - Company Charge by Date Paid");
   const share = (v: number) => (s.totalSales.sales ? `${Math.round((v / s.totalSales.sales) * 100)}% of Total Sales` : "No Sales in This Period");
   const trainees = (n: number) => `${n} Trainee${n === 1 ? "" : "s"}`;
   tiles([
@@ -93,6 +93,7 @@ export async function createFinanceSummaryPdf(s: Summary, printed: string, contr
   cellsRow("Sales from Endorsed Courses", saleCells(s.endorsement), SALE_EDGES, { strong: true, fill: soft, bar: orange });
   for (const c of s.endorsement.centers) cellsRow(c.name, saleCells(c), SALE_EDGES, { indent: true });
   if (!s.endorsement.centers.length) { text("No Endorsed Training in This Period", M + 14, 7.8, reg, muted); y -= 14; }
+  cellsRow("Of Which Company Charge, by Date Paid", saleCells(s.companyCharge), SALE_EDGES, { indent: true });
   y -= 2;
   text("Sales from Endorsed Courses are shown in full; most of the amount is remitted to the partnered centers. New Wave's own income from them is the Net Rebate Income.", M, 6.4, reg, muted);
   y -= 18;

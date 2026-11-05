@@ -1,9 +1,8 @@
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 /**
- * Billing Statement (owner, 22 Oct 2026): every enrollment referred by an agency or
- * consultancy, by date enrolled within the coverage, at the full training fee (the
- * referral rebate is not taken off), with the training status.
+ * Billing Statement (owner, 22 Oct 2026; 5 Nov 2026): every enrollment on Company Charge,
+ * by date enrolled within the coverage, at the full training fee, with the training status.
  */
 export type BillingRow = { enrollmentId?: string; enrolled: string; name: string; training: string; status: string; amount: number };
 export type BillingStatement = { bsNumber: string; date: string; billTo: string; kind: string; coverage: string; rows: BillingRow[]; total: number };
@@ -30,19 +29,19 @@ const chunks = <T,>(xs: T[], n = 200) => Array.from({ length: Math.ceil(xs.lengt
 /** Partners that referred anyone enrolled in the coverage, with their rows (one statement each). */
 export async function buildBillingRows(db: Admin, from: string, to: string) {
   const today = manilaDay(new Date().toISOString());
-  type Enr = { id: string; created_at: string; enrolled_at?: string | null; selling_price_centavos: number; scheduled_on: string | null; referral_agency_id: string | null;
+  type Enr = { id: string; created_at: string; enrolled_at?: string | null; selling_price_centavos: number; scheduled_on: string | null; referral_agency_id: string | null; company_charge_agency_id: string | null;
     courses: { code: string } | { code: string }[] | null; batches: { starts_on: string; ends_on: string } | { starts_on: string; ends_on: string }[] | null;
     trainees: { legal_first_name: string; legal_last_name: string; marketing_agency_id: string | null } | { legal_first_name: string; legal_last_name: string; marketing_agency_id: string | null }[] | null };
   const rows: Enr[] = [];
   for (let a = 0; a < 20000; a += 1000) {
-    const { data, error } = await db.from("enrollments").select("id,created_at,selling_price_centavos,scheduled_on,referral_agency_id,courses(code),batches(starts_on,ends_on),trainees(legal_first_name,legal_last_name,marketing_agency_id)")
+    const { data, error } = await db.from("enrollments").select("id,created_at,selling_price_centavos,scheduled_on,referral_agency_id,company_charge_agency_id,courses(code),batches(starts_on,ends_on),trainees(legal_first_name,legal_last_name,marketing_agency_id)")
       .neq("enrollment_status", "Cancelled").gte("created_at", `${from}T00:00:00+08:00`).lte("created_at", `${to}T23:59:59.999+08:00`).order("created_at").range(a, a + 999);
     if (error) throw error;
     rows.push(...((data ?? []) as unknown as Enr[]));
     if ((data ?? []).length < 1000) break;
   }
-  // Each course has its own partner (owner, 3 Nov 2026); the trainee's earlier partner does not carry over.
-  const agencyOf = (e: Enr) => e.referral_agency_id ?? null;
+  // Only trainees on Company Charge are billed to the company (owner, 5 Nov 2026).
+  const agencyOf = (e: Enr) => e.company_charge_agency_id ?? null;
   const referred = rows.filter((e) => agencyOf(e));
   // The full fee keeps charges and other discounts (e.g. the CCI Package discount); only the referral rebate is left out.
   const extra = new Map<string, number>();

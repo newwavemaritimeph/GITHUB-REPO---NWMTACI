@@ -652,7 +652,7 @@ export function FinanceSummaryReport({ switcher }: { switcher?: ReactNode }) {
       {s && <span className="pd-label"><b>{s.title}</b> · {fmtDate(s.from)} – {fmtDate(s.to)}</span>}</div>
     {error && <Message kind="error" text={error} />}
     {!s ? !error && <p className="portal-empty-copy">Loading the summary…</p> : <>
-      <div className="fs-section"><h2>Sales Summary</h2><small>By Training Date</small></div>
+      <div className="fs-section"><h2>Sales Summary</h2><small>By Training Date · Company Charge by Date Paid</small></div>
       <div className="cx-tiles ac-tiles fs-tiles">
         <div className="cx-tile fs-tile" style={{ ["--c" as string]: "#123F63" }}><span>Total Sales</span><b>{pesos2(s.totalSales.sales)}</b><small>{trainees(s.totalSales.trainees)}</small></div>
         <div className="cx-tile fs-tile" style={{ ["--c" as string]: "#0571D0" }}><span>Sales from New Wave Courses</span><b>{pesos2(s.direct.sales)}</b><small>{trainees(s.direct.trainees)} · {share(s.direct.sales)}</small></div>
@@ -665,6 +665,7 @@ export function FinanceSummaryReport({ switcher }: { switcher?: ReactNode }) {
         <tr className="fs-lvl1" style={{ ["--c" as string]: "#F25615" }}><td>Sales from Endorsed Courses</td>{saleCells(s.endorsement)}</tr>
         {s.endorsement.centers.map((c) => <tr key={c.name} className="fs-sub"><td>{c.name}</td>{saleCells(c)}</tr>)}
         {!s.endorsement.centers.length && none(8, "No Endorsed Training in This Period")}
+        <tr className="fs-sub"><td>Of Which Company Charge, by Date Paid</td>{saleCells(s.companyCharge)}</tr>
       </tbody></table></div><p className="ac-note">Sales from Endorsed Courses are shown in full, though most of the amount is remitted to the partnered centers. New Wave&apos;s own income from them is the Net Rebate Income below.</p></section>
 
       <div className="fs-section"><h2>Sales from New Wave Courses</h2></div>
@@ -716,7 +717,7 @@ const firstOfMonth = (d: string) => `${d.slice(0, 8)}01`;
  * Billing Statement (owner, 22 Oct 2026): per agency or consultancy (dropdown), the trainees
  * enrolled in the coverage at the full fee with their training status; Print PDF issues the BS No.
  */
-export function BillingStatementReport({ switcher }: { switcher?: ReactNode }) {
+export function BillingStatementReport({ switcher, onBack }: { switcher?: ReactNode; onBack?: () => void }) {
   const today = manilaToday();
   const [from, setFrom] = useState(firstOfMonth(today)), [to, setTo] = useState(today), [agency, setAgency] = useState("");
   // Amounts Accounting types before issuing (owner, 29 Oct 2026: partners have their own pricelists); a void lets a corrected one be issued.
@@ -749,12 +750,12 @@ export function BillingStatementReport({ switcher }: { switcher?: ReactNode }) {
   }
   const groups = (["Agency", "Consultancy"] as const).map((k) => [k, list.filter((x) => (x.kind === "Consultancy" ? "Consultancy" : "Agency") === k)] as const).filter(([, xs]) => xs.length);
   return <div className="portal-page cx ac">
-    <div className="cx-head"><div><span className="portal-eyebrow">Accounting · Reports</span><h1>Billing Statement</h1></div>
-      <div className="ac-controls">{st && (issued ? <><a className="portal-primary" href={pdfUrl} target="_blank" rel="noreferrer">Reprint PDF</a><button type="button" className="portal-secondary" disabled={busy} onClick={() => void voidIt()}>Void Statement</button></> : <button type="button" className="portal-primary" disabled={busy || !st.rows.length} onClick={() => void issue()}>{busy ? "Issuing…" : "Issue and Print PDF"}</button>)}</div></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting · Company Charge</span><h1>Issue Statement</h1></div>
+      <div className="ac-controls">{onBack && <button type="button" className="portal-secondary" onClick={onBack}>Back to Company Charge</button>}{st && (issued ? <><a className="portal-primary" href={pdfUrl} target="_blank" rel="noreferrer">Reprint PDF</a><button type="button" className="portal-secondary" disabled={busy} onClick={() => void voidIt()}>Void Statement</button></> : <button type="button" className="portal-primary" disabled={busy || !st.rows.length} onClick={() => void issue()}>{busy ? "Issuing…" : "Issue and Print PDF"}</button>)}</div></div>
     {switcher}
     <div className="pd-bar cs-bar">
       <label className="rp-who">Bill To<select value={st?.agencyId ?? ""} onChange={(e) => setAgency(e.target.value)} disabled={!list.length}>
-        {!list.length && <option value="">No referred enrollments</option>}
+        {!list.length && <option value="">No Company Charge Trainees</option>}
         {groups.map(([k, xs]) => <optgroup key={k} label={k === "Consultancy" ? "Consultancies" : "Agencies"}>{xs.map((x) => <option key={x.agencyId} value={x.agencyId}>{x.billTo}</option>)}</optgroup>)}
       </select></label>
       <label className="rp-who">From<input type="date" value={from} max={to} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label>
@@ -762,7 +763,7 @@ export function BillingStatementReport({ switcher }: { switcher?: ReactNode }) {
     </div>
     {error && <Message kind="error" text={error} />}
     {problem && <Message kind="error" text={problem} />}
-    {!data ? !error && <p className="portal-empty-copy">Loading…</p> : !st ? <p className="portal-empty-copy">No enrollments referred by an agency or consultancy in this coverage.</p> :
+    {!data ? !error && <p className="portal-empty-copy">Loading…</p> : !st ? <p className="portal-empty-copy">No trainees on Company Charge in this coverage.</p> :
       <section className="portal-panel cx-panel bs-sheet">
         <div className="bs-title"><h2>Billing Statement{issued ? ` · BS No. ${st.bsNumber}` : ""}</h2><span className="bs-form">Form No: NW-FMGR-04-24 · Issued Date: 12/03/2025</span></div>
         <table className="bs-info"><tbody><tr><td>Bill to:</td><td><b>{st.billTo}</b></td></tr><tr><td>Billing Coverage:</td><td>{fmtDate(from)} – {fmtDate(to)} (as per date enrolled)</td></tr></tbody></table>
@@ -770,7 +771,7 @@ export function BillingStatementReport({ switcher }: { switcher?: ReactNode }) {
           {st.rows.map((r, i) => <tr key={i}><td>{r.enrolled}</td><td>{r.name}</td><td>{r.training}</td><td className="bs-st">{r.status}</td><td className="fs-n">{!issued && r.enrollmentId ? <input className="rb3-amt" type="number" min="0" step="0.01" aria-label={`Amount for ${r.name}`} value={typed[r.enrollmentId] ?? (r.amount / 100).toFixed(2)} onChange={(e) => setTyped({ ...typed, [r.enrollmentId!]: e.target.value })} /> : pesos2(r.amount)}</td></tr>)}
           <tr className="fs-tot"><td colSpan={4}>Total · {st.rows.length} enrollment{st.rows.length === 1 ? "" : "s"}</td><td className="fs-n">{pesos2(issued ? st.total : total)}</td></tr>
         </tbody></table></div>
-        <p className="ac-note">{issued ? "Issued statements stay as printed. Void it to issue a corrected one with a new BS No." : "Type each amount from the partner's pricelist, then Issue and Print PDF. Company Charge trainees are billed at these amounts, and their balances follow."}</p>
+        <p className="ac-note">{issued ? "Issued statements stay as printed. Void it to issue a corrected one with a new BS No." : "Type each amount from the partner's pricelist, then Issue and Print PDF. These trainees are billed at these amounts, and their balances follow."}</p>
       </section>}
   </div>;
 }

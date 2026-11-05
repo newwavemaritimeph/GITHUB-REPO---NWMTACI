@@ -37,12 +37,13 @@ export async function GET(request: Request) {
   const sale = (label: string, r: SalesLine, bold = false) => { const row = add([label, r.trainees, peso(r.fees), peso(r.charges), peso(0 - r.discounts), peso(r.sales), peso(r.collected), peso(r.balance)], bold); row.getCell(2).numFmt = "0"; };
   add([`Cash and Sales Summary - ${s.title} (${s.from} to ${s.to})`], true);
   sheet.addRow([]);
-  head(["Sales Summary (by training date)", ...SALE_HEADS]);
+  head(["Sales Summary (by training date; Company Charge by date paid)", ...SALE_HEADS]);
   sale("Total Sales", s.totalSales, true);
   sale("Sales from New Wave Courses", s.direct, true);
   for (const c of s.direct.categories) sale(`  ${c.name}`, c);
   sale("Sales from Endorsed Courses", s.endorsement, true);
   for (const c of s.endorsement.centers) sale(`  ${c.name}`, c);
+  sale("  Of Which Company Charge, by Date Paid", s.companyCharge);
   sheet.addRow([]);
   head(["Sales from New Wave Courses", ...SALE_HEADS]);
   for (const c of s.direct.categories) {
