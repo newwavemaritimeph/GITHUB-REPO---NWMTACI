@@ -700,8 +700,9 @@ export async function GET(request: Request) {
 
   // Has anything changed (owner, 4 Nov 2026: "make it faster")? One small read for the portal's 10-second
   // refresh, so it reloads everything only when there is news. Null before 202610290074: it then reloads as before.
-  const changeStamp = async () => { const { data, error } = await db.rpc("portal_change_stamp"); return error ? null : (data as string | null); };
-  if (new URL(request.url).searchParams.has("stamp")) return NextResponse.json({ stamp: await changeStamp() });
+  let stampError = "";
+  const changeStamp = async () => { const { data, error } = await db.rpc("portal_change_stamp"); if (error) { stampError = error.message; console.error("portal_change_stamp failed:", error.message); return null; } return data as string | null; };
+  if (new URL(request.url).searchParams.has("stamp")) { const stamp = await changeStamp(); return NextResponse.json({ stamp, ...(stampError && isAdminRole(staff.roleCodes) ? { stampError } : {}) }); }
 
   // This Month (owner, 3 Nov 2026): every list opens on the current month and steps back month
   // by month, so records load from `since` (the 1st of this month unless the portal asks for an
