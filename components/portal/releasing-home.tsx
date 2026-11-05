@@ -759,6 +759,15 @@ function NumberFormats({ data, reload, settings }: { data: PortalData; reload: (
 
 /* ------------------------------------------------------------ certificate numbers (Admin) */
 
+/** Admin › Certifications › Certificate Numbers (owner, 5 Nov 2026). */
+export function AdminNumberFormats({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
+  const settings = (data as CertData & { certificateNumberSettings?: NumberSettings | null }).certificateNumberSettings;
+  return <div className="portal-page cx ac">
+    <div className="cx-head"><div><span className="portal-eyebrow">Admin</span><h1>Certificate Numbers</h1></div></div>
+    <NumberFormats data={data} reload={reload} settings={settings} />
+  </div>;
+}
+
 type NumberSettings = { reg_prefix: string; reg_last: number; reg_digits: number; set_at: string | null; reg_format?: string | null };
 type LegacyCert = { id: string; trainee_name: string; nwmtaci_number: string | null; course_code: string | null; enrollment_id: string | null; certificate_number: string | null; registration_number: string | null; issued_on: string | null; recorded_at: string };
 /**

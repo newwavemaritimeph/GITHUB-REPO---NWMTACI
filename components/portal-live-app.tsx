@@ -31,7 +31,7 @@ import { NO_REASON, REASONS, ReasonField, RejectInline, reasonReady, reasonText,
 import { MismoDashboard, MismoFinalList, MismoSubmissions } from "./portal/mismo-home";
 import { AssistantDashboard, ClassSchedules, ResourcePlanning, InstructorShortlist, GcashReconciliation, GcashNotInHistory } from "./portal/admin-assistant-home";
 import { RegistrationDeliveries, ReleasingDeliveries } from "./portal/delivery-home";
-import { ReleasingReports, ReleasingHome, CertificatesWorkspace, WaitingCertificates, CertificateTemplates, ReleasedCertificates, AdminCertificateControls, CertificateAlarm, ReleasingNumbering } from "./portal/releasing-home";
+import { ReleasingReports, ReleasingHome, CertificatesWorkspace, WaitingCertificates, CertificateTemplates, ReleasedCertificates, AdminCertificateControls, AdminNumberFormats, CertificateAlarm, ReleasingNumbering } from "./portal/releasing-home";
 import { AccountingHome, ApprovalHistory, AccountingReportsHub, EndorsedSalesReport, FinanceSummaryReport, BillingStatementReport, AccountingPayments, AccountingDocuments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { InstructionsButton } from "./portal/instructions-window";
@@ -516,8 +516,8 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
 /** Admin › Configuration › Certifications (owner, 20 Oct 2026): the Admin uploads templates, approves voids and revokes; numbering is the Releasing Officer's. */
 function AdminCertifications({data,reload}:{data:PortalData;reload:()=>Promise<void>}){
   const [tab,setTab]=useState("Certificate controls");
-  return <><div className="portal-page" style={{paddingBottom:0}}><div className="cx-status" role="tablist">{["Certificate controls","Certificate templates"].map(t=><button key={t} type="button" role="tab" aria-selected={tab===t} className={tab===t?"on":""} onClick={()=>setTab(t)}>{tcl(t)}</button>)}</div></div>
-    {tab==="Certificate templates"?<CertificateTemplates data={data} reload={reload}/>:<AdminCertificateControls data={data} reload={reload}/>}</>;
+  return <><div className="portal-page" style={{paddingBottom:0}}><div className="cx-status" role="tablist">{["Certificate controls","Certificate templates","Certificate numbers"].map(t=><button key={t} type="button" role="tab" aria-selected={tab===t} className={tab===t?"on":""} onClick={()=>setTab(t)}>{tcl(t)}</button>)}</div></div>
+    {tab==="Certificate templates"?<CertificateTemplates data={data} reload={reload}/>:tab==="Certificate numbers"?<AdminNumberFormats data={data} reload={reload}/>:<AdminCertificateControls data={data} reload={reload}/>}</>;
 }
 
 function InstructorAssignmentScreen({data,role,reload}:{data:PortalData;role:string;reload:()=>Promise<void>}){
