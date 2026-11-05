@@ -23,7 +23,7 @@ import { applyReferralRebates, pendingFullPaymentRebates, suggestReferralCode } 
 import { isStcwRebateCourse } from "@/lib/rebates";
 import { automaticEndDate, fitsInWeek, moveProblem } from "@/lib/scheduling";
 import { certificateContext, claimCertificateNumber, downloadDriveFile, ensureCertificate, trySendSoftCopy } from "@/lib/certificates";
-import { driveFileId, googleFormId, isStcwCategory, canSetSeries, releaseProblem, courseRemoveMode } from "@/lib/certificate-rules";
+import { formatProblem, driveFileId, googleFormId, isStcwCategory, canSetSeries, releaseProblem, courseRemoveMode } from "@/lib/certificate-rules";
 import { postTestStatus } from "@/lib/post-test-server";
 import { sendTrainingEndEmail } from "@/lib/training-end-email";
 
@@ -174,7 +174,9 @@ const certificateSeriesInput = z.object({ action: z.literal("certificate-series-
 const certificateVoidRequestInput = z.object({ action: z.literal("certificate-void-request"), enrollmentId: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
 const certificateCorrectInput = z.object({ action: z.literal("certificate-correct"), enrollmentId: z.string().uuid(), name: z.string().trim().max(160).optional().default(""), courseName: z.string().trim().max(200).optional().default(""), batchLabel: z.string().trim().max(60).optional().default(""), startsOn: z.string().date().or(z.literal("")).optional().default(""), endsOn: z.string().date().or(z.literal("")).optional().default(""), issuedOn: z.string().date().or(z.literal("")).optional().default(""), reason: z.string().trim().min(3).max(300) });
 // Continue New Wave's existing numbers (owner, 9 Oct 2026): the Registration No. series and certificates issued before the portal. The Doc. No. is written by hand.
-const certNumberSettingsInput = z.object({ action: z.literal("certificate-number-settings-save"), regPrefix: z.string().trim().min(1).max(20), regLast: z.number().int().min(0).max(999999999999), regDigits: z.number().int().min(1).max(12) });
+const certNumberSettingsInput = z.object({ action: z.literal("certificate-number-settings-save"), regPrefix: z.string().trim().min(1).max(20), regLast: z.number().int().min(0).max(999999999999), regDigits: z.number().int().min(1).max(12), regFormat: z.string().trim().max(60).nullable().optional() });
+// One course's number formats and last number used (owner, 5 Nov 2026).
+const certificateFormatInput = z.object({ action: z.literal("certificate-format-save"), courseId: z.string().uuid(), certFormat: z.string().trim().max(60).nullable(), regFormat: z.string().trim().max(60).nullable(), lastUsed: z.number().int().min(0).max(99999998) });
 const legacyCertRow = z.object({ traineeName: z.string().trim().min(2).max(160), nwmtaciNumber: z.string().trim().max(40).optional().default(""), courseCode: z.string().trim().max(40).optional().default(""), certificateNumber: z.string().trim().max(60).optional().default(""), registrationNumber: z.string().trim().max(60).optional().default(""), issuedOn: z.string().date().or(z.literal("")).optional().default("") });
 const legacyCertAddInput = z.object({ action: z.literal("legacy-certificate-add"), row: legacyCertRow });
 const legacyCertImportInput = z.object({ action: z.literal("legacy-certificate-import"), rows: z.array(legacyCertRow).min(1).max(500) });
@@ -308,7 +310,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [documentControlsInput, instructionCategorySaveInput, paymentVoidRequestInput, paymentVoidDecideInput, statementIssueInput, statementVoidInput, enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, traineeFacebookInput, admissionRecordInput, documentReprintInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [certificateFormatInput, documentControlsInput, instructionCategorySaveInput, paymentVoidRequestInput, paymentVoidDecideInput, statementIssueInput, statementVoidInput, enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, applicationHandoverInput, traineeUpdateInput, traineeFacebookInput, admissionRecordInput, documentReprintInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 /** A proof the trainee sent (29 Oct 2026) backs one payment of that trainee, unless marked Not Valid. Staff-filed proofs return null. */
 async function traineeProofProblem(admin: ReturnType<typeof createSupabaseAdminClient>, proofId: string, traineeId: string) {
@@ -806,7 +808,7 @@ export async function GET(request: Request) {
     ]);
     // Certificate controls (migration 202610080030): numbering, print counts, voids, Drive templates and
     // Google Forms evaluations. Each read is separate so a database without the update still loads.
-    const [controls, series, tplLinks, forms, fbDates, corr, photos, regSeries, qr, fbLinks] = await Promise.all([
+    const [controls, series, tplLinks, forms, fbDates, corr, photos, regSeries, qr, fbLinks, formats] = await Promise.all([
       allRows((from, to) => db.from("certificates").select("id,certificate_number,batch_label,print_count,reprints_allowed,soft_copy_sent_at,void_status,void_reason,void_requested_at,void_remarks").gte("created_at", certificatesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
       db.from("certificate_series").select("course_id,prefix,next_number,pad,batch_prefix,next_batch,set_at,profiles:set_by(complete_name)"),
       db.from("certificate_templates").select("id,drive_link").order("created_at", { ascending: false }).limit(200),
@@ -819,10 +821,13 @@ export async function GET(request: Request) {
       // Revocation, sticker and the evaluation PDF in Drive (migration 202610200047); Registration No. (037) and who printed, for Reports.
       allRows((from, to) => db.from("certificates").select("id,revoked_at,revoked_reason,sticker_no,registration_number,printer:printed_by(complete_name)").gte("created_at", certificatesFrom).order("created_at", { ascending: false }).order("id").range(from, to)),
       db.from("training_feedback").select("enrollment_id,drive_link,comments").order("submitted_at", { ascending: false }).limit(2000),
+      // Number formats (migration 202610290079).
+      db.from("certificate_series").select("course_id,cert_format,reg_format"),
     ]);
     const [base, extra, tpls, rel, settings] = await firstReads;
     const regByCourse = new Map(((regSeries.error ? [] : regSeries.data ?? []) as { course_id: string }[]).map((r) => [r.course_id, r]));
-    const seriesRows = ((series.data ?? []) as { course_id: string }[]).map((s) => ({ ...s, ...(regByCourse.get(s.course_id) ?? {}) }));
+    const formatByCourse = new Map(((formats.error ? [] : formats.data ?? []) as { course_id: string }[]).map((r) => [r.course_id, r]));
+    const seriesRows = ((series.data ?? []) as { course_id: string }[]).map((s) => ({ ...s, ...(regByCourse.get(s.course_id) ?? {}), ...(formatByCourse.get(s.course_id) ?? {}) }));
     let certificates = (base.data ?? []) as { id: string }[];
     for (const merge of [extra.data, controls.data, corr.error ? null : corr.data, qr.error ? null : qr.data]) {
       if (!merge?.length) continue;
@@ -1191,12 +1196,13 @@ export async function GET(request: Request) {
   let holidays: unknown[] = [];
   if (isAdminRole(staff.roleCodes)) task(async () => {
     const admin = createSupabaseAdminClient();
-    const [ns, lc, h] = await Promise.all([
+    const [ns, nf, lc, h] = await Promise.all([
       admin.from("certificate_number_settings").select("reg_prefix,reg_last,reg_digits,set_at").maybeSingle(),
+      admin.from("certificate_number_settings").select("reg_format").maybeSingle(),
       admin.from("legacy_certificates").select("id,trainee_name,nwmtaci_number,course_code,enrollment_id,certificate_number,registration_number,issued_on,recorded_at").order("recorded_at", { ascending: false }).limit(500),
       admin.from("holidays").select("holiday_date,name,kind,marina_status,marina_note,updated_at").order("holiday_date"),
     ]);
-    certificateNumberSettings = ns.error ? null : ns.data;
+    certificateNumberSettings = ns.error || !ns.data ? null : { ...ns.data, ...(nf.error ? {} : nf.data ?? {}) };
     legacyCertificates = lc.error ? [] : lc.data ?? [];
     holidays = h.error ? [] : h.data ?? [];
   });
@@ -2488,9 +2494,11 @@ export async function POST(request: Request) {
       if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin sets the Registration No." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { data: prior } = await admin.from("certificate_number_settings").select("*").maybeSingle();
-      const row = { id: true, reg_prefix: input.regPrefix.toUpperCase(), reg_last: input.regLast, reg_digits: input.regDigits, set_by: staff.user.id, set_at: new Date().toISOString() };
+      const problem = input.regFormat ? formatProblem(input.regFormat) : null;
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+      const row = { id: true, reg_prefix: input.regPrefix.toUpperCase(), reg_last: input.regLast, reg_digits: input.regDigits, ...(input.regFormat === undefined ? {} : { reg_format: input.regFormat }), set_by: staff.user.id, set_at: new Date().toISOString() };
       const { error } = await admin.from("certificate_number_settings").upsert(row);
-      if (error) return NextResponse.json({ error: /certificate_number_settings/i.test(error.message) ? "Apply database update 202610090037 first." : error.message }, { status: 400 });
+      if (error) return NextResponse.json({ error: /reg_format/i.test(error.message) ? "Apply database update 202610290079 first." : /certificate_number_settings/i.test(error.message) ? "Apply database update 202610090037 first." : error.message }, { status: 400 });
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: "certificate.number_series_set", record_type: "settings", record_id: "certificate_number_settings", prior_values: prior ?? null, new_values: row });
       return NextResponse.json({ ok: true });
     }
@@ -2616,6 +2624,14 @@ export async function POST(request: Request) {
       if (error) return NextResponse.json({ error: error.code === "23505" ? "This batch was already recorded as submitted." : error.code === "42P01" ? "Apply database update 202610080031 first." : error.message }, { status: 400 });
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "mismo_officer", action: "mismo.submitted", record_type: "batch", record_id: input.batchId, new_values: { list_date: input.listDate, trainee_count: input.enrollmentIds.length } });
       return NextResponse.json({ ok: true });
+    }
+    if (input.action === "certificate-format-save") {
+      if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin sets the number formats." }, { status: 403 });
+      const problem = (input.certFormat ? formatProblem(input.certFormat) : null) ?? (input.regFormat ? formatProblem(input.regFormat) : null);
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+      const { data: numbered, error } = await createSupabaseAdminClient().rpc("save_certificate_formats", { target_course: input.courseId, target_cert_format: input.certFormat || null, target_reg_format: input.regFormat || null, target_last: input.lastUsed, actor: staff.user.id });
+      if (error) return NextResponse.json({ error: /save_certificate_formats|schema cache/i.test(error.message) ? "Apply database update 202610290079 first." : error.message }, { status: 400 });
+      return NextResponse.json({ ok: true, numbered: typeof numbered === "number" ? numbered : 0 });
     }
     if (input.action === "certificate-series-save") {
       const admin = createSupabaseAdminClient();

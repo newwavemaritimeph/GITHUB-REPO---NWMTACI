@@ -1,7 +1,7 @@
 import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { automaticEndDate } from "@/lib/scheduling";
-import { certificateState, evaluationRequiredFor, type CertificateView } from "@/lib/certificate-rules";
+import { formatNumber, certificateState, evaluationRequiredFor, type CertificateView } from "@/lib/certificate-rules";
 import { corrected, type CertificateCorrections } from "@/lib/certificate-photo";
 import { detectPhotoBox } from "@/lib/certificate-template";
 import { certificateLayout, isHazmatCfr } from "@/lib/certificate-layouts";
@@ -43,7 +43,7 @@ export type CertificateContext = {
 export async function certificateContext(db: Admin, enrollmentId: string): Promise<CertificateContext | null> {
   const { data: e } = await db.from("enrollments").select("id,enrollment_number,course_id,trainee_id,enrollment_status,selling_price_centavos,batch_id,partner_offer_id,batches(starts_on,ends_on,batch_number),courses(id,name,code,duration_label,delivery_type),trainees(legal_first_name,legal_middle_name,legal_last_name,email)").eq("id", enrollmentId).maybeSingle();
   if (!e) return null;
-  const [{ data: extra }, { data: allocations }, { data: charges }, { data: feedback }, { data: settings }, certRes, formRes, photoRes, corrRes, numRes, seriesRes, styleRes, ownRegRes, courseRegRes, qrRes] = await Promise.all([
+  const [{ data: extra }, { data: allocations }, { data: charges }, { data: feedback }, { data: settings }, certRes, formRes, photoRes, corrRes, numRes, seriesRes, styleRes, ownRegRes, courseRegRes, qrRes, courseFormatRes, defaultFormatRes] = await Promise.all([
     db.from("enrollments").select("scheduled_on").eq("id", enrollmentId).maybeSingle(),
     db.from("payment_allocations").select("amount_centavos,payments(received_at,valid)").eq("enrollment_id", enrollmentId),
     db.from("enrollment_charges").select("amount_centavos,event_type").eq("enrollment_id", enrollmentId).eq("valid", true),
@@ -61,6 +61,9 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
     db.from("certificate_series").select("reg_prefix,reg_next,reg_digits,reg_style").eq("course_id", e.course_id).maybeSingle(),
     // QR code, hologram sticker and revocation (migration 202610200047).
     db.from("certificates").select("verify_code,sticker_no,revoked_at").eq("enrollment_id", enrollmentId).maybeSingle(),
+    // Number formats set by the Admin (migration 202610290079).
+    db.from("certificate_series").select("reg_format").eq("course_id", e.course_id).maybeSingle(),
+    db.from("certificate_number_settings").select("reg_format").maybeSingle(),
   ]);
   const own = (numRes.error ? null : numRes.data) as { registration_number?: string | null } | null;
   const ns = (seriesRes.error ? null : seriesRes.data) as { reg_prefix: string; reg_last: number; reg_digits: number; set_at: string | null } | null;
@@ -72,10 +75,12 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
   const courseReg = (courseRegRes.error ? null : courseRegRes.data) as { reg_prefix: string; reg_next: number | null; reg_digits: number; reg_style: string } | null;
   const traineeReg = (ownRegRes.error ? null : (ownRegRes.data as { registration_number?: string } | null)?.registration_number) ?? null;
   const courseNext = courseReg?.reg_next ? (courseReg.reg_style === "number-month" ? `${courseReg.reg_prefix}${String(courseReg.reg_next).padStart(courseReg.reg_digits, "0")}-${month[1]}${month[0]}` : `${courseReg.reg_prefix}${Number(month[1])}${month[0]}-${String(courseReg.reg_next).padStart(courseReg.reg_digits, "0")}`) : null;
+  const courseFormat = courseFormatRes.error ? null : (courseFormatRes.data as { reg_format?: string | null } | null)?.reg_format ?? null;
+  const regFormat = courseFormat ?? (style === "month-number" || defaultFormatRes.error ? null : (defaultFormatRes.data as { reg_format?: string | null } | null)?.reg_format ?? null);
   const numbers = {
     reg: own?.registration_number ?? null,
     // The trainee's number for this course if given before; else the next of the one New Wave series (202610200046).
-    nextReg: courseReg?.reg_next ? traineeReg ?? courseNext : traineeReg ?? (!ns ? null : style === "month-number" ? `${ns.reg_prefix}${Number(month[1])}${month[0]}-${nextNo}` : `${ns.reg_prefix}${String(nextNo).padStart(ns.reg_digits, "0")}-${month[1]}${month[0]}`),
+    nextReg: courseReg?.reg_next ? traineeReg ?? courseNext : traineeReg ?? (!ns ? null : regFormat ? formatNumber(regFormat, c0?.code ?? "", nextNo) : style === "month-number" ? `${ns.reg_prefix}${Number(month[1])}${month[0]}-${nextNo}` : `${ns.reg_prefix}${String(nextNo).padStart(ns.reg_digits, "0")}-${month[1]}${month[0]}`),
   };
   const photo = photoRes.error ? undefined : (photoRes.data as { storage_path: string; file_name: string } | null);
   const corrections = (corrRes.error ? {} : ((corrRes.data as { corrections?: CertificateCorrections } | null)?.corrections ?? {})) as CertificateCorrections;

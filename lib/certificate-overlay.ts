@@ -12,9 +12,10 @@ export type TemplateFieldsV2 = {
   version: 2;
   name?: { cx: number; y: number; size: number; bold?: boolean; maxW: number };
   conducted?: { x: number; y: number; w: number; size: number; leading: number; align: number; text: string };
-  issued?: { cx: number; y: number; size: number; text: string };
-  certNo?: { x: number; y: number; size: number };
-  regNo?: { x: number; y: number; size: number };
+  /** Centred on cx, or from x (UBT-PSSR, owner 5 Nov 2026). */
+  issued?: { cx?: number; x?: number; y: number; size: number; text: string };
+  certNo?: { x: number; y: number; size: number; bold?: boolean };
+  regNo?: { x: number; y: number; size: number; bold?: boolean };
   qr?: { x: number; y: number; w: number; h: number };
   /** A template whose hours line was left blank (CSF "[__] Hours"): covered and printed. */
   hours?: { cx: number; y: number; size: number; text: string; cover: { x: number; y: number; w: number; h: number } };
@@ -69,15 +70,15 @@ export async function drawTemplateFields(pdf: PDFDocument, page: PDFPage, f: Tem
   }
   if (f.issued) {
     const text = safe(fill.blank ? f.issued.text : issuedText(f.issued.text, fill.issuedOn));
-    page.drawText(text, { x: f.issued.cx - reg.widthOfTextAtSize(text, f.issued.size) / 2, y: f.issued.y, size: f.issued.size, font: reg, color: INK });
+    page.drawText(text, { x: f.issued.x ?? (f.issued.cx ?? 0) - body.widthOfTextAtSize(text, f.issued.size) / 2, y: f.issued.y, size: f.issued.size, font: body, color: INK });
   }
   if (f.hours) {
     page.drawRectangle({ ...f.hours.cover, width: f.hours.cover.w, height: f.hours.cover.h, color: rgb(1, 1, 1) });
     page.drawText(f.hours.text, { x: f.hours.cx - bold.widthOfTextAtSize(f.hours.text, f.hours.size) / 2, y: f.hours.y, size: f.hours.size, font: bold, color: INK });
   }
   if (f.issueDate && fill.issuedOn && !fill.blank) page.drawText(longDate(fill.issuedOn), { x: f.issueDate.x, y: f.issueDate.y, size: f.issueDate.size, font: reg, color: INK });
-  if (f.certNo && fill.certificateNumber && !fill.blank) page.drawText(safe(fill.certificateNumber), { x: f.certNo.x, y: f.certNo.y, size: f.certNo.size, font: reg, color: INK });
-  if (f.regNo && fill.registrationNumber && !fill.blank) page.drawText(safe(fill.registrationNumber), { x: f.regNo.x, y: f.regNo.y, size: f.regNo.size, font: reg, color: INK });
+  if (f.certNo && fill.certificateNumber && !fill.blank) page.drawText(safe(fill.certificateNumber), { x: f.certNo.x, y: f.certNo.y, size: f.certNo.size, font: f.certNo.bold ? bodyBold : reg, color: INK });
+  if (f.regNo && fill.registrationNumber && !fill.blank) page.drawText(safe(fill.registrationNumber), { x: f.regNo.x, y: f.regNo.y, size: f.regNo.size, font: f.regNo.bold ? bodyBold : reg, color: INK });
   // Reprints are not marked on the certificate (owner, 20 Oct 2026): the copy number stays internal, in the print audit.
   if (f.qr && fill.verifyUrl && !fill.blank) {
     // Generated at print, never stored: error correction M, quiet zone 1, 600 px.

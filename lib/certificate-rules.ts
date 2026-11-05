@@ -76,6 +76,23 @@ export const canPrint = (v: CertificateView) => (v.state === "Due" || v.state ==
 export const formatCertificateNumber = (prefix: string, next: number, pad: number, year = new Date(Date.now() + 8 * 3600_000).getUTCFullYear()) =>
   `${prefix.replace(/\{YYYY\}/g, String(year))}${String(Math.max(1, Math.trunc(next))).padStart(Math.max(1, Math.min(10, pad)), "0")}`;
 
+/**
+ * Number formats set by the Admin (owner, 5 Nov 2026): {CODE} {YYYY} {YY} {MM} {M}, and {N} or {N:6} for the running
+ * number. public.number_from_format (202610290079) follows the same rule. A longer number is never cut.
+ */
+export function formatNumber(format: string, code: string, n: number, now = new Date()) {
+  const manila = new Date(now.getTime() + 8 * 3600_000), year = String(manila.getUTCFullYear()), month = manila.getUTCMonth() + 1;
+  return format.replace(/\{CODE\}/g, code.toUpperCase()).replace(/\{YYYY\}/g, year).replace(/\{YY\}/g, year.slice(2)).replace(/\{MM\}/g, String(month).padStart(2, "0")).replace(/\{M\}/g, String(month))
+    .replace(/\{N(?::(\d{1,2}))?\}/g, (_, width?: string) => String(Math.trunc(n)).padStart(Number(width ?? 0), "0"));
+}
+
+/** Why a format cannot be saved, or null. */
+export function formatProblem(format: string) {
+  if (/[{}]/.test(format.replace(/\{(CODE|YYYY|YY|MM|M|N(:\d{1,2})?)\}/g, ""))) return "Use only {CODE}, {YYYY}, {YY}, {MM}, {M} and {N:6}.";
+  if ((format.match(/\{N(:\d{1,2})?\}/g) ?? []).length !== 1) return "Add {N} once so each number is different.";
+  return null;
+}
+
 /** The Google Form ID from a pasted Forms link (or the ID itself). */
 export function googleFormId(input: string | null | undefined) {
   const v = (input ?? "").trim();

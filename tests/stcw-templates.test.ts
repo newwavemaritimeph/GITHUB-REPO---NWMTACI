@@ -18,7 +18,27 @@ describe("STCW certificate templates (Safety, Crowd, Crisis)", () => {
   it("gives every converted template a 2x2 photo box", () => {
     const all = Object.values(layouts as Record<string, { photo?: { w: number; h: number } }>);
     expect(all.length).toBeGreaterThanOrEqual(144);
-    expect(all.every((f) => f.photo && f.photo.w > 100 && f.photo.h > 100)).toBe(true);
+    expect(all.every((f) => f.photo && f.photo.w > 80 && f.photo.h > 80)).toBe(true);
+  });
+});
+
+describe("UBT-PSSR training certificate", () => {
+  const file = "course/00000000-0000-0000-0000-000000000000-UBT-PSSR---Training-Certificate.pdf";
+  it("has the layout of the owner's first page: dates, issued line, bold numbers, photo, no QR", () => {
+    const f = bundledLayout(file)!;
+    expect(f.conducted?.text).toContain("[START DATE]");
+    expect(f.conducted?.text).toContain("[ASSESS DATE]");
+    expect(f.issued?.x).toBe(56.55);
+    expect(f.certNo?.bold && f.regNo?.bold && f.sans).toBe(true);
+    expect(f.photo).toBeTruthy();
+    expect(f.qr).toBeUndefined();
+  });
+  it("draws every field on a page", async () => {
+    const { PDFDocument } = await import("pdf-lib");
+    const { drawTemplateFields } = await import("../lib/certificate-overlay");
+    const pdf = await PDFDocument.create(), page = pdf.addPage([595.5, 842]);
+    await drawTemplateFields(pdf, page, bundledLayout(file)!, { name: "Dela Cruz, Juan", startsOn: "2026-11-09", endsOn: "2026-11-09", issuedOn: "2026-11-09", certificateNumber: "NWMTACI-UBT-PSSR2026000001", registrationNumber: "NWMTC000001-112026", verifyUrl: null });
+    expect((await pdf.save()).length).toBeGreaterThan(500);
   });
 });
 

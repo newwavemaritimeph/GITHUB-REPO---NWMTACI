@@ -1,12 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { downloadCsv } from "@/lib/csv";
 import type { PortalData, Enrollment } from "../portal-live-app";
 import { addDays, first, manilaToday, dueCentavos, pesos2 } from "@/lib/portal-format";
 import { automaticEndDate } from "@/lib/scheduling";
-import { canPrint, canSetSeries, certificateState, evaluationRequiredFor, formatCertificateNumber, nextOf, isStcwCategory, matchTemplateFiles, releaseProblem, type CertificateView } from "@/lib/certificate-rules";
-import { Badge, Message, MonthBar, ViewIcon, fmtDate, useMonthRows, useNeedSince, usePaged, usePost } from "./shared-ui";
+import { canPrint, canSetSeries, certificateState, evaluationRequiredFor, formatCertificateNumber, formatNumber, formatProblem, nextOf, isStcwCategory, matchTemplateFiles, releaseProblem, type CertificateView } from "@/lib/certificate-rules";
+import { Badge, Message, MonthBar, ViewIcon, fmtDate, submit, useMonthRows, useNeedSince, usePaged, usePost } from "./shared-ui";
 import { ReleaseConfirm } from "./live-releasing";
 import { DeliveryAlert } from "./delivery-home";
 import { tcl } from "@/lib/title-case";
@@ -25,7 +25,7 @@ import { askConfirm } from "./dialogs";
  */
 
 type CertRow = { id: string; enrollment_id: string; status: string; certificate_number?: string | null; batch_label?: string | null; print_count?: number | null; reprints_allowed?: number | null; void_status?: string | null; void_reason?: string | null; void_requested_at?: string | null; soft_copy_sent_at?: string | null; snapshot?: Record<string, unknown> | null; claimant_name?: string | null; release_method?: string | null; revoked_at?: string | null; revoked_reason?: string | null; sticker_no?: string | null };
-type Series = { course_id: string; prefix: string; next_number: number; pad: number; batch_prefix: string; next_batch: number; set_at: string; reg_prefix?: string; reg_next?: number | null; reg_digits?: number; reg_style?: "month-number" | "number-month"; profiles?: { complete_name: string } | { complete_name: string }[] | null };
+type Series = { course_id: string; prefix: string; next_number: number; pad: number; batch_prefix: string; next_batch: number; set_at: string; cert_format?: string | null; reg_format?: string | null; reg_prefix?: string; reg_next?: number | null; reg_digits?: number; reg_style?: "month-number" | "number-month"; profiles?: { complete_name: string } | { complete_name: string }[] | null };
 type Template = { id: string; course_id: string; version: number; active: boolean; drive_link?: string | null; storage_path?: string | null; approved_at?: string | null };
 const stcwCourse = (c: { course_categories?: unknown }) => isStcwCategory((Array.isArray(c.course_categories) ? c.course_categories[0] : c.course_categories as { name?: string } | null)?.name);
 type Photo = { enrollment_id: string; file_name: string; background_white: boolean; uploaded_at: string; replaced_at?: string | null; profiles?: { complete_name: string } | { complete_name: string }[] | null };
@@ -583,11 +583,11 @@ function NumberingTable({ data, reload, scope }: { data: PortalData; reload: () 
     <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th>Prefix</th><th>Last No. Used</th><th>Digits</th><th>Next Certificate</th><th /></tr></thead><tbody>
       {courses.map((c, i) => { const v = valueOf(c.id), s = series.get(c.id); const changed = !!edit[c.id]; const can = canSetSeries(roles, stcwCourse(c)); const head = groupOf(c) && groupOf(c) !== groupOf(courses[i - 1] ?? { code: "" }) ? groupOf(c) : ""; return [head && <tr key={`${head}-head`} className="nb-group"><td colSpan={6}><b>{head}</b> <span className="cl-sub">{courses.filter((x) => groupOf(x) === head).length}</span></td></tr>, <tr key={c.id}>
         <td className="nb-course"><b>{c.name}</b><small className="cl-sub cl-block"><span className="cl-mono">{c.code}</span> · {s ? `Set ${fmtDate(day(s.set_at) ?? "")}${first(s.profiles)?.complete_name ? ` by ${first(s.profiles)?.complete_name}` : ""}` : "Not set yet"}</small></td>
-        <td><input className="cl-in" aria-label="Prefix" disabled={!can} value={v.prefix} onChange={(e) => set(c.id, "prefix", e.target.value)} placeholder="NWM-HPT-" /></td>
+        <td><input className="cl-in" aria-label="Prefix" disabled={!can || !!s?.cert_format} value={v.prefix} onChange={(e) => set(c.id, "prefix", e.target.value)} placeholder="NWM-HPT-" /></td>
         <td><input className="cl-in cl-num" aria-label="Last certificate number used" disabled={!can} type="number" min={0} value={v.last} onChange={(e) => set(c.id, "last", e.target.value)} placeholder="e.g. 149" /></td>
-        <td><input className="cl-in cl-tiny" aria-label="Digits" disabled={!can} type="number" min={1} max={10} value={v.pad} onChange={(e) => set(c.id, "pad", e.target.value)} /></td>
-        <td className="cl-mono cl-next">{formatCertificateNumber(v.prefix, nextOf(v.last), Number(v.pad) || 5)}</td>
-        <td>{can ? <button type="button" className="portal-primary" disabled={busy || !changed} onClick={() => void post({ action: "certificate-series-save", courseId: c.id, prefix: v.prefix.trim(), nextNumber: nextOf(v.last), pad: Math.min(10, Math.max(1, Number(v.pad) || 5)), batchPrefix: v.batchPrefix.trim(), nextBatch: Math.max(1, Number(v.nextBatch) || 1) }, `Numbering saved. The next certificate is ${formatCertificateNumber(v.prefix.trim(), nextOf(v.last), Number(v.pad) || 5)}; enrolled trainees without a number got theirs in enrollment order.`).then(() => setEdit((e) => { const n = { ...e }; delete n[c.id]; return n; })).catch(() => undefined)}>Save</button> : <span className="cl-sub">Set by the Admin</span>}</td>
+        <td><input className="cl-in cl-tiny" aria-label="Digits" disabled={!can || !!s?.cert_format} type="number" min={1} max={10} value={v.pad} onChange={(e) => set(c.id, "pad", e.target.value)} /></td>
+        <td className="cl-mono cl-next">{s?.cert_format ? formatNumber(s.cert_format, c.code, nextOf(v.last)) : formatCertificateNumber(v.prefix, nextOf(v.last), Number(v.pad) || 5)}</td>
+        <td>{can ? <button type="button" className="portal-primary" disabled={busy || !changed} onClick={() => void post({ action: "certificate-series-save", courseId: c.id, prefix: v.prefix.trim(), nextNumber: nextOf(v.last), pad: Math.min(10, Math.max(1, Number(v.pad) || 5)), batchPrefix: v.batchPrefix.trim(), nextBatch: Math.max(1, Number(v.nextBatch) || 1) }, `Numbering saved. The next certificate is ${s?.cert_format ? formatNumber(s.cert_format, c.code, nextOf(v.last)) : formatCertificateNumber(v.prefix.trim(), nextOf(v.last), Number(v.pad) || 5)}; enrolled trainees without a number got theirs in enrollment order.`).then(() => setEdit((e) => { const n = { ...e }; delete n[c.id]; return n; })).catch(() => undefined)}>Save</button> : <span className="cl-sub">Set by the Admin</span>}</td>
       </tr>]; })}
     </tbody></table></div>
     {!courses.length && <p className="portal-empty-copy">{term ? "No courses match." : "No In-House courses."}</p>}
@@ -683,9 +683,83 @@ function CertificateCorrectionsPanel({ data, reload, mode }: { data: PortalData;
   </section>;
 }
 
+/**
+ * Admin › Certificate Numbers › Numbering (owner, 5 Nov 2026; design/ubt-pssr-certificate-prototype.html). The Admin types the
+ * format of the numbers once, per course, with a live preview; after that the portal gives every number. Printed numbers never change.
+ */
+const NUMBER_TOKENS: [string, string][] = [["{CODE}", "Course Code"], ["{YYYY}", "Year"], ["{YY}", "Year, 2 Digits"], ["{MM}", "Month"], ["{M}", "Month, No Zero"], ["{N:6}", "Running Number, 6 Digits"]];
+type FormatRow = { cert: string; reg: string; last: string };
+
+function NumberFormats({ data, reload, settings }: { data: PortalData; reload: () => Promise<void>; settings: NumberSettings | null | undefined }) {
+  const d = data as CertData;
+  const series = new Map((d.certificateSeries ?? []).map((s) => [s.course_id, s]));
+  const startReg = settings?.reg_format ?? `${settings?.reg_prefix ?? "NWMTC"}{N:${settings?.reg_digits ?? 6}}-{MM}{YYYY}`, startLast = String(settings?.reg_last ?? 0);
+  const [regFormat, setRegFormat] = useState(startReg), [regLast, setRegLast] = useState(startLast);
+  const [edit, setEdit] = useState<Record<string, FormatRow>>({});
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  // The box the token chips add to: the last one the cursor was in.
+  const active = useRef<{ el: HTMLInputElement; set: (v: string) => void } | null>(null);
+  const addToken = (token: string) => { const a = active.current; if (!a) return; const at = a.el.selectionStart ?? a.el.value.length, end = a.el.selectionEnd ?? at; a.set(a.el.value.slice(0, at) + token + a.el.value.slice(end)); requestAnimationFrame(() => { a.el.focus(); a.el.setSelectionRange(at + token.length, at + token.length); }); };
+  const derived = (id: string) => { const s = series.get(id); return s?.prefix ? `${s.prefix}{N:${s.pad}}` : ""; };
+  const saved = (id: string): FormatRow => { const s = series.get(id); return { cert: s?.cert_format ?? derived(id), reg: s?.reg_format ?? "", last: s && s.next_number > 1 ? String(s.next_number - 1) : "" }; };
+  const valueOf = (id: string) => edit[id] ?? saved(id);
+  const set = (id: string, k: keyof FormatRow, v: string) => setEdit((cur) => ({ ...cur, [id]: { ...(cur[id] ?? saved(id)), [k]: v } }));
+  const term = q.trim().toLowerCase();
+  const rank = (c: { code: string }) => { const i = ADMIN_STCW_CODES.indexOf(c.code); return i < 0 ? 99 : i; };
+  const courses = data.courses.filter((c, i, all) => c.delivery_type === "In-House" && c.code !== "CCI" && all.findIndex((x) => x.id === c.id) === i && (term ? `${c.code} ${c.name}`.toLowerCase().includes(term) : rank(c) < 99 || !stcwCourse(c))).sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+  const { shown, pager } = usePaged(courses, 10);
+  const groupOf = (c: { code: string }) => (rank(c) < 99 ? "STCW Courses" : "In-House Courses");
+  const nextRegNo = (Number(regLast) || 0) + 1;
+  const changed = Object.keys(edit).filter((id) => JSON.stringify(edit[id]) !== JSON.stringify(saved(id)));
+  const regChanged = regFormat.trim() !== startReg || regLast !== startLast;
+  const problemOf = (v: string) => (v.trim() ? formatProblem(v.trim()) : null);
+  const regProblem = formatProblem(regFormat.trim());
+  const blocked = !!regProblem || changed.some((id) => problemOf(edit[id].cert) || problemOf(edit[id].reg));
+  async function saveAll() {
+    setBusy(true); setMsg(null);
+    try {
+      if (regChanged) await submit({ action: "certificate-number-settings-save", regPrefix: regFormat.trim().split("{")[0] || settings?.reg_prefix || "NWMTC", regLast: Number(regLast) || 0, regDigits: Number(regFormat.match(/\{N:(\d+)\}/)?.[1]) || settings?.reg_digits || 6, regFormat: regFormat.trim() });
+      for (const id of changed) {
+        const v = edit[id], typed = v.cert.trim();
+        // A format that only repeats the old prefix and digits stays on them.
+        await submit({ action: "certificate-format-save", courseId: id, certFormat: !typed || typed === derived(id) ? null : typed, regFormat: v.reg.trim() || null, lastUsed: Math.max(0, Math.trunc(Number(v.last) || 0)) });
+      }
+      await reload();
+      setEdit({});
+      setMsg({ kind: "success", text: "Saved. From now on the portal gives these numbers." });
+    } catch (e) { setMsg({ kind: "error", text: e instanceof Error ? e.message : "Could not save." }); } finally { setBusy(false); }
+  }
+  const pending = changed.length + (regChanged ? 1 : 0);
+  return <>
+    <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Registration No., Default for Every Course</h2></div>
+      <div className="portal-form cx-formpad"><label className="cn-wide">Format<input className={`cl-mono lc${regProblem ? " cn-bad" : ""}`} value={regFormat} onFocus={(e) => { active.current = { el: e.currentTarget, set: setRegFormat }; }} onChange={(e) => setRegFormat(e.target.value)} />{regProblem && <small className="cn-err">{regProblem}</small>}</label><label>Last Number Used<input type="number" min={0} className="cl-mono" value={regLast} onChange={(e) => setRegLast(e.target.value)} /></label></div>
+      <div className="cn-next"><span>Next Registration No.</span><b className="cl-mono lc">{regProblem ? "—" : formatNumber(regFormat.trim(), "", nextRegNo)}</b></div>
+    </section>
+    <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Certificate No. per Course</h2></div>
+      {msg && <Message kind={msg.kind} text={msg.text} />}
+      <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search courses" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search any In-House course by name or code" /></div>
+      <div className="cn-chips"><span>Tap to Add:</span>{NUMBER_TOKENS.map(([t, label]) => <button type="button" key={t} className="cn-chip lc" onMouseDown={(e) => e.preventDefault()} onClick={() => addToken(t)}>{t}<small>{label}</small></button>)}</div>
+      <div className="cl-wrap"><table className="cl-log cl-light"><thead><tr><th>Course</th><th>Certificate No. Format</th><th>Last No. Used</th><th>Registration No. Format</th><th>Next Numbers</th></tr></thead><tbody>
+        {shown.map((c, i) => { const v = valueOf(c.id), certBad = problemOf(v.cert), regBad = problemOf(v.reg), head = i === 0 || groupOf(c) !== groupOf(shown[i - 1]) ? groupOf(c) : ""; const regShape = v.reg.trim() || regFormat.trim(); return [head && <tr key={`${head}-${c.id}`} className="nb-group"><td colSpan={5}><b>{head}</b></td></tr>, <tr key={c.id}>
+          <td className="nb-course"><b>{c.code}</b><small className="cl-sub cl-block">{c.name}</small></td>
+          <td><input className={`cl-in cn-fmt lc${certBad ? " cn-bad" : ""}`} aria-label={`Certificate No. format for ${c.code}`} value={v.cert} onFocus={(e) => { active.current = { el: e.currentTarget, set: (x) => set(c.id, "cert", x) }; }} onChange={(e) => set(c.id, "cert", e.target.value)} />{certBad && <small className="cn-err">{certBad}</small>}</td>
+          <td><input className="cl-in cl-num" aria-label={`Last Certificate No. used for ${c.code}`} type="number" min={0} value={v.last} placeholder="0" onChange={(e) => set(c.id, "last", e.target.value)} /></td>
+          <td><input className={`cl-in cn-fmt lc${regBad ? " cn-bad" : ""}`} aria-label={`Registration No. format for ${c.code}`} placeholder="Same as Default" value={v.reg} onFocus={(e) => { active.current = { el: e.currentTarget, set: (x) => set(c.id, "reg", x) }; }} onChange={(e) => set(c.id, "reg", e.target.value)} />{regBad && <small className="cn-err">{regBad}</small>}</td>
+          <td className="cl-mono cl-next lc">{v.cert.trim() && !certBad ? formatNumber(v.cert.trim(), c.code, nextOf(v.last)) : <small className="cl-sub">Set a Format First</small>}<small className="cl-sub cl-block">{!regBad && !regProblem ? formatNumber(regShape, c.code, nextRegNo) : "—"}</small></td>
+        </tr>]; })}
+      </tbody></table></div>
+      {!courses.length && <p className="portal-empty-copy">No courses match.</p>}
+      {pager}
+      {pending > 0 && <div className="cn-savebar"><span>{pending} Unsaved {pending === 1 ? "Change" : "Changes"}</span><span className="cl-acts"><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setEdit({}); setRegFormat(startReg); setRegLast(startLast); }}>Discard</button><button type="button" className="portal-primary" disabled={busy || blocked} onClick={() => void saveAll()}>{busy ? "Saving…" : "Save Changes"}</button></span></div>}
+      <p className="cl-legend">Numbers already printed never change. A number reserved for an enrolled trainee and not printed yet takes the new format. Each print takes the next number, and a trainee keeps their Registration No. for re-prints and retakes of the same course.</p>
+    </section>
+  </>;
+}
+
 /* ------------------------------------------------------------ certificate numbers (Admin) */
 
-type NumberSettings = { reg_prefix: string; reg_last: number; reg_digits: number; set_at: string | null };
+type NumberSettings = { reg_prefix: string; reg_last: number; reg_digits: number; set_at: string | null; reg_format?: string | null };
 type LegacyCert = { id: string; trainee_name: string; nwmtaci_number: string | null; course_code: string | null; enrollment_id: string | null; certificate_number: string | null; registration_number: string | null; issued_on: string | null; recorded_at: string };
 /**
  * Admin › Certificate Numbers (owner, 9 Oct 2026): continue New Wave's existing
@@ -699,14 +773,10 @@ export function AdminCertificateNumbers({ data, reload }: { data: PortalData; re
   const { busy, msg, setMsg, post } = usePost(reload);
   const [tab, setTab] = useState<"numbering" | "legacy">("numbering");
   const ns = d.certificateNumberSettings;
-  const [form, setForm] = useState({ regPrefix: ns?.reg_prefix ?? "NWMTC", regLast: String(ns?.reg_last ?? 0), regDigits: String(ns?.reg_digits ?? 6) });
   const [one, setOne] = useState<LegacyRow>({ traineeName: "", nwmtaciNumber: "", courseCode: "", certificateNumber: "", registrationNumber: "", issuedOn: "" });
   const [preview, setPreview] = useState<{ file: string; rows: LegacyRow[]; missing: string[] } | null>(null);
   const [results, setResults] = useState<ImportResult[] | null>(null);
-  const month = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric", month: "2-digit" }).format(new Date()).split("-");
-  const nextReg = `${form.regPrefix.toUpperCase()}${String((Number(form.regLast) || 0) + 1).padStart(Number(form.regDigits) || 6, "0")}-${month[1]}${month[0]}`;
   const legacy = d.legacyCertificates ?? [];
-  const saveSeries = () => void post({ action: "certificate-number-settings-save", regPrefix: form.regPrefix.trim() || "NWMTC", regLast: Number(form.regLast) || 0, regDigits: Number(form.regDigits) || 6 }, `Saved. The next certificate prints Registration No. ${nextReg}.`).catch(() => undefined);
   const chooseCsv = async (file: File | undefined) => { setResults(null); if (!file) return; const parsed = legacyRowsFromCsv(await file.text()); setPreview({ file: file.name, ...parsed }); if (parsed.missing.length) setMsg({ kind: "error", text: `The spreadsheet needs these columns: ${parsed.missing.join(", ")}.` }); };
   const importRows = () => preview && void post({ action: "legacy-certificate-import", rows: preview.rows }).then((r) => { const res = (r as { results?: ImportResult[] }).results ?? []; setResults(res); setPreview(null); setMsg({ kind: "success", text: `${res.filter((x) => x.ok).length} of ${res.length} recorded · ${res.filter((x) => x.ok && x.matched).length} matched to a trainee's enrollment.` }); }).catch(() => undefined);
   const addOne = () => void post({ action: "legacy-certificate-add", row: one }, "Recorded. These numbers are reserved.").then(() => setOne({ traineeName: "", nwmtaciNumber: "", courseCode: "", certificateNumber: "", registrationNumber: "", issuedOn: "" })).catch(() => undefined);
@@ -716,14 +786,7 @@ export function AdminCertificateNumbers({ data, reload }: { data: PortalData; re
       <span className="cn-tabs" role="tablist"><button type="button" role="tab" aria-selected={tab === "numbering"} className={tab === "numbering" ? "on" : ""} onClick={() => setTab("numbering")}>Numbering</button><button type="button" role="tab" aria-selected={tab === "legacy"} className={tab === "legacy" ? "on" : ""} onClick={() => setTab("legacy")}>Issued Before the Portal{legacy.length ? ` · ${legacy.length}` : ""}</button></span></div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
     {tab === "numbering" ? <>
-      <p className="ac-note">Enter the <b>last Registration No. you already used</b> on paper. The portal continues from the next one at the moment a certificate is printed, and never reuses a number recorded under Issued Before the Portal. The Doc. No. is written on the certificate by hand.</p>
-      <div className="cn-series">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Registration No.</h2><span className="muted-text">One automatic series for every course</span></div>
-          <div className="portal-form cx-formpad"><label>Prefix<input className="cl-mono" value={form.regPrefix} onChange={(e) => setForm({ ...form, regPrefix: e.target.value })} /></label><label>Last Number Used<input type="number" min={0} className="cl-mono" value={form.regLast} onChange={(e) => setForm({ ...form, regLast: e.target.value })} /></label><label>Digits<input type="number" min={1} max={12} value={form.regDigits} onChange={(e) => setForm({ ...form, regDigits: e.target.value })} /></label></div>
-          <div className="cn-next"><span>Next certificate prints (issued this month)</span><b className="cl-mono">{nextReg}</b></div></section>
-      </div>
-      <div className="cn-save"><span className="muted-text">{ns?.set_at ? `Last saved ${fmtDate(day(ns.set_at) ?? "")}` : "Not set yet — the series starts from 1 until this is saved."}</span><button type="button" className="portal-primary" disabled={busy} onClick={saveSeries}>Save Registration No.</button></div>
-      <NumberingTable data={data} reload={reload} scope="all" />
+      <NumberFormats data={data} reload={reload} settings={ns} />
     </> : <>
       <p className="ac-note">Record certificates you already printed, so their numbers are reserved and the trainees show as released. Upload your log as a CSV (save the Excel sheet as CSV), or add one at a time.</p>
       <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Upload Your Log</h2><span className="muted-text">Columns: Trainee (LAST, FIRST) · NWMTACI No. · Course · Certificate No. · Registration No. · Date Issued</span></div>
