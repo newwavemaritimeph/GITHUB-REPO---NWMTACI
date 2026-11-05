@@ -57,7 +57,7 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
     {err && <Message kind="error" text={err} />}
     <p className="portal-form-note full">Goes to the Cashier to collect the fee. The change is applied automatically once the fee is paid.</p>
     {reqType === "TAR reprint" && <p className="portal-form-note full">The Training Admission Record has been printed twice. Each approval by Accounting allows one more print with the same AR number.</p>}
-    {reqType === "Make-up Class" && <p className="portal-form-note full">Make-up classes are for courses of three days or more; the fee is Php 350.00 per training day (Terms, section 5).</p>}
+    {reqType === "Make-up Class" && <p className="portal-form-note full">Make-up classes are for courses of three days or more; the fee is Php 350.00 per training day (Terms and Conditions).</p>}
     {reqType === "Rescheduling" && <label className="full">New Batch<select value={batchId} onChange={(e) => setBatchId(e.target.value)}><option value="">Select a Schedule</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.batch_number} · {fmtDate(b.starts_on)}–{fmtDate(b.ends_on)} · {b.capacity - b.confirmed_count} slots</option>)}</select></label>}
     {reqType === "Change Course" && <>
       <label className="full">New Course<select value={courseId} onChange={(e) => { setCourseId(e.target.value); setOfferId(""); }}>{data.courses.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select></label>

@@ -1,10 +1,11 @@
 /**
- * Request fee rules: the Refund Policy printed on the TAR (owner, 29 Oct 2026; replaces 8 Oct), counted
+ * Request fee rules: the Refund Policy (owner, 29 Oct 2026; replaces 8 Oct), counted
  * from the date the trainee asked to the training start date (Manila dates):
  * - 5 or more days before → ₱350.00 processing fee;
  * - under 5 days, on or after the start → 50% of the course fee + ₱250.00.
  * Rescheduling and Cancellation are charged this fee; a Refund keeps it as the deduction and returns the rest.
  * Other request types use the fee the Cashier picks (Schedule of fees).
+ * Not yet changed: the TAR's Revision 03 terms (5 Nov 2026) differ on Cancellation, Refund and training already started.
  */
 export const FLAT_FEE = 35000;
 export const SERVICE_CHARGE = 25000;

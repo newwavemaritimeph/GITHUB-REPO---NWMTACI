@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { PrintControls } from "./print-controls";
 
 /**
@@ -8,18 +9,54 @@ import { PrintControls } from "./print-controls";
 
 const peso = (c: number) => "₱" + (c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-// Short form of the terms the trainee accepted in full at registration.
-const TERMS: [string, string][] = [
-  ["1. Payment", "Full payment or at least 50% down payment on enrollment; settle in full before training ends. One-day courses are paid in full."],
-  ["2. Cancellation", "Notify the Training Center before the training date. Deductions follow the Refund Policy."],
-  ["3. Rescheduling", "One- to two-day courses may be rescheduled, subject to slots and approval. Charges follow the Refund Policy."],
-  ["4. Refund", "Five or more days before training: Php 350.00 processing fee. Within five days: 50% of the course fee plus Php 250.00."],
-  ["5. Make-up class", "For courses of three days or more, subject to schedule and approval. Php 350.00 per training day."],
-  ["6. Certificate", "Issued only when all course requirements are completed and all balances are settled."],
-  ["7. Miscellaneous", "Miscellaneous fees are part of the total due. This record is your admission slip. Terms may be updated without prior notice."],
+// Back of the TAR, Revision No. 03 (owner, 5 Nov 2026), in two columns. Bold marks the amounts and deadlines; the wording is the owner's.
+const TERMS: { n: number; title: string; lines: ReactNode[] }[][] = [
+  [
+    { n: 1, title: "Payment Terms", lines: [
+      <>Full payment or a minimum of <b>50% down payment</b> is required upon enrollment.</>,
+      "Full payment must be settled before the completion of the training.",
+      "Full payment is required for one (1) day courses of New Wave.",
+    ] },
+    { n: 2, title: "No Refund Policy", lines: [
+      <><b>All fees paid are non-refundable</b> for reasons attributable to the trainee, including change of mind, incomplete requirements, failed assessment, absence, or late arrival.</>,
+      "Fees already remitted to the training center are likewise non-refundable.",
+    ] },
+    { n: 3, title: "Rescheduling", lines: [
+      <>Requests made at least <b>five (5) days</b> before the start of training are subject to a rescheduling fee of <b>₱350.00</b>.</>,
+      <>Requests made less than <b>five (5) days</b> before the start of training are subject to a fee equivalent to <b>fifty percent (50%)</b> of the training fee, plus a processing fee of <b>₱250.00</b>.</>,
+      "Trainees who are unable to attend their scheduled training session for courses with a duration of one (1) to two (2) days may request to have their training rescheduled.",
+      "Trainees may request to reschedule their training schedule subject to slot availability and approval of the Training Center.",
+    ] },
+  ],
+  [
+    { n: 4, title: "Cancellation", lines: [
+      <>Cancellations requested at least <b>six (6) days</b> before the start of training are subject to a cancellation charge of <b>₱350.00</b>.</>,
+      <>For requests made less than <b>six (6) days</b> before training, the payment may only be transferred to another New Wave course for the same trainee, to be used within <b>twelve (12) months</b>; any price difference shall be paid by the trainee.</>,
+      "Payments are non-transferable to another person.",
+    ] },
+    { n: 5, title: "Training in Progress", lines: [
+      <><b>No rescheduling or cancellation</b> shall be allowed once training has started, and all fees paid shall be forfeited.</>,
+    ] },
+    { n: 6, title: "Partial Payments", lines: [
+      <>Trainees with partial payments must settle their remaining balance in full on or before the <b>second (2nd) day</b> of training, particularly for STCW/MARINA-mandated courses.</>,
+    ] },
+    { n: 7, title: "Make-Up Class Policy", lines: [
+      <>Make-up classes are available only for training courses with a duration of <b>three (3) days or more</b> and subject to schedule availability and approval of the Training Center.</>,
+      "Trainees who are unable to attend a scheduled training session due to valid reasons must immediately inform the Training Center.",
+      <>A make-up class fee of <b>₱350.00</b> per training day shall be charged.</>,
+    ] },
+    { n: 8, title: "Issuance of Certificate of Completion", lines: [
+      "Certificates of Completion shall be issued only to trainees who have successfully completed all course requirements and settled all outstanding balances.",
+    ] },
+  ],
 ];
+// The trainee's signature on the front of the TAR accepts these terms (owner, 5 Nov 2026).
+const ACKNOWLEDGEMENT = "By signing below, I hereby acknowledge that I have read, understood, and agreed to comply with the Terms and Conditions of New Wave MTACI, including the policies, guidelines, and instructions discussed during the course orientation.";
 const ORG = "NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.";
-const ADDRESS = "Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000 · +63 948 847 6530 · (02) 8553 0310 · newwavemaritime@gmail.com · facebook.com/newwavemtc";
+const STREET = "Room 103, Bel-Air Apartment, 1020 Roxas Boulevard, Ermita, Manila 1000";
+const CONTACTS = "+63 948 847 6530 · (02) 8553 0310 · newwavemaritime@gmail.com · facebook.com/newwavemtc";
+const ADDRESS = `${STREET} · ${CONTACTS}`;
+const PRINT_HINT = "Print on legal paper (8.5 × 14 in), portrait, on both sides, flip on long edge, at 100% scale with no margins. Cut along the dashed line: original for the trainee, duplicate for the file.";
 export const COURSES_ON_FRONT = 6;
 
 export type TarCourse = { id: string; code: string; name: string; dates: string; time: string; room: string; fee: number };
@@ -65,24 +102,38 @@ export function TarSheets(p: TarProps) {
             {p.payments.map((x) => <tr key={x.id}><td className="mono">{x.number}</td><td className="nw">{x.dateLabel}</td><td>{x.label ?? "Training Fee"}</td><td className="r b">{peso(x.amount)}</td></tr>)}
             {!p.payments.length && <tr><td colSpan={4} className="dim">{p.billedTo ? `Billed to ${p.billedTo} on the Billing Statement.` : "No receipt issued yet."}</td></tr>}
           </tbody></table>
+          <div className="tar-ack">{ACKNOWLEDGEMENT}</div>
           <div className="tar-sigs">{[["Registration officer", p.officer], ["Trainee", ""]].map(([label, n]) => <div key={label}><span>{n}</span><small>{label}</small></div>)}</div>
         </div>
       </div>
-      <div className="tar-terms"><div className="tar-terms-head"><b>TERMS AND CONDITIONS (SUMMARY)</b><span>Full terms accepted at registration. Present this record with a valid ID on the first training day; report by 7:30 AM.</span></div>
-        <div className="tar-terms-cols">{TERMS.map(([h, body]) => <p key={h}><b>{h}</b> {body}</p>)}</div></div>
+      <div className="tar-terms"><div className="tar-terms-head"><b>TERMS AND CONDITIONS AT THE BACK</b><span className="tar-terms-note">Present this record with a valid ID on the first training day; report by 7:30 AM. Miscellaneous fees are part of the total due. This record is your admission slip.</span></div></div>
   </>;
   const page2 = more.length > 0 ? <>
       {header(2)}
       <table className="tar-table"><thead><tr><th className="c">#</th><th>Course</th><th>Training Dates</th><th>Time</th><th>Room</th><th className="r">Fee</th></tr></thead><tbody>{courseRows(more, COURSES_ON_FRONT)}</tbody></table>
-      <p className="dim tar-cont">Continuation of {p.arNumber} for {p.name}. Fees, payments and terms are on page 1.</p>
+      <p className="dim tar-cont">Continuation of {p.arNumber} for {p.name}. Fees and payments are on page 1; the Terms and Conditions are at the back of page 1.</p>
   </> : null;
-  const copies = [["ORIGINAL COPY", "Trainee"], ["DUPLICATE COPY", "Office file"]];
+  const copies = [["ORIGINAL COPY", "Trainee"], ["DUPLICATE COPY", "Office File"]];
+  const frontSheet = (content: ReactNode) => <section className="tar-legal">
+    {copies.map(([label, holder]) => <div className="tar-copy" key={label}>
+      <div className="tar-sheet"><span className="tar-copy-tag"><b>{label}</b> · {holder}</span>{content}</div>
+    </div>)}
+  </section>;
+  // The back of page 1, so it prints right after it: two copies, one behind each cut front when flipped on the long edge.
+  const backSheet = <section className="tar-legal">
+    {copies.map(([label, holder]) => <div className="tar-copy" key={label}>
+      <div className="tar-back"><span className="tar-back-tag"><b>{label}</b> · {holder}</span>
+        <div className="tar-back-letter"><img src={p.logoSrc ?? "/brand/new-wave-emblem.png"} alt="" width={50} height={50} /><div><b>{ORG}</b><i>Ride the New Wave of Maritime Excellence</i><span>{STREET}</span><span>{CONTACTS}</span></div></div>
+        <div className="tar-back-title"><b>TERMS AND CONDITIONS</b><span>Please read carefully.</span></div>
+        <div className="tar-back-cols">{TERMS.map((column) => <div key={column[0].n}>{column.map((s) => <div className="tar-back-sec" key={s.n}><h4><i>{s.n}</i>{s.title}</h4><ul>{s.lines.map((line, i) => <li key={i}>{line}</li>)}</ul></div>)}</div>)}</div>
+        <div className="tar-back-foot"><em>New Wave Maritime Training and Assessment Center, Inc. reserves the right to amend, revise, or update the details stated above without prior notice.</em><small>Revision No. 03<br />Revision Date: 11/05/2026<br />Issued Date: 11/05/2026</small></div>
+      </div>
+    </div>)}
+  </section>;
   return <main className="tar-screen">
-    <PrintControls arNumber={p.arNumber} />
-    {[page1, page2].filter(Boolean).map((content, i) => <section className="tar-legal" key={i}>
-      {copies.map(([label, holder]) => <div className="tar-copy" key={label}>
-        <div className="tar-sheet"><span className="tar-copy-tag"><b>{label}</b> · {holder}</span>{content}</div>
-      </div>)}
-    </section>)}
+    <PrintControls arNumber={p.arNumber} hint={PRINT_HINT} />
+    {frontSheet(page1)}
+    {backSheet}
+    {page2 && frontSheet(page2)}
   </main>;
 }
