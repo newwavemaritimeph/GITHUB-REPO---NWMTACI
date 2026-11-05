@@ -5,16 +5,17 @@ import { createPortal } from "react-dom";
 import type { PortalData, Enrollment } from "../portal-live-app";
 import { matchClassroomLine } from "@/lib/admin-imports";
 import { classroomJoin } from "@/lib/classroom";
-import { emailResult, instructionSendText, sentTimes, type InstructionEmail } from "@/lib/instruction-email-status";
+import { canSendInstructions, emailResult, instructionSendText, type InstructionEmail } from "@/lib/instruction-email-status";
 import { isOnlineMode } from "@/lib/instruction-templates";
 import { first } from "@/lib/portal-format";
 import { VALIDATION_MESSAGES, isEmail, normalizeEmail } from "@/lib/validation";
-import { Badge, Message, Modal, ViewIcon, fmtDate, submit } from "./shared-ui";
+import { Badge, Message, Modal, fmtDate, submit } from "./shared-ui";
 
 /**
  * Training Instructions (owner, 5 Nov 2026; design/send-instructions-prototype.html).
  * The Instructions button opens one window: the address it goes to, the last send, and the
- * Google Classroom class. Registration may send as many times as needed; each send is kept.
+ * Google Classroom class. One send and one resend (owner, 5 Nov 2026), then the button goes away; a failed email does not
+ * use up a send. Orange for the first send, blue for the resend, and no remarks on the row (Option 2).
  */
 
 type ClassRow = { id: string; name: string };
@@ -34,20 +35,17 @@ function LastSent({ email }: { email: InstructionEmail }) {
 
 export function InstructionsButton({ data, enrollment: e, reload }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void> }) {
   const [open, setOpen] = useState(false);
-  const [notice, setNotice] = useState<Notice | null>(null);
-  if (e.enrollment_status === "Cancelled") return null;
-  const count = instructionsCountOf(data, e), enrolled = ["Enrolled", "Open Schedule"].includes(e.enrollment_status), email = data.instructionEmails?.[e.id];
+  const count = instructionsCountOf(data, e);
+  // An open window stays until it is closed, so the result of the last send can be read.
+  if (!["Enrolled", "Open Schedule"].includes(e.enrollment_status) || (!open && !canSendInstructions(count, data.instructionEmails?.[e.id]?.state))) return null;
   return <span className="gi" onClick={(ev) => ev.stopPropagation()}>
-    <span className="gi-row"><button type="button" className={enrolled ? "portal-primary" : "portal-secondary"} disabled={!enrolled} onClick={() => { setNotice(null); setOpen(true); }}>Instructions</button>{enrolled && count > 0 && <ViewIcon label="View PDF" href={pdfOf(e)} />}</span>
-    <small>{!enrolled ? "Enrolled trainees only" : count ? `Sent ${sentTimes(count)}` : "Not Yet Sent"}</small>
-    {enrolled && email && <small><LastSent email={email} /></small>}
-    {notice && <small className={`lc ${notice.ok ? "iw-ok" : "cx-bad"}`} role="status">{notice.text}</small>}
+    <button type="button" className={`gi-btn${count ? "" : " first"}`} onClick={() => setOpen(true)}>Instructions</button>
     {/* Outside the table and action rows, so their button styles do not apply; still inside the portal's own styles. */}
-    {open && createPortal(<InstructionsWindow data={data} enrollment={e} reload={reload} onClose={() => setOpen(false)} onSent={setNotice} />, document.querySelector(".portal-shell") ?? document.body)}
+    {open && createPortal(<InstructionsWindow data={data} enrollment={e} reload={reload} onClose={() => setOpen(false)} />, document.querySelector(".portal-shell") ?? document.body)}
   </span>;
 }
 
-export function InstructionsWindow({ data, enrollment: e, reload, onClose, onSent }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void; onSent: (notice: Notice) => void }) {
+export function InstructionsWindow({ data, enrollment: e, reload, onClose }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void }) {
   const t = first(e.trainees), b = first(e.batches), c = first(e.courses), course = data.courses.find((x) => x.id === e.course_id);
   const onRecord = t?.email ?? data.trainees.find((x) => x.id === e.trainee_id)?.email ?? "";
   const email = data.instructionEmails?.[e.id];
@@ -68,6 +66,7 @@ export function InstructionsWindow({ data, enrollment: e, reload, onClose, onSen
   const [classError, setClassError] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [result, setResult] = useState<Notice | null>(null);
 
   useEffect(() => {
     if (classList || !connected || (!linked && !online)) return;
@@ -86,19 +85,18 @@ export function InstructionsWindow({ data, enrollment: e, reload, onClose, onSen
   const typed = to.trim(), valid = isEmail(typed), changed = normalizeEmail(typed) !== normalizeEmail(onRecord), saving = changed && save;
   const canInvite = !!classId || !!pick, withClass = linked || !!pick;
   const schedule = b ? `${fmtDate(b.starts_on)}${b.ends_on !== b.starts_on ? ` - ${fmtDate(b.ends_on)}` : ""} · ${b.venue || b.mode}` : e.scheduled_on ? fmtDate(e.scheduled_on) : "To Be Scheduled";
-  const count = instructionsCountOf(data, e);
 
   async function send() {
     setBusy(true); setError("");
     try {
       // The class is saved first, so this email already carries its button.
       if (needsClass && pick) await submit({ action: "classroom-course-link", courseId: e.course_id, classroomCourseId: pick });
-      const result = await submit({ action: "send-instructions", enrollmentId: e.id, to: typed, saveEmail: saving, invite: canInvite && invite });
+      const sent = await submit({ action: "send-instructions", enrollmentId: e.id, to: typed, saveEmail: saving, invite: canInvite && invite });
       await reload();
-      onSent(instructionSendText(result, saving, changed && !save ? onRecord : null));
-      onClose();
+      setResult(instructionSendText(sent, saving, changed && !save ? onRecord : null));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not send the instructions.");
+    } finally {
       setBusy(false);
     }
   }
@@ -108,6 +106,7 @@ export function InstructionsWindow({ data, enrollment: e, reload, onClose, onSen
   return <Modal title="Training Instructions" onClose={onClose}>
     <div className="iw">
       {error && <Message kind="error" text={error} />}
+      {result && <Message kind={result.ok ? "success" : "error"} text={result.text} />}
       <section className="iw-box">
         <label className="iw-head" htmlFor="iw-to">Send To</label>
         <input id="iw-to" className={`iw-field lc${valid ? "" : " bad"}`} type="email" autoComplete="off" spellCheck={false} value={to} onChange={(ev) => setTo(ev.target.value)} />
@@ -122,7 +121,6 @@ export function InstructionsWindow({ data, enrollment: e, reload, onClose, onSen
       <dl className="iw-facts">
         <dt>Course</dt><dd>{c?.code} · {c?.name}</dd>
         <dt>Schedule</dt><dd>{schedule}</dd>
-        <dt>Sent</dt><dd>{sentTimes(count)}</dd>
       </dl>
 
       {linked ? <section className="iw-box">
@@ -147,9 +145,9 @@ export function InstructionsWindow({ data, enrollment: e, reload, onClose, onSen
       </section>}
     </div>
     <footer className="iw-foot">
-      <button type="button" className="portal-secondary" onClick={onClose}>Cancel</button>
+      {!result && <button type="button" className="portal-secondary" onClick={onClose}>Cancel</button>}
       <a className="portal-secondary" href={pdfOf(e)} target="_blank" rel="noreferrer">View PDF</a>
-      <button type="button" className="portal-primary" disabled={busy || !valid} onClick={() => void send()}>{busy ? "Sending…" : withClass ? "Send With Classroom Link" : "Send"}</button>
+      {result ? <button type="button" className="portal-primary" onClick={onClose}>Close</button> : <button type="button" className="portal-primary" disabled={busy || !valid} onClick={() => void send()}>{busy ? "Sending…" : withClass ? "Send With Classroom Link" : "Send"}</button>}
     </footer>
   </Modal>;
 }

@@ -1,0 +1,212 @@
+<title>Instructions Button</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a comparison of the five buttons first, then each one on a copy of the Trainee Account window. */
+:root {
+  --bg: #f2f6f9; --fg: #123f63; --muted: #587184; --line: #d6e2ea; --surface: #ffffff; --accent: #0571d0; --accent-ink: #ffffff;
+  --font: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif; --mono: "Geist Mono", ui-monospace, Consolas, monospace;
+  /* The portal itself has one look, so its copy keeps these colors in both themes. */
+  --m-bg: #ffffff; --m-ink: #123f63; --m-muted: #5d6f7c; --m-line: #dbe5ec; --m-soft: #edf2f5; --m-head: #e9f6fa;
+  --m-orange: #f25615; --m-blue: #0571d0; --m-navy: #123f63; --m-cyan: #35ccfa; --m-outline: #b9dcec; --m-tint: #e6f2fc;
+  --m-good: #12714a; --m-good-bg: #e4f5ec; --m-todo: #b4410c; --m-todo-bg: #fdeee6;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0d1c28; --fg: #e4eef4; --muted: #9db2c0; --line: #27404f; --surface: #142836; --accent: #5db2f5; --accent-ink: #0d1c28; color-scheme: dark; } }
+:root[data-theme="dark"] { --bg: #0d1c28; --fg: #e4eef4; --muted: #9db2c0; --line: #27404f; --surface: #142836; --accent: #5db2f5; --accent-ink: #0d1c28; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 400 15px/1.5 var(--font); padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.page { max-width: 1040px; margin: 0 auto; display: grid; gap: 16px; }
+h1 { margin: 0; font-size: 24px; line-height: 1.2; font-weight: 700; }
+.lead { margin: 0; color: var(--muted); max-width: 70ch; }
+.tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.tabs button { font: 500 14px var(--font); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 9px; padding: 8px 13px; cursor: pointer; }
+.tabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--m-cyan); outline-offset: 2px; }
+.why { margin: 0 0 12px; font-weight: 500; }
+.why span { color: var(--muted); font-weight: 400; }
+
+/* Compare */
+.cmp { background: var(--m-bg); color: var(--m-ink); border: 1px solid var(--m-line); border-radius: 14px; overflow: hidden; color-scheme: light; }
+.cmp-row { display: grid; grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--m-soft); align-items: center; }
+.cmp-row:first-child { border-top: 0; background: var(--m-head); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--m-muted); font-weight: 600; }
+.cmp-row > div { padding: 14px; min-width: 0; }
+.cmp-row:first-child > div { padding-block: 9px; }
+.cmp-name { text-align: left; background: none; border: 0; padding: 0; font: 600 14px var(--font); color: var(--m-ink); cursor: pointer; display: block; }
+.cmp-name:hover { color: var(--m-blue); text-decoration: underline; }
+.cmp-where { display: block; color: var(--m-muted); font-size: 12.5px; margin-top: 2px; }
+.tag { display: inline-block; margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--m-good); background: var(--m-good-bg); border-radius: 99px; padding: 2px 8px; }
+.none { color: var(--m-muted); font-size: 12.5px; }
+.cell-label { display: none; }
+
+/* Copy of the Trainee Account window */
+.m { background: var(--m-bg); color: var(--m-ink); border: 1px solid var(--m-line); border-radius: 14px; padding: 20px; font-size: 13px; color-scheme: light; zoom: .85; min-width: 0; }
+.m h2 { margin: 0 0 14px; font-size: 19px; font-weight: 600; }
+.hero { background: var(--m-navy); color: #fff; border-radius: 12px; padding: 16px 18px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.avatar { width: 46px; height: 46px; border-radius: 10px; background: var(--m-cyan); color: var(--m-navy); font-weight: 700; display: grid; place-items: center; flex: none; }
+.hero b { font-size: 17px; display: block; }
+.hero small { font-size: 12.5px; color: #cfe1ec; font-family: var(--mono); }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+.tile { border: 1px solid var(--m-line); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+.tile span { display: block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--m-muted); font-weight: 600; }
+.tile b { font: 500 17px var(--mono); font-variant-numeric: tabular-nums; }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 12px; align-items: start; }
+.panel { border: 1px solid var(--m-line); border-radius: 10px; padding: 12px; min-width: 0; }
+.panel + .panel { margin-top: 12px; }
+.panel h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--m-muted); font-weight: 600; padding: 6px; background: var(--m-head); border-bottom: 1px solid var(--m-line); white-space: nowrap; }
+td { padding: 8px 6px; border-bottom: 1px solid var(--m-soft); vertical-align: top; }
+td small { display: block; color: var(--m-muted); font-size: 11.5px; }
+td.first { min-width: 130px; }
+.r { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+tr.has-sub td { border-bottom: 0; padding-bottom: 2px; }
+tr.sub td { padding-top: 2px; padding-bottom: 10px; }
+.in-course { margin-top: 6px; }
+.badge { display: inline-block; border-radius: 99px; padding: 2px 9px; font-size: 12px; font-weight: 500; }
+.badge.on { background: var(--m-good-bg); color: var(--m-good); }
+.badge.wait { background: var(--m-todo-bg); color: var(--m-todo); }
+.chip { display: inline-block; border: 1px solid var(--m-outline); color: var(--m-blue); border-radius: 99px; padding: 1px 8px; font-size: 12px; }
+dl { margin: 0; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 10px; font-size: 12.5px; }
+dt { color: var(--m-muted); }
+dd { margin: 0; overflow-wrap: anywhere; }
+.doc-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* The five buttons: same size, 30px high, 13px text. */
+.b { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 30px; padding: 0 12px; font: 600 13px var(--font); line-height: 1; border-radius: 8px; border: 1px solid transparent; cursor: pointer; white-space: nowrap; }
+.b svg { width: 15px; height: 15px; flex: none; }
+.tar { background: var(--m-orange); border-color: var(--m-orange); color: #fff; }
+.o1 { background: var(--m-bg); border-color: var(--m-outline); color: var(--m-blue); }
+.o1:hover { background: var(--m-blue); border-color: var(--m-blue); color: #fff; }
+.o2 { background: var(--m-orange); border-color: var(--m-orange); color: #fff; }
+.o2:hover { filter: brightness(.93); }
+.o2.again { background: var(--m-bg); border-color: var(--m-outline); color: var(--m-blue); }
+.o2.again:hover { filter: none; background: var(--m-blue); border-color: var(--m-blue); color: #fff; }
+.o3 { background: var(--m-tint); color: var(--m-blue); }
+.o3:hover { background: #d3e8fa; }
+.o4 { background: var(--m-bg); border-color: var(--m-navy); color: var(--m-navy); padding: 0 12px 0 10px; }
+.o4:hover { background: var(--m-navy); color: #fff; }
+.o5 { background: var(--m-navy); border-color: var(--m-navy); color: #fff; }
+.o5:hover { background: #0d3350; }
+
+/* The Instructions window */
+.veil { position: fixed; inset: 0; background: rgba(13, 28, 40, .5); display: grid; place-items: center; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px)); z-index: 5; color-scheme: light; }
+.win { background: var(--m-bg); color: var(--m-ink); border-radius: 14px; padding: 20px; width: min(520px, 100%); max-height: 100%; overflow: auto; font-size: 13.5px; display: grid; gap: 12px; }
+.win h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.win label { display: grid; gap: 4px; font-weight: 500; }
+.win input { font: 400 14px var(--font); padding: 8px 10px; border: 1px solid var(--m-line); border-radius: 8px; color: var(--m-ink); background: var(--m-bg); width: 100%; }
+.win .foot { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.note { background: var(--m-good-bg); color: var(--m-good); border-radius: 8px; padding: 8px 12px; font-weight: 500; }
+
+@media (max-width: 760px) {
+  .m { zoom: 1; padding: 14px; }
+  .tile { padding: 8px; }
+  .tile b { font-size: 13.5px; }
+  .cols { grid-template-columns: minmax(0, 1fr); }
+  .cmp-row { grid-template-columns: minmax(0, 1fr); }
+  .cmp-row:first-child { display: none; }
+  .cmp-row > div { padding-block: 8px; }
+  .cmp-row > div:first-child { padding-top: 14px; }
+  .cmp-row > div:last-child { padding-bottom: 14px; }
+  .cell-label { display: block; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--m-muted); font-weight: 600; margin-bottom: 4px; }
+}
+</style>
+
+<div class="page">
+  <h1>Instructions Button</h1>
+  <p class="lead">One send and one resend, then the button is gone. No remarks beside it, and no button until the trainee is enrolled. Sample names only, and nothing is sent.</p>
+  <div class="tabs" role="tablist" aria-label="Options" id="tabs"></div>
+  <div id="view"></div>
+</div>
+<div id="dialog"></div>
+
+<script>
+const MAIL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>';
+const EMAIL = "juan.delacruz@example.com";
+const START = [
+  { id: "ubt", code: "UBT-PSSR", name: "Updating Course on BT-PSSR", enr: "ENR-2026-000045", when: "Nov 9, 2026", status: "Enrolled", due: "900.00", paid: "900.00", bal: "0.00", sent: 0, last: "" },
+  { id: "apa", code: "APA", name: "Anti Piracy Awareness", enr: "ENR-2026-000031", when: "Nov 5, 2026", status: "Enrolled", due: "1,100.00", paid: "1,100.00", bal: "0.00", sent: 1, last: `${EMAIL} · Nov 5, 2026` },
+  { id: "ism", code: "ISM", name: "International Safety Management", enr: "ENR-2026-000029", when: "Nov 3, 2026", status: "Enrolled", due: "1,200.00", paid: "1,200.00", bal: "0.00", sent: 2, last: `${EMAIL} · Nov 2, 2026` },
+  { id: "ssoc", code: "SSOC", name: "Shipboard Safety and Ship Security", enr: "ENR-2026-000052", when: "Nov 16, 2026", status: "Pending", due: "1,000.00", paid: "0.00", bal: "1,000.00", sent: 0, last: "" },
+];
+const OPTIONS = [
+  { n: 1, name: "Blue Outline", where: "Inside the Course column", inCourse: true, rec: true, why: "Matches Request, Upload and Preview, leaves orange for payments, and adds no row." },
+  { n: 2, name: "Orange, Then Blue", where: "Inside the Course column", inCourse: true, why: "Orange means not sent yet, and the resend turns blue, so the color tells you without a remark." },
+  { n: 3, name: "Soft Blue", where: "Under the course row", why: "The quietest button, on its own line under the course." },
+  { n: 4, name: "Envelope Icon", where: "Under the course row", why: "The icon says email at a glance, on its own line under the course." },
+  { n: 5, name: "Solid Navy", where: "Inside the Course column", inCourse: true, why: "Formal and strong, in the same navy as the top of the window." },
+];
+let courses = JSON.parse(JSON.stringify(START)), tab = "compare", open = null, result = "";
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const canSend = (c) => c.status === "Enrolled" && c.sent < 2;
+function button(n, c) {
+  if (!canSend(c)) return "";
+  const cls = n === 2 && c.sent ? "o2 again" : `o${n}`;
+  return `<button type="button" class="b ${cls}" data-open="${c.id}">${n === 4 ? MAIL : ""}Instructions</button>`;
+}
+
+function compareView() {
+  const heads = ["Option", "Not Yet Sent", "Sent Once", "Sent Twice"];
+  return `<div class="cmp"><div class="cmp-row">${heads.map((h) => `<div>${h}</div>`).join("")}</div>${OPTIONS.map((o) => `<div class="cmp-row">
+    <div><button type="button" class="cmp-name" data-tab="${o.n}">Option ${o.n} · ${o.name}</button><span class="cmp-where">${o.where}</span>${o.rec ? '<span class="tag">Recommended</span>' : ""}</div>
+    ${START.slice(0, 3).map((c, i) => `<div><span class="cell-label">${heads[i + 1]}</span>${button(o.n, c) || '<span class="none">No Button</span>'}</div>`).join("")}
+  </div>`).join("")}</div>`;
+}
+
+function optionView(n) {
+  const o = OPTIONS[n - 1];
+  const rows = courses.map((c) => {
+    const btn = button(n, c), sub = !o.inCourse && btn;
+    return `<tr class="${sub ? "has-sub" : ""}"><td class="first"><b>${c.code}</b><small>${c.name} · ${c.enr}</small>${o.inCourse && btn ? `<div class="in-course">${btn}</div>` : ""}</td><td>${c.when}</td><td><span class="chip">Online</span></td><td>—</td><td><span class="badge ${c.status === "Enrolled" ? "on" : "wait"}">${c.status}</span></td><td class="r">${c.due}</td><td class="r">${c.paid}</td><td class="r">${c.bal}</td></tr>${sub ? `<tr class="sub"><td colspan="8">${btn}</td></tr>` : ""}`;
+  }).join("");
+  return `<p class="why">Option ${o.n} · ${o.name}${o.rec ? " (Recommended)" : ""} <span>· ${o.why}</span></p>
+  <div class="m">
+    <h2>Trainee Account</h2>
+    <div class="hero"><span class="avatar">JD</span><div><b>DELA CRUZ, JUAN P.</b><small>NWMTACI-0000099 · THIRD MATE · Registered Nov 5, 2026</small></div></div>
+    <div class="tiles"><div class="tile"><span>Courses</span><b>4</b></div><div class="tile"><span>Paid</span><b>₱3,200.00</b></div><div class="tile"><span>Balance</span><b>₱1,000.00</b></div></div>
+    <div class="cols"><div style="min-width:0">
+      <section class="panel"><h3>Courses</h3><div class="scroll"><table><thead><tr><th>Course</th><th>Schedule</th><th>Source</th><th>Rebate</th><th>Status</th><th class="r">Due</th><th class="r">Paid</th><th class="r">Balance</th></tr></thead><tbody>${rows}</tbody></table></div></section>
+      <section class="panel"><h3>Enrollment Window · Documents</h3><div class="doc-row"><button type="button" class="b tar" data-noop="1">Print TAR</button>${button(n, courses[0])}</div></section>
+    </div>
+    <aside class="panel"><h3>Personal and Contact</h3><dl><dt>Birth Date</dt><dd>Jan 15, 1990</dd><dt>SRN</dt><dd>1234567</dd><dt>Mobile</dt><dd>+63 917 000 0000</dd><dt>Email</dt><dd>${EMAIL}</dd><dt>Company</dt><dd>Sample Shipping Inc.</dd></dl></aside></div>
+  </div>`;
+}
+
+function dialogView() {
+  if (!open) return "";
+  const c = courses.find((x) => x.id === open);
+  const facts = `<dl><dt>Course</dt><dd>${c.code} · ${c.name}</dd><dt>Schedule</dt><dd>${c.when}</dd>${c.last ? `<dt>Last Sent</dt><dd>${esc(c.last)}</dd>` : ""}<dt>Google Classroom</dt><dd>Linked</dd></dl>`;
+  if (result) return `<div class="veil"><div class="win" role="dialog" aria-modal="true" aria-labelledby="win-title"><h2 id="win-title">Training Instructions</h2><div class="note" role="status">${esc(result)}</div>${facts}<div class="foot"><button type="button" class="b o1" data-close="1" id="win-close">Close</button></div></div></div>`;
+  return `<div class="veil"><div class="win" role="dialog" aria-modal="true" aria-labelledby="win-title">
+    <h2 id="win-title">Training Instructions</h2>
+    <label for="send-to">Send To<input id="send-to" type="email" value="${EMAIL}"></label>
+    ${facts}
+    <div class="foot"><button type="button" class="b o1" data-close="1">Cancel</button><button type="button" class="b o2" data-send="1">Send With Classroom Link</button></div>
+  </div></div>`;
+}
+
+function render() {
+  document.getElementById("tabs").innerHTML = [["compare", "Compare All"], ...OPTIONS.map((o) => [String(o.n), `Option ${o.n}`])].map(([k, label]) => `<button type="button" role="tab" aria-selected="${tab === k}" data-tab="${k}">${label}</button>`).join("") + '<button type="button" data-reset="1">Start Over</button>';
+  document.getElementById("view").innerHTML = tab === "compare" ? compareView() : optionView(Number(tab));
+  document.getElementById("dialog").innerHTML = dialogView();
+  if (open) (document.getElementById("send-to") ?? document.getElementById("win-close"))?.focus();
+}
+
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-tab],[data-open],[data-send],[data-close],[data-reset]");
+  if (!el) return;
+  if (el.dataset.tab) tab = el.dataset.tab;
+  else if (el.dataset.reset) { courses = JSON.parse(JSON.stringify(START)); open = null; result = ""; }
+  else if (el.dataset.open) { open = el.dataset.open; result = ""; }
+  else if (el.dataset.send) {
+    const c = courses.find((x) => x.id === open), to = document.getElementById("send-to").value.trim() || EMAIL;
+    c.sent += 1; c.last = `${to} · Nov 5, 2026`;
+    result = `Sample only: this would send to ${to}.${c.sent >= 2 ? " This course's button is now gone." : ""}`;
+  } else if (el.dataset.close) { open = null; result = ""; }
+  render();
+});
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && open) { open = null; result = ""; render(); } });
+render();
+</script>

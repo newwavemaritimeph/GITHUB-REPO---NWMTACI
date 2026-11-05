@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { rankMatches, sameTrainee, tarGroups, tarPrintable } from "@/lib/trainee-match";
+import { printableTars, rankMatches, sameTrainee, tarGroups, tarPrintable } from "@/lib/trainee-match";
+
+describe("printableTars", () => {
+  const groups = [{ ids: ["c"] }, { ids: ["a", "b"] }, { ids: ["d"] }];
+  const left = (ids: string[]) => (ids[0] === "d" ? 0 : 1);
+  it("keeps the TARs with prints left, newest first", () => expect(printableTars(groups, left)).toEqual([{ ids: ["c"] }, { ids: ["a", "b"] }]));
+  it("gives the Enrollment window only its own course's TAR", () => expect(printableTars(groups, left, "b")).toEqual([{ ids: ["a", "b"] }]));
+  it("gives nothing when that TAR is used up", () => expect(printableTars(groups, left, "d")).toEqual([]));
+});
 
 describe("rankMatches", () => {
   const people = [{ n: "JESTER RUAZOL NATIVIDAD", o: "NWMTACI-0000019 UBT-PSSR" }, { n: "JAYSON JAYSON CABRERO", o: "NWMTACI-0000022 APA" }, { n: "KING STEPHEN PACQUING", o: "NWMTACI-0000002 UBT-PSSR" }];

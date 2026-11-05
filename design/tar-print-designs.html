@@ -1,0 +1,150 @@
+<title>TAR Print Button</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: five working copies of the Trainee Account header stacked for comparison, with one switch for how many TARs are left. */
+:root {
+  --bg: #f2f6f9; --fg: #123f63; --muted: #587184; --line: #d6e2ea; --surface: #ffffff; --accent: #0571d0; --accent-ink: #ffffff;
+  --font: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif; --mono: "Geist Mono", ui-monospace, Consolas, monospace;
+  /* The portal itself has one look, so its copy keeps these colors in both themes. */
+  --m-bg: #ffffff; --m-ink: #123f63; --m-muted: #5d6f7c; --m-line: #dbe5ec; --m-soft: #edf2f5; --m-head: #e9f6fa;
+  --m-orange: #f25615; --m-orange-dark: #d24610; --m-blue: #0571d0; --m-navy: #123f63; --m-cyan: #35ccfa; --m-outline: #b9dcec; --m-off-bg: #f7c2ab;
+  --m-good: #12714a; --m-good-bg: #e4f5ec;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #0d1c28; --fg: #e4eef4; --muted: #9db2c0; --line: #27404f; --surface: #142836; --accent: #5db2f5; --accent-ink: #0d1c28; color-scheme: dark; } }
+:root[data-theme="dark"] { --bg: #0d1c28; --fg: #e4eef4; --muted: #9db2c0; --line: #27404f; --surface: #142836; --accent: #5db2f5; --accent-ink: #0d1c28; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font: 400 15px/1.5 var(--font); padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.page { max-width: 1040px; margin: 0 auto; display: grid; gap: 18px; }
+h1 { margin: 0; font-size: 24px; line-height: 1.2; font-weight: 700; }
+.lead { margin: 0; color: var(--muted); max-width: 72ch; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.seg span { font-weight: 500; margin-right: 4px; }
+.seg button { font: 500 14px var(--font); color: var(--fg); background: var(--surface); border: 1px solid var(--line); border-radius: 9px; padding: 8px 13px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+button:focus-visible, select:focus-visible { outline: 2px solid var(--m-cyan); outline-offset: 2px; }
+.opt { display: grid; gap: 8px; min-width: 0; }
+.opt h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.opt p { margin: 0; color: var(--muted); }
+.tag { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 600; color: var(--m-good); background: var(--m-good-bg); border-radius: 99px; padding: 2px 8px; vertical-align: 2px; }
+.note { background: var(--m-good-bg); color: var(--m-good); border-radius: 8px; padding: 8px 12px; font-weight: 500; }
+
+/* Copy of the Trainee Account header */
+.m { color-scheme: light; color: var(--m-ink); zoom: .85; min-width: 0; }
+.hero { background: var(--m-navy); color: #fff; border-radius: 12px; padding: 16px 18px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.avatar { width: 46px; height: 46px; border-radius: 10px; background: var(--m-cyan); color: var(--m-navy); font-weight: 700; display: grid; place-items: center; flex: none; }
+.who { flex: 1 1 240px; min-width: 0; }
+.who b { font-size: 17px; display: block; }
+.who small { font-size: 12.5px; color: #9ee3f1; font-family: var(--mono); display: block; }
+.chips { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+.chips i { font-style: normal; font-size: 12px; font-weight: 500; border-radius: 99px; padding: 2px 9px; background: #fdeee6; color: #b4410c; }
+.chips i + i { background: var(--m-good-bg); color: var(--m-good); }
+.acts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; position: relative; }
+.h { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; font: 500 15.5px var(--font); border-radius: 9px; border: 1px solid var(--m-outline); background: var(--m-bg); color: var(--m-blue); cursor: pointer; white-space: nowrap; }
+.h.go { background: var(--m-orange); border-color: var(--m-orange); color: #fff; font-weight: 600; }
+.h.go:hover:not(:disabled) { background: var(--m-orange-dark); border-color: var(--m-orange-dark); }
+.h.go:disabled { background: var(--m-off-bg); border-color: var(--m-off-bg); cursor: not-allowed; }
+.caret { font-size: 11px; line-height: 1; }
+.split { display: inline-flex; position: relative; }
+.split .h:first-child { border-radius: 9px 0 0 9px; }
+.split .h:last-child { border-radius: 0 9px 9px 0; padding: 0 11px; border-left: 1px solid rgba(255, 255, 255, .55); }
+.pick { height: 40px; max-width: 100%; padding: 0 10px; font: 400 14.5px var(--font); color: var(--m-ink); background: var(--m-bg); border: 1px solid var(--m-outline); border-radius: 9px; }
+.drop { position: relative; display: inline-flex; }
+.menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 3; width: 290px; max-width: 80vw; background: var(--m-bg); color: var(--m-ink); border: 1px solid var(--m-line); border-radius: 10px; box-shadow: 0 10px 28px rgba(13, 28, 40, .22); padding: 4px; }
+.menu button { display: flex; justify-content: space-between; gap: 12px; width: 100%; background: none; border: 0; border-radius: 7px; padding: 9px 10px; text-align: left; font: 500 14px var(--font); color: var(--m-ink); cursor: pointer; }
+.menu button:hover, .menu button:focus-visible { background: var(--m-head); }
+.menu small { color: var(--m-muted); font-weight: 400; font-size: 12.5px; white-space: nowrap; }
+
+/* Option 5: the Transactions table */
+.panel { margin-top: 10px; background: var(--m-bg); border: 1px solid var(--m-line); border-radius: 10px; padding: 12px; font-size: 13px; }
+.panel h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+.scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--m-muted); font-weight: 600; padding: 6px; background: var(--m-head); border-bottom: 1px solid var(--m-line); white-space: nowrap; }
+td { padding: 8px 6px; border-bottom: 1px solid var(--m-soft); vertical-align: middle; }
+td small { display: block; color: var(--m-muted); font-size: 11.5px; }
+.mono { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; }
+.s { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; font: 600 13px var(--font); border-radius: 8px; border: 1px solid var(--m-outline); background: var(--m-bg); color: var(--m-blue); cursor: pointer; white-space: nowrap; }
+.s:hover { background: var(--m-blue); border-color: var(--m-blue); color: #fff; }
+
+/* Option 4: the window */
+.veil { position: fixed; inset: 0; background: rgba(13, 28, 40, .5); display: grid; place-items: center; padding: 16px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px)); z-index: 5; color-scheme: light; }
+.win { background: var(--m-bg); color: var(--m-ink); border-radius: 14px; padding: 20px; width: min(560px, 100%); max-height: 100%; overflow: auto; font-size: 13.5px; display: grid; gap: 12px; }
+.win h2 { margin: 0; font-size: 18px; font-weight: 600; }
+.foot { display: flex; justify-content: flex-end; }
+
+@media (max-width: 760px) {
+  .m { zoom: 1; }
+  .acts { width: 100%; }
+  .menu { left: 0; right: auto; }
+}
+</style>
+
+<div class="page">
+  <h1>TAR Print Button</h1>
+  <p class="lead">The button no longer lists the courses. A TAR is per transaction, so courses paid together stay on one line. In the Enrollment window the course is already known, so it stays a plain Print TAR. Sample names only, and nothing prints.</p>
+  <div class="seg" id="seg"></div>
+  <div id="note" role="status"></div>
+  <div id="view" style="display:grid;gap:24px"></div>
+</div>
+<div id="dialog"></div>
+
+<script>
+const ALL = [
+  { id: "t3", courses: "SSOC, ISM", at: "Nov 5, 10:05 AM", tar: "TAR-2026-000013", receipt: "AR-2026-000127" },
+  { id: "t2", courses: "BTR · Nautical Options", at: "Nov 4, 2:40 PM", tar: "TAR-2026-000012", receipt: "AR-2026-000125" },
+  { id: "t1", courses: "APA", at: "Nov 4, 9:12 AM", tar: "TAR-2026-000011", receipt: "AR-2026-000124" },
+];
+const LEFT = { many: 3, one: 1, none: 0 };
+const OPTIONS = [
+  { n: 1, name: "Print TAR Menu", rec: true, why: "One clean button. Click it to see each transaction, then click the one to print." },
+  { n: 2, name: "Split Button", why: "One click prints the newest, and the arrow lists the rest. The button does not say which course it prints." },
+  { n: 3, name: "Course Dropdown and Print", why: "Pick the course first, then print. Two steps, and it takes the most room in the header." },
+  { n: 4, name: "Small Window", why: "Shows the TAR No. and the date before printing. One extra window to open and close." },
+  { n: 5, name: "In the Transactions Table", why: "No TAR button in the header. Each transaction has its own Print, but you scroll down to reach it." },
+];
+let scene = "many", menu = null, win = false, note = "", picked = "";
+const rows = () => ALL.slice(0, LEFT[scene]);
+const toast = (t) => { note = `Sample only: this would print ${t.tar} for ${t.courses}.`; menu = null; win = false; };
+const items = () => rows().map((t) => `<button type="button" role="menuitem" data-print="${t.id}"><span>${t.courses}</span><small>${t.at}</small></button>`).join("");
+const plain = () => rows().length === 1 ? `<button type="button" class="h go" data-print="${rows()[0].id}">Print TAR</button>` : "";
+
+function control(n) {
+  const list = rows();
+  if (!list.length) return "";
+  if (n === 5) return "";
+  if (list.length === 1) return plain();
+  if (n === 1) return `<span class="drop"><button type="button" class="h go" aria-haspopup="menu" aria-expanded="${menu === 1}" data-menu="1">Print TAR <span class="caret">▾</span></button>${menu === 1 ? `<div class="menu" role="menu">${items()}</div>` : ""}</span>`;
+  if (n === 2) return `<span class="split"><button type="button" class="h go" data-print="${list[0].id}">Print TAR</button><button type="button" class="h go" aria-label="Choose which TAR" aria-haspopup="menu" aria-expanded="${menu === 2}" data-menu="2"><span class="caret">▾</span></button>${menu === 2 ? `<div class="menu" role="menu">${items()}</div>` : ""}</span>`;
+  if (n === 3) return `<select class="pick" id="pick" aria-label="Choose the course"><option value="">Choose Course</option>${list.map((t) => `<option value="${t.id}" ${picked === t.id ? "selected" : ""}>${t.courses}</option>`).join("")}</select><button type="button" class="h go" data-print="${picked}" ${picked ? "" : "disabled"}>Print TAR</button>`;
+  return `<button type="button" class="h go" data-win="1">Print TAR</button>`;
+}
+
+function hero(n) {
+  const table = n === 5 ? `<section class="panel"><h3>Transactions</h3><div class="scroll"><table><thead><tr><th>Transaction</th><th>Courses</th><th>TAR No.</th><th>Receipts</th><th></th></tr></thead><tbody>${ALL.map((t, i) => `<tr><td><b>Transaction ${ALL.length - i}</b><small>${t.at}</small></td><td>${t.courses}</td><td class="mono">${t.tar}</td><td class="mono">${t.receipt}</td><td>${rows().includes(t) ? `<button type="button" class="s" data-print="${t.id}">Print TAR</button>` : ""}</td></tr>`).join("")}</tbody></table></div></section>` : "";
+  return `<div class="m"><div class="hero"><span class="avatar">JD</span><div class="who"><b>DELA CRUZ, JUAN P.</b><small>NWMTACI-0000099 · THIRD MATE · Registered Nov 4, 2026</small><div class="chips"><i>Walk-In</i><i>4 Enrolled</i></div></div><div class="acts"><button type="button" class="h" data-noop="1">Copy as Text</button><button type="button" class="h" data-noop="1">Copy as Row</button>${control(n)}</div></div>${table}</div>`;
+}
+
+function render() {
+  document.getElementById("seg").innerHTML = '<span>Try:</span>' + [["many", "3 TARs to Print"], ["one", "1 TAR Left"], ["none", "None Left"]].map(([k, l]) => `<button type="button" aria-pressed="${scene === k}" data-scene="${k}">${l}</button>`).join("");
+  document.getElementById("note").innerHTML = note ? `<div class="note">${note}</div>` : "";
+  document.getElementById("view").innerHTML = OPTIONS.map((o) => `<section class="opt"><h2>Option ${o.n} · ${o.name}${o.rec ? '<span class="tag">Recommended</span>' : ""}</h2><p>${o.why}</p>${hero(o.n)}</section>`).join("");
+  document.getElementById("dialog").innerHTML = win ? `<div class="veil"><div class="win" role="dialog" aria-modal="true" aria-labelledby="win-title"><h2 id="win-title">Print TAR</h2><div class="scroll"><table><thead><tr><th>Courses</th><th>Date</th><th>TAR No.</th><th></th></tr></thead><tbody>${rows().map((t) => `<tr><td>${t.courses}</td><td>${t.at}</td><td class="mono">${t.tar}</td><td><button type="button" class="s" data-print="${t.id}">Print</button></td></tr>`).join("")}</tbody></table></div><div class="foot"><button type="button" class="s" data-closewin="1">Close</button></div></div></div>` : "";
+}
+
+document.addEventListener("click", (e) => {
+  const el = e.target.closest("[data-scene],[data-menu],[data-print],[data-win],[data-closewin]");
+  if (!el) { if (menu) { menu = null; render(); } return; }
+  if (el.dataset.scene) { scene = el.dataset.scene; menu = null; win = false; note = ""; picked = ""; }
+  else if (el.dataset.menu) menu = menu === Number(el.dataset.menu) ? null : Number(el.dataset.menu);
+  else if (el.dataset.win) win = true;
+  else if (el.dataset.closewin) win = false;
+  else if (el.dataset.print) toast(ALL.find((t) => t.id === el.dataset.print));
+  render();
+});
+document.addEventListener("change", (e) => { if (e.target.id === "pick") { picked = e.target.value; note = ""; render(); } });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape" && (menu || win)) { menu = null; win = false; render(); } });
+render();
+</script>

@@ -15,7 +15,9 @@ export function emailStatusText(email?: InstructionEmail | null): string | null 
 /** The result shown on the Last Sent line. */
 export const emailResult = (state: string) => (state === "Sent" || state === "Delivered" ? "Sent" : state === "Failed" || state === "Delivery Failed" ? "Failed" : "Queued");
 
-export const sentTimes = (n: number) => `${n} ${n === 1 ? "Time" : "Times"}`;
+/** One send and one resend, then the button goes away (owner, 5 Nov 2026). A failed email does not use up a send. */
+export const INSTRUCTION_SENDS = 2;
+export const canSendInstructions = (count: number, lastState?: string | null) => count < INSTRUCTION_SENDS || emailResult(lastState ?? "") === "Failed";
 
 /**
  * Instructions window (owner, 5 Nov 2026): who the email goes to, and whether the

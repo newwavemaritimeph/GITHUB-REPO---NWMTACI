@@ -10,7 +10,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hardDeleteEnrollment, pruneUnpaidEnrollments, deletePastEmptyBatches } from "@/lib/enrollments";
 import { VALIDATION_MESSAGES, isEmail, isMetaThreadUrl, isPhContactNumber, isSrn, normalizeEmail, normalizeMetaThreadUrl, normalizePhContactNumber, normalizeSrn } from "@/lib/validation";
-import { instructionRecipient } from "@/lib/instruction-email-status";
+import { INSTRUCTION_SENDS, emailResult, instructionRecipient } from "@/lib/instruction-email-status";
 import { emailConfigured, processEmailJobs } from "@/lib/email-jobs";
 import { classroomEmailBlocks } from "@/lib/classroom";
 import { loadInstructionDetails } from "@/lib/training-instructions";
@@ -2401,6 +2401,16 @@ export async function POST(request: Request) {
       if (!["Enrolled", "Open Schedule"].includes(enrollment.enrollment_status)) return NextResponse.json({ error: "Instructions are generated once the trainee is paid and enrolled." }, { status: 400 });
       const trainee = Array.isArray(enrollment.trainees) ? enrollment.trainees[0] : enrollment.trainees;
       const course = Array.isArray(enrollment.courses) ? enrollment.courses[0] : enrollment.courses;
+      // One send and one resend for every role (owner, 5 Nov 2026); a failed email does not use one up. Checked first, so a refused send changes nothing.
+      const { data: lastJob } = await admin.from("email_jobs").select("state").eq("template_code", "training.instructions").eq("variables->>enrollment_id", input.enrollmentId).order("created_at", { ascending: false }).limit(1).maybeSingle();
+      // Without the migration, fall back to stamping instructions_sent_at.
+      const { data: generation, error: countError } = await admin.rpc("record_instructions_generated", { target_enrollment: input.enrollmentId, actor: staff.user.id, max_count: emailResult((lastJob as { state?: string } | null)?.state ?? "") === "Failed" ? null : INSTRUCTION_SENDS });
+      if (countError && /function public.record_instructions_generated/i.test(countError.message)) {
+        const { error: sentError } = await admin.from("enrollments").update({ instructions_sent_at: new Date().toISOString() }).eq("id", input.enrollmentId);
+        if (sentError) console.error("Could not set instructions_sent_at:", sentError.message);
+      } else if (countError) {
+        return NextResponse.json({ error: /already generated/i.test(countError.message) ? "These instructions were already sent twice." : countError.message }, { status: 400 });
+      }
       // The address can be changed in the window (owner, 5 Nov 2026), in case the trainee's email does not work.
       // The record changes only when the box is ticked; this-time-only stays on the email job.
       const { to, saveToRecord } = instructionRecipient(trainee?.email, input.to, input.saveEmail);
@@ -2408,15 +2418,6 @@ export async function POST(request: Request) {
         const { error: saveError } = await admin.from("trainees").update({ email: to }).eq("id", enrollment.trainee_id);
         if (saveError) return NextResponse.json({ error: saveError.message }, { status: 400 });
         await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("admin") ? "admin" : "registration", action: "trainee.email_changed", record_type: "trainee", record_id: enrollment.trainee_id, prior_values: { email: trainee?.email ?? null }, new_values: { email: to, enrollment_id: input.enrollmentId } });
-      }
-      // Each send is counted; there is no limit on sending (owner, 5 Nov 2026).
-      // Without the migration, fall back to stamping instructions_sent_at.
-      const { data: generation, error: countError } = await admin.rpc("record_instructions_generated", { target_enrollment: input.enrollmentId, actor: staff.user.id, max_count: null });
-      if (countError && /function public.record_instructions_generated/i.test(countError.message)) {
-        const { error: sentError } = await admin.from("enrollments").update({ instructions_sent_at: new Date().toISOString() }).eq("id", input.enrollmentId);
-        if (sentError) console.error("Could not set instructions_sent_at:", sentError.message);
-      } else if (countError) {
-        return NextResponse.json({ error: countError.message }, { status: 400 });
       }
       // Best-effort in-app notification to the trainee (only if they have a portal account).
       if (trainee?.profile_id) {

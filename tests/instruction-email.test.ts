@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("resend", () => ({ Resend: class {} }));
 import { classroomEmailBlocks, classroomJoin } from "@/lib/classroom";
 import { renderTemplate } from "@/lib/email-jobs";
-import { emailResult, emailStatusText, instructionRecipient, instructionSendText, sentTimes } from "@/lib/instruction-email-status";
+import { emailResult, emailStatusText, canSendInstructions, instructionRecipient, instructionSendText } from "@/lib/instruction-email-status";
 
 describe("Google Classroom join link", () => {
   it("adds the class code to the class link", () => {
@@ -49,8 +49,15 @@ describe("Instructions window", () => {
     expect(instructionSendText({ email: { state: "Queued", to: "a@b.co", error: "Quota" } }, false)).toEqual({ ok: false, text: "The email to a@b.co did not go out yet (Quota). It will retry automatically." });
     expect(instructionSendText({ email: sent, classroom: { state: "Failed", email: "a@b.co", error: "No account" } }, false).text).toContain("invitation failed: No account");
   });
-  it("labels the last send and the count", () => {
+  it("labels the last send", () => {
     expect([emailResult("Delivered"), emailResult("Delivery Failed"), emailResult("Queued")]).toEqual(["Sent", "Failed", "Queued"]);
-    expect([sentTimes(1), sentTimes(4)]).toEqual(["1 Time", "4 Times"]);
+  });
+  it("allows one send and one resend; a failed email does not use one up", () => {
+    expect(canSendInstructions(0)).toBe(true);
+    expect(canSendInstructions(1, "Sent")).toBe(true);
+    expect(canSendInstructions(2, "Sent")).toBe(false);
+    expect(canSendInstructions(2, "Queued")).toBe(false);
+    expect(canSendInstructions(2, "Failed")).toBe(true);
+    expect(canSendInstructions(4, "Delivered")).toBe(false);
   });
 });

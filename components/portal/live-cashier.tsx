@@ -13,7 +13,7 @@ import { tcl } from "@/lib/title-case";
 import { PayTheCenters, centerLines } from "./pay-centers";
 import { shrinkProof } from "@/lib/proof-shrink";
 import { NO_REASON, REASONS, REJECT_REASONS, ReasonField, reasonReady, reasonText, type ReasonValue } from "./reject-inline";
-import { rankMatches, tarPrintable, type TarGroup } from "@/lib/trainee-match";
+import { printableTars, rankMatches, tarPrintable, type TarGroup } from "@/lib/trainee-match";
 import { sourceLabel } from "@/lib/company-charge";
 
 /**
@@ -71,9 +71,12 @@ export function ReceiptButton({ data, paymentId, reload, className = "portal-sec
   return <a className={className} href={`/portal/payment-receipt/${paymentId}`} target="_blank" rel="noreferrer" onClick={() => window.setTimeout(() => void reload?.(), 2500)}>Receipt</a>;
 }
 
-/** Print TAR (owner, 8 Oct 2026): prints twice; after the second print the button is gone. Registration prints it (owner, 20 Oct 2026). */
-export function TarButton({ data, traineeId, reload, className = "portal-secondary" }: { data: PortalData; traineeId: string; reload?: () => Promise<void>; className?: string }) {
-  const [error, setError] = useState("");
+/**
+ * Print TAR (owner, 8 Oct 2026): prints twice; after the second print it is gone. Registration prints it (20 Oct 2026). With several TARs
+ * left the main part prints the newest and ▾ lists the rest (Split Button, 5 Nov 2026); with one it is a plain button. The Enrollment window prints its own course's.
+ */
+export function TarButton({ data, traineeId, reload, className = "portal-secondary", enrollmentId }: { data: PortalData; traineeId: string; reload?: () => Promise<void>; className?: string; enrollmentId?: string }) {
+  const [error, setError] = useState(""), [menu, setMenu] = useState(false);
   // One TAR per transaction (owner, 4 Nov 2026). The server alone knows which payment first covered each
   // course; read again when a course, receipt or TAR of the trainee changes.
   const [groups, setGroups] = useState<TarGroup[] | null>(null);
@@ -84,11 +87,16 @@ export function TarButton({ data, traineeId, reload, className = "portal-seconda
     return () => { live = false; };
   }, [traineeId, stamp]);
   const print = (ids: string[]) => { setError(""); void openAdmissionRecord(traineeId, ids).then(() => reload?.()).catch((e) => setError(e instanceof Error ? e.message : "Could not open the admission record.")); };
-  if (!groups?.length) return <><button type="button" className={className} disabled>Print TAR</button>{groups && <small className="muted-text">No course on this record yet</small>}</>;
-  return <>
-    {groups.map((g) => tarState(data, traineeId, g.ids).left > 0 && <button key={g.ids.join("|")} type="button" className={className} onClick={() => print(g.ids)}>Print TAR{groups.length > 1 ? ` · ${g.ids.map((id) => { const e = data.enrollments.find((x) => x.id === id); return e ? courseCode(e) : ""; }).filter(Boolean).join(", ") || txWhen(g.at)}` : ""}</button>)}
-    {error && <Message kind="error" text={error} />}
-  </>;
+  const left = printableTars(groups ?? [], (ids) => tarState(data, traineeId, ids).left, enrollmentId);
+  const issue = error ? <Message kind="error" text={error} /> : null;
+  if (!left.length) return issue;
+  const codes = (g: TarGroup) => g.ids.map((id) => { const e = data.enrollments.find((x) => x.id === id); return e ? courseCode(e) : ""; }).filter(Boolean).join(", ");
+  if (left.length === 1) return <><button type="button" className={className} onClick={() => print(left[0].ids)}>Print TAR</button>{issue}</>;
+  return <><span className="cx-split tar-split">
+    <button type="button" className={className} title={`Prints ${codes(left[0])}`} onClick={() => print(left[0].ids)}>Print TAR</button>
+    <button type="button" className={`${className} cx-splitdd`} aria-haspopup="menu" aria-expanded={menu} aria-label="Choose Another TAR" onClick={() => setMenu((v) => !v)}>▾</button>
+    {menu && <div className="cx-splitmenu tar-menu" role="menu">{left.slice(1).map((g) => <button key={g.ids.join("|")} type="button" role="menuitem" onClick={() => { setMenu(false); print(g.ids); }}><b>{codes(g) || "TAR"}</b><small>{txWhen(g.at)}</small></button>)}</div>}
+  </span>{issue}</>;
 }
 
 export function CashierPaymentQueue({ data, onPay, reload }: { data: PortalData; onPay: (enrollmentId: string) => void; reload: () => Promise<void> }) {

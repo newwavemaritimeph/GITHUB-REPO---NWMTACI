@@ -762,11 +762,11 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose, onOpenA
       <div className="full"><strong>Documents</strong></div>
       {hasDocuments ? <>
         <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
-          <TarButton data={data} traineeId={e.trainee_id} reload={reload} className="portal-primary" />
+          <TarButton data={data} traineeId={e.trainee_id} reload={reload} className="portal-primary" enrollmentId={e.id} />
           <InstructionsButton data={data} enrollment={e} reload={reload} />
         </div>
       </> : isApplication ? <>
-        <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}><TarButton data={data} traineeId={e.trainee_id} reload={reload} className="portal-primary" /></div>
+        <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}><TarButton data={data} traineeId={e.trainee_id} reload={reload} className="portal-primary" enrollmentId={e.id} /></div>
         <p className="portal-form-note full">The TAR prints regardless of payment and shows the balance. Training instructions become available once the trainee is paid and enrolled.</p>
       </> : <p className="portal-form-note full">No documents for a cancelled enrollment.</p>}
 

@@ -149,16 +149,19 @@ describe("Registration Officer workspace", () => {
     expect(html).not.toContain("payable");
   });
 
-  it("keeps the Instructions button open at any number of sends, with Send To and Last Sent in the window", () => {
+  it("shows one Instructions button with no remarks: orange, then blue, then gone; back after a failed email", () => {
     const e = fixture.enrollments.find((x) => x.id === "e1")!;
     const enrolled = { ...e, enrollment_status: "Enrolled" };
+    const at = (count: number, state?: string) => renderToString(createElement(InstructionsButton, { data: { ...fixture, instructionsCount: { e1: count }, instructionEmails: state ? { e1: { state, to: "old@example.com", sent_at: null, last_error: null, created_at: "2026-11-05T02:00:00Z" } } : {} } as PortalData, enrollment: enrolled, reload }));
+    expect(at(0)).toContain("gi-btn first");
+    expect(at(1, "Sent")).toContain(">Instructions</button>");
+    expect(at(1, "Sent")).not.toContain("gi-btn first");
+    expect(at(1, "Sent")).not.toContain("<small");
+    expect(at(2, "Sent")).toBe("");
+    expect(at(2, "Failed")).toContain(">Instructions</button>");
+    expect(renderToString(createElement(InstructionsButton, { data: fixture, enrollment: { ...e, enrollment_status: "Pending" }, reload }))).toBe("");
     const emails = { ...fixture, instructionEmails: { e1: { state: "Failed", to: "old@example.com", sent_at: null, last_error: null, created_at: "2026-11-05T02:00:00Z" } } } as PortalData;
-    const button = renderToString(createElement(InstructionsButton, { data: emails, enrollment: enrolled, reload }));
-    expect(button).toContain(">Instructions</button>");
-    expect(button).not.toContain("disabled");
-    expect(button).toContain("Sent 2 Times");
-    expect(button).not.toContain(" of 2");
-    const win = renderToString(createElement(InstructionsWindow, { data: emails, enrollment: enrolled, reload, onClose: noop, onSent: noop }));
+    const win = renderToString(createElement(InstructionsWindow, { data: emails, enrollment: enrolled, reload, onClose: noop }));
     expect(win).toContain("Send To");
     expect(win).toContain("Last Sent");
     expect(win).toContain("old@example.com");

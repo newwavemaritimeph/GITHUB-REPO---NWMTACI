@@ -18,6 +18,9 @@ export const TAR_VISIT_MINUTES = 30;
  * payment: paid together, one TAR and Acknowledgement Receipt; paid separately, one each. Unpaid courses go by
  * when they were added. `issued` is newest record first.
  */
+/** The TARs that can still print, newest first; only that course's when an enrollment is given. */
+export const printableTars = <G extends { ids: string[] }>(groups: G[], printsLeft: (ids: string[]) => number, enrollmentId?: string) => groups.filter((g) => (!enrollmentId || g.ids.includes(enrollmentId)) && printsLeft(g.ids) > 0);
+
 export function tarGroups(rows: TarRow[], issued: string[][] = []): TarGroup[] {
   const live = new Map(rows.filter(tarPrintable).map((r) => [r.id, r]));
   const time = (v: string) => new Date(v).getTime();
