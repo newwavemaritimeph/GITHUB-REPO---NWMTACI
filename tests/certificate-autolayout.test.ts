@@ -224,6 +224,18 @@ describe("an uploaded PDF from start to finish", () => {
     expect(await autoLayout(bytes, { hasMeasuredLayout: true })).toBeNull();
     expect((await autoLayout(bytes, { hasMeasuredLayout: false }))?.fields).not.toBeNull();
   });
+
+  it("keeps the measured positions when the page hides its dates paragraph, and reads a new design under an old name", async () => {
+    // The 141 In-House PDFs: the name, description and dates stay invisible until print, so a read finds no dates paragraph.
+    const doc = await PDFDocument.create(), font = await doc.embedFont(StandardFonts.Helvetica), page = doc.addPage([595, 842]);
+    page.drawText("is issued to", { x: 260, y: 607, size: 12, font });
+    page.drawText("for having successfully completed the", { x: 200, y: 533, size: 12, font });
+    page.drawText("Certificate Number:", { x: 56, y: 235, size: 9, font });
+    const converted = await doc.save();
+    expect(await autoLayout(converted, { hasMeasuredLayout: true })).toBeNull();
+    expect((await autoLayout(converted, { hasMeasuredLayout: false }))?.missing).toContain("Training Dates");
+    expect(await autoLayout(await sample(), { hasMeasuredLayout: true })).not.toBeNull();
+  });
 });
 
 describe("which positions a template prints with", () => {

@@ -200,6 +200,8 @@ export async function autoLayout(bytes: Uint8Array, { hasMeasuredLayout }: { has
   const { lines, pageW, pageH } = await readTemplateLines(bytes);
   if (hasMeasuredLayout && lines.some((l) => /\[TRAINEE FULL NAME\]/i.test(l.text))) return null;
   const read = layoutFromLines(lines, pageW, pageH);
+  // A template converted from Word hides its description and dates until print, so no dates paragraph can be read here (6 Nov 2026): its measured positions must stay.
+  if (hasMeasuredLayout && read.missing.includes("Training Dates")) return null;
   if (!read.fields?.lift?.length) return read;
   const doc = await PDFDocument.load(bytes, { ignoreEncryption: true, updateMetadata: false });
   liftTemplateText(doc, doc.getPage(0), read.fields.lift);
