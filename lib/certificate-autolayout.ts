@@ -42,6 +42,9 @@ const ISSUED = /^issued\s+this\s+\S+(?:\s+\S+)??\s+day\s+of\s+(?:[a-z]+\.?|_+)[\
 const ISSUE_LABEL = /^(date\s+(?:of\s+)?issued?\s*:?|date\s+issued\s*:?|issued\s+on\s*:?)\s*(.*)$/i;
 
 /** Pure: finds the certificate's details among the page's lines of text. */
+/** The widest number expected, in font sizes: about 24 characters, as NWMTACI-2026-CCMD-000001. */
+const NUMBER_WIDTH = 13.2;
+
 export function layoutFromLines(lines: TemplateLine[], pageW: number, pageH: number): ReadLayout {
   const sorted = [...lines].sort((a, b) => b.y - a.y || a.x - b.x);
   const below = (l: TemplateLine) => sorted.find((o) => o.y < l.y - 1 && o.x < l.right && o.right > l.x);
@@ -114,7 +117,9 @@ export function layoutFromLines(lines: TemplateLine[], pageW: number, pageH: num
     if (!line) return undefined;
     const m = line.text.match(rule)!;
     // A bare label stays on the page and the value goes after it; with a sample value, the portal redraws both.
-    if (!m[2].replace(/[\s:.]/g, "")) return { x: round(line.right + line.size * 0.3), y: line.y, size: line.size, body: true, bold: line.bold };
+    // So does a label too near the right edge for a long number (CCMD, owner 5 Nov 2026), so the overlay can move it left.
+    const roomy = line.right + line.size * (0.3 + NUMBER_WIDTH) <= pageW - 36;
+    if (!m[2].replace(/[\s:.]/g, "") && roomy) return { x: round(line.right + line.size * 0.3), y: line.y, size: line.size, body: true, bold: line.bold };
     lifted.push(line);
     return { x: line.x, y: line.y, size: line.size, label: m[1].trim(), body: true, bold: line.bold };
   };

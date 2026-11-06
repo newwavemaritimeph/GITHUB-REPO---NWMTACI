@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { PDFDocument, PDFName, PDFRawStream, StandardFonts, decodePDFRawStream } from "pdf-lib";
 import { autoLayout, dateSlots, layoutFromLines, readTemplateLines, type TemplateLine } from "../lib/certificate-autolayout";
-import { drawTemplateFields, liftTemplateText, type TemplateFieldsV2 } from "../lib/certificate-overlay";
+import { drawTemplateFields, liftTemplateText, numberShift, type TemplateFieldsV2 } from "../lib/certificate-overlay";
 import { templateLayout } from "../lib/certificate-template-layouts";
 import { templateReadText } from "../components/portal/releasing-home";
 
@@ -132,6 +132,20 @@ describe("reading a certificate's details from an uploaded PDF", () => {
     expect(f?.issueDate?.x).toBeGreaterThan(130);
     expect(f?.certNo?.x).toBeGreaterThan(134);
     expect(found.filter((x) => x === "Issued Date")).toHaveLength(1);
+  });
+  it("redraws a bare label too near the right edge, so a long number can move left (CCMD)", () => {
+    const { fields: f, lifted } = layoutFromLines([
+      line("TRAINEES NAME", 214.8, 380.4, 530, 20, { bold: true }),
+      line("Certificate No:", 380, 460, 699),
+      line("Registration No:", 380, 468, 685),
+    ], W, H);
+    expect(f?.certNo).toMatchObject({ x: 380, label: "Certificate No:" });
+    expect(f?.regNo).toMatchObject({ x: 380, label: "Registration No:" });
+    expect(lifted.map((l) => l.text)).toEqual(expect.arrayContaining(["Certificate No:", "Registration No:"]));
+  });
+  it("moves number lines left only as far as the widest needs, and not at all when they fit", () => {
+    expect(numberShift([{ x: 57, width: 200 }, { x: 57, width: 215 }], W)).toBe(0);
+    expect(numberShift([{ x: 380, width: 170 }, { x: 380, width: 215 }], 595)).toBe(36);
   });
 });
 

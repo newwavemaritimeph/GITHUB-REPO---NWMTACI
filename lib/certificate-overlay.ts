@@ -101,6 +101,9 @@ export function liftTemplateText(doc: PDFDocument, page: PDFPage, zones: LiftZon
   return removed;
 }
 
+/** How far to move number lines left so none passes the page's right margin. They move together, so they stay lined up. */
+export const numberShift = (lines: { x: number; width: number }[], pageW: number) => Math.max(0, ...lines.map((l) => l.x + l.width - (pageW - 36)));
+
 export async function drawTemplateFields(pdf: PDFDocument, page: PDFPage, f: TemplateFieldsV2, fill: OverlayFill) {
   const reg = await pdf.embedFont(StandardFonts.TimesRoman), bold = await pdf.embedFont(StandardFonts.TimesRomanBold);
   const body = f.sans ? await pdf.embedFont(StandardFonts.Helvetica) : reg, bodyBold = f.sans ? await pdf.embedFont(StandardFonts.HelveticaBold) : bold;
@@ -134,13 +137,17 @@ export async function drawTemplateFields(pdf: PDFDocument, page: PDFPage, f: Tem
     page.drawRectangle({ ...f.hours.cover, width: f.hours.cover.w, height: f.hours.cover.h, color: rgb(1, 1, 1) });
     page.drawText(f.hours.text, { x: f.hours.cx - bold.widthOfTextAtSize(f.hours.text, f.hours.size) / 2, y: f.hours.y, size: f.hours.size, font: bold, color: INK });
   }
-  const labelled = (at: NumberAt | undefined, value: string) => {
-    const text = at && [at.label, fill.blank ? "" : value].filter(Boolean).join(" ");
-    if (at && text) page.drawText(safe(text), { x: at.x, y: at.y, size: at.size, font: at.bold ? bodyBold : at.body ? body : reg, color: INK });
+  const textOf = (at: NumberAt, value: string) => safe([at.label, fill.blank ? "" : value].filter(Boolean).join(" "));
+  const fontOf = (at: NumberAt) => (at.bold ? bodyBold : at.body ? body : reg);
+  const labelled = (at: NumberAt | undefined, value: string, shift = 0) => {
+    const text = at && textOf(at, value);
+    if (at && text) page.drawText(text, { x: at.x - (at.label ? shift : 0), y: at.y, size: at.size, font: fontOf(at), color: INK });
   };
   labelled(f.issueDate, fill.issuedOn ? longDate(fill.issuedOn) : "");
-  labelled(f.certNo, fill.certificateNumber);
-  labelled(f.regNo, fill.registrationNumber);
+  // Only a line drawn with its label can move; one printed after the template's own label stays put.
+  const numbers = [[f.certNo, fill.certificateNumber], [f.regNo, fill.registrationNumber]] as const;
+  const shift = numberShift(numbers.flatMap(([at, value]) => (at?.label ? [{ x: at.x, width: fontOf(at).widthOfTextAtSize(textOf(at, value), at.size) }] : [])), page.getWidth());
+  for (const [at, value] of numbers) labelled(at, value, shift);
   // Reprints are not marked on the certificate (owner, 20 Oct 2026): the copy number stays internal, in the print audit.
   if (f.qr && fill.verifyUrl && !fill.blank) {
     // Generated at print, never stored: error correction M, quiet zone 1, 600 px.
