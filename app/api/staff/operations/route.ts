@@ -4,7 +4,7 @@ import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { pendingTraineeProofs } from "@/lib/trainee-proof";
 import { loadTarGroups } from "@/lib/trainee-match-server";
-import { pricelistAdjustment, splitStatementPayment } from "@/lib/company-charge";
+import { canRecordCompanyPayment, pricelistAdjustment, splitStatementPayment } from "@/lib/company-charge";
 import { bsNumber, buildBillingRows, statementTotal } from "@/lib/billing-statement";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -2277,7 +2277,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "company-payment") {
-      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting records a company payment." }, { status: 403 });
+      if (!canRecordCompanyPayment(staff.roleCodes)) return NextResponse.json({ error: "Only the Accounting Head records a company payment." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const modeProblem = await paymentModeProblem(admin, input.method, input.referenceNumber);
       if (modeProblem) return NextResponse.json({ error: modeProblem }, { status: 400 });
@@ -2319,7 +2319,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, companyPaymentId: cp.id, payments: paymentIds.length, enrolled, invoice });
     }
     if (input.action === "service-invoice-issue") {
-      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting issues Service Invoices." }, { status: 403 });
+      if (!canRecordCompanyPayment(staff.roleCodes)) return NextResponse.json({ error: "Only the Accounting Head issues Service Invoices." }, { status: 403 });
       try { return NextResponse.json({ ok: true, invoice: await issueServiceInvoice(createSupabaseAdminClient(), input.companyPaymentId, staff.user.id) }); }
       catch (e) { return NextResponse.json({ error: e instanceof Error ? e.message : "The Service Invoice could not be issued." }, { status: 400 }); }
     }

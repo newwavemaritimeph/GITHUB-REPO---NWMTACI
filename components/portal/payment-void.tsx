@@ -3,7 +3,6 @@
 import type { PortalData } from "../portal-live-app";
 import { askReason } from "./dialogs";
 import { REASONS } from "./reject-inline";
-import { Badge } from "./shared-ui";
 
 /**
  * Payment voids (owner, 29 Oct 2026): the Cashier requests a void with a reason, Accounting approves or
@@ -40,18 +39,13 @@ async function askVoid(payment: VoidablePayment, post: Post) {
 /** The printer on a payment row's print or reprint icon. */
 export const PrintGlyph = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 9V3h12v6" /><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><path d="M6 14h12v7H6z" /></svg>;
 
+/** The crossed circle on a payment row's void icon. */
+export const VoidGlyph = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m6 6 12 12" /></svg>;
+
+/** The line above each day of a payment list (Payment Row 6 + 9): how many that day and their valid total, over the Amount column. */
+export const PaymentDayRow = ({ day, count, total, span }: { day: string; count: number; total: string; span: number }) => <tr className="pv-dayrow"><td data-l="" colSpan={span}>{day} · {count} Payment{count === 1 ? "" : "s"}</td><td data-l="" className="r cx-amt">{total}</td><td data-l="" /></tr>;
+
 /** Request Void as a small icon, named on hover. */
 export function RequestVoidIcon({ payment, busy, post }: { payment: VoidablePayment; busy: boolean; post: Post }) {
-  return <button type="button" className="pv-icon d" title="Request Void" aria-label={`Request Void ${payment.payment_number}`} disabled={busy} onClick={() => void askVoid(payment, post)}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="m6 6 12 12" /></svg></button>;
-}
-
-/** Status chip and, for the Cashier, the Request Void button. */
-export function PaymentVoidCell({ data, payment, canRequest, busy, post }: { data: PortalData; payment: VoidablePayment; canRequest: boolean; busy: boolean; post: Post }) {
-  const s = voidStateOf(data, payment);
-  const request = () => askVoid(payment, post);
-  return <span className="pv-cell">
-    {s.state === "Void" ? <Badge tone="cancelled">VOID</Badge> : s.state === "Requested" ? <Badge tone="orange">Void Requested</Badge> : <Badge tone="active">Valid</Badge>}
-    {s.note && <small>{s.note}</small>}
-    {canRequest && s.state === "Valid" && <button type="button" className="ghost-button" disabled={busy} onClick={() => void request()}>Request Void</button>}
-  </span>;
+  return <button type="button" className="pv-icon d" title="Request Void" aria-label={`Request Void ${payment.payment_number}`} disabled={busy} onClick={() => void askVoid(payment, post)}><VoidGlyph /></button>;
 }

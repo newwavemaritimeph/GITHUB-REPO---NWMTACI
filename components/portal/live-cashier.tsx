@@ -5,7 +5,7 @@ import type { PortalData, Enrollment, TraineeProofRow } from "../portal-live-app
 import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos, pesos2 } from "@/lib/portal-format";
 import { pesosInWords } from "@/lib/amount-words";
 import { ALL_DATES, Badge, Message, Modal, PageHead, ViewIcon, fullName, fmtDate, fmtClock, txWhen, useNeedSince, usePaged, usePost, openAdmissionRecord, submit, MonthBar, usePeriod } from "./shared-ui";
-import { PrintGlyph, RequestVoidIcon, paymentStatus } from "./payment-void";
+import { PaymentDayRow, PrintGlyph, RequestVoidIcon, paymentStatus } from "./payment-void";
 import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balances";
 import { requestFee } from "@/lib/request-fees";
 import type { CashierReportSnapshot } from "@/lib/documents";
@@ -650,7 +650,7 @@ export function CashierPayments({ data, onPay, reload }: { data: PortalData; onP
         const ar = first((p as { receipts?: { receipt_number: string } | { receipt_number: string }[] | null }).receipts)?.receipt_number;
         const rowsOn = rows.filter((x) => day(x.received_at) === d);
         return [
-          (!i || day(paged.shown[i - 1].received_at) !== d) && <tr key={`day-${d}`} className="pv-dayrow"><td data-l="" colSpan={4}>{fmtDate(d)} · {rowsOn.length} Payment{rowsOn.length === 1 ? "" : "s"}</td><td data-l="" className="r cx-amt">{pesos(rowsOn.filter((x) => (x as { valid?: boolean }).valid !== false).reduce((n, x) => n + Number(x.amount_centavos), 0))}</td><td data-l=""></td></tr>,
+          (!i || day(paged.shown[i - 1].received_at) !== d) && <PaymentDayRow key={`day-${d}`} day={fmtDate(d)} count={rowsOn.length} span={4} total={pesos(rowsOn.filter((x) => (x as { valid?: boolean }).valid !== false).reduce((n, x) => n + Number(x.amount_centavos), 0))} />,
           <tr key={p.id} className={isVoid ? "pv-void" : undefined}><td data-l="Time" className="cx-mono">{fmtClock(p.received_at)}</td><td data-l="" className="lead"><span className="cx-name">{t ? `${t.legal_first_name} ${t.legal_last_name}` : "—"}</span><small className="cx-mono">{ar ?? p.payment_number}</small></td><td data-l="Mode">{p.method}{p.reference_number ? <small className="cx-mono">{p.reference_number}</small> : null}</td><td data-l="Status"><Badge tone={s.tone}>{s.label}</Badge>{s.note && <small>{s.note}</small>}</td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos(p.amount_centavos)}</strong></td><td data-l=""><div className="cx-acts"><ReceiptButton data={data} paymentId={p.id} reload={reload} icon />{reload && s.canVoid && <RequestVoidIcon payment={p} busy={busy} post={post} />}</div></td></tr>,
         ];
       })}

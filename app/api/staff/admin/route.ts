@@ -143,7 +143,7 @@ async function trainee(db: Db, id: string) {
   const coursesByPayment = new Map<string, string[]>();
   for (const a of allocations.data ?? []) coursesByPayment.set(a.payment_id, [...new Set([...(coursesByPayment.get(a.payment_id) ?? []), courseOf.get(a.enrollment_id) ?? "—"])]);
 
-  const base = "id,payment_number,amount_centavos,method,reference_number,received_at,valid,profiles:cashier_id(complete_name),receipts(receipt_number)";
+  const base = "id,payment_number,amount_centavos,method,reference_number,received_at,valid,verification_state,profiles:cashier_id(complete_name),receipts(receipt_number)";
   let pays = await db.from("payments").select(`${base},void_reason,voided_at`).eq("trainee_id", id).order("received_at", { ascending: false });
   if (pays.error) pays = await db.from("payments").select(base).eq("trainee_id", id).order("received_at", { ascending: false }) as typeof pays;
   if (pays.error) throw pays.error;
@@ -158,7 +158,7 @@ async function trainee(db: Db, id: string) {
       id: p.id as string, number: p.payment_number as string, receipt: one(p.receipts as { receipt_number: string } | null)?.receipt_number ?? null,
       amount: Number(p.amount_centavos), method: p.method as string, reference: (p.reference_number as string | null) ?? null, receivedAt: p.received_at as string,
       recordedBy: one(p.profiles as { complete_name: string } | null)?.complete_name ?? null, courses: coursesByPayment.get(p.id as string) ?? [],
-      valid: p.valid !== false, voidReason: (p.void_reason as string | null) ?? null, voidedAt: (p.voided_at as string | null) ?? null,
+      valid: p.valid !== false, voidReason: (p.void_reason as string | null) ?? null, voidedAt: (p.voided_at as string | null) ?? null, verification: (p.verification_state as string | null) ?? null,
     })),
   };
 }

@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
 import { groupNotices, holidayReminders, holidaysInMonth, totalsByChannel, voidReasonProblem, type HolidayDay, type MarinaStatus, type Notice } from "@/lib/admin-dashboard";
-import { ALL_DATES, Badge, Message, MonthBar, PeriodBar, usePeriod, fmtDate, fullName, useMonthRows, useNeedSince, usePost as useRawPost } from "./shared-ui";
+import { ALL_DATES, Badge, Message, MonthBar, PeriodBar, usePeriod, fmtClock, fmtDate, fullName, manilaDay, useMonthRows, useNeedSince, usePost as useRawPost } from "./shared-ui";
+import { PaymentDayRow, PrintGlyph, VoidGlyph, paymentStatus } from "./payment-void";
 import { NO_REASON, REASONS, ReasonField, reasonReady, reasonText, type ReasonValue } from "./reject-inline";
 import { certificateLines } from "./releasing-home";
 import { upcoming } from "./admin-assistant-home";
@@ -236,7 +237,7 @@ export function AdminHolidays({ data, reload }: { data: PortalData; reload: () =
 
 type Ledger = {
   enrollments: { id: string; number: string; status: string; courseCode: string; courseName: string; batch: string | null; startsOn: string | null; endsOn: string | null; due: number; paid: number }[];
-  payments: { id: string; number: string; receipt: string | null; amount: number; method: string; reference: string | null; receivedAt: string; recordedBy: string | null; courses: string[]; valid: boolean; voidReason: string | null; voidedAt: string | null }[];
+  payments: { id: string; number: string; receipt: string | null; amount: number; method: string; reference: string | null; receivedAt: string; recordedBy: string | null; courses: string[]; valid: boolean; voidReason: string | null; voidedAt: string | null; verification: string | null }[];
 };
 
 export function AdminSearchTrainee({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
@@ -255,11 +256,11 @@ export function AdminSearchTrainee({ data, reload }: { data: PortalData; reload:
         {matches.map((m) => <tr key={m.id}><td><b>{fullName(m)}</b></td><td className="cl-mono">{m.trainee_number}</td><td className="cl-mono">{m.srn ?? "—"}</td><td>{m.mobile}<small>{m.email}</small></td><td><button type="button" className="portal-secondary" onClick={() => setPick(m.id)}>Open</button></td></tr>)}
       </tbody></table></div> : <p className="portal-empty-copy">No trainee matches.</p>)}
     </section>
-    {t && <TraineeLedger trainee={t} reload={reload} onBack={() => setPick(null)} />}
+    {t && <TraineeLedger data={data} trainee={t} reload={reload} onBack={() => setPick(null)} />}
   </div>;
 }
 
-function TraineeLedger({ trainee, reload, onBack }: { trainee: PortalData["trainees"][number]; reload: () => Promise<void>; onBack: () => void }) {
+function TraineeLedger({ data, trainee, reload, onBack }: { data: PortalData; trainee: PortalData["trainees"][number]; reload: () => Promise<void>; onBack: () => void }) {
   const { data: ledger, error, load } = useJson<Ledger>(`/api/staff/admin?view=trainee&id=${trainee.id}`);
   const after = async () => { await load(); await reload(); };
   const { busy, msg, post } = usePost(after);
@@ -280,11 +281,17 @@ function TraineeLedger({ trainee, reload, onBack }: { trainee: PortalData["train
         onConfirm={async (reason) => { if (await post({ action: "enrollment-cancel", enrollmentId: e.id, reason }, `${e.number} cancelled.`)) setAct(null); }} /> : null; })()}
     </section>
     <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Payments</h2><small>{ledger?.payments.length ?? 0} receipt{ledger?.payments.length === 1 ? "" : "s"}</small></div>
-      <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Receipt No.</th><th>Date</th><th>Course</th><th>Mode</th><th>Reference</th><th>Amount</th><th>Recorded By</th><th></th></tr></thead><tbody>
-        {(ledger?.payments ?? []).map((p) => <tr key={p.id} className={p.valid ? "" : "ad-voided"}><td className="cl-mono"><a href={`/portal/payment-receipt/${p.id}`} target="_blank" rel="noreferrer">{p.receipt ?? p.number}</a></td><td>{when(p.receivedAt)}</td><td>{p.courses.join(", ") || "—"}</td><td>{p.method}</td><td className="cl-mono">{p.reference ?? "—"}</td>
-          <td className="cl-mono">{p.valid ? <b>{pesos2(p.amount)}</b> : <s>{pesos2(p.amount)}</s>}</td><td>{p.recordedBy ?? "—"}</td>
-          <td>{p.valid ? <button type="button" className="ad-danger-link" onClick={() => setAct({ kind: "pay", id: p.id })}>Void Payment</button> : <><Badge tone="red">VOID</Badge><small>{p.voidReason}{p.voidedAt ? ` · ${when(p.voidedAt)}` : ""}</small></>}</td></tr>)}
-        {ledger && !ledger.payments.length && <tr><td colSpan={8}><span className="portal-empty-copy">No payments.</span></td></tr>}
+      <div className="portal-table cx-cards"><table><thead><tr><th>Time</th><th>Receipt</th><th>Mode</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
+        {/* Day Ledger with Icon Actions, the same row as Cashier › Payments (owner, 5 Nov 2026). */}
+        {(ledger?.payments ?? []).flatMap((p, i, all) => {
+          const d = manilaDay(p.receivedAt), onDay = all.filter((x) => manilaDay(x.receivedAt) === d);
+          const s = paymentStatus(data, { id: p.id, valid: p.valid, void_reason: p.voidReason, verification_state: p.verification });
+          return [
+            (!i || manilaDay(all[i - 1].receivedAt) !== d) && <PaymentDayRow key={`day-${d}`} day={fmtDate(d)} count={onDay.length} span={4} total={pesos2(onDay.filter((x) => x.valid).reduce((n, x) => n + x.amount, 0))} />,
+            <tr key={p.id} className={p.valid ? undefined : "pv-void"}><td data-l="Time" className="cx-mono">{fmtClock(p.receivedAt)}{p.recordedBy && <small>{p.recordedBy}</small>}</td><td data-l="" className="lead"><span className="cx-name cx-mono">{p.receipt ?? p.number}</span>{p.courses.length > 0 && <small>{p.courses.join(", ")}</small>}</td><td data-l="Mode">{p.method}{p.reference && <small className="cx-mono">{p.reference}</small>}</td><td data-l="Status"><Badge tone={s.tone}>{s.label}</Badge>{s.note && <small>{s.note}{p.voidedAt ? ` · ${when(p.voidedAt)}` : ""}</small>}</td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(p.amount)}</strong></td><td data-l=""><div className="cx-acts"><a className="pv-icon" title="Print Receipt" aria-label={`Print Receipt ${p.receipt ?? p.number}`} href={`/portal/payment-receipt/${p.id}`} target="_blank" rel="noreferrer"><PrintGlyph /></a>{p.valid && <button type="button" className="pv-icon d" title="Void Payment" aria-label={`Void Payment ${p.receipt ?? p.number}`} onClick={() => setAct({ kind: "pay", id: p.id })}><VoidGlyph /></button>}</div></td></tr>,
+          ];
+        })}
+        {ledger && !ledger.payments.length && <tr><td colSpan={6}><span className="portal-empty-copy">No payments.</span></td></tr>}
       </tbody></table></div>
       {act?.kind === "pay" && (() => { const p = ledger?.payments.find((x) => x.id === act.id); return p ? <VoidBox title="Void Payment" busy={busy} onCancel={() => setAct(null)}
         detail={`${pesos2(p.amount)} ${p.method} goes back to ${name}'s balance. The receipt prints VOID and the payment leaves the day's collections and reconciliation. A reversal record and the audit log keep the history; nothing is erased. A cashier closing already submitted is not changed.`}

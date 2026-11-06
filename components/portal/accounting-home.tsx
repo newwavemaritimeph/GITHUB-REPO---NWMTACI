@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useState, type ReactNode } from "react";
 import type { PortalData } from "../portal-live-app";
 import { addDays, first, manilaToday, pesos2 } from "@/lib/portal-format";
-import { Badge, Message, MonthBar, PeriodBar, ViewIcon, fmtClock, fmtDate, submit, useMonthRows, usePeriod, usePost, usePaged } from "./shared-ui";
+import { Badge, Message, MonthBar, PeriodBar, ViewIcon, fmtClock, fmtDate, manilaDay, submit, useMonthRows, usePeriod, usePost, usePaged } from "./shared-ui";
 import { BarChart, Donut, HBars } from "./charts";
 import { REASONS, REJECT_REASONS, RejectInline } from "./reject-inline";
 import { PERIODS, percentChange, periodStart, type Period } from "@/lib/accounting-periods";
@@ -16,7 +16,7 @@ import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balanc
 import { downloadCsv } from "@/lib/csv";
 import { tcl } from "@/lib/title-case";
 import { askReason } from "./dialogs";
-import { PrintGlyph, paymentStatus } from "./payment-void";
+import { PaymentDayRow, PrintGlyph, paymentStatus } from "./payment-void";
 
 /**
  * Accounting (owner, 8 Oct 2026): a view-first dashboard like the
@@ -266,7 +266,7 @@ function PaymentReceipts({ pills, data }: { pills: ReactNode; data: PortalData }
           {pg.shown.flatMap((x, i) => {
             const s = paymentStatus(data, { id: x.paymentId ?? "", valid: x.valid, void_reason: x.voidReason, verification_state: x.verificationState }), isVoid = x.valid === false;
             return [
-              !i && <tr key="day" className="pv-dayrow"><td data-l="" colSpan={5}>{fmtDate(date)} · {shown.length} Payment{shown.length === 1 ? "" : "s"}{channel ? ` · ${channel}` : ""}</td><td data-l="" className="r cx-amt">{pesos2(shown.filter((v) => v.valid !== false).reduce((n, v) => n + v.amountCentavos, 0))}</td><td data-l="" /></tr>,
+              !i && <PaymentDayRow key="day" day={fmtDate(date)} count={shown.length} span={5} total={pesos2(shown.filter((v) => v.valid !== false).reduce((n, v) => n + v.amountCentavos, 0))} />,
               <tr key={`${x.receipt}-${i}`} className={isVoid ? "pv-void" : undefined}><td data-l="Time" className="cx-mono">{x.time}</td><td data-l="" className="lead"><span className="cx-name">{x.trainee}</span><small className="cx-mono">{x.receipt}{x.codes ? ` · ${x.codes}` : ""}</small></td><td data-l="Source"><span className={`cs-chip ${x.source === "Walk-in" ? "wk" : "ag"}`}>{x.source === "Walk-in" ? "Walk-In" : x.source}</span>{x.rebateCentavos ? <small>Rebate {pesos2(x.rebateCentavos)} · {x.rebateStatus}</small> : null}</td><td data-l="Mode">{x.channel}{x.reference ? <small className="cx-mono">{x.reference}</small> : null}</td><td data-l="Status"><Badge tone={s.tone}>{s.label}</Badge>{s.note ? <small>{s.note}</small> : x.channel !== "Cash" ? <small className={x.proof ? "ac-up" : ""}>{tcl(proofOf(x))}</small> : null}</td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(x.amountCentavos)}</strong></td><td data-l="">{x.paymentId && !isVoid && <button type="button" className="pv-icon" title="Reprint" aria-label={`Reprint ${x.receipt}`} onClick={() => rp.toggle(x.paymentId!)}><PrintGlyph /></button>}</td></tr>,
               x.paymentId ? <Fragment key={`${x.receipt}-${i}-reprint`}>{rp.formRow("receipt", x.paymentId, x.receipt, 7)}</Fragment> : null,
             ];
@@ -789,9 +789,9 @@ export function BillingStatementReport({ switcher, onBack }: { switcher?: ReactN
   </div>;
 }
 
-type DocRow = { id: string; number: string; issuedAt: string; trainee: string; nwmtaciNo: string; label?: string; courses?: string; method?: string; reference?: string; amount?: number; valid?: boolean; payment?: string; balanceCentavos?: number; printCount: number };
+type DocRow = { id: string; number: string; issuedAt: string; trainee: string; nwmtaciNo: string; label?: string; courses?: string; method?: string; reference?: string; amount?: number; valid?: boolean; voidReason?: string | null; verificationState?: string | null; payment?: string; balanceCentavos?: number; printCount: number };
 /** Accounting › Receipts and TARs (owner, 3 Nov 2026): date-sensitive lists of every receipt and TAR issued; Accounting reprints them, with a reason and no limit. */
-export function AccountingDocuments({ only, embedded }: { only?: "receipts" | "tars"; embedded?: boolean } = {}) {
+export function AccountingDocuments({ only, embedded, data: portal }: { only?: "receipts" | "tars"; embedded?: boolean; data?: PortalData } = {}) {
   const p = usePeriod();
   const [kindPick, setKind] = useState<"receipts" | "tars">(only ?? "receipts"), [q, setQ] = useState(""), [tick, setTick] = useState(0);
   const kind = only ?? kindPick;
@@ -803,8 +803,7 @@ export function AccountingDocuments({ only, embedded }: { only?: "receipts" | "t
   const pg = usePaged(rows);
   const rp = useReprint(() => setTick((n) => n + 1));
   const total = rows.filter((r) => r.valid !== false).reduce((s, r) => s + Number(r.amount ?? 0), 0);
-  const cols = kind === "receipts" ? 8 : 7;
-  const when = (iso: string) => `${fmtDate(iso)} · ${new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso))}`;
+  const when =(iso: string) => `${fmtDate(iso)} · ${new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso))}`;
   const body = <>
     {!only && <div className="sub-pills">{([["receipts", "Acknowledgement Receipts"], ["tars", "Training Admission Records"]] as const).map(([k, label]) => <button key={k} type="button" className={kind === k ? "on" : ""} onClick={() => { setKind(k); rp.close(); }}>{label}</button>)}</div>}
     {rp.msg && <Message kind={rp.msg.kind} text={rp.msg.text} />}
@@ -812,19 +811,28 @@ export function AccountingDocuments({ only, embedded }: { only?: "receipts" | "t
     <section className="portal-panel cx-panel">
       <PeriodBar p={p} what={kind === "receipts" ? "Receipts issued" : "TARs issued"} count={`${rows.length}`} />
       <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search receipts and TARs" placeholder="Search number, trainee or NWMTACI No." value={q} onChange={(e) => setQ(e.target.value)} /></div>
-      {!range ? null : !data ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : rows.length ? <div className="portal-table ac-table"><table><thead><tr>
-        {kind === "receipts" ? <><th>AR No.</th><th>Issued</th><th>Trainee</th><th>For</th><th>Mode</th><th className="r">Amount</th><th>Printed</th><th></th></> : <><th>TAR No.</th><th>Issued</th><th>Trainee</th><th>Courses</th><th>Payment</th><th>Printed</th><th></th></>}
-      </tr></thead><tbody>
-        {pg.shown.map((r) => <Fragment key={r.id}><tr className={r.valid === false ? "pv-void" : undefined}>
-          <td className="cx-mono"><b>{r.number}</b></td><td>{when(r.issuedAt)}</td><td>{r.trainee}<small className="cx-mono">{r.nwmtaciNo}</small></td>
-          {kind === "receipts" ? <><td>{r.label}</td><td>{r.method}{r.reference ? <small>Ref. {r.reference}</small> : null}</td><td className="r cx-amt">{pesos2(Number(r.amount ?? 0))}</td></>
-            : <><td>{r.courses || "—"}</td><td><Badge tone={r.payment === "Paid" ? "active" : r.payment === "Company Charge" ? "pending" : "cancelled"}>{r.payment === "Balance" ? `Balance ${pesos2(Number(r.balanceCentavos ?? 0))}` : r.payment ?? ""}</Badge></td></>}
-          <td>{r.valid === false ? <Badge tone="cancelled">VOID</Badge> : r.printCount ? `Printed ${r.printCount} time${r.printCount === 1 ? "" : "s"}` : "Not printed yet"}</td>
-          <td>{r.valid !== false && <button type="button" className="portal-secondary" onClick={() => rp.toggle(r.id)}>Reprint</button>}</td></tr>
-          {rp.formRow(kind === "receipts" ? "receipt" : "tar", r.id, r.number, cols)}
-        </Fragment>)}
-      </tbody>{kind === "receipts" && <tfoot><tr><td colSpan={5}>{rows.length} receipt{rows.length === 1 ? "" : "s"} · {range.label}</td><td className="r cx-amt">{pesos2(total)}</td><td colSpan={2} /></tr></tfoot>}</table>{pg.pager}</div>
-        : <p className="portal-empty-copy">No {kind === "receipts" ? "receipts" : "TARs"} issued in this period.</p>}
+      {!range ? null : !data ? <p className="portal-empty-copy">{error ? "" : "Loading…"}</p> : !rows.length ? <p className="portal-empty-copy">No {kind === "receipts" ? "receipts" : "TARs"} issued in this period.</p>
+        : kind === "receipts" ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Time</th><th>Trainee</th><th>For</th><th>Mode</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
+          {/* Day Ledger with Icon Actions, the same row as Cashier › Payments (owner, 5 Nov 2026). */}
+          {pg.shown.flatMap((r, i) => {
+            const d = manilaDay(r.issuedAt), onDay = rows.filter((x) => manilaDay(x.issuedAt) === d), isVoid = r.valid === false;
+            const s = paymentStatus(portal ?? {}, { id: r.id, valid: r.valid, void_reason: r.voidReason, verification_state: r.verificationState });
+            return [
+              (!i || manilaDay(pg.shown[i - 1].issuedAt) !== d) && <PaymentDayRow key={`day-${d}`} day={fmtDate(d)} count={onDay.length} span={5} total={pesos2(onDay.filter((x) => x.valid !== false).reduce((n, x) => n + Number(x.amount ?? 0), 0))} />,
+              <tr key={r.id} className={isVoid ? "pv-void" : undefined}><td data-l="Time" className="cx-mono">{fmtClock(r.issuedAt)}</td><td data-l="" className="lead"><span className="cx-name">{r.trainee}</span><small className="cx-mono">{r.number}</small></td><td data-l="For">{r.label}</td><td data-l="Mode">{r.method}{r.reference ? <small className="cx-mono">{r.reference}</small> : null}</td><td data-l="Status"><Badge tone={s.tone}>{s.label}</Badge><small>{s.note || (r.printCount ? `Printed ${r.printCount} Time${r.printCount === 1 ? "" : "s"}` : "Not Yet Printed")}</small></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(Number(r.amount ?? 0))}</strong></td><td data-l="">{!isVoid && <button type="button" className="pv-icon" title="Reprint" aria-label={`Reprint ${r.number}`} onClick={() => rp.toggle(r.id)}><PrintGlyph /></button>}</td></tr>,
+              <Fragment key={`${r.id}-reprint`}>{rp.formRow("receipt", r.id, r.number, 7)}</Fragment>,
+            ];
+          })}
+        </tbody><tfoot><tr><td data-l="" colSpan={5}>{rows.length} receipt{rows.length === 1 ? "" : "s"} · {range.label}</td><td data-l="Total" className="r cx-amt">{pesos2(total)}</td><td data-l="" /></tr></tfoot></table>{pg.pager}</div>
+        : <div className="portal-table ac-table"><table><thead><tr><th>TAR No.</th><th>Issued</th><th>Trainee</th><th>Courses</th><th>Payment</th><th>Printed</th><th></th></tr></thead><tbody>
+          {pg.shown.map((r) => <Fragment key={r.id}><tr>
+            <td className="cx-mono"><b>{r.number}</b></td><td>{when(r.issuedAt)}</td><td>{r.trainee}<small className="cx-mono">{r.nwmtaciNo}</small></td>
+            <td>{r.courses || "—"}</td><td><Badge tone={r.payment === "Paid" ? "active" : r.payment === "Company Charge" ? "pending" : "cancelled"}>{r.payment === "Balance" ? `Balance ${pesos2(Number(r.balanceCentavos ?? 0))}` : r.payment ?? ""}</Badge></td>
+            <td>{r.printCount ? `Printed ${r.printCount} time${r.printCount === 1 ? "" : "s"}` : "Not printed yet"}</td>
+            <td><button type="button" className="portal-secondary" onClick={() => rp.toggle(r.id)}>Reprint</button></td></tr>
+            {rp.formRow("tar", r.id, r.number, 7)}
+          </Fragment>)}
+        </tbody></table>{pg.pager}</div>}
     </section>
   </>;
   return embedded ? body : <div className="portal-page cx ac"><TxHead title="Receipts and TARs" />{body}</div>;
