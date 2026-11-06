@@ -5,7 +5,7 @@ import type { PortalData, Enrollment, TraineeProofRow } from "../portal-live-app
 import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos, pesos2 } from "@/lib/portal-format";
 import { pesosInWords } from "@/lib/amount-words";
 import { ALL_DATES, Badge, Message, Modal, PageHead, ViewIcon, fullName, fmtDate, fmtClock, txWhen, useNeedSince, usePaged, usePost, openAdmissionRecord, submit, MonthBar, usePeriod } from "./shared-ui";
-import { PaymentDayRow, PrintGlyph, RequestVoidIcon, paymentStatus } from "./payment-void";
+import { PaymentDayRow, PrintGlyph, RequestVoidIcon, VoidGlyph, paymentStatus } from "./payment-void";
 import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balances";
 import { requestFee } from "@/lib/request-fees";
 import type { CashierReportSnapshot } from "@/lib/documents";
@@ -201,9 +201,6 @@ function groupByTrainee(data: PortalData, list: Enrollment[], sinceOf: (e: Enrol
   }
   return [...map.values()];
 }
-function CourseList({ list }: { list: Enrollment[] }) {
-  return <div className="cx-courses">{list.map((e) => <div key={e.id}><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small></div>)}</div>;
-}
 /**
  * Tick boxes for separate payments (owner, 4 Nov 2026): each course with a balance has a tick; the button records the
  * ticked ones. Ticked courses paid together share one receipt and one TAR; paid separately, each has its own.
@@ -218,6 +215,11 @@ export function RecordTicked({ data, list, off, onPay }: { data: PortalData; lis
   const ticked = list.filter((e) => balanceOf(e) > 0 && !off[e.id]);
   const amount = ticked.reduce((s, e) => s + Math.max(0, balanceOf(e) - (data.pendingRebates?.[e.id] ?? 0)), 0);
   return <button type="button" className="portal-primary" disabled={!ticked.length} onClick={() => onPay(ticked[0].id, ticked.map((e) => e.id))}>{ticked.length ? `Record ${pesos(amount)}` : "Tick a Course"}</button>;
+}
+/** Paid and Enrolled, Balance First: who still owes stays in view; everyone fully paid folds into one line. */
+export function paidSections<G extends { balance: number; paid: number }>(groups: G[]) {
+  const withBalance = groups.filter((g) => g.balance > 0), fullyPaid = groups.filter((g) => g.balance <= 0);
+  return { withBalance, fullyPaid, fullyPaidTotal: fullyPaid.reduce((s, g) => s + g.paid, 0) };
 }
 const Who = ({ name, number }: { name: string; number?: string }) => <><span className="cx-name">{name}</span>{number ? <span className="cx-id">{number}</span> : null}</>;
 const payState = (e: Enrollment) => (e.enrollment_status === "Cancelled" ? "Cancelled" : balanceOf(e) === 0 ? "Paid" : paidOf(e) > 0 ? "Partially paid" : "Unpaid");
@@ -495,8 +497,9 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
  * Registration (waiting for payment), trainees already paid and enrolled, and
  * balances still due after training (emailed daily at 4:00 PM).
  */
-export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData; onPay: (enrollmentId: string, courses?: string[]) => void; reload: () => Promise<void>; go?: (module: string) => void }) {
+export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { data: PortalData; onPay: (enrollmentId: string, courses?: string[]) => void; reload: () => Promise<void>; go?: (module: string) => void; onOpenTrainee?: (traineeId: string) => void }) {
   const [raising, setRaising] = useState(false), [reqFilter, setReqFilter] = useState<"All" | "For Approval" | "Approved" | "Rejected">("All");
+  const [showPaid, setShowPaid] = useState(false);
   const today = manilaToday();
   const handed = data.handedToCashier ?? {};
   const todays = data.payments.filter((p) => day(p.received_at) === today);
@@ -518,7 +521,16 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
   const unpaid = unpaidAfterTraining(data.enrollments.filter((e) => !data.companyCharge?.[e.id]) as unknown as BalanceEnrollment[], (id) => durations.get(id), today);
   const proofs = data.traineeProofs ?? [];
   const [fromProof, setFromProof] = useState<TraineeProofRow | null>(null), [notValid, setNotValid] = useState<{ id: string; why: ReasonValue } | null>(null);
-  const freshP = usePaged(fresh), paidP = usePaged(paid), unpaidP = usePaged(unpaid), proofP = usePaged(proofs);
+  const { withBalance, fullyPaid, fullyPaidTotal } = paidSections(paid);
+  const freshP = usePaged(fresh), dueP = usePaged(withBalance), paidP = usePaged(fullyPaid), unpaidP = usePaged(unpaid), proofP = usePaged(proofs);
+  // Paid and Enrolled, Design 1 · Balance First (owner, 6 Nov 2026): the course count stays; the Trainee Account holds the courses, and the Record window the ticks.
+  const trainee = (id: string, name: string, number: string) => (onOpenTrainee ? <button type="button" className="pv-open" onClick={() => onOpenTrainee(id)}><Who name={name} number={number} /></button> : <Who name={name} number={number} />);
+  const paidRow = (g: TraineeGroup) => { const latest = data.payments.filter((p) => p.trainee_id === g.traineeId).sort((a, b) => b.received_at.localeCompare(a.received_at))[0]; return <tr key={g.traineeId}>
+    <td data-l="" className="lead">{trainee(g.traineeId, g.name, g.number)}</td>
+    <td data-l="Courses">{g.enrollments.length} Course{g.enrollments.length === 1 ? "" : "s"}</td>
+    <td data-l="Paid" className="r"><strong className="cx-amt">{pesos(g.paid)}</strong></td>
+    <td data-l="Status">{g.balance === 0 ? <Badge tone="active">Paid</Badge> : <Badge tone="orange">{`Balance ${pesos(g.balance)}`}</Badge>}</td>
+    <td data-l=""><div className="cx-acts">{g.balance > 0 && <RecordTicked data={data} list={g.enrollments} off={{}} onPay={onPay} />}{latest && <ReceiptButton data={data} paymentId={latest.id} reload={reload} icon />}</div></td></tr>; };
   const unpaidTotal = unpaid.reduce((s, r) => s + r.balanceCentavos, 0);
   const { busy, msg, post } = usePost(reload);
   const opening = (data.cashierOpenings ?? []).find((o) => o.opening_date === today);
@@ -573,15 +585,13 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
       <div className="ac-stack">
         {/* Proofs of payment sent by trainees from the website, still with no receipt (owner, 29 Oct 2026). */}
         {proofs.length > 0 && <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Proofs of Payment · No Receipt Yet</h2></div><span className="slot-count">{proofs.length}</span></div>
-          <div className="portal-table cx-cards"><table><thead><tr><th>Uploaded</th><th>Trainee</th><th>Courses</th><th>Mode</th><th className="r">Amount</th><th>Reference</th><th></th></tr></thead><tbody>
-            {proofP.shown.map((p) => { const g = groupByTrainee(data, data.enrollments.filter((e) => e.trainee_id === p.trainee_id && e.enrollment_status !== "Cancelled"))[0]; return <tr key={p.id}>
-              <td data-l="Uploaded">{fmtDate(day(p.submitted_at))}<small>{fmtClock(p.submitted_at)}</small></td>
-              <td data-l="" className="lead"><Who name={p.name} number={p.number} /></td>
-              <td data-l="Courses">{g ? <><CourseList list={g.enrollments} /><small>Balance {pesos(g.balance)}</small></> : <small>No course yet</small>}</td>
-              <td data-l="Mode">{p.method}</td>
+          <div className="portal-table cx-cards pe-table pe-proofs"><table><thead><tr><th>Trainee</th><th>Mode</th><th className="r">Amount</th><th>Uploaded</th><th></th></tr></thead><tbody>
+            {proofP.shown.map((p) => { const hasCourse = data.enrollments.some((e) => e.trainee_id === p.trainee_id && e.enrollment_status !== "Cancelled"); return <tr key={p.id}>
+              <td data-l="" className="lead">{trainee(p.trainee_id, p.name, p.number)}{!hasCourse && <small>No Course Yet</small>}</td>
+              <td data-l="Mode">{p.method}{p.reference ? <small className="cl-mono">{p.reference}</small> : null}</td>
               <td data-l="Amount" className="r"><strong className="cx-amt">{pesos(p.amount_centavos)}</strong></td>
-              <td data-l="Reference" className="cl-mono">{p.reference}</td>
-              <td data-l=""><div className="cx-acts">{p.drive_link && <ViewIcon label="View Proof" href={p.drive_link} />}<button type="button" className="portal-primary" disabled={!g} onClick={() => setFromProof(p)}>Record</button><button type="button" className="portal-secondary" onClick={() => setNotValid({ id: p.id, why: NO_REASON })}>Not Valid</button></div>
+              <td data-l="Uploaded">{fmtDate(day(p.submitted_at))}<small>{fmtClock(p.submitted_at)}</small></td>
+              <td data-l=""><div className="cx-acts">{p.drive_link && <ViewIcon label="View Proof" href={p.drive_link} />}<button type="button" className="portal-primary" disabled={!hasCourse} onClick={() => setFromProof(p)}>Record</button><button type="button" className="pv-icon d" title="Not Valid" aria-label={`Not Valid, proof of ${p.name}`} onClick={() => setNotValid({ id: p.id, why: NO_REASON })}><VoidGlyph /></button></div>
                 {notValid?.id === p.id && <div className="cx-acts" style={{ marginTop: 6 }}><span className="cx-reasons"><ReasonField reasons={REASONS.proofNotValid} value={notValid.why} onChange={(why) => setNotValid({ id: p.id, why })} autoFocus /></span><button type="button" className="portal-primary" disabled={busy || !reasonReady(notValid.why)} onClick={async () => { await post({ action: "proof-dismiss", proofId: p.id, reason: reasonText(notValid.why) }, "Marked Not Valid."); setNotValid(null); }}>Confirm</button><button type="button" className="portal-secondary" onClick={() => setNotValid(null)}>Cancel</button></div>}</td>
             </tr>; })}
           </tbody></table>{proofP.pager}</div></section>}
@@ -598,13 +608,11 @@ export function CashierDashboard({ data, onPay, reload, go }: { data: PortalData
         </section>
         {/* Paid and Enrolled (owner, 20 Oct 2026): one compact line per trainee; the TAR is printed by Registration. */}
         <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Paid and Enrolled</h2></div><span className="slot-count">{paid.length}</span></div>
-      {paid.length ? <div className="portal-table cx-cards pe-table"><table><thead><tr><th>Trainee · NWMTACI No.</th><th>Courses · Training</th><th className="r">Payment</th><th></th></tr></thead><tbody>
-        {paidP.shown.map((g) => { const latest = data.payments.filter((p) => p.trainee_id === g.traineeId).sort((a, b) => b.received_at.localeCompare(a.received_at))[0]; return <tr key={g.traineeId}>
-          <td data-l="" className="lead"><Who name={g.name} number={g.number} /></td>
-          <td data-l="Courses">{g.balance > 0 ? <TickCourses list={g.enrollments} off={off} setOff={setOff} /> : <span className="pe-courses">{g.enrollments.map((e) => <span key={e.id} className="pe-course" title={first(e.courses)?.name ?? ""}><b>{courseCode(e)}</b>{scheduleText(e)}</span>)}</span>}</td>
-          <td data-l="Payment" className="r"><strong className="cx-amt">{pesos(g.paid)}</strong><small>{g.balance === 0 ? <Badge tone="active">Paid</Badge> : <Badge tone="orange">{`Balance ${pesos(g.balance)}`}</Badge>}</small></td>
-          <td data-l=""><div className="cx-acts">{g.balance > 0 && <RecordTicked data={data} list={g.enrollments} off={off} onPay={onPay} />}{latest && <ReceiptButton data={data} paymentId={latest.id} reload={reload} />}</div></td></tr>; })}
-      </tbody></table>{paidP.pager}</div> : <p className="portal-empty-copy">No paid trainees in the last 7 days.</p>}
+      {!paid.length ? <p className="portal-empty-copy">No paid trainees in the last 7 days.</p> : <>
+        {withBalance.length > 0 && <><div className="pe-sec">With Balance · {withBalance.length}</div><div className="portal-table cx-cards pe-table"><table><tbody>{dueP.shown.map(paidRow)}</tbody></table>{dueP.pager}</div></>}
+        {fullyPaid.length > 0 && <button type="button" className="pe-fold" aria-expanded={showPaid} onClick={() => setShowPaid((s) => !s)}><span>{fullyPaid.length} Fully Paid · {pesos(fullyPaidTotal)}</span><span>{showPaid ? "Hide ▴" : "Show ▾"}</span></button>}
+        {showPaid && fullyPaid.length > 0 && <div className="portal-table cx-cards pe-table"><table><tbody>{paidP.shown.map(paidRow)}</tbody></table>{paidP.pager}</div>}
+      </>}
     </section>
         <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Unpaid Balances · 4:00 PM Summary</h2></div><span className="document-actions"><button type="button" className="portal-secondary" disabled={busy} onClick={() => void post({ action: "balance-summary-send" }, "Summary emailed.").catch(() => undefined)}>Email Summary Now</button></span></div>
       {unpaid.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Training</th><th>Status</th><th className="r">Balance</th><th></th></tr></thead><tbody>

@@ -464,7 +464,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Cash position")return <AccountingCashPosition data={data}/>;
   }
   if(gateRole==="cashier"){
-    if(active==="Dashboard")return <CashierDashboard data={data} onPay={onPay} reload={reload} go={(m)=>go(m as Module)}/>;
+    if(active==="Dashboard")return <CashierHome data={data} onPay={onPay} reload={reload} role={gateRole} go={(m)=>go(m as Module)}/>;
     if(active==="Search trainee")return <CashierSearchTrainee data={data} onPay={onPay} reload={reload} role={gateRole}/>;
     if(active==="Payments")return <CashierPayments data={data} onPay={onPay} reload={reload}/>;
     if(active==="Daily summary")return <CashierSummaryReport data={data}/>;
@@ -763,6 +763,14 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
     {addingCourse&&reload&&<AssignCourseModal data={data} trainee={trainee} reload={reload} onClose={()=>setAddingCourse(false)}/>}
     {openEnrollment&&reload&&(()=>{const e=data.enrollments.find(x=>x.id===openEnrollment);return e?<EnrollmentDrawer data={data} enrollment={e} reload={reload} onClose={()=>setOpenEnrollment(null)}/>:null})()}
   </Modal>;
+}
+
+/** Cashier Dashboard with the Trainee Account a click away (owner, 6 Nov 2026). A trainee from an earlier month is not loaded yet, so opening one loads all dates. */
+function CashierHome({data,onPay,reload,role,go}:{data:PortalData;onPay:(enrollmentId:string,courses?:string[])=>void;reload:()=>Promise<void>;role:string;go:(module:string)=>void}){
+  const [sel,setSel]=useState<string|null>(null);
+  useNeedSince(sel?ALL_DATES:"");
+  const t=sel?data.trainees.find(x=>x.id===sel):undefined;
+  return <><CashierDashboard data={data} onPay={onPay} reload={reload} go={go} onOpenTrainee={setSel}/>{t&&<TraineeDetailModal data={data} trainee={t} reload={reload} role={role} onClose={()=>setSel(null)}/>}</>;
 }
 
 /** Cashier › Search Trainee, with the Trainee Account a click away (payment voids, 29 Oct 2026). */
