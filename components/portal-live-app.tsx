@@ -403,7 +403,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Other income")return <OtherIncome data={data} reload={reload} canRecord={["cashier","accounting","admin"].includes(gateRole)} canVoid={data.roles.includes("admin")} canAddCategory={["accounting","admin"].includes(gateRole)}/>;
   // Training Completion and Record of Assessment Report (owner, 9 Oct 2026): MISMO Compliance Officer and Admin.
   if(active==="MISMO List"&&["mismo_officer","admin"].includes(gateRole))return <MismoList/>;
-  if(active==="Dashboard"&&gateRole==="registration")return <RegistrationDashboard data={data} go={m=>go(m as Module)}/>;
+  if(active==="Dashboard"&&gateRole==="registration")return <RegistrationDashboard data={data} go={m=>go(m as Module)} reload={reload} account={(id,close)=>{const t=data.trainees.find(x=>x.id===id);return t?<TraineeDetailModal data={data} trainee={t} reload={reload} role={gateRole} onClose={close}/>:null}}/>;
   // Admin › Configuration › Courses: add, edit and remove (owner, 20 Oct 2026); Registration keeps the read-only list.
   // Admin › Configuration › Post-Tests (owner, 20 Oct 2026).
   if(active==="Post-tests"&&gateRole==="admin")return <PostTestReview/>;

@@ -30,6 +30,8 @@ import { VALIDATION_MESSAGES, isMetaThreadUrl } from "@/lib/validation";
  */
 
 type RequestRow = PortalData["requests"][number];
+/** Opens the Trainee Account from an application window; the portal shell renders it. */
+type TraineeAccount = (traineeId: string, onClose: () => void) => ReactNode;
 
 const fmtLong = (v: string) => new Intl.DateTimeFormat("en-PH", { weekday: "long", month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${v}T00:00:00+08:00`));
 const day = (v?: string | null) => (v ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date(v)) : "");
@@ -69,100 +71,109 @@ function groupBy<T>(rows: T[], key: (r: T) => string): [string, T[]][] {
   return [...m.entries()];
 }
 
-/**
- * Registration dashboard (owner, 7 Oct 2026): two boxes.
- * - New Registrations: website applications not yet enrolled, newest first.
- * - Enrollments: pick a day to see who became enrolled (paid) that day.
- */
-export function RegistrationDashboard({ data, go }: { data: PortalData; go: (module: string) => void }) {
+/** The enrollments of one Manila day, with its date picker (owner, 7 Oct 2026). */
+export function EnrolledDayPanel({ data, onOpen }: { data: PortalData; onOpen: (e: Enrollment) => void }) {
   const today = manilaToday();
   const [picked, setPicked] = useState(today);
-  const courseById = new Map(data.courses.map((c) => [c.id, c]));
-  const courseLabel = (e: Enrollment) => first(e.courses)?.name ?? courseById.get(e.course_id)?.name ?? "Course";
-  const applications = applicationsOf(data).sort((a, b) => b.created_at.localeCompare(a.created_at));
-  const noCourse = awaitingCourseOf(data);
-  const newCount = applications.length + noCourse.length;
-  const newToday = applications.filter((e) => day(e.created_at) === today).length + noCourse.filter((t) => day(t.registered_at) === today).length;
-  // Enrolled on the picked day (enrolled_at, or the last update for older rows).
-  const enrolledDay = (e: Enrollment) => day(e.enrolled_at ?? e.updated_at ?? e.created_at);
-  const enrolled = data.enrollments.filter((e) => e.enrollment_status === "Enrolled" && enrolledDay(e) === picked)
-    .sort((a, b) => (b.enrolled_at ?? b.updated_at ?? "").localeCompare(a.enrolled_at ?? a.updated_at ?? ""));
-  const enrolledPaid = enrolled.reduce((sum, e) => sum + Number(e.verified_paid_centavos ?? e.paid_centavos ?? 0), 0);
-  const shift = (days: number) => setPicked((d) => addDays(d, days));
+  useNeedSince(picked);
+  const rows = enrolledOn(data, picked);
+  const paid = rows.reduce((sum, e) => sum + Number(e.verified_paid_centavos ?? e.paid_centavos ?? 0), 0);
+  return <section className="portal-panel cx-panel">
+    <div className="panel-heading"><h2>Enrollments</h2><button type="button" className="portal-secondary" onClick={() => setPicked(today)} disabled={picked === today}>Today</button></div>
+    <div className="rd-datebar nu-pad">
+      <button type="button" className="ghost-button" aria-label="Previous Day" onClick={() => setPicked((d) => addDays(d, -1))}>‹</button>
+      <input type="date" value={picked} max={today} onChange={(ev) => ev.target.value && setPicked(ev.target.value)} aria-label="Enrollment Date" />
+      <button type="button" className="ghost-button" aria-label="Next Day" disabled={picked >= today} onClick={() => setPicked((d) => addDays(d, 1))}>›</button>
+      <span className="rd-datesum">{fmtDay(picked)} · {rows.length} Enrolled · {pesos(paid)} Paid</span>
+    </div>
+    {rows.length ? <div className="portal-table cx-cards nu-table"><table><tbody>{rows.map((e) => <tr key={e.id}>
+      <td data-l="" className="lead"><button type="button" className="pv-open" onClick={() => onOpen(e)}><span className="cx-name">{nameOf(e)}</span><span className="cx-id">{appNoOf(data, e.trainee_id) ?? first(e.trainees)?.trainee_number ?? e.enrollment_number}</span></button></td>
+      <td data-l="Course">{first(e.courses)?.code ?? "—"}<small>{scheduleOf(e)}</small></td>
+      <td data-l="Paid" className="r"><strong className="cx-amt">{pesos(Number(e.verified_paid_centavos ?? e.paid_centavos ?? 0))}</strong></td>
+    </tr>)}</tbody></table></div> : <p className="portal-empty-copy">Nobody enrolled on {fmtDay(picked)}.</p>}
+  </section>;
+}
 
-  // Summary rail (owner, 8 Oct 2026): figures on the left, the two working lists on the right.
-  const states = applications.map((e) => stateOf(readinessOf(data, e)).text);
-  const stateCount = (t: string) => states.filter((x) => x === t).length;
-  const queue: [string, string, number][] = [["Screening", "#0571D0", stateCount("Screening") + stateCount("Needs attention")], ["For payment", "#F25615", stateCount("For payment")], ["Paid · choose batch", "#7a3fb8", stateCount("Paid · choose batch") + stateCount("Paid · enrolling") + stateCount("Paid · requirements missing")], ["Course to assign", "#5d6f7e", noCourse.length]];
-  const now = new Date().toISOString(), tomorrow = addDays(today, 1);
-  const stcw = uniqueCourses(data.courses.filter((x) => x.delivery_type === "In-House" && isStcwCourse(x))).map((course) => ({ course, next: data.batches.filter((x) => x.course_id === course.id && isBookable(x, today, now)).sort((x, y) => x.starts_on.localeCompare(y.starts_on))[0] })).filter((x) => x.next);
+/** The next bookable batch of each STCW course, with its seats. */
+export function StcwSeatsPanel({ seats, go }: { seats: StcwSeat[]; go: (module: string) => void }) {
+  return <section className="portal-panel cx-panel">
+    <div className="panel-heading"><h2>STCW Seats</h2><button type="button" className="portal-secondary" onClick={() => go("Batch schedules")}>View Schedules</button></div>
+    {seats.length ? seats.map(({ course, next }) => { const left = seatsLeft(next); return <div className="nu-seat" key={course.id}>
+      <span className="nu-seatname"><b>{course.code}</b><small>{dateRange(next.starts_on, next.ends_on)} · {next.batch_number}</small></span>
+      <span className={`nu-meter${left <= 3 ? " low" : ""}`} role="img" aria-label={`${next.confirmed_count} of ${next.capacity} seats taken`}><i style={{ width: `${Math.round((next.confirmed_count / Math.max(1, next.capacity)) * 100)}%` }} /></span>
+      <span className="nu-left"><strong className="cx-amt">{left}</strong> Left</span>
+    </div>; }) : <p className="portal-empty-copy">No STCW batches open.</p>}
+  </section>;
+}
+
+/**
+ * Registration Dashboard, Design 1 · Next Up (owner, 6 Nov 2026): one work list
+ * with the next step on each row, the trainees with the Cashier folded under it,
+ * and tomorrow, STCW seats and the day's enrollments as three small tiles that
+ * open one panel at a time. Each step opens the window that already does it.
+ */
+export function RegistrationDashboard({ data, go, reload, account }: { data: PortalData; go: (module: string) => void; reload: () => Promise<void>; account?: TraineeAccount }) {
+  const today = manilaToday(), now = new Date().toISOString(), tomorrow = addDays(today, 1);
+  const [panel, setPanel] = useState<"" | "tomorrow" | "seats" | "enrolled">("");
+  const [showCashier, setShowCashier] = useState(false);
+  const [open, setOpen] = useState<Enrollment | null>(null);
+  const [placing, setPlacing] = useState<Enrollment | null>(null);
+  const [assigning, setAssigning] = useState<Trainee | null>(null);
+  const [accountOf, setAccountOf] = useState<string | null>(null);
+  const toggle = (name: typeof panel) => setPanel((v) => (v === name ? "" : name));
+
+  const items: NextUpItem[] = [
+    ...awaitingCourseOf(data).map((t) => ({ key: t.id, t, step: "Assign Course", chip: "No Course Yet", tone: "pending", rank: 2, at: t.registered_at ?? "" }) as NextUpItem),
+    ...applicationsOf(data).map((e) => ({ key: e.id, e, ...nextUpOf(readinessOf(data, e), !!chargeTo(data, e)), at: e.created_at }) as NextUpItem),
+  ];
+  const work = items.filter((x) => x.step).sort((a, b) => a.rank - b.rank || a.at.localeCompare(b.at));
+  const withCashier = items.filter((x) => !x.step).sort((a, b) => a.at.localeCompare(b.at));
+  const workPage = usePaged(work), cashierPage = usePaged(withCashier);
+  const current = open ? data.enrollments.find((e) => e.id === open.id) ?? open : null;
+
+  const row = (x: NextUpItem) => { const e = x.e, id = e?.trainee_id ?? x.t?.id, c = e ? first(e.courses) : null; return <tr key={x.key}>
+    <td data-l="" className="lead"><button type="button" className="pv-open" onClick={() => (e ? setOpen(e) : setAssigning(x.t!))}><span className="cx-name">{e ? nameOf(e) : fullName(x.t!)}</span><span className="cx-id">{appNoOf(data, id) ?? x.t?.trainee_number ?? e?.enrollment_number}</span></button></td>
+    <td data-l="Course">{e ? <>{c?.code ?? c?.name ?? "—"}<small>{scheduleOf(e)}</small></> : <span className="muted-text">Course to Assign</span>}</td>
+    <td data-l="Status"><Badge tone={x.tone}>{x.chip}</Badge></td>
+    <td data-l=""><div className="cx-acts">{x.step && <button type="button" className="portal-primary" onClick={() => (!e ? setAssigning(x.t!) : x.step === "Choose Batch" ? setPlacing(e) : setOpen(e))}>{x.step}</button>}</div></td>
+  </tr>; };
+
+  const seats = stcwSeatsOf(data, today, now);
+  const seatsOpen = seats.reduce((sum, x) => sum + seatsLeft(x.next), 0);
   const tomorrowBatches = data.batches.filter((x) => x.starts_on === tomorrow && x.status !== "Cancelled");
   const tomorrowIds = new Set(tomorrowBatches.map((x) => x.id));
   const tomorrowEnr = data.enrollments.filter((e) => e.batch_id && tomorrowIds.has(e.batch_id) && e.enrollment_status === "Enrolled");
   const notSent = tomorrowEnr.filter((e) => instructionsCountOf(data, e) === 0).length;
+  const enrolledToday = enrolledOn(data, today).length;
+  const tile = (name: Exclude<typeof panel, "">, title: string, sub: string, warn = false) => <button type="button" className={`nu-tile${warn ? " warn" : ""}`} aria-expanded={panel === name} onClick={() => toggle(name)}><b>{title}</b><span>{sub}</span></button>;
+
   return <div className="portal-page cx ac">
     <div className="cx-head">
-      <div><span className="portal-eyebrow">Registration</span><h1>Dashboard</h1></div>
-      <span style={{ display: "inline-flex", gap: 10, flexWrap: "wrap" }}>
-        <button type="button" className="portal-secondary" onClick={() => go("Trainees")}>Search Trainee</button>
-        <button type="button" className="portal-primary" onClick={() => go("Applications")}>Screen Applications{newCount ? ` (${newCount})` : ""}</button>
-      </span>
+      <div><span className="portal-eyebrow">{fmtLong(today)}</span><h1>Dashboard</h1></div>
+      <button type="button" className="portal-secondary" onClick={() => go("Trainees")}>Search Trainee</button>
     </div>
-    <p className="ac-note">{fmtLong(today)}</p>
-
-    <div className="ac-rail">
-      <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Applications</h2><span className="muted-text">tap to open</span></div>
-          <div className="cx-tiles ac-tiles ac-tiles-in">{queue.map(([label, color, n]) => <button type="button" key={label} className="cx-tile ac-pick ac-count" style={{ ["--c" as string]: color }} onClick={() => go("Applications")}><span>{tcl(label)}</span><b>{n}</b></button>)}
-            <div className="cx-tile ac-total ac-count"><span>New today</span><b>{newToday}</b></div></div>
-        </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>STCW Seats Open</h2><button type="button" className="portal-secondary" onClick={() => go("Batch schedules")}>View Schedules</button></div>
-          {stcw.length ? <div className="cx-tiles ac-tiles ac-tiles-in">{stcw.map(({ course, next }) => { const left = seatsLeft(next!); return <div key={course.id} className="cx-tile ac-count ac-seat" style={{ ["--c" as string]: left <= 3 ? "#F25615" : "#0571D0" }}><span>{course.name}<small>{dateRange(next!.starts_on, next!.ends_on)} · {next!.batch_number}</small><i className="ac-meter"><i style={{ width: `${Math.round((next!.confirmed_count / Math.max(1, next!.capacity)) * 100)}%` }} /></i></span><b>{left}</b></div>; })}
-            <div className="cx-tile ac-total ac-count"><span>Seats left</span><b>{stcw.reduce((sum, x) => sum + seatsLeft(x.next!), 0)}</b></div></div> : <p className="portal-empty-copy">No STCW batches open.</p>}
-        </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Tomorrow</h2><span className="muted-text">{fmtShort(tomorrow)}</span></div>
-          <dl className="ac-lines"><div><dt>Trainees in class</dt><dd>{tomorrowEnr.length}</dd></div><div><dt>Batches</dt><dd>{tomorrowBatches.length}</dd></div><div><dt>Instructions not yet sent</dt><dd className={notSent ? "warn" : ""}>{notSent}</dd></div></dl>
-        </section>
-      </div>
-      <div className="ac-stack">
-        <section className="portal-panel rd-panel" id="rd-new">
-          <div className="panel-heading"><div><h2>New Registrations</h2><p>From the website, not yet enrolled · {newToday} today</p></div><span className="rd-count">{newCount}</span></div>
-          <div className="rd-scroll">
-            {noCourse.map((t) => <button type="button" className="rd-row" key={t.id} onClick={() => go("Applications")}>
-              <span className="rd-main"><strong>{fullName(t)}</strong><small>{appNoOf(data, t.id) ? <span className="app-no">{appNoOf(data, t.id)}</span> : null}Course to be assigned</small></span>
-              <Badge tone="pending">No Course Yet</Badge>
-              <span className="rd-time">{day(t.registered_at) === today ? fmtClock(t.registered_at) : fmtShort(day(t.registered_at))}</span>
-            </button>)}
-            {applications.map((e) => { const st = stateOf(readinessOf(data, e)), c = first(e.courses); return <button type="button" className="rd-row" key={e.id} onClick={() => go("Applications")}>
-              <span className="rd-main"><strong>{nameOf(e)}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{c?.code ? `${c.code} · ` : ""}{scheduleOf(e)}</small></span>
-              <Badge tone={st.tone}>{st.text}</Badge>
-              <span className="rd-time">{day(e.created_at) === today ? fmtClock(e.created_at) : fmtShort(day(e.created_at))}</span>
-            </button>; })}
-            {!newCount && <p className="rd-empty">No new registrations waiting.</p>}
-          </div>
-          <button type="button" className="ghost-button rd-more" onClick={() => go("Applications")}>View All →</button>
-        </section>
-
-        <section className="portal-panel rd-panel" id="rd-enrolled">
-          <div className="panel-heading"><div><h2>Enrollments</h2><p>Trainees enrolled (paid) on the selected day</p></div><span className="rd-count">{enrolled.length}</span></div>
-          <div className="rd-datebar">
-            <button type="button" className="ghost-button" aria-label="Previous day" onClick={() => shift(-1)}>‹</button>
-            <input type="date" value={picked} max={today} onChange={(ev) => ev.target.value && setPicked(ev.target.value)} aria-label="Enrollment date" />
-            <button type="button" className="ghost-button" aria-label="Next day" disabled={picked >= today} onClick={() => shift(1)}>›</button>
-            {picked !== today && <button type="button" className="ghost-button" onClick={() => setPicked(today)}>Today</button>}
-            <span className="rd-datesum">{fmtDay(picked)} · {pesos(enrolledPaid)} paid</span>
-          </div>
-          <div className="rd-scroll">
-            {enrolled.map((e) => { const t = first(e.trainees); return <button type="button" className="rd-row" key={e.id} onClick={() => go("Enrollments")}>
-              <span className="rd-main"><strong>{nameOf(e)}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{courseLabel(e)} · {scheduleOf(e)}</small></span>
-              <span className="rd-time">{pesos(Number(e.verified_paid_centavos ?? e.paid_centavos ?? 0))}<small>{t?.trainee_number ?? e.enrollment_number}</small></span>
-            </button>; })}
-            {!enrolled.length && <p className="rd-empty">No trainees were enrolled on {fmtDay(picked)}.</p>}
-          </div>
-          <button type="button" className="ghost-button rd-more" onClick={() => go("Enrollments")}>All Enrollments →</button>
-        </section>
-      </div>
+    <div className="ac-stack">
+    <section className="portal-panel cx-panel" id="rd-next">
+      <div className="panel-heading"><h2>Next Up</h2><span className="rd-count">{work.length}</span></div>
+      {work.length ? <div className="portal-table cx-cards nu-table"><table><thead><tr><th>Trainee</th><th>Course</th><th>Status</th><th></th></tr></thead><tbody>{workPage.shown.map(row)}</tbody></table>{workPage.pager}</div> : <p className="portal-empty-copy">Nobody is waiting on you.</p>}
+      {withCashier.length > 0 && <button type="button" className="pe-fold" aria-expanded={showCashier} onClick={() => setShowCashier((v) => !v)}><span>{withCashier.length} With the Cashier</span><span>{showCashier ? "Hide ▴" : "Show ▾"}</span></button>}
+      {showCashier && withCashier.length > 0 && <div className="portal-table cx-cards nu-table"><table><tbody>{cashierPage.shown.map(row)}</tbody></table>{cashierPage.pager}</div>}
+    </section>
+    <div className="nu-strip">
+      {tile("tomorrow", `Tomorrow · ${tomorrowEnr.length} Trainee${tomorrowEnr.length === 1 ? "" : "s"}`, notSent ? `${notSent} Instruction${notSent === 1 ? "" : "s"} Not Yet Sent` : "All Instructions Sent", notSent > 0)}
+      {tile("seats", `STCW Seats · ${seatsOpen} Open`, "Next Batch per Course")}
+      {tile("enrolled", `Enrolled Today · ${enrolledToday}`, "Pick a Date to See Others")}
     </div>
+    {panel === "tomorrow" && <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Tomorrow · {fmtShort(tomorrow)}</h2></div>
+      <dl className="ac-lines"><div><dt>Trainees in Class</dt><dd>{tomorrowEnr.length}</dd></div><div><dt>Batches</dt><dd>{tomorrowBatches.length}</dd></div><div><dt>Instructions Not Yet Sent</dt><dd className={notSent ? "warn" : ""}>{notSent}</dd></div></dl>
+    </section>}
+    {panel === "seats" && <StcwSeatsPanel seats={seats} go={go} />}
+    {panel === "enrolled" && <EnrolledDayPanel data={data} onOpen={setOpen} />}
+    </div>
+    {current && <EnrollmentDrawer data={data} enrollment={current} reload={reload} onClose={() => setOpen(null)} onOpenAccount={account ? () => setAccountOf(current.trainee_id) : undefined} />}
+    {accountOf && account?.(accountOf, () => setAccountOf(null))}
+    {assigning && <AssignCourseModal data={data} trainee={assigning} reload={reload} onClose={() => setAssigning(null)} />}
+    {placing && <ChooseBatchModal data={data} enrollment={placing} reload={reload} onClose={() => setPlacing(null)} />}
   </div>;
 }
 
@@ -173,10 +184,10 @@ export function RegistrationDashboard({ data, go }: { data: PortalData; go: (mod
  * (owner, 7 Oct 2026). "Other" is an optional, noted extra and never blocks.
  */
 export const REQUIREMENTS = [
-  { code: "valid_id", label: "Valid ID / passport" },
-  { code: "medical_peme", label: "Medical certificate (PEME format)" },
-  { code: "photo_2x2", label: "2x2 photo" },
-  { code: "seamans_book", label: "Seaman's book / SRN" },
+  { code: "valid_id", label: "Valid ID / passport", short: "Valid ID" },
+  { code: "medical_peme", label: "Medical certificate (PEME format)", short: "Medical" },
+  { code: "photo_2x2", label: "2x2 photo", short: "2x2 Photo" },
+  { code: "seamans_book", label: "Seaman's book / SRN", short: "Seaman's Book" },
 ] as const;
 const OTHER_REQUIREMENT = { code: "other", label: "Other" } as const;
 /** A legacy "medical_certificate" tick counts as the PEME medical. */
@@ -202,6 +213,25 @@ export function applicationReadiness(e: Enrollment, checks: RequirementCheck[], 
 }
 /** Screening state of a Pending application. Paid and on a batch means the server enrolls it. */
 const stateOf = (r: ReturnType<typeof applicationReadiness>) => (r.ready ? { text: "Paid · enrolling", tone: "active" } : r.paid && !r.missing.length ? { text: "Paid · choose batch", tone: "active" } : r.paid ? { text: "Paid · requirements missing", tone: "cancelled" } : r.handed ? { text: "For payment", tone: "orange" } : r.rejected.length ? { text: "Needs attention", tone: "cancelled" } : { text: "Screening", tone: "pending" });
+/**
+ * Next Up (owner, 6 Nov 2026): the one thing Registration does next on an
+ * application, or no step when it waits on the Cashier. Lower rank comes first.
+ */
+export function nextUpOf(r: ReturnType<typeof applicationReadiness>, companyCharge = false): { step: string | null; chip: string; tone: string; rank: number } {
+  if (r.handed && !r.paid) return { step: null, chip: "With the Cashier", tone: "orange", rank: 9 };
+  if (r.ready) return { step: "Open", chip: "Paid · Enrolling", tone: "active", rank: 1 };
+  if (r.paid && !r.missing.length) return { step: "Choose Batch", chip: "Paid", tone: "active", rank: 1 };
+  if (r.paid) return { step: "Check Requirements", chip: "Paid · Requirements Missing", tone: "cancelled", rank: 0 };
+  const rejected = REQUIREMENTS.filter((x) => r.latest.get(x.code)?.status === "Rejected");
+  if (rejected.length) return { step: "Check Requirements", chip: rejected.length === 1 ? `${rejected[0].short} Rejected` : `${rejected.length} Requirements Rejected`, tone: "cancelled", rank: 0 };
+  if (!r.missing.length) return { step: companyCharge ? "Enroll · Company Charge" : "Hand to Cashier", chip: "Requirements Complete", tone: "active", rank: 1 };
+  return { step: "Check Requirements", chip: `${r.verified} of ${REQUIREMENTS.length} Requirements`, tone: "pending", rank: 3 };
+}
+type NextUpItem = ReturnType<typeof nextUpOf> & { key: string; at: string; e?: Enrollment; t?: Trainee };
+type StcwSeat = { course: PortalData["courses"][number]; next: Batch };
+const stcwSeatsOf = (data: PortalData, today: string, now: string): StcwSeat[] => uniqueCourses(data.courses.filter((x) => x.delivery_type === "In-House" && isStcwCourse(x))).flatMap((course) => { const next = data.batches.filter((x) => x.course_id === course.id && isBookable(x, today, now)).sort((x, y) => x.starts_on.localeCompare(y.starts_on))[0]; return next ? [{ course, next }] : []; });
+/** Enrolled on a Manila day (enrolled_at, or the last update for older rows), newest first. */
+const enrolledOn = (data: PortalData, d: string) => data.enrollments.filter((e) => e.enrollment_status === "Enrolled" && day(e.enrolled_at ?? e.updated_at ?? e.created_at) === d).sort((a, b) => (b.enrolled_at ?? b.updated_at ?? "").localeCompare(a.enrolled_at ?? a.updated_at ?? ""));
 /** Waiting at the Cashier: handed over and not yet paid. */
 const forPayment = (r: ReturnType<typeof applicationReadiness>) => r.handed && !r.paid;
 const readinessOf = (data: PortalData, e: Enrollment) => applicationReadiness(e, data.requirementChecks ?? [], data.handedToCashier?.[e.id] ?? null);
@@ -337,8 +367,6 @@ function ChooseBatchModal({ data, enrollment, reload, onClose }: { data: PortalD
  * still need a batch) and For payment (handed to the Cashier, not yet paid).
  * Applicants without a course sit above the table under All and Screening.
  */
-/** Opens the Trainee Account from an application window; the portal shell renders it. */
-type TraineeAccount = (traineeId: string, onClose: () => void) => ReactNode;
 function EnrollmentQueue({ data, query, reload, initial, account }: { data: PortalData; query: string; reload: () => Promise<void>; initial: RecordFilter; account?: TraineeAccount }) {
   const [accountOf, setAccountOf] = useState<string | null>(null);
   const [filter, setFilter] = useState<RecordFilter>(initial);

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import type { PortalData } from "@/components/portal-live-app";
-import { CoursesAndCenters, RegistrationDashboard, RegistrationRecords, applicationReadiness } from "@/components/portal/live-registration";
+import { CoursesAndCenters, EnrolledDayPanel, RegistrationDashboard, RegistrationRecords, StcwSeatsPanel, applicationReadiness, nextUpOf } from "@/components/portal/live-registration";
 import { InstructionsButton, InstructionsWindow } from "@/components/portal/instructions-window";
 
 /**
@@ -67,20 +67,52 @@ const noop = () => undefined;
 const reload = async () => undefined;
 
 describe("Registration Officer workspace", () => {
-  it("renders the two-box dashboard: new registrations and enrollments by day", () => {
-    const html = renderToString(createElement(RegistrationDashboard, { data: fixture, go: noop }));
-    for (const title of ["New Registrations", "Enrollments", "Search Trainee", "Screen Applications"]) expect(html).toContain(title);
-    // New Registrations: applicants not yet enrolled (and the one without a course).
-    const box = html.slice(html.indexOf('id="rd-new"'), html.indexOf('id="rd-enrolled"'));
-    expect(box).toContain("Juan Santos");
-    expect(box).toContain("No Course Yet");
-    expect(box).not.toContain("ENR-0001");
-    // Enrollments: today by default, so ENR-0001 (enrolled today) and not ENR-0006 (January).
-    const enrolled = html.slice(html.indexOf('id="rd-enrolled"'));
-    expect(enrolled).toContain("Maria Reyes");
-    expect(enrolled).not.toContain("Pedro Cruz");
-    expect(enrolled).toContain('type="date"');
+  it("renders Next Up: one work list, the Cashier's trainees folded, three tiles", () => {
+    const html = renderToString(createElement(RegistrationDashboard, { data: fixture, go: noop, reload }));
+    for (const title of ["Next Up", "Search Trainee", "STCW Seats · 21 Open", "Enrolled Today · 1", "Tomorrow · 0 Trainees"]) expect(html).toContain(title);
+    expect(html).not.toContain("Screen Applications");
+    // The applicant without a course, and each application with its next step.
+    expect(html).toContain("Pedro Cruz");
+    expect(html).toContain("No Course Yet");
+    expect(html).toContain("Assign Course");
+    expect(html).toContain("0 of 4 Requirements");
+    expect(html).toContain("Check Requirements");
+    // Paid, ticked and on a batch: the server enrolls it, nothing to choose.
+    expect(html).toContain("Paid · Enrolling");
     expect(html).not.toContain("Register a trainee");
+  });
+
+  it("folds the trainees waiting at the Cashier under Next Up", () => {
+    const html = renderToString(createElement(RegistrationDashboard, { data: { ...fixture, handedToCashier: { e5: nowIso } }, go: noop, reload }));
+    expect(html).toMatch(/1(<!-- -->)? With the Cashier/);
+    expect(html).not.toContain("Juan Santos");
+  });
+
+  it("gives each application its next step, the urgent ones first", () => {
+    const [e4, e5] = ["e4", "e5"].map((id) => fixture.enrollments.find((e) => e.id === id)!);
+    const checks = fixture.requirementChecks ?? [];
+    const allTicks = checks.map((c) => ({ ...c, enrollment_id: "e5" }));
+    const rejected = [{ ...checks[0], enrollment_id: "e5", requirement: "medical_peme", status: "Rejected" }];
+    expect(nextUpOf(applicationReadiness(e5, []))).toMatchObject({ step: "Check Requirements", chip: "0 of 4 Requirements", rank: 3 });
+    expect(nextUpOf(applicationReadiness(e5, rejected))).toMatchObject({ step: "Check Requirements", chip: "Medical Rejected", rank: 0 });
+    expect(nextUpOf(applicationReadiness(e5, allTicks))).toMatchObject({ step: "Hand to Cashier", chip: "Requirements Complete", rank: 1 });
+    expect(nextUpOf(applicationReadiness(e5, allTicks), true).step).toBe("Enroll · Company Charge");
+    // Handed over and unpaid: nothing for Registration to do, even with a rejected tick.
+    expect(nextUpOf(applicationReadiness(e5, rejected, nowIso))).toMatchObject({ step: null, chip: "With the Cashier" });
+    // Paid: choose the batch, or chase the requirement that is still missing.
+    expect(nextUpOf(applicationReadiness({ ...e4, batch_id: null, batches: null }, checks, nowIso))).toMatchObject({ step: "Choose Batch", chip: "Paid" });
+    expect(nextUpOf(applicationReadiness(e4, checks.slice(1), nowIso))).toMatchObject({ step: "Check Requirements", chip: "Paid · Requirements Missing", rank: 0 });
+    expect(nextUpOf(applicationReadiness(e4, checks, nowIso))).toMatchObject({ step: "Open", chip: "Paid · Enrolling" });
+  });
+
+  it("shows the enrollments of the picked day and the open STCW seats", () => {
+    const day = renderToString(createElement(EnrolledDayPanel, { data: fixture, onOpen: noop }));
+    expect(day).toContain("Maria Reyes");
+    expect(day).not.toContain("Pedro Cruz"); // Enrolled in January.
+    expect(day).toContain('type="date"');
+    const seats = renderToString(createElement(StcwSeatsPanel, { seats: [{ course: fixture.courses[0], next: fixture.batches[0] }], go: noop }));
+    expect(seats).toContain("SSO-2610");
+    expect(seats).toContain("View Schedules");
   });
 
   it("lets an application be paid before it has a batch, enrolling once the batch is chosen", () => {

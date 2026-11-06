@@ -2825,6 +2825,7 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .pe-sec { padding: 7px 16px; background: #fff8f4; border-top: 1px solid #fbdcc9; color: #a4530c; font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
 .nw-shell .pe-fold { display: flex; justify-content: space-between; gap: 10px; width: 100%; box-sizing: border-box; padding: 11px 16px; border: 0; border-top: 1px solid var(--nw-line); background: #f7fbfd; color: var(--nw-navy); font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
 .nw-shell .pe-fold:hover { background: var(--nw-soft); }
+.nw-shell .cx-panel > .pe-fold { margin: 0 !important; }
 .nw-shell .pe-table table { min-width: 0 !important; }
 @media (min-width: 641px) {
   .nw-shell .pe-table table { table-layout: fixed; }
@@ -2841,6 +2842,36 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .pv-icon svg { width: 15px; height: 15px; }
 .nw-shell .pv-icon.d { color: var(--nw-bad); border-color: #efc9c4; }
 .nw-shell .pv-icon[disabled] { opacity: .5; cursor: not-allowed; }
+
+/* Registration Dashboard, Next Up (owner, 6 Nov 2026) */
+.nw-shell .nu-table table { min-width: 0 !important; }
+.nw-shell .nu-table td small { display: block; color: var(--nw-muted); font-size: 12.5px; }
+.nw-shell .nu-table .cx-acts .portal-primary { white-space: nowrap; }
+.nw-shell .nu-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.nw-shell .nu-tile { display: grid; gap: 2px; min-width: 0; padding: 11px 16px; border: 1px solid var(--nw-line); border-radius: 12px; background: #fff; color: var(--nw-navy); font: inherit; text-align: left; cursor: pointer; }
+.nw-shell .nu-tile b { font-weight: 600; }
+.nw-shell .nu-tile span { color: var(--nw-muted); font-size: 13px; }
+.nw-shell .nu-tile.warn span { color: #a4530c; font-weight: 600; }
+.nw-shell .nu-tile:hover { background: #f7fbfd; }
+.nw-shell .nu-tile[aria-expanded="true"] { border-color: var(--nw-navy); }
+.nw-shell .nu-pad { padding: 4px 20px 12px; margin: 0; border-bottom: 0; }
+.nw-shell .nu-seat { display: grid; grid-template-columns: minmax(0, 1fr) 150px 84px; align-items: center; gap: 4px 14px; padding: 9px 20px; border-top: 1px solid var(--nw-line); }
+.nw-shell .nu-seatname b { display: block; font-weight: 600; }
+.nw-shell .nu-seatname small { color: var(--nw-muted); font-size: 12.5px; }
+.nw-shell .nu-meter { display: block; height: 6px; border-radius: 99px; background: #e3ecf0; overflow: hidden; }
+.nw-shell .nu-meter i { display: block; height: 100%; background: var(--nw-blue); }
+.nw-shell .nu-meter.low i { background: #F25615; }
+.nw-shell .nu-left { text-align: right; color: var(--nw-muted); font-size: 13px; }
+@media (min-width: 641px) {
+  .nw-shell .nu-table table { table-layout: fixed; }
+  .nw-shell #rd-next .nu-table th:nth-child(3), .nw-shell #rd-next .nu-table td:nth-child(3) { width: 210px; }
+  .nw-shell #rd-next .nu-table th:nth-child(4), .nw-shell #rd-next .nu-table td:nth-child(4) { width: 210px; }
+}
+@media (max-width: 640px) {
+  .nw-shell .nu-strip { grid-template-columns: minmax(0, 1fr); }
+  .nw-shell .nu-seat { grid-template-columns: minmax(0, 1fr) 84px; }
+  .nw-shell .nu-meter { grid-column: 1 / -1; grid-row: 2; }
+}
 
 /* Company Charge, Design 1 (owner, 5 Nov 2026) */
 .nw-shell .cc-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
