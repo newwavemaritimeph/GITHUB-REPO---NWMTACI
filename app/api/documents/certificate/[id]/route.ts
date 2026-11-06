@@ -58,7 +58,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       await claimCertificateNumber(db, certId, staff.user.id);
       ctx = (await certificateContext(db, id))!;
     }
-    // The QR verification code, once per certificate (202610200047; skipped before it).
+    // The verification code, once per certificate (202610200047; skipped before it).
     if (!ctx.cert?.verify_code && await ensureVerifyCode(db, certId)) ctx = (await certificateContext(db, id))!;
     // The Registration No. is taken at the print itself (migration 202610090037; skipped before it).
     if (!ctx.numbers.reg) {

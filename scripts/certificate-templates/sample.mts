@@ -13,7 +13,7 @@ if (fields.lift) console.log("lifted", liftTemplateText(src, src.getPages()[0], 
 const [copied] = await pdf.copyPages(src, [0]);
 const page = pdf.addPage([copied.getWidth(), copied.getHeight()]);
 page.drawPage(await pdf.embedPage(copied), { x: 0, y: 0, width: copied.getWidth(), height: copied.getHeight() });
-await drawTemplateFields(pdf, page, fields, { name, startsOn: start, endsOn: end, issuedOn: "2026-10-20", certificateNumber: cert, registrationNumber: regNo, verifyUrl: "https://newwavemaritimemtaci.com/verify/8KX4-Q2PM-7TZD" });
+await drawTemplateFields(pdf, page, fields, { name, startsOn: start, endsOn: end, issuedOn: "2026-10-20", certificateNumber: cert, registrationNumber: regNo });
 const box = await detectPhotoBox(bytes);
 if (box) { page.drawRectangle({ x: box.x + 2, y: box.y + 2, width: box.w - 4, height: box.h - 4, color: rgb(0.86, 0.9, 0.93) }); const f = await pdf.embedFont(StandardFonts.Helvetica); page.drawText("2x2 PHOTO", { x: box.x + box.w / 2 - 22, y: box.y + box.h / 2, size: 8, font: f, color: rgb(0.4, 0.45, 0.5) }); }
 fs.writeFileSync(out, await pdf.save());

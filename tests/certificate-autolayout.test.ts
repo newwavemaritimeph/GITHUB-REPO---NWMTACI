@@ -197,7 +197,7 @@ describe("an uploaded PDF from start to finish", () => {
     liftTemplateText(src, src.getPage(0), fields.lift!);
     const [copied] = await out.copyPages(src, [0]);
     const page = out.addPage(copied);
-    await drawTemplateFields(out, page, fields, { name: "Juan Dela Cruz", startsOn: "2026-11-09", endsOn: "2026-11-09", issuedOn: "2026-11-05", certificateNumber: "094-609-000123", registrationNumber: "NWMTC112026-177", verifyUrl: null });
+    await drawTemplateFields(out, page, fields, { name: "Juan Dela Cruz", startsOn: "2026-11-09", endsOn: "2026-11-09", issuedOn: "2026-11-05", certificateNumber: "094-609-000123", registrationNumber: "NWMTC112026-177" });
     const text = (await readTemplateLines(await out.save())).lines.map((l) => l.text).join("\n");
     expect(text).toContain("JUAN DELA CRUZ");
     expect(text).toContain("conducted on November 9, 2026 in Manila");

@@ -94,7 +94,7 @@ describe("template view", () => {
     const drawn: string[] = [];
     const orig = page.drawText.bind(page);
     page.drawText = ((t: string, o?: Parameters<typeof orig>[1]) => { drawn.push(t); return orig(t, o); }) as typeof page.drawText;
-    await drawTemplateFields(pdf, page, fields, { name: "", startsOn: null, endsOn: null, issuedOn: "", certificateNumber: "ABC-00042", registrationNumber: "NWMTC1", verifyUrl: null, blank: true });
+    await drawTemplateFields(pdf, page, fields, { name: "", startsOn: null, endsOn: null, issuedOn: "", certificateNumber: "ABC-00042", registrationNumber: "NWMTC1", blank: true });
     const all = drawn.join(" ");
     expect(all).toContain("TRAINEE NAME");
     expect(all).toContain("________________");

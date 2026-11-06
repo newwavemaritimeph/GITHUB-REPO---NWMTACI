@@ -21,7 +21,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   const { data: template } = await db.from("certificate_templates").select("id,storage_path,fields,courses(code)").eq("id", id).maybeSingle();
   if (!template) return NextResponse.json({ error: "Template not found." }, { status: 404 });
   // ?view=1 (owner, 20 Oct 2026): the template as a PDF with its course description, the dates,
-  // name, numbers and QR left blank, for checking a template before any certificate is printed.
+  // name and numbers left blank, for checking a template before any certificate is printed.
   if (new URL(request.url).searchParams.get("view") === "1") {
     const { data: file } = await db.storage.from("certificate-templates").download(template.storage_path);
     if (!file) return NextResponse.json({ error: "The template file could not be read." }, { status: 404 });
@@ -35,7 +35,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       const [copied] = await pdf.copyPages(src, [0]);
       const page = pdf.addPage([copied.getWidth(), copied.getHeight()]);
       page.drawPage(await pdf.embedPage(copied), { x: 0, y: 0, width: copied.getWidth(), height: copied.getHeight() });
-      await drawTemplateFields(pdf, page, fields, { name: "", startsOn: null, endsOn: null, issuedOn: "", certificateNumber: "", registrationNumber: "", verifyUrl: null, blank: true });
+      await drawTemplateFields(pdf, page, fields, { name: "", startsOn: null, endsOn: null, issuedOn: "", certificateNumber: "", registrationNumber: "", blank: true });
       out = await pdf.save();
     }
     const pdfOut = template.storage_path.toLowerCase().endsWith(".pdf");

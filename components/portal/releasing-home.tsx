@@ -277,7 +277,7 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
     const done = rows.filter((r) => r.result === "Uploaded").length, failed = rows.filter((r) => r.courseId && r.result !== "Uploaded").length, skipped = rows.filter((r) => !r.courseId).length, check = rows.filter((r) => readNeedsCheck(r.read ?? null)).length;
     setMsg({ kind: failed || check ? "error" : "success", text: `${done} template${done === 1 ? "" : "s"} uploaded and now in use.${failed ? ` ${failed} failed: see the list.` : ""}${check ? ` ${check} to check: see the list.` : ""}${skipped ? ` ${skipped} skipped (no course).` : ""}` });
   }
-  // The template with its course description; name, dates, numbers and QR left blank.
+  // The template with its course description; name, dates and numbers left blank.
   const view = (id: string) => window.open(`/api/staff/certificate-templates/${id}?view=1`, "_blank", "noopener");
   const group = (label: string, rows: typeof courses) => rows.length ? <div key={label}>
     <p className="tp-group"><b>{label} Courses</b><span>{rows.filter((c) => active.has(c.id)).length} of {rows.length} with template</span></p>
@@ -287,7 +287,7 @@ export function CertificateTemplates({ data, reload }: { data: PortalData; reloa
       <span className="cl-acts">{uploaded && <ViewIcon label="View Template" onClick={() => view(t!.id)} />}<label className={uploaded ? "portal-secondary tp-upload" : "portal-primary tp-upload"}>{uploading === c.id ? "Uploading…" : uploaded ? "Replace PDF" : "Upload PDF"}<input type="file" accept="application/pdf" hidden disabled={!!uploading} onChange={(e) => { void upload(c.id, e.target.files?.[0]); e.target.value = ""; }} /></label></span>
     </div>; })}</div></div> : null;
   return <div className="portal-page cx ac">
-    <Head title="Templates" note="View shows each template with its course description; the trainee's name, training dates, issue date, Certificate No., Registration No. and QR are filled in when a certificate is printed. A new upload replaces the one in use; earlier versions are kept." />
+    <Head title="Templates" note="View shows each template with its course description; the trainee's name, training dates, issue date, Certificate No. and Registration No. are filled in when a certificate is printed. A new upload replaces the one in use; earlier versions are kept." />
     {msg && <Message kind={msg.kind} text={msg.text} />}
     <div className="ac-rail">
       <div className="ac-stack">
@@ -705,7 +705,7 @@ export function AdminCertificateNumbers({ data, reload }: { data: PortalData; re
   </div>;
 }
 
-/** Admin › Certificate Controls › Revoke (owner, 20 Oct 2026): the QR page shows REVOKED at once and printing stops. */
+/** Admin › Certificate Controls › Revoke (owner, 20 Oct 2026): the verification page shows REVOKED at once and printing stops. */
 function RevokePanel({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   const { busy, msg, post } = usePost(reload);
   const [q, setQ] = useState(""), [pickedId, setPickedId] = useState<string | null>(null), [reason, setReason] = useState(""), [asking, setAsking] = useState(false);
@@ -720,9 +720,9 @@ function RevokePanel({ data, reload }: { data: PortalData; reload: () => Promise
     {found.length > 0 && <div className="cc-found">{found.map((l) => <button type="button" key={l.e.id} onClick={() => { setPickedId(l.e.id); setQ(""); setReason(""); setAsking(false); }}><b>{l.name}</b><span>{l.course.code} · {l.cert?.certificate_number}</span></button>)}</div>}
     {line && <div className="cc-edit">
       <p><b>{line.name}</b> · {line.course.name} · <span className="cl-mono">{line.cert?.certificate_number}</span> <Badge tone={revoked ? "red" : "green"}>{revoked ? "Revoked" : "Valid"}</Badge></p>
-      {revoked ? <p className="cl-sub">Revoked{line.cert?.revoked_reason ? `: ${line.cert.revoked_reason}` : ""}. {"The QR page shows: This certificate has been revoked."}</p> : <div className="cl-void">
+      {revoked ? <p className="cl-sub">Revoked{line.cert?.revoked_reason ? `: ${line.cert.revoked_reason}` : ""}. {"The verification page shows: This certificate has been revoked."}</p> : <div className="cl-void">
         <label>Reason<input value={reason} onChange={(e) => { setReason(e.target.value); setAsking(false); }} placeholder="e.g. Issued in error: trainee did not complete the course" /></label>
-        {asking ? <><span className="cl-sub">Revoke {line.cert?.certificate_number}? This shows on the QR page at once.</span><button type="button" className="portal-secondary" onClick={() => setAsking(false)}>Keep</button><button type="button" className="cl-danger" disabled={busy} onClick={() => void post({ action: "certificate-revoke", enrollmentId: line.e.id, reason: reason.trim() }, "Certificate revoked. Its QR page now shows REVOKED.").then(() => setAsking(false)).catch(() => undefined)}>Yes, Revoke</button></>
+        {asking ? <><span className="cl-sub">Revoke {line.cert?.certificate_number}? This shows on the verification page at once.</span><button type="button" className="portal-secondary" onClick={() => setAsking(false)}>Keep</button><button type="button" className="cl-danger" disabled={busy} onClick={() => void post({ action: "certificate-revoke", enrollmentId: line.e.id, reason: reason.trim() }, "Certificate revoked. Its QR page now shows REVOKED.").then(() => setAsking(false)).catch(() => undefined)}>Yes, Revoke</button></>
           : <button type="button" className="cl-danger" disabled={reason.trim().length < 5} onClick={() => setAsking(true)}>Revoke</button>}
       </div>}
     </div>}

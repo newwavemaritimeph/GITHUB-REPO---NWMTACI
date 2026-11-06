@@ -163,7 +163,7 @@ function StatusTab() {
 
 /* ------------------------------------------------ certificate verification --- */
 
-/** Verify a certificate by the code printed on it (owner, 20 Oct 2026); the QR code opens the same page. */
+/** Verify a certificate by its code (owner, 20 Oct 2026); the soft copy email's Verify button opens the same page. */
 function VerifyTab() {
   const router = useRouter();
   const [code, setCode] = useState("");
@@ -176,7 +176,6 @@ function VerifyTab() {
         <input value={code} onChange={(event) => setCode(event.target.value)} placeholder="8KX4-Q2PM-7TZD" autoComplete="off" autoCapitalize="characters" />
       </label>
       <button className="button button-primary button-block" disabled={normalized.length < 4}>Verify Certificate</button>
-      <p>Or scan the QR code on the certificate.</p>
     </form>
   );
 }

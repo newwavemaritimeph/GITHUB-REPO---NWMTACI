@@ -66,7 +66,7 @@ describe("UBT-PSSR training certificate", () => {
     const { PDFDocument } = await import("pdf-lib");
     const { drawTemplateFields } = await import("../lib/certificate-overlay");
     const pdf = await PDFDocument.create(), page = pdf.addPage([595.5, 842]);
-    await drawTemplateFields(pdf, page, bundledLayout(file)!, { name: "Dela Cruz, Juan", startsOn: "2026-11-09", endsOn: "2026-11-09", issuedOn: "2026-11-09", certificateNumber: "NWMTACI-UBT-PSSR2026000001", registrationNumber: "NWMTC000001-112026", verifyUrl: null });
+    await drawTemplateFields(pdf, page, bundledLayout(file)!, { name: "Dela Cruz, Juan", startsOn: "2026-11-09", endsOn: "2026-11-09", issuedOn: "2026-11-09", certificateNumber: "NWMTACI-UBT-PSSR2026000001", registrationNumber: "NWMTC000001-112026" });
     expect((await pdf.save()).length).toBeGreaterThan(500);
   });
 });

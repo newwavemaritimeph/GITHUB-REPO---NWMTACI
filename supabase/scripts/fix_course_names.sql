@@ -66,7 +66,7 @@ insert into official_courses(code, name, duration_label) values
   ('HSBAT', 'Hydrogen Sulfide Basic Awareness Training', '2 days'),
   ('INCI', 'Incident Investigation', '1 day'),
   ('IHM', 'Inventory of Hazardous Materials', '1 day'),
-  ('ISM', 'FRAMO Pump', '1 day'),
+  ('ISM', 'International Safety Management (ISM) Code', '1 day'),
   ('IP', 'Injury Prevention', '1 day'),
   ('LCBOCT', 'Liquid Cargo and Ballast Operations for Chemical Tankers', '1 day'),
   ('LMT', 'Leadership and Management Training', '1 day'),

@@ -144,7 +144,7 @@ export async function claimCertificateNumber(db: Admin, certificateId: string, a
   return String(data);
 }
 
-/** Gives the certificate its QR verification code once (202610200047); null before the migration. */
+/** Gives the certificate its verification code once (202610200047), for the soft copy email's Verify button; null before the migration. */
 export async function ensureVerifyCode(db: Admin, certificateId: string) {
   const { data, error } = await db.from("certificates").select("verify_code").eq("id", certificateId).maybeSingle();
   if (error) return null;
@@ -230,7 +230,7 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
   // A course with its own layout (HAZMAT with CFR) is filled like New Wave's sample certificate.
   const layout = certificateLayout(ctx.course);
   if (v2) {
-    await drawTemplateFields(pdf, page, v2, { name: String(traineeName), startsOn: startsOn ?? null, endsOn: endsOn ?? null, issuedOn: String(issuedOn), certificateNumber: number, registrationNumber: regNo ?? "", verifyUrl: ctx.cert?.verify_code ? verifyUrl(ctx.cert.verify_code) : null });
+    await drawTemplateFields(pdf, page, v2, { name: String(traineeName), startsOn: startsOn ?? null, endsOn: endsOn ?? null, issuedOn: String(issuedOn), certificateNumber: number, registrationNumber: regNo ?? "" });
   } else if (layout) {
     await layout(pdf, page, { name: String(traineeName), startsOn: startsOn ?? null, endsOn: endsOn ?? null, issuedOn: String(issuedOn), certificateNumber: number, registrationNumber: regNo ?? "" });
   } else {

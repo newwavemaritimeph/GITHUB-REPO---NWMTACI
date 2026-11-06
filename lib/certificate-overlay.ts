@@ -1,4 +1,3 @@
-import QRCode from "qrcode";
 import { PDFArray, PDFName, PDFRawStream, StandardFonts, decodePDFRawStream, rgb, type PDFDocument, type PDFPage, type PDFStream } from "pdf-lib";
 import { justified, ordinal } from "@/lib/certificate-layouts";
 import { IDENTITY, apply, mul, tokens, type M } from "@/lib/certificate-template";
@@ -7,7 +6,7 @@ import { IDENTITY, apply, mul, tokens, type M } from "@/lib/certificate-template
  * Fills a certificate template converted from New Wave's Word files
  * (scripts/certificate-templates, owner 20 Oct 2026). `fields` (version 2) holds
  * where each placeholder sat in the Word layout; the portal writes the values
- * there in Times (built in) and prints the QR inside the QR Verify box.
+ * there in Times (built in). The QR Verify box is covered: no QR prints (owner, 6 Nov 2026).
  */
 type NumberAt = { x: number; y: number; size: number; bold?: boolean; body?: boolean;
   /** Drawn before the value, from x: the words came off the page with the sample value beside them. */
@@ -41,8 +40,8 @@ export type TemplateFieldsV2 = {
   fixed?: { text: string; cx?: number; x?: number; y: number; size: number; bold?: boolean }[];
 };
 export type LiftZone = { yMin: number; yMax: number; xMin?: number; xMax?: number };
-export type OverlayFill = { name: string; startsOn: string | null; endsOn: string | null; issuedOn: string; certificateNumber: string; registrationNumber: string; verifyUrl: string | null;
-  /** Template view (owner, 20 Oct 2026): the description with blank dates, a "TRAINEE NAME" guide, no numbers or QR. */
+export type OverlayFill = { name: string; startsOn: string | null; endsOn: string | null; issuedOn: string; certificateNumber: string; registrationNumber: string;
+  /** Template view (owner, 20 Oct 2026): the description with blank dates, a "TRAINEE NAME" guide, no numbers. */
   blank?: boolean };
 
 export const isFieldsV2 = (f: unknown): f is TemplateFieldsV2 => !!f && typeof f === "object" && (f as { version?: unknown }).version === 2;
@@ -149,14 +148,7 @@ export async function drawTemplateFields(pdf: PDFDocument, page: PDFPage, f: Tem
   const shift = numberShift(numbers.flatMap(([at, value]) => (at?.label ? [{ x: at.x, width: fontOf(at).widthOfTextAtSize(textOf(at, value), at.size) }] : [])), page.getWidth());
   for (const [at, value] of numbers) labelled(at, value, shift);
   // Reprints are not marked on the certificate (owner, 20 Oct 2026): the copy number stays internal, in the print audit.
-  if (f.qr && fill.verifyUrl && !fill.blank) {
-    // Generated at print, never stored: error correction M, quiet zone 1, 600 px.
-    const png = await QRCode.toBuffer(fill.verifyUrl, { errorCorrectionLevel: "M", margin: 1, width: 600, type: "png" });
-    const img = await pdf.embedPng(new Uint8Array(png));
-    const { x, y, w, h } = f.qr, caption = Math.max(5, Math.min(7, h * 0.11)), side = Math.min(w, h - caption * 1.6);
-    page.drawRectangle({ x, y, width: w, height: h, color: rgb(1, 1, 1) });
-    page.drawImage(img, { x: x + (w - side) / 2, y: y + h - side, width: side, height: side });
-    const label = "SCAN TO VERIFY", hb = await pdf.embedFont(StandardFonts.HelveticaBold);
-    page.drawText(label, { x: x + (w - hb.widthOfTextAtSize(label, caption)) / 2, y: y + caption * 0.35, size: caption, font: hb, color: rgb(0.07, 0.25, 0.39) });
-  }
+  // No QR on the certificate (owner, 6 Nov 2026): this covers the template's own QR CODE placeholder and SCAN TO VERIFY.
+  // MARINA's QR, part of the STCW and UBT-PSSR templates, has no box here and stays. The margin takes the placeholder's dashed border too.
+  if (f.qr) page.drawRectangle({ x: f.qr.x - 1.5, y: f.qr.y - 1.5, width: f.qr.w + 3, height: f.qr.h + 3, color: rgb(1, 1, 1) });
 }

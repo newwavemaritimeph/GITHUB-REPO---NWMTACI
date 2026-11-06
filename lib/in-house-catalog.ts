@@ -67,7 +67,7 @@ H2S|Hydrogen Sulfide Awareness|1 day|Online|200000
 HSBAT|Hydrogen Sulfide Basic Awareness Training|2 days|Online|250000
 INCI|Incident Investigation|1 day|Online|90000
 IHM|Inventory of Hazardous Materials|1 day|Online|350000
-ISM|FRAMO Pump|1 day|Online|70000
+ISM|International Safety Management (ISM) Code|1 day|Online|70000
 IP|Injury Prevention|1 day|Online|70000
 LCBOCT|Liquid Cargo and Ballast Operations for Chemical Tankers|1 day|Online|100000
 LMT|Leadership and Management Training|1 day|Online|150000

@@ -156,7 +156,7 @@ export function ReleaseConfirm({ target, onClose, onDone }: { target: { enrollme
   const [idOk, setIdOk] = useState(false), [spaOk, setSpaOk] = useState(false);
   const [courier, setCourier] = useState("LBC"), [tracking, setTracking] = useState(""), [fee, setFee] = useState("Paid"), [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false), [err, setErr] = useState("");
-  // Hologram sticker serial (owner, 20 Oct 2026), shown on the certificate's QR page.
+  // Hologram sticker serial (owner, 20 Oct 2026), shown on the certificate's verification page.
   const [sticker, setSticker] = useState("");
   const ready = method === "Pickup" ? name.trim().length > 1 && idOk : method === "Representative" ? name.trim().length > 1 && rel.trim().length > 1 && idOk && spaOk : address.trim().length > 4;
   async function confirm() {

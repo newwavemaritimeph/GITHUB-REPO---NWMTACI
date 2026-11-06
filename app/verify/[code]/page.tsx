@@ -46,7 +46,7 @@ function Body({ r }: { r: VerifyResult }) {
   </div>;
 }
 
-/** Public certificate verification, opened from the QR (owner, 20 Oct 2026). The address format never changes. */
+/** Public certificate verification, opened from the soft copy email or a typed code (owner, 20 Oct 2026). The address format never changes. */
 export default async function VerifyPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
   const h = await headers();

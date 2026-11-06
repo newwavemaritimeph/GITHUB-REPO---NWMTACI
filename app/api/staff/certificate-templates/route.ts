@@ -59,11 +59,10 @@ export async function POST(request: Request) {
       if (read) {
         layout = { found: read.found, missing: read.missing, covered: read.covered };
         (photoBox ? layout.found : layout.missing).push("Photo Box");
-        // A new version keeps the QR box when its picture is still in the same place.
+        // A new version keeps the QR box, which covers the template's placeholder, when its picture is still in the same place.
         const { data: current } = await db.from("certificate_templates").select("storage_path,fields").eq("course_id", courseId).eq("active", true).maybeSingle();
         const qr = current ? templateLayout({ storagePath: current.storage_path, fields: current.fields, code: course.code, isPdf: true })?.qr : undefined;
         const keepQr = !!qr && await hasPictureAt(bytes, qr);
-        if (qr) (keepQr ? layout.found : layout.missing).push("QR Code");
         if (read.fields) fields = { ...read.fields, ...(photoBox ? { photo: { x: photoBox.x, y: photoBox.y, w: photoBox.w, h: photoBox.h } } : {}), ...(keepQr ? { qr } : {}) };
       }
     }

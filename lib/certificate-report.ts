@@ -14,7 +14,7 @@ const clock = (iso: string) => new Intl.DateTimeFormat("en-PH", { timeZone: "Asi
 
 /**
  * The 8:00 PM owner report (owner's QR plan, 20 Oct 2026): prints, reprints and
- * revocations with who did them, the exceptions to look at, and QR scan activity.
+ * revocations with who did them, the exceptions to look at, and verification page activity.
  * Reprints before 8 AM or from 6 PM count as after hours.
  */
 export function summarizeCertificateDay(input: { prints: ReportPrint[]; revokes: ReportRevoke[]; directSql: number; scans: ReportScan[] }) {
@@ -41,7 +41,7 @@ function render(s: ReturnType<typeof summarizeCertificateDay>) {
     ["Printed", s.printed, s.printedBy.join(", ")], ["Reprinted", s.reprinted, s.reprints.join("; ")], ["Revoked", s.revoked, s.revokes.join("; ")],
     ["Printed with a balance", s.unpaid.length, s.unpaid.join(", ")], ["Direct database changes", s.directSql, s.directSql ? "See the audit log (certificate.direct_sql)" : ""],
     ["Reprints before 8 AM or after 6 PM", s.afterHours.length, s.afterHours.join("; ")],
-    ["QR scans", s.scans, ""], ["Codes not found", s.notFound, ""], ["Scanned from 3+ devices", s.spread.length, s.spread.map((x) => `${x.certNo} (${x.devices} devices)`).join(", ")],
+    ["Verification page visits", s.scans, ""], ["Codes not found", s.notFound, ""], ["Opened from 3+ devices", s.spread.length, s.spread.map((x) => `${x.certNo} (${x.devices} devices)`).join(", ")],
   ];
   const head = (t: string) => `<tr><td colspan="3" style="padding:12px 8px 4px;font-weight:700;color:#0571D0;font-size:12px;letter-spacing:.06em;text-transform:uppercase">${t}</td></tr>`;
   const row = ([label, n, note]: [string, string | number, string]) => `<tr><td style="padding:6px 8px;border-top:1px solid #e3ecf0">${escapeHtml(label)}</td><td style="padding:6px 8px;border-top:1px solid #e3ecf0;text-align:right;font-weight:700${Number(n) && /balance|Direct|after|3\+/.test(label) ? ";color:#b42318" : ""}">${n}</td><td style="padding:6px 8px;border-top:1px solid #e3ecf0;color:#5b7587">${escapeHtml(note)}</td></tr>`;
