@@ -1,11 +1,10 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { enforceRateLimit } from "@/lib/security";
-import { processEmailJobs } from "@/lib/email-jobs";
-import { trySendSoftCopy } from "@/lib/certificates";
+import { sendWaitingSoftCopies } from "@/lib/email-jobs";
 import { matchEvaluationEnrollment } from "@/lib/certificate-rules";
 
 export const runtime = "nodejs";
@@ -29,8 +28,8 @@ const sameSecret = (given: string, expected: string) => {
  * evaluation form posts here on submit (docs/google-form-evaluation.gs). The
  * trainee is matched by NWMTACI number or registered email to their latest
  * enrollment in the course that owns the form; the evaluation is recorded,
- * the certificate becomes due once the fee is settled, and the soft copy is
- * emailed. Answers stay in Google Forms; only the fact of submission is kept.
+ * the certificate becomes due once the fee is settled, and the soft copy goes
+ * out once it is printed. Answers stay in Google Forms; only the fact of submission is kept.
  */
 export async function POST(request: Request) {
   if (!isSupabaseConfigured()) return NextResponse.json({ error: "Not available." }, { status: 503 });
@@ -75,7 +74,6 @@ export async function POST(request: Request) {
   if (error) return NextResponse.json({ error: "Could not record the evaluation." }, { status: 500 });
   await db.from("audit_logs").insert({ actor_id: null, actor_role: "system", action: "evaluation.received", record_type: "enrollment", record_id: enrollment.id, new_values: { source: "Google Form" } });
 
-  const soft = await trySendSoftCopy(db, enrollment.id);
-  if (soft.state === "Queued" && soft.jobId) await processEmailJobs(db, { ids: [soft.jobId], origin: new URL(request.url).origin }).catch(() => undefined);
-  return NextResponse.json({ ok: true, softCopy: soft.state });
+  after(() => sendWaitingSoftCopies(db, [enrollment.id]));
+  return NextResponse.json({ ok: true });
 }

@@ -74,6 +74,32 @@ export function releaseProblem(f: { balanceCentavos: number; evaluationRequired:
   return null;
 }
 
+export type SoftCopyJob = { state: string; to?: string; sent_at: string | null; last_error: string | null; created_at: string };
+export type SoftCopyStatus = { tone: "sent" | "wait" | "fail" | "none"; text: string; on: string | null; canSend: boolean; failed: boolean; title?: string };
+const STUCK_MS = 15 * 60_000;
+
+/**
+ * The one line on a printed certificate's row (owner, 6 Nov 2026; design/soft-copy-sample.html). `canSend` is what the
+ * ▾ menu's Resend Soft Copy follows, with the same waits as Release; the server checks again (softCopyProblem).
+ */
+export function softCopyLine(f: { email?: string | null; sentAt?: string | null; printedAt?: string | null; job?: SoftCopyJob | null; balanceCentavos: number; evaluationRequired: boolean; evaluationOn: string | null; postTestRequired?: boolean; postTestPassed?: boolean; now?: number }): SoftCopyStatus {
+  const waiting = f.balanceCentavos > 0 ? "Sends When Balance Is Paid" : f.postTestRequired && !f.postTestPassed ? "Sends When Post-Test Is Passed" : f.evaluationRequired && !f.evaluationOn ? "Sends When Evaluation Is In" : null;
+  const canSend = !!f.email && !waiting;
+  const sent = (on: string): SoftCopyStatus => ({ tone: "sent", text: "Soft Copy Sent", on, canSend, failed: false });
+  // An email from before the latest print says nothing about this print.
+  const job = f.job && !(f.printedAt && Date.parse(f.job.created_at) < Date.parse(f.printedAt)) ? f.job : null;
+  if (job) {
+    if (job.state === "Sent" || job.state === "Delivered") return sent(job.sent_at ?? job.created_at);
+    const stuck = job.state === "Processing" && (f.now ?? Date.now()) - Date.parse(job.created_at) > STUCK_MS;
+    if (stuck || job.last_error || !["Queued", "Processing"].includes(job.state)) return { tone: "fail", text: "Soft Copy Failed", on: null, canSend, failed: canSend, title: job.last_error ?? undefined };
+    return { tone: "wait", text: "Soft Copy Sending", on: null, canSend, failed: false };
+  }
+  if (!f.email) return { tone: "none", text: "No Email on Record", on: null, canSend, failed: false };
+  if (waiting) return { tone: "wait", text: waiting, on: null, canSend, failed: false };
+  if (f.sentAt) return sent(f.sentAt);
+  return { tone: "none", text: "Soft Copy Not Sent", on: null, canSend, failed: false };
+}
+
 /**
  * The Releasing Officer's tabs (owner, 5 Nov 2026: Stage Tabs). A certificate moves by itself: once printed it leaves
  * Waiting and To Print; an approved reprint comes back to To Print once.

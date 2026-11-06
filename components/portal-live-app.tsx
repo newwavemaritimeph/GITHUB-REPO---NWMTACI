@@ -21,6 +21,7 @@ import { downloadCsv } from "@/lib/csv";
 import { RegistrationDashboard, RegistrationRecords, type RecordsView, CoursesAndCenters, AssignCourseModal, EnrollmentDrawer, CourseSourceCell, MetaThreadField, partnerOf, chargeTo } from "./portal/live-registration";
 import { InstructionTemplates } from "./portal/instruction-templates";
 import type { CategoryTemplate } from "@/lib/instruction-templates";
+import type { SoftCopyJob } from "@/lib/certificate-rules";
 import { sourceLabel } from "@/lib/company-charge";
 import { PaymentDayRow, PrintGlyph, RequestVoidIcon, paymentStatus } from "./portal/payment-void";
 import { ALL_DATES, Badge, DataSince, Message, Modal, Page, PageHead, PeriodBar, ViewIcon, fmtClock, manilaDay, submit, fullName, txWhen, useMonthRows, useNeedSince, usePaged, usePeriod } from "./portal/shared-ui";
@@ -97,6 +98,7 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   instructionsCount?:Record<string,number>;
   // Latest training-instructions email per enrollment id (202610070012).
   instructionEmails?:Record<string,{state:string;to:string;sent_at:string|null;last_error:string|null;created_at:string;with_class?:boolean}>;
+  softCopyEmails?:Record<string,SoftCopyJob>;
   batchClasses?:Record<string,{link:string;code:string|null}>;
   // Google Classroom class code per course id (202610070012).
   classroomCodes?:Record<string,string>;

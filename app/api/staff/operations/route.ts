@@ -1,5 +1,5 @@
 import { isFormCode } from "@/lib/document-controls";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { pendingTraineeProofs } from "@/lib/trainee-proof";
@@ -14,7 +14,7 @@ import { clearMismoAfterVoid } from "@/lib/mismo-server";
 import { issueServiceInvoice, siFormatProblem } from "@/lib/service-invoice";
 import { VALIDATION_MESSAGES, isEmail, isMetaThreadUrl, isPhContactNumber, isSrn, normalizeEmail, normalizeMetaThreadUrl, normalizePhContactNumber, normalizeSrn } from "@/lib/validation";
 import { INSTRUCTION_SENDS, emailResult, instructionRecipient } from "@/lib/instruction-email-status";
-import { emailConfigured, processEmailJobs } from "@/lib/email-jobs";
+import { emailConfigured, processEmailJobs, sendWaitingSoftCopies } from "@/lib/email-jobs";
 import { classroomEmailBlocks } from "@/lib/classroom";
 import { loadInstructionDetails } from "@/lib/training-instructions";
 import { fileVoucherInDrive } from "@/lib/expense-voucher";
@@ -1097,6 +1097,14 @@ export async function GET(request: Request) {
       if (id && !instructionEmails[id]) instructionEmails[id] = { state: row.state, to: row.recipient, sent_at: row.sent_at, last_error: row.last_error, created_at: row.created_at, with_class: !!(row.variables as { classroom_join_url?: string } | null)?.classroom_join_url };
     }
   });
+  // Latest soft copy email per enrollment, for the line on the Releasing Officer's row (owner, 6 Nov 2026).
+  const softCopyEmails: Record<string, { state: string; to: string; sent_at: string | null; last_error: string | null; created_at: string }> = {};
+  task(async () => {
+    const { data: softRows } = await createSupabaseAdminClient().from("email_jobs").select("recipient,state,sent_at,last_error,created_at,enrollment_id:variables->>attach_certificate_for").eq("template_code", "certificate.softcopy").order("created_at", { ascending: false }).limit(1000);
+    for (const row of (softRows ?? []) as unknown as { recipient: string; state: string; sent_at: string | null; last_error: string | null; created_at: string; enrollment_id: string | null }[]) {
+      if (row.enrollment_id && !softCopyEmails[row.enrollment_id]) softCopyEmails[row.enrollment_id] = { state: row.state, to: row.recipient, sent_at: row.sent_at, last_error: row.last_error, created_at: row.created_at };
+    }
+  });
   // How many times instructions were generated per enrollment, and the printed
   // admission records (202610070007). Missing columns yield none.
   let instructionsCount: Record<string, number> = {};
@@ -1346,7 +1354,7 @@ export async function GET(request: Request) {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, feedbackLinks: certs.feedbackLinks, certificatePhotos: certs.photos, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    documentControls, centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, stamp, applicationNumbers, traineeFacebook, instructionCategories, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, batchClasses, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, pendingRebates, deliveryRequests, instructors, accreditations, batchResources, batchCancels, certificateNumberSettings, legacyCertificates, holidays, otherIncome, incomeCategories, rebatesReceived, traineeProofs, companyCharge, billingStatements, paymentVoids, voidedPayments }, { headers: { "Cache-Control": "no-store" } });
+    documentControls, centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, stamp, applicationNumbers, traineeFacebook, instructionCategories, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, softCopyEmails, classroomCodes, classroom, classroomCourseIds, classroomInvites, batchClasses, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, pendingRebates, deliveryRequests, instructors, accreditations, batchResources, batchCancels, certificateNumberSettings, legacyCertificates, holidays, otherIncome, incomeCategories, rebatesReceived, traineeProofs, companyCharge, billingStatements, paymentVoids, voidedPayments }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /**
@@ -2781,8 +2789,12 @@ export async function POST(request: Request) {
       const admin = createSupabaseAdminClient();
       const soft = await trySendSoftCopy(admin, input.enrollmentId, { force: true, actor: staff.user.id });
       if (soft.state === "Failed") return NextResponse.json({ error: soft.error }, { status: 400 });
-      if (soft.state !== "Queued") return NextResponse.json({ error: "The certificate is not ready, the balance is not settled, printing is turned off, or the trainee has no email." }, { status: 400 });
-      if (soft.jobId) await processEmailJobs(admin, { ids: [soft.jobId], origin: new URL(request.url).origin }).catch(() => undefined);
+      if (soft.state === "Skipped") return NextResponse.json({ error: soft.why }, { status: 400 });
+      if (soft.state !== "Queued") return NextResponse.json({ error: "The soft copy was already sent." }, { status: 400 });
+      const sent = soft.jobId ? await processEmailJobs(admin, { ids: [soft.jobId], origin: new URL(request.url).origin }).catch(() => null) : null;
+      const failed = sent?.results.find((r) => r.state !== "Sent");
+      if (!sent || failed) return NextResponse.json({ error: `The soft copy could not be sent${failed?.error ? `: ${failed.error}` : "."}` }, { status: 400 });
+      if (!sent.configured) return NextResponse.json({ error: "Email sending is not connected yet. The soft copy goes out once it is." }, { status: 400 });
       return NextResponse.json({ ok: true, to: soft.to });
     }
     if (input.action === "certificate-release-plan") {
@@ -3290,6 +3302,7 @@ export async function POST(request: Request) {
       const enrolled = await tryAutoEnroll(admin, ids, staff.user.id);
       const implemented = await autoImplementPaidRequests(admin, ids, staff.user.id);
       await applyReferralRebates(admin, ids, staff.user.id, { paid: true }); // "No deduction" agencies: rebate owed once paid
+      after(() => sendWaitingSoftCopies(admin, ids)); // A printed certificate waiting for this payment.
       return NextResponse.json({ ok: true, enrolled, implemented, payment: posted[0]?.id, payments: posted });
     }
     if (input.action === "enrollment-delete") {
@@ -3630,6 +3643,7 @@ export async function POST(request: Request) {
     const enrolled = await tryAutoEnroll(admin, [input.enrollmentId], staff.user.id);
     const implemented = await autoImplementPaidRequests(admin, [input.enrollmentId], staff.user.id);
     await applyReferralRebates(admin, [input.enrollmentId], staff.user.id, { paid: true }); // "No deduction" agencies: rebate owed once paid
+    after(() => sendWaitingSoftCopies(admin, [input.enrollmentId])); // A printed certificate waiting for this payment.
     return NextResponse.json({ ok: true, payment: data, enrolled, implemented });
   } catch (error) {
     // Zod validation errors: report the specific field problems, not the raw JSON dump.

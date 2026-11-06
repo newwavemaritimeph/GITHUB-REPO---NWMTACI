@@ -5,7 +5,7 @@ import { downloadCsv } from "@/lib/csv";
 import type { PortalData, Enrollment } from "../portal-live-app";
 import { addDays, first, manilaToday, dueCentavos, pesos2 } from "@/lib/portal-format";
 import { automaticEndDate } from "@/lib/scheduling";
-import { CERTIFICATE_STAGES, canSetSeries, certificateStage, certificateState, evaluationRequiredFor, formatCertificateNumber, formatNumber, formatProblem, nextOf, isStcwCategory, matchTemplateFiles, releaseProblem, type CertificateStage, type CertificateView } from "@/lib/certificate-rules";
+import { CERTIFICATE_STAGES, canSetSeries, certificateStage, certificateState, evaluationRequiredFor, formatCertificateNumber, formatNumber, formatProblem, nextOf, isStcwCategory, matchTemplateFiles, releaseProblem, softCopyLine, type CertificateStage, type CertificateView } from "@/lib/certificate-rules";
 import { ALL_DATES, Badge, Message, Modal, PeriodBar, ViewIcon, fmtDate, submit, useNeedSince, usePaged, usePeriod, usePost } from "./shared-ui";
 import { ReleaseConfirm } from "./live-releasing";
 import { DeliveryAlert, deliveriesOf, deliveryAddress } from "./delivery-home";
@@ -137,13 +137,17 @@ export function ReleasingCertificates({ data, reload }: { data: PortalData; relo
   const afterPrint = () => window.setTimeout(() => void reload(), 2500);
   const pay = (l: CertificateLine) => data.companyCharge?.[l.e.id] ? <Badge tone="blue">Company Charge</Badge> : l.balance > 0 ? <Badge tone="orange">Balance {pesos2(l.balance)}</Badge> : <Badge tone="green">Paid</Badge>;
   const needs = (l: CertificateLine) => [l.view.state === "Training not finished" && `In Training · Ends ${short(l.ended)}`, l.postTest?.required && !l.postTest.passed && "Post-Test", l.evalNeeded && !l.evalDone && "Evaluation", tracked && !l.photo && "Photo"].filter(Boolean) as string[];
-  const printedOn = (l: CertificateLine) => short(day((l.cert as { printed_at?: string | null } | null)?.printed_at));
+  const printedAt = (l: CertificateLine) => (l.cert as { printed_at?: string | null } | null)?.printed_at;
+  const printedOn = (l: CertificateLine) => short(day(printedAt(l)));
+  const softOf = (l: CertificateLine) => softCopyLine({ email: (first(l.e.trainees) as { email?: string | null } | null)?.email, sentAt: l.cert?.soft_copy_sent_at, printedAt: printedAt(l), job: data.softCopyEmails?.[l.e.id], balanceCentavos: l.balance, evaluationRequired: l.evalNeeded, evaluationOn: l.evalDone ? "in" : null, postTestRequired: l.postTest?.required, postTestPassed: l.postTest?.passed });
+  const sendSoft = (l: CertificateLine) => void post({ action: "certificate-soft-copy", enrollmentId: l.e.id }, "Soft copy emailed.").catch(() => undefined);
+  const softLine = (l: CertificateLine) => { if (l.view.state === "Void requested") return null; const s = softOf(l); return <span className={`st-soft ${s.tone}`} title={s.title}>{s.text}{s.on && ` · ${short(day(s.on))}`}{s.failed && <button type="button" className="st-b" disabled={busy} onClick={() => sendSoft(l)}>Resend</button>}</span>; };
   const more = (l: CertificateLine) => <details className="cl-more"><summary aria-label="More actions">▾</summary><div>
     <button type="button" onClick={() => setCorrecting(l.e.id)}>Correct Details</button>
     {l.photo && <button type="button" onClick={() => void openCertificatePhoto(l.e.id)}>View Photo</button>}
     {l.evalLink && <a href={l.evalLink} target="_blank" rel="noreferrer">Open Evaluation</a>}
     {l.view.printCount > 0 && l.view.state !== "Void requested" && <button type="button" disabled={busy} onClick={() => { setVoiding(l.e.id); setWhy(NO_REASON); }}>Request Void</button>}
-    {l.view.printCount > 0 && l.balance === 0 && <button type="button" disabled={busy} onClick={() => void post({ action: "certificate-soft-copy", enrollmentId: l.e.id }, "Soft copy emailed.").catch(() => undefined)}>Email Soft Copy</button>}
+    {l.view.printCount > 0 && l.view.state !== "Void requested" && softOf(l).canSend && <button type="button" disabled={busy} onClick={() => sendSoft(l)}>Resend Soft Copy</button>}
   </div></details>;
   const heads: Record<Exclude<CertificateStage, "Released">, string[]> = {
     Waiting: ["#", "Trainee · NWMTACI No.", "Course", "Payment", "Still Needs", "Action"],
@@ -156,7 +160,7 @@ export function ReleasingCertificates({ data, reload }: { data: PortalData; relo
       <td className="cl-no st-no">{i + 1}</td>
       <td data-l="Trainee"><b>{l.name}</b><small className="cl-mono cl-sub cl-block">{l.number.replace(/^NWMTACI-/, "")}</small>{l.view.overdue && <Badge tone="red">Overdue</Badge>}{reprint && <Badge tone="blue">Reprint</Badge>}{stage === "To Release" && ship && <Badge tone="blue">LBC · {ship.city}</Badge>}</td>
       <td data-l="Course" title={l.course.name}><b>{l.course.code}</b><small className="cl-sub cl-block">{stage === "To Release" ? `Printed ${printedOn(l)}` : l.view.state === "Training not finished" ? `Ends ${short(l.ended)}` : `Ended ${short(l.ended)}`}</small></td>
-      {stage === "To Release" && <td data-l="Certificate No." className="cl-mono">{l.cert?.certificate_number ?? "—"}</td>}
+      {stage === "To Release" && <td data-l="Certificate No."><span className="cl-mono">{l.cert?.certificate_number ?? "—"}</span>{softLine(l)}</td>}
       <td data-l="Payment">{pay(l)}</td>
       {stage === "Waiting" && <td data-l="Still Needs">{need.map((n) => <span key={n} className="st-need">{n}</span>)}</td>}
       <td data-l=""><span className="cl-acts st-acts">

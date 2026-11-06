@@ -1,10 +1,12 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { canPrint } from "@/lib/certificate-rules";
 import { buildCertificatePdf, certificateContext, claimCertificateNumber, ensureCertificate, ensureVerifyCode } from "@/lib/certificates";
+import { softCopyAfterPrint } from "@/lib/email-jobs";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 // Opened in a new tab, so refusals are a short readable page rather than JSON.
 const notice = (message: string, status: number) => new Response(
@@ -68,6 +70,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const bytes = await buildCertificatePdf(db, ctx, "print");
     const { error } = await db.rpc("record_certificate_print", { target_certificate: certId, actor: staff.user.id });
     if (error) return notice(error.message, 409);
+    // The soft copy goes out after the reply, so printing stays fast.
+    after(() => softCopyAfterPrint(db, id, certId, staff.user.id));
     const name = `certificate-${ctx.cert?.certificate_number ?? ctx.enrollment.enrollment_number}.pdf`;
     return new Response(Buffer.from(bytes), { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="${name}"`, "cache-control": "no-store" } });
   } catch (error) {

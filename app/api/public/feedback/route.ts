@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -7,7 +7,7 @@ import { automaticEndDate } from "@/lib/scheduling";
 import { googleConfigured } from "@/lib/google-classroom";
 import { evaluationProblem, type EvaluationAnswers } from "@/lib/evaluation-form";
 import { fileEvaluationInDrive } from "@/lib/evaluation-drive";
-import { trySendSoftCopy } from "@/lib/certificates";
+import { sendWaitingSoftCopies } from "@/lib/email-jobs";
 
 export const runtime = "nodejs";
 
@@ -98,6 +98,6 @@ export async function POST(request: Request) {
     if (!cert) await admin.from("certificates").insert({ enrollment_id: e.id, status: "Ready to Print", snapshot: { feedback_attendance: true } });
     else if (!["Printed", "Released", "Cancelled"].includes(cert.status)) await admin.from("certificates").update({ status: "Ready to Print", updated_at: new Date().toISOString() }).eq("id", cert.id);
   }
-  await trySendSoftCopy(admin, e.id); // never throws
+  after(() => sendWaitingSoftCopies(admin, [e.id]));
   return NextResponse.json({ ok: true });
 }

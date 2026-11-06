@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { enforceRateLimit } from "@/lib/security";
 import { forTrainee, passMark, picksProblem, scorePostTest } from "@/lib/post-test";
 import { loadPostTest } from "@/lib/post-test-server";
+import { sendWaitingSoftCopies } from "@/lib/email-jobs";
 
 export const runtime = "nodejs";
 
@@ -59,6 +60,7 @@ export async function POST(request: Request) {
   const result = scorePostTest(test.questions, parsed.data.picks, test.passingPercent);
   const { error } = await admin.from("post_test_attempts").insert({ enrollment_id: e.id, course_id: e.course.id, score: result.score, total: result.total, percent: result.percent, passed: result.passed, answers: { picks: parsed.data.picks, questions: test.questions.map((q) => q.q) } });
   if (error) return NextResponse.json({ error: "Your answers could not be saved. Please try again." }, { status: 500 });
+  if (result.passed) after(() => sendWaitingSoftCopies(admin, [e.id]));
   const attempts = await attemptsOf(admin, e.id);
   return NextResponse.json({ ...result, passingPercent: test.passingPercent, passMark: passMark(result.total, test.passingPercent), attempts: attempts.length });
 }

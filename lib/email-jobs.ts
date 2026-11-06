@@ -3,7 +3,7 @@ import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { escapeHtml } from "@/lib/classroom";
 import { instructionEmailVariables } from "@/lib/instruction-templates";
 import { buildTrainingInstructionsPdf, loadInstructionDetails } from "@/lib/training-instructions";
-import { buildCertificatePdf, certificateContext } from "@/lib/certificates";
+import { buildCertificatePdf, certificateContext, softCopyEmailVariables, softCopyProblem, trySendSoftCopy } from "@/lib/certificates";
 import { activeConnection, googleConfigured, hasGmailScope } from "@/lib/google-classroom";
 import { sendViaGmail, type MailMessage } from "@/lib/google-mail";
 
@@ -84,6 +84,10 @@ export async function processEmailJobs(db: Admin, options: { limit?: number; ids
       if (typeof variables.attach_certificate_for === "string") {
         const ctx = await certificateContext(db, variables.attach_certificate_for);
         if (!ctx) throw new Error("Certificate not found for the soft copy.");
+        // Checked again here: a queued email waits until the daily job if it could not go out at once.
+        const notNow = softCopyProblem(ctx);
+        if (notNow) throw new Error(notNow);
+        Object.assign(variables, softCopyEmailVariables(ctx));
         attachments.push({ filename: `certificate-${ctx.cert?.certificate_number ?? ctx.enrollment.enrollment_number}.pdf`, content: Buffer.from(await buildCertificatePdf(db, ctx, "soft")) });
       }
       const sent = await send({
@@ -106,4 +110,30 @@ export async function processEmailJobs(db: Admin, options: { limit?: number; ids
     }
   }
   return { configured: true, results };
+}
+
+/** Queue the soft copy and send it at once; the daily job sends whatever stays Queued. Never throws. */
+export async function emailSoftCopy(db: Admin, enrollmentId: string, options: { force?: boolean; actor?: string | null } = {}) {
+  const soft = await trySendSoftCopy(db, enrollmentId, options);
+  if (soft.state === "Queued" && soft.jobId) await processEmailJobs(db, { ids: [soft.jobId] }).catch(() => undefined);
+  return soft;
+}
+
+/** Every print sends the soft copy, so a corrected reprint replaces a wrong copy (owner, 6 Nov 2026). Never blocks or fails the print. */
+export async function softCopyAfterPrint(db: Admin, enrollmentId: string, certificateId: string, actor: string) {
+  try {
+    await db.from("certificates").update({ soft_copy_sent_at: null }).eq("id", certificateId);
+    await emailSoftCopy(db, enrollmentId, { actor });
+  } catch { /* The row shows Soft Copy Not Sent, with Resend Soft Copy. */ }
+}
+
+/**
+ * A printed certificate with no soft copy yet: what it waited for (the balance, post-test or evaluation) may be done now.
+ * One read when there is nothing to send. Only these enrollments, so older prints are never mass-emailed. Never throws.
+ */
+export async function sendWaitingSoftCopies(db: Admin, enrollmentIds: string[]) {
+  try {
+    const { data } = await db.from("certificates").select("enrollment_id").in("enrollment_id", enrollmentIds).gt("print_count", 0).is("soft_copy_sent_at", null);
+    for (const row of (data ?? []) as { enrollment_id: string }[]) await emailSoftCopy(db, row.enrollment_id);
+  } catch { /* The row shows Soft Copy Not Sent, with Resend Soft Copy. */ }
 }

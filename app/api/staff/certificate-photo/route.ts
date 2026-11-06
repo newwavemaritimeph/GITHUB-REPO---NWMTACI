@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { photoFileName } from "@/lib/certificate-photo";
-import { certificateContext, trySendSoftCopy } from "@/lib/certificates";
+import { certificateContext } from "@/lib/certificates";
 
 export const runtime = "nodejs";
 
@@ -74,8 +74,6 @@ export async function POST(request: Request) {
   if (error) { await db.storage.from("certificate-photos").remove([path]); return NextResponse.json({ error: error.message }, { status: 400 }); }
   if (prior) await db.storage.from("certificate-photos").remove([prior.storage_path]);
   await db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: isAdmin ? "admin" : "releasing_officer", action: prior ? "certificate.photo_replaced" : "certificate.photo_uploaded", record_type: "enrollment", record_id: enrollmentId.data, prior_values: prior ? { file_name: prior.file_name } : null, new_values: { file_name: fileName, bytes: bytes.length, background_white: row.background_white } });
-  // With the photo in, a certificate that was only waiting for it may now be emailed.
-  await trySendSoftCopy(db, enrollmentId.data, { actor: staff.user.id });
   return NextResponse.json({ ok: true, fileName });
 }
 

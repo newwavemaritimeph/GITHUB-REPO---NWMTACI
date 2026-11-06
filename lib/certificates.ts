@@ -1,14 +1,15 @@
 import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { automaticEndDate } from "@/lib/scheduling";
-import { formatNumber, certificateState, evaluationRequiredFor, type CertificateView } from "@/lib/certificate-rules";
+import { formatNumber, certificateState, evaluationRequiredFor, releaseProblem, type CertificateView } from "@/lib/certificate-rules";
+import { escapeHtml } from "@/lib/classroom";
 import { corrected, type CertificateCorrections } from "@/lib/certificate-photo";
 import { detectPhotoBox } from "@/lib/certificate-template";
 import { certificateLayout, isHazmatCfr } from "@/lib/certificate-layouts";
 import { drawTemplateFields, liftTemplateText } from "@/lib/certificate-overlay";
 import { templateLayout } from "@/lib/certificate-template-layouts";
 import { postTestStatus } from "@/lib/post-test-server";
-import { newVerifyCode, verifyUrl } from "@/lib/certificate-verify";
+import { newVerifyCode, verifyBaseUrl, verifyUrl } from "@/lib/certificate-verify";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -20,7 +21,7 @@ export type CertificateContext = {
   trainee: { name: string; email: string | null; firstName: string; middleName: string | null; lastName: string };
   course: { id: string; name: string; code: string; evaluationFormId: string | null };
   batch: { starts_on: string | null; ends_on: string | null; batch_number: string | null };
-  cert: { id: string; status: string; certificate_number: string | null; batch_label: string | null; print_count: number; reprints_allowed: number; void_status: string | null; soft_copy_sent_at: string | null; snapshot: Record<string, unknown> | null; verify_code?: string | null; sticker_no?: string | null; revoked_at?: string | null } | null;
+  cert: { id: string; status: string; certificate_number: string | null; batch_label: string | null; print_count: number; reprints_allowed: number; void_status: string | null; soft_copy_sent_at: string | null; printed_at?: string | null; snapshot: Record<string, unknown> | null; verify_code?: string | null; sticker_no?: string | null; revoked_at?: string | null } | null;
   view: CertificateView;
   issuanceEnabled: boolean;
   balanceCentavos: number;
@@ -49,7 +50,7 @@ export async function certificateContext(db: Admin, enrollmentId: string): Promi
     db.from("enrollment_charges").select("amount_centavos,event_type").eq("enrollment_id", enrollmentId).eq("valid", true),
     db.from("training_feedback").select("submitted_at").eq("enrollment_id", enrollmentId).maybeSingle(),
     db.from("organization_settings").select("certificate_issuance_enabled").maybeSingle(),
-    db.from("certificates").select("id,status,snapshot,certificate_number,batch_label,print_count,reprints_allowed,void_status,soft_copy_sent_at").eq("enrollment_id", enrollmentId).maybeSingle(),
+    db.from("certificates").select("id,status,snapshot,certificate_number,batch_label,print_count,reprints_allowed,void_status,soft_copy_sent_at,printed_at").eq("enrollment_id", enrollmentId).maybeSingle(),
     db.from("courses").select("evaluation_form_id,google_classroom_link").eq("id", e.course_id).maybeSingle(),
     db.from("certificate_photos").select("storage_path,file_name").eq("enrollment_id", enrollmentId).maybeSingle(),
     db.from("certificates").select("corrections").eq("enrollment_id", enrollmentId).maybeSingle(),
@@ -189,6 +190,8 @@ const isJpg = (b: Uint8Array) => b[0] === 0xff && b[1] === 0xd8;
 
 const longDate = (d: string | null) => (d ? new Intl.DateTimeFormat("en-PH", { month: "long", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${d}T00:00:00+08:00`)) : "");
 const range = (a: string | null, b: string | null) => (!a ? longDate(b) : !b || a === b ? longDate(a) : `${longDate(a)} – ${longDate(b)}`);
+/** The soft copy matches the paper, so a later resend keeps the printed day (owner, 6 Nov 2026). The Admin's correction still wins. */
+const softIssueDay = (ctx: CertificateContext) => String(corrected(manilaDay(ctx.cert?.printed_at) ?? manilaToday(), ctx.corrections?.issuedOn));
 
 /**
  * The certificate PDF: the course template with the trainee's name, course,
@@ -219,7 +222,7 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
   const traineeName = corrected(ctx.trainee.name, fix.name), courseName = corrected(ctx.course.name, fix.courseName);
   const batchLabel = corrected(ctx.cert?.batch_label ?? null, fix.batchLabel);
   const startsOn = corrected(ctx.batch.starts_on, fix.startsOn), endsOn = corrected(ctx.batch.ends_on, fix.endsOn);
-  const issuedOn = corrected(manilaToday(), fix.issuedOn);
+  const issuedOn = mode === "soft" ? softIssueDay(ctx) : corrected(manilaToday(), fix.issuedOn);
   const preview = mode === "preview";
   const regNo = ctx.numbers?.reg ?? (preview ? ctx.numbers?.nextReg : null);
   const number = ctx.cert?.certificate_number ?? "";
@@ -272,36 +275,70 @@ export async function buildCertificatePdf(db: Admin, ctx: CertificateContext, mo
     const text = "DRAFT - NOT FOR RELEASE", size = Math.round(W / 14);
     page.drawText(text, { x: W * 0.12, y: H * 0.25, size, font: bold, color: rgb(0.71, 0.14, 0.09), opacity: 0.18, rotate: degrees(20) });
   }
-  if (mode === "soft") page.drawText("Electronic copy", { x: 18, y: 14, size: 8, font: reg, color: rgb(0.45, 0.5, 0.55) });
+  if (mode === "soft") page.drawText("Electronic Copy", { x: 18, y: 14, size: 8, font: reg, color: rgb(0.45, 0.5, 0.55) });
   return pdf.save();
 }
 
+/** "November 3 to 4, 2026" */
+const trainingDates = (a: string | null, b: string | null) => {
+  if (!a || !b || a === b) return longDate(a ?? b);
+  const noYear = (d: string) => longDate(d).replace(/, \d{4}$/, "");
+  if (a.slice(0, 4) !== b.slice(0, 4)) return `${longDate(a)} to ${longDate(b)}`;
+  return `${noYear(a)} to ${a.slice(0, 7) === b.slice(0, 7) ? Number(b.slice(8, 10)) : noYear(b)}, ${b.slice(0, 4)}`;
+};
+const properName = (s: string) => s.toLowerCase().replace(/(^|[\s'-])(\p{L})/gu, (_, before: string, letter: string) => before + letter.toUpperCase());
+
 /**
- * Email the soft copy once: evaluation in (when the course has a form), fee
- * settled, training ended. Claims a number if needed. Never throws.
+ * What certificate.softcopy version 2 fills in (migration 202610290084), taken when the email goes out so it always matches
+ * the attached PDF, with the Admin's corrections. Blank details are left out.
  */
-export async function trySendSoftCopy(db: Admin, enrollmentId: string, options: { force?: boolean; actor?: string | null } = {}) {
+export function softCopyEmailVariables(ctx: CertificateContext) {
+  const fix = ctx.corrections ?? {};
+  const courseName = String(corrected(ctx.course.name, fix.courseName));
+  const dates = trainingDates(corrected(ctx.batch.starts_on, fix.startsOn), corrected(ctx.batch.ends_on, fix.endsOn));
+  const number = ctx.cert?.certificate_number ?? "", reg = ctx.numbers?.reg ?? "", issued = longDate(softIssueDay(ctx));
+  const verify = ctx.cert?.verify_code ? verifyUrl(ctx.cert.verify_code) : "";
+  const rows = [["Course", courseName], ["Training Dates", dates], ["Certificate No.", number], ["Registration No.", reg], ["Date of Issue", issued]].filter(([, value]) => value);
+  return {
+    first_name: properName(ctx.trainee.firstName), course_name: courseName, training_dates: dates, certificate_number: number, registration_number: reg, issued_on: issued,
+    verify_url: verify, delivery_url: `${verifyBaseUrl()}/certificate-delivery`,
+    details_html: rows.map(([label, value]) => `<tr><td style="padding:6px 12px 6px 0;color:#587184;font-size:13px;white-space:nowrap;vertical-align:top">${escapeHtml(label)}</td><td style="padding:6px 0;font-size:13.5px;font-weight:600;word-break:break-word">${escapeHtml(value)}</td></tr>`).join(""),
+    verify_block_html: verify ? `<a href="${escapeHtml(verify)}" style="display:inline-block;margin:0 8px 8px 0;background:#0571D0;color:#ffffff;text-decoration:none;font-size:13.5px;font-weight:700;padding:10px 16px;border-radius:8px">Verify This Certificate</a>` : "",
+  };
+}
+
+/** Why the soft copy cannot go out, or null (owner, 6 Nov 2026): printed, and what Release waits for is done. A Company Charge counts as settled. */
+export function softCopyProblem(ctx: CertificateContext) {
+  if (!ctx.trainee.email) return "The trainee has no email on record.";
+  if (!ctx.issuanceEnabled) return "Certificate printing is turned off.";
+  if (ctx.view.state !== "Printed" && ctx.view.state !== "Released") return "Only a printed certificate can be sent.";
+  return releaseProblem({ balanceCentavos: ctx.balanceCentavos, evaluationRequired: ctx.evaluation.required, evaluationOn: ctx.evaluation.on, revoked: !!ctx.cert?.revoked_at, postTestRequired: ctx.postTest.required, postTestPassed: ctx.postTest.passed });
+}
+
+type SoftCopyResult = { state: "Queued"; jobId: string | null; to: string } | { state: "Skipped"; why: string } | { state: "Already sent" } | { state: "Failed"; error: string };
+
+/**
+ * Queue the soft copy, once per print; `force` is the Resend button. Never throws. Sending is up to the caller
+ * (email-jobs: emailSoftCopy), so this file does not depend on the mail code.
+ */
+export async function trySendSoftCopy(db: Admin, enrollmentId: string, options: { force?: boolean; actor?: string | null } = {}): Promise<SoftCopyResult> {
   try {
     const ctx = await certificateContext(db, enrollmentId);
-    if (!ctx || !ctx.trainee.email || !ctx.issuanceEnabled) return { state: "Skipped" as const };
-    if (!["Due", "Printed", "Released"].includes(ctx.view.state)) return { state: "Skipped" as const };
-    // A certificate printed on an initial payment stays at the office until the balance is settled (owner, 5 Nov 2026).
-    if (ctx.balanceCentavos > 0) return { state: "Skipped" as const };
-    // Sent once the evaluation is in; without one it goes out only when asked from the screen.
-    if (!options.force) {
-      const { data: fb } = await db.from("training_feedback").select("id").eq("enrollment_id", enrollmentId).maybeSingle();
-      if (!fb) return { state: "Skipped" as const };
-    }
-    if (ctx.cert?.soft_copy_sent_at && !options.force) return { state: "Already sent" as const };
+    if (!ctx) return { state: "Skipped", why: "Enrollment not found." };
+    const problem = softCopyProblem(ctx);
+    if (problem) return { state: "Skipped", why: problem };
+    if (ctx.cert?.soft_copy_sent_at && !options.force) return { state: "Already sent" };
     const certId = await ensureCertificate(db, ctx);
     const number = ctx.cert?.certificate_number ?? await claimCertificateNumber(db, certId, options.actor ?? null);
     await ensureVerifyCode(db, certId);
-    const key = `certificate-softcopy:${certId}:${options.force ? Date.now() : "first"}`;
-    const { data: job, error } = await db.from("email_jobs").insert({ template_code: "certificate.softcopy", recipient: ctx.trainee.email, idempotency_key: key, variables: { trainee_name: ctx.trainee.name, course_name: ctx.course.name, certificate_number: number, attach_certificate_for: enrollmentId } }).select("id").maybeSingle();
+    const key = `certificate-softcopy:${certId}:${options.force ? Date.now() : `print-${ctx.view.printCount}`}`;
+    // A new send replaces one still waiting to retry, so the trainee gets one email.
+    await db.from("email_jobs").update({ state: "Failed", last_error: "Replaced by a later send." }).eq("template_code", "certificate.softcopy").eq("state", "Queued").neq("idempotency_key", key).contains("variables", { attach_certificate_for: enrollmentId });
+    const { data: job, error } = await db.from("email_jobs").insert({ template_code: "certificate.softcopy", recipient: ctx.trainee.email!, idempotency_key: key, variables: { trainee_name: ctx.trainee.name, course_name: ctx.course.name, certificate_number: number, attach_certificate_for: enrollmentId } }).select("id").maybeSingle();
     if (error && error.code !== "23505") throw error;
     await db.from("certificates").update({ soft_copy_sent_at: new Date().toISOString() }).eq("id", certId);
-    return { state: "Queued" as const, jobId: (job as { id?: string } | null)?.id ?? null, to: ctx.trainee.email };
+    return { state: "Queued", jobId: (job as { id?: string } | null)?.id ?? null, to: ctx.trainee.email! };
   } catch (error) {
-    return { state: "Failed" as const, error: error instanceof Error ? error.message : "Could not send the soft copy." };
+    return { state: "Failed", error: error instanceof Error ? error.message : "Could not send the soft copy." };
   }
 }
