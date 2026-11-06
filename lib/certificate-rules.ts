@@ -192,16 +192,20 @@ export const canSetSeries = (roles: string[], _stcw: boolean) => roles.includes(
 
 /**
  * Upload Many templates (owner, 20 Oct 2026): pairs each PDF file name with a course.
- * The course code as a whole word wins, longest code first ("HAZMAT-CFR Certificate.pdf"
- * beats HAZMAT); otherwise the full course name in the file name. Unmatched files get null.
+ * "CODE - Course Name.pdf" belongs to that code; if no course has it, only the full course name
+ * can match, never a code further along ("HUPH - HACCP and ..." is not HACCP, and
+ * "MARPOL-5DAY - ..." is not the 3-day MARPOL; 6 Nov 2026). Any other file name: the course code
+ * as a whole word, longest code first ("HAZMAT-CFR Certificate.pdf" beats HAZMAT), then the
+ * full course name. Unmatched files get null, and the screen asks which course.
  */
 export function matchTemplateFiles(fileNames: string[], courses: { id: string; code: string; name: string }[]) {
   const norm = (s: string) => ` ${s.toUpperCase().replace(/\.PDF$/, "").replace(/[^A-Z0-9]+/g, " ").trim()} `;
   const byCode = [...courses].sort((a, b) => norm(b.code).length - norm(a.code).length);
   const byName = [...courses].sort((a, b) => norm(b.name).length - norm(a.name).length);
   return fileNames.map((file) => {
-    const f = norm(file);
-    const hit = byCode.find((c) => norm(c.code).trim() && f.includes(norm(c.code))) ?? byName.find((c) => norm(c.name).trim() && f.includes(norm(c.name)));
+    const f = norm(file), lead = file.match(/^(.+?)\s+-\s/)?.[1];
+    const named = () => byName.find((c) => norm(c.name).trim() && f.includes(norm(c.name)));
+    const hit = lead ? courses.find((c) => norm(c.code) === norm(lead)) ?? named() : byCode.find((c) => norm(c.code).trim() && f.includes(norm(c.code))) ?? named();
     return { file, courseId: hit?.id ?? null };
   });
 }

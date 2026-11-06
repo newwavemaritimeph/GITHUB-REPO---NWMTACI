@@ -19,6 +19,24 @@ describe("matchTemplateFiles", () => {
   });
 });
 
+describe("matchTemplateFiles, CODE - Course Name files", () => {
+  const list = [
+    { id: "haccp", code: "HACCP", name: "Hazard Analysis and Critical Control" },
+    { id: "huph", code: "HUPH", name: "HACCP and United State Public Points" },
+    { id: "ghh", code: "GHH", name: "Galley Hygiene with HACCP" },
+    { id: "fh", code: "FH-HACCP", name: "Food Hygiene with HACCP" },
+    { id: "marpol", code: "MARPOL", name: "Consolidated MARPOL Annex I-VI" },
+  ];
+  it("gives a file to the code it starts with, not a longer code further along", () => {
+    const r = matchTemplateFiles(["HUPH - HACCP and United State Public Health.pdf", "GHH - Galley Hygiene with HACCP.pdf", "FH-HACCP - Food Hygiene with HACCP.pdf"], list);
+    expect(r.map((x) => x.courseId)).toEqual(["huph", "ghh", "fh"]);
+  });
+  it("matches an unknown leading code by the full course name only", () => {
+    const r = matchTemplateFiles(["MARPOL-3DAY - Consolidated MARPOL Annex I-VI.pdf", "MARPOL-5DAY - Consolidated MARPOL Annexes I-VI.pdf", "ILO - Food Hygiene with HACCP.pdf", "ILO - Something with HACCP.pdf"], list);
+    expect(r.map((x) => x.courseId)).toEqual(["marpol", null, "fh", null]);
+  });
+});
+
 describe("nextOf", () => {
   it("continues from the last Certificate No. used", async () => {
     const { nextOf } = await import("../lib/certificate-rules");
