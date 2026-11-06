@@ -4,6 +4,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { normalizeSrn } from "@/lib/validation";
 import { sameTrainee, tarPrintable } from "@/lib/trainee-match";
 import { loadTarGroups } from "@/lib/trainee-match-server";
+import { voidReasons } from "@/lib/payment-void-reasons";
 
 export const runtime = "nodejs";
 
@@ -21,8 +22,8 @@ export async function GET(request: Request) {
   const { data: me } = await db.from("trainees").select("id,srn,legal_first_name,legal_last_name,birthdate").eq("id", traineeId).maybeSingle();
   if (!me) return NextResponse.json({ error: "Trainee not found." }, { status: 404 });
   // Every receipt and TAR of this trainee (owner, 3 Nov 2026: Accounting reprints from the Trainee Account).
-  type PayRow = { id: string; payment_number: string; trainee_id: string; amount_centavos: number; method: string; reference_number: string | null; received_at: string; valid: boolean; remarks: string | null; verification_state: string | null; void_reason: string | null; receipts: { receipt_number?: string; print_count?: number } | { receipt_number?: string; print_count?: number }[] | null };
-  const paySelect = (receipts: string) => db.from("payments").select(`id,payment_number,trainee_id,amount_centavos,method,reference_number,received_at,valid,remarks,verification_state,void_reason,receipts(${receipts})`).eq("trainee_id", traineeId).order("received_at", { ascending: true }).limit(500);
+  type PayRow = { id: string; payment_number: string; trainee_id: string; amount_centavos: number; method: string; reference_number: string | null; received_at: string; valid: boolean; remarks: string | null; verification_state: string | null; receipts: { receipt_number?: string; print_count?: number } | { receipt_number?: string; print_count?: number }[] | null };
+  const paySelect = (receipts: string) => db.from("payments").select(`id,payment_number,trainee_id,amount_centavos,method,reference_number,received_at,valid,remarks,verification_state,receipts(${receipts})`).eq("trainee_id", traineeId).order("received_at", { ascending: true }).limit(500);
   const [firstPay, tarRes] = await Promise.all([
     paySelect("receipt_number,print_count"),
     db.from("admission_records").select("id,ar_number,enrollment_ids,print_count,reprints_approved,issued_at").eq("trainee_id", traineeId).order("issued_at", { ascending: true }).limit(200),
@@ -32,7 +33,9 @@ export async function GET(request: Request) {
   let payRes = firstPay;
   if (payRes.error) { console.error("Trainee Account payments:", payRes.error.message); payRes = await paySelect("receipt_number"); }
   if (payRes.error) console.error("Trainee Account payments, retry:", payRes.error.message);
-  const payments = payRes.error ? undefined : ((payRes.data ?? []) as unknown as PayRow[]).map((p) => { const r = Array.isArray(p.receipts) ? p.receipts[0] : p.receipts; return { id: p.id, payment_number: p.payment_number, trainee_id: p.trainee_id, amount_centavos: p.amount_centavos, method: p.method, reference_number: p.reference_number, received_at: p.received_at, valid: p.valid, remarks: p.remarks, verification_state: p.verification_state, void_reason: p.void_reason, receipt_number: r?.receipt_number ?? null, print_count: Number(r?.print_count ?? 0) }; });
+  const payRows = payRes.error ? [] : (payRes.data ?? []) as unknown as PayRow[];
+  const why = await voidReasons(db, payRows.filter((p) => !p.valid).map((p) => p.id));
+  const payments = payRes.error ? undefined : payRows.map((p) => { const r = Array.isArray(p.receipts) ? p.receipts[0] : p.receipts; return { id: p.id, payment_number: p.payment_number, trainee_id: p.trainee_id, amount_centavos: p.amount_centavos, method: p.method, reference_number: p.reference_number, received_at: p.received_at, valid: p.valid, remarks: p.remarks, verification_state: p.verification_state, void_reason: why.get(p.id) ?? null, receipt_number: r?.receipt_number ?? null, print_count: Number(r?.print_count ?? 0) }; });
   // Candidates: same SRN, or same last name (then name + birth date is checked in code).
   const srn = normalizeSrn(me.srn ?? "");
   const [bySrn, byName] = await Promise.all([
