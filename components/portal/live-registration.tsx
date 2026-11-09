@@ -3,7 +3,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import type { PortalData, Enrollment, Batch, Trainee } from "../portal-live-app";
 import { first, manilaToday, dueCentavos, balanceOf, pesos, pesos2, addDays } from "@/lib/portal-format";
-import { LATE_ENROLLMENT_CODES, PUBLIC_STCW_CODES, automaticEndDate, fitsInWeek } from "@/lib/scheduling";
+import { LATE_ENROLLMENT_CODES, PUBLIC_STCW_CODES, automaticEndDate, directBatchChange, fitsInWeek } from "@/lib/scheduling";
 import { isPackageCourse, packageWeeks } from "@/lib/packages";
 import { ALL_DATES, Badge, Message, Modal, PageHead, PeriodBar, ViewIcon, useNeedSince, usePaged, usePost, usePeriod, submit, fullName, fmtDate, fmtClock } from "./shared-ui";
 import { RequestActionModal, type RequestType } from "./payment-actions";
@@ -345,18 +345,21 @@ export function AssignCourseModal({ data, trainee, reload, onClose }: { data: Po
 }
 
 /** Put a Pending application that has no batch yet onto an open batch of its course. */
-function ChooseBatchModal({ data, enrollment, reload, onClose }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void }) {
+/** Choose Batch for an application without one; with `change`, Change Schedule for an enrollment with no payment yet (owner, 9 Nov 2026). */
+function ChooseBatchModal({ data, enrollment, reload, onClose, change = false }: { data: PortalData; enrollment: Enrollment; reload: () => Promise<void>; onClose: () => void; change?: boolean }) {
   const { busy, msg, post } = usePost(reload);
   const [batchId, setBatchId] = useState("");
   const today = manilaToday(), now = new Date().toISOString();
-  const batches = data.batches.filter((x) => x.course_id === enrollment.course_id && isBookable(x, today, now)).sort((x, y) => x.starts_on.localeCompare(y.starts_on));
-  const place = () => void post({ action: "application-place-batch", enrollmentId: enrollment.id, batchId }, "Placed on the batch.").then(onClose).catch(() => undefined);
-  return <Modal title={`Choose batch · ${first(enrollment.courses)?.name ?? "Course"}`} onClose={onClose}>
+  const batches = data.batches.filter((x) => x.course_id === enrollment.course_id && x.id !== enrollment.batch_id && isBookable(x, today, now)).sort((x, y) => x.starts_on.localeCompare(y.starts_on));
+  const place = () => void (change
+    ? post({ action: "registration-change-batch", enrollmentId: enrollment.id, batchId }, `Schedule changed to Batch ${batches.find((x) => x.id === batchId)?.batch_number ?? ""}.`)
+    : post({ action: "application-place-batch", enrollmentId: enrollment.id, batchId }, "Placed on the batch.")).then(onClose).catch(() => undefined);
+  return <Modal title={`${change ? "Change Schedule" : "Choose Batch"} · ${first(enrollment.courses)?.name ?? "Course"}`} onClose={onClose}>
     <div className="portal-form">
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
       <div className="full"><BatchCards data={data} batches={batches} selected={batchId} onSelect={setBatchId} /></div>
       {!batches.length && <p className="portal-form-note full">The application stays ready; place it once a batch opens.</p>}
-      <div className="bc-foot full"><span>{batchSummary(data, batches.find((x) => x.id === batchId)) || "Choose a batch."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!batchId || busy} onClick={place}>{busy ? "Placing…" : "Place on Batch"}</button></span></div>
+      <div className="bc-foot full"><span>{batchSummary(data, batches.find((x) => x.id === batchId)) || "Choose a batch."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!batchId || busy} onClick={place}>{busy ? (change ? "Saving…" : "Placing…") : change ? "Save Schedule" : "Place on Batch"}</button></span></div>
     </div>
   </Modal>;
 }
@@ -750,7 +753,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose, onOpenA
   const { busy, msg, post } = usePost(reload);
   const [req, setReq] = useState<RequestType | null>(null);
   const [addingCourse, setAddingCourse] = useState(false);
-  const [choosingBatch, setChoosingBatch] = useState(false);
+  const [choosingBatch, setChoosingBatch] = useState(false), [changingBatch, setChangingBatch] = useState(false);
   const t = first(e.trainees), c = first(e.courses), b = first(e.batches);
   const traineeRecord = data.trainees.find((x) => x.id === e.trainee_id) ?? null;
   const center = first(first(e.partner_course_offers)?.partner_centers)?.name;
@@ -760,6 +763,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose, onOpenA
   const pendingTypes = new Set(history.filter((r) => r.status === "Pending").map((r) => r.request_type));
   const canRequest = e.enrollment_status !== "Cancelled";
   const isApplication = e.enrollment_status === "Pending";
+  const canChangeBatch = directBatchChange(e);
   const hasDocuments = e.enrollment_status === "Enrolled" || e.enrollment_status === "Open Schedule";
   const p = payState(e);
   const billTo = e.enrollment_status !== "Cancelled" ? chargeTo(data, e) : null;
@@ -770,7 +774,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose, onOpenA
       {!isApplication && <div className="kv-grid kv-stack full">
         <div><span>{isApplication ? "Applicant" : "Trainee"}</span><strong>{t ? fullName(t) : "—"}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{t?.trainee_number} · <span className="lc">{t?.email}</span> · {t?.mobile}</small></div>
         <div><span>Course</span><strong>{c?.name ?? "—"}</strong><small>{c?.code}{center ? ` · endorsed: ${center}` : " · New Wave"}</small></div>
-        <div><span>Schedule</span><strong>{scheduleOf(e)}</strong><small>{b ? `${b.batch_number}${b.mode ? ` · ${b.mode}` : ""}${b.venue ? ` · ${b.venue}` : ""}` : e.scheduled_on ? (c && first(e.partner_course_offers) ? "Endorsed training date" : `Start date picked · ends ${fmtDate(automaticEndDate(e.scheduled_on, data.courses.find((x) => x.id === e.course_id)?.duration_label ?? "1"))}`) : "Not yet placed on a batch"}</small></div>
+        <div><span>Schedule</span>{canChangeBatch && <button type="button" className="portal-secondary reg-change-batch" onClick={() => setChangingBatch(true)}>Change Schedule</button>}<strong>{scheduleOf(e)}</strong><small>{b ? `${b.batch_number}${b.mode ? ` · ${b.mode}` : ""}${b.venue ? ` · ${b.venue}` : ""}` : e.scheduled_on ? (c && first(e.partner_course_offers) ? "Endorsed training date" : `Start date picked · ends ${fmtDate(automaticEndDate(e.scheduled_on, data.courses.find((x) => x.id === e.course_id)?.duration_label ?? "1"))}`) : "Not yet placed on a batch"}</small></div>
         <div><span>Status</span><strong><Badge tone={statusTone(e.enrollment_status)}>{e.enrollment_status}</Badge></strong><small>{isApplication ? "Submitted" : "Created"} {fmtDate(day(e.created_at))}{e.source ? ` · ${e.source}` : ""}</small></div>
       </div>}
       <StartDateEditor data={data} enrollment={e} busy={busy} post={post} />
@@ -802,8 +806,9 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose, onOpenA
 
       <div className="full"><strong>Request a change</strong> <small style={{ color: "var(--muted)" }}>goes to the Cashier for charges, then Accounting for approval</small></div>
       <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
-        {REG_REQUESTS.filter((type) => !(isApplication && (type === "Make-up Class" || type === "Reprinting" || type === "TAR reprint"))).map((type) => <button key={type} type="button" disabled={!canRequest || pendingTypes.has(type)} title={pendingTypes.has(type) ? "A request of this type is already pending" : undefined} onClick={() => setReq(type)}>{requestLabel(type, isApplication)}</button>)}
+        {REG_REQUESTS.filter((type) => !(isApplication && (type === "Make-up Class" || type === "Reprinting" || type === "TAR reprint")) && !(canChangeBatch && type === "Rescheduling")).map((type) => <button key={type} type="button" disabled={!canRequest || pendingTypes.has(type)} title={pendingTypes.has(type) ? "A request of this type is already pending" : undefined} onClick={() => setReq(type)}>{requestLabel(type, isApplication)}</button>)}
       </div>
+      {canChangeBatch && <p className="portal-form-note full">Not paid yet: change the schedule with Change Schedule. Once the Cashier records any payment, a change of batch goes through the request and its fee.</p>}
       {history.length > 0 && <div className="full"><small style={{ color: "var(--muted)", fontWeight: 700 }}>Request history</small>{history.map((r: RequestRow) => { const st = requestStage(r); const charge = first(r.enrollment_charges); return <div className="live-row-item" key={r.id}><div><strong>{r.request_number} · {r.request_type === "Rescheduling" ? "Change batch / reschedule" : r.request_type}</strong><small>{r.reason} · filed {fmtDate(day(r.created_at))}{charge ? ` · charge ${pesos(charge.amount_centavos)}` : r.stage === "For approval" && r.status === "Pending" ? " · no charge" : ""}{r.decided_at ? ` · decided ${fmtDate(day(r.decided_at))}` : ""}{r.decision_remarks ? ` · ${r.decision_remarks}` : ""}</small></div><Badge tone={st.tone}>{st.text}</Badge></div>; })}</div>}
 
       <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Close</button></div>
@@ -811,6 +816,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose, onOpenA
     {req && <RequestActionModal data={data} enrollment={e} reqType={req} onClose={() => setReq(null)} post={(body) => post(body, "Request sent to the Cashier for charges.")} />}
     {addingCourse && traineeRecord && <AssignCourseModal data={data} trainee={traineeRecord} reload={reload} onClose={() => setAddingCourse(false)} />}
     {choosingBatch && <ChooseBatchModal data={data} enrollment={e} reload={reload} onClose={() => setChoosingBatch(false)} />}
+    {changingBatch && <ChooseBatchModal data={data} enrollment={e} reload={reload} change onClose={() => setChangingBatch(false)} />}
   </Modal>;
 }
 

@@ -8,6 +8,12 @@ export function courseDays(durationLabel: string) {
 export const PUBLIC_STCW_CODES = ["UBT-PSSR", "STPPDSPPS", "PSCMT", "PSCMHBT", "CCMD"] as const;
 /** Courses that keep taking enrollments after training starts, until the last day (courses.late_enrollment). */
 export const LATE_ENROLLMENT_CODES: readonly string[] = ["CCMD"];
+/**
+ * Registration changes the batch itself while the Cashier has recorded no payment for the enrollment (owner, 9 Nov 2026);
+ * once anything is paid, a change of batch goes through the Change Batch / Reschedule request and its fee.
+ */
+export const directBatchChange = (e: { batch_id?: string | null; enrollment_status: string; paid_centavos?: number | string | null }) =>
+  !!e.batch_id && e.enrollment_status !== "Cancelled" && Number(e.paid_centavos ?? 0) === 0;
 
 /**
  * Whether an In-House course picked on the website can start on this date: no

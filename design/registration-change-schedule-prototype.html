@@ -1,0 +1,133 @@
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Registration Change Schedule</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+/* The staff portal is light only. Layout: navy bar, a trainee switcher, then Registration's Enrollment window as in the portal. */
+:root { color-scheme: light; --ink: #0f2638; --mute: #587184; --line: #d6e9f1; --soft: #eef4f8; --navy: #123F63; --blue: #0571D0; --orange: #F25615; --good: #0a7a3e; --goodbg: #e3f5ea; --warn: #a4530c; --warnbg: #fdeee0; --bad: #b42318; --badbg: #fde8e6; --ui: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif; --num: "Geist Mono", ui-monospace, Consolas, monospace; }
+html, body { background: #f2f9fc; color: var(--ink); margin: 0; font: 14px/1.45 var(--ui); }
+.gut { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+#bar { background: var(--navy); color: #fff; display: flex; align-items: center; gap: 10px; padding-block: 10px; }
+#bar b { font-weight: 600; }
+#bar span { margin-left: auto; color: #cfe6f2; font-size: 13px; }
+#pick { background: #fff; border-bottom: 2px solid var(--navy); padding-block: 10px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { font: 600 13px var(--ui); height: 32px; padding: 0 11px; border-radius: 8px; border: 1px solid #b9dcec; background: #fff; color: var(--navy); cursor: pointer; }
+.seg button[aria-selected="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+#app { padding-block: 16px 40px; max-width: 900px; margin-inline: auto; box-sizing: border-box; width: 100%; display: grid; gap: 14px; }
+.modal { background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 10px 30px #0f263822; overflow: hidden; }
+.modal > header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--line); gap: 10px; }
+.modal > header h2 { margin: 0; font: 700 18px var(--ui); color: var(--navy); }
+.mb { padding: 16px 20px 18px; display: grid; gap: 14px; }
+.kv { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.kv > div { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.kv span { display: block; color: var(--mute); font: 600 11.5px var(--ui); letter-spacing: .05em; text-transform: uppercase; }
+.kv strong { display: block; font: 600 15px var(--ui); margin-top: 2px; }
+.kv small { color: var(--mute); font-size: 12.5px; }
+.kv .sched { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.pills { display: flex; flex-wrap: wrap; gap: 8px; }
+.pills div { border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; }
+.pills span { display: block; font-size: 11.5px; color: var(--mute); }
+.pills b { font-family: var(--num); font-weight: 600; }
+.pills .bad { background: var(--badbg); border-color: #f6c7c2; }
+.pills .ok { background: var(--goodbg); border-color: #bfe5cd; }
+h3 { margin: 0; font: 600 14px var(--ui); }
+h3 small { color: var(--mute); font-weight: 400; }
+.acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.b { display: inline-flex; align-items: center; height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid #b9dcec; background: #fff; color: var(--blue); font: 600 13.5px var(--ui); cursor: pointer; white-space: nowrap; }
+.b.p { background: var(--orange); border-color: var(--orange); color: #fff; }
+.b[disabled] { opacity: .45; cursor: not-allowed; }
+.chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font: 600 12px var(--ui); white-space: nowrap; }
+.chip.g { background: var(--goodbg); color: var(--good); }
+.chip.o { background: var(--warnbg); color: var(--warn); }
+.chip.r { background: var(--badbg); color: var(--bad); }
+.note { color: var(--mute); font-size: 13px; margin: 0; }
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+.card { text-align: left; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: #fff; cursor: pointer; font: inherit; color: inherit; display: grid; gap: 2px; }
+.card b { font: 600 14px var(--ui); }
+.card small { color: var(--mute); font-size: 12.5px; }
+.card .mono { font-family: var(--num); font-size: 12.5px; color: var(--navy); }
+.card[aria-pressed="true"] { border-color: var(--blue); box-shadow: 0 0 0 2px #0571d033; background: #f3f9ff; }
+.card[disabled] { opacity: .5; cursor: not-allowed; }
+.foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px solid var(--line); padding-top: 12px; }
+.panel { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 4px 16px 16px; }
+.panel h2 { font: 600 16px var(--ui); margin: 12px 0 6px; }
+.panel ol { margin: 0; padding-left: 20px; display: grid; gap: 7px; max-width: 80ch; }
+button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--navy); color: #fff; padding: 9px 14px; border-radius: 10px; font-size: 13.5px; z-index: 50; max-width: calc(100% - 32px); box-sizing: border-box; }
+@media (max-width: 640px) { .kv { grid-template-columns: 1fr; } }
+</style>
+
+<div id="bar" class="gut"><b>Registration › Enrollment Window</b><span>Prototype · Sample Names Only</span></div>
+<div id="pick" class="gut"><div id="tabs" class="seg" role="tablist" aria-label="Sample trainee"></div></div>
+<div id="app" class="gut"></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+const TRAINEES = [
+  { tab: "Not Paid", name: "DELA CRUZ, Juan Perez", no: "EN-2026-004512", status: "Pending", paid: 0, fee: 1500, batch: "26-507-023" },
+  { tab: "Partly Paid", name: "SANTOS, Maria Lopez", no: "EN-2026-004498", status: "Pending", paid: 500, fee: 1500, batch: "26-507-023" },
+  { tab: "Paid", name: "REYES, Carlo Mendoza", no: "EN-2026-004471", status: "Enrolled", paid: 1500, fee: 1500, batch: "26-507-023" },
+];
+const BATCHES = [
+  { no: "26-507-023", dates: "Nov 10 – 11, 2026", day: "Tue – Wed", left: 9 },
+  { no: "26-507-024", dates: "Nov 17 – 18, 2026", day: "Tue – Wed", left: 14 },
+  { no: "26-507-025", dates: "Nov 24 – 25, 2026", day: "Tue – Wed", left: 0 },
+  { no: "26-507-026", dates: "Dec 1 – 2, 2026", day: "Tue – Wed", left: 22 },
+];
+const S = { t: 0, choosing: false, pick: "", moved: {} };
+const app = document.getElementById("app"), tabs = document.getElementById("tabs"), toastEl = document.getElementById("toast");
+let timer;
+const toast = (t) => { toastEl.textContent = t; toastEl.hidden = false; clearTimeout(timer); timer = setTimeout(() => { toastEl.hidden = true; }, 3400); };
+const peso = (n) => `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
+const T = () => TRAINEES[S.t];
+const batchOf = (t) => BATCHES.find((b) => b.no === (S.moved[S.t] ?? t.batch));
+
+function windowView() {
+  const t = T(), b = batchOf(t), unpaid = t.paid === 0, bal = t.fee - t.paid;
+  const payTone = t.paid === 0 ? "bad" : bal > 0 ? "" : "ok";
+  const chooser = S.choosing ? `<div class="panel" style="padding-top:2px"><h2>Change Schedule · Passenger Ship Crowd Management Training</h2>
+      <div class="cards">${BATCHES.filter((x) => x.no !== b.no).map((x) => `<button type="button" class="card" data-act="pick" data-id="${x.no}" aria-pressed="${S.pick === x.no}"${x.left ? "" : " disabled"}><span class="mono">${x.no}</span><b>${x.dates}</b><small>${x.day} · ${x.left ? `${x.left} slots left` : "Full"}</small></button>`).join("")}</div>
+      <div class="foot"><span class="note">${S.pick ? `Moves ${t.name.split(",")[0]} from ${b.no} to ${S.pick}. No fee: not paid yet.` : "Choose the new batch."}</span><span class="acts"><button type="button" class="b" data-act="cancel">Cancel</button><button type="button" class="b p" data-act="save"${S.pick ? "" : " disabled"}>Save Schedule</button></span></div></div>` : "";
+  return `<div class="modal" role="dialog" aria-label="Enrollment ${t.no}"><header><h2>Enrollment · ${t.no}</h2><button type="button" class="b" data-act="toast" data-id="Closes the window." aria-label="Close">×</button></header><div class="mb">
+    <div class="kv">
+      <div><span>Trainee</span><strong>${t.name}</strong><small>sample@email.com · 0917 000 0000</small></div>
+      <div><span>Course</span><strong>Passenger Ship Crowd Management Training</strong><small>PSCMT · New Wave</small></div>
+      <div><span>Schedule</span><div class="sched"><div><strong>${b.dates}</strong><small>${b.no} · F2F · Room 103</small></div>${unpaid ? `<button type="button" class="b" data-act="choose">Change Schedule</button>` : ""}</div></div>
+      <div><span>Status</span><strong><span class="chip ${t.status === "Enrolled" ? "g" : "o"}">${t.status}</span></strong><small>Created Nov 5, 2026 · Walk-in</small></div>
+    </div>
+    ${chooser}
+    <div><h3>Payment Status <small>read-only — payments are recorded by the Cashier</small></h3></div>
+    <div class="pills"><div><span>Fee</span><b>${peso(t.fee)}</b></div><div><span>Total Due</span><b>${peso(t.fee)}</b></div><div class="${payTone}"><span>${t.paid === 0 ? "Not Paid" : bal > 0 ? "Partly Paid" : "Fully Paid"}</span><b>${peso(t.paid)} paid · ${peso(bal)} balance</b></div></div>
+    <div><h3>Request a Change <small>goes to the Cashier for charges, then Accounting for approval</small></h3></div>
+    <div class="acts">${unpaid ? "" : `<button type="button" class="b" data-act="toast" data-id="Opens the Change Batch request (fee by policy, collected by the Cashier).">Change Batch / Reschedule</button>`}<button type="button" class="b" data-act="toast" data-id="Opens the Change Course request.">Change Course</button><button type="button" class="b" data-act="toast" data-id="Opens the Cancel request.">Cancel</button></div>
+    ${unpaid ? `<p class="note">Not paid yet: change the schedule directly with Change Schedule. Once the Cashier records any payment, a change of batch goes through the request and its fee.</p>` : ""}
+  </div></div>`;
+}
+const confirmView = () => `<div class="panel"><h2>To Confirm</h2><ol>
+  <li><b>Change Schedule</b> shows beside the Schedule in Registration's Enrollment window while the Cashier has recorded <b>no payment</b> for that enrollment. It moves the trainee to another open batch of the same course at once: no request, no fee, no Accounting approval.</li>
+  <li>Only open batches of the same course with free slots can be chosen; full or closed batches are greyed out. Seat counts on both batches update.</li>
+  <li><b>Partly paid or paid</b>: Change Schedule is gone, and the Change Batch / Reschedule request (Cashier fee, then automatic once paid) stays as today. The "Partly Paid" sample shows this.</li>
+  <li>Every change is saved in the audit log with the old and new batch and who made it.</li>
+  <li>The Cashier and the Admin keep their own Reschedule as today. Company Charge trainees with no payment recorded can also be moved this way.</li>
+  <li>An applicant without a batch still uses Choose Batch, as today.</li>
+</ol></div>`;
+
+function render() {
+  tabs.innerHTML = [...TRAINEES.map((t, i) => `<button type="button" role="tab" data-act="t" data-id="${i}" aria-selected="${S.t === i}">${t.tab}</button>`), `<button type="button" role="tab" data-act="t" data-id="c" aria-selected="${S.t === "c"}">To Confirm</button>`].join("");
+  app.innerHTML = S.t === "c" ? confirmView() : windowView();
+}
+document.addEventListener("click", (ev) => {
+  const el = ev.target.closest("[data-act]");
+  if (!el || el.disabled) return;
+  const { act, id } = el.dataset;
+  if (act === "t") { S.t = id === "c" ? "c" : Number(id); S.choosing = false; S.pick = ""; return render(); }
+  if (act === "choose") { S.choosing = true; S.pick = ""; return render(); }
+  if (act === "pick") { S.pick = id; return render(); }
+  if (act === "cancel") { S.choosing = false; return render(); }
+  if (act === "save") { S.moved[S.t] = S.pick; S.choosing = false; const p = S.pick; S.pick = ""; render(); return toast(`Schedule changed to Batch ${p}.`); }
+  if (act === "toast") return toast(id);
+});
+render();
+</script>
