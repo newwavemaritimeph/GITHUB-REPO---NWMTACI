@@ -2790,6 +2790,7 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .tr-todo.none { color: var(--nw-good); }
 .nw-shell .bw-marina { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--nw-line); border-radius: 12px; background: var(--nw-soft); }
 .nw-shell .bw-marina > b { color: var(--nw-navy); margin-right: 4px; }
+.portal-shell .tp-change, .nw-shell .tp-change { display: block; margin-top: 6px; min-height: 30px; padding: 0 10px; font-size: 13px; }
 .portal-shell .reg-change-batch, .nw-shell .reg-change-batch { float: right; margin: -2px 0 0 8px; min-height: 30px; padding: 0 10px; font-size: 13px; }
 .nw-shell .bw-days { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .nw-shell .bw-cell { min-width: 220px; }

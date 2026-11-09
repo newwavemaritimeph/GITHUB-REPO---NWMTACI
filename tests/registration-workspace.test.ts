@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { createElement } from "react";
 import { renderToString } from "react-dom/server";
 import type { PortalData } from "@/components/portal-live-app";
-import { CoursesAndCenters, EnrolledDayPanel, RegistrationDashboard, RegistrationRecords, StcwSeatsPanel, applicationReadiness, nextUpOf } from "@/components/portal/live-registration";
+import { CoursesAndCenters, EnrolledDayPanel, EnrollmentDrawer, RegistrationDashboard, RegistrationRecords, StcwSeatsPanel, applicationReadiness, nextUpOf } from "@/components/portal/live-registration";
 import { InstructionsButton, InstructionsWindow } from "@/components/portal/instructions-window";
 
 /**
@@ -221,5 +221,12 @@ describe("Registration Officer workspace", () => {
     for (const forbidden of ["create-enrollment", "post-payment", "payment-split", "enrollment-charge", "enrollment-reschedule", "enrollment-course-change", "enrollment-delete", "record-agency-rebate", "discount-request", "PaymentForm", "PaymentHubModal", "ChargeActionModal", "DiscountRequestModal", "SplitActionModal"]) {
       expect(source).not.toContain(forbidden);
     }
+  });
+  it("offers Change Schedule on an unpaid application, and not once anything is paid (owner, 9 Nov 2026)", () => {
+    const open = (id: string) => renderToString(createElement(EnrollmentDrawer, { data: fixture, enrollment: fixture.enrollments.find((e) => e.id === id)!, reload: async () => undefined, onClose: () => undefined }));
+    // e5: Pending on batch b1, nothing paid. The application window has no Schedule box, so the button sits in its Training box.
+    expect(open("e5")).toContain("Change Schedule");
+    // e4: Pending on b1 with a payment recorded: the Change Batch request stays instead.
+    expect(open("e4")).not.toContain("Change Schedule");
   });
 });

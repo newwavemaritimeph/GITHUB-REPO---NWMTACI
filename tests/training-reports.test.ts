@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { MismoCell, mismoInWindow } from "@/components/portal/batch-window";
+import { MismoCell, manilaHour, mismoInWindow } from "@/components/portal/batch-window";
 import { TrainingReports, batchStats, courseGroups } from "@/components/portal/mismo-home";
 import type { MismoBatch, MismoTrainee } from "@/lib/mismo";
 import { addDays, manilaToday } from "@/lib/portal-format";
@@ -37,7 +37,8 @@ describe("Training Reports (owner, 9 Nov 2026)", () => {
     expect(html).toContain("All Encoded");
     expect(html).toContain(">26-609-144</button>");
     expect(html).not.toContain(">26-609-140</button>");
-    expect(html).toContain("Not Yet · 4:00 PM Today");
+    // Today's Final List is ready from 4:00 PM Manila time; before that it waits.
+    expect(html).toContain(manilaHour() >= 16 ? "Final List PDF" : "Not Yet · 4:00 PM Today");
     expect(html).toMatch(/Final List PDF/);
   });
   it("gives each trainee one MARINA MISMO cell", () => {

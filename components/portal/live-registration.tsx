@@ -555,7 +555,7 @@ export function RegistrationRecords({ data, query, reload, view, setView, traine
  * remarks, who received it), signature lines and the hand-over button.
  */
 function ScreeningPanel({ data, enrollment: e, busy, post, reload, onOpenAccount }: { data: PortalData; enrollment: Enrollment; busy: boolean; post: (body: Record<string, unknown>, successText?: string) => Promise<Record<string, unknown>>; reload: () => Promise<void>; onOpenAccount?: () => void }) {
-  const [unticking, setUnticking] = useState<string | null>(null);
+  const [unticking, setUnticking] = useState<string | null>(null), [changing, setChanging] = useState(false);
   const [remarks, setRemarks] = useState("");
   const [notes, setNotes] = useState<Record<string, string>>({});
   // Ticks show at once and save in the background (owner, 20 Oct 2026: ticking was slow);
@@ -622,7 +622,8 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload, onOpenAccount
     </div>
     {e.enrollment_status === "Pending" && <SourcePicker key={`${e.id}:${partner?.id ?? e.source}`} data={data} enrollment={e} busy={busy} post={post} />}
     <div className="tp-stats">
-      <div><span className="tp-cap">Training</span><b>{c ? `${c.code} · ${c.name}` : "—"}</b><small>{scheduleOf(e)}{b ? ` · ${b.batch_number}` : ""}</small></div>
+      {/* Change Schedule while the Cashier has recorded no payment (owner, 9 Nov 2026): unpaid trainees are still applications, so it sits here too. */}
+      <div><span className="tp-cap">Training</span><b>{c ? `${c.code} · ${c.name}` : "—"}</b><small>{scheduleOf(e)}{b ? ` · ${b.batch_number}` : ""}</small>{directBatchChange(e) && <button type="button" className="portal-secondary tp-change" onClick={() => setChanging(true)}>Change Schedule</button>}{changing && <ChooseBatchModal data={data} enrollment={e} reload={reload} change onClose={() => setChanging(false)} />}</div>
       <div><span className="tp-cap">Payment</span><b className={`tp-mono${r.paid ? " sc-good" : ""}`}>{r.paid ? pesos2(r.paidCentavos) : pesos2(balance)}</b><small>{billTo ? `Billed to ${billTo.name}` : r.paid ? `Paid · balance ${pesos2(balance)}` : r.handed ? "With the Cashier" : "Not paid yet"}</small></div>
       <div><span className="tp-cap">Requirements</span><b>{REQUIREMENTS.length - missingNow.length} of {REQUIREMENTS.length}</b><small>{missingNow.length ? `Missing: ${missingNow.map((q) => q.label).join(", ")}` : "All received"}</small></div>
     </div>
