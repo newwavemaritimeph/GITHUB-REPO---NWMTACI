@@ -1,0 +1,279 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Batch Numbers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+/* One look: the staff portal is light only. Layout: the portal's navy bar, three tabs (the Admin screen, Open Batches, To Confirm), then the page at its portal size. */
+:root { color-scheme: light; --ink: #0f2638; --mute: #587184; --line: #d6e9f1; --soft: #eef4f8; --head: #e3f4fb; --navy: #123F63; --blue: #0571D0; --orange: #F25615; --good: #0a7a3e; --goodbg: #e3f5ea; --warn: #a4530c; --warnbg: #fdeee0; --bad: #b42318; --badbg: #fbe9e7; --ui: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif; --num: "Geist Mono", ui-monospace, Consolas, monospace; }
+html, body { background: #f2f9fc; color: var(--ink); margin: 0; font: 14px/1.45 var(--ui); }
+.gut { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+#bar { background: var(--navy); color: #fff; display: flex; align-items: center; gap: 10px; padding-block: 8px; }
+#bar img { width: 30px; height: 30px; }
+#bar b { font-weight: 600; }
+#bar span { margin-left: auto; color: #cfe6f2; font-size: 13px; }
+#pick { background: #fff; border-bottom: 2px solid var(--navy); padding-block: 10px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { font: 600 13px var(--ui); height: 32px; padding: 0 11px; border-radius: 8px; border: 1px solid #b9dcec; background: #fff; color: var(--navy); cursor: pointer; }
+.seg button[aria-selected="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+#app { padding-block: 16px 40px; display: flex; flex-direction: column; gap: 14px; max-width: 1040px; margin-inline: auto; box-sizing: border-box; width: 100%; }
+.head { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+.eyebrow { color: var(--blue); font: 600 12px var(--ui); letter-spacing: .08em; text-transform: uppercase; }
+h1 { margin: 2px 0 0; font: 700 24px/1.2 var(--ui); color: var(--ink); }
+.panel { background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; min-width: 0; }
+.panel > header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 10px; padding: 12px 16px; }
+.panel h2 { margin: 0; font: 600 16px/1.25 var(--ui); }
+.row { display: grid; align-items: center; gap: 6px 12px; padding: 9px 16px; border-top: 1px solid var(--line); }
+.row.next { grid-template-columns: minmax(0, 1.5fr) 92px 92px minmax(0, 1.25fr) minmax(0, 1fr) 82px; }
+.row.up { grid-template-columns: 112px minmax(0, 1.3fr) minmax(0, 1.4fr) 76px 82px; }
+.row.head2 { background: var(--head); color: var(--navy); font: 600 12px var(--ui); letter-spacing: .05em; text-transform: uppercase; padding-block: 7px; }
+.c { min-width: 0; }
+.c b { font-weight: 600; }
+.c small { display: block; color: var(--mute); font-size: 12.5px; overflow-wrap: anywhere; }
+.m { font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 13.5px; overflow-wrap: anywhere; }
+.lbl { display: none; color: var(--mute); font: 600 11.5px var(--ui); letter-spacing: .05em; text-transform: uppercase; }
+input, select { font: 500 14px var(--ui); color: var(--ink); height: 34px; border: 1px solid #b9dcec; border-radius: 8px; padding: 0 9px; background: #fff; box-sizing: border-box; width: 100%; min-width: 0; }
+input.m { font-family: var(--num); }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+input.err { border-color: var(--bad); background: #fffafa; }
+.b { display: inline-flex; align-items: center; justify-content: center; height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid #b9dcec; background: #fff; color: var(--blue); font: 600 13.5px var(--ui); cursor: pointer; white-space: nowrap; }
+.b.p { background: var(--orange); border-color: var(--orange); color: #fff; }
+.b[disabled] { background: #eef2f5; border-color: #dbe3e9; color: #8496a3; cursor: not-allowed; }
+.chip { display: inline-block; padding: 2px 9px; border-radius: 999px; font: 600 12px var(--ui); white-space: nowrap; }
+.chip.w { background: var(--warnbg); color: var(--warn); }
+.chip.g { background: var(--goodbg); color: var(--good); }
+.msg { font-size: 12.5px; font-weight: 600; margin-top: 3px; }
+.msg.bad { color: var(--bad); }
+.msg.warn { color: var(--warn); }
+.foot { padding: 10px 16px; border-top: 1px solid var(--line); color: var(--mute); font-size: 13px; display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; justify-content: space-between; }
+.bar2 { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 16px 12px; }
+.bar2 input { width: auto; flex: 1 1 220px; }
+.add { display: grid; grid-template-columns: minmax(0, 2fr) 110px 110px auto auto; gap: 8px; align-items: end; padding: 12px 16px; border-top: 1px solid var(--line); background: #fbfdfe; }
+.add label { display: grid; gap: 4px; font: 600 12.5px var(--ui); color: var(--navy); }
+.pager { display: flex; gap: 6px; align-items: center; }
+/* Open Batches, as the portal's window. */
+.modal { max-width: 640px; width: 100%; margin-inline: auto; background: #fff; border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 10px 30px #0f263822; overflow: hidden; box-sizing: border-box; }
+.modal > header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.modal > header h2 { margin: 0; font: 700 19px var(--ui); color: var(--navy); }
+.mbody { padding: 16px 20px 20px; display: grid; gap: 14px; }
+.tabs2 { display: flex; gap: 22px; border-bottom: 1px solid var(--line); }
+.tabs2 button { border: 0; background: none; padding: 8px 2px 10px; font: 600 15px var(--ui); color: var(--mute); cursor: pointer; border-bottom: 2px solid transparent; }
+.tabs2 button[aria-selected="true"] { color: var(--blue); border-bottom-color: var(--blue); }
+.field { display: grid; gap: 5px; font: 600 14px var(--ui); color: var(--navy); }
+.pattern { background: #ecf8fc; border: 1px solid #cbe9f3; border-radius: 10px; padding: 10px 14px; }
+.pattern small { color: var(--mute); font-size: 12.5px; }
+.pattern b { display: block; font: 700 18px var(--ui); color: var(--navy); margin-top: 2px; }
+.numrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.macts { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.confirm { padding: 4px 16px 16px; }
+.confirm h3 { margin: 12px 0 6px; font: 600 14px var(--ui); color: var(--navy); }
+.confirm ol { margin: 0; padding-left: 20px; display: grid; gap: 7px; max-width: 76ch; }
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--navy); color: #fff; padding: 9px 14px; border-radius: 10px; font-size: 13.5px; z-index: 50; max-width: calc(100% - 32px); box-sizing: border-box; }
+@media (max-width: 720px) {
+  .row.next, .row.up { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding-block: 11px; }
+  .row.head2 { display: none; }
+  .row .wide { grid-column: 1 / -1; }
+  .lbl { display: block; }
+  .add { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .add .wide { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div id="bar" class="gut"><img src="data:image/png;base64,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" alt=""><b>Batch Numbers Prototype</b><span>Sample Data Only</span></div>
+<div id="pick" class="gut"><div id="tabs" class="seg" role="tablist" aria-label="Sections"></div></div>
+<div id="app" class="gut"></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+const TABS = ["Admin › Batch Numbers", "Open Batches", "To Confirm"];
+const YY = "26";
+const COURSES = [
+  { code: "UBT-PSSR", name: "Updating Course on Basic Training (BT-PSSR)", mid: "609", next: 146 },
+  { code: "STPPDSPPS", name: "Safety Training for Personnel in Passenger Spaces", mid: "506", next: 23 },
+  { code: "PSCMT", name: "Passenger Ship Crowd Management Training", mid: "507", next: 24 },
+  { code: "PSCMHBT", name: "Passenger Ship Crisis Management and Human Behaviour", mid: "508", next: 24 },
+];
+const OTHERS = [["CCMD", "Crowd and Crisis Management - Domestic"], ["MARPOL", "Consolidated MARPOL Annex I-VI"], ["HAZMAT-CFR", "HAZMAT with CFR"], ["APA", "Anti Piracy Awareness"]];
+const seed = () => [
+  { id: 1, start: "2026-11-09", end: "2026-11-09", code: "STPPDSPPS", no: "26-506-023", n: 3 },
+  { id: 2, start: "2026-11-10", end: "2026-11-10", code: "UBT-PSSR", no: "26-609-145", n: 11 },
+  { id: 3, start: "2026-11-10", end: "2026-11-11", code: "PSCMT", no: "26-507-023", n: 4 },
+  { id: 4, start: "2026-11-12", end: "2026-11-14", code: "PSCMHBT", no: "26-508-023", n: 2 },
+  { id: 5, start: "2026-11-13", end: "2026-11-13", code: "APA", no: "BCH-2026-000141", n: 5 },
+  { id: 6, start: "2026-11-17", end: "2026-11-17", code: "UBT-PSSR", no: "26-609-146", n: 0 },
+  { id: 7, start: "2026-11-18", end: "2026-11-20", code: "MARPOL", no: "BCH-2026-000142", n: 1 },
+  { id: 8, start: "2026-11-19", end: "2026-11-20", code: "HAZMAT-CFR", no: "BCH-2026-000143", n: 0 },
+  { id: 9, start: "2026-11-23", end: "2026-11-25", code: "CCMD", no: "BCH-2026-000144", n: 0 },
+  { id: 10, start: "2026-11-24", end: "2026-11-24", code: "UBT-PSSR", no: "26-609-147", n: 0 },
+  { id: 11, start: "2026-12-01", end: "2026-12-02", code: "PSCMT", no: "26-507-024", n: 0 },
+  { id: 12, start: "2026-12-07", end: "2026-12-07", code: "STPPDSPPS", no: "26-506-024", n: 0 },
+];
+const S = { tab: 0, view: "next", period: "This Month", q: "", page: 0, rows: COURSES.map((c) => ({ ...c, edit: { mid: c.mid, next: String(c.next).padStart(3, "0") } })), batches: seed(), draft: {}, adding: false, mode: "week", typed: null, opened: [] };
+const app = document.getElementById("app"), tabs = document.getElementById("tabs"), toastEl = document.getElementById("toast");
+let timer;
+const toast = (t) => { toastEl.textContent = t; toastEl.hidden = false; clearTimeout(timer); timer = setTimeout(() => { toastEl.hidden = true; }, 3200); };
+const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[ch]);
+const fmt = (d) => new Date(`${d}T00:00:00+08:00`).toLocaleDateString("en-PH", { month: "short", day: "numeric", timeZone: "Asia/Manila" });
+const range = (a, b) => (a === b ? fmt(a) : `${fmt(a)}–${Number(b.slice(8))}`);
+const numOf = (mid, n) => `${YY}-${mid}-${String(n).padStart(3, "0")}`;
+const used = (no, except) => S.batches.find((b) => b.no === no && b.id !== except);
+const highest = (mid) => S.batches.filter((b) => b.no.startsWith(`${YY}-${mid}-`)).map((b) => b.no).sort().at(-1) ?? "—";
+const firstFree = (mid, n) => { while (used(numOf(mid, n))) n += 1; return n; };
+const nameOf = (code) => (COURSES.find((c) => c.code === code)?.name ?? OTHERS.find((o) => o[0] === code)?.[1] ?? code);
+
+function nextView() {
+  const rows = S.rows.map((r, i) => {
+    const mid = r.edit.mid.trim(), n = Number(r.edit.next);
+    const okMid = /^[0-9A-Za-z]{1,6}$/.test(mid), okN = Number.isInteger(n) && n > 0 && n < 1000;
+    const preview = okMid && okN ? numOf(mid, n) : "—";
+    const taken = okMid && okN && used(preview);
+    const changed = mid !== r.mid || n !== r.next;
+    const note = !okMid ? '<div class="msg bad">Use letters or digits only</div>' : !okN ? '<div class="msg bad">Use a number from 1 to 999</div>' : taken ? `<div class="msg warn">Already used by ${esc(taken.code)} · ${fmt(taken.start)}. The next batch takes ${numOf(mid, firstFree(mid, n))}.</div>` : "";
+    return `<div class="row next">
+      <div class="c wide"><b>${esc(r.code)}</b><small>${esc(r.name)}</small></div>
+      <label class="c"><span class="lbl">Course No.</span><input class="m${okMid ? "" : " err"}" id="mid-${i}" data-i="${i}" data-f="mid" value="${esc(r.edit.mid)}" inputmode="numeric" aria-label="Course number for ${esc(r.code)}"></label>
+      <label class="c"><span class="lbl">Next No.</span><input class="m${okN ? "" : " err"}" id="next-${i}" data-i="${i}" data-f="next" value="${esc(r.edit.next)}" inputmode="numeric" aria-label="Next number for ${esc(r.code)}"></label>
+      <div class="c wide"><span class="lbl">Next Batch No.</span><span class="m"><b>${preview}</b></span>${note}</div>
+      <div class="c"><span class="lbl">Highest Used</span><span class="m">${highest(r.mid)}</span></div>
+      <div class="c"><button type="button" class="b${changed ? " p" : ""}" data-act="save-next" data-id="${i}" ${changed && okMid && okN ? "" : "disabled"}>Save</button></div>
+    </div>`;
+  }).join("");
+  const add = S.adding ? `<div class="add">
+      <label class="wide">Course<select id="add-course">${OTHERS.filter((o) => !S.rows.some((r) => r.code === o[0])).map((o) => `<option value="${o[0]}">${o[0]} · ${esc(o[1])}</option>`).join("")}</select></label>
+      <label>Course No.<input class="m" id="add-mid" placeholder="e.g. 510" inputmode="numeric"></label>
+      <label>First No.<input class="m" id="add-next" value="001" inputmode="numeric"></label>
+      <button type="button" class="b" data-act="add-cancel">Cancel</button>
+      <button type="button" class="b p" data-act="add-save">Add</button>
+    </div>` : "";
+  return `<section class="panel"><header><h2>Next Number</h2><button type="button" class="b" data-act="add-open" ${S.adding ? "disabled" : ""}>Add a Course</button></header>
+    <div class="row next head2"><div>Course</div><div>Course No.</div><div>Next No.</div><div>Next Batch No.</div><div>Highest Used</div><div></div></div>
+    ${rows}${add}
+    <div class="foot"><span>Every other course: <span class="m">BCH-2026-000145</span>, numbered automatically</span><span>Restarts at 001 every January</span></div>
+  </section>`;
+}
+
+function upView() {
+  const term = S.q.trim().toLowerCase();
+  const months = { "This Week": ["2026-11-09", "2026-11-15"], "This Month": ["2026-11-01", "2026-11-30"], "Next Month": ["2026-12-01", "2026-12-31"] };
+  const [a, b] = months[S.period];
+  const list = S.batches.filter((x) => (term ? `${x.no} ${x.code} ${nameOf(x.code)}`.toLowerCase().includes(term) : x.start >= a && x.start <= b)).sort((x, y) => x.start.localeCompare(y.start));
+  const pages = Math.max(1, Math.ceil(list.length / 10)); S.page = Math.min(S.page, pages - 1);
+  const shown = list.slice(S.page * 10, S.page * 10 + 10);
+  const rows = shown.map((x) => {
+    const v = S.draft[x.id] ?? x.no, clean = v.trim().toUpperCase(), clash = clean && used(clean, x.id), changed = clean !== x.no;
+    const bad = !clean ? "Enter a batch number" : !/^[0-9A-Z][0-9A-Z-]{2,29}$/.test(clean) ? "Use letters, digits and dashes" : clash ? `Already used by ${clash.code} · ${fmt(clash.start)}` : "";
+    return `<div class="row up">
+      <div class="c"><span class="lbl">Starts</span><b>${range(x.start, x.end)}</b></div>
+      <div class="c"><span class="lbl">Course</span><b>${esc(x.code)}</b><small>${esc(nameOf(x.code))}</small></div>
+      <label class="c wide"><span class="lbl">Batch No.</span><input class="m${bad ? " err" : ""}" id="bn-${x.id}" data-bid="${x.id}" value="${esc(v)}" aria-label="Batch number, ${esc(x.code)} ${range(x.start, x.end)}">${bad ? `<div class="msg bad">${esc(bad)}</div>` : ""}</label>
+      <div class="c"><span class="lbl">Trainees</span><span class="m">${x.n}</span></div>
+      <div class="c"><button type="button" class="b${changed ? " p" : ""}" data-act="save-bn" data-id="${x.id}" ${changed && !bad ? "" : "disabled"}>Save</button></div>
+    </div>`;
+  }).join("");
+  return `<section class="panel"><header><h2>Upcoming Batches</h2><span class="seg" role="group" aria-label="Period">${["This Week", "This Month", "Next Month"].map((p) => `<button type="button" data-act="period" data-id="${p}" aria-selected="${S.period === p && !term}">${p}</button>`).join("")}</span></header>
+    <div class="bar2"><input id="q" value="${esc(S.q)}" placeholder="Search batch number or course" aria-label="Search batches"></div>
+    <div class="row up head2"><div>Starts</div><div>Course</div><div>Batch No.</div><div>Trainees</div><div></div></div>
+    ${rows || '<p class="row" style="color:var(--mute);margin:0">No batches on these dates.</p>'}
+    <div class="foot"><span>${term ? `Searching all dates · ${list.length} found` : `Showing ${list.length ? S.page * 10 + 1 : 0}–${S.page * 10 + shown.length} of ${list.length}`}</span><span class="pager"><button type="button" class="b" data-act="pg" data-id="-1" ${S.page ? "" : "disabled"}>Previous</button><button type="button" class="b" data-act="pg" data-id="1" ${S.page < pages - 1 ? "" : "disabled"}>Next</button></span></div>
+  </section>`;
+}
+
+function screen() {
+  return `<div class="head"><div><div class="eyebrow">Admin</div><h1>Batch Numbers</h1></div>
+    <div class="seg" role="tablist" aria-label="View">${[["next", "Next Number"], ["up", "Upcoming Batches"]].map(([k, t]) => `<button type="button" role="tab" data-act="view" data-id="${k}" aria-selected="${S.view === k}">${t}</button>`).join("")}</div></div>
+    ${S.view === "next" ? nextView() : upView()}`;
+}
+
+function openBatches() {
+  const r = S.rows.find((x) => x.code === "STPPDSPPS");
+  const auto = numOf(r.mid, firstFree(r.mid, r.next));
+  const v = S.typed ?? auto, clean = v.trim().toUpperCase(), clash = used(clean);
+  const bad = !clean ? "Enter a batch number" : !/^[0-9A-Z][0-9A-Z-]{2,29}$/.test(clean) ? "Use letters, digits and dashes" : clash ? `Already used by ${clash.code} · ${fmt(clash.start)}` : "";
+  const month = [];
+  let n = r.next; for (let i = 0; i < 4; i += 1) { n = firstFree(r.mid, n); month.push(numOf(r.mid, n)); n += 1; }
+  const opened = S.opened.length ? `<div class="pattern" style="background:var(--goodbg);border-color:#bfe5cd"><small>Opened</small><b style="font-size:15px">${S.opened.map(esc).join(", ")}</b></div>` : "";
+  return `<div class="modal" role="dialog" aria-label="Open Batches"><header><h2>Open Batches</h2><button type="button" class="b" data-act="toast" data-id="Closes the window." aria-label="Close">×</button></header>
+    <div class="mbody">
+      <div class="tabs2" role="tablist">${[["week", "This Week"], ["month", "Whole Month"]].map(([k, t]) => `<button type="button" role="tab" data-act="mode" data-id="${k}" aria-selected="${S.mode === k}">${t}</button>`).join("")}</div>
+      <label class="field">Course<select id="ob-course"><option>STPPDSPPS · Safety Training for Personnel Providing Direct Service to Passengers in Passenger Spaces</option></select></label>
+      <div class="pattern"><small>Required Pattern</small><b>Safety begins every Monday.</b></div>
+      <label class="field">${S.mode === "week" ? "Week Starting" : "Month"}<input id="ob-date" type="${S.mode === "week" ? "date" : "month"}" value="${S.mode === "week" ? "2026-11-16" : "2026-12"}"></label>
+      ${S.mode === "week" ? `<label class="field">Batch No.
+        <span class="numrow"><input class="m${bad ? " err" : ""}" id="ob-no" value="${esc(v)}" aria-label="Batch number">${S.typed !== null && clean !== auto ? `<button type="button" class="b" data-act="ob-reset">Use ${auto}</button>` : '<span class="chip g">Next Number</span>'}</span>
+        ${bad ? `<span class="msg bad">${esc(bad)}</span>` : ""}</label>` : `<div class="field">Batch Numbers<span class="m" style="font-weight:500">${month.join(", ")}</span></div>`}
+      ${opened}
+      <div class="macts"><button type="button" class="b" data-act="toast" data-id="Closes the window.">Close</button><button type="button" class="b p" data-act="ob-open" ${S.mode === "week" && bad ? "disabled" : ""}>${S.mode === "week" ? "Auto-Open Week" : "Auto-Open Month"}</button></div>
+    </div></div>`;
+}
+
+const confirmTab = () => `<section class="panel"><header><h2>To Confirm</h2></header><div class="confirm"><ol>
+    <li>Batch Numbers is for the Admin only. Admin Assistants keep Edit Batch in Schedules for renaming one batch.</li>
+    <li>Next Number covers the four STCW courses. Add a Course gives another course its own number, like 26-510-001. Every other course keeps automatic BCH numbers.</li>
+    <li>A number already on a batch is refused when typed, and the counter skips used numbers by itself.</li>
+    <li>In Open Batches, the Admin may type a batch number for one week; it starts as the next number. A whole month always follows the counter.</li>
+    <li>Renaming a batch changes it on screens and on documents printed after. TARs, MISMO lists and certificates already printed keep the number they were printed with.</li>
+    <li>Every change is kept in the audit log: who, when, the old number and the new one.</li>
+  </ol></div></section>`;
+
+function render() {
+  tabs.innerHTML = TABS.map((t, i) => `<button type="button" role="tab" data-act="tab" data-id="${i}" aria-selected="${S.tab === i}">${t}</button>`).join("");
+  const focus = document.activeElement?.id, pos = document.activeElement?.selectionStart;
+  app.innerHTML = S.tab === 0 ? screen() : S.tab === 1 ? openBatches() : confirmTab();
+  const el = focus && document.getElementById(focus);
+  if (el) { el.focus(); if (typeof pos === "number" && el.setSelectionRange) try { el.setSelectionRange(pos, pos); } catch { /* not a text field */ } }
+}
+
+document.addEventListener("input", (ev) => {
+  const t = ev.target;
+  if (t.dataset.f) { S.rows[Number(t.dataset.i)].edit[t.dataset.f] = t.value; return render(); }
+  if (t.dataset.bid) { S.draft[t.dataset.bid] = t.value; return render(); }
+  if (t.id === "q") { S.q = t.value; S.page = 0; return render(); }
+  if (t.id === "ob-no") { S.typed = t.value; return render(); }
+});
+document.addEventListener("click", (ev) => {
+  const el = ev.target.closest("[data-act]");
+  if (!el || el.disabled) return;
+  const { act, id } = el.dataset;
+  if (act === "tab") { S.tab = Number(id); return render(); }
+  if (act === "view") { S.view = id; return render(); }
+  if (act === "period") { S.period = id; S.q = ""; S.page = 0; return render(); }
+  if (act === "pg") { S.page += Number(id); return render(); }
+  if (act === "toast") return toast(id);
+  if (act === "save-next") {
+    const r = S.rows[Number(id)], mid = r.edit.mid.trim(), n = Number(r.edit.next);
+    r.mid = mid; r.next = n; r.edit = { mid, next: String(n).padStart(3, "0") };
+    toast(`Saved. The next ${r.code} batch takes ${numOf(mid, firstFree(mid, n))}.`); return render();
+  }
+  if (act === "save-bn") {
+    const b = S.batches.find((x) => x.id === Number(id)), v = S.draft[id].trim().toUpperCase();
+    toast(`Renamed ${b.no} to ${v}.`); b.no = v; delete S.draft[id]; return render();
+  }
+  if (act === "add-open") { S.adding = true; return render(); }
+  if (act === "add-cancel") { S.adding = false; return render(); }
+  if (act === "add-save") {
+    const code = document.getElementById("add-course").value, mid = document.getElementById("add-mid").value.trim(), n = Number(document.getElementById("add-next").value);
+    if (!/^[0-9A-Za-z]{1,6}$/.test(mid) || !(n > 0 && n < 1000)) return toast("Enter the course number and a first number from 1 to 999.");
+    S.rows.push({ code, name: nameOf(code), mid, next: n, edit: { mid, next: String(n).padStart(3, "0") } }); S.adding = false;
+    toast(`${code} batches now start at ${numOf(mid, n)}.`); return render();
+  }
+  if (act === "mode") { S.mode = id; S.opened = []; return render(); }
+  if (act === "ob-reset") { S.typed = null; return render(); }
+  if (act === "ob-open") {
+    const r = S.rows.find((x) => x.code === "STPPDSPPS");
+    const take = (no, start) => { S.batches.push({ id: Date.now() + Math.random(), start, end: start, code: "STPPDSPPS", no, n: 0 }); };
+    if (S.mode === "week") {
+      const auto = numOf(r.mid, firstFree(r.mid, r.next)), no = (S.typed ?? auto).trim().toUpperCase();
+      take(no, "2026-11-16"); if (no === auto) r.next = firstFree(r.mid, r.next) + 1;
+      S.opened = [`${no} · Nov 16`]; S.typed = null; toast(`Opened Safety, Nov 16 · ${no}.`);
+    } else {
+      S.opened = [];
+      ["2026-12-07", "2026-12-14", "2026-12-21", "2026-12-28"].forEach((d) => { if (S.batches.some((b) => b.code === "STPPDSPPS" && b.start === d)) return; const n = firstFree(r.mid, r.next); const no = numOf(r.mid, n); take(no, d); r.next = n + 1; S.opened.push(`${no} · ${fmt(d)}`); });
+      toast(S.opened.length ? `Opened ${S.opened.length} Safety batches in December.` : "Every December Monday already has a batch.");
+    }
+    return render();
+  }
+});
+render();
+</script>
