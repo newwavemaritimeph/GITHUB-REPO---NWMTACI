@@ -4,7 +4,8 @@ import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { manilaDay } from "@/lib/reconciliation";
 import { cleanTasks, listCompletionBatches, loadCompletion } from "@/lib/completion-record-server";
-import { completionProblems, fitResult } from "@/lib/completion-record";
+import { completionProblems, fitResult, MAX_TASKS } from "@/lib/completion-record";
+import { cleanExercises } from "@/lib/training-sheets";
 import { fileCompletionInDrive } from "@/lib/completion-drive";
 
 export const runtime = "nodejs";
@@ -19,16 +20,17 @@ const MIGRATION = "Apply database update 202610090039 first.";
 const text = (n: number) => z.string().trim().max(n).default("");
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).or(z.literal("")).default("");
 const task = z.object({ title: z.string().trim().min(1).max(400), criteria: z.string().trim().max(600).default("") });
-const result = z.object({ pct: z.number().min(0).max(100).nullable(), ticks: z.array(z.boolean().nullable()).max(8), cert: z.string().trim().max(60).default("") });
+const result = z.object({ pct: z.number().min(0).max(100).nullable(), ticks: z.array(z.boolean().nullable()).max(MAX_TASKS), cert: z.string().trim().max(60).default("") });
 const saveInput = z.object({
   action: z.literal("save"), batchId: z.string().uuid(),
   fields: z.object({ classNo: text(40), resitClassNo: text(40), resitDuration: text(80), writtenPlace: text(60), practicalPlace: text(60), assessor: text(120), coaValidity: text(60), assessedOn: day, director: text(120), directorOn: day }),
   results: z.record(z.string().uuid(), result),
 });
-const tasksInput = z.object({ action: z.literal("tasks"), courseId: z.string().uuid(), batchId: z.string().uuid().optional(), tasks: z.array(task).max(8) });
+const tasksInput = z.object({ action: z.literal("tasks"), courseId: z.string().uuid(), batchId: z.string().uuid().optional(), tasks: z.array(task).max(MAX_TASKS) });
+const exercisesInput = z.object({ action: z.literal("exercises"), courseId: z.string().uuid(), exercises: z.array(z.string().trim().max(120)).max(10) });
 const printInput = z.object({ action: z.literal("printed"), batchId: z.string().uuid() });
 const driveInput = z.object({ action: z.literal("drive"), batchId: z.string().uuid() });
-const input = z.discriminatedUnion("action", [saveInput, tasksInput, printInput, driveInput]);
+const input = z.discriminatedUnion("action", [saveInput, tasksInput, exercisesInput, printInput, driveInput]);
 const missing = (m: string) => /training_completion_records|course_assessment_tasks|does not exist|schema cache/i.test(m);
 
 export async function GET(request: Request) {
@@ -57,6 +59,15 @@ export async function POST(request: Request) {
   const role = staff.roleCodes.includes("mismo_officer") ? "mismo_officer" : "admin";
   const body = parsed.data;
   const now = new Date().toISOString();
+
+  // Exercise titles for the Exercise Performance Sheet (owner, 9 Nov 2026).
+  if (body.action === "exercises") {
+    const exercises = cleanExercises(body.exercises);
+    const { error } = await db.from("course_assessment_tasks").upsert({ course_id: body.courseId, exercises, updated_by: staff.user.id, updated_at: now }, { onConflict: "course_id" });
+    if (error) return NextResponse.json({ error: /exercises|schema cache|does not exist/i.test(error.message) ? "Run database update 202610290086 first." : error.message }, { status: 400 });
+    await db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: role, action: "course_exercises.saved", record_type: "course", record_id: body.courseId, new_values: { exercises } });
+    return NextResponse.json({ ok: true, exercises });
+  }
 
   if (body.action === "tasks") {
     const tasks = cleanTasks(body.tasks);

@@ -12,10 +12,41 @@ export type CompletionFields = {
   classNo: string; resitClassNo: string; resitDuration: string; writtenPlace: string; practicalPlace: string;
   assessor: string; coaValidity: string; assessedOn: string; director: string; directorOn: string;
 };
-export type CompletionTrainee = { enrollmentId: string; name: string; birthdate: string | null; placeOfBirth: string | null; rank: string | null };
+export type CompletionTrainee = { enrollmentId: string; name: string; birthdate: string | null; placeOfBirth: string | null; rank: string | null; srn?: string | null };
 
 export const PASS_MARK = 75;
 export const SHEET_LINES = 24;
+/** Crisis has 10 assessment tasks (owner's Assessment Performance Sheet, 9 Nov 2026). */
+export const MAX_TASKS = 12;
+
+/** Neighbouring tasks with the same title print under one heading: Safety's "Communication with passengers during emergency" has three criteria. */
+export function taskGroups(tasks: AssessmentTask[]): { title: string; from: number; to: number }[] {
+  const out: { title: string; from: number; to: number }[] = [];
+  tasks.forEach((t, i) => { const last = out[out.length - 1]; if (last && last.title === t.title) last.to = i; else out.push({ title: t.title, from: i, to: i }); });
+  return out;
+}
+/** One task on the Assessment Performance Sheet: ✓ when every criterion is performed, X when any is not, null while unchecked. */
+export function groupTick(r: TraineeResult, g: { from: number; to: number }): boolean | null {
+  const v = r.ticks.slice(g.from, g.to + 1);
+  if (v.some((x) => x === false)) return false;
+  return v.length > 0 && v.every((x) => x === true) ? true : null;
+}
+
+/** New Wave's own forms per STCW course (owner, 9 Nov 2026): TCROA paper, and the Assessment Performance Sheet's written column and task labels. */
+export type CourseForm = { paper: "A4" | "Legal"; writtenOnSheet: boolean; apCount: number; apLabel: (i: number) => string };
+export function courseForm(code: string): CourseForm {
+  const ap = (i: number) => `AP ${i + 1}`;
+  switch (code.toUpperCase()) {
+    case "UBT-PSSR": return { paper: "A4", writtenOnSheet: false, apCount: 4, apLabel: (i) => `AP A6.${i + 1}` };
+    case "STPPDSPPS": return { paper: "Legal", writtenOnSheet: true, apCount: 2, apLabel: ap };
+    case "PSCMT": return { paper: "Legal", writtenOnSheet: true, apCount: 7, apLabel: ap };
+    case "PSCMHBT": return { paper: "Legal", writtenOnSheet: true, apCount: 10, apLabel: ap };
+    case "CCMD": return { paper: "Legal", writtenOnSheet: false, apCount: 4, apLabel: ap };
+    default: return { paper: "A4", writtenOnSheet: true, apCount: 4, apLabel: ap };
+  }
+}
+/** Page size in points, landscape. */
+export const paperSize = (paper: CourseForm["paper"]): [number, number] => (paper === "Legal" ? [1008, 612] : [841.89, 595.28]);
 
 export const remarkOf = (pct: number | null) => (pct === null ? "" : pct >= PASS_MARK ? "P" : "F");
 export const practicalDone = (r: TraineeResult, taskCount: number) => taskCount > 0 && r.ticks.length >= taskCount && r.ticks.slice(0, taskCount).every((t) => t !== null);

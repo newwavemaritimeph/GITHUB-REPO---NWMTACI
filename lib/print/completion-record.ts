@@ -1,13 +1,14 @@
 import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage } from "pdf-lib";
 import type { DocumentControl } from "@/lib/document-controls";
-import { durationText, formDate, practicalOk, remarkOf, resultOf, SHEET_LINES, type AssessmentTask, type CompletionFields, type CompletionTrainee, type TraineeResult } from "@/lib/completion-record";
+import { courseForm, durationText, formDate, paperSize, practicalOk, remarkOf, resultOf, SHEET_LINES, taskGroups, type AssessmentTask, type CompletionFields, type CompletionTrainee, type TraineeResult } from "@/lib/completion-record";
 
 /**
  * Training Completion and Record of Assessment Report as a PDF (owner, 9 Oct 2026):
  * drawn cell for cell like New Wave's form (AD NO. 05-00), A4 landscape, for the
- * TCROA folder in Google Drive and for printing.
+ * TCROA folder in Google Drive and for printing. Paper follows New Wave's file per course (9 Nov 2026):
+ * A4 for UBT-PSSR, Legal for Safety, Crowd, Crisis and CCM Domestic.
  */
-export type CompletionPdfInput = { control?: DocumentControl | null; courseName: string; startsOn: string; endsOn: string; tasks: AssessmentTask[]; trainees: CompletionTrainee[]; results: Record<string, TraineeResult>; fields: CompletionFields; logo?: Uint8Array };
+export type CompletionPdfInput = { control?: DocumentControl | null; courseCode?: string; courseName: string; startsOn: string; endsOn: string; tasks: AssessmentTask[]; trainees: CompletionTrainee[]; results: Record<string, TraineeResult>; fields: CompletionFields; logo?: Uint8Array };
 
 /** Helvetica speaks WinAnsi: keep Latin-1 (Ñ, é) and swap typographic dashes and quotes. */
 const safe = (s: string) => s.replace(/[–—]/g, "-").replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/·/g, "-").replace(/[^\x20-\x7E\xA0-\xFF]/g, "");
@@ -35,7 +36,7 @@ export async function createCompletionRecordPdf(input: CompletionPdfInput) {
   pdf.setAuthor("New Wave Maritime Training and Assessment Center, Inc.");
   const reg = await pdf.embedFont(StandardFonts.Helvetica), bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const ital = await pdf.embedFont(StandardFonts.HelveticaOblique), boldItal = await pdf.embedFont(StandardFonts.HelveticaBoldOblique);
-  const W = 841.89, H = 595.28, L = 17, R = W - 17, black = rgb(0, 0, 0);
+  const [W, H] = paperSize(courseForm(input.courseCode ?? "").paper), L = 17, R = W - 17, black = rgb(0, 0, 0);
   const page: PDFPage = pdf.addPage([W, H]);
   const n = input.tasks.length;
 
@@ -69,8 +70,9 @@ export async function createCompletionRecordPdf(input: CompletionPdfInput) {
   let y = H - 18;
   const ctl = input.control;
   write([`AD NO.: ${ctl?.formNo ?? "05-00"}`, `Initial Issue Date: ${ctl?.issuedDate ?? "09-14-2023"}`, `Revision Date: ${ctl?.revisionDate ?? "00"}`, ...(ctl?.revisionNo ? [`Revision No.: ${ctl.revisionNo}`] : [])], L - 2.5, y, 120, 30, 4.8, reg, "left", "top");
-  if (input.logo) { try { const img = await pdf.embedPng(input.logo); page.drawImage(img, { x: L + 170, y: y - 48, width: 46, height: 46 }); } catch { /* the form prints without the emblem */ } }
-  page.drawText("TRAINING COMPLETION AND RECORD OF ASSESSMENT REPORT", { x: L + 290, y: y - 30, size: 11, font: bold, color: black });
+  const title = "TRAINING COMPLETION AND RECORD OF ASSESSMENT REPORT", tx = (W - bold.widthOfTextAtSize(title, 11)) / 2;
+  if (input.logo) { try { const img = await pdf.embedPng(input.logo); page.drawImage(img, { x: tx - 120, y: y - 48, width: 46, height: 46 }); } catch { /* the form prints without the emblem */ } }
+  page.drawText(title, { x: tx, y: y - 30, size: 11, font: bold, color: black });
   y -= 56;
 
   // Organisation row.
@@ -84,7 +86,7 @@ export async function createCompletionRecordPdf(input: CompletionPdfInput) {
   box(nm.x, top, nm.w, h1); write(wrap(`Training Course: ${input.courseName}`, bold, 7.5, nm.w - 5), nm.x, top, nm.w, h1, 7.5, bold, "left", "top");
   const pd = span(2, 4); box(pd.x, top, pd.w, h1); write(["Personal Data"], pd.x, top, pd.w, h1, 6.5, bold, "center");
   const wr = span(iPct, iRem); box(wr.x, top, wr.w, h1 + h2); vertical("Written Assessment Result (refer to *Grading Scheme)", wr.x, top, wr.w, h1 + h2, 5.2, boldItal);
-  input.tasks.forEach((t, i) => { const c = col(iTask + i); box(c.x, top, c.w, h1); const k = shrink(t.title, reg, 5.4, c.w - 6, h1 - 3); write(k.lines, c.x, top, c.w, h1, k.size, reg, "center"); });
+  taskGroups(input.tasks).forEach((g) => { const c = span(iTask + g.from, iTask + g.to); box(c.x, top, c.w, h1); const k = shrink(g.title, reg, 6.5, c.w - 6, h1 - 3); write(k.lines, c.x, top, c.w, h1, k.size, reg, "center"); });
   const pr = col(iPrac); box(pr.x, top, pr.w, h1 + h2 + h3); vertical("Practical Assessment Result (Refer **Grading Scheme)", pr.x, top, pr.w, h1 + h2 + h3, 5.2, boldItal);
   const rs = span(iC, iNyc); box(rs.x, top, rs.w, h1 + h2); vertical("Result of the Assessment", rs.x, top, rs.w, h1 + h2, 5.2, boldItal);
   const ct = col(iCert); box(ct.x, top, ct.w, h1 + h2 + h3); write(["Training Certificate Number"], ct.x, top, ct.w, h1 + h2 + h3, 6.5, bold, "center");
@@ -95,7 +97,7 @@ export async function createCompletionRecordPdf(input: CompletionPdfInput) {
   box(nm.x, y2, nm.w, h2);
   write([...wrap(`Class No.: ${f.classNo}`, reg, 6, nm.w - 5), ...wrap(`Training Duration: ${durationText(input.startsOn, input.endsOn)}`, reg, 6, nm.w - 5), ...wrap(`Class No.: (For re-sit) ${f.resitClassNo}   Training Duration: ${f.resitDuration}`, reg, 6, nm.w - 5)], nm.x, y2, nm.w, h2, 6, reg, "left", "top");
   ([["Date of Birth (mm/dd/yyyy)", 2], ["Place of Birth", 3], ["Rank", 4]] as const).forEach(([label, i]) => { const c = col(i); box(c.x, y2, c.w, h2 + h3); vertical(label, c.x, y2, c.w, h2 + h3, 5, reg); });
-  input.tasks.forEach((t, i) => { const c = col(iTask + i); box(c.x, y2, c.w, h2 + h3); vertical(t.criteria, c.x, y2, c.w, h2 + h3, 4.1, reg); });
+  input.tasks.forEach((t, i) => { const c = col(iTask + i); box(c.x, y2, c.w, h2 + h3); vertical(t.criteria, c.x, y2, c.w, h2 + h3, 5.4, reg); });
 
   // Row 3.
   const y3 = y2 - h2;

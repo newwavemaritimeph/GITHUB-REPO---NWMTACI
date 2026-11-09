@@ -26,7 +26,7 @@ async function logo() { try { return new Uint8Array(await readFile(path.join(pro
 
 /** The record as a PDF (also used by the download route). */
 export async function completionPdf(record: CompletionPayload) {
-  return createCompletionRecordPdf({ control: record.control, courseName: record.batch.courseName, startsOn: record.batch.startsOn, endsOn: record.batch.endsOn, tasks: record.tasks, trainees: record.trainees, results: record.results, fields: record.fields, logo: await logo() });
+  return createCompletionRecordPdf({ control: record.control, courseCode: record.batch.courseCode, courseName: record.batch.courseName, startsOn: record.batch.startsOn, endsOn: record.batch.endsOn, tasks: record.tasks, trainees: record.trainees, results: record.results, fields: record.fields, logo: await logo() });
 }
 
 export type DriveFiling = { state: "Filed" | "Updated" | "Not configured" | "Not complete" | "Failed"; link?: string | null; path?: string | null; error?: string };

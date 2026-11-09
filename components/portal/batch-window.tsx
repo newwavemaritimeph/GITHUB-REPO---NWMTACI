@@ -6,6 +6,7 @@ import { RecordEditor } from "./completion-records";
 import { manilaToday, pesos2 } from "@/lib/portal-format";
 import { downloadCsv } from "@/lib/csv";
 import type { BatchRoster } from "@/lib/batch-roster";
+import { sheetUrl, trainingDays } from "@/lib/training-sheets";
 import { MISMO_COURSE_CODES, finalList, mismoCopyText, mismoCsv, mismoListed, mismoMissing, mismoState, paidLate, type MismoBatch, type MismoTrainee } from "@/lib/mismo";
 
 /** Manila hour now (0–23). */
@@ -52,6 +53,40 @@ function AddDetails({ t, onClose, onSaved }: { t: MismoTrainee; onClose: () => v
  * The Batch window (owner, 3 Nov 2026): every trainee on one batch, from the database, with Copy List, Excel and PDF.
  * With `mismo`, each trainee also has the MARINA MISMO cell and the batch has its MARINA documents (owner, 9 Nov 2026).
  */
+/** Training Reports for the batch (owner, 9 Nov 2026): Attendance Sheet per day, Exercise and Assessment Performance Sheets, and the TCROA. */
+function SheetsRow({ batchId, startsOn, endsOn, record, onRecord }: { batchId: string; startsOn: string; endsOn: string; record: boolean; onRecord: () => void }) {
+  const days = trainingDays(startsOn, endsOn);
+  const [ex, setEx] = useState<{ courseId: string; text: string } | null>(null), [open, setOpen] = useState(false), [msg, setMsg] = useState(""), [saving, setSaving] = useState(false);
+  const toggle = async () => {
+    setOpen((o) => !o); setMsg("");
+    if (ex) return;
+    const r = await fetch(`/api/staff/completion-records?batch=${batchId}`, { cache: "no-store" }), b = await r.json().catch(() => ({}));
+    if (!r.ok) { setMsg(b.error ?? "Could not load the exercise titles."); return; }
+    setEx({ courseId: b.batch.courseId, text: ((b.exercises ?? []) as string[]).join("\n") });
+  };
+  const save = async () => {
+    if (!ex) return;
+    setSaving(true); setMsg("");
+    const r = await fetch("/api/staff/completion-records", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action: "exercises", courseId: ex.courseId, exercises: ex.text.split("\n").map((x) => x.trim()).filter(Boolean).slice(0, 10) }) });
+    const b = await r.json().catch(() => ({}));
+    setSaving(false); setMsg(r.ok ? "Exercise titles saved for this course." : b.error ?? "Could not save the exercise titles.");
+  };
+  return <>
+    <div className="bw-marina bw-sheets full"><b>Training Reports</b>
+      <span className="bw-days">Attendance Sheet:{days.map((d, i) => <a key={d} className="portal-secondary" href={sheetUrl(batchId, "attendance", d)} target="_blank" rel="noreferrer">{`Day ${i + 1} · ${shortDay(d)}`}</a>)}{days.length > 1 && <a className="portal-secondary" href={sheetUrl(batchId, "attendance", "all")} target="_blank" rel="noreferrer">All Days</a>}</span>
+      <a className="portal-secondary" href={sheetUrl(batchId, "exercise")} target="_blank" rel="noreferrer">Exercise Performance Sheet</a>
+      <button type="button" className="portal-secondary" onClick={() => void toggle()}>{open ? "Hide Exercise Titles" : "Exercise Titles"}</button>
+      <a className="portal-secondary" href={sheetUrl(batchId, "assessment")} target="_blank" rel="noreferrer">Assessment Performance Sheet</a>
+      <button type="button" className="portal-secondary" onClick={onRecord}>{record ? "Hide TCROA" : "TCROA"}</button>
+    </div>
+    {open && <div className="bw-ex full">
+      {ex ? <label>Exercise Titles, One Per Line (Up to 10)<textarea rows={5} value={ex.text} onChange={(e) => setEx({ ...ex, text: e.target.value })} placeholder={"Donning of life jacket\nMuster drill"} /></label> : !msg && <p className="portal-empty-copy">Loading…</p>}
+      {ex && <button type="button" className="portal-primary" disabled={saving} onClick={() => void save()}>{saving ? "Saving…" : "Save Exercise Titles"}</button>}
+      {msg && <small className="cl-sub">{msg}</small>}
+    </div>}
+  </>;
+}
+
 export function BatchWindow({ batchId, batchNumber, mismo = false, onClose, onChanged }: { batchId: string; batchNumber: string; mismo?: boolean; onClose: () => void; onChanged?: () => void }) {
   const [roster, setRoster] = useState<BatchRoster | null>(null), [error, setError] = useState(""), [find, setFind] = useState(""), [note, setNote] = useState(""), [copyBox, setCopyBox] = useState("");
   const [marina, setMarina] = useState<MismoBatch | null>(null), [marinaTick, setMarinaTick] = useState(0), [problem, setProblem] = useState("");
@@ -110,9 +145,9 @@ export function BatchWindow({ batchId, batchNumber, mismo = false, onClose, onCh
         {finalReady ? <><a className="portal-secondary" href={mismoPdfUrl(cut, "final", batchId)} target="_blank" rel="noreferrer">Final List PDF</a><button type="button" className="portal-secondary" disabled={!marina || !finalList(marina).length} onClick={() => marina && saveCsv(`MISMO-${batchNumber}-${cut}.csv`, mismoCsv(marina))}>CSV for MARINA</button></>
           : <span className="st-need">Final List · 4:00 PM {cut === today ? "Today" : shortDay(cut)}</span>}
         {inClass && (hour >= 11 ? <a className="portal-secondary" href={mismoPdfUrl(today, "unsettled", batchId)} target="_blank" rel="noreferrer">11:00 AM Unpaid</a> : <span className="st-need">11:00 AM Unpaid · Opens at 11:00 AM</span>)}
-        <button type="button" className="portal-secondary" onClick={() => setRecord((r) => !r)}>{record ? "Hide Completion Record" : "Completion Record"}</button>
         {marina && <Badge tone={listed.length && encoded === listed.length ? "green" : "orange"}>{`${encoded} of ${listed.length} Encoded`}</Badge>}
       </div>}
+      {mismo && <SheetsRow batchId={batchId} startsOn={b.startsOn} endsOn={b.endsOn} record={record} onRecord={() => setRecord((r) => !r)} />}
       {mismo && record && <div className="full"><RecordEditor batchId={batchId} onSaved={() => undefined} /></div>}
       {copyBox && <div className="sa-copybox full"><textarea readOnly rows={Math.min(14, copyBox.split("\n").length + 1)} value={copyBox} onFocus={(e) => e.currentTarget.select()} aria-label="Trainee list to copy" /><button type="button" className="portal-secondary" onClick={() => setCopyBox("")}>Close</button></div>}
       <div className="cl-wrap full"><table className="cl-log"><thead><tr><th>#</th><th>Trainee</th><th>NWMTACI No.</th><th>SRN</th><th>Rank</th><th>Mobile</th><th>Source</th><th>Status</th><th>Payment</th><th>Requirements</th>{mismo && <th>MARINA MISMO</th>}</tr></thead><tbody>

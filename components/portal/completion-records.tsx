@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { completionProblems, durationText, emptyResult, formDate, numberSeries, practicalDone, practicalOk, remarkOf, resultOf, type AssessmentTask, type CompletionFields, type TraineeResult } from "@/lib/completion-record";
+import { completionProblems, durationText, emptyResult, formDate, MAX_TASKS, numberSeries, practicalDone, practicalOk, remarkOf, resultOf, type AssessmentTask, type CompletionFields, type TraineeResult } from "@/lib/completion-record";
 import type { CompletionBatch, CompletionPayload } from "@/lib/completion-record-server";
 import { ALL_DATES, Badge, Message, MonthBar, usePeriod } from "./shared-ui";
 
@@ -116,7 +116,7 @@ export function RecordEditor({ batchId, onSaved }: { batchId: string; onSaved: (
           <label>Assessment Task<textarea value={t.title} maxLength={400} onChange={(e) => setEditTasks(editTasks.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))} /></label>
           <label>Assessment Criteria<textarea value={t.criteria} maxLength={600} onChange={(e) => setEditTasks(editTasks.map((x, j) => (j === i ? { ...x, criteria: e.target.value } : x)))} /></label>
           <button type="button" className="portal-secondary" onClick={() => setEditTasks(editTasks.filter((_, j) => j !== i))}>Remove</button></div>)}
-          {editTasks.length < 8 && <button type="button" className="portal-secondary tcr-add" onClick={() => setEditTasks([...editTasks, { title: "", criteria: "" }])}>Add Task</button>}
+          {editTasks.length < MAX_TASKS && <button type="button" className="portal-secondary tcr-add" onClick={() => setEditTasks([...editTasks, { title: "", criteria: "" }])}>Add Task</button>}
           <p className="ac-note">Saved for {data.batch.courseCode} and used on every record of this course that is not printed yet. After changing the tasks, check this record&apos;s checklist again.</p></div>
         : data.tasks.length ? <div className="tcr-tasks">{data.tasks.map((t, i) => <div key={i} className="tcr-task"><b>Task {i + 1}</b><span>{t.title}</span>{t.criteria && <small>{t.criteria}</small>}</div>)}</div>
         : <p className="portal-empty-copy">Add the assessment tasks for {data.batch.courseCode} once; they are reused on every record of this course.</p>}
