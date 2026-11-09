@@ -2780,6 +2780,20 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .st-soft.fail { color: var(--nw-bad); }
 .nw-shell .st-soft.none { color: var(--nw-muted); font-weight: 500; }
 .nw-shell .st-soft .st-b { height: 26px; padding: 0 8px; font-size: 12.5px; }
+/* Training Reports (owner, 9 Nov 2026): course tabs, and the Batch window's MARINA MISMO column */
+.nw-shell .tr-ctabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+.nw-shell .tr-ctab { text-align: left; border: 1px solid var(--nw-line); background: var(--nw-surface); border-radius: 12px; padding: 10px 12px; cursor: pointer; font: inherit; color: var(--nw-fg); min-width: 0; display: grid; gap: 2px; }
+.nw-shell .tr-ctab b { font-size: 15px; }
+.nw-shell .tr-ctab small { color: var(--nw-muted); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nw-shell .tr-ctab.on { border-color: var(--nw-navy); box-shadow: inset 0 0 0 1px var(--nw-navy); background: var(--nw-soft); }
+.nw-shell .tr-todo { font-size: 12.5px; font-weight: 600; color: var(--nw-warn); }
+.nw-shell .tr-todo.none { color: var(--nw-good); }
+.nw-shell .bw-marina { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--nw-line); border-radius: 12px; background: var(--nw-soft); }
+.nw-shell .bw-marina > b { color: var(--nw-navy); margin-right: 4px; }
+.nw-shell .bw-cell { min-width: 220px; }
+.nw-shell .bw-mm { flex-wrap: wrap; gap: 6px; align-items: center; }
+.nw-shell .bw-done { color: var(--nw-good); font-weight: 600; font-size: 13.5px; }
+@media (max-width: 760px) { .nw-shell .tr-ctabs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 /* Schedules › Batch Numbers (owner, 9 Nov 2026) */
 .nw-shell .bn-in { width: 84px; }
 .nw-shell .bn-wide { width: 100%; max-width: 220px; box-sizing: border-box; }

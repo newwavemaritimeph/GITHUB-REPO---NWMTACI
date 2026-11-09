@@ -61,7 +61,7 @@ function driveNote(d: { state?: string; path?: string | null; error?: string } |
   return "";
 }
 
-function RecordEditor({ batchId, onSaved }: { batchId: string; onSaved: () => void }) {
+export function RecordEditor({ batchId, onSaved }: { batchId: string; onSaved: () => void }) {
   const [tick, setTick] = useState(0);
   const { data, error } = useLoad<CompletionPayload>(`${API}?batch=${batchId}`, tick);
   const [fields, setFields] = useState<CompletionFields | null>(null);

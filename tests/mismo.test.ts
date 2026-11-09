@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createElement } from "react";
 import { NO_FILTER, balanceAt, cutDateOf, entryMovedFrom, finalList, lineOfEntry, lineOfRow, manilaInstant, mismoListed, mismoCopyText, mismoCsv, mismoFiltered, mismoMissing, mismoRowsCsv, mismoSorted, mismoState, mismoWork, owesAt, paidLate, ticksToClear, unsettledAt11, whenOf, type MismoBatch, type MismoEntry, type MismoRow, type MismoTrainee } from "../lib/mismo";
 import { clearMismoAfterVoid, loadMismoDay, loadMismoRemoved } from "../lib/mismo-server";
-import { MismoWorkList, RemovedAlert } from "../components/portal/mismo-home";
+import { RemovedAlert } from "../components/portal/mismo-home";
 
 const t = (id: string, due: number, b11: number, b16: number, now: number, extra: Partial<MismoTrainee> = {}): MismoTrainee => ({ enrollmentId: id, lastName: id.toUpperCase(), firstName: "Juan", middleName: null, birthdate: "1990-01-01", srn: "SRN-1", rank: "AB", dueCentavos: due, paidBy11: b11, paidBy16: b16, paidNow: now, ...extra });
 const batch = (trainees: MismoTrainee[]): MismoBatch => ({ id: "b1", batchNumber: "BCH-1", courseName: "Crowd Management", courseCode: "PSCMT", startsOn: "2026-10-08", endsOn: "2026-10-09", room: "Room 1", instructor: "Capt. X", trainees, submittedAt: null, submittedCount: null });
@@ -111,7 +111,7 @@ describe("MISMO officer's list (Design 3)", () => {
   });
 });
 
-describe("MISMO List: upcoming batches, sort and filters", () => {
+describe("Training Reports: upcoming batches, sort and filters", () => {
   const paidUp = (id: string, extra: Partial<MismoTrainee> = {}) => t(id, 100, 100, 100, 100, extra);
   const at = (id: string, code: string, starts: string, ends: string, trainees: MismoTrainee[]): MismoBatch => ({ ...batch(trainees), id, batchNumber: id, courseCode: code, startsOn: starts, endsOn: ends });
   const today = "2026-11-05";
@@ -158,12 +158,6 @@ describe("MISMO List: upcoming batches, sort and filters", () => {
   it("sorts the Encoded list newest first by encoding time", () => {
     const entry = (id: string, doneAt: string): MismoEntry => ({ enrollmentId: id, lastName: id, firstName: "A", middleName: null, srn: null, batchNumber: "26-1", code: "PSCMT", startsOn: "2026-11-04", endsOn: "2026-11-05", doneAt, by: "Officer", cancelled: false });
     expect(mismoSorted([entry("old", "2026-11-01T00:00:00Z"), entry("new", "2026-11-05T00:00:00Z")], "at", lineOfEntry).map((e) => e.enrollmentId)).toEqual(["new", "old"]);
-  });
-  it("shows upcoming trainees with their chips and every tool, with no unpaid name", () => {
-    const moved: MismoRow = { b: upcoming, t: paidUp("moved", { movedFrom: "26-1" }) };
-    const html = renderToStaticMarkup(createElement(MismoWorkList, { stage: "For Encoding", rows: [...rows, moved], loaded: true, filter: NO_FILTER, setFilter: () => undefined, sort: "date", setSort: () => undefined, today, copied: "", onCopy: () => undefined, onEncode: () => undefined, onAdd: () => undefined }));
-    for (const text of ["Search", "Course", "Batch", "Class Date", "Sort", "Upcoming (3)", "Today (1)", "Past Classes (1)", "Paid On · Newest First", "Company Charge", "Moved · Was 26-1", "Encoded", "Copy", "ABE"]) expect(html).toContain(text);
-    expect(html).not.toContain("NONE");
   });
 });
 

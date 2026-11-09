@@ -7,8 +7,7 @@ import { ROLES, accreditationFor, handles, moveTargets, planRows, rangesOverlap,
 import { Badge, Message, Modal, ViewIcon, fmtDate, periodRange, useNeedSince, usePost, usePaged } from "./shared-ui";
 import { CHANNELS, type Channel, type DaySummary, type ReconStatus } from "@/lib/reconciliation";
 import { MoveBatch } from "./move-batch";
-import { downloadCsv } from "@/lib/csv";
-import type { BatchRoster } from "@/lib/batch-roster";
+import { BatchWindow, mismoInWindow } from "./batch-window";
 
 /**
  * Admin Assistant (owner, 9 Oct 2026): resource planning (course › batch › classroom › students › instructor) and the
@@ -256,7 +255,7 @@ const STATUS_TONE: Record<string, string> = { Open: "green", Full: "orange", Ong
  * edits, renames and cancels batches. Dates follow the course pattern; a
  * cancelled batch moves every trainee to another batch of the same course.
  */
-export function ClassSchedules({ data, reload, onOpenBatches, onCreate, canManage = true, courseCodes }: { data: PortalData; reload: () => Promise<void>; onOpenBatches: () => void; onCreate: () => void; canManage?: boolean; /** Only these courses, and each trainee's MARINA MISMO state (MISMO Compliance Officer, 5 Nov 2026). */ courseCodes?: string[] }) {
+export function ClassSchedules({ data, reload, onOpenBatches, onCreate, canManage = true, courseCodes, viewerRole }: { data: PortalData; reload: () => Promise<void>; onOpenBatches: () => void; onCreate: () => void; canManage?: boolean; /** Only these courses (MISMO Compliance Officer, 5 Nov 2026). */ courseCodes?: string[]; /** Copy and Encoded in the Batch window for the officer and the Admin on STCW batches (owner, 9 Nov 2026). */ viewerRole?: string }) {
   const { today, range, bar } = usePlanPeriod();
   const [filter, setFilter] = useState<(typeof SCHEDULE_FILTERS)[number]>("All");
   const [editing, setEditing] = useState<Batch | null>(null);
@@ -325,47 +324,10 @@ export function ClassSchedules({ data, reload, onOpenBatches, onCreate, canManag
         </tbody></table>{paged.pager}</div> : <p className="portal-empty-copy">No batches in this period.</p>}
       </section></div>
     </div>
-    {rosterOf && <BatchRosterModal batch={rosterOf} showMismo={!!courseCodes} onClose={() => setRosterOf(null)} />}
+    {rosterOf && <BatchWindow batchId={rosterOf.id} batchNumber={rosterOf.batch_number} mismo={mismoInWindow(viewerRole, codeOf(rosterOf))} onClose={() => setRosterOf(null)} />}
     {editing && <EditBatch batch={editing} code={course.get(editing.course_id)?.code ?? ""} durationLabel={course.get(editing.course_id)?.duration_label ?? "1 day"} reload={reload} onClose={() => setEditing(null)} onDone={(t) => { setDone(t); setEditing(null); }} />}
     {cancelling && <CancelBatch data={data} batch={cancelling} code={course.get(cancelling.course_id)?.code ?? ""} today={today} reload={reload} onClose={() => setCancelling(null)} onDone={(t) => { setDone(t); setCancelling(null); }} />}
   </div>;
-}
-
-/** Every trainee on one batch, from the database (owner, 3 Nov 2026): Copy List, Excel and PDF. */
-function BatchRosterModal({ batch, showMismo, onClose }: { batch: Batch; showMismo?: boolean; onClose: () => void }) {
-  const [roster, setRoster] = useState<BatchRoster | null>(null), [error, setError] = useState(""), [find, setFind] = useState(""), [note, setNote] = useState(""), [copyBox, setCopyBox] = useState("");
-  useEffect(() => { let live = true; fetch(`/api/staff/batch-roster?batchId=${batch.id}`, { cache: "no-store" }).then(async (r) => { const b = await r.json(); if (!r.ok) throw new Error(b.error ?? "Could not load the trainees."); if (live) setRoster(b as BatchRoster); }).catch((e: unknown) => { if (live) setError(e instanceof Error ? e.message : "Could not load the trainees."); }); return () => { live = false; }; }, [batch.id]);
-  const t = find.trim().toLowerCase();
-  const rows = (roster?.rows ?? []).filter((r) => !t || `${r.name} ${r.nwmtaciNo} ${r.srn} ${r.mobile}`.toLowerCase().includes(t));
-  const payText = (r: BatchRoster["rows"][number]) => (r.payment === "Balance" ? `Balance ${pesos2(r.balanceCentavos)}` : r.payment);
-  const b = roster?.batch, enrolled = (roster?.rows ?? []).filter((r) => r.status !== "Pending").length, pending = (roster?.rows.length ?? 0) - enrolled;
-  async function copy() {
-    const text = (roster?.rows ?? []).map((r, i) => `${i + 1}. ${r.name} · ${r.nwmtaciNo}`).join("\n");
-    try { await navigator.clipboard.writeText(text); setCopyBox(""); setNote(`Copied ${roster?.rows.length ?? 0} names. Paste them in Messenger or Viber.`); } catch { setCopyBox(text); }
-  }
-  const csv = () => roster && downloadCsv(`batch-${roster.batch.batchNumber}.csv`, [["#", "Trainee", "NWMTACI No.", "SRN", "Rank", "Mobile", "Email", "Meta Thread", "Source", "Status", "Payment", "Requirements"], ...roster.rows.map((r, i) => [i + 1, r.name, r.nwmtaciNo, r.srn, r.rank, r.mobile, r.email, r.facebook, r.source, r.status, payText(r), `${r.requirements} of 4`])]);
-  return <Modal title={`Batch ${batch.batch_number}`} onClose={onClose} wide><div className="portal-form br">
-    {error && <Message kind="error" text={error} />}
-    {note && <Message kind="success" text={note} />}
-    {!roster && !error && <p className="portal-empty-copy">Loading the trainees…</p>}
-    {b && <>
-      <div className="br-head full">
-        <div><span>Course</span><b>{b.code}</b><small>{b.course}</small></div>
-        <div><span>Dates</span><b>{spanOf({ startsOn: b.startsOn, endsOn: b.endsOn })}</b><small>{[b.dailyStart?.slice(0, 5), b.dailyEnd?.slice(0, 5)].filter(Boolean).join(" – ") || "8:00 – 17:00"}</small></div>
-        <div><span>Room · Instructor</span><b>{b.room ?? "To be assigned"}</b><small>{b.instructor ?? "No instructor yet"}</small></div>
-        <div><span>Trainees</span><b>{enrolled} enrolled · {pending} pending</b><small>{Math.max(0, b.capacity - b.held)} slots left of {b.capacity}</small></div>
-      </div>
-      <div className="br-tools full"><label>Find<input value={find} onChange={(e) => setFind(e.target.value)} placeholder="Name, NWMTACI No., SRN, mobile" /></label><span className="br-acts"><button type="button" className="portal-secondary" disabled={!roster.rows.length} onClick={() => void copy()}>Copy List</button><button type="button" className="portal-secondary" disabled={!roster.rows.length} onClick={csv}>Download Excel</button><a className="portal-primary" href={`/api/documents/batch-roster?batchId=${batch.id}`} target="_blank" rel="noreferrer">Print / Save PDF</a></span></div>
-      {copyBox && <div className="sa-copybox full"><textarea readOnly rows={Math.min(14, copyBox.split("\n").length + 1)} value={copyBox} onFocus={(e) => e.currentTarget.select()} aria-label="Trainee list to copy" /><button type="button" className="portal-secondary" onClick={() => setCopyBox("")}>Close</button></div>}
-      <div className="cl-wrap full"><table className="cl-log"><thead><tr><th>#</th><th>Trainee</th><th>NWMTACI No.</th><th>SRN</th><th>Rank</th><th>Mobile</th><th>Source</th><th>Status</th><th>Payment</th><th>Requirements</th>{showMismo && <th>MARINA MISMO</th>}</tr></thead><tbody>
-        {rows.map((r, i) => <tr key={r.enrollmentId}><td>{i + 1}</td><td><b>{r.name}</b></td><td className="cl-mono">{r.nwmtaciNo}</td><td className="cl-mono">{r.srn || "—"}</td><td>{r.rank || "—"}</td><td className="cl-mono">{r.mobile || "—"}</td><td>{r.source}</td>
-          <td><Badge tone={r.status === "Pending" ? "orange" : "active"}>{r.status}</Badge></td>
-          <td><Badge tone={r.payment === "Paid" ? "active" : r.payment === "Company Charge" ? "blue" : r.payment === "Balance" ? "orange" : "red"}>{payText(r)}</Badge></td><td>{r.requirements} of 4</td>{showMismo && <td>{r.mismoDoneAt ? <Badge tone="green">Done</Badge> : r.payment === "Paid" || r.payment === "Company Charge" ? <Badge tone="orange">To Input</Badge> : "—"}</td>}</tr>)}
-        {!rows.length && <tr><td colSpan={showMismo ? 11 : 10} className="portal-empty-copy">{roster.rows.length ? "No trainee matches." : "No trainees on this batch yet."}</td></tr>}
-      </tbody></table></div>
-      <p className="portal-form-note full">Cancelled enrollments are left out.</p>
-    </>}
-  </div></Modal>;
 }
 
 const manilaLocal = (iso?: string | null) => (iso ? new Date(iso).toLocaleString("sv-SE", { timeZone: "Asia/Manila" }).slice(0, 16).replace(" ", "T") : "");
