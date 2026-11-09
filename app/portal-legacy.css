@@ -2791,8 +2791,6 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .bw-marina { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--nw-line); border-radius: 12px; background: var(--nw-soft); }
 .nw-shell .bw-marina > b { color: var(--nw-navy); margin-right: 4px; }
 .nw-shell .bw-days { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.nw-shell .bw-ex { display: grid; gap: 8px; max-width: 560px; }
-.nw-shell .bw-ex textarea { width: 100%; }
 .nw-shell .bw-cell { min-width: 220px; }
 .nw-shell .bw-mm { flex-wrap: wrap; gap: 6px; align-items: center; }
 .nw-shell .bw-done { color: var(--nw-good); font-weight: 600; font-size: 13.5px; }

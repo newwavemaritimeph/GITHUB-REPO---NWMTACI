@@ -5,7 +5,6 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { manilaDay } from "@/lib/reconciliation";
 import { cleanTasks, listCompletionBatches, loadCompletion } from "@/lib/completion-record-server";
 import { completionProblems, fitResult, MAX_TASKS } from "@/lib/completion-record";
-import { cleanExercises } from "@/lib/training-sheets";
 import { fileCompletionInDrive } from "@/lib/completion-drive";
 
 export const runtime = "nodejs";
@@ -27,10 +26,9 @@ const saveInput = z.object({
   results: z.record(z.string().uuid(), result),
 });
 const tasksInput = z.object({ action: z.literal("tasks"), courseId: z.string().uuid(), batchId: z.string().uuid().optional(), tasks: z.array(task).max(MAX_TASKS) });
-const exercisesInput = z.object({ action: z.literal("exercises"), courseId: z.string().uuid(), exercises: z.array(z.string().trim().max(120)).max(10) });
 const printInput = z.object({ action: z.literal("printed"), batchId: z.string().uuid() });
 const driveInput = z.object({ action: z.literal("drive"), batchId: z.string().uuid() });
-const input = z.discriminatedUnion("action", [saveInput, tasksInput, exercisesInput, printInput, driveInput]);
+const input = z.discriminatedUnion("action", [saveInput, tasksInput, printInput, driveInput]);
 const missing = (m: string) => /training_completion_records|course_assessment_tasks|does not exist|schema cache/i.test(m);
 
 export async function GET(request: Request) {
@@ -59,15 +57,6 @@ export async function POST(request: Request) {
   const role = staff.roleCodes.includes("mismo_officer") ? "mismo_officer" : "admin";
   const body = parsed.data;
   const now = new Date().toISOString();
-
-  // Exercise titles for the Exercise Performance Sheet (owner, 9 Nov 2026).
-  if (body.action === "exercises") {
-    const exercises = cleanExercises(body.exercises);
-    const { error } = await db.from("course_assessment_tasks").upsert({ course_id: body.courseId, exercises, updated_by: staff.user.id, updated_at: now }, { onConflict: "course_id" });
-    if (error) return NextResponse.json({ error: /exercises|schema cache|does not exist/i.test(error.message) ? "Run database update 202610290086 first." : error.message }, { status: 400 });
-    await db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: role, action: "course_exercises.saved", record_type: "course", record_id: body.courseId, new_values: { exercises } });
-    return NextResponse.json({ ok: true, exercises });
-  }
 
   if (body.action === "tasks") {
     const tasks = cleanTasks(body.tasks);

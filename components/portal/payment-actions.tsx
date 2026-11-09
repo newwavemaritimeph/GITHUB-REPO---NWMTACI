@@ -55,7 +55,7 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
   }
   const inner = <div className="portal-form">
     {err && <Message kind="error" text={err} />}
-    <p className="portal-form-note full">Goes to the Cashier to collect the fee. The change is applied automatically once the fee is paid.</p>
+    {reqType !== "TAR reprint" && <p className="portal-form-note full">Goes to the Cashier to collect the fee. The change is applied automatically once the fee is paid.</p>}
     {reqType === "TAR reprint" && <p className="portal-form-note full">The Training Admission Record has been printed twice. Each approval by Accounting allows one more print with the same AR number.</p>}
     {reqType === "Make-up Class" && <p className="portal-form-note full">Make-up classes are for courses of three days or more; the fee is Php 350.00 per training day (Terms and Conditions).</p>}
     {reqType === "Rescheduling" && <label className="full">New Batch<select value={batchId} onChange={(e) => setBatchId(e.target.value)}><option value="">Select a Schedule</option>{batches.map((b) => <option key={b.id} value={b.id}>{b.batch_number} · {fmtDate(b.starts_on)}–{fmtDate(b.ends_on)} · {b.capacity - b.confirmed_count} slots</option>)}</select></label>}
@@ -67,7 +67,7 @@ export function RequestActionModal({ data, enrollment, reqType, onClose, post, e
     <label>Date Requested<input type="date" value={requestedOn} max={today} onChange={(e) => setRequestedOn(e.target.value)} /></label>
     {policyFee && <div className="rate-preview"><span>{reqType === "Refund" ? "Deduction by policy" : "Fee by policy"}</span><strong>{pesos(policyFee.amountCentavos)}</strong><small>{policyFee.rule}</small></div>}
     <ReasonField reasons={REASONS[reqType]} value={why} onChange={setWhy} />
-    <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={send}>{busy ? "Sending…" : "Send to Cashier"}</button></div>
+    <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={send}>{busy ? "Sending…" : reqType === "TAR reprint" ? "Send to Accounting" : "Send to Cashier"}</button></div>
   </div>;
   const title = reqType === "Rescheduling" ? "Change batch / reschedule" : reqType === "Make-up Class" ? "Make-up class" : reqType === "TAR reprint" ? "TAR reprint" : reqType;
   return embedded ? inner : <Modal title={`Request: ${title}`} onClose={onClose}>{inner}</Modal>;

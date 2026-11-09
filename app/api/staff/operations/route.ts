@@ -21,7 +21,7 @@ import { fileVoucherInDrive } from "@/lib/expense-voucher";
 import { channelOf } from "@/lib/reconciliation";
 import { activeConnection, googleConfigured, hasDriveScope, hasGmailScope, inviteStudent, listClasses, revokeConnection } from "@/lib/google-classroom";
 import { sendBalanceSummary } from "@/lib/balance-summary";
-import { RULED_REQUESTS, refundAfterDeduction, requestFee } from "@/lib/request-fees";
+import { PAY_FIRST_REQUESTS, RULED_REQUESTS, firstStage, refundAfterDeduction, requestFee } from "@/lib/request-fees";
 import { applyReferralRebates, pendingFullPaymentRebates, suggestReferralCode } from "@/lib/referral";
 import { isStcwRebateCourse } from "@/lib/rebates";
 import { automaticEndDate, fitsInWeek, moveProblem } from "@/lib/scheduling";
@@ -453,11 +453,9 @@ async function tryAutoEnroll(admin: ReturnType<typeof createSupabaseAdminClient>
   return enrolled;
 }
 
-// Charge-bearing requests (Change Course, Rescheduling, Make-up Class,
-// Cancellation, Reprinting, TAR reprint) are approved only after their fee is
-// paid to the Cashier (owner, 7 Oct 2026). Their charge is payable as soon as the
-// Cashier sets it; Accounting approves once it is collected.
-const PAY_FIRST_REQUESTS = ["Change Course", "Rescheduling", "Make-up Class", "Cancellation", "Reprinting", "TAR reprint", "Certificate delivery"];
+// Charge-bearing requests (PAY_FIRST_REQUESTS, lib/request-fees) are approved only after their fee is paid to the
+// Cashier (owner, 7 Oct 2026). Their charge is payable as soon as the Cashier sets it. A TAR reprint goes straight to
+// Accounting instead and is never applied automatically (owner, 9 Nov 2026).
 /** How much of a request's charge has been collected: verified payments on the enrollment made after the charge was set. */
 async function chargeCollection(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentId: string, chargeId: string) {
   const { data: charge } = await admin.from("enrollment_charges").select("amount_centavos,created_at").eq("id", chargeId).maybeSingle();
@@ -1998,10 +1996,10 @@ export async function POST(request: Request) {
       const { data: reference, error: refError } = await db.rpc("next_reference", { prefix: "REQ" });
       if (refError) throw refError;
       // Requests go to the Cashier for charges first, then to Accounting; a request
-      // raised by Accounting/Admin goes straight to approval. Without migration
+      // raised by Accounting/Admin, or a TAR reprint, goes straight to approval. Without migration
       // 202610070004 (no stage column) it falls back to the old direct routing.
       const row = { request_number: reference, trainee_id: enrollment.trainee_id, enrollment_id: input.enrollmentId, request_type: input.requestType, requested_values: requested, reason: input.reason, requester_id: staff.user.id, status: "Pending" };
-      let inserted = await admin.from("enrollment_requests").insert({ ...row, stage: canManageAccounting(staff.roleCodes) ? "For approval" : "With cashier" }).select("id").single();
+      let inserted = await admin.from("enrollment_requests").insert({ ...row, stage: firstStage(input.requestType, canManageAccounting(staff.roleCodes)) }).select("id").single();
       if (inserted.error && /stage/i.test(inserted.error.message)) inserted = await admin.from("enrollment_requests").insert(row).select("id").single();
       const { data: created, error: insertError } = inserted;
       if (insertError || !created) throw insertError ?? new Error("Could not raise the request.");
@@ -2023,7 +2021,8 @@ export async function POST(request: Request) {
       const req = found.data as { id: string; enrollment_id: string; request_type: string; requested_values: unknown; status: string; stage?: string; charge_id?: string | null } | null;
       if (found.error || !req) throw found.error ?? new Error("Request not found.");
       if (req.status !== "Pending") return NextResponse.json({ error: "This request has already been decided." }, { status: 400 });
-      if (req.stage === "With cashier") return NextResponse.json({ error: "Waiting for the Cashier to add charges." }, { status: 400 });
+      // A TAR reprint raised before 9 Nov 2026 may still sit "With cashier"; Accounting decides it all the same.
+      if (req.stage === "With cashier" && req.request_type !== "TAR reprint") return NextResponse.json({ error: "Waiting for the Cashier to add charges." }, { status: 400 });
       if (input.approve && req.charge_id && PAY_FIRST_REQUESTS.includes(req.request_type)) {
         const due = await chargeCollection(admin, req.enrollment_id, req.charge_id);
         if (!due.paid) return NextResponse.json({ error: `The ${req.request_type === "Rescheduling" ? "reschedule" : "change of course"} fee is not paid yet (₱${(due.collected / 100).toFixed(2)} of ₱${(due.amount / 100).toFixed(2)} collected). Approve it once the trainee pays the Cashier.` }, { status: 400 });

@@ -27,13 +27,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ batc
   const roster = await loadBatchRoster(db, batchId).catch(() => null);
   const b = record.batch, allDays = trainingDays(b.startsOn, b.endsOn);
   const days = kind === "attendance" ? (allDays.includes(day) ? [day] : allDays) : [];
-  const logo = await readFile(path.join(process.cwd(), "public", "new-wave-emblem.png")).then((x) => new Uint8Array(x)).catch(() => undefined);
+  const image = (name: string) => readFile(path.join(process.cwd(), "public", name)).then((x) => new Uint8Array(x)).catch(() => undefined);
+  const [logo, emblem] = await Promise.all([image("new-wave-logo.png"), image("new-wave-emblem.png")]);
   const bytes = await createTrainingSheetPdf({
-    kind, control: await loadDocumentControl(db, SHEET_FORMS[kind]), logo,
+    kind, control: await loadDocumentControl(db, SHEET_FORMS[kind]), logo, emblem,
     courseCode: b.courseCode, courseName: b.courseName, classNo: record.fields.classNo || b.batchNumber, startsOn: b.startsOn, endsOn: b.endsOn,
-    room: roster?.batch.room ?? null, instructor: roster?.batch.instructor ?? null, days, allDays,
-    trainees: record.trainees.map((t) => ({ enrollmentId: t.enrollmentId, name: t.name, srn: t.srn ?? null })),
-    tasks: record.tasks, results: record.results, exercises: record.exercises, assessor: record.fields.assessor,
+    dailyStart: roster?.batch.dailyStart ?? null, dailyEnd: roster?.batch.dailyEnd ?? null, instructor: roster?.batch.instructor ?? null, days, allDays,
+    trainees: record.trainees.map((t) => ({ enrollmentId: t.enrollmentId, name: t.name, rank: t.rank })),
+    tasks: record.tasks, results: record.results, assessor: record.fields.assessor,
   });
   await db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("mismo_officer") ? "mismo_officer" : "admin", action: "report.exported", record_type: "training_sheet", record_id: `${batchId}:${kind}${days.length === 1 ? `:${days[0]}` : ""}`, new_values: { sheet: kind, days } });
   const name = `${kind}-sheet-${b.batchNumber}${days.length === 1 ? `-${days[0]}` : ""}`.replace(/[^\w.-]/g, "");

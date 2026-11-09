@@ -1,11 +1,10 @@
--- Training Reports sheets (owner, 9 Nov 2026).
--- 1. Practical exercise titles per course, printed on the Exercise Performance Sheet.
--- 2. The assessment tasks of UBT-PSSR, Safety (STPPDSPPS) and Crowd (PSCMT) as on New Wave's own TCROA files,
+-- Training Reports sheets (owner, 9 Nov 2026). Safe to run more than once.
+-- 1. The assessment tasks of UBT-PSSR, Safety (STPPDSPPS) and Crowd (PSCMT) as on New Wave's own TCROA files,
 --    filled in only where the course has no tasks yet (tasks the officer already typed are kept).
 --    Safety's first three criteria share one task title, so they print under one heading.
--- Crisis (PSCMHBT) and CCM Domestic (CCMD) tasks are encoded by the MISMO Compliance Officer in the portal.
-
-alter table public.course_assessment_tasks add column if not exists exercises jsonb not null default '[]'::jsonb;
+--    Crisis (PSCMHBT) and CCM Domestic (CCMD) tasks are encoded by the MISMO Compliance Officer in the portal.
+-- 2. The Form Numbers of the three sheets, from New Wave's Word forms. The Exercise Performance Sheet prints each
+--    course's EP columns from its form, so no exercise titles are stored (the earlier draft's column is not added).
 
 with seed(code, tasks) as (values
   ('UBT-PSSR', '[
@@ -35,15 +34,23 @@ select c.id, s.tasks, now() from seed s join public.courses c on upper(c.code) =
 on conflict (course_id) do update set tasks = excluded.tasks, updated_at = now()
 where public.course_assessment_tasks.tasks = '[]'::jsonb;
 
--- Form Numbers for the three sheets (Accounting or the Admin can change them later). The Assessment Performance
--- Sheet starts with the values on New Wave's file.
+-- Form Numbers for the three sheets (Accounting or the Admin can change them later in Form Numbers).
+-- The Attendance Sheet's Word file reads "10/082025"; it is stored as 10/08/2025.
 insert into public.document_controls (form_code, form_no, revision_no, revision_date, issued_date) values
-  ('attendance_sheet', '', '', '', ''),
-  ('exercise_sheet', '', '', '', ''),
+  ('attendance_sheet', 'NW-TRNG-06-25', '', '', '10/08/2025'),
+  ('exercise_sheet', 'NW-TRNG-08-26', '', '', '05/25/2026'),
   ('assessment_sheet', 'NW-TRNG-09-26', '', '', '05/25/2026')
 on conflict (form_code) do nothing;
+-- An earlier draft of this file saved the Attendance and Exercise rows blank; fill them unless someone has set them.
+update public.document_controls d set form_no = v.form_no, issued_date = v.issued_date
+from (values ('attendance_sheet', 'NW-TRNG-06-25', '10/08/2025'), ('exercise_sheet', 'NW-TRNG-08-26', '05/25/2026')) as v(form_code, form_no, issued_date)
+where d.form_code = v.form_code and d.form_no = '' and d.issued_date = '';
 
--- What each STCW course has now.
-select c.code, jsonb_array_length(t.tasks) as tasks, jsonb_array_length(t.exercises) as exercises
+-- What each STCW course has now, and the three Form Numbers (one result, so the SQL Editor shows all of it).
+select 'Tasks: ' || c.code as item, coalesce(jsonb_array_length(t.tasks), 0)::text as value
 from public.courses c left join public.course_assessment_tasks t on t.course_id = c.id
-where upper(c.code) in ('UBT-PSSR', 'STPPDSPPS', 'PSCMT', 'PSCMHBT', 'CCMD') order by c.code;
+where upper(c.code) in ('UBT-PSSR', 'STPPDSPPS', 'PSCMT', 'PSCMHBT', 'CCMD')
+union all
+select 'Form: ' || form_code, form_no || ' · ' || issued_date from public.document_controls
+where form_code in ('attendance_sheet', 'exercise_sheet', 'assessment_sheet')
+order by item;

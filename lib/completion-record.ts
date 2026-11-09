@@ -32,17 +32,23 @@ export function groupTick(r: TraineeResult, g: { from: number; to: number }): bo
   return v.length > 0 && v.every((x) => x === true) ? true : null;
 }
 
-/** New Wave's own forms per STCW course (owner, 9 Nov 2026): TCROA paper, and the Assessment Performance Sheet's written column and task labels. */
-export type CourseForm = { paper: "A4" | "Legal"; writtenOnSheet: boolean; apCount: number; apLabel: (i: number) => string };
+/**
+ * New Wave's own forms per STCW course (owner, 9 Nov 2026): TCROA paper, the Assessment Performance Sheet's written
+ * column and task labels, the Exercise Performance Sheet's EP columns (their Word grid in twips: number, name, each EP,
+ * signature, remarks), and whether the Attendance Sheet puts every day on one sheet (CCMD) or prints one per day.
+ */
+export type CourseForm = { paper: "A4" | "Legal"; writtenOnSheet: boolean; apCount: number; apLabel: (i: number) => string; eps: { prefix: string; widths: number[] }; attendanceAllDays: boolean };
+const EPS_4 = [562, 4253, 1134, 1134, 1417, 1417, 2127, 2977];
 export function courseForm(code: string): CourseForm {
   const ap = (i: number) => `AP ${i + 1}`;
+  const base = { attendanceAllDays: false, eps: { prefix: "EP ", widths: EPS_4 } };
   switch (code.toUpperCase()) {
-    case "UBT-PSSR": return { paper: "A4", writtenOnSheet: false, apCount: 4, apLabel: (i) => `AP A6.${i + 1}` };
-    case "STPPDSPPS": return { paper: "Legal", writtenOnSheet: true, apCount: 2, apLabel: ap };
-    case "PSCMT": return { paper: "Legal", writtenOnSheet: true, apCount: 7, apLabel: ap };
-    case "PSCMHBT": return { paper: "Legal", writtenOnSheet: true, apCount: 10, apLabel: ap };
-    case "CCMD": return { paper: "Legal", writtenOnSheet: false, apCount: 4, apLabel: ap };
-    default: return { paper: "A4", writtenOnSheet: true, apCount: 4, apLabel: ap };
+    case "UBT-PSSR": return { ...base, paper: "A4", writtenOnSheet: false, apCount: 4, apLabel: (i) => `AP A6.${i + 1}`, eps: { prefix: "EP A6.", widths: EPS_4 } };
+    case "STPPDSPPS": return { ...base, paper: "Legal", writtenOnSheet: true, apCount: 2, apLabel: ap, eps: { prefix: "EP A7.", widths: EPS_4 } };
+    case "PSCMT": return { ...base, paper: "Legal", writtenOnSheet: true, apCount: 7, apLabel: ap, eps: { prefix: "EP A8.", widths: [442, 4656, 699, 699, 699, 699, 699, 691, 681, 681, 681, 1814, 2320] } };
+    case "PSCMHBT": return { ...base, paper: "Legal", writtenOnSheet: true, apCount: 10, apLabel: ap, eps: { prefix: "EP A4.", widths: [367, 4595, 513, 512, 512, 512, 525, 512, 512, 512, 512, 590, 590, 590, 590, 604, 590, 1322, 1375] } };
+    case "CCMD": return { ...base, paper: "Legal", writtenOnSheet: false, apCount: 4, apLabel: ap, eps: { prefix: "EP ", widths: [367, 5047, 722, 720, 720, 720, 2338, 2250] }, attendanceAllDays: true };
+    default: return { ...base, paper: "A4", writtenOnSheet: true, apCount: 4, apLabel: ap };
   }
 }
 /** Page size in points, landscape. */

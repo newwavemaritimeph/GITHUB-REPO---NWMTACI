@@ -21,8 +21,5 @@ export function trainingDays(startsOn: string, endsOn: string): string[] {
   return out.length ? out : [startsOn];
 }
 
-/** A course's practical exercise titles: trimmed, blanks dropped, at most 10 of 120 characters. */
-export const cleanExercises = (v: unknown): string[] => (Array.isArray(v) ? v.map((x) => String(x ?? "").trim().slice(0, 120)).filter(Boolean).slice(0, 10) : []);
-
-/** The PDF of one sheet; `day` is a training day or "all" (Attendance Sheet only). */
+/** The PDF of one sheet; `day` is a training day or "all" (Attendance Sheet only; CCMD always prints every day on one sheet). */
 export const sheetUrl = (batchId: string, kind: SheetKind, day?: string) => `/api/documents/training-sheet/${batchId}?sheet=${kind}${day ? `&day=${day}` : ""}`;

@@ -11,6 +11,13 @@ export const FLAT_FEE = 35000;
 export const SERVICE_CHARGE = 25000;
 /** Requests whose policy fee is attached as a charge. */
 export const RULED_REQUESTS = ["Rescheduling", "Cancellation"] as const;
+/**
+ * Charge-bearing requests, approved only after their fee is paid to the Cashier and then applied automatically
+ * (owner, 7 Oct 2026). A TAR reprint is not one: it goes straight to Accounting, who approves or rejects it (owner, 9 Nov 2026).
+ */
+export const PAY_FIRST_REQUESTS: readonly string[] = ["Change Course", "Rescheduling", "Make-up Class", "Cancellation", "Reprinting", "Certificate delivery"];
+/** Where a new request starts: with the Cashier for its fee, or at Accounting (raised by Accounting or the Admin, or a TAR reprint). */
+export const firstStage = (type: string, raisedByAccounting: boolean) => (raisedByAccounting || type === "TAR reprint" ? "For approval" : "With cashier");
 const MIN_DAYS: Record<string, number> = { Rescheduling: 5, Cancellation: 5, Refund: 5 };
 
 const peso = (v: number) => `₱${(v / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;

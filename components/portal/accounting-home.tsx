@@ -47,15 +47,20 @@ function useJson<T>(url: string | null) {
 /* ------------------------------------------------------------ approvals */
 
 // Accounting Dashboard Design 06 (owner, 3 Nov 2026): Requisitions are not Accounting's; voucher reprints sit with expense requests.
-type Category = "Expense requests" | "Refunds" | "Discounts" | "Payment voids" | "Rebates owed to partners" | "Cashier opening and closing";
-const CATEGORY_GROUPS: [string, Category[]][] = [["Needs your decision", ["Expense requests", "Refunds", "Discounts", "Payment voids"]], ["For billing", ["Rebates owed to partners"]], ["Cash control", ["Cashier opening and closing"]]];
+// TAR reprints come straight to Accounting (owner, 9 Nov 2026).
+type Category = "Expense requests" | "Refunds" | "Discounts" | "Payment voids" | "TAR reprints" | "Rebates owed to partners" | "Cashier opening and closing";
+const CATEGORY_GROUPS: [string, Category[]][] = [["Needs your decision", ["Expense requests", "Refunds", "Discounts", "Payment voids", "TAR reprints"]], ["For billing", ["Rebates owed to partners"]], ["Cash control", ["Cashier opening and closing"]]];
+/** Pending TAR reprint requests, of any stage: one raised before 9 Nov 2026 may still sit with the Cashier. */
+const pendingTarReprints = (data: PortalData) => data.requests.filter((r) => r.request_type === "TAR reprint" && r.status === "Pending");
+/** Lists that count requests, not money. */
+const COUNTED: Category[] = ["TAR reprints", "Cashier opening and closing"];
 /** Receipt photos the Cashier attached (owner, 19 Oct 2026), opened in Google Drive. */
 function ApprovalReceipts({ files }: { files: { fileId: string; link: string }[] }) {
   return files.length
     ? <small className="ap-receipts">{files.map((f, i) => <a key={f.fileId} href={f.link} target="_blank" rel="noreferrer" onClick={(ev) => ev.stopPropagation()}>Receipt {i + 1}</a>)}</small>
     : <small className="ap-receipts none">No receipt photo</small>;
 }
-type Row = { id: string; reasons?: string[]; title: string; detail: string; receipts?: { fileId: string; link: string }[]; ref: string; who: string; when: string; amount: number; act: (approve: boolean, remarks?: string) => Promise<unknown>; okLabel: string; canReject: boolean };
+type Row = { id: string; reasons?: string[]; title: string; detail: string; receipts?: { fileId: string; link: string }[]; ref: string; who: string; when: string; amount: number; noAmount?: boolean; act: (approve: boolean, remarks?: string) => Promise<unknown>; okLabel: string; canReject: boolean };
 
 /**
  * Approvals by category (owner, 8 Oct 2026): money out (expense requests,
@@ -95,12 +100,15 @@ export function AccountingApprovals({ data, reload, compact, rail }: { data: Por
   const payById = new Map(data.payments.map((p) => [p.id, p]));
   const voids = (data.paymentVoids ?? []).filter((r) => r.status === "Pending").map((r): Row => { const p = payById.get(r.payment_id); const t = p ? first(p.trainees) : null; return { id: r.id, reasons: REJECT_REASONS.paymentVoid, title: `${p?.payment_number ?? "Payment"} · ${name(t ?? null)}`, detail: `${p ? `${p.method}${p.reference_number ? ` · Ref ${p.reference_number}` : ""} · ` : ""}Reason: ${r.reason}`, ref: "Void", who: r.requested_by_name ?? "Cashier", when: fmtDate(day(r.requested_at)), amount: Number(p?.amount_centavos ?? 0), okLabel: "Approve Void", canReject: true,
     act: (approve, remarks) => post({ action: "payment-void-decide", requestId: r.id, approve, remarks }, approve ? "Payment voided. The receipt shows VOID and the amount is back on the balance." : "Void request rejected.") }; });
-  const lists: Record<Category, Row[]> = { "Expense requests": [...expenses, ...reprints], Refunds: refunds, Discounts: discounts, "Payment voids": voids, "Rebates owed to partners": rebates, "Cashier opening and closing": closings };
+  // Approving allows one more print of the TAR with the same AR number (applyApprovedRequest).
+  const tars = pendingTarReprints(data).map((r): Row => { const e = first(r.enrollments), en = data.enrollments.find((x) => x.id === e?.id), course = first(en?.courses)?.code ?? first(e?.courses)?.name; return { id: r.id, title: `${name(first(r.trainees))}${course ? ` · ${course}` : ""}`, detail: `Reason: ${r.reason}`, ref: r.request_number, who: "", when: fmtDate(day(r.created_at)), amount: 0, noAmount: true, okLabel: "Approve", canReject: true,
+    act: (approve, remarks) => post({ action: "request-decide", id: r.id, approve, remarks }, approve ? "Approved. One more print of the TAR is allowed." : "TAR reprint rejected.") }; });
+  const lists: Record<Category, Row[]> = { "Expense requests": [...expenses, ...reprints], Refunds: refunds, Discounts: discounts, "Payment voids": voids, "TAR reprints": tars, "Rebates owed to partners": rebates, "Cashier opening and closing": closings };
   const waiting = Object.values(lists).reduce((s, l) => s + l.length, 0);
   const rowsOf = (list: Row[]) => list.map((r) => <div key={r.id} className={rejecting && rejecting !== r.id ? "ac-dim" : undefined}>
     <div className={`ac-req${rejecting === r.id ? " ac-rejecting" : ""}`}>
       <div><strong>{r.title}</strong>{r.detail && <small>{r.detail}</small>}{r.receipts && <ApprovalReceipts files={r.receipts} />}<small className="cx-mono">{[r.ref, r.who, r.when].filter(Boolean).join(" · ")}</small></div>
-      <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{pesos2(r.amount)}</strong>
+      <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{r.noAmount ? "—" : pesos2(r.amount)}</strong>
       {rejecting === r.id ? <span className="ac-rejlabel">Rejecting</span> : <div className="cx-acts"><button type="button" className="portal-primary" disabled={busy || !!rejecting} onClick={() => void r.act(true).catch(() => undefined)}>{r.okLabel}</button>{r.canReject && <button type="button" className="portal-secondary" disabled={busy || !!rejecting} onClick={() => setRejecting(r.id)}>Reject</button>}</div>}
     </div>
     {rejecting === r.id && <RejectInline reasons={r.reasons ?? REJECT_REASONS.request} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
@@ -112,7 +120,7 @@ export function AccountingApprovals({ data, reload, compact, rail }: { data: Por
     return <div className="ad-split">
       <section className="portal-panel cx-panel ad-rail"><div className="panel-heading"><h2>To Do</h2><Badge tone={waiting ? "orange" : undefined}>{waiting} waiting</Badge></div>
         {CATEGORY_GROUPS.map(([g, cs], i) => <div key={g} className="ad-grp"><span className="ad-grp-h">{i + 1} · {tcl(g)}</span>
-          {cs.map((k) => <button key={k} type="button" className={current === k ? "on" : ""} onClick={() => { setCat(k); setRejecting(null); }}><span>{tcl(k)}<small>{k === "Cashier opening and closing" ? `${lists[k].length} to review` : pesos2(lists[k].reduce((x, r) => x + r.amount, 0))}</small></span><b className={lists[k].length ? "" : "zero"}>{lists[k].length}</b></button>)}
+          {cs.map((k) => <button key={k} type="button" className={current === k ? "on" : ""} onClick={() => { setCat(k); setRejecting(null); }}><span>{tcl(k)}<small>{COUNTED.includes(k) ? `${lists[k].length} to ${k === "TAR reprints" ? "decide" : "review"}` : pesos2(lists[k].reduce((x, r) => x + r.amount, 0))}</small></span><b className={lists[k].length ? "" : "zero"}>{lists[k].length}</b></button>)}
         </div>)}
       </section>
       <div className="ac-stack">
@@ -171,7 +179,7 @@ export function AccountingApprovals({ data, reload, compact, rail }: { data: Por
           <div className={`ac-crow${rejecting === r.id ? " ac-rejecting" : ""}`}>
             <input type="checkbox" id={`ap-${r.id}`} checked={picked.has(r.id)} disabled={!!bulk} onChange={() => toggle(r.id)} aria-label={`Select ${r.title}`} />
             <label htmlFor={`ap-${r.id}`}><strong>{r.title}</strong>{r.detail && <small>{r.detail}</small>}{r.receipts && <ApprovalReceipts files={r.receipts} />}<small className="cx-mono">{[r.ref, r.who, r.when].filter(Boolean).join(" · ")}</small></label>
-            <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{pesos2(r.amount)}</strong>
+            <strong className="cx-amt" style={r.amount < 0 ? { color: "#b42318" } : undefined}>{r.noAmount ? "—" : pesos2(r.amount)}</strong>
             {rejecting === r.id ? <span className="ac-rejlabel">Rejecting</span> : <div className="cx-acts">{r.canReject && <button type="button" className="portal-secondary" disabled={busy || !!rejecting || !!bulk} onClick={() => setRejecting(r.id)}>Reject</button>}<button type="button" className="portal-primary" disabled={busy || !!rejecting || !!bulk} onClick={() => void r.act(true).then(() => setPicked((p) => { const n = new Set(p); n.delete(r.id); return n; })).catch(() => undefined)}>{r.okLabel}</button></div>}
           </div>
           {rejecting === r.id && <RejectInline reasons={r.reasons ?? REJECT_REASONS.request} busy={busy} onCancel={() => setRejecting(null)} onReject={(why) => void r.act(false, why).then(() => setRejecting(null)).catch(() => undefined)} />}
@@ -840,7 +848,7 @@ export function AccountingDocuments({ only, embedded, data: portal }: { only?: "
 
 type HistoryRow = { id: string; category: string; decidedAt: string; title: string; detail: string; amountCentavos: number; decision: string; by: string; remarks: string };
 // One line of short filters (owner, 3 Nov 2026); the table keeps each row's full category.
-const HISTORY_FILTERS: [string, string[]][] = [["Expenses", ["Expense Requests", "Voucher Reprints"]], ["Refunds", ["Refunds"]], ["Changes", ["Change Requests"]], ["Discounts", ["Discounts"]], ["Voids", ["Payment Voids"]], ["Rebates", ["Rebates Paid to Partners"]], ["Closings", ["Cashier Closings Reviewed"]]];
+const HISTORY_FILTERS: [string, string[]][] = [["Expenses", ["Expense Requests", "Voucher Reprints"]], ["Refunds", ["Refunds"]], ["Changes", ["Change Requests"]], ["TAR Reprints", ["TAR Reprints"]], ["Discounts", ["Discounts"]], ["Voids", ["Payment Voids"]], ["Rebates", ["Rebates Paid to Partners"]], ["Closings", ["Cashier Closings Reviewed"]]];
 const DECISION_TONE: Record<string, "active" | "cancelled" | "pending"> = { Approved: "active", Paid: "active", Reviewed: "active", Voided: "pending", Rejected: "cancelled", Cancelled: "cancelled" };
 
 /** Accounting › Approvals (owner, 3 Nov 2026): a date-sensitive history of every decision, by category. Waiting items are on the Dashboard. */
@@ -858,7 +866,7 @@ export function ApprovalHistory({ data, go }: { data: PortalData; go: (module: s
   const okRows = rows.filter((r) => r.decision !== "Rejected" && r.decision !== "Cancelled"), noRows = rows.filter((r) => r.decision === "Rejected");
   const sum = (l: HistoryRow[]) => l.reduce((s, r) => s + r.amountCentavos, 0);
   // Still waiting: the same counts the Dashboard rail shows.
-  const waiting = data.expenses.filter((e) => e.status === "Pending").length + (data.expenseReprints ?? []).filter((r) => r.status === "Pending").length + data.requests.filter((r) => r.request_type === "Refund" && r.status === "Pending" && r.stage !== "With cashier").length + data.pendingDiscounts.length + (data.paymentVoids ?? []).filter((r) => r.status === "Pending").length + data.agencyRebates.filter((r) => r.status === "Pending").length + data.cashierClosings.filter((c) => c.status === "Submitted").length;
+  const waiting = data.expenses.filter((e) => e.status === "Pending").length + (data.expenseReprints ?? []).filter((r) => r.status === "Pending").length + data.requests.filter((r) => r.request_type === "Refund" && r.status === "Pending" && r.stage !== "With cashier").length + data.pendingDiscounts.length + (data.paymentVoids ?? []).filter((r) => r.status === "Pending").length + pendingTarReprints(data).length + data.agencyRebates.filter((r) => r.status === "Pending").length + data.cashierClosings.filter((c) => c.status === "Submitted").length;
   const when = (iso: string) => `${fmtDate(iso)} · ${new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso))}`;
   return <>
     {waiting > 0 && <div className="ah-wait"><span>{waiting} still waiting for your decision</span><button type="button" className="portal-secondary" onClick={() => go("Dashboard")}>Open on the Dashboard</button></div>}

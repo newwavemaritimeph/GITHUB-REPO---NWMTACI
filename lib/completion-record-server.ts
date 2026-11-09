@@ -2,7 +2,6 @@ import { loadDocumentControl, type DocumentControl } from "@/lib/document-contro
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isStcwCategory } from "@/lib/certificate-rules";
 import { MISMO_COURSE_CODES } from "@/lib/mismo";
-import { cleanExercises } from "@/lib/training-sheets";
 import { fitResult, MAX_TASKS, type AssessmentTask, type CompletionFields, type CompletionTrainee, type TraineeResult } from "@/lib/completion-record";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
@@ -16,8 +15,6 @@ export type CompletionPayload = {
   batch: CompletionBatch;
   tasks: AssessmentTask[];
   courseTasks: AssessmentTask[];
-  /** Practical exercise titles for the Exercise Performance Sheet (migration 202610290086); empty until set. */
-  exercises: string[];
   trainees: CompletionTrainee[];
   fields: CompletionFields;
   results: Record<string, TraineeResult>;
@@ -70,9 +67,6 @@ export async function loadCompletion(db: Admin, batchId: string): Promise<Comple
   const tpl = await db.from("course_assessment_tasks").select("tasks").eq("course_id", b.course_id).maybeSingle();
   if (tpl.error) { if (!missingTable(tpl.error.message)) throw tpl.error; ready = false; }
   const courseTasks = cleanTasks(tpl.data?.tasks);
-  // A separate read so the record still loads before migration 202610290086 adds the column.
-  const ex = ready ? await db.from("course_assessment_tasks").select("exercises").eq("course_id", b.course_id).maybeSingle() : { data: null };
-  const exercises = cleanExercises((ex.data as { exercises?: unknown } | null)?.exercises);
   const rec = ready ? await db.from("training_completion_records").select("*").eq("batch_id", batchId).maybeSingle() : { data: null, error: null };
   if (rec.error) { if (!missingTable(rec.error.message)) throw rec.error; ready = false; }
   const r = rec.data as Record<string, unknown> | null;
@@ -92,7 +86,7 @@ export async function loadCompletion(db: Admin, batchId: string): Promise<Comple
     control: await loadDocumentControl(db, "completion_record"),
     ready,
     batch: { id: b.id as string, batchNumber: b.batch_number as string, startsOn: b.starts_on as string, endsOn: b.ends_on as string, courseId: b.course_id as string, courseCode: c?.code ?? "—", courseName: c?.name ?? "", trainees: trainees.length, status: (r?.status as CompletionBatch["status"]) ?? "Not Started" },
-    tasks, courseTasks, exercises, trainees, fields, results,
+    tasks, courseTasks, trainees, fields, results,
     status: (r?.status as CompletionBatch["status"]) ?? "Not Started",
     printCount: Number(r?.print_count ?? 0), printedAt: (r?.printed_at as string | null) ?? null, lastSignatories,
     drive: r?.drive_file_id ? { fileId: String(r.drive_file_id), link: (r.drive_link as string | null) ?? null, path: (r.drive_path as string | null) ?? null, filedAt: (r.drive_filed_at as string | null) ?? null } : null,

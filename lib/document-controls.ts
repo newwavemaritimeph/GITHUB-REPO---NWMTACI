@@ -25,8 +25,9 @@ export const DOCUMENT_FORMS = [
   { code: "enrollment_record", name: "Enrollment Record", group: "Registration" },
   { code: "instructions", name: "Training Instructions", group: "Registration" },
   { code: "completion_record", name: "Completion Record", group: "Training and MISMO", start: { formNo: "05-00", revisionDate: "00", issuedDate: "09-14-2023" }, note: "Prints as AD No. and Initial Issue Date" },
-  { code: "attendance_sheet", name: "Attendance Sheet", group: "Training and MISMO" },
-  { code: "exercise_sheet", name: "Exercise Performance Sheet", group: "Training and MISMO" },
+  // The values on New Wave's Word forms (owner, 9 Nov 2026); the Attendance Sheet's file reads "10/082025".
+  { code: "attendance_sheet", name: "Attendance Sheet", group: "Training and MISMO", start: { formNo: "NW-TRNG-06-25", issuedDate: "10/08/2025" } },
+  { code: "exercise_sheet", name: "Exercise Performance Sheet", group: "Training and MISMO", start: { formNo: "NW-TRNG-08-26", issuedDate: "05/25/2026" } },
   { code: "assessment_sheet", name: "Assessment Performance Sheet", group: "Training and MISMO", start: { formNo: "NW-TRNG-09-26", issuedDate: "05/25/2026" } },
   { code: "mismo_final", name: "MISMO Final List", group: "Training and MISMO" },
   { code: "mismo_unsettled", name: "MISMO Not Settled List", group: "Training and MISMO" },

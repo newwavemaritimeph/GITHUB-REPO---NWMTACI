@@ -1,5 +1,6 @@
-import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument, StandardFonts, degrees, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import type { DocumentControl } from "@/lib/document-controls";
+import { drawWatermark } from "@/lib/print/watermark";
 import { courseForm, durationText, formDate, paperSize, practicalOk, remarkOf, resultOf, SHEET_LINES, taskGroups, type AssessmentTask, type CompletionFields, type CompletionTrainee, type TraineeResult } from "@/lib/completion-record";
 
 /**
@@ -38,6 +39,10 @@ export async function createCompletionRecordPdf(input: CompletionPdfInput) {
   const ital = await pdf.embedFont(StandardFonts.HelveticaOblique), boldItal = await pdf.embedFont(StandardFonts.HelveticaBoldOblique);
   const [W, H] = paperSize(courseForm(input.courseCode ?? "").paper), L = 17, R = W - 17, black = rgb(0, 0, 0);
   const page: PDFPage = pdf.addPage([W, H]);
+  let emblem: PDFImage | null = null;
+  if (input.logo) { try { emblem = await pdf.embedPng(input.logo); } catch { /* the form prints without the emblem */ } }
+  // New Wave's emblem as a faint watermark behind the form (owner, 9 Nov 2026).
+  if (emblem) drawWatermark(page, emblem);
   const n = input.tasks.length;
 
   // Columns: no, name, birth, place, rank, %, remarks, tasks…, practical, C, NYC, certificate.
@@ -71,7 +76,7 @@ export async function createCompletionRecordPdf(input: CompletionPdfInput) {
   const ctl = input.control;
   write([`AD NO.: ${ctl?.formNo ?? "05-00"}`, `Initial Issue Date: ${ctl?.issuedDate ?? "09-14-2023"}`, `Revision Date: ${ctl?.revisionDate ?? "00"}`, ...(ctl?.revisionNo ? [`Revision No.: ${ctl.revisionNo}`] : [])], L - 2.5, y, 120, 30, 4.8, reg, "left", "top");
   const title = "TRAINING COMPLETION AND RECORD OF ASSESSMENT REPORT", tx = (W - bold.widthOfTextAtSize(title, 11)) / 2;
-  if (input.logo) { try { const img = await pdf.embedPng(input.logo); page.drawImage(img, { x: tx - 120, y: y - 48, width: 46, height: 46 }); } catch { /* the form prints without the emblem */ } }
+  if (emblem) page.drawImage(emblem, { x: tx - 120, y: y - 48, width: 46, height: 46 });
   page.drawText(title, { x: tx, y: y - 30, size: 11, font: bold, color: black });
   y -= 56;
 
