@@ -2981,3 +2981,6 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .cx-chip{height:28px;padding:0 10px;border-radius:999px;border:1px dashed #9fc3da;background:#fff;color:#123F63;font:600 12.5px var(--font-portal),sans-serif;cursor:pointer;white-space:nowrap}.nw-shell .cx-chip:hover{background:#eef6fb}
 .nw-shell .cx-step{display:inline-flex;align-items:center;border:1px solid #c9dce7;border-radius:7px;overflow:hidden;height:26px}.nw-shell .cx-step button{width:24px;height:26px;border:0;background:#f4f8fa;color:#123F63;font-weight:700;cursor:pointer}.nw-shell .cx-step b{min-width:22px;text-align:center;font-family:var(--font-geist-mono),monospace;font-size:13px}
 .nw-shell .cx-from{font-size:11px;font-weight:600;background:#eef6fb;color:#123F63;border-radius:999px;padding:1px 7px;white-space:nowrap}
+/* Referral Voucher in Payables (10 Nov 2026). */
+.nw-shell .rv-panel{margin-bottom:12px}.nw-shell .rv-form{display:flex;flex-wrap:wrap;gap:10px;align-items:end;padding:0 16px 12px}.nw-shell .rv-form label{display:grid;gap:3px;font-size:12.5px;font-weight:600;color:#40606f}
+.nw-shell .rv-form select,.nw-shell .rv-form input{height:32px;border:1px solid #cfdbe3;border-radius:8px;padding:0 8px;font-size:14px;background:#fff;color:#0f2638}.nw-shell .rv-done{margin:0;padding:0 16px 12px}

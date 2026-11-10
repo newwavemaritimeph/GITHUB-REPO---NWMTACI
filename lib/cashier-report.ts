@@ -12,11 +12,11 @@ import type { CashierReportSnapshot } from "@/lib/documents";
  */
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
-export const SOURCES = ["Direct walk-ins", "Agencies", "Consultancies"] as const;
-export type SourceKind = "Direct walk-in" | "Agency" | "Consultancy";
+export const SOURCES = ["Direct walk-ins", "Agencies", "Consultancies", "Freelance"] as const;
+export type SourceKind = "Direct walk-in" | "Agency" | "Consultancy" | "Freelance";
 export type CollectionRow = { paymentId?: string; rebateCentavos?: number; rebateStatus?: string; receipt: string; time: string; trainee: string; course: string; channel: string; reference: string; amountCentavos: number; kind: SourceKind; agency: string; proof?: boolean; receivedAt?: string; codes?: string; valid?: boolean; voidReason?: string | null; verificationState?: string | null };
 
-const sourceOf = (kind: SourceKind) => (kind === "Direct walk-in" ? "Direct walk-ins" : kind === "Agency" ? "Agencies" : "Consultancies");
+const sourceOf = (kind: SourceKind) => (kind === "Direct walk-in" ? "Direct walk-ins" : kind === "Agency" ? "Agencies" : kind === "Freelance" ? "Freelance" : "Consultancies");
 
 /** The summary matrix (source × channel) and the receipts grouped by source and agency name. */
 export function collectionsBySource(rows: CollectionRow[], channelOrder: string[]) {
@@ -30,7 +30,7 @@ export function collectionsBySource(rows: CollectionRow[], channelOrder: string[
       totalCentavos: list.reduce((s, r) => s + r.amountCentavos, 0),
     };
   });
-  const order: SourceKind[] = ["Direct walk-in", "Agency", "Consultancy"];
+  const order: SourceKind[] = ["Direct walk-in", "Agency", "Consultancy", "Freelance"];
   const keyed = new Map<string, { kind: SourceKind; name: string; rows: CollectionRow[] }>();
   for (const r of rows) {
     const key = `${r.kind}|${r.kind === "Direct walk-in" ? "" : r.agency}`;
@@ -96,7 +96,7 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
     // The paid course's own partner (owner, 3 Nov 2026), not the trainee's earlier one.
     const agencyId = mine.map((a) => agencyOfEnrollment.get(a.enrollment_id) ?? one(a.enrollments as { referral_agency_id?: string | null } | null)?.referral_agency_id).find(Boolean) ?? null;
     const agency = agencyId ? agencyById.get(agencyId) : undefined;
-    const kind: SourceKind = !agency ? "Direct walk-in" : agency.kind === "Consultancy" ? "Consultancy" : "Agency";
+    const kind: SourceKind = !agency ? "Direct walk-in" : agency.kind === "Consultancy" ? "Consultancy" : agency.kind === "Freelance" ? "Freelance" : "Agency";
     const courses = [...new Set(mine.map((a) => { const c = one(one(a.enrollments as { courses?: unknown } | null)?.courses as { code?: string; name?: string } | null); return c?.name ? `${c.name}${c.code ? ` (${c.code})` : ""}` : ""; }).filter(Boolean))];
     const rebate = mine.map((a) => rebateOfEnrollment.get(a.enrollment_id)).find(Boolean);
     const codes = [...new Set(mine.map((a) => one(one(a.enrollments as { courses?: unknown } | null)?.courses as { code?: string } | null)?.code).filter(Boolean))].join(", ");

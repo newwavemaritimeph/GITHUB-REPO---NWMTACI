@@ -422,11 +422,42 @@ export function AccountingReceivables({ data }: { data: PortalData }) {
 }
 
 const PAYABLE_TABS = ["Open", "Due this week", "Overdue", "Paid"] as const;
+/**
+ * Referral Voucher, Design 1 (owner, 10 Nov 2026): Accounting picks a partner (Agency, Consultancy or Freelance) and the dates;
+ * the voucher lists every trainee that partner endorsed in those dates with the rebate, and is kept as issued (RV No.).
+ */
+function ReferralVoucherPanel({ data, busy, post, onClose }: { data: PortalData; busy: boolean; post: (body: Record<string, unknown>, ok?: string) => Promise<Record<string, unknown> | undefined>; onClose: () => void }) {
+  const today = manilaToday();
+  const partners = data.agencies.filter((a) => a.active).sort((a, b) => a.name.localeCompare(b.name));
+  const [agencyId, setAgencyId] = useState(partners[0]?.id ?? ""), [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today);
+  const [issued, setIssued] = useState<{ id: string; number: string } | null>(null);
+  const nameOf = (id: string) => data.agencies.find((a) => a.id === id)?.name ?? "Partner";
+  async function generate() {
+    setIssued(null);
+    try { const r = await post({ action: "referral-voucher-issue", agencyId, from, to }, "Referral Voucher issued."); if (r?.id) setIssued({ id: String(r.id), number: String(r.number) }); }
+    catch { /* the page shows the error */ }
+  }
+  const list = data.referralVouchers ?? [];
+  return <section className="portal-panel cx-panel rv-panel">
+    <div className="panel-heading"><h2>Referral Voucher</h2><button type="button" className="portal-secondary row-act" onClick={onClose}>Close</button></div>
+    <div className="rv-form">
+      <label>Partner<select value={agencyId} onChange={(e) => setAgencyId(e.target.value)}>{partners.map((a) => <option key={a.id} value={a.id}>{a.name} · {a.kind === "Consultancy" || a.kind === "Freelance" ? a.kind : "Agency"}</option>)}</select></label>
+      <label>From<input type="date" value={from} max={today} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label>
+      <label>To<input type="date" value={to} max={today} onChange={(e) => e.target.value && setTo(e.target.value)} /></label>
+      <button type="button" className="portal-primary row-act" disabled={busy || !agencyId || to < from} onClick={() => void generate()}>{busy ? "Issuing…" : "Generate"}</button>
+    </div>
+    {issued && <p className="rv-done"><a className="portal-secondary row-act" href={`/api/documents/referral-voucher/${issued.id}`} target="_blank" rel="noreferrer">Open {issued.number}</a></p>}
+    {list.length > 0 && <div className="portal-table cx-cards"><table><thead><tr><th>Voucher</th><th>Partner</th><th>Period</th><th className="r">Total</th><th></th></tr></thead><tbody>
+      {list.map((v) => <tr key={v.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{v.voucher_number}</span><small>{fmtDate(manilaDay(v.issued_at))}</small></td><td data-l="Partner">{nameOf(v.agency_id)}</td><td data-l="Period">{fmtDate(v.period_from)} – {fmtDate(v.period_to)}</td><td data-l="Total" className="r"><strong className="cx-amt">{pesos2(Number(v.total_centavos))}</strong></td><td data-l=""><ViewIcon label={`View ${v.voucher_number}`} href={`/api/documents/referral-voucher/${v.id}`} /></td></tr>)}
+    </tbody></table></div>}
+  </section>;
+}
+
 /** Payables: bills and fees New Wave owes, plus rebates owed to no-deduction partners. Mark paid records the settlement. */
 export function AccountingPayables({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   const today = manilaToday(), weekEnd = addDays(today, 7), monthStart = `${today.slice(0, 8)}01`;
   const { busy, msg, post } = usePost(reload);
-  const [tab, setTab] = useState<(typeof PAYABLE_TABS)[number]>("Open");
+  const [tab, setTab] = useState<(typeof PAYABLE_TABS)[number]>("Open"), [voucherOpen, setVoucherOpen] = useState(false);
   type Item = { id: string; payee: string; kind: string; what: string; due: string | null; amount: number; paid: boolean; paidOn: string | null; settle: () => Promise<unknown> };
   const bills: Item[] = (data.payables as (PortalData["payables"][number] & { paid_at?: string | null })[]).map((p) => ({ id: p.id, payee: p.description, kind: "Bills and fees", what: "", due: p.due_on ?? null, amount: Number(p.amount_centavos), paid: p.status === "Paid", paidOn: day(p.paid_at), settle: () => post({ action: "payable-mark-paid", id: p.id }, "Marked paid.") }));
   const rebates: Item[] = (data.agencyRebates as (PortalData["agencyRebates"][number] & { settlement?: string | null })[]).filter((r) => r.status === "Pending" || (r.status === "Paid" && !(r.settlement ?? "").startsWith("Deducted"))).map((r) => {
@@ -443,8 +474,9 @@ export function AccountingPayables({ data, reload }: { data: PortalData; reload:
   const kinds = ["Bills and fees", "Agency rebates"].map((k, n) => { const l = open.filter((i) => i.kind === k); return { name: k, color: n ? "#F25615" : "#0571D0", count: l.length, amount: l.reduce((s, i) => s + i.amount, 0) }; });
   const sum = (l: Item[]) => pesos2(l.reduce((s, i) => s + i.amount, 0));
   return <div className="portal-page cx ac">
-    <TxHead title="Payables" note={<>Amounts New Wave owes · as of {fmtDate(today)}</>} />
+    <TxHead title="Payables" note={<>Amounts New Wave owes · as of {fmtDate(today)}</>} right={<button type="button" className="portal-primary row-act" onClick={() => setVoucherOpen((v) => !v)}>Referral Voucher</button>} />
     {msg && <Message kind={msg.kind} text={msg.text} />}
+    {voucherOpen && <ReferralVoucherPanel data={data} busy={busy} post={post} onClose={() => setVoucherOpen(false)} />}
     <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Owed Now</h2></div><FigureColumn rows={kinds} unit="item" totalLabel="Total owed" /></section>
@@ -839,7 +871,7 @@ export function BillingStatementReport({ switcher, onBack }: { switcher?: ReactN
     try { await act({ action: "billing-statement-void", billingStatementId: st.statementId, reason: reason.trim() }); setVersion((v) => v + 1); }
     catch (e) { setProblem(e instanceof Error ? e.message : "Could not void the statement."); }
   }
-  const groups = (["Agency", "Consultancy"] as const).map((k) => [k, list.filter((x) => (x.kind === "Consultancy" ? "Consultancy" : "Agency") === k)] as const).filter(([, xs]) => xs.length);
+  const groups = (["Agency", "Consultancy", "Freelance"] as const).map((k) => [k, list.filter((x) => (x.kind === "Consultancy" ? "Consultancy" : x.kind === "Freelance" ? "Freelance" : "Agency") === k)] as const).filter(([, xs]) => xs.length);
   return <div className="portal-page cx ac">
     <div className="cx-head"><div><span className="portal-eyebrow">Accounting · Company Charge</span><h1>Issue Statement</h1></div>
       <div className="ac-controls">{onBack && <button type="button" className="portal-secondary" onClick={onBack}>Back to Company Charge</button>}{st && (issued ? <><a className="portal-primary" href={pdfUrl} target="_blank" rel="noreferrer">Reprint PDF</a><button type="button" className="portal-secondary" disabled={busy} onClick={() => void voidIt()}>Void Statement</button></> : <button type="button" className="portal-primary" disabled={busy || !st.rows.length} onClick={() => void issue()}>{busy ? "Issuing…" : "Issue and Print PDF"}</button>)}</div></div>
@@ -847,7 +879,7 @@ export function BillingStatementReport({ switcher, onBack }: { switcher?: ReactN
     <div className="pd-bar cs-bar">
       <label className="rp-who">Bill To<select value={st?.agencyId ?? ""} onChange={(e) => setAgency(e.target.value)} disabled={!list.length}>
         {!list.length && <option value="">No Company Charge Trainees</option>}
-        {groups.map(([k, xs]) => <optgroup key={k} label={k === "Consultancy" ? "Consultancies" : "Agencies"}>{xs.map((x) => <option key={x.agencyId} value={x.agencyId}>{x.billTo}</option>)}</optgroup>)}
+        {groups.map(([k, xs]) => <optgroup key={k} label={k === "Consultancy" ? "Consultancies" : k === "Freelance" ? "Freelance" : "Agencies"}>{xs.map((x) => <option key={x.agencyId} value={x.agencyId}>{x.billTo}</option>)}</optgroup>)}
       </select></label>
       <label className="rp-who">From<input type="date" value={from} max={to} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label>
       <label className="rp-who">To<input type="date" value={to} min={from} max={today} onChange={(e) => e.target.value && setTo(e.target.value)} /></label>

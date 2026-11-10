@@ -1447,7 +1447,7 @@ function PartnersModule({ data, busy, post }: { data: AccountingData; busy: bool
     {adding && <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Add Partner</h2></div>
       <div className="pm-form">
         <label>Name<input autoFocus value={adding.name} maxLength={120} onChange={(e) => setAdding({ ...adding, name: e.target.value })} placeholder="e.g. Blue Anchor Consultancy" /></label>
-        <label>Type<select value={adding.kind} onChange={(e) => setAdding({ ...adding, kind: e.target.value })}><option>Agency</option><option>Consultancy</option></select></label>
+        <label>Type<select value={adding.kind} onChange={(e) => setAdding({ ...adding, kind: e.target.value })}><option>Agency</option><option>Consultancy</option><option>Freelance</option></select></label>
         <label>Contact Person<input value={adding.contact} maxLength={120} onChange={(e) => setAdding({ ...adding, contact: e.target.value })} /></label>
         <label>Email<input type="email" value={adding.email} onChange={(e) => setAdding({ ...adding, email: e.target.value })} /></label>
         <label>Mobile<input value={adding.mobile} maxLength={40} onChange={(e) => setAdding({ ...adding, mobile: e.target.value })} /></label>
@@ -1477,7 +1477,7 @@ function PartnersModule({ data, busy, post }: { data: AccountingData; busy: bool
           </tr>
           {open === r.id && <tr className="pm-details"><td colSpan={span}><div className="pm-form">
             <label>Name<input value={r.name} maxLength={120} onChange={(e) => set(r.id, { name: e.target.value })} /></label>
-            <label>Type<select value={r.kind} onChange={(e) => set(r.id, { kind: e.target.value })}><option>Agency</option><option>Consultancy</option></select></label>
+            <label>Type<select value={r.kind} onChange={(e) => set(r.id, { kind: e.target.value })}><option>Agency</option><option>Consultancy</option><option>Freelance</option></select></label>
             <label>Contact Person<input value={r.contact} maxLength={120} onChange={(e) => set(r.id, { contact: e.target.value })} /></label>
             <label>Email<input type="email" value={r.email} onChange={(e) => set(r.id, { email: e.target.value })} /></label>
             <label>Mobile<input value={r.mobile} maxLength={40} onChange={(e) => set(r.id, { mobile: e.target.value })} /></label>

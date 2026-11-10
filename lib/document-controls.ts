@@ -14,6 +14,7 @@ export const DOCUMENT_FORMS = [
   { code: "expense_voucher", name: "Expense Voucher", group: "Accounting", start: { revisionNo: "01", issuedDate: "11/05/2026" } },
   { code: "expenses_summary", name: "Expenses Summary", group: "Accounting" },
   { code: "billing_statement", name: "Billing Statement", group: "Accounting", start: { formNo: "NW-FMGR-04-24", issuedDate: "12/03/2025" } },
+  { code: "referral_voucher", name: "Referral Voucher", group: "Accounting" },
   { code: "company_receipt", name: "Company Receipt", group: "Accounting", start: { formNo: "NW-FMGR-04-24", issuedDate: "12/03/2025" } },
   { code: "cash_sales_summary", name: "Cash and Sales Summary", group: "Accounting" },
   { code: "endorsed_courses", name: "Endorsed Courses", group: "Accounting" },

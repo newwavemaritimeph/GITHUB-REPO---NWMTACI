@@ -496,7 +496,7 @@ export function CourseSourceCell({ data, enrollment: e, busy, post }: { data: Po
     </select>
     {src === "Agency" && <select value={current?.id ?? ""} disabled={busy} aria-label="Partner" onChange={(ev) => { if (ev.target.value) save("Agency", ev.target.value); }}>
       <option value="">Choose the partner…</option>
-      {(["Agency", "Consultancy"] as const).map((k) => { const list = partners.filter((a) => (a.kind === "Consultancy" ? "Consultancy" : "Agency") === k); return list.length ? <optgroup key={k} label={k === "Agency" ? "Agencies" : "Consultancies"}>{list.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</optgroup> : null; })}
+      {(["Agency", "Consultancy", "Freelance"] as const).map((k) => { const list = partners.filter((a) => (a.kind === "Consultancy" ? "Consultancy" : a.kind === "Freelance" ? "Freelance" : "Agency") === k); return list.length ? <optgroup key={k} label={k === "Agency" ? "Agencies" : k === "Freelance" ? "Freelance" : "Consultancies"}>{list.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</optgroup> : null; })}
     </select>}
   </span>;
 }
@@ -514,7 +514,7 @@ export function SourcePicker({ data, enrollment: e, busy, post }: { data: Portal
     </select></label>
     {src === "Agency" && <label><span>Partner</span><select value={current?.id ?? ""} disabled={busy} onChange={(ev) => { if (ev.target.value) save("Agency", ev.target.value); }}>
       <option value="">Choose the partner…</option>
-      {(["Agency", "Consultancy"] as const).map((k) => { const list = partners.filter((a) => (a.kind === "Consultancy" ? "Consultancy" : "Agency") === k); return list.length ? <optgroup key={k} label={k === "Agency" ? "Agencies" : "Consultancies"}>{list.map((a) => <option key={a.id} value={a.id}>{a.name}{a.rebate_mode === COMPANY_CHARGE ? " · Company Charge" : ""}</option>)}</optgroup> : null; })}
+      {(["Agency", "Consultancy", "Freelance"] as const).map((k) => { const list = partners.filter((a) => (a.kind === "Consultancy" ? "Consultancy" : a.kind === "Freelance" ? "Freelance" : "Agency") === k); return list.length ? <optgroup key={k} label={k === "Agency" ? "Agencies" : k === "Freelance" ? "Freelance" : "Consultancies"}>{list.map((a) => <option key={a.id} value={a.id}>{a.name}{a.rebate_mode === COMPANY_CHARGE ? " · Company Charge" : ""}</option>)}</optgroup> : null; })}
     </select></label>}
   </div>;
 }
