@@ -110,37 +110,37 @@ export function ReleasingDashboard({ data, reload }: { data: ReleasingData; relo
     <div className="metric-grid">{stats.map(([label, value, note], i) => <article key={label}><div className={`metric-symbol symbol-${i}`}>{["◷", "▤", "◈", "◎", "▦", "✓"][i]}</div><span>{tcl(label)}</span><strong>{value}</strong><small>{note}</small></article>)}</div>
     {needsTotal > 0 && <div className="portal-message" role="status" style={{ marginTop: 12 }}>⚠ {needsTotal} record{needsTotal === 1 ? "" : "s"} need attention</div>}
     <section className="portal-panel" style={{ marginTop: 16, padding: 14 }}>
-      <div className="panel-heading"><div><h2>Certificate Pipeline</h2><p>Where every certificate currently sits</p></div></div>
+      <div className="panel-heading"><div><h2>Certificate Pipeline</h2></div></div>
       <div className="pipeline">{pipeline.map(([label, n], i) => <span key={label}><b>{n}</b>{tcl(label)}{i < pipeline.length - 1 && <i aria-hidden>→</i>}</span>)}</div>
     </section>
     <section className="portal-panel" style={{ marginTop: 16 }}>
-      <div className="panel-heading"><div><h2>Ready for Release</h2><p>Printed certificates that can be claimed</p></div><span className="slot-count">{ready.length}</span></div>
+      <div className="panel-heading"><div><h2>Ready for Release</h2></div><span className="slot-count">{ready.length}</span></div>
       <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Course</th><th>Training Date</th><th>Certificate</th><th>Release Method</th><th>Status</th><th>Action</th></tr></thead><tbody>
         {ready.slice(0, 25).map((c) => { const ch = statusChip(c); return <tr key={c.id}><td><strong>{nameOf(c)}</strong></td><td>{courseOf(c)}</td><td>{trainingEnd(c) ? fmtDate(trainingEnd(c) as string) : "—"}</td><td>{certNo(c)}</td><td>{method(c)}</td><td><span className={`portal-badge ${ch.cls}`}>{ch.text}</span></td><td className="document-actions"><button type="button" onClick={() => setRelease({ enrollmentId: c.enrollment_id, name: nameOf(c), course: courseOf(c), certNo: certNo(c) })}>View / Release</button></td></tr>; })}
       </tbody></table>{!ready.length && <p className="portal-empty-copy">Nothing ready for release.</p>}</div>
     </section>
     <div className="dashboard-panels">
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Needs Attention</h2><p>Blocked or incomplete releases</p></div><span className="slot-count">{needsTotal}</span></div>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Needs Attention</h2></div><span className="slot-count">{needsTotal}</span></div>
         {needs.map((n) => <div className="live-row-item" key={n.label}><div><strong>{n.items.length} — {n.label}</strong><small>{n.items.slice(0, 3).map((c) => nameOf(c)).join(", ")}{n.items.length > 3 ? "…" : ""}</small></div><span className="portal-badge pending">Review</span></div>)}
         {!needs.length && <p className="portal-empty-copy">Nothing blocked.</p>}
       </section>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Today&apos;s Pickup Queue</h2><p>Expected at the office today</p></div><span className="slot-count">{pickupToday.length}</span></div>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Today&apos;s Pickup Queue</h2></div><span className="slot-count">{pickupToday.length}</span></div>
         {pickupToday.slice(0, 12).map((c) => <div className="live-row-item" key={c.id}><div><strong>{nameOf(c)}</strong><small>{courseOf(c)} · claimant: {c.claimant_name ?? (method(c) === "Representative" ? "representative" : "self")}</small></div><span className={`portal-badge ${method(c) === "Representative" && !c.authorization_checked ? "pending" : "active"}`}>{method(c) === "Representative" && !c.authorization_checked ? "Verify SPA" : "Waiting"}</span></div>)}
         {!pickupToday.length && <p className="portal-empty-copy">No pickups expected today.</p>}
       </section>
     </div>
     <section className="portal-panel" style={{ marginTop: 16 }}>
-      <div className="panel-heading"><div><h2>Courier / LBC</h2><p>Certificates to be shipped</p></div><span className="slot-count">{forCourier.length}</span></div>
+      <div className="panel-heading"><div><h2>Courier / LBC</h2></div><span className="slot-count">{forCourier.length}</span></div>
       <div className="portal-table"><table><thead><tr><th>Trainee</th><th>Destination</th><th>Courier</th><th>Payment</th><th>Tracking</th><th>Status</th></tr></thead><tbody>
         {forCourier.slice(0, 20).map((c) => <tr key={c.id}><td><strong>{nameOf(c)}</strong></td><td>{c.shipping_address ?? <span className="portal-badge cancelled">Missing</span>}</td><td>{c.courier_name ?? "LBC"}</td><td>{(c.shipping_fee_status ?? "Pending") === "Paid" ? <span className="portal-badge active">Paid</span> : <span className="portal-badge pending">Pending</span>}</td><td>{c.tracking_number ?? "—"}</td><td>{c.courier_status ?? "For Booking"}</td></tr>)}
       </tbody></table>{!forCourier.length && <p className="portal-empty-copy">No courier releases queued.</p>}</div>
     </section>
     <div className="dashboard-panels">
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Released Today</h2><p>Most recent completed releases</p></div><span className="slot-count">{releasedToday.length}</span></div>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Released Today</h2></div><span className="slot-count">{releasedToday.length}</span></div>
         {releasedToday.slice(0, 15).map((c) => <div className="live-row-item" key={c.id}><div><strong>{nameOf(c)}</strong><small>{courseOf(c)} · to {c.claimant_name ?? "self"}{c.release_method ? ` · ${c.release_method}` : ""}</small></div><span className="portal-badge active">Released</span></div>)}
         {!releasedToday.length && <p className="portal-empty-copy">No certificates released today.</p>}
       </section>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Certificate Corrections</h2><p>Returned for correction</p></div><span className="slot-count">{corrections.length}</span></div>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Certificate Corrections</h2></div><span className="slot-count">{corrections.length}</span></div>
         {corrections.slice(0, 12).map((c) => <div className="live-row-item" key={c.id}><div><strong>{nameOf(c)}</strong><small>{courseOf(c)} · {c.issue_note ?? "Correction requested"}{c.issue_reported_on ? ` · ${fmtDate(c.issue_reported_on)}` : ""}</small></div><button type="button" className="ghost-button" onClick={() => void post({ action: "certificate-issue-report", enrollmentId: c.enrollment_id, issueStatus: "Resolved" })}>Mark Resolved</button></div>)}
         {!corrections.length && <p className="portal-empty-copy">No certificates flagged for correction.</p>}
       </section>
@@ -242,7 +242,7 @@ export function LiveReleasing({ data, role, reload }: { data: ReleasingData; rol
 
   return (
     <div className="portal-page">
-      <div className="portal-heading"><div><span className="portal-eyebrow">Releasing officer</span><h1>Training Certificates</h1><p>Issue, print, release, and monitor in-house training certificates.</p></div></div>
+      <div className="portal-heading"><div><span className="portal-eyebrow">Releasing officer</span><h1>Training Certificates</h1></div></div>
       <div className="portal-tabs">{(["Register", "Templates", "Released report"] as const).map((t) => <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{tcl(t)}</button>)}</div>
       {message && <div className="portal-message error" role="alert">{message}</div>}
       <div className="portal-panel" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap", padding: "12px 14px", marginBottom: 12 }}>

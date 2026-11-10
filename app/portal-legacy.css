@@ -2993,3 +2993,45 @@ button.rd-row:hover { background: #f6fafc; }
 /* New-arrival chime: the sound switch and the note (10 Nov 2026). */
 .nw-sound{height:30px;padding:0 10px;border-radius:999px;border:1px solid #ffffff55;background:transparent;color:#fff;font:600 12.5px var(--font-portal),sans-serif;cursor:pointer;white-space:nowrap}.nw-sound[aria-pressed=false]{opacity:.65}
 .nw-arrival{position:fixed;right:max(16px,env(safe-area-inset-right,0px));top:calc(70px + env(safe-area-inset-top,0px));z-index:60;background:#F25615;color:#fff;border:0;border-radius:12px;padding:10px 16px;font:700 14.5px var(--font-portal),sans-serif;box-shadow:0 12px 30px #0f263840;cursor:pointer}
+
+/* ---- Portal-wide consistency (owner, 10 Nov 2026: "Apply these to all screens and modules of the whole web portal").
+   Loaded last, so it evens out every screen: compact headings, two-column forms, one button size, tab rows as one
+   segmented bar, row actions as small outlined buttons, even table spacing. ---- */
+.nw-shell .portal-workspace :is(.portal-primary, .portal-secondary), .portal-modal :is(.portal-primary, .portal-secondary) { font-size: 14.5px; padding: 8px 14px; min-height: 38px; border-radius: 9px; gap: 6px; line-height: 1.2; }
+.nw-shell .portal-workspace :is(.portal-primary, .portal-secondary).row-act { min-height: 32px; height: auto; padding: 5px 11px; font-size: 13.5px; border-radius: 8px; }
+.nw-shell .portal-workspace .portal-secondary:hover:not(:disabled) { background: #e6f6fd; }
+.nw-shell .portal-workspace .portal-primary:hover:not(:disabled) { filter: brightness(.96); }
+.nw-shell .document-actions { gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+.nw-shell .document-actions > :is(button, a):not(.portal-primary):not(.portal-secondary):not(.is-generated):not(.view-icon) {
+  min-height: 32px; padding: 5px 11px; border-radius: 8px; border: 1px solid #b9dcec; background: #fff; color: #0571D0;
+  font: 600 13.5px var(--font-portal), sans-serif; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; white-space: nowrap;
+}
+.nw-shell .document-actions > :is(button, a):not(.portal-primary):not(.portal-secondary):not(.is-generated):not(.view-icon):hover:not(:disabled) { background: #e6f6fd; }
+.nw-shell .document-actions > button:disabled { opacity: .5; cursor: not-allowed; }
+.nw-shell .panel-heading { padding: 12px 16px; gap: 10px; }
+.nw-shell .panel-heading h2 { font-size: 17px; }
+.nw-shell .portal-heading h1, .nw-shell .cx-head h1 { line-height: 1.15; }
+.nw-shell .portal-form { gap: 12px 14px; }
+.nw-shell .portal-form label { font-size: 13.5px; font-weight: 600; color: #3d5466; min-width: 0; }
+.nw-shell .portal-form label:not(:has(input[type=checkbox], input[type=radio])) { display: grid; gap: 5px; }
+.portal-modal .portal-form { padding: 18px 22px 22px; }
+.nw-shell .portal-form-actions, .portal-modal .portal-form-actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.nw-shell .portal-form-note, .portal-modal .portal-form-note { color: #5b7587; font-size: 13px; margin: 0; }
+.nw-shell .portal-tabs { display: flex; gap: 4px; padding: 4px; margin: 0 0 14px; background: #fff; border: 1px solid #d6e9f1; border-radius: 12px; overflow-x: auto; scrollbar-width: none; }
+.nw-shell .portal-tabs::-webkit-scrollbar { display: none; }
+.nw-shell .portal-tabs button { flex: none; border: 0; background: none; padding: 8px 14px; border-radius: 9px; font: 600 14.5px var(--font-portal), sans-serif; color: #5b7587; white-space: nowrap; cursor: pointer; box-shadow: none; }
+.nw-shell .portal-tabs button:hover { background: #eef7fc; color: #123F63; }
+.nw-shell .portal-tabs button.active, .nw-shell .portal-tabs button[aria-selected=true] { background: #123F63; color: #fff; }
+.nw-shell .portal-table :is(th, td) { padding: 10px 14px; vertical-align: middle; }
+.nw-shell .portal-table th { font-size: 13px; font-weight: 700; color: #0b4f8f; white-space: nowrap; }
+.nw-shell .portal-table td small { display: block; color: #5b7587; font-size: 12.5px; }
+.nw-shell .portal-empty-copy { padding: 14px 16px !important; font-size: 14px; margin: 0; }
+.nw-shell .live-row-item { padding: 10px 16px; gap: 12px; }
+.nw-shell .live-row-item strong { font-size: 14.5px; } .nw-shell .live-row-item small { font-size: 13px; }
+@media (max-width: 640px) {
+  .nw-shell .panel-heading { padding: 10px 12px; }
+  .nw-shell .portal-tabs { margin-bottom: 10px; }
+  .nw-shell .portal-tabs button { padding: 7px 11px; font-size: 13.5px; }
+  .nw-shell .document-actions { justify-content: flex-start; }
+  .portal-modal .portal-form { padding: 14px 14px 18px; }
+}

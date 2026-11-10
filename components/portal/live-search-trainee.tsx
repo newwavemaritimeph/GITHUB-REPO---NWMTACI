@@ -34,7 +34,7 @@ export function LiveSearchTrainee({ data }: { data: SearchData }) {
   return (
     <div className="portal-page">
       <div className="portal-heading">
-        <div><span className="portal-eyebrow">Administration</span><h1>Search Trainee</h1><p>Look up any trainee by name, number, email, or mobile — then review their enrollments and payments.</p></div>
+        <div><span className="portal-eyebrow">Administration</span><h1>Search Trainee</h1></div>
       </div>
 
       <section className="portal-panel">
@@ -73,7 +73,7 @@ export function LiveSearchTrainee({ data }: { data: SearchData }) {
           </section>
 
           <section className="portal-panel">
-            <div className="panel-heading"><div><h2>Enrollments</h2><p>Courses this trainee is enrolled in</p></div></div>
+            <div className="panel-heading"><div><h2>Enrollments</h2></div></div>
             <div className="portal-table"><table><thead><tr><th>Enrollment</th><th>Course</th><th>Status</th><th>Due</th><th>Paid</th><th>Balance</th></tr></thead><tbody>
               {enrollments.map((e) => { const c = one(e.courses as { name: string } | { name: string }[] | null | undefined); const due = dueCentavos(e); const paid = Number(e.paid_centavos); const balance = Math.max(0, due - paid); return (
                 <tr key={e.id}><td><strong>{e.enrollment_number}</strong></td><td>{c?.name ?? "—"}</td><td>{e.enrollment_status}</td><td>{pesos(due)}</td><td>{pesos(paid)}</td><td><strong>{pesos(balance)}</strong></td></tr>
@@ -83,7 +83,7 @@ export function LiveSearchTrainee({ data }: { data: SearchData }) {
           </section>
 
           <section className="portal-panel">
-            <div className="panel-heading"><div><h2>Payments</h2><p>Posted payment ledger</p></div></div>
+            <div className="panel-heading"><div><h2>Payments</h2></div></div>
             <div className="portal-table"><table><thead><tr><th>Payment</th><th>Method</th><th>Reference</th><th>Received</th><th>State</th><th>Amount</th></tr></thead><tbody>
               {payments.map((p) => (
                 <tr key={p.id}><td><strong>{p.payment_number}</strong></td><td>{p.method}</td><td>{p.reference_number || "—"}</td><td>{when(p.received_at)}</td><td>{p.verification_state}</td><td><strong>{pesos(p.amount_centavos)}</strong></td></tr>

@@ -178,7 +178,7 @@ function AccountingOperations({ data, role, reload, profileName }: { data: Accou
     {msg && <div className="portal-message error" role="alert">{msg}</div>}
 
     <div className="fin-cards">{cards.map((c) => <article key={c.label} style={{ borderLeftColor: c.accent, cursor: c.onClick ? "pointer" : undefined }} onClick={c.onClick}><i style={{ background: `${c.accent}1a`, color: c.accent }}>{c.icon}</i><div><span>{c.label}</span><strong>{c.value}</strong><small>{c.note}</small></div></article>)}</div>
-    {showCash && <section className="portal-panel live-list" style={{ marginTop: 12 }}><div className="panel-heading"><div><h2>Cash and Bank Breakdown</h2><p>Collections per receiving account, less paid expenses</p></div><span className="slot-count">{money(available)}</span></div>{accounts.map(([n, v]) => <div className="live-row-item" key={n}><div><strong>{n}</strong></div><span className="slot-count">{money(v)}</span></div>)}<div className="live-row-item"><div><strong>Less: paid expenses</strong></div><span className="slot-count" style={{ color: "#a52020" }}>−{money(paidExpenses)}</span></div></section>}
+    {showCash && <section className="portal-panel live-list" style={{ marginTop: 12 }}><div className="panel-heading"><div><h2>Cash and Bank Breakdown</h2></div><span className="slot-count">{money(available)}</span></div>{accounts.map(([n, v]) => <div className="live-row-item" key={n}><div><strong>{n}</strong></div><span className="slot-count">{money(v)}</span></div>)}<div className="live-row-item"><div><strong>Less: paid expenses</strong></div><span className="slot-count" style={{ color: "#a52020" }}>−{money(paidExpenses)}</span></div></section>}
 
     <section className="portal-panel" style={{ marginTop: 16, padding: "14px 16px" }}>
       <div className="panel-heading" style={{ padding: 0, marginBottom: 10 }}><div><h2>Needs Your Approval <span className="portal-badge pending" style={{ marginLeft: 8 }}>{approvalsTotal} total</span></h2></div></div>
@@ -191,7 +191,7 @@ function AccountingOperations({ data, role, reload, profileName }: { data: Accou
         <div className="live-row-item"><div><strong>Total</strong></div><span className="slot-count" style={{ color: "#0571d0" }}>{money(collectedSpan)}</span></div>
         <p className="portal-empty-copy" style={{ margin: "6px 0 0" }}>{spanPayments.length} transactions · {verified} verified · {spanPayments.length - verified} for verification</p>
       </section>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Cashier Monitoring</h2><p>Today&apos;s session</p></div><span className={`portal-badge ${closingToday ? (variance === 0 ? "active" : "cancelled") : "pending"}`}>{closingToday?.status ?? "No closing"}</span></div>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Cashier Monitoring</h2></div><span className={`portal-badge ${closingToday ? (variance === 0 ? "active" : "cancelled") : "pending"}`}>{closingToday?.status ?? "No closing"}</span></div>
         {closingToday ? <>
           <div className="live-row-item"><div><strong>Transactions</strong></div><span className="slot-count">{spanPayments.length}</span></div>
           <div className="live-row-item"><div><strong>System cash</strong></div><span className="slot-count">{money(closingToday.expected_cash_centavos)}</span></div>
@@ -200,7 +200,7 @@ function AccountingOperations({ data, role, reload, profileName }: { data: Accou
           <p className="portal-empty-copy" style={{ margin: "6px 0 0" }}>Last transaction: {clock(lastPayment?.received_at)}</p>
         </> : <p className="portal-empty-copy">The cashier has not opened a closing for today.</p>}
       </section>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Receivables</h2><p>Overview</p></div><span className="slot-count">{money(outstanding)}</span></div>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Receivables</h2></div><span className="slot-count">{money(outstanding)}</span></div>
         <div className="live-row-item"><div><strong>Due before training</strong></div><span className="slot-count">{money(beforeTraining)}</span></div>
         <div className="live-row-item"><div><strong>In training</strong></div><span className="slot-count">{money(inTraining)}</span></div>
         <div className="live-row-item"><div><strong>Past due</strong></div><span className="slot-count" style={{ color: pastDue > 0 ? "#a52020" : undefined }}>{money(pastDue)}</span></div>
@@ -209,25 +209,25 @@ function AccountingOperations({ data, role, reload, profileName }: { data: Accou
     </div>
 
     <div className="fin-3col">
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Payables</h2><p>Overview</p></div><span className="slot-count">{money(payablesTotal)}</span></div>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Payables</h2></div><span className="slot-count">{money(payablesTotal)}</span></div>
         <div className="live-row-item"><div><strong>Due today</strong></div><span className="slot-count" style={{ color: dueToday > 0 ? "#a52020" : undefined }}>{money(dueToday)}</span></div>
         <div className="live-row-item"><div><strong>Due this week</strong></div><span className="slot-count">{money(dueWeek)}</span></div>
         <div className="live-row-item"><div><strong>Overdue</strong></div><span className="slot-count" style={{ color: overdue > 0 ? "#a52020" : undefined }}>{money(overdue)}</span></div>
         {topPayees.map((p) => <div className="live-row-item" key={p.id}><div><strong>{p.description}</strong><small>{p.due_on ? `Due ${p.due_on}` : "No due date"}</small></div><span className="slot-count">{money(p.amount_centavos)}</span></div>)}
       </section>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Liquidation Forms</h2><p>Summary</p></div></div>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Liquidation Forms</h2></div></div>
         <div className="voucher-stats"><span><b>{pendingVouchers.length}</b>Pending</span><span><b style={{ color: "#0a7d3b" }}>{approvedVouchers}</b>Approved</span><span><b style={{ color: "#a52020" }}>{rejectedVouchers}</b>Rejected</span></div>
         {recentVouchers.map((e) => <div className="live-row-item" key={e.id}><div><strong>{e.expense_number}</strong><small>{e.payee} · {money(e.amount_centavos)}</small></div><span className={`portal-badge ${e.status === "Pending" ? "pending" : e.status === "Rejected" ? "cancelled" : "active"}`}>{e.status}</span></div>)}
         {!recentVouchers.length && <p className="portal-empty-copy">No vouchers yet.</p>}
       </section>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Recent Financial Activity</h2><p>Latest movements</p></div></div>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Recent Financial Activity</h2></div></div>
         {activity.map((a, i) => <div className="live-row-item" key={i}><div><strong>{a.text}</strong><small>{clock(a.at)}</small></div><span className="slot-count" style={{ color: a.amount < 0 ? "#a52020" : "#0a7d3b" }}>{a.amount < 0 ? "−" : ""}{money(Math.abs(a.amount))}</span></div>)}
         {!activity.length && <p className="portal-empty-copy">No financial activity yet.</p>}
       </section>
     </div>
 
     {canManage && pendingVouchers.length > 0 && <section className="portal-panel" style={{ marginTop: 16 }}>
-      <div className="panel-heading"><div><h2>Vouchers Awaiting Your Approval</h2><p>Approve or reject without leaving the dashboard</p></div><span className="slot-count">{pendingVouchers.length}</span></div>
+      <div className="panel-heading"><div><h2>Vouchers Awaiting Your Approval</h2></div><span className="slot-count">{pendingVouchers.length}</span></div>
       <div className="portal-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Category</th><th>Amount</th><th>Action</th></tr></thead><tbody>
         {pendingVouchers.slice(0, 8).map((e) => <tr key={e.id}><td><strong>{e.expense_number}</strong></td><td>{e.payee}</td><td>{e.category}</td><td>{money(e.amount_centavos)}</td><td className="document-actions"><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: e.id, decision: "Approved" })}>Approve</button><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: e.id, decision: "Rejected" })}>Reject</button></td></tr>)}
       </tbody></table></div>
@@ -354,7 +354,7 @@ export function LiveAccounting({ data, role, reload, go }: { data: AccountingDat
   return (
     <div className="portal-page">
       <div className="portal-heading">
-        <div><span className="portal-eyebrow">Financial control</span><h1>Accounting</h1><p>Collections, disbursements, receivables, and setup — from the live Supabase ledger.</p></div>
+        <div><span className="portal-eyebrow">Financial control</span><h1>Accounting</h1></div>
       </div>
       <div className="portal-tabs">
         {tabs.map((item) => (
@@ -507,7 +507,7 @@ function AccountingOverview({ data, go }: { data: AccountingData; go?: (module: 
   return <>
     <div className="portal-tabs">{(["Daily", "Weekly", "Monthly"] as const).map((s) => <button key={s} type="button" className={span === s ? "active" : ""} onClick={() => setSpan(s)}>{tcl(s)}</button>)}</div>
     <div className="fin-cards">{cards.map((c) => <article key={c.label} style={{ borderLeftColor: c.accent, cursor: c.onClick ? "pointer" : undefined }} onClick={c.onClick}><i style={{ background: `${c.accent}1a`, color: c.accent }}>{c.icon}</i><div><span>{c.label}</span><strong>{c.value}</strong><small>{c.note}</small></div></article>)}</div>
-    {showCash && <section className="portal-panel live-list" style={{ marginTop: 12 }}><div className="panel-heading"><div><h2>Cash and Bank Breakdown</h2><p>Per receiving account, less paid expenses</p></div><span className="slot-count">{money(available)}</span></div>{accounts.map(([n, v]) => <div className="live-row-item" key={n}><div><strong>{n}</strong></div><span className="slot-count">{money(v)}</span></div>)}<div className="live-row-item"><div><strong>Less: paid expenses</strong></div><span className="slot-count" style={{ color: "#a52020" }}>−{money(paidExpenses)}</span></div></section>}
+    {showCash && <section className="portal-panel live-list" style={{ marginTop: 12 }}><div className="panel-heading"><div><h2>Cash and Bank Breakdown</h2></div><span className="slot-count">{money(available)}</span></div>{accounts.map(([n, v]) => <div className="live-row-item" key={n}><div><strong>{n}</strong></div><span className="slot-count">{money(v)}</span></div>)}<div className="live-row-item"><div><strong>Less: paid expenses</strong></div><span className="slot-count" style={{ color: "#a52020" }}>−{money(paidExpenses)}</span></div></section>}
 
     <section className="portal-panel alerts-bar" style={{ marginTop: 16 }}>
       <strong>🔔 Accounting alerts</strong>
@@ -642,7 +642,7 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
   }
 
   return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Cashier / accounting</span><h1>Liquidation Forms</h1><p>Raise cash and expense vouchers; accounting approves, rejects, or marks them paid.</p></div></div>
+    <div className="portal-heading"><div><span className="portal-eyebrow">Cashier / accounting</span><h1>Liquidation Forms</h1></div></div>
     {msg && <div className="portal-message error" role="alert">{msg}</div>}
 
     <section className="portal-panel" style={{ padding: 14, marginBottom: 14, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -707,7 +707,7 @@ function NewVoucherForm({ data, busy, onSave }: { data: AccountingData; busy: bo
   const cents = Math.round(Number(amount) * 100);
   const ready = payee.trim() && category && purpose.trim() && Number.isFinite(cents) && cents > 0;
   return <section className="portal-panel" style={{ marginBottom: 14 }}>
-    <div className="panel-heading"><div><h2>New Voucher</h2><p>Raised for accounting approval</p></div></div>
+    <div className="panel-heading"><div><h2>New Voucher</h2></div></div>
     <div className="portal-form">
       <label>Payee<input value={payee} onChange={(e) => setPayee(e.target.value)} /></label>
       <label>Category<select value={category} onChange={(e) => setCategory(e.target.value)}>{data.expenseCategories.map((c) => <option key={c.id}>{c.name}</option>)}</select></label>
@@ -738,7 +738,7 @@ function RecurringPayables({ data, canManage, busy, post }: { data: AccountingDa
   const money = (c: number) => new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2 }).format((Number(c) || 0) / 100);
   const cents = Math.round(Number(amt) * 100);
   return <section className="portal-panel live-list">
-    <div className="panel-heading"><div><h2>Recurring Monthly Payables</h2><p>Rent, utilities, remittances</p></div><span className="slot-count">{data.payables.length}</span></div>
+    <div className="panel-heading"><div><h2>Recurring Monthly Payables</h2></div><span className="slot-count">{data.payables.length}</span></div>
     {canManage && <div className="portal-form" style={{ padding: "0 0 10px" }}>
       <label className="full">Payable Name<input value={desc} onChange={(e) => setDesc(e.target.value)} placeholder="e.g. Electricity" /></label>
       <label>Default Amount (PHP)<input type="number" min="0" step="0.01" value={amt} onChange={(e) => setAmt(e.target.value)} /></label>
@@ -761,7 +761,7 @@ export function LiveInventory({ data, role, reload }: { data: AccountingData; ro
     catch (e) { setMessage(e instanceof Error ? e.message : "The action could not be completed."); }
     finally { setBusy(false); }
   }
-  return <div className="portal-page"><div className="portal-heading"><div><span className="portal-eyebrow">Accounting</span><h1>Inventory</h1><p>Items with stock-in / stock-out movements</p></div></div>{message && <div className="portal-message error" role="alert">{message}</div>}<Inventory data={data} canManage={canManage} busy={busy} post={post} /></div>;
+  return <div className="portal-page"><div className="portal-heading"><div><span className="portal-eyebrow">Accounting</span><h1>Inventory</h1></div></div>{message && <div className="portal-message error" role="alert">{message}</div>}<Inventory data={data} canManage={canManage} busy={busy} post={post} /></div>;
 }
 
 /* ---- Standalone Expenses module (own left-nav item) ---- */
@@ -829,7 +829,7 @@ function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canM
     <>
       {!canManage && <div className="portal-message error">Only Admin and Accounting can edit courses, centers, and pricing.</div>}
       <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Courses</h2><p>Pick a course from the list to edit, or add a new one</p></div>{canManage && <div style={{ display: "flex", gap: "8px", alignItems: "center" }}><select value="" onChange={(e) => { const c = data.courses.find((x) => x.id === e.target.value); if (c) { setError(""); setEdit({ kind: "course", id: c.id, code: c.code, name: c.name, categoryId: c.category_id ?? defaultCategory, deliveryType: c.delivery_type === "Partner or Endorsed" ? "Partner or Endorsed" : "In-House", durationLabel: c.duration_label ?? "", durationDays: String(c.duration_days ?? 1), mode: c.training_mode ?? "Face-to-Face", price: String(c.standard_price_centavos / 100) }); } }} style={{ maxWidth: 240 }}><option value="">Select a Course…</option>{data.courses.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select><button className="portal-primary" disabled={busy} onClick={() => { setError(""); setEdit({ kind: "course", code: "", name: "", categoryId: defaultCategory, deliveryType: "In-House", durationLabel: "1 Day", durationDays: "1", mode: "Face-to-Face", price: "0" }); }}>+ Add Course</button></div>}</div>
+        <div className="panel-heading"><div><h2>Courses</h2></div>{canManage && <div style={{ display: "flex", gap: "8px", alignItems: "center" }}><select value="" onChange={(e) => { const c = data.courses.find((x) => x.id === e.target.value); if (c) { setError(""); setEdit({ kind: "course", id: c.id, code: c.code, name: c.name, categoryId: c.category_id ?? defaultCategory, deliveryType: c.delivery_type === "Partner or Endorsed" ? "Partner or Endorsed" : "In-House", durationLabel: c.duration_label ?? "", durationDays: String(c.duration_days ?? 1), mode: c.training_mode ?? "Face-to-Face", price: String(c.standard_price_centavos / 100) }); } }} style={{ maxWidth: 240 }}><option value="">Select a Course…</option>{data.courses.map((c) => <option key={c.id} value={c.id}>{c.code} · {c.name}</option>)}</select><button className="portal-primary" disabled={busy} onClick={() => { setError(""); setEdit({ kind: "course", code: "", name: "", categoryId: defaultCategory, deliveryType: "In-House", durationLabel: "1 Day", durationDays: "1", mode: "Face-to-Face", price: "0" }); }}>+ Add Course</button></div>}</div>
         <div className="portal-table"><table><thead><tr><th>Course</th><th>Type</th><th>Duration</th><th>Price</th><th>Edited</th><th></th></tr></thead><tbody>
           {data.courses.map((c) => (
             <tr key={c.id}>
@@ -846,7 +846,7 @@ function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canM
       </section>
 
       <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Training Centers</h2><p>Partner / endorsing centers</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => { setError(""); setEdit({ kind: "center", name: "", email: "", mobile: "" }); }}>+ Add Center</button>}</div>
+        <div className="panel-heading"><div><h2>Training Centers</h2></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => { setError(""); setEdit({ kind: "center", name: "", email: "", mobile: "" }); }}>+ Add Center</button>}</div>
         <div className="portal-table"><table><thead><tr><th>Center</th><th>Status</th><th></th></tr></thead><tbody>
           {data.partnerCenters.map((c) => (
             <tr key={c.id} className={c.active ? "" : "row-muted"}>
@@ -860,7 +860,7 @@ function Pricelist({ data, canManage, busy, post }: { data: AccountingData; canM
       </section>
 
       <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Endorsed Programs (Rates and Rebates)</h2><p>Pick a partner center to see the courses it offers</p></div>{offerCenters.length > 0 && <select value={offerCenter} onChange={(e) => setOfferCenter(e.target.value)} style={{ maxWidth: 240 }}>{offerCenters.map((c) => <option key={c} value={c}>{c}</option>)}</select>}</div>
+        <div className="panel-heading"><div><h2>Endorsed Programs (Rates and Rebates)</h2></div>{offerCenters.length > 0 && <select value={offerCenter} onChange={(e) => setOfferCenter(e.target.value)} style={{ maxWidth: 240 }}>{offerCenters.map((c) => <option key={c} value={c}>{c}</option>)}</select>}</div>
         <div className="portal-table"><table><thead><tr><th>Course</th><th>Duration</th><th>Training Fee</th><th>Rebate</th><th>Partner Payable</th><th>Edited</th><th></th></tr></thead><tbody>
           {data.offers.filter((o) => one(o.partner_centers)?.name === offerCenter).map((o) => {
             const center = one(o.partner_centers)?.name ?? "—"; const course = data.courses.find((c) => c.id === o.course_id)?.name ?? one(o.courses)?.name ?? "—";
@@ -1037,7 +1037,7 @@ function Reconciliation({ payments, channels }: { payments: Payment[]; channels:
 
   return <div className="recon-layout">
     <div>
-      <div className="portal-heading" style={{ marginBottom: 14 }}><div><h2 style={{ margin: 0 }}>Bank / GCash Reconciliation</h2><p>Ensure accuracy. Prevent discrepancies. Strengthen financial integrity.</p></div></div>
+      <div className="portal-heading" style={{ marginBottom: 14 }}><div><h2 style={{ margin: 0 }}>Bank / GCash Reconciliation</h2></div></div>
       <div className="fin-cards" style={{ gridTemplateColumns: "repeat(4, 1fr)" }}>
         <article style={{ borderLeftColor: "#0571d0" }}><i style={{ background: "#0571d01a", color: "#0571d0" }}>▦</i><div><span>Bank account</span><strong>{money(stmtTotal(bank.rows))}</strong><small>Statement · system {money(sysTotal(bankLedger))}</small><small style={{ color: bankDiff === 0 ? "#0a7d3b" : "#a52020" }}>Difference {money(bankDiff)}</small></div></article>
         <article style={{ borderLeftColor: "#0a7d3b" }}><i style={{ background: "#0a7d3b1a", color: "#0a7d3b" }}>◎</i><div><span>GCash account</span><strong>{money(stmtTotal(gcash.rows))}</strong><small>Statement · system {money(sysTotal(gcashLedger))}</small><small style={{ color: gcashDiff === 0 ? "#0a7d3b" : "#a52020" }}>Difference {money(gcashDiff)}</small></div></article>
@@ -1078,7 +1078,7 @@ export function TraineeLookup({ data }: { data: AccountingData }) {
     <>
       {!selected && (
         <section className="portal-panel">
-          <div className="panel-heading"><div><h2>Trainee Lookup</h2><p>Search a trainee by name or SRN to review their enrollments and payments</p></div></div>
+          <div className="panel-heading"><div><h2>Trainee Lookup</h2></div></div>
           <div className="portal-form" style={{ padding: "4px 0" }}>
             <label className="full">Search Name or SRN<input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. Dela Cruz or SRN-99887" /></label>
           </div>
@@ -1100,7 +1100,7 @@ export function TraineeLookup({ data }: { data: AccountingData }) {
             </tbody></table></div>
           </section>
           <section className="portal-panel">
-            <div className="panel-heading"><div><h2>Payments</h2><p>Posted payments for this trainee</p></div></div>
+            <div className="panel-heading"><div><h2>Payments</h2></div></div>
             <div className="portal-table"><table><thead><tr><th>Payment</th><th>Method</th><th>Reference</th><th>Amount</th><th>Verification</th></tr></thead><tbody>
               {payments.map((p, i) => <tr key={p.payment_number ?? i}><td><strong>{p.payment_number ?? "—"}</strong></td><td>{p.method}</td><td>{p.reference_number ?? "—"}</td><td>{pesos(p.amount_centavos)}</td><td>{p.verification_state}</td></tr>)}
               {!payments.length && <tr><td colSpan={5}><span className="portal-empty-copy">No payments.</span></td></tr>}
@@ -1142,14 +1142,14 @@ function Inventory({ data, canManage, busy, post }: { data: AccountingData; canM
         <article><span>Movements</span><strong>{data.inventoryMovements.length}</strong><small>Recent in/out</small></article>
       </div>
       <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Items</h2><p>Stock on hand and value</p></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => { setError(""); setEdit({ name: "", category: "", unit: "pc", unitValue: "0" }); }}>+ Add Item</button>}</div>
+        <div className="panel-heading"><div><h2>Items</h2></div>{canManage && <button className="portal-primary" disabled={busy} onClick={() => { setError(""); setEdit({ name: "", category: "", unit: "pc", unitValue: "0" }); }}>+ Add Item</button>}</div>
         <div className="portal-table"><table><thead><tr><th>Item</th><th>Unit</th><th>On Hand</th><th>Unit Value</th><th>Total</th>{canManage && <th></th>}</tr></thead><tbody>
           {data.inventoryItems.map((i) => <tr key={i.id} className={i.active ? "" : "row-muted"}><td><strong>{i.name}</strong><small>{i.category || "—"}</small></td><td>{i.unit}</td><td><strong>{i.quantity_on_hand}</strong></td><td>{pesos(i.unit_value_centavos)}</td><td>{pesos(Number(i.quantity_on_hand) * Number(i.unit_value_centavos))}</td>{canManage && <td className="document-actions"><button disabled={busy} onClick={() => { setError(""); setMove({ item: i, type: "in", quantity: "", remarks: "" }); }}>Stock in</button><button disabled={busy} onClick={() => { setError(""); setMove({ item: i, type: "out", quantity: "", remarks: "" }); }}>Stock Out</button><button disabled={busy} onClick={() => { setError(""); setEdit({ id: i.id, name: i.name, category: i.category || "", unit: i.unit, unitValue: String(i.unit_value_centavos / 100) }); }}>Edit</button><button disabled={busy} onClick={async () => { if (await askConfirm("Remove this item and its movement history?")) post({ action: "inventory-item-save", id: i.id, name: i.name, remove: true }); }}>Remove</button></td>}</tr>)}
           {!data.inventoryItems.length && <tr><td colSpan={canManage ? 6 : 5}><span className="portal-empty-copy">No items yet.</span></td></tr>}
         </tbody></table></div>
       </section>
       <section className="portal-panel">
-        <div className="panel-heading"><div><h2>Recent Movements</h2><p>Stock in / out history</p></div></div>
+        <div className="panel-heading"><div><h2>Recent Movements</h2></div></div>
         <div className="portal-table"><table><thead><tr><th>Item</th><th>Type</th><th>Qty</th><th>Remarks</th><th>When</th></tr></thead><tbody>
           {data.inventoryMovements.slice(0, 60).map((m) => <tr key={m.id}><td><strong>{one(m.inventory_items)?.name ?? "—"}</strong></td><td>{m.movement_type === "in" ? "Stock in" : "Stock out"}</td><td>{m.movement_type === "in" ? "+" : "−"}{m.quantity}</td><td>{m.remarks || "—"}</td><td>{manilaDay(m.created_at)}</td></tr>)}
           {!data.inventoryMovements.length && <tr><td colSpan={5}><span className="portal-empty-copy">No movements yet.</span></td></tr>}
@@ -1291,7 +1291,7 @@ export function ReceivablesModule({ data }: { data: AccountingData }) {
     .sort((a, b) => bal(b) - bal(a));
   const total = rows.reduce((s, e) => s + bal(e), 0);
   return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Collections</span><h1>Outstanding Receivables</h1><p>Unpaid balances aged against the training date.</p></div></div>
+    <div className="portal-heading"><div><span className="portal-eyebrow">Collections</span><h1>Outstanding Receivables</h1></div></div>
     <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end", margin: "0 0 14px" }}>
       <label className="portal-field-inline">Aging<select value={bucket} onChange={(e) => setBucket(e.target.value as typeof bucket)}><option>All</option><option value="Before training">Before Training</option><option value="In training">In Training</option><option value="Past due">Past Due</option></select></label>
       <label className="portal-field-inline" style={{ minWidth: 260 }}>Search<input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Trainee, course or enrollment" /></label>
@@ -1327,21 +1327,21 @@ export function ApprovalsModule({ data, role, reload }: { data: AccountingData; 
     ? <div className="document-actions"><button type="button" disabled={busy} onClick={onYes}>Approve</button><button type="button" disabled={busy} onClick={onNo}>Reject</button></div>
     : <span className="portal-badge pending">Pending</span>;
   return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Financial control</span><h1>Approvals</h1><p>Everything waiting on an Accounting decision.</p></div><span className="portal-badge pending">{total} pending</span></div>
+    <div className="portal-heading"><div><span className="portal-eyebrow">Financial control</span><h1>Approvals</h1></div><span className="portal-badge pending">{total} pending</span></div>
     {msg && <div className="portal-message error" role="alert">{msg}</div>}
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Liquidation Forms</h2><p>Approve before the cashier can print</p></div><span className="slot-count">{vouchers.length}</span></div>
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Liquidation Forms</h2></div><span className="slot-count">{vouchers.length}</span></div>
       {vouchers.map((e) => <div className="live-row-item" key={e.id}><div><strong>{e.payee}</strong><small>{e.expense_number} · {e.category} · {peso2(e.amount_centavos)}</small></div><Actions onYes={() => void post({ action: "expense-decide", id: e.id, decision: "Approved" })} onNo={() => void post({ action: "expense-decide", id: e.id, decision: "Rejected" })} /></div>)}
       {!vouchers.length && <p className="portal-empty-copy">No vouchers pending.</p>}
     </section>
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Payment Adjustments (Charges)</h2><p>Added to a trainee&apos;s balance</p></div><span className="slot-count">{pendingCharges.length}</span></div>
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Payment Adjustments (Charges)</h2></div><span className="slot-count">{pendingCharges.length}</span></div>
       {pendingCharges.map((ch) => { const enr = one(ch.enrollments); const t = one(enr?.trainees ?? null); return <div className="live-row-item" key={ch.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : enr?.enrollment_number ?? "—"}</strong><small>{ch.description} · {peso2(ch.amount_centavos)}</small></div><Actions onYes={() => void post({ action: "charge-decide", id: ch.id, approve: true })} onNo={() => void post({ action: "charge-decide", id: ch.id, approve: false })} /></div>; })}
       {!pendingCharges.length && <p className="portal-empty-copy">No adjustments pending.</p>}
     </section>
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Fee Waivers and Discounts</h2><p>Deducted from a trainee&apos;s balance</p></div><span className="slot-count">{data.pendingDiscounts.length}</span></div>
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Fee Waivers and Discounts</h2></div><span className="slot-count">{data.pendingDiscounts.length}</span></div>
       {data.pendingDiscounts.map((d) => { const enr = d.enrollments ?? null; const t = one(enr?.trainees ?? null); return <div className="live-row-item" key={d.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : enr?.enrollment_number ?? "—"}</strong><small>{d.description} · {peso2(d.amount_centavos)}</small></div><Actions onYes={() => void post({ action: "discount-decide", id: d.id, approve: true })} onNo={() => void post({ action: "discount-decide", id: d.id, approve: false })} /></div>; })}
       {!data.pendingDiscounts.length && <p className="portal-empty-copy">No waivers pending.</p>}
     </section>
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Change Requests</h2><p>Batch, course, make-up, cancellation and refund — priced by the Cashier</p></div><span className="slot-count">{refunds.length}</span></div>
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Change Requests</h2></div><span className="slot-count">{refunds.length}</span></div>
       {refunds.map((r) => { const t = one(r.trainees as { legal_first_name: string; legal_last_name: string } | { legal_first_name: string; legal_last_name: string }[] | null | undefined); const amt = r.requested_values?.amountCentavos; const ch = one(r.enrollment_charges ?? null); const enr = one(r.enrollments ?? null); return <div className="live-row-item" key={r.id}><div><strong>{t ? `${t.legal_first_name} ${t.legal_last_name}` : r.request_number}</strong><small>{r.request_type === "Rescheduling" ? "Change batch / reschedule" : r.request_type}{enr ? ` · ${enr.enrollment_number}` : ""}{amt ? ` · refund ${peso2(amt)}` : ""}{ch ? ` · charge ${peso2(ch.amount_centavos)}` : r.stage === "For approval" ? " · no charge" : ""}{data.chargeCollected?.[r.id] ? (data.chargeCollected[r.id].paid ? " · fee paid ✓" : ` · fee not paid yet (${peso2(data.chargeCollected[r.id].collected)} of ${peso2(data.chargeCollected[r.id].amount)}) — approve after payment`) : ""} · {r.reason}</small></div><Actions onYes={() => void post({ action: "request-decide", id: r.id, approve: true })} onNo={async () => { const remarks = await askReason("Why is this rejected?", REJECT_REASONS.request, { title: "Reject Request", okLabel: "Reject", danger: true }) ?? undefined; void post({ action: "request-decide", id: r.id, approve: false, remarks }); }} /></div>; })}
       {!refunds.length && <p className="portal-empty-copy">No requests pending.</p>}
     </section>
@@ -1363,7 +1363,7 @@ export function PayablesModule({ data }: { data: AccountingData }) {
   const rows = data.payables.filter(match).sort((a, b) => (a.due_on ?? "9999").localeCompare(b.due_on ?? "9999"));
   const total = rows.reduce((s, p) => s + Number(p.amount_centavos), 0);
   return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Payables</span><h1>Accounts Payable</h1><p>Bills, partner-center payments and professional fees.</p></div><span className="portal-badge pending">{peso2(open.reduce((s, p) => s + Number(p.amount_centavos), 0))} open</span></div>
+    <div className="portal-heading"><div><span className="portal-eyebrow">Payables</span><h1>Accounts Payable</h1></div><span className="portal-badge pending">{peso2(open.reduce((s, p) => s + Number(p.amount_centavos), 0))} open</span></div>
     <div className="portal-tabs">{(["All open", "Due today", "This week", "Overdue", "Paid"] as const).map((t) => <button key={t} type="button" className={tab === t ? "active" : ""} onClick={() => setTab(t)}>{tcl(t)}</button>)}</div>
     <div className="portal-table portal-panel"><table><thead><tr><th>Payee / Particular</th><th>Due Date</th><th>Amount</th><th>Status</th></tr></thead><tbody>
       {rows.map((p) => { const late = p.status !== "Paid" && !!p.due_on && p.due_on < today; return <tr key={p.id}><td><strong>{p.description}</strong></td><td style={late ? { color: "#a52020" } : undefined}>{p.due_on ?? "—"}</td><td>{peso2(p.amount_centavos)}</td><td><span className={`portal-badge ${p.status === "Paid" ? "active" : late ? "cancelled" : "pending"}`}>{late ? "Overdue" : p.status}</span></td></tr>; })}
@@ -1377,7 +1377,7 @@ export function CashPositionModule({ data }: { data: AccountingData }) {
   const collected = accounts.reduce((s, [, v]) => s + v.total, 0);
   const paidExpenses = data.expenses.filter((e) => e.status === "Paid").reduce((s, e) => s + Number(e.amount_centavos), 0);
   return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Cash &amp; bank</span><h1>Cash Position</h1><p>Collections per receiving account, less paid expenses.</p></div><span className="portal-badge active">{peso2(collected - paidExpenses)} available</span></div>
+    <div className="portal-heading"><div><span className="portal-eyebrow">Cash &amp; bank</span><h1>Cash Position</h1></div><span className="portal-badge active">{peso2(collected - paidExpenses)} available</span></div>
     <div className="portal-message" role="status">Derived from posted payments and paid expenses. The schema has no bank-account ledger, so this is a running position, not a reconciled balance.</div>
     <div className="portal-table portal-panel" style={{ marginTop: 12 }}><table><thead><tr><th>Account / Channel</th><th>Payments</th><th>Collected</th></tr></thead><tbody>
       {accounts.map(([name, v]) => <tr key={name}><td><strong>{name}</strong></td><td>{v.count}</td><td>{peso2(v.total)}</td></tr>)}

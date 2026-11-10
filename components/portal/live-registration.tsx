@@ -901,12 +901,12 @@ export function CoursesAndCenters({ data, query }: { data: PortalData; query: st
     </article>; })}{!stcw.length && <p className="portal-empty-copy">No STCW courses match.</p>}</div>}
 
     {tab === "In-House courses" && <section className="portal-panel">
-      <div className="panel-heading"><div><h2>In-House Courses</h2><p>Online · trainees pick a start date; training runs on consecutive days, Monday to Saturday</p></div><label className="portal-field-inline">Category<select value={category} onChange={(e) => setCategory(e.target.value)}><option value="">All Categories</option>{categories.map((c) => <option key={c} value={c}>{c}</option>)}</select></label></div>
+      <div className="panel-heading"><div><h2>In-House Courses</h2></div><label className="portal-field-inline">Category<select value={category} onChange={(e) => setCategory(e.target.value)}><option value="">All Categories</option>{categories.map((c) => <option key={c} value={c}>{c}</option>)}</select></label></div>
       <div className="portal-table"><table><thead><tr><th>Code</th><th>Course</th><th>Category</th><th>Duration</th><th>Modality</th><th>Fee</th></tr></thead><tbody>{others.filter((c) => !category || (first(c.course_categories)?.name ?? "In-House") === category).map((c) => <tr key={c.id}><td><strong>{c.code}</strong></td><td>{c.name}</td><td>{first(c.course_categories)?.name ?? "In-House"}</td><td>{c.duration_label}</td><td>Online</td><td>{pesos(c.standard_price_centavos)}</td></tr>)}</tbody></table>{!others.length && <p className="portal-empty-copy">No courses.</p>}</div>
     </section>}
 
     {tab === "Endorsed programs" && <section className="portal-panel">
-      <div className="panel-heading"><div><h2>Endorsed Programs</h2><p>Offered through partner centers</p></div><label className="portal-field-inline">Partner Center<select value={center} onChange={(e) => setCenter(e.target.value)}>{centers.map((c) => <option key={c}>{c}</option>)}{!centers.length && <option value="">None Yet</option>}</select></label></div>
+      <div className="panel-heading"><div><h2>Endorsed Programs</h2></div><label className="portal-field-inline">Partner Center<select value={center} onChange={(e) => setCenter(e.target.value)}>{centers.map((c) => <option key={c}>{c}</option>)}{!centers.length && <option value="">None Yet</option>}</select></label></div>
       <div className="portal-table"><table><thead><tr><th>Code</th><th>Course</th><th>Duration</th><th>Training Fee</th></tr></thead><tbody>{offers.map(({ offer, course }) => <tr key={offer.id}><td><strong>{course?.code}</strong></td><td>{course?.name}</td><td>{offer.duration_label}</td><td>{pesos(offer.training_fee_centavos)}</td></tr>)}</tbody></table>{!offers.length && <p className="portal-empty-copy">No programs for this center.</p>}</div>
     </section>}
   </div>;

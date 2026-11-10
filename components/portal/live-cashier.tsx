@@ -149,7 +149,7 @@ export function CashierPaymentQueue({ data, onPay, reload }: { data: PortalData;
     </tbody></table>{!rows.length && <p className="portal-empty-copy">No applicants waiting for payment. Registration hands them over once their requirements are complete.</p>}</div>
 
     <section className="portal-panel live-list" style={{ marginTop: 16 }}>
-      <div className="panel-heading"><div><h2>Paid · Training Admission Record</h2><p>Enrolled trainees paid in the last 7 days. The TAR prints twice; more needs Accounting&apos;s approval.</p></div><span className="slot-count">{toPrint.length}</span></div>
+      <div className="panel-heading"><div><h2>Paid · Training Admission Record</h2></div><span className="slot-count">{toPrint.length}</span></div>
       {toPrint.map((t) => { const s = tarState(data, t.id); return <div className="live-row-item" key={t.id}>
         <div><strong>{fullName(t)}</strong><small>{data.applicationNumbers?.[t.id] ? <span className="app-no">{data.applicationNumbers[t.id]}</span> : null}{s.paid.map((e) => first(e.courses)?.code ?? first(e.courses)?.name).filter(Boolean).join(", ")}{s.record ? ` · ${s.record.ar_number} · printed ${s.printed} of ${s.allowed}` : " · not printed yet"}</small></div>
       </div>; })}
