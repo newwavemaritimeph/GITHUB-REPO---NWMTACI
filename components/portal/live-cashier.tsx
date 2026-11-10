@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import type { PortalData, Enrollment, TraineeProofRow } from "../portal-live-app";
 import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos, pesos2 } from "@/lib/portal-format";
 import { pesosInWords } from "@/lib/amount-words";
-import { ALL_DATES, Badge, Message, Modal, PageHead, ViewIcon, fullName, fmtDate, fmtClock, txWhen, useNeedSince, usePaged, usePost, openAdmissionRecord, submit, MonthBar, usePeriod } from "./shared-ui";
-import { PaymentDayRow, PrintGlyph, RequestVoidIcon, VoidGlyph, paymentStatus } from "./payment-void";
+import { ActionsMenu, ALL_DATES, Badge, Message, Modal, PageHead, ViewIcon, fullName, fmtDate, fmtClock, txWhen, useNeedSince, usePaged, usePost, openAdmissionRecord, submit, MonthBar, usePeriod } from "./shared-ui";
+import { PaymentDayRow, PrintGlyph, RequestVoidIcon, paymentStatus } from "./payment-void";
 import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balances";
 import { requestFee } from "@/lib/request-fees";
 import type { CashierReportSnapshot } from "@/lib/documents";
@@ -593,7 +593,7 @@ export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { d
               <div className="pf-who">{trainee(p.trainee_id, p.name, p.number)}
                 <div className="pf-meta"><span>{p.method}{p.reference ? <> · <span className="cl-mono">{p.reference}</span></> : null}</span><span>Uploaded {fmtDate(day(p.submitted_at))}, {fmtClock(p.submitted_at)}</span>{!hasCourse && <span className="pf-warn">No Course Yet</span>}</div></div>
               <strong className="cx-amt pf-amt">{pesos(p.amount_centavos)}</strong>
-              <div className="cx-acts pf-acts">{p.drive_link && <ViewIcon label="View Proof" href={p.drive_link} />}<button type="button" className="portal-primary" disabled={!hasCourse} onClick={() => setFromProof(p)}>Record</button><button type="button" className="pv-icon d" title="Not Valid" aria-label={`Not Valid, proof of ${p.name}`} onClick={() => setNotValid({ id: p.id, why: NO_REASON })}><VoidGlyph /></button></div>
+              <div className="cx-acts pf-acts">{p.drive_link && <ViewIcon label="View Proof" href={p.drive_link} />}<button type="button" className="portal-primary row-act" disabled={!hasCourse} onClick={() => setFromProof(p)}>Record</button><ActionsMenu items={[{ label: "Not Valid", danger: true, onClick: () => setNotValid({ id: p.id, why: NO_REASON }) }]} /></div>
               {notValid?.id === p.id && <div className="cx-acts pf-notvalid"><span className="cx-reasons"><ReasonField reasons={REASONS.proofNotValid} value={notValid.why} onChange={(why) => setNotValid({ id: p.id, why })} autoFocus /></span><button type="button" className="portal-primary" disabled={busy || !reasonReady(notValid.why)} onClick={async () => { await post({ action: "proof-dismiss", proofId: p.id, reason: reasonText(notValid.why) }, "Marked Not Valid."); setNotValid(null); }}>Confirm</button><button type="button" className="portal-secondary" onClick={() => setNotValid(null)}>Cancel</button></div>}
             </div>; })}
           {proofP.pager}</div></section>}

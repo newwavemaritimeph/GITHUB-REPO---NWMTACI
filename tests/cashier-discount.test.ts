@@ -22,7 +22,7 @@ describe("Cashier discount requests to Accounting", () => {
   it("gives the Cashier Request ▾ › Discount in the Trainee Account, and tells Accounting who asked", () => {
     const app = readFileSync("components/portal-live-app.tsx", "utf8");
     expect(app).toContain('const canDiscount=!!reload&&role==="cashier"');
-    expect(app).toContain("setDiscounting(true)}}>Discount</button>");
+    expect(app).toContain('{label:"Request Discount",onClick:()=>setDiscounting(true)}');
     expect(app).toContain('action:"discount-request"');
     expect(readFileSync("components/portal/accounting-home.tsx", "utf8")).toContain("requested_by_name ?? \"Cashier\"");
     const route = readFileSync("app/api/staff/operations/route.ts", "utf8");

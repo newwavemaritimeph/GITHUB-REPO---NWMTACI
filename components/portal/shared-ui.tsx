@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { tcl } from "@/lib/title-case";
 
 /**
@@ -139,6 +139,29 @@ export function ViewIcon({ label, href, onClick, disabled }: { label: string; hr
   return href
     ? <a className="view-icon" href={href} target="_blank" rel="noreferrer" aria-label={label} title={label}>{eye}</a>
     : <button type="button" className="view-icon" aria-label={label} title={label} onClick={onClick} disabled={disabled}>{eye}</button>;
+}
+
+/**
+ * One Actions ▾ menu per row instead of a row of buttons (owner, 10 Nov 2026: "consolidate rows, not so much buttons").
+ * Each item runs its action or opens its link; the menu closes on a pick or a click elsewhere.
+ */
+export type ActionItem = { label: string; onClick?: () => void; href?: string; disabled?: boolean; danger?: boolean };
+export function ActionsMenu({ items, label = "Actions", disabled }: { items: (ActionItem | false | null | undefined)[]; label?: string; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const box = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [open]);
+  const list = items.filter(Boolean) as ActionItem[];
+  if (!list.length) return null;
+  return <span className="cx-split act-split" ref={box} onClick={(e) => e.stopPropagation()}><button type="button" className="portal-secondary row-act" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen((v) => !v)}>{label} ▾</button>
+    {open && <div className="cx-splitmenu act-menu" role="menu">{list.map((it) => it.href
+      ? <a key={it.label} role="menuitem" href={it.href} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>{it.label}</a>
+      : <button key={it.label} type="button" role="menuitem" className={it.danger ? "danger" : undefined} disabled={it.disabled} onClick={() => { setOpen(false); it.onClick?.(); }}>{it.label}</button>)}</div>}
+  </span>;
 }
 
 /** When a transaction was made: Nov 4, 9:12 AM. */

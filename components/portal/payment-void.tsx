@@ -30,7 +30,8 @@ export function paymentStatus(data: Pick<PortalData, "paymentVoids">, payment: P
   return { label: v === "Duplicate Review" ? "Duplicate Reference" : v, tone: v === "Verified" ? "active" : "orange", note: s.note, canVoid: true };
 }
 
-async function askVoid(payment: VoidablePayment, post: Post) {
+/** Asks the reason and sends the void request to Accounting; also used from an Actions ▾ menu. */
+export async function askVoid(payment: VoidablePayment, post: Post) {
   const reason = await askReason(`Void ${payment.payment_number} (${payment.method}, ₱${(Number(payment.amount_centavos) / 100).toLocaleString("en-PH", { minimumFractionDigits: 2 })})? Accounting approves it.`, REASONS.paymentVoid, { title: "Request Void", okLabel: "Send to Accounting" });
   if (!reason || reason.trim().length < 5) return;
   await post({ action: "payment-void-request", paymentId: payment.id, reason: reason.trim() }, "Void request sent to Accounting.").catch(() => undefined);

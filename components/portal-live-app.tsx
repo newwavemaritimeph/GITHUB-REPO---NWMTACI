@@ -24,8 +24,8 @@ import type { CategoryTemplate } from "@/lib/instruction-templates";
 import type { SoftCopyJob } from "@/lib/certificate-rules";
 import { BatchNumbers, firstFreeBatchNumber, type BatchSeries } from "./portal/batch-numbers";
 import { sourceLabel } from "@/lib/company-charge";
-import { PaymentDayRow, PrintGlyph, RequestVoidIcon, paymentStatus } from "./portal/payment-void";
-import { ALL_DATES, Badge, DataSince, Message, Modal, Page, PageHead, PeriodBar, ViewIcon, fmtClock, manilaDay, submit, fullName, txWhen, useMonthRows, useNeedSince, usePaged, usePeriod } from "./portal/shared-ui";
+import { PaymentDayRow, askVoid, paymentStatus } from "./portal/payment-void";
+import { ActionsMenu, ALL_DATES, Badge, DataSince, Message, Modal, Page, PageHead, PeriodBar, ViewIcon, fmtClock, manilaDay, submit, fullName, txWhen, useMonthRows, useNeedSince, usePaged, usePeriod } from "./portal/shared-ui";
 import { classroomJoin } from "@/lib/classroom";
 import { ClassroomPanel } from "./portal/classroom-panel";
 import { RequestActionModal, TraineeRequestModal, type RequestType } from "./portal/payment-actions";
@@ -626,7 +626,7 @@ function Trainees({data,query,embedded,reload,role}:{data:PortalData;query:strin
 export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:PortalData;trainee:Trainee;onClose:()=>void;reload?:()=>Promise<void>;role?:string}){
   const canEdit=!!reload&&["registration","admin"].includes(role??"");
   const [editing,setEditing]=useState(false),[addingCourse,setAddingCourse]=useState(false),[openEnrollment,setOpenEnrollment]=useState<string|null>(null);
-  const [menu,setMenu]=useState(false),[reqType,setReqType]=useState<RequestType|null>(null),[note,setNote]=useState("");
+  const [reqType,setReqType]=useState<RequestType|null>(null),[note,setNote]=useState("");
   // The Cashier asks Accounting for a discount from here (owner, 10 Nov 2026, Design 2).
   const canDiscount=!!reload&&role==="cashier";
   const [discounting,setDiscounting]=useState(false);
@@ -737,7 +737,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
               {[...payRows].sort((a,b)=>b.received_at.localeCompare(a.received_at)).flatMap((p,i,all)=>{const no=p.receipt_number??p.payment_number,d=day(p.received_at),isVoid=p.valid===false,s=paymentStatus(data,p),onDay=all.filter(x=>day(x.received_at)===d);return [
                 (!i||day(all[i-1].received_at)!==d)&&<PaymentDayRow key={`day-${d}`} day={d} count={onDay.length} span={4} total={pesos2(onDay.filter(x=>x.valid!==false).reduce((n,x)=>n+Number(x.amount_centavos),0))}/>,
                 <tr key={p.id} className={isVoid?"pv-void":undefined}><td className="tp-mono">{fmtClock(p.received_at)}</td><td className="tp-mono">{no}{feeLabel(p)&&<small>{feeLabel(p)}</small>}</td><td>{p.method}{p.reference_number&&<small className="tp-mono">{p.reference_number}</small>}</td><td><Badge tone={s.tone}>{s.label}</Badge>{s.note&&<small>{s.note}</small>}</td><td className="r tp-mono">{pesos2(Number(p.amount_centavos))}</td>
-                  <td><div className="cx-acts">{canReprint&&!isVoid&&p.receipt_number&&<button type="button" className="pv-icon" title={`Reprint${p.print_count?` · Printed ${p.print_count} Time${p.print_count===1?"":"s"}`:""}`} aria-label={`Reprint ${no}`} onClick={()=>{setReprint({kind:"receipt",id:p.id,no});setWhy("");setWhyOther("")}}><PrintGlyph/></button>}{canVoid&&s.canVoid&&<RequestVoidIcon payment={p} busy={busy} post={post}/>}</div></td></tr>,
+                  <td><div className="cx-acts"><ActionsMenu disabled={busy} items={[canReprint&&!isVoid&&!!p.receipt_number&&{label:`Reprint${p.print_count?` (Printed ${p.print_count})`:""}`,onClick:()=>{setReprint({kind:"receipt",id:p.id,no});setWhy("");setWhyOther("")}},canVoid&&s.canVoid&&{label:"Request Void",danger:true,onClick:()=>void askVoid(p,post)}]}/></div></td></tr>,
                 <Fragment key={`${p.id}-reprint`}>{reprint?.kind==="receipt"&&reprint.id===p.id&&reprintForm(6)}</Fragment>,
               ]})}
               {!payRows.length&&<tr><td colSpan={6} className="sa-empty">No payments yet.</td></tr>}
@@ -766,9 +766,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
       <div className="sa-foot">
         <div className="sa-acts">
           {canEdit&&<button type="button" className="portal-primary" onClick={()=>setAddingCourse(true)}>Add Course</button>}
-          {canEdit&&<button type="button" className="portal-secondary" onClick={()=>setEditing(v=>!v)}>{editing?"Done Editing":"Edit Details"}</button>}
-          {canDiscount&&live.some(e=>balanceOf(e)>0)&&<div className="req-dd"><button type="button" className="portal-secondary" aria-haspopup="menu" aria-expanded={menu} onClick={()=>setMenu(v=>!v)}>Request ▾</button>{menu&&<div className="sa-menu" role="menu"><button type="button" role="menuitem" onClick={()=>{setMenu(false);setDiscounting(true)}}>Discount</button></div>}</div>}
-          {canEdit&&live.length>0&&<div className="req-dd"><button type="button" className="portal-secondary" aria-haspopup="menu" aria-expanded={menu} onClick={()=>setMenu(v=>!v)}>Request ▾</button>{menu&&<div className="sa-menu" role="menu">{TRAINEE_REQUESTS.map(([t,lbl])=><button key={t} type="button" role="menuitem" onClick={()=>{setMenu(false);setReqType(t)}}>{lbl}</button>)}</div>}</div>}
+          {editing?<button type="button" className="portal-secondary" onClick={()=>setEditing(false)}>Done Editing</button>:<ActionsMenu items={[canEdit&&{label:"Edit Details",onClick:()=>setEditing(true)},...(canDiscount&&live.some(e=>balanceOf(e)>0)?[{label:"Request Discount",onClick:()=>setDiscounting(true)}]:[]),...(canEdit&&live.length>0?TRAINEE_REQUESTS.map(([t,lbl])=>({label:`Request ${lbl}`,onClick:()=>setReqType(t)})):[])]}/>}
         </div>
         <div className="sa-acts"><button type="button" className="portal-secondary" onClick={onClose}>Close</button></div>
       </div>

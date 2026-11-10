@@ -536,10 +536,9 @@ export function AdminCertificateControls({ data, reload }: { data: PortalData; r
 }
 
 /**
- * Owner, 9 Oct 2026: the Releasing Officer corrects what prints on a certificate
- * — name, course, batch or dates — with a reason, and uploads, replaces or
- * removes the 2x2 photo ("details"). Only the Admin changes the Certificate
- * Number ("number"). Blank fields print the portal's registered value.
+ * The Releasing Officer corrects only the name that prints on a certificate (owner, 10 Nov 2026: "everything
+ * should be systemized"), with a reason, and uploads, replaces or removes the 2x2 photo ("details"). Course,
+ * batch, dates and issue date come from the system. Only the Admin changes the Certificate Number ("number").
  */
 function CertificateCorrectionsPanel({ data, reload, mode, only, onClose }: { data: PortalData; reload: () => Promise<void>; mode: "details" | "number"; only?: string; onClose?: () => void }) {
   const { busy, msg, post } = usePost(reload);
@@ -579,11 +578,11 @@ function CertificateCorrectionsPanel({ data, reload, mode, only, onClose }: { da
       <p className="cc-who"><b>{line.name}</b> · {line.course.code}{line.cert?.certificate_number ? <> · <span className="cl-mono">{line.cert.certificate_number}</span></> : null}<button type="button" className="ghost-button" onClick={() => (onClose ? onClose() : setPickedId(null))}>Close</button></p>
       {tracked && <div className="cc-photo"><span>2x2 Photo: {line.photo ? <><b>On file</b> <small className="cl-sub">{line.photo.file_name}</small></> : <b className="cl-x">Not uploaded</b>}</span><span className="cl-acts">{line.photo && <ViewIcon label="View Photo" onClick={() => void openCertificatePhoto(line.e.id)} />}<button type="button" className="portal-secondary" onClick={() => setReplacing(true)}>{line.photo ? "Replace Photo" : "Upload Photo"}</button>{line.photo && <button type="button" className="cl-danger" onClick={() => void removePhoto()}>Remove Photo</button>}</span></div>}
       <div className="cl-wrap"><table className="cl-log cl-light cc-table"><thead><tr><th>Field</th><th>From the Portal</th><th>Prints As (Correction)</th></tr></thead><tbody>
-        {FIELDS.map(([k, label, type]) => <tr key={k}><td>{label}</td><td>{type === "date" && portal[k] && portal[k] !== "Print date" ? fmtDate(portal[k]) : portal[k] || "—"}</td><td><input className="cl-in" type={type} aria-label={`${label} correction`} value={form[k] ?? ""} placeholder="Same as the portal" onChange={(e) => setForm({ ...form, [k]: e.target.value })} /></td></tr>)}
+        {FIELDS.map(([k, label, type]) => <tr key={k}><td>{label}</td><td>{type === "date" && portal[k] && portal[k] !== "Print date" ? fmtDate(portal[k]) : portal[k] || "—"}</td><td>{k === "name" ? <input className="cl-in" type={type} aria-label={`${label} correction`} value={form[k] ?? ""} placeholder="Same as the portal" onChange={(e) => setForm({ ...form, [k]: e.target.value })} /> : <span className="cl-sub">From the system</span>}</td></tr>)}
       </tbody></table></div>
       <div className="cl-void"><label>Reason for the Correction<input value={form.reason ?? ""} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="e.g. Name spelled as in the passport" /></label>
-        <button type="button" className="portal-primary" disabled={busy || (form.reason ?? "").trim().length < 3} onClick={() => void post({ action: "certificate-correct", enrollmentId: line.e.id, ...form }, "Correction saved.").catch(() => undefined)}>Save Correction</button></div>
-      <p className="ac-foot">Leave a field blank to print the portal&apos;s registered value. A certificate already printed needs an approved void or a paid Reprinting request for a corrected copy.</p>
+        <button type="button" className="portal-primary" disabled={busy || (form.reason ?? "").trim().length < 3} onClick={() => void post({ action: "certificate-correct", enrollmentId: line.e.id, name: (form.name ?? "").trim(), reason: (form.reason ?? "").trim() }, "Name saved.").catch(() => undefined)}>Save Name</button></div>
+      <p className="ac-foot">Only the name is corrected here. Course, batch and dates come from the system: fix them at the enrollment or the batch. Leave the name blank to print the registered name. A certificate already printed needs an approved void or a paid Reprinting request for a corrected copy.</p>
     </div> : <p className="portal-empty-copy">Search a trainee to correct their certificate details or photo.</p>}
     {replacing && line && <CertificatePhotoModal enrollmentId={line.e.id} traineeName={line.name} fileName={line.fileName} replacing={!!line.photo} onClose={() => setReplacing(false)} onDone={async () => { setReplacing(false); await reload(); }} />}
   </section>;

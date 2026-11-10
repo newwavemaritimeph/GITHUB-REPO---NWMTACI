@@ -37,11 +37,12 @@ describe("Paid and Enrolled, Balance First", () => {
     expect(html).not.toContain("SAMPLE, DONE");
     expect(html).not.toContain("BTR Course");
   });
-  it("gives a proof one line: mode and reference together, Not Valid as an icon, no course list", () => {
+  it("gives a proof one line: mode and reference together, Not Valid in the Actions menu, no course list", () => {
     const html = render();
     expect(html).toContain("Proofs of Payment");
     expect(html).toContain("12345");
-    expect(html).toContain('title="Not Valid"');
+    // Not Valid moved into Actions ▾ (owner, 10 Nov 2026: "not so much buttons"); the menu opens on click.
+    expect(html).toContain("Actions ▾");
     expect(html).not.toContain(">Not Valid<");
   });
 });

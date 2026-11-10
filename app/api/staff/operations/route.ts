@@ -2691,7 +2691,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "certificate-correct") {
-      // The Releasing Officer corrects what prints (owner, 9 Oct 2026); the Certificate Number stays with the Admin. Blank fields use the portal value.
+      // Only the name is corrected (owner, 10 Nov 2026: "everything should be systemized"); course, batch and dates come from the system.
       if (!staff.roleCodes.some((r) => ["admin", "releasing_officer"].includes(r))) return NextResponse.json({ error: "Only the Releasing Officer can correct certificate details." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       // Trainees with a payment or a Company Charge only (owner, 5 Nov 2026).
@@ -2702,7 +2702,7 @@ export async function POST(request: Request) {
         if (created.error) return NextResponse.json({ error: /corrections/i.test(created.error.message) ? "Apply database update 202610090034 first." : created.error.message }, { status: 400 });
         cert = created.data;
       }
-      const next = Object.fromEntries(Object.entries({ name: input.name, courseName: input.courseName, batchLabel: input.batchLabel, startsOn: input.startsOn, endsOn: input.endsOn, issuedOn: input.issuedOn }).filter(([, v]) => v));
+      const next: Record<string, string> = input.name ? { name: input.name } : {};
       const { error } = await admin.from("certificates").update({ corrections: { ...next, reason: input.reason }, updated_at: new Date().toISOString() }).eq("id", cert!.id);
       if (error) return NextResponse.json({ error: /corrections/i.test(error.message) ? "Apply database update 202610090034 first." : error.message }, { status: 400 });
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: isAdminRole(staff.roleCodes) ? "admin" : "releasing_officer", action: "certificate.corrected", record_type: "certificate", record_id: cert!.id, prior_values: (cert as { corrections?: unknown }).corrections ?? {}, new_values: next, reason: input.reason });

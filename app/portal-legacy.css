@@ -2984,3 +2984,7 @@ button.rd-row:hover { background: #f6fafc; }
 /* Referral Voucher in Payables (10 Nov 2026). */
 .nw-shell .rv-panel{margin-bottom:12px}.nw-shell .rv-form{display:flex;flex-wrap:wrap;gap:10px;align-items:end;padding:0 16px 12px}.nw-shell .rv-form label{display:grid;gap:3px;font-size:12.5px;font-weight:600;color:#40606f}
 .nw-shell .rv-form select,.nw-shell .rv-form input{height:32px;border:1px solid #cfdbe3;border-radius:8px;padding:0 8px;font-size:14px;background:#fff;color:#0f2638}.nw-shell .rv-done{margin:0;padding:0 16px 12px}
+/* Actions ▾ on each row (owner, 10 Nov 2026): opens downward, links and buttons alike. */
+.act-split{position:relative;display:inline-block}.cx-splitmenu.act-menu{top:calc(100% + 6px);bottom:auto;z-index:30;min-width:190px}
+.cx-splitmenu.act-menu a{display:block;padding:9px 12px;border-radius:8px;font:500 14.5px var(--font-portal),sans-serif;color:var(--nw-fg);text-decoration:none}.cx-splitmenu.act-menu a:hover{background:var(--nw-soft)}
+.cx-splitmenu.act-menu button.danger{color:#b42318}.portal-shell .ap-eyes{display:inline-flex;gap:4px;align-items:center}
