@@ -261,9 +261,11 @@ const applicationsOf = (data: PortalData) => data.enrollments.filter((e) => e.en
 const awaitingCourseOf = (data: PortalData) => (data.awaitingCourseIds ?? []).map((id) => data.trainees.find((t) => t.id === id)).filter((t): t is Trainee => !!t).sort((a, b) => (b.registered_at ?? "").localeCompare(a.registered_at ?? ""));
 
 /** The three tabs of the Registration list (owner, 7 Oct 2026). */
-export const RECORD_FILTERS = ["All enrollments", "Screening", "For payment"] as const;
+export const RECORD_FILTERS = ["Screening", "For payment", "Enrolled", "Cancelled", "All enrollments"] as const;
 type RecordFilter = (typeof RECORD_FILTERS)[number];
-const inFilter = (f: RecordFilter, r: ReturnType<typeof applicationReadiness> | null) => (f === "All enrollments" ? true : !r ? false : f === "For payment" ? forPayment(r) : !forPayment(r));
+const inFilter = (f: RecordFilter, r: ReturnType<typeof applicationReadiness> | null, status?: string) => (f === "All enrollments" ? true : f === "Enrolled" || f === "Cancelled" ? !r && status === f : !r ? false : f === "For payment" ? forPayment(r) : !forPayment(r));
+/** Requirement tags (owner, 10 Nov 2026, Minimal · Letter Tags): received filled, missing dashed, rejected red. No check marks. */
+const REQ_TAGS: Record<string, string> = { valid_id: "ID", medical_peme: "MED", photo_2x2: "2X2", seamans_book: "SRN" };
 
 const NO_BATCH = "none";
 
@@ -411,57 +413,50 @@ function EnrollmentQueue({ data, query, reload, initial, account }: { data: Port
   const awaiting = awaitingCourseOf(data);
   const noCourse = awaiting.filter((t) => !term || `${fullName(t)} ${t.trainee_number} ${appNoOf(data, t.id) ?? ""} ${t.email} ${t.mobile}`.toLowerCase().includes(term));
   const rank = (x: (typeof all)[number]) => (x.r ? 0 : x.e.enrollment_status === "Cancelled" ? 2 : 1);
-  const GROUPS = ["Applications · Pending", "Enrolled", "Cancelled"];
   const rows = all
-    .filter((x) => inFilter(filter, x.r))
-    .filter(({ e }) => !term || `${nameOf(e)} ${e.enrollment_number} ${appNoOf(data, e.trainee_id) ?? ""} ${first(e.courses)?.name ?? ""} ${first(e.trainees)?.trainee_number ?? ""}`.toLowerCase().includes(term))
+    .filter((x) => inFilter(filter, x.r, x.e.enrollment_status))
+    .filter(({ e }) => !term || `${nameOf(e)} ${e.enrollment_number} ${appNoOf(data, e.trainee_id) ?? ""} ${first(e.courses)?.name ?? ""} ${first(e.courses)?.code ?? ""} ${first(e.trainees)?.trainee_number ?? ""}`.toLowerCase().includes(term))
     .sort((a, b) => rank(a) - rank(b) || b.e.created_at.localeCompare(a.e.created_at));
   const paged = usePaged(rows), pageRows = paged.shown;
   const current = open ? data.enrollments.find((e) => e.id === open.id) ?? open : null;
-  const count = (f: RecordFilter) => all.filter((x) => inFilter(f, x.r)).length + (f === "For payment" ? 0 : awaiting.length);
-  // Summary rail (owner, 8 Oct 2026): the filters, requirement counts and enrollment types on the left; the list on the right.
+  const withCourse = filter === "Screening" || filter === "All enrollments";
+  const count = (f: RecordFilter) => all.filter((x) => inFilter(f, x.r, x.e.enrollment_status)).length + (f === "Screening" || f === "All enrollments" ? awaiting.length : 0);
+  const dated = filter === "Enrolled" || filter === "Cancelled" || filter === "All enrollments";
   const pending = all.filter((x) => x.r);
-  const types = ["Online", "Walk-In", "Agency", "Consultancy"].map((k) => [k, data.enrollments.filter((e) => e.enrollment_status !== "Cancelled" && (enrollmentTypeOf(data, e) || "").startsWith(k)).length] as const);
-  const FILTER_COLORS: Record<RecordFilter, string> = { "All enrollments": "#123F63", Screening: "#0571D0", "For payment": "#F25615" };
+  const label = (f: RecordFilter) => tcl(f);
+  /** Status with the payment folded in: "Paid · Enrolling · ₱1,000", "Company Charge", "Enrolled". */
+  const statusOf = (e: Enrollment, r: ReturnType<typeof applicationReadiness> | null) => {
+    if (e.enrollment_status !== "Cancelled" && chargeTo(data, e)) return <Badge tone="pending">{`Company Charge · ${chargeTo(data, e)!.name}`}</Badge>;
+    if (!r) return <Badge tone={e.enrollment_status === "Cancelled" ? "cancelled" : "active"}>{e.enrollment_status}</Badge>;
+    const s = stateOf(r);
+    return <Badge tone={s.tone}>{`${tcl(s.text)}${r.paid ? ` · ${pesos(r.paidCentavos)}` : ""}`}</Badge>;
+  };
+  const tags = (r: ReturnType<typeof applicationReadiness>) => <span className="rq-tags">{REQUIREMENTS.map((req) => { const st = r.latest.get(req.code)?.status; return <span key={req.code} title={`${req.label}: ${st === "Verified" ? "Received" : st === "Rejected" ? "Rejected" : "Not yet"}`} className={`rq-tag${st === "Verified" ? " got" : st === "Rejected" ? " bad" : ""}`}>{REQ_TAGS[req.code]}</span>; })}</span>;
   return <>
-    <div className="ac-rail">
-      <div className="ac-stack">
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Queue</h2><span className="muted-text">tap to filter</span></div>
-          <div className="cx-tiles ac-tiles ac-tiles-in" role="tablist" aria-label="Enrollment filter">{RECORD_FILTERS.map((f) => <button key={f} type="button" role="tab" aria-selected={filter === f} className={`cx-tile ac-pick ac-count${filter === f ? " on" : ""}`} style={{ ["--c" as string]: FILTER_COLORS[f] }} onClick={() => setFilter(f)}><span>{tcl(f)}</span><b>{count(f)}</b></button>)}</div>
-          {awaiting.length > 0 && <p className="ac-foot">{awaiting.length} applicant{awaiting.length === 1 ? "" : "s"} still need a course.</p>}
-        </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Requirements</h2><span className="muted-text">applications</span></div>
-          <dl className="ac-lines">{REQUIREMENTS.map((req) => <div key={req.code}><dt>{req.label}</dt><dd>{pending.filter((x) => x.r!.latest.get(req.code)?.status === "Verified").length} of {pending.length}</dd></div>)}</dl>
-          <p className="ac-foot">Hand to the Cashier once all four are ticked. Company Charge partners enroll directly.</p>
-        </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By Enrollment Type</h2></div>
-          <dl className="ac-lines">{types.map(([k, n]) => <div key={k}><dt>{tcl(k)}</dt><dd>{n}</dd></div>)}</dl>
-        </section>
-      </div>
-      <div className="ac-stack">
-        <div className="cx-bar ac-bar"><input className="vx-search" aria-label="Search enrollments" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name, NWMTACI number, SRN, course" /></div>
-        <div className="portal-panel">{term ? <p className="pd-label pd-pad">Searching all dates · {rows.length} found</p> : <PeriodBar p={per} what="Enrolled" count={`${rows.length} enrollment${rows.length === 1 ? "" : "s"}`} waitText="Pick a date to show enrolled and cancelled records." />}</div>
-        {filter !== "For payment" && noCourse.length > 0 && <section className="portal-panel nc-panel">
-          <div className="panel-heading"><div><h2>No Course Yet</h2><p>Assign a course and schedule, then screen the application</p></div><span className="slot-count">{noCourse.length}</span></div>
-          {noCourse.map((t) => <div className="rd-row" key={t.id}>
-            <span className="rd-main"><strong>{fullName(t)}</strong><small>{appNoOf(data, t.id) ? <span className="app-no">{appNoOf(data, t.id)}</span> : null}{t.trainee_number} · <span className="lc">{t.email}</span> · {t.mobile}</small></span>
-            <span className="rd-time">{t.registered_at ? fmtShort(day(t.registered_at)) : ""}</span>
-            <button type="button" className="portal-primary row-act" onClick={() => setAssigning(t)}>Assign</button>
-          </div>)}
-        </section>}
-        <div className="portal-table portal-panel tbl-compact"><table><thead><tr><th>Trainee</th><th>Enrollment no.</th><th>Course and Schedule</th><th>Requirements</th><th>Payment</th><th>Status</th></tr></thead><tbody>
-          {pageRows.map((x, i) => [(i === 0 || rank(pageRows[i - 1]) !== rank(x)) && <tr key={`g${rank(x)}`} className="tl-group"><td colSpan={6}><b>{GROUPS[rank(x)]}</b> <span>{rows.filter((y) => rank(y) === rank(x)).length}</span></td></tr>, (({ e, r }) => { const t = first(e.trainees), s = r ? stateOf(r) : { text: e.enrollment_status, tone: statusTone(e.enrollment_status) }, p = payState(e); return <tr key={e.id} className="row-clickable" onClick={() => setOpen(e)}>
-            <td><strong>{t ? fullName(t) : "Unknown"}</strong>{enrollmentTypeOf(data, e) && <span className="et-chip">{enrollmentTypeOf(data, e)}</span>}<small className="tc-mono">{t?.trainee_number}</small></td>
-            <td><strong className="app-no-cell">{appNoOf(data, e.trainee_id) ?? e.enrollment_number}</strong><small className="tc-mono">{appNoOf(data, e.trainee_id) ? `${e.enrollment_number}${term ? ` · ${fmtDate(day(e.created_at))}` : ""}` : fmtDate(day(e.created_at))}</small></td>
-            <td>{first(e.courses)?.name ?? "—"}<small>{scheduleOf(e)}</small></td>
-            <td>{r ? <><span className={`req-count${r.missing.length ? "" : " ok"}`}>{r.verified} of {REQUIREMENTS.length}</span>{r.rejected.length > 0 && <small>Rejected: {r.rejected.join(", ")}</small>}</> : <span className="muted-text">{e.enrollment_status === "Cancelled" ? "—" : "Complete"}</span>}</td>
-            <td>{e.enrollment_status !== "Cancelled" && chargeTo(data, e) ? <><Badge tone="pending">Company Charge</Badge><small>Billed to {chargeTo(data, e)!.name}</small></> : r ? (r.paid ? <><strong>{pesos(r.paidCentavos)}</strong><small>Verified</small></> : <span className="muted-text">{r.handed ? "With cashier" : "Not yet"}</span>) : <><Badge tone={p.tone}>{p.text}</Badge><small>{pesos(balanceOf(e))} balance</small></>}</td>
-            <td><Badge tone={s.tone}>{s.text}</Badge></td>
-          </tr>; })(x)])}
-        </tbody></table>{!rows.length && <p className="portal-empty-copy">{filter === "For payment" ? "Nobody is waiting at the Cashier." : filter === "Screening" ? (noCourse.length ? "Applicants without a course are listed above." : "No applications to screen. New ones arrive from the website.") : term ? "No matching enrollments." : "No enrollments in this period."}</p>}</div>
-        {paged.pager}
-      </div>
+    {/* Minimal · Letter Tags (owner, 10 Nov 2026): one tools line, a Show dropdown with the counts, five columns. */}
+    <div className="rq-tools">
+      <input className="vx-search" aria-label="Search enrollments" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, NWMTACI number, SRN or course" />
+      <select aria-label="Show" value={filter} onChange={(e) => setFilter(e.target.value as RecordFilter)}>{RECORD_FILTERS.map((f) => <option key={f} value={f}>{`Show: ${label(f)} (${count(f)})`}</option>)}</select>
     </div>
+    {dated && <div className="portal-panel rq-period">{term ? <p className="pd-label pd-pad">Searching all dates · {rows.length} found</p> : <PeriodBar p={per} what="Enrolled" count={`${rows.length} enrollment${rows.length === 1 ? "" : "s"}`} waitText="Pick a date to show enrolled and cancelled records." />}</div>}
+    <div className="portal-panel rq-panel"><div className="rq-wrap"><table className="rq-table"><colgroup><col style={{ width: "32%" }} /><col /><col style={{ width: 190 }} /><col style={{ width: 260 }} /><col style={{ width: 150 }} /></colgroup>
+      <thead><tr><th>Trainee</th><th>Course · Schedule</th><th>Requirements</th><th>Status</th><th className="r">Action</th></tr></thead><tbody>
+      {withCourse && paged.offset === 0 && noCourse.map((t) => <tr key={t.id}>
+        <td><strong>{fullName(t)}</strong> <span className="rq-no">{appNoOf(data, t.id) ?? t.trainee_number}</span></td>
+        <td className="muted-text">No course yet · registered {t.registered_at ? fmtShort(day(t.registered_at)) : ""}</td><td></td>
+        <td><Badge tone="orange">No Course Yet</Badge></td>
+        <td className="r"><button type="button" className="portal-primary row-act" onClick={() => setAssigning(t)}>Assign</button></td></tr>)}
+      {pageRows.map(({ e, r }) => { const t = first(e.trainees), c = first(e.courses), type = enrollmentTypeOf(data, e), step = r ? nextUpOf(r, !!chargeTo(data, e)).step : null; return <tr key={e.id} title={e.enrollment_number}>
+        <td><button type="button" className="pv-open rq-name" onClick={() => setOpen(e)}><strong>{t ? fullName(t) : "Unknown"}</strong> <span className="rq-no">{appNoOf(data, e.trainee_id) ?? e.enrollment_number}</span></button>{type && <span className="et-chip">{type}</span>}</td>
+        <td>{c?.code ?? c?.name ?? "—"} <span className="muted-text">· {scheduleOf(e)}</span><span className="rq-enr">{e.enrollment_number}</span></td>
+        <td>{r ? tags(r) : <span className="muted-text">{e.enrollment_status === "Cancelled" ? "—" : "Complete"}</span>}</td>
+        <td>{statusOf(e, r)}</td>
+        <td className="r"><button type="button" className={step && step !== "Open" ? "portal-primary row-act" : "portal-secondary row-act"} onClick={() => setOpen(e)}>{step ?? "Open"}</button></td></tr>; })}
+      </tbody></table></div>
+      {!rows.length && !(withCourse && noCourse.length) && <p className="portal-empty-copy">{filter === "For payment" ? "Nobody is waiting at the Cashier." : filter === "Screening" ? "No applications to screen. New ones arrive from the website." : term ? "No matching enrollments." : dated && !per.picked ? "Pick a date to show enrolled and cancelled records." : "No enrollments in this range."}</p>}
+      {paged.pager}
+    </div>
+    {pending.length > 0 && <p className="rq-totals">Requirements · {REQUIREMENTS.map((req) => `${req.short} ${pending.filter((x) => x.r!.latest.get(req.code)?.status === "Verified").length}/${pending.length}`).join(" · ")}</p>}
     {current && <EnrollmentDrawer data={data} enrollment={current} reload={reload} onClose={() => setOpen(null)} onOpenAccount={account ? () => setAccountOf(current.trainee_id) : undefined} />}
     {accountOf && account?.(accountOf, () => setAccountOf(null))}
     {assigning && <AssignCourseModal data={data} trainee={assigning} reload={reload} onClose={() => setAssigning(null)} />}

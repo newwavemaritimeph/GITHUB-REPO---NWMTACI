@@ -6843,3 +6843,24 @@ a[href^="mailto:"],
 /* Dropdowns show in full (owner, 10 Nov 2026): a panel holding an open menu stops clipping, and the menu sits above the next panel. */
 .portal-shell .cx-panel:has(.cx-splitmenu) { overflow: visible; }
 .cx-splitmenu { z-index: 30; }
+/* Registration tab, Minimal · Letter Tags (owner, 10 Nov 2026). */
+.portal-shell .rq-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.portal-shell .rq-tools .vx-search { flex: 1 1 320px; min-width: 0; }
+.portal-shell .rq-tools select { width: auto; min-height: 40px; }
+.portal-shell .rq-period { margin-bottom: 10px; }
+.portal-shell .rq-panel { overflow: hidden; }
+.portal-shell .rq-wrap { overflow-x: auto; }
+.portal-shell .rq-table { width: 100%; min-width: 860px; border-collapse: collapse; table-layout: fixed; }
+.portal-shell .rq-table th { font-size: 11.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--nw-muted, #5b6b7d); text-align: left; padding: 8px 12px; background: #f6f9fb; border-bottom: 1px solid var(--nw-line, #e2e8ee); }
+.portal-shell .rq-table td { padding: 8px 12px; border-bottom: 1px solid var(--nw-line, #e2e8ee); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; }
+.portal-shell .rq-table tr:last-child td { border-bottom: 0; }
+.portal-shell .rq-table .r { text-align: right; }
+.portal-shell .rq-name { display: inline; padding: 0; text-align: left; }
+.portal-shell .rq-no { font-family: var(--font-mono, ui-monospace), monospace; font-size: 12.5px; color: #0571d0; margin-left: 4px; }
+.portal-shell .rq-enr { display: none; }
+.portal-shell .rq-table .et-chip { margin-left: 6px; }
+.portal-shell .rq-tags { display: inline-flex; gap: 4px; }
+.portal-shell .rq-tag { font: 600 11px var(--font-mono, ui-monospace), monospace; padding: 2px 6px; border-radius: 4px; border: 1px dashed #c7d2dc; color: #5b6b7d; }
+.portal-shell .rq-tag.got { border: 1px solid transparent; background: #eaf3fb; color: #123f63; }
+.portal-shell .rq-tag.bad { border: 1px solid transparent; background: #fdecea; color: #b42318; }
+.portal-shell .rq-totals { margin: 8px 2px 0; font-size: 13px; color: var(--nw-muted, #5b6b7d); }
