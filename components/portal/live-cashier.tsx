@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { PortalData, Enrollment, TraineeProofRow } from "../portal-live-app";
 import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos, pesos2 } from "@/lib/portal-format";
 import { pesosInWords } from "@/lib/amount-words";
@@ -274,7 +274,12 @@ export function CompanyPaymentModal({ data, reload, onClose, initialId }: { data
   </div></Modal>;
 }
 
-type ExtraLine = { key: string; chargeCatalogId: string | null; description: string; unit: number; quantity: number; enrollmentId: string; kind: "item" | "fee" };
+type ExtraLine = { key: string; chargeCatalogId: string | null; description: string; unit: number; quantity: number; enrollmentId: string; kind: "item" | "fee"; chargeId?: string };
+/** Items Registration added at the hand-over (owner, 10 Nov 2026), still unpaid: each opens as a line in Record Payment. */
+export const itemLines = (data: Pick<PortalData, "enrollments" | "pendingItems">, traineeId: string): ExtraLine[] => {
+  const mine = new Set(data.enrollments.filter((e) => e.trainee_id === traineeId && e.enrollment_status !== "Cancelled").map((e) => e.id));
+  return (data.pendingItems ?? []).filter((i) => mine.has(i.enrollment_id)).map((i) => ({ key: `i-${i.id}`, chargeId: i.id, chargeCatalogId: i.charge_catalog_id, description: i.description, unit: Number(i.amount_centavos), quantity: 1, enrollmentId: i.enrollment_id, kind: "item" }));
+};
 
 /**
  * Record payment for one trainee: the amount received is applied across their
@@ -301,10 +306,11 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
   const money = (centavos: number) => (centavos / 100).toFixed(2);
   const ticked = initialCourses ? data.enrollments.filter((e) => initialCourses.includes(e.id) && balanceOf(e) > 0) : [];
   const preset = ticked.length ? money(ticked.reduce((s, e) => s + payable(e), 0)) : initialProof?.amount_centavos ? money(initialProof.amount_centavos) : initialEnrollmentId && initialAmountCentavos ? money(initialAmountCentavos) : "";
-  const [received, setReceived] = useState(preset);
+  // Items Registration added at the hand-over open as lines below, so Amount Received includes them. A trainee's proof keeps its own amount.
+  const heldAtOpen = itemLines(data, initialProof?.trainee_id ?? initial?.trainee_id ?? "");
+  const [received, setReceived] = useState(preset && !initialProof ? money(Math.round(Number(preset) * 100) + heldAtOpen.reduce((s, x) => s + x.unit * x.quantity, 0)) : preset);
   const [amounts, setAmounts] = useState<Record<string, string>>(ticked.length ? Object.fromEntries(ticked.map((e) => [e.id, money(payable(e))])) : preset && initialEnrollmentId ? { [initialEnrollmentId]: preset } : {});
-  const [extras, setExtras] = useState<ExtraLine[]>([]);
-  const [addOpen, setAddOpen] = useState(false);
+  const [extras, setExtras] = useState<ExtraLine[]>(heldAtOpen);
   // Design 03 · Split Primary (owner, 3 Nov 2026): the highlighted suggestion and the ▾ menu beside Record.
   const [hi, setHi] = useState(0), [menu, setMenu] = useState(false);
   useEffect(() => {
@@ -313,12 +319,6 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
     document.addEventListener("mousedown", close); document.addEventListener("keydown", close);
     return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", close); };
   }, [menu]);
-  const extraSeq = useRef(0);
-  const [pick, setPick] = useState("");
-  const [otherName, setOtherName] = useState("");
-  const [otherAmount, setOtherAmount] = useState("");
-  const [quantity, setQuantity] = useState("1");
-  const [forEnrollment, setForEnrollment] = useState("");
   const [receivedAt, setReceivedAt] = useState(() => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16));
   const [remarks, setRemarks] = useState("");
   const [agencyId, setAgencyId] = useState("");
@@ -332,10 +332,6 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
   // Company Charge courses are paid by the partner on its Billing Statement (Accounting records it, 5 Nov 2026), never here.
   const mine = data.enrollments.filter((e) => e.trainee_id === traineeId && e.enrollment_status !== "Cancelled" && !data.companyCharge?.[e.id]);
   const open = mine.filter((e) => balanceOf(e) > 0);
-  const catalog = data.charges.filter((c) => c.active);
-  // Miscellaneous charges are only Uniform and Others (owner, 8 Oct 2026). Uniform's price comes from the schedule of fees, else ₱150.00.
-  const uniform = catalog.find((c) => /uniform/i.test(c.name) && Number(c.default_amount_centavos) > 0);
-  const uniformPrice = uniform ? Number(uniform.default_amount_centavos) : 15000;
   const term = search.trim().toLowerCase();
   // A trainee from an older month can still pay (owner, 3 Nov 2026): typing looks across all dates.
   useNeedSince(term ? ALL_DATES : "");
@@ -358,7 +354,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
   const valid = total > 0 && !over && matches && (!refRequired || (reference.trim().length > 0 && (!!proofFile || !!proof)));
 
   // Choosing a trainee fills every unpaid course in full; ▾ › Distribute in Order handles a partial payment.
-  function choose(id: string) { setTraineeId(id); const opens = data.enrollments.filter((e) => e.trainee_id === id && e.enrollment_status !== "Cancelled" && !data.companyCharge?.[e.id] && balanceOf(e) > 0); setAmounts(Object.fromEntries(opens.map((e) => [e.id, (Math.max(0, balanceOf(e) - pending(e)) / 100).toFixed(2)]))); setReceived((opens.reduce((s, e) => s + Math.max(0, balanceOf(e) - pending(e)), 0) / 100).toFixed(2)); setExtras([]); const firstOpen = data.enrollments.find((e) => e.trainee_id === id && e.enrollment_status !== "Cancelled"); setForEnrollment(firstOpen?.id ?? ""); if (!data.enrollments.some((e) => e.trainee_id === id && e.enrollment_status !== "Cancelled" && balanceOf(e) > 0)) setAddOpen(true); }
+  function choose(id: string) { setTraineeId(id); const opens = data.enrollments.filter((e) => e.trainee_id === id && e.enrollment_status !== "Cancelled" && !data.companyCharge?.[e.id] && balanceOf(e) > 0); setAmounts(Object.fromEntries(opens.map((e) => [e.id, (Math.max(0, balanceOf(e) - pending(e)) / 100).toFixed(2)]))); const held = itemLines(data, id); setReceived(((opens.reduce((s, e) => s + Math.max(0, balanceOf(e) - pending(e)), 0) + held.reduce((s, x) => s + x.unit * x.quantity, 0)) / 100).toFixed(2)); setExtras(held); }
   function fill(how: "all" | "spread" | "clear") {
     if (how === "clear") { setAmounts({}); return; }
     if (how === "all") { setAmounts(Object.fromEntries(open.map((e) => [e.id, (Math.max(0, balanceOf(e) - pending(e)) / 100).toFixed(2)]))); setReceived(((open.reduce((s, e) => s + Math.max(0, balanceOf(e) - pending(e)), 0) + extraTotal) / 100).toFixed(2)); return; }
@@ -370,24 +366,6 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
     const next = { ...amounts, [e.id]: on ? money(payable(e)) : "" };
     setAmounts(next);
     setReceived(money(open.reduce((s, x) => s + Math.min(toCentavos(next[x.id] ?? ""), balanceOf(x)), 0) + extraTotal));
-  }
-  function addExtra() {
-    const qty = Math.max(1, parseInt(quantity, 10) || 1);
-    const target = forEnrollment || mine[0]?.id;
-    if (!target) return;
-    let line: ExtraLine;
-    if (pick === "uniform") {
-      line = { key: `x${++extraSeq.current}`, chargeCatalogId: uniform?.id ?? null, description: "Uniform", unit: uniformPrice, quantity: qty, enrollmentId: target, kind: "item" };
-    } else if (pick === "other") {
-      const unit = toCentavos(otherAmount);
-      if (!otherName.trim() || !unit) { setError("Enter the charge name and amount."); return; }
-      line = { key: `x${++extraSeq.current}`, chargeCatalogId: null, description: otherName.trim(), unit, quantity: qty, enrollmentId: target, kind: "item" };
-    } else {
-      const c = catalog.find((x) => x.id === pick);
-      if (!c || Number(c.default_amount_centavos) <= 0) { setError("Choose a charge with a price in the schedule of fees."); return; }
-      line = { key: `x${++extraSeq.current}`, chargeCatalogId: c.id, description: c.name, unit: Number(c.default_amount_centavos), quantity: qty, enrollmentId: target, kind: (c.kind ?? "fee") === "item" ? "item" : "fee" };
-    }
-    setError(""); setExtras((cur) => [...cur, line]); setReceived(((receivedCentavos + line.unit * line.quantity) / 100).toFixed(2)); setQuantity("1"); setOtherName(""); setOtherAmount("");
   }
   function removeExtra(key: string) { const x = extras.find((l) => l.key === key); setExtras((cur) => cur.filter((l) => l.key !== key)); if (x) setReceived((Math.max(0, receivedCentavos - x.unit * x.quantity) / 100).toFixed(2)); }
 
@@ -421,7 +399,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
       const feeAmount = feeLine ? Math.min(feeLine.amountCentavos, initialAmountCentavos ?? feeLine.amountCentavos) : 0;
       const fee = feeLine && feeAmount > 0 ? { enrollmentId: feeLine.enrollmentId, amountCentavos: feeAmount, label: initialFeeLabel } : null;
       const allocations = lines.map((a) => (fee && a.enrollmentId === fee.enrollmentId ? { ...a, amountCentavos: a.amountCentavos - fee.amountCentavos } : a)).filter((a) => a.amountCentavos > 0);
-      const result = await submit({ action: "payment-split", allocations, fee, items: extras.map((x) => ({ enrollmentId: x.enrollmentId, chargeCatalogId: x.chargeCatalogId, description: x.description, unitCentavos: x.unit, quantity: x.quantity })), method, receivingAccount: method === "Cash" ? "Main cashier" : method, referenceNumber: reference.trim(), receivedAt: new Date(receivedAt).toISOString(), remarks, proofId: filed?.id ?? null }) as { payments?: { id: string; label: string; amount: number }[] };
+      const result = await submit({ action: "payment-split", allocations, fee, items: extras.map((x) => ({ enrollmentId: x.enrollmentId, chargeCatalogId: x.chargeCatalogId, description: x.description, unitCentavos: x.unit, quantity: x.quantity, ...(x.chargeId ? { chargeId: x.chargeId } : {}) })), method, receivingAccount: method === "Cash" ? "Main cashier" : method, referenceNumber: reference.trim(), receivedAt: new Date(receivedAt).toISOString(), remarks, proofId: filed?.id ?? null }) as { payments?: { id: string; label: string; amount: number }[] };
       if (agencyId) for (const a of allocations) { try { await submit({ action: "record-agency-rebate", enrollmentId: a.enrollmentId, agencyId }); } catch { /* the rebate never blocks the payment */ } }
       setPosted({ receipts: result.payments ?? [], amount: total, drive: filed ? { link: filed.link, path: filed.path } : null });
       await onSaved();
@@ -455,20 +433,6 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
           {extras.map((x) => { const e = mine.find((m) => m.id === x.enrollmentId); return <tr key={x.key} className="misc">{open.length > 1 && <td></td>}<td><span className="cx-code misc">{x.kind === "item" ? "Item" : "Fee"}</span> <strong>{x.description}</strong>{x.quantity > 1 ? ` x ${x.quantity}` : ""} <small>For {e ? courseCode(e) : "course"}</small></td><td className="r cx-amt">{pesos(x.unit * x.quantity)}</td><td className="r"><button type="button" className="ghost-button" onClick={() => removeExtra(x.key)}>Remove</button></td></tr>; })}
           {!open.length && !extras.length && <tr><td colSpan={3}><small>All courses are fully paid.</small></td></tr>}
         </tbody></table></div>
-        {addOpen && <div className="cx-addbox full">
-          <div className="cx-addhead"><b>Add Miscellaneous Charge</b><button type="button" className="cx-textbtn" onClick={() => setAddOpen(false)}>Close</button></div>
-          <div className="portal-form">
-            <label>Charge<select value={pick} onChange={(ev) => setPick(ev.target.value)}><option value="">Select a Charge</option>
-              <option value="uniform">Uniform · {pesos(uniformPrice)}</option>
-              {/* Other miscellaneous items in Configuration › Schedule of Fees (19 Oct 2026). */}
-              {catalog.filter((c) => c.kind === "item" && c.id !== uniform?.id && !/uniform/i.test(c.name) && Number(c.default_amount_centavos) > 0).map((c) => <option key={c.id} value={c.id}>{c.name} · {pesos(Number(c.default_amount_centavos))}</option>)}
-              <option value="other">Others</option></select></label>
-            <label>For Course<select value={forEnrollment} onChange={(ev) => setForEnrollment(ev.target.value)}>{mine.map((e) => <option key={e.id} value={e.id}>{courseCode(e)} · {e.enrollment_number}</option>)}</select></label>
-            {pick === "other" && <><label>What is it?<input value={otherName} onChange={(ev) => setOtherName(ev.target.value)} /></label><label>Amount (PHP)<input className="cx-mono" inputMode="decimal" value={otherAmount} onChange={(ev) => setOtherAmount(ev.target.value)} /></label></>}
-            <label>Quantity<input className="cx-mono" inputMode="numeric" value={quantity} onChange={(ev) => setQuantity(ev.target.value)} /></label>
-            <div className="cx-addbtn"><button type="button" className="portal-secondary" disabled={!pick} onClick={addExtra}>Add to Payment</button></div>
-          </div>
-        </div>}
         <div className={`cx-tally full ${matches ? "ok" : "no"}`}><span>Applied {pesos(total)} of {pesos(receivedCentavos)}</span><span>{!receivedCentavos ? "Enter the amount received" : matches ? "Ready to record" : total < receivedCentavos ? `${pesos(receivedCentavos - total)} not applied` : `${pesos(total - receivedCentavos)} over the amount received`}</span></div>
         <div className="full"><span className="pay-label">Mode of payment</span><div className="cx-choice" role="radiogroup" aria-label="Mode of payment">{modes.map((m) => <button type="button" role="radio" aria-checked={method === m} key={m} className={method === m ? "on" : ""} onClick={() => { setMethod(m); if (!initialProof || m !== initialProof.method) setProof(null); else setProof({ id: initialProof.id, link: initialProof.drive_link ?? "", path: "", duplicate: false }); }}>{m}</button>)}</div></div>
         <label>{refRequired ? "Reference number (required)" : "Reference number"}<input className="cx-mono" value={reference} onChange={(ev) => setReference(ev.target.value.toUpperCase())} placeholder={refRequired ? `${method} reference` : "Not needed for cash"} /></label>
@@ -483,7 +447,6 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
           <button type="button" role="menuitem" onClick={() => { fill("all"); setMenu(false); }}>Pay All in Full</button>
           <button type="button" role="menuitem" onClick={() => { fill("spread"); setMenu(false); }}>Distribute in Order</button>
           <button type="button" role="menuitem" onClick={() => { fill("clear"); setMenu(false); }}>Clear Amounts</button>
-          <hr /><button type="button" role="menuitem" onClick={() => { setAddOpen(true); setMenu(false); }}>+ Add Miscellaneous Charge</button>
         </div>}
         <button type="button" className="portal-primary" disabled={!valid || busy} onClick={() => void post()}>{busy ? "Recording…" : `Record ${receivedCentavos > 0 ? pesos(receivedCentavos) : "Payment"}`}</button>
         <button type="button" className="portal-primary cx-splitdd" aria-label="More payment options" aria-haspopup="menu" aria-expanded={menu} onClick={() => setMenu(!menu)}>▾</button>

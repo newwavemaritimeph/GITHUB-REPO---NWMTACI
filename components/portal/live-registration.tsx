@@ -587,11 +587,18 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload, onOpenAccount
   // The Meta thread link is required before the hand-over or Company Charge (owner, 4 Nov 2026).
   const fbSaved = data.traineeFacebook?.[e.trainee_id] ?? "";
   const threadNote = <small>Add the Meta thread link in the Trainee Account{onOpenAccount && <> · <button type="button" className="cx-textbtn" onClick={onOpenAccount}>Open Trainee Account</button></>}</small>;
+  // Items to Collect (owner, 10 Nov 2026, Design 2): Uniform and any other Miscellaneous item in the Schedule of Fees, ticked here,
+  // wait as unpaid charges and the Cashier collects them. Nothing is ticked until the trainee asks for it.
+  const itemList = data.charges.filter((c) => c.active && c.kind === "item" && Number(c.default_amount_centavos) > 0).sort((a, z) => Number(/uniform/i.test(z.name)) - Number(/uniform/i.test(a.name)) || a.name.localeCompare(z.name));
+  const [items, setItems] = useState<Record<string, number>>({});
+  const itemsTotal = itemList.reduce((s, c) => s + Number(c.default_amount_centavos) * (items[c.id] ?? 0), 0);
+  const setQty = (id: string, q: number) => setItems((cur) => ({ ...cur, [id]: Math.max(0, Math.min(10, q)) }));
   async function handOver() {
     setPayError(""); setHanding(true);
     try {
       if (needsProof && payFile) await uploadTraineeProof(e.trainee_id, { mode: payMode, amount: payAmount, reference: payRef, file: payFile });
-      await post({ action: "application-handover", enrollmentId: e.id }, needsProof ? `Proof saved to Google Drive and handed to the Cashier (${payMode}).` : "Handed to the Cashier for payment (Cash).");
+      const chosen = itemList.filter((c) => (items[c.id] ?? 0) > 0).map((c) => ({ chargeCatalogId: c.id, quantity: items[c.id] }));
+      await post({ action: "application-handover", enrollmentId: e.id, ...(chosen.length ? { items: chosen } : {}) }, needsProof ? `Proof saved to Google Drive and handed to the Cashier (${payMode}).` : "Handed to the Cashier for payment (Cash).");
     } catch (err) { setPayError(err instanceof Error ? err.message : "Could not hand to the Cashier."); }
     finally { setHanding(false); }
   }
@@ -652,10 +659,13 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload, onOpenAccount
         <label className="sc-pay-ref">Reference No.<input value={payRef} onChange={(ev) => setPayRef(ev.target.value.toUpperCase())} placeholder="From the screenshot" maxLength={80} /></label>
         <label className="sc-pay-file">Proof of Payment<input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" onChange={(ev) => setPayFile(ev.target.files?.[0] ?? null)} /></label>
       </> : <span className="sc-pay-note">Trainee pays at the Cashier.</span>}
-      {!isCC && <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || handing || anySaving || !proofReady || !fbSaved} onClick={() => void handOver()}>{handing ? "Saving…" : needsProof ? "Upload Proof & Hand to Cashier" : "Hand to Cashier"}</button>{!fbSaved ? threadNote : needsProof && !proofReady && <small>Amount, reference and photo are required</small>}</div>}
+      {!isCC && itemList.length > 0 && <div className="sc-items"><span className="pay-label">Items to Collect</span>
+        {itemList.map((c) => { const q = items[c.id] ?? 0; return <div key={c.id} className="sc-item"><label><input type="checkbox" checked={q > 0} onChange={(ev) => setQty(c.id, ev.target.checked ? 1 : 0)} /> <b>{c.name}</b> <small>{pesos2(Number(c.default_amount_centavos))} each</small></label>{q > 0 && <span className="sc-qty"><button type="button" aria-label={`One less ${c.name}`} onClick={() => setQty(c.id, q - 1)}>−</button><span>{q}</span><button type="button" aria-label={`One more ${c.name}`} onClick={() => setQty(c.id, q + 1)}>+</button></span>}<span className="sc-item-amt">{q > 0 ? pesos2(Number(c.default_amount_centavos) * q) : ""}</span></div>; })}
+      </div>}
+      {!isCC && <div className="sc-pay-go"><button type="button" className="portal-primary" disabled={busy || handing || anySaving || !proofReady || !fbSaved} onClick={() => void handOver()}>{handing ? "Saving…" : `${needsProof ? "Upload Proof & Hand to Cashier" : "Hand to Cashier"} · ${pesos2(balance + itemsTotal)}`}</button>{!fbSaved ? threadNote : needsProof && !proofReady && <small>Amount, reference and photo are required</small>}</div>}
       {payError && <div className="sc-pay-err"><Message kind="error" text={payError} /></div>}
     </div>}
-    {r.handed && !r.paid && !billTo && (() => { const pr = (data.traineeProofs ?? []).filter((x) => x.trainee_id === e.trainee_id).sort((a, z) => z.submitted_at.localeCompare(a.submitted_at))[0]; return <div className="sc-handed">With the Cashier · {pr ? `${pr.method} ${pesos2(pr.amount_centavos)} · Ref. ${pr.reference}` : "Cash"}</div>; })()}
+    {r.handed && !r.paid && !billTo && (() => { const pr = (data.traineeProofs ?? []).filter((x) => x.trainee_id === e.trainee_id).sort((a, z) => z.submitted_at.localeCompare(a.submitted_at))[0]; const held = (data.pendingItems ?? []).filter((x) => x.enrollment_id === e.id); return <div className="sc-handed">With the Cashier · {pr ? `${pr.method} ${pesos2(pr.amount_centavos)} · Ref. ${pr.reference}` : "Cash"}{held.map((x) => ` · ${x.description} ${pesos2(x.amount_centavos)}`).join("")}</div>; })()}
     <div className="sc-foot">
       <small>{!allTicked ? `Still to tick: ${missingNow.map((q) => q.label).join(", ")}` : !fbSaved && !r.handed && !r.paid ? "All requirements received. Add the Meta thread link in the Trainee Account to continue." : isCC && !r.paid ? `All requirements received. Enroll on Company Charge: ${ccName || "the company"} is billed on its Billing Statement, so no payment at the Cashier.` : !r.handed && !r.paid ? "All requirements received. Hand the trainee to the Cashier for payment." : !r.paid ? "With the Cashier — waiting for payment." : !e.batch_id && !e.scheduled_on ? "Paid. Choose a batch and the trainee is enrolled automatically." : "Paid — enrolling. Refresh if the status has not changed."}</small>
       <span className="sc-acts">

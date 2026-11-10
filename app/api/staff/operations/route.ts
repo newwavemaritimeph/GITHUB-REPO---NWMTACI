@@ -263,7 +263,8 @@ const centerSaveInput = z.object({ action: z.literal("center-save"), id: z.strin
 // Cashier actions relocated into the Payments module.
 // Miscellaneous items (Schedule of fees, kind "item") sold with a payment. Each becomes an
 // enrollment charge that is approved because it is paid on the same receipt.
-const paymentItemInput = z.object({ enrollmentId: z.string().uuid(), chargeCatalogId: z.string().uuid().nullable().optional(), description: z.string().trim().min(1).max(120), unitCentavos: z.number().int().positive(), quantity: z.number().int().min(1).max(50) });
+// `chargeId` settles an item Registration added at the hand-over instead of adding a new one (10 Nov 2026).
+const paymentItemInput = z.object({ enrollmentId: z.string().uuid(), chargeCatalogId: z.string().uuid().nullable().optional(), description: z.string().trim().min(1).max(120), unitCentavos: z.number().int().positive(), quantity: z.number().int().min(1).max(50), chargeId: z.string().uuid().optional() });
 // Trainee-sent proof marked Not Valid by the Cashier (29 Oct 2026).
 const proofDismissInput = z.object({ action: z.literal("proof-dismiss"), proofId: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
 const paymentSplitInput = z.object({ action: z.literal("payment-split"), allocations: z.array(z.object({ enrollmentId: z.string().uuid(), amountCentavos: z.number().int().positive() })).max(10).default([]), items: z.array(paymentItemInput).max(10).optional().default([]), fee: z.object({ enrollmentId: z.string().uuid(), amountCentavos: z.number().int().positive(), label: z.string().trim().min(3).max(120) }).nullable().optional(), proofId: z.string().uuid().nullable().optional(), method: z.string().trim().min(1).max(80), receivingAccount: z.string().trim().min(2).max(120), referenceNumber: z.string().trim().max(80).optional().default(""), receivedAt: z.string().datetime({ offset: true }), remarks: z.string().trim().max(500).optional().default("") });
@@ -292,7 +293,8 @@ const traineeFacebookInput = z.object({ action: z.literal("trainee-facebook"), t
 const admissionRecordInput = z.object({ action: z.literal("admission-record-issue"), traineeId: z.string().uuid(), enrollmentIds: z.array(z.string().uuid()).max(30).optional() });
 // Accounting reprints a receipt or a TAR from the Trainee Account, with a reason (owner, 3 Nov 2026).
 const documentReprintInput = z.object({ action: z.literal("document-reprint"), kind: z.enum(["receipt", "tar"]), id: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
-const applicationHandoverInput = z.object({ action: z.literal("application-handover"), enrollmentId: z.string().uuid() });
+// Items Registration ticks at the hand-over (owner, 10 Nov 2026): Uniform and any other Miscellaneous item in the Schedule of Fees.
+const applicationHandoverInput = z.object({ action: z.literal("application-handover"), enrollmentId: z.string().uuid(), items: z.array(z.object({ chargeCatalogId: z.string().uuid(), quantity: z.number().int().min(1).max(10) })).max(10).optional() });
 // Company Charge (owner, 29 Oct 2026): enroll without payment; the partner is billed. One payment per Billing Statement.
 const enrollChargeInput = z.object({ action: z.literal("application-enroll-charge"), enrollmentId: z.string().uuid(), agencyId: z.string().uuid().nullable().optional() });
 const serviceInvoiceSetupInput = z.object({ action: z.literal("service-invoice-setup-save"), controlNo: z.string().trim().max(40), formNo: z.string().trim().max(40), revisionNo: z.string().trim().max(20), revisionDate: z.string().trim().max(20), issuedDate: z.string().trim().max(20), tin: z.string().trim().max(30), format: z.string().trim().min(1).max(40), lastNumber: z.number().int().min(0) });
@@ -859,8 +861,11 @@ export async function GET(request: Request) {
   // Non-discount charges awaiting Accounting approval queue.
   const pendingChargesUnit = (async (): Promise<unknown[]> => {
     if (!seesPendingCharges) return [];
-    const { data } = await db.from("enrollment_charges").select("id,enrollment_id,description,amount_centavos,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name))").eq("event_type", "charge").eq("approval_status", "Pending").order("created_at", { ascending: false }).limit(200);
-    return data ?? [];
+    const { data } = await db.from("enrollment_charges").select("id,enrollment_id,charge_catalog_id,description,amount_centavos,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name))").eq("event_type", "charge").eq("approval_status", "Pending").order("created_at", { ascending: false }).limit(200);
+    // Items Registration adds at the hand-over are paid at the Cashier, never approved by Accounting (10 Nov 2026).
+    const { data: itemKinds } = await db.from("charge_catalog").select("id").eq("kind", "item");
+    const items = new Set((itemKinds ?? []).map((c) => c.id as string));
+    return (data ?? []).filter((c) => !c.charge_catalog_id || !items.has(c.charge_catalog_id as string));
   })();
 
   // Cashier to Accounting requests (Cancellation/Refund/Make-up/Rescheduling).
@@ -1031,6 +1036,16 @@ export async function GET(request: Request) {
   const task = (f: () => Promise<void>) => { tasks.push(f()); };
   // Discounts (owner, 10 Nov 2026): who asked, for Accounting's To Do, and the ones Accounting rejected in the last 30 days
   // with the reason, so the Cashier sees the answer in the Trainee Account.
+  // Items Registration added at the hand-over, still to be paid at the Cashier (10 Nov 2026).
+  let pendingItems: { id: string; enrollment_id: string; charge_catalog_id: string | null; description: string; amount_centavos: number; created_at: string }[] = [];
+  task(async () => {
+    const admin = createSupabaseAdminClient();
+    const { data: cat } = await admin.from("charge_catalog").select("id").eq("kind", "item");
+    const ids = (cat ?? []).map((c) => c.id as string);
+    if (!ids.length) return;
+    const r = await admin.from("enrollment_charges").select("id,enrollment_id,charge_catalog_id,description,amount_centavos,created_at").eq("event_type", "charge").eq("approval_status", "Pending").eq("valid", false).in("charge_catalog_id", ids).order("created_at").limit(500);
+    if (!r.error) pendingItems = (r.data ?? []).map((x) => ({ id: x.id as string, enrollment_id: x.enrollment_id as string, charge_catalog_id: (x.charge_catalog_id as string | null) ?? null, description: x.description as string, amount_centavos: Number(x.amount_centavos), created_at: x.created_at as string }));
+  });
   const discountNames: Record<string, string> = {};
   let rejectedDiscounts: { id: string; enrollment_id: string; amount_centavos: number; decided_at: string | null; reason: string | null }[] = [];
   task(async () => {
@@ -1376,7 +1391,7 @@ export async function GET(request: Request) {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, feedbackLinks: certs.feedbackLinks, certificatePhotos: certs.photos, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    documentControls, centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: ((pendingDiscounts.data ?? []) as { created_by?: string | null }[]).map((d) => ({ ...d, requested_by_name: d.created_by ? discountNames[d.created_by] ?? null : null })), rejectedDiscounts, announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, stamp, applicationNumbers, traineeFacebook, instructionCategories, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, softCopyEmails, batchNumberSeries, classroomCodes, classroom, classroomCourseIds, classroomInvites, batchClasses, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, pendingRebates, deliveryRequests, instructors, accreditations, batchResources, batchCancels, certificateNumberSettings, legacyCertificates, holidays, otherIncome, incomeCategories, rebatesReceived, traineeProofs, companyCharge, billingStatements, paymentVoids, voidedPayments }, { headers: { "Cache-Control": "no-store" } });
+    documentControls, centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: ((pendingDiscounts.data ?? []) as { created_by?: string | null }[]).map((d) => ({ ...d, requested_by_name: d.created_by ? discountNames[d.created_by] ?? null : null })), rejectedDiscounts, pendingItems, announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, stamp, applicationNumbers, traineeFacebook, instructionCategories, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, softCopyEmails, batchNumberSeries, classroomCodes, classroom, classroomCourseIds, classroomInvites, batchClasses, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, pendingRebates, deliveryRequests, instructors, accreditations, batchResources, batchCancels, certificateNumberSettings, legacyCertificates, holidays, otherIncome, incomeCategories, rebatesReceived, traineeProofs, companyCharge, billingStatements, paymentVoids, voidedPayments }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /**
@@ -2215,6 +2230,17 @@ export async function POST(request: Request) {
       const { error } = await admin.from("enrollments").update({ handed_to_cashier_at: at, handed_to_cashier_by: staff.user.id }).eq("id", input.enrollmentId).is("handed_to_cashier_at", null);
       if (error) throw error;
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "registration", action: "application.handed_to_cashier", record_type: "enrollment", record_id: input.enrollmentId, new_values: { handed_to_cashier_at: at } });
+      // The items to collect wait as unpaid charges; the Cashier settles each on its own receipt (10 Nov 2026).
+      if (input.items?.length) {
+        const { data: cat } = await admin.from("charge_catalog").select("id,name,default_amount_centavos,active,kind").in("id", input.items.map((i) => i.chargeCatalogId));
+        const byId = new Map(((cat ?? []) as { id: string; name: string; default_amount_centavos: number; active: boolean; kind: string | null }[]).filter((c) => c.active && c.kind === "item" && Number(c.default_amount_centavos) > 0).map((c) => [c.id, c]));
+        const rows = input.items.flatMap((i) => { const c = byId.get(i.chargeCatalogId); return c ? [{ enrollment_id: input.enrollmentId, charge_catalog_id: c.id, description: i.quantity > 1 ? `${c.name} x ${i.quantity}` : c.name, amount_centavos: Number(c.default_amount_centavos) * i.quantity, event_type: "charge", valid: false, approval_status: "Pending", created_by: staff.user.id }] : []; });
+        if (rows.length) {
+          const { error: itemError } = await admin.from("enrollment_charges").insert(rows);
+          if (itemError) throw itemError;
+          await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "registration", action: "item.added", record_type: "enrollment", record_id: input.enrollmentId, new_values: { items: rows.map((r) => ({ description: r.description, amount_centavos: r.amount_centavos })) } });
+        }
+      }
       return NextResponse.json({ ok: true });
     }
     if (input.action === "application-enroll-charge") {
@@ -3317,7 +3343,7 @@ export async function POST(request: Request) {
       const catalogIds = [...new Set(input.items.map((i) => i.chargeCatalogId).filter(Boolean) as string[])];
       const { data: kinds } = catalogIds.length ? await admin.from("charge_catalog").select("id,kind").in("id", catalogIds) : { data: [] };
       const kindOf = new Map(((kinds ?? []) as { id: string; kind: string | null }[]).map((k) => [k.id, k.kind]));
-      type Part = { label: string; remarks: string | null; allocations: { enrollment_id: string; amount_centavos: number }[]; chargeId?: string };
+      type Part = { label: string; remarks: string | null; allocations: { enrollment_id: string; amount_centavos: number }[]; chargeId?: string; keep?: boolean };
       const parts: Part[] = [];
       // Courses paid together share one receipt and so one TAR (owner, 4 Nov 2026).
       const course = new Map<string, number>();
@@ -3327,6 +3353,14 @@ export async function POST(request: Request) {
       // Items are written as Pending and approved only after their payment posts, so a
       // failed payment never leaves an unpaid charge on the balance.
       for (const item of input.items) {
+        if (item.chargeId) {
+          // An item Registration added at the hand-over: settle that charge as it was written (its own description and amount).
+          const { data: held } = await admin.from("enrollment_charges").select("id,enrollment_id,charge_catalog_id,description,amount_centavos,valid,approval_status").eq("id", item.chargeId).maybeSingle();
+          if (!held || held.valid || held.approval_status !== "Pending" || held.enrollment_id !== item.enrollmentId) return NextResponse.json({ error: `${item.description} is no longer waiting to be paid. Refresh and try again.` }, { status: 400 });
+          const heldLabel = `${held.charge_catalog_id && kindOf.get(held.charge_catalog_id as string) === "fee" ? "Service Fee" : "Miscellaneous"} · ${held.description}`;
+          parts.push({ label: heldLabel, remarks: heldLabel, allocations: [{ enrollment_id: held.enrollment_id as string, amount_centavos: Number(held.amount_centavos) }], chargeId: held.id as string, keep: true });
+          continue;
+        }
         const description = item.quantity > 1 ? `${item.description} x ${item.quantity}` : item.description;
         const { data: row, error: itemError } = await admin.from("enrollment_charges").insert({ enrollment_id: item.enrollmentId, charge_catalog_id: item.chargeCatalogId ?? null, description, amount_centavos: item.unitCentavos * item.quantity, event_type: "charge", valid: false, approval_status: "Pending", created_by: staff.user.id }).select("id").single();
         if (itemError) throw itemError;
@@ -3338,7 +3372,8 @@ export async function POST(request: Request) {
         const amount = part.allocations.reduce((sum, a) => sum + a.amount_centavos, 0);
         const { data: pay, error } = await db.rpc("post_payment", { target_trainee: traineeId, target_amount_centavos: amount, target_method: input.method, target_receiving_account: input.receivingAccount, target_reference: input.referenceNumber || null, target_received_at: input.receivedAt, target_proof: input.proofId ?? null, target_allocations: part.allocations, target_remarks: part.remarks });
         if (error) {
-          const unposted = parts.slice(k).map((x) => x.chargeId).filter(Boolean) as string[];
+          // Items Registration added stay waiting for the next try; only charges added here are dropped.
+          const unposted = parts.slice(k).filter((x) => !x.keep).map((x) => x.chargeId).filter(Boolean) as string[];
           if (unposted.length) await admin.from("enrollment_charges").update({ approval_status: "Rejected" }).in("id", unposted);
           if (!posted.length) throw error;
           return NextResponse.json({ error: `Recorded ${posted.map((x) => x.label).join(", ")}. Not recorded: ${parts.slice(k).map((x) => x.label).join(", ")} (${error.message}).`, payments: posted }, { status: 400 });

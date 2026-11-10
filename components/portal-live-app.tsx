@@ -70,6 +70,8 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   pendingDiscounts:{id:string;enrollment_id:string;description:string;amount_centavos:number;agency_id?:string|null;created_at:string;requested_by_name?:string|null}[];
   /** Discounts Accounting rejected in the last 30 days, with its reason (10 Nov 2026). */
   rejectedDiscounts?:{id:string;enrollment_id:string;amount_centavos:number;decided_at:string|null;reason:string|null}[];
+  /** Items Registration added at the hand-over, still to be paid at the Cashier (10 Nov 2026). */
+  pendingItems?:{id:string;enrollment_id:string;charge_catalog_id:string|null;description:string;amount_centavos:number;created_at:string}[];
   announcements:{id:string;title:string;body:string;audience_roles:string[];published_at?:string|null;expires_at?:string|null}[];
   courseCategories:{id:string;name:string}[]; partnerCenters:{id:string;name:string;active:boolean}[];
   requests:{id:string;request_number:string;request_type:string;requested_values:{batchId?:string;amountCentavos?:number;paymentId?:string}|null;reason:string;status:string;decision_remarks?:string|null;created_at:string;decided_at?:string|null;requested_on?:string|null;fee_rule?:string|null;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;enrollments?:{id?:string;enrollment_number:string;trainee_id?:string;courses?:{name:string}|{name:string}[]|null}|{id?:string;enrollment_number:string;trainee_id?:string;courses?:{name:string}|{name:string}[]|null}[]|null;
