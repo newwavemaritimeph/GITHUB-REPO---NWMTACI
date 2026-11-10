@@ -373,6 +373,8 @@ export function PortalLiveApp(){
         {arrival&&<button type="button" className="nw-arrival" role="status" onClick={()=>setArrival("")}>{arrival}</button>}<div className="nw-brand"><NewWaveLogo inverted/></div>
         <div className="nw-tools">
           <label className="nw-role"><span>Working as</span><select value={role} onChange={e=>{setRole(e.target.value);setActive("Dashboard");setRecordsView("applications");setOpenTab("")}} aria-label="Working as">{roleOptions.map(item=><option key={item} value={item}>{roleNames[item]??item}</option>)}</select></label>
+          {/* Queue Console (owner, 10 Nov 2026): opens on this site, where the staff member is already signed in. */}
+          {(role==="registration"||role==="cashier"||role==="admin")&&<a className="nw-sound nw-queue" href="/queue/staff" target="_blank" rel="noreferrer">Queue Console</a>}
           {(role==="registration"||role==="cashier")&&<button type="button" className="nw-sound" onClick={toggleSound} aria-pressed={soundOn} title={soundOn?"New-arrival chime is on":"New-arrival chime is off"}>{soundOn?"Sound On":"Sound Off"}</button>}
           <button type="button" className="nw-icon" onClick={()=>setNotices(!notices)} aria-label="Notifications"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5-6.71V3.5a2 2 0 1 0-4 0v.79A7 7 0 0 0 5 11v5l-2 2v1h18v-1Z"/></svg>{unread>0&&<b>{unread}</b>}</button>
           <div className="nw-user"><span className="user-dot">{initials}</span><span className="nw-user-text"><strong>{data.profile.complete_name}</strong><small>{roleNames[role]??role}</small></span></div>

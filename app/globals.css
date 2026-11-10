@@ -6864,3 +6864,4 @@ a[href^="mailto:"],
 .portal-shell .rq-tag.got { border: 1px solid transparent; background: #eaf3fb; color: #123f63; }
 .portal-shell .rq-tag.bad { border: 1px solid transparent; background: #fdecea; color: #b42318; }
 .portal-shell .rq-totals { margin: 8px 2px 0; font-size: 13px; color: var(--nw-muted, #5b6b7d); }
+.nw-queue { display: inline-flex; align-items: center; text-decoration: none; background: #F25615 !important; border-color: #F25615 !important; }

@@ -5,7 +5,7 @@ import QRCode from "qrcode";
 import { announcement, announcementTagalog, type QueueBroadcast } from "@/lib/queue";
 import { playChime, unlockChime } from "@/lib/portal-alerts";
 import { DEFAULT_VOICE, VOICE_KEY, listVoices, loadVoice, speak, useQueueLive, type VoiceSettings } from "./use-queue-live";
-import { QueueBrand } from "./queue-brand";
+import { QueueBadge, QueueBrand } from "./queue-brand";
 import { queueBase } from "./queue-join";
 
 type Ticket = { ticket_no: string; service_code: string; window_no: number | null; first_name?: string };
@@ -61,16 +61,17 @@ export function QueueDisplay() {
   return <div className={`qd${flash ? " flash" : ""}`}>
     <header className="qd-top"><QueueBrand sub="NOW SERVING" /><div className="qd-right"><button type="button" className="qd-gear" onClick={() => setVoiceOpen((v) => !v)} aria-expanded={voiceOpen}>Voice Settings</button><div className="qd-clock q-mono">{clock}</div></div></header>
     <main className="qd-main">
-      <section><h2 className="qd-h">Windows</h2>
-        {(s?.windows ?? []).map((w) => <div key={w.no} className={`qd-win${w.service_codes?.includes("P") ? " cashier" : ""}${calling === w.no ? " call" : ""}`}><div><small>WINDOW {w.no}</small><b>{w.name}</b></div><div className="qd-now q-mono">{w.serving ? w.serving.ticket_no : "—"}</div></div>)}
+      <section className="qd-col"><h2 className="qd-h"><span>Now Serving</span></h2>
+        {(s?.windows ?? []).map((w) => <div key={w.no} className={`qd-win${w.service_codes?.includes("P") ? " cashier" : ""}${calling === w.no ? " call" : ""}${w.serving ? "" : " idle"}`}><div className="qd-wno"><small>WINDOW</small><b>{w.no}</b></div><div className="qd-wname">{w.name}</div><div className="qd-now q-mono">{w.serving ? w.serving.ticket_no : "—"}</div></div>)}
       </section>
-      <section><h2 className="qd-h">Up Next{s ? ` · ${s.waitingCount}` : ""}</h2>
-        <div className="qd-next">{(s?.waiting ?? []).map((t) => <span key={t.ticket_no} className="q-mono">{t.ticket_no}{t.first_name ? ` ${t.first_name}` : ""}</span>)}{s && !s.waiting.length && <span style={{ fontSize: 22, fontWeight: 500 }}>No one waiting</span>}</div>
+      <section className="qd-col"><h2 className="qd-h"><span>Up Next</span>{s && <span>{s.waitingCount} Waiting</span>}</h2>
+        <div className="qd-next">{(s?.waiting ?? []).map((t) => <span key={t.ticket_no} className="q-mono">{t.ticket_no}{t.first_name ? ` ${t.first_name}` : ""}</span>)}{s && !s.waiting.length && <span className="qd-empty">No one waiting</span>}</div>
         {/* eslint-disable-next-line @next/next/no-img-element -- a generated data URL */}
         {qr && <div className="qd-qr"><img src={qr} alt="QR code to join the queue" /><div><b>Scan to Join the Queue</b><small>Your number shows on your phone and on this screen.</small></div></div>}
       </section>
     </main>
     <div className="qd-ticker">{s?.ticker ?? ""}</div>
+    {!started && <div className="qd-start"><QueueBadge /><button type="button" onClick={() => void start()}>Start Display</button><button type="button" className="qd-gear" onClick={() => { setVoices(listVoices()); setVoiceOpen(true); }}>Voice Settings</button></div>}
     {voiceOpen && <div className="qd-voice" role="dialog" aria-label="Voice Settings">
       <h2>Voice Settings</h2>
       <label>Voice<select value={voice.voice} onChange={(e) => saveVoice({ ...voice, voice: e.target.value })}>
@@ -84,6 +85,6 @@ export function QueueDisplay() {
     </div>}
     {banner && <div className="qd-banner" role="status">{banner}</div>}
     {!online && <div className="qd-offline">Offline, reconnecting…</div>}
-    {!started && <div className="qd-start"><button type="button" onClick={() => void start()}>Start Display</button></div>}
+
   </div>;
 }

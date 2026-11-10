@@ -10,7 +10,7 @@ type Data = { windows: { no: number; name: string; service_codes: string[] }[]; 
 const WINDOW_KEY = "nw-queue-window";
 const minutes = (iso: string) => Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
 
-/** /staff (queue plan §10; Bright Wave, owner 10 Nov 2026): pick a window, then Call Next, Recall, Done and No-Show; the waiting list and today's numbers. */
+/** /staff (queue plan §10; Harbor Navy, owner 10 Nov 2026): pick a window, then Call Next, Recall, Done and No-Show; the waiting list and today's numbers. */
 export function QueueStaff() {
   const [d, setD] = useState<Data | null>(null), [chosen, setChosen] = useState<number | null>(null), [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ err?: boolean; text: string } | null>(null);
   const load = useCallback(async () => {
@@ -57,7 +57,7 @@ export function QueueStaff() {
   if (!d) return <main className="qs"><p className="q-note">{msg?.text ?? "Loading the queue…"}</p></main>;
   if (!d.windows.length) return <main className="qs"><p className="qs-msg err">No window is set up for your role.</p></main>;
   return <div onPointerDown={unlockChime}>
-    <div className="qs-bar"><QueueBrand sub="Queue Console" /><label>Window <select value={win ?? ""} onChange={(e) => pick(Number(e.target.value))} aria-label="Window">{d.windows.map((w) => <option key={w.no} value={w.no}>{`Window ${w.no} · ${w.name}`}</option>)}</select></label></div>
+    <div className="qs-bar"><QueueBrand sub="Queue Console" /><label>Window<select value={win ?? ""} onChange={(e) => pick(Number(e.target.value))} aria-label="Window">{d.windows.map((w) => <option key={w.no} value={w.no}>{`Window ${w.no} · ${w.name}`}</option>)}</select></label></div>
     <main className="qs">
     {!online && <p className="qs-msg err">Offline, reconnecting…</p>}
     {msg && <p className={`qs-msg${msg.err ? " err" : ""}`} role="status">{msg.text}</p>}
@@ -66,7 +66,7 @@ export function QueueStaff() {
         <section className="qs-now" aria-live="polite">
           <small>NOW SERVING · WINDOW {win}</small>
           <div className="q-no q-mono">{serving?.ticket_no ?? "—"}</div>
-          {serving && <div>{serving.full_name ?? "Walk-in"} · {svc(serving.service_code)}{serving.recall_count ? ` · recalled ${serving.recall_count}×` : ""}</div>}
+          {serving && <div className="qs-who">{serving.full_name ?? "Walk-in"} · {svc(serving.service_code)}{serving.recall_count ? ` · recalled ${serving.recall_count}×` : ""}</div>}
           <div className="qs-btns">
             <button type="button" className="main" disabled={busy || !win} onClick={() => void act({ action: "call-next", window: win }, "Now serving {no}.")}>Call Next<kbd>N</kbd></button>
             <button type="button" disabled={busy || !serving} onClick={() => serving && void act({ action: "recall", ticketId: serving.id }, "Recalled {no}.")}>Recall<kbd>R</kbd></button>

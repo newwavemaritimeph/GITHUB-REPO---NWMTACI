@@ -9,7 +9,7 @@ type Win = { no: number; name: string; service_codes: string[] };
 /** Links work on the queue host (/t/...) and, for testing, on the main host (/queue/t/...). */
 export const queueBase = () => (typeof window !== "undefined" && window.location.pathname.startsWith("/queue") ? "/queue" : "");
 
-/** /join (queue plan §10; Bright Wave, owner 10 Nov 2026): full name, mobile, service, consent, Submit. */
+/** /join (queue plan §10; Harbor Navy, owner 10 Nov 2026): full name, mobile, service, consent, Submit. */
 export function QueueJoin() {
   const [services, setServices] = useState<Service[]>([]), [windows, setWindows] = useState<Win[]>([]);
   const [name, setName] = useState(""), [mobile, setMobile] = useState(""), [service, setService] = useState(""), [consent, setConsent] = useState(false);
@@ -35,7 +35,7 @@ export function QueueJoin() {
   const where = (code: string) => { const nos = windowsFor(code, windows); const w = windows.find((x) => x.no === nos[0]); return `${w?.name ?? ""} · ${windowsText(nos)}`; };
   return <main className="q-wrap">
     <QueueHead sub="Walk-In Queue" />
-    <section className="q-body">
+    <section className="q-sheet">
       <h1>Queue Registration</h1>
       <label className="q-field">Full Name<input type="text" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Juan Dela Cruz" maxLength={120} /></label>
       <label className="q-field">Mobile Number<input type="tel" inputMode="tel" autoComplete="tel" value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="09XX XXX XXXX" maxLength={16} /></label>
