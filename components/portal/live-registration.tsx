@@ -9,7 +9,7 @@ import { askReason } from "./dialogs";
 import { isPackageCourse, packageWeeks } from "@/lib/packages";
 import { ALL_DATES, Badge, Message, Modal, PageHead, PeriodBar, ViewIcon, useNeedSince, usePaged, usePost, usePeriod, submit, fullName, fmtDate, fmtClock } from "./shared-ui";
 import { RequestActionModal, type RequestType } from "./payment-actions";
-import { TarButton } from "./live-cashier";
+import { TarButton, WorkRow } from "./live-cashier";
 import { InstructionsButton, instructionsCountOf } from "./instructions-window";
 import { tcl } from "@/lib/title-case";
 import { shrinkProof } from "@/lib/proof-shrink";
@@ -114,21 +114,20 @@ export function StcwSeatsPanel({ seats, go }: { seats: StcwSeat[]; go: (module: 
 }
 
 /**
- * Registration Dashboard, Design 1 · Next Up (owner, 6 Nov 2026): one work list
- * with the next step on each row, the trainees with the Cashier folded under it,
- * and tomorrow, STCW seats and the day's enrollments as three small tiles that
- * open one panel at a time. Each step opens the window that already does it.
+ * Registration Dashboard, Design 3 · Work and Classes (owner, 10 Nov 2026): the work on the left as one panel with tabs
+ * (Next Up, Screening, No Course or Batch, With the Cashier), 5 rows a page, and Enrolled Today folded under it; on the
+ * right, the upcoming classes with their instructions, the STCW seats and the Team: the enrollments each employee
+ * handed to the Cashier today, this week or this month. Each step opens the window that already does it.
  */
 export function RegistrationDashboard({ data, go, reload, account }: { data: PortalData; go: (module: string) => void; reload: () => Promise<void>; account?: TraineeAccount }) {
   const today = manilaToday(), now = new Date().toISOString(), tomorrow = addDays(today, 1);
-  const [panel, setPanel] = useState<"" | "tomorrow" | "seats" | "enrolled">("");
-  const [showCashier, setShowCashier] = useState(false);
+  const [tab, setTab] = useState<"next" | "screening" | "setup" | "cashier">("next"), [showEnrolled, setShowEnrolled] = useState(false);
+  const [period, setPeriod] = useState<"today" | "week" | "month">("today");
   const [open, setOpen] = useState<Enrollment | null>(null);
   const [placing, setPlacing] = useState<Enrollment | null>(null);
   const [assigning, setAssigning] = useState<Trainee | null>(null);
   const [accountOf, setAccountOf] = useState<string | null>(null);
   const [registering, setRegistering] = useState(false), [registered, setRegistered] = useState<{ kind: "success" | "error"; text: string } | null>(null);
-  const toggle = (name: typeof panel) => setPanel((v) => (v === name ? "" : name));
 
   const items: NextUpItem[] = [
     ...awaitingCourseOf(data).map((t) => ({ key: t.id, t, step: "Assign", chip: "No Course Yet", tone: "pending", rank: 2, at: t.registered_at ?? "" }) as NextUpItem),
@@ -136,24 +135,25 @@ export function RegistrationDashboard({ data, go, reload, account }: { data: Por
   ];
   const work = items.filter((x) => x.step).sort((a, b) => a.rank - b.rank || a.at.localeCompare(b.at));
   const withCashier = items.filter((x) => !x.step).sort((a, b) => a.at.localeCompare(b.at));
-  const workPage = usePaged(work), cashierPage = usePaged(withCashier);
+  const setup = work.filter((x) => x.step === "Assign" || x.step === "Choose Batch"), screening = work.filter((x) => !setup.includes(x));
+  const lists = { next: work, screening, setup, cashier: withCashier };
+  const page = usePaged(lists[tab], 5);
   const current = open ? data.enrollments.find((e) => e.id === open.id) ?? open : null;
 
-  const row = (x: NextUpItem) => { const e = x.e, id = e?.trainee_id ?? x.t?.id, c = e ? first(e.courses) : null; return <tr key={x.key}>
-    <td data-l="" className="lead"><button type="button" className="pv-open" onClick={() => (e ? setOpen(e) : setAssigning(x.t!))}><span className="cx-name">{e ? nameOf(e) : fullName(x.t!)}</span><span className="cx-id">{appNoOf(data, id) ?? x.t?.trainee_number ?? e?.enrollment_number}</span></button></td>
-    <td data-l="Course">{e ? <>{c?.code ?? c?.name ?? "—"}<small>{scheduleOf(e)}</small></> : <span className="muted-text">Course to Assign</span>}</td>
-    <td data-l="Status"><Badge tone={x.tone}>{x.chip}</Badge>{e && <LateChip e={e} />}</td>
-    <td data-l=""><div className="cx-acts">{x.step && <button type="button" className="portal-primary row-act" onClick={() => (!e ? setAssigning(x.t!) : x.step === "Choose Batch" ? setPlacing(e) : setOpen(e))}>{x.step}</button>}</div></td>
-  </tr>; };
+  const row = (x: NextUpItem) => { const e = x.e, id = e?.trainee_id ?? x.t?.id, c = e ? first(e.courses) : null; return <WorkRow key={x.key}
+    who={<button type="button" className="pv-open" onClick={() => (e ? setOpen(e) : setAssigning(x.t!))}><span className="cx-name">{e ? nameOf(e) : fullName(x.t!)}</span><span className="cx-id">{appNoOf(data, id) ?? x.t?.trainee_number ?? e?.enrollment_number}</span></button>}
+    meta={e ? `${c?.code ?? c?.name ?? "Course"} · ${scheduleOf(e)}` : "Course to Assign"}
+    mid={<><Badge tone={x.tone}>{x.chip}</Badge>{e && <LateChip e={e} />}</>}
+    acts={x.step ? <button type="button" className="portal-primary row-act" onClick={() => (!e ? setAssigning(x.t!) : x.step === "Choose Batch" ? setPlacing(e) : setOpen(e))}>{x.step}</button> : null} />; };
 
   const seats = stcwSeatsOf(data, today, now);
   const seatsOpen = seats.reduce((sum, x) => sum + seatsLeft(x.next), 0);
-  const tomorrowBatches = data.batches.filter((x) => x.starts_on === tomorrow && x.status !== "Cancelled");
-  const tomorrowIds = new Set(tomorrowBatches.map((x) => x.id));
-  const tomorrowEnr = data.enrollments.filter((e) => e.batch_id && tomorrowIds.has(e.batch_id) && e.enrollment_status === "Enrolled");
-  const notSent = tomorrowEnr.filter((e) => instructionsCountOf(data, e) === 0).length;
+  // Upcoming classes: tomorrow and the next two days, with the instructions still to send.
+  const soon = data.batches.filter((x) => x.starts_on >= tomorrow && x.starts_on <= addDays(today, 3) && x.status !== "Cancelled" && !x.partner_offer_id).sort((x, y) => x.starts_on.localeCompare(y.starts_on));
+  const classes = soon.map((b) => { const enr = data.enrollments.filter((e) => e.batch_id === b.id && e.enrollment_status === "Enrolled"); return { b, n: enr.length, notSent: enr.filter((e) => instructionsCountOf(data, e) === 0).length }; }).filter((x) => x.n > 0);
   const enrolledToday = enrolledOn(data, today).length;
-  const tile = (name: Exclude<typeof panel, "">, title: string, sub: string, warn = false) => <button type="button" className={`nu-tile${warn ? " warn" : ""}`} aria-expanded={panel === name} onClick={() => toggle(name)}><b>{title}</b><span>{sub}</span></button>;
+  const team = data.registrationTeam ?? [], teamMax = Math.max(1, ...team.map((m) => m[period])), teamTotal = team.reduce((s, m) => s + m[period], 0);
+  const TABS: [typeof tab, string][] = [["next", "Next Up"], ["screening", "Screening"], ["setup", "No Course or Batch"], ["cashier", "With the Cashier"]];
 
   return <div className="portal-page cx ac">
     <div className="cx-head">
@@ -164,23 +164,30 @@ export function RegistrationDashboard({ data, go, reload, account }: { data: Por
     {registering && <Modal wide title="Register Trainee" onClose={() => setRegistering(false)}>
       <RegistrationForm staff={{ onDone: (r) => { setRegistering(false); setRegistered({ kind: r.warnings?.length ? "error" : "success", text: `Registered · ${r.applicationNumber ?? r.reference}.${r.warnings?.length ? ` ${r.warnings.join(" ")}` : ""}` }); void reload(); } }} />
     </Modal>}
-    <div className="ac-stack">
-    <section className="portal-panel cx-panel" id="rd-next">
-      <div className="panel-heading"><h2>Next Up</h2><span className="rd-count">{work.length}</span></div>
-      {work.length ? <div className="portal-table cx-cards nu-table"><table><thead><tr><th>Trainee</th><th>Course</th><th>Status</th><th></th></tr></thead><tbody>{workPage.shown.map(row)}</tbody></table>{workPage.pager}</div> : <p className="portal-empty-copy">Nobody is waiting on you.</p>}
-      {withCashier.length > 0 && <button type="button" className="pe-fold" aria-expanded={showCashier} onClick={() => setShowCashier((v) => !v)}><span>{withCashier.length} With the Cashier</span><span>{showCashier ? "Hide ▴" : "Show ▾"}</span></button>}
-      {showCashier && withCashier.length > 0 && <div className="portal-table cx-cards nu-table"><table><tbody>{cashierPage.shown.map(row)}</tbody></table>{cashierPage.pager}</div>}
-    </section>
-    <div className="nu-strip">
-      {tile("tomorrow", `Tomorrow · ${tomorrowEnr.length} Trainee${tomorrowEnr.length === 1 ? "" : "s"}`, notSent ? `${notSent} Instruction${notSent === 1 ? "" : "s"} Not Yet Sent` : "All Instructions Sent", notSent > 0)}
-      {tile("seats", `STCW Seats · ${seatsOpen} Open`, "Next Batch per Course")}
-      {tile("enrolled", `Enrolled Today · ${enrolledToday}`, "Pick a Date to See Others")}
-    </div>
-    {panel === "tomorrow" && <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Tomorrow · {fmtShort(tomorrow)}</h2></div>
-      <dl className="ac-lines"><div><dt>Trainees in Class</dt><dd>{tomorrowEnr.length}</dd></div><div><dt>Batches</dt><dd>{tomorrowBatches.length}</dd></div><div><dt>Instructions Not Yet Sent</dt><dd className={notSent ? "warn" : ""}>{notSent}</dd></div></dl>
-    </section>}
-    {panel === "seats" && <StcwSeatsPanel seats={seats} go={go} />}
-    {panel === "enrolled" && <EnrolledDayPanel data={data} onOpen={setOpen} />}
+    <div className="cx-split">
+      <div className="ac-stack">
+        <section className="portal-panel cx-panel" id="rd-next">
+          <div className="panel-heading"><h2>Work</h2><span className="cx-sum">{work.length} Waiting on You</span></div>
+          <div className="cx-tabs" role="tablist">{TABS.map(([k, label]) => <button key={k} type="button" role="tab" aria-selected={tab === k} className={tab === k ? "on" : ""} onClick={() => setTab(k)}>{label}<b>{lists[k].length}</b></button>)}</div>
+          {lists[tab].length ? <div className="wr-list">{page.shown.map(row)}{page.pager}</div> : <p className="portal-empty-copy">{tab === "cashier" ? "Nobody is with the Cashier." : "Nobody is waiting on you."}</p>}
+        </section>
+        <button type="button" className="pe-fold" aria-expanded={showEnrolled} onClick={() => setShowEnrolled((v) => !v)}><span>Enrolled Today · {enrolledToday}</span><span>{showEnrolled ? "Hide ▴" : "Show ▾"}</span></button>
+        {showEnrolled && <EnrolledDayPanel data={data} onOpen={setOpen} />}
+      </div>
+      <aside className="cx-cashcol" aria-label="Classes and Team">
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Upcoming Classes</h2><span className="cx-sum">{classes.reduce((s, x) => s + x.n, 0)} Trainees</span></div>
+          {classes.length ? <div className="wr-list">{classes.map(({ b, n, notSent }) => <WorkRow key={b.id} who={<span className="cx-name">{first(b.courses)?.code ?? "Course"} <span className="cx-id">{b.batch_number}</span></span>} meta={`${b.starts_on === tomorrow ? "Tomorrow" : fmtShort(b.starts_on)} · ${n} trainee${n === 1 ? "" : "s"}`}
+            mid={notSent ? <Badge tone="orange">{`${notSent} Not Sent`}</Badge> : <Badge tone="active">All Sent</Badge>} acts={notSent ? <button type="button" className="portal-secondary row-act" onClick={() => go("Batch schedules")}>Open</button> : null} />)}</div> : <p className="portal-empty-copy">No classes in the next three days.</p>}
+        </section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>STCW Seats · Next Batch</h2><span className="cx-sum">{seatsOpen} Open</span></div>
+          <dl className="ac-lines">{seats.map((x) => <div key={x.course.id}><dt>{x.course.code}<small className="cl-sub cl-block">{fmtShort(x.next.starts_on)}</small></dt><dd>{seatsLeft(x.next)} of {x.next.capacity}</dd></div>)}</dl>
+        </section>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Team · Enrollments</h2>
+          <span className="cx-period">{([["today", "Today"], ["week", "This Week"], ["month", "This Month"]] as const).map(([k, label]) => <button key={k} type="button" className={period === k ? "on" : ""} aria-pressed={period === k} onClick={() => setPeriod(k)}>{label}</button>)}</span></div>
+          {team.length ? <div className="rd-team">{team.map((m) => <div key={m.id} className="rd-member"><span className="rd-av">{m.name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase()}</span><div><strong>{m.name}</strong><span className="rd-bar"><i style={{ width: `${Math.round((m[period] / teamMax) * 100)}%` }} /></span></div><b>{m[period]}</b></div>)}
+            <div className="rd-member rd-total"><span /><div>Total Enrollments</div><b>{teamTotal}</b></div></div> : <p className="portal-empty-copy">No hand-overs to the Cashier yet this month.</p>}
+        </section>
+      </aside>
     </div>
     {current && <EnrollmentDrawer data={data} enrollment={current} reload={reload} onClose={() => setOpen(null)} onOpenAccount={account ? () => setAccountOf(current.trainee_id) : undefined} />}
     {accountOf && account?.(accountOf, () => setAccountOf(null))}

@@ -67,9 +67,11 @@ const noop = () => undefined;
 const reload = async () => undefined;
 
 describe("Registration Officer workspace", () => {
-  it("renders Next Up: one work list, the Cashier's trainees folded, three tiles", () => {
+  it("renders Work and Classes: the work in tabs, the classes, seats and team on the right", () => {
     const html = renderToString(createElement(RegistrationDashboard, { data: fixture, go: noop, reload }));
-    for (const title of ["Next Up", "Search Trainee", "STCW Seats · 21 Open", "Enrolled Today · 1", "Tomorrow · 0 Trainees"]) expect(html).toContain(title);
+    for (const title of ["Next Up", "Search Trainee", "STCW Seats · Next Batch", "Upcoming Classes", "Team · Enrollments"]) expect(html).toContain(title);
+    expect(html).toMatch(/21(<!-- -->)? Open/);
+    expect(html).toMatch(/Enrolled Today · (<!-- -->)?1/);
     expect(html).not.toContain("Screen Applications");
     // The applicant without a course, and each application with its next step.
     expect(html).toContain("Pedro Cruz");
@@ -84,7 +86,7 @@ describe("Registration Officer workspace", () => {
 
   it("folds the trainees waiting at the Cashier under Next Up", () => {
     const html = renderToString(createElement(RegistrationDashboard, { data: { ...fixture, handedToCashier: { e5: nowIso } }, go: noop, reload }));
-    expect(html).toMatch(/1(<!-- -->)? With the Cashier/);
+    expect(html).toMatch(/With the Cashier(<!-- -->)?<b>1<\/b>/);
     expect(html).not.toContain("Juan Santos");
   });
 

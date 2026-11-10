@@ -503,7 +503,7 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
  * balances still due after training (emailed daily at 4:00 PM).
  */
 /** A dashboard row (owner, 10 Nov 2026): who with a one-line note, a status, the amount, the actions aligned right. */
-function WorkRow({ who, meta, mid, amount, acts }: { who: ReactNode; meta?: string; mid?: ReactNode; amount?: string; acts?: ReactNode }) {
+export function WorkRow({ who, meta, mid, amount, acts }: { who: ReactNode; meta?: string; mid?: ReactNode; amount?: string; acts?: ReactNode }) {
   return <div className="wr-row"><div className="wr-who">{who}{meta && <small title={meta}>{meta}</small>}</div><div className="wr-mid">{mid}</div><strong className="cx-amt wr-amt">{amount ?? ""}</strong><div className="cx-acts wr-acts">{acts}</div></div>;
 }
 

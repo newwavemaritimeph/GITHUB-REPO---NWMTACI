@@ -72,6 +72,7 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   /** Discounts Accounting rejected in the last 30 days, with its reason (10 Nov 2026). */
   rejectedDiscounts?:{id:string;enrollment_id:string;amount_centavos:number;decided_at:string|null;reason:string|null}[];
   /** Items Registration added at the hand-over, still to be paid at the Cashier (10 Nov 2026). */
+  registrationTeam?:{id:string;name:string;today:number;week:number;month:number}[];
   referralVouchers?:{id:string;voucher_number:string;agency_id:string;period_from:string;period_to:string;total_centavos:number;issued_at:string;mode?:string|null;status?:string;remarks?:string|null}[];
   pendingItems?:{id:string;enrollment_id:string;charge_catalog_id:string|null;description:string;amount_centavos:number;created_at:string}[];
   announcements:{id:string;title:string;body:string;audience_roles:string[];published_at?:string|null;expires_at?:string|null}[];

@@ -6827,3 +6827,15 @@ a[href^="mailto:"],
 .portal-shell .cx-chfold { margin: 4px 16px; width: calc(100% - 32px); }
 .portal-shell .cx-close { margin: 8px 16px 16px; width: calc(100% - 32px); }
 @media (max-width: 640px) { .portal-shell .wr-row { grid-template-columns: minmax(0, 1fr) auto; } .portal-shell .wr-mid { grid-column: 1 / -1; justify-content: flex-start; } .portal-shell .wr-acts { grid-column: 1 / -1; justify-content: flex-start; flex-wrap: wrap; } }
+/* Registration Dashboard, Design 3 · Work and Classes (owner, 10 Nov 2026). */
+.portal-shell .cx-period { display: inline-flex; border: 1px solid var(--nw-line, #dce4ec); border-radius: 8px; overflow: hidden; }
+.portal-shell .cx-period button { border: 0; background: #fff; color: var(--nw-muted, #5b6b7d); font: inherit; font-size: 12.5px; font-weight: 600; padding: 5px 9px; cursor: pointer; }
+.portal-shell .cx-period button.on { background: var(--blue-dark, #123f63); color: #fff; }
+.portal-shell .rd-team { display: grid; gap: 10px; padding: 4px 16px 14px; }
+.portal-shell .rd-member { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.portal-shell .rd-member strong { display: block; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.portal-shell .rd-member > b { font-size: 17px; font-variant-numeric: tabular-nums; }
+.portal-shell .rd-av { width: 32px; height: 32px; border-radius: 50%; background: #eaf3fb; color: #0571d0; display: grid; place-items: center; font-weight: 700; font-size: 12px; }
+.portal-shell .rd-bar { display: block; height: 6px; border-radius: 3px; background: #eaf3fb; overflow: hidden; margin-top: 4px; }
+.portal-shell .rd-bar i { display: block; height: 100%; background: #0571d0; border-radius: 3px; }
+.portal-shell .rd-total { border-top: 1px solid var(--nw-line, #dce4ec); padding-top: 8px; color: var(--nw-muted, #5b6b7d); font-size: 14px; }
