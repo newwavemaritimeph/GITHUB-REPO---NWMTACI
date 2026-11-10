@@ -2,7 +2,7 @@
 import { NwLoader } from "@/components/nw-loader";
 import { InstallApp } from "@/components/install-app";
 import { traineeCopy } from "@/lib/trainee-copy";
-import { newArrivals, playChime, unlockChime } from "@/lib/portal-alerts";
+import { newArrivals, playChime, unlockChime, SOUND_ROLES } from "@/lib/portal-alerts";
 
 import { FormEvent, Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { NewWaveLogo } from "./new-wave-logo";
@@ -11,10 +11,11 @@ import { LiveAttendance } from "./portal/live-attendance";
 import { LiveAccounting, AccountingDashboard, ReceivablesModule, ApprovalsModule, PayablesModule, CashPositionModule, LiveVouchers, LiveInventory, LiveExpenses, SetupList, AccountingConfiguration, ACCOUNTING_CONFIG_SECTIONS, type AccountingConfigSection } from "./portal/live-accounting";
 import { LiveCashierClosing } from "./portal/live-cashier-closing";
 import { CashierPaymentQueue, RequestChargeModal, feeForRequest, TarButton, RecordPaymentModal, RecordTicked, CashierDashboard, CashierPayments, DiscountRequests, CashierEnrollments, CashierExpensesSummary, CashierOpening, CashierSummaryReport, ExpensesWorkspace } from "./portal/live-cashier";
-import { LiveHr, type HrData } from "./portal/live-hr";
+import { LiveHr, HR_GROUPS, HR_LABEL, HR_VIEWS, type HrData, type HrView } from "./portal/live-hr";
 import { useHrDue, type HrPlus } from "./portal/hr-people";
-import { MyHrChecks, MyHrMemos, myDueItems, type MyHrExtras } from "./portal/myhr-extra";
+import { MyHrChecks, MyHrCoe, MyHrMemos, myDueItems, type MyHrExtras } from "./portal/myhr-extra";
 import { BellDrawer, bellCount } from "./portal/hr-bell";
+import { PortalSounds } from "./portal/portal-sounds";
 import { LiveTraining, type TrainingData } from "./portal/live-training";
 import { ReleasingDashboard, LiveReleasing } from "./portal/live-releasing";
 import { LiveSearchTrainee } from "./portal/live-search-trainee";
@@ -54,7 +55,7 @@ import { ClassroomLinksImport, DefaultRoomsPanel } from "./portal/admin-setup";
 import { AdminHome, AdminSearchTrainee, AdminEnrollments, AdminVouchers, AdminHolidays } from "./portal/admin-home";
 import { askText, askConfirm, showAlert } from "./portal/dialogs";
 
-type Module = "Batch numbers" | "Form numbers" | "Classroom links" | "Post-tests" | "Training instructions" | "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Daily summary" | "Opening and closing" | "Expenses summary" | "Templates" | "Certificate controls" | "Delivery requests" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Company Charge" | "Sales from endorsed courses" | "Training Reports" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
+type Module = HrView | "Portal sounds" | "Batch numbers" | "Form numbers" | "Classroom links" | "Post-tests" | "Training instructions" | "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Daily summary" | "Opening and closing" | "Expenses summary" | "Templates" | "Certificate controls" | "Delivery requests" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Company Charge" | "Sales from endorsed courses" | "Training Reports" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; training_mode?:string; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -87,6 +88,7 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
     stage?:string;charge_id?:string|null;enrollment_charges?:{amount_centavos:number;description:string;approval_status:string}|{amount_centavos:number;description:string;approval_status:string}[]|null}[];
   pendingCharges:{id:string;enrollment_id:string;description:string;amount_centavos:number;created_at:string;enrollments?:{enrollment_number:string;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;courses?:{name:string}|{name:string}[]|null}|{enrollment_number:string;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;courses?:{name:string}|{name:string}[]|null}[]|null}[];
   hrPlus?:HrPlus;
+  portalSound?:Record<string,boolean>|null;
   myHr:{extras?:MyHrExtras;employee:{id?:string;employee_number:string;complete_name:string;position:string;employment_status:string;date_hired?:string|null;pay_type?:string|null;base_rate_centavos?:number|null;work_email?:string|null;active:boolean};leave:{id:string;leave_type:string;starts_on:string;ends_on:string;reason:string;status:string;created_at:string}[];advances:{id:string;amount_centavos:number;requested_on:string;balance_centavos:number;status:string}[];charges:EmployeeCharge[];attendance:{id:string;attendance_date:string;checked_in_at?:string|null;checked_out_at?:string|null;minutes_late:number;minutes_undertime:number;status:string}[]}|null;
   employeeCharges:EmployeeCharge[]; chargeEmployees:{id:string;complete_name:string;employee_number:string;active:boolean}[];
   instructionTemplates:{course_id:string;subject:string;body:{text?:string}|string|null;active:boolean}[];
@@ -168,9 +170,9 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // Admin Assistant (owner, 9 Oct 2026): resource planning, instructor shortlist. Requisitions removed (owner, 3 Nov 2026).
   admin_assistant: ["Dashboard","Batch schedules","Resource planning","Instructors","Reconciliation","MyHr"],
   // HR Officer (owner, 10 Nov 2026): HR and MyHR.
-  hr: ["HR & payroll","MyHr"],
+  hr: [...HR_VIEWS,"MyHr"],
   // Admin (owner, 3 Nov 2026): Dashboard · Enrollments ▾ · Schedules ▾ · Reports ▾ · MISMO ▾ · Configuration ▾ (ADMIN_TABS).
-  admin: ["HR & payroll","MyHr","Dashboard","Search trainee","Enrollments","Batch schedules","Batch numbers","Resource planning","Courses","Post-tests","Training instructions","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Holidays","Requests","Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Company Charge","Training Reports"],
+  admin: [...HR_VIEWS,"MyHr","Portal sounds","Dashboard","Search trainee","Enrollments","Batch schedules","Batch numbers","Resource planning","Courses","Post-tests","Training instructions","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Holidays","Requests","Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Company Charge","Training Reports"],
   // Cashier (Accounting Officer), owner's menu of 7 Oct 2026, shown as top tabs:
   // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses, Requests ·
   // Reports ▾ Daily Summary, Opening and Closing, Expenses Summary (CASHIER_TABS; reports consolidated 5 Nov 2026).
@@ -193,6 +195,8 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   // Cashier workspace (7 Oct 2026); the top tabs come from CASHIER_TABS.
   {label:"Daily summary",icon:"∑",roles:["cashier","accounting"],group:"Records"},{label:"Opening and closing",icon:"⚖",roles:["cashier"],group:"Records"},{label:"Expenses summary",icon:"∑",roles:["cashier"],group:"Records"},
   {label:"HR & payroll",icon:"♙",roles:["admin"],group:"People"},{label:"MyHr",icon:"☺",group:"People"},
+  ...HR_VIEWS.map(label=>({label,icon:"♙",roles:["admin","hr"],group:"People" as NavGroup})),
+  {label:"Portal sounds",icon:"♪",roles:["admin"],group:"Configuration"},
   {label:"Templates",icon:"▤",roles:["releasing_officer"],group:"Work"},{label:"Numbering",icon:"№",roles:["releasing_officer"],group:"Work"},
   {label:"Delivery requests",icon:"⇥",roles:["registration"],group:"Work"},
   {label:"Training Reports",icon:"▤",roles:["mismo_officer","admin"],group:"Work"},{label:"Batch schedules",icon:"□",roles:["admin_assistant","registration","cashier","mismo_officer","admin"],group:"Work"},{label:"Batch numbers",icon:"#",roles:["admin"],group:"Work"},{label:"Resource planning",icon:"▢",roles:["admin_assistant","admin"],group:"Work"},{label:"Instructors",icon:"♙",roles:["admin_assistant","admin"],group:"Work"},{label:"Reconciliation",icon:"✓",roles:["admin_assistant","admin"],group:"Work"},
@@ -222,7 +226,7 @@ const GROUP_LABELS:Partial<Record<NavGroup,string>>={"Payables & cash":"Payables
 // "Batch Schedules" reads "Schedules" (owner, 3 Nov 2026); the module key stays the same.
 const shownAs=(label:string)=>label==="Batch schedules"?"Schedules":label;
 // The owner's name for this report (5 Nov 2026); the module key stays, because "Endorsed courses" is another module.
-const menuLabel=(label:string)=>label==="Sales from endorsed courses"?"Endorsed Courses":label==="MyHr"?"MyHR":label==="HR & payroll"?"HR":tcl(shownAs(label));
+const menuLabel=(label:string)=>label==="Sales from endorsed courses"?"Endorsed Courses":label==="MyHr"?"MyHR":label==="HR & payroll"?"HR":HR_LABEL[label as HrView]??tcl(shownAs(label));
 const ACCOUNTING_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
   // Reprints of receipts and TARs live in the Trainee Account (owner, 3 Nov 2026).
@@ -234,7 +238,7 @@ const ACCOUNTING_TABS:TopTab[]=[
   {label:"MyHr",items:["MyHr"]},
 ];
 const RELEASING_TABS:TopTab[]=[{label:"Certificates",items:["Certificates"]},{label:"Reports",items:["Reports"]},{label:"MyHr",items:["MyHr"]}];
-const HR_TABS:TopTab[]=[{label:"HR & payroll",items:["HR & payroll"]},{label:"MyHr",items:["MyHr"]}];
+const HR_TABS:TopTab[]=[{label:"HR dashboard",items:["HR dashboard"]},...HR_GROUPS.map(([label,items])=>({label,items:[...items] as Module[]})),{label:"MyHr",items:["MyHr"]}];
 // Admin tabs consolidated (owner, 3 Nov 2026): trainee work under Enrollments, schedules together, Configuration grouped and last.
 const ADMIN_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
@@ -242,9 +246,9 @@ const ADMIN_TABS:TopTab[]=[
   {label:"Schedules",items:["Batch schedules","Batch numbers","Resource planning"]},
   {label:"Reports",items:["Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Company Charge"]},
   {label:"Training Reports",items:["Training Reports"]},
-  {label:"HR & payroll",items:["HR & payroll"]},
+  {label:"HR",items:[...HR_VIEWS],heads:Object.fromEntries(HR_GROUPS.map(([g,items])=>[items[0],g])) as Partial<Record<Module,string>>},
   {label:"MyHr",items:["MyHr"]},
-  {label:"Configuration",items:["Courses","Post-tests","Training instructions","Classroom links","Instructors","Classrooms","Certifications","Holidays","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Employee accounts","Partnered Centers"],
+  {label:"Configuration",items:["Courses","Post-tests","Training instructions","Classroom links","Instructors","Classrooms","Certifications","Holidays","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Employee accounts","Partnered Centers","Portal sounds"],
     heads:{Courses:"Training","Schedule of fees":"Fees and Accounts","Employee accounts":"People and Partners"}},
 ];
 function topTabsFor(role:string,allowed:Module[]):TopTab[]{
@@ -336,7 +340,7 @@ export function PortalLiveApp(){
   const refresh=useCallback(async()=>{savesRefreshing.current+=1;setSyncing(true);void load().finally(()=>{savesRefreshing.current-=1;if(!savesRefreshing.current)setSyncing(false)})},[load]);
   useEffect(()=>{void load()},[load,since]);
   // A link to /portal#myhr (HR e-mails and notices) opens MyHR.
-  useEffect(()=>{const t=window.setTimeout(()=>{if(window.location.hash==="#myhr")setActive("MyHr");else if(window.location.hash==="#hr")setActive("HR & payroll")},0);return()=>window.clearTimeout(t)},[]);
+  useEffect(()=>{const t=window.setTimeout(()=>{if(window.location.hash==="#myhr")setActive("MyHr");else if(window.location.hash==="#hr")setActive("HR dashboard")},0);return()=>window.clearTimeout(t)},[]);
   // Refresh every 10 seconds (owner, 21 Oct 2026), quietly. Skipped while the tab is hidden,
   // a window is open or a field has focus, so nothing being typed is lost.
   // A new Manila day re-opens the screens on today (owner, 21 Oct 2026: date tabs start on the current date).
@@ -344,12 +348,13 @@ export function PortalLiveApp(){
   const [day,setDay]=useState(manilaNow);
   // New-arrival chime (owner, 10 Nov 2026): Registration hears new registrations, the Cashier new payments and hand-overs.
   // Their tabs keep checking while hidden, so the chime plays from another tab; the sound can be turned off.
-  const roleRef=useRef(role),alertPrev=useRef<PortalData|null>(null),[soundOn,setSoundOn]=useState(()=>{try{return localStorage.getItem("nw-chime")!=="off"}catch{return true}}),soundRef=useRef(soundOn),[arrival,setArrival]=useState("");
+  const roleRef=useRef(role),alertPrev=useRef<PortalData|null>(null),soundRef=useRef(true),[arrival,setArrival]=useState("");
   useEffect(()=>{roleRef.current=role},[role]);
   useEffect(()=>{const unlock=()=>unlockChime();document.addEventListener("pointerdown",unlock,{once:true});return()=>document.removeEventListener("pointerdown",unlock)},[]);
-  const toggleSound=()=>{const next=!soundRef.current;soundRef.current=next;setSoundOn(next);try{localStorage.setItem("nw-chime",next?"on":"off")}catch{/* no storage */}if(next){unlockChime();playChime()}};
+  // The chime follows Admin › Portal Sounds for the working role (on unless the Admin turned it off).
+  useEffect(()=>{soundRef.current=data?.portalSound?.[role]!==false},[data?.portalSound,role]);
   useEffect(()=>{if(!arrival)return;const t=window.setTimeout(()=>setArrival(""),8000);return()=>window.clearTimeout(t)},[arrival]);
-  useEffect(()=>{let running=false;const listens=()=>roleRef.current==="registration"||roleRef.current==="cashier";const tick=async()=>{setDay(d=>{const now=manilaNow();return d===now?d:now});const el=document.activeElement;if(running||savesRefreshing.current||(document.hidden&&!listens())||document.querySelector("[role=dialog]")||(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;running=true;try{const s=await fetch("/api/staff/operations?stamp=1",{cache:"no-store"});const stamp=s.ok?(await s.json()).stamp as string|null:null;if(!needsFullRefresh(lastStamp.current,stamp,Date.now()-lastFull.current))return;const seq=++loadSeq.current;const r=await fetch(recordsUrl(sinceRef.current),{cache:"no-store"});if(r.ok){const body=await r.json();if(seq===loadSeq.current){lastStamp.current=body.stamp??null;lastFull.current=Date.now();const hit=newArrivals(alertPrev.current,body,roleRef.current);alertPrev.current=body;setData(body);if(hit.count){setArrival(hit.label);if(soundRef.current)playChime()}}}}catch{/* next tick retries */}finally{running=false}};const id=window.setInterval(()=>void tick(),10000);const shown=()=>{if(!document.hidden)void tick()};document.addEventListener("visibilitychange",shown);return()=>{window.clearInterval(id);document.removeEventListener("visibilitychange",shown)}},[]);
+  useEffect(()=>{let running=false;const listens=()=>(SOUND_ROLES as readonly string[]).includes(roleRef.current);const tick=async()=>{setDay(d=>{const now=manilaNow();return d===now?d:now});const el=document.activeElement;if(running||savesRefreshing.current||(document.hidden&&!listens())||document.querySelector("[role=dialog]")||(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;running=true;try{const s=await fetch("/api/staff/operations?stamp=1",{cache:"no-store"});const stamp=s.ok?(await s.json()).stamp as string|null:null;if(!needsFullRefresh(lastStamp.current,stamp,Date.now()-lastFull.current))return;const seq=++loadSeq.current;const r=await fetch(recordsUrl(sinceRef.current),{cache:"no-store"});if(r.ok){const body=await r.json();if(seq===loadSeq.current){lastStamp.current=body.stamp??null;lastFull.current=Date.now();const hit=newArrivals(alertPrev.current,body,roleRef.current);alertPrev.current=body;setData(body);if(hit.count){setArrival(hit.label);if(soundRef.current)playChime()}}}}catch{/* next tick retries */}finally{running=false}};const id=window.setInterval(()=>void tick(),10000);const shown=()=>{if(!document.hidden)void tick()};document.addEventListener("visibilitychange",shown);return()=>{window.clearInterval(id);document.removeEventListener("visibilitychange",shown)}},[]);
   // Admin keeps an oversight-only workspace: Dashboard, Search trainee, Enrollments,
   // Accounting, Enrollment summary, Reports, MyHr and Setup. Everything else is the
   // day-to-day work of the specialised roles and is hidden here.
@@ -387,7 +392,7 @@ export function PortalLiveApp(){
   const roleOptions=workingRolesFor(data.roles);
   const tabs=topTabsFor(role,allowedNav.map(item=>item.label));
   // The Releasing Officer has no Dashboard; Certificates is the home page.
-  const current:Module=active==="Dashboard"&&role==="hr"?"HR & payroll":active==="Dashboard"&&role==="releasing_officer"?"Certificates":active==="Dashboard"&&role==="mismo_officer"?"Training Reports":active;
+  const current:Module=(active==="Dashboard"&&role==="hr")||active==="HR & payroll"?"HR dashboard":active==="Dashboard"&&role==="releasing_officer"?"Certificates":active==="Dashboard"&&role==="mismo_officer"?"Training Reports":active;
   const openRequests=data.requests.filter(r=>r.status==="Pending"&&(r.stage==="With cashier"||(r.charge_id&&data.chargeCollected?.[r.id]&&!data.chargeCollected[r.id].paid))).length;
   const initials=data.profile.complete_name.split(" ").map(v=>v[0]).slice(0,2).join("").toUpperCase();
   return <DataSince.Provider value={needSince}><main className="portal-shell nw-shell">
@@ -398,7 +403,6 @@ export function PortalLiveApp(){
           <label className="nw-role"><span>Working as</span><select value={role} onChange={e=>{setRole(e.target.value);setActive("Dashboard");setRecordsView("applications");setOpenTab("")}} aria-label="Working as">{roleOptions.map(item=><option key={item} value={item}>{roleNames[item]??item}</option>)}</select></label>
           {/* Queue Console (owner, 10 Nov 2026): opens on this site, where the staff member is already signed in. */}
           {(role==="registration"||role==="cashier"||role==="admin")&&<a className="nw-sound nw-queue" href="/queue/staff" target="_blank" rel="noreferrer">Queue Console</a>}
-          {(role==="registration"||role==="cashier")&&<button type="button" className="nw-sound" onClick={toggleSound} aria-pressed={soundOn} title={soundOn?"New-arrival chime is on":"New-arrival chime is off"}>{soundOn?"Sound On":"Sound Off"}</button>}
           <button type="button" className="nw-icon" onClick={()=>setNotices(!notices)} aria-label="Notifications" aria-expanded={notices}><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5-6.71V3.5a2 2 0 1 0-4 0v.79A7 7 0 0 0 5 11v5l-2 2v1h18v-1Z"/></svg>{bellN>0&&<b>{bellN}</b>}</button>
           <div className="nw-user"><span className="user-dot">{initials}</span><span className="nw-user-text"><strong>{data.profile.complete_name}</strong><small>{roleNames[role]??role}</small></span></div>
           <button type="button" className="nw-account" onClick={()=>setAccount(true)} title="Change Password"><span aria-hidden="true">⚿</span><span className="nw-account-text">Change Password</span></button>
@@ -410,7 +414,7 @@ export function PortalLiveApp(){
         <button type="button" aria-haspopup={single?undefined:"menu"} aria-expanded={single?undefined:isOpen} aria-current={on?"page":undefined} onClick={e=>{if(single){go(tab.items[0]);return}const r=e.currentTarget.getBoundingClientRect();setMenuAt({left:Math.max(16,Math.min(r.left,window.innerWidth-276)),top:r.bottom+6});setOpenTab(isOpen?"":tab.label)}}>{menuLabel(tab.label)}{count>0&&<b className="nw-count">{count}</b>}{!single&&<span className="nw-caret" aria-hidden="true"/>}</button>
         {!single&&isOpen&&<div className="nw-menu" role="menu" style={{left:menuAt.left,top:menuAt.top}}>{tab.items.map(item=><Fragment key={item}>{tab.heads?.[item]&&<div role="presentation" className="nw-menu-head">{tab.heads[item]}</div>}<button type="button" role="menuitem" className={active===item?"on":""} onClick={()=>go(item)}>{menuLabel(item)}</button></Fragment>)}</div>}
       </div>})}</nav>
-      {notices&&<BellDrawer hrDue={isHrRole?hrDue:null} mine={mine} notes={data.notifications} onClose={()=>setNotices(false)} markRead={markRead} openHr={()=>{setNotices(false);go("HR & payroll")}} openMyHr={()=>{setNotices(false);go("MyHr")}} reload={refresh}/>}
+      {notices&&<BellDrawer hrDue={isHrRole?hrDue:null} mine={mine} notes={data.notifications} onClose={()=>setNotices(false)} markRead={markRead} openHr={()=>{setNotices(false);go("201 and checks")}} openMyHr={()=>{setNotices(false);go("MyHr")}} reload={refresh}/>}
     </header>
     <section className={`portal-workspace${syncing?" nw-syncing":""}`}>{error&&<div className="portal-inline-error"><Message kind="error" text={error}/></div>}<PortalContent key={day} modules={rebuildModules} recordsView={recordsView} setRecordsView={setRecordsView} active={current} role={role} data={data} query={query} go={go} open={setModal} onPay={(id:string,courses?:string[])=>{setPayTarget(id);setPayCourses(courses);setModal("payment")}} canEnroll={canEnroll} canSchedule={canSchedule} canPay={canPay} reload={refresh}/></section>
     {modal==="enrollment"&&<EnrollmentForm data={data} onClose={()=>setModal(null)} onSaved={refresh}/>} {modal==="batch"&&<BatchForm data={data} onClose={()=>setModal(null)} onSaved={refresh}/>} {modal==="payment"&&<RecordPaymentModal data={data} initialEnrollmentId={payTarget||undefined} initialCourses={payCourses} onClose={()=>{setModal(null);setPayTarget("")}} onSaved={refresh}/>} {account&&<ChangePasswordModal email={data.profile.email} onClose={()=>setAccount(false)}/>}
@@ -542,7 +546,8 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Accounting")return <LiveAccounting data={data} role={gateRole} reload={reload} go={m=>go(m as Module)}/>;
   if(active==="Expenses")return <ExpensesWorkspace data={data} role={gateRole} reload={reload}/>;
   if(active==="Inventory")return <LiveInventory data={data} role={gateRole} reload={reload}/>;
-  if(active==="HR & payroll"&&["admin","hr"].includes(gateRole))return <LiveHr data={data} role={gateRole} reload={reload} plus={data.hrPlus??null}/>;
+  if(active==="Portal sounds"&&gateRole==="admin")return <PortalSounds value={data.portalSound} reload={reload}/>;
+  if(HR_VIEWS.includes(active as HrView)&&["admin","hr"].includes(gateRole))return <LiveHr key={active} data={data} role={gateRole} reload={reload} plus={data.hrPlus??null} view={active as HrView} go={go}/>;
   if(active==="Rooms & facilities"&&["admin"].includes(gateRole))return <LiveTraining data={{classrooms:data.classrooms,certificates:data.certificates,batches:data.batches,enrollments:data.enrollments,courses:data.courses,certificateTemplates:data.certificateTemplates}} role={gateRole} reload={reload} initialTab="Classrooms"/>;
   if(active==="Certificates"&&["admin","releasing_officer"].includes(gateRole))return <LiveReleasing data={data as unknown as Parameters<typeof LiveReleasing>[0]["data"]} role={gateRole} reload={reload}/>;
   if((ACCOUNTING_CONFIG_SECTIONS as readonly string[]).includes(active))return <AccountingConfiguration section={active as AccountingConfigSection} data={data as unknown as Parameters<typeof AccountingConfiguration>[0]["data"]} trainees={data.trainees} applicationNumbers={data.applicationNumbers} reload={reload}/>;
@@ -993,10 +998,11 @@ function ConnectedModule({module,data}:{module:Module;data:PortalData}){const co
  * Leave / Cash advance / Charge tabs each show their form together with their
  * own history — replacing three always-open forms plus three history lists.
  */
+type MyHrTab="Home"|"Leave"|"Cash Advance"|"Charges"|"My 201"|"Memos"|"COE";
 function LiveMyHr({data,reload}:{data:PortalData;reload:()=>Promise<void>}){
   const hr=data.myHr;
   const [busy,setBusy]=useState(""),[msg,setMsg]=useState("");
-  const [tab,setTab]=useState<"Leave"|"Cash advance"|"Charge">("Leave");
+  const [tab,setTab]=useState<MyHrTab>("Home");
   const [lt,setLt]=useState("Vacation"),[ls,setLs]=useState(""),[le,setLe]=useState(""),[lr,setLr]=useState("");
   const [amt,setAmt]=useState(""),[ar,setAr]=useState("");
   const [cc,setCc]=useState("Rescheduling"),[cn,setCn]=useState("");
@@ -1006,30 +1012,41 @@ function LiveMyHr({data,reload}:{data:PortalData;reload:()=>Promise<void>}){
   if(!hr)return <div className="portal-page"><PageHead eyebrow="Self-Service" title="MyHr" text="Your own employee record, leave, and cash advances."/><section className="portal-panel live-list"><p className="portal-empty-copy">No employee record is linked to your account yet. Ask HR to add you (matched by your work email).</p></section></div>;
   const e=hr.employee;
   const decideTone=(s:string)=>s==="Approved"?"green":s==="Rejected"?"red":"orange";
-  return <div className="portal-page">
-    <PageHead eyebrow="Self-Service" title="MyHR" text="Your own employee record, leave, cash advances, and charges."/>{msg&&<Message kind="error" text={msg}/>}
-    <MyHrChecks x={hr.extras??null} employeeId={hr.employee.id} reload={reload}/>
-    <MyHrMemos x={hr.extras??null} reload={reload}/>
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>{e.complete_name}</h2><p>{e.position} · {e.employee_number}</p></div><Badge tone={e.active?"green":"slate"}>{e.employment_status}</Badge></div>
-      <div className="live-row-item"><div><strong>Date hired</strong><small>{e.date_hired?date(e.date_hired):"—"}</small></div><span className="slot-count">{e.pay_type??""}</span></div>
-      {typeof e.base_rate_centavos==="number"&&<div className="live-row-item"><div><strong>Base rate</strong><small>Per your pay type</small></div><span className="slot-count">{pesos(e.base_rate_centavos)}</span></div>}
-    </section>
-    <section className="portal-panel">
-      <div className="panel-heading"><div><h2>File a Request</h2><p>Pick a request type — its form and your history for that type appear below</p></div></div>
-      <div className="portal-tabs">{(["Leave","Cash advance","Charge"] as const).map(t=><button key={t} type="button" className={tab===t?"active":""} onClick={()=>{setTab(t);setMsg("")}}>{tcl(t)}</button>)}</div>
-      {tab==="Leave"&&<>
-        <div className="portal-form"><label>Type<select value={lt} onChange={ev=>setLt(ev.target.value)}><option>Vacation</option><option>Sick</option><option>Emergency</option><option>Unpaid</option></select></label><label>From<input type="date" value={ls} onChange={ev=>setLs(ev.target.value)}/></label><label>To<input type="date" value={le} onChange={ev=>setLe(ev.target.value)}/></label><label className="full">Reason<input value={lr} onChange={ev=>setLr(ev.target.value)}/></label><div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy==="leave"} onClick={fileLeave}>{busy==="Leave"?"Filing…":"File Leave"}</button></div></div>
-        <div className="live-list">{hr.leave.map(l=><div className="live-row-item" key={l.id}><div><strong>{l.leave_type} · {date(l.starts_on)}–{date(l.ends_on)}</strong><small>{l.reason}</small></div><Badge tone={decideTone(l.status)}>{l.status}</Badge></div>)}{!hr.leave.length&&<p className="portal-empty-copy">No leave on record.</p>}</div>
-      </>}
-      {tab==="Cash advance"&&<>
-        <div className="portal-form"><label>Amount (PHP)<input type="number" min="0" step="0.01" value={amt} onChange={ev=>setAmt(ev.target.value)}/></label><label className="full">Reason (Optional)<input value={ar} onChange={ev=>setAr(ev.target.value)}/></label><div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy==="adv"} onClick={fileAdvance}>{busy==="adv"?"Requesting…":"Request Advance"}</button></div></div>
-        <div className="live-list">{hr.advances.map(a=><div className="live-row-item" key={a.id}><div><strong>{pesos(a.amount_centavos)}</strong><small>Requested {date(a.requested_on)} · balance {pesos(a.balance_centavos)}</small></div><Badge tone={decideTone(a.status)}>{a.status}</Badge></div>)}{!hr.advances.length&&<p className="portal-empty-copy">No cash advances on record.</p>}</div>
-      </>}
-      {tab==="Charge"&&<>
-        <div className="portal-form"><label>Category<select value={cc} onChange={ev=>setCc(ev.target.value)}><option>Rescheduling</option><option>Cancellation</option><option>Wrong Enrollment</option><option>Reprinting</option><option>Others</option></select></label><label className="full">Note (Optional)<input value={cn} onChange={ev=>setCn(ev.target.value)} placeholder="What happened"/></label><div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy==="chg"} onClick={fileCharge}>{busy==="chg"?"Filing…":"File Charge"}</button></div><p className="portal-form-note full">Accounting sets the amount, then it is deducted from your salary.</p></div>
-        <div className="live-list">{hr.charges.map(c=><div className="live-row-item" key={c.id}><div><strong>{c.category??"Charge"}{c.note?` · ${c.note}`:""}</strong><small>{c.status==="Pending"?"Awaiting amount from Accounting":`${pesos(c.amount_centavos)}${typeof c.balance_centavos==="number"&&c.balance_centavos>0&&c.status==="Active"?` · balance ${pesos(c.balance_centavos)}`:""}`}</small></div><Badge tone={c.status==="Active"?"orange":c.status==="Settled"?"green":c.status==="Cancelled"?"red":"slate"}>{c.status}</Badge></div>)}{!hr.charges.length&&<p className="portal-empty-copy">No charges on record.</p>}</div>
-      </>}
-    </section>
+  const x=hr.extras??null, mine=myDueItems(x);
+  const unread=(x?.memos??[]).filter(m=>!m.acknowledged_at).length;
+  const tabs:[MyHrTab,number][]=[["Home",mine.length],["Leave",0],["Cash Advance",0],["Charges",0],["My 201",mine.filter(m=>m.key!=="memo").length],["Memos",unread],["COE",0]];
+  const leaveRows=<div className="live-list">{hr.leave.map(l=><div className="live-row-item" key={l.id}><div><strong>{l.leave_type} · {date(l.starts_on)}–{date(l.ends_on)}</strong><small>{l.reason}</small></div><Badge tone={decideTone(l.status)}>{l.status}</Badge></div>)}{!hr.leave.length&&<p className="portal-empty-copy">No leave on record.</p>}</div>;
+  return <div className="portal-page myhr-page">
+    <div className="portal-heading hr-head"><div><span className="portal-eyebrow">{e.employee_number} · {e.position}</span><h1>MyHR</h1></div>
+      <div className="hr-head-acts"><select className="hr-show myhr-tabsel" value={tab} onChange={ev=>{setTab(ev.target.value as MyHrTab);setMsg("")}} aria-label="Show">{tabs.map(([t,n])=><option key={t} value={t}>{t}{n?` (${n})`:""}</option>)}</select></div></div>
+    <nav className="myhr-tabs" aria-label="MyHR">{tabs.map(([t,n])=><button key={t} type="button" className={tab===t?"on":""} onClick={()=>{setTab(t);setMsg("")}}>{t}{n>0&&<b>{n}</b>}</button>)}</nav>
+    {msg&&<Message kind="error" text={msg}/>}
+    {tab==="Home"&&<>
+      <div className="hr-kpis">{([["Leave Filed",hr.leave.filter(l=>l.status==="Pending").length,"Pending","Leave"],["Cash Advance",hr.advances.filter(a=>a.status!=="Rejected"&&a.balance_centavos>0).length,"Open","Cash Advance"],["Unread Memos",unread,"To Read","Memos"],["Charges",hr.charges.filter(c=>c.status==="Active").length,"Active","Charges"]] as [string,number,string,MyHrTab][]).map(([l,n,sub,to])=><button type="button" key={l} className="hr-kpi" onClick={()=>setTab(to)}><b>{n}</b><small>{l} · {sub}</small></button>)}</div>
+      <section className="portal-panel"><div className="panel-heading"><h2>To Do</h2></div>
+        {mine.map((m,i)=><div className="hr-row" key={i}><div><strong>{m.title}</strong><small>{m.text}</small></div><span className="hr-acts"><Badge tone={m.tone}>{m.label}</Badge><button type="button" className="portal-primary row-act" onClick={()=>setTab(m.key==="memo"?"Memos":"My 201")}>{m.key==="fit"?"Upload":m.key==="biodata"?"Review":"Read"}</button></span></div>)}
+        {!mine.length&&<p className="hr-none">You are all caught up.</p>}
+      </section>
+    </>}
+    {tab==="Leave"&&<section className="portal-panel"><div className="panel-heading"><h2>File Leave</h2></div>
+      <div className="portal-form hr-form"><label>Leave Type<select value={lt} onChange={ev=>setLt(ev.target.value)}><option>Vacation</option><option>Sick</option><option>Emergency</option><option>Unpaid</option></select></label><label>From<input type="date" value={ls} onChange={ev=>setLs(ev.target.value)}/></label><label>To<input type="date" value={le} onChange={ev=>setLe(ev.target.value)}/></label><label>Reason<input value={lr} onChange={ev=>setLr(ev.target.value)}/></label><div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy==="leave"} onClick={fileLeave}>{busy==="leave"?"Filing…":"File Leave"}</button></div></div>
+      <h3 className="hr-sub">My Leave</h3>{leaveRows}</section>}
+    {tab==="Cash Advance"&&<section className="portal-panel"><div className="panel-heading"><h2>Request a Cash Advance</h2></div>
+      <div className="portal-form hr-form"><label>Amount (PHP)<input type="number" min="0" step="0.01" value={amt} onChange={ev=>setAmt(ev.target.value)}/></label><label>Reason<input value={ar} onChange={ev=>setAr(ev.target.value)}/></label><div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy==="adv"} onClick={fileAdvance}>{busy==="adv"?"Requesting…":"Request Advance"}</button></div></div>
+      <h3 className="hr-sub">My Cash Advances</h3>
+      <div className="live-list">{hr.advances.map(a=><div className="live-row-item" key={a.id}><div><strong>{pesos(a.amount_centavos)}</strong><small>Requested {date(a.requested_on)} · balance {pesos(a.balance_centavos)}</small></div><Badge tone={decideTone(a.status)}>{a.status}</Badge></div>)}{!hr.advances.length&&<p className="portal-empty-copy">No cash advances on record.</p>}</div></section>}
+    {tab==="Charges"&&<section className="portal-panel"><div className="panel-heading"><h2>Report a Charge</h2></div>
+      <div className="portal-form hr-form"><label>Category<select value={cc} onChange={ev=>setCc(ev.target.value)}><option>Rescheduling</option><option>Cancellation</option><option>Wrong Enrollment</option><option>Reprinting</option><option>Others</option></select></label><label>Note<input value={cn} onChange={ev=>setCn(ev.target.value)} placeholder="What happened"/></label><div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy==="chg"} onClick={fileCharge}>{busy==="chg"?"Filing…":"File Charge"}</button></div></div>
+      <h3 className="hr-sub">My Charges</h3>
+      <div className="live-list">{hr.charges.map(c=><div className="live-row-item" key={c.id}><div><strong>{c.category??"Charge"}{c.note?` · ${c.note}`:""}</strong><small>{c.status==="Pending"?"Waiting for the amount from Accounting":`${pesos(c.amount_centavos)}${typeof c.balance_centavos==="number"&&c.balance_centavos>0&&c.status==="Active"?` · balance ${pesos(c.balance_centavos)}`:""}`}</small></div><Badge tone={c.status==="Active"?"orange":c.status==="Settled"?"green":c.status==="Cancelled"?"red":"slate"}>{c.status}</Badge></div>)}{!hr.charges.length&&<p className="portal-empty-copy">No charges on record.</p>}</div></section>}
+    {tab==="My 201"&&<>
+      <section className="portal-panel"><div className="panel-heading"><h2>{e.complete_name}</h2><Badge tone={e.active?"green":"slate"}>{e.employment_status}</Badge></div>
+        <dl className="myhr-kv"><div><dt>Employee No.</dt><dd className="mono">{e.employee_number}</dd></div><div><dt>Position</dt><dd>{e.position}</dd></div><div><dt>Date Hired</dt><dd>{e.date_hired?date(e.date_hired):"—"}</dd></div><div><dt>Pay Type</dt><dd>{e.pay_type??"—"}</dd></div>{typeof e.base_rate_centavos==="number"&&<div><dt>Basic Rate</dt><dd className="mono">{pesos(e.base_rate_centavos)}</dd></div>}{x?.profile?.mobile&&<div><dt>Mobile</dt><dd>{x.profile.mobile}</dd></div>}{x?.profile?.address&&<div><dt>Address</dt><dd>{x.profile.address}</dd></div>}</dl>
+      </section>
+      <MyHrChecks x={x} employeeId={e.id} reload={reload}/>
+    </>}
+    {tab==="Memos"&&<MyHrMemos x={x} reload={reload}/>}
+    {tab==="COE"&&<MyHrCoe x={x} reload={reload}/>}
   </div>;
 }
 

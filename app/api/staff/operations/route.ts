@@ -1470,7 +1470,10 @@ export async function GET(request: Request) {
   ]);
 
   const hrPlus = await hrPlusUnit;
-  return NextResponse.json({ hrPlus, defaultRooms, postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
+  // Portal sounds (owner, 10 Nov 2026): set by the Admin; on for every role until migration 202611100096.
+  const soundRow = await db.from("organization_settings").select("portal_sound").maybeSingle();
+  const portalSound = (soundRow.error ? null : (soundRow.data as { portal_sound?: Record<string, boolean> } | null)?.portal_sound) ?? null;
+  return NextResponse.json({ hrPlus, portalSound, defaultRooms, postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
     paymentMethods: paymentMethodsWithKind, charges: (charges.data ?? []).map((c) => ({ ...c, kind: chargeKinds.get((c as { id: string }).id) ?? "fee" })), agencies: agencies.data ?? [],

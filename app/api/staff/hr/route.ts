@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { canHr, employeeAccounts, manilaToday, notifyEmployees, notifyHr } from "@/lib/hr-server";
+import { canHr, coeFields, employeeAccounts, fileHrDocument, hrPdf, latestTemplate, manilaToday, notifyEmployees, notifyHr } from "@/lib/hr-server";
+import { fillTemplate, longDate, type HrDocSnapshot } from "@/lib/print/hr-documents";
 
 export const runtime = "nodejs";
 
@@ -24,6 +25,21 @@ const input = z.discriminatedUnion("action", [
   z.object({ action: z.literal("myhr-biodata-confirm") }),
   z.object({ action: z.literal("myhr-request-file"), requestType: z.enum(["201 Change"]), details: z.string().trim().min(5).max(1000) }),
   z.object({ action: z.literal("memo-ack"), memoId: z.string().uuid() }),
+  // Add or edit an employee with every 201 detail and the compensation (owner, 10 Nov 2026: "HR must start from 0").
+  z.object({ action: z.literal("hr-employee-save"), id: z.string().uuid().nullable().optional(),
+    completeName: z.string().trim().min(2).max(160), position: z.string().trim().min(1).max(120),
+    employmentType: z.enum(["Probationary", "Regular", "Project", "Contractual"]), employmentStatus: z.enum(["Active", "On Leave", "Suspended", "Separated"]),
+    dateHired: day, regularizationDate: day.optional().nullable(), biometricId: opt(40), workEmail: z.string().trim().email().max(160).optional().or(z.literal("")),
+    birthDate: day.optional().nullable(), sex: opt(20), civilStatus: opt(30), address: opt(300), mobile: opt(30), personalEmail: opt(160),
+    tin: opt(30), sss: opt(30), philhealth: opt(30), pagibig: opt(30),
+    payType: z.enum(["Monthly", "Daily", "Weekly"]), baseRateCentavos: z.number().int().nonnegative().max(1_000_000_000), dailyRateCentavos: z.number().int().nonnegative().max(100_000_000).nullable().optional(),
+    daysFactor: z.union([z.literal(261), z.literal(313)]).default(313), allowanceCentavos: z.number().int().nonnegative().max(100_000_000).default(0),
+    payoutMethod: z.enum(["Cash", "Bank", "GCash"]).default("Cash"), payoutAccount: opt(80),
+    emergencyName: opt(120), emergencyRelation: opt(40), emergencyMobile: opt(30), fitToWorkOn: day.optional().nullable() }),
+  z.object({ action: z.literal("myhr-coe-request"), purpose: z.string().trim().min(3).max(200) }),
+  z.object({ action: z.literal("hr-coe-issue"), id: z.string().uuid() }),
+  z.object({ action: z.literal("hr-coe-reject"), id: z.string().uuid(), reason: z.string().trim().min(3).max(300) }),
+  z.object({ action: z.literal("hr-template-save"), docType: z.enum(["coe", "nte", "memo"]), body: z.string().trim().min(10).max(12000), signatories: z.array(z.object({ label: z.string().trim().max(40), name: z.string().trim().min(1).max(80), title: z.string().trim().max(80) })).min(1).max(6) }),
 ]);
 
 export async function POST(request: Request) {
@@ -40,7 +56,7 @@ export async function POST(request: Request) {
   const fail = (e: { message: string } | null) => NextResponse.json({ error: e && /column|relation|does not exist/i.test(e.message) ? "Apply database update 202611100095 first." : e?.message ?? "Could not save." }, { status: 400 });
 
   // ---- Employee self-service (any staff member with a linked employee record) ----
-  if (body.action === "myhr-biodata-confirm" || body.action === "myhr-request-file" || body.action === "memo-ack") {
+  if (body.action === "myhr-biodata-confirm" || body.action === "myhr-request-file" || body.action === "memo-ack" || body.action === "myhr-coe-request") {
     const { data: emp } = await db.from("employees").select("id,complete_name,biodata_confirmed_at").ilike("work_email", staff.user.email ?? "___none___").maybeSingle();
     if (!emp) return NextResponse.json({ error: "No employee record is linked to your account. Ask HR to add you." }, { status: 400 });
     if (body.action === "myhr-biodata-confirm") {
@@ -48,6 +64,15 @@ export async function POST(request: Request) {
       const { error } = await db.from("employees").update({ biodata_confirmed_at: now }).eq("id", emp.id);
       if (error) return fail(error);
       await audit("hr.biodata_confirmed", "employee", emp.id, { biodata_confirmed_at: emp.biodata_confirmed_at }, { biodata_confirmed_at: now });
+      return NextResponse.json({ ok: true });
+    }
+    if (body.action === "myhr-coe-request") {
+      const { data: open } = await db.from("coe_requests").select("id").eq("employee_id", emp.id).eq("status", "Pending").limit(1);
+      if (open?.length) return NextResponse.json({ error: "You already have a COE request waiting. HR issues it within 3 days." }, { status: 400 });
+      const { data: row, error } = await db.from("coe_requests").insert({ employee_id: emp.id, purpose: body.purpose }).select("id").single();
+      if (error) return fail(error);
+      await audit("hr.coe_requested", "coe_request", row.id, null, { purpose: body.purpose });
+      await notifyHr(db, `COE Request: ${emp.complete_name}`, `Purpose: ${body.purpose}. Issue within 3 days.`, "coe_request", row.id);
       return NextResponse.json({ ok: true });
     }
     if (body.action === "myhr-request-file") {
@@ -72,6 +97,39 @@ export async function POST(request: Request) {
 
   // ---- HR Officer and Admin ----
   if (!canHr(staff.roleCodes)) return NextResponse.json({ error: "Only the HR Officer or the Admin can do this." }, { status: 403 });
+
+  if (body.action === "hr-employee-save") {
+    const today = manilaToday();
+    if (body.fitToWorkOn && body.fitToWorkOn > today) return NextResponse.json({ error: "The Fit to Work date cannot be in the future." }, { status: 400 });
+    const row = {
+      complete_name: body.completeName, position: body.position, employment_type: body.employmentType, employment_status: body.employmentStatus,
+      active: body.employmentStatus !== "Separated", date_hired: body.dateHired, regularization_date: body.regularizationDate ?? null, biometric_id: body.biometricId,
+      work_email: body.workEmail ? body.workEmail.toLowerCase() : null, birth_date: body.birthDate ?? null, sex: body.sex, civil_status: body.civilStatus, address: body.address,
+      mobile: body.mobile, personal_email: body.personalEmail, fit_to_work_on: body.fitToWorkOn ?? null,
+      government_ids: { tin: body.tin, sss: body.sss, philhealth: body.philhealth, pagibig: body.pagibig },
+      pay_type: body.payType, base_rate_centavos: body.baseRateCentavos, instructor_daily_rate_centavos: body.payType === "Daily" ? body.dailyRateCentavos ?? body.baseRateCentavos : null,
+      payroll_account: { method: body.payoutMethod, account: body.payoutAccount, days_factor: body.daysFactor, allowance_centavos: body.allowanceCentavos },
+      emergency_contact: { name: body.emergencyName, relation: body.emergencyRelation, mobile: body.emergencyMobile },
+    };
+    const taken = (m: string) => /work_email|lower/i.test(m) ? "Another employee already uses this work email." : /biometric/i.test(m) ? "Another employee already has this biometric ID." : null;
+    if (body.id) {
+      const { data: prior, error: pe } = await db.from("employees").select("*").eq("id", body.id).maybeSingle();
+      if (pe) return fail(pe);
+      if (!prior) return NextResponse.json({ error: "Employee not found." }, { status: 404 });
+      const { error } = await db.from("employees").update(row).eq("id", body.id);
+      if (error) return taken(error.message) ? NextResponse.json({ error: taken(error.message) }, { status: 400 }) : fail(error);
+      await audit(prior.base_rate_centavos !== row.base_rate_centavos ? "hr.employee_saved.salary_changed" : "hr.employee_saved", "employee", body.id, prior, row);
+      return NextResponse.json({ ok: true, id: body.id });
+    }
+    // New employees are numbered NWM-EMP-0001, -0002 … (one series, never reused).
+    const { data: ref, error: refErr } = await db.rpc("next_reference", { prefix: "NWM-EMP", requested_year: 2000 });
+    if (refErr) return fail(refErr);
+    const employeeNumber = `NWM-EMP-${String(ref).replace(/^.*-0*(\d+)$/, "$1").padStart(4, "0")}`;
+    const { data: created, error } = await db.from("employees").insert({ ...row, employee_number: employeeNumber }).select("id").single();
+    if (error) return taken(error.message) ? NextResponse.json({ error: taken(error.message) }, { status: 400 }) : fail(error);
+    await audit("hr.employee_added", "employee", created.id, null, { ...row, employee_number: employeeNumber });
+    return NextResponse.json({ ok: true, id: created.id, employeeNumber });
+  }
 
   if (body.action === "hr-201-save") {
     const cols = "id,birth_date,sex,civil_status,address,mobile,personal_email,employment_type,biometric_id,regularization_date,fit_to_work_on";
@@ -143,6 +201,43 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: true });
   }
 
+  if (body.action === "hr-template-save") {
+    const prior = await latestTemplate(db, body.docType);
+    const version = (prior?.version ?? 0) + 1;
+    const { error } = await db.from("hr_document_templates").insert({ doc_type: body.docType, version, body: body.body, signatories: body.signatories, created_by: staff.user.id });
+    if (error) return fail(error);
+    await audit("hr.template_saved", "hr_document_template", `${body.docType}:${version}`, prior ? { version: prior.version } : null, { version, signatories: body.signatories });
+    return NextResponse.json({ ok: true, version });
+  }
+
+  if (body.action === "hr-coe-issue" || body.action === "hr-coe-reject") {
+    const { data: req, error: re } = await db.from("coe_requests").select("id,employee_id,purpose,status").eq("id", body.id).maybeSingle();
+    if (re) return fail(re);
+    if (!req || req.status !== "Pending") return NextResponse.json({ error: "This request was already handled." }, { status: 400 });
+    const now = new Date().toISOString();
+    if (body.action === "hr-coe-reject") {
+      const { error } = await db.from("coe_requests").update({ status: "Rejected", completed_at: now, issued_by: staff.user.id }).eq("id", req.id).eq("status", "Pending");
+      if (error) return fail(error);
+      await audit("hr.coe_rejected", "coe_request", req.id, { status: "Pending" }, { status: "Rejected" }, body.reason);
+      await notifyEmployees(db, await employeeAccounts(db, [req.employee_id]), { type: "hr", origin, key: `coe-rejected:${req.id}`, title: "COE Request Not Issued", body: `HR could not issue your Certificate of Employment: ${body.reason}` });
+      return NextResponse.json({ ok: true });
+    }
+    const [{ data: emp }, tpl] = await Promise.all([db.from("employees").select("complete_name,position,date_hired,active,sex,employment_type").eq("id", req.employee_id).maybeSingle(), latestTemplate(db, "coe")]);
+    if (!emp || !tpl) return NextResponse.json({ error: tpl ? "Employee not found." : "Apply database update 202611100096 first." }, { status: 400 });
+    const { data: ref, error: refErr } = await db.rpc("next_reference", { prefix: "COE" });
+    if (refErr) return fail(refErr);
+    const coeNo = `NWM-${String(ref).replace(/-0*(\d+)$/, (_, n: string) => `-${n.padStart(4, "0")}`)}`;
+    const today = manilaToday();
+    const snapshot: HrDocSnapshot = { type: "coe", number: coeNo, templateVersion: tpl.version, body: fillTemplate(tpl.body, coeFields(emp as Parameters<typeof coeFields>[0], req.purpose as string, today)), signatories: tpl.signatories };
+    const { error } = await db.from("coe_requests").update({ status: "Issued", coe_no: coeNo, snapshot, issued_by: staff.user.id, completed_at: now }).eq("id", req.id).eq("status", "Pending");
+    if (error) return fail(error);
+    await audit("hr.coe_issued", "coe_request", req.id, { status: "Pending" }, { coe_no: coeNo, template_version: tpl.version });
+    const link = await fileHrDocument(db, "Certificates of Employment", `${today} ${coeNo} ${String(emp.complete_name).toUpperCase()}`, await hrPdf(db, snapshot));
+    if (link) await db.from("coe_requests").update({ drive_link: link }).eq("id", req.id);
+    await notifyEmployees(db, await employeeAccounts(db, [req.employee_id]), { type: "hr", origin, key: `coe-issued:${req.id}`, title: "Your COE Is Ready", body: `Certificate of Employment ${coeNo} is ready. Claim the signed copy with the dry seal from HR; a view copy is in MyHR.` });
+    return NextResponse.json({ ok: true, coeNo });
+  }
+
   // memo-issue
   const { data: all } = await db.from("employees").select("id").eq("active", true);
   const recipients = body.employeeIds.length ? body.employeeIds : (all ?? []).map((e) => e.id as string);
@@ -150,11 +245,16 @@ export async function POST(request: Request) {
   const { data: ref, error: refErr } = await db.rpc("next_reference", { prefix: "MEMO" });
   if (refErr) return fail(refErr);
   const memoNo = `NWM-${String(ref).replace(/-0*(\d+)$/, (_, n: string) => `-${n.padStart(3, "0")}`)}`;
-  const { data: memo, error } = await db.from("memos").insert({ memo_no: memoNo, memo_type: body.memoType, subject: body.subject, body: body.body, audience: body.employeeIds.length ? `${recipients.length} Selected` : "All Employees", issued_by: staff.user.id }).select("id").single();
+  const audience = body.employeeIds.length ? `${recipients.length} Selected Employees` : "All Employees";
+  const tpl = await latestTemplate(db, "memo").catch(() => null);
+  const snapshot: HrDocSnapshot | null = tpl ? { type: "memo", number: memoNo, templateVersion: tpl.version, body: fillTemplate(tpl.body, { memo_body: body.body, subject: body.subject, memo_type: body.memoType, memo_no: memoNo }), signatories: tpl.signatories,
+    rows: [["To", audience], ["From", "Admin, New Wave Maritime"], ["Date", longDate(manilaToday())], ["Subject", body.subject], ["Type", body.memoType]] } : null;
+  const { data: memo, error } = await db.from("memos").insert({ memo_no: memoNo, memo_type: body.memoType, subject: body.subject, body: body.body, audience, issued_by: staff.user.id, ...(snapshot ? { snapshot } : {}) }).select("id").single();
   if (error) return fail(error);
   const { error: re } = await db.from("memo_recipients").insert(recipients.map((id) => ({ memo_id: memo.id, employee_id: id })));
   if (re) return fail(re);
   await audit("hr.memo_issued", "memo", memo.id, null, { memo_no: memoNo, subject: body.subject, recipients: recipients.length });
+  if (snapshot) await fileHrDocument(db, "Memorandums", `${manilaToday()} ${memoNo} ${body.subject}`, await hrPdf(db, snapshot));
   await notifyEmployees(db, await employeeAccounts(db, recipients), { type: "hr", origin, key: `memo:${memo.id}`, recordType: "memo", recordId: memo.id, title: `Memo ${memoNo}: ${body.subject}`, body: "A new memo is waiting in MyHR. Please read it and tap I Have Read and Understood." });
   return NextResponse.json({ ok: true, memoNo });
 }

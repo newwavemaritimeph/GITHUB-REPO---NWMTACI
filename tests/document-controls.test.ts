@@ -5,13 +5,13 @@ import { createExpenseVoucherPdf } from "@/lib/documents";
 import { PDFDocument } from "pdf-lib";
 
 // Forms added later get their row in a later migration (202610290086: the Training Reports sheets).
-const migration = ["202610290078_document_controls.sql", "202610290086_course_exercises.sql", "202610290088_freelance_referral_vouchers.sql"].map((f) => readFileSync(`supabase/migrations/${f}`, "utf8")).join("\n");
+const migration = ["202610290078_document_controls.sql", "202610290086_course_exercises.sql", "202610290088_freelance_referral_vouchers.sql", "202611100096_hr_documents.sql"].map((f) => readFileSync(`supabase/migrations/${f}`, "utf8")).join("\n");
 
 describe("Form Numbers", () => {
   it("has one row per form, the same in the code and the migration", () => {
     const codes = DOCUMENT_FORMS.map((f) => f.code);
-    expect(codes).toHaveLength(23);
-    expect(new Set(codes).size).toBe(23);
+    expect(codes).toHaveLength(26);
+    expect(new Set(codes).size).toBe(26);
     for (const code of codes) expect(migration).toContain(`('${code}',`);
     expect(isFormCode("expense_voucher")).toBe(true);
     expect(isFormCode("certificate")).toBe(false);
@@ -30,7 +30,7 @@ describe("Form Numbers", () => {
     expect(controlLine(startControl("expense_voucher"))).toBe("Revision No. 01  |  Issued Date 11/05/2026");
   });
   it("is read by the page or route of every form", () => {
-    const files = ["app/api/documents/referral-voucher/[id]/route.ts", "app/api/documents/billing-statement/route.ts", "app/api/documents/company-receipt/[id]/route.ts", "app/api/documents/finance-summary/route.ts", "app/api/documents/endorsed-sales/route.ts", "app/api/documents/reconciliation/route.ts", "app/api/documents/expenses-daily/route.ts", "app/api/documents/expenses-summary/route.ts", "app/api/documents/cashier-report/route.ts", "app/api/documents/admission-invoice/[id]/route.ts", "app/api/documents/mismo/route.ts", "app/api/documents/batch-roster/route.ts", "app/api/documents/resource-plan/route.ts", "app/api/documents/payslip/[id]/route.ts", "app/portal/admission-record/[id]/page.tsx", "app/portal/payment-receipt/[id]/page.tsx", "lib/expense-voucher.ts", "lib/training-instructions.ts", "lib/completion-record-server.ts", "lib/training-sheets.ts"];
+    const files = ["app/api/documents/referral-voucher/[id]/route.ts", "app/api/documents/billing-statement/route.ts", "app/api/documents/company-receipt/[id]/route.ts", "app/api/documents/finance-summary/route.ts", "app/api/documents/endorsed-sales/route.ts", "app/api/documents/reconciliation/route.ts", "app/api/documents/expenses-daily/route.ts", "app/api/documents/expenses-summary/route.ts", "app/api/documents/cashier-report/route.ts", "app/api/documents/admission-invoice/[id]/route.ts", "app/api/documents/mismo/route.ts", "app/api/documents/batch-roster/route.ts", "app/api/documents/resource-plan/route.ts", "app/api/documents/payslip/[id]/route.ts", "app/portal/admission-record/[id]/page.tsx", "app/portal/payment-receipt/[id]/page.tsx", "lib/expense-voucher.ts", "lib/training-instructions.ts", "lib/completion-record-server.ts", "lib/training-sheets.ts", "app/api/documents/hr/route.ts"];
     const source = files.map((f) => readFileSync(f, "utf8")).join("\n");
     for (const f of DOCUMENT_FORMS) expect(source, f.code).toContain(`"${f.code}"`);
   });

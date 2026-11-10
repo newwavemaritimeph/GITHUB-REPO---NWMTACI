@@ -17,4 +17,8 @@ describe("new-arrival chime", () => {
   it("stays quiet for other roles", () => {
     expect(newArrivals({ enrollments: [] }, { enrollments: [{ id: "e1" }] }, "accounting").count).toBe(0);
   });
+  it("chimes for the Releasing Officer on new certificates and for MISMO on new enrollments", () => {
+    expect(newArrivals({ certificates: [{ id: "c1" }] }, { certificates: [{ id: "c1" }, { id: "c2" }] }, "releasing_officer")).toEqual({ count: 1, label: "New Certificate" });
+    expect(newArrivals({ enrollments: [] }, { enrollments: [{ id: "e1" }, { id: "e2" }] }, "mismo_officer")).toEqual({ count: 2, label: "2 New Enrollments" });
+  });
 });

@@ -4,10 +4,10 @@ import { useState } from "react";
 import { Badge, Message } from "./shared-ui";
 import { dueLabel, dueOf, HR_DEFAULTS, type HrSettings } from "@/lib/hr-due";
 import type { Hr201 } from "@/lib/hr-server";
-import { hrPost, shortDate, todayManila, toneOf, type HrMemo, type HrRequest } from "./hr-people";
+import { hrPost, shortDate, todayManila, toneOf, type HrCoe, type HrMemo, type HrRequest } from "./hr-people";
 
 /** MyHR (owner, 10 Nov 2026): the employee's six-month checks, biodata review, Fit to Work upload and memos. */
-export type MyHrExtras = { profile: Hr201 | null; memos: (HrMemo & { acknowledged_at: string | null })[]; requests: HrRequest[]; settings: HrSettings } | null;
+export type MyHrExtras = { profile: Hr201 | null; memos: (HrMemo & { acknowledged_at: string | null })[]; requests: HrRequest[]; settings: HrSettings; coes?: HrCoe[] } | null;
 
 /** The employee's own due items, for MyHR and the bell. */
 export function myDueItems(x: MyHrExtras) {
@@ -63,9 +63,27 @@ export function MyHrMemos({ x, reload }: { x: MyHrExtras; reload: () => Promise<
     {x.memos.map((m) => <div key={m.id} className="myhr-memo">
       <div className="myhr-check-head"><div><strong>{m.subject}</strong><small>{m.memo_no} · {m.memo_type} · {shortDate(m.issued_at)}</small></div><Badge tone={m.acknowledged_at ? "green" : "red"}>{m.acknowledged_at ? "Acknowledged" : "Unread"}</Badge></div>
       <p>{m.body}</p>
+      <a className="hr-link" href={`/api/documents/hr?type=memo&id=${m.id}`} target="_blank" rel="noreferrer">View PDF</a>
       {m.acknowledged_at ? <small className="myhr-note">You acknowledged this on {shortDate(m.acknowledged_at)}.</small>
         : <button type="button" className="portal-primary" disabled={!!busy} onClick={async () => { setBusy(m.id); setErr(""); try { await hrPost({ action: "memo-ack", memoId: m.id }); await reload(); } catch (e) { setErr(e instanceof Error ? e.message : "Could not save."); } finally { setBusy(""); } }}>{busy === m.id ? "Saving…" : "I Have Read and Understood"}</button>}
     </div>)}
     {!x.memos.length && <p className="portal-empty-copy">No memos yet.</p>}
+  </section>;
+}
+
+/** Certificate of Employment (owner, 10 Nov 2026): request with a purpose; HR issues it within 3 days. */
+export function MyHrCoe({ x, reload }: { x: MyHrExtras; reload: () => Promise<void> }) {
+  const [purpose, setPurpose] = useState(""), [busy, setBusy] = useState(false), [msg, setMsg] = useState<{ kind: "success" | "error"; text: string } | null>(null);
+  if (!x) return null;
+  const rows = x.coes ?? [], waiting = rows.some((c) => c.status === "Pending");
+  return <section className="portal-panel">
+    <div className="panel-heading"><h2>Certificate of Employment</h2></div>
+    {msg && <Message kind={msg.kind} text={msg.text} />}
+    {!waiting && <div className="portal-form hr-form"><label className="full">Purpose<input value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="e.g. Bank loan, visa application" /></label>
+      <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || purpose.trim().length < 3} onClick={async () => { setBusy(true); setMsg(null); try { await hrPost({ action: "myhr-coe-request", purpose: purpose.trim() }); setPurpose(""); await reload(); setMsg({ kind: "success", text: "Sent to HR. You get it within 3 days." }); } catch (e) { setMsg({ kind: "error", text: e instanceof Error ? e.message : "Could not send." }); } finally { setBusy(false); } }}>{busy ? "Sending…" : "Request COE"}</button></div></div>}
+    <h3 className="hr-sub">My Requests</h3>
+    <div className="live-list">{rows.map((c) => <div className="live-row-item" key={c.id}><div><strong>{c.purpose}</strong><small>{c.coe_no ? `${c.coe_no} · ` : ""}Requested {shortDate(c.requested_at)}</small></div>
+      <span className="hr-acts"><Badge tone={c.status === "Issued" ? "green" : c.status === "Rejected" ? "red" : "orange"}>{c.status === "Pending" ? "With HR" : c.status}</Badge>{c.status === "Issued" && <a className="portal-secondary row-act" href={`/api/documents/hr?type=coe&id=${c.id}`} target="_blank" rel="noreferrer">View</a>}</span></div>)}
+      {!rows.length && <p className="portal-empty-copy">No requests yet.</p>}</div>
   </section>;
 }

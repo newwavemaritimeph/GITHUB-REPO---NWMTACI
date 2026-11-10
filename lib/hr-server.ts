@@ -1,6 +1,11 @@
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { escapeHtml } from "@/lib/classroom";
 import { emailConfigured, processEmailJobs } from "@/lib/email-jobs";
+import { fileInDrive } from "@/lib/google-drive";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { loadDocumentControl } from "@/lib/document-controls";
+import { buildHrDocumentPdf, dayOf, longDate, type HrDocSnapshot } from "@/lib/print/hr-documents";
 import { HR_DEFAULTS, daysBetween, dueLabel, hrDueItems, manilaDate, needsAction, KIND_LABEL, type HrSettings } from "@/lib/hr-due";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
@@ -8,8 +13,8 @@ export const HR_ROLES = ["admin", "hr"];
 export const canHr = (roles: string[]) => roles.some((r) => HR_ROLES.includes(r));
 export const manilaToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
 
-const PROFILE_COLS = "id,birth_date,sex,civil_status,address,mobile,personal_email,employment_type,biometric_id,regularization_date,fit_to_work_on,fit_to_work_pending_on,fit_to_work_uploaded_at,biodata_confirmed_at,profile_id,work_email";
-export type Hr201 = { id: string; birth_date: string | null; sex: string | null; civil_status: string | null; address: string | null; mobile: string | null; personal_email: string | null; employment_type: string | null; biometric_id: string | null; regularization_date: string | null; fit_to_work_on: string | null; fit_to_work_pending_on: string | null; fit_to_work_uploaded_at: string | null; biodata_confirmed_at: string | null; profile_id?: string | null; work_email?: string | null };
+const PROFILE_COLS = "id,government_ids,payroll_account,emergency_contact,birth_date,sex,civil_status,address,mobile,personal_email,employment_type,biometric_id,regularization_date,fit_to_work_on,fit_to_work_pending_on,fit_to_work_uploaded_at,biodata_confirmed_at,profile_id,work_email";
+export type Hr201 = { id: string; government_ids?: { tin?: string | null; sss?: string | null; philhealth?: string | null; pagibig?: string | null } | null; payroll_account?: { method?: string | null; account?: string | null; days_factor?: number | null; allowance_centavos?: number | null } | null; emergency_contact?: { name?: string | null; relation?: string | null; mobile?: string | null } | null; birth_date: string | null; sex: string | null; civil_status: string | null; address: string | null; mobile: string | null; personal_email: string | null; employment_type: string | null; biometric_id: string | null; regularization_date: string | null; fit_to_work_on: string | null; fit_to_work_pending_on: string | null; fit_to_work_uploaded_at: string | null; biodata_confirmed_at: string | null; profile_id?: string | null; work_email?: string | null };
 
 export async function hrSettings(db: Admin): Promise<HrSettings> {
   const { data } = await db.from("hr_settings").select("fit_to_work_months,biodata_months,first_reminder_days,repeat_days,include_in_daily_email").eq("id", true).maybeSingle();
@@ -27,23 +32,30 @@ export async function loadHrExtras(db: Admin) {
     db.from("hr_reminders").select("employee_id,reminder_type,sent_at").order("sent_at", { ascending: false }).limit(500),
   ]);
   if (p.error) return null;
+  const [tpl, coes] = await Promise.all([
+    db.from("hr_document_templates").select("doc_type,version,body,signatories,created_at").order("version", { ascending: false }).limit(60),
+    db.from("coe_requests").select("id,employee_id,purpose,status,requested_at,completed_at,coe_no,drive_link").order("requested_at", { ascending: false }).limit(200),
+  ]);
+  const templates: Record<string, unknown> = {};
+  for (const t of tpl.data ?? []) if (!templates[t.doc_type as string]) templates[t.doc_type as string] = t;
   const lastReminder: Record<string, string> = {};
   for (const r of rem.data ?? []) { const k = `${r.employee_id}:${r.reminder_type}`; if (!lastReminder[k]) lastReminder[k] = r.sent_at as string; }
-  return { profiles: (p.data ?? []) as Hr201[], memos: memos.data ?? [], memoRecipients: rec.data ?? [], requests: reqs.data ?? [], settings, lastReminder };
+  return { profiles: (p.data ?? []) as Hr201[], memos: memos.data ?? [], memoRecipients: rec.data ?? [], requests: reqs.data ?? [], settings, lastReminder, templates, coes: coes.error ? [] : coes.data ?? [] };
 }
 
 /** MyHR: the employee's own 201 extras, memos, and requests. */
 export async function loadMyHrExtras(db: Admin, employeeId: string) {
-  const [p, rec, reqs, settings] = await Promise.all([
+  const [p, rec, reqs, settings, coes] = await Promise.all([
     db.from("employees").select(PROFILE_COLS).eq("id", employeeId).maybeSingle(),
     db.from("memo_recipients").select("memo_id,acknowledged_at,memos(id,memo_no,memo_type,subject,body,issued_at)").eq("employee_id", employeeId).limit(100),
     db.from("hr_requests").select("id,request_no,request_type,details,status,decision_remarks,created_at").eq("employee_id", employeeId).order("created_at", { ascending: false }).limit(50),
     hrSettings(db),
+    db.from("coe_requests").select("id,purpose,status,requested_at,completed_at,coe_no").eq("employee_id", employeeId).order("requested_at", { ascending: false }).limit(30),
   ]);
   if (p.error) return null;
   const memos = (rec.data ?? []).map((r) => { const m = (Array.isArray(r.memos) ? r.memos[0] : r.memos) as Record<string, unknown> | null; return m ? { ...m, acknowledged_at: r.acknowledged_at } : null; }).filter(Boolean)
     .sort((a, b) => String((b as unknown as { issued_at: string }).issued_at).localeCompare(String((a as unknown as { issued_at: string }).issued_at)));
-  return { profile: p.data as Hr201 | null, memos, requests: reqs.data ?? [], settings };
+  return { profile: p.data as Hr201 | null, memos, requests: reqs.data ?? [], settings, coes: coes.error ? [] : coes.data ?? [] };
 }
 
 /** The portal account behind an employee: the linked profile, else the profile with the same work e-mail. */
@@ -119,4 +131,36 @@ export async function sendAutoReminders(db: Admin, origin?: string) {
     sent += people.length;
   }
   return { sent };
+}
+
+/** The newest saved version of an HR document template (seeded by migration 202611100096). */
+export async function latestTemplate(db: Admin, docType: "coe" | "nte" | "memo") {
+  const { data } = await db.from("hr_document_templates").select("version,body,signatories").eq("doc_type", docType).order("version", { ascending: false }).limit(1).maybeSingle();
+  return data as { version: number; body: string; signatories: { label: string; name: string; title: string }[] } | null;
+}
+
+/** COE wording for an employee: the template with its fields filled from the 201. */
+export function coeFields(e: { complete_name: string; position: string; date_hired: string; active: boolean; sex?: string | null; employment_type?: string | null }, purpose: string, issuedOn: string) {
+  const title = e.sex === "Female" ? "Ms." : e.sex === "Male" ? "Mr." : "";
+  const [last] = e.complete_name.split(",");
+  return {
+    employee_name: e.complete_name.toUpperCase(), title, last_name: (last ?? e.complete_name).trim(), position: e.position,
+    date_hired: longDate(e.date_hired), date_until: e.active ? "the present" : "the date of separation",
+    employment_type: (e.employment_type ?? "regular").toLowerCase(), purpose, date_issued: dayOf(issuedOn),
+  };
+}
+
+/** Best-effort copy in Google Drive: New Wave HR / {folder} / {year}. Never throws. */
+export async function fileHrDocument(db: Admin, folder: "Certificates of Employment" | "Memorandums", base: string, bytes: Uint8Array) {
+  try {
+    const year = manilaToday().slice(0, 4), key = folder === "Memorandums" ? "hr/memos" : "hr/coe";
+    const r = await fileInDrive(db, { rootKey: "hr", rootName: "New Wave HR", folders: [{ key, name: folder }, { key: `${key}/${year}`, name: year }], base, ext: "pdf", mime: "application/pdf", bytes });
+    return r.link;
+  } catch (e) { console.error("HR Drive filing failed:", e instanceof Error ? e.message : e); return null; }
+}
+
+/** The PDF bytes for an HR document snapshot, with the form's Form Numbers and the emblem. */
+export async function hrPdf(db: Admin, doc: HrDocSnapshot) {
+  const emblem = await readFile(path.join(process.cwd(), "public", "new-wave-emblem.png")).then((x) => new Uint8Array(x)).catch(() => undefined);
+  return buildHrDocumentPdf(doc, await loadDocumentControl(db, doc.type), emblem);
 }

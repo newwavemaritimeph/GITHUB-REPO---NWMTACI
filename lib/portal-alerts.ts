@@ -10,6 +10,7 @@ export type AlertSnapshot = {
   awaitingCourseIds?: string[];
   traineeProofs?: { id: string }[];
   handedToCashier?: Record<string, string>;
+  certificates?: { id: string }[];
 };
 
 const fresh = (before: string[], after: string[]) => { const seen = new Set(before); return after.filter((x) => !seen.has(x)).length; };
@@ -28,8 +29,13 @@ export function newArrivals(prev: AlertSnapshot | null, next: AlertSnapshot, rol
     const parts = [proofs && plural(proofs, "Payment"), handed && plural(handed, "Hand-Over")].filter(Boolean);
     return { count: proofs + handed, label: parts.join(" · ") };
   }
+  // Releasing Officer: certificates newly ready; MISMO Compliance Officer: new enrollments (owner, 10 Nov 2026).
+  if (role === "releasing_officer") { const n = fresh(ids(prev.certificates), ids(next.certificates)); return { count: n, label: n ? plural(n, "Certificate") : "" }; }
+  if (role === "mismo_officer") { const n = fresh(ids(prev.enrollments), ids(next.enrollments)); return { count: n, label: n ? plural(n, "Enrollment") : "" }; }
   return { count: 0, label: "" };
 }
+/** Roles that hear the chime (each can be turned off in Admin › Portal Sounds). */
+export const SOUND_ROLES = ["registration", "cashier", "releasing_officer", "mismo_officer"] as const;
 
 let audio: AudioContext | null = null;
 /** Lets the chime play later: browsers allow sound only after the person has clicked on the page once. */

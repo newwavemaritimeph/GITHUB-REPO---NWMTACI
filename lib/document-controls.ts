@@ -10,7 +10,7 @@ export type DocumentControl = { formNo: string; revisionNo: string; revisionDate
   issuedTo?: string; controlledBy?: string; approvedBy?: string };
 export const FOOTER_DEFAULTS = { controlledBy: "VAM", approvedBy: "MAAV" };
 
-export const FORM_GROUPS = ["Accounting", "Cashier", "Registration", "Training and MISMO", "Payroll"] as const;
+export const FORM_GROUPS = ["Accounting", "Cashier", "Registration", "Training and MISMO", "Payroll", "HR"] as const;
 type Form = { code: string; name: string; group: (typeof FORM_GROUPS)[number]; start?: Partial<DocumentControl>; note?: string };
 
 export const DOCUMENT_FORMS = [
@@ -38,6 +38,10 @@ export const DOCUMENT_FORMS = [
   { code: "batch_roster", name: "Batch Roster", group: "Training and MISMO" },
   { code: "resource_plan", name: "Resource Plan", group: "Training and MISMO" },
   { code: "payslip", name: "Payslip", group: "Payroll" },
+  // HR documents (owner, 10 Nov 2026): COE on A4, NTE and Memorandum on Legal.
+  { code: "coe", name: "Certificate of Employment", group: "HR" },
+  { code: "nte", name: "Notice to Explain", group: "HR" },
+  { code: "memo", name: "Memorandum", group: "HR" },
 ] as const satisfies readonly Form[];
 
 export type FormCode = (typeof DOCUMENT_FORMS)[number]["code"];
