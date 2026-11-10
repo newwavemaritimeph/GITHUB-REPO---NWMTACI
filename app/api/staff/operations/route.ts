@@ -110,7 +110,7 @@ const notificationInput = z.object({ action: z.literal("mark-notifications-read"
 const channelInput = z.object({ action: z.literal("channel-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), code: z.string().trim().max(40).optional(), requiresReference: z.boolean().default(false), allowsProof: z.boolean().default(true), kind: z.enum(["receivable", "payable"]).optional(), active: z.boolean().optional(), accountDetails: z.string().trim().max(300).optional() });
 const chargeInput = z.object({ action: z.literal("charge-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), defaultAmountCentavos: z.number().int().nonnegative().default(0), active: z.boolean().optional(), kind: z.enum(["item", "fee"]).optional() });
 // Form Numbers (owner, 5 Nov 2026): saved together so one Save is one request.
-const documentControlsInput = z.object({ action: z.literal("document-controls-save"), rows: z.array(z.object({ formCode: z.string().max(40), formNo: z.string().trim().max(40), revisionNo: z.string().trim().max(20), revisionDate: z.string().trim().max(20), issuedDate: z.string().trim().max(20) })).min(1).max(40) });
+const documentControlsInput = z.object({ action: z.literal("document-controls-save"), rows: z.array(z.object({ formCode: z.string().max(40), formNo: z.string().trim().max(40), revisionNo: z.string().trim().max(20), revisionDate: z.string().trim().max(20), issuedDate: z.string().trim().max(20), issuedTo: z.string().trim().max(60).optional(), controlledBy: z.string().trim().max(20).optional(), approvedBy: z.string().trim().max(20).optional() })).min(1).max(40) });
 const incomeCategoryInput = z.object({ action: z.literal("income-category-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(2).max(60), active: z.boolean().optional(), remove: z.boolean().optional() });
 const expenseCategoryInput = z.object({ action: z.literal("expense-category-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(80), active: z.boolean().optional(), remove: z.boolean().optional() });
 const inventoryItemInput = z.object({ action: z.literal("inventory-item-save"), id: z.string().uuid().nullable().optional(), name: z.string().trim().min(1).max(120), category: z.string().trim().max(80).optional(), unit: z.string().trim().min(1).max(24).default("pc"), unitValueCentavos: z.number().int().nonnegative().default(0), active: z.boolean().optional(), remove: z.boolean().optional() });
@@ -1272,8 +1272,11 @@ export async function GET(request: Request) {
   // Form Numbers (migration 202610290078; empty without it, and the screen then shows the starting values).
   let documentControls: unknown[] = [];
   if (canManageAccounting(staff.roleCodes)) task(async () => {
-    const { data, error } = await createSupabaseAdminClient().from("document_controls").select("form_code,form_no,revision_no,revision_date,issued_date,updated_by,updated_at,profiles(complete_name)");
-    documentControls = error ? [] : data ?? [];
+    const db2 = createSupabaseAdminClient();
+    let r = await db2.from("document_controls").select("form_code,form_no,revision_no,revision_date,issued_date,issued_to,controlled_by,approved_by,updated_by,updated_at,profiles(complete_name)");
+    // Before 202610290089 the signatory columns are missing.
+    if (r.error) r = await db2.from("document_controls").select("form_code,form_no,revision_no,revision_date,issued_date,updated_by,updated_at,profiles(complete_name)") as typeof r;
+    documentControls = r.error ? [] : r.data ?? [];
   });
   // Other income (migration 202610190045; empty without it): Cashier, Accounting and Admin.
   let otherIncome: unknown[] = [], centerPayments: unknown[] = [], incomeCategories: unknown[] = [];
@@ -1505,11 +1508,17 @@ export async function POST(request: Request) {
       const notYet = (message: string) => (/document_controls/.test(message) ? "Apply database update 202610290078 first." : message);
       if (readError) return NextResponse.json({ error: notYet(readError.message) }, { status: 400 });
       const stamp = new Date().toISOString();
-      const rows = input.rows.map((r) => ({ form_code: r.formCode, form_no: r.formNo, revision_no: r.revisionNo, revision_date: r.revisionDate, issued_date: r.issuedDate, updated_by: staff.user.id, updated_at: stamp }));
-      const { error } = await admin.from("document_controls").upsert(rows, { onConflict: "form_code" });
+      const rows = input.rows.map((r) => ({ form_code: r.formCode, form_no: r.formNo, revision_no: r.revisionNo, revision_date: r.revisionDate, issued_date: r.issuedDate, updated_by: staff.user.id, updated_at: stamp,
+        ...(r.issuedTo !== undefined ? { issued_to: r.issuedTo } : {}), ...(r.controlledBy !== undefined ? { controlled_by: r.controlledBy } : {}), ...(r.approvedBy !== undefined ? { approved_by: r.approvedBy } : {}) }));
+      let { error } = await admin.from("document_controls").upsert(rows, { onConflict: "form_code" });
+      // Before 202610290089: save the four details and say what is missing.
+      if (error && /issued_to|controlled_by|approved_by/.test(error.message)) {
+        ({ error } = await admin.from("document_controls").upsert(rows.map(({ form_code, form_no, revision_no, revision_date, issued_date, updated_by, updated_at }) => ({ form_code, form_no, revision_no, revision_date, issued_date, updated_by, updated_at })), { onConflict: "form_code" }));
+        if (!error) return NextResponse.json({ error: "Saved the form details. Issued To, Controlled By and Approved By need database update 202610290089 first." }, { status: 400 });
+      }
       if (error) return NextResponse.json({ error: notYet(error.message) }, { status: 400 });
       const prior = new Map((priorRows ?? []).map((p) => [p.form_code as string, p]));
-      await admin.from("audit_logs").insert(rows.map((r) => { const { form_code, form_no, revision_no, revision_date, issued_date } = r; return { actor_id: staff.user.id, actor_role: staff.roleCodes.includes("accounting") ? "accounting" : "admin", action: "document_control.updated", record_type: "document_control", record_id: form_code, prior_values: prior.get(form_code) ?? null, new_values: { form_no, revision_no, revision_date, issued_date } }; }));
+      await admin.from("audit_logs").insert(rows.map((r) => { const { form_code, form_no, revision_no, revision_date, issued_date, updated_by: _by, updated_at: _at, ...signatories } = r; void _by; void _at; return { actor_id: staff.user.id, actor_role: staff.roleCodes.includes("accounting") ? "accounting" : "admin", action: "document_control.updated", record_type: "document_control", record_id: form_code, prior_values: prior.get(form_code) ?? null, new_values: { form_no, revision_no, revision_date, issued_date, ...signatories } }; }));
       return NextResponse.json({ ok: true });
     }
     if (input.action === "income-category-save") {

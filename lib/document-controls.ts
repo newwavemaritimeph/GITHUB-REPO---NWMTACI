@@ -5,7 +5,10 @@ import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
  * and Issued Date of every form. The dates are text because existing forms print values such as "00".
  * A form with all four blank prints no details. Certificates are not listed: they print from approved templates.
  */
-export type DocumentControl = { formNo: string; revisionNo: string; revisionDate: string; issuedDate: string };
+export type DocumentControl = { formNo: string; revisionNo: string; revisionDate: string; issuedDate: string;
+  /** The footer's signatories (owner, 10 Nov 2026, migration 202610290089). Undefined until loaded: the footer then prints VAM and MAAV. */
+  issuedTo?: string; controlledBy?: string; approvedBy?: string };
+export const FOOTER_DEFAULTS = { controlledBy: "VAM", approvedBy: "MAAV" };
 
 export const FORM_GROUPS = ["Accounting", "Cashier", "Registration", "Training and MISMO", "Payroll"] as const;
 type Form = { code: string; name: string; group: (typeof FORM_GROUPS)[number]; start?: Partial<DocumentControl>; note?: string };
@@ -54,12 +57,14 @@ export const controlRows = (c: DocumentControl | null | undefined, always = fals
 export const controlLine = (c: DocumentControl | null | undefined) => controlRows(c).filter(([, v]) => v).map(([k, v]) => `${k} ${v}`).join("  |  ");
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
-type Row = { form_no: string | null; revision_no: string | null; revision_date: string | null; issued_date: string | null };
+type Row = { form_no: string | null; revision_no: string | null; revision_date: string | null; issued_date: string | null; issued_to?: string | null; controlled_by?: string | null; approved_by?: string | null };
 
 /** The form's saved details; the starting values until migration 202610290078 is run. */
 export async function loadDocumentControl(db: Admin, code: FormCode): Promise<DocumentControl> {
-  const { data, error } = await db.from("document_controls").select("form_no,revision_no,revision_date,issued_date").eq("form_code", code).maybeSingle();
-  if (error || !data) return startControl(code);
-  const r = data as Row;
-  return { formNo: r.form_no ?? "", revisionNo: r.revision_no ?? "", revisionDate: r.revision_date ?? "", issuedDate: r.issued_date ?? "" };
+  let res = await db.from("document_controls").select("form_no,revision_no,revision_date,issued_date,issued_to,controlled_by,approved_by").eq("form_code", code).maybeSingle();
+  // Before 202610290089 the signatory columns are missing: read the four details only.
+  if (res.error) res = await db.from("document_controls").select("form_no,revision_no,revision_date,issued_date").eq("form_code", code).maybeSingle() as typeof res;
+  if (res.error || !res.data) return startControl(code);
+  const r = res.data as Row;
+  return { formNo: r.form_no ?? "", revisionNo: r.revision_no ?? "", revisionDate: r.revision_date ?? "", issuedDate: r.issued_date ?? "", issuedTo: r.issued_to ?? undefined, controlledBy: r.controlled_by ?? undefined, approvedBy: r.approved_by ?? undefined };
 }

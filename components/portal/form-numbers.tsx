@@ -1,16 +1,19 @@
 "use client";
 
 import { Fragment, useState } from "react";
-import { DOCUMENT_FORMS, controlIsSet, startControl, type DocumentControl, type FormCode } from "@/lib/document-controls";
+import { DOCUMENT_FORMS, FOOTER_DEFAULTS, controlIsSet, startControl, type DocumentControl, type FormCode } from "@/lib/document-controls";
 import { usePaged } from "./shared-ui";
 
-export type DocumentControlRow = { form_code: string; form_no: string | null; revision_no: string | null; revision_date: string | null; issued_date: string | null; updated_by: string | null; updated_at: string | null; profiles?: { complete_name: string } | { complete_name: string }[] | null };
+export type DocumentControlRow = { form_code: string; form_no: string | null; revision_no: string | null; revision_date: string | null; issued_date: string | null; issued_to?: string | null; controlled_by?: string | null; approved_by?: string | null; updated_by: string | null; updated_at: string | null; profiles?: { complete_name: string } | { complete_name: string }[] | null };
 
 const FIELDS: { key: keyof DocumentControl; label: string; placeholder?: string }[] = [
   { key: "formNo", label: "Form No." }, { key: "revisionNo", label: "Revision No." },
   { key: "revisionDate", label: "Revision Date", placeholder: "MM/DD/YYYY" }, { key: "issuedDate", label: "Issued Date", placeholder: "MM/DD/YYYY" },
+  // The footer's signatories (owner, 10 Nov 2026).
+  { key: "issuedTo", label: "Issued To" }, { key: "controlledBy", label: "Controlled By" }, { key: "approvedBy", label: "Approved By" },
 ];
-const same = (a: DocumentControl, b: DocumentControl) => FIELDS.every((f) => a[f.key].trim() === b[f.key].trim());
+const val = (c: DocumentControl, k: keyof DocumentControl) => (c[k] ?? "").trim();
+const same = (a: DocumentControl, b: DocumentControl) => FIELDS.every((f) => val(a, f.key) === val(b, f.key));
 const changedOn = (iso: string) => new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(iso));
 
 /**
@@ -19,7 +22,7 @@ const changedOn = (iso: string) => new Intl.DateTimeFormat("en-PH", { month: "sh
  */
 export function FormNumbers({ rows, busy, post }: { rows: DocumentControlRow[]; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
   const saved = new Map(rows.map((r) => [r.form_code, r]));
-  const base = (code: FormCode): DocumentControl => { const r = saved.get(code); return r ? { formNo: r.form_no ?? "", revisionNo: r.revision_no ?? "", revisionDate: r.revision_date ?? "", issuedDate: r.issued_date ?? "" } : startControl(code); };
+  const base = (code: FormCode): DocumentControl => { const r = saved.get(code); const sig = { issuedTo: r?.issued_to ?? "", controlledBy: r?.controlled_by ?? FOOTER_DEFAULTS.controlledBy, approvedBy: r?.approved_by ?? FOOTER_DEFAULTS.approvedBy }; return r ? { formNo: r.form_no ?? "", revisionNo: r.revision_no ?? "", revisionDate: r.revision_date ?? "", issuedDate: r.issued_date ?? "", ...sig } : { ...startControl(code), ...sig }; };
   const [edits, setEdits] = useState<Partial<Record<FormCode, DocumentControl>>>({});
   const [filter, setFilter] = useState<"All" | "Set" | "Not Set">("All"), [query, setQuery] = useState(""), [done, setDone] = useState("");
   const current = DOCUMENT_FORMS.map((form) => ({ form, value: edits[form.code] ?? base(form.code) }));
@@ -36,7 +39,7 @@ export function FormNumbers({ rows, busy, post }: { rows: DocumentControlRow[]; 
   };
   async function save() {
     try {
-      await post({ action: "document-controls-save", rows: dirty.map((c) => ({ formCode: c.form.code, formNo: c.value.formNo.trim(), revisionNo: c.value.revisionNo.trim(), revisionDate: c.value.revisionDate.trim(), issuedDate: c.value.issuedDate.trim() })) });
+      await post({ action: "document-controls-save", rows: dirty.map((c) => ({ formCode: c.form.code, formNo: val(c.value, "formNo"), revisionNo: val(c.value, "revisionNo"), revisionDate: val(c.value, "revisionDate"), issuedDate: val(c.value, "issuedDate"), issuedTo: val(c.value, "issuedTo"), controlledBy: val(c.value, "controlledBy"), approvedBy: val(c.value, "approvedBy") })) });
       setEdits({}); setDone(`Saved ${dirty.length} form${dirty.length === 1 ? "" : "s"}. The next print shows the new details.`);
     } catch { /* the page shows the error */ }
   }
@@ -50,15 +53,15 @@ export function FormNumbers({ rows, busy, post }: { rows: DocumentControlRow[]; 
         const head = i === 0 || pg.shown[i - 1].form.group !== form.group ? form.group : "";
         const note = (form as { note?: string }).note;
         return <Fragment key={form.code}>
-          {head && <tr className="pm-details"><td colSpan={6}><b>{head}</b></td></tr>}
+          {head && <tr className="pm-details"><td colSpan={FIELDS.length + 2}><b>{head}</b></td></tr>}
           <tr className={same(value, base(form.code)) ? "" : "dirty"}>
             <td><b>{form.name}</b>{note && <small>{note}</small>}</td>
-            {FIELDS.map((f) => <td key={f.key}><input className="cm-text cx-mono" aria-label={`${f.label} for ${form.name}`} placeholder={f.placeholder ?? ""} maxLength={f.key === "formNo" ? 40 : 20} value={value[f.key]} onChange={(e) => set(form.code, { ...value, [f.key]: e.target.value })} /></td>)}
+            {FIELDS.map((f) => <td key={f.key}><input className="cm-text cx-mono" aria-label={`${f.label} for ${form.name}`} placeholder={f.placeholder ?? ""} maxLength={f.key === "formNo" ? 40 : f.key === "issuedTo" ? 60 : 20} value={value[f.key] ?? ""} onChange={(e) => set(form.code, { ...value, [f.key]: e.target.value })} /></td>)}
             <td className="fn-changed">{lastChanged(form.code, value)}</td>
           </tr>
         </Fragment>;
       })}
-      {!shown.length && <tr><td colSpan={6}><span className="portal-empty-copy">Nothing to show.</span></td></tr>}</tbody></table></div>
+      {!shown.length && <tr><td colSpan={FIELDS.length + 2}><span className="portal-empty-copy">Nothing to show.</span></td></tr>}</tbody></table></div>
     {pg.pager}
     <div className={`rb3-bar${dirty.length ? " on" : ""}`}><span>{dirty.length ? `${dirty.length} form${dirty.length === 1 ? "" : "s"} changed` : "No changes"}</span>
       <span className="cx-acts"><button type="button" className="portal-secondary" disabled={!dirty.length || busy} onClick={() => { setEdits({}); setDone(""); }}>Discard</button><button type="button" className="portal-primary" disabled={!dirty.length || busy} onClick={() => void save()}>{busy ? "Saving…" : "Save Changes"}</button></span></div>
