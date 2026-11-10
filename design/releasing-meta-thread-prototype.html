@@ -1,0 +1,166 @@
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Releasing Meta Thread</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+/* The staff portal is light only. Layout: navy bar, design tabs, then the Releasing Officer's Certificates page as in the portal (stage tabs over one table). */
+:root { color-scheme: light; --ink: #0f2638; --mute: #587184; --line: #d6e9f1; --soft: #eef4f8; --th: #e6f6fd; --thc: #0b4f8f; --navy: #123F63; --blue: #0571D0; --orange: #F25615; --good: #0a7a3e; --goodbg: #e3f5ea; --warn: #a4530c; --warnbg: #fdeee0; --meta: #0866FF; --metabg: #e8f0ff; --ui: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif; --num: "Geist Mono", ui-monospace, Consolas, monospace; }
+html, body { background: #f2f6f8; color: var(--ink); margin: 0; font: 14px/1.45 var(--ui); }
+.gut { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+#bar { background: var(--navy); color: #fff; display: flex; align-items: center; gap: 10px; padding-block: 10px; }
+#bar b { font-weight: 600; }
+#bar span { margin-left: auto; color: #cfe6f2; font-size: 13px; }
+#pick { background: #fff; border-bottom: 2px solid var(--navy); padding-block: 10px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { font: 600 13px var(--ui); height: 32px; padding: 0 11px; border-radius: 8px; border: 1px solid #b9dcec; background: #fff; color: var(--navy); cursor: pointer; }
+.seg button[aria-selected="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+#app { padding-block: 16px 40px; max-width: 1120px; margin-inline: auto; box-sizing: border-box; width: 100%; display: grid; gap: 12px; }
+h1 { margin: 0; font: 700 22px var(--ui); color: var(--navy); }
+.lead { margin: 0; color: var(--mute); font-size: 13.5px; }
+.lead b { color: var(--ink); }
+.st-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.st-tab { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font: 600 13.5px var(--ui); color: var(--ink); cursor: pointer; }
+.st-tab b { background: var(--soft); color: var(--navy); border-radius: 999px; padding: 0 7px; font-size: 12px; }
+.st-tab.on { background: var(--navy); color: #fff; border-color: var(--navy); }
+.st-tab.on b { background: #fff; color: var(--navy); }
+.panel { background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { background: var(--th); color: var(--thc); font: 600 12px var(--ui); text-transform: uppercase; letter-spacing: .05em; text-align: left; padding: 9px 12px; white-space: nowrap; }
+td { padding: 10px 12px; border-top: 1px solid var(--line); vertical-align: top; }
+td.no { color: var(--mute); font-family: var(--num); width: 28px; }
+td small { display: block; color: var(--mute); font-size: 12.5px; }
+.mono { font-family: var(--num); font-variant-numeric: tabular-nums; }
+.badge { display: inline-block; margin-top: 3px; padding: 1px 8px; border-radius: 999px; font: 600 11.5px var(--ui); background: var(--soft); color: var(--navy); }
+.badge.g { background: var(--goodbg); color: var(--good); }
+.badge.o { background: var(--warnbg); color: var(--warn); }
+.need { display: inline-block; margin: 0 4px 3px 0; padding: 1px 8px; border-radius: 999px; background: var(--warnbg); color: var(--warn); font: 600 12px var(--ui); }
+.acts { display: flex; flex-wrap: wrap; gap: 6px; }
+.b { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 11px; border-radius: 8px; border: 1px solid #b9dcec; background: #fff; color: var(--blue); font: 600 13px var(--ui); cursor: pointer; white-space: nowrap; text-decoration: none; }
+.b.p { background: var(--orange); border-color: var(--orange); color: #fff; }
+.b[disabled] { opacity: .45; cursor: not-allowed; }
+/* Design 1: a small link under the name. */
+.mt { display: inline-flex; align-items: center; gap: 5px; margin-top: 4px; font: 600 12.5px var(--ui); color: var(--meta); text-decoration: none; }
+.mt:hover { text-decoration: underline; }
+.mt.none { color: var(--mute); font-weight: 500; }
+.mt svg, .b svg { width: 14px; height: 14px; flex: none; }
+/* Design 2: the Meta button. */
+.b.meta { color: var(--meta); border-color: #b9cdfc; background: var(--metabg); }
+/* Design 3: the name opens a contact card. */
+.who { border: 0; background: none; padding: 0; font: 700 14px var(--ui); color: var(--ink); cursor: pointer; text-align: left; text-decoration: underline dotted #9fb6c6; text-underline-offset: 3px; }
+.who:hover { color: var(--blue); }
+.scrim { position: fixed; inset: 0; background: #0f263866; display: grid; place-items: center; padding: 16px; z-index: 40; }
+.card { background: #fff; border-radius: 16px; width: min(420px, 100%); box-shadow: 0 20px 50px #0f263844; overflow: hidden; }
+.card header { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.card h2 { margin: 0; font: 700 16px var(--ui); color: var(--navy); }
+.card dl { margin: 0; padding: 12px 18px 16px; display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 9px 12px; }
+.card dt { color: var(--mute); font-size: 13px; }
+.card dd { margin: 0; overflow-wrap: anywhere; }
+.card .muted { color: var(--mute); }
+.confirm { padding: 4px 18px 18px; }
+.confirm h2 { font: 600 16px var(--ui); margin: 12px 0 6px; }
+.confirm ol { margin: 0; padding-left: 20px; display: grid; gap: 7px; max-width: 80ch; }
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--navy); color: #fff; padding: 9px 14px; border-radius: 10px; font-size: 13.5px; z-index: 50; max-width: calc(100% - 32px); box-sizing: border-box; }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+</style>
+
+<div id="bar" class="gut"><b>Releasing Officer › Certificates</b><span>Prototype · Sample Names Only</span></div>
+<div id="pick" class="gut"><div id="tabs" class="seg" role="tablist" aria-label="Design"></div></div>
+<div id="app" class="gut"></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+// Sample trainees. "fb" marks the ones Registration has given a Meta thread link.
+const ROWS = [
+  { stage: "Waiting", name: "TAN, ROBERTO CRUZ", no: "0000041", course: "PSCMHBT", note: "Ended Nov 8", pay: "Paid", needs: ["Photo", "Evaluation"], fb: true, mobile: "0917 000 0041", email: "roberto.sample@email.com" },
+  { stage: "Waiting", name: "LIM, SOFIA RAMOS", no: "0000044", course: "UBT-PSSR", note: "Ended Nov 9", pay: "Paid", needs: ["Post-Test"], fb: false, mobile: "0917 000 0044", email: "sofia.sample@email.com" },
+  { stage: "To Print", name: "DELA CRUZ, JUAN PEREZ", no: "0000031", course: "UBT-PSSR", note: "Ended Nov 9", pay: "Paid", fb: true, mobile: "0917 000 0031", email: "juan.sample@email.com" },
+  { stage: "To Print", name: "SANTOS, MARIA LOPEZ", no: "0000027", course: "PSCMT", note: "Ended Nov 7", pay: "Paid", fb: false, mobile: "0917 000 0027", email: "maria.sample@email.com" },
+  { stage: "To Release", name: "REYES, CARLO MENDOZA", no: "0000019", course: "STPPDSPPS", note: "Printed Nov 9", pay: "Paid", cert: "STP-2026-0012", lbc: "Quezon City", address: "12 Sample St., Brgy. Sample, Quezon City", fb: true, mobile: "0917 000 0019", email: "carlo.sample@email.com" },
+  { stage: "To Release", name: "GARCIA, ANNA BAUTISTA", no: "0000022", course: "PSCMT", note: "Printed Nov 8", pay: "Balance ₱300.00", cert: "PSCMT-2026-0031", fb: true, mobile: "0917 000 0022", email: "anna.sample@email.com" },
+  { stage: "Released", name: "VILLA, MARK SANTOS", no: "0000012", course: "UBT-PSSR", cert: "UBT-2026-0007", time: "9:14 AM", to: "Trainee", method: "Pick-Up", fb: true, mobile: "0917 000 0012", email: "mark.sample@email.com" },
+  { stage: "Released", name: "CRUZ, ELLA DIAZ", no: "0000015", course: "STPPDSPPS", cert: "STP-2026-0009", time: "10:02 AM", to: "Trainee", method: "LBC", fb: false, mobile: "0917 000 0015", email: "ella.sample@email.com" },
+];
+const STAGES = ["Waiting", "To Print", "To Release", "Released"];
+const TABS = ["Design 1 · Link Under the Name", "Design 2 · Message Button", "Design 3 · Contact Card", "To Confirm"];
+const S = { tab: 0, stage: "To Print", card: null };
+const app = document.getElementById("app"), tabs = document.getElementById("tabs"), toastEl = document.getElementById("toast");
+let timer;
+const toast = (t) => { toastEl.textContent = t; toastEl.hidden = false; clearTimeout(timer); timer = setTimeout(() => { toastEl.hidden = true; }, 3200); };
+const CHAT = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 1.2C4.1 1.2 1.2 4 1.2 7.6c0 1.9.8 3.6 2.2 4.8v2.4l2.2-1.2c.8.2 1.5.3 2.4.3 3.9 0 6.8-2.8 6.8-6.4S11.9 1.2 8 1.2Zm.7 8.6L7 8 3.8 9.8l3.5-3.7L9 7.9l3.2-1.8-3.5 3.7Z"/></svg>';
+const open = (r) => `<a class="mt" href="#" data-act="meta" data-id="${r.name}">${CHAT}Meta Thread</a>`;
+const none = '<span class="mt none">No Meta thread yet</span>';
+
+function nameCell(r) {
+  const nameEl = S.tab === 2 ? `<button type="button" class="who" data-act="card" data-id="${r.name}" title="Contact details">${r.name}</button>` : `<b>${r.name}</b>`;
+  const lbc = r.lbc && r.stage === "To Release" ? `<span class="badge">LBC · ${r.lbc}</span>` : "";
+  return `${nameEl}<small class="mono">${r.no}</small>${lbc}${S.tab === 0 ? `<div>${r.fb ? open(r) : none}</div>` : ""}`;
+}
+const metaBtn = (r) => (r.fb ? `<a class="b meta" href="#" data-act="meta" data-id="${r.name}">${CHAT}Message on Meta</a>` : `<button type="button" class="b meta" disabled title="Registration has not added the Meta thread">${CHAT}Message on Meta</button>`);
+
+function table() {
+  const rows = ROWS.filter((r) => r.stage === S.stage);
+  if (S.stage === "Released") {
+    const heads = ["Time", "Trainee", "Course", "Certificate No.", "Released To", "Method", ...(S.tab === 1 ? ["Message"] : [])];
+    return `<table><thead><tr>${heads.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>
+      <tr><td colspan="${heads.length}" style="background:#f7fafc"><b>Monday, November 9, 2026</b> <span class="lead" style="display:inline">${rows.length} released</span></td></tr>
+      ${rows.map((r) => `<tr><td class="mono">${r.time}</td><td>${nameCell(r)}</td><td>${r.course}</td><td class="mono">${r.cert}</td><td>${r.to}</td><td>${r.method}</td>${S.tab === 1 ? `<td>${metaBtn(r)}</td>` : ""}</tr>`).join("")}</tbody></table>`;
+  }
+  const heads = ["#", "Trainee · NWMTACI No.", "Course", ...(S.stage === "To Release" ? ["Certificate No."] : []), "Payment", ...(S.stage === "Waiting" ? ["Still Needs"] : []), "Action"];
+  const action = (r) => {
+    const main = S.stage === "To Print" ? `<a class="b p" href="#" data-act="toast" data-id="Opens the certificate to print.">Print</a><a class="b" href="#" data-act="toast" data-id="Opens a draft for checking.">Preview</a>`
+      : S.stage === "To Release" ? (r.lbc ? `<button type="button" class="b p" data-act="toast" data-id="Asks for the LBC tracking number.">Mark Shipped</button>` : `<button type="button" class="b p" data-act="toast" data-id="Opens Release, as today."${r.pay.startsWith("Balance") ? ' disabled title="Balance must be settled first"' : ""}>Release</button>`)
+      : `${r.needs.includes("Photo") ? '<button type="button" class="b p" data-act="toast" data-id="Uploads the 2x2 photo.">Upload</button>' : ""}${r.needs.some((n) => n !== "Photo") ? '<button type="button" class="b" data-act="toast" data-id="Emails the post-test and evaluation links.">Email Post-Test</button>' : ""}`;
+    return `<div class="acts">${main}${S.tab === 1 ? metaBtn(r) : ""}</div>`;
+  };
+  return `<table><thead><tr>${heads.map((h) => `<th>${h}</th>`).join("")}</tr></thead><tbody>
+    <tr><td colspan="${heads.length}" style="background:#f7fafc"><b>STCW</b> <span class="lead" style="display:inline">${rows.length}</span></td></tr>
+    ${rows.map((r, i) => `<tr><td class="no">${i + 1}</td><td>${nameCell(r)}</td><td><b>${r.course}</b><small>${r.note}</small></td>${S.stage === "To Release" ? `<td class="mono">${r.cert}</td>` : ""}<td><span class="badge ${r.pay === "Paid" ? "g" : "o"}">${r.pay}</span></td>${S.stage === "Waiting" ? `<td>${r.needs.map((n) => `<span class="need">${n}</span>`).join("")}</td>` : ""}<td>${action(r)}</td></tr>`).join("")}</tbody></table>`;
+}
+const LEADS = [
+  "<b>Design 1.</b> A small Meta Thread link sits under every trainee's name, on every tab and in the Released log. Without one it says No Meta thread yet.",
+  "<b>Design 2.</b> A Message on Meta button sits with the other actions on every row. It is greyed out when Registration has not added the thread.",
+  "<b>Design 3.</b> Click a trainee's name to open a contact card: mobile, email, Meta thread, and the LBC address when there is one.",
+];
+function cardView() {
+  const r = ROWS.find((x) => x.name === S.card);
+  if (!r) return "";
+  return `<div class="scrim" data-act="close"><div class="card" role="dialog" aria-label="Contact ${r.name}"><header><h2>${r.name}</h2><button type="button" class="b" data-act="close" aria-label="Close">×</button></header>
+    <dl><dt>NWMTACI No.</dt><dd class="mono">NWMTACI-${r.no}</dd><dt>Course</dt><dd>${r.course}${r.cert ? ` · <span class="mono">${r.cert}</span>` : ""}</dd><dt>Mobile</dt><dd class="mono">${r.mobile}</dd><dt>Email</dt><dd>${r.email}</dd>
+    <dt>Meta Thread</dt><dd>${r.fb ? `<a class="b meta" href="#" data-act="meta" data-id="${r.name}">${CHAT}Open Conversation</a>` : '<span class="muted">Not yet recorded. Registration adds it in the Trainee Account.</span>'}</dd>
+    ${r.address ? `<dt>Deliver To</dt><dd>${r.address} (LBC)</dd>` : ""}</dl></div></div>`;
+}
+const confirmView = () => `<section class="panel"><div class="confirm"><h2>To Confirm</h2><ol>
+  <li>The Releasing Officer only <b>sees</b> the Meta thread link. Registration still adds or changes it in the Trainee Account.</li>
+  <li>The link opens the trainee's conversation in Meta Business Suite in a new tab, ready for a message about pick-up, the soft copy or LBC delivery.</li>
+  <li>It shows on every Certificates tab (Waiting, To Print, To Release) and in the Released log, so a released trainee can still be reached.</li>
+  <li>No new data: the portal already loads the links; this only shows them on the Releasing Officer's screen.</li>
+  <li>Pick one design, or say what to mix (for example, Design 1's link plus Design 3's card).</li>
+</ol></div></section>`;
+
+function render() {
+  tabs.innerHTML = TABS.map((t, i) => `<button type="button" role="tab" data-act="tab" data-id="${i}" aria-selected="${S.tab === i}">${t}</button>`).join("");
+  if (S.tab === 3) { app.innerHTML = confirmView(); return; }
+  const count = (s) => ROWS.filter((r) => r.stage === s).length;
+  app.innerHTML = `<h1>Certificates</h1><p class="lead">${LEADS[S.tab]}</p>
+    <div class="st-tabs" role="tablist" aria-label="Certificate stages">${STAGES.map((s) => `<button type="button" role="tab" class="st-tab${S.stage === s ? " on" : ""}" aria-selected="${S.stage === s}" data-act="stage" data-id="${s}">${s}<b>${count(s)}</b></button>`).join("")}</div>
+    <section class="panel"><div class="wrap">${table()}</div></section>${cardView()}`;
+}
+document.addEventListener("click", (ev) => {
+  const el = ev.target.closest("[data-act]");
+  if (!el) return;
+  const { act, id } = el.dataset;
+  if (act === "close" && el.classList.contains("scrim") && ev.target !== el) return;
+  if (el.tagName === "A") ev.preventDefault();
+  if (el.disabled) return;
+  if (act === "tab") { S.tab = Number(id); S.card = null; return render(); }
+  if (act === "stage") { S.stage = id; return render(); }
+  if (act === "card") { S.card = id; return render(); }
+  if (act === "close") { S.card = null; return render(); }
+  if (act === "meta") return toast(`Opens ${id.split(",")[0]}'s conversation in Meta Business Suite in a new tab.`);
+  if (act === "toast") return toast(id);
+});
+document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && S.card) { S.card = null; render(); } });
+render();
+</script>

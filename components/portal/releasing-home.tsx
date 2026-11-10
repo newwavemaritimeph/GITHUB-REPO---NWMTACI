@@ -116,6 +116,7 @@ export function ReleasingCertificates({ data, reload }: { data: PortalData; relo
   const [uploading, setUploading] = useState<CertificateLine | null>(null), [releasing, setReleasing] = useState<CertificateLine | null>(null), [correcting, setCorrecting] = useState<string | null>(null);
   const [voiding, setVoiding] = useState<string | null>(null), [why, setWhy] = useState<ReasonValue>(NO_REASON);
   const [shipping, setShipping] = useState<string | null>(null), [tracking, setTracking] = useState(""), [shippedOn, setShippedOn] = useState(manilaToday());
+  const [contact, setContact] = useState<string | null>(null);
   const { busy, msg, post } = usePost(reload);
   const per = usePeriod();
   const term = q.trim().toLowerCase();
@@ -158,7 +159,7 @@ export function ReleasingCertificates({ data, reload }: { data: PortalData; relo
     const ship = deliveries.find((r) => r.status === "Paid" && r.enrollment_id === l.e.id), reprint = stage === "To Print" && l.view.printCount > 0, need = needs(l);
     return [<tr key={l.e.id}>
       <td className="cl-no st-no">{i + 1}</td>
-      <td data-l="Trainee"><b>{l.name}</b><small className="cl-mono cl-sub cl-block">{l.number.replace(/^NWMTACI-/, "")}</small>{l.view.overdue && <Badge tone="red">Overdue</Badge>}{reprint && <Badge tone="blue">Reprint</Badge>}{stage === "To Release" && ship && <Badge tone="blue">LBC · {ship.city}</Badge>}</td>
+      <td data-l="Trainee"><button type="button" className="rc-who" title="Contact details" onClick={() => setContact(l.e.id)}>{l.name}</button><small className="cl-mono cl-sub cl-block">{l.number.replace(/^NWMTACI-/, "")}</small>{l.view.overdue && <Badge tone="red">Overdue</Badge>}{reprint && <Badge tone="blue">Reprint</Badge>}{stage === "To Release" && ship && <Badge tone="blue">LBC · {ship.city}</Badge>}</td>
       <td data-l="Course" title={l.course.name}><b>{l.course.code}</b><small className="cl-sub cl-block">{stage === "To Release" ? `Printed ${printedOn(l)}` : l.view.state === "Training not finished" ? `Ends ${short(l.ended)}` : `Ended ${short(l.ended)}`}</small></td>
       {stage === "To Release" && <td data-l="Certificate No."><span className="cl-mono">{l.cert?.certificate_number ?? "—"}</span>{softLine(l)}</td>}
       <td data-l="Payment">{pay(l)}</td>
@@ -197,7 +198,7 @@ export function ReleasingCertificates({ data, reload }: { data: PortalData; relo
         {term ? <p className="pd-label pd-pad">Searching all dates · {released.length} found</p> : <PeriodBar p={per} what="Released" count={`${released.length} certificate${released.length === 1 ? "" : "s"}`} />}
         {(per.picked || !!term) && (released.length ? <><div className="st-wrap"><table className="cl-log st-log"><thead><tr><th>Time</th><th>Trainee</th><th>Course</th><th>Certificate No.</th><th>Released To</th><th>Method</th><th>Sticker No.</th></tr></thead><tbody>
           {days.map((d) => { const g = relPaged.shown.filter((r) => r.day === d); return [<tr key={d} className="nb-group"><td colSpan={7}><b>{longDay(d)}</b> <span className="cl-sub">{g.length} released</span></td></tr>,
-            ...g.map((r) => { const sent = deliveries.find((x) => x.status === "Shipped" && x.enrollment_id === enrollmentOfCert.get(r.certId)); return <tr key={r.id}><td data-l="Time" className="cl-mono">{clock(r.at)}</td><td data-l="Trainee"><b>{r.name}</b></td><td data-l="Course" title={r.courseName}>{r.course}</td><td data-l="Certificate No." className="cl-mono">{r.certNo}</td><td data-l="Released To">{r.to}{r.idType && <small className="cl-sub cl-block">{r.idType}</small>}</td><td data-l="Method"><Badge tone={r.method === "Courier" ? undefined : "green"}>{r.method === "Pickup" ? "Picked Up" : r.method}</Badge>{sent && <><small className="cl-sub cl-block cl-mono">{sent.tracking_number}</small><button type="button" className="st-b" disabled={busy} onClick={() => void post({ action: "delivery-delivered", id: sent.id }, "Marked delivered.").catch(() => undefined)}>Mark Delivered</button></>}</td><td data-l="Sticker No." className="cl-mono">{r.sticker || "—"}</td></tr>; })]; })}
+            ...g.map((r) => { const sent = deliveries.find((x) => x.status === "Shipped" && x.enrollment_id === enrollmentOfCert.get(r.certId)); return <tr key={r.id}><td data-l="Time" className="cl-mono">{clock(r.at)}</td><td data-l="Trainee">{enrollmentOfCert.get(r.certId) ? <button type="button" className="rc-who" title="Contact details" onClick={() => setContact(enrollmentOfCert.get(r.certId) ?? null)}>{r.name}</button> : <b>{r.name}</b>}</td><td data-l="Course" title={r.courseName}>{r.course}</td><td data-l="Certificate No." className="cl-mono">{r.certNo}</td><td data-l="Released To">{r.to}{r.idType && <small className="cl-sub cl-block">{r.idType}</small>}</td><td data-l="Method"><Badge tone={r.method === "Courier" ? undefined : "green"}>{r.method === "Pickup" ? "Picked Up" : r.method}</Badge>{sent && <><small className="cl-sub cl-block cl-mono">{sent.tracking_number}</small><button type="button" className="st-b" disabled={busy} onClick={() => void post({ action: "delivery-delivered", id: sent.id }, "Marked delivered.").catch(() => undefined)}>Mark Delivered</button></>}</td><td data-l="Sticker No." className="cl-mono">{r.sticker || "—"}</td></tr>; })]; })}
         </tbody></table></div>{relPaged.pager}</> : <p className="portal-empty-copy">Nothing released on these dates.</p>)}
       </> : workPaged.shown.length ? <><div className="st-wrap"><table className="cl-log st-log"><thead><tr>{heads[stage].map((h) => <th key={h}>{h}</th>)}</tr></thead><tbody>
         {byCourseGroup(data, workPaged.shown).flatMap(({ group, lines: g }) => [<tr key={group} className="nb-group"><td colSpan={heads[stage].length}><b>{group}</b> <span className="cl-sub">{g.length}</span></td></tr>, ...g.flatMap((l, i) => row(l, i, heads[stage].length))])}
@@ -205,6 +206,7 @@ export function ReleasingCertificates({ data, reload }: { data: PortalData; relo
       {data.certificateIssuanceEnabled === false && <p className="cl-legend cl-warn">Printing is turned off. The Admin turns it on in Certificate controls.</p>}
     </section>
     {uploading && <CertificatePhotoModal enrollmentId={uploading.e.id} traineeName={uploading.name} fileName={uploading.fileName} onClose={() => setUploading(null)} onDone={async () => { setUploading(null); await reload(); }} />}
+    {contact && <TraineeContactCard data={data} enrollmentId={contact} onClose={() => setContact(null)} />}
     {releasing && <ReleaseConfirm target={{ enrollmentId: releasing.e.id, name: releasing.name, course: releasing.course.name, certNo: releasing.cert?.certificate_number ?? "" }} onClose={() => setReleasing(null)} onDone={async () => { setReleasing(null); await reload(); }} />}
     {correcting && <Modal title="Correct Details" wide onClose={() => setCorrecting(null)}><CertificateCorrectionsPanel data={data} reload={reload} mode="details" only={correcting} onClose={() => setCorrecting(null)} /></Modal>}
   </div>;
@@ -327,6 +329,29 @@ function ReleaseButton({ l, onRelease, primary }: { l: CertificateLine; onReleas
 /** Post-test result (20 Oct 2026): "—" when the course has no approved post-test. */
 /** Release events (newest 400) with the certificate's number, method and sticker, by Manila day. */
 type ReleaseEvent = { id: string; certificate_id: string; event_type: string; recipient_name: string | null; recipient_id_type: string | null; created_at: string; certificates?: unknown };
+/**
+ * The trainee's contact card (owner, 10 Nov 2026, Design 3): the Releasing Officer clicks a name to see the mobile, the
+ * email, the Meta thread link Registration recorded and the LBC address, to message the trainee about the certificate.
+ * Read-only: only Registration adds or changes the link.
+ */
+export function TraineeContactCard({ data, enrollmentId, onClose }: { data: PortalData; enrollmentId: string; onClose: () => void }) {
+  const e = data.enrollments.find((x) => x.id === enrollmentId);
+  const t = e ? data.trainees.find((x) => x.id === e.trainee_id) : undefined;
+  const c = e ? data.courses.find((x) => x.id === e.course_id) : undefined;
+  const cert = (data.certificates as unknown as CertRow[]).find((x) => x.enrollment_id === enrollmentId);
+  const ship = deliveriesOf(data).filter((r) => r.enrollment_id === enrollmentId && !/declin|cancel/i.test(r.status)).at(-1);
+  const fb = (e && data.traineeFacebook?.[e.trainee_id]) || "";
+  const name = t ? `${t.legal_last_name.toUpperCase()}, ${t.legal_first_name}` : e?.enrollment_number ?? "Trainee";
+  return <Modal title={name} onClose={onClose}><dl className="rc-card">
+    <dt>NWMTACI No.</dt><dd className="cl-mono">{(e && data.applicationNumbers?.[e.trainee_id]) || t?.trainee_number || "—"}</dd>
+    <dt>Course</dt><dd>{c?.code ?? "—"}{cert?.certificate_number ? <> · <span className="cl-mono">{cert.certificate_number}</span></> : null}</dd>
+    <dt>Mobile</dt><dd className="cl-mono">{t?.mobile || "—"}</dd>
+    <dt>Email</dt><dd>{t?.email || "—"}</dd>
+    <dt>Meta Thread</dt><dd>{fb.startsWith("https://") ? <a className="st-b rc-meta" href={fb} target="_blank" rel="noreferrer">Open Conversation</a> : <span className="cl-sub">Not yet recorded. Registration adds it in the Trainee Account.</span>}</dd>
+    {ship && <><dt>Deliver To</dt><dd>{deliveryAddress(ship)} (LBC · {ship.status})</dd></>}
+  </dl></Modal>;
+}
+
 function releaseRows(data: PortalData) {
   const certs = new Map((data.certificates as unknown as (CertRow & { printed_at?: string | null })[]).map((c) => [c.id, c]));
   return ((data as unknown as { certificateReleases?: ReleaseEvent[] }).certificateReleases ?? []).filter((r) => r.event_type === "release").map((r) => {
