@@ -62,27 +62,27 @@ describe("Training Reports sheets", () => {
     expect(courseForm("CCMD")).toMatchObject({ writtenOnSheet: false, apCount: 4, attendanceAllDays: true });
     expect(paperSize("Legal")).toEqual([1008, 612]);
   });
-  it("draws the Assessment Performance Sheet like the Safety form, with the watermark", async () => {
+  it("draws the Assessment Performance Sheet on the letterhead (Design 2), with the watermark", async () => {
     const bytes = await createTrainingSheetPdf({ ...base, emblem });
     const text = await textOf(bytes);
-    for (const s of ["ASSESSMENT PERFORMANCE SHEET", "Form No.: NW-TRNG-09-26", "Class No.:", "26-506-002", "09 NOV 2026 – 09 NOV 2026", "Written", "Grade in %", "AP 1", "AP 2", "SANTOS, ANA REYES", "90", "-Nothing Follows-", "Certified correct by:", "Sample Assessor"]) expect(text).toContain(s);
+    for (const s of ["Assessment Performance Sheet", "NW-TRNG-09-26", "CLASS NO.:", "26-506-002", "09 NOV 2026 - 09 NOV 2026", "WRITTEN", "GRADE IN %", "AP 1", "AP 2", "SANTOS, ANA REYES", "90", "-Nothing Follows-", "Certified correct by:", "Sample Assessor"]) expect(text).toContain(s);
     expect(text).not.toContain("AP 3");
-    expect(await size(bytes)).toEqual([842, 595]);
-    expect(await opacities(bytes)).toContain("0.16");
+    expect(await size(bytes)).toEqual([1008, 612]);
+    expect(await opacities(bytes)).toContain("0.08");
   });
   it("leaves out the written column for UBT-PSSR and labels its tasks A6.1 to A6.4", async () => {
     const text = await textOf(await createTrainingSheetPdf({ ...base, courseCode: "UBT-PSSR", tasks: [] }));
     expect(text).toContain("AP A6.4");
-    expect(text).not.toContain("Written Assessment Grade");
+    expect(text).not.toContain("WRITTEN");
   });
-  it("prints the Attendance Sheet on A4 portrait, one sheet per training day, like New Wave's form", async () => {
+  it("prints the Attendance Sheet on Legal portrait, one sheet per training day, like New Wave's form", async () => {
     const many = Array.from({ length: 30 }, (_, i) => ({ enrollmentId: `t${i}`, name: `TRAINEE ${i}`, rank: null }));
     const all = await createTrainingSheetPdf({ ...base, kind: "attendance", courseCode: "PSCMHBT", trainees: many, days: days3, allDays: days3, logo, emblem });
     expect((await PDFDocument.load(all)).getPageCount()).toBe(6);
-    expect(await size(all)).toEqual([595, 842]);
+    expect(await size(all)).toEqual([612, 1008]);
     const one = await createTrainingSheetPdf({ ...base, kind: "attendance", courseCode: "PSCMHBT", control: { formNo: "NW-TRNG-06-25", revisionNo: "", revisionDate: "", issuedDate: "10/08/2025" }, days: [days3[1]], allDays: days3 });
     const text = await textOf(one);
-    for (const s of ["ATTENDANCE SHEET", "Form No.: NW-TRNG-06-25", "NAME OF TRAINEES", "RANK/ POSITION", "SIGNATURE DAY 2", "AM SESSION", "PM SESSION", "Able Seafarer Deck", "Training Course:", "Class Schedule:", "Checked and Verified by:", "Instructor", "Maritime Excellence"]) expect(text).toContain(s);
+    for (const s of ["Attendance Sheet", "NW-TRNG-06-25", "NAME OF TRAINEES", "RANK/ POSITION", "SIGNATURE DAY 2", "AM SESSION", "PM SESSION", "Able Seafarer Deck", "TRAINING COURSE:", "CLASS SCHEDULE:", "Checked and Verified by:", "Instructor", "Maritime Excellence"]) expect(text).toContain(s);
     expect(text).toContain("24.");
     expect(text).not.toContain("Room:");
   });
@@ -95,15 +95,15 @@ describe("Training Reports sheets", () => {
     const bytes = await createTrainingSheetPdf({ ...base, kind: "attendance", courseCode: "CCMD", classNo: "CCMD001", startsOn: days3[0], endsOn: days3[2], dailyStart: "08:00:00", dailyEnd: "17:00:00", days: days3, allDays: days3 });
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
     const text = await textOf(bytes);
-    for (const s of ["Course:", "Course Batch:", "CCMD001", "Schedule:", "NOV 09-11, 2026 (08:00-17:00)", "DAY 1", "DAY 3", "30."]) expect(text).toContain(s);
+    for (const s of ["COURSE:", "COURSE BATCH:", "CCMD001", "SCHEDULE:", "NOV 09-11, 2026 (08:00-17:00)", "DAY 1", "DAY 3", "30."]) expect(text).toContain(s);
   });
   it("prints each course's EP columns on the Exercise Performance Sheet", async () => {
     const crowd = await textOf(await createTrainingSheetPdf({ ...base, kind: "exercise", courseCode: "PSCMT", control: { formNo: "NW-TRNG-08-26", revisionNo: "", revisionDate: "", issuedDate: "05/25/2026" } }));
-    for (const s of ["EXERCISE PERFORMANCE SHEET", "Form No.: NW-TRNG-08-26", "TRAINEE'S NAME", "EP A8.1", "EP A8.9", "Signature", "Remarks", "Instructor's printed name over signature", "Sample Instructor", "Not Performed"]) expect(crowd).toContain(s);
+    for (const s of ["Exercise Performance Sheet", "NW-TRNG-08-26", "TRAINEE'S NAME", "EP A8.1", "EP A8.9", "SIGNATURE", "REMARKS", "Instructor's printed name over signature", "Sample Instructor", "Not Performed"]) expect(crowd).toContain(s);
     expect(crowd).not.toContain("A8.10");
     const crisis = await createTrainingSheetPdf({ ...base, kind: "exercise", courseCode: "PSCMHBT" });
     expect(await textOf(crisis)).toContain("A4.15");
-    expect(await size(crisis)).toEqual([842, 595]);
+    expect(await size(crisis)).toEqual([1008, 612]);
     expect(await textOf(await createTrainingSheetPdf({ ...base, kind: "exercise", courseCode: "CCMD" }))).toContain("EP 4");
   });
   it("prints the TCROA on Legal for Safety with one heading over its three criteria, and the watermark", async () => {
