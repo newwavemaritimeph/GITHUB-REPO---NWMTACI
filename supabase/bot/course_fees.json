@@ -1,0 +1,1354 @@
+[
+ {
+  "category": "STCW",
+  "code": "STPPDSPPS",
+  "name": "Safety Training for Personnel Providing Direct Service to Passengers in Passenger Spaces",
+  "days": 1,
+  "modality": "Face-to-face",
+  "schedule": "as schedule",
+  "fee_centavos": 120000
+ },
+ {
+  "category": "STCW",
+  "code": "PSCMT",
+  "name": "Passenger Ship Crowd Management Training",
+  "days": 2,
+  "modality": "Face-to-face",
+  "schedule": "as schedule",
+  "fee_centavos": 160000
+ },
+ {
+  "category": "STCW",
+  "code": "PSCMHBT",
+  "name": "Passenger Ship Crisis Management and Human behaviour Training",
+  "days": 3,
+  "modality": "Face-to-face",
+  "schedule": "as schedule",
+  "fee_centavos": 160000
+ },
+ {
+  "category": "STCW",
+  "code": "UBT-PSSR",
+  "name": "Updating Training on Basic Training - PSSR",
+  "days": 1,
+  "modality": "Face-to-face",
+  "schedule": "as schedule",
+  "fee_centavos": 130000
+ },
+ {
+  "category": "STCW",
+  "code": "CCMI",
+  "name": "Safety, Crowd and Crisis Package",
+  "days": 5.5,
+  "modality": "Face-to-face",
+  "schedule": "as schedule",
+  "fee_centavos": 420000
+ },
+ {
+  "category": "Domestic",
+  "code": "CCMD",
+  "name": "Crowd and Crisis Management - Domestic",
+  "days": 3,
+  "modality": "Blended",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 250000
+ },
+ {
+  "category": "In-House",
+  "code": "ABC",
+  "name": "Awareness on Basic Computer",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 90000
+ },
+ {
+  "category": "In-House",
+  "code": "AHPR",
+  "name": "Awareness on Harassment Prevention and Response",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "APA",
+  "name": "Anti Piracy Awareness",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 60000
+ },
+ {
+  "category": "In-House",
+  "code": "AI",
+  "name": "Accident Investigation",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 90000
+ },
+ {
+  "category": "In-House",
+  "code": "AI/RA",
+  "name": "Accident Investigation and Risk Assessment Course",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "AIS",
+  "name": "Automatic Idenfication System",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "AIIRCA",
+  "name": "Accident Investigation and Root Cause Analysis",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 250000
+ },
+ {
+  "category": "In-House",
+  "code": "AMMS",
+  "name": "Auxiliary Marine Machinery Systems",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "ARPA",
+  "name": "Automatic Radar Plotting Aids",
+  "days": 5,
+  "modality": "Online",
+  "schedule": "Mon-Fri",
+  "fee_centavos": 400000
+ },
+ {
+  "category": "In-House",
+  "code": "BAC",
+  "name": "Basic Arabic Culture",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "BNC",
+  "name": "Basic Networking Course",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "BMT",
+  "name": "Banksman Training",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "BBSC",
+  "name": "Behavioral Based Safety Course",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 250000
+ },
+ {
+  "category": "In-House",
+  "code": "BRM",
+  "name": "Bridge Resources Management",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "BRM - BTM",
+  "name": "BRM W/ BTM",
+  "days": 5,
+  "modality": "Online",
+  "schedule": "Mon-Fri",
+  "fee_centavos": 500000
+ },
+ {
+  "category": "In-House",
+  "code": "RBTMBRM",
+  "name": "Refresher for BRM and BTM",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 300000
+ },
+ {
+  "category": "In-House",
+  "code": "BS",
+  "name": "Banksman and Slinging",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "BTM",
+  "name": "Bridge Team Management",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 300000
+ },
+ {
+  "category": "In-House",
+  "code": "BULKFAM",
+  "name": "Bulk Carrier Familiarization and Safety",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 500000
+ },
+ {
+  "category": "In-House",
+  "code": "BCAF",
+  "name": "Bunkering calculation and familiarization",
+  "days": 3,
+  "modality": "Online",
+  "schedule": null,
+  "fee_centavos": 300000
+ },
+ {
+  "category": "In-House",
+  "code": "CA",
+  "name": "Collision Avoidance",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "CE",
+  "name": "Control Engineering",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "CFC",
+  "name": "Classification Familiarization Course",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 250000
+ },
+ {
+  "category": "In-House",
+  "code": "CHCC",
+  "name": "Cargo Handling and Care of Cargo",
+  "days": 5,
+  "modality": "Online",
+  "schedule": null,
+  "fee_centavos": 450000
+ },
+ {
+  "category": "In-House",
+  "code": "CSA",
+  "name": "Cyber Security Awareness",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 250000
+ },
+ {
+  "category": "In-House",
+  "code": "CSF",
+  "name": "Container Ship Familiarization",
+  "days": null,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 100000
+ },
+ {
+  "category": "In-House",
+  "code": "CST",
+  "name": "Crane Safety Training",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "COC",
+  "name": "Crane Operation Course",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "COW",
+  "name": "Crude Oil Washing System",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "DCST",
+  "name": "Deck Crane Safety Training",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "DMA",
+  "name": "Deck Machinery Awareness",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "DHHCB",
+  "name": "Dangerous Hazardous and Harmful Cargoes for Bulk",
+  "days": 5,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "ECDIS",
+  "name": "Operational Use of Electronic Chart, Display and Information System",
+  "days": 5,
+  "modality": "Online",
+  "schedule": "Mon-Fri",
+  "fee_centavos": 300000
+ },
+ {
+  "category": "In-House",
+  "code": "EPS",
+  "name": "Electro Pneumatic System",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "In-House",
+  "code": "ESE",
+  "name": "Enclosed Space Entry",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 250000
+ },
+ {
+  "category": "In-House",
+  "code": "EMS",
+  "name": "Environmental Management System",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 100000
+ },
+ {
+  "category": "In-House",
+  "code": "ERTM",
+  "name": "Engine Room Team Management",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 300000
+ },
+ {
+  "category": "In-House",
+  "code": "ERRM",
+  "name": "Engine Room Resource Management",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "EWK",
+  "name": "Engine Watch Keeping - Domestic",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "FRAMO",
+  "name": "FRAMO PUMP",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 300000
+ },
+ {
+  "category": "In-House",
+  "code": "HAZMAT",
+  "name": "Dangerous Hazardous and Harmful Cargoes (HAZMAT)",
+  "days": 4,
+  "modality": "Online",
+  "schedule": "Mon-Thu",
+  "fee_centavos": 100000
+ },
+ {
+  "category": "In-House",
+  "code": "HAZMAT-CFR",
+  "name": "HAZMAT with CFR",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 100000
+ },
+ {
+  "category": "In-House",
+  "code": "HAZID",
+  "name": "Hazard Identification",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 350000
+ },
+ {
+  "category": "In-House",
+  "code": "HVT",
+  "name": "High Voltage Training",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "HPT",
+  "name": "Hydraulic and Pheumatic Training",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "H2S",
+  "name": "Hydrogen Sulfide Awareness",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "HSBAT",
+  "name": "Hydrogen Sulfide Basic Awareness Training",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 250000
+ },
+ {
+  "category": "In-House",
+  "code": "INCI",
+  "name": "Incident Investigation",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 90000
+ },
+ {
+  "category": "In-House",
+  "code": "IHM",
+  "name": "Inventory of Hazardous Materials",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 350000
+ },
+ {
+  "category": "In-House",
+  "code": "ISM",
+  "name": "fRAMO PUMP",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 70000,
+  "needs_check": "named 'fRAMO PUMP' in both the price list and the portal; confirm name"
+ },
+ {
+  "category": "In-House",
+  "code": "IP",
+  "name": "Injury Prevention",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 70000
+ },
+ {
+  "category": "In-House",
+  "code": "LCBOCT",
+  "name": "Liquid Cargo and Ballast Operations or Chemical Tankers",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 100000
+ },
+ {
+  "category": "In-House",
+  "code": "LMT",
+  "name": "Leadership and Management Training",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "LSC",
+  "name": "Low Sulfur",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 250000
+ },
+ {
+  "category": "In-House",
+  "code": "LSHB",
+  "name": "Leadership and Human Behavior",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "LT",
+  "name": "Leadership and Teamwork",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "In-House",
+  "code": "MAEN",
+  "name": "Maritime English",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 90000
+ },
+ {
+  "category": "In-House",
+  "code": "MEA",
+  "name": "Marine Environmental Awareness",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "MARPOL",
+  "name": "Consolidated MARPOL Annex I-VI",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 110000
+ },
+ {
+  "category": "In-House",
+  "code": "MARPOL-IX",
+  "name": "Consolidated MARPOL Annex I-IX",
+  "days": 5,
+  "modality": "Online",
+  "schedule": "Mon-Fri / Tue-Sat",
+  "fee_centavos": 150000,
+  "needs_check": "code not in portal; confirm"
+ },
+ {
+  "category": "In-House",
+  "code": "MEFAR",
+  "name": "Medical First Aid - Refresher",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "MECAR",
+  "name": "Medical Care - Refresher",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 250000
+ },
+ {
+  "category": "In-House",
+  "code": "MHA",
+  "name": "Mental Health Awareness",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "MOSHA",
+  "name": "Marine Occupational Safety and Health Awareness",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 100000
+ },
+ {
+  "category": "In-House",
+  "code": "MLA",
+  "name": "Maritime Law Awareness",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "MLSO",
+  "name": "Maritime Law for Ship Officers",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "MLH",
+  "name": "Marine Leadership and Human Behavior",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "MP",
+  "name": "Marine Positioning",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 300000
+ },
+ {
+  "category": "In-House",
+  "code": "OPA",
+  "name": "Oil Pollution Act",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "OPESLOG",
+  "name": "Orientation on Proper Entries on Ships Logbooks",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 90000
+ },
+ {
+  "category": "In-House",
+  "code": "ORB",
+  "name": "Oil Record Book",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 350000
+ },
+ {
+  "category": "In-House",
+  "code": "PAMA",
+  "name": "Paint Maintenance",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 100000
+ },
+ {
+  "category": "In-House",
+  "code": "PADAMS",
+  "name": "Prevention of Alcohol and Drug Abuse in the Maritime Sector",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 70000
+ },
+ {
+  "category": "In-House",
+  "code": "PDS",
+  "name": "Practical Deck Skill",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "PP",
+  "name": "Passage Planning",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 250000
+ },
+ {
+  "category": "In-House",
+  "code": "PEVF",
+  "name": "Personal Effectiveness and Values Formation",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 160000
+ },
+ {
+  "category": "In-House",
+  "code": "PSA",
+  "name": "Personal Safety Awareness",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "PSC",
+  "name": "Port State Control",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 90000
+ },
+ {
+  "category": "In-House",
+  "code": "PPE",
+  "name": "Personal Protective Equipment",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 100000
+ },
+ {
+  "category": "In-House",
+  "code": "PAP",
+  "name": "Preparation of Arrival in Port",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "RNRPUA",
+  "name": "Radar Navigation, Radar Plotting and Use of ARPA",
+  "days": 5,
+  "modality": "Online",
+  "schedule": "Mon-Fri",
+  "fee_centavos": 400000
+ },
+ {
+  "category": "In-House",
+  "code": "RADAROC",
+  "name": "RADAR Operation Course",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 250000
+ },
+ {
+  "category": "In-House",
+  "code": "RAM",
+  "name": "Risk Assessment and Management",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 100000
+ },
+ {
+  "category": "In-House",
+  "code": "RAC",
+  "name": "Risk Assesment Course",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 90000
+ },
+ {
+  "category": "In-House",
+  "code": "RAIA",
+  "name": "Risk Assessment, Incident Investigation and Analysis",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 250000
+ },
+ {
+  "category": "In-House",
+  "code": "RSDI",
+  "name": "Rightship Inspection",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 400000
+ },
+ {
+  "category": "In-House",
+  "code": "RCSHM",
+  "name": "Refresher course on ship Handlling and Maneuvering",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "ROPA",
+  "name": "Radar Observation and Plotting",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "SAM",
+  "name": "Stress and Anger Management",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "SARTA",
+  "name": "Sart Awareness",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "SMC",
+  "name": "Stress Management Course",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "SMO",
+  "name": "Safe-Mooring-Operations",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 250000
+ },
+ {
+  "category": "In-House",
+  "code": "SNCA",
+  "name": "Safe Navigation and Collision Avoidance",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "SNC",
+  "name": "Safe Navigation Course",
+  "days": 4,
+  "modality": "Online",
+  "schedule": "Mon-Thu",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "SNT",
+  "name": "Safe Navigation Training",
+  "days": 4,
+  "modality": "Online",
+  "schedule": "Mon-Thu",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "SSOR",
+  "name": "Ship's Security Officer - Refresher",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 100000
+ },
+ {
+  "category": "In-House",
+  "code": "SOC",
+  "name": "Safety Officer Course",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 100000
+ },
+ {
+  "category": "In-House",
+  "code": "SSOC",
+  "name": "Shipboard Safety Officer Course",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 100000
+ },
+ {
+  "category": "In-House",
+  "code": "SOTC",
+  "name": "Security Officer Training Course",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "SOPEP",
+  "name": "Shipboard Oil Pollution Emergency Plan",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "SGS",
+  "name": "Ship General Safety",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "In-House",
+  "code": "SHM",
+  "name": "Ship Handling and Manuevering",
+  "days": 5,
+  "modality": "Online",
+  "schedule": "Mon-Fri",
+  "fee_centavos": 450000
+ },
+ {
+  "category": "In-House",
+  "code": "SDC",
+  "name": "Smoke Diving Course",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "SSC",
+  "name": "Ship Steering Course",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "In-House",
+  "code": "SVI",
+  "name": "Sire and Vetting Inspection",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "In-House",
+  "code": "TANKFAM",
+  "name": "Tanker Familiarization and Safety",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 500000
+ },
+ {
+  "category": "In-House",
+  "code": "TAS",
+  "name": "Trim and Stability",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 500000
+ },
+ {
+  "category": "In-House",
+  "code": "TI",
+  "name": "Tank Inspection",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 100000
+ },
+ {
+  "category": "In-House",
+  "code": "MRC",
+  "name": "Media Response Course",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 300000
+ },
+ {
+  "category": "In-House",
+  "code": "HCIM",
+  "name": "Hatch Cover Inspection and Maintenance",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 500000
+ },
+ {
+  "category": "In-House",
+  "code": "PFRBC",
+  "name": "Proficiency in Fast Rescue Boat Coxswain",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 300000
+ },
+ {
+  "category": "In-House",
+  "code": "COLREG",
+  "name": "Collision Regulation on Rules of the Roads",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 350000
+ },
+ {
+  "category": "In-House",
+  "code": "VOC",
+  "name": "Volatile Organic Compound",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 400000
+ },
+ {
+  "category": "In-House",
+  "code": "VRM",
+  "name": "Vessel Resource Management",
+  "days": 5,
+  "modality": "Online",
+  "schedule": "Mon-Fri",
+  "fee_centavos": 500000
+ },
+ {
+  "category": "In-House",
+  "code": "VP",
+  "name": "Voyage Planning",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 350000
+ },
+ {
+  "category": "In-House",
+  "code": "VPCC",
+  "name": "Voyage Planning and Chart Correction",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 350000
+ },
+ {
+  "category": "In-House",
+  "code": "WH",
+  "name": "Working at Heights",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 200000
+ },
+ {
+  "category": "Catering",
+  "code": "BAC-CAT",
+  "name": "Basic Arabic Course",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "Catering",
+  "code": "BFH",
+  "name": "Basic Food Hygiene",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "BNHACCP",
+  "name": "Basic Nutrition with HACCP",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "BSFM",
+  "name": "Basic Shipboard Food Management",
+  "days": 5,
+  "modality": "Online",
+  "schedule": "Mon-Fri",
+  "fee_centavos": 350000
+ },
+ {
+  "category": "Catering",
+  "code": "CHSM",
+  "name": "Catering Health and Safety Management",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "CM",
+  "name": "Catering Management",
+  "days": 5,
+  "modality": "Online",
+  "schedule": "Mon-Fri",
+  "fee_centavos": 350000
+ },
+ {
+  "category": "Catering",
+  "code": "CCTC",
+  "name": "Consumption Control Training Course",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 285000
+ },
+ {
+  "category": "Catering",
+  "code": "FCM",
+  "name": "Food and Catering Management",
+  "days": 5,
+  "modality": "Online",
+  "schedule": "Mon-Fri",
+  "fee_centavos": 350000
+ },
+ {
+  "category": "Catering",
+  "code": "FH",
+  "name": "Food Hygiene",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "FH-HACCP",
+  "name": "Food Hygiene with HACCP",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "FHS",
+  "name": "Food Hygiene and Sanitation",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "FSH",
+  "name": "Food Safety and Hygiene",
+  "days": 2,
+  "modality": "Online",
+  "schedule": null,
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "FST",
+  "name": "Food Safety Training",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "GAC",
+  "name": "Galley Awareness Course",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "GAH",
+  "name": "Galley Affairs and Housekeeping",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "GHFS",
+  "name": "Galley Hygiene and Food Sanitation",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "GHH",
+  "name": "Galley Hygiene with HACCP",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "GHC",
+  "name": "Good Housekeeping Course",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "GPM",
+  "name": "Galley (Provision) Management",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "HACCP",
+  "name": "Hazard Analysis and Critical Control Points",
+  "days": 1,
+  "modality": "Online",
+  "schedule": "Mon-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "HUPH",
+  "name": "HACCP and United State Public Health",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "MSC",
+  "name": "Messman/Steward Course",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 150000
+ },
+ {
+  "category": "Catering",
+  "code": "PHS",
+  "name": "Public Health and Sanitation",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "SC",
+  "name": "Shipboard Culinary",
+  "days": 3,
+  "modality": "Online",
+  "schedule": "Mon-Wed / Thu-Sat",
+  "fee_centavos": 350000
+ },
+ {
+  "category": "Catering",
+  "code": "SCCM",
+  "name": "Shipboard Culinary and Catering Management",
+  "days": 5,
+  "modality": "Online",
+  "schedule": "Mon-Fri",
+  "fee_centavos": 350000
+ },
+ {
+  "category": "Catering",
+  "code": "SFH",
+  "name": "Safe Food Handling",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 180000
+ },
+ {
+  "category": "Catering",
+  "code": "SV",
+  "name": "Shipboard Victualling",
+  "days": 2,
+  "modality": "Online",
+  "schedule": "Mon-Tue / Wed-Thu / Fri-Sat",
+  "fee_centavos": 250000
+ }
+]
