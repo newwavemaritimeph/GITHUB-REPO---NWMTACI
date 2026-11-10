@@ -146,7 +146,7 @@ function AccountingOperations({ data, role, reload, profileName }: { data: Accou
   // approvals -------------------------------------------------------------
   const refundRequests = data.requests.filter((r) => r.status === "Pending" && ["Refund", "Cancellation"].includes(r.request_type));
   const approvals: { icon: string; label: string; n: number; tone: "High" | "Medium" | "Low" }[] = [
-    { icon: "✉", label: "Expense vouchers", n: pendingVouchers.length, tone: "High" },
+    { icon: "✉", label: "Liquidation forms", n: pendingVouchers.length, tone: "High" },
     { icon: "◷", label: "Payment adjustments", n: data.pendingCharges.length, tone: "Medium" },
     { icon: "↺", label: "Refund / cancellation requests", n: refundRequests.length, tone: "Medium" },
     { icon: "⚖", label: "Fee waivers", n: data.pendingDiscounts.length, tone: "Low" },
@@ -166,7 +166,7 @@ function AccountingOperations({ data, role, reload, profileName }: { data: Accou
     { label: "Outstanding receivables", value: money(outstanding), note: `${owing.length} unpaid`, icon: "◷", accent: "#0a7d3b" },
     { label: "Expenses this month", value: money(expTotal), note: `${expMonth.length} posted`, icon: "◰", accent: "#0571d0" },
     { label: "Payables due", value: money(payablesTotal), note: `${openPayables.length} open`, icon: "▤", accent: "#7c3aed" },
-    { label: "Pending expense vouchers", value: String(pendingVouchers.length), note: "Awaiting approval", icon: "✉", accent: "#be185d" },
+    { label: "Pending liquidation forms", value: String(pendingVouchers.length), note: "Awaiting approval", icon: "✉", accent: "#be185d" },
     { label: "Cashier variance", value: money(variance), note: closingToday ? `${variancePct.toFixed(2)}% of system cash` : "No closing today", icon: "⚖", accent: "#0e7490" },
     { label: "Available cash / bank", value: money(available), note: "Click for breakdown", icon: "◈", accent: "#b45309", onClick: () => setShowCash((s) => !s) },
   ];
@@ -215,7 +215,7 @@ function AccountingOperations({ data, role, reload, profileName }: { data: Accou
         <div className="live-row-item"><div><strong>Overdue</strong></div><span className="slot-count" style={{ color: overdue > 0 ? "#a52020" : undefined }}>{money(overdue)}</span></div>
         {topPayees.map((p) => <div className="live-row-item" key={p.id}><div><strong>{p.description}</strong><small>{p.due_on ? `Due ${p.due_on}` : "No due date"}</small></div><span className="slot-count">{money(p.amount_centavos)}</span></div>)}
       </section>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Expense Vouchers</h2><p>Summary</p></div></div>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Liquidation Forms</h2><p>Summary</p></div></div>
         <div className="voucher-stats"><span><b>{pendingVouchers.length}</b>Pending</span><span><b style={{ color: "#0a7d3b" }}>{approvedVouchers}</b>Approved</span><span><b style={{ color: "#a52020" }}>{rejectedVouchers}</b>Rejected</span></div>
         {recentVouchers.map((e) => <div className="live-row-item" key={e.id}><div><strong>{e.expense_number}</strong><small>{e.payee} · {money(e.amount_centavos)}</small></div><span className={`portal-badge ${e.status === "Pending" ? "pending" : e.status === "Rejected" ? "cancelled" : "active"}`}>{e.status}</span></div>)}
         {!recentVouchers.length && <p className="portal-empty-copy">No vouchers yet.</p>}
@@ -476,7 +476,7 @@ function AccountingOverview({ data, go }: { data: AccountingData; go?: (module: 
 
   const refundRequests = data.requests.filter((r) => r.status === "Pending" && ["Refund", "Cancellation"].includes(r.request_type));
   const alerts: { label: string; n: number; tone: "High" | "Medium" | "Low"; color: string }[] = [
-    { label: "Expense vouchers", n: pendingVouchers.length, tone: "High", color: "#f25615" },
+    { label: "Liquidation forms", n: pendingVouchers.length, tone: "High", color: "#f25615" },
     { label: "Payment adjustments", n: data.pendingCharges.length, tone: "Medium", color: "#f2a615" },
     { label: "Refund / cancellation", n: refundRequests.length, tone: "Medium", color: "#f2a615" },
     { label: "Fee waivers", n: data.pendingDiscounts.length, tone: "Low", color: "#0a7d3b" },
@@ -557,7 +557,7 @@ function AccountingOverview({ data, go }: { data: AccountingData; go?: (module: 
         {topPayees.map((p, i) => <div className="live-row-item" key={p.id}><div><strong>{i + 1}. {p.description}</strong></div><span className="slot-count">{money(p.amount_centavos)}</span></div>)}
         {!topPayees.length && <p className="portal-empty-copy">No open payables.</p>}
       </section>
-      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Expense Voucher Summary</h2></div></div>
+      <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Liquidation Form Summary</h2></div></div>
         <div className="pill-row"><div><span>Pending</span><b>{pendingVouchers.length}</b></div><div className="ok"><span>Approved</span><b>{approvedVouchers}</b></div><div className="bad"><span>Rejected</span><b>{rejectedVouchers}</b></div></div>
         <div className="portal-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Amount</th><th>Status</th></tr></thead><tbody>
           {recentVouchers.map((e) => <tr key={e.id}><td>{e.expense_number}</td><td>{e.payee}</td><td>{money(e.amount_centavos)}</td><td><span className={`portal-badge ${e.status === "Pending" ? "pending" : e.status === "Rejected" ? "cancelled" : "active"}`}>{e.status}</span></td></tr>)}
@@ -642,7 +642,7 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
   }
 
   return <div className="portal-page">
-    <div className="portal-heading"><div><span className="portal-eyebrow">Cashier / accounting</span><h1>Expense Vouchers</h1><p>Raise cash and expense vouchers; accounting approves, rejects, or marks them paid.</p></div></div>
+    <div className="portal-heading"><div><span className="portal-eyebrow">Cashier / accounting</span><h1>Liquidation Forms</h1><p>Raise cash and expense vouchers; accounting approves, rejects, or marks them paid.</p></div></div>
     {msg && <div className="portal-message error" role="alert">{msg}</div>}
 
     <section className="portal-panel" style={{ padding: 14, marginBottom: 14, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -1329,7 +1329,7 @@ export function ApprovalsModule({ data, role, reload }: { data: AccountingData; 
   return <div className="portal-page">
     <div className="portal-heading"><div><span className="portal-eyebrow">Financial control</span><h1>Approvals</h1><p>Everything waiting on an Accounting decision.</p></div><span className="portal-badge pending">{total} pending</span></div>
     {msg && <div className="portal-message error" role="alert">{msg}</div>}
-    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Expense Vouchers</h2><p>Approve before the cashier can print</p></div><span className="slot-count">{vouchers.length}</span></div>
+    <section className="portal-panel live-list"><div className="panel-heading"><div><h2>Liquidation Forms</h2><p>Approve before the cashier can print</p></div><span className="slot-count">{vouchers.length}</span></div>
       {vouchers.map((e) => <div className="live-row-item" key={e.id}><div><strong>{e.payee}</strong><small>{e.expense_number} · {e.category} · {peso2(e.amount_centavos)}</small></div><Actions onYes={() => void post({ action: "expense-decide", id: e.id, decision: "Approved" })} onNo={() => void post({ action: "expense-decide", id: e.id, decision: "Rejected" })} /></div>)}
       {!vouchers.length && <p className="portal-empty-copy">No vouchers pending.</p>}
     </section>

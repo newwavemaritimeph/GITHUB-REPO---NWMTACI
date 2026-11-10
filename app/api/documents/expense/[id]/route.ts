@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 // Opened in a new tab, so refusals are a short readable page rather than JSON.
 const notice = (message: string, status: number) => new Response(
-  `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Expense voucher</title><body style="font:16px/1.5 system-ui,sans-serif;color:#123F63;padding:32px;max-width:560px"><h1 style="font-size:22px">Expense voucher</h1><p>${message.replace(/</g, "&lt;")}</p><p style="color:#5f7180">Close this tab to go back to the portal.</p></body>`,
+  `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Liquidation Form</title><body style="font:16px/1.5 system-ui,sans-serif;color:#123F63;padding:32px;max-width:560px"><h1 style="font-size:22px">Expense voucher</h1><p>${message.replace(/</g, "&lt;")}</p><p style="color:#5f7180">Close this tab to go back to the portal.</p></body>`,
   { status, headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
 
 /**

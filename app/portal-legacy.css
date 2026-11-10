@@ -2976,3 +2976,8 @@ button.rd-row:hover { background: #f6fafc; }
 /* Daily Summary Design 3 (Accounting, 10 Nov 2026): period pills, custom dates, range label. */
 .nw-shell .ds-bar{flex-wrap:wrap;align-items:center}.nw-shell .ds-bar .sub-pills{margin:0}.nw-shell .ds-bar .sub-pills button.on{background:#123F63;border-color:#123F63;color:#fff}
 .nw-shell .ds-custom{display:inline-flex;flex-wrap:wrap;gap:8px}.nw-shell .ds-bar>.cx-mono{margin-left:auto}
+/* Item Chips in Record Payment (owner, 10 Nov 2026). */
+.nw-shell .cx-chips{display:flex;flex-wrap:wrap;gap:6px}
+.nw-shell .cx-chip{height:28px;padding:0 10px;border-radius:999px;border:1px dashed #9fc3da;background:#fff;color:#123F63;font:600 12.5px var(--font-portal),sans-serif;cursor:pointer;white-space:nowrap}.nw-shell .cx-chip:hover{background:#eef6fb}
+.nw-shell .cx-step{display:inline-flex;align-items:center;border:1px solid #c9dce7;border-radius:7px;overflow:hidden;height:26px}.nw-shell .cx-step button{width:24px;height:26px;border:0;background:#f4f8fa;color:#123F63;font-weight:700;cursor:pointer}.nw-shell .cx-step b{min-width:22px;text-align:center;font-family:var(--font-geist-mono),monospace;font-size:13px}
+.nw-shell .cx-from{font-size:11px;font-weight:600;background:#eef6fb;color:#123F63;border-radius:999px;padding:1px 7px;white-space:nowrap}

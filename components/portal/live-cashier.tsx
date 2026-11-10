@@ -388,6 +388,24 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
     setReceived(money(open.reduce((s, x) => s + Math.min(toCentavos(next[x.id] ?? ""), balanceOf(x)), 0) + extraTotal));
   }
   function removeExtra(key: string) { const x = extras.find((l) => l.key === key); setExtras((cur) => cur.filter((l) => l.key !== key)); if (x) setReceived((Math.max(0, receivedCentavos - x.unit * x.quantity) / 100).toFixed(2)); }
+  // Item Chips (owner, 10 Nov 2026): the Cashier adds Uniform, T-Shirt, Online Assessment and every other Miscellaneous Item
+  // from the Schedule of Fees; − and + change the quantity and Amount Received follows.
+  const counterItems = data.charges.filter((c) => c.active && c.kind === "item");
+  const itemFor = open[0]?.id ?? mine[0]?.id;
+  function addItem(c: { id: string; name: string; default_amount_centavos: number }) {
+    if (!itemFor) return;
+    const unit = Number(c.default_amount_centavos), hit = extras.find((x) => !x.chargeId && x.chargeCatalogId === c.id);
+    if (hit && hit.quantity >= 50) return;
+    setExtras((cur) => hit ? cur.map((x) => (x.key === hit.key ? { ...x, quantity: x.quantity + 1 } : x)) : [...cur, { key: `c-${c.id}`, chargeCatalogId: c.id, description: c.name, unit, quantity: 1, enrollmentId: itemFor, kind: "item" }]);
+    setReceived(money(receivedCentavos + unit));
+  }
+  function stepItem(key: string, by: 1 | -1) {
+    const x = extras.find((l) => l.key === key);
+    if (!x || x.quantity + by > 50) return;
+    if (x.quantity + by <= 0) { removeExtra(key); return; }
+    setExtras((cur) => cur.map((l) => (l.key === key ? { ...l, quantity: l.quantity + by } : l)));
+    setReceived(money(Math.max(0, receivedCentavos + by * x.unit)));
+  }
 
   /** GCash, PSBank and UnionBank: file the proof in Google Drive first (Mode › Month, "LASTNAME - date"). */
   async function fileProof() {
@@ -450,7 +468,8 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
         <label>Amount Received (PHP)<input className="cx-mono" inputMode="decimal" value={received} onChange={(ev) => setReceived(ev.target.value)} placeholder="0.00" /></label>
         <div className="cx-lines full"><table><thead><tr>{open.length > 1 && <th aria-label="Pay now"></th>}<th>Course or Charge</th><th className="r">Balance</th><th className="r">Apply</th></tr></thead><tbody>
           {open.map((e) => { const v = amounts[e.id] ?? ""; const bad = toCentavos(v) > balanceOf(e); return <tr key={e.id} className={toCentavos(v) > 0 ? "sel" : ""}>{open.length > 1 && <td><input type="checkbox" className="cx-tickbox" checked={toCentavos(v) > 0} aria-label={`Pay ${courseCode(e)} now`} onChange={(ev) => tick(e, ev.target.checked)} /></td>}<td><span className="cx-code">{courseCode(e)}</span> <small>{first(e.courses)?.name} · {scheduleText(e)}</small>{(() => { const ag = partnerOn(e); return ag ? <small className="ref-line">{ag.name} · {ag.rebate_mode === "No deduction" ? "rebate paid to the agency later" : pending(e) > 0 ? `rebate ${pesos(pending(e))} once ${pesos(balanceOf(e) - pending(e))} is paid` : "rebate deducted"}</small> : <small className="ref-line wk">{sourceLabel(e.source, null) || "Online"} · no rebate</small>; })()}</td><td className="r cx-amt">{pesos(balanceOf(e))}</td><td className="r"><input className="cx-apply" inputMode="decimal" value={v} placeholder="0.00" aria-label={`Amount for ${courseCode(e)}`} onChange={(ev) => setAmounts((cur) => ({ ...cur, [e.id]: ev.target.value }))} />{bad && <small className="cx-bad">More than the balance</small>}</td></tr>; })}
-          {extras.map((x) => { const e = mine.find((m) => m.id === x.enrollmentId); return <tr key={x.key} className="misc">{open.length > 1 && <td></td>}<td><span className="cx-code misc">{x.kind === "item" ? "Item" : "Fee"}</span> <strong>{x.description}</strong>{x.quantity > 1 ? ` x ${x.quantity}` : ""} <small>For {e ? courseCode(e) : "course"}</small></td><td className="r cx-amt">{pesos(x.unit * x.quantity)}</td><td className="r"><button type="button" className="ghost-button" onClick={() => removeExtra(x.key)}>Remove</button></td></tr>; })}
+          {extras.map((x) => { const e = mine.find((m) => m.id === x.enrollmentId); return <tr key={x.key} className="misc">{open.length > 1 && <td></td>}<td><span className="cx-code misc">{x.kind === "item" ? "Item" : "Fee"}</span> <strong>{x.description}</strong>{x.chargeId && x.quantity > 1 ? ` x ${x.quantity}` : ""} {x.chargeId ? <span className="cx-from">From Registration</span> : <small>{pesos(x.unit)} each · For {e ? courseCode(e) : "course"}</small>}</td><td className="r cx-amt">{pesos(x.unit * x.quantity)}</td><td className="r">{x.chargeId ? <button type="button" className="ghost-button" onClick={() => removeExtra(x.key)}>Remove</button> : <span className="cx-step"><button type="button" aria-label={`One less ${x.description}`} onClick={() => stepItem(x.key, -1)}>−</button><b>{x.quantity}</b><button type="button" aria-label={`One more ${x.description}`} onClick={() => stepItem(x.key, 1)}>+</button></span>}</td></tr>; })}
+          {counterItems.length > 0 && itemFor && <tr className="cx-chiprow">{open.length > 1 && <td></td>}<td colSpan={3}><div className="cx-chips">{counterItems.map((c) => <button key={c.id} type="button" className="cx-chip" onClick={() => addItem(c)}>+ {c.name} {pesos(Number(c.default_amount_centavos)).replace(/\.00$/, "")}</button>)}</div></td></tr>}
           {!open.length && !extras.length && <tr><td colSpan={3}><small>All courses are fully paid.</small></td></tr>}
         </tbody></table></div>
         <div className={`cx-tally full ${matches ? "ok" : "no"}`}><span>Applied {pesos(total)} of {pesos(receivedCentavos)}</span><span>{!receivedCentavos ? "Enter the amount received" : matches ? "Ready to record" : total < receivedCentavos ? `${pesos(receivedCentavos - total)} not applied` : `${pesos(total - receivedCentavos)} over the amount received`}</span></div>
@@ -912,7 +931,7 @@ function VoucherDrawer({ e, reprints, isManager, onClose, onRelease, onRequestRe
   useEffect(() => { const esc = (ev: KeyboardEvent) => { if (ev.key === "Escape") onClose(); }; document.addEventListener("keydown", esc); return () => document.removeEventListener("keydown", esc); }, [onClose]);
   return <div className="vx-drawer" onClick={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
     <aside className="vx-panel" role="dialog" aria-label={`Voucher ${e.voucher_number ?? e.expense_number}`}>
-      <div className="vx-dh"><div><span className="portal-eyebrow">Expense voucher</span><h2 className="cx-mono">{e.voucher_number ?? e.expense_number}</h2><Badge tone={released ? "active" : "blue"}>{released ? "Released" : "Awaiting Release"}</Badge></div><button type="button" className="vx-x" aria-label="Close" onClick={onClose}>×</button></div>
+      <div className="vx-dh"><div><span className="portal-eyebrow">Liquidation Form</span><h2 className="cx-mono">{e.voucher_number ?? e.expense_number}</h2><Badge tone={released ? "active" : "blue"}>{released ? "Released" : "Awaiting Release"}</Badge></div><button type="button" className="vx-x" aria-label="Close" onClick={onClose}>×</button></div>
       <div className="vx-db">
         <dl className="vx-kv">
           <div><dt>Payee</dt><dd>{e.payee}</dd></div><div><dt>Category</dt><dd>{e.category}</dd></div>

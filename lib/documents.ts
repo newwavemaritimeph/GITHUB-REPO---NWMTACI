@@ -865,9 +865,9 @@ export async function createExpenseVoucherPdf(snapshot: ExpenseVoucherSnapshot) 
   page.drawRectangle({ x: X0, y: y - barH, width: CW, height: barH, color: c.navy });
   page.drawRectangle({ x: X0, y: y - barH - 2.2, width: CW, height: 2.2, color: c.orange });
   const barText = y - barH + 5;
-  text("EXPENSE VOUCHER", X0 + 8, barText, 9.5, bold, c.white);
+  text("LIQUIDATION FORM", X0 + 8, barText, 9.5, bold, c.white); // Liquidation Form, Design 1 (owner, 10 Nov 2026)
   const state = `${isVoid && snapshot.printLabel ? `VOID - ${snapshot.printLabel}` : snapshot.status}  |  issued ${snapshot.issuedAt || "-"}`;
-  text(state, X0 + 8 + bold.widthOfTextAtSize("EXPENSE VOUCHER", 9.5) + 8, barText, 7, reg, c.lightcyan);
+  text(state, X0 + 8 + bold.widthOfTextAtSize("LIQUIDATION FORM", 9.5) + 8, barText, 7, reg, c.lightcyan);
   const numberW = monoBold.widthOfTextAtSize(ascii(snapshot.number), 9);
   text(snapshot.number, X1 - 8 - numberW, barText, 9, monoBold, c.white);
   const labelEnd = X1 - 8 - numberW - 4;
@@ -947,9 +947,9 @@ export async function createExpenseVoucherPdf(snapshot: ExpenseVoucherSnapshot) 
 
   // 6. Signatures.
   const sigs = [
-    { label: "Prepared by", name: snapshot.preparedBy, note: snapshot.preparedAt || "Cashier" },
+    { label: "Requested by", name: snapshot.preparedBy, note: snapshot.preparedAt || "Cashier" },
     { label: "Approved by", name: snapshot.approvedBy, note: snapshot.approvedAt || "Accounting" },
-    { label: "Released by", name: snapshot.releasedBy ?? "", note: snapshot.releasedAt || "Cashier" },
+    { label: "Liquidated by", name: snapshot.releasedBy ?? "", note: snapshot.releasedAt || "Cashier" },
     { label: "Received by", name: "", note: "Payee Signature Over Printed Name, Date" },
   ];
   const sigGap = 14, sigW = (CW - sigGap * (sigs.length - 1)) / sigs.length;
