@@ -859,9 +859,9 @@ export function CashierSummaryReport({ embedded, day }: { data?: PortalData; emb
 /* ====================================================== Expenses (Oct 2026) */
 
 type ReceiptFile = { fileId: string; link: string; name: string; mime: string };
-type ExpenseRow = PortalData["expenses"][number] & { receipt_files?: ReceiptFile[] | null; purpose?: string; payment_channel?: string | null; reference_number?: string | null; request_number?: string | null; voucher_number?: string | null; approved_at?: string | null; decision_remarks?: string | null; released_at?: string | null; paid_at?: string | null; drive_link?: string | null; print_count?: number | null; reprints_approved?: number | null; line_items?: { description: string; quantity: number; unitCentavos: number }[] | null; supporting_document?: string | null; requested_by_name?: string | null; approved_by_name?: string | null; released_by_name?: string | null };
+type ExpenseRow = PortalData["expenses"][number] & { receipt_files?: ReceiptFile[] | null; purpose?: string; payment_channel?: string | null; reference_number?: string | null; request_number?: string | null; voucher_number?: string | null; approved_at?: string | null; decision_remarks?: string | null; released_at?: string | null; paid_at?: string | null; drive_link?: string | null; print_count?: number | null; reprints_approved?: number | null; line_items?: { description: string; quantity: number; unitCentavos: number }[] | null; supporting_document?: string | null; requested_by_name?: string | null; approved_by_name?: string | null; released_by_name?: string | null; is_budget?: boolean | null; advance_centavos?: number | null; returned_centavos?: number | null; liquidated_at?: string | null };
 type ReprintRow = NonNullable<PortalData["expenseReprints"]>[number];
-export const EXPENSE_STATUSES = ["All", "For approval", "Approved", "Released", "Rejected"] as const;
+export const EXPENSE_STATUSES = ["All", "For approval", "Approved", "Advanced", "Released", "Rejected"] as const;
 export const expenseState = (e: { status: string }) => (e.status === "Pending" ? "For approval" : e.status === "Paid" ? "Released" : e.status);
 /** Approved and released expenses in [from, to] (Manila dates), totalled per payment channel. */
 export function expenseTotalsByChannel(rows: { status: string; created_at: string; amount_centavos: number; payment_channel?: string | null }[], from: string, to: string) {
@@ -906,7 +906,7 @@ export function vouchersByMonth<T extends { status: string; created_at: string; 
     total: list.reduce((s, e) => s + Number(e.amount_centavos), 0),
   }));
 }
-const EXPENSE_TONE: Record<string, string> = { "For approval": "orange", Approved: "blue", Released: "active", Rejected: "cancelled" };
+const EXPENSE_TONE: Record<string, string> = { "For approval": "orange", Approved: "blue", Advanced: "orange", Released: "active", Rejected: "cancelled" };
 
 export const VOUCHER_FILTERS = ["All", "Awaiting release", "Released", "Reprint requests"] as const;
 /** Voucher list filter (owner, 8 Oct 2026). */
@@ -1000,7 +1000,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   // Open expenses always show; released and rejected ones wait for a date (owner, 5 Nov 2026).
   const per = usePeriod();
   const [tab, setTab] = useState<(typeof EXPENSE_STATUSES)[number]>(canDecide ? "For approval" : "All");
-  const [recording, setRecording] = useState(false);
+  const [recording, setRecording] = useState(false), [budgeting, setBudgeting] = useState(false), [liquidating, setLiquidating] = useState<ExpenseRow | null>(null);
   const [releasing, setReleasing] = useState<ExpenseRow | null>(null);
   const [rejecting, setRejecting] = useState<ExpenseRow | null>(null);
   const [reprinting, setReprinting] = useState<ExpenseRow | null>(null);
@@ -1014,7 +1014,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   const reprints = data.expenseReprints ?? [];
   const rows = (data.expenses as ExpenseRow[]).slice().sort((a, b) => b.created_at.localeCompare(a.created_at));
   const byId = new Map(rows.map((e) => [e.id, e]));
-  const inRange = rows.filter((e) => e.status === "Pending" || e.status === "Approved" || per.inRange(e.created_at));
+  const inRange = rows.filter((e) => e.status === "Pending" || e.status === "Approved" || e.status === "Advanced" || per.inRange(e.created_at));
   const shown = inRange.filter((e) => tab === "All" || expenseState(e) === tab);
   const count = (t: string) => inRange.filter((e) => t === "All" || expenseState(e) === t).length;
   const months = vouchersByMonth(rows);
@@ -1028,7 +1028,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   const printCell = (e: ExpenseRow) => <VoucherPrint e={e} reprints={reprints} onRequest={(x) => { setReprinting(x); setWhy(NO_REASON); }} reload={reload} />;
 
   return <div className="portal-page cx">
-    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Expenses</h1></div><button type="button" className="portal-primary" onClick={() => setRecording(true)}>Record Expense</button></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Expenses</h1></div><span className="cx-acts"><button type="button" className="portal-secondary" onClick={() => setBudgeting(true)}>Request Budget</button><button type="button" className="portal-primary" onClick={() => setRecording(true)}>Record Expense</button></span></div>
     <div className="cx-status cx-views" role="tablist">{(["Expenses", "Vouchers", "Pay the Centers"] as const).map((v) => <button key={v} type="button" role="tab" aria-selected={view === v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{v}{v === "Pay the Centers" && centersDue > 0 && <span className="cx-count"> {centersDue}</span>}{v === "Vouchers" && pendingReprints.length ? <span>{pendingReprints.length}</span> : null}</button>)}</div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
 
@@ -1037,16 +1037,17 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
       <div className="cx-status" role="tablist">{EXPENSE_STATUSES.map((t) => <button key={t} type="button" role="tab" aria-selected={tab === t} className={tab === t ? "on" : ""} onClick={() => setTab(t)}>{tcl(t)}<span>{count(t)}</span></button>)}</div>
       <section className="portal-panel cx-panel">{shown.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Number</th><th>Payee</th><th>Category</th><th>Channel</th><th className="r">Amount</th><th>Status</th><th></th></tr></thead><tbody>
         {shown.map((e) => { const st = expenseState(e); return <tr key={e.id}>
-          <td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher_number ?? e.expense_number}</span><small>{e.voucher_number && e.request_number && e.request_number !== e.voucher_number ? `${e.request_number} · ` : ""}{fmtDate(day(e.created_at))}</small></td>
+          <td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher_number ?? e.expense_number}</span><small>{e.is_budget ? "Budget · " : ""}{e.voucher_number && e.request_number && e.request_number !== e.voucher_number ? `${e.request_number} · ` : ""}{fmtDate(day(e.created_at))}</small></td>
           <td data-l="Payee">{e.payee}<small>{e.purpose}</small></td>
           <td data-l="Category">{e.category}</td>
           <td data-l="Channel">{e.payment_channel || "—"}{e.reference_number ? <small className="cx-mono">{e.reference_number}</small> : null}</td>
           <td data-l="Amount" className="r"><strong className="cx-amt">{pesos(e.amount_centavos)}</strong></td>
-          <td data-l="Status"><Badge tone={EXPENSE_TONE[st]}>{st}</Badge>{st === "Rejected" && e.decision_remarks ? <small>{e.decision_remarks}</small> : null}{st === "Released" && e.released_at ? <small>{fmtDate(day(e.released_at))}</small> : null}</td>
+          <td data-l="Status"><Badge tone={EXPENSE_TONE[st]}>{st}</Badge>{st === "Rejected" && e.decision_remarks ? <small>{e.decision_remarks}</small> : null}{st === "Released" && e.released_at ? <small>{fmtDate(day(e.released_at))}</small> : null}{st === "Advanced" ? <small>Cash out · liquidate when spent</small> : null}{e.is_budget && e.liquidated_at && e.returned_centavos != null ? <small>{e.returned_centavos >= 0 ? `Change ${pesos(e.returned_centavos)}` : `Reimburse ${pesos(-e.returned_centavos)}`}</small> : null}</td>
           <td data-l=""><div className="cx-acts">
             {st === "For approval" && canDecide && <><button type="button" className="portal-primary" disabled={busy} onClick={() => approve(e)}>Approve</button><button type="button" className="portal-secondary" disabled={busy} onClick={() => { setRejecting(e); setWhy(NO_REASON); }}>Reject</button></>}
             {(st === "Approved" || st === "Released") && printCell(e)}
-            {st === "Approved" && <button type="button" className="portal-primary" onClick={() => setReleasing(e)}>Mark Released</button>}
+            {st === "Approved" && <button type="button" className="portal-primary" onClick={() => setReleasing(e)}>{e.is_budget ? "Release Cash" : "Mark Released"}</button>}
+            {st === "Advanced" && <button type="button" className="portal-primary row-act" onClick={() => setLiquidating(e)}>Liquidate</button>}
             {e.drive_link && <a className="ghost-button" href={e.drive_link} target="_blank" rel="noreferrer">Drive</a>}
           </div></td>
         </tr>; })}
@@ -1115,6 +1116,8 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
 
     {selected && <VoucherDrawer e={(data.expenses as ExpenseRow[]).find((x) => x.id === selected.id) ?? selected} reprints={reprints} isManager={isManager} reload={reload} onClose={() => setSelected(null)} onRelease={(x) => { setSelected(null); setReleasing(x); }} onRequestReprint={(x) => { setReprinting(x); setWhy(NO_REASON); }} />}
     {recording && <RecordExpenseModal data={data} onClose={() => setRecording(false)} post={post} />}
+    {budgeting && <BudgetRequestModal data={data} onClose={() => setBudgeting(false)} post={post} />}
+    {liquidating && <RecordExpenseModal data={data} liquidate={liquidating} onClose={() => setLiquidating(null)} post={post} />}
     {releasing && <ReleaseExpenseModal data={data} expense={releasing} onClose={() => setReleasing(null)} post={post} />}
     {rejecting && <Modal title={`Reject ${rejecting.expense_number}`} onClose={() => setRejecting(null)}>
       <div className="portal-form">
@@ -1155,12 +1158,32 @@ export async function shrinkPhoto(file: File): Promise<File> {
 const isInstructorCategory = (name: string) => /^instructors?$/i.test(name.trim());
 const expenseChannels = (data: PortalData) => { const all = data.paymentMethods.filter((m) => m.active); const payable = all.filter((m) => m.kind === "payable"); return (payable.length ? payable : all).map((m) => m.name); };
 
-function RecordExpenseModal({ data, onClose, post }: { data: PortalData; onClose: () => void; post: (body: Record<string, unknown>, ok?: string) => Promise<Record<string, unknown>> }) {
+/** Budget Request (owner, 10 Nov 2026): the Cashier asks for cash first; receipts come with the Liquidation Form. */
+function BudgetRequestModal({ data, onClose, post }: { data: PortalData; onClose: () => void; post: (body: Record<string, unknown>, ok?: string) => Promise<Record<string, unknown>> }) {
+  const categories = data.expenseCategories.filter((c) => c.active);
+  const [payee, setPayee] = useState(""), [category, setCategory] = useState(categories[0]?.name ?? ""), [purpose, setPurpose] = useState(""), [amount, setAmount] = useState("");
+  const cents = toCentavos(amount);
+  const ready = !!payee.trim() && !!category && purpose.trim().length >= 3 && cents > 0;
+  return <Modal title="Request Budget" onClose={onClose}>
+    <div className="portal-form">
+      <label>Payee or Supplier<input value={payee} onChange={(e) => setPayee(e.target.value)} placeholder="e.g. Office Warehouse" /></label>
+      <label>Category<select value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></label>
+      <label className="full">Purpose<input value={purpose} maxLength={300} onChange={(e) => setPurpose(e.target.value)} placeholder="e.g. Office supplies and courier for the week" /></label>
+      <label>Amount Needed (PHP)<input className="cx-mono" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" /></label>
+      <p className="portal-form-note full">Accounting approves it; the cash is then released as an advance. File the Liquidation Form with the receipts and the change once it is spent.</p>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!ready} onClick={() => void post({ action: "budget-request", payee: payee.trim(), category, purpose: purpose.trim(), amountCentavos: cents }, "Budget request sent to Accounting.").then(onClose).catch(() => undefined)}>Send to Accounting</button></div>
+    </div>
+  </Modal>;
+}
+
+function RecordExpenseModal({ data, onClose, post, liquidate }: { data: PortalData; onClose: () => void; post: (body: Record<string, unknown>, ok?: string) => Promise<Record<string, unknown>>; liquidate?: ExpenseRow }) {
   // "Instructors" is always offered (owner, 19 Oct 2026), even before it is added in Configuration.
   const active = data.expenseCategories.filter((c) => c.active);
   const categories = active.some((c) => isInstructorCategory(c.name)) ? active : [...active, { id: "instructors", name: "Instructors", active: true }];
   const channels = expenseChannels(data);
-  const [payee, setPayee] = useState(""), [category, setCategory] = useState(categories[0]?.name ?? "");
+  // Liquidation mode (owner, 10 Nov 2026): the budget's payee and category, its receipts and what was spent.
+  const [payee, setPayee] = useState(liquidate?.payee ?? ""), [category, setCategory] = useState(liquidate?.category ?? categories[0]?.name ?? "");
+  const advance = liquidate ? Number(liquidate.advance_centavos ?? liquidate.amount_centavos) : 0;
   const [channel, setChannel] = useState(channels[0] ?? "Cash"), [reference, setReference] = useState(""), [supporting, setSupporting] = useState("");
   // Voucher lines (Design 2): particulars, quantity and unit cost; the total is their sum.
   const [lines, setLines] = useState([{ description: "", quantity: "1", unit: "" }]);
@@ -1195,10 +1218,12 @@ function RecordExpenseModal({ data, onClose, post }: { data: PortalData; onClose
   }
   const ready = !!payee.trim() && !!category && (instructor ? single > 0 : linesOk && total > 0) && receipts.length > 0 && !uploading.some((u) => !u.error);
   const purpose = instructor ? (note.trim() || "Instructor's fee").slice(0, 300) : filled.map((l) => l.description).join("; ").slice(0, 300);
-  return <Modal title="Record Expense" onClose={onClose}>
+  const spent = instructor ? single : total;
+  return <Modal title={liquidate ? `Liquidation Form · ${liquidate.voucher_number ?? liquidate.expense_number}` : "Record Expense"} onClose={onClose}>
     <div className="portal-form">
-      <label>Payee<input value={payee} onChange={(e) => setPayee(e.target.value)} /></label>
-      <label>Category<select value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></label>
+      {liquidate && <div className="full cx-liq"><div><span>Cash Advance</span><b className="cx-mono">{pesos(advance)}</b></div><div><span>Spent</span><b className="cx-mono">{pesos(spent)}</b></div><div className={advance - spent < 0 ? "due" : "ok"}><span>{advance - spent < 0 ? "To Reimburse" : "Change Returned"}</span><b className="cx-mono">{pesos(Math.abs(advance - spent))}</b></div></div>}
+      <label>Payee<input value={payee} disabled={!!liquidate} onChange={(e) => setPayee(e.target.value)} /></label>
+      <label>Category<select value={category} disabled={!!liquidate} onChange={(e) => setCategory(e.target.value)}>{categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}</select></label>
       {instructor ? <>
         <label>Amount (PHP)<input className="cx-mono" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" /></label>
         <label>Purpose<input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="e.g. Instructor's fee, BT-PSSR Oct 12" /></label>
@@ -1228,7 +1253,9 @@ function RecordExpenseModal({ data, onClose, post }: { data: PortalData; onClose
       </div>
       <label className="full">Supporting Document (Optional Note)<input placeholder="e.g. Meralco bill and official receipt" value={supporting} onChange={(e) => setSupporting(e.target.value)} /></label>
       {!categories.length && <p className="portal-form-note full">Accounting adds expense categories in Configuration.</p>}
-      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!ready} onClick={() => void post({ action: "expense-create", payee: payee.trim(), category, amountCentavos: instructor ? single : total, purpose, lines: instructor ? [] : filled, receiptFiles: receipts.map((f) => ({ fileId: f.fileId, link: f.link, name: f.name, mime: f.mime })), paymentChannel: channel, referenceNumber: reference.trim(), supportingDocument: supporting.trim() }, "Expense recorded and sent for approval.").then(onClose).catch(() => undefined)}>Send for Approval</button></div>
+      <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button>{liquidate
+        ? <button type="button" className="portal-primary" disabled={!ready} onClick={() => void post({ action: "expense-liquidate", id: liquidate.id, amountCentavos: spent, lines: instructor ? [] : filled, receiptFiles: receipts.map((f) => ({ fileId: f.fileId, link: f.link, name: f.name, mime: f.mime })), referenceNumber: reference.trim(), supportingDocument: supporting.trim() }, advance - spent >= 0 ? `Liquidated. Return the change of ${pesos(advance - spent)} to the drawer.` : `Liquidated. ${pesos(spent - advance)} is to be reimbursed.`).then(onClose).catch(() => undefined)}>Submit Liquidation</button>
+        : <button type="button" className="portal-primary" disabled={!ready} onClick={() => void post({ action: "expense-create", payee: payee.trim(), category, amountCentavos: instructor ? single : total, purpose, lines: instructor ? [] : filled, receiptFiles: receipts.map((f) => ({ fileId: f.fileId, link: f.link, name: f.name, mime: f.mime })), paymentChannel: channel, referenceNumber: reference.trim(), supportingDocument: supporting.trim() }, "Expense recorded and sent for approval.").then(onClose).catch(() => undefined)}>Send for Approval</button>}</div>
     </div>
   </Modal>;
 }

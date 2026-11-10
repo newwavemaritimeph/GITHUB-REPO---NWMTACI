@@ -28,7 +28,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (!voided) return notice("Voucher not found.", 404);
     return new Response(voided.bytes as BodyInit, { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="${voided.voucherNumber}-void.pdf"`, "cache-control": "private, no-store" } });
   }
-  if (row.status !== "Approved" && row.status !== "Paid") return notice("The voucher is issued once Accounting approves the expense.", 409);
+  if (row.status !== "Approved" && row.status !== "Advanced" && row.status !== "Paid") return notice("The voucher is issued once Accounting approves the expense.", 409);
 
   // ?copy=1: a file copy for viewing (Vouchers tab). Marked, and never counted as a print.
   if (new URL(request.url).searchParams.get("copy") === "1") {

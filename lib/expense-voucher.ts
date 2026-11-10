@@ -34,10 +34,17 @@ export async function buildExpenseVoucher(db: Admin, id: string, options: { prin
   // Receipt photos (202610190044); ignored before it.
   const { data: receiptData } = await db.from("expenses").select("receipt_files").eq("id", id).maybeSingle();
   const receiptCount = Array.isArray((receiptData as { receipt_files?: unknown[] } | null)?.receipt_files) ? (receiptData as { receipt_files: unknown[] }).receipt_files.length : 0;
-  if (data.status !== "Approved" && data.status !== "Paid" && data.status !== "Void") return null;
+  if (data.status !== "Approved" && data.status !== "Advanced" && data.status !== "Paid" && data.status !== "Void") return null;
+  // A budget (202610290090): the advance, what was spent and the change, on the Liquidation Form.
+  const { data: budgetData } = await db.from("expenses").select("is_budget,advance_centavos,returned_centavos,liquidated_at").eq("id", id).maybeSingle();
+  const b = (budgetData ?? {}) as { is_budget?: boolean; advance_centavos?: number | null; returned_centavos?: number | null; liquidated_at?: string | null };
+  const peso = (c: number) => `PHP ${(c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const budgetNote = b.is_budget ? (b.liquidated_at && b.returned_centavos != null
+    ? `Cash Advance ${peso(Number(b.advance_centavos ?? 0))} - Spent ${peso(Number(data.amount_centavos))} - ${b.returned_centavos >= 0 ? `Change Returned ${peso(b.returned_centavos)}` : `To Reimburse ${peso(-b.returned_centavos)}`}`
+    : `Cash Advance ${peso(Number(b.advance_centavos ?? data.amount_centavos))} - to be liquidated with receipts`) : "";
   const requester = one(data.requester as { complete_name: string } | { complete_name: string }[] | null)?.complete_name ?? "";
   const approver = one(data.approver as { complete_name: string } | { complete_name: string }[] | null)?.complete_name ?? "";
-  const released = data.status === "Paid";
+  const released = data.status === "Paid" || data.status === "Advanced";
   const { data: releaser } = released && x.released_by ? await db.from("profiles").select("complete_name").eq("id", x.released_by).maybeSingle() : { data: null };
   const voucherNumber = x.voucher_number ?? data.expense_number;
   const bytes = await createExpenseVoucherPdf({
@@ -49,8 +56,8 @@ export async function buildExpenseVoucher(db: Admin, id: string, options: { prin
     amountCentavos: Number(data.amount_centavos),
     lines: Array.isArray(l.line_items) ? l.line_items : [],
     paymentChannel: x.payment_channel ?? "", referenceNumber: x.reference_number ?? "",
-    supportingDocument: l.supporting_document || (receiptCount ? `${receiptCount} receipt photo${receiptCount === 1 ? "" : "s"} attached (Google Drive)` : ""),
-    requestedBy: requester, modeOfPayment: x.payment_channel ?? "", status: data.status === "Void" ? "VOID" : released ? "Released" : "Approved",
+    supportingDocument: [budgetNote, l.supporting_document || (receiptCount ? `${receiptCount} receipt photo${receiptCount === 1 ? "" : "s"} attached (Google Drive)` : "")].filter(Boolean).join(" | "),
+    requestedBy: requester, modeOfPayment: x.payment_channel ?? "", status: data.status === "Void" ? "VOID" : data.status === "Advanced" ? "Advanced" : released ? "Released" : "Approved",
     preparedBy: requester, preparedAt: `Cashier · ${fmt(data.created_at)}`,
     approvedBy: approver, approvedAt: `Accounting · ${fmt(x.approved_at)}`,
     releasedBy: released ? (releaser as { complete_name?: string } | null)?.complete_name ?? "" : "",

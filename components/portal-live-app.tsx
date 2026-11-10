@@ -1,5 +1,6 @@
 "use client";
 import { traineeCopy } from "@/lib/trainee-copy";
+import { newArrivals, playChime, unlockChime } from "@/lib/portal-alerts";
 
 import { FormEvent, Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { NewWaveLogo } from "./new-wave-logo";
@@ -313,7 +314,7 @@ export function PortalLiveApp(){
   const needSince=useCallback((from:string)=>{const loaded=sinceRef.current||`${new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date()).slice(0,8)}01`;if(from<loaded){sinceRef.current=from;setSince(from)}},[]);
   // The newest load wins, so a slow older reply never paints over a save (owner, 4 Nov 2026: "make it faster").
   const loadSeq=useRef(0),savesRefreshing=useRef(0),lastStamp=useRef<string|null>(null),lastFull=useRef(0),[syncing,setSyncing]=useState(false);
-  const load=useCallback(async()=>{const seq=++loadSeq.current;setLoading(true);setError("");try{const response=await fetch(recordsUrl(sinceRef.current),{cache:"no-store"});const body=await response.json();if(!response.ok)throw new Error(body.error??"Unable to load staff records.");if(seq!==loadSeq.current)return;lastStamp.current=body.stamp??null;lastFull.current=Date.now();setData(body);setRole((current:string)=>{const options=workingRolesFor(body.roles);return options.includes(current)?current:defaultWorkingRole(body.roles)})}catch(e){if(seq===loadSeq.current)setError(e instanceof Error?e.message:"Unable to load staff records.")}finally{if(seq===loadSeq.current)setLoading(false)}},[]);
+  const load=useCallback(async()=>{const seq=++loadSeq.current;setLoading(true);setError("");try{const response=await fetch(recordsUrl(sinceRef.current),{cache:"no-store"});const body=await response.json();if(!response.ok)throw new Error(body.error??"Unable to load staff records.");if(seq!==loadSeq.current)return;lastStamp.current=body.stamp??null;lastFull.current=Date.now();alertPrev.current=body;setData(body);setRole((current:string)=>{const options=workingRolesFor(body.roles);return options.includes(current)?current:defaultWorkingRole(body.roles)})}catch(e){if(seq===loadSeq.current)setError(e instanceof Error?e.message:"Unable to load staff records.")}finally{if(seq===loadSeq.current)setLoading(false)}},[]);
   // After a save the screen moves on at once and the records refresh behind it; the lists take no clicks until they are current.
   const refresh=useCallback(async()=>{savesRefreshing.current+=1;setSyncing(true);void load().finally(()=>{savesRefreshing.current-=1;if(!savesRefreshing.current)setSyncing(false)})},[load]);
   useEffect(()=>{void load()},[load,since]);
@@ -322,7 +323,14 @@ export function PortalLiveApp(){
   // A new Manila day re-opens the screens on today (owner, 21 Oct 2026: date tabs start on the current date).
   const manilaNow=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila"}).format(new Date());
   const [day,setDay]=useState(manilaNow);
-  useEffect(()=>{let running=false;const id=window.setInterval(async()=>{setDay(d=>{const now=manilaNow();return d===now?d:now});const el=document.activeElement;if(running||savesRefreshing.current||document.hidden||document.querySelector("[role=dialog]")||(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;running=true;try{const s=await fetch("/api/staff/operations?stamp=1",{cache:"no-store"});const stamp=s.ok?(await s.json()).stamp as string|null:null;if(!needsFullRefresh(lastStamp.current,stamp,Date.now()-lastFull.current))return;const seq=++loadSeq.current;const r=await fetch(recordsUrl(sinceRef.current),{cache:"no-store"});if(r.ok){const body=await r.json();if(seq===loadSeq.current){lastStamp.current=body.stamp??null;lastFull.current=Date.now();setData(body)}}}catch{/* next tick retries */}finally{running=false}},10000);return()=>window.clearInterval(id)},[]);
+  // New-arrival chime (owner, 10 Nov 2026): Registration hears new registrations, the Cashier new payments and hand-overs.
+  // Their tabs keep checking while hidden, so the chime plays from another tab; the sound can be turned off.
+  const roleRef=useRef(role),alertPrev=useRef<PortalData|null>(null),[soundOn,setSoundOn]=useState(()=>{try{return localStorage.getItem("nw-chime")!=="off"}catch{return true}}),soundRef=useRef(soundOn),[arrival,setArrival]=useState("");
+  useEffect(()=>{roleRef.current=role},[role]);
+  useEffect(()=>{const unlock=()=>unlockChime();document.addEventListener("pointerdown",unlock,{once:true});return()=>document.removeEventListener("pointerdown",unlock)},[]);
+  const toggleSound=()=>{const next=!soundRef.current;soundRef.current=next;setSoundOn(next);try{localStorage.setItem("nw-chime",next?"on":"off")}catch{/* no storage */}if(next){unlockChime();playChime()}};
+  useEffect(()=>{if(!arrival)return;const t=window.setTimeout(()=>setArrival(""),8000);return()=>window.clearTimeout(t)},[arrival]);
+  useEffect(()=>{let running=false;const listens=()=>roleRef.current==="registration"||roleRef.current==="cashier";const tick=async()=>{setDay(d=>{const now=manilaNow();return d===now?d:now});const el=document.activeElement;if(running||savesRefreshing.current||(document.hidden&&!listens())||document.querySelector("[role=dialog]")||(el&&/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)))return;running=true;try{const s=await fetch("/api/staff/operations?stamp=1",{cache:"no-store"});const stamp=s.ok?(await s.json()).stamp as string|null:null;if(!needsFullRefresh(lastStamp.current,stamp,Date.now()-lastFull.current))return;const seq=++loadSeq.current;const r=await fetch(recordsUrl(sinceRef.current),{cache:"no-store"});if(r.ok){const body=await r.json();if(seq===loadSeq.current){lastStamp.current=body.stamp??null;lastFull.current=Date.now();const hit=newArrivals(alertPrev.current,body,roleRef.current);alertPrev.current=body;setData(body);if(hit.count){setArrival(hit.label);if(soundRef.current)playChime()}}}}catch{/* next tick retries */}finally{running=false}};const id=window.setInterval(()=>void tick(),10000);const shown=()=>{if(!document.hidden)void tick()};document.addEventListener("visibilitychange",shown);return()=>{window.clearInterval(id);document.removeEventListener("visibilitychange",shown)}},[]);
   // Admin keeps an oversight-only workspace: Dashboard, Search trainee, Enrollments,
   // Accounting, Enrollment summary, Reports, MyHr and Setup. Everything else is the
   // day-to-day work of the specialised roles and is hidden here.
@@ -361,9 +369,10 @@ export function PortalLiveApp(){
   return <DataSince.Provider value={needSince}><main className="portal-shell nw-shell">
     <header className="nw-bar">
       <div className="nw-bar-row">
-        <div className="nw-brand"><NewWaveLogo inverted/></div>
+        {arrival&&<button type="button" className="nw-arrival" role="status" onClick={()=>setArrival("")}>{arrival}</button>}<div className="nw-brand"><NewWaveLogo inverted/></div>
         <div className="nw-tools">
           <label className="nw-role"><span>Working as</span><select value={role} onChange={e=>{setRole(e.target.value);setActive("Dashboard");setRecordsView("applications");setOpenTab("")}} aria-label="Working as">{roleOptions.map(item=><option key={item} value={item}>{roleNames[item]??item}</option>)}</select></label>
+          {(role==="registration"||role==="cashier")&&<button type="button" className="nw-sound" onClick={toggleSound} aria-pressed={soundOn} title={soundOn?"New-arrival chime is on":"New-arrival chime is off"}>{soundOn?"Sound On":"Sound Off"}</button>}
           <button type="button" className="nw-icon" onClick={()=>setNotices(!notices)} aria-label="Notifications"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5-6.71V3.5a2 2 0 1 0-4 0v.79A7 7 0 0 0 5 11v5l-2 2v1h18v-1Z"/></svg>{unread>0&&<b>{unread}</b>}</button>
           <div className="nw-user"><span className="user-dot">{initials}</span><span className="nw-user-text"><strong>{data.profile.complete_name}</strong><small>{roleNames[role]??role}</small></span></div>
           <button type="button" className="nw-account" onClick={()=>setAccount(true)} title="Change Password"><span aria-hidden="true">⚿</span><span className="nw-account-text">Change Password</span></button>

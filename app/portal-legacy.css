@@ -2988,3 +2988,8 @@ button.rd-row:hover { background: #f6fafc; }
 .act-split{position:relative;display:inline-block}.cx-splitmenu.act-menu{top:calc(100% + 6px);bottom:auto;z-index:30;min-width:190px}
 .cx-splitmenu.act-menu a{display:block;padding:9px 12px;border-radius:8px;font:500 14.5px var(--font-portal),sans-serif;color:var(--nw-fg);text-decoration:none}.cx-splitmenu.act-menu a:hover{background:var(--nw-soft)}
 .cx-splitmenu.act-menu button.danger{color:#b42318}.portal-shell .ap-eyes{display:inline-flex;gap:4px;align-items:center}
+/* Liquidation Form box (Budget Request, 10 Nov 2026). */
+.nw-shell .cx-liq{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.nw-shell .cx-liq>div{border:1px solid #d6e3ea;border-radius:10px;padding:8px 10px}.nw-shell .cx-liq span{display:block;font-size:12px;color:#587184}.nw-shell .cx-liq b{font-size:16px}.nw-shell .cx-liq .ok{border-color:#0a7a3e;background:#e3f5ea}.nw-shell .cx-liq .due{border-color:#b42318;background:#fde8e6}
+/* New-arrival chime: the sound switch and the note (10 Nov 2026). */
+.nw-sound{height:30px;padding:0 10px;border-radius:999px;border:1px solid #ffffff55;background:transparent;color:#fff;font:600 12.5px var(--font-portal),sans-serif;cursor:pointer;white-space:nowrap}.nw-sound[aria-pressed=false]{opacity:.65}
+.nw-arrival{position:fixed;right:max(16px,env(safe-area-inset-right,0px));top:calc(70px + env(safe-area-inset-top,0px));z-index:60;background:#F25615;color:#fff;border:0;border-radius:12px;padding:10px 16px;font:700 14.5px var(--font-portal),sans-serif;box-shadow:0 12px 30px #0f263840;cursor:pointer}

@@ -109,7 +109,7 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
 
   // Expenses released (paid) that day, with voucher numbers.
   const { data: exBase } = await db.from("expenses").select("id,expense_number,payee,category,amount_centavos,status,paid_at")
-    .eq("status", "Paid").gte("paid_at", start).lte("paid_at", end).order("paid_at", { ascending: true }).limit(2000);
+    .in("status", ["Paid", "Advanced"]).gte("paid_at", start).lte("paid_at", end).order("paid_at", { ascending: true }).limit(2000);
   const exRows = exBase ?? [];
   const exExtra = new Map<string, { voucher_number?: string | null; payment_channel?: string | null; reference_number?: string | null }>();
   if (exRows.length) {
