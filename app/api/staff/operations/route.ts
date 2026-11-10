@@ -1591,7 +1591,7 @@ export async function POST(request: Request) {
       if (error) throw error;
       // The covered rebates become due again.
       await admin.from("other_income_rebates").delete().eq("income_id", input.id);
-      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "admin", action: "income.voided", record_type: "other_income", record_id: input.id, prior_values: prior, reason: input.reason });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: isAdminRole(staff.roleCodes) ? "admin" : "accounting", action: "income.voided", record_type: "other_income", record_id: input.id, prior_values: prior, reason: input.reason });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "partner-rebates-save") {

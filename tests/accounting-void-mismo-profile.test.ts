@@ -16,6 +16,12 @@ describe("Void for Accounting", () => {
     expect(income).toContain("!canManageAccounting(staff.roleCodes)");
     expect(route).toContain('const canManageAccounting = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));');
   });
+  it("records the voider's own role in the audit log, not always admin", () => {
+    const sql = readFileSync("supabase/migrations/202610290087_void_actor_role.sql", "utf8");
+    expect(sql.match(/public\.void_actor_role\(actor\), '(payment|expense)\.voided'/g)).toHaveLength(2);
+    expect(sql).not.toMatch(/values \(actor, 'admin'/);
+    expect(route).toContain('actor_role: isAdminRole(staff.roleCodes) ? "admin" : "accounting", action: "income.voided"');
+  });
   it("puts Void on Accounting's Payments, Expenses and Expense Vouchers", () => {
     const home = readFileSync("components/portal/accounting-home.tsx", "utf8"), vouchers = readFileSync("components/portal/live-accounting.tsx", "utf8");
     expect(home).toContain('action: "payment-void", paymentId: id, reason');
