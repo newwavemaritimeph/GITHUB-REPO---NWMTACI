@@ -1,0 +1,17 @@
+{
+  "name": "New Wave Staff",
+  "short_name": "New Wave Staff",
+  "description": "New Wave Maritime staff portal",
+  "id": "/portal",
+  "start_url": "/portal",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#123F63",
+  "theme_color": "#123F63",
+  "icons": [
+    { "src": "/icons/staff-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/staff-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/staff-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

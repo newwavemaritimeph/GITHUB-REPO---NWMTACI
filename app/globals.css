@@ -6865,3 +6865,59 @@ a[href^="mailto:"],
 .portal-shell .rq-tag.bad { border: 1px solid transparent; background: #fdecea; color: #b42318; }
 .portal-shell .rq-totals { margin: 8px 2px 0; font-size: 13px; color: var(--nw-muted, #5b6b7d); }
 .nw-queue { display: inline-flex; align-items: center; text-decoration: none; background: #F25615 !important; border-color: #F25615 !important; }
+
+/* New Wave loader, Rising Tide (owner, 10 Nov 2026). The emblem art has a white background, so both copies
+   multiply onto the badge: the white square disappears and only the helm and wave show. */
+.nw-loader{display:grid;justify-items:center;gap:12px;text-align:center;color:#123F63}
+.nw-loader strong{font:600 16px var(--font-portal,var(--font-ui)),system-ui,sans-serif;display:inline-flex;align-items:center;gap:6px}
+.nw-loader small{font-size:13px;color:#5B6B7D}
+.nw-tide{--s:92px;width:var(--s);height:var(--s);border-radius:50%;background:#fff;position:relative;overflow:hidden;isolation:isolate;box-shadow:0 0 0 4px #9EE3F1;display:block}
+.nw-tide img{position:absolute;left:12%;bottom:calc(var(--s)*.12);width:calc(var(--s)*.76);height:auto;mix-blend-mode:multiply}
+.nw-tide>img{filter:grayscale(1);opacity:.3}
+.nw-tide-fill{position:absolute;left:0;right:0;bottom:0;height:0;background:#35CCFA2e;animation:nw-rise 2.4s ease-in-out infinite}
+.nw-tide-fill>span{position:absolute;inset:0;overflow:hidden}
+.nw-tide-fill::before{content:"";position:absolute;left:0;width:200%;top:-6px;height:8px;background:radial-gradient(8px 6px at 8px 8px,#35CCFA 98%,transparent) 0 0/16px 8px repeat-x;animation:nw-drift .8s linear infinite}
+@keyframes nw-rise{0%{height:0}75%,100%{height:100%}}
+@keyframes nw-drift{to{transform:translateX(-16px)}}
+.nw-dots{display:inline-flex;gap:4px}.nw-dots i{width:6px;height:6px;border-radius:50%;background:currentColor;animation:nw-dot 1s ease-in-out infinite}.nw-dots i:nth-child(2){animation-delay:.15s}.nw-dots i:nth-child(3){animation-delay:.3s}
+@keyframes nw-dot{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-3px)}}
+@media (prefers-reduced-motion:reduce){.nw-tide-fill,.nw-tide-fill::before,.nw-dots i{animation-duration:3s}}
+
+/* Staff app on phones (owner, 10 Nov 2026): condensed bar, the workspace tabs as a bottom bar, smaller buttons,
+   and short labels from data-short (e.g. "Record Payment" reads "Payment"). */
+.nw-install{display:flex;align-items:center;gap:10px;max-width:1500px;margin:10px auto 0;background:#EAF6FD;border:1px solid #BFE3F7;border-radius:12px;padding:8px 10px;color:#123F63}
+.nw-install img{width:34px;height:34px;border-radius:9px;background:#fff;border:1px solid #d6e9f1;padding:3px;flex:none}
+.nw-install div{flex:1;min-width:0;display:grid}.nw-install b{font-size:14px}.nw-install small{font-size:12.5px;color:#5B6B7D}
+.nw-install button{border:0;border-radius:8px;font:600 13.5px var(--font-portal,var(--font-ui)),sans-serif;padding:7px 12px;cursor:pointer;min-height:34px}
+.nw-install .go{background:#F25615;color:#fff}.nw-install .no{background:none;color:#5B6B7D;padding:7px 8px}
+@media (max-width:640px){
+  .nw-shell .nw-bar{padding:8px max(10px,env(safe-area-inset-left,0px)) 8px;padding-top:calc(8px + env(safe-area-inset-top,0px))}
+  .nw-shell .nw-bar-row{gap:8px;flex-wrap:nowrap}
+  .nw-shell .nw-brand{flex:none}.nw-shell .nw-brand .logo-copy{display:none}.nw-shell .nw-brand img{max-height:34px;width:34px;height:34px}
+  .nw-shell .nw-tools{gap:6px;flex-wrap:nowrap;min-width:0}
+  .nw-shell .nw-role{min-width:0}.nw-shell .nw-role select{padding:6px 8px;font-size:13.5px;max-width:42vw}
+  .nw-shell .nw-icon,.nw-shell .nw-account{width:34px;height:34px;border-radius:9px}
+  .nw-shell .nw-sound:not(.nw-queue),.nw-shell .nw-user{display:none}
+  .nw-shell .nw-queue{height:34px;display:inline-grid;place-items:center;font-size:0;width:34px;padding:0}
+  .nw-shell .nw-queue::after{content:"Q";font:700 14px var(--font-portal,var(--font-ui)),sans-serif}
+  .nw-shell .nw-signout{padding:6px 9px;font-size:13px}
+  .nw-shell .nw-tabs{position:fixed;left:0;right:0;bottom:0;z-index:40;margin:0;max-width:none;background:#fff;border-top:1px solid #d6e9f1;box-shadow:0 -6px 18px #0f263814;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(68px,1fr);gap:0;padding:2px 4px calc(4px + env(safe-area-inset-bottom,0px))}
+  .nw-shell .nw-tab>button{flex-direction:column;justify-content:center;gap:2px;width:100%;min-height:50px;padding:6px 4px;border-radius:10px;font-size:12px;font-weight:600;color:#5B6B7D;white-space:nowrap;box-shadow:none}
+  .nw-shell .nw-tab.on>button{background:#EAF6FD;color:#0571D0;box-shadow:inset 0 3px 0 #F25615}
+  .nw-shell .nw-tab>button:hover{background:#EAF6FD;color:#0571D0}
+  .nw-shell .nw-caret{width:7px;height:7px;transform:rotate(-135deg)}
+  .nw-shell .nw-tab.open .nw-caret{transform:rotate(45deg)}
+  .nw-shell .nw-count{position:absolute;margin:-30px 0 0 34px;min-width:18px;height:18px;font-size:11px}
+  .nw-shell .nw-tab{position:relative}
+  .nw-shell .nw-menu{left:8px!important;right:8px;top:auto!important;bottom:calc(62px + env(safe-area-inset-bottom,0px));min-width:0;max-height:60vh;overflow:auto}
+  .nw-shell .nw-menu button{font-size:15px;padding:11px 12px}
+  .nw-shell .nw-notices{position:fixed;left:8px;right:8px;top:calc(56px + env(safe-area-inset-top,0px));max-height:70vh;overflow:auto}
+  .nw-shell .portal-workspace{padding-bottom:calc(66px + env(safe-area-inset-bottom,0px))}
+  .nw-shell .portal-page{padding:14px 12px 40px}
+  .nw-shell .portal-heading,.nw-shell .cx-head{margin-bottom:12px;gap:10px}
+  .nw-shell .portal-heading h1,.nw-shell .cx-head h1{font-size:21px}
+  .nw-shell .portal-workspace .portal-primary,.nw-shell .portal-workspace .portal-secondary{font-size:13.5px;padding:7px 11px;min-height:34px;border-radius:8px}
+  .nw-shell [data-short]{font-size:0!important}
+  .nw-shell [data-short]::after{content:attr(data-short);font-size:13.5px}
+  .nw-install{margin:8px 0 0}
+}

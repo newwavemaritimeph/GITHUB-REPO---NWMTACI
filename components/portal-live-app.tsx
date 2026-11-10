@@ -1,4 +1,6 @@
 "use client";
+import { NwLoader } from "@/components/nw-loader";
+import { InstallApp } from "@/components/install-app";
 import { traineeCopy } from "@/lib/trainee-copy";
 import { newArrivals, playChime, unlockChime } from "@/lib/portal-alerts";
 
@@ -351,7 +353,7 @@ export function PortalLiveApp(){
   const go=(module:Module)=>{const view=recordViews[module];if(view&&rebuildModules?.includes("Registration")){setRecordsView(view);setActive("Registration")}else setActive(module);setOpenTab("")};
   const unread=data?.notifications.filter(item=>!item.read_at).length??0;
   async function markRead(){await fetch("/api/staff/operations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"mark-notifications-read"})});setData(current=>current?{...current,notifications:current.notifications.map(item=>({...item,read_at:item.read_at??new Date().toISOString()}))}:current)}
-  if(loading&&!data)return <main className="portal-loading"><div className="portal-spinner"/><strong>Loading secure staff records…</strong></main>;
+  if(loading&&!data)return <main className="portal-loading"><NwLoader label="Loading Staff Records"/></main>;
   if(error&&!data)return <main className="portal-loading"><Message kind="error" text={error}/><button className="portal-primary" onClick={()=>void load()}>Try Again</button></main>;
   if(!data)return null;
   const canEnroll=data.roles.some(item=>["admin","registration"].includes(item));
@@ -382,6 +384,7 @@ export function PortalLiveApp(){
           <form action="/auth/signout" method="post"><button type="submit" className="nw-signout">Sign Out</button></form>
         </div>
       </div>
+      <InstallApp/>
       <nav className="nw-tabs" aria-label="Staff workspace">{tabs.map(tab=>{const single=tab.items.length===1&&tab.items[0]===tab.label;const on=tab.items.includes(current);const isOpen=openTab===tab.label;const count=tab.items.includes("Requests")?openRequests:0;return <div key={tab.label} className={`nw-tab${on?" on":""}${isOpen?" open":""}`}>
         <button type="button" aria-haspopup={single?undefined:"menu"} aria-expanded={single?undefined:isOpen} aria-current={on?"page":undefined} onClick={e=>{if(single){go(tab.items[0]);return}const r=e.currentTarget.getBoundingClientRect();setMenuAt({left:Math.max(16,Math.min(r.left,window.innerWidth-276)),top:r.bottom+6});setOpenTab(isOpen?"":tab.label)}}>{menuLabel(tab.label)}{count>0&&<b className="nw-count">{count}</b>}{!single&&<span className="nw-caret" aria-hidden="true"/>}</button>
         {!single&&isOpen&&<div className="nw-menu" role="menu" style={{left:menuAt.left,top:menuAt.top}}>{tab.items.map(item=><Fragment key={item}>{tab.heads?.[item]&&<div role="presentation" className="nw-menu-head">{tab.heads[item]}</div>}<button type="button" role="menuitem" className={active===item?"on":""} onClick={()=>go(item)}>{menuLabel(item)}</button></Fragment>)}</div>}

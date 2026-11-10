@@ -1,3 +1,4 @@
+import type { Metadata, Viewport } from "next";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import { PortalApp } from "@/components/portal-app";
@@ -9,6 +10,14 @@ import { getUserRoleNames } from "@/lib/supabase/roles";
 import { MFA_COOKIE, isMfaEnforced, mfaEnforcementEnabled, verifyMfaCookie } from "@/lib/mfa";
 
 export const dynamic = "force-dynamic";
+
+// New Wave Staff app (owner, 10 Nov 2026): the portal installs to the home screen and opens full-screen.
+export const metadata: Metadata = {
+  manifest: "/staff.webmanifest",
+  icons: { icon: "/new-wave-logo.png", apple: "/icons/staff-180.png" },
+  appleWebApp: { capable: true, title: "New Wave Staff", statusBarStyle: "default" },
+};
+export const viewport: Viewport = { themeColor: "#123F63" };
 
 export default async function PortalPage() {
   // The unauthenticated browser-local workspace is a development convenience and

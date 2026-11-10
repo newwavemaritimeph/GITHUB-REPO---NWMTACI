@@ -580,7 +580,7 @@ export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { d
   const rebatesToCollect = rebateLines.filter((l) => !got[l.e.id] && Number(l.e.rebate_centavos) > 0);
   return <div className="portal-page cx">
     <div className="cx-head"><div><span className="portal-eyebrow">{fmtDate(today)}</span><h1>Cashier Dashboard</h1></div>
-      <span className="bc-foot-actions">{go && <button type="button" className="portal-secondary" onClick={() => go("Search trainee")}>Search Trainee</button>}<button type="button" className="portal-secondary" onClick={() => setRaising(true)}>Raise Expense</button><button type="button" className="portal-primary" onClick={() => onPay("")}>Record Payment{fresh.length ? ` · ${fresh.length} Waiting` : ""}</button></span></div>
+      <span className="bc-foot-actions">{go && <button type="button" className="portal-secondary" data-short="Search" onClick={() => go("Search trainee")}>Search Trainee</button>}<button type="button" className="portal-secondary" data-short="Expense" onClick={() => setRaising(true)}>Raise Expense</button><button type="button" className="portal-primary" data-short={`Payment${fresh.length ? ` · ${fresh.length}` : ""}`} onClick={() => onPay("")}>Record Payment{fresh.length ? ` · ${fresh.length} Waiting` : ""}</button></span></div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
     {(() => { const due = centerLines(data).filter((l) => l.state === "Due"); return due.length ? <p className="ac-note fr-warn">⚠ {pesos2(due.reduce((s, l) => s + l.amount, 0))} due to partnered centers · {due.length} trainee{due.length === 1 ? "" : "s"} <span className="muted-text">Accounting › Expenses › Pay the Centers</span></p> : null; })()}
     {/* Design 3 + 6, organized (owner, 10 Nov 2026): Money In and Money Out as tabbed panels, 5 rows a page, the rest folded; Today's Cash in one card. */}
@@ -1049,7 +1049,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   const printCell = (e: ExpenseRow) => <VoucherPrint e={e} reprints={reprints} onRequest={(x) => { setReprinting(x); setWhy(NO_REASON); }} reload={reload} />;
 
   return <div className="portal-page cx">
-    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Expenses</h1></div><span className="cx-acts"><button type="button" className="portal-secondary" onClick={() => setBudgeting(true)}>Request Budget</button><button type="button" className="portal-primary" onClick={() => setRecording(true)}>Record Expense</button></span></div>
+    <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Expenses</h1></div><span className="cx-acts"><button type="button" className="portal-secondary" data-short="Budget" onClick={() => setBudgeting(true)}>Request Budget</button><button type="button" className="portal-primary" data-short="Expense" onClick={() => setRecording(true)}>Record Expense</button></span></div>
     <div className="cx-status cx-views" role="tablist">{(["Expenses", "Vouchers", "Pay the Centers", "Referral Vouchers"] as const).map((v) => <button key={v} type="button" role="tab" aria-selected={view === v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{v}{v === "Pay the Centers" && centersDue > 0 && <span className="cx-count"> {centersDue}</span>}{v === "Vouchers" && pendingReprints.length ? <span>{pendingReprints.length}</span> : null}</button>)}</div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
 

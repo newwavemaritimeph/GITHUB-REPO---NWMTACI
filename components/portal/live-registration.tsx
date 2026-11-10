@@ -144,7 +144,7 @@ export function RegistrationDashboard({ data, go, reload, account }: { data: Por
     who={<button type="button" className="pv-open" onClick={() => (e ? setOpen(e) : setAssigning(x.t!))}><span className="cx-name">{e ? nameOf(e) : fullName(x.t!)}</span></button>}
     meta={`${appNoOf(data, id) ?? x.t?.trainee_number ?? e?.enrollment_number ?? ""} · ${e ? `${c?.code ?? c?.name ?? "Course"} · ${scheduleOf(e)}` : "Course to Assign"}`}
     mid={<><Badge tone={x.tone}>{x.chip}</Badge>{e && <LateChip e={e} />}</>}
-    acts={x.step ? <button type="button" className="portal-primary row-act" onClick={() => (!e ? setAssigning(x.t!) : x.step === "Choose Batch" ? setPlacing(e) : setOpen(e))}>{x.step}</button> : null} />; };
+    acts={x.step ? <button type="button" className="portal-primary row-act" data-short={x.step === "Choose Batch" ? "Batch" : undefined} onClick={() => (!e ? setAssigning(x.t!) : x.step === "Choose Batch" ? setPlacing(e) : setOpen(e))}>{x.step}</button> : null} />; };
 
   const seats = stcwSeatsOf(data, today, now);
   const seatsOpen = seats.reduce((sum, x) => sum + seatsLeft(x.next), 0);
@@ -836,7 +836,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose, onOpenA
         <p className="portal-form-note full">The TAR prints regardless of payment and shows the balance. Training instructions become available once the trainee is paid and enrolled.</p>
       </> : <p className="portal-form-note full">No documents for a cancelled enrollment.</p>}
 
-      {isApplication && <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>{!e.batch_id && !e.scheduled_on && <button type="button" className="portal-primary" onClick={() => setChoosingBatch(true)}>Choose Batch</button>}{traineeRecord && <button type="button" onClick={() => setAddingCourse(true)}>+ Add Another Course</button>}</div>}
+      {isApplication && <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>{!e.batch_id && !e.scheduled_on && <button type="button" className="portal-primary" data-short="Batch" onClick={() => setChoosingBatch(true)}>Choose Batch</button>}{traineeRecord && <button type="button" onClick={() => setAddingCourse(true)}>+ Add Another Course</button>}</div>}
 
       <div className="full"><strong>Request a change</strong> <small style={{ color: "var(--muted)" }}>goes to the Cashier for charges, then Accounting for approval</small></div>
       <div className="document-actions full" style={{ gap: 8, flexWrap: "wrap" }}>
