@@ -42,7 +42,12 @@
   "days": 5.5,
   "modality": "Face-to-face",
   "schedule": "as schedule",
-  "fee_centavos": 420000
+  "fee_centavos": 410000,
+  "bundle_of": [
+   "STPPDSPPS",
+   "PSCMT",
+   "PSCMHBT"
+  ]
  },
  {
   "category": "Domestic",
@@ -282,7 +287,7 @@
   "category": "In-House",
   "code": "CSF",
   "name": "Container Ship Familiarization",
-  "days": null,
+  "days": 1,
   "modality": "Online",
   "schedule": "Mon-Sat",
   "fee_centavos": 100000
@@ -497,12 +502,11 @@
  {
   "category": "In-House",
   "code": "ISM",
-  "name": "fRAMO PUMP",
+  "name": "International Safety Management (ISM)",
   "days": 1,
   "modality": "Online",
   "schedule": "Mon-Sat",
-  "fee_centavos": 70000,
-  "needs_check": "named 'fRAMO PUMP' in both the price list and the portal; confirm name"
+  "fee_centavos": 70000
  },
  {
   "category": "In-House",
@@ -592,8 +596,7 @@
   "days": 5,
   "modality": "Online",
   "schedule": "Mon-Fri / Tue-Sat",
-  "fee_centavos": 150000,
-  "needs_check": "code not in portal; confirm"
+  "fee_centavos": 150000
  },
  {
   "category": "In-House",
