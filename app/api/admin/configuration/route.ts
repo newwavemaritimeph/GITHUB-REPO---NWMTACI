@@ -6,9 +6,9 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { withAuthTimeout } from "@/lib/supabase/config";
 
-// The seven portal roles (owner, 9 Oct 2026).
-const ROLE_CODES=z.enum(["admin","registration","cashier","accounting","releasing_officer","mismo_officer","admin_assistant"]);
-const ROLE_NAMES:Record<string,string>={admin:"Admin",registration:"Registration",cashier:"Cashier",accounting:"Accounting",releasing_officer:"Releasing Officer",mismo_officer:"MISMO Compliance Officer",admin_assistant:"Admin Assistant"};
+// The portal roles (owner, 9 Oct 2026); HR Officer added back (owner, 10 Nov 2026).
+const ROLE_CODES=z.enum(["admin","registration","cashier","accounting","releasing_officer","mismo_officer","admin_assistant","hr"]);
+const ROLE_NAMES:Record<string,string>={admin:"Admin",registration:"Registration",cashier:"Cashier",accounting:"Accounting",releasing_officer:"Releasing Officer",mismo_officer:"MISMO Compliance Officer",admin_assistant:"Admin Assistant",hr:"HR Officer"};
 const input=z.discriminatedUnion("action",[
   z.object({action:z.literal("payment-method"),name:z.string().trim().min(2).max(80),requiresReference:z.boolean(),allowsProof:z.boolean()}),
   z.object({action:z.literal("marketing-agency"),name:z.string().trim().min(2).max(160),contactName:z.string().trim().max(160).optional(),email:z.string().email().optional().or(z.literal("")),mobile:z.string().trim().max(40).optional()}),

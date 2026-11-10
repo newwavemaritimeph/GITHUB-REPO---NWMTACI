@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { tcl } from "@/lib/title-case";
 import { askText, askConfirm, showAlert } from "./dialogs";
+import { HrPeople, type HrPlus } from "./hr-people";
 
 /** Loose shapes for the HR slices of the staff-operations payload. */
 type Employee = { id: string; employee_number: string; complete_name: string; position: string; employment_status: string; date_hired: string; pay_type: string; base_rate_centavos: number; instructor_daily_rate_centavos?: number | null; work_email?: string | null; active: boolean };
@@ -30,11 +31,11 @@ const pesos = (centavos: number) => new Intl.NumberFormat("en-PH", { style: "cur
 const todayManila = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
 const num = async (raw: string | null) => (raw == null || raw.trim() === "" ? null : Math.round(Number(raw) * 100));
 
-export function LiveHr({ data, role, reload }: { data: HrData; role: string; reload: () => Promise<void> }) {
-  const [tab, setTab] = useState<"Overview" | "Directory" | "Attendance" | "Requests" | "Benefits" | "Contracts" | "Payroll" | "13th month">("Overview");
+export function LiveHr({ data, role, reload, plus = null }: { data: HrData; role: string; reload: () => Promise<void>; plus?: HrPlus }) {
+  const [tab, setTab] = useState<"Overview" | "201 and Checks" | "Memos" | "Change Requests" | "Reminders" | "Directory" | "Attendance" | "Requests" | "Benefits" | "Contracts" | "Payroll" | "13th month">("201 and Checks");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  const canManage = role === "admin";
+  const canManage = role === "admin" || role === "hr";
   const nameOf = useMemo(() => new Map(data.employees.map((e) => [e.id, e.complete_name])), [data.employees]);
 
   async function post(body: Record<string, unknown>) {
@@ -83,14 +84,15 @@ export function LiveHr({ data, role, reload }: { data: HrData; role: string; rel
   return (
     <div className="portal-page">
       <div className="portal-heading">
-        <div><span className="portal-eyebrow">People operations</span><h1>HR &Amp; Payroll</h1><p>Employee directory, daily attendance, leave and cash-advance requests, and payroll periods.</p></div>
+        <div><span className="portal-eyebrow">People</span><h1>HR</h1></div>
       </div>
       <div className="portal-tabs">
-        {(["Overview", "Directory", "Attendance", "Requests", "Benefits", "Contracts", "Payroll", "13th month"] as const).map((item) => (
-          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{tcl(item)}</button>
+        {(["201 and Checks", "Memos", "Change Requests", "Overview", "Directory", "Attendance", "Requests", "Benefits", "Contracts", "Payroll", "13th month", "Reminders"] as const).map((item) => (
+          <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{tcl(item)}{item === "Change Requests" && plus?.requests.some((r) => r.status === "Pending") ? ` · ${plus.requests.filter((r) => r.status === "Pending").length}` : ""}</button>
         ))}
       </div>
       {message && <div className="portal-message error" role="alert">{message}</div>}
+      {(tab === "201 and Checks" || tab === "Memos" || tab === "Change Requests" || tab === "Reminders") && <HrPeople view={tab === "201 and Checks" ? "201" : tab === "Change Requests" ? "Requests" : tab === "Reminders" ? "Settings" : "Memos"} employees={data.employees} plus={plus} reload={reload} />}
 
       {tab === "Overview" && (
         <>

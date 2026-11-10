@@ -2,6 +2,7 @@ import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { escapeHtml } from "@/lib/classroom";
 import { emailConfigured, processEmailJobs } from "@/lib/email-jobs";
 import { certificateContext } from "@/lib/certificates";
+import { hrDailySection } from "@/lib/hr-server";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 
@@ -90,7 +91,10 @@ export async function sendCertificateReport(db: Admin, options: { origin?: strin
     directSql: (logs ?? []).filter((l) => l.action === "certificate.direct_sql").length,
     scans: (scansRes.error ? [] : scansRes.data ?? []).map((s) => ({ certNo: certNo(s.certificate_id as string | null), result: s.result as string, ipHash: s.ip_hash as string | null })),
   });
-  const { html, text } = render(summary);
+  const cert = render(summary);
+  // HR section (owner, 10 Nov 2026): Fit to Work and Biodata checks that need action.
+  const hrPart = await hrDailySection(db).catch(() => ({ html: "", text: "" }));
+  const html = cert.html + hrPart.html, text = cert.text + hrPart.text;
   const date = new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date());
   const ids: string[] = [];
   for (const to of await adminRecipients(db)) {

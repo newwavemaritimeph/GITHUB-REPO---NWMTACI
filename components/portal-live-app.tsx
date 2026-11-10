@@ -12,6 +12,9 @@ import { LiveAccounting, AccountingDashboard, ReceivablesModule, ApprovalsModule
 import { LiveCashierClosing } from "./portal/live-cashier-closing";
 import { CashierPaymentQueue, RequestChargeModal, feeForRequest, TarButton, RecordPaymentModal, RecordTicked, CashierDashboard, CashierPayments, DiscountRequests, CashierEnrollments, CashierExpensesSummary, CashierOpening, CashierSummaryReport, ExpensesWorkspace } from "./portal/live-cashier";
 import { LiveHr, type HrData } from "./portal/live-hr";
+import { useHrDue, type HrPlus } from "./portal/hr-people";
+import { MyHrChecks, MyHrMemos, myDueItems, type MyHrExtras } from "./portal/myhr-extra";
+import { BellDrawer, bellCount } from "./portal/hr-bell";
 import { LiveTraining, type TrainingData } from "./portal/live-training";
 import { ReleasingDashboard, LiveReleasing } from "./portal/live-releasing";
 import { LiveSearchTrainee } from "./portal/live-search-trainee";
@@ -83,7 +86,8 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
     // Routing (202610070004): With cashier → For approval; the Cashier's charge, if any.
     stage?:string;charge_id?:string|null;enrollment_charges?:{amount_centavos:number;description:string;approval_status:string}|{amount_centavos:number;description:string;approval_status:string}[]|null}[];
   pendingCharges:{id:string;enrollment_id:string;description:string;amount_centavos:number;created_at:string;enrollments?:{enrollment_number:string;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;courses?:{name:string}|{name:string}[]|null}|{enrollment_number:string;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;courses?:{name:string}|{name:string}[]|null}[]|null}[];
-  myHr:{employee:{employee_number:string;complete_name:string;position:string;employment_status:string;date_hired?:string|null;pay_type?:string|null;base_rate_centavos?:number|null;work_email?:string|null;active:boolean};leave:{id:string;leave_type:string;starts_on:string;ends_on:string;reason:string;status:string;created_at:string}[];advances:{id:string;amount_centavos:number;requested_on:string;balance_centavos:number;status:string}[];charges:EmployeeCharge[];attendance:{id:string;attendance_date:string;checked_in_at?:string|null;checked_out_at?:string|null;minutes_late:number;minutes_undertime:number;status:string}[]}|null;
+  hrPlus?:HrPlus;
+  myHr:{extras?:MyHrExtras;employee:{id?:string;employee_number:string;complete_name:string;position:string;employment_status:string;date_hired?:string|null;pay_type?:string|null;base_rate_centavos?:number|null;work_email?:string|null;active:boolean};leave:{id:string;leave_type:string;starts_on:string;ends_on:string;reason:string;status:string;created_at:string}[];advances:{id:string;amount_centavos:number;requested_on:string;balance_centavos:number;status:string}[];charges:EmployeeCharge[];attendance:{id:string;attendance_date:string;checked_in_at?:string|null;checked_out_at?:string|null;minutes_late:number;minutes_undertime:number;status:string}[]}|null;
   employeeCharges:EmployeeCharge[]; chargeEmployees:{id:string;complete_name:string;employee_number:string;active:boolean}[];
   instructionTemplates:{course_id:string;subject:string;body:{text?:string}|string|null;active:boolean}[];
   batchStaffing:{batch_id:string;instructor_name:string|null;room_name:string|null}[];
@@ -150,7 +154,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // in this order. Applications, enrollments and trainee records share the
   // Registration tab, and new
   // registrations come only from the website — there is no staff intake.
-  registration: ["Dashboard","Registration","Batch schedules","Courses","Delivery requests"],
+  registration: ["Dashboard","Registration","Batch schedules","Courses","Delivery requests","MyHr"],
   // Cleared on the owner's instruction (7 Oct 2026) ahead of the Registration,
   // Cashier and Accounting rebuilds. Their dashboards and modules stay on disk.
   // Scheduler (Training Operations), reopened 7 Oct 2026: open batches each month,
@@ -158,20 +162,21 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // Attendance stays off until it is rebuilt.
   instructor: [],
   // Releasing Officer (owner, 5 Nov 2026): one Certificates page in stage tabs, and Reports (RELEASING_TABS).
-  releasing_officer: ["Certificates","Reports"],
+  releasing_officer: ["Certificates","Reports","MyHr"],
   // MARINA MISMO Compliance Officer (owner, 8 Oct 2026): STCW trainees owing at 11:00 AM, the 4:00 PM final list, submissions.
-  mismo_officer: ["Training Reports","Batch schedules"],
+  mismo_officer: ["Training Reports","Batch schedules","MyHr"],
   // Admin Assistant (owner, 9 Oct 2026): resource planning, instructor shortlist. Requisitions removed (owner, 3 Nov 2026).
-  admin_assistant: ["Dashboard","Batch schedules","Resource planning","Instructors","Reconciliation"],
-  hr: [],
+  admin_assistant: ["Dashboard","Batch schedules","Resource planning","Instructors","Reconciliation","MyHr"],
+  // HR Officer (owner, 10 Nov 2026): HR and MyHR.
+  hr: ["HR & payroll","MyHr"],
   // Admin (owner, 3 Nov 2026): Dashboard · Enrollments ▾ · Schedules ▾ · Reports ▾ · MISMO ▾ · Configuration ▾ (ADMIN_TABS).
-  admin: ["Dashboard","Search trainee","Enrollments","Batch schedules","Batch numbers","Resource planning","Courses","Post-tests","Training instructions","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Holidays","Requests","Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Company Charge","Training Reports"],
+  admin: ["HR & payroll","MyHr","Dashboard","Search trainee","Enrollments","Batch schedules","Batch numbers","Resource planning","Courses","Post-tests","Training instructions","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Holidays","Requests","Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Company Charge","Training Reports"],
   // Cashier (Accounting Officer), owner's menu of 7 Oct 2026, shown as top tabs:
   // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses, Requests ·
   // Reports ▾ Daily Summary, Opening and Closing, Expenses Summary (CASHIER_TABS; reports consolidated 5 Nov 2026).
-  cashier: ["Dashboard","Search trainee","Batch schedules","Payments","Other income","Expenses","Requests","Daily summary","Opening and closing","Expenses summary"],
+  cashier: ["Dashboard","Search trainee","Batch schedules","Payments","Other income","Expenses","Requests","Daily summary","Opening and closing","Expenses summary","MyHr"],
   // Accounting (owner, 8 Oct 2026): Dashboard · Approvals · Transactions ▾ · Reports ▾ · Configuration ▾ (ACCOUNTING_TABS; reports consolidated 5 Nov 2026).
-  accounting: ["Dashboard","Search trainee","Approvals","Payments","Other income","Expenses","Payables","Daily summary","Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
+  accounting: ["MyHr","Dashboard","Search trainee","Approvals","Payments","Other income","Expenses","Payables","Daily summary","Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
 };
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
@@ -211,12 +216,13 @@ const CASHIER_TABS:TopTab[]=[
   {label:"Enrollments",items:["Search trainee","Batch schedules"]},
   {label:"Accounting",items:["Payments","Other income","Expenses","Requests"]},
   {label:"Reports",items:["Daily summary","Opening and closing","Expenses summary"]},
+  {label:"MyHr",items:["MyHr"]},
 ];
 const GROUP_LABELS:Partial<Record<NavGroup,string>>={"Payables & cash":"Payables and cash"};
 // "Batch Schedules" reads "Schedules" (owner, 3 Nov 2026); the module key stays the same.
 const shownAs=(label:string)=>label==="Batch schedules"?"Schedules":label;
 // The owner's name for this report (5 Nov 2026); the module key stays, because "Endorsed courses" is another module.
-const menuLabel=(label:string)=>label==="Sales from endorsed courses"?"Endorsed Courses":tcl(shownAs(label));
+const menuLabel=(label:string)=>label==="Sales from endorsed courses"?"Endorsed Courses":label==="MyHr"?"MyHR":label==="HR & payroll"?"HR":tcl(shownAs(label));
 const ACCOUNTING_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
   // Reprints of receipts and TARs live in the Trainee Account (owner, 3 Nov 2026).
@@ -225,8 +231,10 @@ const ACCOUNTING_TABS:TopTab[]=[
   {label:"Transactions",items:["Payments","Other income","Expenses","Payables"]},
   {label:"Reports",items:["Daily summary","Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position"]},
   {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS]},
+  {label:"MyHr",items:["MyHr"]},
 ];
-const RELEASING_TABS:TopTab[]=[{label:"Certificates",items:["Certificates"]},{label:"Reports",items:["Reports"]}];
+const RELEASING_TABS:TopTab[]=[{label:"Certificates",items:["Certificates"]},{label:"Reports",items:["Reports"]},{label:"MyHr",items:["MyHr"]}];
+const HR_TABS:TopTab[]=[{label:"HR & payroll",items:["HR & payroll"]},{label:"MyHr",items:["MyHr"]}];
 // Admin tabs consolidated (owner, 3 Nov 2026): trainee work under Enrollments, schedules together, Configuration grouped and last.
 const ADMIN_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
@@ -234,28 +242,33 @@ const ADMIN_TABS:TopTab[]=[
   {label:"Schedules",items:["Batch schedules","Batch numbers","Resource planning"]},
   {label:"Reports",items:["Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Company Charge"]},
   {label:"Training Reports",items:["Training Reports"]},
+  {label:"HR & payroll",items:["HR & payroll"]},
+  {label:"MyHr",items:["MyHr"]},
   {label:"Configuration",items:["Courses","Post-tests","Training instructions","Classroom links","Instructors","Classrooms","Certifications","Holidays","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Employee accounts","Partnered Centers"],
     heads:{Courses:"Training","Schedule of fees":"Fees and Accounts","Employee accounts":"People and Partners"}},
 ];
 function topTabsFor(role:string,allowed:Module[]):TopTab[]{
   if(role==="admin")return ADMIN_TABS.map(tab=>({...tab,items:tab.items.filter(item=>allowed.includes(item))})).filter(tab=>tab.items.length);
   if(role==="releasing_officer")return RELEASING_TABS.filter(tab=>tab.items.every(item=>allowed.includes(item)));
+  if(role==="hr")return HR_TABS.filter(tab=>tab.items.every(item=>allowed.includes(item)));
   if(role==="accounting")return ACCOUNTING_TABS.map(tab=>({...tab,items:tab.items.filter(item=>allowed.includes(item))})).filter(tab=>tab.items.length);
   if(role==="cashier")return CASHIER_TABS.map(tab=>({...tab,items:tab.items.filter(item=>allowed.includes(item))})).filter(tab=>tab.items.length);
   const tabs:TopTab[]=[];
   for(const group of NAV_GROUPS){
     const items=nav.filter(item=>item.group===group&&allowed.includes(item.label)).map(item=>item.label);
     if(!items.length)continue;
-    if(group==="Work")for(const item of items)tabs.push({label:item,items:[item]});
-    else tabs.push({label:GROUP_LABELS[group]??group,items});
+    const rest=items.filter(item=>item!=="MyHr");
+    if(group==="Work")for(const item of rest)tabs.push({label:item,items:[item]});
+    else if(rest.length)tabs.push({label:GROUP_LABELS[group]??group,items:rest});
   }
+  if(allowed.includes("MyHr"))tabs.push({label:"MyHr",items:["MyHr"]});
   return tabs;
 }
-const WORKING_ROLES=["registration","cashier","accounting","releasing_officer","mismo_officer","admin_assistant","admin"] as const;
+const WORKING_ROLES=["registration","cashier","accounting","releasing_officer","mismo_officer","admin_assistant","hr","admin"] as const;
 // An employee may hold two roles (9 Oct 2026): "Working as" lists every role they hold; Admin can view all workspaces.
 function workingRolesFor(roles:string[]){const isAdmin=roles.includes("admin");const held:string[]=isAdmin?[...WORKING_ROLES]:roles.filter(r=>r in roleNames);return held.length?held:roles.slice(0,1)}
 function defaultWorkingRole(roles:string[]){return roles.includes("admin")?"admin":workingRolesFor(roles)[0]??"admin"}
-const roleNames:Record<string,string>={registration:"Registration",cashier:"Cashier",accounting:"Accounting",admin:"Admin",releasing_officer:"Releasing Officer",mismo_officer:"MISMO Compliance Officer",admin_assistant:"Admin Assistant"};
+const roleNames:Record<string,string>={registration:"Registration",cashier:"Cashier",accounting:"Accounting",admin:"Admin",releasing_officer:"Releasing Officer",mismo_officer:"MISMO Compliance Officer",admin_assistant:"Admin Assistant",hr:"HR Officer"};
 const date=(value:string)=>new Intl.DateTimeFormat("en-PH",{month:"short",day:"numeric",year:"numeric",timeZone:"Asia/Manila"}).format(new Date(`${value}T00:00:00+08:00`));
 
 // New Wave's own courses (delivery_type "In-House"), split into the two families
@@ -308,6 +321,7 @@ function ChangePasswordModal({email,onClose}:{email:string;onClose:()=>void}){
 }
 
 const recordsUrl=(since:string)=>since?`/api/staff/operations?since=${since}`:"/api/staff/operations";
+const NO_EMPLOYEES:HrData["employees"]=[];
 export function PortalLiveApp(){
   const [data,setData]=useState<PortalData|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[active,setActive]=useState<Module>("Dashboard"),[recordsView,setRecordsView]=useState<RecordsView>("applications"),[role,setRole]=useState(""),[openTab,setOpenTab]=useState(""),[menuAt,setMenuAt]=useState({left:16,top:120}),[notices,setNotices]=useState(false),[modal,setModal]=useState<"enrollment"|"batch"|"payment"|null>(null),[payTarget,setPayTarget]=useState(""),[payCourses,setPayCourses]=useState<string[]|undefined>(),[account,setAccount]=useState(false);
   // The top-bar "Search this page" box was removed (owner, 8 Oct 2026); screens keep their own search.
@@ -321,6 +335,8 @@ export function PortalLiveApp(){
   // After a save the screen moves on at once and the records refresh behind it; the lists take no clicks until they are current.
   const refresh=useCallback(async()=>{savesRefreshing.current+=1;setSyncing(true);void load().finally(()=>{savesRefreshing.current-=1;if(!savesRefreshing.current)setSyncing(false)})},[load]);
   useEffect(()=>{void load()},[load,since]);
+  // A link to /portal#myhr (HR e-mails and notices) opens MyHR.
+  useEffect(()=>{const t=window.setTimeout(()=>{if(window.location.hash==="#myhr")setActive("MyHr");else if(window.location.hash==="#hr")setActive("HR & payroll")},0);return()=>window.clearTimeout(t)},[]);
   // Refresh every 10 seconds (owner, 21 Oct 2026), quietly. Skipped while the tab is hidden,
   // a window is open or a field has focus, so nothing being typed is lost.
   // A new Manila day re-opens the screens on today (owner, 21 Oct 2026: date tabs start on the current date).
@@ -343,6 +359,7 @@ export function PortalLiveApp(){
   // the established role tags and hidden sets. (The registration, training
   // operations and releasing hidden sets are gone: those roles are allow-listed.)
   const rebuildModules=ROLE_MODULES[role];
+  const hrDue=useHrDue(data?.employees??NO_EMPLOYEES,data?.hrPlus??null);
   // A dropdown closes on a click outside the tabs, on Escape, and on resize.
   useEffect(()=>{if(!openTab)return;const close=(e:Event)=>{if(e instanceof KeyboardEvent&&e.key!=="Escape")return;if(e instanceof PointerEvent&&(e.target as HTMLElement|null)?.closest?.(".nw-tab"))return;setOpenTab("")};window.addEventListener("pointerdown",close);window.addEventListener("keydown",close);window.addEventListener("resize",close);return()=>{window.removeEventListener("pointerdown",close);window.removeEventListener("keydown",close);window.removeEventListener("resize",close)}},[openTab]);
   const legacyNav=nav.filter(item=>(!item.roles||item.roles.includes(role))&&!(role==="admin"&&adminHidden.has(item.label))&&!(role==="accounting"&&accountingHidden.has(item.label)));
@@ -352,6 +369,10 @@ export function PortalLiveApp(){
   const recordViews:Partial<Record<string,RecordsView>>={Applications:"applications",Enrollments:"enrollments",Trainees:"trainees"};
   const go=(module:Module)=>{const view=recordViews[module];if(view&&rebuildModules?.includes("Registration")){setRecordsView(view);setActive("Registration")}else setActive(module);setOpenTab("")};
   const unread=data?.notifications.filter(item=>!item.read_at).length??0;
+  // Bell (owner, 10 Nov 2026): HR and the Admin see everyone's six-month checks; each employee sees their own.
+  const isHrRole=role==="hr"||role==="admin";
+  const mine=myDueItems(data?.myHr?.extras??null);
+  const bellN=bellCount(isHrRole?hrDue:[],mine,unread);
   async function markRead(){await fetch("/api/staff/operations",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"mark-notifications-read"})});setData(current=>current?{...current,notifications:current.notifications.map(item=>({...item,read_at:item.read_at??new Date().toISOString()}))}:current)}
   if(loading&&!data)return <main className="portal-loading"><NwLoader label="Loading Staff Records"/></main>;
   if(error&&!data)return <main className="portal-loading"><Message kind="error" text={error}/><button className="portal-primary" onClick={()=>void load()}>Try Again</button></main>;
@@ -366,7 +387,7 @@ export function PortalLiveApp(){
   const roleOptions=workingRolesFor(data.roles);
   const tabs=topTabsFor(role,allowedNav.map(item=>item.label));
   // The Releasing Officer has no Dashboard; Certificates is the home page.
-  const current:Module=active==="Dashboard"&&role==="releasing_officer"?"Certificates":active==="Dashboard"&&role==="mismo_officer"?"Training Reports":active;
+  const current:Module=active==="Dashboard"&&role==="hr"?"HR & payroll":active==="Dashboard"&&role==="releasing_officer"?"Certificates":active==="Dashboard"&&role==="mismo_officer"?"Training Reports":active;
   const openRequests=data.requests.filter(r=>r.status==="Pending"&&(r.stage==="With cashier"||(r.charge_id&&data.chargeCollected?.[r.id]&&!data.chargeCollected[r.id].paid))).length;
   const initials=data.profile.complete_name.split(" ").map(v=>v[0]).slice(0,2).join("").toUpperCase();
   return <DataSince.Provider value={needSince}><main className="portal-shell nw-shell">
@@ -378,7 +399,7 @@ export function PortalLiveApp(){
           {/* Queue Console (owner, 10 Nov 2026): opens on this site, where the staff member is already signed in. */}
           {(role==="registration"||role==="cashier"||role==="admin")&&<a className="nw-sound nw-queue" href="/queue/staff" target="_blank" rel="noreferrer">Queue Console</a>}
           {(role==="registration"||role==="cashier")&&<button type="button" className="nw-sound" onClick={toggleSound} aria-pressed={soundOn} title={soundOn?"New-arrival chime is on":"New-arrival chime is off"}>{soundOn?"Sound On":"Sound Off"}</button>}
-          <button type="button" className="nw-icon" onClick={()=>setNotices(!notices)} aria-label="Notifications"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5-6.71V3.5a2 2 0 1 0-4 0v.79A7 7 0 0 0 5 11v5l-2 2v1h18v-1Z"/></svg>{unread>0&&<b>{unread}</b>}</button>
+          <button type="button" className="nw-icon" onClick={()=>setNotices(!notices)} aria-label="Notifications" aria-expanded={notices}><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="currentColor" d="M12 22a2.5 2.5 0 0 0 2.45-2h-4.9A2.5 2.5 0 0 0 12 22Zm7-6V11a7 7 0 0 0-5-6.71V3.5a2 2 0 1 0-4 0v.79A7 7 0 0 0 5 11v5l-2 2v1h18v-1Z"/></svg>{bellN>0&&<b>{bellN}</b>}</button>
           <div className="nw-user"><span className="user-dot">{initials}</span><span className="nw-user-text"><strong>{data.profile.complete_name}</strong><small>{roleNames[role]??role}</small></span></div>
           <button type="button" className="nw-account" onClick={()=>setAccount(true)} title="Change Password"><span aria-hidden="true">⚿</span><span className="nw-account-text">Change Password</span></button>
           <form action="/auth/signout" method="post"><button type="submit" className="nw-signout">Sign Out</button></form>
@@ -389,7 +410,7 @@ export function PortalLiveApp(){
         <button type="button" aria-haspopup={single?undefined:"menu"} aria-expanded={single?undefined:isOpen} aria-current={on?"page":undefined} onClick={e=>{if(single){go(tab.items[0]);return}const r=e.currentTarget.getBoundingClientRect();setMenuAt({left:Math.max(16,Math.min(r.left,window.innerWidth-276)),top:r.bottom+6});setOpenTab(isOpen?"":tab.label)}}>{menuLabel(tab.label)}{count>0&&<b className="nw-count">{count}</b>}{!single&&<span className="nw-caret" aria-hidden="true"/>}</button>
         {!single&&isOpen&&<div className="nw-menu" role="menu" style={{left:menuAt.left,top:menuAt.top}}>{tab.items.map(item=><Fragment key={item}>{tab.heads?.[item]&&<div role="presentation" className="nw-menu-head">{tab.heads[item]}</div>}<button type="button" role="menuitem" className={active===item?"on":""} onClick={()=>go(item)}>{menuLabel(item)}</button></Fragment>)}</div>}
       </div>})}</nav>
-      {notices&&<div className="notification-popover nw-notices"><div><h3>Notifications</h3><button onClick={()=>void markRead()}>Mark All as Read</button></div>{data.notifications.length?data.notifications.map(item=><button key={item.id} onClick={()=>{if(item.deep_link)setNotices(false)}}><i style={{opacity:item.read_at?.length?0:1}}/><span><strong>{item.title}</strong><small>{item.body}</small></span></button>):<p className="portal-empty-copy">No notifications yet.</p>}</div>}
+      {notices&&<BellDrawer hrDue={isHrRole?hrDue:null} mine={mine} notes={data.notifications} onClose={()=>setNotices(false)} markRead={markRead} openHr={()=>{setNotices(false);go("HR & payroll")}} openMyHr={()=>{setNotices(false);go("MyHr")}} reload={refresh}/>}
     </header>
     <section className={`portal-workspace${syncing?" nw-syncing":""}`}>{error&&<div className="portal-inline-error"><Message kind="error" text={error}/></div>}<PortalContent key={day} modules={rebuildModules} recordsView={recordsView} setRecordsView={setRecordsView} active={current} role={role} data={data} query={query} go={go} open={setModal} onPay={(id:string,courses?:string[])=>{setPayTarget(id);setPayCourses(courses);setModal("payment")}} canEnroll={canEnroll} canSchedule={canSchedule} canPay={canPay} reload={refresh}/></section>
     {modal==="enrollment"&&<EnrollmentForm data={data} onClose={()=>setModal(null)} onSaved={refresh}/>} {modal==="batch"&&<BatchForm data={data} onClose={()=>setModal(null)} onSaved={refresh}/>} {modal==="payment"&&<RecordPaymentModal data={data} initialEnrollmentId={payTarget||undefined} initialCourses={payCourses} onClose={()=>{setModal(null);setPayTarget("")}} onSaved={refresh}/>} {account&&<ChangePasswordModal email={data.profile.email} onClose={()=>setAccount(false)}/>}
@@ -521,7 +542,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Accounting")return <LiveAccounting data={data} role={gateRole} reload={reload} go={m=>go(m as Module)}/>;
   if(active==="Expenses")return <ExpensesWorkspace data={data} role={gateRole} reload={reload}/>;
   if(active==="Inventory")return <LiveInventory data={data} role={gateRole} reload={reload}/>;
-  if(active==="HR & payroll"&&["admin"].includes(gateRole))return <LiveHr data={data} role={gateRole} reload={reload}/>;
+  if(active==="HR & payroll"&&["admin","hr"].includes(gateRole))return <LiveHr data={data} role={gateRole} reload={reload} plus={data.hrPlus??null}/>;
   if(active==="Rooms & facilities"&&["admin"].includes(gateRole))return <LiveTraining data={{classrooms:data.classrooms,certificates:data.certificates,batches:data.batches,enrollments:data.enrollments,courses:data.courses,certificateTemplates:data.certificateTemplates}} role={gateRole} reload={reload} initialTab="Classrooms"/>;
   if(active==="Certificates"&&["admin","releasing_officer"].includes(gateRole))return <LiveReleasing data={data as unknown as Parameters<typeof LiveReleasing>[0]["data"]} role={gateRole} reload={reload}/>;
   if((ACCOUNTING_CONFIG_SECTIONS as readonly string[]).includes(active))return <AccountingConfiguration section={active as AccountingConfigSection} data={data as unknown as Parameters<typeof AccountingConfiguration>[0]["data"]} trainees={data.trainees} applicationNumbers={data.applicationNumbers} reload={reload}/>;
@@ -986,7 +1007,9 @@ function LiveMyHr({data,reload}:{data:PortalData;reload:()=>Promise<void>}){
   const e=hr.employee;
   const decideTone=(s:string)=>s==="Approved"?"green":s==="Rejected"?"red":"orange";
   return <div className="portal-page">
-    <PageHead eyebrow="Self-Service" title="MyHr" text="Your own employee record, leave, cash advances, and charges."/>{msg&&<Message kind="error" text={msg}/>}
+    <PageHead eyebrow="Self-Service" title="MyHR" text="Your own employee record, leave, cash advances, and charges."/>{msg&&<Message kind="error" text={msg}/>}
+    <MyHrChecks x={hr.extras??null} employeeId={hr.employee.id} reload={reload}/>
+    <MyHrMemos x={hr.extras??null} reload={reload}/>
     <section className="portal-panel live-list"><div className="panel-heading"><div><h2>{e.complete_name}</h2><p>{e.position} · {e.employee_number}</p></div><Badge tone={e.active?"green":"slate"}>{e.employment_status}</Badge></div>
       <div className="live-row-item"><div><strong>Date hired</strong><small>{e.date_hired?date(e.date_hired):"—"}</small></div><span className="slot-count">{e.pay_type??""}</span></div>
       {typeof e.base_rate_centavos==="number"&&<div className="live-row-item"><div><strong>Base rate</strong><small>Per your pay type</small></div><span className="slot-count">{pesos(e.base_rate_centavos)}</span></div>}

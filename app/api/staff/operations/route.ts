@@ -8,6 +8,7 @@ import { loadTarGroups } from "@/lib/trainee-match-server";
 import { canRecordCompanyPayment, isEndorsedEnrollment, itemAllowed, pricelistAdjustment, splitStatementPayment } from "@/lib/company-charge";
 import { bsNumber, buildBillingRows, statementTotal } from "@/lib/billing-statement";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { loadHrExtras, loadMyHrExtras } from "@/lib/hr-server";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hardDeleteEnrollment, pruneUnpaidEnrollments, deletePastEmptyBatches } from "@/lib/enrollments";
 import { entryMovedFrom } from "@/lib/mismo";
@@ -400,7 +401,7 @@ async function saveResourcePlan(admin: ReturnType<typeof createSupabaseAdminClie
 
 // Class Schedules (owner, 21 Oct 2026): the Admin and the Admin Assistant open, edit, rename and cancel batches.
 const canSchedule = canAssist;
-const canManageHr = (roles: string[]) => roles.some((role) => ["admin"].includes(role));
+const canManageHr = (roles: string[]) => roles.some((role) => ["admin", "hr"].includes(role));
 // Employee-charge management: Accounting owns it; admin + HR (who run payroll) included.
 const canManageEmployeeCharges = (roles: string[]) => roles.some((role) => ["admin", "accounting"].includes(role));
 const canManageTraining = (roles: string[]) => roles.some((role) => ["admin"].includes(role));
@@ -975,7 +976,9 @@ export async function GET(request: Request) {
   // MyHr self-service: the signed-in staff member's OWN employee record plus leave and
   // cash-advance history, matched by login email to employees.work_email. Read via
   // service role, self only.
-  const myHrUnit = (async (): Promise<{ employee: unknown; leave: unknown[]; advances: unknown[]; charges: unknown[]; attendance: unknown[] } | null> => {
+  // HR Officer and Admin (10 Nov 2026): 201 extras, memos, 201 change requests, reminder settings.
+  const hrPlusUnit = isHr ? loadHrExtras(db).catch(() => null) : Promise.resolve(null);
+  const myHrUnit = (async (): Promise<{ employee: unknown; leave: unknown[]; advances: unknown[]; charges: unknown[]; attendance: unknown[]; extras: unknown } | null> => {
     if (!staffEmail) return null;
     const { data: emp } = await db.from("employees").select("id,employee_number,complete_name,position,employment_status,date_hired,pay_type,base_rate_centavos,work_email,active").ilike("work_email", staffEmail).maybeSingle();
     if (!emp) return null;
@@ -986,7 +989,9 @@ export async function GET(request: Request) {
       db.from("employee_charges").select("id,category,note,amount_centavos,balance_centavos,status,effective_on,activated_at").eq("employee_id", emp.id).order("effective_on", { ascending: false }).limit(50),
       db.from("employee_attendance").select("id,attendance_date,checked_in_at,checked_out_at,minutes_late,minutes_undertime,status").eq("employee_id", emp.id).order("attendance_date", { ascending: false }).limit(30),
     ]);
-    return { employee: emp, leave: leave.data ?? [], advances: adv.data ?? [], charges: chg.data ?? [], attendance: att.data ?? [] };
+    // HR Module (10 Nov 2026): 201 extras, memos and requests; null before migration 202611100095.
+    const extras = await loadMyHrExtras(db, emp.id).catch(() => null);
+    return { employee: { ...emp, id: emp.id }, leave: leave.data ?? [], advances: adv.data ?? [], charges: chg.data ?? [], attendance: att.data ?? [], extras };
   })();
 
   // Tolerant merge of expense payment channel + reference (migration 202608100001).
@@ -1464,7 +1469,8 @@ export async function GET(request: Request) {
     canRelease(staff.roleCodes) ? postTestStatus(createSupabaseAdminClient(), (enrollments as { id: string; course_id: string; partner_offer_id?: string | null; enrollment_status: string }[]).filter((e) => !e.partner_offer_id && e.enrollment_status !== "Cancelled")).catch(() => ({})) : Promise.resolve({}),
   ]);
 
-  return NextResponse.json({ defaultRooms, postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
+  const hrPlus = await hrPlusUnit;
+  return NextResponse.json({ hrPlus, defaultRooms, postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
     paymentMethods: paymentMethodsWithKind, charges: (charges.data ?? []).map((c) => ({ ...c, kind: chargeKinds.get((c as { id: string }).id) ?? "fee" })), agencies: agencies.data ?? [],

@@ -6921,3 +6921,53 @@ a[href^="mailto:"],
   .nw-shell [data-short]::after{content:attr(data-short);font-size:13.5px}
   .nw-install{margin:8px 0 0}
 }
+
+/* Bell, Design 3 (owner, 10 Nov 2026): a drawer from the right; a bottom sheet on phones. */
+.bell-bg{position:fixed;inset:0;background:#0f263840;z-index:90}
+.bell-drawer{position:fixed;top:0;right:0;bottom:0;z-index:91;width:min(420px,94vw);background:#fff;color:#14263A;display:flex;flex-direction:column;box-shadow:-16px 0 40px #0f263840;padding:env(safe-area-inset-top,0px) env(safe-area-inset-right,0px) env(safe-area-inset-bottom,0px) 0;font-family:var(--font-portal,var(--font-ui)),system-ui,sans-serif}
+.bell-grab{display:none}
+.bell-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid #DCE4EC}
+.bell-head b{color:#123F63;font-size:17px}
+.bell-x{border:0;background:none;font-size:26px;line-height:1;color:#5B6B7D;cursor:pointer;width:38px;height:38px;border-radius:9px}
+.bell-x:hover{background:#EAF6FD}
+.bell-tabs{display:flex;gap:4px;padding:10px 12px;border-bottom:1px solid #DCE4EC;overflow-x:auto;scrollbar-width:none}
+.bell-tabs button{border:0;background:none;font-weight:600;font-size:13.5px;font-family:inherit;color:#5B6B7D;padding:7px 11px;border-radius:8px;cursor:pointer;white-space:nowrap}
+.bell-tabs button span{font:700 11px var(--font-num,monospace);background:#EEF2F5;border-radius:999px;padding:1px 6px;margin-left:5px}
+.bell-tabs button.on{background:#123F63;color:#fff}.bell-tabs button.on span{background:#ffffff2b;color:#fff}
+.bell-msg{padding:8px 12px 0}
+.bell-list{flex:1;overflow:auto;overscroll-behavior:contain}
+.bell-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:11px 16px;border-bottom:1px solid #EEF2F5}
+label.bell-row{cursor:pointer}
+.bell-row input{width:18px;height:18px;margin:0}
+.bell-row b{display:block;font-size:14px;font-weight:600}.bell-row small{display:block;color:#5B6B7D;font-size:12.5px}
+.bell-row.unread{background:#F5FBFE}
+.bell-dot{width:8px;height:8px;border-radius:50%;background:transparent}.bell-row.unread .bell-dot{background:#F25615}
+.bell-when{white-space:nowrap}
+.bell-ic{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font:700 11px var(--font-num,monospace);background:#EEF2F5;color:#5B6B7D}
+.bell-ic.fit{background:#FDECEA;color:#B42318}.bell-ic.biodata{background:#EAF6FD;color:#0571D0}
+.bell-foot{display:flex;gap:8px;padding:12px 16px;border-top:1px solid #DCE4EC}
+.bell-foot .portal-primary{flex:1}
+@media (max-width:640px){
+  .bell-drawer{top:auto;left:0;width:auto;max-height:82vh;border-radius:20px 20px 0 0;box-shadow:0 -12px 30px #0f263840;padding-left:env(safe-area-inset-left,0px)}
+  .bell-grab{display:block;width:42px;height:5px;border-radius:9px;background:#C9D6E2;margin:8px auto 0}
+  .bell-head{padding:8px 12px 8px 16px}
+}
+
+/* HR 201 checks and MyHR (owner, 10 Nov 2026). */
+.hr-due{display:inline-grid;gap:3px;justify-items:start}.hr-due small{color:var(--nw-muted,#5B6B7D);font-size:12.5px}
+.hr-acts{display:inline-flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.hr-link{display:inline-block;margin-top:4px;font-size:13px;font-weight:600;color:#0571D0}
+.hr-memo-row{width:100%;background:none;border:0;border-top:1px solid #edf2f4;text-align:left;cursor:pointer;font:inherit}
+.hr-memo-open{padding:4px 2px 14px;font-size:14px}.hr-memo-open p{white-space:pre-wrap;margin:0 0 8px}.hr-memo-open ul{margin:0;padding-left:18px;color:#5B6B7D;font-size:13px}
+.hr-check{display:flex!important;flex-direction:row!important;align-items:center;gap:8px}
+.myhr-checks{padding-bottom:6px}
+.myhr-check,.myhr-memo{display:grid;gap:8px;padding:12px 18px;border-top:1px solid #edf2f4}
+.myhr-check-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.myhr-check-head strong{display:block}.myhr-check-head small{display:block;color:#5B6B7D;font-size:13px}
+.myhr-note{color:#5B6B7D;font-size:13px}
+.myhr-memo p{margin:0;white-space:pre-wrap;font-size:14px}
+.myhr-upload{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+.myhr-upload label{display:grid;gap:4px;font-size:13px;font-weight:600;color:#5B6B7D;min-width:0}
+.myhr-upload label.full{flex-basis:100%}
+.myhr-upload input,.myhr-upload textarea{font-size:14px;font-family:inherit;padding:8px 10px;border:1px solid #d6e9f1;border-radius:8px;min-width:0;max-width:100%}
+.myhr-acts{display:flex;gap:8px;flex-wrap:wrap}
