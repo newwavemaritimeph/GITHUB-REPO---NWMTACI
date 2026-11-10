@@ -123,7 +123,7 @@ export function RegistrationDashboard({ data, go, reload, account }: { data: Por
   const toggle = (name: typeof panel) => setPanel((v) => (v === name ? "" : name));
 
   const items: NextUpItem[] = [
-    ...awaitingCourseOf(data).map((t) => ({ key: t.id, t, step: "Assign Course", chip: "No Course Yet", tone: "pending", rank: 2, at: t.registered_at ?? "" }) as NextUpItem),
+    ...awaitingCourseOf(data).map((t) => ({ key: t.id, t, step: "Assign", chip: "No Course Yet", tone: "pending", rank: 2, at: t.registered_at ?? "" }) as NextUpItem),
     ...applicationsOf(data).map((e) => ({ key: e.id, e, ...nextUpOf(readinessOf(data, e), !!chargeTo(data, e)), at: e.created_at }) as NextUpItem),
   ];
   const work = items.filter((x) => x.step).sort((a, b) => a.rank - b.rank || a.at.localeCompare(b.at));
@@ -135,7 +135,7 @@ export function RegistrationDashboard({ data, go, reload, account }: { data: Por
     <td data-l="" className="lead"><button type="button" className="pv-open" onClick={() => (e ? setOpen(e) : setAssigning(x.t!))}><span className="cx-name">{e ? nameOf(e) : fullName(x.t!)}</span><span className="cx-id">{appNoOf(data, id) ?? x.t?.trainee_number ?? e?.enrollment_number}</span></button></td>
     <td data-l="Course">{e ? <>{c?.code ?? c?.name ?? "—"}<small>{scheduleOf(e)}</small></> : <span className="muted-text">Course to Assign</span>}</td>
     <td data-l="Status"><Badge tone={x.tone}>{x.chip}</Badge></td>
-    <td data-l=""><div className="cx-acts">{x.step && <button type="button" className="portal-primary" onClick={() => (!e ? setAssigning(x.t!) : x.step === "Choose Batch" ? setPlacing(e) : setOpen(e))}>{x.step}</button>}</div></td>
+    <td data-l=""><div className="cx-acts">{x.step && <button type="button" className="portal-primary row-act" onClick={() => (!e ? setAssigning(x.t!) : x.step === "Choose Batch" ? setPlacing(e) : setOpen(e))}>{x.step}</button>}</div></td>
   </tr>; };
 
   const seats = stcwSeatsOf(data, today, now);
@@ -221,11 +221,11 @@ export function nextUpOf(r: ReturnType<typeof applicationReadiness>, companyChar
   if (r.handed && !r.paid) return { step: null, chip: "With the Cashier", tone: "orange", rank: 9 };
   if (r.ready) return { step: "Open", chip: "Paid · Enrolling", tone: "active", rank: 1 };
   if (r.paid && !r.missing.length) return { step: "Choose Batch", chip: "Paid", tone: "active", rank: 1 };
-  if (r.paid) return { step: "Check Requirements", chip: "Paid · Requirements Missing", tone: "cancelled", rank: 0 };
+  if (r.paid) return { step: "Requirements", chip: "Paid · Requirements Missing", tone: "cancelled", rank: 0 };
   const rejected = REQUIREMENTS.filter((x) => r.latest.get(x.code)?.status === "Rejected");
-  if (rejected.length) return { step: "Check Requirements", chip: rejected.length === 1 ? `${rejected[0].short} Rejected` : `${rejected.length} Requirements Rejected`, tone: "cancelled", rank: 0 };
-  if (!r.missing.length) return { step: companyCharge ? "Enroll · Company Charge" : "Hand to Cashier", chip: "Requirements Complete", tone: "active", rank: 1 };
-  return { step: "Check Requirements", chip: `${r.verified} of ${REQUIREMENTS.length} Requirements`, tone: "pending", rank: 3 };
+  if (rejected.length) return { step: "Requirements", chip: rejected.length === 1 ? `${rejected[0].short} Rejected` : `${rejected.length} Requirements Rejected`, tone: "cancelled", rank: 0 };
+  if (!r.missing.length) return { step: companyCharge ? "Enroll · Company Charge" : "Cashier", chip: "Requirements Complete", tone: "active", rank: 1 };
+  return { step: "Requirements", chip: `${r.verified} of ${REQUIREMENTS.length} Requirements`, tone: "pending", rank: 3 };
 }
 type NextUpItem = ReturnType<typeof nextUpOf> & { key: string; at: string; e?: Enrollment; t?: Trainee };
 type StcwSeat = { course: PortalData["courses"][number]; next: Batch };
@@ -419,7 +419,7 @@ function EnrollmentQueue({ data, query, reload, initial, account }: { data: Port
           {noCourse.map((t) => <div className="rd-row" key={t.id}>
             <span className="rd-main"><strong>{fullName(t)}</strong><small>{appNoOf(data, t.id) ? <span className="app-no">{appNoOf(data, t.id)}</span> : null}{t.trainee_number} · <span className="lc">{t.email}</span> · {t.mobile}</small></span>
             <span className="rd-time">{t.registered_at ? fmtShort(day(t.registered_at)) : ""}</span>
-            <button type="button" className="portal-primary" onClick={() => setAssigning(t)}>Assign Course</button>
+            <button type="button" className="portal-primary row-act" onClick={() => setAssigning(t)}>Assign</button>
           </div>)}
         </section>}
         <div className="portal-table portal-panel tbl-compact"><table><thead><tr><th>Trainee</th><th>Enrollment no.</th><th>Course and Schedule</th><th>Requirements</th><th>Payment</th><th>Status</th></tr></thead><tbody>
@@ -529,12 +529,12 @@ export type RecordsView = "applications" | "enrollments" | "trainees";
  */
 export function RegistrationRecords({ data, query, reload, view, setView, trainees, account }: { data: PortalData; query: string; reload: () => Promise<void>; view: RecordsView; setView: (v: RecordsView) => void; trainees: ReactNode; account?: TraineeAccount }) {
   const onList = view !== "trainees";
-  const tabs: [RecordsView, string, number, boolean][] = [["enrollments", "Enrollments", data.enrollments.length + awaitingCourseOf(data).length, onList], ["trainees", "Trainees", data.trainees.length, !onList]];
+  const tabs: [RecordsView, string, boolean][] = [["enrollments", "Enrollments", onList], ["trainees", "Trainees", !onList]];
   const weekAgo = addDays(manilaToday(), -6);
   return <div className="portal-page cx ac">
     <div className="cx-head"><div><span className="portal-eyebrow">Registration</span><h1>{onList ? "Enrollments" : "Trainees"}</h1></div></div>
     <div className="rr-switch" role="tablist" aria-label="Records">
-      {tabs.map(([v, label, n, on]) => <button key={v} type="button" role="tab" aria-selected={on} className={on ? "active" : ""} onClick={() => setView(v)}>{tcl(label)}<small>{n}</small></button>)}
+      {tabs.map(([v, label, on]) => <button key={v} type="button" role="tab" aria-selected={on} className={on ? "active" : ""} onClick={() => setView(v)}>{tcl(label)}</button>)}
     </div>
     {onList && <EnrollmentQueue key={view} data={data} query={query} reload={reload} initial={view === "applications" ? "Screening" : "All enrollments"} account={account} />}
     {view === "trainees" && <div className="ac-rail">

@@ -408,7 +408,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   // old workspace would still paint even though the sidebar is empty.
   if(modules&&!modules.includes(active))return <RebuildingWorkspace/>;
   // Other income (owner, 19 Oct 2026): endorsement rebates and other income; the Cashier records, Accounting views, the Admin voids.
-  if(active==="Other income")return <OtherIncome data={data} reload={reload} canRecord={["cashier","accounting","admin"].includes(gateRole)} canVoid={data.roles.includes("admin")} canAddCategory={["accounting","admin"].includes(gateRole)}/>;
+  if(active==="Other income")return <OtherIncome data={data} reload={reload} canRecord={["cashier","accounting","admin"].includes(gateRole)} canVoid={["accounting","admin"].includes(gateRole)} canAddCategory={["accounting","admin"].includes(gateRole)}/>;
   // Training Completion and Record of Assessment Report (owner, 9 Oct 2026): MISMO Compliance Officer and Admin.
   if(active==="Training Reports"&&["mismo_officer","admin"].includes(gateRole))return <TrainingReports/>;
   if(active==="Dashboard"&&gateRole==="registration")return <RegistrationDashboard data={data} go={m=>go(m as Module)} reload={reload} account={(id,close)=>{const t=data.trainees.find(x=>x.id===id);return t?<TraineeDetailModal data={data} trainee={t} reload={reload} role={gateRole} onClose={close}/>:null}}/>;
@@ -467,7 +467,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Search trainee")return <Trainees data={data} query={query} reload={reload} role={gateRole}/>;
     if(active==="Payments")return <AccountingPayments data={data}/>;
     if(active==="Receipts and TARs")return <AccountingDocuments data={data}/>;
-    if(active==="Expenses")return <AccountingExpenses data={data}/>;
+    if(active==="Expenses")return <AccountingExpenses data={data} reload={reload}/>;
     if(active==="Receivables")return <AccountingReceivables data={data}/>;
     if(active==="Payables")return <AccountingPayables data={data} reload={reload}/>;
     if(active==="Cash position")return <AccountingCashPosition data={data}/>;

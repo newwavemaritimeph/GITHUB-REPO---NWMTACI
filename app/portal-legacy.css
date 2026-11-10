@@ -2951,3 +2951,10 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .cc-sort select { height: 34px; border: 1px solid #cfdbe3; border-radius: 8px; padding: 0 10px; background: #fff; color: var(--nw-fg); font-size: 14px; }
 .nw-shell .cc-link { color: var(--nw-blue); font-weight: 600; white-space: nowrap; }
 @media (max-width: 640px) { .nw-shell .cc-tiles { grid-template-columns: minmax(0, 1fr); } }
+/* Row buttons, Option B · Small (owner, 10 Nov 2026): Assign, Requirements, Cashier, Record ₱… in lists. */
+.portal-primary.row-act, .nw-shell .portal-primary.row-act { min-height: 30px; height: 30px; padding: 0 10px; font-size: 13px; font-weight: 600; border-radius: 7px; }
+/* Trainee Account, view only, from the Batch window (10 Nov 2026). */
+.tp.tp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.tp.tp-grid .full{grid-column:1/-1}
+.tp.tp-grid .tp-kv+h4{margin-top:14px}
+@media (max-width:640px){.tp.tp-grid{grid-template-columns:minmax(0,1fr)}}

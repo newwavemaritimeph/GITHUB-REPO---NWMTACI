@@ -74,9 +74,9 @@ describe("Registration Officer workspace", () => {
     // The applicant without a course, and each application with its next step.
     expect(html).toContain("Pedro Cruz");
     expect(html).toContain("No Course Yet");
-    expect(html).toContain("Assign Course");
+    expect(html).toContain(">Assign<");
     expect(html).toContain("0 of 4 Requirements");
-    expect(html).toContain("Check Requirements");
+    expect(html).toContain(">Requirements<");
     // Paid, ticked and on a batch: the server enrolls it, nothing to choose.
     expect(html).toContain("Paid · Enrolling");
     expect(html).not.toContain("Register a trainee");
@@ -93,15 +93,15 @@ describe("Registration Officer workspace", () => {
     const checks = fixture.requirementChecks ?? [];
     const allTicks = checks.map((c) => ({ ...c, enrollment_id: "e5" }));
     const rejected = [{ ...checks[0], enrollment_id: "e5", requirement: "medical_peme", status: "Rejected" }];
-    expect(nextUpOf(applicationReadiness(e5, []))).toMatchObject({ step: "Check Requirements", chip: "0 of 4 Requirements", rank: 3 });
-    expect(nextUpOf(applicationReadiness(e5, rejected))).toMatchObject({ step: "Check Requirements", chip: "Medical Rejected", rank: 0 });
-    expect(nextUpOf(applicationReadiness(e5, allTicks))).toMatchObject({ step: "Hand to Cashier", chip: "Requirements Complete", rank: 1 });
+    expect(nextUpOf(applicationReadiness(e5, []))).toMatchObject({ step: "Requirements", chip: "0 of 4 Requirements", rank: 3 });
+    expect(nextUpOf(applicationReadiness(e5, rejected))).toMatchObject({ step: "Requirements", chip: "Medical Rejected", rank: 0 });
+    expect(nextUpOf(applicationReadiness(e5, allTicks))).toMatchObject({ step: "Cashier", chip: "Requirements Complete", rank: 1 });
     expect(nextUpOf(applicationReadiness(e5, allTicks), true).step).toBe("Enroll · Company Charge");
     // Handed over and unpaid: nothing for Registration to do, even with a rejected tick.
     expect(nextUpOf(applicationReadiness(e5, rejected, nowIso))).toMatchObject({ step: null, chip: "With the Cashier" });
     // Paid: choose the batch, or chase the requirement that is still missing.
     expect(nextUpOf(applicationReadiness({ ...e4, batch_id: null, batches: null }, checks, nowIso))).toMatchObject({ step: "Choose Batch", chip: "Paid" });
-    expect(nextUpOf(applicationReadiness(e4, checks.slice(1), nowIso))).toMatchObject({ step: "Check Requirements", chip: "Paid · Requirements Missing", rank: 0 });
+    expect(nextUpOf(applicationReadiness(e4, checks.slice(1), nowIso))).toMatchObject({ step: "Requirements", chip: "Paid · Requirements Missing", rank: 0 });
     expect(nextUpOf(applicationReadiness(e4, checks, nowIso))).toMatchObject({ step: "Open", chip: "Paid · Enrolling" });
   });
 
@@ -159,7 +159,7 @@ describe("Registration Officer workspace", () => {
     // A website applicant without a course waits for Registration to assign one.
     expect(apps).toContain("No Course Yet");
     expect(apps).toContain("Pedro Cruz");
-    expect(apps).toContain("Assign Course");
+    expect(apps).toContain(">Assign<");
     // Staff find applications by the NWMTACI number applicants quote on Facebook.
     expect(apps).toContain("NWMTACI-0000003");
     expect(apps).toContain("NWMTACI-0000001");

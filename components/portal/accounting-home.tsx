@@ -16,7 +16,7 @@ import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balanc
 import { downloadCsv } from "@/lib/csv";
 import { tcl } from "@/lib/title-case";
 import { askReason } from "./dialogs";
-import { PaymentDayRow, PrintGlyph, paymentStatus } from "./payment-void";
+import { PaymentDayRow, PrintGlyph, VoidGlyph, paymentStatus } from "./payment-void";
 
 /**
  * Accounting (owner, 8 Oct 2026): a view-first dashboard like the
@@ -241,8 +241,14 @@ export function AccountingPayments({ data }: { data: PortalData }) {
 
 function PaymentReceipts({ pills, data }: { pills: ReactNode; data: PortalData }) {
   const today = manilaToday();
-  const [date, setDate] = useState(today), [channel, setChannel] = useState(""), [q, setQ] = useState("");
-  const { data: r, error } = useJson<PayDay>(`/api/staff/cashier-report?date=${date}`);
+  const [date, setDate] = useState(today), [channel, setChannel] = useState(""), [q, setQ] = useState(""), [tick, setTick] = useState(0);
+  const { data: r, error } = useJson<PayDay>(`/api/staff/cashier-report?date=${date}${tick ? `&v=${tick}` : ""}`);
+  // Void for Accounting (owner, 10 Nov 2026): the payment stays listed, marked VOID; a reversal and the audit log keep the history.
+  const vp = usePost(async () => setTick((t) => t + 1));
+  async function voidPayment(id: string, receipt: string, amount: number, channel: string) {
+    const reason = await askReason(`Void ${receipt} (${channel}, ${pesos2(amount)})? It goes back to the trainee's balance and the receipt prints VOID. Nothing is erased.`, REASONS.paymentVoid, { title: "Void Payment", okLabel: "Void", danger: true });
+    if (reason) await vp.post({ action: "payment-void", paymentId: id, reason }, `${receipt} voided.`);
+  }
   const sourceName = (kind: string, name: string) => (kind === "Direct walk-in" ? "Walk-in" : name || kind);
   const rows = r ? r.groups.flatMap((g) => g.rows.map((x) => ({ ...x, source: sourceName(g.kind, g.name) }))) : [];
   const term = q.trim().toLowerCase();
@@ -259,6 +265,7 @@ function PaymentReceipts({ pills, data }: { pills: ReactNode; data: PortalData }
     <TxHead title="Payments" right={<DayPicker date={date} setDate={setDate} />} />{pills}<p className="ac-note">{longDay(date)} · <span className="ac-ro">View only — the Cashier records payments</span></p>
     {error && <Message kind="error" text={error} />}
     {rp.msg && <Message kind={rp.msg.kind} text={rp.msg.text} />}
+    {vp.msg && <Message kind={vp.msg.kind} text={vp.msg.text} />}
     <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By Channel</h2><span className="muted-text">tap to filter</span></div><FigureColumn rows={byChannel} unit="receipt" totalLabel="Total collected" pick={channel} onPick={setChannel} /></section>
@@ -275,7 +282,7 @@ function PaymentReceipts({ pills, data }: { pills: ReactNode; data: PortalData }
             const s = paymentStatus(data, { id: x.paymentId ?? "", valid: x.valid, void_reason: x.voidReason, verification_state: x.verificationState }), isVoid = x.valid === false;
             return [
               !i && <PaymentDayRow key="day" day={fmtDate(date)} count={shown.length} span={5} total={pesos2(shown.filter((v) => v.valid !== false).reduce((n, v) => n + v.amountCentavos, 0))} />,
-              <tr key={`${x.receipt}-${i}`} className={isVoid ? "pv-void" : undefined}><td data-l="Time" className="cx-mono">{x.time}</td><td data-l="" className="lead"><span className="cx-name">{x.trainee}</span><small className="cx-mono">{x.receipt}{x.codes ? ` · ${x.codes}` : ""}</small></td><td data-l="Source"><span className={`cs-chip ${x.source === "Walk-in" ? "wk" : "ag"}`}>{x.source === "Walk-in" ? "Walk-In" : x.source}</span>{x.rebateCentavos ? <small>Rebate {pesos2(x.rebateCentavos)} · {x.rebateStatus}</small> : null}</td><td data-l="Mode">{x.channel}{x.reference ? <small className="cx-mono">{x.reference}</small> : null}</td><td data-l="Status"><Badge tone={s.tone}>{s.label}</Badge>{s.note ? <small>{s.note}</small> : x.channel !== "Cash" ? <small className={x.proof ? "ac-up" : ""}>{tcl(proofOf(x))}</small> : null}</td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(x.amountCentavos)}</strong></td><td data-l="">{x.paymentId && !isVoid && <button type="button" className="pv-icon" title="Reprint" aria-label={`Reprint ${x.receipt}`} onClick={() => rp.toggle(x.paymentId!)}><PrintGlyph /></button>}</td></tr>,
+              <tr key={`${x.receipt}-${i}`} className={isVoid ? "pv-void" : undefined}><td data-l="Time" className="cx-mono">{x.time}</td><td data-l="" className="lead"><span className="cx-name">{x.trainee}</span><small className="cx-mono">{x.receipt}{x.codes ? ` · ${x.codes}` : ""}</small></td><td data-l="Source"><span className={`cs-chip ${x.source === "Walk-in" ? "wk" : "ag"}`}>{x.source === "Walk-in" ? "Walk-In" : x.source}</span>{x.rebateCentavos ? <small>Rebate {pesos2(x.rebateCentavos)} · {x.rebateStatus}</small> : null}</td><td data-l="Mode">{x.channel}{x.reference ? <small className="cx-mono">{x.reference}</small> : null}</td><td data-l="Status"><Badge tone={s.tone}>{s.label}</Badge>{s.note ? <small>{s.note}</small> : x.channel !== "Cash" ? <small className={x.proof ? "ac-up" : ""}>{tcl(proofOf(x))}</small> : null}</td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(x.amountCentavos)}</strong></td><td data-l="">{x.paymentId && !isVoid && <button type="button" className="pv-icon" title="Reprint" aria-label={`Reprint ${x.receipt}`} onClick={() => rp.toggle(x.paymentId!)}><PrintGlyph /></button>}{x.paymentId && !isVoid && <button type="button" className="pv-icon" title="Void" aria-label={`Void ${x.receipt}`} disabled={vp.busy} onClick={() => void voidPayment(x.paymentId!, x.receipt, x.amountCentavos, x.channel)}><VoidGlyph /></button>}</td></tr>,
               x.paymentId ? <Fragment key={`${x.receipt}-${i}-reprint`}>{rp.formRow("receipt", x.paymentId, x.receipt, 7)}</Fragment> : null,
             ];
           })}
@@ -286,8 +293,9 @@ function PaymentReceipts({ pills, data }: { pills: ReactNode; data: PortalData }
 }
 
 const EXPENSE_STATES = ["All", "For approval", "Awaiting release", "Released", "Rejected"] as const;
-export function AccountingExpenses({ data }: { data: PortalData }) {
+export function AccountingExpenses({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   const p = usePeriod();
+  const vx = usePost(reload);
   const [st, setSt] = useState<(typeof EXPENSE_STATES)[number]>("All");
   type Ex = PortalData["expenses"][number] & { payment_channel?: string | null; reference_number?: string | null; voucher_number?: string | null; paid_at?: string | null; approved_at?: string | null };
   const label = (e: Ex) => (e.status === "Paid" ? "Released" : e.status === "Approved" ? "Awaiting release" : e.status === "Pending" ? "For approval" : e.status);
@@ -297,10 +305,16 @@ export function AccountingExpenses({ data }: { data: PortalData }) {
   const cats = [...new Set(list.filter((e) => e.status !== "Rejected").map((e) => e.category))];
   const shown = list.filter((e) => st === "All" || label(e) === st);
   const pg = usePaged(shown);
-  const tone = (s: string) => (s === "Released" ? "green" : s === "Rejected" ? "red" : s === "For approval" ? "orange" : "blue");
+  const tone = (s: string) => (s === "Released" ? "green" : s === "Rejected" || s === "Void" ? "red" : s === "For approval" ? "orange" : "blue");
+  async function voidVoucher(e: Ex) {
+    const no = e.voucher_number ?? e.expense_number;
+    const reason = await askReason(`Void ${no} (${e.payee}, ${pesos2(e.amount_centavos)})? It leaves the expense totals and the voucher prints VOID; ${no} is kept and never reused.${e.status === "Paid" && (e.payment_channel ?? "Cash") === "Cash" ? " If the cash was handed out, return it to the drawer." : ""}`, REASONS.voucherVoid, { title: "Void Voucher", okLabel: "Void", danger: true });
+    if (reason) await vx.post({ action: "expense-void", id: e.id, reason }, `${no} voided.`);
+  }
   return <div className="portal-page cx ac">
     <TxHead title="Expenses" note={<span className="ac-ro">View only — the Cashier records and releases expenses</span>} />
     <MonthBar p={p} what="Expenses" count={`${list.length} voucher${list.length === 1 ? "" : "s"}`} />
+    {vx.msg && <Message kind={vx.msg.kind} text={vx.msg.text} />}
     {p.picked && <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Released by Channel</h2></div><FigureColumn rows={byChannel} unit="voucher" totalLabel="Total released" /></section>
@@ -313,7 +327,7 @@ export function AccountingExpenses({ data }: { data: PortalData }) {
       <section className="portal-panel cx-panel">
         <div className="ac-chipbar">{EXPENSE_STATES.map((s) => <button key={s} type="button" className={`ac-chip${st === s ? " on" : ""}`} onClick={() => setSt(s)}>{tcl(s)}<span>{s === "All" ? list.length : list.filter((e) => label(e) === s).length}</span></button>)}</div>
         {shown.length ? <div className="portal-table cx-cards ac-table"><table><thead><tr><th>Voucher</th><th>Payee</th><th>Channel</th><th>Status</th><th className="r">Amount</th><th></th></tr></thead><tbody>
-          {pg.shown.map((e) => <tr key={e.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher_number ?? e.expense_number}</span><small>{fmtDate(day(e.created_at))}</small></td><td data-l="Payee"><strong>{e.payee}</strong><small>{e.category}</small></td><td data-l="Channel">{e.payment_channel || "—"}{e.reference_number ? <small className="cx-mono">{e.reference_number}</small> : null}</td><td data-l="Status"><Badge tone={tone(label(e))}>{label(e)}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(e.amount_centavos)}</strong></td><td data-l="">{e.voucher_number && <ViewIcon label="View Voucher" href={`/api/documents/expense/${e.id}?copy=1`} />}</td></tr>)}
+          {pg.shown.map((e) => <tr key={e.id} className={e.status === "Void" ? "pv-void" : undefined}><td data-l="" className="lead"><span className="cx-name cx-mono">{e.voucher_number ?? e.expense_number}</span><small>{fmtDate(day(e.created_at))}</small></td><td data-l="Payee"><strong>{e.payee}</strong><small>{e.category}</small></td><td data-l="Channel">{e.payment_channel || "—"}{e.reference_number ? <small className="cx-mono">{e.reference_number}</small> : null}</td><td data-l="Status"><Badge tone={tone(label(e))}>{label(e)}</Badge></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(e.amount_centavos)}</strong></td><td data-l="">{e.voucher_number && <ViewIcon label="View Voucher" href={`/api/documents/expense/${e.id}?copy=1`} />}{(e.status === "Approved" || e.status === "Paid") && <button type="button" className="pv-icon" title="Void" aria-label={`Void ${e.voucher_number ?? e.expense_number}`} disabled={vx.busy} onClick={() => void voidVoucher(e)}><VoidGlyph /></button>}</td></tr>)}
         </tbody></table>{pg.pager}</div> : <p className="portal-empty-copy">{list.length ? "Nothing with this status." : "No expenses in this period."}</p>}
       </section>
     </div>}

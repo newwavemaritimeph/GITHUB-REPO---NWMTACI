@@ -9,7 +9,7 @@ import { LiveCashierClosing, type ClosingData } from "./live-cashier-closing";
 import { tcl } from "@/lib/title-case";
 import { REBATE_PRESETS, STCW_REBATE_COURSES, rebateRowsProblem } from "@/lib/rebates";
 import { askReason, askConfirm } from "./dialogs";
-import { REJECT_REASONS } from "./reject-inline";
+import { REASONS, REJECT_REASONS } from "./reject-inline";
 import { useNeedSince } from "./shared-ui";
 
 /** Loose shapes for the accounting slices of the staff-operations payload. */
@@ -629,7 +629,12 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
     { label: "Approved / for release", n: approved.length, total: sum(approved), icon: "✓", accent: "#0a7d3b", list: approved },
     { label: "Marked paid", n: paidV.length, total: sum(paidV), icon: "◈", accent: "#7c3aed", list: paidV },
   ];
-  const tone = (s: string) => (s === "Pending" ? "pending" : s === "Rejected" ? "cancelled" : "active");
+  const tone = (s: string) => (s === "Pending" ? "pending" : s === "Rejected" || s === "Void" ? "cancelled" : "active");
+  // Void for Accounting (owner, 10 Nov 2026): the voucher stays listed, marked Void, and prints VOID.
+  async function voidVoucher(v: Vx) {
+    const reason = await askReason(`Void ${v.expense_number} (${v.payee}, ${money(v.amount_centavos)})? It leaves the expense totals and the voucher prints VOID; the number is never reused.`, REASONS.voucherVoid, { title: "Void Voucher", okLabel: "Void", danger: true });
+    if (reason) await post({ action: "expense-void", id: v.id, reason });
+  }
 
   function exportCsv() {
     downloadCsv(`expense-vouchers-${from}_to_${to}.csv`, [["Voucher", "Payee", "Purpose", "Category", "Channel", "Reference", "Amount (PHP)", "Status", "Requested by", "Date"],
@@ -643,7 +648,7 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
     <section className="portal-panel" style={{ padding: 14, marginBottom: 14, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-end" }}>
       <label className="portal-field-inline">Start Date<input type="date" value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} /></label>
       <label className="portal-field-inline">End Date<input type="date" value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} /></label>
-      <label className="portal-field-inline">Status<select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="All statuses">All Statuses</option><option>Pending</option><option>Approved</option><option>Paid</option><option>Rejected</option></select></label>
+      <label className="portal-field-inline">Status<select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}><option value="All statuses">All Statuses</option><option>Pending</option><option>Approved</option><option>Paid</option><option>Rejected</option><option>Void</option></select></label>
       <label className="portal-field-inline" style={{ minWidth: 240, flex: 1 }}>Search<input value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} placeholder="Voucher #, payee, purpose or reference" /></label>
       <button type="button" className="portal-secondary" onClick={exportCsv} disabled={!rows.length}>Export CSV</button>
       <a className="portal-secondary" href={`/api/documents/expenses-daily?date=${to}`} target="_blank" rel="noreferrer" style={{ display: "inline-flex", alignItems: "center" }}>Daily Summary PDF</a>
@@ -669,7 +674,8 @@ export function LiveVouchers({ data, role, reload }: { data: AccountingData; rol
             {/* The server takes `decision`, not a boolean — sending `approve` failed Zod validation and every approval 400'd. */}
             {v.status === "Pending" && <><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: v.id, decision: "Approved" })}>Approve</button><button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: v.id, decision: "Rejected" })}>Reject</button></>}
             {v.status === "Approved" && <button type="button" disabled={busy} onClick={() => void post({ action: "expense-decide", id: v.id, decision: "Paid" })}>Mark Paid</button>}
-            {(v.status === "Paid" || v.status === "Rejected") && <span className="portal-empty-copy" style={{ margin: 0 }}>—</span>}
+            {(v.status === "Approved" || v.status === "Paid") && <button type="button" disabled={busy} onClick={() => void voidVoucher(v)}>Void</button>}
+            {(v.status === "Rejected" || v.status === "Void") && <span className="portal-empty-copy" style={{ margin: 0 }}>—</span>}
           </td>}
         </tr>)}
       </tbody></table>{!shown.length && <p className="portal-empty-copy">No vouchers match these filters.</p>}</div>

@@ -21,6 +21,29 @@ export function saveCsv(name: string, text: string) {
 /** The MARINA MISMO column shows for the MISMO Compliance Officer and the Admin, on the STCW courses (owner, 9 Nov 2026). */
 export const mismoInWindow = (role: string | undefined, courseCode: string) => (role === "admin" || role === "mismo_officer") && MISMO_COURSE_CODES.includes(courseCode);
 
+export type TraineeProfile = { name: string; nwmtaciNo: string | null; traineeNo: string | null; srn: string | null; rank: string | null; birthdate: string | null; placeOfBirth: string | null; sex: string | null; nationality: string | null; address: string | null; mobile: string | null; email: string | null; company: string | null; emergencyName: string | null; emergencyMobile: string | null; courses: { id: string; code: string; name: string; batch: string | null; startsOn: string | null; endsOn: string | null; status: string }[] };
+
+/** Trainee details, view only, from a name in the Batch window (owner, 10 Nov 2026: for the MISMO Compliance Officer). */
+export function TraineeProfileView({ p }: { p: TraineeProfile }) {
+  const kv = (rows: [string, string | null | undefined][]) => <dl className="tp-kv">{rows.map(([k, v]) => <div key={k} style={{ display: "contents" }}><dt>{k}</dt><dd>{v || "—"}</dd></div>)}</dl>;
+  return <div className="tp tp-grid">
+    <section className="tp-panel"><h4>Personal</h4>{kv([["Name", p.name], ["NWMTACI No.", p.nwmtaciNo], ["Trainee No.", p.traineeNo], ["SRN", p.srn], ["Rank", p.rank], ["Birth Date", p.birthdate ? fmtDate(p.birthdate) : null], ["Place of Birth", p.placeOfBirth], ["Sex", p.sex], ["Nationality", p.nationality]])}</section>
+    <section className="tp-panel"><h4>Contact</h4>{kv([["Mobile", p.mobile], ["Email", p.email], ["Address", p.address], ["Company", p.company]])}
+      <h4>Emergency Contact</h4>{kv([["Name", p.emergencyName], ["Mobile", p.emergencyMobile]])}</section>
+    <section className="tp-panel full"><h4>Courses</h4>{p.courses.length ? <div className="cl-wrap"><table className="cl-log"><thead><tr><th>Course</th><th>Batch</th><th>Dates</th><th>Status</th></tr></thead><tbody>
+      {p.courses.map((c) => <tr key={c.id}><td><b>{c.code}</b><small className="cl-sub cl-block">{c.name}</small></td><td className="cl-mono">{c.batch ?? "—"}</td><td>{c.startsOn ? spanOf({ startsOn: c.startsOn, endsOn: c.endsOn ?? c.startsOn }) : "—"}</td><td>{c.status}</td></tr>)}
+    </tbody></table></div> : <p className="portal-empty-copy">No courses.</p>}</section>
+  </div>;
+}
+
+function TraineeProfileModal({ enrollmentId, onClose }: { enrollmentId: string; onClose: () => void }) {
+  const [p, setP] = useState<TraineeProfile | null>(null), [error, setError] = useState("");
+  useEffect(() => { let live = true; fetch(`/api/staff/trainee-profile?enrollmentId=${enrollmentId}`, { cache: "no-store" }).then(async (r) => { const b = await r.json(); if (!r.ok) throw new Error(b.error ?? "Could not load the trainee."); if (live) setP(b as TraineeProfile); }).catch((e: unknown) => { if (live) setError(e instanceof Error ? e.message : "Could not load the trainee."); }); return () => { live = false; }; }, [enrollmentId]);
+  return <Modal title={p ? `Trainee Account · ${p.name}` : "Trainee Account"} onClose={onClose} wide>
+    {error ? <Message kind="error" text={error} /> : p ? <TraineeProfileView p={p} /> : <p className="portal-empty-copy">Loading…</p>}
+  </Modal>;
+}
+
 const spanOf = (r: { startsOn: string; endsOn: string }) => (r.startsOn === r.endsOn ? fmtDate(r.startsOn) : `${fmtDate(r.startsOn)} – ${fmtDate(r.endsOn)}`);
 const shortDay = (iso: string) => new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", timeZone: "Asia/Manila" }).format(new Date(iso.length === 10 ? `${iso}T00:00:00+08:00` : iso));
 
@@ -74,7 +97,7 @@ export function BatchWindow({ batchId, batchNumber, mismo = false, onClose, onCh
   const [roster, setRoster] = useState<BatchRoster | null>(null), [error, setError] = useState(""), [find, setFind] = useState(""), [note, setNote] = useState(""), [copyBox, setCopyBox] = useState("");
   const [marina, setMarina] = useState<MismoBatch | null>(null), [marinaTick, setMarinaTick] = useState(0), [problem, setProblem] = useState("");
   // A tick shows at once: the officer works through many in a row and should not wait on each save.
-  const [ticked, setTicked] = useState<Record<string, string | null>>({}), [busy, setBusy] = useState(""), [copied, setCopied] = useState(""), [adding, setAdding] = useState<MismoTrainee | null>(null), [record, setRecord] = useState(false);
+  const [ticked, setTicked] = useState<Record<string, string | null>>({}), [busy, setBusy] = useState(""), [copied, setCopied] = useState(""), [adding, setAdding] = useState<MismoTrainee | null>(null), [viewing, setViewing] = useState(""), [record, setRecord] = useState(false);
   useEffect(() => { let live = true; fetch(`/api/staff/batch-roster?batchId=${batchId}`, { cache: "no-store" }).then(async (r) => { const b = await r.json(); if (!r.ok) throw new Error(b.error ?? "Could not load the trainees."); if (live) setRoster(b as BatchRoster); }).catch((e: unknown) => { if (live) setError(e instanceof Error ? e.message : "Could not load the trainees."); }); return () => { live = false; }; }, [batchId]);
   const from = roster?.batch.startsOn, to = roster?.batch.endsOn;
   useEffect(() => {
@@ -134,7 +157,7 @@ export function BatchWindow({ batchId, batchNumber, mismo = false, onClose, onCh
       {mismo && record && <div className="full"><RecordEditor batchId={batchId} onSaved={() => undefined} /></div>}
       {copyBox && <div className="sa-copybox full"><textarea readOnly rows={Math.min(14, copyBox.split("\n").length + 1)} value={copyBox} onFocus={(e) => e.currentTarget.select()} aria-label="Trainee list to copy" /><button type="button" className="portal-secondary" onClick={() => setCopyBox("")}>Close</button></div>}
       <div className="cl-wrap full"><table className="cl-log"><thead><tr><th>#</th><th>Trainee</th><th>NWMTACI No.</th><th>SRN</th><th>Rank</th><th>Mobile</th><th>Source</th><th>Status</th><th>Payment</th><th>Requirements</th>{mismo && <th>MARINA MISMO</th>}</tr></thead><tbody>
-        {rows.map((r, i) => { const x = trainees.get(r.enrollmentId); return <tr key={r.enrollmentId}><td>{i + 1}</td><td><b>{r.name}</b></td><td className="cl-mono">{r.nwmtaciNo}</td><td className="cl-mono">{r.srn || "—"}</td><td>{r.rank || "—"}</td><td className="cl-mono">{r.mobile || "—"}</td><td>{r.source}</td>
+        {rows.map((r, i) => { const x = trainees.get(r.enrollmentId); return <tr key={r.enrollmentId}><td>{i + 1}</td><td><button type="button" className="rc-who" onClick={() => setViewing(r.enrollmentId)}>{r.name}</button></td><td className="cl-mono">{r.nwmtaciNo}</td><td className="cl-mono">{r.srn || "—"}</td><td>{r.rank || "—"}</td><td className="cl-mono">{r.mobile || "—"}</td><td>{r.source}</td>
           <td><Badge tone={r.status === "Pending" ? "orange" : "active"}>{r.status}</Badge></td>
           <td><Badge tone={r.payment === "Paid" ? "active" : r.payment === "Company Charge" ? "blue" : r.payment === "Balance" ? "orange" : "red"}>{payText(r)}</Badge></td><td>{r.requirements} of 4</td>
           {mismo && <td className="bw-cell">{x ? <MismoCell t={x} copied={copied === x.enrollmentId} busy={busy === x.enrollmentId} onCopy={() => void copyOne(x)} onEncode={() => void mark(x, true)} onUndo={() => void mark(x, false)} onAdd={() => setAdding(x)} /> : marina ? "—" : <small className="cl-sub">Loading…</small>}</td>}</tr>; })}
@@ -142,6 +165,7 @@ export function BatchWindow({ batchId, batchNumber, mismo = false, onClose, onCh
       </tbody></table></div>
       <p className="portal-form-note full">Cancelled enrollments are left out.{mismo ? " Trainees not yet paid appear only on the instructor's 11:00 AM printout." : ""}</p>
     </>}
+    {viewing && <TraineeProfileModal enrollmentId={viewing} onClose={() => setViewing("")} />}
     {adding && <AddDetails t={adding} onClose={() => setAdding(null)} onSaved={() => { setAdding(null); setMarinaTick((n) => n + 1); onChanged?.(); }} />}
   </div></Modal>;
 }

@@ -67,19 +67,15 @@ const tar: TarProps = {
   arNumber: "AR-2026-001204", issued: "Oct 12, 2026, 9:42 AM", name: "DELA CRUZ, JUAN PEREZ",
   trainee: { appNo: "NWMTACI-0000411", srn: "SRN-2210441", rank: "Able Seaman", mobile: "0917 100 2001", company: "Qapla Maritime" },
   courses: [
-    { id: "1", code: "UBT-PSSR", name: "Updating Training on Basic Training – PSSR", dates: "12 Oct (Mon)", time: "8:00–17:00", room: "ROOM 101", fee: 180000 },
-    { id: "2", code: "PSCMT", name: "Crowd Management Training", dates: "13–14 Oct (Tue–Wed)", time: "8:00–17:00", room: "ROOM 102", fee: 130000 },
+    { id: "1", code: "UBT-PSSR", name: "Updating Training on Basic Training – PSSR", dates: "12 Oct (Mon)", time: "8:00–17:00", room: "ROOM 101" },
+    { id: "2", code: "PSCMT", name: "Crowd Management Training", dates: "13–14 Oct (Tue–Wed)", time: "8:00–17:00", room: "ROOM 102" },
   ],
-  misc: [{ label: "Uniform", amount: 15000 }, { label: "ID Lace x 2", amount: 10000 }], discounts: [{ label: "Referral rebate (Qapla Maritime)", amount: 20000 }],
-  payments: [{ id: "p1", number: "PAY-2026-001498", dateLabel: "12 Oct", method: "GCash", ref: "7012345678901", amount: 200000 }],
-  feesTotal: 310000, due: 315000, paid: 200000, balance: 115000, status: "PARTIALLY PAID", officer: "Sophia Ugadan", cashier: "Karen Mallari",
+  officer: "Sophia Ugadan",
 };
 await printHtml("01-training-admission-record.pdf", "Training Admission Record", <TarSheets {...tar} control={ctl("NW-REG-01")} termsControl={ctl("NW-REG-02")} />);
 const many = ["UBT-PSSR|Updating Training on Basic Training – PSSR", "STPPDSPPS|Ship Security Awareness", "PSCMT|Crowd Management Training", "PSCMHBT|Crisis Management and Human Behavior", "CCMD|Crisis Management – Domestic", "HPT|Hydraulic and Pneumatic Training", "SFA|Standard First Aid", "BOSH|Basic Occupational Safety and Health"]
-  .map((x, i) => { const [code, name] = x.split("|"); return { id: String(i), code, name, dates: `${12 + i} Oct`, time: "8:00–17:00", room: i % 2 ? "ROOM 102" : "ROOM 101", fee: 120000 + i * 15000 }; });
-const manyFees = many.reduce((s, c) => s + c.fee, 0);
-await printHtml("02-training-admission-record-multi-course.pdf", "Training Admission Record (8 courses, 2 pages)", <TarSheets {...tar} control={ctl("NW-REG-01")} termsControl={ctl("NW-REG-02")} arNumber="AR-2026-001205" courses={many} misc={[]} discounts={[]} feesTotal={manyFees} due={manyFees} paid={manyFees} balance={0} status="FULLY PAID"
-  payments={[{ id: "a", number: "PAY-2026-001510", dateLabel: "12 Oct", method: "Cash", ref: "—", amount: 600000 }, { id: "b", number: "PAY-2026-001511", dateLabel: "12 Oct", method: "UnionBank", ref: "UB-88123007", amount: manyFees - 600000 }]} />);
+  .map((x, i) => { const [code, name] = x.split("|"); return { id: String(i), code, name, dates: `${12 + i} Oct`, time: "8:00–17:00", room: i % 2 ? "ROOM 102" : "ROOM 101" }; });
+await printHtml("02-training-admission-record-multi-course.pdf", "Training Admission Record (8 courses, 2 pages)", <TarSheets {...tar} control={ctl("NW-REG-01")} termsControl={ctl("NW-REG-02")} arNumber="AR-2026-001205" courses={many} />);
 
 // ---- Acknowledgement receipt -----------------------------------------------------
 const receipt: ReceiptProps = {

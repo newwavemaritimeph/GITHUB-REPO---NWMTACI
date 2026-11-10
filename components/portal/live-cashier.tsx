@@ -234,7 +234,7 @@ export function TickCourses({ list, off, setOff }: { list: Enrollment[]; off: Un
 export function RecordTicked({ data, list, off, onPay }: { data: PortalData; list: Enrollment[]; off: Unticked; onPay: (enrollmentId: string, courses: string[]) => void }) {
   const ticked = list.filter((e) => balanceOf(e) > 0 && !off[e.id]);
   const amount = ticked.reduce((s, e) => s + Math.max(0, balanceOf(e) - (data.pendingRebates?.[e.id] ?? 0)), 0);
-  return <button type="button" className="portal-primary" disabled={!ticked.length} onClick={() => onPay(ticked[0].id, ticked.map((e) => e.id))}>{ticked.length ? `Record ${pesos(amount)}` : "Tick a Course"}</button>;
+  return <button type="button" className="portal-primary row-act" disabled={!ticked.length} onClick={() => onPay(ticked[0].id, ticked.map((e) => e.id))}>{ticked.length ? `Record ${pesos(amount)}` : "Tick a Course"}</button>;
 }
 /** Paid and Enrolled, Balance First: who still owes stays in view; everyone fully paid folds into one line. */
 export function paidSections<G extends { balance: number; paid: number }>(groups: G[]) {

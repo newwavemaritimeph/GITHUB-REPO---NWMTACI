@@ -8,9 +8,8 @@ import "./admission-record.css";
 /**
  * Training Admission Record (Oct 2026, "Design 01 · classic official").
  * Two copies (original and duplicate) on one legal sheet (8.5 × 14 in): the trainee's admission
- * slip and acknowledgement receipt with its AR number, every active course,
- * fees including miscellaneous charges, each payment received, and the terms
- * and conditions. Amounts are read live; the AR number comes from
+ * slip with its TAR number, every active course and the Terms and Conditions. No fees or
+ * payments since 10 Nov 2026 (owner): those stay on the Acknowledgement Receipt. The number comes from
  * admission_records (migration 202610070006), so a reprint keeps it.
  */
 
@@ -30,7 +29,6 @@ function trainingDates(start?: string | null, end?: string | null) {
 const hhmm = (t?: string | null) => (t ? String(Number(t.slice(0, 2))) + t.slice(2, 5) : "");
 
 type BatchRow = { batch_number: string; starts_on: string; ends_on: string; daily_start: string | null; daily_end: string | null; venue: string | null };
-type PaymentRow = { id: string; payment_number: string; received_at: string; method: string; reference_number: string | null; valid: boolean; cashier_id: string | null; remarks: string | null; receipts: { receipt_number: string } | { receipt_number: string }[] | null };
 
 export default async function AdmissionRecordPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ reprint?: string }> }) {
   const staff = await requireStaff(["admin", "registration", "cashier", "accounting"]);
@@ -44,11 +42,9 @@ export default async function AdmissionRecordPage({ params, searchParams }: { pa
   if (!record) notFound();
   const ids = record.enrollment_ids as string[];
 
-  const [traineeRes, enrollRes, chargeRes, allocRes, officerRes] = await Promise.all([
+  const [traineeRes, enrollRes, officerRes] = await Promise.all([
     db.from("trainees").select("trainee_number,legal_first_name,legal_middle_name,legal_last_name,suffix,srn,rank,mobile,company,application_number").eq("id", record.trainee_id).maybeSingle(),
-    db.from("enrollments").select("id,enrollment_number,enrollment_status,selling_price_centavos,created_at,batch_id,scheduled_on,courses(code,name),partner_course_offers(partner_centers(name)),batches(batch_number,starts_on,ends_on,daily_start,daily_end,venue)").in("id", ids),
-    db.from("enrollment_charges").select("enrollment_id,description,amount_centavos,event_type,valid").in("enrollment_id", ids).eq("valid", true),
-    db.from("payment_allocations").select("enrollment_id,amount_centavos,payments(id,payment_number,received_at,method,reference_number,valid,cashier_id,remarks,receipts(receipt_number))").in("enrollment_id", ids),
+    db.from("enrollments").select("id,enrollment_number,enrollment_status,created_at,batch_id,scheduled_on,courses(code,name),partner_course_offers(partner_centers(name)),batches(batch_number,starts_on,ends_on,daily_start,daily_end,venue)").in("id", ids),
     record.issued_by ? db.from("profiles").select("complete_name").eq("id", record.issued_by).maybeSingle() : Promise.resolve({ data: null }),
   ]);
   const t = traineeRes.data;
@@ -78,47 +74,14 @@ export default async function AdmissionRecordPage({ params, searchParams }: { pa
     .map((e) => { const c = one(e.courses as { code: string; name: string } | { code: string; name: string }[] | null); const b = one(e.batches as unknown as BatchRow | BatchRow[] | null);
       const center = one(one(e.partner_course_offers as unknown as { partner_centers: unknown } | { partner_centers: unknown }[] | null)?.partner_centers as { name: string } | { name: string }[] | null)?.name;
       const day = (e as { scheduled_on?: string | null }).scheduled_on ?? null;
-      return { id: e.id, code: c?.code ?? "", name: center ? `${c?.name ?? "Course"} · ${center}` : c?.name ?? "Course", start: b?.starts_on ?? day, dates: b ? trainingDates(b.starts_on, b.ends_on) : trainingDates(day ?? undefined, day ?? undefined), time: b ? `${hhmm(b.daily_start) || "8:00"}–${hhmm(b.daily_end) || "17:00"}` : "—", room: (e.batch_id && roomByBatch.get(e.batch_id)) || b?.venue || center || "To be assigned", fee: Number(e.selling_price_centavos) }; })
+      return { id: e.id, code: c?.code ?? "", name: center ? `${c?.name ?? "Course"} · ${center}` : c?.name ?? "Course", start: b?.starts_on ?? day, dates: b ? trainingDates(b.starts_on, b.ends_on) : trainingDates(day ?? undefined, day ?? undefined), time: b ? `${hhmm(b.daily_start) || "8:00"}–${hhmm(b.daily_end) || "17:00"}` : "—", room: (e.batch_id && roomByBatch.get(e.batch_id)) || b?.venue || center || "To be assigned" }; })
     .sort((a, b) => (a.start ?? "9999").localeCompare(b.start ?? "9999"));
 
-  const misc = (chargeRes.data ?? []).filter((c) => c.event_type !== "discount").map((c) => ({ label: c.description as string, amount: Number(c.amount_centavos) }));
-  const discounts = (chargeRes.data ?? []).filter((c) => c.event_type === "discount").map((c) => ({ label: c.description as string, amount: Number(c.amount_centavos) }));
-
-  // The TAR is the admission slip only (owner, 3 Nov 2026): it lists the Acknowledgement Receipts issued, one line
-  // per receipt, summing its allocations across the covered enrollments. Payment details stay on the receipt.
-  type PayRow = { id: string; number: string; date: string; method: string; ref: string; label: string; amount: number };
-  const payMap = new Map<string, PayRow>();
-  for (const a of allocRes.data ?? []) {
-    const p = one(a.payments as unknown as PaymentRow | PaymentRow[] | null);
-    if (!p || p.valid === false) continue;
-    const row = payMap.get(p.id) ?? { id: p.id, number: one(p.receipts)?.receipt_number ?? p.payment_number, date: p.received_at, method: p.method, ref: p.reference_number || "—", label: p.remarks && /^(Miscellaneous|Service Fee) · /.test(p.remarks) ? p.remarks : "Training Fee", amount: 0 };
-    row.amount += Number(a.amount_centavos);
-    payMap.set(p.id, row);
-  }
-  const payments = [...payMap.values()].sort((a, b) => a.date.localeCompare(b.date));
-
-  const feesTotal = courses.reduce((s, c) => s + c.fee, 0), miscTotal = misc.reduce((s, m) => s + m.amount, 0), discTotal = discounts.reduce((s, d) => s + d.amount, 0);
-  const due = feesTotal + miscTotal - discTotal, paid = payments.reduce((s, p) => s + p.amount, 0), balance = Math.max(0, due - paid);
-  // Company Charge (owner, 29 Oct 2026): the partner is billed on its Billing Statement, so the TAR says so instead of UNPAID.
-  const live = (enrollRes.data ?? []).filter((e) => e.enrollment_status !== "Cancelled").map((e) => e.id as string);
-  const { data: cc } = live.length ? await db.from("enrollments").select("company_charge_agency_id").in("id", live).not("company_charge_agency_id", "is", null).limit(1) : { data: null };
-  let ccAgency = (cc?.[0] as { company_charge_agency_id?: string } | undefined)?.company_charge_agency_id ?? null;
-  if (!ccAgency && live.length) {
-    // Not enrolled yet: the partner on these courses is a Company Charge partner (each course has its own, 3 Nov 2026).
-    const { data: refs } = await db.from("enrollments").select("referral_agency_id").in("id", live).not("referral_agency_id", "is", null);
-    const candidates = [...new Set((refs ?? []).map((r) => r.referral_agency_id as string).filter(Boolean))];
-    if (candidates.length) ccAgency = ((await db.from("marketing_agencies").select("id").in("id", candidates).eq("rebate_mode", "Company Charge").limit(1)).data?.[0]?.id as string | undefined) ?? null;
-  }
-  const billedTo = ccAgency ? ((await db.from("marketing_agencies").select("name").eq("id", ccAgency).maybeSingle()).data?.name as string | undefined) ?? "the partner" : null;
-  const status = billedTo ? "COMPANY CHARGE" : due > 0 && paid >= due ? "FULLY PAID" : paid > 0 ? "PARTIALLY PAID" : "UNPAID";
   const name = `${t.legal_last_name}, ${[t.legal_first_name, t.legal_middle_name, t.suffix].filter(Boolean).join(" ")}`.toUpperCase();
   const issued = manila({ dateStyle: "medium", timeStyle: "short" }).format(new Date(record.issued_at));
   const officer = (officerRes.data as { complete_name?: string } | null)?.complete_name ?? "";
-  const payDate = manila({ day: "numeric", month: "short" });
   const [control, termsControl] = await Promise.all([loadDocumentControl(db, "tar"), loadDocumentControl(db, "terms")]);
   return <TarSheets control={control} termsControl={termsControl} arNumber={record.ar_number} reprintCopy={reprint ? Number(record.print_count ?? 0) : null} issued={issued} name={name}
     trainee={{ appNo: t.application_number ?? t.trainee_number, srn: t.srn, rank: t.rank, mobile: t.mobile, company: t.company }}
-    courses={courses} misc={misc} discounts={discounts}
-    payments={payments.map((p) => ({ id: p.id, number: p.number, dateLabel: payDate.format(new Date(p.date)), method: p.method, ref: p.ref, label: p.label, amount: p.amount }))}
-    feesTotal={feesTotal} due={due} paid={paid} balance={balance} status={status} billedTo={billedTo} officer={officer} cashier="" />;
+    courses={courses} officer={officer} />;
 }

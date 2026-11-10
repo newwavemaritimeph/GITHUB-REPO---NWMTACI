@@ -1582,7 +1582,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true, incomeNumber: number });
     }
     if (input.action === "income-void") {
-      if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin can void income." }, { status: 403 });
+      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or the Admin can void income." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const { data: prior } = await admin.from("other_income").select("id,income_number,amount_centavos,voided_at").eq("id", input.id).maybeSingle();
       if (!prior) return NextResponse.json({ error: "Income not found." }, { status: 404 });
@@ -1801,7 +1801,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "payment-void" || input.action === "expense-void" || input.action === "enrollment-cancel") {
-      if (!isAdminRole(staff.roleCodes)) return NextResponse.json({ error: "Only the Admin can void or cancel." }, { status: 403 });
+      // Accounting voids payments and vouchers too (owner, 10 Nov 2026); cancelling an enrollment stays with the Admin.
+      if (input.action === "enrollment-cancel" ? !isAdminRole(staff.roleCodes) : !canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: input.action === "enrollment-cancel" ? "Only the Admin can cancel an enrollment." : "Only Accounting or the Admin can void." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const call = input.action === "payment-void" ? admin.rpc("void_payment", { target_payment: input.paymentId, actor: staff.user.id, reason: input.reason })
         : input.action === "expense-void" ? admin.rpc("void_expense", { target_expense: input.id, actor: staff.user.id, reason: input.reason })
