@@ -38,8 +38,20 @@ export function announcement(ticketNo: string, windowNo: number) {
   return `Now serving, ${code}, ${Number(n)}. Please proceed to window ${windowNo}.`;
 }
 
-/** The windows a staff member may call at (owner's plan, §7): their own window; the Admin any. */
-export const ROLE_WINDOWS: Record<string, number[]> = { registration: [1], cashier: [2], releasing_officer: [3] };
+/** The optional Tagalog line (queue plan §11): "Numero E 4, pumunta po sa window 1." */
+export function announcementTagalog(ticketNo: string, windowNo: number) {
+  const [code, n] = ticketNo.split("-");
+  return `Numero ${code} ${Number(n)}, pumunta po sa window ${windowNo}.`;
+}
+
+/**
+ * The windows a staff member may call at (owner's plan, §7; owner, 10 Nov 2026: two walk-in Registration windows and one
+ * Cashier): Registration Windows 1 and 2, the Cashier Window 3, the Admin any.
+ */
+export const ROLE_WINDOWS: Record<string, number[]> = { registration: [1, 2], cashier: [3] };
+/** "Window 1 or 2", "Window 3": the windows that serve a service. */
+export const windowsText = (nos: number[]) => (nos.length ? `Window ${nos.length > 1 ? `${nos.slice(0, -1).join(", ")} or ${nos[nos.length - 1]}` : nos[0]}` : "Window");
+export const windowsFor = (code: string, windows: { no: number; service_codes: string[] }[]) => windows.filter((w) => w.service_codes.includes(code)).map((w) => w.no).sort((a, b) => a - b);
 export function allowedWindows(roleCodes: string[], all: number[]) {
   if (roleCodes.includes("admin")) return all;
   return [...new Set(roleCodes.flatMap((r) => ROLE_WINDOWS[r] ?? []))].filter((w) => all.includes(w)).sort((a, b) => a - b);

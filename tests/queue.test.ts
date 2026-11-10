@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { QUEUE_TOKEN, allowedWindows, announcement, joinProblem, normalizeQueueMobile, queueOpen, queueRewrite } from "@/lib/queue";
+import { QUEUE_TOKEN, allowedWindows, announcement, joinProblem, normalizeQueueMobile, queueOpen, queueRewrite, windowsFor, windowsText } from "@/lib/queue";
 
 // New Wave Queue, Phase 1 (owner, 10 Nov 2026; NWMTACI_Queue_System_Plan.md).
 describe("Queue host and rules", () => {
@@ -32,8 +32,13 @@ describe("Queue host and rules", () => {
     expect(announcement("P-012", 2)).toBe("Now serving, P, 12. Please proceed to window 2.");
   });
   it("lets each role call only at its own window, the Admin at any", () => {
-    expect(allowedWindows(["cashier"], [1, 2, 3])).toEqual([2]);
-    expect(allowedWindows(["registration", "cashier"], [1, 2, 3])).toEqual([1, 2]);
+    // Two walk-in Registration windows and one Cashier (owner, 10 Nov 2026).
+    expect(allowedWindows(["cashier"], [1, 2, 3])).toEqual([3]);
+    expect(allowedWindows(["registration"], [1, 2, 3])).toEqual([1, 2]);
+    expect(allowedWindows(["registration", "cashier"], [1, 2, 3])).toEqual([1, 2, 3]);
+    expect(windowsText([1, 2])).toBe("Window 1 or 2");
+    expect(windowsText([3])).toBe("Window 3");
+    expect(windowsFor("E", [{ no: 1, service_codes: ["E", "I", "C"] }, { no: 2, service_codes: ["E", "I", "C"] }, { no: 3, service_codes: ["P"] }])).toEqual([1, 2]);
     expect(allowedWindows(["admin"], [1, 2, 3])).toEqual([1, 2, 3]);
     expect(allowedWindows(["accounting"], [1, 2, 3])).toEqual([]);
     expect(QUEUE_TOKEN.test("0123456789ABCDEF")).toBe(true);
@@ -59,6 +64,12 @@ describe("Queue database and server", () => {
     const state = readFileSync("app/api/queue/state/route.ts", "utf8");
     expect(state).not.toMatch(/mobile:/);
     expect(state).toContain("...(showName && x.full_name ? { first_name: x.full_name.split(/\\s+/)[0] } : {})");
+  });
+  it("lets Windows 1 and 2 share the Registration line", () => {
+    const w = readFileSync("supabase/migrations/202610290094_queue_windows.sql", "utf8");
+    expect(w).toContain("(1, 'Registration', '{E,I,C}', true), (2, 'Registration', '{E,I,C}', true), (3, 'Cashier', '{P}', true)");
+    expect(w).toContain("service_code = any(w.service_codes) and (window_no is null or window_no = w.no)");
+    expect(w).toContain("for update skip locked limit 1");
   });
   it("checks the window on the server before every staff action", () => {
     const staff = readFileSync("app/api/queue/staff/route.ts", "utf8");

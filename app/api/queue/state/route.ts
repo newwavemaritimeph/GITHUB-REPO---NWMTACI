@@ -24,7 +24,7 @@ export async function GET() {
   const shown = (x: { ticket_no: string; service_code: string; window_no: number | null; full_name: string | null }) => ({ ticket_no: x.ticket_no, service_code: x.service_code, window_no: x.window_no, ...(showName && x.full_name ? { first_name: x.full_name.split(/\s+/)[0] } : {}) });
   const tickets = t.data ?? [];
   return NextResponse.json({
-    windows: (w.data ?? []).map((x) => { const now = tickets.find((k) => k.status === "serving" && k.window_no === x.no); return { no: x.no, name: x.name, serving: now ? { ...shown(now), called_at: now.called_at, recall_count: now.recall_count } : null }; }),
+    windows: (w.data ?? []).map((x) => { const now = tickets.find((k) => k.status === "serving" && k.window_no === x.no); return { no: x.no, name: x.name, service_codes: x.service_codes, serving: now ? { ...shown(now), called_at: now.called_at, recall_count: now.recall_count } : null }; }),
     waiting: tickets.filter((k) => k.status === "waiting").slice(0, 8).map(shown),
     waitingCount: tickets.filter((k) => k.status === "waiting").length,
     services: s.data ?? [],
