@@ -1009,7 +1009,7 @@ export async function GET(request: Request) {
     db.from("expense_categories").select("id,name,active").order("name"),
     db.from("inventory_items").select("id,name,category,unit,quantity_on_hand,unit_value_centavos,active").order("name"),
     db.from("inventory_movements").select("id,item_id,movement_type,quantity,remarks,created_at,inventory_items(name)").order("created_at", { ascending: false }).limit(200),
-    db.from("enrollment_charges").select("id,enrollment_id,description,amount_centavos,agency_id,created_at,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name)),marketing_agencies(name)").eq("event_type", "discount").eq("approval_status", "Pending").order("created_at", { ascending: false }).limit(200),
+    db.from("enrollment_charges").select("id,enrollment_id,description,amount_centavos,agency_id,created_at,created_by,enrollments(enrollment_number,trainees(legal_first_name,legal_last_name),courses(name)),marketing_agencies(name)").eq("event_type", "discount").eq("approval_status", "Pending").order("created_at", { ascending: false }).limit(200),
     db.from("announcements").select("id,title,body,audience_roles,published_at,expires_at").order("published_at", { ascending: false, nullsFirst: false }).limit(30),
   ]);
   const error = results.find((item) => item.error)?.error;
@@ -1029,6 +1029,21 @@ export async function GET(request: Request) {
   // lookups below run together instead of one after another. Each task fills its own result.
   const tasks: Promise<void>[] = [];
   const task = (f: () => Promise<void>) => { tasks.push(f()); };
+  // Discounts (owner, 10 Nov 2026): who asked, for Accounting's To Do, and the ones Accounting rejected in the last 30 days
+  // with the reason, so the Cashier sees the answer in the Trainee Account.
+  const discountNames: Record<string, string> = {};
+  let rejectedDiscounts: { id: string; enrollment_id: string; amount_centavos: number; decided_at: string | null; reason: string | null }[] = [];
+  task(async () => {
+    const admin = createSupabaseAdminClient();
+    const ids = [...new Set(((pendingDiscounts.data ?? []) as { created_by?: string | null }[]).map((d) => d.created_by).filter(Boolean) as string[])];
+    if (ids.length) { const { data: who } = await admin.from("profiles").select("id,complete_name").in("id", ids); for (const p of who ?? []) discountNames[p.id as string] = p.complete_name as string; }
+    const since = new Date(Date.now() - 30 * 86400000).toISOString();
+    const r = await admin.from("enrollment_charges").select("id,enrollment_id,amount_centavos,decided_at").eq("event_type", "discount").eq("approval_status", "Rejected").gte("decided_at", since).order("decided_at", { ascending: false }).limit(300);
+    if (r.error || !r.data?.length) return;
+    const why = await admin.from("audit_logs").select("record_id,new_values").eq("action", "discount.rejected").in("record_id", r.data.map((x) => x.id as string));
+    const reasons = new Map((why.data ?? []).map((a) => [a.record_id as string, (a.new_values as { remarks?: string } | null)?.remarks ?? null]));
+    rejectedDiscounts = r.data.map((x) => ({ id: x.id as string, enrollment_id: x.enrollment_id as string, amount_centavos: Number(x.amount_centavos), decided_at: (x.decided_at as string | null) ?? null, reason: reasons.get(x.id as string) ?? null }));
+  });
 
   // Collection status of pending Change Course / Rescheduling fees, shown to the
   // Cashier and Accounting (approval waits for payment).
@@ -1361,7 +1376,7 @@ export async function GET(request: Request) {
     expenses: expensesMerged, payables: payables.data ?? [], cashierClosings: cashierClosings.data ?? [], enrollmentCharges: enrollmentCharges.data ?? [],
     employees: hr.employees, employeeAttendance: hr.employeeAttendance, leaveRequests: hr.leaveRequests, cashAdvances: hr.cashAdvances, payrollPeriods: hr.payrollPeriods, payrollItems: hr.payrollItems, benefitRecords: hr.benefitRecords, employmentContracts: hr.employmentContracts,
     classrooms: classrooms.data ?? [], certificates: certs.certificates, certificateTemplates: certs.templates, certificateReleases: certs.releases, certificateIssuanceEnabled: certs.issuanceEnabled, certificateSeries: certs.series, evaluationForms: certs.evaluationForms, feedbackAt: certs.feedbackAt, feedbackLinks: certs.feedbackLinks, certificatePhotos: certs.photos, courseCategories: courseCategories.data ?? [], partnerCenters: partnerCenters.data ?? [],
-    documentControls, centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: pendingDiscounts.data ?? [], announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, stamp, applicationNumbers, traineeFacebook, instructionCategories, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, softCopyEmails, batchNumberSeries, classroomCodes, classroom, classroomCourseIds, classroomInvites, batchClasses, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, pendingRebates, deliveryRequests, instructors, accreditations, batchResources, batchCancels, certificateNumberSettings, legacyCertificates, holidays, otherIncome, incomeCategories, rebatesReceived, traineeProofs, companyCharge, billingStatements, paymentVoids, voidedPayments }, { headers: { "Cache-Control": "no-store" } });
+    documentControls, centerPayments, agencyCourseRebates: agencyCourseRebates.data ?? [], agencyRebates: agencyRebates.data ?? [], expenseCategories: expenseCategories.data ?? [], inventoryItems: inventoryItems.data ?? [], inventoryMovements: inventoryMovements.data ?? [], pendingDiscounts: ((pendingDiscounts.data ?? []) as { created_by?: string | null }[]).map((d) => ({ ...d, requested_by_name: d.created_by ? discountNames[d.created_by] ?? null : null })), rejectedDiscounts, announcements: announcements.data ?? [], requests, pendingCharges, employeeCharges: employeeChargeData.charges, chargeEmployees: employeeChargeData.employees, instructionTemplates, batchStaffing, requirementChecks, awaitingCourseIds, stamp, applicationNumbers, traineeFacebook, instructionCategories, handedToCashier, instructionsCount, admissionRecords, chargeCollected, instructionEmails, softCopyEmails, batchNumberSeries, classroomCodes, classroom, classroomCourseIds, classroomInvites, batchClasses, cashierOpenings, expenseReprints, referralByEnrollment, receiptPrints, pendingRebates, deliveryRequests, instructors, accreditations, batchResources, batchCancels, certificateNumberSettings, legacyCertificates, holidays, otherIncome, incomeCategories, rebatesReceived, traineeProofs, companyCharge, billingStatements, paymentVoids, voidedPayments }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /**
@@ -1944,6 +1959,7 @@ export async function POST(request: Request) {
       if (!staff.roleCodes.some((r) => ["admin", "accounting", "cashier"].includes(r))) return NextResponse.json({ error: "Not authorized." }, { status: 403 });
       const { data, error } = await db.rpc("request_enrollment_discount", { target_enrollment: input.enrollmentId, target_amount: input.amountCentavos, target_description: input.description ?? "Discount", target_agency: input.agencyId ?? null });
       if (error) throw error;
+      await createSupabaseAdminClient().from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("cashier") ? "cashier" : staff.roleCodes[0] ?? null, action: "discount.requested", record_type: "enrollment", record_id: input.enrollmentId, new_values: { amount_centavos: input.amountCentavos }, reason: input.description ?? null });
       return NextResponse.json({ ok: true, charge: data });
     }
     if (input.action === "discount-decide") {

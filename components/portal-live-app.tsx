@@ -67,7 +67,9 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   agencyCourseRebates:{id:string;agency_id:string;course_id:string;rebate_centavos:number}[]; agencyRebates:{id:string;agency_id:string;enrollment_id:string;course_id:string;rebate_centavos:number;status:string;created_at:string;marketing_agencies?:{name:string}|{name:string}[]|null;courses?:{name:string}|{name:string}[]|null;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null}[];
   expenseCategories:{id:string;name:string;active:boolean}[];
   inventoryItems:{id:string;name:string;category?:string|null;unit:string;quantity_on_hand:number;unit_value_centavos:number;active:boolean}[]; inventoryMovements:{id:string;item_id:string;movement_type:string;quantity:number;remarks?:string|null;created_at:string;inventory_items?:{name:string}|{name:string}[]|null}[];
-  pendingDiscounts:{id:string;enrollment_id:string;description:string;amount_centavos:number;agency_id?:string|null;created_at:string}[];
+  pendingDiscounts:{id:string;enrollment_id:string;description:string;amount_centavos:number;agency_id?:string|null;created_at:string;requested_by_name?:string|null}[];
+  /** Discounts Accounting rejected in the last 30 days, with its reason (10 Nov 2026). */
+  rejectedDiscounts?:{id:string;enrollment_id:string;amount_centavos:number;decided_at:string|null;reason:string|null}[];
   announcements:{id:string;title:string;body:string;audience_roles:string[];published_at?:string|null;expires_at?:string|null}[];
   courseCategories:{id:string;name:string}[]; partnerCenters:{id:string;name:string;active:boolean}[];
   requests:{id:string;request_number:string;request_type:string;requested_values:{batchId?:string;amountCentavos?:number;paymentId?:string}|null;reason:string;status:string;decision_remarks?:string|null;created_at:string;decided_at?:string|null;requested_on?:string|null;fee_rule?:string|null;trainees?:{legal_first_name:string;legal_last_name:string}|{legal_first_name:string;legal_last_name:string}[]|null;enrollments?:{id?:string;enrollment_number:string;trainee_id?:string;courses?:{name:string}|{name:string}[]|null}|{id?:string;enrollment_number:string;trainee_id?:string;courses?:{name:string}|{name:string}[]|null}[]|null;
@@ -622,6 +624,9 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   const canEdit=!!reload&&["registration","admin"].includes(role??"");
   const [editing,setEditing]=useState(false),[addingCourse,setAddingCourse]=useState(false),[openEnrollment,setOpenEnrollment]=useState<string|null>(null);
   const [menu,setMenu]=useState(false),[reqType,setReqType]=useState<RequestType|null>(null),[note,setNote]=useState("");
+  // The Cashier asks Accounting for a discount from here (owner, 10 Nov 2026, Design 2).
+  const canDiscount=!!reload&&role==="cashier";
+  const [discounting,setDiscounting]=useState(false);
   const canPrint=["admin","registration"].includes(role??"");
   // Tick boxes for separate payments (owner, 4 Nov 2026).
   const canSettle=!!reload&&["cashier","admin"].includes(role??"");
@@ -712,7 +717,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
             <div className="tp-scroll"><table className="tp-table"><thead><tr>{canSettle&&<th className="tp-tick" aria-label="Pay now"></th>}<th>Course</th><th>Schedule</th><th>Source</th><th>Rebate</th><th>Status</th><th className="r">Due</th><th className="r">Paid</th><th className="r">Balance</th></tr></thead><tbody>
               {enrolls.map(e=>{const c=first(e.courses),cancelled=e.enrollment_status==="Cancelled",d=cancelled?0:dueCentavos(e),bal=cancelled?0:balanceOf(e);return <tr key={e.id} className={canEdit?"sa-click":undefined} onClick={canEdit?()=>setOpenEnrollment(e.id):undefined} title={canEdit?"Open this enrollment":undefined}>
                 {canSettle&&<td className="tp-tick" onClick={ev=>ev.stopPropagation()}>{bal>0&&!data.companyCharge?.[e.id]&&<input type="checkbox" className="cx-tickbox" checked={!off[e.id]} aria-label={`Pay ${c?.code??"this course"} now`} onChange={ev=>{const on=ev.target.checked;setOff(cur=>({...cur,[e.id]:!on}))}}/>}</td>}
-                <td><b>{c?.code??"Course"}</b><small>{c?.name} · {e.enrollment_number}</small>{canEdit&&reload&&<InstructionsButton data={data} enrollment={e} reload={reload}/>}</td><td>{when(e)}</td><td>{canEdit?<CourseSourceCell key={`${e.id}:${partnerOf(data,e)?.id??e.source}`} data={data} enrollment={e} busy={busy} post={post}/>:<span className={`cs-chip ${partnerOf(data,e)?"ag":"wk"}`}>{sourceLabel(e.source,partnerOf(data,e))||"Online"}</span>}</td><td>{rebateOf(e)}</td>
+                <td><b>{c?.code??"Course"}</b><small>{c?.name} · {e.enrollment_number}</small><DiscountStatus data={data} e={e}/>{canEdit&&reload&&<InstructionsButton data={data} enrollment={e} reload={reload}/>}</td><td>{when(e)}</td><td>{canEdit?<CourseSourceCell key={`${e.id}:${partnerOf(data,e)?.id??e.source}`} data={data} enrollment={e} busy={busy} post={post}/>:<span className={`cs-chip ${partnerOf(data,e)?"ag":"wk"}`}>{sourceLabel(e.source,partnerOf(data,e))||"Online"}</span>}</td><td>{rebateOf(e)}</td>
                 <td>{!cancelled&&chargeTo(data,e)?<Badge tone="pending">Company Charge</Badge>:<Badge tone={e.enrollment_status==="Enrolled"?"active":e.enrollment_status==="Cancelled"?"cancelled":"pending"}>{e.enrollment_status}</Badge>}</td>
                 <td className="r tp-mono">{money(d)}</td><td className="r tp-mono">{money(Math.max(0,d-bal))}</td><td className="r tp-mono">{money(bal)}</td></tr>})}
               {!enrolls.length&&<tr><td colSpan={8+(canSettle?1:0)} className="sa-empty">No courses yet.</td></tr>}
@@ -759,15 +764,43 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
         <div className="sa-acts">
           {canEdit&&<button type="button" className="portal-primary" onClick={()=>setAddingCourse(true)}>Add Course</button>}
           {canEdit&&<button type="button" className="portal-secondary" onClick={()=>setEditing(v=>!v)}>{editing?"Done Editing":"Edit Details"}</button>}
+          {canDiscount&&live.some(e=>balanceOf(e)>0)&&<div className="req-dd"><button type="button" className="portal-secondary" aria-haspopup="menu" aria-expanded={menu} onClick={()=>setMenu(v=>!v)}>Request ▾</button>{menu&&<div className="sa-menu" role="menu"><button type="button" role="menuitem" onClick={()=>{setMenu(false);setDiscounting(true)}}>Discount</button></div>}</div>}
           {canEdit&&live.length>0&&<div className="req-dd"><button type="button" className="portal-secondary" aria-haspopup="menu" aria-expanded={menu} onClick={()=>setMenu(v=>!v)}>Request ▾</button>{menu&&<div className="sa-menu" role="menu">{TRAINEE_REQUESTS.map(([t,lbl])=><button key={t} type="button" role="menuitem" onClick={()=>{setMenu(false);setReqType(t)}}>{lbl}</button>)}</div>}</div>}
         </div>
         <div className="sa-acts"><button type="button" className="portal-secondary" onClick={onClose}>Close</button></div>
       </div>
     </div>
     {reqType&&<TraineeRequestModal data={data} traineeId={trainee.id} reqType={reqType} onClose={()=>setReqType(null)} post={raise}/>}
+    {discounting&&reload&&<CashierDiscountModal enrollments={live} onClose={()=>setDiscounting(false)} onSent={async(text)=>{setNote(text);await reload()}}/>}
     {addingCourse&&reload&&<AssignCourseModal data={data} trainee={trainee} reload={reload} onClose={()=>setAddingCourse(false)}/>}
     {openEnrollment&&reload&&(()=>{const e=data.enrollments.find(x=>x.id===openEnrollment);return e?<EnrollmentDrawer data={data} enrollment={e} reload={reload} onClose={()=>setOpenEnrollment(null)}/>:null})()}
   </Modal>;
+}
+
+/** A course's discount as the Cashier sees it (owner, 10 Nov 2026): waiting for Accounting, approved, or rejected with the reason. */
+export function DiscountStatus({data,e}:{data:Pick<PortalData,"pendingDiscounts"|"rejectedDiscounts">;e:Pick<Enrollment,"id"|"discounts_centavos">}){
+  const waiting=data.pendingDiscounts.filter(d=>d.enrollment_id===e.id);
+  const rejected=(data.rejectedDiscounts??[]).filter(d=>d.enrollment_id===e.id);
+  const approved=Number(e.discounts_centavos??0);
+  if(!waiting.length&&!rejected.length&&approved<=0)return null;
+  return <span className="sa-disc">{waiting.map(d=><Badge key={d.id} tone="orange">{`Discount ${pesos(d.amount_centavos)} · Waiting for Accounting`}</Badge>)}{approved>0&&<Badge tone="green">{`Discount −${pesos(approved)} · Approved`}</Badge>}{rejected.map(d=><Badge key={d.id} tone="red">{`Discount ${pesos(d.amount_centavos)} Rejected${d.reason?` · ${d.reason}`:""}`}</Badge>)}</span>;
+}
+
+/** The Cashier's discount request (owner, 10 Nov 2026, Design 2): a course with a balance, the amount and the reason, sent to Accounting. */
+export function CashierDiscountModal({enrollments,onClose,onSent}:{enrollments:Enrollment[];onClose:()=>void;onSent:(text:string)=>Promise<void>}){
+  const open=enrollments.filter(e=>balanceOf(e)>0);
+  const [id,setId]=useState(open[0]?.id??""),[amount,setAmount]=useState(""),[why,setWhy]=useState<ReasonValue>(NO_REASON),[busy,setBusy]=useState(false),[err,setErr]=useState("");
+  const e=open.find(x=>x.id===id),cents=Math.round(Number(amount||0)*100),max=e?balanceOf(e):0;
+  const ok=!!e&&Number.isFinite(cents)&&cents>0&&cents<=max&&reasonReady(why);
+  async function send(){setBusy(true);setErr("");try{await submit({action:"discount-request",enrollmentId:id,amountCentavos:cents,description:reasonText(why)});await onSent(`Discount of ${pesos(cents)} sent to Accounting for approval.`);onClose()}catch(x){setErr(x instanceof Error?x.message:"Could not send the request.")}finally{setBusy(false)}}
+  return <Modal title="Request Discount" onClose={onClose}><div className="portal-form">
+    {err&&<div className="full"><Message kind="error" text={err}/></div>}
+    <label className="full">Course<select value={id} onChange={ev=>setId(ev.target.value)}>{open.map(x=><option key={x.id} value={x.id}>{`${first(x.courses)?.code??"Course"} · ${x.enrollment_number} · balance ${pesos(balanceOf(x))}`}</option>)}</select></label>
+    <label>Discount Amount (PHP)<input inputMode="decimal" value={amount} onChange={ev=>setAmount(ev.target.value)} placeholder="0.00"/></label>
+    <ReasonField reasons={REASONS.discount} value={why} onChange={setWhy}/>
+    {cents>max&&<p className="portal-form-note full">The discount cannot be more than the balance ({pesos(max)}).</p>}
+    <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy||!ok} onClick={()=>void send()}>{busy?"Sending…":"Send to Accounting"}</button></div>
+  </div></Modal>;
 }
 
 /** Cashier Dashboard with the Trainee Account a click away (owner, 6 Nov 2026). A trainee from an earlier month is not loaded yet, so opening one loads all dates. */
