@@ -1,4 +1,5 @@
 "use client";
+import { Modal } from "./shared-ui";
 
 import { FormEvent, useState } from "react";
 import { CertificatePdfModal, type CertPdfTarget } from "./certificate-pdf-modal";
@@ -168,9 +169,7 @@ export function ReleaseConfirm({ target, onClose, onDone }: { target: { enrollme
     } catch (e) { setErr(e instanceof Error ? e.message : "Could not release the certificate."); }
     finally { setBusy(false); }
   }
-  return <div className="portal-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-    <section className="portal-modal" role="dialog" aria-modal="true" aria-labelledby="rel-title">
-      <header><div><span className="portal-eyebrow">Secure staff action</span><h2 id="rel-title">Release Certificate</h2></div><button type="button" onClick={onClose} aria-label="Close dialog">×</button></header>
+  return <Modal title="Release Certificate" eyebrow="Secure staff action" onClose={onClose}>
       <div className="portal-form">
         {err && <div className="portal-message error full" role="alert">{err}</div>}
         <p className="full" style={{ margin: 0 }}><strong>{target.name}</strong><br />{target.course} · Certificate {target.certNo}</p>
@@ -192,8 +191,7 @@ export function ReleaseConfirm({ target, onClose, onDone }: { target: { enrollme
         <p className="portal-form-note full">Released by, date and time are recorded automatically for the audit trail.</p>
         <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy || !ready} onClick={confirm}>{busy ? "Releasing…" : "Confirm Release"}</button></div>
       </div>
-    </section>
-  </div>;
+    </Modal>;
 }
 
 export function LiveReleasing({ data, role, reload }: { data: ReleasingData; role: string; reload: () => Promise<void> }) {
@@ -298,8 +296,7 @@ function OverrideModal({ enrollment, cert, onClose, onDone, busy }: { enrollment
   const [certNo, setCertNo] = useState(snap.certificate_number || "");
   const [regNo, setRegNo] = useState(ov.registration_number || enrollment.enrollment_number || "");
   function go() { void onDone({ action: "certificate-override", enrollmentId: enrollment.id, certificateNumber: certNo.trim() || undefined, overrides: { name: name.trim(), course_title: courseName.trim(), course_content: courseContent.trim(), conducted_date: conductedDate.trim(), issued_date: issuedDate.trim(), registration_number: regNo.trim() } }); }
-  return <div className="portal-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-    <section className="portal-modal" role="dialog" aria-modal="true"><header><div><span className="portal-eyebrow">Admin override</span><h2>Edit Certificate Details</h2></div><button type="button" onClick={onClose} aria-label="Close">×</button></header>
+  return <Modal title="Edit Certificate Details" eyebrow="Admin override" onClose={onClose}>
       <div className="portal-form">
         <p className="portal-form-note full">Admin-only. These values print on the certificate (they override the trainee/course defaults). Leave a field blank to keep the default.</p>
         <label className="full">Name on Certificate<input value={name} onChange={(e) => setName(e.target.value)} /></label>
@@ -310,8 +307,7 @@ function OverrideModal({ enrollment, cert, onClose, onDone, busy }: { enrollment
         <label>Certificate no.<input value={certNo} onChange={(e) => setCertNo(e.target.value)} placeholder="Keep issued" /></label>
         <label>Registration no.<input value={regNo} onChange={(e) => setRegNo(e.target.value)} /></label>
         <div className="portal-form-actions full"><button type="button" className="ghost-button" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={go}>{busy ? "Saving…" : "Save Overrides"}</button></div>
-      </div></section>
-  </div>;
+      </div></Modal>;
 }
 
 function ReleaseModal({ enrollment, onClose, onDone, busy }: { enrollment: Enrollment; onClose: () => void; onDone: (body: Record<string, unknown>) => Promise<void>; busy: boolean }) {
@@ -320,16 +316,14 @@ function ReleaseModal({ enrollment, onClose, onDone, busy }: { enrollment: Enrol
   const [reason, setReason] = useState("");
   const [err, setErr] = useState("");
   function go() { if (!name.trim()) { setErr("Enter the recipient's name."); return; } void onDone({ action: "certificate-release", enrollmentId: enrollment.id, recipientName: name.trim(), recipientIdType: idType.trim() || undefined, reason: reason.trim() || undefined }); }
-  return <div className="portal-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-    <section className="portal-modal" role="dialog" aria-modal="true"><header><div><span className="portal-eyebrow">Certificate</span><h2>Release Certificate</h2></div><button type="button" onClick={onClose} aria-label="Close">×</button></header>
+  return <Modal title="Release Certificate" eyebrow="Certificate" onClose={onClose}>
       <div className="portal-form">{err && <div className="portal-message error full">{err}</div>}
         <p className="portal-form-note full">Records who received the certificate. This is logged and appears in the released report.</p>
         <label className="full">Recipient Name<input value={name} onChange={(e) => setName(e.target.value)} /></label>
         <label className="full">ID Presented (Type)<input value={idType} onChange={(e) => setIdType(e.target.value)} placeholder="e.g. Driver's license, SRN, authorization letter" /></label>
         <label className="full">Remarks<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Optional" /></label>
         <div className="portal-form-actions full"><button type="button" className="ghost-button" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={go}>{busy ? "Releasing…" : "Confirm Release"}</button></div>
-      </div></section>
-  </div>;
+      </div></Modal>;
 }
 
 function TemplateUpload({ data, ownCourses, onSaved }: { data: ReleasingData; ownCourses: Course[]; onSaved: () => Promise<void> }) {

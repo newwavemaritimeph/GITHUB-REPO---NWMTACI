@@ -10,7 +10,7 @@ import { tcl } from "@/lib/title-case";
 import { REBATE_PRESETS, STCW_REBATE_COURSES, rebateRowsProblem } from "@/lib/rebates";
 import { askReason, askConfirm } from "./dialogs";
 import { REASONS, REJECT_REASONS } from "./reject-inline";
-import { useNeedSince } from "./shared-ui";
+import { useNeedSince, Modal } from "./shared-ui";
 
 /** Loose shapes for the accounting slices of the staff-operations payload. */
 type Payment = { payment_number?: string; method: string; receiving_account?: string | null; amount_centavos: number; reference_number?: string | null; received_at?: string; verification_state: string; trainee_id?: string };
@@ -776,15 +776,12 @@ export function LiveExpenses({ data, role, reload }: { data: AccountingData; rol
 /* ---- Small styled modal (replaces native window.prompt) ---- */
 function EditModal({ title, subtitle, children, onClose, onSave, saveLabel = "Save changes", busy }: { title: string; subtitle?: string; children: React.ReactNode; onClose: () => void; onSave: () => void; saveLabel?: string; busy?: boolean }) {
   return (
-    <div className="portal-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <section className="portal-modal" role="dialog" aria-modal="true" aria-labelledby="edit-modal-title">
-        <header><div><span className="portal-eyebrow">Accounting · pricing</span><h2 id="edit-modal-title">{title}</h2>{subtitle && <p style={{ margin: "2px 0 0", color: "var(--muted)", fontSize: 13 }}>{subtitle}</p>}</div><button type="button" onClick={onClose} aria-label="Close dialog">×</button></header>
+    <Modal title={title} eyebrow="Accounting · pricing" onClose={onClose}>{subtitle && <p className="portal-form-note" style={{ margin: "12px 22px 0" }}>{subtitle}</p>}
         <form className="portal-form" onSubmit={(e) => { e.preventDefault(); onSave(); }}>
           {children}
           <div className="portal-form-actions full"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="submit" className="portal-primary" disabled={busy}>{busy ? "Saving…" : saveLabel}</button></div>
         </form>
-      </section>
-    </div>
+      </Modal>
   );
 }
 

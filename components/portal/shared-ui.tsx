@@ -14,8 +14,19 @@ export function Badge({ children, tone }: { children: ReactNode; tone?: string }
   return <span className={`portal-badge ${tone ?? String(children).toLowerCase().replaceAll(" ", "-")}`}>{tcl(children)}</span>;
 }
 
+/**
+ * Feedback after an action (owner, 10 Nov 2026 polish pass). A success shows as a toast at the bottom right that
+ * fades after 5 seconds (it can be closed); an error stays in place, where it happened, until the next action.
+ */
 export function Message({ kind, text }: { kind: "success" | "error"; text: string }) {
-  return <div className={`portal-message ${kind}`} role={kind === "error" ? "alert" : "status"}>{text}</div>;
+  if (kind === "error") return <div className="portal-message error" role="alert">{text}</div>;
+  return <Toast key={text} text={text} />;
+}
+function Toast({ text }: { text: string }) {
+  const [shown, setShown] = useState(true);
+  useEffect(() => { const t = window.setTimeout(() => setShown(false), 5000); return () => window.clearTimeout(t); }, []);
+  if (!shown) return null;
+  return <div className="nw-toast" role="status" aria-live="polite"><span className="nw-toast-ic" aria-hidden="true">✓</span><span>{text}</span><button type="button" aria-label="Close" onClick={() => setShown(false)}>×</button></div>;
 }
 
 /** Keeps Tab inside a dialog, closes on Escape, and puts focus back on what opened it (owner, 10 Nov 2026 polish pass). */
@@ -40,12 +51,12 @@ export function useDialogFocus(box: { current: HTMLElement | null }, onEscape?: 
 }
 
 /** The shared window: sm (440), md (640, the default) or lg (980, also `wide`). Escape, the × and the backdrop close it. */
-export function Modal({ title, children, onClose, wide, size }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean; size?: "sm" | "md" | "lg" }) {
+export function Modal({ title, eyebrow, children, onClose, wide, size }: { title: string; eyebrow?: string; children: ReactNode; onClose: () => void; wide?: boolean; size?: "sm" | "md" | "lg" }) {
   const box = useRef<HTMLElement>(null);
   useDialogFocus(box, onClose);
   return <div className="portal-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
     <section ref={box} className="portal-modal" data-size={size ?? (wide ? "lg" : "md")} role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <header><div><h2 id="modal-title">{title}</h2></div><button type="button" onClick={onClose} aria-label="Close">×</button></header>
+      <header><div>{eyebrow && <span className="portal-eyebrow">{eyebrow}</span>}<h2 id="modal-title">{title}</h2></div><button type="button" onClick={onClose} aria-label="Close">×</button></header>
       {children}
     </section>
   </div>;

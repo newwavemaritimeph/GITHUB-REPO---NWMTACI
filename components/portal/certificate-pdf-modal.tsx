@@ -1,4 +1,5 @@
 "use client";
+import { Modal } from "./shared-ui";
 
 import { useEffect, useState } from "react";
 
@@ -117,9 +118,7 @@ export function CertificatePdfModal({ target, onClose }: { target: CertPdfTarget
   }
 
   return (
-    <div className="portal-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <section className="portal-modal" role="dialog" aria-modal="true" aria-labelledby="cert-pdf-title">
-        <header><div><span className="portal-eyebrow">Certificate</span><h2 id="cert-pdf-title">Generate Certificate PDF</h2></div><button type="button" onClick={onClose} aria-label="Close dialog">×</button></header>
+    <Modal title="Generate Certificate PDF" eyebrow="Certificate" onClose={onClose}>
         <div className="portal-form">
           {message && <div className="portal-message full" role="status">{message}</div>}
           <div className="full"><strong>{target.traineeName}</strong> — {target.courseName} · {target.enrollmentNumber}</div>
@@ -141,8 +140,7 @@ export function CertificatePdfModal({ target, onClose }: { target: CertPdfTarget
             <button type="button" className="portal-primary" disabled={busy || !meta?.url} onClick={() => void generate()}>{busy ? "Generating…" : "Generate & Open PDF"}</button>
           </div>
         </div>
-      </section>
-    </div>
+      </Modal>
   );
 }
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Inter, Geist, Geist_Mono, Source_Serif_4, Outfit, Montserrat, Caveat } from "next/font/google";
+import { Geist, Source_Serif_4, Outfit, Montserrat, Caveat } from "next/font/google";
 import "./globals.css";
 import "./catalog.css";
 import "./portal-legacy.css";
@@ -8,16 +8,13 @@ import "./portal-tokens.css";
 
 // Interface face. Inter is drawn for screen UI: it stays legible at the small
 // sizes the portal uses for table meta and field labels.
-const interSans = Inter({
-  variable: "--font-ui",
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-});
+// One readable family across the website, the staff portal, MyHR and the queue (owner, 10 Nov 2026):
+// Geist for every interface word. Variable font, so no weight list.
+const interSans = Geist({ variable: "--font-ui", subsets: ["latin"], display: "swap" });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+// Numbers use the same Geist with even-width (tabular) digits instead of a monospace face, so amounts read
+// like the rest of the text and still line up in columns (owner, 10 Nov 2026: "readable fonts").
+const geistMono = Geist({ variable: "--font-geist-mono", subsets: ["latin"], display: "swap" });
 
 // Display face for headings and figures (the "Editorial" direction). A serif
 // gives headings and numbers a considered, reported quality — fitting for
@@ -35,7 +32,7 @@ const sourceSerif = Source_Serif_4({
 // for amounts and identifiers. Scoped to .portal-shell in portal-legacy.css; the
 // public site keeps Editorial. Both are variable fonts, so no weight list.
 const portalSans = Geist({ variable: "--font-portal", subsets: ["latin"], display: "swap" });
-const portalNumerals = Geist_Mono({ variable: "--font-num", subsets: ["latin"], display: "swap" });
+const portalNumerals = Geist({ variable: "--font-num", subsets: ["latin"], display: "swap" });
 // Registration form headings ("Quiet Checklist" direction). Variable font.
 const formDisplay = Outfit({ variable: "--font-form", subsets: ["latin"], display: "swap" });
 // Registration page heading (owner, 20 Oct 2026: design 4): Montserrat headline, Caveat tagline. Both variable fonts.
