@@ -8,7 +8,7 @@ import { FOOT, INK, LEGAL, MUTED, NAVY, SIDE, drawLetterhead, finishPages, fitTe
 const peso = (c: number) => (c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const longDay = (iso: string) => new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date(`${iso}T00:00:00+08:00`));
 
-export async function createReferralVoucherPdf(s: ReferralVoucherSnapshot, logoBytes?: Uint8Array, control?: DocumentControl | null) {
+export async function createReferralVoucherPdf(s: ReferralVoucherSnapshot, logoBytes?: Uint8Array, control?: DocumentControl | null, status?: string) {
   const pdf = await PDFDocument.create();
   pdf.setTitle(`Referral Voucher ${s.number}`);
   pdf.setAuthor("New Wave Maritime Training and Assessment Center, Inc.");
@@ -24,7 +24,9 @@ export async function createReferralVoucherPdf(s: ReferralVoucherSnapshot, logoB
   const tableHead = () => { let x = SIDE; for (const c of cols) { box(x, y, c.w, 20, NAVY); const lab = c.label.toUpperCase(); if (c.r) right(lab, x + c.w - 7, y - 13.5, 9, bold, white); else text(lab, x + 7, y - 13.5, 9, bold, white); x += c.w; } y -= 20; };
   y = drawLetterhead(page, brand, control, { title: "REFERRAL VOUCHER", right: s.number });
   // Referral details: two pairs per row.
-  const pairs: [string, string][] = [["Referred By", s.partner], ["Voucher No.", s.number], ["Type", s.kind || "Agency"], ["Period", `${longDay(s.from)} - ${longDay(s.to)}`], ["Referral Code", s.referralCode ?? "-"], ["Trainees", String(s.rows.length)], ["Contact", s.contact ?? "-"], ["Date Issued", longDay(s.issuedOn)]];
+  const pairs: [string, string][] = [["Referred By", s.partner], ["Voucher No.", s.number], ["Type", s.kind || "Agency"], ["Period", `${longDay(s.from)} - ${longDay(s.to)}`], ["Referral Code", s.referralCode ?? "-"], ["Trainees", String(s.rows.length)], ["Contact", s.contact ?? "-"], ["Date Issued", longDay(s.issuedOn)],
+    // How the partner is paid (owner, 10 Nov 2026): set by the Cashier, approved by Accounting.
+    ["Mode of Payment", s.mode ?? "-"], ["Status", status ?? "For Approval"], ["Payee Account", s.payeeAccount ?? "-"], ["Reference", s.reference ?? "-"]];
   const lw = 94, vw = CW / 2 - lw, rh = 20;
   for (let i = 0; i < pairs.length; i += 2) {
     [pairs[i], pairs[i + 1]].forEach(([k, v], j) => { const x = SIDE + j * (CW / 2); box(x, y, lw, rh, label); box(x + lw, y, vw, rh); text(k, x + 6, y - 13.5, 10, reg, MUTED); text(fitText(v, bold, 10.5, vw - 12), x + lw + 6, y - 13.5, 10.5, bold); });

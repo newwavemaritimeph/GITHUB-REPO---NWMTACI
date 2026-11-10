@@ -50,8 +50,8 @@ function useJson<T>(url: string | null) {
 
 // Accounting Dashboard Design 06 (owner, 3 Nov 2026): Requisitions are not Accounting's; voucher reprints sit with expense requests.
 // TAR reprints come straight to Accounting (owner, 9 Nov 2026).
-type Category = "Expense requests" | "Refunds" | "Discounts" | "Payment voids" | "TAR reprints" | "Rebates owed to partners" | "Cashier opening and closing";
-const CATEGORY_GROUPS: [string, Category[]][] = [["Needs your decision", ["Expense requests", "Refunds", "Discounts", "Payment voids", "TAR reprints"]], ["For billing", ["Rebates owed to partners"]], ["Cash control", ["Cashier opening and closing"]]];
+type Category = "Expense requests" | "Referral vouchers" | "Refunds" | "Discounts" | "Payment voids" | "TAR reprints" | "Rebates owed to partners" | "Cashier opening and closing";
+const CATEGORY_GROUPS: [string, Category[]][] = [["Needs your decision", ["Expense requests", "Referral vouchers", "Refunds", "Discounts", "Payment voids", "TAR reprints"]], ["For billing", ["Rebates owed to partners"]], ["Cash control", ["Cashier opening and closing"]]];
 /** Pending TAR reprint requests, of any stage: one raised before 9 Nov 2026 may still sit with the Cashier. */
 const pendingTarReprints = (data: PortalData) => data.requests.filter((r) => r.request_type === "TAR reprint" && r.status === "Pending");
 /** Lists that count requests, not money. */
@@ -111,7 +111,11 @@ export function AccountingApprovals({ data, reload, compact, rail }: { data: Por
   // Approving allows one more print of the TAR with the same AR number (applyApprovedRequest).
   const tars = pendingTarReprints(data).map((r): Row => { const e = first(r.enrollments), en = data.enrollments.find((x) => x.id === e?.id), course = first(en?.courses)?.code ?? first(e?.courses)?.name; return { id: r.id, title: `${name(first(r.trainees))}${course ? ` · ${course}` : ""}`, detail: `Reason: ${r.reason}`, ref: r.request_number, who: "", when: fmtDate(day(r.created_at)), amount: 0, noAmount: true, okLabel: "Approve", canReject: true,
     act: (approve, remarks) => post({ action: "request-decide", id: r.id, approve, remarks }, approve ? "Approved. One more print of the TAR is allowed." : "TAR reprint rejected.") }; });
-  const lists: Record<Category, Row[]> = { "Expense requests": [...expenses, ...reprints], Refunds: refunds, Discounts: discounts, "Payment voids": voids, "TAR reprints": tars, "Rebates owed to partners": rebates, "Cashier opening and closing": closings };
+  // Referral Vouchers the Cashier sent (owner, 10 Nov 2026): preview the PDF, then approve or return.
+  const partnerName = (id: string) => data.agencies.find((a) => a.id === id)?.name ?? "Partner";
+  const vouchers = (data.referralVouchers ?? []).filter((v) => (v.status ?? "For Approval") === "For Approval").map((v): Row => ({ id: v.id, preview: { label: `View ${v.voucher_number}`, href: `/api/documents/referral-voucher/${v.id}` }, reasons: ["Wrong partner or period", "Wrong mode of payment", "Missing account details"], title: `${partnerName(v.agency_id)} · Referral Voucher`, detail: `${fmtDate(v.period_from)} – ${fmtDate(v.period_to)}${v.mode ? ` · ${v.mode}` : ""}`, ref: v.voucher_number, who: "Cashier", when: fmtDate(day(v.issued_at)), amount: Number(v.total_centavos), okLabel: "Approve", canReject: true,
+    act: (approve, remarks) => post({ action: "referral-voucher-decide", id: v.id, approve, remarks: remarks ?? "" }, approve ? "Approved. The Cashier can release it." : "Returned to the Cashier.") }));
+  const lists: Record<Category, Row[]> = { "Expense requests": [...expenses, ...reprints], "Referral vouchers": vouchers, Refunds: refunds, Discounts: discounts, "Payment voids": voids, "TAR reprints": tars, "Rebates owed to partners": rebates, "Cashier opening and closing": closings };
   const waiting = Object.values(lists).reduce((s, l) => s + l.length, 0);
   const rowsOf = (list: Row[]) => list.map((r) => <div key={r.id} className={rejecting && rejecting !== r.id ? "ac-dim" : undefined}>
     <div className={`ac-req${rejecting === r.id ? " ac-rejecting" : ""}`}>
@@ -429,32 +433,50 @@ export function AccountingReceivables({ data }: { data: PortalData }) {
 
 const PAYABLE_TABS = ["Open", "Due this week", "Overdue", "Paid"] as const;
 /**
- * Referral Voucher, Design 1 (owner, 10 Nov 2026): Accounting picks a partner (Agency, Consultancy or Freelance) and the dates;
- * the voucher lists every trainee that partner endorsed in those dates with the rebate, and is kept as issued (RV No.).
+ * Referral Voucher (owner, 10 Nov 2026): the Cashier prepares it for a partner (Agency, Consultancy or Freelance) and a period,
+ * with the mode of payment and the partner's account, and submits it; Accounting previews the PDF and approves or returns it;
+ * the Cashier then releases it and the rebates on it are paid. The voucher is kept as issued (RV No.); each step is recorded.
  */
-function ReferralVoucherPanel({ data, busy, post, onClose }: { data: PortalData; busy: boolean; post: (body: Record<string, unknown>, ok?: string) => Promise<Record<string, unknown> | undefined>; onClose: () => void }) {
+const RV_TONE: Record<string, string> = { "For Approval": "orange", Approved: "blue", Returned: "red", Released: "green" };
+export function ReferralVoucherPanel({ data, busy, post, onClose, role }: { data: PortalData; busy: boolean; post: (body: Record<string, unknown>, ok?: string) => Promise<Record<string, unknown> | undefined>; onClose?: () => void; role: "cashier" | "accounting" }) {
   const today = manilaToday();
   const partners = data.agencies.filter((a) => a.active).sort((a, b) => a.name.localeCompare(b.name));
   const [agencyId, setAgencyId] = useState(partners[0]?.id ?? ""), [from, setFrom] = useState(`${today.slice(0, 8)}01`), [to, setTo] = useState(today);
+  const [mode, setMode] = useState<string>("Offset at Payment"), [reference, setReference] = useState(""), [payeeAccount, setPayeeAccount] = useState("");
   const [issued, setIssued] = useState<{ id: string; number: string } | null>(null);
   const nameOf = (id: string) => data.agencies.find((a) => a.id === id)?.name ?? "Partner";
+  const needsAccount = mode !== "Offset at Payment" && mode !== "Cash";
   async function generate() {
     setIssued(null);
-    try { const r = await post({ action: "referral-voucher-issue", agencyId, from, to }, "Referral Voucher issued."); if (r?.id) setIssued({ id: String(r.id), number: String(r.number) }); }
+    try { const r = await post({ action: "referral-voucher-issue", agencyId, from, to, mode, reference: reference.trim(), payeeAccount: payeeAccount.trim() }, "Referral Voucher sent to Accounting for approval."); if (r?.id) setIssued({ id: String(r.id), number: String(r.number) }); }
     catch { /* the page shows the error */ }
   }
+  const decide = async (id: string, approve: boolean) => {
+    const remarks = approve ? "" : await askReason("Return this Referral Voucher to the Cashier?", ["Wrong partner or period", "Wrong mode of payment", "Missing account details", "Other"], { title: "Return Voucher", okLabel: "Return", danger: true });
+    if (!approve && !remarks) return;
+    await post({ action: "referral-voucher-decide", id, approve, remarks: remarks ?? "" }, approve ? "Approved. The Cashier can release it." : "Returned to the Cashier.").catch(() => undefined);
+  };
+  const release = async (id: string, vMode?: string | null) => {
+    const ref = vMode && vMode !== "Offset at Payment" && vMode !== "Cash" ? await askReason(`Release by ${vMode}: enter the transaction reference.`, [], { title: "Release Voucher", okLabel: "Release" }) : "";
+    if (ref === null) return;
+    await post({ action: "referral-voucher-release", id, reference: ref ?? "" }, "Released. The rebates on it are paid.").catch(() => undefined);
+  };
   const list = data.referralVouchers ?? [];
   return <section className="portal-panel cx-panel rv-panel">
-    <div className="panel-heading"><h2>Referral Voucher</h2><button type="button" className="portal-secondary row-act" onClick={onClose}>Close</button></div>
+    <div className="panel-heading"><h2>Referral Vouchers</h2>{onClose && <button type="button" className="portal-secondary row-act" onClick={onClose}>Close</button>}</div>
     <div className="rv-form">
       <label>Partner<select value={agencyId} onChange={(e) => setAgencyId(e.target.value)}>{partners.map((a) => <option key={a.id} value={a.id}>{a.name} · {a.kind === "Consultancy" || a.kind === "Freelance" ? a.kind : "Agency"}</option>)}</select></label>
       <label>From<input type="date" value={from} max={today} onChange={(e) => e.target.value && setFrom(e.target.value)} /></label>
       <label>To<input type="date" value={to} max={today} onChange={(e) => e.target.value && setTo(e.target.value)} /></label>
-      <button type="button" className="portal-primary row-act" disabled={busy || !agencyId || to < from} onClick={() => void generate()}>{busy ? "Issuing…" : "Generate"}</button>
+      <label>Mode of Payment<select value={mode} onChange={(e) => setMode(e.target.value)}>{["Offset at Payment", "Cash", "GCash", "Bank Transfer"].map((m) => <option key={m}>{m}</option>)}</select></label>
+      {needsAccount && <label>Payee Account<input value={payeeAccount} maxLength={160} onChange={(e) => setPayeeAccount(e.target.value)} placeholder="Account name and number" /></label>}
+      {needsAccount && <label>Reference / Details<input value={reference} maxLength={80} onChange={(e) => setReference(e.target.value)} placeholder="Optional" /></label>}
+      <button type="button" className="portal-primary row-act" disabled={busy || !agencyId || to < from || (needsAccount && !payeeAccount.trim() && !reference.trim())} onClick={() => void generate()}>{busy ? "Sending…" : "Submit to Accounting"}</button>
     </div>
-    {issued && <p className="rv-done"><a className="portal-secondary row-act" href={`/api/documents/referral-voucher/${issued.id}`} target="_blank" rel="noreferrer">Open {issued.number}</a></p>}
-    {list.length > 0 && <div className="portal-table cx-cards"><table><thead><tr><th>Voucher</th><th>Partner</th><th>Period</th><th className="r">Total</th><th></th></tr></thead><tbody>
-      {list.map((v) => <tr key={v.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{v.voucher_number}</span><small>{fmtDate(manilaDay(v.issued_at))}</small></td><td data-l="Partner">{nameOf(v.agency_id)}</td><td data-l="Period">{fmtDate(v.period_from)} – {fmtDate(v.period_to)}</td><td data-l="Total" className="r"><strong className="cx-amt">{pesos2(Number(v.total_centavos))}</strong></td><td data-l=""><ViewIcon label={`View ${v.voucher_number}`} href={`/api/documents/referral-voucher/${v.id}`} /></td></tr>)}
+    {issued && <p className="rv-done"><a className="portal-secondary row-act" href={`/api/documents/referral-voucher/${issued.id}`} target="_blank" rel="noreferrer">Preview {issued.number}</a></p>}
+    {list.length > 0 && <div className="portal-table cx-cards"><table><thead><tr><th>Voucher</th><th>Partner</th><th>Mode</th><th>Status</th><th className="r">Total</th><th></th></tr></thead><tbody>
+      {list.map((v) => { const st = v.status ?? "For Approval"; return <tr key={v.id}><td data-l="" className="lead"><span className="cx-name cx-mono">{v.voucher_number}</span><small>{fmtDate(manilaDay(v.issued_at))}</small></td><td data-l="Partner">{nameOf(v.agency_id)}<small>{fmtDate(v.period_from)} – {fmtDate(v.period_to)}</small></td><td data-l="Mode">{v.mode ?? "—"}</td><td data-l="Status"><Badge tone={RV_TONE[st]}>{st}</Badge>{st === "Returned" && v.remarks ? <small>{v.remarks}</small> : null}</td><td data-l="Total" className="r"><strong className="cx-amt">{pesos2(Number(v.total_centavos))}</strong></td>
+        <td data-l=""><div className="cx-acts"><ViewIcon label={`Preview ${v.voucher_number}`} href={`/api/documents/referral-voucher/${v.id}`} /><ActionsMenu disabled={busy} items={[role === "accounting" && st === "For Approval" && { label: "Approve", onClick: () => void decide(v.id, true) }, role === "accounting" && st === "For Approval" && { label: "Return with Reason", danger: true, onClick: () => void decide(v.id, false) }, role === "cashier" && st === "Approved" && { label: "Release", onClick: () => void release(v.id, v.mode) }]} /></div></td></tr>; })}
     </tbody></table></div>}
   </section>;
 }
@@ -482,7 +504,7 @@ export function AccountingPayables({ data, reload }: { data: PortalData; reload:
   return <div className="portal-page cx ac">
     <TxHead title="Payables" note={<>Amounts New Wave owes · as of {fmtDate(today)}</>} right={<button type="button" className="portal-primary row-act" onClick={() => setVoucherOpen((v) => !v)}>Referral Voucher</button>} />
     {msg && <Message kind={msg.kind} text={msg.text} />}
-    {voucherOpen && <ReferralVoucherPanel data={data} busy={busy} post={post} onClose={() => setVoucherOpen(false)} />}
+    {voucherOpen && <ReferralVoucherPanel data={data} busy={busy} post={post} role="accounting" onClose={() => setVoucherOpen(false)} />}
     <div className="ac-rail">
       <div className="ac-stack">
         <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Owed Now</h2></div><FigureColumn rows={kinds} unit="item" totalLabel="Total owed" /></section>

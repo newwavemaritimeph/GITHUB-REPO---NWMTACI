@@ -1,5 +1,5 @@
 import { isFormCode } from "@/lib/document-controls";
-import { manilaDay as manilaDayOf, voucherRows, voucherTotal, type RebateForVoucher, type ReferralVoucherSnapshot } from "@/lib/referral-voucher";
+import { manilaDay as manilaDayOf, voucherRows, voucherStatus, voucherTotal, type RebateForVoucher, type ReferralVoucherSnapshot } from "@/lib/referral-voucher";
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireStaff } from "@/lib/security";
@@ -308,7 +308,11 @@ const serviceInvoiceIssueInput = z.object({ action: z.literal("service-invoice-i
 const companyPaymentInput = z.object({ action: z.literal("company-payment"), proofId: z.string().uuid().optional(), billingStatementId: z.string().uuid(), amountCentavos: z.number().int().positive(), method: z.string().trim().min(1).max(80), referenceNumber: z.string().trim().max(80).optional().default(""), receivedAt: z.string().datetime({ offset: true }) });
 // Billing Statement amounts typed by Accounting, and void and reissue (owner, 29 Oct 2026).
 // Referral Voucher, Design 1 (owner, 10 Nov 2026): one partner, one period, issued as RV-YYYY-NNNNNN.
-const referralVoucherIssueInput = z.object({ action: z.literal("referral-voucher-issue"), agencyId: z.string().uuid(), from: z.string().date(), to: z.string().date() });
+const referralVoucherIssueInput = z.object({ action: z.literal("referral-voucher-issue"), agencyId: z.string().uuid(), from: z.string().date(), to: z.string().date(),
+  mode: z.enum(["Offset at Payment", "Cash", "GCash", "Bank Transfer"]).default("Offset at Payment"), reference: z.string().trim().max(80).optional().default(""), payeeAccount: z.string().trim().max(160).optional().default("") });
+// Accounting approves or returns it; the Cashier releases it (owner, 10 Nov 2026; migration 202610290091).
+const referralVoucherDecideInput = z.object({ action: z.literal("referral-voucher-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(300).optional().default("") });
+const referralVoucherReleaseInput = z.object({ action: z.literal("referral-voucher-release"), id: z.string().uuid(), reference: z.string().trim().max(80).optional().default("") });
 const statementIssueInput = z.object({ action: z.literal("billing-statement-issue"), agencyId: z.string().uuid(), from: z.string().date(), to: z.string().date(), amounts: z.record(z.string().uuid(), z.number().int().min(0).max(100_000_000)).default({}) });
 const statementVoidInput = z.object({ action: z.literal("billing-statement-void"), billingStatementId: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
 // Referral per course (owner, 3 Nov 2026): the source and partner belong to one enrollment, not to the trainee.
@@ -335,7 +339,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [budgetRequestInput, expenseLiquidateInput, referralVoucherIssueInput, batchSeriesSaveInput, batchRenameInput, mismoEntryInput, mismoAlertClearInput, mismoDetailsInput, serviceInvoiceSetupInput, serviceInvoiceIssueInput, certificateFormatInput, documentControlsInput, instructionCategorySaveInput, paymentVoidRequestInput, paymentVoidDecideInput, statementIssueInput, statementVoidInput, enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, registrationChangeBatchInput, applicationHandoverInput, traineeUpdateInput, traineeFacebookInput, admissionRecordInput, documentReprintInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [referralVoucherDecideInput, referralVoucherReleaseInput, budgetRequestInput, expenseLiquidateInput, referralVoucherIssueInput, batchSeriesSaveInput, batchRenameInput, mismoEntryInput, mismoAlertClearInput, mismoDetailsInput, serviceInvoiceSetupInput, serviceInvoiceIssueInput, certificateFormatInput, documentControlsInput, instructionCategorySaveInput, paymentVoidRequestInput, paymentVoidDecideInput, statementIssueInput, statementVoidInput, enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, registrationChangeBatchInput, applicationHandoverInput, traineeUpdateInput, traineeFacebookInput, admissionRecordInput, documentReprintInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 /** A proof the trainee sent (29 Oct 2026) backs one payment of that trainee, unless marked Not Valid. Staff-filed proofs return null. */
 async function traineeProofProblem(admin: ReturnType<typeof createSupabaseAdminClient>, proofId: string, traineeId: string) {
@@ -1021,7 +1025,7 @@ export async function GET(request: Request) {
     db.from("course_categories").select("id,name").eq("active", true).order("sort_order"),
     db.from("partner_centers").select("id,name,active").order("name"),
     db.from("agency_course_rebates").select("id,agency_id,course_id,rebate_centavos,updated_at").limit(2000),
-    db.from("agency_rebates").select("id,agency_id,enrollment_id,course_id,rebate_centavos,status,created_at,marketing_agencies(name),courses(name),trainees(legal_first_name,legal_last_name)").order("created_at", { ascending: false }).limit(300),
+    db.from("agency_rebates").select("id,agency_id,enrollment_id,course_id,rebate_centavos,status,settlement,created_at,marketing_agencies(name),courses(name),trainees(legal_first_name,legal_last_name)").order("created_at", { ascending: false }).limit(300),
     db.from("expense_categories").select("id,name,active").order("name"),
     db.from("inventory_items").select("id,name,category,unit,quantity_on_hand,unit_value_centavos,active").order("name"),
     db.from("inventory_movements").select("id,item_id,movement_type,quantity,remarks,created_at,inventory_items(name)").order("created_at", { ascending: false }).limit(200),
@@ -1050,10 +1054,15 @@ export async function GET(request: Request) {
   // Items Registration added at the hand-over, still to be paid at the Cashier (10 Nov 2026).
   let pendingItems: { id: string; enrollment_id: string; charge_catalog_id: string | null; description: string; amount_centavos: number; created_at: string }[] = [];
   // Referral Vouchers issued (10 Nov 2026), newest 50, for Accounting's Payables. Empty before 202610290088.
-  let referralVouchers: { id: string; voucher_number: string; agency_id: string; period_from: string; period_to: string; total_centavos: number; issued_at: string }[] = [];
-  if (staff.roleCodes.some((role) => ["admin", "accounting"].includes(role))) task(async () => {
-    const r = await db.from("referral_vouchers").select("id,voucher_number,agency_id,period_from,period_to,total_centavos,issued_at").order("issued_at", { ascending: false }).limit(50);
-    if (!r.error) referralVouchers = (r.data ?? []) as typeof referralVouchers;
+  let referralVouchers: { id: string; voucher_number: string; agency_id: string; period_from: string; period_to: string; total_centavos: number; issued_at: string; mode?: string | null; status?: string; remarks?: string | null }[] = [];
+  if (canCashier(staff.roleCodes)) task(async () => {
+    const r = await db.from("referral_vouchers").select("id,voucher_number,agency_id,period_from,period_to,total_centavos,issued_at,mode:snapshot->>mode").order("issued_at", { ascending: false }).limit(50);
+    if (r.error) return;
+    const list = (r.data ?? []) as typeof referralVouchers;
+    const ev = list.length ? await db.from("referral_voucher_events").select("voucher_id,status,remarks,created_at").in("voucher_id", list.map((v) => v.id)) : { data: [], error: null };
+    const byVoucher = new Map<string, { status: string; remarks: string | null; created_at: string }[]>();
+    for (const e of (ev.error ? [] : ev.data ?? []) as { voucher_id: string; status: string; remarks: string | null; created_at: string }[]) byVoucher.set(e.voucher_id, [...(byVoucher.get(e.voucher_id) ?? []), e]);
+    referralVouchers = list.map((v) => { const mine = byVoucher.get(v.id) ?? []; const last = [...mine].sort((a, b) => b.created_at.localeCompare(a.created_at))[0]; return { ...v, status: voucherStatus(mine), remarks: last?.remarks ?? null }; });
   });
   task(async () => {
     const admin = createSupabaseAdminClient();
@@ -2354,25 +2363,62 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
     if (input.action === "referral-voucher-issue") {
-      if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or the Admin issues Referral Vouchers." }, { status: 403 });
+      // The Cashier prepares it (owner, 10 Nov 2026); Accounting approves it before it is released.
+      if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Only the Cashier, Accounting or the Admin prepares Referral Vouchers." }, { status: 403 });
       if (input.to < input.from) return NextResponse.json({ error: "Choose the period." }, { status: 400 });
+      if (input.mode !== "Offset at Payment" && input.mode !== "Cash" && !input.reference && !input.payeeAccount) return NextResponse.json({ error: `Enter the ${input.mode} account or reference of the partner.` }, { status: 400 });
       const admin = createSupabaseAdminClient();
       const { data: partner } = await admin.from("marketing_agencies").select("id,name,kind,referral_code,contact_name,mobile,email").eq("id", input.agencyId).maybeSingle();
       if (!partner) return NextResponse.json({ error: "Partner not found." }, { status: 404 });
-      const { data: rebates, error: rebateError } = await admin.from("agency_rebates").select("status,rebate_centavos,enrollments(created_at),trainees(legal_first_name,legal_middle_name,legal_last_name),courses(code,name)").eq("agency_id", input.agencyId).neq("status", "Cancelled").limit(5000);
+      const { data: rebates, error: rebateError } = await admin.from("agency_rebates").select("id,status,rebate_centavos,enrollments(created_at),trainees(legal_first_name,legal_middle_name,legal_last_name),courses(code,name)").eq("agency_id", input.agencyId).neq("status", "Cancelled").limit(5000);
       if (rebateError) throw rebateError;
-      const rows = voucherRows((rebates ?? []) as unknown as RebateForVoucher[], input.from, input.to);
-      if (!rows.length) return NextResponse.json({ error: "No endorsed trainees from this partner in these dates." }, { status: 404 });
+      // Rebates already on a voucher that was not returned are left out.
+      const { data: earlier } = await admin.from("referral_vouchers").select("id,snapshot").eq("agency_id", input.agencyId);
+      const { data: earlierEvents, error: eventsError } = (earlier ?? []).length ? await admin.from("referral_voucher_events").select("voucher_id,status,created_at").in("voucher_id", (earlier ?? []).map((v) => v.id as string)) : { data: [], error: null };
+      if (eventsError) return NextResponse.json({ error: "Apply database update 202610290091 first." }, { status: 400 });
+      const taken = new Set<string>();
+      for (const v of (earlier ?? []) as { id: string; snapshot: ReferralVoucherSnapshot }[]) {
+        if (voucherStatus(((earlierEvents ?? []) as { voucher_id: string; status: string; created_at: string }[]).filter((e) => e.voucher_id === v.id)) === "Returned") continue;
+        for (const r of v.snapshot?.rows ?? []) if (r.rebateId) taken.add(r.rebateId);
+      }
+      const rows = voucherRows((rebates ?? []) as unknown as RebateForVoucher[], input.from, input.to, taken);
+      if (!rows.length) return NextResponse.json({ error: "No endorsed trainees from this partner in these dates that are not already on a voucher." }, { status: 404 });
       const { data: number, error: numberError } = await admin.rpc("next_reference", { prefix: "RV" });
       if (numberError) throw numberError;
       const { data: me } = await admin.from("profiles").select("complete_name").eq("id", staff.user.id).maybeSingle();
       const p = partner as { name: string; kind?: string | null; referral_code?: string | null; contact_name?: string | null; mobile?: string | null; email?: string | null };
       const snapshot: ReferralVoucherSnapshot = { number: String(number), issuedOn: manilaDayOf(new Date().toISOString()), partner: p.name, kind: p.kind ?? "Agency", referralCode: p.referral_code ?? null,
-        contact: [p.contact_name, p.mobile || p.email].filter(Boolean).join(" - ") || null, from: input.from, to: input.to, rows, totalCentavos: voucherTotal(rows), preparedBy: (me as { complete_name?: string } | null)?.complete_name ?? staff.user.email ?? "Accounting" };
+        contact: [p.contact_name, p.mobile || p.email].filter(Boolean).join(" - ") || null, from: input.from, to: input.to, rows, totalCentavos: voucherTotal(rows), mode: input.mode, reference: input.reference || null, payeeAccount: input.payeeAccount || null, preparedBy: (me as { complete_name?: string } | null)?.complete_name ?? staff.user.email ?? "Accounting" };
       const { data: saved, error } = await admin.from("referral_vouchers").insert({ voucher_number: snapshot.number, agency_id: input.agencyId, period_from: input.from, period_to: input.to, total_centavos: snapshot.totalCentavos, snapshot, issued_by: staff.user.id }).select("id").single();
       if (error) return NextResponse.json({ error: /referral_vouchers/.test(error.message) ? "Apply database update 202610290088 first." : error.message }, { status: 400 });
-      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: isAdminRole(staff.roleCodes) ? "admin" : "accounting", action: "referral_voucher.issued", record_type: "referral_voucher", record_id: saved.id, new_values: { number: snapshot.number, agency_id: input.agencyId, from: input.from, to: input.to, total_centavos: snapshot.totalCentavos, trainees: rows.length } });
+      const { error: eventError } = await admin.from("referral_voucher_events").insert({ voucher_id: saved.id, status: "For Approval", actor: staff.user.id });
+      if (eventError) return NextResponse.json({ error: "Saved, but apply database update 202610290091 so it can go to Accounting." }, { status: 400 });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: isAdminRole(staff.roleCodes) ? "admin" : staff.roleCodes.includes("cashier") ? "cashier" : "accounting", action: "referral_voucher.issued", record_type: "referral_voucher", record_id: saved.id, new_values: { number: snapshot.number, agency_id: input.agencyId, from: input.from, to: input.to, total_centavos: snapshot.totalCentavos, trainees: rows.length } });
       return NextResponse.json({ ok: true, id: saved.id, number: snapshot.number });
+    }
+    if (input.action === "referral-voucher-decide" || input.action === "referral-voucher-release") {
+      const deciding = input.action === "referral-voucher-decide";
+      if (deciding ? !canManageAccounting(staff.roleCodes) : !canCashier(staff.roleCodes)) return NextResponse.json({ error: deciding ? "Only Accounting approves Referral Vouchers." : "Only the Cashier releases Referral Vouchers." }, { status: 403 });
+      if (deciding && !input.approve && (input.remarks ?? "").length < 3) return NextResponse.json({ error: "Enter the reason for returning it." }, { status: 400 });
+      const admin = createSupabaseAdminClient();
+      const { data: voucher } = await admin.from("referral_vouchers").select("id,voucher_number,snapshot").eq("id", input.id).maybeSingle();
+      if (!voucher) return NextResponse.json({ error: "Voucher not found." }, { status: 404 });
+      const { data: events, error: eventsError } = await admin.from("referral_voucher_events").select("status,created_at").eq("voucher_id", input.id);
+      if (eventsError) return NextResponse.json({ error: "Apply database update 202610290091 first." }, { status: 400 });
+      const now = voucherStatus((events ?? []) as { status: string; created_at: string }[]);
+      if (deciding && now !== "For Approval") return NextResponse.json({ error: `This voucher is already ${now.toLowerCase()}.` }, { status: 400 });
+      if (!deciding && now !== "Approved") return NextResponse.json({ error: now === "Released" ? "This voucher is already released." : "Accounting approves the voucher before it is released." }, { status: 400 });
+      const next = deciding ? (input.approve ? "Approved" : "Returned") : "Released";
+      const { error } = await admin.from("referral_voucher_events").insert({ voucher_id: input.id, status: next, remarks: deciding ? input.remarks || null : null, reference: deciding ? null : input.reference || null, actor: staff.user.id });
+      if (error) throw error;
+      const snap = voucher.snapshot as ReferralVoucherSnapshot;
+      // Released: the partner's rebates on it are paid.
+      if (!deciding) {
+        const ids = (snap?.rows ?? []).map((r) => r.rebateId).filter(Boolean) as string[];
+        if (ids.length) await admin.from("agency_rebates").update({ status: "Paid", settlement: `Paid by Referral Voucher ${voucher.voucher_number}${snap?.mode ? ` (${snap.mode})` : ""}` }).in("id", ids).eq("status", "Pending");
+      }
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: deciding ? (isAdminRole(staff.roleCodes) ? "admin" : "accounting") : staff.roleCodes.includes("cashier") ? "cashier" : staff.roleCodes[0] ?? null, action: `referral_voucher.${next.toLowerCase().replace(" ", "_")}`, record_type: "referral_voucher", record_id: input.id, prior_values: { status: now }, new_values: { status: next, reference: deciding ? null : input.reference || null }, reason: deciding ? input.remarks || null : null });
+      return NextResponse.json({ ok: true, status: next });
     }
     if (input.action === "billing-statement-issue") {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or the Admin issues Billing Statements." }, { status: 403 });

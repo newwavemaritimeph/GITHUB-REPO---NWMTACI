@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { isReferralRebate, referralRebateTotal } from "@/lib/referral-voucher";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { loadDocumentControl } from "@/lib/document-controls";
@@ -73,8 +74,10 @@ export default async function PaymentReceiptPage({ params, searchParams }: { par
   const appliedTo = (enrollRes.data ?? []).map((e) => {
     const c = one(e.courses as { code: string; name: string } | { code: string; name: string }[] | null), b = one(e.batches as unknown as BatchRow | BatchRow[] | null);
     const charges = (chargeRes.data ?? []).filter((x) => x.enrollment_id === e.id);
-    const due = Number(e.selling_price_centavos) + charges.filter((x) => x.event_type !== "discount").reduce((s, x) => s + Number(x.amount_centavos), 0) - charges.filter((x) => x.event_type === "discount").reduce((s, x) => s + Number(x.amount_centavos), 0);
-    const paid = (paidRes.data ?? []).filter((x) => x.enrollment_id === e.id).reduce((s, x) => s + Number(x.amount_centavos), 0);
+    // The referral rebate is not shown as "less rebate": the full fee is due and the rebate counts as paid.
+    const rebate = referralRebateTotal(charges);
+    const due = Number(e.selling_price_centavos) + charges.filter((x) => x.event_type !== "discount").reduce((s, x) => s + Number(x.amount_centavos), 0) - charges.filter((x) => x.event_type === "discount" && !isReferralRebate(x)).reduce((s, x) => s + Number(x.amount_centavos), 0);
+    const paid = rebate + (paidRes.data ?? []).filter((x) => x.enrollment_id === e.id).reduce((s, x) => s + Number(x.amount_centavos), 0);
     const applied = (allocRes.data ?? []).filter((a) => a.enrollment_id === e.id).reduce((s, a) => s + Number(a.amount_centavos), 0);
     // Miscellaneous items sold with this payment (owner, 19 Oct 2026): the Cashier adds them just before
     // posting it, so they are this enrollment's charges by the same Cashier in the two minutes before.

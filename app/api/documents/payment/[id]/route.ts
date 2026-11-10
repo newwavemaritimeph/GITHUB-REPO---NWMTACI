@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/security";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createAcknowledgmentReceiptPdf, createPaymentInvoicePdf } from "@/lib/documents";
+import { referralRebateTotal } from "@/lib/referral-voucher";
 
 export const runtime="nodejs";
 const one=<T,>(value:T|T[]|null|undefined):T|null=>Array.isArray(value)?value[0]??null:value??null;
@@ -19,7 +20,10 @@ export async function GET(request:Request,{params}:{params:Promise<{id:string}>}
   ]);
   if(!allocation||!receipt||!invoice)return NextResponse.json({error:"Payment documents are still being prepared."},{status:409});
   const trainee=one(payment.trainees),enrollment=one(allocation.enrollments),course=one(enrollment?.courses),snapshot=receipt.snapshot as Record<string,unknown>;
-  const document={invoiceNumber:invoice.invoice_number,receiptNumber:receipt.receipt_number,paymentNumber:payment.payment_number,enrollmentNumber:enrollment?.enrollment_number??"-",traineeName:[trainee?.legal_first_name,trainee?.legal_middle_name,trainee?.legal_last_name,trainee?.suffix].filter(Boolean).join(" "),traineeNumber:trainee?.trainee_number??"-",address:trainee?.address??"",course:course?.name??"Training",amountCentavos:Number(payment.amount_centavos),totalDueCentavos:Number(enrollment?.selling_price_centavos??0),totalPaidCentavos:Number(snapshot.total_paid_centavos??payment.amount_centavos),balanceCentavos:Number(snapshot.balance_centavos??0),method:payment.method,referenceNumber:payment.reference_number??"",receivedAt:payment.received_at,cashierName:cashier?.complete_name??"Authorized Cashier"};
+  // Receipt shows the full fee (owner, 10 Nov 2026): the referral rebate counts as paid, never as "less rebate".
+  const {data:rebateRows}=await db.from("enrollment_charges").select("event_type,description,amount_centavos").eq("enrollment_id",allocation.enrollment_id).eq("valid",true).eq("event_type","discount");
+  const rebate=referralRebateTotal(rebateRows??[]);
+  const document={invoiceNumber:invoice.invoice_number,receiptNumber:receipt.receipt_number,paymentNumber:payment.payment_number,enrollmentNumber:enrollment?.enrollment_number??"-",traineeName:[trainee?.legal_first_name,trainee?.legal_middle_name,trainee?.legal_last_name,trainee?.suffix].filter(Boolean).join(" "),traineeNumber:trainee?.trainee_number??"-",address:trainee?.address??"",course:course?.name??"Training",amountCentavos:Number(payment.amount_centavos),totalDueCentavos:Number(enrollment?.selling_price_centavos??0),totalPaidCentavos:Number(snapshot.total_paid_centavos??payment.amount_centavos)+rebate,balanceCentavos:Number(snapshot.balance_centavos??0),method:payment.method,referenceNumber:payment.reference_number??"",receivedAt:payment.received_at,cashierName:cashier?.complete_name??"Authorized Cashier"};
   let bytes:Uint8Array,filename:string;
   if(type==="receipt"){const template=await fetch(new URL("/document-templates/acknowledgment-receipt-reference.png",request.url)).then(response=>response.arrayBuffer());bytes=await createAcknowledgmentReceiptPdf(document,new Uint8Array(template));filename=`${receipt.receipt_number}-acknowledgment-receipt.pdf`}else{bytes=await createPaymentInvoicePdf(document,await fetch(new URL("/new-wave-emblem.png",request.url)).then(async response=>response.ok?new Uint8Array(await response.arrayBuffer()):undefined).catch(()=>undefined));filename=`${invoice.invoice_number}-invoice.pdf`}
   return new Response(bytes as BodyInit,{headers:{"content-type":"application/pdf","content-disposition":`inline; filename="${filename}"`,"cache-control":"private, no-store"}});

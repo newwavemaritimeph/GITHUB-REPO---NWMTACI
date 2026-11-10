@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ReferralVoucherPanel } from "./accounting-home";
 import type { PortalData, Enrollment, TraineeProofRow } from "../portal-live-app";
 import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos, pesos2 } from "@/lib/portal-format";
 import { pesosInWords } from "@/lib/amount-words";
@@ -995,7 +996,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
   const today = manilaToday();
   const canDecide = role === "accounting" || role === "admin";
   const isManager = role === "accounting";
-  const [view, setView] = useState<"Expenses" | "Vouchers" | "Pay the Centers">("Expenses");
+  const [view, setView] = useState<"Expenses" | "Vouchers" | "Pay the Centers" | "Referral Vouchers">("Expenses");
   const centersDue = centerLines(data).filter((l) => l.state === "Due").length;
   // Open expenses always show; released and rejected ones wait for a date (owner, 5 Nov 2026).
   const per = usePeriod();
@@ -1029,7 +1030,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
 
   return <div className="portal-page cx">
     <div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Expenses</h1></div><span className="cx-acts"><button type="button" className="portal-secondary" onClick={() => setBudgeting(true)}>Request Budget</button><button type="button" className="portal-primary" onClick={() => setRecording(true)}>Record Expense</button></span></div>
-    <div className="cx-status cx-views" role="tablist">{(["Expenses", "Vouchers", "Pay the Centers"] as const).map((v) => <button key={v} type="button" role="tab" aria-selected={view === v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{v}{v === "Pay the Centers" && centersDue > 0 && <span className="cx-count"> {centersDue}</span>}{v === "Vouchers" && pendingReprints.length ? <span>{pendingReprints.length}</span> : null}</button>)}</div>
+    <div className="cx-status cx-views" role="tablist">{(["Expenses", "Vouchers", "Pay the Centers", "Referral Vouchers"] as const).map((v) => <button key={v} type="button" role="tab" aria-selected={view === v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{v}{v === "Pay the Centers" && centersDue > 0 && <span className="cx-count"> {centersDue}</span>}{v === "Vouchers" && pendingReprints.length ? <span>{pendingReprints.length}</span> : null}</button>)}</div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
 
     {view === "Expenses" && <>
@@ -1054,6 +1055,7 @@ export function ExpensesWorkspace({ data, role, reload }: { data: PortalData; ro
       </tbody></table></div> : <p className="portal-empty-copy">No expenses in this view.</p>}</section>
     </>}
 
+    {view === "Referral Vouchers" && <ReferralVoucherPanel data={data} busy={busy} post={post} role={canDecide ? "accounting" : "cashier"} />}
     {view === "Pay the Centers" && <PayTheCenters data={data} reload={reload} onRelease={(id) => { const e = byId.get(id); if (e) setReleasing(e); }} />}
     {view === "Vouchers" && <>
       {pendingReprints.length > 0 && <section className="portal-panel cx-panel">
