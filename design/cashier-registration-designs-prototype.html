@@ -1,0 +1,273 @@
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<title>Cashier and Registration Designs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap">
+<style>
+/* The staff portal is light only. Layout: navy bar, topic tabs, design tabs, then the screen being redesigned at its real width. */
+:root { color-scheme: light; --ink: #0f2638; --mute: #587184; --line: #d6e9f1; --soft: #eef4f8; --th: #e6f6fd; --thc: #0b4f8f; --navy: #123F63; --blue: #0571D0; --orange: #F25615; --good: #0a7a3e; --goodbg: #e3f5ea; --warn: #a4530c; --warnbg: #fdeee0; --bad: #b42318; --badbg: #fde8e6; --ui: "Geist", system-ui, -apple-system, "Segoe UI", sans-serif; --num: "Geist Mono", ui-monospace, Consolas, monospace; }
+html, body { background: #f2f6f8; color: var(--ink); margin: 0; font: 14px/1.45 var(--ui); }
+.gut { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+#bar { background: var(--navy); color: #fff; display: flex; align-items: center; gap: 10px; padding-block: 10px; }
+#bar b { font-weight: 600; }
+#bar span { margin-left: auto; color: #cfe6f2; font-size: 13px; }
+.picks { background: #fff; border-bottom: 2px solid var(--navy); padding-block: 10px; display: grid; gap: 8px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.seg button { font: 600 13px var(--ui); height: 32px; padding: 0 11px; border-radius: 8px; border: 1px solid #b9dcec; background: #fff; color: var(--navy); cursor: pointer; }
+.seg button[aria-selected="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+.seg.sub button { height: 28px; font-size: 12.5px; }
+.seg.sub button[aria-selected="true"] { background: var(--blue); border-color: var(--blue); }
+#app { padding-block: 16px 40px; max-width: 1100px; margin-inline: auto; box-sizing: border-box; width: 100%; display: grid; gap: 12px; }
+.lead { margin: 0; color: var(--mute); font-size: 13.5px; max-width: 90ch; }
+.lead b { color: var(--ink); }
+.panel { background: #fff; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.panel > header { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.panel h2 { margin: 0; font: 600 16px var(--ui); }
+.panel h3 { margin: 0; font: 600 14px var(--ui); }
+.count { background: var(--soft); color: var(--navy); border-radius: 999px; padding: 1px 9px; font: 600 12.5px var(--ui); }
+.pad { padding: 14px 16px; }
+.wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th { background: var(--th); color: var(--thc); font: 600 12px var(--ui); text-transform: uppercase; letter-spacing: .05em; text-align: left; padding: 9px 14px; white-space: nowrap; }
+td { padding: 10px 14px; border-top: 1px solid var(--line); vertical-align: middle; }
+td small, .sub2, .line small { display: block; color: var(--mute); font-size: 12.5px; }
+.r { text-align: right; }
+.mono { font-family: var(--num); font-variant-numeric: tabular-nums; }
+.num { font-family: var(--num); color: var(--blue); font-size: 12.5px; }
+.amt { font: 700 15px var(--num); }
+.b { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid #b9dcec; background: #fff; color: var(--blue); font: 600 13.5px var(--ui); cursor: pointer; white-space: nowrap; text-decoration: none; }
+.b.p { background: var(--orange); border-color: var(--orange); color: #fff; }
+.b.sm { height: 30px; padding: 0 10px; font-size: 13px; }
+.b[disabled] { opacity: .45; cursor: not-allowed; }
+.ib { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 999px; border: 1px solid var(--line); background: #fff; color: var(--mute); cursor: pointer; }
+.ib.d { border-radius: 8px; color: var(--bad); border-color: #f3c7c2; }
+.ib svg { width: 16px; height: 16px; }
+.acts { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 999px; font: 600 12px var(--ui); white-space: nowrap; background: var(--soft); color: var(--navy); }
+.chip.g { background: var(--goodbg); color: var(--good); }
+.chip.o { background: var(--warnbg); color: var(--warn); }
+.chip.r { background: var(--badbg); color: var(--bad); }
+.split { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 12px; align-items: start; }
+@media (max-width: 860px) { .split { grid-template-columns: 1fr; } }
+.cap { font: 600 11.5px var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--mute); }
+.note { margin: 0; color: var(--mute); font-size: 13px; }
+.form { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); align-items: end; }
+.form label { display: grid; gap: 4px; font: 600 12.5px var(--ui); color: var(--ink); }
+.form input, .form select { height: 34px; border: 1px solid #b9dcec; border-radius: 8px; padding: 0 9px; font: 14px var(--ui); background: #fff; color: var(--ink); min-width: 0; }
+.qty { display: inline-flex; align-items: center; border: 1px solid #b9dcec; border-radius: 8px; overflow: hidden; }
+.qty button { width: 30px; height: 30px; border: 0; background: var(--soft); color: var(--navy); font: 700 15px var(--ui); cursor: pointer; }
+.qty span { width: 32px; text-align: center; font: 600 14px var(--num); }
+.lines { display: grid; }
+.line { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px; align-items: center; padding: 9px 0; border-top: 1px solid var(--line); }
+.line:first-child { border-top: 0; }
+.line .amt { font-size: 14px; }
+.total { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 2px solid var(--ink); font-weight: 700; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.stats > div { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; display: grid; gap: 4px; align-content: start; }
+.stats b { font-size: 15px; }
+@media (max-width: 700px) { .stats { grid-template-columns: 1fr; } }
+/* Proof rows */
+.p-now table { table-layout: fixed; }
+.p-d1 table { table-layout: fixed; }
+.p-d2 .row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 16px; align-items: center; padding: 10px 16px; border-top: 1px solid var(--line); }
+.p-d2 .row:first-child { border-top: 0; }
+.p-d2 .meta { color: var(--mute); font-size: 12.5px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+.p-d2 .meta .mono { color: var(--ink); }
+@media (max-width: 640px) { .p-d2 .row { grid-template-columns: 1fr auto; } .p-d2 .row .acts { grid-column: 1 / -1; } }
+.p-d3 .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; padding: 12px; }
+.p-d3 .card { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: grid; gap: 6px; }
+.p-d3 .card .top { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+.p-d3 .card .acts .b.p { flex: 1; }
+.menu { position: relative; display: inline-flex; }
+.menu .dd { position: absolute; right: 0; top: calc(100% + 4px); background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 24px #0f263822; min-width: 230px; z-index: 5; padding: 4px; display: grid; }
+.menu .dd button { border: 0; background: none; text-align: left; padding: 8px 10px; border-radius: 7px; font: 14px var(--ui); color: var(--ink); cursor: pointer; display: grid; }
+.menu .dd button:hover { background: var(--soft); }
+.menu .dd small { color: var(--mute); font-size: 12px; }
+.confirm { padding: 4px 18px 18px; }
+.confirm h3 { margin: 14px 0 6px; font: 600 14px var(--ui); color: var(--navy); }
+.confirm ol { margin: 0; padding-left: 20px; display: grid; gap: 6px; max-width: 85ch; }
+#toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); background: var(--navy); color: #fff; padding: 9px 14px; border-radius: 10px; font-size: 13.5px; z-index: 50; max-width: calc(100% - 32px); box-sizing: border-box; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+</style>
+
+<div id="bar" class="gut"><b>Cashier and Registration · Designs</b><span>Prototype · Sample Names Only</span></div>
+<div class="picks gut"><div id="topics" class="seg" role="tablist" aria-label="Topic"></div><div id="designs" class="seg sub" role="tablist" aria-label="Design"></div></div>
+<div id="app" class="gut"></div>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+const EYE = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.4" d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z"/><circle cx="8" cy="8" r="2" fill="currentColor"/></svg>';
+const BAN = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3.8 12.2 12.2 3.8" stroke="currentColor" stroke-width="1.5"/></svg>';
+const PROOFS = [
+  { name: "DELA CRUZ, JUAN PEREZ", no: "NWMTACI-0000027", mode: "GCash", ref: "0047061603017", amt: 2700, day: "Nov 9, 2026", time: "3:27 PM" },
+  { name: "SANTOS, MARIA LOPEZ", no: "NWMTACI-0000031", mode: "PSBank", ref: "PSB-55128840", amt: 1300, day: "Nov 9, 2026", time: "4:05 PM" },
+  { name: "REYES, CARLO MENDOZA", no: "NWMTACI-0000034", mode: "GCash", ref: "0047061649902", amt: 4200, day: "Nov 10, 2026", time: "8:41 AM" },
+];
+const TOPICS = [
+  { key: "proofs", label: "Proof Rows Spacing", designs: ["Now", "Design 1 · Even Columns", "Design 2 · Two-Line Rows", "Design 3 · Compact Cards"] },
+  { key: "uniform", label: "Uniform in Registration", designs: ["Design 1 · Application Window", "Design 2 · At Hand to Cashier", "Design 3 · Trainee Account"] },
+  { key: "ar", label: "Separate Print AR", designs: ["Design 1 · On Each Payment", "Design 2 · Receipts to Print List", "Design 3 · Print AR Button"] },
+  { key: "discount", label: "Discount Request", designs: ["Design 1 · Inside Record Payment", "Design 2 · From the Trainee Account", "Design 3 · Requests Tab With Results"] },
+  { key: "confirm", label: "To Confirm", designs: [] },
+];
+const S = { topic: 0, design: [0, 0, 0, 0], uniformQty: 1, uniformOn: true, prints: { "AR-2026-000041": 1, "AR-2026-000042": 0, "AR-2026-000043": 2, "AR-2026-000044": 0 }, arFilter: "Not Printed Twice", disc: null, discOpen: false, menu: null, discTab: "Waiting" };
+const app = document.getElementById("app"), topicsEl = document.getElementById("topics"), designsEl = document.getElementById("designs"), toastEl = document.getElementById("toast");
+let timer;
+const toast = (t) => { toastEl.textContent = t; toastEl.hidden = false; clearTimeout(timer); timer = setTimeout(() => { toastEl.hidden = true; }, 3200); };
+const peso = (n) => `₱${n.toLocaleString("en-PH")}`;
+const peso2 = (n) => `₱${n.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
+
+/* ---------- 1. Proof rows ---------- */
+const proofActs = (p, stacked) => `<div class="acts"${stacked ? ' style="flex-direction:column;align-items:flex-end"' : ""}><span class="acts"><button type="button" class="ib" title="View Proof" data-act="toast" data-id="Opens the proof in Google Drive.">${EYE}</button><button type="button" class="b p" data-act="toast" data-id="Opens Record Payment with this proof filled in.">Record</button></span><button type="button" class="ib d" title="Not Valid" data-act="toast" data-id="Asks for the reason the proof is not valid.">${BAN}</button></div>`;
+function proofs(d) {
+  const head = `<header><h2>Proofs of Payment · No Receipt Yet</h2><span class="count">${PROOFS.length}</span></header>`;
+  if (d === 0) return `<p class="lead"><b>Now.</b> The trainee column takes all the spare width, so the name sits far from its payment.</p>
+    <section class="panel p-now">${head}<div class="wrap"><table><colgroup><col><col style="width:150px"><col style="width:100px"><col style="width:130px"><col style="width:150px"></colgroup><thead><tr><th>Trainee</th><th>Mode</th><th class="r">Amount</th><th>Uploaded</th><th></th></tr></thead><tbody>
+    ${PROOFS.map((p) => `<tr><td><b>${p.name}</b><span class="num" style="display:block">${p.no}</span></td><td>${p.mode}<small class="mono">${p.ref}</small></td><td class="r amt">${peso(p.amt)}</td><td>${p.day}<small>${p.time}</small></td><td>${proofActs(p, true)}</td></tr>`).join("")}</tbody></table></div></section>`;
+  if (d === 1) return `<p class="lead"><b>Design 1 · Even Columns.</b> The same table, with the width shared out by what each column holds, and the three actions on one line.</p>
+    <section class="panel p-d1">${head}<div class="wrap"><table><colgroup><col style="width:32%"><col style="width:22%"><col style="width:12%"><col style="width:15%"><col style="width:19%"></colgroup><thead><tr><th>Trainee</th><th>Mode · Reference</th><th class="r">Amount</th><th>Uploaded</th><th></th></tr></thead><tbody>
+    ${PROOFS.map((p) => `<tr><td><b>${p.name}</b><span class="num" style="display:block">${p.no}</span></td><td>${p.mode}<small class="mono">${p.ref}</small></td><td class="r amt">${peso(p.amt)}</td><td>${p.day}<small>${p.time}</small></td><td>${proofActs(p)}</td></tr>`).join("")}</tbody></table></div></section>`;
+  if (d === 2) return `<p class="lead"><b>Design 2 · Two-Line Rows.</b> No columns: the name on top, the payment details right under it, the amount and actions at the right.</p>
+    <section class="panel p-d2">${head}<div>${PROOFS.map((p) => `<div class="row"><div><b>${p.name}</b> <span class="num">${p.no}</span><div class="meta"><span>${p.mode} · <span class="mono">${p.ref}</span></span><span>Uploaded ${p.day}, ${p.time}</span></div></div><span class="amt">${peso(p.amt)}</span>${proofActs(p)}</div>`).join("")}</div></section>`;
+  return `<p class="lead"><b>Design 3 · Compact Cards.</b> A small card per proof, two or three across, with Record filling the card's width.</p>
+    <section class="panel p-d3">${head}<div class="cards">${PROOFS.map((p) => `<div class="card"><div class="top"><div><b>${p.name}</b><span class="num" style="display:block">${p.no}</span></div><span class="amt">${peso(p.amt)}</span></div><span class="sub2">${p.mode} · <span class="mono">${p.ref}</span> · ${p.day}, ${p.time}</span><div class="acts"><button type="button" class="ib" title="View Proof" data-act="toast" data-id="Opens the proof in Google Drive.">${EYE}</button><button type="button" class="b p" data-act="toast" data-id="Opens Record Payment with this proof filled in.">Record</button><button type="button" class="ib d" title="Not Valid" data-act="toast" data-id="Asks for the reason the proof is not valid.">${BAN}</button></div></div>`).join("")}</div></section>`;
+}
+
+/* ---------- 2. Uniform in Registration ---------- */
+const UNIFORM = 150, FEE = 900;
+const qty = () => `<span class="qty"><button type="button" data-act="uq" data-id="-1" aria-label="One less">−</button><span>${S.uniformQty}</span><button type="button" data-act="uq" data-id="1" aria-label="One more">+</button></span>`;
+const dueNow = () => FEE + (S.uniformOn ? UNIFORM * S.uniformQty : 0);
+const cashierSees = () => `<section class="panel"><header><h3>What the Cashier Sees · Record Payment</h3><span class="chip">Cashier</span></header><div class="pad"><div class="lines">
+    <div class="line"><div><b>UBT-PSSR</b><small>Training Fee</small></div><span></span><span class="amt">${peso2(FEE)}</span></div>
+    ${S.uniformOn ? `<div class="line"><div><b>Uniform × ${S.uniformQty}</b><small>Added by Registration · prints on its own receipt</small></div><span class="chip">Item</span><span class="amt">${peso2(UNIFORM * S.uniformQty)}</span></div>` : ""}
+  </div><div class="total"><span>Amount Received</span><span class="mono">${peso2(dueNow())}</span></div><p class="note" style="margin-top:8px">No "+ Add Miscellaneous Charge" here any more: the items come from Registration.</p></div></section>`;
+function uniform(d) {
+  const itemsBox = S.uniformOn ? `<div class="line"><div><b>Uniform</b><small>${peso2(UNIFORM)} each · from the Schedule of Fees</small></div>${qty()}<button type="button" class="b sm" data-act="uoff">Remove</button></div>` : `<p class="note">No items yet.</p>`;
+  if (d === 0) return `<p class="lead"><b>Design 1 · Application Window.</b> Registration adds Uniform while screening, in a new Items box beside Training and Payment. Payment updates at once.</p>
+    <div class="split"><section class="panel"><header><h2>Application · NWMTACI-0000027</h2><span class="chip o">For Payment</span></header><div class="pad" style="display:grid;gap:12px">
+      <div class="stats"><div><span class="cap">Training</span><b>UBT-PSSR</b><small class="sub2">Nov 11, 2026 · 26-609-146</small></div><div><span class="cap">Payment</span><b class="mono">${peso2(dueNow())}</b><small class="sub2">Course ${peso(FEE)}${S.uniformOn ? ` + Uniform ${peso(UNIFORM * S.uniformQty)}` : ""}</small></div><div><span class="cap">Requirements</span><b>4 of 4</b><small class="sub2">All received</small></div></div>
+      <div><div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span class="cap">Items</span>${S.uniformOn ? "" : '<button type="button" class="b sm" data-act="uon">+ Add Uniform</button>'}</div><div class="lines">${itemsBox}</div></div>
+      <div class="acts"><button type="button" class="b p" data-act="toast" data-id="Hands the trainee to the Cashier with ${peso2(dueNow())} to collect.">Hand to Cashier</button></div></div></section>${cashierSees()}</div>`;
+  if (d === 1) return `<p class="lead"><b>Design 2 · At Hand to Cashier.</b> Registration ticks the items to collect as the last step before the hand-over. The button shows the full amount.</p>
+    <div class="split"><section class="panel"><header><h2>Hand to Cashier</h2><span class="chip g">Requirements 4 of 4</span></header><div class="pad" style="display:grid;gap:12px">
+      <div class="form"><label>Mode of Payment<select><option>GCash</option><option>Cash</option><option>PSBank</option></select></label><label>Reference No.<input value="0047061603017"></label></div>
+      <div><span class="cap">Items to Collect</span><div class="lines"><div class="line"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-act="utoggle"${S.uniformOn ? " checked" : ""}> <b>Uniform</b> <small style="display:inline">${peso2(UNIFORM)} each</small></label>${S.uniformOn ? qty() : "<span></span>"}<span class="amt">${S.uniformOn ? peso2(UNIFORM * S.uniformQty) : "—"}</span></div></div></div>
+      <div class="total"><span>To Collect</span><span class="mono">${peso2(dueNow())}</span></div>
+      <button type="button" class="b p" data-act="toast" data-id="Handed to the Cashier: ${peso2(dueNow())} to collect.">Hand to Cashier · ${peso2(dueNow())}</button></div></section>${cashierSees()}</div>`;
+  return `<p class="lead"><b>Design 3 · Trainee Account.</b> An Items section under Courses, and an Add Item button beside Add Course. Good when a trainee comes back later for a uniform.</p>
+    <div class="split"><section class="panel"><header><h2>Trainee Account · DELA CRUZ, JUAN PEREZ</h2><span class="chip">NWMTACI-0000027</span></header><div class="pad" style="display:grid;gap:12px">
+      <div><span class="cap">Courses</span><table><thead><tr><th>Course</th><th>Schedule</th><th>Status</th><th class="r">Due</th></tr></thead><tbody><tr><td><b>UBT-PSSR</b><small>ENR-2026-000084</small></td><td>Nov 11, 2026</td><td><span class="chip o">Pending</span></td><td class="r amt">${peso(FEE)}</td></tr></tbody></table></div>
+      <div><span class="cap">Items</span>${S.uniformOn ? `<table><thead><tr><th>Item</th><th>For</th><th>Qty</th><th class="r">Amount</th><th></th></tr></thead><tbody><tr><td><b>Uniform</b><small>Added by Registration · Not paid</small></td><td>UBT-PSSR</td><td>${qty()}</td><td class="r amt">${peso(UNIFORM * S.uniformQty)}</td><td><button type="button" class="b sm" data-act="uoff">Remove</button></td></tr></tbody></table>` : '<p class="note">No items yet.</p>'}</div>
+      <div class="acts"><button type="button" class="b p" data-act="toast" data-id="Opens Add Course, as today.">Add Course</button><button type="button" class="b" data-act="uon">Add Item</button><button type="button" class="b" data-act="toast" data-id="Opens Edit Details, as today.">Edit Details</button></div></div></section>${cashierSees()}</div>`;
+}
+
+/* ---------- 3. Separate Print AR ---------- */
+const RECEIPTS = [
+  { no: "AR-2026-000041", who: "DELA CRUZ, JUAN PEREZ", for: "Training Fee · UBT-PSSR", amt: 900, mode: "GCash", time: "9:12 AM" },
+  { no: "AR-2026-000042", who: "DELA CRUZ, JUAN PEREZ", for: "Miscellaneous · Uniform × 1", amt: 150, mode: "GCash", time: "9:12 AM" },
+  { no: "AR-2026-000043", who: "SANTOS, MARIA LOPEZ", for: "Training Fee · PSCMT", amt: 1600, mode: "Cash", time: "10:30 AM" },
+  { no: "AR-2026-000044", who: "REYES, CARLO MENDOZA", for: "Training Fee · STPPDSPPS", amt: 1300, mode: "PSBank", time: "11:05 AM" },
+];
+const printed = (no) => S.prints[no] ?? 0;
+const arBtn = (r, cls = "b sm") => (printed(r.no) >= 2 ? '<span class="chip">Printed Twice</span>' : `<button type="button" class="${cls}" data-act="print" data-id="${r.no}">Print AR</button>`);
+const arState = (r) => `<small>${printed(r.no) === 0 ? "Not printed yet" : printed(r.no) === 1 ? "Printed once · 1 left" : "Printed twice · Accounting reprints"}</small>`;
+function ar(d) {
+  if (d === 0) {
+    const mine = RECEIPTS.filter((r) => r.who.startsWith("DELA CRUZ"));
+    return `<p class="lead"><b>Design 1 · On Each Payment.</b> In the Trainee Account, each receipt in Payments gets its own Print AR button for the Cashier, apart from the TAR. It shows how many prints are left.</p>
+    <section class="panel"><header><h2>Trainee Account · DELA CRUZ, JUAN PEREZ</h2><span class="acts"><span class="chip">TAR-2026-000025 · printed by Registration</span></span></header><div class="pad"><span class="cap">Payments</span><div class="wrap"><table><thead><tr><th>Time</th><th>Receipt</th><th>For</th><th>Mode</th><th class="r">Amount</th><th>Print</th></tr></thead><tbody>
+    ${mine.map((r) => `<tr><td class="mono">Nov 10 · ${r.time}</td><td class="mono"><b>${r.no}</b>${arState(r)}</td><td>${r.for}</td><td>${r.mode}</td><td class="r amt">${peso(r.amt)}</td><td>${arBtn(r)}</td></tr>`).join("")}</tbody></table></div></div></section>`;
+  }
+  if (d === 1) {
+    const list = RECEIPTS.filter((r) => S.arFilter === "All" || printed(r.no) < 2);
+    return `<p class="lead"><b>Design 2 · Receipts to Print List.</b> A Receipts to Print page under Payments: every AR recorded today, one Print AR button each, with a filter for those still waiting.</p>
+    <section class="panel"><header><h2>Receipts to Print</h2><span class="seg sub">${["Not Printed Twice", "All"].map((f) => `<button type="button" data-act="arf" data-id="${f}" aria-selected="${S.arFilter === f}">${f}</button>`).join("")}</span></header><div class="wrap"><table><thead><tr><th>Receipt</th><th>Trainee</th><th>For</th><th class="r">Amount</th><th>Printed</th><th></th></tr></thead><tbody>
+    ${list.map((r) => `<tr><td class="mono"><b>${r.no}</b><small>Today · ${r.time}</small></td><td><b>${r.who}</b></td><td>${r.for}<small>${r.mode}</small></td><td class="r amt">${peso(r.amt)}</td><td><span class="chip ${printed(r.no) === 0 ? "o" : printed(r.no) === 1 ? "" : "g"}">${printed(r.no)} of 2</span></td><td>${arBtn(r, "b p sm")}</td></tr>`).join("")}</tbody></table></div></section>`;
+  }
+  const mine = RECEIPTS.filter((r) => r.who.startsWith("DELA CRUZ"));
+  return `<p class="lead"><b>Design 3 · Print AR Button.</b> On the Cashier Dashboard, each paid trainee gets a Print AR button of its own. Its menu lists every receipt of the payment (the training fee and the uniform), not only the latest.</p>
+    <section class="panel"><header><h2>Paid and Enrolled · Today</h2><span class="count">1</span></header><div class="wrap"><table><thead><tr><th>Trainee</th><th>Course</th><th class="r">Paid</th><th></th></tr></thead><tbody>
+    <tr><td><b>DELA CRUZ, JUAN PEREZ</b><span class="num" style="display:block">NWMTACI-0000027</span></td><td>UBT-PSSR<small>Nov 11, 2026</small></td><td class="r amt">${peso(1050)}</td><td><span class="menu"><button type="button" class="b p sm" data-act="menu" data-id="ar">Print AR ▾</button>${S.menu === "ar" ? `<div class="dd" role="menu">${mine.map((r) => `<button type="button" role="menuitem" data-act="print" data-id="${r.no}"${printed(r.no) >= 2 ? " disabled" : ""}><b class="mono">${r.no}</b><small>${r.for} · ${peso(r.amt)} · printed ${printed(r.no)} of 2</small></button>`).join("")}</div>` : ""}</span></td></tr></tbody></table></div></section>`;
+}
+
+/* ---------- 4. Discount request ---------- */
+const discLine = () => {
+  if (!S.disc) return "";
+  if (S.disc.state === "Waiting") return `<div class="line"><div><b>Discount ${peso(S.disc.amt)}</b><small>${S.disc.why} · sent to Accounting</small></div><span class="chip o">Waiting for Accounting</span><span class="amt" style="color:var(--mute)">−${peso2(S.disc.amt)}</span></div>`;
+  if (S.disc.state === "Approved") return `<div class="line"><div><b>Discount ${peso(S.disc.amt)}</b><small>${S.disc.why} · approved by Accounting</small></div><span class="chip g">Approved</span><span class="amt" style="color:var(--good)">−${peso2(S.disc.amt)}</span></div>`;
+  return `<div class="line"><div><b>Discount ${peso(S.disc.amt)}</b><small>Rejected · Not Covered by the Policy</small></div><span class="chip r">Rejected</span><span class="amt" style="color:var(--mute)">—</span></div>`;
+};
+const discForm = (send) => `<div class="form" style="margin-top:8px"><label>Discount Amount (PHP)<input id="damt" inputmode="decimal" value="200"></label><label>Reason<select id="dwhy"><option>Agency Rebate</option><option>Company Arrangement</option><option>Promo</option><option>Approved by Management</option><option>Other</option></select></label><button type="button" class="b p" data-act="dsend">${send}</button></div>`;
+const accountingSees = () => `<section class="panel"><header><h3>What Accounting Sees · To Do › Discounts</h3><span class="chip">Accounting</span></header><div class="pad">${S.disc && S.disc.state === "Waiting" ? `<div class="line"><div><b>DELA CRUZ, Juan · UBT-PSSR</b><small>${S.disc.why} · requested by <b>Karen (Cashier)</b> · Nov 10, 2026</small></div><span class="amt">−${peso2(S.disc.amt)}</span><span class="acts"><button type="button" class="b p sm" data-act="dok">Approve</button><button type="button" class="b sm" data-act="dno">Reject</button></span></div>` : '<p class="note">Nothing waiting. Send a request on the left to see it here.</p>'}</div></section>`;
+const balance = () => FEE - (S.disc && S.disc.state === "Approved" ? S.disc.amt : 0);
+function discount(d) {
+  if (d === 0) return `<p class="lead"><b>Design 1 · Inside Record Payment.</b> The Cashier asks for the discount right on the course line while recording. The line shows the answer, and the amount to collect follows it.</p>
+    <div class="split"><section class="panel"><header><h2>Record Payment · DELA CRUZ, JUAN PEREZ</h2></header><div class="pad"><div class="lines">
+      <div class="line"><div><b>UBT-PSSR</b><small>Training Fee${S.disc ? "" : ' · <button type="button" class="b sm" style="height:24px;padding:0 8px" data-act="dopen">Request Discount</button>'}</small></div><span></span><span class="amt">${peso2(FEE)}</span></div>${discLine()}</div>
+      ${S.discOpen && !S.disc ? discForm("Send to Accounting") : ""}
+      <div class="total" style="margin-top:8px"><span>To Collect</span><span class="mono">${peso2(balance())}</span></div>
+      ${S.disc && S.disc.state === "Waiting" ? '<p class="note" style="margin-top:8px">You can record the payment now for the full amount, or wait for Accounting.</p>' : ""}</div></section>${accountingSees()}</div>`;
+  if (d === 1) return `<p class="lead"><b>Design 2 · From the Trainee Account.</b> The Cashier gets a Request ▾ menu in the Trainee Account with Discount in it. The course row then shows Waiting, Approved or Rejected with Accounting's reason.</p>
+    <div class="split"><section class="panel"><header><h2>Trainee Account · DELA CRUZ, JUAN PEREZ</h2><span class="menu"><button type="button" class="b sm" data-act="menu" data-id="req">Request ▾</button>${S.menu === "req" ? '<div class="dd" role="menu"><button type="button" role="menuitem" data-act="dopen"><b>Discount</b><small>Sent to Accounting for approval</small></button></div>' : ""}</span></header><div class="pad">
+      <table><thead><tr><th>Course</th><th>Status</th><th class="r">Balance</th></tr></thead><tbody><tr><td><b>UBT-PSSR</b><small>ENR-2026-000084</small>${S.disc ? `<div style="margin-top:4px">${S.disc.state === "Waiting" ? `<span class="chip o">Discount ${peso(S.disc.amt)} · Waiting for Accounting</span>` : S.disc.state === "Approved" ? `<span class="chip g">Discount −${peso(S.disc.amt)} · Approved</span>` : '<span class="chip r">Discount Rejected · Not Covered by the Policy</span>'}</div>` : ""}</td><td><span class="chip o">Pending</span></td><td class="r amt">${peso(balance())}</td></tr></tbody></table>
+      ${S.discOpen && !S.disc ? `<div style="margin-top:12px"><span class="cap">Request Discount · UBT-PSSR</span>${discForm("Send to Accounting")}</div>` : ""}</div></section>${accountingSees()}</div>`;
+  const rows = S.disc ? [{ ...S.disc }] : [];
+  const sample = [{ who: "SANTOS, Maria · PSCMT", amt: 300, why: "Company Arrangement", state: "Approved" }, { who: "REYES, Carlo · STPPDSPPS", amt: 500, why: "Promo", state: "Rejected", reason: "No Approval on File" }];
+  const all = [...rows.map((r) => ({ who: "DELA CRUZ, Juan · UBT-PSSR", ...r, reason: r.state === "Rejected" ? "Not Covered by the Policy" : "" })), ...sample];
+  const shown = all.filter((r) => r.state === S.discTab);
+  return `<p class="lead"><b>Design 3 · Requests Tab With Results.</b> Requests › Discount keeps the form, and adds the Cashier's own requests in Waiting, Approved and Rejected, with Accounting's reason. The Dashboard shows a notice when Accounting decides.</p>
+    <div class="split"><section class="panel"><header><h2>Requests › Discount</h2></header><div class="pad" style="display:grid;gap:12px">
+      ${S.disc ? "" : `<div><span class="cap">New Discount Request</span><div class="form" style="margin-top:6px"><label>Enrollment<select><option>DELA CRUZ, Juan · UBT-PSSR · ₱900 balance</option></select></label></div>${discForm("Request Discount")}</div>`}
+      <div><div class="seg sub">${["Waiting", "Approved", "Rejected"].map((t) => `<button type="button" data-act="dtab" data-id="${t}" aria-selected="${S.discTab === t}">${t} <span class="count" style="margin-left:4px">${all.filter((r) => r.state === t).length}</span></button>`).join("")}</div>
+      <div class="lines" style="margin-top:8px">${shown.length ? shown.map((r) => `<div class="line"><div><b>${r.who}</b><small>${r.why}${r.reason ? ` · Accounting: ${r.reason}` : ""}</small></div><span class="chip ${r.state === "Approved" ? "g" : r.state === "Rejected" ? "r" : "o"}">${r.state}</span><span class="amt">−${peso(r.amt)}</span></div>`).join("") : '<p class="note">None.</p>'}</div></div></div></section>${accountingSees()}</div>`;
+}
+
+const confirmView = () => `<section class="panel"><div class="confirm">
+  <h3>Proof Rows Spacing</h3><ol><li>Pick Design 1, 2 or 3. The same spacing is used for New Enrollments and the other Cashier lists that show the same gap.</li></ol>
+  <h3>Uniform in Registration</h3><ol>
+    <li>Registration adds Uniform (and any other item Accounting puts in the Schedule of Fees) to the trainee's course. The price comes from the Schedule of Fees, so it needs no Accounting approval.</li>
+    <li>The Cashier collects it with the course in Record Payment. The Cashier's "+ Add Miscellaneous Charge" is removed.</li>
+    <li>Uniform still prints on its own Acknowledgement Receipt, as today, and shows on the TAR as Miscellaneous. Say if it should be on the same receipt as the training fee.</li>
+    <li>Registration can remove an item only while it is not paid.</li></ol>
+  <h3>Separate Print AR</h3><ol>
+    <li>Today the AR already prints on its own page, but the Cashier reaches it only from the screen after Record, the Dashboard's last payment, or the Payments list. These designs give the Cashier one clear Print AR place, never mixed with the TAR, which Registration prints.</li>
+    <li>Each AR still prints twice at most; Accounting does reprints.</li>
+    <li>If "separate" meant something else (for example, the original and duplicate copies on separate sheets), say so.</li></ol>
+  <h3>Discount Request</h3><ol>
+    <li>Today the Cashier can already ask under Requests › Discount, and Accounting decides on its Dashboard. But the Cashier never sees a rejection, and nothing shows the request while recording.</li>
+    <li>In every design the Cashier sees Waiting, Approved or Rejected with Accounting's reason, and Accounting sees who asked (not just "Cashier").</li>
+    <li>The amount comes off the balance only after Accounting approves.</li></ol>
+</div></section>`;
+
+function render() {
+  topicsEl.innerHTML = TOPICS.map((t, i) => `<button type="button" role="tab" data-act="topic" data-id="${i}" aria-selected="${S.topic === i}">${t.label}</button>`).join("");
+  const t = TOPICS[S.topic];
+  designsEl.hidden = !t.designs.length;
+  designsEl.innerHTML = t.designs.map((d, i) => `<button type="button" role="tab" data-act="design" data-id="${i}" aria-selected="${S.design[S.topic] === i}">${d}</button>`).join("");
+  const d = S.design[S.topic];
+  app.innerHTML = t.key === "proofs" ? proofs(d) : t.key === "uniform" ? uniform(d) : t.key === "ar" ? ar(d) : t.key === "discount" ? discount(d) : confirmView();
+}
+document.addEventListener("click", (ev) => {
+  const el = ev.target.closest("[data-act]");
+  if (!el || el.disabled || el.tagName === "INPUT") return;
+  const { act, id } = el.dataset;
+  if (act !== "menu") S.menu = null;
+  if (act === "topic") { S.topic = Number(id); return render(); }
+  if (act === "design") { S.design[S.topic] = Number(id); S.discOpen = false; return render(); }
+  if (act === "uq") { S.uniformQty = Math.min(5, Math.max(1, S.uniformQty + Number(id))); return render(); }
+  if (act === "uoff") { S.uniformOn = false; return render(); }
+  if (act === "uon") { S.uniformOn = true; S.uniformQty = 1; render(); return toast("Uniform added. The Cashier will collect it with the course."); }
+  if (act === "print") { S.prints[id] = Math.min(2, printed(id) + 1); render(); return toast(`Opens ${id} to print (copy ${printed(id)} of 2).`); }
+  if (act === "arf") { S.arFilter = id; return render(); }
+  if (act === "menu") { S.menu = S.menu === id ? null : id; return render(); }
+  if (act === "dopen") { S.discOpen = true; return render(); }
+  if (act === "dsend") { const amt = Math.round(Number(document.getElementById("damt").value) || 0); if (amt <= 0 || amt > FEE) return toast("Enter an amount up to the balance."); S.disc = { amt, why: document.getElementById("dwhy").value, state: "Waiting" }; S.discOpen = false; S.discTab = "Waiting"; render(); return toast("Sent to Accounting for approval."); }
+  if (act === "dok") { S.disc.state = "Approved"; S.discTab = "Approved"; render(); return toast("Accounting approved it. The Cashier sees Approved and the new balance."); }
+  if (act === "dno") { S.disc.state = "Rejected"; S.discTab = "Rejected"; render(); return toast("Accounting rejected it. The Cashier sees Rejected and the reason."); }
+  if (act === "dtab") { S.discTab = id; return render(); }
+  if (act === "toast") return toast(id);
+  render();
+});
+document.addEventListener("change", (ev) => { if (ev.target.dataset.act === "utoggle") { S.uniformOn = ev.target.checked; render(); } });
+render();
+</script>
