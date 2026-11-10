@@ -65,6 +65,26 @@ export function tarState(data: PortalData, traineeId: string, groupIds?: string[
 
 /** Print the TAR, or — once the limit is reached — ask Accounting for one more print. */
 /** Print receipt (owner, 8 Oct 2026): prints twice; after the second print the button is gone. */
+/** The receipts of a trainee's latest payments (owner, 10 Nov 2026, Print AR Design 3): the training fee and each item or fee have their own AR. */
+export function receiptsOf(data: Pick<PortalData, "payments">, traineeId: string) {
+  const mine = data.payments.filter((p) => p.trainee_id === traineeId && (p as { valid?: boolean }).valid !== false).sort((a, b) => b.received_at.localeCompare(a.received_at));
+  if (!mine.length) return [];
+  // One transaction: everything recorded within two minutes of the newest payment.
+  const newest = new Date(mine[0].received_at).getTime();
+  return mine.filter((p) => newest - new Date(p.received_at).getTime() <= 120000).map((p) => { const remarks = (p as { remarks?: string | null }).remarks ?? ""; return { id: p.id, label: /^(Miscellaneous|Service Fee) · /.test(remarks) ? remarks : "Training Fee", amount: Number(p.amount_centavos) }; });
+}
+/** Print AR ▾ on the Cashier Dashboard: every receipt of the trainee's latest payment, each printed twice at most. */
+export function PrintArMenu({ data, traineeId, reload }: { data: PortalData; traineeId: string; reload?: () => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const list = receiptsOf(data, traineeId);
+  if (!list.length) return null;
+  const printed = (id: string) => data.receiptPrints?.[id] ?? 0;
+  return <span className="cx-split ar-split"><button type="button" className="portal-secondary" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)}>Print AR ▾</button>
+    {open && <div className="cx-splitmenu ar-menu" role="menu">{list.map((r) => printed(r.id) >= 2
+      ? <span key={r.id} className="ar-done"><b>{r.label}</b><small>{pesos(r.amount)} · Printed Twice</small></span>
+      : <a key={r.id} role="menuitem" href={`/portal/payment-receipt/${r.id}`} target="_blank" rel="noreferrer" onClick={() => { setOpen(false); window.setTimeout(() => void reload?.(), 2500); }}><b>{r.label}</b><small>{pesos(r.amount)} · printed {printed(r.id)} of 2</small></a>)}</div>}
+  </span>;
+}
 export function ReceiptButton({ data, paymentId, reload, className = "portal-secondary", icon }: { data: PortalData; paymentId: string; reload?: () => Promise<void>; className?: string; icon?: boolean }) {
   const printed = data.receiptPrints?.[paymentId] ?? 0;
   if (printed >= 2) return icon ? <small className="muted-text">Printed Twice</small> : null;
@@ -488,12 +508,12 @@ export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { d
   const freshP = usePaged(fresh), dueP = usePaged(withBalance), paidP = usePaged(fullyPaid), unpaidP = usePaged(unpaid), proofP = usePaged(proofs);
   // Paid and Enrolled, Design 1 · Balance First (owner, 6 Nov 2026): the course count stays; the Trainee Account holds the courses, and the Record window the ticks.
   const trainee = (id: string, name: string, number: string) => (onOpenTrainee ? <button type="button" className="pv-open" onClick={() => onOpenTrainee(id)}><Who name={name} number={number} /></button> : <Who name={name} number={number} />);
-  const paidRow = (g: TraineeGroup) => { const latest = data.payments.filter((p) => p.trainee_id === g.traineeId).sort((a, b) => b.received_at.localeCompare(a.received_at))[0]; return <tr key={g.traineeId}>
+  const paidRow = (g: TraineeGroup) => <tr key={g.traineeId}>
     <td data-l="" className="lead">{trainee(g.traineeId, g.name, g.number)}</td>
     <td data-l="Courses">{g.enrollments.length} Course{g.enrollments.length === 1 ? "" : "s"}</td>
     <td data-l="Paid" className="r"><strong className="cx-amt">{pesos(g.paid)}</strong></td>
     <td data-l="Status">{g.balance === 0 ? <Badge tone="active">Paid</Badge> : <Badge tone="orange">{`Balance ${pesos(g.balance)}`}</Badge>}</td>
-    <td data-l=""><div className="cx-acts">{g.balance > 0 && <RecordTicked data={data} list={g.enrollments} off={{}} onPay={onPay} />}{latest && <ReceiptButton data={data} paymentId={latest.id} reload={reload} icon />}</div></td></tr>; };
+    <td data-l=""><div className="cx-acts">{g.balance > 0 && <RecordTicked data={data} list={g.enrollments} off={{}} onPay={onPay} />}<PrintArMenu data={data} traineeId={g.traineeId} reload={reload} /></div></td></tr>;
   const unpaidTotal = unpaid.reduce((s, r) => s + r.balanceCentavos, 0);
   const { busy, msg, post } = usePost(reload);
   const opening = (data.cashierOpenings ?? []).find((o) => o.opening_date === today);

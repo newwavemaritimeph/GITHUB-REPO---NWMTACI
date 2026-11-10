@@ -2246,6 +2246,8 @@ button.rd-row:hover { background: #f6fafc; }
 .nw-shell .pc-alerts{display:flex;gap:8px;flex-wrap:wrap;padding:0 16px 10px}.nw-shell .pc-alert{border:0;background:#fde9dd;color:#b4480f;border-radius:10px;padding:7px 12px;font-size:13.5px;font-weight:500;cursor:pointer}.nw-shell .pc-miss{color:#b4480f;font-size:12.5px;font-weight:600}.nw-shell .pc-sign{display:none}@media print{.nw-shell .pc-panel .cx-bar,.nw-shell .pc-alerts{display:none!important}.nw-shell .pc-sign{display:flex;justify-content:space-between;margin-top:48px;padding:0 16px}}
 /* Cashier dashboard proofs as two-line rows (10 Nov 2026). */
 /* Items to Collect at Registration's hand-over (10 Nov 2026): a full row of its own inside the pay area. */
+/* Print AR ▾ on the Cashier Dashboard (10 Nov 2026). */
+.nw-shell .ar-menu{min-width:240px;right:0;left:auto}.nw-shell .ar-menu a,.nw-shell .ar-menu .ar-done{display:grid;gap:1px;padding:8px 10px;border-radius:7px;text-decoration:none;color:inherit}.nw-shell .ar-menu a:hover{background:#eef4f8}.nw-shell .ar-menu small{color:#5f7180;font-size:12px}.nw-shell .ar-menu .ar-done{opacity:.55}
 .portal-shell .sc-pay .sc-items{flex:1 1 100%;display:grid;gap:0;max-width:560px}
 .portal-shell .sc-pay .sc-item{display:grid;grid-template-columns:minmax(0,1fr) auto 96px;align-items:center;gap:10px;padding:6px 0;border-top:1px solid #e3ebf0}
 .portal-shell .sc-pay .sc-item label{flex-direction:row;align-items:center;gap:8px;flex-wrap:wrap;font-weight:500;color:#0f2638}
