@@ -1,7 +1,7 @@
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { PDFDocument, rgb, type PDFFont } from "pdf-lib";
 import { channelTotal, channelsUsed, sideTotal, type Line, type SalesLine, type summarize } from "@/lib/finance-summary";
 import type { DocumentControl } from "@/lib/document-controls";
-import { drawControlBlock } from "@/lib/print/control-block";
+import { enlarged, loadBrand } from "@/lib/print/letterhead";
 
 type Summary = ReturnType<typeof summarize> & { title: string; from: string; to: string };
 export const ascii = (s: string) => s.replace(/[–—]/g, "-").replace(/·/g, "-").replace(/₱/g, "PHP ").normalize("NFKD").replace(/[^\x20-\x7E]/g, "");
@@ -9,24 +9,22 @@ export const money = (c: number) => `${c < 0 ? "-" : ""}${(Math.abs(c) / 100).to
 export const day = (d: string) => new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T00:00:00Z`));
 
 /**
- * Cash and Sales Summary, A4 portrait (owner, 21 Oct 2026; segregated sales, 5 Nov 2026):
+ * Cash and Sales Summary (owner, 21 Oct 2026; segregated sales, 5 Nov 2026), on the shared Corporate Two-Tone letterhead,
+ * legal paper, drawn 1.17 times larger (10 Nov 2026):
  * Total Sales, then Sales from New Wave Courses by category, then Sales from Endorsed Courses by center, then cash. Amounts in PHP.
  */
-export async function createFinanceSummaryPdf(s: Summary, printed: string, control?: DocumentControl | null) {
+export async function createFinanceSummaryPdf(s: Summary, printed: string, control?: DocumentControl | null, logoBytes?: Uint8Array) {
   const pdf = await PDFDocument.create();
-  const reg = await pdf.embedFont(StandardFonts.Helvetica), bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const brand = await loadBrand(pdf, logoBytes), { reg, bold } = brand;
   const navy = rgb(0.07, 0.25, 0.39), blue = rgb(0.02, 0.44, 0.82), muted = rgb(0.37, 0.44, 0.5), ink = rgb(0.06, 0.15, 0.22), rule = rgb(0.86, 0.9, 0.93), band = rgb(0.9, 0.96, 0.99), soft = rgb(0.93, 0.96, 0.97), orange = rgb(0.95, 0.34, 0.08), red = rgb(0.71, 0.14, 0.09), green = rgb(0.04, 0.48, 0.24);
-  const W = 595.28, H = 841.89, M = 36, IW = W - 2 * M;
-  let page: PDFPage = pdf.addPage([W, H]);
-  let y = H - M;
+  const TITLE = "CASH AND SALES SUMMARY", frame = enlarged(pdf, brand, control, 1.17), { W, M } = frame, IW = W - 2 * M;
+  let { page, y } = frame.open({ title: TITLE });
   const text = (t: string, x: number, size: number, font: PDFFont = reg, color = ink) => page.drawText(ascii(t), { x, y, size, font, color });
   const right = (t: string, xr: number, size: number, font: PDFFont = reg, color = ink) => { const v = ascii(t); page.drawText(v, { x: xr - font.widthOfTextAtSize(v, size), y, size, font, color }); };
   const fit = (t: string, width: number, size: number, font: PDFFont = reg) => { let v = ascii(t); if (font.widthOfTextAtSize(v, size) <= width) return v; while (v.length > 1 && font.widthOfTextAtSize(`${v}...`, size) > width) v = v.slice(0, -1); return `${v}...`; };
-  const need = (h: number) => { if (y - h < M + 40) { page = pdf.addPage([W, H]); y = H - M; } };
+  const need = (h: number) => { if (y - h < frame.bottom) ({ page, y } = frame.open({ title: TITLE, cont: true })); };
 
-  drawControlBlock(page, { reg, bold }, control, { right: W - M, top: y + 7, width: 125, rowHeight: 9 });
-  text("NEW WAVE MARITIME TRAINING AND ASSESSMENT CENTER, INC.", M, 8.5, bold, navy); y -= 20;
-  text("Cash and Sales Summary", M, 17, bold); y -= 15;
+  y += 4;
   text(`${s.title} - ${day(s.from)} to ${day(s.to)} - amounts in PHP - printed ${day(printed)}`, M, 8.5, reg, muted); y -= 8;
   page.drawRectangle({ x: M, y, width: IW, height: 2, color: orange }); y -= 18;
 
@@ -59,7 +57,8 @@ export async function createFinanceSummaryPdf(s: Summary, printed: string, contr
     labels.slice(1).forEach((h, i) => h.split("\n").forEach((part, k, parts) => { const yy = y; y = yy + (parts.length > 1 ? 0 : -8) - k * 8; right(part, edges[i] - 3, 6.6, bold, navy); y = yy; }));
     y -= 27;
   };
-  const SALE_EDGES = [189, 253, 311, 361, 415, 469, IW].map((v) => M + v);
+  // The column edges of the A4 layout (523.28 pt wide), kept in proportion.
+  const SALE_EDGES = [189, 253, 311, 361, 415, 469, 523.28].map((v) => M + (v / 523.28) * IW);
   const SALE_HEADS = ["Trainees", "Course\nFees", "Miscellaneous\nCharges", "Less\nDiscounts", "Total\nSales", "Amount\nCollected", "Outstanding\nBalance"];
   const saleCells = (r: SalesLine) => [String(r.trainees), money(r.fees), money(r.charges), money(0 - r.discounts), money(r.sales), money(r.collected), money(r.balance)];
   type RowStyle = { strong?: boolean; fill?: ReturnType<typeof rgb>; bar?: ReturnType<typeof rgb>; indent?: boolean; sub?: string };
@@ -108,7 +107,7 @@ export async function createFinanceSummaryPdf(s: Summary, printed: string, contr
     cellsRow(`Total ${c.name}`, saleCells(c), SALE_EDGES, { strong: true });
   }
   cellsRow("Total Sales from New Wave Courses", saleCells(s.direct), SALE_EDGES, { strong: true, fill: band });
-  const lastOnly = (label: string, v: number, o: RowStyle = {}) => cellsRow(label, ["", "", "", "", "", "", money(v)], [W - M - 200, ...SALE_EDGES.slice(1)], o);
+  const lastOnly = (label: string, v: number, o: RowStyle = {}) => cellsRow(label, ["", "", "", "", "", "", money(v)], [W - M - 184, ...SALE_EDGES.slice(1)], o);
   lastOnly("Less Operating Expenses for the Period", 0 - s.direct.expenses);
   lastOnly("Gross Margin on New Wave Courses", s.direct.margin, { strong: true, fill: band });
   y -= 12;
@@ -177,10 +176,11 @@ export async function createFinanceSummaryPdf(s: Summary, printed: string, contr
   row(["Less Disbursements", money(0 - dE), money(0 - dD), money(0 - dE - dD)], { red: [dE > 0, dD > 0, dE + dD > 0] });
   row(["Net Cash", money(rE - dE), money(rD - dD), money(rE + rD - dE - dD)], { bold: true });
 
-  y = Math.max(y - 46, M + 20);
-  if (y < M + 40) { page = pdf.addPage([W, H]); y = H - M - 40; }
+  need(70);
+  y -= 46;
   const sig = (label: string, x: number) => { page.drawLine({ start: { x, y }, end: { x: x + 200, y }, thickness: 0.7, color: ink }); page.drawText(label, { x, y: y - 12, size: 8.5, font: reg, color: muted }); };
   sig("Prepared by (Accounting)", M);
   sig("Noted by (Admin)", W - M - 200);
+  frame.close();
   return pdf.save();
 }

@@ -1,3 +1,5 @@
+import path from "node:path";
+import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/security";
 import { createReconciliationSheetPdf } from "@/lib/print/reconciliation-sheet";
@@ -22,7 +24,7 @@ export async function GET(request: Request) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return NextResponse.json({ error: "Invalid date." }, { status: 400 });
   const db = createSupabaseAdminClient();
   const day = await loadReconDay(db, date, today, channel);
-  const bytes = await createReconciliationSheetPdf(date, channel, day, await loadDocumentControl(db, "reconciliation"));
+  const bytes = await createReconciliationSheetPdf(date, channel, day, await loadDocumentControl(db, "reconciliation"), await readFile(path.join(process.cwd(), "public", "new-wave-emblem.png")).then((b) => new Uint8Array(b)).catch(() => undefined));
   await db.from("audit_logs").insert({ actor_id: staff.user.id, action: "report.exported", record_type: "report", record_id: `reconciliation:${channel}:${date}`, new_values: { date, channel, payments: day.rows.length } });
   return new Response(Buffer.from(bytes), { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="${channel.toLowerCase()}-reconciliation-${date}.pdf"`, "cache-control": "no-store" } });
 }

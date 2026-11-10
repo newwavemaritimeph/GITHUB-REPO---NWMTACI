@@ -1,3 +1,5 @@
+import path from "node:path";
+import { readFile } from "node:fs/promises";
 import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
 import { requireStaff } from "@/lib/security";
@@ -24,7 +26,7 @@ export async function GET(request: Request) {
   await db.from("audit_logs").insert({ actor_id: staff.user.id, action: "report.exported", record_type: "report", record_id: `finance-summary:${period}:${s.from}:${s.to}`, new_values: { period, from: s.from, to: s.to, format: xlsx ? "xlsx" : "pdf" } });
   const name = `cash-and-sales-summary-${s.from}-to-${s.to}`;
   if (!xlsx) {
-    const bytes = await createFinanceSummaryPdf(s, today, await loadDocumentControl(db, "cash_sales_summary"));
+    const bytes = await createFinanceSummaryPdf(s, today, await loadDocumentControl(db, "cash_sales_summary"), await readFile(path.join(process.cwd(), "public", "new-wave-emblem.png")).then((b) => new Uint8Array(b)).catch(() => undefined));
     return new Response(Buffer.from(bytes), { headers: { "content-type": "application/pdf", "content-disposition": `inline; filename="${name}.pdf"`, "cache-control": "no-store" } });
   }
   const book = new ExcelJS.Workbook();

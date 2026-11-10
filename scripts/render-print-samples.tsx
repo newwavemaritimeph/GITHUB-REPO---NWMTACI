@@ -170,7 +170,7 @@ await save("10-payment-reconciliation-day-sheet.pdf", "Payment Reconciliation Da
   { id: "1", payment_number: "PAY-2026-001490", receipt_number: "AR-2026-001190", received_at: "2026-10-11T02:15:00Z", amount_centavos: 180000, reference_number: "7012345678901", trainee: "REYES, Paolo", recorded_by: "Karen Mallari", proof_link: null, status: "Reconciled", remarks: null, checked_by: "Admin Assistant", checked_at: null },
   { id: "2", payment_number: "PAY-2026-001491", receipt_number: "AR-2026-001191", received_at: "2026-10-11T03:40:00Z", amount_centavos: 130000, reference_number: "7012345611112", trainee: "AQUINO, Rey", recorded_by: "Kat Garcia", proof_link: null, status: null, remarks: null, checked_by: null, checked_at: null },
   { id: "3", payment_number: "PAY-2026-001492", receipt_number: "AR-2026-001192", received_at: "2026-10-11T06:05:00Z", amount_centavos: 250000, reference_number: "7012349900001", trainee: "MENDOZA, Carlo", recorded_by: "Karen Mallari", proof_link: null, status: "Not in History", remarks: "Not on the printout", checked_by: "Admin Assistant", checked_at: null },
-  { id: "4", payment_number: "PAY-2026-001493", receipt_number: "AR-2026-001193", received_at: "2026-10-11T07:30:00Z", amount_centavos: 90000, reference_number: "7012340000777", trainee: "BAUTISTA, Ana", recorded_by: "Karen Mallari", proof_link: null, status: null, remarks: null, checked_by: null, checked_at: null }] }, ctl("NW-ACC-07")));
+  { id: "4", payment_number: "PAY-2026-001493", receipt_number: "AR-2026-001193", received_at: "2026-10-11T07:30:00Z", amount_centavos: 90000, reference_number: "7012340000777", trainee: "BAUTISTA, Ana", recorded_by: "Karen Mallari", proof_link: null, status: null, remarks: null, checked_by: null, checked_at: null }] }, ctl("NW-ACC-07"), logoBytes));
 
 // ---- Resource plan ---------------------------------------------------------------
 const pb = (id: string, no: string, code: string, name: string, s: string, e: string, n: number, room: string | null, ins: string | null): PlanBatch => ({ id, batchNumber: no, courseId: code, courseCode: code, courseName: name, startsOn: s, endsOn: e, students: n, capacity: 24, classroomId: room, instructorId: ins });
@@ -185,7 +185,7 @@ const plan = planRows([
 ], [{ id: "r1", name: "ROOM 101", capacity: 24 }, { id: "r2", name: "ROOM 102", capacity: 24 }, { id: "r3", name: "Simulator Room", capacity: 12 }],
   [{ id: "i1", complete_name: "Capt. R. Villanueva" }, { id: "i2", complete_name: "C/E M. Ramos" }, { id: "i3", complete_name: "2/O J. Dizon" }, { id: "i4", complete_name: "Engr. L. Cruz" }],
   [{ instructor_id: "i1", course_id: "UBT-PSSR", valid_until: "2027-03-31" }, { instructor_id: "i3", course_id: "UBT-PSSR", valid_until: "2027-01-15" }, { instructor_id: "i3", course_id: "STPPDSPPS", valid_until: "2026-09-30" }, { instructor_id: "i4", course_id: "PSCMT", valid_until: "2027-04-30" }, { instructor_id: "i2", course_id: "HPT", valid_until: "2026-10-20" }]);
-await save("11-resource-plan.pdf", "Resource Plan", await createResourcePlanPdf("2026-10-12", "2026-10-25", "2026-10-12", plan, ctl("NW-TRN-05")));
+await save("11-resource-plan.pdf", "Resource Plan", await createResourcePlanPdf("2026-10-12", "2026-10-25", "2026-10-12", plan, ctl("NW-TRN-05"), logoBytes));
 
 // ---- MARINA MISMO lists ----------------------------------------------------------
 const tr = (id: string, last: string, first: string, mid: string | null, birth: string, srn: string, rank: string, due: number, p11: number, p16: number) => ({ enrollmentId: id, lastName: last, firstName: first, middleName: mid, birthdate: birth, srn, rank, dueCentavos: due, paidBy11: p11, paidBy16: p16, paidNow: p16 });
@@ -233,7 +233,7 @@ const saleBase = { center: "", payable: 0, rebate: 0, share: 0, charges: 3500, d
 await save("20-cash-and-sales-summary.pdf", "Cash and Sales Summary", await createFinanceSummaryPdf({ title: "November 2026", from: "2026-11-01", to: "2026-11-05", ...summarize({
   payments: [{ amount: 130000, channel: "Cash", allocations: [{ amount: 130000, endorsement: false }] }, { amount: 550000, channel: "GCash", allocations: [{ amount: 550000, endorsement: true }] }], income: [{ amount: 130000, channel: "PSBank", source: "Endorsement Rebate" }], expenses: [{ amount: 550000, channel: "PSBank", category: "Partnered Center Payment" }, { amount: 50000, channel: "Cash", category: "Utilities" }],
   sales: [{ ...saleBase, endorsement: false, category: "STCW", code: "UBT-PSSR", name: "Updating Training on Basic Training - PSSR", price: 130000 }, { ...saleBase, endorsement: false, category: "In-House", code: "APA", name: "Anti Piracy Awareness Prevention and Response", price: 70000, collected: 70000 }, { ...saleBase, endorsement: true, code: "BT", name: "Basic Training", center: "Nautical Options", price: 550000, payable: 550000, rebate: 130000, share: 100000, collected: 550000, rebateReceived: 130000 }],
-}) }, "2026-11-05", ctl("NW-ACC-05")));
+}) }, "2026-11-05", ctl("NW-ACC-05"), logoBytes));
 
 // ---- One combined file ---------------------------------------------------------------
 const all = await PDFDocument.create();

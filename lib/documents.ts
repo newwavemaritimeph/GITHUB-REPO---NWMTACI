@@ -1,6 +1,6 @@
 import { PDFDocument, StandardFonts, degrees, rgb } from "pdf-lib";
 import { drawControlBlock, drawControlLine } from "@/lib/print/control-block";
-import { FOOT, LEGAL, SIDE, drawLetterhead, finishPages, loadBrand, newPage } from "@/lib/print/letterhead";
+import { FOOT, LEGAL, SIDE, drawLetterhead, enlarged, finishPages, loadBrand, newPage } from "@/lib/print/letterhead";
 import type { DocumentControl } from "@/lib/document-controls";
 import { pesosInWords } from "@/lib/amount-words";
 
@@ -11,41 +11,37 @@ export type DocumentSnapshot = {
   recipient?: string;
   sections: { heading: string; rows: { label: string; value: string }[] }[];
   footer?: string;
+  logoBytes?: Uint8Array;
 };
 
+/** A plain record page (the Payment Invoice) on the shared Corporate Two-Tone letterhead, legal paper, drawn 1.15 times larger (10 Nov 2026). */
 export async function createBrandedPdf(snapshot: DocumentSnapshot) {
   const pdf = await PDFDocument.create();
-  let page = pdf.addPage([595.28, 841.89]);
-  const regular = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const colors = { ink: rgb(.07,.25,.39), blue: rgb(.02,.44,.82), orange: rgb(.95,.34,.08), muted: rgb(.38,.47,.54), line: rgb(.84,.9,.93) };
-  let y = 785;
-  const addPage = () => { page = pdf.addPage([595.28,841.89]); y = 790; };
-  page.drawRectangle({ x: 0, y: 813, width: 595.28, height: 29, color: colors.blue });
-  page.drawRectangle({ x: 0, y: 806, width: 595.28, height: 7, color: colors.orange });
-  page.drawText("NEW WAVE MARITIME", { x: 44, y, size: 15, font: bold, color: colors.blue });
-  page.drawText("Training and Assessment Center, Inc.", { x: 44, y: y - 16, size: 8, font: regular, color: colors.muted });
-  y -= 62;
-  page.drawText(snapshot.title, { x: 44, y, size: 24, font: bold, color: colors.ink });
-  y -= 27;
-  page.drawText(`Reference: ${snapshot.reference}`, { x: 44, y, size: 9, font: regular, color: colors.muted });
-  page.drawText(`Issued: ${snapshot.issuedAt}`, { x: 360, y, size: 9, font: regular, color: colors.muted });
+  const brand = await loadBrand(pdf, snapshot.logoBytes), { reg: regular, bold } = brand;
+  const colors = { ink: rgb(.07,.25,.39), blue: rgb(.02,.44,.82), muted: rgb(.38,.47,.54), line: rgb(.84,.9,.93) };
+  const title = ascii(snapshot.title).toUpperCase(), frame = enlarged(pdf, brand, null, 1.15), { W, M } = frame;
+  let { page, y } = frame.open({ title, right: snapshot.reference });
+  const addPage = () => { ({ page, y } = frame.open({ title, cont: true })); };
+  page.drawText(ascii(`Reference: ${snapshot.reference}`), { x: M, y, size: 9, font: regular, color: colors.muted });
+  page.drawText(ascii(`Issued: ${snapshot.issuedAt}`), { x: W - M - 190, y, size: 9, font: regular, color: colors.muted });
   y -= 30;
   for (const section of snapshot.sections) {
-    if (y < 120) addPage();
-    page.drawRectangle({ x: 44, y: y - 5, width: 507, height: 25, color: rgb(.94,.98,.99) });
-    page.drawText(section.heading, { x: 54, y: y + 3, size: 10, font: bold, color: colors.blue });
+    if (y < frame.bottom + 60) addPage();
+    page.drawRectangle({ x: M, y: y - 5, width: W - 2 * M, height: 25, color: rgb(.94,.98,.99) });
+    page.drawText(ascii(section.heading), { x: M + 10, y: y + 3, size: 10, font: bold, color: colors.blue });
     y -= 25;
     for (const row of section.rows) {
-      if (y < 75) addPage();
-      page.drawText(row.label, { x: 54, y, size: 9, font: regular, color: colors.muted });
-      page.drawText(row.value.slice(0, 70), { x: 210, y, size: 9, font: bold, color: colors.ink });
-      page.drawLine({ start: { x: 54, y: y - 7 }, end: { x: 541, y: y - 7 }, thickness: .5, color: colors.line });
+      if (y < frame.bottom + 20) addPage();
+      page.drawText(ascii(row.label), { x: M + 10, y, size: 9, font: regular, color: colors.muted });
+      page.drawText(ascii(row.value).slice(0, 70), { x: M + 166, y, size: 9, font: bold, color: colors.ink });
+      page.drawLine({ start: { x: M + 10, y: y - 7 }, end: { x: W - M - 10, y: y - 7 }, thickness: .5, color: colors.line });
       y -= 23;
     }
     y -= 12;
   }
-  page.drawText(snapshot.footer ?? "Generated from a versioned New Wave record snapshot.", { x: 44, y: 36, size: 7, font: regular, color: colors.muted });
+  if (y < frame.bottom + 10) addPage();
+  page.drawText(ascii(snapshot.footer ?? "Generated from a versioned New Wave record snapshot."), { x: M, y, size: 7, font: regular, color: colors.muted });
+  frame.close();
   return pdf.save();
 }
 
@@ -986,14 +982,13 @@ export type DailyExpensesSnapshot = {
   channelTotals?: { channel: string; count: number; totalCentavos: number }[];
 };
 
-/** Daily expenses summary — one A4 portrait page (paginated) listing the day's
- * expense vouchers with payment channel, reference, status, and totals. */
+/** Daily expenses summary: the day's (or period's) expense vouchers with payment channel, reference, status and totals,
+ * on the shared Corporate Two-Tone letterhead, legal paper, drawn 1.12 times larger (10 Nov 2026). */
 export async function createDailyExpensesPdf(snapshot: DailyExpensesSnapshot) {
   const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const orange = rgb(0.949, 0.337, 0.086), dark = rgb(0.071, 0.247, 0.388), gray = rgb(0.42, 0.45, 0.5), line = rgb(0.85, 0.88, 0.9);
-  const W = 595.28, H = 841.89, margin = 40;
+  const brand = await loadBrand(doc, snapshot.logoBytes), { reg: font, bold } = brand;
+  const dark = rgb(0.071, 0.247, 0.388), gray = rgb(0.42, 0.45, 0.5), line = rgb(0.85, 0.88, 0.9);
+  const title = (snapshot.title ?? "Daily Expenses Summary").toUpperCase(), frame = enlarged(doc, brand, snapshot.control, 1.12), W = frame.W, margin = frame.M;
   const cols = [
     { label: "Voucher", x: margin, w: 74 },
     { label: "Payee", x: margin + 74, w: 104 },
@@ -1008,25 +1003,15 @@ export async function createDailyExpensesPdf(snapshot: DailyExpensesSnapshot) {
     while (t.length > 1 && f.widthOfTextAtSize(t, size) > w - 4) t = t.slice(0, -1);
     return t.length < (text ?? "").length ? `${t.slice(0, -1)}…` : t;
   };
-  let page = doc.addPage([W, H]);
-  let y = H - margin;
-  const header = async () => {
-    if (snapshot.logoBytes) { try { const img = await doc.embedPng(snapshot.logoBytes); const d = img.scaleToFit(46, 46); page.drawImage(img, { x: margin, y: y - d.height + 6, width: d.width, height: d.height }); } catch { /* skip logo */ } }
-    page.drawText("New Wave Maritime Training and Assessment Center, Inc.", { x: margin + 54, y: y - 8, size: 11, font: bold, color: dark });
-    page.drawText(snapshot.title ?? "Daily Expenses Summary", { x: margin + 54, y: y - 24, size: 15, font: bold, color: orange });
-    page.drawText(snapshot.dateLabel, { x: margin + 54, y: y - 40, size: 10, font, color: gray });
-    drawControlBlock(page, { reg: font, bold }, snapshot.control, { right: W - margin, top: y + 6, width: 125, rowHeight: 9 });
-    y -= 66;
-    drawHead();
-  };
+  let { page, y } = frame.open({ title, right: snapshot.dateLabel });
   const drawHead = () => {
     page.drawRectangle({ x: margin, y: y - 4, width: W - margin * 2, height: 18, color: rgb(0.96, 0.98, 0.99) });
     for (const c of cols) page.drawText(c.label, { x: c.align === "right" ? c.x + c.w - (bold.widthOfTextAtSize(c.label, 8) + 2) : c.x + 2, y, size: 8, font: bold, color: dark });
     y -= 18;
   };
-  await header();
+  drawHead();
   for (const r of snapshot.rows) {
-    if (y < margin + 60) { page = doc.addPage([W, H]); y = H - margin; drawHead(); }
+    if (y < frame.bottom + 20) { ({ page, y } = frame.open({ title, cont: true })); drawHead(); }
     const cells = [r.number, r.payee, r.category, r.channel || "—", r.reference || "—", r.status, php(r.amountCentavos)];
     cells.forEach((val, i) => {
       const c = cols[i];
@@ -1043,7 +1028,7 @@ export async function createDailyExpensesPdf(snapshot: DailyExpensesSnapshot) {
   page.drawText(`${snapshot.rows.length} voucher(s)`, { x: W - margin - font.widthOfTextAtSize(`${snapshot.rows.length} voucher(s)`, 9), y, size: 9, font, color: gray });
   if (snapshot.channelTotals?.length) {
     y -= 26;
-    if (y < margin + 40 + snapshot.channelTotals.length * 15) { page = doc.addPage([W, H]); y = H - margin; }
+    if (y < frame.bottom + 20 + snapshot.channelTotals.length * 15) ({ page, y } = frame.open({ title, cont: true }));
     page.drawRectangle({ x: margin, y: y - 4, width: W - margin * 2, height: 18, color: rgb(0.96, 0.98, 0.99) });
     page.drawText("Per payment channel", { x: margin + 2, y, size: 8, font: bold, color: dark });
     page.drawText("Vouchers", { x: margin + 300, y, size: 8, font: bold, color: dark });
@@ -1058,9 +1043,11 @@ export async function createDailyExpensesPdf(snapshot: DailyExpensesSnapshot) {
       page.drawLine({ start: { x: margin, y: y + 3 }, end: { x: W - margin, y: y + 3 }, thickness: 0.4, color: line });
     }
   }
+  if (y - 56 < frame.bottom) ({ page, y } = frame.open({ title, cont: true }));
   y -= 40;
   page.drawText(`Prepared by: ${snapshot.preparedBy || "—"}`, { x: margin, y, size: 9, font, color: rgb(0.15, 0.18, 0.22) });
-  page.drawText("Amounts are in Philippine peso. Retain for accounting and audit.", { x: margin, y: margin - 12, size: 7.5, font, color: gray });
+  page.drawText("Amounts are in Philippine peso. Retain for accounting and audit.", { x: margin, y: y - 14, size: 7.5, font, color: gray });
+  frame.close();
   return doc.save();
 }
 
@@ -1114,8 +1101,8 @@ export async function createPayslipPdf(snapshot: PayslipSnapshot) {
   });
 }
 
-export async function createPaymentInvoicePdf(snapshot:PaymentSnapshot){
-  return createBrandedPdf({title:"Payment Invoice",reference:snapshot.invoiceNumber,issuedAt:new Date(snapshot.receivedAt).toLocaleString("en-PH"),recipient:snapshot.traineeName,sections:[
+export async function createPaymentInvoicePdf(snapshot:PaymentSnapshot,logoBytes?:Uint8Array){
+  return createBrandedPdf({logoBytes,title:"Payment Invoice",reference:snapshot.invoiceNumber,issuedAt:new Date(snapshot.receivedAt).toLocaleString("en-PH"),recipient:snapshot.traineeName,sections:[
     {heading:"Billed to",rows:[{label:"Trainee",value:snapshot.traineeName},{label:"Trainee number",value:snapshot.traineeNumber},{label:"Address",value:snapshot.address||"-"},{label:"Enrollment",value:snapshot.enrollmentNumber}]},
     {heading:"Training and payment",rows:[{label:"Course",value:snapshot.course},{label:"Payment",value:snapshot.paymentNumber},{label:"Payment method",value:snapshot.method},{label:"Transaction reference",value:snapshot.referenceNumber||"Manual / none"},{label:"This payment",value:php(snapshot.amountCentavos)},{label:"Total course fee",value:php(snapshot.totalDueCentavos)},{label:"Total paid",value:php(snapshot.totalPaidCentavos)},{label:"Remaining balance",value:php(snapshot.balanceCentavos)}]},
   ],footer:"This invoice was generated automatically from an immutable payment snapshot. An acknowledgment receipt is issued separately."});

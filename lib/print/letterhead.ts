@@ -1,4 +1,4 @@
-import { StandardFonts, rgb, type PDFDocument, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
+import { StandardFonts, popGraphicsState, pushGraphicsState, rgb, scale, type PDFDocument, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import { FOOTER_DEFAULTS, controlRows, type DocumentControl } from "@/lib/document-controls";
 
 /**
@@ -120,4 +120,22 @@ export function finishPages(pdf: PDFDocument, b: Brand, control: DocumentControl
     page.drawText(TAGLINE, { x: W - SIDE - b.italic.widthOfTextAtSize(TAGLINE, 9.5), y, size: 9.5, font: b.italic, color: ORANGE });
     twoTone(page, 0);
   });
+}
+
+/**
+ * Bigger text on a report's existing layout: the body is laid out in its own, smaller coordinates (page width `W`,
+ * side margin `M`, lowest usable y `bottom`) and drawn enlarged `k` times on the real page. `open` starts a page with
+ * the letterhead at true size and returns the page and the y where the body starts; `close` adds the footers.
+ */
+export function enlarged(pdf: PDFDocument, b: Brand, control: DocumentControl | null | undefined, k: number, size: [number, number] = LEGAL) {
+  let current: PDFPage | null = null;
+  const open = (opts: Parameters<typeof drawLetterhead>[3]) => {
+    if (current) current.pushOperators(popGraphicsState());
+    const page = newPage(pdf, b, size), top = drawLetterhead(page, b, control, opts);
+    page.pushOperators(pushGraphicsState(), scale(k, k));
+    current = page;
+    return { page, y: top / k };
+  };
+  const close = () => { if (current) current.pushOperators(popGraphicsState()); current = null; finishPages(pdf, b, control); };
+  return { W: size[0] / k, M: SIDE / k, bottom: (FOOT + 12) / k, open, close };
 }
