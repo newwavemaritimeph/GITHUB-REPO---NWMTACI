@@ -141,8 +141,8 @@ export function RegistrationDashboard({ data, go, reload, account }: { data: Por
   const current = open ? data.enrollments.find((e) => e.id === open.id) ?? open : null;
 
   const row = (x: NextUpItem) => { const e = x.e, id = e?.trainee_id ?? x.t?.id, c = e ? first(e.courses) : null; return <WorkRow key={x.key}
-    who={<button type="button" className="pv-open" onClick={() => (e ? setOpen(e) : setAssigning(x.t!))}><span className="cx-name">{e ? nameOf(e) : fullName(x.t!)}</span><span className="cx-id">{appNoOf(data, id) ?? x.t?.trainee_number ?? e?.enrollment_number}</span></button>}
-    meta={e ? `${c?.code ?? c?.name ?? "Course"} · ${scheduleOf(e)}` : "Course to Assign"}
+    who={<button type="button" className="pv-open" onClick={() => (e ? setOpen(e) : setAssigning(x.t!))}><span className="cx-name">{e ? nameOf(e) : fullName(x.t!)}</span></button>}
+    meta={`${appNoOf(data, id) ?? x.t?.trainee_number ?? e?.enrollment_number ?? ""} · ${e ? `${c?.code ?? c?.name ?? "Course"} · ${scheduleOf(e)}` : "Course to Assign"}`}
     mid={<><Badge tone={x.tone}>{x.chip}</Badge>{e && <LateChip e={e} />}</>}
     acts={x.step ? <button type="button" className="portal-primary row-act" onClick={() => (!e ? setAssigning(x.t!) : x.step === "Choose Batch" ? setPlacing(e) : setOpen(e))}>{x.step}</button> : null} />; };
 
@@ -164,7 +164,7 @@ export function RegistrationDashboard({ data, go, reload, account }: { data: Por
     {registering && <Modal wide title="Register Trainee" onClose={() => setRegistering(false)}>
       <RegistrationForm staff={{ onDone: (r) => { setRegistering(false); setRegistered({ kind: r.warnings?.length ? "error" : "success", text: `Registered · ${r.applicationNumber ?? r.reference}.${r.warnings?.length ? ` ${r.warnings.join(" ")}` : ""}` }); void reload(); } }} />
     </Modal>}
-    <div className="cx-split">
+    <div className="cx-dash">
       <div className="ac-stack">
         <section className="portal-panel cx-panel" id="rd-next">
           <div className="panel-heading"><h2>Work</h2><span className="cx-sum">{work.length} Waiting on You</span></div>

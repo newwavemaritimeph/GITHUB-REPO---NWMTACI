@@ -6797,16 +6797,17 @@ a[href^="mailto:"],
 .portal-modal .ql-staff .ql-types { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); max-width: 520px; }
 @media (max-width: 760px) { .portal-modal .ql-staff { grid-template-columns: 1fr; padding: 12px; } .portal-modal .ql-staff .ql-rail { position: static; } .portal-modal .ql-staff .ql-body { padding: 2px 14px 16px; } }
 /* Cashier Dashboard, Design 3 + 6 (owner, 10 Nov 2026): Money In and Money Out, with Today's Cash beside them. */
-.portal-shell .cx-split { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
-.portal-shell .cx-split > * { min-width: 0; }
+/* cx-dash, not cx-split: cx-split is every row dropdown's wrapper (Actions, Print AR, TAR). */
+.portal-shell .cx-dash { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 16px; align-items: start; }
+.portal-shell .cx-dash > * { min-width: 0; }
 .portal-shell .cx-cashcol { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 12px; min-width: 0; }
 .portal-shell .cx-group-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 4px 2px -8px; }
 .portal-shell .cx-group-h h2 { margin: 0; font-size: 19px; color: var(--blue-dark); }
 .portal-shell .cx-group-h span { font-size: 14px; font-weight: 600; }
 .portal-shell .cx-group-h .in { color: #0a6a33; } .portal-shell .cx-group-h .out { color: #b4400c; }
-@media (max-width: 1280px) { .portal-shell .cx-split { grid-template-columns: 1fr; } .portal-shell .cx-cashcol { position: static; order: -1; } }
+@media (max-width: 1280px) { .portal-shell .cx-dash { grid-template-columns: 1fr; } .portal-shell .cx-cashcol { position: static; order: -1; } }
 /* Cashier Dashboard, organized (owner, 10 Nov 2026): tabs, one row shape, folds. */
-.portal-shell .cx-split .ac-stack { gap: 16px; }
+.portal-shell .cx-dash .ac-stack { gap: 16px; }
 .portal-shell .cx-sum { font-size: 14px; font-weight: 600; white-space: nowrap; }
 .portal-shell .cx-sum.in { color: #0a6a33; } .portal-shell .cx-sum.out { color: #b4400c; }
 .portal-shell .cx-tabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--nw-line, #dce4ec); margin: 0 16px; }
@@ -6815,7 +6816,7 @@ a[href^="mailto:"],
 .portal-shell .cx-tabs b { background: #eaf3fb; color: #0571d0; border-radius: 999px; padding: 0 7px; font-size: 12px; }
 .portal-shell .cx-tabs em { font-style: normal; font-weight: 500; font-size: 13px; }
 .portal-shell .wr-list { display: grid; }
-.portal-shell .wr-row { display: grid; grid-template-columns: minmax(0, 1fr) auto 104px auto; align-items: center; gap: 6px 14px; padding: 10px 16px; border-top: 1px solid var(--nw-line, #dce4ec); }
+.portal-shell .wr-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 6px 12px; padding: 8px 16px; border-top: 1px solid var(--nw-line, #dce4ec); }
 .portal-shell .wr-list > :first-child .wr-row, .portal-shell .wr-list > .wr-row:first-child { border-top: 0; }
 .portal-shell .wr-who { min-width: 0; }
 .portal-shell .wr-who > small { display: block; color: var(--nw-muted, #5b6b7d); font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
@@ -6839,3 +6840,6 @@ a[href^="mailto:"],
 .portal-shell .rd-bar { display: block; height: 6px; border-radius: 3px; background: #eaf3fb; overflow: hidden; margin-top: 4px; }
 .portal-shell .rd-bar i { display: block; height: 100%; background: #0571d0; border-radius: 3px; }
 .portal-shell .rd-total { border-top: 1px solid var(--nw-line, #dce4ec); padding-top: 8px; color: var(--nw-muted, #5b6b7d); font-size: 14px; }
+/* Dropdowns show in full (owner, 10 Nov 2026): a panel holding an open menu stops clipping, and the menu sits above the next panel. */
+.portal-shell .cx-panel:has(.cx-splitmenu) { overflow: visible; }
+.cx-splitmenu { z-index: 30; }
