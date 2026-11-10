@@ -6786,3 +6786,21 @@ a[href^="mailto:"],
 .ql-late-reason label { display: grid; gap: 4px; }
 .bc-late-h b { color: #b4400c; }
 .bc-card.bc-late { background: #fff7f2; }
+/* Register Trainee inside the portal window (owner, 10 Nov 2026: "Improve design & spacing"). */
+.portal-modal .ql-staff { padding: 18px 22px 24px; grid-template-columns: 190px minmax(0, 1fr); gap: 18px; }
+.portal-modal .ql-staff .ql-rail { top: 0; padding: 16px; border-radius: 12px; }
+.portal-modal .ql-staff .ql-sections { gap: 10px; min-width: 0; }
+.portal-modal .ql-staff .ql-section { border-radius: 12px; }
+.portal-modal .ql-staff .ql-section.open { border-width: 1.5px; box-shadow: 0 4px 14px rgba(18, 63, 99, 0.07); }
+.portal-modal .ql-staff .ql-head { padding: 12px 16px; gap: 12px; }
+.portal-modal .ql-staff .ql-body { padding: 2px 18px 18px 56px; }
+.portal-modal .ql-staff .ql-types { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); max-width: 520px; }
+@media (max-width: 760px) { .portal-modal .ql-staff { grid-template-columns: 1fr; padding: 12px; } .portal-modal .ql-staff .ql-rail { position: static; } .portal-modal .ql-staff .ql-body { padding: 2px 14px 16px; } }
+/* Cashier Dashboard, Design 3 + 6 (owner, 10 Nov 2026): Money In and Money Out, with Today's Cash beside them. */
+.portal-shell .cx-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 360px); gap: 20px; align-items: start; }
+.portal-shell .cx-cashcol { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 12px; min-width: 0; }
+.portal-shell .cx-group-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 4px 2px -8px; }
+.portal-shell .cx-group-h h2 { margin: 0; font-size: 19px; color: var(--blue-dark); }
+.portal-shell .cx-group-h span { font-size: 14px; font-weight: 600; }
+.portal-shell .cx-group-h .in { color: #0a6a33; } .portal-shell .cx-group-h .out { color: #b4400c; }
+@media (max-width: 1080px) { .portal-shell .cx-split { grid-template-columns: 1fr; } .portal-shell .cx-cashcol { position: static; } }

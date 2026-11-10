@@ -64,7 +64,7 @@ const chipRange = (start: string, end: string) => { const f = (iso: string, o: I
 const manilaToday = () => new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
 
 function Wizard({ staff }: { staff?: StaffIntake }) {
-  const [open, setOpen] = useState<SectionKey>("enrollment");
+  const [open, setOpen] = useState<SectionKey>(staff ? "identification" : "enrollment");
   const [applicant, setApplicant] = useState(() => (staff ? { ...emptyApplicant, enrollmentType: "Walk-in" } : emptyApplicant));
   const [lateReason, setLateReason] = useState(""), [lateOther, setLateOther] = useState("");
   const [catalog, setCatalog] = useState<Catalog | null>(null);
@@ -392,9 +392,9 @@ function Wizard({ staff }: { staff?: StaffIntake }) {
   };
 
   return (
-    <div className="ql-form">
+    <div className={`ql-form${staff ? " ql-staff" : ""}`}>
       <aside className="ql-rail" aria-label="Application progress">
-        <strong>Your Application</strong>
+        <strong>{staff ? "Registration" : "Your Application"}</strong>
         <span className="ql-rail-count">{doneCount} of {sections.length} sections done</span>
         <span className="ql-bar" aria-hidden="true"><i style={{ width: `${Math.round((doneCount / sections.length) * 100)}%` }} /></span>
         <ol>
@@ -424,7 +424,7 @@ function Wizard({ staff }: { staff?: StaffIntake }) {
         <section className={`ql-section ql-review${open === "review" ? " open" : ""}`}>
           <button type="button" className="ql-head" onClick={() => allDone && setOpen("review")} aria-expanded={open === "review"} disabled={!allDone}>
             <span className="ql-mark" aria-hidden="true">{sections.length + 1}</span>
-            <span className="ql-title"><h2>{sections.length + 1}. Review and submit</h2><span>{allDone ? "Accept the terms and send your application." : "Complete the sections above first."}</span></span>
+            <span className="ql-title"><h2>{sections.length + 1}. Review and Submit</h2><span>{allDone ? "Accept the terms and send your application." : "Complete the sections above first."}</span></span>
           </button>
           {open === "review" && allDone && <div className="ql-body">
             <div className="ql-schedule"><h4>Your Training Schedule</h4><table><thead><tr><th>#</th><th>Course</th><th>Dates</th></tr></thead><tbody>{trainings.map((t, i) => <tr key={t.code}><td>{i + 1}</td><td><b>{t.name}</b><small>{t.code} · {t.modality}</small></td><td>{when(t)}</td></tr>)}</tbody></table></div>
