@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ReferralVoucherPanel } from "./accounting-home";
 import type { PortalData, Enrollment, TraineeProofRow } from "../portal-live-app";
 import { addDays, balanceOf, dueCentavos, first, manilaToday, pesos, pesos2 } from "@/lib/portal-format";
@@ -502,9 +502,16 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
  * Registration (waiting for payment), trainees already paid and enrolled, and
  * balances still due after training (emailed daily at 4:00 PM).
  */
+/** A dashboard row (owner, 10 Nov 2026): who with a one-line note, a status, the amount, the actions aligned right. */
+function WorkRow({ who, meta, mid, amount, acts }: { who: ReactNode; meta?: string; mid?: ReactNode; amount?: string; acts?: ReactNode }) {
+  return <div className="wr-row"><div className="wr-who">{who}{meta && <small title={meta}>{meta}</small>}</div><div className="wr-mid">{mid}</div><strong className="cx-amt wr-amt">{amount ?? ""}</strong><div className="cx-acts wr-acts">{acts}</div></div>;
+}
+
 export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { data: PortalData; onPay: (enrollmentId: string, courses?: string[]) => void; reload: () => Promise<void>; go?: (module: string) => void; onOpenTrainee?: (traineeId: string) => void }) {
   const [raising, setRaising] = useState(false), [reqFilter, setReqFilter] = useState<"All" | "For Approval" | "Approved" | "Rejected">("All");
-  const [showPaid, setShowPaid] = useState(false), [showUnpaid, setShowUnpaid] = useState(false);
+  // Organized (owner, 10 Nov 2026): tabs in Money In and Money Out, 5 rows a page, folds.
+  const [showPaid, setShowPaid] = useState(false), [showUnpaid, setShowUnpaid] = useState(false), [showChannels, setShowChannels] = useState(false);
+  const [inTab, setInTab] = useState<"proofs" | "new" | null>(null), [outTab, setOutTab] = useState<"release" | "requests" | null>(null);
   const today = manilaToday();
   const handed = data.handedToCashier ?? {};
   const todays = data.payments.filter((p) => day(p.received_at) === today);
@@ -527,15 +534,13 @@ export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { d
   const proofs = data.traineeProofs ?? [];
   const [fromProof, setFromProof] = useState<TraineeProofRow | null>(null), [notValid, setNotValid] = useState<{ id: string; why: ReasonValue } | null>(null);
   const { withBalance, fullyPaid, fullyPaidTotal } = paidSections(paid);
-  const freshP = usePaged(fresh), dueP = usePaged(withBalance), paidP = usePaged(fullyPaid), unpaidP = usePaged(unpaid), proofP = usePaged(proofs);
+  const paidList = [...withBalance, ...fullyPaid];
+  const freshP = usePaged(fresh, 5), paidP = usePaged(paidList, 5), unpaidP = usePaged(unpaid, 5), proofP = usePaged(proofs, 5);
   // Paid and Enrolled, Design 1 · Balance First (owner, 6 Nov 2026): the course count stays; the Trainee Account holds the courses, and the Record window the ticks.
   const trainee = (id: string, name: string, number: string) => (onOpenTrainee ? <button type="button" className="pv-open" onClick={() => onOpenTrainee(id)}><Who name={name} number={number} /></button> : <Who name={name} number={number} />);
-  const paidRow = (g: TraineeGroup) => <tr key={g.traineeId}>
-    <td data-l="" className="lead">{trainee(g.traineeId, g.name, g.number)}</td>
-    <td data-l="Courses">{g.enrollments.length} Course{g.enrollments.length === 1 ? "" : "s"}</td>
-    <td data-l="Paid" className="r"><strong className="cx-amt">{pesos(g.paid)}</strong></td>
-    <td data-l="Status">{g.balance === 0 ? <Badge tone="active">Paid</Badge> : <Badge tone="orange">{`Balance ${pesos(g.balance)}`}</Badge>}</td>
-    <td data-l=""><div className="cx-acts">{g.balance > 0 && <RecordTicked data={data} list={g.enrollments} off={{}} onPay={onPay} />}<PrintArMenu data={data} traineeId={g.traineeId} reload={reload} /></div></td></tr>;
+  const paidRow = (g: TraineeGroup) => <WorkRow key={g.traineeId} who={trainee(g.traineeId, g.name, g.number)} meta={`${g.enrollments.length} Course${g.enrollments.length === 1 ? "" : "s"} · Paid ${pesos(g.paid)}`}
+    mid={g.balance === 0 ? <Badge tone="active">Paid</Badge> : <Badge tone="orange">{`Balance ${pesos(g.balance)}`}</Badge>}
+    acts={<>{g.balance > 0 && <RecordTicked data={data} list={g.enrollments} off={{}} onPay={onPay} />}<PrintArMenu data={data} traineeId={g.traineeId} reload={reload} /></>} />;
   const unpaidTotal = unpaid.reduce((s, r) => s + r.balanceCentavos, 0);
   const { busy, msg, post } = usePost(reload);
   const opening = (data.cashierOpenings ?? []).find((o) => o.opening_date === today);
@@ -557,7 +562,7 @@ export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { d
     ...(data.expenseReprints ?? []).map((v) => ({ id: `v${v.id}`, kind: "Voucher Reprint", what: v.reason, status: (v.status === "Pending" ? "For Approval" : v.status === "Rejected" ? "Rejected" : "Approved") as Ask["status"], label: v.status === "Pending" ? "For Approval" : v.status, at: v.requested_at, note: v.decision_remarks ?? "" })),
   ].filter((x: Ask) => x.status === "For Approval" || x.status === "To Do" || day(x.done || x.at) >= decidedSince).sort((x, y) => y.at.localeCompare(x.at));
   const askShown = asks.filter((x) => reqFilter === "All" || x.status === reqFilter || (reqFilter === "For Approval" && x.status === "To Do"));
-  const askP = usePaged(askShown);
+  const askP = usePaged(askShown, 5);
   const ASK_TONE: Record<Ask["status"], string> = { "For Approval": "orange", "To Do": "pending", Approved: "active", Rejected: "cancelled" };
   // Design 3 + 6 (owner, 10 Nov 2026): Money In and Money Out on the left, Today's Cash on the right.
   const moneyIn = proofs.reduce((s, p) => s + Number(p.amount_centavos), 0) + fresh.reduce((s, g) => s + g.balance, 0);
@@ -567,77 +572,75 @@ export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { d
     ...(data.referralVouchers ?? []).filter((v) => v.status === "Approved").map((v) => ({ id: `rv${v.id}`, what: `${partnerName(v.agency_id)} · Referral Voucher${v.mode ? ` · ${v.mode}` : ""}`, ref: v.voucher_number, amount: Number(v.total_centavos) })),
   ];
   const moneyOut = toRelease.reduce((s, r) => s + r.amount, 0);
+  const proofTotal = proofs.reduce((s, p) => s + Number(p.amount_centavos), 0), freshTotal = fresh.reduce((s, g) => s + g.balance, 0);
+  const inShown = inTab ?? (proofs.length || !fresh.length ? "proofs" : "new"), outShown = outTab ?? (toRelease.length || !asks.length ? "release" : "requests");
+  const releaseP = usePaged(toRelease, 5);
+  const rebateLines = centerLines(data).filter((l) => l.state === "Paid"), got = (data as unknown as { rebatesReceived?: Record<string, string> }).rebatesReceived ?? {};
+  const rebatesToCollect = rebateLines.filter((l) => !got[l.e.id] && Number(l.e.rebate_centavos) > 0);
   return <div className="portal-page cx">
     <div className="cx-head"><div><span className="portal-eyebrow">{fmtDate(today)}</span><h1>Cashier Dashboard</h1></div>
       <span className="bc-foot-actions">{go && <button type="button" className="portal-secondary" onClick={() => go("Search trainee")}>Search Trainee</button>}<button type="button" className="portal-secondary" onClick={() => setRaising(true)}>Raise Expense</button><button type="button" className="portal-primary" onClick={() => onPay("")}>Record Payment{fresh.length ? ` · ${fresh.length} Waiting` : ""}</button></span></div>
     {msg && <Message kind={msg.kind} text={msg.text} />}
     {(() => { const due = centerLines(data).filter((l) => l.state === "Due"); return due.length ? <p className="ac-note fr-warn">⚠ {pesos2(due.reduce((s, l) => s + l.amount, 0))} due to partnered centers · {due.length} trainee{due.length === 1 ? "" : "s"} <span className="muted-text">Accounting › Expenses › Pay the Centers</span></p> : null; })()}
-    {/* Design 3 + 6 (owner, 10 Nov 2026): the work on the left as Money In and Money Out; Today's Cash on the right. */}
+    {/* Design 3 + 6, organized (owner, 10 Nov 2026): Money In and Money Out as tabbed panels, 5 rows a page, the rest folded; Today's Cash in one card. */}
     <div className="cx-split">
       <div className="ac-stack">
-        <div className="cx-group-h"><h2>Money In</h2><span className="in">{proofs.length + fresh.length} · {pesos(moneyIn)} to Collect</span></div>
-        {/* Proofs of payment sent by trainees from the website, still with no receipt (owner, 29 Oct 2026). */}
-        {proofs.length > 0 && <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Proofs of Payment · No Receipt Yet</h2></div><span className="slot-count">{proofs.length}</span></div>
-          {/* Two-line rows (owner, 10 Nov 2026, Design 2): the name with the payment under it, the amount and the actions at the right. */}
-          <div className="pf-rows">
-            {proofP.shown.map((p) => { const hasCourse = data.enrollments.some((e) => e.trainee_id === p.trainee_id && e.enrollment_status !== "Cancelled"); return <div key={p.id} className="pf-row">
-              <div className="pf-who">{trainee(p.trainee_id, p.name, p.number)}
-                <div className="pf-meta"><span>{p.method}{p.reference ? <> · <span className="cl-mono">{p.reference}</span></> : null}</span><span>Uploaded {fmtDate(day(p.submitted_at))}, {fmtClock(p.submitted_at)}</span>{!hasCourse && <span className="pf-warn">No Course Yet</span>}</div></div>
-              <strong className="cx-amt pf-amt">{pesos(p.amount_centavos)}</strong>
-              <div className="cx-acts pf-acts">{p.drive_link && <ViewIcon label="View Proof" href={p.drive_link} />}<button type="button" className="portal-primary row-act" disabled={!hasCourse} onClick={() => setFromProof(p)}>Record</button><ActionsMenu items={[{ label: "Not Valid", danger: true, onClick: () => setNotValid({ id: p.id, why: NO_REASON }) }]} /></div>
+        <section className="portal-panel cx-panel">
+          <div className="panel-heading"><h2>Money In</h2><span className="cx-sum in">{proofs.length + fresh.length} · {pesos(moneyIn)} to Collect</span></div>
+          <div className="cx-tabs" role="tablist">
+            <button type="button" role="tab" aria-selected={inShown === "proofs"} className={inShown === "proofs" ? "on" : ""} onClick={() => setInTab("proofs")}>Proofs of Payment<b>{proofs.length}</b><em>{pesos(proofTotal)}</em></button>
+            <button type="button" role="tab" aria-selected={inShown === "new"} className={inShown === "new" ? "on" : ""} onClick={() => setInTab("new")}>New Enrollments<b>{fresh.length}</b><em>{pesos(freshTotal)}</em></button>
+          </div>
+          {/* Proofs of payment sent by trainees from the website, still with no receipt (owner, 29 Oct 2026). */}
+          {inShown === "proofs" && (proofs.length ? <div className="wr-list">
+            {proofP.shown.map((p) => { const hasCourse = data.enrollments.some((e) => e.trainee_id === p.trainee_id && e.enrollment_status !== "Cancelled"); return <div key={p.id}>
+              <WorkRow who={trainee(p.trainee_id, p.name, p.number)} meta={`${p.method}${p.reference ? ` · ${p.reference}` : ""} · Uploaded ${fmtDate(day(p.submitted_at))}, ${fmtClock(p.submitted_at)}`}
+                mid={!hasCourse ? <Badge tone="orange">No Course Yet</Badge> : null} amount={pesos(p.amount_centavos)}
+                acts={<>{p.drive_link && <ViewIcon label="View Proof" href={p.drive_link} />}<button type="button" className="portal-primary row-act" disabled={!hasCourse} onClick={() => setFromProof(p)}>Record</button><ActionsMenu items={[{ label: "Not Valid", danger: true, onClick: () => setNotValid({ id: p.id, why: NO_REASON }) }]} /></>} />
               {notValid?.id === p.id && <div className="cx-acts pf-notvalid"><span className="cx-reasons"><ReasonField reasons={REASONS.proofNotValid} value={notValid.why} onChange={(why) => setNotValid({ id: p.id, why })} autoFocus /></span><button type="button" className="portal-primary" disabled={busy || !reasonReady(notValid.why)} onClick={async () => { await post({ action: "proof-dismiss", proofId: p.id, reason: reasonText(notValid.why) }, "Marked Not Valid."); setNotValid(null); }}>Confirm</button><button type="button" className="portal-secondary" onClick={() => setNotValid(null)}>Cancel</button></div>}
             </div>; })}
-          {proofP.pager}</div></section>}
-        <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>New Enrollments</h2></div><span className="slot-count">{fresh.length}</span></div>
-      {fresh.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Courses</th><th>Endorsed</th><th className="r">Total Due</th><th></th></tr></thead><tbody>
-        {freshP.shown.map((g) => <tr key={g.traineeId}><td data-l="" className="lead"><Who name={g.name} number={g.number} /></td><td data-l="Courses"><TickCourses list={g.enrollments} off={off} setOff={setOff} /></td><td data-l="Endorsed">{fmtDate(day(g.since))}<small>{fmtClock(g.since)}</small></td><td data-l="Total due" className="r"><strong className="cx-amt">{pesos(g.due)}</strong><small>{g.enrollments.length} course{g.enrollments.length === 1 ? "" : "s"}</small></td><td data-l=""><div className="cx-acts"><RecordTicked data={data} list={g.enrollments} off={off} onPay={onPay} /></div></td></tr>)}
-      </tbody></table>{freshP.pager}</div> : <p className="portal-empty-copy">No new enrollments.</p>}
-    </section>
-        <div className="cx-group-h"><h2>Money Out</h2><span className="out">{toRelease.length} · {pesos(moneyOut)} to Release</span></div>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Approved · To Release</h2></div><span className="slot-count">{toRelease.length}</span></div>
-          {toRelease.length ? <div className="portal-table cx-cards"><table><tbody>{toRelease.map((r) => <tr key={r.id}><td data-l="" className="lead"><span className="cx-name">{r.what}</span><span className="cx-id">{r.ref}</span></td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(r.amount)}</strong></td><td data-l=""><div className="cx-acts">{go && <button type="button" className="portal-primary row-act" onClick={() => go("Expenses")}>Release</button>}</div></td></tr>)}</tbody></table></div> : <p className="portal-empty-copy">Nothing approved to release.</p>}
+            {proofP.pager}</div> : <p className="portal-empty-copy">No proofs waiting.</p>)}
+          {inShown === "new" && (fresh.length ? <div className="wr-list">
+            {freshP.shown.map((g) => <WorkRow key={g.traineeId} who={<Who name={g.name} number={g.number} />} meta={`Endorsed ${fmtDate(day(g.since))}, ${fmtClock(g.since)} · ${g.enrollments.length} Course${g.enrollments.length === 1 ? "" : "s"}`}
+              mid={<TickCourses list={g.enrollments} off={off} setOff={setOff} />} amount={pesos(g.due)} acts={<RecordTicked data={data} list={g.enrollments} off={off} onPay={onPay} />} />)}
+            {freshP.pager}</div> : <p className="portal-empty-copy">No new enrollments.</p>)}
         </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Approvals and Requests</h2></div>
-          <span className="cx-seg">{(["All", "For Approval", "Approved", "Rejected"] as const).map((k) => <button key={k} type="button" className={reqFilter === k ? "on" : ""} onClick={() => setReqFilter(k)}>{k} <small className="cl-mono">{asks.filter((x) => k === "All" || x.status === k || (k === "For Approval" && x.status === "To Do")).length}</small></button>)}</span></div>
-          {askShown.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Request</th><th>Status</th><th>Sent</th></tr></thead><tbody>
-            {askP.shown.map((x) => <tr key={x.id}><td data-l="" className="lead"><b>{x.kind}</b><small>{x.what}</small></td><td data-l="Status"><Badge tone={ASK_TONE[x.status]}>{x.label}</Badge>{x.note && <small>{x.note}</small>}</td><td data-l="Sent">{fmtDate(day(x.at))}<small>{x.at ? fmtClock(x.at) : ""}</small></td></tr>)}
-          </tbody></table>{askP.pager}</div> : <p className="portal-empty-copy">No open requests; decided ones show for 5 days.</p>}
+        <section className="portal-panel cx-panel">
+          <div className="panel-heading"><h2>Money Out</h2><span className="cx-sum out">{toRelease.length} · {pesos(moneyOut)} to Release</span></div>
+          <div className="cx-tabs" role="tablist">
+            <button type="button" role="tab" aria-selected={outShown === "release"} className={outShown === "release" ? "on" : ""} onClick={() => setOutTab("release")}>To Release<b>{toRelease.length}</b><em>{pesos(moneyOut)}</em></button>
+            <button type="button" role="tab" aria-selected={outShown === "requests"} className={outShown === "requests" ? "on" : ""} onClick={() => setOutTab("requests")}>Requests<b>{asks.length}</b></button>
+          </div>
+          {outShown === "release" && (toRelease.length ? <div className="wr-list">{releaseP.shown.map((r) => <WorkRow key={r.id} who={<span className="cx-name">{r.what}</span>} meta={r.ref} amount={pesos2(r.amount)} acts={go ? <button type="button" className="portal-primary row-act" onClick={() => go("Expenses")}>Release</button> : null} />)}{releaseP.pager}</div> : <p className="portal-empty-copy">Nothing approved to release.</p>)}
+          {outShown === "requests" && <>
+            <label className="cx-status">Status<select value={reqFilter} onChange={(ev) => setReqFilter(ev.target.value as typeof reqFilter)}>{(["All", "For Approval", "Approved", "Rejected"] as const).map((k) => <option key={k} value={k}>{k} · {asks.filter((x) => k === "All" || x.status === k || (k === "For Approval" && x.status === "To Do")).length}</option>)}</select></label>
+            {askShown.length ? <div className="wr-list">{askP.shown.map((x) => <WorkRow key={x.id} who={<b>{x.kind}</b>} meta={`${x.what} · Sent ${fmtDate(day(x.at))}${x.at ? `, ${fmtClock(x.at)}` : ""}${x.note ? ` · ${x.note}` : ""}`} mid={<Badge tone={ASK_TONE[x.status]}>{x.label}</Badge>} />)}{askP.pager}</div> : <p className="portal-empty-copy">No open requests; decided ones show for 5 days.</p>}
+          </>}
         </section>
-        {/* Paid and Enrolled (owner, 20 Oct 2026): one compact line per trainee; the TAR is printed by Registration. */}
-        <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Paid and Enrolled</h2></div><span className="slot-count">{paid.length}</span></div>
-      {!paid.length ? <p className="portal-empty-copy">No paid trainees in the last 7 days.</p> : <>
-        {withBalance.length > 0 && <><div className="pe-sec">With Balance · {withBalance.length}</div><div className="portal-table cx-cards pe-table"><table><tbody>{dueP.shown.map(paidRow)}</tbody></table>{dueP.pager}</div></>}
-        {fullyPaid.length > 0 && <button type="button" className="pe-fold" aria-expanded={showPaid} onClick={() => setShowPaid((s) => !s)}><span>{fullyPaid.length} Fully Paid · {pesos(fullyPaidTotal)}</span><span>{showPaid ? "Hide ▴" : "Show ▾"}</span></button>}
-        {showPaid && fullyPaid.length > 0 && <div className="portal-table cx-cards pe-table"><table><tbody>{paidP.shown.map(paidRow)}</tbody></table>{paidP.pager}</div>}
-      </>}
-    </section>
+        {/* Paid and Enrolled (owner, 20 Oct 2026): paid in the last 7 days, balances first; folded to one line. */}
+        <button type="button" className="pe-fold" aria-expanded={showPaid} onClick={() => setShowPaid((v) => !v)}><span>Paid and Enrolled · {withBalance.length} With Balance {pesos(withBalance.reduce((s, g) => s + g.balance, 0))} · {fullyPaid.length} Fully Paid {pesos(fullyPaidTotal)}</span><span>{showPaid ? "Hide ▴" : "Show ▾"}</span></button>
+        {showPaid && <section className="portal-panel cx-panel">{paidList.length ? <div className="wr-list">{paidP.shown.map(paidRow)}{paidP.pager}</div> : <p className="portal-empty-copy">No paid trainees in the last 7 days.</p>}</section>}
         <button type="button" className="pe-fold" aria-expanded={showUnpaid} onClick={() => setShowUnpaid((v) => !v)}><span>{unpaid.length} Unpaid Balances · 4:00 PM Summary · {pesos(unpaidTotal)}</span><span>{showUnpaid ? "Hide ▴" : "Show ▾"}</span></button>
-        {showUnpaid && <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>Unpaid Balances · 4:00 PM Summary</h2></div><span className="document-actions"><button type="button" className="portal-secondary" disabled={busy} onClick={() => void post({ action: "balance-summary-send" }, "Summary emailed.").catch(() => undefined)}>Email Summary Now</button></span></div>
-      {unpaid.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Training</th><th>Status</th><th className="r">Balance</th><th></th></tr></thead><tbody>
-        {unpaidP.shown.map((r) => <tr key={r.id}><td data-l="" className="lead"><span className="cx-name">{r.traineeName}</span><span className="cx-id">{r.enrollmentNumber}</span></td><td data-l="Training">{r.course}<small>{r.endsToday ? "Ends today" : `Ended ${fmtDate(r.trainingEnd)}`}</small></td><td data-l="Status">{r.endsToday ? <Badge tone="orange">Ends Today</Badge> : <Badge tone="cancelled">Past Due</Badge>}</td><td data-l="Balance" className="r"><strong className="cx-amt">{pesos(r.balanceCentavos)}</strong><small>of {pesos(r.dueCentavos)}</small></td><td data-l=""><div className="cx-acts"><button type="button" className="portal-primary" onClick={() => onPay(r.id, [r.id])}>Balance</button></div></td></tr>)}
-      </tbody></table>{unpaidP.pager}</div> : <p className="portal-empty-copy">No unpaid balances after training.</p>}
-    </section>}
+        {showUnpaid && <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Unpaid Balances · 4:00 PM Summary</h2><span className="document-actions"><button type="button" className="portal-secondary" disabled={busy} onClick={() => void post({ action: "balance-summary-send" }, "Summary emailed.").catch(() => undefined)}>Email Summary Now</button></span></div>
+          {unpaid.length ? <div className="wr-list">{unpaidP.shown.map((r) => <WorkRow key={r.id} who={<><span className="cx-name">{r.traineeName}</span> <span className="cx-id">{r.enrollmentNumber}</span></>} meta={`${r.course} · ${r.endsToday ? "Ends today" : `Ended ${fmtDate(r.trainingEnd)}`} · of ${pesos(r.dueCentavos)}`}
+            mid={r.endsToday ? <Badge tone="orange">Ends Today</Badge> : <Badge tone="cancelled">Past Due</Badge>} amount={pesos(r.balanceCentavos)} acts={<button type="button" className="portal-primary row-act" onClick={() => onPay(r.id, [r.id])}>Balance</button>} />)}{unpaidP.pager}</div> : <p className="portal-empty-copy">No unpaid balances after training.</p>}
+        </section>}
       </div>
       <aside className="cx-cashcol" aria-label="Today's Cash">
-        <div className="cx-group-h"><h2>Today&apos;s Cash</h2></div>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Cash Drawer</h2><Badge tone={closedToday ? "active" : opening ? "orange" : "cancelled"}>{closedToday ? "Closed" : opening ? "Open" : "Not Opened"}</Badge></div>
+        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Today&apos;s Cash</h2><Badge tone={closedToday ? "active" : opening ? "orange" : "cancelled"}>{closedToday ? "Closed" : opening ? "Drawer Open" : "Not Opened"}</Badge></div>
           <dl className="ac-lines">
-            <div><dt>Opening cash{opening ? ` · ${fmtClock(opening.created_at)}` : ""}</dt><dd>{opening ? pesos(opening.opening_cash_centavos) : "Not recorded"}</dd></div>
-            <div><dt>+ Cash collected</dt><dd className="plus">{pesos(cashIn)}</dd></div>
-            <div><dt>− Cash expenses</dt><dd className="minus">{pesos(cashOut)}</dd></div>
-            <div className="total"><dt>= Expected in drawer</dt><dd className="eq">{pesos(expected)}</dd></div>
+            <div><dt>Opening Cash{opening ? ` · ${fmtClock(opening.created_at)}` : ""}</dt><dd>{opening ? pesos(opening.opening_cash_centavos) : "Not Recorded"}</dd></div>
+            <div><dt>+ Cash Collected</dt><dd className="plus">{pesos(cashIn)}</dd></div>
+            <div><dt>− Cash Expenses</dt><dd className="minus">{pesos(cashOut)}</dd></div>
+            <div className="total"><dt>= Expected in Drawer</dt><dd className="eq">{pesos(expected)}</dd></div>
           </dl>
-          {!closedToday && <div className="cr-act"><button type="button" className="portal-secondary" onClick={() => go?.("Opening and closing")}>{opening ? "Close Cash" : "Record Opening Cash"}</button></div>}
-        </section>
-        <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Per Channel</h2><span className="muted-text">today</span></div>
-          <dl className="ac-lines">
+          <button type="button" className="pe-fold cx-chfold" aria-expanded={showChannels} onClick={() => setShowChannels((v) => !v)}><span>Per Channel · Net {pesos(totalToday - releasedToday)}</span><span>{showChannels ? "Hide ▴" : "Show ▾"}</span></button>
+          {showChannels && <dl className="ac-lines">
             {channels.map((c) => <div key={c.m}><dt><span className="cr-dot" style={{ background: MODE_COLORS[c.m] ?? "#0571D0" }} />{c.m}<small className="cl-sub cl-block">{c.receipts} receipt{c.receipts === 1 ? "" : "s"}</small></dt><dd><span className="plus">{pesos(c.in)}</span>{c.out > 0 && <small className="minus cl-block">− {pesos(c.out)}</small>}</dd></div>)}
-            <div className="total"><dt>Net today</dt><dd className="eq">{pesos(totalToday - releasedToday)}</dd></div>
-          </dl>
+          </dl>}
+          {rebateLines.length > 0 && <dl className="ac-lines"><div><dt>Rebates to Collect · {rebatesToCollect.length}{go && <> · <button type="button" className="cx-textbtn" onClick={() => go("Other income")}>Open</button></>}</dt><dd className="minus">{pesos2(rebatesToCollect.reduce((s, l) => s + Number(l.e.rebate_centavos), 0))}</dd></div></dl>}
+          {!closedToday && <button type="button" className="portal-primary cx-close" onClick={() => go?.("Opening and closing")}>{opening ? "Close Cash" : "Record Opening Cash"}</button>}
         </section>
-        {(() => { const paid = centerLines(data).filter((l) => l.state === "Paid"); const got = (data as unknown as { rebatesReceived?: Record<string, string> }).rebatesReceived ?? {}; const toCollect = paid.filter((l) => !got[l.e.id] && Number(l.e.rebate_centavos) > 0); return paid.length ? <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Rebates to Collect</h2><span className="muted-text">from centers</span></div>
-          <dl className="ac-lines"><div><dt>To collect · {toCollect.length}</dt><dd className="minus">{pesos2(toCollect.reduce((s, l) => s + Number(l.e.rebate_centavos), 0))}</dd></div></dl>
-          {go && <div className="cr-act"><button type="button" className="portal-secondary" onClick={() => go("Other income")}>Open Rebates</button></div>}</section> : null; })()}
       </aside>
     </div>
     {raising && <RecordExpenseModal data={data} onClose={() => setRaising(false)} post={post} />}

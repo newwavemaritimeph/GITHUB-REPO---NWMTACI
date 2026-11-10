@@ -29,10 +29,10 @@ describe("Paid and Enrolled, Balance First", () => {
   });
   it("shows the trainee with a balance, a course count and no course list, and hides the fully paid until asked", () => {
     const html = render();
-    expect(html).toContain("With Balance · 1");
-    expect(html).toContain("2 Courses");
-    expect(html).toContain("Record ₱1,100");
+    // Organized (owner, 10 Nov 2026): Paid and Enrolled folds to one line with its counts and totals.
+    expect(html).toContain("Paid and Enrolled · 1 With Balance");
     expect(html).toContain("2 Fully Paid");
+    expect(html).not.toContain("2 Courses · Paid");
     expect(html).toContain("Show ▾");
     expect(html).not.toContain("SAMPLE, DONE");
     expect(html).not.toContain("BTR Course");
