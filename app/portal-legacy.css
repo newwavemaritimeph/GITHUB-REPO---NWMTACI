@@ -2997,10 +2997,7 @@ button.rd-row:hover { background: #f6fafc; }
 /* ---- Portal-wide consistency (owner, 10 Nov 2026: "Apply these to all screens and modules of the whole web portal").
    Loaded last, so it evens out every screen: compact headings, two-column forms, one button size, tab rows as one
    segmented bar, row actions as small outlined buttons, even table spacing. ---- */
-.nw-shell .portal-workspace :is(.portal-primary, .portal-secondary), .portal-modal :is(.portal-primary, .portal-secondary) { font-size: 14.5px; padding: 8px 14px; min-height: 38px; border-radius: 9px; gap: 6px; line-height: 1.2; }
-.nw-shell .portal-workspace :is(.portal-primary, .portal-secondary).row-act { min-height: 32px; height: auto; padding: 5px 11px; font-size: 13.5px; border-radius: 8px; }
 .nw-shell .portal-workspace .portal-secondary:hover:not(:disabled) { background: #e6f6fd; }
-.nw-shell .portal-workspace .portal-primary:hover:not(:disabled) { filter: brightness(.96); }
 .nw-shell .document-actions { gap: 6px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
 .nw-shell .document-actions > :is(button, a):not(.portal-primary):not(.portal-secondary):not(.is-generated):not(.view-icon) {
   min-height: 32px; padding: 5px 11px; border-radius: 8px; border: 1px solid #b9dcec; background: #fff; color: #0571D0;

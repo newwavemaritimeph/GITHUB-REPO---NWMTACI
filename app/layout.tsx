@@ -4,6 +4,7 @@ import { Inter, Geist, Geist_Mono, Source_Serif_4, Outfit, Montserrat, Caveat } 
 import "./globals.css";
 import "./catalog.css";
 import "./portal-legacy.css";
+import "./portal-tokens.css";
 
 // Interface face. Inter is drawn for screen UI: it stays legible at the small
 // sizes the portal uses for table meta and field labels.

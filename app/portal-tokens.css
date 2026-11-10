@@ -1,0 +1,128 @@
+/*
+ * New Wave portal design tokens (owner, 10 Nov 2026: full UI/UX polish pass). One source of truth for the staff
+ * portal; loaded after globals.css and portal-legacy.css so it evens out every screen through the shared classes
+ * (portal-primary / portal-secondary / row-act, portal-panel, portal-modal, nw-dialog, portal-badge, portal-message,
+ * the tables and the fields). Feature, data and route code is untouched.
+ */
+:root {
+  /* Spacing: 4 / 8 grid. */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px; --sp-7: 48px; --sp-8: 64px;
+  /* Type scale (Geist). */
+  --fs-page: 26px; --fs-section: 17px; --fs-modal: 20px; --fs-body: 15px; --fs-label: 13.5px; --fs-meta: 13px; --fs-th: 12.5px;
+  --lh-tight: 1.2; --lh-body: 1.5;
+  /* Radius: controls, cards and windows, pills. */
+  --r-control: 9px; --r-card: 14px; --r-pill: 999px;
+  /* Shadows: card, dropdown, window. */
+  --sh-card: 0 1px 2px rgba(15, 38, 56, .06); --sh-pop: 0 12px 28px rgba(15, 38, 56, .16); --sh-modal: 0 28px 70px rgba(8, 35, 54, .32);
+  /* Colours. */
+  --c-primary: #F25615; --c-primary-hover: #d9480f; --c-secondary: #0571D0; --c-navy: #123F63;
+  --c-danger: #B42318; --c-danger-bg: #FDECEA; --c-warning: #B4400C; --c-warning-bg: #FFF1E9; --c-success: #0A7A3E; --c-success-bg: #E2F5E9; --c-info-bg: #E6F6FD;
+  --c-text: #0F2638; --c-text-2: #3D5466; --c-muted: #5B7587;
+  --c-border: #D6E9F1; --c-border-strong: #B9DCEC; --c-bg: #F2F9FC; --c-surface: #FFFFFF; --c-soft: #E6F6FD;
+  --c-overlay: rgba(8, 35, 54, .55); --c-focus: rgba(53, 204, 250, .45);
+  /* Control heights: sm, md (fields match md), lg. */
+  --h-sm: 32px; --h-md: 40px; --h-lg: 44px;
+}
+
+/* ---------- Typography ---------- */
+.nw-shell .portal-workspace .portal-heading h1, .nw-shell .portal-workspace .cx-head h1 { font-size: var(--fs-page); font-weight: 700; line-height: var(--lh-tight); color: var(--c-navy); }
+.nw-shell .portal-workspace .panel-heading h2 { font-size: var(--fs-section); font-weight: 600; line-height: var(--lh-tight); color: var(--c-text); }
+.nw-shell .portal-workspace { color: var(--c-text); font-size: var(--fs-body); line-height: var(--lh-body); }
+.nw-shell .portal-workspace small { font-size: var(--fs-meta); }
+
+/* ---------- Buttons: primary, secondary, ghost, danger; sm / md / lg ---------- */
+.nw-shell :is(.portal-primary, .portal-secondary), .portal-modal :is(.portal-primary, .portal-secondary), .nw-dialog :is(.nw-dialog-ok, .nw-dialog-cancel) {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-2);
+  min-height: var(--h-md); padding: 6px var(--sp-4); border-radius: var(--r-control);
+  font: 600 14.5px/1.2 var(--font-portal), system-ui, sans-serif; white-space: nowrap; text-decoration: none; cursor: pointer;
+  transition: background-color .15s, border-color .15s, box-shadow .15s, color .15s; box-sizing: border-box;
+}
+.nw-shell .portal-primary, .portal-modal .portal-primary, .nw-dialog .nw-dialog-ok { background: var(--c-primary); border: 1px solid var(--c-primary); color: #fff; }
+.nw-shell .portal-primary:hover:not(:disabled), .portal-modal .portal-primary:hover:not(:disabled), .nw-dialog .nw-dialog-ok:hover:not(:disabled) { background: var(--c-primary-hover); border-color: var(--c-primary-hover); filter: none; }
+.nw-shell .portal-secondary, .portal-modal .portal-secondary, .nw-dialog .nw-dialog-cancel { background: var(--c-surface); border: 1px solid var(--c-border-strong); color: var(--c-secondary); }
+.nw-shell .portal-secondary:hover:not(:disabled), .portal-modal .portal-secondary:hover:not(:disabled), .nw-dialog .nw-dialog-cancel:hover { background: var(--c-soft); }
+.nw-shell :is(.portal-primary, .portal-secondary).ghost, .portal-modal :is(.portal-primary, .portal-secondary).ghost { background: transparent; border-color: transparent; color: var(--c-secondary); }
+.nw-shell :is(.portal-primary, .portal-secondary).ghost:hover:not(:disabled) { background: var(--c-soft); }
+.nw-shell :is(.portal-primary, .portal-secondary).danger, .portal-modal :is(.portal-primary, .portal-secondary).danger, .nw-dialog .nw-dialog-ok.danger, .nw-shell .portal-primary.cs-danger-btn { background: var(--c-danger); border-color: var(--c-danger); color: #fff; }
+.nw-shell .portal-secondary.danger:not(:hover), .portal-modal .portal-secondary.danger:not(:hover) { background: var(--c-surface); color: var(--c-danger); border-color: #EBB8B3; }
+.nw-shell :is(.portal-primary, .portal-secondary).danger:hover:not(:disabled), .nw-dialog .nw-dialog-ok.danger:hover { background: #971c12; border-color: #971c12; color: #fff; }
+.nw-shell :is(.portal-primary, .portal-secondary).row-act, .portal-modal :is(.portal-primary, .portal-secondary).row-act, .nw-shell :is(.portal-primary, .portal-secondary).sm { min-height: var(--h-sm); height: auto; padding: 4px var(--sp-3); font-size: 13.5px; border-radius: 8px; }
+.nw-shell :is(.portal-primary, .portal-secondary).lg { min-height: var(--h-lg); padding: 8px var(--sp-5); font-size: 15.5px; }
+.nw-shell :is(.portal-primary, .portal-secondary):disabled, .portal-modal :is(.portal-primary, .portal-secondary):disabled, .nw-dialog .nw-dialog-ok:disabled { opacity: .5; cursor: not-allowed; }
+.nw-shell :is(.portal-primary, .portal-secondary)[aria-busy=true], .portal-modal :is(.portal-primary, .portal-secondary)[aria-busy=true] { cursor: progress; opacity: .8; }
+/* One subtle focus ring for every control (no double outlines). */
+.nw-shell :is(button, a, input, select, textarea, summary):focus-visible, .portal-modal :is(button, a, input, select, textarea):focus-visible, .nw-dialog :is(button, input):focus-visible { outline: none !important; box-shadow: 0 0 0 3px var(--c-focus) !important; }
+/* Side-by-side buttons: same height, centred, 8px gap. */
+.nw-shell :is(.portal-form-actions, .hr-head-acts, .hr-acts, .document-actions, .bell-foot), .portal-modal .portal-form-actions, .nw-dialog .nw-dialog-acts { gap: var(--sp-2); align-items: center; }
+.nw-shell .nw-caret { margin-left: var(--sp-1); }
+
+/* ---------- Fields: same height as md buttons ---------- */
+.nw-shell :is(.portal-workspace, .bell-drawer) :is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]), select),
+.portal-modal :is(input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]), select), .nw-dialog .nw-dialog-input {
+  height: var(--h-md); min-height: var(--h-md); border-radius: var(--r-control); border: 1px solid var(--c-border-strong); font-size: var(--fs-body); color: var(--c-text); background-color: var(--c-surface); box-sizing: border-box;
+}
+.nw-shell :is(.portal-workspace, .bell-drawer) select[multiple], .portal-modal select[multiple] { height: auto; }
+/* The chevron keeps its own space (the general field padding would otherwise cover it). */
+.nw-shell :is(.portal-workspace, .bell-drawer) select:not([multiple]), .portal-modal select:not([multiple]) { padding-right: 34px !important; text-overflow: ellipsis; }
+.nw-shell :is(.portal-workspace) :is(input, select, textarea)[aria-invalid=true], .portal-modal :is(input, select, textarea)[aria-invalid=true], .nw-shell :is(input, select, textarea):user-invalid { border-color: var(--c-danger); }
+.nw-shell :is(input, textarea)[readonly], .portal-modal :is(input, textarea)[readonly] { background-color: #F6FAFC; color: var(--c-text-2); }
+.nw-shell .portal-form label, .portal-modal .portal-form label { font-size: var(--fs-label); font-weight: 600; color: var(--c-text-2); }
+.nw-shell .field-help, .portal-modal .field-help { font-size: var(--fs-meta); color: var(--c-muted); font-weight: 400; }
+.nw-shell input[type=search], .portal-modal input[type=search] {
+  padding-left: 34px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235B7587' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: 11px center; background-size: 16px;
+}
+.nw-shell input[type=search]::-webkit-search-cancel-button { cursor: pointer; }
+
+/* ---------- Cards and panels ---------- */
+.nw-shell .portal-workspace .portal-panel { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-card); box-shadow: var(--sh-card); }
+.nw-shell .portal-workspace .panel-heading { padding: var(--sp-3) var(--sp-4); display: flex; justify-content: space-between; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+
+/* A page-level panel has one inset (16px; 12px on phones); its heading sits inside it, not padded again. */
+.nw-shell .portal-workspace .portal-page > .portal-panel { padding: var(--sp-4); }
+.nw-shell .portal-workspace .portal-page > .portal-panel > .panel-heading { padding: 0 0 var(--sp-3); margin: 0 0 var(--sp-3); }
+.nw-shell .portal-workspace .portal-page > .portal-panel > .portal-form { padding: 0; }
+.nw-shell .portal-workspace :is(.hr-page, .myhr-page) > .portal-panel { padding: 0; }
+.nw-shell .portal-workspace :is(.hr-page, .myhr-page) > .portal-panel > .panel-heading { padding: var(--sp-3) var(--sp-4); margin: 0; }
+.nw-shell .portal-workspace :is(.hr-page, .myhr-page) > .portal-panel > .portal-form { padding: var(--sp-3) var(--sp-4) var(--sp-4); }
+
+/* ---------- Modals and confirm dialogs: sm / md / lg ---------- */
+.portal-modal-backdrop, .nw-dialog-backdrop { background: var(--c-overlay) !important; backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+.portal-modal { width: min(640px, 100%); border-radius: var(--r-card) !important; box-shadow: var(--sh-modal) !important; }
+.portal-modal[data-size=sm] { width: min(440px, 100%); }
+.portal-modal[data-size=lg] { width: min(980px, 100%); }
+.portal-modal > header { padding: var(--sp-4) var(--sp-5) !important; align-items: center !important; gap: var(--sp-3); }
+.portal-modal > header h2 { font-size: var(--fs-modal) !important; font-weight: 700; color: var(--c-navy); margin: 0 !important; line-height: var(--lh-tight); }
+.portal-modal > header > button { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+.portal-modal > header > button:hover { background: var(--c-soft) !important; }
+.nw-dialog { border-radius: var(--r-card) !important; box-shadow: var(--sh-modal) !important; padding: var(--sp-5) !important; width: min(440px, calc(100vw - 32px)) !important; display: grid; gap: var(--sp-3); }
+.nw-dialog .nw-dialog-head h2 { font-size: var(--fs-modal); color: var(--c-navy); }
+.nw-dialog .nw-dialog-msg { margin: 0; color: var(--c-text-2); font-size: var(--fs-body); line-height: var(--lh-body); white-space: pre-line; }
+.nw-dialog .nw-dialog-acts { display: flex; justify-content: flex-end; margin-top: var(--sp-2); }
+
+/* ---------- Badges ---------- */
+.nw-shell .portal-badge { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: var(--r-pill); font: 600 12.5px/1 var(--font-portal), sans-serif; white-space: nowrap; }
+
+/* ---------- Messages (feedback after an action) ---------- */
+.nw-shell .portal-message, .portal-modal .portal-message { border-radius: var(--r-control); padding: 10px 14px; font-size: 14px; line-height: 1.45; border: 1px solid transparent; border-left-width: 4px; }
+.nw-shell .portal-message.success, .portal-modal .portal-message.success { background: var(--c-success-bg); color: var(--c-success); border-color: #b8e2c8; border-left-color: var(--c-success); }
+.nw-shell .portal-message.error, .portal-modal .portal-message.error { background: var(--c-danger-bg); color: var(--c-danger); border-color: #f2c7c3; border-left-color: var(--c-danger); }
+
+/* ---------- Tables ---------- */
+.nw-shell .portal-workspace :is(.portal-table table, table.portal-table, .cl-log, .rb3-table, .tar-table, .tp-table, .rq-table, .rp-table, .rc-log) { width: 100%; border-collapse: collapse; }
+.nw-shell .portal-workspace :is(.portal-table, .cl-log, .rb3-table, .tar-table, .tp-table, .rq-table, .rp-table, .rc-log) th { font-size: var(--fs-th); font-weight: 700; color: #0b4f8f; letter-spacing: .01em; text-align: left; padding: 10px 14px; white-space: nowrap; }
+.nw-shell .portal-workspace :is(.portal-table, .cl-log, .rb3-table, .tar-table, .tp-table, .rq-table, .rp-table, .rc-log) td { padding: 10px 14px; vertical-align: middle; }
+.nw-shell .portal-workspace :is(td, th).num { text-align: right; font-variant-numeric: tabular-nums; }
+.nw-shell .portal-workspace .portal-table-wrap, .nw-shell .portal-workspace .portal-table { overflow-x: auto; }
+
+/* ---------- Phones ---------- */
+@media (max-width: 640px) {
+  :root { --fs-page: 22px; --fs-modal: 18px; }
+  .portal-modal, .portal-modal[data-size] { width: 100%; }
+  .portal-modal > header { padding: var(--sp-3) var(--sp-4) !important; }
+  .nw-dialog { padding: var(--sp-4) !important; }
+  .nw-shell .portal-workspace .portal-page > .portal-panel { padding: var(--sp-3); }
+  .nw-shell .portal-workspace :is(.hr-page, .myhr-page) > .portal-panel { padding: 0; }
+  .nw-dialog .nw-dialog-acts > * { flex: 1; }
+}

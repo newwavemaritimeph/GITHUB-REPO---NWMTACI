@@ -18,10 +18,34 @@ export function Message({ kind, text }: { kind: "success" | "error"; text: strin
   return <div className={`portal-message ${kind}`} role={kind === "error" ? "alert" : "status"}>{text}</div>;
 }
 
-export function Modal({ title, children, onClose, wide }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean }) {
+/** Keeps Tab inside a dialog, closes on Escape, and puts focus back on what opened it (owner, 10 Nov 2026 polish pass). */
+export function useDialogFocus(box: { current: HTMLElement | null }, onEscape?: () => void) {
+  const esc = useRef(onEscape);
+  useEffect(() => { esc.current = onEscape; });
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    const focusables = () => [...(box.current?.querySelectorAll<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])') ?? [])];
+    if (box.current && !box.current.contains(document.activeElement)) (box.current.querySelector<HTMLElement>("input, select, textarea") ?? focusables()[0])?.focus();
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && esc.current) { e.stopPropagation(); esc.current(); return; }
+      if (e.key !== "Tab") return;
+      const f = focusables(); if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    const el = box.current; el?.addEventListener("keydown", key);
+    return () => { el?.removeEventListener("keydown", key); if (opener?.isConnected) opener.focus(); };
+  }, [box]);
+}
+
+/** The shared window: sm (440), md (640, the default) or lg (980, also `wide`). Escape, the × and the backdrop close it. */
+export function Modal({ title, children, onClose, wide, size }: { title: string; children: ReactNode; onClose: () => void; wide?: boolean; size?: "sm" | "md" | "lg" }) {
+  const box = useRef<HTMLElement>(null);
+  useDialogFocus(box, onClose);
   return <div className="portal-modal-backdrop" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-    <section className="portal-modal" style={wide ? { width: "min(980px, 100%)" } : undefined} role="dialog" aria-modal="true" aria-labelledby="modal-title">
-      <header><div><h2 id="modal-title">{title}</h2></div><button type="button" onClick={onClose} aria-label="Close dialog">×</button></header>
+    <section ref={box} className="portal-modal" data-size={size ?? (wide ? "lg" : "md")} role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <header><div><h2 id="modal-title">{title}</h2></div><button type="button" onClick={onClose} aria-label="Close">×</button></header>
       {children}
     </section>
   </div>;
