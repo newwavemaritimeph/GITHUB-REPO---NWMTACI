@@ -5,7 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { VALIDATION_MESSAGES, isEmail, isPhContactNumber, isSrn } from "@/lib/validation";
-import { automaticEndDate, fitsInWeek } from "@/lib/scheduling";
+import { LATE_ADD_REASONS, automaticEndDate, fitsInWeek, lateDayLabel } from "@/lib/scheduling";
 import { MAX_COURSES, ORDER_RULE_TEXT, orderConflict, type PickRange } from "@/lib/course-selection";
 
 // Official New Wave channels shown on the application summary.
@@ -26,7 +26,10 @@ const RANKS = [
 ] as const;
 
 /** Live catalog (/api/public/catalog): STCW courses with batches, In-House courses for a start date. */
-type CatalogBatch = { id: string; number: string; startsOn: string; endsOn: string; full: boolean };
+/** late: a batch that started, listed only on Registration's portal form (owner, 10 Nov 2026). */
+type CatalogBatch = { id: string; number: string; startsOn: string; endsOn: string; full: boolean; late?: boolean };
+/** Register Trainee in the portal: the same form, posted as Registration, which then closes. */
+export type StaffIntake = { onDone: (result: { reference: string; applicationNumber: string | null; traineeId?: string; warnings?: string[] }) => void };
 type StcwCourse = { code: string; name: string; duration: string; modality: string; category: string; batches: CatalogBatch[] };
 type InHouseCourse = { code: string; name: string; duration: string; modality: string; category: string };
 type OtherCourse = { code: string; name: string };
@@ -60,9 +63,10 @@ const weekday = (iso: string) => new Intl.DateTimeFormat("en-PH", { weekday: "lo
 const chipRange = (start: string, end: string) => { const f = (iso: string, o: Intl.DateTimeFormatOptions) => new Intl.DateTimeFormat("en-PH", { ...o, timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`)); const a = f(start, { weekday: "short", month: "short", day: "numeric" }); return start === end ? a : `${a} – ${(start.slice(0, 7) === end.slice(0, 7) ? `${f(end, { weekday: "short" })} ${Number(end.slice(8, 10))}` : f(end, { weekday: "short", month: "short", day: "numeric" }))}`; };
 const manilaToday = () => new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
 
-function Wizard() {
+function Wizard({ staff }: { staff?: StaffIntake }) {
   const [open, setOpen] = useState<SectionKey>("enrollment");
-  const [applicant, setApplicant] = useState(emptyApplicant);
+  const [applicant, setApplicant] = useState(() => (staff ? { ...emptyApplicant, enrollmentType: "Walk-in" } : emptyApplicant));
+  const [lateReason, setLateReason] = useState(""), [lateOther, setLateOther] = useState("");
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [rows, setRows] = useState<Row[]>([EMPTY_ROW]);
   const [submittedTrainings, setSubmittedTrainings] = useState<Training[]>([]);
@@ -85,7 +89,7 @@ function Wizard() {
   // and fills the first row.
   useEffect(() => {
     let live = true;
-    fetch("/api/public/catalog").then((r) => r.json()).then((b: Catalog) => {
+    fetch(staff ? "/api/public/catalog?ongoing=1" : "/api/public/catalog").then((r) => r.json()).then((b: Catalog) => {
       if (!live) return;
       const next = { stcw: b.stcw ?? [], inHouse: b.inHouse ?? [], other: b.other ?? [], packages: b.packages ?? [] };
       setCatalog(next);
@@ -98,7 +102,7 @@ function Wizard() {
       else if (code && start && /^\d{4}-\d{2}-\d{2}$/.test(start) && next.inHouse.some((c) => c.code === code)) setRows([{ code, batchId: "", start }]);
     }).catch(() => { if (live) setCatalog({ stcw: [], inHouse: [], other: [] }); });
     return () => { live = false; };
-  }, []);
+  }, [staff]);
 
   // Returning-applicant autofill: once a full 10-digit SRN is entered, look up the
   // saved trainee details and prefill the form (once per distinct SRN).
@@ -172,7 +176,10 @@ function Wizard() {
   const contactValid = applicant.address.trim().length >= 8 && mobileValid && emailValid;
   const emergencyValid = applicant.emergencyContactName.trim().length >= 2 && emergencyMobileValid;
   // At least one course; every chosen course needs a valid schedule that respects the order.
-  const selectionsValid = trainings.length >= 1 && rows.every((r, i) => !r.code || !!otherOf(r.code) || (!!rangeOf(r) && !rowProblem(r, i)));
+  const lateOf = (r: Row) => !!stcwOf(r.code)?.batches.find((b) => b.id === r.batchId)?.late;
+  const anyLate = rows.some(lateOf);
+  const reasonText = lateReason === "Other" ? lateOther.trim() : lateReason;
+  const selectionsValid = trainings.length >= 1 && rows.every((r, i) => !r.code || !!otherOf(r.code) || (!!rangeOf(r) && !rowProblem(r, i))) && (!anyLate || reasonText.length >= 3);
   const when = (t: Training) => (t.start ? pickedRange(t.start, t.end) : "To be confirmed");
 
   async function submit() {
@@ -189,18 +196,20 @@ function Wizard() {
         if (r.code && otherOf(r.code)) { fd.append("otherCourseCodes", r.code); continue; }
         if (!r.code || !rangeOf(r)) continue;
         if (pkgOf(r.code)) fd.append("packageWeeks", r.start);
-        else if (stcwOf(r.code)) fd.append("scheduleIds", r.batchId);
+        else if (stcwOf(r.code)) fd.append(lateOf(r) ? "lateIds" : "scheduleIds", r.batchId);
         else { fd.append("courseCodes", r.code); fd.append("startDates", r.start); }
       }
       fd.set("termsAccepted", "on");
+      if (anyLate) fd.set("lateReason", reasonText);
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 25000);
       let response: Response;
       try {
-        response = await fetch("/api/public/registrations", { method: "POST", body: fd, signal: controller.signal });
+        response = await fetch("/api/public/registrations", { method: "POST", body: fd, signal: controller.signal, ...(staff ? { headers: { "x-staff-intake": "1" } } : {}) });
       } finally { clearTimeout(timer); }
       const body = await response.json();
       if (!response.ok) { setError(body.error ?? "We could not submit your application. Please review your details and try again."); return; }
+      if (staff) { staff.onDone({ reference: body.reference, applicationNumber: body.applicationNumber ?? null, traineeId: body.traineeId, warnings: body.warnings }); return; }
       setReference(body.reference);
       setApplicationNumber(body.applicationNumber ?? "");
       setSubmittedTrainings(trainings);
@@ -350,11 +359,15 @@ function Wizard() {
               {catalog.other.length > 0 && <optgroup label="Other STCW Courses">{catalog.other.filter((c) => !taken.has(c.code) && !stcwOf(c.code) && !inHouseOf(c.code)).map((c) => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}</optgroup>}
               {categories.map((cat) => <optgroup key={cat} label={`${cat} · online`}>{catalog.inHouse.filter((c) => c.category === cat && !taken.has(c.code)).map((c) => <option key={c.code} value={c.code}>{c.name} ({c.code})</option>)}</optgroup>)}
             </select>
-            {st && (st.batches.length ? <div className="ql-chips" role="radiogroup" aria-label="Schedule">{st.batches.map((b) => {
-              const conflict = orderConflict({ code: st.code, start: b.startsOn, end: b.endsOn }, others);
-              const disabled = b.full || !!conflict, on = row.batchId === b.id;
-              return <button type="button" role="radio" aria-checked={on} key={b.id} disabled={disabled && !on} className={`ql-chip${on ? " on" : ""}${disabled ? " off" : ""}`} onClick={() => setRow(index, { batchId: b.id })}><b>{on ? "✓ " : ""}{chipRange(b.startsOn, b.endsOn)}</b><small>{b.full ? "Full" : conflict ?? "Open"}</small></button>;
-            })}</div> : <p className="ql-error">No open schedule for this course yet. Please choose another course.</p>)}
+            {st && (st.batches.length ? [false, true].map((late) => {
+              const list = st.batches.filter((b) => !!b.late === late);
+              if (!list.length) return null;
+              return <div key={String(late)}>{late && <p className="ql-late-h">Started: Late Add</p>}<div className="ql-chips" role="radiogroup" aria-label={late ? "Started batches" : "Schedule"}>{list.map((b) => {
+                const conflict = orderConflict({ code: st.code, start: b.startsOn, end: b.endsOn }, others);
+                const disabled = b.full || !!conflict, on = row.batchId === b.id;
+                return <button type="button" role="radio" aria-checked={on} key={b.id} disabled={disabled && !on} className={`ql-chip${on ? " on" : ""}${disabled ? " off" : ""}${late ? " late" : ""}`} onClick={() => setRow(index, { batchId: b.id })}><b>{on ? "✓ " : ""}{chipRange(b.startsOn, b.endsOn)}</b><small>{b.full ? "Full" : conflict ?? (late ? lateDayLabel(b.startsOn, b.endsOn, today) : "Open")}</small></button>;
+              })}</div></div>;
+            }) : <p className="ql-error">No open schedule for this course yet. Please choose another course.</p>)}
             {pkgOf(row.code) && (pkgOf(row.code)!.weeks.length ? <div className="ql-chips" role="radiogroup" aria-label="Week">{pkgOf(row.code)!.weeks.map((w) => {
               const on = row.start === w.monday;
               return <button type="button" role="radio" aria-checked={on} key={w.monday} disabled={w.full && !on} className={`ql-chip${on ? " on" : ""}${w.full ? " off" : ""}`} onClick={() => setRow(index, { start: w.monday })}><b>{on ? "✓ " : ""}{chipRange(w.monday, w.ends)}</b><small>{w.full ? "Full" : "Open"}</small></button>;
@@ -367,6 +380,11 @@ function Wizard() {
             {ih && !problem && row.start && row.start < today && <p className="ql-rule-note">This date has passed. Registration will confirm your training dates.</p>}
           </div>;
         })}
+        {anyLate && <div className="ql-late-reason">
+          <p>A batch you chose has started. Choose the reason for the late add; it is saved in the audit log.</p>
+          <div className="ql-chips" role="radiogroup" aria-label="Late add reason">{[...LATE_ADD_REASONS, "Other"].map((r) => <button type="button" role="radio" aria-checked={lateReason === r} key={r} className={`ql-chip${lateReason === r ? " on" : ""}`} onClick={() => setLateReason(r)}><b>{r}</b></button>)}</div>
+          {lateReason === "Other" && <label><span>Reason</span><input value={lateOther} maxLength={300} onChange={(e) => setLateOther(e.target.value)} placeholder="Type the reason" /></label>}
+        </div>}
         {rows.length < MAX_COURSES && <button type="button" className="ql-link" onClick={addRow}>+ Add Another Course ({rows.length}/{MAX_COURSES})</button>}
         {trainings.length > 0 && <div className="ql-schedule"><h4>Your Training Schedule</h4><table><thead><tr><th>#</th><th>Course</th><th>Dates</th></tr></thead><tbody>{trainings.map((t, i) => <tr key={t.code}><td>{i + 1}</td><td><b>{t.name}</b><small>{t.code} · {t.modality}</small></td><td>{when(t)}</td></tr>)}</tbody></table></div>}
       </>}
@@ -418,10 +436,10 @@ function Wizard() {
             </div>
             <label className="consent-row">
               <input type="checkbox" checked={accepted} onChange={(e) => setAccepted(e.target.checked)} />
-              <span>I have read and accepted the New Wave Maritime Terms and Conditions, including the payment, no refund, rescheduling, cancellation, make-up class, and certificate policies, and I confirm that the information I provided is complete and accurate.</span>
+              <span>{staff ? "Trainee read and accepted the Terms and Conditions, and confirmed that the information is complete and accurate." : "I have read and accepted the New Wave Maritime Terms and Conditions, including the payment, no refund, rescheduling, cancellation, make-up class, and certificate policies, and I confirm that the information I provided is complete and accurate."}</span>
             </label>
             {error && <p className="form-message" role="alert">{error}</p>}
-            <div className="ql-actions"><button className="button button-primary" type="button" disabled={!accepted || !selectionsValid || submitting} onClick={submit}>{submitting ? "Submitting…" : "Submit Application"}</button></div>
+            <div className="ql-actions"><button className="button button-primary" type="button" disabled={!accepted || !selectionsValid || submitting} onClick={submit}>{submitting ? "Submitting…" : staff ? "Register Trainee" : "Submit Application"}</button></div>
           </div>}
         </section>
       </div>
@@ -433,6 +451,6 @@ function Field({ label, wide, children }: { label: string; wide?: boolean; child
   return <label className={wide ? "span-2" : ""}>{label}{children}</label>;
 }
 
-export function RegistrationForm() {
-  return <Wizard />;
+export function RegistrationForm({ staff }: { staff?: StaffIntake } = {}) {
+  return <Wizard staff={staff} />;
 }

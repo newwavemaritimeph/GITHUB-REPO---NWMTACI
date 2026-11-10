@@ -3,6 +3,12 @@
  * on the Billing Statement instead of the trainee paying at the Cashier. No rebate applies.
  */
 export const COMPANY_CHARGE = "Company Charge";
+/**
+ * Items to Collect (owner, 10 Nov 2026): New Wave's own training courses take every Miscellaneous Item (Uniform, LBC,
+ * Online Assessment, ...); an endorsed course (a partner center's offer) takes only Online Medical.
+ */
+export const itemAllowed = (name: string, endorsed: boolean) => !endorsed || /online medical/i.test(name);
+export const isEndorsedEnrollment = (e: { partner_offer_id?: string | null }, deliveryType?: string | null) => !!e.partner_offer_id || deliveryType === "Partner or Endorsed";
 
 /** Only the Accounting Head records what a company paid and issues its Service Invoice (owner, 5 Nov 2026); the Admin views. */
 export const canRecordCompanyPayment = (roles: string[]) => roles.includes("accounting");

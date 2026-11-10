@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { enforceRateLimit } from "@/lib/security";
+import { enforceRateLimit, requireStaff } from "@/lib/security";
 import {
   VALIDATION_MESSAGES,
   isEmail,
@@ -77,8 +77,16 @@ function withTimeout<T>(promise: PromiseLike<T>, ms: number, message: string): P
 export async function POST(request: Request) {
   if (!isSupabaseConfigured()) return NextResponse.json({ error: "Registration will open after the secure production environment is connected." }, { status: 503 });
   try {
-    const ipHash = await enforceRateLimit(request, "public-registration", 5, 30);
+    // Register Trainee in the portal (owner, 10 Nov 2026): Registration (or the Admin) uses this same form; no rate limit,
+    // and it may add the trainee to batches that already started (lateIds, with a reason).
+    const staffIntake = request.headers.get("x-staff-intake") === "1";
+    const staff = staffIntake ? await requireStaff(["admin", "registration"]) : null;
+    if (staffIntake && !staff) return NextResponse.json({ error: "Sign in as Registration to register a trainee." }, { status: 403 });
+    const ipHash = staff ? `staff:${staff.user.id}` : await enforceRateLimit(request, "public-registration", 5, 30);
     const form = await request.formData();
+    const lateIds = staff ? batchesSchema.parse([...new Set(form.getAll("lateIds").map(String).filter(Boolean))]) : [];
+    const lateReason = String(form.get("lateReason") ?? "").trim().slice(0, 300);
+    if (lateIds.length && lateReason.length < 3) throw new Error("Enter the reason for the late add.");
     const body = registrationSchema.parse(Object.fromEntries(form));
     const batches = batchesSchema.parse(form.getAll("scheduleIds").map((v) => String(v)).filter(Boolean));
     // In-House courses picked with a start date (courseCodes[i] + startDates[i]).
@@ -89,9 +97,9 @@ export async function POST(request: Request) {
     // CCI Package weeks (owner, 21 Oct 2026): a Monday each.
     const packageWeeks = [...new Set(form.getAll("packageWeeks").map(String).filter((v) => /^\d{4}-\d{2}-\d{2}$/.test(v)))].slice(0, 2);
     const otherCodes = [...new Set(form.getAll("otherCourseCodes").map((v) => String(v).trim().toUpperCase()).filter(Boolean))].slice(0, MAX_COURSES);
-    if (batches.length + dated.length + otherCodes.length + packageWeeks.length * 3 > MAX_COURSES) throw new Error(`You can choose up to ${MAX_COURSES} courses per application.`);
+    if (batches.length + lateIds.length + dated.length + otherCodes.length + packageWeeks.length * 3 > MAX_COURSES) throw new Error(`You can choose up to ${MAX_COURSES} courses per application.`);
     const db = createSupabaseAdminClient();
-    await checkCourseOrder(db, batches, dated);
+    await checkCourseOrder(db, [...batches, ...lateIds], dated);
     const startedAt = new Date().toISOString();
     const referral = body.enrollmentType === "Agency" ? await agencyForCode(db, normaliseReferralCode(body.referralCode)) : null;
     if (body.enrollmentType === "Agency" && !referral) throw new Error("Enter the referral code from your agency, or choose Online enrollment.");
@@ -106,6 +114,8 @@ export async function POST(request: Request) {
     if (error) throw error;
     const result = data as { application_number?:string;registration_reference:string;trainee_id:string;email:string;complete_name:string };
     for (const pick of dated) await attachDatedCourse(db, result.trainee_id, pick);
+    const warnings: string[] = [];
+    for (const batchId of lateIds) warnings.push(...await lateAdd(db, result.trainee_id, batchId, staff!.user.id, lateReason));
     for (const code of otherCodes) await attachOtherCourse(db, result.trainee_id, code);
     for (const week of packageWeeks) { const { error: pkgError } = await db.rpc("assign_cci_package", { target_trainee: result.trainee_id, week_start: week, actor: null }); if (pkgError) console.error("Could not attach the CCI Package:", pkgError.message); }
     if (referral) await tagReferral(db, result.trainee_id, referral.id, startedAt);
@@ -115,7 +125,8 @@ export async function POST(request: Request) {
     // public status lookup using this reference plus their registered email.
     // application_number (NWMTACI-0000001) exists once migration 202610070003 is
     // applied; until then the summary falls back to the registration reference.
-    return NextResponse.json({ reference: result.registration_reference, applicationNumber: result.application_number ?? null });
+    if (staff) await db.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: staff.roleCodes.includes("registration") ? "registration" : "admin", action: "registration.staff_submitted", record_type: "trainee", record_id: result.trainee_id, new_values: { application_number: result.application_number ?? null, late_batches: lateIds, late_reason: lateIds.length ? lateReason : null } });
+    return NextResponse.json({ reference: result.registration_reference, applicationNumber: result.application_number ?? null, ...(staff ? { traineeId: result.trainee_id, warnings } : {}) });
   } catch (error) {
     const status = error instanceof Error && error.message === "RATE_LIMITED" ? 429 : 400;
     if (status !== 429) console.error("Public registration failed:", error);
@@ -168,6 +179,16 @@ async function attachOtherCourse(db: ReturnType<typeof createSupabaseAdminClient
     const { error } = await db.rpc("assign_other_course", { target_trainee: traineeId, target_course: course.id, actor: null });
     if (error) console.error("Could not attach the Other STCW course (apply database update 202610200050):", error.message);
   } catch (err) { console.error("Could not attach the Other STCW course:", err instanceof Error ? err.message : err); }
+}
+
+/** Late add from the portal form: the course without a batch, then the started batch with the reason (202610290092). */
+async function lateAdd(db: ReturnType<typeof createSupabaseAdminClient>, traineeId: string, batchId: string, actor: string, reason: string): Promise<string[]> {
+  const { data: batch } = await db.from("batches").select("course_id,batch_number").eq("id", batchId).maybeSingle();
+  if (!batch) return ["One of the started batches was not found."];
+  const { data: enrollment, error } = await db.rpc("assign_application_course", { target_trainee: traineeId, target_course: batch.course_id, target_batch: null, actor });
+  if (error || !enrollment) return [`Batch ${batch.batch_number}: ${error?.message ?? "the course was not added"}.`];
+  const { error: lateError } = await db.rpc("late_add_to_batch", { target_enrollment: (enrollment as { id: string }).id, target_batch: batchId, actor, reason });
+  return lateError ? [`Batch ${batch.batch_number}: the course was added without the batch (${/late_add_to_batch/.test(lateError.message) ? "apply database update 202610290092" : lateError.message}). Use Choose Batch.`] : [];
 }
 
 /**

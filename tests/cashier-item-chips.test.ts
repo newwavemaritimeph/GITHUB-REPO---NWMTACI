@@ -27,7 +27,8 @@ describe("Item Chips in the Cashier's Record Payment", () => {
     try { html = renderToStaticMarkup(createElement(RecordPaymentModal, { data, initialEnrollmentId: "e1", onClose: () => undefined, onSaved: async () => undefined })); }
     catch { /* fall back to the source check below when the fixture is too thin to render */ }
     const cashier = readFileSync("components/portal/live-cashier.tsx", "utf8");
-    expect(cashier).toContain('const counterItems = data.charges.filter((c) => c.active && c.kind === "item");');
+    // An endorsed course takes only Online Medical (owner, 10 Nov 2026).
+    expect(cashier).toContain('const counterItems = data.charges.filter((c) => c.active && c.kind === "item" && itemAllowed(c.name, itemEndorsed));');
     if (html) {
       for (const chip of ["+ Uniform ₱150", "+ T-Shirt ₱150", "+ Online Assessment ₱500"]) expect(html).toContain(chip);
       expect(html).not.toContain("+ Reprinting");

@@ -5,7 +5,7 @@ import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { pendingTraineeProofs } from "@/lib/trainee-proof";
 import { loadTarGroups } from "@/lib/trainee-match-server";
-import { canRecordCompanyPayment, pricelistAdjustment, splitStatementPayment } from "@/lib/company-charge";
+import { canRecordCompanyPayment, isEndorsedEnrollment, itemAllowed, pricelistAdjustment, splitStatementPayment } from "@/lib/company-charge";
 import { bsNumber, buildBillingRows, statementTotal } from "@/lib/billing-statement";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -326,6 +326,8 @@ const traineeCopyInput = z.object({ action: z.literal("trainee-details-copied"),
 const packageAssignInput = z.object({ action: z.literal("package-assign"), traineeId: z.string().uuid(), weekStart: z.string().date(), ...courseSource });
 const applicationAssignInput = z.object({ action: z.literal("application-assign"), traineeId: z.string().uuid(), courseId: z.string().uuid(), batchId: z.string().uuid().nullable().optional(), scheduledOn: z.string().date().nullable().optional(), offerId: z.string().uuid().nullable().optional(), ...courseSource });
 const applicationPlaceBatchInput = z.object({ action: z.literal("application-place-batch"), enrollmentId: z.string().uuid(), batchId: z.string().uuid() });
+// Late add (owner, 10 Nov 2026): a started batch, up to its last day, with a reason. An existing application, or a trainee and course.
+const applicationLateAddInput = z.object({ action: z.literal("application-late-add"), enrollmentId: z.string().uuid().optional(), traineeId: z.string().uuid().optional(), courseId: z.string().uuid().optional(), batchId: z.string().uuid(), reason: z.string().trim().min(3, "Enter the reason for the late add.").max(300), ...courseSource });
 // Registration moves an enrollment with no payment to another open batch of the same course, at once and without a fee (owner, 9 Nov 2026).
 const registrationChangeBatchInput = z.object({ action: z.literal("registration-change-batch"), enrollmentId: z.string().uuid(), batchId: z.string().uuid() });
 // Instructions window (owner, 5 Nov 2026): the address for this send, saving it to the record, and the Classroom invitation.
@@ -339,7 +341,7 @@ const classroomCourseLinkInput = z.object({ action: z.literal("classroom-course-
 const classroomDisconnectInput = z.object({ action: z.literal("classroom-disconnect") });
 const requestDecideInput = z.object({ action: z.literal("request-decide"), id: z.string().uuid(), approve: z.boolean(), remarks: z.string().trim().max(500).optional() });
 
-const actionInput = z.discriminatedUnion("action", [referralVoucherDecideInput, referralVoucherReleaseInput, budgetRequestInput, expenseLiquidateInput, referralVoucherIssueInput, batchSeriesSaveInput, batchRenameInput, mismoEntryInput, mismoAlertClearInput, mismoDetailsInput, serviceInvoiceSetupInput, serviceInvoiceIssueInput, certificateFormatInput, documentControlsInput, instructionCategorySaveInput, paymentVoidRequestInput, paymentVoidDecideInput, statementIssueInput, statementVoidInput, enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, registrationChangeBatchInput, applicationHandoverInput, traineeUpdateInput, traineeFacebookInput, admissionRecordInput, documentReprintInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
+const actionInput = z.discriminatedUnion("action", [applicationLateAddInput, referralVoucherDecideInput, referralVoucherReleaseInput, budgetRequestInput, expenseLiquidateInput, referralVoucherIssueInput, batchSeriesSaveInput, batchRenameInput, mismoEntryInput, mismoAlertClearInput, mismoDetailsInput, serviceInvoiceSetupInput, serviceInvoiceIssueInput, certificateFormatInput, documentControlsInput, instructionCategorySaveInput, paymentVoidRequestInput, paymentVoidDecideInput, statementIssueInput, statementVoidInput, enrollChargeInput, companyPaymentInput, sourceSetInput, batchMoveInput, proofDismissInput, centerPaymentInput, otherCenterInput, classroomLinksImportInput, defaultRoomSaveInput, trainingEndEmailInput, courseRemoveInput, courseRestoreInput, certificateRevokeInput, offerCreateInput, offerArchiveInput, incomeRecordInput, incomeVoidInput, enrollmentStartInput, partnerRebatesInput, paymentVoidInput, expenseVoidInput, enrollmentCancelInput, holidaySaveInput, holidayDeleteInput, holidayMarinaInput, configRemoveInput, closingReviewInput, agencyCodeInput, expenseReprintRequestInput, expenseReprintDecideInput, expenseReleaseInput, cashierOpenInput, balanceSummaryInput, classroomClassesInput, classroomCourseLinkInput, classroomDisconnectInput, requirementCheckInput, applicationEnrollInput, applicationAssignInput, packageAssignInput, traineeCopyInput, applicationPlaceBatchInput, registrationChangeBatchInput, applicationHandoverInput, traineeUpdateInput, traineeFacebookInput, admissionRecordInput, documentReprintInput, requestChargeInput, batchInput, autoOpenBatchInput, autoOpenAllInput, enrollmentDeleteInput, batchUpdateInput, agencyRebateSetInput, recordAgencyRebateInput, agencyRebateSettleInput, expenseCategoryInput, incomeCategoryInput, inventoryItemInput, inventoryMoveInput, paymentInput, enrollmentInput, notificationInput, channelInput, chargeInput, agencyInput, payableInput, payableMarkPaidInput, expenseCreateInput, expenseDecideInput, closingInput, enrollmentChargeInput, enrollmentChargeVoidInput, hrAttendanceInput, leaveFileInput, leaveDecideInput, advanceFileInput, advanceDecideInput, employeeSaveInput, employeeSetActiveInput, payrollOpenInput, payrollReviewInput, payrollFinalizeInput, classroomSaveInput, classroomSetActiveInput, coursePriceInput, offerRateInput, courseSaveInput, centerSaveInput, paymentSplitInput, courseChangeInput, rescheduleInput, sendInstructionsInput, instructionTemplateSaveInput, classroomLinkSaveInput, leaveFileSelfInput, advanceFileSelfInput, requestRaiseInput, requestDecideInput, discountRequestInput, discountDecideInput, chargeDecideInput, announcementPostInput, announcementDeleteInput, certificateStatusInput, certificateIssueInput, certificatePrintInput, certificateVoidInput, certificateReleaseInput, certificateReleasePlanInput, certificateIssueInput2, certificateOverrideInput, certificateIssuanceToggleInput, certificateSeriesInput, deliveryCheckInput, deliveryDeclineInput, deliveryShipInput, deliveryDeliveredInput, mismoSubmitInput, instructorSaveInput, accreditationInput, resourcePlanInput, reconcileMarkInput, reconcileUndoInput, certificateVoidRequestInput, certificateVoidDecideInput, certificateCorrectInput, certificateNumberSetInput, certNumberSettingsInput, legacyCertAddInput, legacyCertImportInput, certificateTemplateLinkInput, evaluationFormInput, certificateSoftCopyInput, feedbackSendEmailInput, pruneNowInput, employeeChargeFileSelfInput, employeeChargeSetAmountInput, employeeChargeInput, employeeChargeCancelInput, batchDeleteInput, batchCancelInput, benefitSaveInput, benefitRemoveInput, contractSaveInput, contractRemoveInput, attendanceCheckInSelfInput, attendanceCheckOutSelfInput, autoOpenWeekInput, autoOpenAllWeekInput]);
 const canCashier = (roles: string[]) => roles.some((role) => ["admin", "cashier", "accounting"].includes(role));
 /** A proof the trainee sent (29 Oct 2026) backs one payment of that trainee, unless marked Not Valid. Staff-filed proofs return null. */
 async function traineeProofProblem(admin: ReturnType<typeof createSupabaseAdminClient>, proofId: string, traineeId: string) {
@@ -458,6 +460,30 @@ async function facebookMissing(admin: ReturnType<typeof createSupabaseAdminClien
   return !first(data?.trainees as unknown as { facebook_url: string | null } | null)?.facebook_url;
 }
 
+/**
+ * A released Referral Voucher paid in Cash, GCash or Bank Transfer is money out (owner, 10 Nov 2026): it is recorded as a
+ * Paid expense (Referral Rebates), numbered and approved like any voucher (approve_expense, by the Accounting approver),
+ * so it shows in Expenses, the Expenses Summary and the Cashier's cash out. Offset at Payment records none: that rebate
+ * already came off the trainee's payment. Returns an error message, or null.
+ */
+async function bookVoucherExpense(admin: ReturnType<typeof createSupabaseAdminClient>, number: string, snap: ReferralVoucherSnapshot, events: { status: string; created_at: string; actor?: string | null }[], cashier: string, reference: string | null): Promise<string | null> {
+  if (!snap?.mode || snap.mode === "Offset at Payment" || !(Number(snap.totalCentavos) > 0)) return null;
+  const approver = [...events].filter((e) => e.status === "Approved").sort((a, b) => b.created_at.localeCompare(a.created_at))[0]?.actor ?? cashier;
+  const year = Number(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila", year: "numeric" }).format(new Date()));
+  const { data: requestNumber, error: numberError } = await admin.rpc("next_reference", { prefix: "ER", requested_year: year });
+  if (numberError || !requestNumber) return numberError?.message ?? "Could not number the expense.";
+  const purpose = `Referral Voucher ${number} · ${snap.partner} · ${snap.from} to ${snap.to}`.slice(0, 300);
+  const { data: created, error } = await admin.from("expenses").insert({ expense_number: requestNumber, request_number: requestNumber, payee: snap.partner, category: "Referral Rebates", amount_centavos: Number(snap.totalCentavos), purpose, status: "Pending", requested_by: cashier }).select("id").single();
+  if (error) return error.message;
+  const { error: approveError } = await admin.rpc("approve_expense", { target: created.id, actor: approver, remarks: `Approved with Referral Voucher ${number}` });
+  if (approveError) return approveError.message;
+  const now = new Date().toISOString();
+  const { error: paidError } = await admin.from("expenses").update({ status: "Paid", paid_at: now, payment_channel: snap.mode, reference_number: reference ?? snap.reference ?? null, released_by: cashier, released_at: now }).eq("id", created.id).eq("status", "Approved");
+  if (paidError) return paidError.message;
+  await admin.from("audit_logs").insert({ actor_id: cashier, actor_role: "cashier", action: "expense.released", record_type: "expense", record_id: created.id, new_values: { channel: snap.mode, reference, referral_voucher: number } });
+  await fileVoucherInDrive(admin, created.id).catch(() => undefined);
+  return null;
+}
 async function tryAutoEnroll(admin: ReturnType<typeof createSupabaseAdminClient>, enrollmentIds: string[], actor: string) {
   const enrolled: string[] = [];
   const { data: pending } = await admin.from("enrollments").select("id").in("id", enrollmentIds).eq("enrollment_status", "Pending");
@@ -1054,6 +1080,12 @@ export async function GET(request: Request) {
   // Items Registration added at the hand-over, still to be paid at the Cashier (10 Nov 2026).
   let pendingItems: { id: string; enrollment_id: string; charge_catalog_id: string | null; description: string; amount_centavos: number; created_at: string }[] = [];
   // Referral Vouchers issued (10 Nov 2026), newest 50, for Accounting's Payables. Empty before 202610290088.
+  // Late add (202610290092): the reason on each enrollment added to a started batch; absent until the update is applied.
+  const lateAdds = new Map<string, string>();
+  task(async () => {
+    const r = await db.from("enrollments").select("id,late_add_reason").not("late_add_reason", "is", null).order("late_added_at", { ascending: false }).limit(2000);
+    for (const x of (r.error ? [] : r.data ?? []) as { id: string; late_add_reason: string }[]) lateAdds.set(x.id, x.late_add_reason);
+  });
   let referralVouchers: { id: string; voucher_number: string; agency_id: string; period_from: string; period_to: string; total_centavos: number; issued_at: string; mode?: string | null; status?: string; remarks?: string | null }[] = [];
   if (canCashier(staff.roleCodes)) task(async () => {
     const r = await db.from("referral_vouchers").select("id,voucher_number,agency_id,period_from,period_to,total_centavos,issued_at,mode:snapshot->>mode").order("issued_at", { ascending: false }).limit(50);
@@ -1384,6 +1416,7 @@ export async function GET(request: Request) {
     const extra = extrasByEnrollment.get(row.id);
     return { ...row,
       scheduled_on: extra?.scheduled_on ?? null,
+      late_add_reason: lateAdds.get(row.id) ?? null,
       instructions_sent_at: extra?.instructions_sent_at ?? null,
       agency_share_centavos: Number(extra?.agency_share_centavos ?? 0),
       enrolled_at: enrolledAt.get(row.id) ?? null,
@@ -2300,6 +2333,9 @@ export async function POST(request: Request) {
       // The items to collect wait as unpaid charges; the Cashier settles each on its own receipt (10 Nov 2026).
       if (input.items?.length) {
         const { data: cat } = await admin.from("charge_catalog").select("id,name,default_amount_centavos,active,kind").in("id", input.items.map((i) => i.chargeCatalogId));
+        const { data: itemEn } = await admin.from("enrollments").select("partner_offer_id,courses(delivery_type)").eq("id", input.enrollmentId).maybeSingle();
+        const itemEndorsed = !!itemEn && isEndorsedEnrollment(itemEn, first(itemEn.courses as { delivery_type: string } | { delivery_type: string }[] | null)?.delivery_type);
+        if (((cat ?? []) as { name: string }[]).some((c) => !itemAllowed(c.name, itemEndorsed))) return NextResponse.json({ error: "Only Online Medical can be added to an endorsed course." }, { status: 400 });
         const byId = new Map(((cat ?? []) as { id: string; name: string; default_amount_centavos: number; active: boolean; kind: string | null }[]).filter((c) => c.active && c.kind === "item" && Number(c.default_amount_centavos) > 0).map((c) => [c.id, c]));
         const rows = input.items.flatMap((i) => { const c = byId.get(i.chargeCatalogId); return c ? [{ enrollment_id: input.enrollmentId, charge_catalog_id: c.id, description: i.quantity > 1 ? `${c.name} x ${i.quantity}` : c.name, amount_centavos: Number(c.default_amount_centavos) * i.quantity, event_type: "charge", valid: false, approval_status: "Pending", created_by: staff.user.id }] : []; });
         if (rows.length) {
@@ -2403,7 +2439,7 @@ export async function POST(request: Request) {
       const admin = createSupabaseAdminClient();
       const { data: voucher } = await admin.from("referral_vouchers").select("id,voucher_number,snapshot").eq("id", input.id).maybeSingle();
       if (!voucher) return NextResponse.json({ error: "Voucher not found." }, { status: 404 });
-      const { data: events, error: eventsError } = await admin.from("referral_voucher_events").select("status,created_at").eq("voucher_id", input.id);
+      const { data: events, error: eventsError } = await admin.from("referral_voucher_events").select("status,created_at,actor").eq("voucher_id", input.id);
       if (eventsError) return NextResponse.json({ error: "Apply database update 202610290091 first." }, { status: 400 });
       const now = voucherStatus((events ?? []) as { status: string; created_at: string }[]);
       if (deciding && now !== "For Approval") return NextResponse.json({ error: `This voucher is already ${now.toLowerCase()}.` }, { status: 400 });
@@ -2416,6 +2452,8 @@ export async function POST(request: Request) {
       if (!deciding) {
         const ids = (snap?.rows ?? []).map((r) => r.rebateId).filter(Boolean) as string[];
         if (ids.length) await admin.from("agency_rebates").update({ status: "Paid", settlement: `Paid by Referral Voucher ${voucher.voucher_number}${snap?.mode ? ` (${snap.mode})` : ""}` }).in("id", ids).eq("status", "Pending");
+        const expenseError = await bookVoucherExpense(admin, voucher.voucher_number, snap, (events ?? []) as { status: string; created_at: string; actor?: string | null }[], staff.user.id, input.reference || null);
+        if (expenseError) return NextResponse.json({ ok: true, status: next, warning: `Released, but the expense was not recorded: ${expenseError}` });
       }
       await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: deciding ? (isAdminRole(staff.roleCodes) ? "admin" : "accounting") : staff.roleCodes.includes("cashier") ? "cashier" : staff.roleCodes[0] ?? null, action: `referral_voucher.${next.toLowerCase().replace(" ", "_")}`, record_type: "referral_voucher", record_id: input.id, prior_values: { status: now }, new_values: { status: next, reference: deciding ? null : input.reference || null }, reason: deciding ? input.remarks || null : null });
       return NextResponse.json({ ok: true, status: next });
@@ -2601,6 +2639,23 @@ export async function POST(request: Request) {
       const { data, error } = await admin.rpc("place_application_batch", { target_enrollment: input.enrollmentId, target_batch: input.batchId, actor: staff.user.id });
       if (error) return NextResponse.json({ error: error.message }, { status: 400 });
       const enrolled = await tryAutoEnroll(admin, [input.enrollmentId], staff.user.id);
+      return NextResponse.json({ ok: true, enrollment: data, enrolled });
+    }
+    if (input.action === "application-late-add") {
+      if (!canRegister(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot place applications on a batch." }, { status: 403 });
+      const admin = createSupabaseAdminClient();
+      let enrollmentId = input.enrollmentId;
+      if (!enrollmentId) {
+        if (!input.traineeId || !input.courseId) return NextResponse.json({ error: "Choose the trainee and the course." }, { status: 400 });
+        const { data, error } = await admin.rpc("assign_application_course", { target_trainee: input.traineeId, target_course: input.courseId, target_batch: null, actor: staff.user.id });
+        if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+        enrollmentId = (data as { id: string }).id;
+        const srcError = await setCourseSource(admin, [enrollmentId], input.source, input.agencyId, staff.user.id);
+        if (srcError) return NextResponse.json({ error: `Course added, but its source was not saved: ${srcError}` }, { status: 400 });
+      }
+      const { data, error } = await admin.rpc("late_add_to_batch", { target_enrollment: enrollmentId, target_batch: input.batchId, actor: staff.user.id, reason: input.reason });
+      if (error) return NextResponse.json({ error: /late_add_to_batch/.test(error.message) ? "Apply database update 202610290092 first." : input.enrollmentId ? error.message : `The course was added, but not the late add: ${error.message}` }, { status: 400 });
+      const enrolled = await tryAutoEnroll(admin, [enrollmentId], staff.user.id);
       return NextResponse.json({ ok: true, enrollment: data, enrolled });
     }
     if (input.action === "registration-change-batch") {
@@ -3466,8 +3521,16 @@ export async function POST(request: Request) {
       // Separate receipts (owner, 3 Nov 2026): the training fee, each miscellaneous item and each service fee
       // is its own payment with its own Acknowledgement Receipt, never combined. The remarks name the fee.
       const catalogIds = [...new Set(input.items.map((i) => i.chargeCatalogId).filter(Boolean) as string[])];
-      const { data: kinds } = catalogIds.length ? await admin.from("charge_catalog").select("id,kind").in("id", catalogIds) : { data: [] };
+      const { data: kinds } = catalogIds.length ? await admin.from("charge_catalog").select("id,kind,name").in("id", catalogIds) : { data: [] };
       const kindOf = new Map(((kinds ?? []) as { id: string; kind: string | null }[]).map((k) => [k.id, k.kind]));
+      // Items to Collect (owner, 10 Nov 2026): an endorsed course takes only Online Medical.
+      const nameOf = new Map(((kinds ?? []) as { id: string; name: string }[]).map((k) => [k.id, k.name]));
+      const itemLines = input.items.filter((i) => i.chargeCatalogId && kindOf.get(i.chargeCatalogId) === "item");
+      if (itemLines.length) {
+        const { data: ens } = await admin.from("enrollments").select("id,partner_offer_id,courses(delivery_type)").in("id", [...new Set(itemLines.map((i) => i.enrollmentId))]);
+        const endorsedIds = new Set(((ens ?? []) as { id: string; partner_offer_id: string | null; courses: unknown }[]).filter((x) => isEndorsedEnrollment(x, first(x.courses as { delivery_type: string } | { delivery_type: string }[] | null)?.delivery_type)).map((x) => x.id));
+        if (itemLines.some((i) => endorsedIds.has(i.enrollmentId) && !itemAllowed(nameOf.get(i.chargeCatalogId!) ?? i.description, true))) throw new Error("Only Online Medical can be added to an endorsed course.");
+      }
       type Part = { label: string; remarks: string | null; allocations: { enrollment_id: string; amount_centavos: number }[]; chargeId?: string; keep?: boolean };
       const parts: Part[] = [];
       // Courses paid together share one receipt and so one TAR (owner, 4 Nov 2026).

@@ -204,7 +204,8 @@ describe("Registration Officer workspace", () => {
     const source = readFileSync(new URL("../components/portal/live-registration.tsx", import.meta.url), "utf8");
     // Sent directly from the Registration screens. registration-change-batch: Change Schedule before any payment (owner, 9 Nov 2026).
     const direct = new Set([...source.matchAll(/action: ?"([a-z-]+)"/g)].map((m) => m[1]));
-    expect([...direct].sort()).toEqual(["application-assign", "application-enroll", "application-enroll-charge", "application-handover", "application-place-batch", "enrollment-set-start", "enrollment-source", "other-course-center", "package-assign", "registration-change-batch", "requirement-check", "trainee-facebook"]);
+    // application-late-add: a started batch with a reason (owner, 10 Nov 2026).
+    expect([...direct].sort()).toEqual(["application-assign", "application-enroll", "application-enroll-charge", "application-handover", "application-late-add", "application-place-batch", "enrollment-set-start", "enrollment-source", "other-course-center", "package-assign", "registration-change-batch", "requirement-check", "trainee-facebook"]);
     // The Instructions window, its own file, sends only these.
     const windowSource = readFileSync(new URL("../components/portal/instructions-window.tsx", import.meta.url), "utf8");
     expect([...new Set([...windowSource.matchAll(/action: ?"([a-z-]+)"/g)].map((m) => m[1]))].sort()).toEqual(["classroom-classes", "classroom-course-link", "send-instructions"]);

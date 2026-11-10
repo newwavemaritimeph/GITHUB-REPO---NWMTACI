@@ -15,7 +15,7 @@ import { PayTheCenters, centerLines } from "./pay-centers";
 import { shrinkProof } from "@/lib/proof-shrink";
 import { NO_REASON, REASONS, REJECT_REASONS, ReasonField, reasonReady, reasonText, type ReasonValue } from "./reject-inline";
 import { printableTars, rankMatches, tarPrintable, type TarGroup } from "@/lib/trainee-match";
-import { sourceLabel } from "@/lib/company-charge";
+import { isEndorsedEnrollment, itemAllowed, sourceLabel } from "@/lib/company-charge";
 
 /**
  * Cashier pieces of the registration workflow (Oct 2026):
@@ -391,8 +391,10 @@ export function RecordPaymentModal({ data, initialEnrollmentId, initialCourses, 
   function removeExtra(key: string) { const x = extras.find((l) => l.key === key); setExtras((cur) => cur.filter((l) => l.key !== key)); if (x) setReceived((Math.max(0, receivedCentavos - x.unit * x.quantity) / 100).toFixed(2)); }
   // Item Chips (owner, 10 Nov 2026): the Cashier adds Uniform, T-Shirt, Online Assessment and every other Miscellaneous Item
   // from the Schedule of Fees; − and + change the quantity and Amount Received follows.
-  const counterItems = data.charges.filter((c) => c.active && c.kind === "item");
   const itemFor = open[0]?.id ?? mine[0]?.id;
+  const itemEnrollment = mine.find((x) => x.id === itemFor);
+  const itemEndorsed = !!itemEnrollment && isEndorsedEnrollment(itemEnrollment, data.courses.find((c) => c.id === itemEnrollment.course_id)?.delivery_type);
+  const counterItems = data.charges.filter((c) => c.active && c.kind === "item" && itemAllowed(c.name, itemEndorsed));
   function addItem(c: { id: string; name: string; default_amount_centavos: number }) {
     if (!itemFor) return;
     const unit = Number(c.default_amount_centavos), hit = extras.find((x) => !x.chargeId && x.chargeCatalogId === c.id);

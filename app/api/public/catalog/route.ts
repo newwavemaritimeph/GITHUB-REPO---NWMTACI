@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { LATE_ENROLLMENT_CODES, PUBLIC_STCW_CODES } from "@/lib/scheduling";
+import { LATE_ENROLLMENT_CODES, PUBLIC_STCW_CODES, isLateAddable } from "@/lib/scheduling";
+import { requireStaff } from "@/lib/security";
 import { IN_HOUSE_COURSES } from "@/lib/in-house-catalog";
 import { CCI_CODE, packageWeeks } from "@/lib/packages";
 
@@ -22,16 +23,18 @@ const first = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v)
  * Read-only and anonymous; only names, codes, durations, modality, category,
  * batch dates and an Open/Full flag leave the server (seat counts stay internal) (no prices, rebates or partner data).
  */
-export async function GET() {
+export async function GET(request: Request) {
   if (!isSupabaseConfigured()) return NextResponse.json({ stcw: [], inHouse: [], other: [] });
   const db = createSupabaseAdminClient();
   const now = new Date();
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(now);
+  // Late add (owner, 10 Nov 2026): Registration's portal form also lists batches that started, up to their last day.
+  const ongoing = new URL(request.url).searchParams.get("ongoing") === "1" && !!(await requireStaff(["admin", "registration"]));
   const [courses, batches, offers] = await Promise.all([
     db.from("courses").select("id,code,name,duration_label,duration_days,training_mode,standard_price_centavos,course_categories(name)").eq("active", true).eq("delivery_type", "In-House").order("name"),
-    db.from("batches").select("id,batch_number,course_id,starts_on,ends_on,capacity,confirmed_count,status,courses!inner(code,delivery_type)")
-      .in("status", ["Open", "Full"]).not("published_at", "is", null).gte("ends_on", today).gt("enrollment_deadline", now.toISOString())
-      .in("courses.code", [...PUBLIC_STCW_CODES]).order("starts_on"),
+    (() => { const q = db.from("batches").select("id,batch_number,course_id,starts_on,ends_on,capacity,confirmed_count,status,enrollment_deadline,courses!inner(code,delivery_type)")
+      .in("status", ongoing ? ["Open", "Full", "Ongoing"] : ["Open", "Full"]).not("published_at", "is", null).gte("ends_on", today);
+      return (ongoing ? q : q.gt("enrollment_deadline", now.toISOString())).in("courses.code", [...PUBLIC_STCW_CODES]).order("starts_on"); })(),
     // Other STCW Courses (owner, 20 Oct 2026): courses a partnered center offers; never the center, fee or rebate.
     db.from("partner_course_offers").select("courses!inner(code,name,active,public_visible)").eq("active", true).eq("courses.active", true).eq("courses.public_visible", true),
   ]);
@@ -47,9 +50,12 @@ export async function GET() {
   for (const c of courses.data) idsByCode.set(c.code, (idsByCode.get(c.code) ?? new Set()).add(c.id));
   const stcw = PUBLIC_STCW_CODES.map((code) => courses.data.find((c) => c.code === code)).filter((c): c is NonNullable<typeof c> => !!c).map((c) => ({
     ...shape(c),
-    batches: (batches.data ?? []).filter((b) => idsByCode.get(c.code)?.has(b.course_id) && (b.starts_on >= today || LATE_ENROLLMENT_CODES.includes(c.code)))
+    batches: (batches.data ?? []).filter((b) => idsByCode.get(c.code)?.has(b.course_id)).flatMap((b) => {
+      const bookable = b.enrollment_deadline > now.toISOString() && b.status !== "Ongoing" && (b.starts_on >= today || LATE_ENROLLMENT_CODES.includes(c.code));
+      const late = ongoing && !bookable && isLateAddable(b, today, now.toISOString());
       // Seat counts stay internal (Registration sees them in the portal); the public only learns Open or Full.
-      .map((b) => ({ id: b.id, number: b.batch_number, startsOn: b.starts_on, endsOn: b.ends_on, full: b.status === "Full" || b.confirmed_count >= b.capacity })),
+      return bookable || late ? [{ id: b.id, number: b.batch_number, startsOn: b.starts_on, endsOn: b.ends_on, full: b.status === "Full" || b.confirmed_count >= b.capacity, ...(late ? { late: true } : {}) }] : [];
+    }),
   }));
   // The In-House picker leaves out every STCW / MARINA Domestic course: only the five above are offered.
   const seen = new Set<string>();
@@ -58,7 +64,7 @@ export async function GET() {
   const cci = courses.data.find((c) => c.code === CCI_CODE);
   const parts = ["STPPDSPPS", "PSCMT", "PSCMHBT"].map((code) => courses.data.find((c) => c.code === code));
   const packages = cci ? [{ code: cci.code, name: cci.name, duration: cci.duration_label, modality: "Face-to-face", category: "STCW Package", price: Number(cci.standard_price_centavos), regular: parts.reduce((t, c) => t + Number(c?.standard_price_centavos ?? 0), 0),
-    weeks: packageWeeks(stcw.filter((c) => ["STPPDSPPS", "PSCMT", "PSCMHBT"].includes(c.code)).flatMap((c) => c.batches.map((b) => ({ code: c.code, startsOn: b.startsOn, full: b.full })))).filter((w) => w.monday > today) }] : [];
+    weeks: packageWeeks(stcw.filter((c) => ["STPPDSPPS", "PSCMT", "PSCMHBT"].includes(c.code)).flatMap((c) => c.batches.filter((b) => !("late" in b)).map((b) => ({ code: c.code, startsOn: b.startsOn, full: b.full })))).filter((w) => w.monday > today) }] : [];
   const inHouse = courses.data.filter((c) => !stcwCodes.has(c.code) && c.code !== CCI_CODE).map((c) => ({ ...shape(c), modality: "Online" })).filter((c) => !STCW_CATEGORIES.has(c.category) && !/stcw|domestic/i.test(c.category))
     .filter((c) => { const keys = [`code:${c.code.trim().toUpperCase()}`, `name:${c.name.trim().toLowerCase().replace(/\s+/g, " ")}`]; if (keys.some((k) => seen.has(k))) return false; keys.forEach((k) => seen.add(k)); return true; });
   const other = [...new Map(((offers.error ? [] : offers.data) ?? []).map((o) => first(o.courses as { code: string; name: string } | { code: string; name: string }[] | null)).filter((c): c is { code: string; name: string } => !!c).map((c) => [c.code, { code: c.code, name: c.name }])).values()].sort((a, b) => a.name.localeCompare(b.name));

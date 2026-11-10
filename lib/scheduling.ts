@@ -7,6 +7,21 @@ export function courseDays(durationLabel: string) {
 /** The STCW courses New Wave schedules and publishes on the website (owner, 7 Oct 2026). */
 export const PUBLIC_STCW_CODES = ["UBT-PSSR", "STPPDSPPS", "PSCMT", "PSCMHBT", "CCMD"] as const;
 /** Courses that keep taking enrollments after training starts, until the last day (courses.late_enrollment). */
+/**
+ * Late add (owner, 10 Nov 2026): a New Wave batch that has started (or whose enrollment deadline passed) stays open to
+ * Registration until its last day, seats permitting. The website never offers it. Callers leave out batches that are
+ * still bookable the normal way (CCMD).
+ */
+export const isLateAddable = (b: { partner_offer_id?: string | null; status: string; starts_on: string; ends_on: string; enrollment_deadline?: string | null; confirmed_count: number; capacity: number }, today: string, now: string) =>
+  !b.partner_offer_id && (b.status === "Open" || b.status === "Ongoing") && b.ends_on >= today && Number(b.confirmed_count) < Number(b.capacity)
+  && (b.starts_on < today || (!!b.enrollment_deadline && b.enrollment_deadline <= now));
+/** "Day 2 of 5" for a started batch (calendar days). */
+export function lateDayLabel(start: string, end: string, today: string) {
+  const day = (a: string, b: string) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000) + 1;
+  const total = day(start, end), n = Math.min(total, Math.max(1, day(start, today)));
+  return start > today ? "Not started" : `Day ${n} of ${total}${n === total ? " · last day" : ""}`;
+}
+export const LATE_ADD_REASONS = ["Arrived late", "Transferred from another batch", "Company request"];
 export const LATE_ENROLLMENT_CODES: readonly string[] = ["CCMD"];
 /**
  * Registration changes the batch itself while the Cashier has recorded no payment for the enrollment (owner, 9 Nov 2026);

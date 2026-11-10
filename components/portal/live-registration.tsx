@@ -1,9 +1,11 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { Fragment, useRef, useState, type ReactNode } from "react";
 import type { PortalData, Enrollment, Batch, Trainee } from "../portal-live-app";
 import { first, manilaToday, dueCentavos, balanceOf, pesos, pesos2, addDays } from "@/lib/portal-format";
-import { LATE_ENROLLMENT_CODES, PUBLIC_STCW_CODES, automaticEndDate, directBatchChange, fitsInWeek } from "@/lib/scheduling";
+import { LATE_ADD_REASONS, LATE_ENROLLMENT_CODES, PUBLIC_STCW_CODES, automaticEndDate, directBatchChange, fitsInWeek, isLateAddable, lateDayLabel } from "@/lib/scheduling";
+import { RegistrationForm } from "../registration-form";
+import { askReason } from "./dialogs";
 import { isPackageCourse, packageWeeks } from "@/lib/packages";
 import { ALL_DATES, Badge, Message, Modal, PageHead, PeriodBar, ViewIcon, useNeedSince, usePaged, usePost, usePeriod, submit, fullName, fmtDate, fmtClock } from "./shared-ui";
 import { RequestActionModal, type RequestType } from "./payment-actions";
@@ -11,7 +13,7 @@ import { TarButton } from "./live-cashier";
 import { InstructionsButton, instructionsCountOf } from "./instructions-window";
 import { tcl } from "@/lib/title-case";
 import { shrinkProof } from "@/lib/proof-shrink";
-import { COMPANY_CHARGE, sourceLabel } from "@/lib/company-charge";
+import { COMPANY_CHARGE, isEndorsedEnrollment, itemAllowed, sourceLabel } from "@/lib/company-charge";
 import { VALIDATION_MESSAGES, isMetaThreadUrl } from "@/lib/validation";
 
 /**
@@ -57,6 +59,11 @@ function uniqueCourses<T extends { code: string; name: string }>(rows: T[]) {
 /** STCW courses are the In-House courses filed under an STCW category. */
 const isStcwCourse = (c?: PortalData["courses"][number] | null) => (first(c?.course_categories)?.name ?? "").toLowerCase().includes("stcw");
 /** A New Wave batch a trainee can still be placed on: open, not started (CCMD: not finished), before its deadline, with seats left. */
+/** A started batch Registration may still add to (late add, owner, 10 Nov 2026): not bookable the normal way, up to its last day. */
+const lateBatchesOf = (data: PortalData, courseId: string, today: string, now: string, skip?: string | null) => data.batches.filter((x) => x.course_id === courseId && x.id !== skip && !isBookable(x, today, now) && isLateAddable(x, today, now)).sort((x, y) => x.starts_on.localeCompare(y.starts_on));
+const askLateReason = (b: Batch) => askReason(`Batch ${b.batch_number} has started (${lateDayLabel(b.starts_on, b.ends_on, manilaToday())}). Choose the reason for the late add; it is saved in the audit log.`, LATE_ADD_REASONS, { title: "Late Add", okLabel: "Add to Batch" });
+/** The Late Add chip, with the reason on hover. */
+const LateChip = ({ e }: { e: Enrollment }) => (e.late_add_reason ? <span title={e.late_add_reason}><Badge tone="orange">Late Add</Badge></span> : null);
 const isBookable = (b: Batch, today: string, now: string) => !b.partner_offer_id && b.status === "Open" && (b.starts_on >= today || (b.ends_on >= today && LATE_ENROLLMENT_CODES.includes(first(b.courses)?.code ?? ""))) && b.enrollment_deadline > now && b.confirmed_count < b.capacity;
 
 /* ------------------------------------------------------------------ Dashboard */
@@ -120,6 +127,7 @@ export function RegistrationDashboard({ data, go, reload, account }: { data: Por
   const [placing, setPlacing] = useState<Enrollment | null>(null);
   const [assigning, setAssigning] = useState<Trainee | null>(null);
   const [accountOf, setAccountOf] = useState<string | null>(null);
+  const [registering, setRegistering] = useState(false), [registered, setRegistered] = useState<{ kind: "success" | "error"; text: string } | null>(null);
   const toggle = (name: typeof panel) => setPanel((v) => (v === name ? "" : name));
 
   const items: NextUpItem[] = [
@@ -134,7 +142,7 @@ export function RegistrationDashboard({ data, go, reload, account }: { data: Por
   const row = (x: NextUpItem) => { const e = x.e, id = e?.trainee_id ?? x.t?.id, c = e ? first(e.courses) : null; return <tr key={x.key}>
     <td data-l="" className="lead"><button type="button" className="pv-open" onClick={() => (e ? setOpen(e) : setAssigning(x.t!))}><span className="cx-name">{e ? nameOf(e) : fullName(x.t!)}</span><span className="cx-id">{appNoOf(data, id) ?? x.t?.trainee_number ?? e?.enrollment_number}</span></button></td>
     <td data-l="Course">{e ? <>{c?.code ?? c?.name ?? "—"}<small>{scheduleOf(e)}</small></> : <span className="muted-text">Course to Assign</span>}</td>
-    <td data-l="Status"><Badge tone={x.tone}>{x.chip}</Badge></td>
+    <td data-l="Status"><Badge tone={x.tone}>{x.chip}</Badge>{e && <LateChip e={e} />}</td>
     <td data-l=""><div className="cx-acts">{x.step && <button type="button" className="portal-primary row-act" onClick={() => (!e ? setAssigning(x.t!) : x.step === "Choose Batch" ? setPlacing(e) : setOpen(e))}>{x.step}</button>}</div></td>
   </tr>; };
 
@@ -150,8 +158,12 @@ export function RegistrationDashboard({ data, go, reload, account }: { data: Por
   return <div className="portal-page cx ac">
     <div className="cx-head">
       <div><span className="portal-eyebrow">{fmtLong(today)}</span><h1>Dashboard</h1></div>
-      <button type="button" className="portal-secondary" onClick={() => go("Trainees")}>Search Trainee</button>
+      <span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={() => go("Trainees")}>Search Trainee</button><button type="button" className="portal-primary" onClick={() => { setRegistered(null); setRegistering(true); }}>Register Trainee</button></span>
     </div>
+    {registered && <Message kind={registered.kind} text={registered.text} />}
+    {registering && <Modal wide title="Register Trainee" onClose={() => setRegistering(false)}>
+      <RegistrationForm staff={{ onDone: (r) => { setRegistering(false); setRegistered({ kind: r.warnings?.length ? "error" : "success", text: `Registered · ${r.applicationNumber ?? r.reference}.${r.warnings?.length ? ` ${r.warnings.join(" ")}` : ""}` }); void reload(); } }} />
+    </Modal>}
     <div className="ac-stack">
     <section className="portal-panel cx-panel" id="rd-next">
       <div className="panel-heading"><h2>Next Up</h2><span className="rd-count">{work.length}</span></div>
@@ -257,19 +269,20 @@ const closesAt = (iso: string) => new Intl.DateTimeFormat("en-PH", { month: "sho
  * dates, batch number with room and instructor, and a seat meter that turns
  * orange when nearly full. The "No batch yet" card is optional.
  */
-export function BatchCards({ data, batches, selected, onSelect, allowNone }: { data: PortalData; batches: Batch[]; selected: string; onSelect: (id: string) => void; allowNone?: boolean }) {
+export function BatchCards({ data, batches, selected, onSelect, allowNone, late = [] }: { data: PortalData; batches: Batch[]; selected: string; onSelect: (id: string) => void; allowNone?: boolean; late?: Batch[] }) {
+  const today = manilaToday();
   const staffing = new Map((data.batchStaffing ?? []).map((x) => [x.batch_id, x]));
   return <div className="bc-list" role="radiogroup" aria-label="Batch">
     <div className="bc-head"><b>Choose a Batch</b><span>{batches.length ? `${batches.length} open · 24 seats each` : "No open batch for this course yet"}</span></div>
-    {batches.map((x) => {
+    {[...batches, ...late].map((x, i) => {
       const left = seatsLeft(x), on = selected === x.id, low = left <= 3, st = staffing.get(x.id);
       const days = x.starts_on === x.ends_on ? weekdayOf(x.starts_on) : `${weekdayOf(x.starts_on)}–${weekdayOf(x.ends_on)}`;
-      return <button type="button" role="radio" aria-checked={on} key={x.id} className={`bc-card${on ? " on" : ""}`} onClick={() => onSelect(x.id)}>
+      return <Fragment key={x.id}>{i === batches.length && <div className="bc-head bc-late-h"><b>Started: Late Add</b><span>Open to Registration until the last day · a reason is required</span></div>}<button type="button" role="radio" aria-checked={on} className={`bc-card${on ? " on" : ""}${late.includes(x) ? " bc-late" : ""}`} onClick={() => onSelect(x.id)}>
         <span className="bc-radio" aria-hidden="true" />
         <span className="bc-tile"><small>{tileMonth(x.starts_on)}</small><b>{Number(x.starts_on.slice(8, 10))}</b></span>
         <span className="bc-main"><b>{days} · {dateRange(x.starts_on, x.ends_on)}</b><small>{x.batch_number} · {st?.room_name ?? x.venue ?? "Room not set"} · {st?.instructor_name ?? "Instructor not assigned"}</small></span>
-        <span className="bc-seats"><span><b className={low ? "low" : ""}>{left} of {x.capacity} left</b><small>{closesAt(x.enrollment_deadline)}</small></span><span className="bc-meter"><i className={low ? "low" : ""} style={{ width: `${Math.round(((x.capacity - left) / Math.max(1, x.capacity)) * 100)}%` }} /></span></span>
-      </button>;
+        <span className="bc-seats"><span><b className={low ? "low" : ""}>{left} of {x.capacity} left</b><small>{late.includes(x) ? lateDayLabel(x.starts_on, x.ends_on, today) : closesAt(x.enrollment_deadline)}</small></span><span className="bc-meter"><i className={low ? "low" : ""} style={{ width: `${Math.round(((x.capacity - left) / Math.max(1, x.capacity)) * 100)}%` }} /></span></span>
+      </button></Fragment>;
     })}
     {allowNone && <button type="button" role="radio" aria-checked={selected === NO_BATCH} className={`bc-card bc-none${selected === NO_BATCH ? " on" : ""}`} onClick={() => onSelect(NO_BATCH)}>
       <span className="bc-radio" aria-hidden="true" />
@@ -298,12 +311,14 @@ export function AssignCourseModal({ data, trainee, reload, onClose }: { data: Po
   const [offerId, setOfferId] = useState(""), [otherDate, setOtherDate] = useState("");
   const offer = centers.find((o) => o.id === offerId);
   const batches = data.batches.filter((x) => x.course_id === courseId && isBookable(x, today, now)).sort((x, y) => x.starts_on.localeCompare(y.starts_on));
+  const late = courseId ? lateBatchesOf(data, courseId, today, now) : [];
+  const lateBatch = late.find((x) => x.id === batchId);
   const course = courses.find((c) => c.id === courseId);
   const withBatch = batchId !== NO_BATCH;
   // Non-STCW in-house courses run on a picked start date (Sundays skipped,
   // consecutive within the week) instead of a batch.
   const [startDate, setStartDate] = useState("");
-  const dated = !!course && !isStcwCourse(course) && !batches.length;
+  const dated = !!course && !isStcwCourse(course) && !batches.length && !late.length;
   // Backdating is allowed (owner, 13 Oct 2026): a course already held can be recorded on its real dates.
   const dateOk = !startDate || fitsInWeek(startDate, course?.duration_label ?? "1");
   // CCI Package (owner, 21 Oct 2026): pick a week; the week's Safety, Crowd and Crisis batches are taken together.
@@ -316,7 +331,8 @@ export function AssignCourseModal({ data, trainee, reload, onClose }: { data: Po
   const srcBody = { source: src, agencyId: src === "Agency" ? srcPartner || null : null };
   const srcPartners = data.agencies.filter((a) => a.active).sort((a, z) => a.name.localeCompare(z.name));
   const assignPackage = () => void post({ action: "package-assign", traineeId: trainee.id, weekStart: week, ...srcBody }, "CCI Package assigned: Safety, Crowd and Crisis seats held. Screening can start.").then(onClose).catch(() => undefined);
-  const assign = () => isPackage ? assignPackage() : otherCourse ? void post({ action: "application-assign", traineeId: trainee.id, courseId, batchId: null, offerId: offerId && otherDate ? offerId : null, scheduledOn: offerId && otherDate ? otherDate : null, ...srcBody }, offerId && otherDate ? "Other STCW course, center and date assigned. Screening can start." : "Other STCW course assigned. Set the training center and date in the record.").then(onClose).catch(() => undefined) : void post({ action: "application-assign", traineeId: trainee.id, courseId, batchId: withBatch ? batchId : null, scheduledOn: dated && startDate ? startDate : null, ...srcBody }, withBatch ? "Course and batch assigned. Screening can start." : dated && startDate ? "Course and start date assigned. Screening can start." : "Course assigned. Screening can start; place on a batch once one opens.").then(onClose).catch(() => undefined);
+  const assignLate = async (b: Batch) => { const reason = await askLateReason(b); if (!reason) return; await post({ action: "application-late-add", traineeId: trainee.id, courseId, batchId: b.id, reason, ...srcBody }, `Added late to Batch ${b.batch_number}. The reason is saved.`).then(onClose).catch(() => undefined); };
+  const assign = () => lateBatch ? void assignLate(lateBatch) : isPackage ? assignPackage() : otherCourse ? void post({ action: "application-assign", traineeId: trainee.id, courseId, batchId: null, offerId: offerId && otherDate ? offerId : null, scheduledOn: offerId && otherDate ? otherDate : null, ...srcBody }, offerId && otherDate ? "Other STCW course, center and date assigned. Screening can start." : "Other STCW course assigned. Set the training center and date in the record.").then(onClose).catch(() => undefined) : void post({ action: "application-assign", traineeId: trainee.id, courseId, batchId: withBatch ? batchId : null, scheduledOn: dated && startDate ? startDate : null, ...srcBody }, withBatch ? "Course and batch assigned. Screening can start." : dated && startDate ? "Course and start date assigned. Screening can start." : "Course assigned. Screening can start; place on a batch once one opens.").then(onClose).catch(() => undefined);
   return <Modal title={`Assign a course · ${fullName(trainee)}`} onClose={onClose}>
     <div className="portal-form">
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
@@ -333,13 +349,13 @@ export function AssignCourseModal({ data, trainee, reload, onClose }: { data: Po
       </>}
       {isPackage && <label className="full">Week<select value={week} onChange={(e) => setWeek(e.target.value)}><option value="">Choose a week</option>{weeks.map((w) => <option key={w.monday} value={w.monday} disabled={w.full}>{fmtDate(w.monday)} – {fmtDate(w.ends)}{w.full ? " · Full" : ""}</option>)}</select></label>}
       {isPackage && !weeks.length && <p className="portal-form-note full">No week has open Safety, Crowd and Crisis batches yet.</p>}
-      {course && !dated && !isPackage && <div className="full"><BatchCards data={data} batches={batches} selected={batchId} onSelect={setBatchId} allowNone /></div>}
+      {course && !dated && !isPackage && <div className="full"><BatchCards data={data} batches={batches} late={late} selected={batchId} onSelect={setBatchId} allowNone /></div>}
       {dated && course && <label className="full">Start Date (Optional)<input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /><small style={{ color: dateOk ? "var(--muted)" : "var(--red, #b42318)" }}>{!startDate ? `${course.duration_label} · Monday to Saturday, consecutive days in one week. Leave empty to set later.` : dateOk ? `${startDate < today ? "Backdated · ran" : "Runs"} ${fmtDate(startDate)} to ${fmtDate(automaticEndDate(startDate, course.duration_label))}` : "Pick a date that is not a Sunday and lets the course finish by Saturday of the same week."}</small></label>}
       {courseId && <div className="full tp"><div className="tp-source"><span className="tp-cap">Where the Trainee Came From · This Course</span>
         <label><span>Source</span><select value={src} onChange={(ev) => setSrc(ev.target.value)}><option value="Walk-in">Walk-In</option><option value="Online enrollment">Online</option><option value="Agency">Agency / Consultancy</option></select></label>
         {src === "Agency" && <label><span>Partner</span><select value={srcPartner} onChange={(ev) => setSrcPartner(ev.target.value)}><option value="">Choose the partner…</option>{(["Agency", "Consultancy"] as const).map((k) => { const list = srcPartners.filter((a) => (a.kind === "Consultancy" ? "Consultancy" : "Agency") === k); return list.length ? <optgroup key={k} label={k === "Agency" ? "Agencies" : "Consultancies"}>{list.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</optgroup> : null; })}</select></label>}
       </div></div>}
-      <div className="bc-foot full"><span>{otherCourse ? `${otherCourse.code} · Other STCW${offer ? ` · ${first(offer.partner_centers)?.name ?? ""} · fee ${pesos(Number(offer.training_fee_centavos))}` : " · center not set yet"}` : course ? (withBatch ? batchSummary(data, batches.find((x) => x.id === batchId)) : `${course.code} · fee ${pesos(course.standard_price_centavos)} · no batch yet`) : "Choose a course first."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!courseId || busy || (isPackage && !week) || (!otherCourse && !dateOk) || (!!offerId !== !!otherDate && !!otherCourse) || (src === "Agency" && !srcPartner)} onClick={assign}>{busy ? "Assigning…" : isPackage ? "Assign CCI Package" : withBatch ? "Assign Course and Batch" : "Assign Course"}</button></span></div>
+      <div className="bc-foot full"><span>{otherCourse ? `${otherCourse.code} · Other STCW${offer ? ` · ${first(offer.partner_centers)?.name ?? ""} · fee ${pesos(Number(offer.training_fee_centavos))}` : " · center not set yet"}` : course ? (withBatch ? batchSummary(data, batches.find((x) => x.id === batchId) ?? lateBatch) : `${course.code} · fee ${pesos(course.standard_price_centavos)} · no batch yet`) : "Choose a course first."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!courseId || busy || (isPackage && !week) || (!otherCourse && !dateOk) || (!!offerId !== !!otherDate && !!otherCourse) || (src === "Agency" && !srcPartner)} onClick={assign}>{busy ? "Assigning…" : isPackage ? "Assign CCI Package" : withBatch ? "Assign Course and Batch" : "Assign Course"}</button></span></div>
     </div>
   </Modal>;
 }
@@ -351,15 +367,19 @@ function ChooseBatchModal({ data, enrollment, reload, onClose, change = false }:
   const [batchId, setBatchId] = useState("");
   const today = manilaToday(), now = new Date().toISOString();
   const batches = data.batches.filter((x) => x.course_id === enrollment.course_id && x.id !== enrollment.batch_id && isBookable(x, today, now)).sort((x, y) => x.starts_on.localeCompare(y.starts_on));
-  const place = () => void (change
+  // Late add only places an application without a batch; a schedule change keeps its own rules.
+  const late = change ? [] : lateBatchesOf(data, enrollment.course_id, today, now, enrollment.batch_id);
+  const lateBatch = late.find((x) => x.id === batchId);
+  const placeLate = async (b: Batch) => { const reason = await askLateReason(b); if (!reason) return; await post({ action: "application-late-add", enrollmentId: enrollment.id, batchId: b.id, reason }, `Added late to Batch ${b.batch_number}. The reason is saved.`).then(onClose).catch(() => undefined); };
+  const place = () => lateBatch ? void placeLate(lateBatch) : void (change
     ? post({ action: "registration-change-batch", enrollmentId: enrollment.id, batchId }, `Schedule changed to Batch ${batches.find((x) => x.id === batchId)?.batch_number ?? ""}.`)
     : post({ action: "application-place-batch", enrollmentId: enrollment.id, batchId }, "Placed on the batch.")).then(onClose).catch(() => undefined);
   return <Modal title={`${change ? "Change Schedule" : "Choose Batch"} · ${first(enrollment.courses)?.name ?? "Course"}`} onClose={onClose}>
     <div className="portal-form">
       {msg && <div className="full"><Message kind={msg.kind} text={msg.text} /></div>}
-      <div className="full"><BatchCards data={data} batches={batches} selected={batchId} onSelect={setBatchId} /></div>
-      {!batches.length && <p className="portal-form-note full">The application stays ready; place it once a batch opens.</p>}
-      <div className="bc-foot full"><span>{batchSummary(data, batches.find((x) => x.id === batchId)) || "Choose a batch."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!batchId || busy} onClick={place}>{busy ? (change ? "Saving…" : "Placing…") : change ? "Save Schedule" : "Place on Batch"}</button></span></div>
+      <div className="full"><BatchCards data={data} batches={batches} late={late} selected={batchId} onSelect={setBatchId} /></div>
+      {!batches.length && !late.length && <p className="portal-form-note full">The application stays ready; place it once a batch opens.</p>}
+      <div className="bc-foot full"><span>{batchSummary(data, batches.find((x) => x.id === batchId) ?? lateBatch) || "Choose a batch."}</span><span className="bc-foot-actions"><button type="button" className="portal-secondary" onClick={onClose}>Cancel</button><button type="button" className="portal-primary" disabled={!batchId || busy} onClick={place}>{busy ? (change ? "Saving…" : "Placing…") : change ? "Save Schedule" : "Place on Batch"}</button></span></div>
     </div>
   </Modal>;
 }
@@ -589,7 +609,8 @@ function ScreeningPanel({ data, enrollment: e, busy, post, reload, onOpenAccount
   const threadNote = <small>Add the Meta thread link in the Trainee Account{onOpenAccount && <> · <button type="button" className="cx-textbtn" onClick={onOpenAccount}>Open Trainee Account</button></>}</small>;
   // Items to Collect (owner, 10 Nov 2026, Design 2): Uniform and any other Miscellaneous item in the Schedule of Fees, ticked here,
   // wait as unpaid charges and the Cashier collects them. Nothing is ticked until the trainee asks for it.
-  const itemList = data.charges.filter((c) => c.active && c.kind === "item" && Number(c.default_amount_centavos) > 0).sort((a, z) => Number(/uniform/i.test(z.name)) - Number(/uniform/i.test(a.name)) || a.name.localeCompare(z.name));
+  const endorsed = isEndorsedEnrollment(e, data.courses.find((c) => c.id === e.course_id)?.delivery_type);
+  const itemList = data.charges.filter((c) => c.active && c.kind === "item" && Number(c.default_amount_centavos) > 0 && itemAllowed(c.name, endorsed)).sort((a, z) => Number(/uniform/i.test(z.name)) - Number(/uniform/i.test(a.name)) || a.name.localeCompare(z.name));
   const [items, setItems] = useState<Record<string, number>>({});
   const itemsTotal = itemList.reduce((s, c) => s + Number(c.default_amount_centavos) * (items[c.id] ?? 0), 0);
   const setQty = (id: string, q: number) => setItems((cur) => ({ ...cur, [id]: Math.max(0, Math.min(10, q)) }));
@@ -786,7 +807,7 @@ export function EnrollmentDrawer({ data, enrollment: e, reload, onClose, onOpenA
         <div><span>{isApplication ? "Applicant" : "Trainee"}</span><strong>{t ? fullName(t) : "—"}</strong><small>{appNoOf(data, e.trainee_id) ? <span className="app-no">{appNoOf(data, e.trainee_id)}</span> : null}{t?.trainee_number} · <span className="lc">{t?.email}</span> · {t?.mobile}</small></div>
         <div><span>Course</span><strong>{c?.name ?? "—"}</strong><small>{c?.code}{center ? ` · endorsed: ${center}` : " · New Wave"}</small></div>
         <div><span>Schedule</span>{canChangeBatch && <button type="button" className="portal-secondary reg-change-batch" onClick={() => setChangingBatch(true)}>Change Schedule</button>}<strong>{scheduleOf(e)}</strong><small>{b ? `${b.batch_number}${b.mode ? ` · ${b.mode}` : ""}${b.venue ? ` · ${b.venue}` : ""}` : e.scheduled_on ? (c && first(e.partner_course_offers) ? "Endorsed training date" : `Start date picked · ends ${fmtDate(automaticEndDate(e.scheduled_on, data.courses.find((x) => x.id === e.course_id)?.duration_label ?? "1"))}`) : "Not yet placed on a batch"}</small></div>
-        <div><span>Status</span><strong><Badge tone={statusTone(e.enrollment_status)}>{e.enrollment_status}</Badge></strong><small>{isApplication ? "Submitted" : "Created"} {fmtDate(day(e.created_at))}{e.source ? ` · ${e.source}` : ""}</small></div>
+        <div><span>Status</span><strong><Badge tone={statusTone(e.enrollment_status)}>{e.enrollment_status}</Badge><LateChip e={e} /></strong><small>{isApplication ? "Submitted" : "Created"} {fmtDate(day(e.created_at))}{e.source ? ` · ${e.source}` : ""}</small></div>
       </div>}
       <StartDateEditor data={data} enrollment={e} busy={busy} post={post} />
       <OtherCenterEditor data={data} enrollment={e} busy={busy} post={post} />
