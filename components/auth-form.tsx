@@ -13,16 +13,19 @@ export function AuthForm({ portal }: { portal: "staff" | "trainee" }) {
     event.preventDefault();
     setBusy(true);
     setMessage("");
+    // Back to the page that asked for sign-in (the queue console, owner 10 Nov 2026); only a path on this site.
+    const next = new URLSearchParams(window.location.search).get("next");
+    const staffHome = next && /^\/(?!\/)/.test(next) ? next : "/portal";
     try {
       if (portal === "staff") {
         const temporary = await fetch("/api/auth/temp-staff", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email, password }) });
-        if (temporary.ok) { window.location.href = "/portal"; return; }
+        if (temporary.ok) { window.location.href = staffHome; return; }
         if (temporary.status === 401) throw new Error("Invalid email or password.");
       }
       const supabase = createSupabaseBrowserClient();
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      window.location.href = portal === "staff" ? "/portal" : "/registration-search";
+      window.location.href = portal === "staff" ? staffHome : "/registration-search";
     } catch (error) {
       setMessage(error instanceof Error && error.message !== "Supabase is not configured." ? error.message : "Invalid email or password.");
     } finally {

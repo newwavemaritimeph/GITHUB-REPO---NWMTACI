@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { AUTH_TIMEOUT_MS, supabaseConfig, withAuthTimeout } from "@/lib/supabase/config";
+import { queueRewrite } from "@/lib/queue";
 
 /**
  * Keeps the Supabase auth session fresh on every request.
@@ -15,7 +16,14 @@ import { AUTH_TIMEOUT_MS, supabaseConfig, withAuthTimeout } from "@/lib/supabase
  * See: https://supabase.com/docs/guides/auth/server-side/nextjs
  */
 export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // New Wave Queue (owner, 10 Nov 2026): queue.newwavemaritimemtaci.com serves /join, /t/{token}, /display and /staff
+  // from /queue/... in this same app. The public queue pages read no session; other paths on the main host that match
+  // only for the queue (/, /join, ...) pass straight through.
+  const target = queueRewrite(request.headers.get("host") ?? "", request.nextUrl.pathname);
+  const pass = () => (target ? NextResponse.rewrite(new URL(`${target}${request.nextUrl.search}`, request.url), { request }) : NextResponse.next({ request }));
+  if (target && target !== "/queue/staff") return pass();
+  if (!target && !/^\/(portal|auth|api|queue\/staff)(\/|$)/.test(request.nextUrl.pathname)) return NextResponse.next();
+  let response = pass();
 
   // If Supabase isn't configured (e.g. demo/local), do nothing.
   if (!supabaseConfig.url || !supabaseConfig.anonKey) return response;
@@ -25,7 +33,7 @@ export async function middleware(request: NextRequest) {
       getAll: () => request.cookies.getAll(),
       setAll: (cookiesToSet) => {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-        response = NextResponse.next({ request });
+        response = pass();
         cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
       },
     },
@@ -60,5 +68,12 @@ export const config = {
     "/portal/:path*",
     "/auth/:path*",
     "/api/:path*",
+    // The queue host's fixed paths, and its staff console on the main host.
+    "/",
+    "/join",
+    "/display",
+    "/staff",
+    "/t/:path*",
+    "/queue/staff",
   ],
 };
