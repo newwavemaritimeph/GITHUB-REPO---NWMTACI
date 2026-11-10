@@ -97,7 +97,8 @@
 /* Staff console. */
 .qs-bar { background: var(--q-navy); padding: 12px 20px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center; }
 .qs-bar label { display: flex; align-items: center; gap: 8px; color: var(--q-lcyan); font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
-.qs-bar select { font: 600 15px var(--font-portal), system-ui, sans-serif; padding: 8px 12px; border: 0; border-radius: 10px; min-height: 42px; color: var(--q-navy); text-transform: none; letter-spacing: 0; }
+.qs-bar select { font: 600 15px var(--font-portal), system-ui, sans-serif; padding: 8px 36px 8px 14px; border: 0; border-radius: 10px; min-height: 42px; min-width: 220px; appearance: none; -webkit-appearance: none; background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23123F63' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 14px center !important; cursor: pointer; color: var(--q-navy) !important; -webkit-text-fill-color: var(--q-navy); text-transform: none; letter-spacing: 0; color-scheme: light; }
+.qs-bar select option { background: #fff; color: var(--q-navy); }
 .qs { max-width: 1120px; margin: 0 auto; padding: 20px; display: grid; gap: 16px; }
 .qs-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
 @media (max-width: 860px) { .qs-grid { grid-template-columns: 1fr; } .qs { padding: 16px; } }
