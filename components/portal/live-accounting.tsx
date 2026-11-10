@@ -1502,7 +1502,9 @@ function PartnersModule({ data, busy, post }: { data: AccountingData; busy: bool
 function EndorsedPrograms({ data, busy, post }: { data: AccountingData; busy: boolean; post: (body: Record<string, unknown>) => Promise<void> }) {
   const centers = data.partnerCenters.filter((c) => c.active);
   const [centerId, setCenterId] = useState(centers[0]?.id ?? "");
-  const center = centers.find((c) => c.id === centerId) ?? centers[0];
+  // Design 3 (owner, 10 Nov 2026): "+ Add Training Center" beside the dropdown; the new center is picked once it is saved.
+  const [newCenter, setNewCenter] = useState<{ name: string; email: string; mobile: string } | null>(null), [added, setAdded] = useState(""), [centerProblem, setCenterProblem] = useState("");
+  const center = centers.find((c) => c.id === centerId) ?? (added ? centers.find((c) => c.name === added) : undefined) ?? centers[0];
   const blank = { name: "", code: "", duration: "1 Day", fee: "", rebate: "", share: "" };
   const [editing, setEditing] = useState<{ id: string; fee: string; rebate: string; share: string } | null>(null);
   const shareOf = (o: unknown) => Number((o as { agency_share_centavos?: number }).agency_share_centavos ?? 0);
@@ -1533,6 +1535,15 @@ function EndorsedPrograms({ data, busy, post }: { data: AccountingData; busy: bo
     try { await post({ action: "offer-create", partnerCenterId: center.id, courseName, courseCode, durationLabel, trainingFeeCentavos: fee, rebateCentavos: rebate, agencyShareCentavos: share ?? 0 }); setForm(blank); setDone(`${courseName} added to ${center.name}.`); }
     catch { /* the page shows the error */ }
   }
+  async function addCenter() {
+    if (!newCenter) return;
+    const name = newCenter.name.trim(), email = newCenter.email.trim();
+    if (name.length < 2) { setCenterProblem("Enter the training center's name."); return; }
+    if (centers.some((c) => c.name.toLowerCase() === name.toLowerCase())) { setCenterProblem(`${name} is already in the list.`); return; }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setCenterProblem("Enter a valid email or leave it blank."); return; }
+    try { await post({ action: "center-save", id: null, name, email, mobile: newCenter.mobile.trim() }); setNewCenter(null); setCenterId(""); setAdded(name); setDone(`${name} added. Add its programs below.`); }
+    catch { /* the page shows the error */ }
+  }
   async function archive(offerId: string, name: string, active: boolean) {
     setProblem(""); setDone("");
     try { await post({ action: "offer-archive", offerId, active }); setDone(`${name} ${active ? "restored" : "archived"}.`); }
@@ -1540,7 +1551,15 @@ function EndorsedPrograms({ data, busy, post }: { data: AccountingData; busy: bo
   }
   return <section className="portal-panel cx-panel rb3">
     <div className="panel-heading"><h2>Programs</h2>
-      {centers.length > 0 && <div className="pm-tools"><select className="rb3-mode" aria-label="Partner center" value={center?.id ?? ""} onChange={(e) => { setCenterId(e.target.value); setProblem(""); setDone(""); }}>{centers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>}</div>
+      <div className="pm-tools">{centers.length > 0 && <select className="rb3-mode" aria-label="Partner center" value={center?.id ?? ""} onChange={(e) => { setCenterId(e.target.value); setProblem(""); setDone(""); }}>{centers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select>}
+        <button type="button" className="portal-secondary" disabled={busy} onClick={() => { setNewCenter(newCenter ? null : { name: "", email: "", mobile: "" }); setCenterProblem(""); setDone(""); }}>+ Add Training Center</button></div></div>
+    {newCenter && <div className="portal-form pm-newcenter">
+      <label>Training Center<input value={newCenter.name} onChange={(e) => setNewCenter({ ...newCenter, name: e.target.value })} maxLength={160} autoFocus /></label>
+      <label>Email<input type="email" value={newCenter.email} onChange={(e) => setNewCenter({ ...newCenter, email: e.target.value })} /></label>
+      <label>Mobile<input inputMode="tel" value={newCenter.mobile} onChange={(e) => setNewCenter({ ...newCenter, mobile: e.target.value })} maxLength={40} /></label>
+      <div className="pm-newcenter-go"><button type="button" className="portal-secondary" onClick={() => setNewCenter(null)}>Cancel</button><button type="button" className="portal-primary" disabled={busy} onClick={() => void addCenter()}>{busy ? "Saving…" : "Save Training Center"}</button></div>
+      {centerProblem && <p className="portal-message error full">{centerProblem}</p>}
+    </div>}
     {done && <div className="portal-message success">{done}</div>}
     {!center ? <p className="portal-empty-copy">No partner centers yet.</p> : <>
       <div className="rb3-wrap"><table className="rb3-table"><thead><tr><th>Program</th><th>Duration</th><th className="r">Training Fee</th><th className="r">Rebate to New Wave</th><th className="r">Agency Commission</th><th className="r">Net Rebate Income</th><th>Status</th><th /></tr></thead>

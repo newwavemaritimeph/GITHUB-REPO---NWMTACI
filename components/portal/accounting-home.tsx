@@ -16,6 +16,8 @@ import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balanc
 import { downloadCsv } from "@/lib/csv";
 import { tcl } from "@/lib/title-case";
 import { askReason } from "./dialogs";
+import { CashierSummaryReport } from "./live-cashier";
+import type { SummaryRange } from "@/lib/summary-range";
 import { PaymentDayRow, PrintGlyph, VoidGlyph, paymentStatus } from "./payment-void";
 
 /**
@@ -289,6 +291,60 @@ function PaymentReceipts({ pills, data }: { pills: ReactNode; data: PortalData }
         </tbody></table>{pg.pager}</div> : <p className="portal-empty-copy">No payments match.</p>}
       </section>
     </div>
+  </div>;
+}
+
+/* ------------------------------------------------------------ daily summary */
+
+const SUMMARY_PERIODS = ["Today", "Yesterday", "This Week", "This Month", "Custom"] as const;
+type SummaryPeriod = (typeof SUMMARY_PERIODS)[number];
+/** The first and last day of a Daily Summary period; weeks start on Monday (Manila). */
+export function summaryRange(period: SummaryPeriod, today: string, custom: { from: string; to: string }) {
+  const weekday = (new Date(`${today}T12:00:00+08:00`).getUTCDay() + 6) % 7;
+  if (period === "Today") return { from: today, to: today };
+  if (period === "Yesterday") { const y = addDays(today, -1); return { from: y, to: y }; }
+  if (period === "This Week") return { from: addDays(today, -weekday), to: today };
+  if (period === "This Month") return { from: `${today.slice(0, 8)}01`, to: today };
+  return custom.from <= custom.to ? custom : { from: custom.to, to: custom.from };
+}
+
+/**
+ * Daily Summary for Accounting, Design 3 · Range With Chart (owner, 10 Nov 2026): any period, totals and a bar
+ * per day's collection on top, the mode breakdown below. A single day also shows that day's full report.
+ */
+export function AccountingDailySummary() {
+  const today = manilaToday();
+  const [period, setPeriod] = useState<SummaryPeriod>("Today"), [custom, setCustom] = useState({ from: addDays(today, -6), to: today });
+  const { from, to } = summaryRange(period, today, custom);
+  const { data: r, error } = useJson<SummaryRange>(`/api/staff/cashier-report?from=${from}&to=${to}`);
+  const sum = (k: "receipts" | "collectedCentavos" | "vouchers" | "expensesCentavos") => (r?.days ?? []).reduce((s, d) => s + d[k], 0);
+  const collected = sum("collectedCentavos"), expenses = sum("expensesCentavos"), oneDay = from === to;
+  const modeOf = (m: string) => r?.modes.find((x) => x.mode === m)?.amountCentavos ?? 0;
+  const label = (d: string) => fmtDate(d).replace(/, \d{4}$/, "");
+  return <div className="portal-page cx ac">
+    <div className="cx-head"><div><span className="portal-eyebrow">Reports</span><h1>Daily Summary</h1></div>
+      {oneDay && <a className="portal-primary" href={`/api/documents/cashier-report?date=${from}`} target="_blank" rel="noreferrer">Generate Report (PDF)</a>}</div>
+    <div className="cx-bar ds-bar"><div className="sub-pills">{SUMMARY_PERIODS.map((p) => <button key={p} type="button" className={period === p ? "on" : ""} onClick={() => setPeriod(p)}>{p}</button>)}</div>
+      {period === "Custom" && <span className="ds-custom"><label className="cx-dt">From<input type="date" value={custom.from} max={today} onChange={(e) => e.target.value && setCustom({ ...custom, from: e.target.value })} /></label><label className="cx-dt">To<input type="date" value={custom.to} max={today} onChange={(e) => e.target.value && setCustom({ ...custom, to: e.target.value })} /></label></span>}
+      <span className="cx-mono muted-text">{oneDay ? fmtDate(from) : `${fmtDate(from)} – ${fmtDate(to)}`}</span></div>
+    {error && <Message kind="error" text={error} />}
+    {!r && !error && <p className="portal-empty-copy">Loading the summary…</p>}
+    {r && <>
+      <div className="cx-tiles ac-tiles">
+        <div className="cx-tile" style={{ ["--c" as string]: "#0571D0" }}><span>Collected</span><b>{pesos2(collected)}</b><small>{sum("receipts")} receipt{sum("receipts") === 1 ? "" : "s"}</small></div>
+        <div className="cx-tile" style={{ ["--c" as string]: "#F25615" }}><span>Expenses</span><b>{pesos2(expenses)}</b><small>{sum("vouchers")} voucher{sum("vouchers") === 1 ? "" : "s"}</small></div>
+        <div className="cx-tile" style={{ ["--c" as string]: "#0a7a3e" }}><span>Net</span><b>{pesos2(collected - expenses)}</b><small>{r.days.length} day{r.days.length === 1 ? "" : "s"}</small></div>
+        <div className="cx-tile" style={{ ["--c" as string]: "#35CCFA" }}><span>Cash</span><b>{pesos2(modeOf("Cash"))}</b><small>GCash {pesos2(modeOf("GCash"))}</small></div>
+      </div>
+      {!oneDay && <section className="portal-panel cx-panel"><div className="panel-heading"><h2>Collected per Day</h2></div>
+        <BarChart label="Collected per day" labels={r.days.map((d) => label(d.day))} series={[{ name: "Collected", color: "#0571D0", values: r.days.map((d) => d.collectedCentavos) }]} /></section>}
+      <section className="portal-panel cx-panel"><div className="panel-heading"><h2>By Mode of Payment</h2></div>
+        {r.modes.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Mode</th><th className="r">Receipts</th><th className="r">Amount</th></tr></thead><tbody>
+          {r.modes.map((m) => <tr key={m.mode}><td data-l="" className="lead"><span className="cx-name">{m.mode}</span></td><td data-l="Receipts" className="r cx-mono">{m.receipts}</td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(m.amountCentavos)}</strong></td></tr>)}
+          <tr className="rp-total"><td data-l="" className="lead"><strong>Total</strong></td><td data-l="Receipts" className="r cx-mono">{sum("receipts")}</td><td data-l="Amount" className="r"><strong className="cx-amt">{pesos2(collected)}</strong></td></tr>
+        </tbody></table></div> : <p className="portal-empty-copy">No collections in this period.</p>}</section>
+    </>}
+    {oneDay && <CashierSummaryReport embedded day={from} />}
   </div>;
 }
 

@@ -36,7 +36,7 @@ import { MISMO_COURSE_CODES } from "@/lib/mismo";
 import { AssistantDashboard, ClassSchedules, ResourcePlanning, InstructorShortlist, GcashReconciliation, GcashNotInHistory } from "./portal/admin-assistant-home";
 import { RegistrationDeliveries } from "./portal/delivery-home";
 import { ReleasingReports, ReleasingCertificates, CertificateTemplates, AdminCertificateControls, AdminNumberFormats, CertificateAlarm, ReleasingNumbering } from "./portal/releasing-home";
-import { AccountingHome, ApprovalHistory, AccountingReportsHub, EndorsedSalesReport, FinanceSummaryReport, AccountingPayments, AccountingDocuments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
+import { AccountingHome, AccountingDailySummary, ApprovalHistory, AccountingReportsHub, EndorsedSalesReport, FinanceSummaryReport, AccountingPayments, AccountingDocuments, AccountingExpenses, AccountingReceivables, AccountingPayables, AccountingCashPosition } from "./portal/accounting-home";
 import { emailStatusText } from "@/lib/instruction-email-status";
 import { InstructionsButton } from "./portal/instructions-window";
 import { AdminDashboard, TrainingCalendar, TraineeScheduling, InstructorAssignment, ScheduleChanges } from "./portal/live-scheduling";
@@ -460,7 +460,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Dashboard")return <><div className="cl-admin-alarm"><GcashNotInHistory/></div><AccountingHome data={data} reload={reload} go={m=>go(m as Module)}/></>;
     // Approvals is the history of decisions (owner, 3 Nov 2026); waiting items are on the Dashboard.
     if(active==="Approvals")return <div className="portal-page cx ac"><div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Approvals</h1></div></div><ApprovalHistory data={data} go={m=>go(m as Module)}/></div>;
-    if(active==="Daily summary")return <CashierSummaryReport data={data}/>;
+    if(active==="Daily summary")return <AccountingDailySummary/>;
     if(active==="Cash and sales summary")return <AccountingReportsHub/>;
     if(active==="Sales from endorsed courses")return <EndorsedSalesReport/>;
     if(active==="Company Charge")return <CompanyChargeReport data={data} reload={reload}/>;

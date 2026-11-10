@@ -760,9 +760,10 @@ type ReportData = Omit<CashierReportSnapshot, "logoBytes">;
  * Cash position, collections by source and channel, receipts by source,
  * expenses with voucher numbers.
  */
-export function CashierSummaryReport({ embedded }: { data?: PortalData; embedded?: boolean }) {
+export function CashierSummaryReport({ embedded, day }: { data?: PortalData; embedded?: boolean; day?: string }) {
   const today = manilaToday();
-  const [date, setDate] = useState(today);
+  const [picked, setDate] = useState(today);
+  const date = day ?? picked;
   const [report, setReport] = useState<ReportData | null>(null);
   const [error, setError] = useState("");
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -786,11 +787,11 @@ export function CashierSummaryReport({ embedded }: { data?: PortalData; embedded
   const cell = (n: number, v: number) => (n ? <><span className="cx-amt">{pesos(v)}</span><small>{n} receipt{n === 1 ? "" : "s"}</small></> : <span className="muted-text">—</span>);
   return <div className={embedded ? "" : "portal-page cx"}>
     {!embedded && <div className="cx-head"><div><span className="portal-eyebrow">Reports</span><h1>Daily Summary</h1></div></div>}
-    <div className="cx-bar">
+    {!day && <div className="cx-bar">
       <label className="cx-dt">Date<input type="date" value={date} max={today} onChange={(e) => e.target.value && setDate(e.target.value)} /></label>
       <a className="portal-primary" href={`/api/documents/cashier-report?date=${date}`} target="_blank" rel="noreferrer">Generate Report (PDF)</a>
       {shown && <span className="cx-mono muted-text">{shown.dateLabel}</span>}
-    </div>
+    </div>}
     {error && <Message kind="error" text={error} />}
     {!shown && !error && <p className="portal-empty-copy">Loading the report…</p>}
     {shown && p && <>

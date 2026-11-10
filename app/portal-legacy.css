@@ -2958,3 +2958,21 @@ button.rd-row:hover { background: #f6fafc; }
 .tp.tp-grid .full{grid-column:1/-1}
 .tp.tp-grid .tp-kv+h4{margin-top:14px}
 @media (max-width:640px){.tp.tp-grid{grid-template-columns:minmax(0,1fr)}}
+/* Training Centers Design 3 (10 Nov 2026): add a center beside the Programs dropdown. */
+.nw-shell .pm-newcenter{display:grid;grid-template-columns:2fr 1.4fr 1fr;gap:10px;align-items:end;padding:12px 16px;border-bottom:1px solid #e1e8f1;background:#f7fafc}
+.nw-shell .pm-newcenter .full,.nw-shell .pm-newcenter-go{grid-column:1/-1}.nw-shell .pm-newcenter-go{display:flex;gap:8px;justify-content:flex-end}
+@media (max-width:640px){.nw-shell .pm-newcenter{grid-template-columns:minmax(0,1fr)}}
+/* Spacing Design 1 · Compact (owner, 10 Nov 2026): rows about 44px, small pills, tighter panel headings, set once for the whole portal. */
+.nw-shell .panel-heading{padding:12px 16px}
+.nw-shell .cx-panel>.panel-heading{padding:12px 16px 10px}
+.nw-shell .panel-heading h2{font-size:17px}
+.nw-shell .portal-table th{padding:8px 14px}
+.nw-shell .portal-table td{padding:9px 14px;font-size:14.5px}
+.nw-shell .rb3-table th{padding:8px 10px}
+.nw-shell .rb3-table td{padding:8px 10px}
+.nw-shell .portal-page.ac .cl-log td,.nw-shell .ms-page .cl-log td{padding:7px 10px}
+.nw-shell .portal-page.ac .cl-log th,.nw-shell .ms-page .cl-log th{padding:8px 10px}
+.nw-shell .portal-badge{font-size:12.5px;padding:2px 9px}
+/* Daily Summary Design 3 (Accounting, 10 Nov 2026): period pills, custom dates, range label. */
+.nw-shell .ds-bar{flex-wrap:wrap;align-items:center}.nw-shell .ds-bar .sub-pills{margin:0}.nw-shell .ds-bar .sub-pills button.on{background:#123F63;border-color:#123F63;color:#fff}
+.nw-shell .ds-custom{display:inline-flex;flex-wrap:wrap;gap:8px}.nw-shell .ds-bar>.cx-mono{margin-left:auto}
