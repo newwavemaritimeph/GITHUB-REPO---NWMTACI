@@ -1,4 +1,5 @@
 "use client";
+import { leftDrawer, type BankDeposit } from "@/lib/bank-deposits";
 
 import { FormNumbers, type DocumentControlRow } from "./form-numbers";
 import { ServiceInvoiceSetup } from "./company-charge";
@@ -1368,7 +1369,10 @@ export function PayablesModule({ data }: { data: AccountingData }) {
   </div>;
 }
 
-export function CashPositionModule({ data }: { data: AccountingData }) {
+export function CashPositionModule({ data }: { data: AccountingData & { bankDeposits?: BankDeposit[] } }) {
+  // Bank deposits (owner, 11 Nov 2026): a transfer from Cash on Hand to a bank account; the total does not change.
+  const moved = [...(data.bankDeposits ?? []).filter((d) => leftDrawer(d.status)).reduce((m, d) => m.set(d.account, (m.get(d.account) ?? 0) + Number(d.amount_centavos)), new Map<string, number>())];
+  const movedTotal = moved.reduce((s, [, v]) => s + v, 0);
   const channel = (m: string) => { const t = (m || "").toLowerCase(); if (t.includes("gcash")) return "GCash"; if (t.includes("cash")) return "Cash"; if (t.includes("bank") || t.includes("union") || t.includes("psb") || t.includes("transfer")) return "Bank"; return "Others"; };
   const accounts = [...data.payments.reduce((m, p) => { const k = p.receiving_account || channel(p.method); return m.set(k, { total: (m.get(k)?.total ?? 0) + Number(p.amount_centavos), count: (m.get(k)?.count ?? 0) + 1 }); }, new Map<string, { total: number; count: number }>()).entries()].sort((a, b) => b[1].total - a[1].total);
   const collected = accounts.reduce((s, [, v]) => s + v.total, 0);
@@ -1378,6 +1382,8 @@ export function CashPositionModule({ data }: { data: AccountingData }) {
     <div className="portal-message" role="status">Derived from posted payments and paid expenses. The schema has no bank-account ledger, so this is a running position, not a reconciled balance.</div>
     <div className="portal-table portal-panel" style={{ marginTop: 12 }}><table><thead><tr><th>Account / Channel</th><th>Payments</th><th>Collected</th></tr></thead><tbody>
       {accounts.map(([name, v]) => <tr key={name}><td><strong>{name}</strong></td><td>{v.count}</td><td>{peso2(v.total)}</td></tr>)}
+      {movedTotal > 0 && <><tr><td><strong>Cash on hand deposited to bank</strong><small>Transfer, not an expense</small></td><td>—</td><td style={{ color: "#a52020" }}>−{peso2(movedTotal)}</td></tr>
+        {moved.map(([acct, v]) => <tr key={acct}><td><strong>Deposited to {acct}</strong><small>Transfer from cash on hand</small></td><td>—</td><td>+{peso2(v)}</td></tr>)}</>}
       <tr><td><strong>Less: paid expenses</strong></td><td>—</td><td style={{ color: "#a52020" }}>−{peso2(paidExpenses)}</td></tr>
       <tr><td><strong>Total available</strong></td><td>—</td><td><strong>{peso2(collected - paidExpenses)}</strong></td></tr>
     </tbody></table>{!accounts.length && <p className="portal-empty-copy">No payments posted yet.</p>}</div>

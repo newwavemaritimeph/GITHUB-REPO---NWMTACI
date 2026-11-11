@@ -1116,7 +1116,7 @@ export type CashierReportSnapshot = {
   preparedBy: string;
   checkedBy?: string;
   logoBytes?: Uint8Array;
-  position: { previousLabel: string; previousNote?: string; previousCentavos: number; cashCollectedCentavos: number; cashExpensesCentavos: number; onHandCentavos: number; countedCentavos: number | null; overShortCentavos: number | null };
+  position: { previousLabel: string; previousNote?: string; previousCentavos: number; cashCollectedCentavos: number; cashExpensesCentavos: number; bankDepositsCentavos?: number; onHandCentavos: number; countedCentavos: number | null; overShortCentavos: number | null };
   channels: string[];
   matrix: { source: string; cells: { channel: string; count: number; totalCentavos: number }[]; count: number; totalCentavos: number }[];
   groups: { kind: string; name: string; rows: CashierReportRow[]; subtotalCentavos: number }[];
@@ -1202,6 +1202,7 @@ export async function createCashierReportPdf(s: CashierReportSnapshot) {
     [p.previousLabel, money(p.previousCentavos), c.ink, p.previousNote],
     ["+ Cash collected", money(p.cashCollectedCentavos), c.green],
     ["- Cash expenses", money(p.cashExpensesCentavos), c.red],
+    ...(p.bankDepositsCentavos ? [["- Bank deposits", money(p.bankDepositsCentavos), c.navy] as [string, string, typeof c.ink]] : []),
     ["= Cash on hand", money(p.onHandCentavos), c.navy],
     ["Counted at closing", p.countedCentavos == null ? "Not yet" : money(p.countedCentavos), c.ink],
     ["Over / short", p.overShortCentavos == null ? "-" : `${p.overShortCentavos > 0 ? "+" : ""}${money(p.overShortCentavos)}`, p.overShortCentavos ? (p.overShortCentavos < 0 ? c.red : c.green) : c.ink],

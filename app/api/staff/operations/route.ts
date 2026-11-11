@@ -9,6 +9,7 @@ import { canRecordCompanyPayment, isEndorsedEnrollment, itemAllowed, pricelistAd
 import { bsNumber, buildBillingRows, statementTotal } from "@/lib/billing-statement";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { loadHrExtras, loadMyHrExtras } from "@/lib/hr-server";
+import { depositedOn } from "@/lib/bank-deposits";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { hardDeleteEnrollment, pruneUnpaidEnrollments, deletePastEmptyBatches } from "@/lib/enrollments";
 import { entryMovedFrom } from "@/lib/mismo";
@@ -1286,6 +1287,12 @@ export async function GET(request: Request) {
     const { data: openingRows } = await createSupabaseAdminClient().from("cashier_openings").select("id,opening_date,opening_cash_centavos,remarks,created_at").eq("cashier_id", staff.user.id).order("opening_date", { ascending: false }).limit(31);
     cashierOpenings = openingRows ?? [];
   });
+  // Bank deposits (migration 202611110097; empty without it): Cashier, Accounting and Admin.
+  let bankDeposits: unknown[] = [];
+  if (canCashier(staff.roleCodes)) task(async () => {
+    const { data: depRows, error: depErr } = await createSupabaseAdminClient().from("bank_deposits").select("id,deposit_no,amount_centavos,account,due_on,note,status,requested_at,deposited_at,deposited_on,reference,slip_link,confirmed_at,reason").order("requested_at", { ascending: false }).limit(200);
+    bankDeposits = depErr ? [] : depRows ?? [];
+  });
   // When each enrollment became Enrolled (migration 202610070014; empty without it).
   let enrolledAt = new Map<string, string>();
   task(async () => { const { data: enrolledRows } = await db.from("enrollments").select("id,enrolled_at").not("enrolled_at", "is", null).order("enrolled_at", { ascending: false }).limit(5000); enrolledAt = new Map(((enrolledRows ?? []) as { id: string; enrolled_at: string }[]).map((r) => [r.id, r.enrolled_at])); });
@@ -1473,7 +1480,7 @@ export async function GET(request: Request) {
   // Portal sounds (owner, 10 Nov 2026): set by the Admin; on for every role until migration 202611100096.
   const soundRow = await db.from("organization_settings").select("portal_sound").maybeSingle();
   const portalSound = (soundRow.error ? null : (soundRow.data as { portal_sound?: Record<string, boolean> } | null)?.portal_sound) ?? null;
-  return NextResponse.json({ hrPlus, portalSound, defaultRooms, postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
+  return NextResponse.json({ hrPlus, portalSound, bankDeposits, defaultRooms, postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
     paymentMethods: paymentMethodsWithKind, charges: (charges.data ?? []).map((c) => ({ ...c, kind: chargeKinds.get((c as { id: string }).id) ?? "fee" })), agencies: agencies.data ?? [],
@@ -2070,7 +2077,10 @@ export async function POST(request: Request) {
       // Cash other income (202610190045) is in the drawer too; ignored before it.
       const { data: dayIncome } = await admin.from("other_income").select("amount_centavos,channel").is("voided_at", null).eq("received_on", input.closingDate);
       const incomeCash = (dayIncome ?? []).filter((i) => i.channel === "Cash").reduce((s, i) => s + Number(i.amount_centavos), 0);
-      const expected = input.openingCashCentavos + cash + incomeCash - expensesTotal - refunds;
+      // Bank deposits (202611110097) leave the drawer; not expenses. 0 before the migration.
+      const { data: dayDeps, error: depErr } = await admin.from("bank_deposits").select("status,deposited_on,amount_centavos").eq("deposited_on", input.closingDate);
+      const deposits = depErr ? 0 : depositedOn((dayDeps ?? []) as Parameters<typeof depositedOn>[0], input.closingDate);
+      const expected = input.openingCashCentavos + cash + incomeCash - expensesTotal - refunds - deposits;
       const variance = input.actualCashCentavos - expected;
       const { error } = await admin.from("cashier_closings").insert({ cashier_id: staff.user.id, closing_date: input.closingDate, opening_cash_centavos: input.openingCashCentavos, cash_collections_centavos: cash, online_collections_centavos: online, refunds_centavos: refunds, expenses_centavos: expensesTotal, expected_cash_centavos: expected, actual_cash_centavos: input.actualCashCentavos, variance_centavos: variance, status: "Submitted", submitted_at: new Date().toISOString(), remarks: input.remarks || null });
       if (error) throw error;

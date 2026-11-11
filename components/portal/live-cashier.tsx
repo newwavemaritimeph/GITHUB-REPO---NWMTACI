@@ -1,5 +1,7 @@
 "use client";
 
+import { MarkDepositedModal } from "./bank-deposits";
+import { depositedOn, drawerExpected, type BankDeposit } from "@/lib/bank-deposits";
 import { useEffect, useState, type ReactNode } from "react";
 import { ReferralVoucherPanel } from "./accounting-home";
 import type { PortalData, Enrollment, TraineeProofRow } from "../portal-live-app";
@@ -506,7 +508,7 @@ export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { d
   const [raising, setRaising] = useState(false), [reqFilter, setReqFilter] = useState<"All" | "For Approval" | "Approved" | "Rejected">("All");
   // Organized (owner, 10 Nov 2026): tabs in Money In and Money Out, 5 rows a page, folds.
   const [showPaid, setShowPaid] = useState(false), [showUnpaid, setShowUnpaid] = useState(false), [showChannels, setShowChannels] = useState(false);
-  const [inTab, setInTab] = useState<"proofs" | "new" | null>(null), [outTab, setOutTab] = useState<"release" | "requests" | null>(null);
+  const [inTab, setInTab] = useState<"proofs" | "new" | null>(null), [outTab, setOutTab] = useState<"release" | "requests" | "deposits" | null>(null), [marking, setMarking] = useState<BankDeposit | null>(null);
   const today = manilaToday();
   const handed = data.handedToCashier ?? {};
   const todays = data.payments.filter((p) => day(p.received_at) === today);
@@ -547,7 +549,11 @@ export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { d
   const cashOut = released.filter((e) => e.payment_channel === "Cash").reduce((s, e) => s + Number(e.amount_centavos), 0);
   // Payments in and expenses out per channel, today.
   const channels = [...new Set([...tileModes, ...released.map((e) => e.payment_channel ?? "Cash")])].map((m) => ({ m, in: todays.filter((p) => p.method === m).reduce((x, p) => x + Number(p.amount_centavos), 0), receipts: todays.filter((p) => p.method === m).length, out: released.filter((e) => (e.payment_channel ?? "Cash") === m).reduce((x, e) => x + Number(e.amount_centavos), 0) })).filter((c) => c.in || c.out || ["Cash", "GCash", "PSBank", "UnionBank"].includes(c.m));
-  const expected = (opening?.opening_cash_centavos ?? 0) + cashIn - cashOut;
+  // Bank deposits (owner, 11 Nov 2026): cash moved to the bank leaves the drawer, but is never an expense.
+  const deps = data.bankDeposits ?? [];
+  const toDeposit = deps.filter((d) => d.status === "Requested" || d.status === "Returned");
+  const depositedToday = depositedOn(deps, today);
+  const expected = drawerExpected({ opening: opening?.opening_cash_centavos ?? 0, cashIn, cashExpenses: cashOut, deposits: depositedToday });
   // Approvals and requests the Cashier is waiting on: expenses, change requests and voucher reprints, newest first.
   type Ask = { id: string; kind: string; what: string; status: "For Approval" | "Approved" | "Rejected" | "To Do"; label: string; at: string; done?: string | null; note: string };
   const exps = data.expenses as (PortalData["expenses"][number] & { payee?: string; voucher_number?: string | null; created_at?: string; decision_remarks?: string | null; approved_at?: string | null; paid_at?: string | null })[];
@@ -569,7 +575,7 @@ export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { d
   ];
   const moneyOut = toRelease.reduce((s, r) => s + r.amount, 0);
   const proofTotal = proofs.reduce((s, p) => s + Number(p.amount_centavos), 0), freshTotal = fresh.reduce((s, g) => s + g.balance, 0);
-  const inShown = inTab ?? (proofs.length || !fresh.length ? "proofs" : "new"), outShown = outTab ?? (toRelease.length || !asks.length ? "release" : "requests");
+  const inShown = inTab ?? (proofs.length || !fresh.length ? "proofs" : "new"), outShown = outTab ?? (toRelease.length ? "release" : toDeposit.length ? "deposits" : asks.length ? "requests" : "release");
   const releaseP = usePaged(toRelease, 5);
   const rebateLines = centerLines(data).filter((l) => l.state === "Paid"), got = (data as unknown as { rebatesReceived?: Record<string, string> }).rebatesReceived ?? {};
   const rebatesToCollect = rebateLines.filter((l) => !got[l.e.id] && Number(l.e.rebate_centavos) > 0);
@@ -613,7 +619,10 @@ export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { d
           <div className="cx-tabs" role="tablist">
             <button type="button" role="tab" aria-selected={outShown === "release"} className={outShown === "release" ? "on" : ""} onClick={() => setOutTab("release")}>To Release<b>{toRelease.length}</b><em>{pesos(moneyOut)}</em></button>
             <button type="button" role="tab" aria-selected={outShown === "requests"} className={outShown === "requests" ? "on" : ""} onClick={() => setOutTab("requests")}>Requests<b>{asks.length}</b></button>
+            <button type="button" role="tab" aria-selected={outShown === "deposits"} className={outShown === "deposits" ? "on" : ""} onClick={() => setOutTab("deposits")}>Deposits<b>{toDeposit.length}</b><em>{pesos(toDeposit.reduce((s, d) => s + Number(d.amount_centavos), 0))}</em></button>
           </div>
+          {outShown === "deposits" && (toDeposit.length ? <div className="wr-list">{toDeposit.map((d) => <WorkRow key={d.id} who={<span className="cx-name">{d.deposit_no} · {d.account}</span>} meta={d.status === "Returned" ? `Returned: ${d.reason ?? ""}` : `Deposit by ${d.due_on ? fmtDate(d.due_on) : "today"}${d.note ? ` · ${d.note}` : ""}`}
+            mid={<Badge tone={d.status === "Returned" ? "cancelled" : "orange"}>{d.status === "Returned" ? "Returned" : "To Deposit"}</Badge>} amount={pesos2(Number(d.amount_centavos))} acts={<button type="button" className="portal-primary row-act" onClick={() => setMarking(d)}>Mark Deposited</button>} />)}</div> : <p className="portal-empty-copy">No deposits requested by Accounting.</p>)}
           {outShown === "release" && (toRelease.length ? <div className="wr-list">{releaseP.shown.map((r) => <WorkRow key={r.id} who={<span className="cx-name">{r.what}</span>} meta={r.ref} amount={pesos2(r.amount)} acts={go ? <button type="button" className="portal-primary row-act" onClick={() => go("Expenses")}>Release</button> : null} />)}{releaseP.pager}</div> : <p className="portal-empty-copy">Nothing approved to release.</p>)}
           {outShown === "requests" && <>
             <label className="cx-status">Status<select value={reqFilter} onChange={(ev) => setReqFilter(ev.target.value as typeof reqFilter)}>{(["All", "For Approval", "Approved", "Rejected"] as const).map((k) => <option key={k} value={k}>{k} · {asks.filter((x) => k === "All" || x.status === k || (k === "For Approval" && x.status === "To Do")).length}</option>)}</select></label>
@@ -635,6 +644,7 @@ export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { d
             <div><dt>Opening Cash{opening ? ` · ${fmtClock(opening.created_at)}` : ""}</dt><dd>{opening ? pesos(opening.opening_cash_centavos) : "Not Recorded"}</dd></div>
             <div><dt>+ Cash Collected</dt><dd className="plus">{pesos(cashIn)}</dd></div>
             <div><dt>− Cash Expenses</dt><dd className="minus">{pesos(cashOut)}</dd></div>
+            {(depositedToday > 0 || toDeposit.length > 0) && <div><dt>− Bank Deposits</dt><dd className="minus">{pesos(depositedToday)}</dd></div>}
             <div className="total"><dt>= Expected in Drawer</dt><dd className="eq">{pesos(expected)}</dd></div>
           </dl>
           <button type="button" className="pe-fold cx-chfold" aria-expanded={showChannels} onClick={() => setShowChannels((v) => !v)}><span>Per Channel · Net {pesos(totalToday - releasedToday)}</span><span>{showChannels ? "Hide ▴" : "Show ▾"}</span></button>
@@ -647,6 +657,7 @@ export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { d
       </aside>
     </div>
     {raising && <RecordExpenseModal data={data} onClose={() => setRaising(false)} post={post} />}
+    {marking && <MarkDepositedModal deposit={marking} onClose={() => setMarking(null)} onDone={reload} />}
     {fromProof && <RecordPaymentModal data={data} initialProof={fromProof} onClose={() => setFromProof(null)} onSaved={reload} />}
   </div>;
 }

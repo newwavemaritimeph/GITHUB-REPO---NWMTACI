@@ -1,3 +1,4 @@
+import { depositedOn } from "@/lib/bank-deposits";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -44,9 +45,16 @@ export function collectionsBySource(rows: CollectionRow[], channelOrder: string[
 }
 
 /** Previous cash + cash collected − cash expenses = cash on hand; compared with the count at closing. */
-export function cashPosition(input: { previousCentavos: number; cashCollectedCentavos: number; cashExpensesCentavos: number; countedCentavos: number | null }) {
-  const onHandCentavos = input.previousCentavos + input.cashCollectedCentavos - input.cashExpensesCentavos;
+export function cashPosition(input: { previousCentavos: number; cashCollectedCentavos: number; cashExpensesCentavos: number; bankDepositsCentavos?: number; countedCentavos: number | null }) {
+  // Bank deposits (11 Nov 2026) leave the drawer but are not expenses.
+  const onHandCentavos = input.previousCentavos + input.cashCollectedCentavos - input.cashExpensesCentavos - (input.bankDepositsCentavos ?? 0);
   return { ...input, onHandCentavos, overShortCentavos: input.countedCentavos == null ? null : input.countedCentavos - onHandCentavos };
+}
+
+/** Drawer cash deposited to the bank on a day; 0 before migration 202611110097. */
+async function depositsOn(db: Admin, date: string) {
+  const { data, error } = await db.from("bank_deposits").select("status,deposited_on,amount_centavos").eq("deposited_on", date);
+  return error ? 0 : depositedOn((data ?? []) as Parameters<typeof depositedOn>[0], date);
 }
 
 const one = <T,>(v: T | T[] | null | undefined): T | null => (Array.isArray(v) ? v[0] ?? null : v ?? null);
@@ -143,6 +151,7 @@ export async function buildCashierReport(db: Admin, date: string, preparedBy: st
     previousCentavos,
     cashCollectedCentavos: rows.filter((r) => r.channel === "Cash").reduce((s, r) => s + r.amountCentavos, 0) + otherIncome.filter((i) => i.channel === "Cash").reduce((s, i) => s + i.amountCentavos, 0),
     cashExpensesCentavos: expenses.filter((e) => e.channel === "Cash").reduce((s, e) => s + e.amountCentavos, 0),
+    bankDepositsCentavos: await depositsOn(db, date),
     countedCentavos: counted.length ? counted.reduce((s, c) => s + Number(c.actual_cash_centavos), 0) : null,
   });
 

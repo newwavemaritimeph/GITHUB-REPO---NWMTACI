@@ -51,6 +51,19 @@ function render(s: ReturnType<typeof summarizeCertificateDay>) {
   return { html, text };
 }
 
+/** Bank deposits Accounting requested more than a day ago that the Cashier has not made yet (owner, 11 Nov 2026). */
+async function lateDeposits(db: Admin) {
+  const cutoff = new Date(Date.now() - 86_400_000).toISOString();
+  const { data, error } = await db.from("bank_deposits").select("deposit_no,amount_centavos,account,requested_at").eq("status", "Requested").lt("requested_at", cutoff).order("requested_at");
+  if (error || !data?.length) return { html: "", text: "" };
+  const peso = (c: number) => `₱${(c / 100).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
+  const rows = data.map((d) => `${d.deposit_no} · ${d.account} · ${peso(Number(d.amount_centavos))}`);
+  return {
+    html: `<table role="presentation" style="width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px"><tr><td style="padding:12px 8px 4px;font-weight:700;color:#0571D0;font-size:12px;letter-spacing:.06em;text-transform:uppercase">Bank Deposits Not Yet Made</td></tr>${rows.map((r) => `<tr><td style="padding:6px 8px;border-top:1px solid #e3ecf0;color:#B4400C">${escapeHtml(r)}</td></tr>`).join("")}</table>`,
+    text: `\nBANK DEPOSITS NOT YET MADE\n${rows.map((r) => `- ${r}`).join("\n")}`,
+  };
+}
+
 /** Active Admin email addresses (the owner holds the Admin role). */
 async function adminRecipients(db: Admin) {
   const { data } = await db.from("user_roles").select("profiles!inner(email,account_state),roles!inner(code)").eq("roles.code", "admin");
@@ -94,7 +107,8 @@ export async function sendCertificateReport(db: Admin, options: { origin?: strin
   const cert = render(summary);
   // HR section (owner, 10 Nov 2026): Fit to Work and Biodata checks that need action.
   const hrPart = await hrDailySection(db).catch(() => ({ html: "", text: "" }));
-  const html = cert.html + hrPart.html, text = cert.text + hrPart.text;
+  const late = await lateDeposits(db).catch(() => ({ html: "", text: "" }));
+  const html = cert.html + hrPart.html + late.html, text = cert.text + hrPart.text + late.text;
   const date = new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date());
   const ids: string[] = [];
   for (const to of await adminRecipients(db)) {
