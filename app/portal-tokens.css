@@ -169,3 +169,10 @@
   .nw-shell .ne-table tr.ne-sub td { border-top: 0; }
   .nw-shell .ne-table td.ne-act { text-align: left; }
 }
+
+/* Bank Ledger (owner, 11 Nov 2026): money in green, money out red, running balance bold; void rows struck through. */
+.nw-shell .bl-table td.bl-in { color: var(--c-success); font-weight: 600; }
+.nw-shell .bl-table td.bl-out { color: var(--c-danger); font-weight: 600; }
+.nw-shell .bl-table tr.bl-open td { background: #F6FAFC; font-weight: 600; }
+.nw-shell .bl-table tr.bl-void td:nth-child(-n+3) { color: #9AA8B5; text-decoration: line-through; }
+.nw-shell .bl-table td.num, .nw-shell .bl-table th.num { white-space: nowrap; }

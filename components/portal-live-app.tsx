@@ -17,6 +17,7 @@ import { MyHrChecks, MyHrCoe, MyHrMemos, myDueItems, type MyHrExtras } from "./p
 import { BellDrawer, bellCount } from "./portal/hr-bell";
 import { PortalSounds } from "./portal/portal-sounds";
 import { BankDeposits } from "./portal/bank-deposits";
+import { BankLedger, BankAccountsSetup } from "./portal/bank-ledger";
 import type { BankDeposit } from "@/lib/bank-deposits";
 import { LiveTraining, type TrainingData } from "./portal/live-training";
 import { ReleasingDashboard, LiveReleasing } from "./portal/live-releasing";
@@ -57,7 +58,7 @@ import { ClassroomLinksImport, DefaultRoomsPanel } from "./portal/admin-setup";
 import { AdminHome, AdminSearchTrainee, AdminEnrollments, AdminVouchers, AdminHolidays } from "./portal/admin-home";
 import { askText, askConfirm, showAlert } from "./portal/dialogs";
 
-type Module = HrView | "Portal sounds" | "Bank deposits" | "Batch numbers" | "Form numbers" | "Classroom links" | "Post-tests" | "Training instructions" | "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Daily summary" | "Opening and closing" | "Expenses summary" | "Templates" | "Certificate controls" | "Delivery requests" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Company Charge" | "Sales from endorsed courses" | "Training Reports" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
+type Module = HrView | "Portal sounds" | "Bank deposits" | "Bank ledger" | "Bank accounts" | "Batch numbers" | "Form numbers" | "Classroom links" | "Post-tests" | "Training instructions" | "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Daily summary" | "Opening and closing" | "Expenses summary" | "Templates" | "Certificate controls" | "Delivery requests" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Company Charge" | "Sales from endorsed courses" | "Training Reports" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; training_mode?:string; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -181,7 +182,7 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // Reports ▾ Daily Summary, Opening and Closing, Expenses Summary (CASHIER_TABS; reports consolidated 5 Nov 2026).
   cashier: ["Dashboard","Search trainee","Batch schedules","Payments","Other income","Expenses","Requests","Daily summary","Opening and closing","Expenses summary","MyHr"],
   // Accounting (owner, 8 Oct 2026): Dashboard · Approvals · Transactions ▾ · Reports ▾ · Configuration ▾ (ACCOUNTING_TABS; reports consolidated 5 Nov 2026).
-  accounting: ["MyHr","Dashboard","Search trainee","Approvals","Payments","Other income","Expenses","Bank deposits","Payables","Daily summary","Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
+  accounting: ["MyHr","Dashboard","Search trainee","Approvals","Payments","Other income","Expenses","Bank deposits","Bank ledger","Bank accounts","Payables","Daily summary","Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
 };
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
@@ -201,6 +202,7 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   ...HR_VIEWS.map(label=>({label,icon:"♙",roles:["admin","hr"],group:"People" as NavGroup})),
   {label:"Portal sounds",icon:"♪",roles:["admin"],group:"Configuration"},
   {label:"Bank deposits",icon:"⇄",roles:["accounting","admin"],group:"Accounting"},
+  {label:"Bank ledger",icon:"▤",roles:["accounting","admin"],group:"Accounting"},{label:"Bank accounts",icon:"⚙",roles:["accounting","admin"],group:"Configuration"},
   {label:"Templates",icon:"▤",roles:["releasing_officer"],group:"Work"},{label:"Numbering",icon:"№",roles:["releasing_officer"],group:"Work"},
   {label:"Delivery requests",icon:"⇥",roles:["registration"],group:"Work"},
   {label:"Training Reports",icon:"▤",roles:["mismo_officer","admin"],group:"Work"},{label:"Batch schedules",icon:"□",roles:["admin_assistant","registration","cashier","mismo_officer","admin"],group:"Work"},{label:"Batch numbers",icon:"#",roles:["admin"],group:"Work"},{label:"Resource planning",icon:"▢",roles:["admin_assistant","admin"],group:"Work"},{label:"Instructors",icon:"♙",roles:["admin_assistant","admin"],group:"Work"},{label:"Reconciliation",icon:"✓",roles:["admin_assistant","admin"],group:"Work"},
@@ -236,9 +238,9 @@ const ACCOUNTING_TABS:TopTab[]=[
   // Reprints of receipts and TARs live in the Trainee Account (owner, 3 Nov 2026).
   {label:"Search Trainee",items:["Search trainee"]},
   {label:"Approvals",items:["Approvals"]},
-  {label:"Transactions",items:["Payments","Other income","Expenses","Bank deposits","Payables"]},
+  {label:"Transactions",items:["Payments","Other income","Expenses","Bank deposits","Bank ledger","Payables"]},
   {label:"Reports",items:["Daily summary","Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position"]},
-  {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS]},
+  {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS,"Bank accounts"]},
   {label:"MyHr",items:["MyHr"]},
 ];
 const RELEASING_TABS:TopTab[]=[{label:"Certificates",items:["Certificates"]},{label:"Reports",items:["Reports"]},{label:"MyHr",items:["MyHr"]}];
@@ -330,6 +332,8 @@ function ChangePasswordModal({email,onClose}:{email:string;onClose:()=>void}){
 
 const recordsUrl=(since:string)=>since?`/api/staff/operations?since=${since}`:"/api/staff/operations";
 const NO_EMPLOYEES:HrData["employees"]=[];
+// Bank accounts receive a Payment Channel other than Cash (owner, 11 Nov 2026).
+const bankChannels=(data:PortalData)=>data.paymentMethods.filter(m=>m.active&&!/^cash$/i.test(m.name)).map(m=>m.name);
 export function PortalLiveApp(){
   const [data,setData]=useState<PortalData|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[active,setActive]=useState<Module>("Dashboard"),[recordsView,setRecordsView]=useState<RecordsView>("applications"),[role,setRole]=useState(""),[openTab,setOpenTab]=useState(""),[menuAt,setMenuAt]=useState({left:16,top:120}),[notices,setNotices]=useState(false),[modal,setModal]=useState<"enrollment"|"batch"|"payment"|null>(null),[payTarget,setPayTarget]=useState(""),[payCourses,setPayCourses]=useState<string[]|undefined>(),[account,setAccount]=useState(false);
   // The top-bar "Search this page" box was removed (owner, 8 Oct 2026); screens keep their own search.
@@ -552,6 +556,8 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Inventory")return <LiveInventory data={data} role={gateRole} reload={reload}/>;
   if(active==="Portal sounds"&&gateRole==="admin")return <PortalSounds value={data.portalSound} reload={reload}/>;
   if(active==="Bank deposits"&&["accounting","admin"].includes(gateRole))return <BankDeposits data={data} reload={reload}/>;
+  if(active==="Bank ledger"&&["accounting","admin"].includes(gateRole))return <BankLedger/>;
+  if(active==="Bank accounts"&&["accounting","admin"].includes(gateRole))return <BankAccountsSetup channels={bankChannels(data)}/>;
   if(HR_VIEWS.includes(active as HrView)&&["admin","hr"].includes(gateRole))return <LiveHr key={active} data={data} role={gateRole} reload={reload} plus={data.hrPlus??null} view={active as HrView} go={go}/>;
   if(active==="Rooms & facilities"&&["admin"].includes(gateRole))return <LiveTraining data={{classrooms:data.classrooms,certificates:data.certificates,batches:data.batches,enrollments:data.enrollments,courses:data.courses,certificateTemplates:data.certificateTemplates}} role={gateRole} reload={reload} initialTab="Classrooms"/>;
   if(active==="Certificates"&&["admin","releasing_officer"].includes(gateRole))return <LiveReleasing data={data as unknown as Parameters<typeof LiveReleasing>[0]["data"]} role={gateRole} reload={reload}/>;

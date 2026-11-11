@@ -3,6 +3,7 @@ import { escapeHtml } from "@/lib/classroom";
 import { emailConfigured, processEmailJobs } from "@/lib/email-jobs";
 import { certificateContext } from "@/lib/certificates";
 import { hrDailySection } from "@/lib/hr-server";
+import { bankLedgerAlerts } from "@/lib/bank-ledger-server";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 
@@ -108,7 +109,10 @@ export async function sendCertificateReport(db: Admin, options: { origin?: strin
   // HR section (owner, 10 Nov 2026): Fit to Work and Biodata checks that need action.
   const hrPart = await hrDailySection(db).catch(() => ({ html: "", text: "" }));
   const late = await lateDeposits(db).catch(() => ({ html: "", text: "" }));
-  const html = cert.html + hrPart.html + late.html, text = cert.text + hrPart.text + late.text;
+  const bank = await bankLedgerAlerts(db).catch(() => [] as string[]);
+  const bankHtml = bank.length ? `<table role="presentation" style="width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px"><tr><td style="padding:12px 8px 4px;font-weight:700;color:#0571D0;font-size:12px;letter-spacing:.06em;text-transform:uppercase">Bank Ledger</td></tr>${bank.map((r) => `<tr><td style="padding:6px 8px;border-top:1px solid #e3ecf0;color:#B4400C">${escapeHtml(r)}</td></tr>`).join("")}</table>` : "";
+  const bankText = bank.length ? `\nBANK LEDGER\n${bank.map((r) => `- ${r}`).join("\n")}` : "";
+  const html = cert.html + hrPart.html + late.html + bankHtml, text = cert.text + hrPart.text + late.text + bankText;
   const date = new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date());
   const ids: string[] = [];
   for (const to of await adminRecipients(db)) {

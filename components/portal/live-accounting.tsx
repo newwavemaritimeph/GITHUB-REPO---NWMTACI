@@ -1,5 +1,6 @@
 "use client";
 import { leftDrawer, type BankDeposit } from "@/lib/bank-deposits";
+import { BankBalances } from "./bank-ledger";
 
 import { FormNumbers, type DocumentControlRow } from "./form-numbers";
 import { ServiceInvoiceSetup } from "./company-charge";
@@ -1387,6 +1388,7 @@ export function CashPositionModule({ data }: { data: AccountingData & { bankDepo
       <tr><td><strong>Less: paid expenses</strong></td><td>—</td><td style={{ color: "#a52020" }}>−{peso2(paidExpenses)}</td></tr>
       <tr><td><strong>Total available</strong></td><td>—</td><td><strong>{peso2(collected - paidExpenses)}</strong></td></tr>
     </tbody></table>{!accounts.length && <p className="portal-empty-copy">No payments posted yet.</p>}</div>
+    <BankBalances />
   </div>;
 }
 
