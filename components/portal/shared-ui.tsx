@@ -182,18 +182,28 @@ export function ViewIcon({ label, href, onClick, disabled }: { label: string; hr
  */
 export type ActionItem = { label: string; onClick?: () => void; href?: string; disabled?: boolean; danger?: boolean };
 export function ActionsMenu({ items, label = "Actions", disabled }: { items: (ActionItem | false | null | undefined)[]; label?: string; disabled?: boolean }) {
-  const [open, setOpen] = useState(false);
+  // The menu floats (position: fixed) so a scrolling window or table never clips it (owner, 11 Nov 2026).
+  const [at, setAt] = useState<{ left: number; top?: number; bottom?: number } | null>(null);
+  const open = at !== null, setOpen = (v: boolean) => { if (!v) setAt(null); };
   const box = useRef<HTMLSpanElement>(null);
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener("mousedown", close);
-    return () => document.removeEventListener("mousedown", close);
+    const close = (e: Event) => { if (e instanceof KeyboardEvent ? e.key === "Escape" : !box.current?.contains(e.target as Node)) setAt(null); };
+    const shut = () => setAt(null);
+    document.addEventListener("mousedown", close); document.addEventListener("keydown", close);
+    window.addEventListener("resize", shut); window.addEventListener("scroll", shut, true);
+    return () => { document.removeEventListener("mousedown", close); document.removeEventListener("keydown", close); window.removeEventListener("resize", shut); window.removeEventListener("scroll", shut, true); };
   }, [open]);
+  const toggle = (b: HTMLButtonElement) => {
+    if (open) { setAt(null); return; }
+    const r = b.getBoundingClientRect(), w = 220, below = window.innerHeight - r.bottom;
+    const left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+    setAt(below < 200 && r.top > below ? { left, bottom: window.innerHeight - r.top + 6 } : { left, top: r.bottom + 6 });
+  };
   const list = items.filter(Boolean) as ActionItem[];
   if (!list.length) return null;
-  return <span className="cx-split act-split" ref={box} onClick={(e) => e.stopPropagation()}><button type="button" className="portal-secondary row-act" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen((v) => !v)}>{label} ▾</button>
-    {open && <div className="cx-splitmenu act-menu" role="menu">{list.map((it) => it.href
+  return <span className="cx-split act-split" ref={box} onClick={(e) => e.stopPropagation()}><button type="button" className="portal-secondary row-act" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={(e) => toggle(e.currentTarget)}>{label} <span className="act-caret" aria-hidden="true" /></button>
+    {at && <div className="cx-splitmenu act-menu" role="menu" style={{ position: "fixed", left: at.left, top: at.top ?? "auto", bottom: at.bottom ?? "auto", right: "auto", width: 220 }}>{list.map((it) => it.href
       ? <a key={it.label} role="menuitem" href={it.href} target="_blank" rel="noreferrer" onClick={() => setOpen(false)}>{it.label}</a>
       : <button key={it.label} type="button" role="menuitem" className={it.danger ? "danger" : undefined} disabled={it.disabled} onClick={() => { setOpen(false); it.onClick?.(); }}>{it.label}</button>)}</div>}
   </span>;

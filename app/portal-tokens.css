@@ -140,3 +140,12 @@
 @keyframes nw-toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 @media (max-width: 640px) { .nw-toast { left: var(--sp-3); right: var(--sp-3); max-width: none; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); } }
 @media (prefers-reduced-motion: reduce) { .nw-toast { animation: none; } }
+
+/* Actions ▾ menus (owner, 11 Nov 2026: "Fix dropdown buttons spacing and alignment"): one caret, a floating menu with even items. */
+.act-caret { display: inline-block; width: 7px; height: 7px; margin-left: 6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: translateY(-2px) rotate(45deg); transition: transform .15s; }
+[aria-expanded=true] > .act-caret { transform: translateY(1px) rotate(-135deg); }
+.cx-splitmenu.act-menu { z-index: 500 !important; min-width: 0 !important; max-height: min(320px, 60vh); overflow-y: auto; padding: var(--sp-1) !important; gap: 2px; border-radius: var(--r-control) !important; border: 1px solid var(--c-border) !important; box-shadow: var(--sh-pop) !important; background: var(--c-surface) !important; display: flex; flex-direction: column; }
+.cx-splitmenu.act-menu :is(a, button) { display: flex !important; align-items: center; width: 100%; min-height: 36px; padding: 0 var(--sp-3) !important; border: 0; border-radius: 7px !important; background: none; text-align: left; font: 500 14.5px/1.2 var(--font-portal), system-ui, sans-serif !important; color: var(--c-text) !important; text-decoration: none; cursor: pointer; white-space: normal; }
+.cx-splitmenu.act-menu :is(a, button):hover:not(:disabled), .cx-splitmenu.act-menu :is(a, button):focus-visible { background: var(--c-soft) !important; }
+.cx-splitmenu.act-menu button.danger { color: var(--c-danger) !important; }
+.cx-splitmenu.act-menu button:disabled { opacity: .5; cursor: not-allowed; }
