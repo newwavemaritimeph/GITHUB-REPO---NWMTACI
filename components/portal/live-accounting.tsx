@@ -371,7 +371,7 @@ export function LiveAccounting({ data, role, reload, go }: { data: AccountingDat
 
       {tab === "Reconciliation" && <Reconciliation payments={data.payments} channels={data.paymentMethods} />}
 
-      {tab === "Cashier closing" && <LiveCashierClosing data={data as unknown as ClosingData} reload={reload} />}
+      {tab === "Cashier closing" && <LiveCashierClosing data={data as unknown as ClosingData} reload={reload} canAct={false} />}
 
       {tab === "Setup" && (
         <>

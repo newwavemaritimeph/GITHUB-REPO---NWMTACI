@@ -198,3 +198,28 @@
 .nw-dialog.nw-sheet .nw-dialog-head, .nw-dialog.nw-sheet .nw-dialog-mark { display: none; }
 .portal-modal { border-top: 5px solid var(--c-primary); }
 @media (max-width: 480px) { .nw-dialog.nw-sheet { width: 100% !important; border-radius: var(--r-card) var(--r-card) 0 0 !important; padding-bottom: env(safe-area-inset-bottom, 0px) !important; } }
+
+/* Opening and Closing, Cash and GCash (owner, 11 Nov 2026). */
+.oc-steps { display: flex; gap: var(--sp-1); padding: var(--sp-1); background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 12px; overflow-x: auto; scrollbar-width: none; }
+.oc-steps button { flex: 1; min-width: 116px; display: flex; align-items: center; justify-content: center; gap: var(--sp-2); border: 0; background: none; padding: 9px 12px; border-radius: 9px; font: 600 14.5px var(--font-portal), sans-serif; color: var(--c-muted); cursor: pointer; white-space: nowrap; }
+.oc-steps button i { font-style: normal; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12.5px; background: #EEF2F5; }
+.oc-steps button.on { background: var(--c-navy); color: #fff; } .oc-steps button.on i { background: #ffffff2b; }
+.oc-steps button.done i { background: var(--c-success); color: #fff; }
+.oc-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); align-items: start; }
+.oc-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
+.oc-dot.cash { background: var(--c-success); } .oc-dot.gcash { background: #0071E3; }
+.oc-lines { margin: 0; padding: var(--sp-2) var(--sp-4) var(--sp-3); }
+.oc-lines > div.total dt, .oc-lines > div.total dd { font-size: 16px; font-weight: 700; color: var(--c-navy); }
+.oc-var { padding: 0 var(--sp-4) var(--sp-3); display: flex; justify-content: flex-end; }
+.oc-bills { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); }
+.oc-bill { display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; gap: var(--sp-2); align-items: center; border: 1px solid var(--c-border); border-radius: 10px; padding: 6px 8px; }
+.oc-bill b { font-size: 14px; }
+.nw-shell .portal-workspace .oc-bill input { height: 34px !important; min-height: 34px !important; text-align: center; padding: 0 6px !important; }
+.oc-bill span { font-size: 13px; color: var(--c-muted); min-width: 76px; text-align: right; }
+.oc-total { display: flex; justify-content: space-between; align-items: center; padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--c-border); background: #F6FAFC; }
+.oc-total b { font-size: 20px; color: var(--c-navy); }
+.oc-need { color: var(--c-danger); font-weight: 600; margin-left: 6px; }
+.oc-sum { margin-right: auto; color: var(--c-text-2); font-size: 14px; }
+.nw-shell .oc-table th.oc-grp { text-align: center; border-left: 2px solid #fff; }
+.nw-shell .oc-table .oc-g1 { border-left: 2px solid #EAF2F6; }
+@media (max-width: 760px) { .oc-two { grid-template-columns: minmax(0, 1fr); } .oc-sum { flex-basis: 100%; } }

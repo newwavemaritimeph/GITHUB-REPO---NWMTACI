@@ -9,8 +9,8 @@ import { NewWaveLogo } from "./new-wave-logo";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { LiveAttendance } from "./portal/live-attendance";
 import { LiveAccounting, AccountingDashboard, ReceivablesModule, ApprovalsModule, PayablesModule, CashPositionModule, LiveVouchers, LiveInventory, LiveExpenses, SetupList, AccountingConfiguration, ACCOUNTING_CONFIG_SECTIONS, type AccountingConfigSection } from "./portal/live-accounting";
-import { LiveCashierClosing } from "./portal/live-cashier-closing";
-import { CashierPaymentQueue, RequestChargeModal, feeForRequest, TarButton, RecordPaymentModal, RecordTicked, CashierDashboard, CashierPayments, DiscountRequests, CashierEnrollments, CashierExpensesSummary, CashierOpening, CashierSummaryReport, ExpensesWorkspace } from "./portal/live-cashier";
+import { LiveCashierClosing, type ClosingData } from "./portal/live-cashier-closing";
+import { CashierPaymentQueue, RequestChargeModal, feeForRequest, TarButton, RecordPaymentModal, RecordTicked, CashierDashboard, CashierPayments, DiscountRequests, CashierEnrollments, CashierExpensesSummary, CashierSummaryReport, ExpensesWorkspace } from "./portal/live-cashier";
 import { LiveHr, HR_GROUPS, HR_LABEL, HR_VIEWS, type HrData, type HrView } from "./portal/live-hr";
 import { useHrDue, type HrPlus } from "./portal/hr-people";
 import { MyHrChecks, MyHrCoe, MyHrMemos, myDueItems, type MyHrExtras } from "./portal/myhr-extra";
@@ -124,7 +124,8 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   // Google Classroom class code per course id (202610070012).
   classroomCodes?:Record<string,string>;
   // Cashier start-of-day opening cash (202610070015).
-  cashierOpenings?:{id:string;opening_date:string;opening_cash_centavos:number;remarks:string|null;created_at:string}[];
+  cashierOpenings?:{id:string;opening_date:string;opening_cash_centavos:number;opening_gcash_centavos?:number|null;remarks:string|null;created_at:string}[];
+  closingExtras?:ClosingData["closingExtras"];
   // Google Classroom connection (202610070013): status only, never tokens.
   classroom?:{configured:boolean;connected:boolean;accountEmail:string|null;connectedAt:string|null;driveReady?:boolean;mailReady?:boolean};
   classroomCourseIds?:Record<string,string>;
@@ -526,7 +527,7 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
     if(active==="Search trainee")return <CashierSearchTrainee data={data} onPay={onPay} reload={reload} role={gateRole}/>;
     if(active==="Payments")return <CashierPayments data={data} onPay={onPay} reload={reload}/>;
     if(active==="Daily summary")return <CashierSummaryReport data={data}/>;
-    if(active==="Opening and closing")return <div className="portal-page cx"><div className="cx-head"><div><span className="portal-eyebrow">Reports</span><h1>Opening and Closing</h1></div></div><CashierOpening data={data} reload={reload}/><LiveCashierClosing data={data} reload={reload} initialOpening={(data.cashierOpenings??[]).find(o=>o.opening_date===manilaToday())?.opening_cash_centavos}/></div>;
+    if(active==="Opening and closing")return <LiveCashierClosing data={data} reload={reload}/>;
     if(active==="Expenses summary")return <CashierExpensesSummary data={data}/>;
     if(active==="Requests")return <CashierRequests data={data} reload={reload}/>;
     if(active==="Expenses")return <ExpensesWorkspace data={data} role="cashier" reload={reload}/>;

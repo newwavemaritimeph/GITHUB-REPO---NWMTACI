@@ -144,7 +144,7 @@ const expenseDecideInput = z.object({ action: z.literal("expense-decide"), id: z
 const expenseReprintRequestInput = z.object({ action: z.literal("expense-reprint-request"), id: z.string().uuid(), reason: z.string().trim().min(3).max(300) });
 const expenseReprintDecideInput = z.object({ action: z.literal("expense-reprint-decide"), requestId: z.string().uuid(), decision: z.enum(["Approved", "Rejected"]), remarks: z.string().trim().max(300).optional() });
 const expenseReleaseInput = z.object({ action: z.literal("expense-release"), id: z.string().uuid(), paymentChannel: z.string().trim().min(1).max(40), referenceNumber: z.string().trim().max(80).optional().default("") });
-const cashierOpenInput = z.object({ action: z.literal("cashier-open"), openingCashCentavos: z.number().int().nonnegative(), remarks: z.string().trim().max(300).optional() });
+const cashierOpenInput = z.object({ action: z.literal("cashier-open"), openingCashCentavos: z.number().int().nonnegative(), openingGcashCentavos: z.number().int().nonnegative().optional(), remarks: z.string().trim().max(300).optional() });
 const balanceSummaryInput = z.object({ action: z.literal("balance-summary-send") });
 // Accounting marks a submitted cashier closing reviewed (8 Oct 2026).
 const closingReviewInput = z.object({ action: z.literal("cashier-closing-review"), id: z.string().uuid(), remarks: z.string().trim().max(300).optional() });
@@ -1286,6 +1286,14 @@ export async function GET(request: Request) {
   if (canCashier(staff.roleCodes)) task(async () => {
     const { data: openingRows } = await createSupabaseAdminClient().from("cashier_openings").select("id,opening_date,opening_cash_centavos,remarks,created_at").eq("cashier_id", staff.user.id).order("opening_date", { ascending: false }).limit(31);
     cashierOpenings = openingRows ?? [];
+    const { data: g, error: gErr } = await createSupabaseAdminClient().from("cashier_openings").select("id,opening_gcash_centavos").eq("cashier_id", staff.user.id).order("opening_date", { ascending: false }).limit(31);
+    if (!gErr) { const byId = new Map((g ?? []).map((r) => [r.id, r.opening_gcash_centavos])); cashierOpenings = (cashierOpenings as { id: string }[]).map((o) => ({ ...o, opening_gcash_centavos: byId.get(o.id) ?? null })); }
+  });
+  // Closing extras (202611110099): the GCash side, bank deposits and the bill count.
+  let closingExtras: Record<string, unknown> = {};
+  if (canCashier(staff.roleCodes)) task(async () => {
+    const { data: x, error: xErr } = await createSupabaseAdminClient().from("cashier_closings").select("id,cash_expenses_centavos,bank_deposits_centavos,denominations,opening_gcash_centavos,gcash_collections_centavos,gcash_expenses_centavos,expected_gcash_centavos,actual_gcash_centavos,gcash_variance_centavos,gcash_screenshot_link,remarks").order("closing_date", { ascending: false }).limit(400);
+    if (!xErr) closingExtras = Object.fromEntries((x ?? []).map((r) => [r.id, r]));
   });
   // Bank deposits (migration 202611110097; empty without it): Cashier, Accounting and Admin.
   let bankDeposits: unknown[] = [];
@@ -1480,7 +1488,7 @@ export async function GET(request: Request) {
   // Portal sounds (owner, 10 Nov 2026): set by the Admin; on for every role until migration 202611100096.
   const soundRow = await db.from("organization_settings").select("portal_sound").maybeSingle();
   const portalSound = (soundRow.error ? null : (soundRow.data as { portal_sound?: Record<string, boolean> } | null)?.portal_sound) ?? null;
-  return NextResponse.json({ hrPlus, portalSound, bankDeposits, defaultRooms, postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
+  return NextResponse.json({ hrPlus, portalSound, bankDeposits, closingExtras, defaultRooms, postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
     paymentMethods: paymentMethodsWithKind, charges: (charges.data ?? []).map((c) => ({ ...c, kind: chargeKinds.get((c as { id: string }).id) ?? "fee" })), agencies: agencies.data ?? [],
@@ -2042,9 +2050,12 @@ export async function POST(request: Request) {
       if (!canCashier(staff.roleCodes)) return NextResponse.json({ error: "Your account cannot record a cashier opening." }, { status: 403 });
       const admin = createSupabaseAdminClient();
       const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
-      const { error } = await admin.from("cashier_openings").insert({ cashier_id: staff.user.id, opening_date: today, opening_cash_centavos: input.openingCashCentavos, remarks: input.remarks ?? null });
+      const base: Record<string, unknown> = { cashier_id: staff.user.id, opening_date: today, opening_cash_centavos: input.openingCashCentavos, remarks: input.remarks ?? null };
+      // GCash opening (202611110099); before that update the cash opening still saves.
+      let { error } = await admin.from("cashier_openings").insert(input.openingGcashCentavos == null ? base : { ...base, opening_gcash_centavos: input.openingGcashCentavos });
+      if (error && /opening_gcash/i.test(error.message)) ({ error } = await admin.from("cashier_openings").insert(base));
       if (error) return NextResponse.json({ error: /duplicate|unique/i.test(error.message) ? "Today's opening is already recorded." : /cashier_openings/i.test(error.message) ? "Apply database update 202610070015 first." : error.message }, { status: 400 });
-      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "cashier", action: "cashier.opened", record_type: "cashier_opening", record_id: today, new_values: { opening_cash_centavos: input.openingCashCentavos } });
+      await admin.from("audit_logs").insert({ actor_id: staff.user.id, actor_role: "cashier", action: "cashier.opened", record_type: "cashier_opening", record_id: today, new_values: { opening_cash_centavos: input.openingCashCentavos, opening_gcash_centavos: input.openingGcashCentavos ?? null } });
       return NextResponse.json({ ok: true });
     }
     if (input.action === "balance-summary-send") {

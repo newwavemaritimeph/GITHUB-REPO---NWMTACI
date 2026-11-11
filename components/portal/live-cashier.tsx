@@ -788,23 +788,6 @@ export function TarReprints({ data }: { data: PortalData }) {
 }
 
 /** Start-of-day opening cash, recorded once per day; the closing below starts from it. */
-export function CashierOpening({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
-  const today = manilaToday();
-  const opening = (data.cashierOpenings ?? []).find((o) => o.opening_date === today);
-  const { busy, msg, post } = usePost(reload);
-  const [amount, setAmount] = useState("");
-  const [remarks, setRemarks] = useState("");
-  return <section className="portal-panel cx-panel">
-    <div className="panel-heading"><div><h2>Opening</h2></div>{opening && <Badge tone="active">Recorded</Badge>}</div>
-    {msg && <Message kind={msg.kind} text={msg.text} />}
-    {opening ? <dl className="cx-sum"><div><dt>Opening cash</dt><dd>{pesos(opening.opening_cash_centavos)}</dd></div><div><dt>Recorded at</dt><dd>{fmtClock(opening.created_at)}</dd></div>{opening.remarks && <div><dt>Remarks</dt><dd>{opening.remarks}</dd></div>}</dl>
-      : <div className="portal-form cx-formpad">
-        <label>Opening Cash (PHP)<input type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
-        <label>Remarks<input value={remarks} onChange={(e) => setRemarks(e.target.value)} /></label>
-        <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || amount === ""} onClick={() => void post({ action: "cashier-open", openingCashCentavos: Math.round(Number(amount) * 100), remarks: remarks.trim() || undefined }, "Opening recorded.").catch(() => undefined)}>{busy ? "Saving…" : "Record Opening"}</button></div>
-      </div>}
-  </section>;
-}
 
 /** Summary report: collections by mode, expenses, net cash, the cash drawer and balances due after training. */
 type ReportData = Omit<CashierReportSnapshot, "logoBytes">;
