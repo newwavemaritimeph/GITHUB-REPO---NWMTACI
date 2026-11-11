@@ -46,7 +46,7 @@ describe("Paid and Enrolled, Balance First", () => {
     expect(html).toContain("Proofs of Payment");
     expect(html).toContain("12345");
     // Not Valid moved into Actions ▾ (owner, 10 Nov 2026: "not so much buttons"); the menu opens on click.
-    expect(html).toContain("Actions ▾");
+    expect(html).toMatch(/Actions <span class="act-caret"/);
     expect(html).not.toContain(">Not Valid<");
   });
 });
