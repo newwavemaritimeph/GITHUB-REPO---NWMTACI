@@ -14,10 +14,12 @@ const DANGER = /^(archive|remove|delete|void|reject|cancel|revoke|return|discard
 const VERB = /^(approve|archive|remove|delete|void|reject|cancel|revoke|return|issue|finalize|release|send|post|save|submit|restore|discard|clear|mark|record|print|reprint|move|assign|close|open|lock|unlock|publish|confirm|proceed|replace|apply|reset|deactivate|activate|suspend)\b/i;
 export function dialogWording(kind: "text" | "confirm" | "alert", message: string, opts: { title?: string; okLabel?: string; danger?: boolean }) {
   const q = kind === "confirm" && !opts.title ? message.match(/^([^?]{3,90}\?)\s*([\s\S]*)$/) : null;
-  const title = opts.title ?? (q ? q[1] : kind === "confirm" ? "Confirm" : "New Wave Portal");
-  const body = q ? q[2].trim() : message;
+  // A typed answer: the question itself is the title (Accent Sheet, owner 11 Nov 2026), unless the caller names one.
+  const ask = kind === "text" && !opts.title ? message.match(/^([^\n]{3,120})\n?([\s\S]*)$/) : null;
+  const title = opts.title ?? (q ? q[1] : ask ? ask[1] : kind === "confirm" ? "Confirm" : "New Wave Portal");
+  const body = q ? q[2].trim() : ask ? ask[2].trim() : message;
   const verb = (q ? q[1] : message).match(VERB)?.[1];
-  const okLabel = opts.okLabel ?? (kind === "alert" ? "Close" : kind === "text" ? "Save" : verb ? verb[0].toUpperCase() + verb.slice(1).toLowerCase() : "Confirm");
+  const okLabel = opts.okLabel ?? (kind === "alert" ? "Close" : kind === "text" ? "Submit" : verb ? verb[0].toUpperCase() + verb.slice(1).toLowerCase() : "Confirm");
   const danger = opts.danger ?? (kind === "confirm" && DANGER.test(q ? q[1] : message));
   return { title, body, okLabel, danger };
 }
@@ -28,7 +30,13 @@ export function dialogWording(kind: "text" | "confirm" | "alert", message: strin
  * the browser's grey box. Each call mounts its own dialog and removes it when answered.
  */
 type Kind = "text" | "confirm" | "alert";
-type Opts = { title?: string; okLabel?: string; danger?: boolean };
+/**
+ * Accent Sheet (owner, 11 Nov 2026): a coloured top edge (orange; red when destructive; blue for a notice), a small
+ * section label, the title stating the action, an optional record box naming exactly what is affected, and
+ * full-width buttons. `record` = [what, detail]; `label` names the text field; `required` keeps the button off until filled.
+ */
+type Opts = { title?: string; okLabel?: string; danger?: boolean; eyebrow?: string; record?: [string, string]; label?: string; required?: boolean; multiline?: boolean };
+const isReasonAsk = (message: string, opts: Opts) => opts.required ?? (opts.label === "Reason" || /^(why|what should|reason)/i.test(message.trim()));
 
 function open<T>(kind: Kind, message: string, initial: string, opts: Opts, done: (value: string | null) => T): Promise<T> {
   return new Promise((resolve) => {
@@ -42,18 +50,24 @@ function open<T>(kind: Kind, message: string, initial: string, opts: Opts, done:
 
 function Dialog({ kind, message, initial, opts, onDone }: { kind: Kind; message: string; initial: string; opts: Opts; onDone: (value: string | null) => void }) {
   const [value, setValue] = useState(initial);
-  const field = useRef<HTMLInputElement>(null), ok = useRef<HTMLButtonElement>(null), box = useRef<HTMLFormElement>(null);
+  const field = useRef<HTMLInputElement & HTMLTextAreaElement>(null), ok = useRef<HTMLButtonElement>(null), box = useRef<HTMLFormElement>(null);
   useEffect(() => { if (kind === "text") field.current?.select(); else ok.current?.focus(); }, [kind]);
   useDialogFocus(box, () => onDone(null));
-  const w = dialogWording(kind, message, opts), title = w.title;
+  const w = dialogWording(kind, message, opts), reason = kind === "text" && isReasonAsk(message, opts), long = kind === "text" && (opts.multiline ?? reason);
+  const tone = w.danger ? " danger" : kind === "alert" ? " info" : "";
   return <div className="nw-dialog-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget && kind !== "alert") onDone(null); }}>
-    <form ref={box} className="nw-dialog" role="dialog" aria-modal="true" aria-labelledby="nw-dialog-title" onSubmit={(e) => { e.preventDefault(); onDone(kind === "text" ? value : "ok"); }}>
-      <div className="nw-dialog-head"><span className="nw-dialog-mark" aria-hidden="true">NW</span><h2 id="nw-dialog-title">{title}</h2></div>
+    <form ref={box} className={`nw-dialog nw-sheet${tone}`} role="dialog" aria-modal="true" aria-labelledby="nw-dialog-title" onSubmit={(e) => { e.preventDefault(); if (reason && !value.trim()) return; onDone(kind === "text" ? value : "ok"); }}>
+      <span className="nw-sheet-eyebrow">{opts.eyebrow ?? "New Wave Portal"}</span>
+      <h2 id="nw-dialog-title" className="nw-sheet-title">{w.title}</h2>
+      {opts.record && <div className="nw-sheet-rec"><b>{opts.record[0]}</b><span>{opts.record[1]}</span></div>}
       {w.body && <p className="nw-dialog-msg">{w.body}</p>}
-      {kind === "text" && <input ref={field} className="nw-dialog-input" value={value} onChange={(e) => setValue(e.target.value)} aria-label={message} />}
+      {kind === "text" && <label className="nw-sheet-field">{(opts.label ?? (reason ? "Reason" : "")) && <span>{opts.label ?? "Reason"}</span>}
+        {long ? <textarea ref={field} className="nw-dialog-input" rows={3} maxLength={300} value={value} onChange={(e) => setValue(e.target.value)} aria-label={opts.label ?? w.title} />
+          : <input ref={field} className="nw-dialog-input" value={value} onChange={(e) => setValue(e.target.value)} aria-label={opts.label ?? w.title} />}
+        {long && <small>{value.length} / 300</small>}</label>}
       <div className="nw-dialog-acts">
         {kind !== "alert" && <button type="button" className="nw-dialog-cancel" onClick={() => onDone(null)}>Cancel</button>}
-        <button ref={ok} type="submit" className={w.danger ? "nw-dialog-ok danger" : "nw-dialog-ok"}>{w.okLabel}</button>
+        <button ref={ok} type="submit" disabled={reason && !value.trim()} className={w.danger ? "nw-dialog-ok danger" : "nw-dialog-ok"}>{w.okLabel}</button>
       </div>
     </form>
   </div>;
@@ -64,9 +78,11 @@ function ReasonDialog({ message, reasons, opts, onDone }: { message: string; rea
   const box = useRef<HTMLFormElement>(null);
   useDialogFocus(box, () => onDone(null));
   return <div className="nw-dialog-backdrop" onMouseDown={(e) => { if (e.target === e.currentTarget) onDone(null); }}>
-    <form ref={box} className="nw-dialog" role="dialog" aria-modal="true" aria-labelledby="nw-dialog-title" onSubmit={(e) => { e.preventDefault(); if (reasonReady(why)) onDone(reasonText(why)); }}>
-      <div className="nw-dialog-head"><span className="nw-dialog-mark" aria-hidden="true">NW</span><h2 id="nw-dialog-title">{opts.title ?? "New Wave Portal"}</h2></div>
-      <p className="nw-dialog-msg">{message}</p>
+    <form ref={box} className={`nw-dialog nw-sheet${opts.danger ? " danger" : ""}`} role="dialog" aria-modal="true" aria-labelledby="nw-dialog-title" onSubmit={(e) => { e.preventDefault(); if (reasonReady(why)) onDone(reasonText(why)); }}>
+      <span className="nw-sheet-eyebrow">{opts.eyebrow ?? "New Wave Portal"}</span>
+      <h2 id="nw-dialog-title" className="nw-sheet-title">{opts.title ?? message}</h2>
+      {opts.record && <div className="nw-sheet-rec"><b>{opts.record[0]}</b><span>{opts.record[1]}</span></div>}
+      {opts.title && <p className="nw-dialog-msg">{message}</p>}
       <div className="nw-dialog-reason"><ReasonField reasons={reasons} value={why} onChange={setWhy} autoFocus /></div>
       <div className="nw-dialog-acts">
         <button type="button" className="nw-dialog-cancel" onClick={() => onDone(null)}>Cancel</button>

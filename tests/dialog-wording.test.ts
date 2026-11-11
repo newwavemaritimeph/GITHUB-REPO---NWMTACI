@@ -11,4 +11,8 @@ describe("confirm dialog wording", () => {
     expect(dialogWording("alert", "Saved.", {}).okLabel).toBe("Close");
     expect(dialogWording("confirm", "This cannot be undone", {}).okLabel).toBe("Confirm");
   });
+  it("uses a typed question as the title and never says Save for a reason", () => {
+    expect(dialogWording("text", "Why is NWM-DEP-2026-0001 cancelled?", {})).toMatchObject({ title: "Why is NWM-DEP-2026-0001 cancelled?", body: "", okLabel: "Submit" });
+    expect(dialogWording("text", ["Certificate number?", "Leave blank to auto-generate."].join("\n"), {})).toMatchObject({ title: "Certificate number?", body: "Leave blank to auto-generate." });
+  });
 });

@@ -176,3 +176,25 @@
 .nw-shell .bl-table tr.bl-open td { background: #F6FAFC; font-weight: 600; }
 .nw-shell .bl-table tr.bl-void td:nth-child(-n+3) { color: #9AA8B5; text-decoration: line-through; }
 .nw-shell .bl-table td.num, .nw-shell .bl-table th.num { white-space: nowrap; }
+
+/* Pop-ups, Accent Sheet (owner, 11 Nov 2026): coloured top edge, section label, the title states the action,
+   a record box naming exactly what is affected, full-width buttons. Windows share the same edge. */
+.nw-dialog.nw-sheet { display: grid !important; gap: var(--sp-3) !important; padding: var(--sp-5) var(--sp-5) 0 !important; border-top: 5px solid var(--c-primary); border-radius: var(--r-card) !important; overflow: hidden; font-family: var(--font-portal), "Geist", system-ui, sans-serif; color: var(--c-text); width: min(460px, calc(100vw - 32px)) !important; }
+.nw-dialog.nw-sheet.danger { border-top-color: var(--c-danger); }
+.nw-dialog.nw-sheet.info { border-top-color: var(--c-secondary); }
+.nw-sheet-eyebrow { font-size: 12.5px; font-weight: 600; color: var(--c-muted); }
+.nw-dialog .nw-sheet-title { margin: -6px 0 0 !important; font: 700 19px/1.25 var(--font-portal), "Geist", system-ui, sans-serif !important; color: var(--c-navy) !important; letter-spacing: 0; }
+.nw-sheet-rec { display: flex; justify-content: space-between; align-items: center; gap: var(--sp-3); flex-wrap: wrap; background: var(--c-soft); border-radius: var(--r-control); padding: 9px 12px; font-size: 14px; }
+.nw-sheet-rec b { color: var(--c-navy); }
+.nw-sheet-rec span { color: var(--c-text-2); }
+.nw-dialog.nw-sheet .nw-dialog-msg { margin: 0; font-size: 14.5px; color: var(--c-text-2); }
+.nw-sheet-field { display: grid; gap: 5px; font-size: 13.5px; font-weight: 600; color: var(--c-text-2); }
+.nw-sheet-field small { justify-self: end; font-weight: 400; color: var(--c-muted); font-size: 12.5px; }
+.nw-dialog.nw-sheet textarea.nw-dialog-input { height: auto; min-height: 84px; padding: 9px 11px; resize: vertical; line-height: 1.5; }
+.nw-dialog.nw-sheet .nw-dialog-input:focus { outline: none; border-color: var(--c-secondary); box-shadow: 0 0 0 3px var(--c-focus); }
+.nw-dialog.nw-sheet .nw-dialog-acts { display: flex; gap: var(--sp-2); margin: var(--sp-1) calc(-1 * var(--sp-5)) 0; padding: var(--sp-3) var(--sp-5); border-top: 1px solid var(--c-border); }
+.nw-dialog.nw-sheet .nw-dialog-acts > * { flex: 1; }
+.nw-dialog.nw-sheet .nw-dialog-ok:disabled { opacity: .45; cursor: not-allowed; }
+.nw-dialog.nw-sheet .nw-dialog-head, .nw-dialog.nw-sheet .nw-dialog-mark { display: none; }
+.portal-modal { border-top: 5px solid var(--c-primary); }
+@media (max-width: 480px) { .nw-dialog.nw-sheet { width: 100% !important; border-radius: var(--r-card) var(--r-card) 0 0 !important; padding-bottom: env(safe-area-inset-bottom, 0px) !important; } }
