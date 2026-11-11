@@ -149,3 +149,23 @@
 .cx-splitmenu.act-menu :is(a, button):hover:not(:disabled), .cx-splitmenu.act-menu :is(a, button):focus-visible { background: var(--c-soft) !important; }
 .cx-splitmenu.act-menu button.danger { color: var(--c-danger) !important; }
 .cx-splitmenu.act-menu button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Cashier › New Enrollments, Design A (owner, 11 Nov 2026): aligned columns, one Record button per trainee. */
+.nw-shell .ne-table { width: 100%; min-width: 720px; table-layout: fixed; }
+.nw-shell .ne-table th:nth-child(1) { width: 32%; }
+.nw-shell .ne-table th:nth-child(2) { width: 26%; } .nw-shell .ne-table th:nth-child(3) { width: 17%; } .nw-shell .ne-table th:nth-child(4) { width: 11%; } .nw-shell .ne-table th:nth-child(5) { width: 160px; }
+.nw-shell .ne-table td { border-top: 1px solid #EAF2F6; }
+.nw-shell .ne-table tr.ne-sub td { border-top: 1px dashed #EAF2F6; }
+.nw-shell .ne-table td.lead .cx-name { display: block; font-weight: 700; }
+.nw-shell .ne-table td.lead small { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nw-shell .ne-course { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.nw-shell .ne-course input { flex: none; width: 18px; height: 18px; accent-color: var(--c-primary); }
+.nw-shell .ne-course .cx-code { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 7px; background: var(--c-soft); color: var(--c-secondary); font-weight: 600; font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.nw-shell .ne-table td.num b { font-weight: 700; }
+.nw-shell .ne-table td.ne-act { text-align: right; }
+.nw-shell .ne-table td.ne-act .portal-primary { width: 100%; }
+@media (max-width: 640px) {
+  .nw-shell .ne-table { min-width: 0; table-layout: auto; }
+  .nw-shell .ne-table tr.ne-sub td { border-top: 0; }
+  .nw-shell .ne-table td.ne-act { text-align: left; }
+}

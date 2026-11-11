@@ -227,11 +227,6 @@ function groupByTrainee(data: PortalData, list: Enrollment[], sinceOf: (e: Enrol
  * ticked ones. Ticked courses paid together share one receipt and one TAR; paid separately, each has its own.
  */
 type Unticked = Record<string, boolean>;
-export function TickCourses({ list, off, setOff }: { list: Enrollment[]; off: Unticked; setOff: (update: (cur: Unticked) => Unticked) => void }) {
-  return <div className="cx-courses cx-ticks">{list.map((e) => balanceOf(e) > 0
-    ? <label key={e.id} className="cx-tick"><input type="checkbox" checked={!off[e.id]} onChange={(ev) => { const on = ev.target.checked; setOff((cur) => ({ ...cur, [e.id]: !on })); }} aria-label={`Pay ${courseCode(e)} now`} /><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small><b className="cx-amt">{pesos(balanceOf(e))}</b></label>
-    : <div key={e.id} className="cx-tick"><span className="cx-code">{courseCode(e)}</span><small>{scheduleText(e)}</small><b className="cx-amt"><Badge tone="active">Paid</Badge></b></div>)}</div>;
-}
 export function RecordTicked({ data, list, off, onPay }: { data: PortalData; list: Enrollment[]; off: Unticked; onPay: (enrollmentId: string, courses: string[]) => void }) {
   const ticked = list.filter((e) => balanceOf(e) > 0 && !off[e.id]);
   const amount = ticked.reduce((s, e) => s + Math.max(0, balanceOf(e) - (data.pendingRebates?.[e.id] ?? 0)), 0);
@@ -601,9 +596,16 @@ export function CashierDashboard({ data, onPay, reload, go, onOpenTrainee }: { d
               {notValid?.id === p.id && <div className="cx-acts pf-notvalid"><span className="cx-reasons"><ReasonField reasons={REASONS.proofNotValid} value={notValid.why} onChange={(why) => setNotValid({ id: p.id, why })} autoFocus /></span><button type="button" className="portal-primary" disabled={busy || !reasonReady(notValid.why)} onClick={async () => { await post({ action: "proof-dismiss", proofId: p.id, reason: reasonText(notValid.why) }, "Marked Not Valid."); setNotValid(null); }}>Confirm</button><button type="button" className="portal-secondary" onClick={() => setNotValid(null)}>Cancel</button></div>}
             </div>; })}
             {proofP.pager}</div> : <p className="portal-empty-copy">No proofs waiting.</p>)}
-          {inShown === "new" && (fresh.length ? <div className="wr-list">
-            {freshP.shown.map((g) => <WorkRow key={g.traineeId} who={<span className="cx-name">{g.name}</span>} meta={`${g.number} · Endorsed ${fmtDate(day(g.since))}, ${fmtClock(g.since)} · ${g.enrollments.length} Course${g.enrollments.length === 1 ? "" : "s"}`}
-              mid={<TickCourses list={g.enrollments} off={off} setOff={setOff} />} amount={pesos(g.due)} acts={<RecordTicked data={data} list={g.enrollments} off={off} onPay={onPay} />} />)}
+          {/* Design A, Aligned Table (owner, 11 Nov 2026): real columns; each course on its own line under the trainee. */}
+          {inShown === "new" && (fresh.length ? <div className="wr-list"><div className="portal-table-wrap ne-wrap"><table className="portal-table cx-cards ne-table">
+            <thead><tr><th>Trainee</th><th>Course</th><th>Schedule</th><th className="num">Amount</th><th /></tr></thead>
+            <tbody>{freshP.shown.map((g) => g.enrollments.map((e, j) => <tr key={e.id} className={j ? "ne-sub" : "ne-first"}>
+              {j === 0 && <td className="lead" data-l="" rowSpan={g.enrollments.length}><span className="cx-name">{g.name}</span><small>{g.number} · Endorsed {fmtDate(day(g.since))}, {fmtClock(g.since)}</small></td>}
+              <td data-l="Course"><span className="ne-course">{balanceOf(e) > 0 ? <input type="checkbox" checked={!off[e.id]} onChange={(ev) => { const on = ev.target.checked; setOff((cur) => ({ ...cur, [e.id]: !on })); }} aria-label={`Pay ${courseCode(e)} now`} /> : <Badge tone="active">Paid</Badge>}<span className="cx-code">{courseCode(e)}</span></span></td>
+              <td data-l="Schedule">{scheduleText(e)}</td>
+              <td data-l="Amount" className="num"><b>{pesos(balanceOf(e))}</b></td>
+              {j === 0 && <td data-l="" className="ne-act" rowSpan={g.enrollments.length}><RecordTicked data={data} list={g.enrollments} off={off} onPay={onPay} /></td>}
+            </tr>))}</tbody></table></div>
             {freshP.pager}</div> : <p className="portal-empty-copy">No new enrollments.</p>)}
         </section>
         <section className="portal-panel cx-panel">
