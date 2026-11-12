@@ -1,6 +1,7 @@
 "use client";
 
 import { MarkDepositedModal } from "./bank-deposits";
+import { SPECIAL_TONE, SpecialRequestForm, specialCourse, specialTrainee } from "./special-arrangements";
 import { depositedOn, drawerExpected, fromLabel, type BankDeposit } from "@/lib/bank-deposits";
 import { useEffect, useState, type ReactNode } from "react";
 import { ReferralVoucherPanel } from "./accounting-home";
@@ -702,9 +703,14 @@ export function CashierPayments({ data, onPay, reload }: { data: PortalData; onP
   </div>;
 }
 
-/** Discount requests filed by the Cashier; Accounting approves them. */
+/** Discount and Special Arrangement requests filed by the Cashier, in one Request dropdown (owner, 12 Nov 2026); Accounting or the Admin decide. */
 export function DiscountRequests({ data, reload }: { data: PortalData; reload: () => Promise<void> }) {
   const { busy, msg, post } = usePost(reload);
+  const [kind, setKind] = useState<"Discount" | "Special Arrangement">("Discount");
+  const [saNote, setSaNote] = useState("");
+  // Special arrangements waiting, and those decided in the last 7 days so the Cashier sees the outcome.
+  const weekAgo = addDays(manilaToday(), -7);
+  const specials = (data.specialRequests ?? []).filter((r) => r.approval_status === "Pending" || (r.decided_at && day(r.decided_at) >= weekAgo));
   const [enrollmentId, setEnrollmentId] = useState("");
   const [amount, setAmount] = useState("");
   const [why, setWhy] = useState<ReasonValue>(NO_REASON);
@@ -717,20 +723,25 @@ export function DiscountRequests({ data, reload }: { data: PortalData; reload: (
   const enrollmentOf = (id: string) => data.enrollments.find((x) => x.id === id);
   return <div className="cx-stack">
     <section className="portal-panel cx-panel">
-      <div className="panel-heading"><div><h2>New Discount Request</h2></div></div>
+      <div className="panel-heading"><div><h2>New Request</h2></div></div>
       {msg && <Message kind={msg.kind} text={msg.text} />}
+      {saNote && <Message kind="success" text={saNote} />}
       <div className="portal-form cx-formpad">
+        <label className="full">Request<select value={kind} onChange={(ev) => { setKind(ev.target.value as typeof kind); setSaNote(""); }}><option>Discount</option><option>Special Arrangement</option></select></label>
+        {kind === "Special Arrangement" ? <SpecialRequestForm data={data} enrollments={data.enrollments} onSent={async (text) => { await reload(); setSaNote(text); }} /> : <>
         <label className="full">Enrollment<select value={enrollmentId} onChange={(ev) => setEnrollmentId(ev.target.value)}><option value="">Select a Trainee with a Balance</option>{open.map((x) => <option key={x.id} value={x.id}>{traineeName(x)} · {x.enrollment_number} · {courseCode(x)} · {pesos(balanceOf(x))}</option>)}</select></label>
         <label>Endorsing Agency<select value={agencyId} onChange={(ev) => setAgencyId(ev.target.value)}><option value="">None</option>{data.agencies.filter((a) => a.active).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}</select></label>
         <label>Discount Amount (PHP){rebate != null ? <input value={(rebate / 100).toFixed(2)} readOnly /> : <input type="number" min="0.01" step="0.01" value={amount} onChange={(ev) => setAmount(ev.target.value)} />}</label>
         <ReasonField reasons={REASONS.discount} value={why} onChange={setWhy} />
         <div className="portal-form-actions full"><button type="button" className="portal-primary" disabled={busy || !e || !reasonReady(why) || centavos <= 0 || (e && centavos > balanceOf(e))} onClick={file}>{busy ? "Sending…" : "Request Discount"}</button></div>
+        </>}
       </div>
     </section>
-    <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>For Approval</h2></div><span className="slot-count">{data.pendingDiscounts.length}</span></div>
-      {data.pendingDiscounts.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Reason</th><th>Filed</th><th className="r">Discount</th></tr></thead><tbody>
-        {data.pendingDiscounts.map((d) => { const x = enrollmentOf(d.enrollment_id); return <tr key={d.id}><td data-l="" className="lead"><span className="cx-name">{x ? traineeName(x) : "Enrollment"}</span><span className="cx-id">{x?.enrollment_number}</span></td><td data-l="Reason">{d.description}</td><td data-l="Filed">{fmtDate(day(d.created_at))}</td><td data-l="Discount" className="r cx-amt">{pesos(d.amount_centavos)}</td></tr>; })}
-      </tbody></table></div> : <p className="portal-empty-copy">No discount requests for approval.</p>}
+    <section className="portal-panel cx-panel"><div className="panel-heading"><div><h2>For Approval</h2></div><span className="slot-count">{data.pendingDiscounts.length + specials.filter((r) => r.approval_status === "Pending").length}</span></div>
+      {data.pendingDiscounts.length || specials.length ? <div className="portal-table cx-cards"><table><thead><tr><th>Trainee</th><th>Request</th><th>Details</th><th>Filed</th><th className="r">Amount</th></tr></thead><tbody>
+        {specials.map((r) => <tr key={r.id}><td data-l="" className="lead"><span className="cx-name">{specialTrainee(r)}</span><span className="cx-id">{r.request_no ?? r.enrollments?.enrollment_number}</span></td><td data-l="Request"><Badge tone={SPECIAL_TONE[r.approval_status]}>{r.approval_status === "Pending" ? "Special Arrangement" : `Special Arrangement ${r.approval_status}`}</Badge></td><td data-l="Details">{specialCourse(r)} · {r.arrangement} · {pesos(r.standard_centavos)} → {pesos(r.special_centavos)}{r.decision_remarks ? ` · ${r.decision_remarks}` : ""}</td><td data-l="Filed">{fmtDate(day(r.created_at))}</td><td data-l="Amount" className="r cx-amt">+ {pesos(r.amount_centavos)}</td></tr>)}
+        {data.pendingDiscounts.map((d) => { const x = enrollmentOf(d.enrollment_id); return <tr key={d.id}><td data-l="" className="lead"><span className="cx-name">{x ? traineeName(x) : "Enrollment"}</span><span className="cx-id">{x?.enrollment_number}</span></td><td data-l="Request"><Badge tone="blue">Discount</Badge></td><td data-l="Details">{d.description}</td><td data-l="Filed">{fmtDate(day(d.created_at))}</td><td data-l="Amount" className="r cx-amt">− {pesos(d.amount_centavos)}</td></tr>; })}
+      </tbody></table></div> : <p className="portal-empty-copy">No discount or special arrangement requests for approval.</p>}
     </section>
   </div>;
 }

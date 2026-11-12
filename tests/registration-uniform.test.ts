@@ -41,6 +41,6 @@ describe("Items Registration adds at the hand-over", () => {
     expect(route).toContain("if (item.chargeId) {");
     expect(route).toContain("keep: true");
     expect(route).toContain(".filter((x) => !x.keep)");
-    expect(route).toContain("return (data ?? []).filter((c) => !c.charge_catalog_id || !items.has(c.charge_catalog_id as string));");
+    expect(route).toContain("return (data ?? []).filter((c) => (!c.charge_catalog_id || !items.has(c.charge_catalog_id as string)) && !isSpecialCharge(c as { description: string }));");
   });
 });

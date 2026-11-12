@@ -18,6 +18,8 @@ import { BellDrawer, bellCount } from "./portal/hr-bell";
 import { PortalSounds } from "./portal/portal-sounds";
 import { BankDeposits } from "./portal/bank-deposits";
 import { BankLedger, BankAccountsSetup } from "./portal/bank-ledger";
+import { SpecialArrangementsReport, SpecialRatesSetup, SpecialRequestForm, pendingSpecials, type SpecialRow } from "./portal/special-arrangements";
+import type { SpecialRate } from "@/lib/special-arrangements";
 import type { BankDeposit } from "@/lib/bank-deposits";
 import { LiveTraining, type TrainingData } from "./portal/live-training";
 import { ReleasingDashboard, LiveReleasing } from "./portal/live-releasing";
@@ -58,7 +60,7 @@ import { ClassroomLinksImport, DefaultRoomsPanel } from "./portal/admin-setup";
 import { AdminHome, AdminSearchTrainee, AdminEnrollments, AdminVouchers, AdminHolidays } from "./portal/admin-home";
 import { askText, askConfirm, showAlert } from "./portal/dialogs";
 
-type Module = HrView | "Portal sounds" | "Bank deposits" | "Bank ledger" | "Bank accounts" | "Batch numbers" | "Form numbers" | "Classroom links" | "Post-tests" | "Training instructions" | "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Daily summary" | "Opening and closing" | "Expenses summary" | "Templates" | "Certificate controls" | "Delivery requests" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Company Charge" | "Sales from endorsed courses" | "Training Reports" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
+type Module = HrView | "Portal sounds" | "Special arrangements" | "Special arrangement rates" | "Bank deposits" | "Bank ledger" | "Bank accounts" | "Batch numbers" | "Form numbers" | "Classroom links" | "Post-tests" | "Training instructions" | "Dashboard" | "Search trainee" | "Trainees" | "Enrollments" | "Endorsed courses" | "Schedules" | "Batch schedules" | "Instructions" | "Payments" | "Expense vouchers" | "Cashier closing" | "Accounting" | "Expenses" | "Inventory" | "Attendance" | "Rooms & facilities" | "Training calendar" | "Trainee scheduling" | "Instructor assignment" | "Schedule changes" | "Certificates" | "HR & payroll" | "MyHr" | "Requests" | "Employee charges" | "Reports" | "Configuration" | "Receivables" | "Approvals" | "Payables" | "Cash position" | "Trainee enrollments" | "Courses" | "Registration" | "For payment" | "Daily summary" | "Opening and closing" | "Expenses summary" | "Templates" | "Certificate controls" | "Delivery requests" | "Class schedules" | "Resource planning" | "Instructors" | "Numbering" | "Reconciliation" | "Certificate numbers" | "Employee accounts" | "Classrooms" | "Certifications" | "Holidays" | "Daily summary report" | "Cash and sales summary" | "Company Charge" | "Sales from endorsed courses" | "Training Reports" | "Other income" | "Receipts and TARs" | AccountingConfigSection;
 export type Course = { id:string; code:string; name:string; delivery_type:string; duration_label:string; standard_price_centavos:number; training_mode?:string; google_classroom_link?:string|null; course_categories?: {name:string}|{name:string}[]|null };
 export type Offer = { id:string; course_id:string; duration_label:string; training_fee_centavos:number; rebate_centavos:number; partner_payable_centavos:number; partner_centers?: {name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}|{name:string;contact_details?:{email?:string|null;mobile?:string|null}|null}[]|null };
 export type Trainee = { id:string; trainee_number:string; legal_first_name:string; legal_middle_name?:string|null; legal_last_name:string; suffix?:string|null; birthdate:string; sex?:string|null; nationality?:string|null; address?:string|null; place_of_birth?:string|null; rank?:string|null; company?:string|null; emergency_contact?:{name?:string;mobile?:string|null}|null; srn?:string|null; email:string; mobile:string; account_state:string; registered_at:string };
@@ -93,6 +95,7 @@ export type PortalData = { profile:{complete_name:string;email:string}; roles:st
   hrPlus?:HrPlus;
   portalSound?:Record<string,boolean>|null;
   bankDeposits?:BankDeposit[];
+  specialRates?:SpecialRate[]; specialRequests?:SpecialRow[];
   myHr:{extras?:MyHrExtras;employee:{id?:string;employee_number:string;complete_name:string;position:string;employment_status:string;date_hired?:string|null;pay_type?:string|null;base_rate_centavos?:number|null;work_email?:string|null;active:boolean};leave:{id:string;leave_type:string;starts_on:string;ends_on:string;reason:string;status:string;created_at:string}[];advances:{id:string;amount_centavos:number;requested_on:string;balance_centavos:number;status:string}[];charges:EmployeeCharge[];attendance:{id:string;attendance_date:string;checked_in_at?:string|null;checked_out_at?:string|null;minutes_late:number;minutes_undertime:number;status:string}[]}|null;
   employeeCharges:EmployeeCharge[]; chargeEmployees:{id:string;complete_name:string;employee_number:string;active:boolean}[];
   instructionTemplates:{course_id:string;subject:string;body:{text?:string}|string|null;active:boolean}[];
@@ -177,13 +180,13 @@ const ROLE_MODULES: Partial<Record<string, Module[]>> = {
   // HR Officer (owner, 10 Nov 2026): HR and MyHR.
   hr: [...HR_VIEWS,"MyHr"],
   // Admin (owner, 3 Nov 2026): Dashboard · Enrollments ▾ · Schedules ▾ · Reports ▾ · MISMO ▾ · Configuration ▾ (ADMIN_TABS).
-  admin: [...HR_VIEWS,"MyHr","Portal sounds","Dashboard","Search trainee","Enrollments","Batch schedules","Batch numbers","Resource planning","Courses","Post-tests","Training instructions","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Holidays","Requests","Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Company Charge","Training Reports"],
+  admin: [...HR_VIEWS,"MyHr","Portal sounds","Dashboard","Search trainee","Enrollments","Batch schedules","Batch numbers","Resource planning","Courses","Post-tests","Training instructions","Classroom links","Employee accounts","Instructors","Classrooms","Certifications","Partnered Centers","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Holidays","Requests","Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Company Charge","Training Reports","Special arrangements","Special arrangement rates"],
   // Cashier (Accounting Officer), owner's menu of 7 Oct 2026, shown as top tabs:
   // Dashboard · Enrollments ▾ Search trainee · Accounting ▾ Payments, Expenses, Requests ·
   // Reports ▾ Daily Summary, Opening and Closing, Expenses Summary (CASHIER_TABS; reports consolidated 5 Nov 2026).
   cashier: ["Dashboard","Search trainee","Batch schedules","Payments","Other income","Expenses","Requests","Daily summary","Opening and closing","Expenses summary","MyHr"],
   // Accounting (owner, 8 Oct 2026): Dashboard · Approvals · Transactions ▾ · Reports ▾ · Configuration ▾ (ACCOUNTING_TABS; reports consolidated 5 Nov 2026).
-  accounting: ["MyHr","Dashboard","Search trainee","Approvals","Payments","Other income","Expenses","Bank deposits","Bank ledger","Bank accounts","Payables","Daily summary","Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position",...ACCOUNTING_CONFIG_SECTIONS],
+  accounting: ["MyHr","Dashboard","Search trainee","Approvals","Payments","Other income","Expenses","Bank deposits","Bank ledger","Bank accounts","Payables","Daily summary","Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position","Special arrangements","Special arrangement rates",...ACCOUNTING_CONFIG_SECTIONS],
 };
 
 const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
@@ -203,7 +206,8 @@ const nav: {label:Module;icon:string;roles?:string[];group:NavGroup}[] = [
   ...HR_VIEWS.map(label=>({label,icon:"♙",roles:["admin","hr"],group:"People" as NavGroup})),
   {label:"Portal sounds",icon:"♪",roles:["admin"],group:"Configuration"},
   {label:"Bank deposits",icon:"⇄",roles:["accounting","admin"],group:"Accounting"},
-  {label:"Bank ledger",icon:"▤",roles:["accounting","admin"],group:"Accounting"},{label:"Bank accounts",icon:"⚙",roles:["accounting","admin"],group:"Configuration"},
+  {label:"Bank ledger",icon:"▤",roles:["accounting","admin"],group:"Accounting"},
+  {label:"Special arrangements",icon:"∑",roles:["accounting","admin"],group:"Records"},{label:"Special arrangement rates",icon:"⚙",roles:["accounting","admin"],group:"Configuration"},{label:"Bank accounts",icon:"⚙",roles:["accounting","admin"],group:"Configuration"},
   {label:"Templates",icon:"▤",roles:["releasing_officer"],group:"Work"},{label:"Numbering",icon:"№",roles:["releasing_officer"],group:"Work"},
   {label:"Delivery requests",icon:"⇥",roles:["registration"],group:"Work"},
   {label:"Training Reports",icon:"▤",roles:["mismo_officer","admin"],group:"Work"},{label:"Batch schedules",icon:"□",roles:["admin_assistant","registration","cashier","mismo_officer","admin"],group:"Work"},{label:"Batch numbers",icon:"#",roles:["admin"],group:"Work"},{label:"Resource planning",icon:"▢",roles:["admin_assistant","admin"],group:"Work"},{label:"Instructors",icon:"♙",roles:["admin_assistant","admin"],group:"Work"},{label:"Reconciliation",icon:"✓",roles:["admin_assistant","admin"],group:"Work"},
@@ -240,8 +244,8 @@ const ACCOUNTING_TABS:TopTab[]=[
   {label:"Search Trainee",items:["Search trainee"]},
   {label:"Approvals",items:["Approvals"]},
   {label:"Transactions",items:["Payments","Other income","Expenses","Bank deposits","Bank ledger","Payables"]},
-  {label:"Reports",items:["Daily summary","Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position"]},
-  {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS,"Bank accounts"]},
+  {label:"Reports",items:["Daily summary","Cash and sales summary","Sales from endorsed courses","Company Charge","Receivables","Cash position","Special arrangements"]},
+  {label:"Configuration",items:[...ACCOUNTING_CONFIG_SECTIONS,"Special arrangement rates","Bank accounts"]},
   {label:"MyHr",items:["MyHr"]},
 ];
 const RELEASING_TABS:TopTab[]=[{label:"Certificates",items:["Certificates"]},{label:"Reports",items:["Reports"]},{label:"MyHr",items:["MyHr"]}];
@@ -251,11 +255,11 @@ const ADMIN_TABS:TopTab[]=[
   {label:"Dashboard",items:["Dashboard"]},
   {label:"Enrollments",items:["Search trainee","Enrollments","Requests"]},
   {label:"Schedules",items:["Batch schedules","Batch numbers","Resource planning"]},
-  {label:"Reports",items:["Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Company Charge"]},
+  {label:"Reports",items:["Daily summary report","Receipts and TARs","Cash and sales summary","Sales from endorsed courses","Company Charge","Special arrangements"]},
   {label:"Training Reports",items:["Training Reports"]},
   {label:"HR",items:[...HR_VIEWS],heads:Object.fromEntries(HR_GROUPS.map(([g,items])=>[items[0],g])) as Partial<Record<Module,string>>},
   {label:"MyHr",items:["MyHr"]},
-  {label:"Configuration",items:["Courses","Post-tests","Training instructions","Classroom links","Instructors","Classrooms","Certifications","Holidays","Schedule of fees","Payment channels","Expense categories","Other income categories","Form numbers","Employee accounts","Partnered Centers","Portal sounds"],
+  {label:"Configuration",items:["Courses","Post-tests","Training instructions","Classroom links","Instructors","Classrooms","Certifications","Holidays","Schedule of fees","Special arrangement rates","Payment channels","Expense categories","Other income categories","Form numbers","Employee accounts","Partnered Centers","Portal sounds"],
     heads:{Courses:"Training","Schedule of fees":"Fees and Accounts","Employee accounts":"People and Partners"}},
 ];
 function topTabsFor(role:string,allowed:Module[]):TopTab[]{
@@ -440,15 +444,15 @@ function RebuildingWorkspace(){
 
 /** Requests by category. A request whose fee is paid is implemented automatically. */
 // Consolidated (8 Oct 2026): Changes = change course, rescheduling, reprinting and make-up class.
-const REQUEST_CATEGORIES:[string,string[]|null][]=[["All",null],["Changes",["Change Course","Rescheduling","Reprinting","Make-up Class"]],["Cancellation",["Cancellation"]],["TAR reprint",["TAR reprint"]],["Delivery",["Certificate delivery"]],["Discount",null]];
+const REQUEST_CATEGORIES:[string,string[]|null][]=[["All",null],["Changes",["Change Course","Rescheduling","Reprinting","Make-up Class"]],["Cancellation",["Cancellation"]],["TAR reprint",["TAR reprint"]],["Delivery",["Certificate delivery"]],["Discount & special arrangement",null]];
 function CashierRequests({data,reload}:{data:PortalData;reload:()=>Promise<void>}){
   const [cat,setCat]=useState("All");
   const types=REQUEST_CATEGORIES.find(([l])=>l===cat)?.[1]??null;
   const open=(t:string[]|null)=>data.requests.filter(r=>r.status==="Pending"&&(!t||t.includes(r.request_type))).length;
   const scoped={...data,requests:types?data.requests.filter(r=>types.includes(r.request_type)):data.requests};
   return <div className="portal-page cx"><div className="cx-head"><div><span className="portal-eyebrow">Accounting</span><h1>Requests</h1></div></div>
-    <div className="cx-status" role="tablist">{REQUEST_CATEGORIES.map(([label,t])=>{const n=label==="Discount"?data.pendingDiscounts.length:open(t);return <button key={label} type="button" role="tab" aria-selected={cat===label} className={cat===label?"on":""} onClick={()=>setCat(label)}>{tcl(label)}{n>0&&<span>{n}</span>}</button>})}</div>
-    {cat==="Discount"?<DiscountRequests data={data} reload={reload}/>:<LiveRequests data={scoped} role="cashier" reload={reload} embedded/>}
+    <div className="cx-status" role="tablist">{REQUEST_CATEGORIES.map(([label,t])=>{const n=label==="Discount & special arrangement"?data.pendingDiscounts.length+pendingSpecials(data).length:open(t);return <button key={label} type="button" role="tab" aria-selected={cat===label} className={cat===label?"on":""} onClick={()=>setCat(label)}>{tcl(label)}{n>0&&<span>{n}</span>}</button>})}</div>
+    {cat==="Discount & special arrangement"?<DiscountRequests data={data} reload={reload}/>:<LiveRequests data={scoped} role="cashier" reload={reload} embedded/>}
   </div>;
 }
 
@@ -472,6 +476,9 @@ function PortalContent({modules,recordsView,setRecordsView,active,role,data,quer
   if(active==="Courses")return <CoursesAndCenters data={data} query={query}/>;
   if(active==="For payment")return <CashierPaymentQueue data={data} onPay={onPay} reload={reload}/>;
   if(active==="Registration")return <RegistrationRecords data={data} query={query} reload={reload} view={recordsView} setView={setRecordsView} trainees={<Trainees data={data} query={query} embedded reload={reload} role={gateRole}/>} account={(id,close)=>{const t=data.trainees.find(x=>x.id===id);return t?<TraineeDetailModal data={data} trainee={t} reload={reload} role={gateRole} onClose={close}/>:null}}/>;
+  // Special Arrangement fees (owner, 12 Nov 2026): Accounting and the Admin monitor, decide and set the rates.
+  if(active==="Special arrangements"&&["accounting","admin"].includes(gateRole))return <SpecialArrangementsReport data={data} reload={reload} canDecide/>;
+  if(active==="Special arrangement rates"&&["accounting","admin"].includes(gateRole))return <SpecialRatesSetup data={data} reload={reload}/>;
   if(gateRole==="admin"){
     // The Admin workspace (owner, 9 Oct 2026); voids and cancellations are Admin-only.
     if(active==="Dashboard")return <AdminHome data={data} reload={reload} go={m=>go(m as Module)}/>;
@@ -682,7 +689,7 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
   const [reqType,setReqType]=useState<RequestType|null>(null),[note,setNote]=useState("");
   // The Cashier asks Accounting for a discount from here (owner, 10 Nov 2026, Design 2).
   const canDiscount=!!reload&&role==="cashier";
-  const [discounting,setDiscounting]=useState(false);
+  const [discounting,setDiscounting]=useState(false),[specialing,setSpecialing]=useState(false);
   const canPrint=["admin","registration"].includes(role??"");
   // Tick boxes for separate payments (owner, 4 Nov 2026).
   const canSettle=!!reload&&["cashier","admin"].includes(role??"");
@@ -819,12 +826,13 @@ export function TraineeDetailModal({data,trainee,onClose,reload,role}:{data:Port
       <div className="sa-foot">
         <div className="sa-acts">
           {canEdit&&<button type="button" className="portal-primary" onClick={()=>setAddingCourse(true)}>Add Course</button>}
-          {editing?<button type="button" className="portal-secondary" onClick={()=>setEditing(false)}>Done Editing</button>:<ActionsMenu items={[canEdit&&{label:"Edit Details",onClick:()=>setEditing(true)},...(canDiscount&&live.some(e=>balanceOf(e)>0)?[{label:"Request Discount",onClick:()=>setDiscounting(true)}]:[]),...(canEdit&&live.length>0?TRAINEE_REQUESTS.map(([t,lbl])=>({label:`Request ${lbl}`,onClick:()=>setReqType(t)})):[])]}/>}
+          {editing?<button type="button" className="portal-secondary" onClick={()=>setEditing(false)}>Done Editing</button>:<ActionsMenu items={[canEdit&&{label:"Edit Details",onClick:()=>setEditing(true)},...(canDiscount&&live.some(e=>balanceOf(e)>0)?[{label:"Request Discount",onClick:()=>setDiscounting(true)}]:[]),...(canDiscount&&live.length>0?[{label:"Request Special Arrangement",onClick:()=>setSpecialing(true)}]:[]),...(canEdit&&live.length>0?TRAINEE_REQUESTS.map(([t,lbl])=>({label:`Request ${lbl}`,onClick:()=>setReqType(t)})):[])]}/>}
         </div>
         <div className="sa-acts"><button type="button" className="portal-secondary" onClick={onClose}>Close</button></div>
       </div>
     </div>
     {reqType&&<TraineeRequestModal data={data} traineeId={trainee.id} reqType={reqType} onClose={()=>setReqType(null)} post={raise}/>}
+    {specialing&&reload&&<Modal title="Request Special Arrangement" onClose={()=>setSpecialing(false)}><div className="portal-form"><SpecialRequestForm data={data} enrollments={live} sendLabel="Send for Approval" onCancel={()=>setSpecialing(false)} onSent={async(text)=>{setNote(text);setSpecialing(false);await reload()}}/></div></Modal>}
     {discounting&&reload&&<CashierDiscountModal enrollments={live} onClose={()=>setDiscounting(false)} onSent={async(text)=>{setNote(text);await reload()}}/>}
     {addingCourse&&reload&&<AssignCourseModal data={data} trainee={trainee} reload={reload} onClose={()=>setAddingCourse(false)}/>}
     {openEnrollment&&reload&&(()=>{const e=data.enrollments.find(x=>x.id===openEnrollment);return e?<EnrollmentDrawer data={data} enrollment={e} reload={reload} onClose={()=>setOpenEnrollment(null)}/>:null})()}

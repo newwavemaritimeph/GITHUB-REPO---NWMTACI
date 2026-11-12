@@ -16,6 +16,7 @@ import { unpaidAfterTraining, type BalanceEnrollment } from "@/lib/unpaid-balanc
 import { downloadCsv } from "@/lib/csv";
 import { tcl } from "@/lib/title-case";
 import { askReason } from "./dialogs";
+import { SPECIAL_URL, pendingSpecials, specialCourse, specialTrainee } from "./special-arrangements";
 import { CashierSummaryReport } from "./live-cashier";
 import type { SummaryRange } from "@/lib/summary-range";
 import { PaymentDayRow, PrintGlyph, VoidGlyph, paymentStatus } from "./payment-void";
@@ -50,8 +51,8 @@ function useJson<T>(url: string | null) {
 
 // Accounting Dashboard Design 06 (owner, 3 Nov 2026): Requisitions are not Accounting's; voucher reprints sit with expense requests.
 // TAR reprints come straight to Accounting (owner, 9 Nov 2026).
-type Category = "Expense requests" | "Referral vouchers" | "Refunds" | "Discounts" | "Payment voids" | "TAR reprints" | "Rebates owed to partners" | "Cashier opening and closing";
-const CATEGORY_GROUPS: [string, Category[]][] = [["Needs your decision", ["Expense requests", "Referral vouchers", "Refunds", "Discounts", "Payment voids", "TAR reprints"]], ["For billing", ["Rebates owed to partners"]], ["Cash control", ["Cashier opening and closing"]]];
+type Category = "Expense requests" | "Referral vouchers" | "Refunds" | "Discounts" | "Special arrangements" | "Payment voids" | "TAR reprints" | "Rebates owed to partners" | "Cashier opening and closing";
+const CATEGORY_GROUPS: [string, Category[]][] = [["Needs your decision", ["Expense requests", "Referral vouchers", "Refunds", "Discounts", "Special arrangements", "Payment voids", "TAR reprints"]], ["For billing", ["Rebates owed to partners"]], ["Cash control", ["Cashier opening and closing"]]];
 /** Pending TAR reprint requests, of any stage: one raised before 9 Nov 2026 may still sit with the Cashier. */
 const pendingTarReprints = (data: PortalData) => data.requests.filter((r) => r.request_type === "TAR reprint" && r.status === "Pending");
 /** Lists that count requests, not money. */
@@ -100,6 +101,9 @@ export function AccountingApprovals({ data, reload, compact, rail }: { data: Por
     return { id: d.id, reasons: REJECT_REASONS.discount, title: `${name(first(en?.trainees as { legal_first_name: string; legal_last_name: string } | null))}${c ? ` · ${c.name}` : ""}`, detail: d.description, ref: en?.enrollment_number ?? "", who: (d as { requested_by_name?: string | null }).requested_by_name ?? "Cashier", when: fmtDate(day(d.created_at)), amount: Number(d.amount_centavos), okLabel: "Approve", canReject: true,
       act: (approve, remarks) => post({ action: "discount-decide", id: d.id, approve, remarks }, approve ? "Discount approved." : "Discount rejected.") };
   });
+  // Special Arrangement fees (owner, 12 Nov 2026): approving adds the difference to the balance.
+  const specials = pendingSpecials(data).map((r): Row => ({ id: r.id, reasons: ["Not covered by the agency agreement", "Wrong arrangement or price", "Use a standard fee instead"], title: `${specialTrainee(r)} · ${specialCourse(r)} · ${r.arrangement}`, detail: `${pesos2(r.standard_centavos)} → ${pesos2(r.special_centavos)}${r.off_list ? " · Not on the List" : ""}${r.reason ? ` · ${r.reason}` : ""}`, ref: r.request_no ?? r.enrollments?.enrollment_number ?? "", who: r.requested_by_name ?? "Cashier", when: fmtDate(day(r.created_at)), amount: Number(r.amount_centavos), okLabel: "Approve", canReject: true,
+    act: (approve, remarks) => post({ action: "decide", id: r.id, approve, remarks: remarks ?? "" }, approve ? `${r.request_no ?? "Request"} approved. The balance now includes ${pesos2(r.amount_centavos)}.` : "Special arrangement rejected.", SPECIAL_URL) }));
   const rebates = (data.agencyRebates as (PortalData["agencyRebates"][number] & { marketing_agencies?: unknown; courses?: unknown; trainees?: unknown })[]).filter((r) => r.status === "Pending").map((r): Row => ({ id: r.id, title: `${first(r.marketing_agencies as { name: string } | null)?.name ?? "Partner"} · ${name(first(r.trainees as { legal_first_name: string; legal_last_name: string } | null))}`, detail: `${first(r.courses as { name: string } | null)?.name ?? "Course"} · rebate owed (no-deduction partner)`, ref: "Payable", who: "Recorded automatically", when: fmtDate(day(r.created_at)), amount: Number(r.rebate_centavos), okLabel: "Mark paid", canReject: false,
     act: () => post({ action: "agency-rebate-settle", id: r.id, status: "Paid" }, "Rebate marked paid to the partner.") }));
   const closings = data.cashierClosings.filter((c) => c.status === "Submitted").map((c): Row => ({ id: c.id, title: `Cashier closing · ${fmtDate(c.closing_date)}`, detail: `Expected ${pesos2(c.expected_cash_centavos)} · counted ${pesos2(Number(c.actual_cash_centavos ?? 0))}`, ref: Number(c.variance_centavos ?? 0) === 0 ? "Balanced" : Number(c.variance_centavos) < 0 ? `Short ${pesos2(-Number(c.variance_centavos))}` : `Over ${pesos2(Number(c.variance_centavos))}`, who: "Cashier", when: fmtDate(c.closing_date), amount: Number(c.variance_centavos ?? 0), okLabel: "Mark reviewed", canReject: false,
@@ -115,7 +119,7 @@ export function AccountingApprovals({ data, reload, compact, rail }: { data: Por
   const partnerName = (id: string) => data.agencies.find((a) => a.id === id)?.name ?? "Partner";
   const vouchers = (data.referralVouchers ?? []).filter((v) => (v.status ?? "For Approval") === "For Approval").map((v): Row => ({ id: v.id, preview: { label: `View ${v.voucher_number}`, href: `/api/documents/referral-voucher/${v.id}` }, reasons: ["Wrong partner or period", "Wrong mode of payment", "Missing account details"], title: `${partnerName(v.agency_id)} · Referral Voucher`, detail: `${fmtDate(v.period_from)} – ${fmtDate(v.period_to)}${v.mode ? ` · ${v.mode}` : ""}`, ref: v.voucher_number, who: "Cashier", when: fmtDate(day(v.issued_at)), amount: Number(v.total_centavos), okLabel: "Approve", canReject: true,
     act: (approve, remarks) => post({ action: "referral-voucher-decide", id: v.id, approve, remarks: remarks ?? "" }, approve ? "Approved. The Cashier can release it." : "Returned to the Cashier.") }));
-  const lists: Record<Category, Row[]> = { "Expense requests": [...expenses, ...reprints], "Referral vouchers": vouchers, Refunds: refunds, Discounts: discounts, "Payment voids": voids, "TAR reprints": tars, "Rebates owed to partners": rebates, "Cashier opening and closing": closings };
+  const lists: Record<Category, Row[]> = { "Expense requests": [...expenses, ...reprints], "Referral vouchers": vouchers, Refunds: refunds, Discounts: discounts, "Special arrangements": specials, "Payment voids": voids, "TAR reprints": tars, "Rebates owed to partners": rebates, "Cashier opening and closing": closings };
   const waiting = Object.values(lists).reduce((s, l) => s + l.length, 0);
   const rowsOf = (list: Row[]) => list.map((r) => <div key={r.id} className={rejecting && rejecting !== r.id ? "ac-dim" : undefined}>
     <div className={`ac-req${rejecting === r.id ? " ac-rejecting" : ""}`}>
@@ -996,7 +1000,7 @@ export function ApprovalHistory({ data, go }: { data: PortalData; go: (module: s
   const okRows = rows.filter((r) => r.decision !== "Rejected" && r.decision !== "Cancelled"), noRows = rows.filter((r) => r.decision === "Rejected");
   const sum = (l: HistoryRow[]) => l.reduce((s, r) => s + r.amountCentavos, 0);
   // Still waiting: the same counts the Dashboard rail shows.
-  const waiting = data.expenses.filter((e) => e.status === "Pending").length + (data.expenseReprints ?? []).filter((r) => r.status === "Pending").length + data.requests.filter((r) => r.request_type === "Refund" && r.status === "Pending" && r.stage !== "With cashier").length + data.pendingDiscounts.length + (data.paymentVoids ?? []).filter((r) => r.status === "Pending").length + pendingTarReprints(data).length + data.agencyRebates.filter((r) => r.status === "Pending").length + data.cashierClosings.filter((c) => c.status === "Submitted").length;
+  const waiting = data.expenses.filter((e) => e.status === "Pending").length + (data.expenseReprints ?? []).filter((r) => r.status === "Pending").length + data.requests.filter((r) => r.request_type === "Refund" && r.status === "Pending" && r.stage !== "With cashier").length + data.pendingDiscounts.length + pendingSpecials(data).length + (data.paymentVoids ?? []).filter((r) => r.status === "Pending").length + pendingTarReprints(data).length + data.agencyRebates.filter((r) => r.status === "Pending").length + data.cashierClosings.filter((c) => c.status === "Submitted").length;
   const when = (iso: string) => `${fmtDate(iso)} · ${new Intl.DateTimeFormat("en-PH", { hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso))}`;
   return <>
     {waiting > 0 && <div className="ah-wait"><span>{waiting} still waiting for your decision</span><button type="button" className="portal-secondary" onClick={() => go("Dashboard")}>Open on the Dashboard</button></div>}

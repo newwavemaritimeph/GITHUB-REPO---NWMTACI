@@ -213,8 +213,8 @@ export function ActionsMenu({ items, label = "Actions", disabled }: { items: (Ac
 export const txWhen = (iso: string) => new Intl.DateTimeFormat("en-PH", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", timeZone: "Asia/Manila" }).format(new Date(iso));
 
 /** POST one action to the staff operations endpoint. Throws with the server's message. */
-export async function submit(body: unknown) {
-  const response = await fetch("/api/staff/operations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+export async function submit(body: unknown, url = "/api/staff/operations") {
+  const response = await fetch(url, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error ?? "Unable to save the record.");
   return result;
@@ -227,10 +227,10 @@ export async function submit(body: unknown) {
 export function usePost(reload: () => Promise<void>) {
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "success" | "error"; text: string } | null>(null);
-  async function post(body: Record<string, unknown>, successText?: string) {
+  async function post(body: Record<string, unknown>, successText?: string, url?: string) {
     setBusy(true); setMsg(null);
     try {
-      const result = await submit(body);
+      const result = await submit(body, url);
       await reload();
       if (successText) setMsg({ kind: "success", text: successText });
       return result as Record<string, unknown>;

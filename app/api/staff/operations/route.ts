@@ -1,6 +1,7 @@
 import { isFormCode } from "@/lib/document-controls";
 import { manilaDay as manilaDayOf, voucherRows, voucherStatus, voucherTotal, type RebateForVoucher, type ReferralVoucherSnapshot } from "@/lib/referral-voucher";
 import { after, NextResponse } from "next/server";
+import { isSpecialCharge } from "@/lib/special-arrangements";
 import { z } from "zod";
 import { requireStaff } from "@/lib/security";
 import { pendingTraineeProofs } from "@/lib/trainee-proof";
@@ -905,7 +906,7 @@ export async function GET(request: Request) {
     // Items Registration adds at the hand-over are paid at the Cashier, never approved by Accounting (10 Nov 2026).
     const { data: itemKinds } = await db.from("charge_catalog").select("id").eq("kind", "item");
     const items = new Set((itemKinds ?? []).map((c) => c.id as string));
-    return (data ?? []).filter((c) => !c.charge_catalog_id || !items.has(c.charge_catalog_id as string));
+    return (data ?? []).filter((c) => (!c.charge_catalog_id || !items.has(c.charge_catalog_id as string)) && !isSpecialCharge(c as { description: string }));
   })();
 
   // Cashier to Accounting requests (Cancellation/Refund/Make-up/Rescheduling).
@@ -1301,6 +1302,21 @@ export async function GET(request: Request) {
     const { data: depRows, error: depErr } = await createSupabaseAdminClient().from("bank_deposits").select("id,deposit_no,amount_centavos,account,source,cheque_no,due_on,note,status,requested_at,deposited_at,deposited_on,reference,slip_link,confirmed_at,reason").order("requested_at", { ascending: false }).limit(200);
     bankDeposits = depErr ? [] : depRows ?? [];
   });
+  // Special Arrangement fees (migration 202611120101; empty without it): Cashier, Accounting and Admin.
+  let specialRates: unknown[] = [], specialRequests: unknown[] = [];
+  if (canCashier(staff.roleCodes)) task(async () => {
+    const admin = createSupabaseAdminClient();
+    const [rates, reqs] = await Promise.all([
+      admin.from("special_rates").select("id,course_id,arrangement,price_centavos,active").order("arrangement"),
+      admin.from("enrollment_charges").select("id,request_no,enrollment_id,arrangement,standard_centavos,special_centavos,amount_centavos,agency_id,reason,off_list,approval_status,decision_remarks,created_at,decided_at,created_by,decided_by,enrollments(enrollment_number,trainee_id,course_id,trainees(legal_first_name,legal_last_name),courses(code,name))").not("arrangement", "is", null).order("created_at", { ascending: false }).limit(1000),
+    ]);
+    if (rates.error || reqs.error) return;
+    specialRates = rates.data ?? [];
+    const ids = [...new Set((reqs.data ?? []).flatMap((r) => [r.created_by, r.decided_by]).filter(Boolean) as string[])];
+    const who = new Map<string, string>();
+    if (ids.length) for (const p of (await admin.from("profiles").select("id,complete_name").in("id", ids)).data ?? []) who.set(p.id as string, p.complete_name as string);
+    specialRequests = (reqs.data ?? []).map(({ created_by, decided_by, ...r }) => ({ ...r, requested_by_name: who.get(created_by ?? "") ?? null, decided_by_name: who.get(decided_by ?? "") ?? null }));
+  });
   // When each enrollment became Enrolled (migration 202610070014; empty without it).
   let enrolledAt = new Map<string, string>();
   task(async () => { const { data: enrolledRows } = await db.from("enrollments").select("id,enrolled_at").not("enrolled_at", "is", null).order("enrolled_at", { ascending: false }).limit(5000); enrolledAt = new Map(((enrolledRows ?? []) as { id: string; enrolled_at: string }[]).map((r) => [r.id, r.enrolled_at])); });
@@ -1488,7 +1504,7 @@ export async function GET(request: Request) {
   // Portal sounds (owner, 10 Nov 2026): set by the Admin; on for every role until migration 202611100096.
   const soundRow = await db.from("organization_settings").select("portal_sound").maybeSingle();
   const portalSound = (soundRow.error ? null : (soundRow.data as { portal_sound?: Record<string, boolean> } | null)?.portal_sound) ?? null;
-  return NextResponse.json({ hrPlus, portalSound, bankDeposits, closingExtras, defaultRooms, postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
+  return NextResponse.json({ hrPlus, portalSound, bankDeposits, specialRates, specialRequests, closingExtras, defaultRooms, postTestResults, allOffers, archivedCourses, profile: profile.data ?? { complete_name: staff.user.email?.split("@")[0] ?? "Staff", email: staff.user.email }, roles: staff.roleCodes, myHr,
     courses: courses.data ?? [], offers: offers.data ?? [], trainees: trainees.data ?? [], batches: batches.data ?? [], enrollments,
     payments: payments.data ?? [], notifications: notifications.data ?? [],
     paymentMethods: paymentMethodsWithKind, charges: (charges.data ?? []).map((c) => ({ ...c, kind: chargeKinds.get((c as { id: string }).id) ?? "fee" })), agencies: agencies.data ?? [],
@@ -2136,7 +2152,7 @@ export async function POST(request: Request) {
     if (input.action === "charge-decide") {
       if (!canManageAccounting(staff.roleCodes)) return NextResponse.json({ error: "Only Accounting or Admin can decide charges." }, { status: 403 });
       const admin = createSupabaseAdminClient();
-      const { error } = await admin.from("enrollment_charges").update({ valid: input.approve, approval_status: input.approve ? "Approved" : "Rejected", decided_by: staff.user.id, decided_at: new Date().toISOString() }).eq("id", input.id).eq("event_type", "charge").eq("approval_status", "Pending");
+      const { error } = await admin.from("enrollment_charges").update({ valid: input.approve, approval_status: input.approve ? "Approved" : "Rejected", decided_by: staff.user.id, decided_at: new Date().toISOString() }).eq("id", input.id).eq("event_type", "charge").eq("approval_status", "Pending").not("description", "like", "Special Arrangement ·%");
       if (error) throw error;
       return NextResponse.json({ ok: true });
     }

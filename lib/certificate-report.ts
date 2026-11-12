@@ -4,6 +4,7 @@ import { emailConfigured, processEmailJobs } from "@/lib/email-jobs";
 import { certificateContext } from "@/lib/certificates";
 import { hrDailySection } from "@/lib/hr-server";
 import { bankLedgerAlerts } from "@/lib/bank-ledger-server";
+import { specialAlerts } from "@/lib/special-arrangements";
 
 type Admin = ReturnType<typeof createSupabaseAdminClient>;
 
@@ -112,7 +113,16 @@ export async function sendCertificateReport(db: Admin, options: { origin?: strin
   const bank = await bankLedgerAlerts(db).catch(() => [] as string[]);
   const bankHtml = bank.length ? `<table role="presentation" style="width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px"><tr><td style="padding:12px 8px 4px;font-weight:700;color:#0571D0;font-size:12px;letter-spacing:.06em;text-transform:uppercase">Bank Ledger</td></tr>${bank.map((r) => `<tr><td style="padding:6px 8px;border-top:1px solid #e3ecf0;color:#B4400C">${escapeHtml(r)}</td></tr>`).join("")}</table>` : "";
   const bankText = bank.length ? `\nBANK LEDGER\n${bank.map((r) => `- ${r}`).join("\n")}` : "";
-  const html = cert.html + hrPart.html + late.html + bankHtml, text = cert.text + hrPart.text + late.text + bankText;
+  // Special Arrangement fees (owner, 12 Nov 2026): requests waiting over a day, off-list prices approved today.
+  const since = new Date(Date.now() - 2 * 86_400_000).toISOString();
+  const [saOpen, saOff] = await Promise.all([
+    db.from("enrollment_charges").select("request_no,approval_status,off_list,created_at,decided_at,special_centavos,arrangement").not("arrangement", "is", null).eq("approval_status", "Pending").limit(200),
+    db.from("enrollment_charges").select("request_no,approval_status,off_list,created_at,decided_at,special_centavos,arrangement").not("arrangement", "is", null).eq("approval_status", "Approved").eq("off_list", true).gte("decided_at", since).limit(200),
+  ]);
+  const sa = saOpen.error || saOff.error ? [] : specialAlerts([...(saOpen.data ?? []), ...(saOff.data ?? [])] as Parameters<typeof specialAlerts>[0]);
+  const saHtml = sa.length ? `<table role="presentation" style="width:100%;border-collapse:collapse;font-size:13.5px;margin-top:8px"><tr><td style="padding:12px 8px 4px;font-weight:700;color:#0571D0;font-size:12px">Special Arrangements</td></tr>${sa.map((r) => `<tr><td style="padding:6px 8px;border-top:1px solid #E3EEF5">${r.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</td></tr>`).join("")}</table>` : "";
+  const saText = sa.length ? ["", "Special Arrangements", ...sa.map((r) => `- ${r}`)].join("\n") : "";
+  const html = cert.html + hrPart.html + late.html + bankHtml + saHtml, text = cert.text + hrPart.text + late.text + bankText + saText;
   const date = new Intl.DateTimeFormat("en-PH", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila" }).format(new Date());
   const ids: string[] = [];
   for (const to of await adminRecipients(db)) {
